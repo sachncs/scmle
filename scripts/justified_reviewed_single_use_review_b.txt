@@ -1,0 +1,181 @@
+scmle/data/robustness/shift.py pooled_codes single-use docstring states the contract (Stacks the two tables into one numeric table), which an inlined caller would lose
+scmle/data/robustness/stability.py applicable_choices single-use docstring states the contract (The declared choices this estimator can act on, and what was dropped), which an inlined caller would lose; a test names it
+scmle/data/splitting/duplicates.py fold_of_held_rows single-use docstring states the contract (Finds the fold that holds out each development row of a duplicate group), which an inlined caller would lose
+scmle/data/store/conformance.py check_binary_and_empty single-use docstring states the contract (Every byte value and the empty object survive), which an inlined caller would lose
+scmle/data/store/conformance.py check_delete single-use docstring states the contract (Delete removes the object and is idempotent), which an inlined caller would lose
+scmle/data/store/conformance.py check_head_matches_get single-use docstring states the contract (head reports what get reports), which an inlined caller would lose
+scmle/data/store/conformance.py check_if_absent single-use docstring states the contract (A conditional put creates once and then refuses without changes), which an inlined caller would lose
+scmle/data/store/conformance.py check_isolation single-use docstring states the contract (Objects written under one prefix are not listed under a sibling), which an inlined caller would lose
+scmle/data/store/conformance.py check_key_rules single-use docstring states the contract (Unsafe keys are refused before reaching the backend), which an inlined caller would lose
+scmle/data/store/conformance.py check_large single-use docstring states the contract (A one-mebibyte object round-trips), which an inlined caller would lose
+scmle/data/store/conformance.py check_missing single-use docstring states the contract (Reading a missing object is NotFoundError; exists says no), which an inlined caller would lose
+scmle/data/store/conformance.py check_overwrite single-use docstring states the contract (An unconditional put replaces the object), which an inlined caller would lose
+scmle/data/store/conformance.py check_pagination single-use docstring states the contract (More objects than one page are all listed once), which an inlined caller would lose
+scmle/data/store/conformance.py cleanup single-use docstring states the contract (Removes what a check wrote, ignoring cleanup failures), which an inlined caller would lose; a test names it
+scmle/data/store/objectstore.py is_temporary single-use docstring states the contract (Whether a file name is a half-written temp file, not an object), which an inlined caller would lose; a test names it
+scmle/data/store/objectstore.py refused_as_existing single-use docstring states the contract (Whether a failed exclusive link means the target is already taken), which an inlined caller would lose; a test names it
+scmle/data/store/objectstore.py unlink_tolerantly single-use docstring states the contract (Removes a temp file, retrying while Windows still holds it open), which an inlined caller would lose
+scmle/data/store/snapshot.py parse_time single-use docstring states the contract (Parses an ISO 8601 time), which an inlined caller would lose; a test names it
+scmle/data/validation/columns.py experimental_impute single-use docstring states the contract (Builds the iterative imputer (scikit-learn gates it behind an import)), which an inlined caller would lose
+scmle/data/validation/columns.py threshold_association single-use docstring states the contract (Class-separation gain of a small decision tree on one numeric feature), which an inlined caller would lose; a test names it
+scmle/data/validation/columns.py to_text single-use docstring states the contract (Casts a one-column block to a 1-D array of strings ('' if missing)), which an inlined caller would lose
+scmle/data/validation/target.py check_events single-use docstring states the contract (Requires a complete 0/1 event column with enough observed events), which an inlined caller would lose
+scmle/data/validation/target.py check_targets single-use docstring states the contract (Requires every target column to exist, be complete and fit the task), which an inlined caller would lose
+scmle/data/validation/target.py check_treatment single-use docstring states the contract (Requires a complete 0/1 treatment column with both arms present), which an inlined caller would lose
+scmle/decision/anytime.py centered_paths single-use docstring states the contract (Computes log e-process paths of the centred pseudo-outcomes), which an inlined caller would lose; a test names it
+scmle/decision/ope.py support_violations single-use docstring states the contract (Counts rows where the target puts mass on an action with mu < eps), which an inlined caller would lose; a test names it
+scmle/decision/threshold.py bayes_threshold single-use docstring states the contract (Returns the Bayes threshold t* = c_FP / (c_FP + c_FN)), which an inlined caller would lose; a test names it
+scmle/decision/threshold.py stable_span single-use docstring states the contract (Span of t in the chartered range where the frozen rule beats both), which an inlined caller would lose
+scmle/deploy/attest.py material single-use docstring states the contract (Describes one file of the folder by SHA-256), which an inlined caller would lose; a test names it
+scmle/deploy/attest.py material_problems single-use docstring states the contract (Lists materials of a service statement that differ from the folder), which an inlined caller would lose; a test names it
+scmle/deploy/attest.py write_image_attestation single-use docstring states the contract (Writes image-attestation.json, binding an image to its provenance), which an inlined caller would lose; a test names it
+scmle/deploy/attest.py write_provenance single-use docstring states the contract (Writes provenance.json for a packaged service folder), which an inlined caller would lose; a test names it
+scmle/deploy/base_image.py read_lock single-use docstring states the contract (Reads and validates a lock; refuses the placeholder), which an inlined caller would lose
+scmle/deploy/context.py dockerignore_text single-use docstring states the contract (Builds the .dockerignore written beside a generated Dockerfile), which an inlined caller would lose
+scmle/deploy/contract.py check_config_entries single-use docstring states the contract (Checks that every config entry is a plain, non-secret variable), which an inlined caller would lose
+scmle/deploy/contract.py check_production_rules single-use docstring states the contract (Applies the production-only rules to a deployment), which an inlined caller would lose
+scmle/deploy/contract.py check_secret_names single-use docstring states the contract (Checks that secret names are unique and distinct from config names), which an inlined caller would lose
+scmle/deploy/contract.py conformance_problems single-use docstring states the contract (Lists every way the running service differs from the spec), which an inlined caller would lose; a test names it
+scmle/deploy/demo.py fail_not_ready single-use docstring states the contract (Raises the error for a service that did not become ready), which an inlined caller would lose
+scmle/deploy/demo.py process_memory_mb single-use docstring states the contract (Reads the resident memory of a child process), which an inlined caller would lose
+scmle/deploy/gate.py check_problems single-use docstring states the contract (Lists the reasons the live checks do not support the release), which an inlined caller would lose
+scmle/deploy/livetests.py run_checks single-use docstring states the contract (Runs the four checks in order; a failing check does not stop the rest), which an inlined caller would lose; a test names it
+scmle/deploy/lockfile.py marker_applies single-use docstring states the contract (Reports whether an environment marker holds here (extras never do)), which an inlined caller would lose
+scmle/deploy/lockfile.py requirement_name single-use docstring states the contract (Splits a Requires-Dist line into (name, marker)), which an inlined caller would lose; a test names it
+scmle/deploy/mocks.py put_object single-use docstring states the contract (Uploads data to base/path), which an inlined caller would lose; a test names it
+scmle/deploy/mocks.py safe_key single-use docstring states the contract (Validates an object path of the form bucket/key...), which an inlined caller would lose; a test names it
+scmle/deploy/record.py write_record single-use docstring states the contract (Writes the record as JSON), which an inlined caller would lose; a test names it
+scmle/deploy/release.py scan_result single-use docstring states the contract (Applies the vulnerability policy to a scanner report), which an inlined caller would lose
+scmle/deploy/runtime.py emit_signals single-use docstring states the contract (Evaluates the monitor and appends one JSON line), which an inlined caller would lose; a test names it
+scmle/deploy/runtime.py make_loader single-use docstring states the contract (Builds the loader that drives the verify and load readiness steps), which an inlined caller would lose
+scmle/deploy/runtime.py signal_loop single-use docstring states the contract (Evaluates and writes the signals every interval seconds), which an inlined caller would lose
+scmle/deploy/runtime.py signal_settings single-use docstring states the contract (Reads where and how often the evaluated signals are written), which an inlined caller would lose; a test names it
+scmle/deploy/verify.py check_listed_files single-use docstring states the contract (Checks the checksum of every file the manifest lists, unparsed), which an inlined caller would lose
+scmle/deploy/verify.py refuse_published_key single-use docstring states the contract (Raises when production is given a key that is published in the repo), which an inlined caller would lose; a test names it
+scmle/durability.py replace_file single-use docstring states the contract (Atomically move source over target, tolerating Windows sharing), which an inlined caller would lose
+scmle/evaluation/backtest.py seasonal_lag single-use docstring states the contract (Rows back to the value at the same season point as t + step), which an inlined caller would lose
+scmle/evaluation/backtest.py seasonal_naive single-use docstring states the contract (Seasonal-naive forecasts for the rows at positions of an ordered frame), which an inlined caller would lose
+scmle/evaluation/conformal.py one_row_per_entity single-use docstring states the contract (Positions of one randomly chosen row of each entity, in entity order), which an inlined caller would lose; a test names it
+scmle/evaluation/coverage.py class_coverage single-use docstring states the contract (Coverage within each true class (for class-conditional sets)), which an inlined caller would lose; a test names it
+scmle/evaluation/coverage.py coverage_tier single-use docstring states the contract (Tier of a coverage claim), which an inlined caller would lose; a test names it
+scmle/evaluation/coverage_confirm.py floor_p_value single-use docstring states the contract (One-sided exact p-value of 'coverage is at most floor'), which an inlined caller would lose; a test names it
+scmle/evaluation/coverage_confirm.py inside_of single-use docstring states the contract (Whether the primary interval or set holds, per released row), which an inlined caller would lose
+scmle/evaluation/coverage_run.py claim_document single-use docstring states the contract (The coverage claim, fixed before the final rows are read), which an inlined caller would lose; a test names it
+scmle/evaluation/coverage_run.py run_report single-use docstring states the contract (The coverage_report.json body, or None without intervals or sets), which an inlined caller would lose; a test names it
+scmle/evaluation/coverage_slices.py flag_method_hash single-use docstring states the contract (Hash of the package code the slice-flag certificate measured), which an inlined caller would lose; a test names it
+scmle/evaluation/coverage_slices.py labels_for single-use docstring states the contract (Slice label of each row, or None when the column cannot be sliced), which an inlined caller would lose; a test names it
+scmle/evaluation/cv_plus.py partition_folds single-use docstring states the contract (Fold index of each held-out row when no row is held out twice), which an inlined caller would lose; a test names it
+scmle/evaluation/cv_plus.py plan_scores single-use docstring states the contract (Chooses between the pooled out-of-fold scores and the CV+ models), which an inlined caller would lose; a test names it
+scmle/evaluation/cv_plus.py serialized_size single-use docstring states the contract (Bytes the fold models take when written with joblib), which an inlined caller would lose; a test names it
+scmle/evaluation/diagnostics.py run_suite single-use docstring states the contract (Runs every applicable diagnostic; one failure never hides the others), which an inlined caller would lose; a test names it
+scmle/evaluation/longitudinal.py build_period_result single-use docstring states the contract (Builds a serializable period result after covariance is available), which an inlined caller would lose
+scmle/evaluation/mitigation.py group_cuts single-use docstring states the contract (Threshold per group that matches the overall rate at base), which an inlined caller would lose
+scmle/evaluation/multitarget.py mae_mean_scaled single-use docstring states the contract (Mean absolute error with each column scaled by its spread), which an inlined caller would lose
+scmle/evaluation/nested.py mean_cv_score single-use docstring states the contract (Mean scorer value over inner folds), which an inlined caller would lose
+scmle/evaluation/ordinal.py mean_absolute_class_error single-use docstring states the contract (Average number of levels the guess is away from the truth), which an inlined caller would lose; a test names it
+scmle/evaluation/ordinal.py quadratic_weighted_kappa single-use docstring states the contract (Agreement beyond chance, with larger misses punished quadratically), which an inlined caller would lose; a test names it
+scmle/evaluation/parameter_estimation.py check_prepared_rows single-use docstring states the contract (Checks the rows that remain after missing values were handled), which an inlined caller would lose
+scmle/evaluation/parameter_estimation.py hierarchical_random_effect_precision single-use docstring states the contract (Returns dense precision for one random-effect covariance block), which an inlined caller would lose
+scmle/evaluation/parameter_estimation.py hierarchical_reference single-use docstring states the contract (Runs the independent reference for the hierarchical model), which an inlined caller would lose
+scmle/evaluation/parameter_estimation.py reference_linear single-use docstring states the contract (Independently verifies the linear solution with least squares), which an inlined caller would lose
+scmle/evaluation/parameter_estimation.py reference_logistic single-use docstring states the contract (Independently verifies logistic coefficients with scipy optimization), which an inlined caller would lose
+scmle/evaluation/parameter_estimation.py sensitivity_report single-use docstring states the contract (Records declared sensitivity coverage without inventing causal claims), which an inlined caller would lose; a test names it
+scmle/evaluation/parameter_estimation.py validate_cross_fitting_support single-use docstring states the contract (Validates treatment support in every training and validation fold), which an inlined caller would lose
+scmle/evaluation/proper_scores.py insample_scale single-use docstring states the contract (Mean absolute seasonal-naive error on the training history), which an inlined caller would lose; a test names it
+scmle/evaluation/proper_scores.py pinball_loss single-use docstring states the contract (Mean pinball (quantile) loss of forecast as the level quantile), which an inlined caller would lose; a test names it
+scmle/evaluation/ranking.py mean_average_precision single-use docstring states the contract (Average precision at cutoff (relevant means grade above zero)), which an inlined caller would lose; a test names it
+scmle/evaluation/ranking.py mean_ndcg single-use docstring states the contract (Normalized discounted cumulative gain at cutoff, per-query mean), which an inlined caller would lose; a test names it
+scmle/evaluation/ranking.py mean_reciprocal_rank single-use docstring states the contract (Average of one over the rank of the first relevant document), which an inlined caller would lose; a test names it
+scmle/evaluation/ranking.py per_query_ndcg single-use docstring states the contract (NDCG of every scorable query and the number of excluded queries), which an inlined caller would lose
+scmle/evaluation/ranking.py precision_at single-use docstring states the contract (Share of the top cutoff documents that are relevant, per query), which an inlined caller would lose; a test names it
+scmle/evaluation/ranking.py recall_at single-use docstring states the contract (Share of a query's relevant documents found in the top cutoff), which an inlined caller would lose; a test names it
+scmle/evaluation/release.py check_kind_coverage single-use docstring states the contract (Checks that the counts cover every finding kind and only those), which an inlined caller would lose
+scmle/evaluation/release.py diagnostic_verdict single-use docstring states the contract (Reads the pass verdict a diagnostic report carries), which an inlined caller would lose
+scmle/evaluation/release.py evidence_reference_finding single-use docstring states the contract (Checks one evidence reference the policy requires), which an inlined caller would lose
+scmle/evaluation/release.py explanation_findings single-use docstring states the contract (Applies the required explanation quality thresholds), which an inlined caller would lose
+scmle/evaluation/release.py fairness_metric_values single-use docstring states the contract (Finds finite values for one fairness metric in a nested report), which an inlined caller would lose
+scmle/evaluation/release.py normalize_measure single-use docstring states the contract (Validates an observed or expected value of a finding), which an inlined caller would lose
+scmle/evaluation/robustness.py default_stressors single-use docstring states the contract (Returns the standard stress scenarios), which an inlined caller would lose
+scmle/evaluation/sensitivity.py evaluation_sensitivity single-use docstring states the contract (Computes the spread of the score over random train/test splits), which an inlined caller would lose; a test names it
+scmle/evaluation/sensitivity.py noisy single-use docstring states the contract (Adds Gaussian noise of level standard deviations to numeric columns), which an inlined caller would lose; a test names it
+scmle/evaluation/sensitivity.py performance_sensitivity single-use docstring states the contract (Scores a fitted model as noise is added to the features), which an inlined caller would lose; a test names it
+scmle/evaluation/sequential.py check_propensity_support single-use docstring states the contract (Rejects fitted propensities outside the declared positivity support), which an inlined caller would lose
+scmle/evaluation/sequential.py drop_incomplete_subjects single-use docstring states the contract (Removes every subject that has a missing value in any row), which an inlined caller would lose
+scmle/evaluation/sequential.py regime_covariance single-use docstring states the contract (Estimates subject-level covariance of two normalized regime means), which an inlined caller would lose
+scmle/evaluation/suite.py full_suite single-use docstring states the contract (Returns every diagnostic run after the final evaluation), which an inlined caller would lose; a test names it
+scmle/evaluation/survival.py dynamic_auc single-use docstring states the contract (Computes the mean cumulative/dynamic AUC over the time grid), which an inlined caller would lose; a test names it
+scmle/evaluation/survival.py integrated_brier single-use docstring states the contract (Averages the Brier score over the time grid (trapezoid rule)), which an inlined caller would lose; a test names it
+scmle/evaluation/survival.py time_grid single-use docstring states the contract (Returns evaluation times between the 10th and 90th event-time percentile), which an inlined caller would lose; a test names it
+scmle/evaluation/uplift.py qini_coefficient single-use docstring states the contract (Computes the area between the Qini curve and the random-ranking line), which an inlined caller would lose; a test names it
+scmle/experimentation/strategy_search.py best_default_trials single-use docstring states the contract (Ranks successful default-pipeline trials best-first), which an inlined caller would lose
+scmle/experimentation/trials.py guarded_evaluate single-use docstring states the contract (Evaluates a job in a supervised process under hard limits), which an inlined caller would lose
+scmle/experimentation/trials.py lost_trial single-use docstring states the contract (Builds a failed result for a trial whose worker was lost), which an inlined caller would lose
+scmle/experimentation/trials.py runtime_requirements single-use docstring states the contract (Lists the Python version and the library versions a model needs), which an inlined caller would lose
+scmle/explainability/quality.py evaluate_ground_truth_suite single-use docstring states the contract (Evaluates independent references across a bounded held-out suite), which an inlined caller would lose; a test names it
+scmle/features/feature_graph.py validate_graph single-use docstring states the contract (Validates a graph against the dataset's columns and the data spec), which an inlined caller would lose; a test names it
+scmle/governance/deployment_ledger.py require_object_body single-use docstring states the contract (Checks that a ledger row body is an object), which an inlined caller would lose
+scmle/governance/escalation.py binomial_p_value single-use docstring states the contract (Exact p-value of H: R > r*: P(Bin(cases, r*) <= errors)), which an inlined caller would lose; a test names it
+scmle/governance/escalation.py set_size_score single-use docstring states the contract (Scores g from conformal set sizes and a novelty flag), which an inlined caller would lose; a test names it
+scmle/governance/local_faults.py fail_connector single-use docstring states the contract (Fails like a connector that cannot reach its destination), which an inlined caller would lose
+scmle/governance/local_faults.py reject_over_budget single-use docstring states the contract (Refuses a payload larger than the fixed disk budget, as a full disk), which an inlined caller would lose
+scmle/governance/local_faults.py reject_over_memory_budget single-use docstring states the contract (Refuses an allocation larger than the fixed memory budget), which an inlined caller would lose
+scmle/governance/never_list.py question_for single-use docstring states the contract (Builds the question an attestation must answer for this exact action), which an inlined caller would lose
+scmle/governance/registry.py content_id_of single-use docstring states the contract (Returns the content address of a bundle), which an inlined caller would lose; a test names it
+scmle/governance/release_state.py stop_rollout single-use docstring states the contract (Stops a rollout because the health check objected), which an inlined caller would lose
+scmle/governance/review.py require_artifact_digests single-use docstring states the contract (Checks the artifact digests are present and named), which an inlined caller would lose
+scmle/governance/review.py require_claims single-use docstring states the contract (Checks the claims are present, typed and about distinct criteria), which an inlined caller would lose
+scmle/governance/review.py require_independence single-use docstring states the contract (Checks the implementers are named and do not include the reviewer), which an inlined caller would lose
+scmle/governance/sbom.py source_timestamp single-use docstring states the contract (Returns the build time as SOURCE_DATE_EPOCH or the current time), which an inlined caller would lose; a test names it
+scmle/inference/onnx_export.py unwrap single-use docstring states the contract (Finds the fitted scikit-learn pipeline inside the framework's wrappers), which an inlined caller would lose
+scmle/inference/onnx_export.py without_casts single-use docstring states the contract (Copies a model, replacing its type casts and text imputers by identities), which an inlined caller would lose
+scmle/intelligence/fingerprint.py scale_range single-use docstring states the contract (Measures the orders of magnitude between the widest and narrowest column), which an inlined caller would lose
+scmle/intelligence/fingerprint.py text_like_columns single-use docstring states the contract (Finds categorical columns holding free text rather than short labels), which an inlined caller would lose
+scmle/models/boosting/early_stopping.py wrap single-use docstring states the contract (Wraps an estimator in the early-stopping wrapper of its kind), which an inlined caller would lose; a test names it
+scmle/models/conformance.py check_declared_capabilities single-use docstring states the contract (Verifies the capabilities the pipeline relies on actually work), which an inlined caller would lose
+scmle/models/conformance.py check_probabilities single-use docstring states the contract (Verifies a classifier's probabilities exist and rows sum to one), which an inlined caller would lose
+scmle/models/conformance.py toy_problem single-use docstring states the contract (Builds a small learnable problem for task), which an inlined caller would lose
+scmle/models/deeplearning/training.py resolve_batch_size single-use docstring states the contract (Turns a batch-size setting into a number of rows per step), which an inlined caller would lose; a test names it
+scmle/models/modality_lifecycle.py check_checkpoint_options single-use docstring states the contract (Rejects inconsistent checkpoint and report paths), which an inlined caller would lose
+scmle/models/modality_lifecycle.py check_package_classifier single-use docstring states the contract (Checks a deserialized package classifier against its feature schema), which an inlined caller would lose
+scmle/models/modality_lifecycle.py check_package_signature single-use docstring states the contract (Checks a package manifest's signature over its unsigned content), which an inlined caller would lose
+scmle/models/modality_lifecycle.py execute_with_performance single-use docstring states the contract (Executes one stage and records its duration when it is measured), which an inlined caller would lose
+scmle/models/modality_lifecycle.py parse_checkpoint_signature single-use docstring states the contract (Restores the signature value of a persisted lifecycle checkpoint), which an inlined caller would lose
+scmle/models/modality_lifecycle.py parse_curation_signature single-use docstring states the contract (Restores the signature value of a persisted curation result), which an inlined caller would lose
+scmle/models/modality_lifecycle.py parse_package single-use docstring states the contract (Restores the package identity of a persisted lifecycle report), which an inlined caller would lose
+scmle/models/modality_lifecycle.py parse_stage_evidence single-use docstring states the contract (Restores the per-stage evidence of a persisted lifecycle report), which an inlined caller would lose
+scmle/models/modality_lifecycle.py perturbed_contribution_reports single-use docstring states the contract (Explains a row and copies of it with one feature nudged at a time), which an inlined caller would lose
+scmle/models/modality_lifecycle.py require_feature_names single-use docstring states the contract (Checks the feature names that a package manifest declares), which an inlined caller would lose
+scmle/models/registry.py add_user_adapter single-use docstring states the contract (Registers a user adapter atomically), which an inlined caller would lose
+scmle/models/registry.py builtin_names single-use docstring states the contract (Lists the built-in model names), which an inlined caller would lose; a test names it
+scmle/models/registry.py remove_user_adapter single-use docstring states the contract (Removes a user adapter atomically (no-op if it is not registered)), which an inlined caller would lose
+scmle/models/wrappers.py monotone single-use docstring states the contract (Wraps an estimator so its monotonic parameter is set at fit time), which an inlined caller would lose; a test names it
+scmle/monitoring/events.py inference_timestamp single-use docstring states the contract (Reads the timestamp of one observability sidecar line), which an inlined caller would lose
+scmle/monitoring/incidents.py check_transition single-use docstring states the contract (Checks that a journal event continues the previous state of an incident), which an inlined caller would lose
+scmle/monitoring/labels.py bypass_test single-use docstring states the contract (Tests whether the model's decisions shift the next-period features), which an inlined caller would lose; a test names it
+scmle/monitoring/labels.py feedback_verdict single-use docstring states the contract (Summarizes the feedback-loop evidence), which an inlined caller would lose; a test names it
+scmle/monitoring/labels.py is_matured single-use docstring states the contract (Reports whether a case predicted in batch has matured at batch now), which an inlined caller would lose; a test names it
+scmle/monitoring/reference.py population_stability_index single-use docstring states the contract (Computes PSI between two discrete distributions), which an inlined caller would lose; a test names it
+scmle/operations/faults.py audit_continuity single-use docstring states the contract (Kills an audit-log writer five times and reopens each log), which an inlined caller would lose
+scmle/operations/faults.py detect_performance_loss single-use docstring states the contract (Feeds noisy delayed labels to the monitor until it flags the release), which an inlined caller would lose
+scmle/operations/faults.py metrics_destination_outage single-use docstring states the contract (The metrics sink is down; samples are spooled and drained later), which an inlined caller would lose
+scmle/operations/faults.py object_store_loss single-use docstring states the contract (The store goes away; the service keeps serving; access returns), which an inlined caller would lose
+scmle/operations/faults.py secret_rotation single-use docstring states the contract (A bundle re-signed under a rotated key is refused under the old key), which an inlined caller would lose
+scmle/operations/logs.py parse_traceparent single-use docstring states the contract (The trace id of a valid W3C traceparent header, else None), which an inlined caller would lose; a test names it
+scmle/operations/notify.py urllib_transport single-use docstring states the contract (A transport that POSTs over HTTPS with the standard library), which an inlined caller would lose; a test names it
+scmle/operations/signals.py zero_one_losses single-use docstring states the contract (Loss 1 where a prediction differs from its label, else 0), which an inlined caller would lose; a test names it
+scmle/optimization/optimizers.py create_optimizer single-use docstring states the contract (Instantiates an optimizer by name), which an inlined caller would lose; a test names it
+scmle/optimization/optimizers.py suggest_float single-use docstring states the contract (Suggests a float), which an inlined caller would lose
+scmle/optimization/optimizers.py suggest_int single-use docstring states the contract (Suggests an integer), which an inlined caller would lose
+scmle/runners/entrypoint.py load_workload single-use docstring states the contract (Imports module:function), which an inlined caller would lose; a test names it
+scmle/runners/entrypoint.py open_store single-use docstring states the contract (Opens a file:// store), which an inlined caller would lose; a test names it
+scmle/runners/entrypoint.py spec_from_store single-use docstring states the contract (Rebuilds the stored spec), which an inlined caller would lose
+scmle/runners/project.py saved_run single-use docstring states the contract (Finds the run directory inside a restored workdir), which an inlined caller would lose; a test names it
+scmle/runners/roles.py check_distinct single-use docstring states the contract (Refuses to run training as the serving identity), which an inlined caller would lose
+scmle/security/remote.py discover single-use docstring states the contract (Fetches the discovery document of issuer, checked to name that issuer), which an inlined caller would lose; a test names it
+scmle/security/remote.py revocation_list_of single-use docstring states the contract (Builds a revocation list from a fetched document), which an inlined caller would lose
+scmle/security/tokens.py sign_hs256 single-use docstring states the contract (Mints an HS256 token (for the local demo and for tests)), which an inlined caller would lose; a test names it
+scmle/trail/chain.py check_steps single-use docstring states the contract (Checks that the stored steps are what the retained records give now), which an inlined caller would lose
+scmle/trail/inputs.py criterion_problems single-use docstring states the contract (Lists the missing fields and bad operators of criteria), which an inlined caller would lose
+scmle/trail/show.py facts_lines single-use docstring states the contract (Formats the facts of a step), which an inlined caller would lose
+scmle/unsupervised/clustering.py score_candidate single-use docstring states the contract (Fits and scores one method at one cluster count), which an inlined caller would lose
+scmle/workflow/executor.py run_id_for single-use docstring states the contract (Derives the durable run id of a trigger), which an inlined caller would lose; a test names it

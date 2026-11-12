@@ -159,18 +159,6 @@ environment the model was built in; `sbom.cdx.json` is the CycloneDX SBOM;
 """
 
 
-def lock_roots(info: Any) -> list[str]:
-    """Lists the names of the distributions the service needs.
-
-    Args:
-        info: The bundle information; its `libraries` are included.
-
-    Returns:
-        `scmle`, `scikit-learn`, `pandas` and the bundle's libraries.
-    """
-    return ["scmle", "scikit-learn", "pandas", *info.libraries]
-
-
 def write_service(
     bundle: Any,
     destination: str | pathlib.Path,
@@ -229,7 +217,7 @@ def write_service(
 
     unresolved: list[str] = []
     closure = lockfile.runtime_closure(
-        lock_roots(info),
+        ["scmle", "scikit-learn", "pandas", *info.libraries],
         versions={
             **info.environment,
             "scikit-learn": info.sklearn,
