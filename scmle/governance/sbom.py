@@ -15,44 +15,6 @@ SBOM_SCHEMA = "https://cyclonedx.org/schema/bom-1.5.schema.json"
 PACKAGE_NAME = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 
 
-def normalize_name(name: str) -> str:
-    """Returns a canonical PyPI package name for an SBOM component.
-
-    Args:
-        name: A distribution name.
-
-    Returns:
-        The name stripped, lower-cased, with underscores as hyphens.
-
-    Raises:
-        ValueError: If the result is empty or not a valid distribution name.
-    """
-    value = name.strip().lower().replace("_", "-")
-    if not value or PACKAGE_NAME.fullmatch(value) is None:
-        raise ValueError(f"invalid distribution name: {name!r}")
-    return value
-
-
-def component_ref(name: str, version: str) -> str:
-    """Returns a stable package URL used as the component reference.
-
-    Args:
-        name: A distribution name.
-        version: The pinned version.
-
-    Returns:
-        A `pkg:pypi/<name>@<version>` URL with the normalized name.
-
-    Raises:
-        ValueError: If the name is invalid or the version is empty.
-    """
-    normalized = normalize_name(name)
-    version_value = version.strip()
-    if not version_value:
-        raise ValueError(f"version for {name!r} must not be empty")
-    return f"pkg:pypi/{normalized}@{version_value}"
-
-
 def build(
     distributions: Mapping[str, str],
     *,
@@ -91,8 +53,13 @@ def build(
     components = []
     ordered = sorted(distributions.items(), key=lambda item: item[0])
     for name, version in ordered:
-        normalized = normalize_name(name)
-        reference = component_ref(normalized, str(version))
+        normalized = name.strip().lower().replace("_", "-")
+        if not normalized or PACKAGE_NAME.fullmatch(normalized) is None:
+            raise ValueError(f"invalid distribution name: {name!r}")
+        pinned = str(version).strip()
+        if not pinned:
+            raise ValueError(f"version for {normalized!r} must not be empty")
+        reference = f"pkg:pypi/{normalized}@{pinned}"
         components.append(
             {
                 "type": "library",

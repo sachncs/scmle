@@ -342,25 +342,3 @@ class MonotoneClassifier(base.ClassifierMixin, MonotoneEstimator):  # type: igno
 
 class MonotoneRegressor(base.RegressorMixin, MonotoneEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Monotonically constrained regressor."""
-
-
-def monotone(
-    estimator: base.BaseEstimator, parameter: str, signs: tuple[int, ...]
-) -> MonotoneEstimator:
-    """Wraps an estimator so its monotonic parameter is set at fit time.
-
-    Args:
-        estimator: Unfitted model to constrain.
-        parameter: Name of the parameter that takes the sign vector.
-        signs: Signs (+1, -1, 0) for the leading columns.
-
-    Returns:
-        A monotone classifier if `estimator` is a classifier, otherwise a
-        monotone regressor.
-    """
-    kind = (
-        MonotoneClassifier
-        if base.is_classifier(estimator)
-        else MonotoneRegressor
-    )
-    return kind(estimator, parameter, signs)

@@ -613,7 +613,9 @@ class Verifier:
         subject = claims.get("sub")
         if not isinstance(subject, str) or not subject:
             raise TokenError(MISSING_CLAIM, "sub")
-        expiry = require_number(claims, "exp")
+        expiry = number_claim(claims, "exp")
+        if expiry is None:
+            raise TokenError(MISSING_CLAIM, "exp")
         if now >= expiry + self.leeway:
             raise TokenError(EXPIRED)
         for name in ("nbf", "iat"):
@@ -654,26 +656,6 @@ def number_claim(claims: Mapping[str, Any], name: str) -> float | None:
     if isinstance(value, bool) or not isinstance(value, int | float):
         raise TokenError(MALFORMED, name)
     return float(value)
-
-
-def require_number(claims: Mapping[str, Any], name: str) -> float:
-    """Reads a required numeric claim.
-
-    Args:
-        claims: The token's claims.
-        name: The claim name.
-
-    Returns:
-        The claim as a float.
-
-    Raises:
-        TokenError: `missing_claim` if absent. A claim that is not a number
-            raises `malformed`, as in `number_claim`.
-    """
-    value = number_claim(claims, name)
-    if value is None:
-        raise TokenError(MISSING_CLAIM, name)
-    return value
 
 
 def scopes_of(claims: Mapping[str, Any]) -> frozenset[str]:

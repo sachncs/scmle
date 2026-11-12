@@ -138,50 +138,6 @@ def check_declared_capabilities(
             )
 
 
-def check_estimator_interface(
-    name: str, estimator: Any, features: Any, target: Any
-) -> None:
-    """Verifies a built estimator offers the interface and fits and predicts.
-
-    Args:
-        name: Adapter name, for the messages.
-        estimator: Estimator built by the adapter.
-        features: Toy feature matrix.
-        target: Toy target.
-
-    Raises:
-        ConfigError: If a method is missing or `predict` returns the wrong
-            number of rows.
-    """
-    for method in ("fit", "predict", "get_params", "set_params"):
-        if not hasattr(estimator, method):
-            raise errors.ConfigError(f"{name}: estimator lacks '{method}'")
-    estimator.fit(features, target)
-    if len(numpy.asarray(estimator.predict(features))) != len(features):
-        raise errors.ConfigError(f"{name}: predict returned wrong length")
-
-
-def check_probabilities(name: str, estimator: Any, features: Any) -> None:
-    """Verifies a classifier's probabilities exist and rows sum to one.
-
-    Args:
-        name: Adapter name, for the messages.
-        estimator: Fitted classifier built by the adapter.
-        features: Toy feature matrix.
-
-    Raises:
-        ConfigError: If `predict_proba` is missing or its rows do not sum
-            to one.
-    """
-    if not hasattr(estimator, "predict_proba"):
-        raise errors.ConfigError(
-            f"{name}: declares probabilities but lacks predict_proba"
-        )
-    proba = numpy.asarray(estimator.predict_proba(features))
-    if not numpy.allclose(proba.sum(axis=1), 1.0, atol=1e-6):
-        raise errors.ConfigError(f"{name}: predict_proba rows must sum to 1")
-
-
 def check_search_space(
     adapter: models.Model, task: tasks.Task, features: Any, target: Any
 ) -> None:
@@ -225,10 +181,23 @@ def check_conformance(adapter: models.Model) -> None:
         raise errors.ConfigError(f"{name}: declares no supported tasks")
     for task in adapter.capabilities.tasks:
         features, target = toy_problem(task)
-        estimator = adapter.build(task, 0, adapter.conformance_params)
-        check_estimator_interface(name, estimator, features, target)
+        estimator: Any = adapter.build(task, 0, adapter.conformance_params)
+        for method in ("fit", "predict", "get_params", "set_params"):
+            if not hasattr(estimator, method):
+                raise errors.ConfigError(f"{name}: estimator lacks '{method}'")
+        estimator.fit(features, target)
+        if len(numpy.asarray(estimator.predict(features))) != len(features):
+            raise errors.ConfigError(f"{name}: predict returned wrong length")
         if task.is_classification and adapter.capabilities.probabilities:
-            check_probabilities(name, estimator, features)
+            if not hasattr(estimator, "predict_proba"):
+                raise errors.ConfigError(
+                    f"{name}: declares probabilities but lacks predict_proba"
+                )
+            proba = numpy.asarray(estimator.predict_proba(features))
+            if not numpy.allclose(proba.sum(axis=1), 1.0, atol=1e-6):
+                raise errors.ConfigError(
+                    f"{name}: predict_proba rows must sum to 1"
+                )
         check_search_space(adapter, task, features, target)
         check_declared_capabilities(adapter, task, features, target)
         first = adapter.build(task, 7, adapter.conformance_params)

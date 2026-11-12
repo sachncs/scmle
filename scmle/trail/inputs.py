@@ -113,28 +113,6 @@ def missing_fields(
     return [message.format(name=name) for name in names if name not in section]
 
 
-def criterion_problems(items: Sequence[Mapping[str, Any]]) -> list[str]:
-    """Lists the missing fields and bad operators of criteria.
-
-    Args:
-        items: The acceptance criteria and reviewer thresholds.
-
-    Returns:
-        One message per missing criterion field and per operator that is not
-        in `records.OPERATORS`.
-    """
-    found: list[str] = []
-    for item in items:
-        found.extend(
-            missing_fields(
-                item, ("id", "path", "op", "value"), "a criterion lacks {name}"
-            )
-        )
-        if item.get("op") not in records.OPERATORS:
-            found.append(f"criterion {item.get('id')} has a bad operator")
-    return found
-
-
 def structure_problems(record: Mapping[str, Any]) -> list[str]:
     """Lists missing or malformed fields in the inputs.
 
@@ -176,14 +154,19 @@ def structure_problems(record: Mapping[str, Any]) -> list[str]:
                 "a KPI lacks {name}",
             )
         )
-    found.extend(
-        criterion_problems(
-            [
-                *stakeholder.get("acceptance", []),
-                *reviewer.get("thresholds", []),
-            ]
+    for criterion in [
+        *stakeholder.get("acceptance", []),
+        *reviewer.get("thresholds", []),
+    ]:
+        found.extend(
+            missing_fields(
+                criterion,
+                ("id", "path", "op", "value"),
+                "a criterion lacks {name}",
+            )
         )
-    )
+        if criterion.get("op") not in records.OPERATORS:
+            found.append(f"criterion {criterion.get('id')} has a bad operator")
     found.extend(
         missing_fields(
             stakeholder.get("expectation", {}),
