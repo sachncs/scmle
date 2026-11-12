@@ -211,41 +211,6 @@ def read_declaration_envelope(
     return envelope
 
 
-def rebuild_policy_values(
-    policy_values: dict[str, Any],
-) -> dict[str, Any]:
-    """Turns the stored policy record back into configuration values.
-
-    Args:
-        policy_values: The policy as stored in the declaration; changed in
-            place.
-
-    Returns:
-        The same mapping, with its prior, assumption lists and variance
-        bounds restored to their configuration types.
-    """
-    if "prior" in policy_values:
-        prior_values = dict(policy_values["prior"])
-        policy_values["prior"] = parameter_estimation.BayesianPrior(
-            mean=tuple(prior_values["mean"]),
-            precision=tuple(tuple(row) for row in prior_values["precision"]),
-            shape=prior_values.get("shape", 2.0),
-            scale=prior_values.get("scale", 1.0),
-        )
-    for field in (
-        "causal_assumptions",
-        "continuous_treatment_assumptions",
-        "hierarchical_assumptions",
-    ):
-        if field in policy_values:
-            policy_values[field] = tuple(policy_values[field])
-    if "reml_variance_bounds" in policy_values:
-        policy_values["reml_variance_bounds"] = tuple(
-            policy_values["reml_variance_bounds"]
-        )
-    return policy_values
-
-
 def restore_parameter_estimation_declaration(
     run_directory: str | pathlib.Path,
     expected_config_hash: str,
@@ -308,9 +273,31 @@ def restore_parameter_estimation_declaration(
             assumptions=tuple(estimand_record["assumptions"]),
             description=estimand_record.get("description", ""),
         )
-        policy = parameter_estimation.Config(
-            **rebuild_policy_values(dict(envelope["policy"]))
-        )
+        # The stored policy is plain JSON: restore the prior, the assumption
+        # lists and the variance bounds to the types the configuration takes.
+        policy_values = dict(envelope["policy"])
+        if "prior" in policy_values:
+            prior_values = dict(policy_values["prior"])
+            policy_values["prior"] = parameter_estimation.BayesianPrior(
+                mean=tuple(prior_values["mean"]),
+                precision=tuple(
+                    tuple(row) for row in prior_values["precision"]
+                ),
+                shape=prior_values.get("shape", 2.0),
+                scale=prior_values.get("scale", 1.0),
+            )
+        for field in (
+            "causal_assumptions",
+            "continuous_treatment_assumptions",
+            "hierarchical_assumptions",
+        ):
+            if field in policy_values:
+                policy_values[field] = tuple(policy_values[field])
+        if "reml_variance_bounds" in policy_values:
+            policy_values["reml_variance_bounds"] = tuple(
+                policy_values["reml_variance_bounds"]
+            )
+        policy = parameter_estimation.Config(**policy_values)
     except (KeyError, TypeError, ValueError) as error:
         raise errors.ArtifactError(
             "parameter estimation declaration is invalid",

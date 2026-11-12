@@ -149,57 +149,6 @@ def structural_differences(
     return reasons, notes
 
 
-def compare_trial_scores(
-    first_trials: list[dict[str, Any]],
-    second_trials: list[dict[str, Any]],
-    tolerance_std: float,
-) -> tuple[float, bool, bool, list[str]]:
-    """Compares the scores of two runs' trials, which share their structure.
-
-    Args:
-        first_trials: Trial records of the original run.
-        second_trials: Trial records of the rerun, in the same order.
-        tolerance_std: Allowed difference between a trial's mean scores, in
-            units of the larger of the two trials' score standard deviations
-            (floored at `FLOOR`).
-
-    Returns:
-        The largest fold-score gap, whether every fold score is identical,
-        whether every trial is within tolerance, and the reasons for any
-        trial that is not.
-    """
-    reasons: list[str] = []
-    largest, exact, comparable = 0.0, True, True
-    for left, right in zip(first_trials, second_trials, strict=True):
-        if left["status"] != right["status"]:
-            was, now = left["status"], right["status"]
-            reasons.append(f"{left['trial_id']}: status {was} -> {now}")
-            exact = False
-            comparable = False
-            continue
-        gaps = [
-            abs(x - y)
-            for x, y in zip(
-                left["fold_scores"], right["fold_scores"], strict=True
-            )
-        ]
-        if gaps:
-            largest = max(largest, *gaps)
-        if left["fold_scores"] != right["fold_scores"]:
-            exact = False
-            allowed = tolerance_std * max(
-                left["score_std"], right["score_std"], FLOOR
-            )
-            if abs(left["score_mean"] - right["score_mean"]) > allowed:
-                comparable = False
-                reasons.append(
-                    f"{left['trial_id']}: mean score moved "
-                    f"{abs(left['score_mean'] - right['score_mean']):.4g} "
-                    f"(allowed {allowed:.4g})"
-                )
-    return largest, exact, comparable, reasons
-
-
 def compare_runs(
     first: dict[str, Any],
     second: dict[str, Any],
@@ -226,10 +175,37 @@ def compare_runs(
     if reasons:
         return ReplayVerdict(DIFFERENT, reasons, float("nan"), 0, notes)
 
-    largest, exact, comparable, score_reasons = compare_trial_scores(
-        a, b, tolerance_std
-    )
-    reasons.extend(score_reasons)
+    # The trials share their structure, so they pair up one to one; a changed
+    # status is not comparable, and a changed fold score is compared by the
+    # trial means against the larger score spread (floored at `FLOOR`).
+    largest, exact, comparable = 0.0, True, True
+    for left, right in zip(a, b, strict=True):
+        if left["status"] != right["status"]:
+            was, now = left["status"], right["status"]
+            reasons.append(f"{left['trial_id']}: status {was} -> {now}")
+            exact = False
+            comparable = False
+            continue
+        gaps = [
+            abs(x - y)
+            for x, y in zip(
+                left["fold_scores"], right["fold_scores"], strict=True
+            )
+        ]
+        if gaps:
+            largest = max(largest, *gaps)
+        if left["fold_scores"] != right["fold_scores"]:
+            exact = False
+            allowed = tolerance_std * max(
+                left["score_std"], right["score_std"], FLOOR
+            )
+            if abs(left["score_mean"] - right["score_mean"]) > allowed:
+                comparable = False
+                reasons.append(
+                    f"{left['trial_id']}: mean score moved "
+                    f"{abs(left['score_mean'] - right['score_mean']):.4g} "
+                    f"(allowed {allowed:.4g})"
+                )
     if first["selected"] != second["selected"]:
         exact = False
         comparable = False

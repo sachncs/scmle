@@ -401,31 +401,6 @@ def read_manifest_and_schema(
     return manifest, schema
 
 
-def check_bundle_format(
-    manifest: dict[str, Any], *, legacy_allowed: bool
-) -> None:
-    """Checks that this build can read the manifest's bundle format.
-
-    Args:
-        manifest: The manifest as a dict.
-        legacy_allowed: Whether a format 1 bundle may be read.
-
-    Raises:
-        ArtifactError: If the format is not the current one and not an allowed
-            legacy one.
-    """
-    if manifest.get("format") != BUNDLE_FORMAT and not (
-        manifest.get("format") == 1 and legacy_allowed
-    ):
-        raise errors.ArtifactError(
-            f"unsupported bundle format {manifest.get('format')}: this "
-            f"build reads format {BUNDLE_FORMAT}. A bundle stores the "
-            "module path and class name of the objects inside it, and "
-            "those names changed, so a bundle written by an earlier "
-            "build cannot be loaded; retrain and save it again"
-        )
-
-
 def verify_core_files(
     root: pathlib.Path,
     info: Manifest,
@@ -1259,9 +1234,16 @@ class Bundle:
         root = pathlib.Path(directory)
         manifest, schema = read_manifest_and_schema(root)
         legacy = manifest.get("format") == 1
-        check_bundle_format(
-            manifest, legacy_allowed=legacy and allow_legacy_format and trusted
-        )
+        if manifest.get("format") != BUNDLE_FORMAT and not (
+            legacy and allow_legacy_format and trusted
+        ):
+            raise errors.ArtifactError(
+                f"unsupported bundle format {manifest.get('format')}: this "
+                f"build reads format {BUNDLE_FORMAT}. A bundle stores the "
+                "module path and class name of the objects inside it, and "
+                "those names changed, so a bundle written by an earlier "
+                "build cannot be loaded; retrain and save it again"
+            )
         info = Manifest(**manifest)
         if SCHEMA_FILE not in info.files and not legacy:
             raise errors.ArtifactError(

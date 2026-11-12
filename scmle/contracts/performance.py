@@ -326,7 +326,22 @@ class Baseline:
             observation.operation
             for observation in self.reference_runs[0].observations
         }
-        check_same_operations(operations, expected)
+        if operations != expected:
+            missing = sorted(
+                operation.value for operation in expected - operations
+            )
+            extra = sorted(
+                operation.value for operation in operations - expected
+            )
+            details = []
+            if missing:
+                details.append(f"missing={missing}")
+            if extra:
+                details.append(f"extra={extra}")
+            raise ValueError(
+                "performance comparison operations differ: "
+                + ", ".join(details)
+            )
 
         reference_environment = (
             self.reference_runs[0].observations[0].machine,
@@ -500,31 +515,6 @@ class Baseline:
             "max_relative_regression": self.max_relative_regression,
             "reference_runs": [run.to_dict() for run in self.reference_runs],
         }
-
-
-def check_same_operations(
-    operations: set[Operation], expected: set[Operation]
-) -> None:
-    """Checks that a run covers exactly the operations of the baseline.
-
-    Args:
-        operations: The operations of the run.
-        expected: The operations of the baseline.
-
-    Raises:
-        ValueError: If the operations differ.
-    """
-    if operations != expected:
-        missing = sorted(operation.value for operation in expected - operations)
-        extra = sorted(operation.value for operation in operations - expected)
-        details = []
-        if missing:
-            details.append(f"missing={missing}")
-        if extra:
-            details.append(f"extra={extra}")
-        raise ValueError(
-            "performance comparison operations differ: " + ", ".join(details)
-        )
 
 
 def relative_change(reference: float, current: float) -> float:
