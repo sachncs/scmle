@@ -8,6 +8,7 @@ not only by whether they are exact.
 """
 
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy
@@ -69,7 +70,9 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):  # 
         ranks = numpy.asarray(target, dtype=float).round().astype(int)
         count = self.levels or int(ranks.max()) + 1
         self.classes_ = numpy.arange(count)
-        self.regressor_ = base.clone(self.regressor).fit(features, ranks)
+        self.regressor_ = cast("Any", base.clone(self.regressor)).fit(
+            features, ranks
+        )
         if len(ranks) >= MIN_ROWS_FOR_HONEST_SCORES:
             folds = model_selection.KFold(
                 CROSS_FITS, shuffle=True, random_state=self.random_state

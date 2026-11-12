@@ -405,10 +405,10 @@ class Predictor:
         Returns:
             Array of predicted labels, one per sample.
         """
-        predictions: numpy.ndarray = self.model.predict(
-            self.features_for(samples).values
+        return cast(
+            "numpy.ndarray",
+            self.model.predict(self.features_for(samples).values),
         )
-        return predictions
 
     def predict_proba(self, samples: Sequence[Any]) -> numpy.ndarray:
         """Predicts class probabilities after feature-contract validation.

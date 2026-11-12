@@ -10,6 +10,7 @@ from collections.abc import Callable
 from collections.abc import Sequence
 import dataclasses
 from typing import Any
+from typing import cast
 from typing import ClassVar
 from typing import Self
 
@@ -221,7 +222,9 @@ class Classifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc
         Returns:
             This wrapper, fitted.
         """
-        self.estimator_ = base.clone(self.estimator).fit(features, target)
+        self.estimator_ = cast("Any", base.clone(self.estimator)).fit(
+            features, target
+        )
         self.classes_ = self.estimator_.classes_
         return self
 
@@ -399,7 +402,9 @@ class GroupClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore
         Returns:
             This wrapper, with a refitted clone of the classifier.
         """
-        self.estimator = base.clone(self.estimator).fit(features, target)
+        self.estimator = cast("Any", base.clone(self.estimator)).fit(
+            features, target
+        )
         self.classes_ = self.estimator.classes_
         return self
 

@@ -1,6 +1,7 @@
 """Carries the query column beside the features into a ranking model."""
 
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy
@@ -52,7 +53,7 @@ class QueryAwareEstimator(base.RegressorMixin, base.BaseEstimator):  # type: ign
         sizes = frame[self.query_column].astype(str).value_counts(sort=False)
         ordered = frame[self.query_column].astype(str).drop_duplicates()
         group = sizes.loc[ordered].to_numpy().tolist()
-        steps = base.clone(self.estimator)
+        steps = cast("Any", base.clone(self.estimator))
         self.preprocessing_ = steps[:-1]
         transformed = self.preprocessing_.fit_transform(frame, relevance)
         self.model_ = steps[-1].fit(transformed, relevance, group=group)

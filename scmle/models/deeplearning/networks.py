@@ -287,7 +287,7 @@ class Jepa(Network):
             )
         return None
 
-    def build(
+    def build(  # pyright: ignore[reportIncompatibleMethodOverride]  # sklearn types Pipeline.predict as an available_if descriptor, which the Estimator protocol rejects
         self,
         task: tasks.Task,
         seed: int,
@@ -354,7 +354,7 @@ class Jepa(Network):
             ]
         )
 
-    def assemble(
+    def assemble(  # pyright: ignore[reportIncompatibleMethodOverride]  # sklearn types Pipeline.predict as an available_if descriptor, which the Estimator protocol rejects
         self,
         plan: data.FeaturePlan,
         task: tasks.Task,

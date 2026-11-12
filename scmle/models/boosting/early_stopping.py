@@ -9,6 +9,7 @@ the right stopping arguments for each library.
 
 import inspect
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy
@@ -71,7 +72,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-
         Returns:
             The fitted wrapper.
         """
-        self.estimator_ = base.clone(self.estimator)
+        self.estimator_ = cast("Any", base.clone(self.estimator))
         self.best_iteration_: int | None = None
         if base.is_classifier(self.estimator):
             self.encoder_ = preprocessing.LabelEncoder().fit(target)
@@ -86,11 +87,14 @@ class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-
             >= MIN_CLASS_COUNT_TO_STRATIFY
             else None
         )
-        train, held = model_selection.train_test_split(
-            numpy.arange(len(target)),
-            test_size=self.fraction,
-            random_state=self.random_state,
-            stratify=None if stratify is None else numpy.asarray(stratify),
+        train, held = cast(
+            "tuple[numpy.ndarray, numpy.ndarray]",
+            model_selection.train_test_split(
+                numpy.arange(len(target)),
+                test_size=self.fraction,
+                random_state=self.random_state,
+                stratify=None if stratify is None else numpy.asarray(stratify),
+            ),
         )
         arguments = self.stopping_arguments(features, target, held)
         self.estimator_.fit(
@@ -174,7 +178,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-
             if isinstance(value, int | numpy.integer):
                 return int(value)
         getter = getattr(self.estimator_, "get_best_iteration", None)
-        return int(getter()) if callable(getter) else None
+        return int(cast("int", getter())) if callable(getter) else None
 
     def predict(self, features: Any) -> numpy.ndarray:
         """Predicts with the stopped model, in the original labels.

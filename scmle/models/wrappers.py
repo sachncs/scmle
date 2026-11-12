@@ -1,6 +1,7 @@
 """Estimator wrappers adapting third-party quirks to the framework."""
 
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy
@@ -42,7 +43,7 @@ class LabelEncodedClassifier(base.ClassifierMixin, base.BaseEstimator):  # type:
         """
         self.encoder_ = preprocessing.LabelEncoder().fit(target)
         self.classes_ = self.encoder_.classes_
-        self.estimator_ = base.clone(self.estimator).fit(
+        self.estimator_ = cast("Any", base.clone(self.estimator)).fit(
             features, self.encoder_.transform(target)
         )
         return self
@@ -104,7 +105,9 @@ class FlatPredictionClassifier(base.ClassifierMixin, base.BaseEstimator):  # typ
         Returns:
             This wrapper, fitted.
         """
-        self.estimator_ = base.clone(self.estimator).fit(features, target)
+        self.estimator_ = cast("Any", base.clone(self.estimator)).fit(
+            features, target
+        )
         self.classes_ = numpy.asarray(self.estimator_.classes_).ravel()
         return self
 
@@ -168,7 +171,7 @@ class FitParamsClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ig
         Returns:
             This wrapper, fitted.
         """
-        self.estimator_ = base.clone(self.estimator).fit(
+        self.estimator_ = cast("Any", base.clone(self.estimator)).fit(
             features, target, **self.fit_params
         )
         self.classes_ = numpy.asarray(self.estimator_.classes_)
@@ -229,7 +232,7 @@ class FitParamsRegressor(base.RegressorMixin, base.BaseEstimator):  # type: igno
         Returns:
             This wrapper, fitted.
         """
-        self.estimator_ = base.clone(self.estimator).fit(
+        self.estimator_ = cast("Any", base.clone(self.estimator)).fit(
             features, target, **self.fit_params
         )
         return self
@@ -295,7 +298,7 @@ class MonotoneEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lea
         width = features.shape[1]
         vector = list(self.signs)[:width]
         vector += [0] * (width - len(vector))
-        model = base.clone(self.estimator)
+        model = cast("Any", base.clone(self.estimator))
         path, node = [], model
         while getattr(node, "estimator", None) is not None:
             path.append("estimator")

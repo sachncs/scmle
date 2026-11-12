@@ -9,6 +9,7 @@ meta-learner never sees predictions made on rows a base model was trained on.
 import abc
 from collections.abc import Mapping
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy
@@ -351,12 +352,21 @@ class Stacking(models.Model):
         meta = self.meta_learner(task, len(estimators))
         stack: models.Estimator
         if task.is_classification:
-            stack = ensemble.StackingClassifier(
-                estimators, final_estimator=meta, cv=inner, stack_method="auto"
+            stack = cast(
+                "models.Estimator",
+                ensemble.StackingClassifier(
+                    estimators,
+                    final_estimator=meta,
+                    cv=inner,
+                    stack_method="auto",
+                ),
             )
         else:
-            stack = ensemble.StackingRegressor(
-                estimators, final_estimator=meta, cv=inner
+            stack = cast(
+                "models.Estimator",
+                ensemble.StackingRegressor(
+                    estimators, final_estimator=meta, cv=inner
+                ),
             )
         return stack
 
@@ -406,15 +416,21 @@ class Stacking(models.Model):
         meta = self.meta_learner(task, len(estimators))
         stack: models.Estimator
         if task.is_classification:
-            stack = ensemble.StackingClassifier(
-                estimators,
-                final_estimator=meta,
-                cv=STACK_FOLDS,
-                stack_method="auto",
+            stack = cast(
+                "models.Estimator",
+                ensemble.StackingClassifier(
+                    estimators,
+                    final_estimator=meta,
+                    cv=STACK_FOLDS,
+                    stack_method="auto",
+                ),
             )
         else:
-            stack = ensemble.StackingRegressor(
-                estimators, final_estimator=meta, cv=STACK_FOLDS
+            stack = cast(
+                "models.Estimator",
+                ensemble.StackingRegressor(
+                    estimators, final_estimator=meta, cv=STACK_FOLDS
+                ),
             )
         return stack
 

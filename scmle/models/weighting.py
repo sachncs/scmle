@@ -2,6 +2,7 @@
 
 import inspect
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy
@@ -26,6 +27,8 @@ class WeightedEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lea
         random_state: Seed for the weighted draw.
         estimator_: Fitted clone of `estimator`.
     """
+
+    estimator: Any
 
     def __init__(
         self,
@@ -110,7 +113,7 @@ class WeightedEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lea
         frame = pandas.DataFrame(features).reset_index(drop=True)
         labels = pandas.Series(numpy.asarray(target))
         weights = frame[self.column].to_numpy(dtype=float)
-        candidate = base.clone(self.estimator)
+        candidate = cast("Any", base.clone(self.estimator))
         if self.accepts_weights(candidate):
             candidate.fit(frame, labels, model__sample_weight=weights)
         else:

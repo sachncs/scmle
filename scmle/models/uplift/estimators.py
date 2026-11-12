@@ -19,7 +19,12 @@ from sklearn import ensemble
 MIN_ARM_ROWS = 20
 
 
-def outcome_model(classify: bool, seed: int) -> base.BaseEstimator:
+def outcome_model(
+    classify: bool, seed: int
+) -> (
+    ensemble.HistGradientBoostingClassifier
+    | ensemble.HistGradientBoostingRegressor
+):
     """A fresh outcome model: boosted trees for a label or a number.
 
     Args:

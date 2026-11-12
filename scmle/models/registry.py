@@ -6,6 +6,7 @@ heavy imports only happen when an adapter is actually built.
 
 from importlib import metadata
 import threading
+from typing import Any
 from typing import Self
 
 from scmle.contracts import errors
@@ -175,7 +176,7 @@ class Catalog:
         for entry in metadata.entry_points(group=ENTRY_POINT_GROUP):
             try:
                 loaded = entry.load()
-                found = loaded() if callable(loaded) else loaded
+                found: Any = loaded() if callable(loaded) else loaded
                 items = found if isinstance(found, (list, tuple)) else [found]
                 for adapter in items:
                     conformance.check_conformance(adapter)

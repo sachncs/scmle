@@ -8,6 +8,7 @@ records the adapter as rejected for a missing dependency.
 from collections.abc import Mapping
 import importlib
 from typing import Any
+from typing import cast
 
 from scmle.contracts import errors
 from scmle.contracts import models
@@ -149,7 +150,7 @@ class Booster(models.Model):
             "random_state": seed,
             **given,
         }
-        estimator: models.Estimator = getattr(module, class_name)(**kwargs)
+        estimator: Any = getattr(module, class_name)(**kwargs)
         if self.stopping_rounds:
             estimator = early_stopping.wrap(
                 estimator, self.stopping_rounds, seed
@@ -165,7 +166,7 @@ class Booster(models.Model):
             return wrappers.LabelEncodedClassifier(estimator)
         if task.is_classification and self.flatten_predictions:
             return wrappers.FlatPredictionClassifier(estimator)
-        return estimator
+        return cast("models.Estimator", estimator)
 
 
 class LightGbm(Booster):

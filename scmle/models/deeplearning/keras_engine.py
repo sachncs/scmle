@@ -8,6 +8,7 @@ estimators users see are the proxies in `estimators`.
 import importlib
 import os
 from typing import Any
+from typing import cast
 
 import numpy
 from sklearn import base
@@ -214,7 +215,7 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
             The instance state with `network_` replaced by `weights_`, a list of
             numpy arrays.
         """
-        state = dict(super().__getstate__())
+        state = dict(cast("dict[str, Any]", super().__getstate__()))
         network = state.pop("network_", None)
         if network is not None:
             state["weights_"] = [

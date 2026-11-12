@@ -257,7 +257,7 @@ class SupportVector(Learner):
             support = calibration.CalibratedClassifierCV(
                 svm.SVC(random_state=seed, **kwargs),
                 method="sigmoid",
-                ensemble=False,
+                ensemble=False,  # pyright: ignore[reportArgumentType]  # sklearn infers str from its "auto" default; it also accepts a bool
                 cv=CALIBRATION_FOLDS,
             )
         return support

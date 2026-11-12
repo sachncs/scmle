@@ -18,7 +18,7 @@ import joblib
 import numpy
 from scipy import sparse
 from sklearn import base
-from sklearn import utils
+from sklearn.utils import validation
 
 from scmle import durability
 from scmle.models.deeplearning import contracts
@@ -173,7 +173,7 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
 
     def checkpoint_manifest(self) -> dict[str, object]:
         """Returns the fitted checkpoint metadata, without the weights."""
-        utils.validation.check_is_fitted(self, attributes=["state_"])
+        validation.check_is_fitted(self, attributes=["state_"])
         family = self.model_contract()
         return {
             "format": family.checkpoint.format,
@@ -254,7 +254,7 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
             WorkerError: If the worker still lacks the model state after it was
                 sent.
         """
-        utils.validation.check_is_fitted(self, attributes=["state_"])
+        validation.check_is_fitted(self, attributes=["state_"])
         matrix = self.model_contract().validate_features(
             features, expected_width=self.state_["input_width_"]
         )
@@ -302,7 +302,7 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
         Returns:
             The checkpoint path.
         """
-        utils.validation.check_is_fitted(self, attributes=["state_"])
+        validation.check_is_fitted(self, attributes=["state_"])
         destination = pathlib.Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         family = self.model_contract()
@@ -401,7 +401,7 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
         )
         if not isinstance(estimator, cls):
             raise ValueError(f"checkpoint does not contain a {cls.__name__}")
-        utils.validation.check_is_fitted(estimator, attributes=["state_"])
+        validation.check_is_fitted(estimator, attributes=["state_"])
         family = estimator.model_contract()
         if (
             serialized.get("format") != family.checkpoint.format
