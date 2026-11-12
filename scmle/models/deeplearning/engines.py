@@ -10,6 +10,7 @@ import dataclasses
 import importlib
 import math
 from typing import Any
+from typing import cast
 
 import numpy
 from scipy import sparse
@@ -588,7 +589,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
             The instance state with `network_` replaced by `weights_`, a mapping
             of parameter names to numpy arrays.
         """
-        state = dict(super().__getstate__())
+        state = dict(cast("dict[str, Any]", super().__getstate__()))
         network = state.pop("network_", None)
         if network is not None:
             state["weights_"] = {

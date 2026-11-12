@@ -6,11 +6,12 @@ import io
 import pathlib
 import tempfile
 from typing import Any
+from typing import cast
 
 import joblib
 import numpy
 from sklearn import base
-from sklearn import utils
+from sklearn.utils import validation
 
 from scmle import durability
 from scmle.models.deeplearning import contracts
@@ -95,10 +96,13 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
             This fitted estimator.
         """
         del target
-        return super().fit(
-            features,
-            numpy.zeros(len(features), dtype=numpy.float32),
-            sample_weight,
+        return cast(
+            "JepaEstimator",
+            super().fit(
+                features,
+                numpy.zeros(len(features), dtype=numpy.float32),
+                sample_weight,
+            ),
         )
 
     def transform(self, features: Any) -> numpy.ndarray:
@@ -151,7 +155,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
 
     def checkpoint_manifest(self) -> dict[str, object]:
         """Returns the explicit fitted-checkpoint contract metadata."""
-        utils.validation.check_is_fitted(self, attributes=["state_"])
+        validation.check_is_fitted(self, attributes=["state_"])
         family = self.model_contract()
         return {
             "format": self.CHECKPOINT_FORMAT,
@@ -183,7 +187,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
         Returns:
             The checkpoint path.
         """
-        utils.validation.check_is_fitted(self, attributes=["state_"])
+        validation.check_is_fitted(self, attributes=["state_"])
         destination = pathlib.Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         temporary: pathlib.Path | None = None
@@ -295,7 +299,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
         estimator = serialized.get("estimator")
         if not isinstance(estimator, cls):
             raise ValueError("checkpoint does not contain a JepaEstimator")
-        utils.validation.check_is_fitted(estimator, attributes=["state_"])
+        validation.check_is_fitted(estimator, attributes=["state_"])
         if (
             payload["input_width"] != estimator.state_.get("input_width_")
             or payload["embedding_size"] != estimator.embedding_size
