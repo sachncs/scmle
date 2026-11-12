@@ -8,3 +8,162 @@ scmle/data/store/objectstore.py CorruptObjectError named by the ObjectStore.get 
 scmle/deploy/mocks.py do_PUT http.server calls do_<METHOD> on a request handler by name
 scmle/deploy/mocks.py do_HEAD http.server calls do_<METHOD> on a request handler by name
 scmle/inference/serving.py version_string http.server reads version_string on a request handler by name
+
+# Reviewed extension surfaces: referenced only by tests inside scmle/, but documented
+# or pinned elsewhere (named per symbol; the reason says where).
+scmle/api/project.py ModalityProject documented: website/src/pages/docs/extensions.astro; pinned in public_api.json
+scmle/artifacts/bundle.py rotate_signing_key documented: docs/SECURITY.md, docs/TUTORIAL.md, CHANGELOG.md (Bundle methods)
+scmle/artifacts/bundle.py attach_shift_weights documented: docs/SECURITY.md, docs/TUTORIAL.md, CHANGELOG.md (Bundle methods)
+scmle/artifacts/bundle.py rank_for_labeling documented: docs/SECURITY.md, docs/TUTORIAL.md, CHANGELOG.md (Bundle methods)
+scmle/contracts/qualification.py recall_lower_bound documented extension surface: docs/API_STABILITY.md (qualification types)
+scmle/core/policies.py Callback documented: docs/TUTORIAL.md, examples/approval_gate.py
+scmle/data/admissibility/asof.py reconstruction_mismatch qualification module: docs/API_STABILITY.md (leakage screen)
+scmle/data/charter/contracts.py lint documented extension surface: docs/API_STABILITY.md (charter modules)
+scmle/data/charter/feasibility.py n_required_correlation documented extension surface: docs/API_STABILITY.md (charter modules)
+scmle/data/charter/feasibility.py mde_correlation documented extension surface: docs/API_STABILITY.md (charter modules)
+scmle/data/charter/sealing.py check_amendment documented extension surface: docs/API_STABILITY.md (charter modules)
+scmle/data/custody/manifest.py verify_rows documented extension surface: docs/API_STABILITY.md (custody modules)
+scmle/data/custody/manifest.py load_manifest documented extension surface: docs/API_STABILITY.md (custody modules)
+scmle/data/detectors/certificates.py mark_gating qualification module: docs/API_STABILITY.md ("like the other qualification modules")
+scmle/data/detectors/duplicates.py duplicate_flags qualification module: docs/API_STABILITY.md ("like the other qualification modules")
+scmle/data/detectors/missingness.py imputation_errors qualification module: docs/API_STABILITY.md ("like the other qualification modules")
+scmle/data/detectors/outliers.py error_flags qualification module: docs/API_STABILITY.md ("like the other qualification modules")
+scmle/data/detectors/sentinels.py sentinel_rows qualification module: docs/API_STABILITY.md ("like the other qualification modules")
+scmle/data/framing/costs.py net_benefit_curve qualification module: docs/API_STABILITY.md (framing draft)
+scmle/data/framing/costs.py decision_curve qualification module: docs/API_STABILITY.md (framing draft)
+scmle/data/framing/refusal.py clopper_pearson_upper qualification module: docs/API_STABILITY.md (framing draft)
+scmle/data/identification/iv.py excludes documented extension surface: docs/API_STABILITY.md (causal identification, F10)
+scmle/data/identification/iv.py exclusion_bound documented extension surface: docs/API_STABILITY.md (causal identification, F10)
+scmle/data/identification/sensitivity.py evalue_interval documented extension surface: docs/API_STABILITY.md (causal identification, F10)
+scmle/data/identification/sensitivity.py smd_to_rr documented extension surface: docs/API_STABILITY.md (causal identification, F10)
+scmle/data/ingest/entities.py measure_quality qualification module: docs/API_STABILITY.md (ingest plan)
+scmle/data/ingest/synthesize.py register_family qualification module: docs/API_STABILITY.md (ingest plan)
+scmle/data/ledger/budget.py confirmation_alpha documented extension surface: docs/API_STABILITY.md (qualification types, error budget)
+scmle/data/ledger/controls.py resampling_control documented extension surface: docs/API_STABILITY.md (qualification types, error budget)
+scmle/data/ledger/governed.py run_governed documented extension surface: docs/API_STABILITY.md (qualification types, error budget)
+scmle/data/modalities/document.py Reader documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
+scmle/data/modalities/geospatial.py from_geojson documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
+scmle/data/modalities/geospatial.py spatial_join documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
+scmle/data/modalities/geospatial.py reproject documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
+scmle/data/modalities/graph.py from_edge_file kept in doubt: file loader of the public graph Dataset; no doc names it
+scmle/data/modalities/image.py from_path documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
+scmle/data/modalities/image.py deduplicate kept in doubt: the curate step "deduplicate" of website/src/pages/docs/modalities.astro
+scmle/data/readers/connectors.py LocalFileConnector public connector surface asserted by tests/unit/test_modality_exports.py; same family as documented WarehouseConnector
+scmle/data/readers/connectors.py WarehouseConnector documented: website/src/pages/docs/data.astro (readers, connectors, streaming)
+scmle/data/readers/connectors.py StreamingObjectStoreConnector named in plan.md as a planned connector; same family as documented WarehouseConnector
+scmle/data/readers/incremental.py SequenceEventSource reference implementation of the documented event source contract (website/src/pages/docs/data.astro)
+scmle/data/readers/incremental.py EventStreamSource documented: website/src/pages/docs/data.astro (readers, connectors, streaming)
+scmle/data/readers/incremental.py EventConsumer documented: website/src/pages/docs/data.astro (readers, connectors, streaming)
+scmle/data/readers/streaming.py commit_transaction documented: website/src/pages/docs/data.astro (readers, connectors, streaming)
+scmle/data/readers/streaming.py Consumer documented: website/src/pages/docs/data.astro (readers, connectors, streaming)
+scmle/data/robustness/forward.py forward_check qualification module: docs/API_STABILITY.md ("like the other qualification modules")
+scmle/data/robustness/multiverse.py tier_after_declaration qualification module: docs/API_STABILITY.md ("like the other qualification modules")
+scmle/data/store/conformance.py run_conformance documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/objectstore.py TransientStoreError documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/objectstore.py RetryingStore documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/processing.py IncrementalProcessor documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/processing.py break_lock documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/quality.py SchemaCheck documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/quality.py FreshnessCheck documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/quality.py MinRowsCheck documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/quality.py NullFractionCheck documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/quality.py NoNullsCheck documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/quality.py UniqueKeyCheck documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/quality.py RangeCheck documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/quality.py AllowedValuesCheck documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/data/store/snapshot.py connector_reader documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/decision/anytime.py difference_stream documented extension surface: docs/API_STABILITY.md (decision layer, F11)
+scmle/decision/anytime.py bound_stream documented extension surface: docs/API_STABILITY.md (decision layer, F11)
+scmle/decision/constraints.py cluster_satisfaction_test documented extension surface: docs/API_STABILITY.md (decision layer, F11)
+scmle/decision/constraints.py check_feasibility documented extension surface: docs/API_STABILITY.md (decision layer, F11)
+scmle/decision/constraints.py price_of_constraint documented extension surface: docs/API_STABILITY.md (decision layer, F11)
+scmle/decision/design.py srm_p_value documented extension surface: docs/API_STABILITY.md (decision layer, F11)
+scmle/decision/design.py srm_rejects documented extension surface: docs/API_STABILITY.md (decision layer, F11)
+scmle/decision/missing.py differential_missingness documented extension surface: docs/API_STABILITY.md (decision layer, F11)
+scmle/decision/ope.py difference_value documented extension surface: docs/API_STABILITY.md (decision layer, F11)
+scmle/decision/ope.py fit_outcome_model documented extension surface: docs/API_STABILITY.md (decision layer, F11)
+scmle/decision/ope.py fit_threshold_policy documented extension surface: docs/API_STABILITY.md (decision layer, F11)
+scmle/deploy/attest.py verify_image documented extension surface: docs/API_STABILITY.md (deployment contract); attestation counterpart of a written document
+scmle/deploy/contract.py Provider documented extension surface: docs/API_STABILITY.md (deployment contract); attestation counterpart of a written document
+scmle/evaluation/conformal.py weighted_quantile documented extension surface: docs/API_STABILITY.md (uncertainty, F12); oracle-tested
+scmle/evaluation/conformal.py thin_classes documented extension surface: docs/API_STABILITY.md (uncertainty, F12); oracle-tested
+scmle/evaluation/ipcw.py censoring_weights documented extension surface: docs/API_STABILITY.md (uncertainty, F12); oracle-tested
+scmle/evaluation/ipcw.py truncated_concordance documented extension surface: docs/API_STABILITY.md (uncertainty, F12); oracle-tested
+scmle/evaluation/metrics.py register_metric documented extension surface: docs/API_STABILITY.md (uncertainty, F12); oracle-tested
+scmle/evaluation/proper_scores.py weighted_interval_score documented extension surface: docs/API_STABILITY.md (uncertainty, F12); oracle-tested
+scmle/evaluation/proper_scores.py crps_from_quantiles documented extension surface: docs/API_STABILITY.md (uncertainty, F12); oracle-tested
+scmle/evaluation/ranking.py query_bootstrap_ndcg documented extension surface: docs/API_STABILITY.md (uncertainty, F12); oracle-tested
+scmle/evaluation/reconcile.py bottom_up documented extension surface: docs/API_STABILITY.md (uncertainty, F12); oracle-tested
+scmle/evaluation/reconcile.py shrunk_covariance documented extension surface: docs/API_STABILITY.md (uncertainty, F12); oracle-tested
+scmle/evaluation/reconcile.py mint documented extension surface: docs/API_STABILITY.md (uncertainty, F12); oracle-tested
+scmle/evaluation/reconcile.py coherence_residual documented extension surface: docs/API_STABILITY.md (uncertainty, F12); oracle-tested
+scmle/governance/escalation.py chow_check documented extension surface: docs/API_STABILITY.md (closed loop, F13)
+scmle/governance/keyring.py retire documented: website/src/pages/docs/security.astro, docs/OPERATIONS_REHEARSAL.md (key retirement)
+scmle/governance/loop.py watch_rollback documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
+scmle/governance/loop.py check_feedback documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
+scmle/governance/loop.py guard_registry documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
+scmle/governance/loop.py move_champion documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
+scmle/governance/loop.py execute_rollback documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
+scmle/governance/loop.py reopen_sealed documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
+scmle/governance/loop.py rewrite_ledger documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
+scmle/governance/loop.py act_on_unverified documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
+scmle/governance/loop.py silence_alert documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
+scmle/governance/loop.py change_label_policy documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
+scmle/governance/loop.py delete_or_send documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
+scmle/governance/loop.py amend_policy documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
+scmle/governance/release_state.py deployed_version documented extension surface: docs/API_STABILITY.md (release surfaces)
+scmle/governance/rollout_hook.py RolloutHook documented extension surface: docs/API_STABILITY.md (RolloutHook)
+scmle/governance/rollout_hook.py roll_back documented extension surface: docs/API_STABILITY.md (RolloutHook)
+scmle/governance/uncertainty_feed.py UncertaintyFeed documented extension surface: docs/API_STABILITY.md (UncertaintyFeed)
+scmle/inference/modality_serving.py set_gateway documented: docs/API_STABILITY.md (security surface, set_gateway)
+scmle/inference/parity.py expected_outputs used by scripts/make_serving_golden.py (stored golden generator)
+scmle/integrations/mlflow_store.py MlflowExperimentStore documented: docs/DEPENDENCIES.md (tracking extra)
+scmle/models/custom.py register_estimator public API: pinned in tests/fixtures/public_api.json, docs/API_STABILITY.md
+scmle/models/custom.py unregister_estimator public API: pinned in tests/fixtures/public_api.json, docs/API_STABILITY.md
+scmle/models/documents.py global_explanation kept in doubt: sibling of the documented local_explanation (website/src/pages/docs/api.astro)
+scmle/models/documents.py local_explanation documented: website/src/pages/docs/api.astro (document model explanations)
+scmle/models/documents.py term_ablation_explanation documented: website/src/pages/docs/api.astro (document model explanations)
+scmle/models/images.py global_explanation kept in doubt: sibling of the documented local_explanation (website/src/pages/docs/api.astro)
+scmle/models/images.py local_explanation documented: website/src/pages/docs/api.astro (image model explanations)
+scmle/models/images.py occlusion_explanation documented: website/src/pages/docs/api.astro (image model explanations)
+scmle/monitoring/abtest.py compare_arms called by benchmarks/qualification/f11_certify.py
+scmle/monitoring/alerts.py from_evidence documented: website/src/pages/docs/operations.astro (Alert example)
+scmle/monitoring/alerts.py dispatch documented: website/src/pages/docs/operations.astro (Alert example)
+scmle/monitoring/events.py PredictionLog documented: docs/ARCHITECTURE.md (prediction log); used by tests/spec/test_product_spec.py
+scmle/monitoring/events.py log_predictions documented: docs/ARCHITECTURE.md (prediction log); used by tests/spec/test_product_spec.py
+scmle/monitoring/events.py enforce_retention documented: docs/ARCHITECTURE.md (prediction log); used by tests/spec/test_product_spec.py
+scmle/monitoring/events.py record_outcomes documented: docs/ARCHITECTURE.md (prediction log); used by tests/spec/test_product_spec.py
+scmle/monitoring/labels.py check_randomization documented extension surface: docs/API_STABILITY.md (closed loop, F13)
+scmle/monitoring/labels.py stream_mechanism documented extension surface: docs/API_STABILITY.md (closed loop, F13)
+scmle/monitoring/sequential_tests.py ConfidenceSequence documented extension surface: docs/API_STABILITY.md (closed loop, F13)
+scmle/monitoring/shadow.py ShadowEvaluator documented: docs/ARCHITECTURE.md (ShadowEvaluator)
+scmle/monitoring/shadow.py settle method of the documented ShadowEvaluator (docs/ARCHITECTURE.md)
+scmle/operations/continuous.py load_dataset documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/continuous.py holdback_assignment documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/continuous.py holdback_check documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/continuous.py ContinuousEvaluation documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/continuous.py feed_labels documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/continuous.py feed_outcomes documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/continuous.py run_approved_retrain documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/continuous.py record_training documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/continuous.py check_after_promotion documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/cost.py from_allocation documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/logs.py traceparent_for documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/logs.py trace_for documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/logs.py StructuredLog documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/metrics.py ServiceMetrics documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/metrics.py record_resources documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/respond.py ResponseDesk documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/respond.py expire documented module: docs/OPERATIONS.md module table (operations)
+scmle/operations/signals.py as_metric_samples documented module: docs/OPERATIONS.md module table (operations)
+scmle/runners/roles.py check_separation documented extension surface: docs/API_STABILITY.md (training runners)
+scmle/security/access.py rotate documented extension surface: docs/API_STABILITY.md (Gateway, security surface); key rotation audited
+scmle/security/remote.py Revocations documented in the module docstring of scmle/security/remote.py as the pull side of Verifier(revocations=...)
+scmle/trail/inputs.py sign_inputs documented: docs/TRAIL.md (inputs.json is signed by each author) and docs/API_STABILITY.md (trail)
+scmle/unsupervised/clustering.py find_clusters documented: docs/BREADTH.md (clustering slice)
+scmle/unsupervised/clustering.py external_scores documented: docs/BREADTH.md (clustering slice)
+scmle/workflow/definition.py standard_workflow documented extension surface: docs/API_STABILITY.md and docs/ORCHESTRATION.md (workflow)
+scmle/workflow/executor.py sign_approval documented extension surface: docs/API_STABILITY.md and docs/ORCHESTRATION.md (workflow)
+scmle/workflow/executor.py submit_approval documented extension surface: docs/API_STABILITY.md and docs/ORCHESTRATION.md (workflow)
+scmle/workflow/handlers.py runner_handler documented extension surface: docs/API_STABILITY.md and docs/ORCHESTRATION.md (workflow)
+scmle/workflow/schedule.py Scheduler documented extension surface: docs/API_STABILITY.md and docs/ORCHESTRATION.md (workflow)

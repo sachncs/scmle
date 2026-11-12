@@ -119,22 +119,6 @@ def sensitive_matches(content: str) -> dict[str, int]:
     }
 
 
-def redact_sensitive_text(content: str) -> str:
-    """Replaces supported sensitive values with type-only placeholders.
-
-    Args:
-        content: Text to redact.
-
-    Returns:
-        The text with each match replaced by ``[REDACTED_<NAME>]``, for
-        example ``[REDACTED_EMAIL]``.
-    """
-    redacted = content
-    for name, pattern in sorted(SENSITIVE_PATTERNS.items()):
-        redacted = pattern.sub(f"[REDACTED_{name.upper()}]", redacted)
-    return redacted
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
 class Span:
     """A character range with simple document provenance.

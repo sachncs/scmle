@@ -136,30 +136,6 @@ def build(
     }
 
 
-def parse_pins(text: str) -> dict[str, str]:
-    """Reads `name==version` lines of a lock file; comments are skipped.
-
-    Text after `#` is dropped from each line. The version is the text after
-    `==` up to the first space. A name that is not a valid distribution name
-    makes `normalize_name` raise `ValueError`.
-
-    Args:
-        text: The lock file content.
-
-    Returns:
-        A mapping from normalized name to version; blank lines and lines
-        without `==` are ignored.
-    """
-    pins = {}
-    for line in text.splitlines():
-        entry = line.split("#", 1)[0].strip()
-        if not entry or "==" not in entry:
-            continue
-        parts = entry.partition("==")
-        pins[normalize_name(parts[0])] = parts[2].strip().split(" ")[0]
-    return pins
-
-
 def source_timestamp() -> str:
     """Returns the build time as `SOURCE_DATE_EPOCH` or the current time.
 
