@@ -12,36 +12,6 @@ from scmle.experimentation import trials
 from scmle.sampling import strategies
 
 
-def best_default_trials(
-    screened: list[experiments.Trial],
-    metric_greater_is_better: bool,
-    limit: int,
-    baseline_family_names: frozenset[str],
-) -> list[experiments.Trial]:
-    """Ranks successful default-pipeline trials best-first.
-
-    Args:
-        screened: Trials from screening.
-        metric_greater_is_better: Orientation of the metric.
-        limit: Number of models to keep.
-        baseline_family_names: Models excluded from strategy search.
-
-    Returns:
-        Up to `limit` default-pipeline trials, best first.
-    """
-    sign = 1 if metric_greater_is_better else -1
-    ok = [
-        t
-        for t in screened
-        if t.status is experiments.TrialStatus.OK
-        and not t.params
-        and t.strategy == experiments.DEFAULT_STRATEGY
-        and t.model_name not in baseline_family_names
-    ]
-    ranked = sorted(ok, key=lambda t: -sign * t.score_mean)
-    return ranked[:limit]
-
-
 class StrategySearch:
     """Evaluates data strategies for the most promising screened models.
 
@@ -83,9 +53,18 @@ class StrategySearch:
             for name, adapter in registry.adapters.items()
             if adapter.family == "baseline"
         )
-        leaders = best_default_trials(
-            screened, self.metric.greater_is_better, spec.top_models, baselines
-        )
+        sign = 1 if self.metric.greater_is_better else -1
+        default_trials = [
+            t
+            for t in screened
+            if t.status is experiments.TrialStatus.OK
+            and not t.params
+            and t.strategy == experiments.DEFAULT_STRATEGY
+            and t.model_name not in baselines
+        ]
+        leaders = sorted(default_trials, key=lambda t: -sign * t.score_mean)[
+            : spec.top_models
+        ]
         for leader in leaders:
             if self.context.resource_governor.skip_reason(first=False):
                 break

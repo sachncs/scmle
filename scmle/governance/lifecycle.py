@@ -272,13 +272,22 @@ class Maintainer:
 
         Returns:
             The registered version.
+
+        Raises:
+            ArtifactError: If the run has no `config.json`.
         """
         bundle_dir = result.save(result.run_dir / "export")
+        config_path = result.run_dir / "config.json"
+        if not config_path.exists():
+            raise errors.ArtifactError("run has no config.json")
+        project: dict[str, Any] = json.loads(
+            config_path.read_text(encoding="utf-8")
+        )
         record = self.registry.register(
             self.model,
             bundle_dir,
             metrics=result.evaluation["test_metrics"],
-            config=result.plan.to_dict() | {"project": read_run_config(result)},
+            config=result.plan.to_dict() | {"project": project},
             run_id=result.run_id,
             trusted=True,  # exported moments ago by this very process
         )
@@ -697,22 +706,3 @@ class Maintainer:
             return
         state["rows_since_attempt"] += len(fresh)
         self.write_state(state)
-
-
-def read_run_config(result: results.Run) -> dict[str, Any]:
-    """Reads the saved project configuration of a run.
-
-    Args:
-        result: The completed run.
-
-    Returns:
-        The content of the run's `config.json`.
-
-    Raises:
-        ArtifactError: If the run has no `config.json`.
-    """
-    path = result.run_dir / "config.json"
-    if not path.exists():
-        raise errors.ArtifactError("run has no config.json")
-    config: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-    return config
