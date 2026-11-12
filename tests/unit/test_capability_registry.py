@@ -86,7 +86,7 @@ def test_supported_capability_is_required_by_default():
     record = make_capability()
     registry = capabilities.Registry((record,))
 
-    assert registry.find(record.key) is record
+    assert registry.records.get(record.key) is record
     assert registry.require(record.key) is record
     assert registry.list_capabilities() == (record,)
 
