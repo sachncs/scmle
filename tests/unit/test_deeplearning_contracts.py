@@ -37,8 +37,6 @@ def test_transformer_contract_is_tabular_and_fails_closed_for_images():
     assert family.status is capabilities.Status.EXPERIMENTAL
     assert family.supports_modality(capabilities.Modality.TABULAR)
     assert not family.supports_modality(capabilities.Modality.IMAGE)
-    with pytest.raises(ValueError, match="supports only tabular modality"):
-        family.require_modality(capabilities.Modality.IMAGE)
 
 
 def test_transformer_runs_real_torch_inference_explanation_and_checkpoint(
@@ -145,8 +143,6 @@ def test_torch_adapters_expose_the_same_fail_closed_modality_contract():
     assert transformer.family_contract.supports_modality("tabular")
     assert not transformer.family_contract.supports_modality("image")
     assert jepa_adapter.family_contract is contracts.TABULAR_JEPA_CONTRACT
-    with pytest.raises(ValueError, match="supports only tabular modality"):
-        jepa_adapter.family_contract.require_modality("audio")
 
 
 def test_jepa_rejection_reason_includes_both_training_boundaries():

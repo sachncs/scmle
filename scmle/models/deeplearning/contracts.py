@@ -266,24 +266,6 @@ class ModelFamilyContract:
         value = capabilities.Modality(modality)
         return value in self.modalities
 
-    def require_modality(self, modality: capabilities.Modality | str) -> None:
-        """Rejects a request for a modality the family does not declare.
-
-        Args:
-            modality: A `Modality` or its string value.
-
-        Raises:
-            ValueError: If the family does not declare the modality, or the
-                string is not a known modality.
-        """
-        value = capabilities.Modality(modality)
-        if not self.supports_modality(value):
-            supported = ", ".join(item.value for item in self.modalities)
-            raise ValueError(
-                f"{self.model_family} supports only {supported} modality; "
-                f"received {value.value}"
-            )
-
     def validate_features(
         self, features: Any, expected_width: int | None = None
     ) -> numpy.ndarray:

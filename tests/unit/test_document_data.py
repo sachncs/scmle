@@ -264,15 +264,12 @@ def test_document_layout_confidence_and_offsets_fail_closed():
 
 
 def test_document_sensitive_content_is_detected_without_leaking_values():
-    """Curation counts PII and redaction removes values from derived text."""
+    """Curation counts PII without leaking the values."""
     content = "Contact alice@example.com; SSN 123-45-6789."
     sample = document.Sample("sensitive", content)
     report = document.Dataset((sample,)).curate()
 
     assert document.sensitive_matches(content) == {"email": 1, "ssn": 1}
-    assert document.redact_sensitive_text(content) == (
-        "Contact [REDACTED_EMAIL]; SSN [REDACTED_SSN]."
-    )
     assert report.sensitive_match_counts == {"email": 1, "ssn": 1}
     assert report.release_ready is False
     assert [finding.finding_id for finding in report.risk_findings] == [

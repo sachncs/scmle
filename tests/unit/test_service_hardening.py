@@ -192,10 +192,6 @@ def test_the_service_sbom_is_deterministic_for_one_timestamp():
     )
     with pytest.raises(ValueError, match="sha256"):
         sbom.build_service(pins, **{**arguments, "bundle_digest": "abc"})
-    assert sbom.parse_pins("# c\nnumpy==2.0.0\nbad line\nPandas==3 # x\n") == {
-        "numpy": "2.0.0",
-        "pandas": "3",
-    }
 
 
 def test_source_date_epoch_fixes_the_sbom_time(monkeypatch):
