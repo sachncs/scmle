@@ -184,7 +184,7 @@ def observe_memory_gb() -> tuple[float | None, str]:
 def observe_windows_memory_gb() -> tuple[float | None, str]:
     """Returns total physical memory on Windows from ``psutil``."""
     try:
-        import psutil  # noqa: PLC0415 -- Windows-only dependency
+        import psutil  # noqa: PLC0415 -- Windows-only dependency  # pyright: ignore[reportMissingModuleSource]  # psutil is a Windows-only dependency and ships no stub source here
 
         total = psutil.virtual_memory().total
     except (ImportError, OSError, AttributeError):

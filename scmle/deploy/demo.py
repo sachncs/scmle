@@ -786,7 +786,7 @@ def process_memory_mb(process: subprocess.Popen[bytes] | None) -> float | None:
     if process is None:
         return None
     if sys.platform == "win32":
-        import psutil  # noqa: PLC0415 -- Windows-only dependency
+        import psutil  # noqa: PLC0415 -- Windows-only dependency  # pyright: ignore[reportMissingModuleSource]  # psutil is a Windows-only dependency and ships no stub source here
 
         try:
             return round(
