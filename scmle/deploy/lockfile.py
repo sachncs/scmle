@@ -98,11 +98,11 @@ def runtime_closure(
                 unresolved.append(name)
         closure[name] = version
         for line in declared:
-            requirement, _, marker = line.partition(";")
-            match = NAME_PATTERN.match(requirement.strip())
+            parts = line.partition(";")
+            match = NAME_PATTERN.match(parts[0].strip())
             if match is None:
                 raise errors.ArtifactError(f"cannot read requirement {line!r}")
-            marker = marker.strip()
+            marker = parts[2].strip()
             if not marker or marker_applies(marker):
                 pending.append(canonical(match.group(0)))
     return dict(sorted(closure.items()))
