@@ -20,7 +20,7 @@ from scmle.contracts import tasks
 class Estimator(Protocol):
     """Scikit-learn compatible estimator protocol."""
 
-    def fit(self, features: Any, target: Any) -> Any:
+    def fit(self, features: Any, target: Any, /) -> Any:
         """Fits the estimator.
 
         Args:
@@ -31,7 +31,7 @@ class Estimator(Protocol):
             The fitted estimator.
         """
 
-    def predict(self, features: Any) -> Any:
+    def predict(self, features: Any, /) -> Any:
         """Predicts targets.
 
         Args:

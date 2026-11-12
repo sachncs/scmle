@@ -28,6 +28,8 @@ class WeightedEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lea
         estimator_: Fitted clone of `estimator`.
     """
 
+    estimator: Any
+
     def __init__(
         self,
         estimator: base.BaseEstimator,

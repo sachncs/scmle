@@ -3,7 +3,9 @@
 from collections.abc import Mapping
 import types
 from typing import Any
+from typing import cast
 
+from sklearn import base
 from sklearn import ensemble
 from sklearn import linear_model
 
@@ -49,7 +51,9 @@ class Ordinal(classical.Learner):
         settings = dict(params or {})
         levels = settings.pop(LEVELS, None)
         inner = super().build(tasks.Task.REGRESSION, seed, settings)
-        return estimators.CumulativeThresholdRegressor(inner, levels, seed)
+        return estimators.CumulativeThresholdRegressor(
+            cast("base.BaseEstimator", inner), levels, seed
+        )
 
 
 ORDINAL_RIDGE = Ordinal(

@@ -149,7 +149,7 @@ class Booster(models.Model):
             "random_state": seed,
             **given,
         }
-        estimator: models.Estimator = getattr(module, class_name)(**kwargs)
+        estimator: Any = getattr(module, class_name)(**kwargs)
         if self.stopping_rounds:
             estimator = early_stopping.wrap(
                 estimator, self.stopping_rounds, seed
