@@ -868,7 +868,9 @@ class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit
         Returns:
             Array of shape `(n_rows,)` of class labels.
         """
-        return self.classes_[self.predict_proba(features).argmax(axis=1)]
+        return numpy.asarray(
+            self.classes_[self.predict_proba(features).argmax(axis=1)]
+        )
 
 
 class Regressor(base.RegressorMixin, Trainer):  # type: ignore[misc]  # scikit-learn ships no type information
@@ -942,4 +944,4 @@ class Regressor(base.RegressorMixin, Trainer):  # type: ignore[misc]  # scikit-l
             Array of shape `(n_rows,)`, averaged over ensemble members.
         """
         scaled = self.raw_outputs(features)[:, :, 0].mean(axis=1)
-        return scaled * self.target_scale_ + self.target_mean_
+        return numpy.asarray(scaled * self.target_scale_ + self.target_mean_)

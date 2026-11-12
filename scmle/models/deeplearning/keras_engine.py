@@ -312,7 +312,9 @@ class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit
         Returns:
             Array of shape `(n_rows,)` of class labels.
         """
-        return self.classes_[self.predict_proba(features).argmax(axis=1)]
+        return numpy.asarray(
+            self.classes_[self.predict_proba(features).argmax(axis=1)]
+        )
 
 
 class Regressor(base.RegressorMixin, Trainer):  # type: ignore[misc]  # scikit-learn ships no type information
