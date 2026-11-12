@@ -86,12 +86,15 @@ def test_it():
 """
 
 
-def build(tmp_path, dynamic=""):
+def build(tmp_path, dynamic="", reviewed=""):
     """Lays out a small repository around a copy of the script."""
     (tmp_path / "scripts").mkdir()
     shutil.copy(SCRIPT, tmp_path / "scripts" / "check_justified.py")
     (tmp_path / "scripts" / "justified_dynamic.txt").write_text(
         dynamic, encoding="utf-8"
+    )
+    (tmp_path / "scripts" / "justified_reviewed.txt").write_text(
+        reviewed, encoding="utf-8"
     )
     (tmp_path / "scmle").mkdir()
     (tmp_path / "scmle" / "pkg.py").write_text(PACKAGE, encoding="utf-8")
@@ -176,6 +179,42 @@ def test_a_declared_dynamic_use_is_not_reported(tmp_path):
 
 def test_a_declaration_without_a_reason_is_refused(tmp_path):
     root = build(tmp_path, dynamic="scmle/pkg.py orphan\n")
+
+    result = subprocess.run(  # nosec B603
+        [sys.executable, str(root / "scripts" / "check_justified.py")],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "reason" in result.stderr
+
+
+def test_a_reviewed_keep_is_not_reported_for_its_shape(tmp_path):
+    root = build(
+        tmp_path,
+        reviewed="scmle/pkg.py flagged getter documented public accessor\n",
+    )
+
+    found = run(root)[1]
+
+    assert ("getter", "flagged") not in found
+
+
+def test_a_reviewed_keep_for_one_shape_does_not_hide_another(tmp_path):
+    root = build(
+        tmp_path,
+        reviewed="scmle/pkg.py orphan getter documented public accessor\n",
+    )
+
+    found = run(root)[1]
+
+    assert ("unreferenced", "orphan") in found
+
+
+def test_a_reviewed_keep_without_a_reason_is_refused(tmp_path):
+    root = build(tmp_path, reviewed="scmle/pkg.py flagged getter\n")
 
     result = subprocess.run(  # nosec B603
         [sys.executable, str(root / "scripts" / "check_justified.py")],

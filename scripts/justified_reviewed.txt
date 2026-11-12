@@ -1,0 +1,35 @@
+# Candidates a reviewer examined and decided to keep (2026-11-12).
+# Format: MODULE NAME SHAPE reason. SHAPE is the shape with its space written as a hyphen.
+# One definition per line, no globs. Remove a line when the reason stops being true.
+scmle/api/non_tabular.py predict passthrough public API: Run and Predictor methods pinned in tests/fixtures/public_api.json and shown in the README; scikit-learn estimator interface elsewhere
+scmle/api/non_tabular.py predict_proba passthrough public API or scikit-learn estimator interface
+scmle/api/predict.py load_model passthrough documented in the README and docs/API_STABILITY.md
+scmle/api/results.py explain passthrough public Run method pinned in tests/fixtures/public_api.json
+scmle/api/results.py predict passthrough public API: Run and Predictor methods pinned in tests/fixtures/public_api.json and shown in the README; scikit-learn estimator interface elsewhere
+scmle/api/results.py predict_proba passthrough public API or scikit-learn estimator interface
+scmle/api/results.py save passthrough public Run method pinned in tests/fixtures/public_api.json
+scmle/contracts/models.py Estimator lone-interface structural protocol every scikit-learn estimator and pipeline satisfies; 83 references
+scmle/core/policies.py Reviewer lone-interface documented extension point (README, docs/ARCHITECTURE.md, website)
+scmle/data/ledger/confirm.py ConfirmationSource lone-interface protocol satisfied by custody SealedSet and the vault, so the ledger layer does not import custody
+scmle/data/readers/streaming.py TransactionalSink lone-interface RecordingSink test double, an isinstance check in the code, and the website data docs
+scmle/data/readers/tabular.py load passthrough required TableReader hook called through the reader classes
+scmle/data/readers/tabular.py load passthrough required TableReader hook called through the reader classes
+scmle/data/readers/tabular.py load passthrough required TableReader hook called through the reader classes
+scmle/data/readers/tabular.py load passthrough required TableReader hook called through the reader classes
+scmle/data/readers/tabular.py read_table passthrough builds the default DatasetLoader for seven production callers; inlining would spread that default
+scmle/data/splitting/inner_cv.py get_n_splits getter scikit-learn calls it by name
+scmle/data/splitting/splitters.py issue_token getter member of the ConfirmationSource protocol, satisfied by splitters and the vault
+scmle/data/validation/columns.py matches passthrough required ColumnKind hook, called as kind.matches
+scmle/deploy/contract.py Provider lone-interface FakeAdapter test double; pinned in the public API and docs/API_STABILITY.md
+scmle/deploy/control.py ControlPlane lone-interface ProcessPlane and MemoryPlane implement it; pinned in the public API
+scmle/evaluation/replay.py predict getter public API: Run and Predictor methods pinned in tests/fixtures/public_api.json and shown in the README; scikit-learn estimator interface elsewhere
+scmle/evaluation/selection.py Selector lone-interface documented extension point (README, docs/ARCHITECTURE.md, website)
+scmle/governance/vault.py issue_token getter member of the ConfirmationSource protocol, satisfied by splitters and the vault
+scmle/inference/modality_serving.py ModalitySampleDecoder lone-interface test double, in __all__ and pinned in the public API
+scmle/inference/serving.py RequestObserver lone-interface test doubles in test_service_signals
+scmle/models/deeplearning/jepa_engine.py load_state_dict passthrough mirrors the torch module interface the engines call
+scmle/models/ensembles.py predict_proba passthrough public API or scikit-learn estimator interface
+scmle/models/modality_lifecycle.py modality_notes getter adapter hook documented on the website extensions page
+scmle/operations/faults.py run_all passthrough shown in docs/OPERATIONS.md and the website observability page
+scmle/runners/base.py Runner lone-interface local.Runner implements it; pinned in the public API
+scmle/sampling/synthesis.py SyntheticGenerator lone-interface GaussianCopulaGenerator and a test double; documented in docs/ARCHITECTURE.md

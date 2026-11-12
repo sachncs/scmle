@@ -55,6 +55,7 @@ INTERFACE_BASES = frozenset({"ABC", "Protocol"})
 SINGLE_USE_LINES = 5
 MAXIMUM_NAME_REFERENCE_LENGTH = 120
 ENTRY_FIELDS = 3
+REVIEWED_FIELDS = 4
 FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef)
 
 
@@ -247,6 +248,33 @@ def declared(path: pathlib.Path) -> list[tuple[str, str]]:
     return patterns
 
 
+def reviewed(path: pathlib.Path) -> list[tuple[str, str, str]]:
+    """Reads the candidates a reviewer decided to keep.
+
+    Each non-comment line is `MODULE NAME SHAPE  reason`, where SHAPE is one of
+    the shapes with its space written as a hyphen (`single-use`,
+    `lone-interface`, `passthrough`, `getter`, `lone-method`). The reason is
+    required. Unlike the dynamic-use file, an entry names one definition.
+
+    Args:
+        path: File to read; a missing file means no reviewed keeps.
+
+    Returns:
+        Triples of module path, name and shape.
+    """
+    if not path.exists():
+        return []
+    entries = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        parts = line.split(None, REVIEWED_FIELDS - 1)
+        if line.startswith("#") or not parts:
+            continue
+        if len(parts) < REVIEWED_FIELDS:
+            raise SystemExit(f"{path}: entry without a reason: {line!r}")
+        entries.append((parts[0], parts[1], parts[2].replace("-", " ")))
+    return entries
+
+
 def survey(
     package: dict[pathlib.Path, ast.Module],
 ) -> tuple[collections.Counter, dict[str, set[str]]]:
@@ -282,6 +310,7 @@ class Finder:
         subclasses: collections.Counter,
         methods: dict[str, set[str]],
         patterns: list[tuple[str, str]],
+        kept: list[tuple[str, str, str]] | None = None,
     ) -> None:
         """Stores the counts the tests need.
 
@@ -292,9 +321,11 @@ class Finder:
             subclasses: Subclass counts by base name.
             methods: Method name to the classes that define it.
             patterns: Module and name globs declared as dynamically used.
+            kept: Module, name and shape of candidates a reviewer kept.
         """
         self.root = root
         self.patterns = patterns
+        self.kept = set(kept or [])
         self.production = production
         self.elsewhere = elsewhere
         self.subclasses = subclasses
@@ -312,6 +343,9 @@ class Finder:
             node: Definition node.
             kind: "function", "method" or "class".
         """
+        module = str(path.relative_to(self.root))
+        if (module, node.name, shape) in self.kept:
+            return
         self.found.append(
             {
                 "shape": shape,
@@ -456,6 +490,12 @@ def main() -> int:
         type=pathlib.Path,
         default=pathlib.Path(__file__).with_name("justified_dynamic.txt"),
     )
+    parser.add_argument(
+        "--reviewed",
+        type=pathlib.Path,
+        default=None,
+        help="file of reviewed keeps; default: every justified_reviewed*.txt",
+    )
     options = parser.parse_args()
     root = pathlib.Path(__file__).resolve().parents[1]
     package = trees(root, PACKAGE)
@@ -463,6 +503,14 @@ def main() -> int:
     for folder in OTHER:
         others.update(trees(root, folder))
     subclasses, methods = survey(package)
+    files = (
+        [options.reviewed]
+        if options.reviewed is not None
+        else sorted(
+            pathlib.Path(__file__).parent.glob("justified_reviewed*.txt")
+        )
+    )
+    kept = [entry for file in files for entry in reviewed(file)]
     finder = Finder(
         root,
         count(package),
@@ -470,6 +518,7 @@ def main() -> int:
         subclasses,
         methods,
         declared(options.dynamic),
+        kept,
     )
     for path, tree in package.items():
         finder.visit(path, tree)
