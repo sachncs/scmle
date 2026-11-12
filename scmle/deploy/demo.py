@@ -1217,7 +1217,9 @@ def main(arguments: list[str] | None = None) -> int:
     Returns:
         0 if every recorded step held, otherwise 1.
     """
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(
+        description=__doc__.split("\n\n")[0]  # pyright: ignore[reportOptionalMemberAccess]  # the module docstring is always present
+    )
     actions = parser.add_subparsers(dest="action", required=True)
     for name in ("run", "prepare", "verify"):
         action = actions.add_parser(name)

@@ -614,7 +614,7 @@ class Dataset:
                     sample.byte_size / metadata.frame_count,
                 )
             )
-        values = numpy.asarray(rows, dtype=numpy.float64)
+        values: numpy.ndarray = numpy.asarray(rows, dtype=numpy.float64)
         if not numpy.isfinite(values).all():
             raise VideoValidationError(
                 "video metadata features must be finite",

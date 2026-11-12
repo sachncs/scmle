@@ -21,7 +21,12 @@ def f1_macro_labels(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
         The macro-averaged F-measure; undefined cases count as 0.
     """
     return float(
-        metrics.f1_score(truth, guess, average="macro", zero_division=0)
+        metrics.f1_score(
+            truth,
+            guess,
+            average="macro",
+            zero_division=0,  # pyright: ignore[reportArgumentType]  # scikit-learn infers zero_division as str from its "warn" default
+        )
     )
 
 
@@ -36,7 +41,12 @@ def f1_micro_labels(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
         The micro-averaged F-measure; undefined cases count as 0.
     """
     return float(
-        metrics.f1_score(truth, guess, average="micro", zero_division=0)
+        metrics.f1_score(
+            truth,
+            guess,
+            average="micro",
+            zero_division=0,  # pyright: ignore[reportArgumentType]  # scikit-learn infers zero_division as str from its "warn" default
+        )
     )
 
 

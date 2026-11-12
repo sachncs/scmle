@@ -4,6 +4,7 @@ from collections.abc import Callable
 import dataclasses
 import inspect
 from typing import Any
+from typing import cast
 
 import pandas
 from sklearn import metrics
@@ -124,7 +125,7 @@ class PositiveLabelMetric(Metric):
         return metrics.make_scorer(
             self.score_function,
             greater_is_better=self.greater_is_better,
-            response_method=self.response_methods,
+            response_method=cast("Any", self.response_methods),
             pos_label=positive,
         )
 

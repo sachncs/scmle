@@ -14,6 +14,7 @@ import pathlib
 import sys
 import threading
 import types
+from typing import cast
 from typing import ClassVar
 
 import pandas
@@ -522,7 +523,7 @@ class CatalogCommand(Command):
                 "catalog requires a tabular input or --raw-bytes"
             )
 
-        raw_location = args.raw_bytes
+        raw_location: str | None = args.raw_bytes
         if args.input == "-":
             raw_location = "-"
         if raw_location is not None:
@@ -534,8 +535,10 @@ class CatalogCommand(Command):
             )
         else:
             loader = tabular.DatasetLoader()
-            catalog_input = loader.load(args.input)
-            source = args.source_uri or args.input
+            # Not None: the checks above reject neither input being given.
+            tabular_input = cast("str", args.input)
+            catalog_input = loader.load(tabular_input)
+            source = args.source_uri or tabular_input
 
         try:
             result = Catalog.from_data(

@@ -7,6 +7,7 @@ most so the cause can be inspected.
 """
 
 from typing import Any
+from typing import cast
 
 import numpy
 import pandas
@@ -56,16 +57,19 @@ class AdversarialValidation(diagnostics.Diagnostic):
         frame = pandas.concat([old, new], ignore_index=True)
         labels = numpy.r_[numpy.zeros(len(old)), numpy.ones(len(new))]
         encoded = self.encode(frame, inputs)
-        scores = model_selection.cross_val_predict(
-            ensemble.HistGradientBoostingClassifier(
-                max_iter=60, random_state=inputs.seed
+        scores = cast(
+            "numpy.ndarray",
+            model_selection.cross_val_predict(
+                ensemble.HistGradientBoostingClassifier(
+                    max_iter=60, random_state=inputs.seed
+                ),
+                encoded,
+                labels,
+                cv=model_selection.StratifiedKFold(
+                    FOLDS, shuffle=True, random_state=inputs.seed
+                ),
+                method="predict_proba",
             ),
-            encoded,
-            labels,
-            cv=model_selection.StratifiedKFold(
-                FOLDS, shuffle=True, random_state=inputs.seed
-            ),
-            method="predict_proba",
         )[:, 1]
         auc = float(metrics.roc_auc_score(labels, scores))
         return {

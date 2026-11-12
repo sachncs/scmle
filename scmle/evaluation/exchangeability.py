@@ -66,8 +66,8 @@ def compare(
             "flag": None,
             "status": "not_tested",
         }
-    ks_p = float(stats.ks_2samp(first, second).pvalue)
-    mw_p = float(stats.mannwhitneyu(first, second).pvalue)
+    ks_p = float(stats.ks_2samp(first, second).pvalue)  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
+    mw_p = float(stats.mannwhitneyu(first, second).pvalue)  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
     return {
         **counts,
         "ks_p_value": ks_p,

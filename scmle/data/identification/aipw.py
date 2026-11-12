@@ -29,6 +29,7 @@ by this module.
 import dataclasses
 import hashlib
 from typing import Any
+from typing import cast
 
 import numpy
 import pandas
@@ -475,7 +476,10 @@ def estimate(
     n = int(keep.sum())
     se = float(numpy.sqrt(influence.var(ddof=1) / n))
     z = float(stats.norm.ppf(0.5 + level / 2))
-    matrix = nuisances.scaler.transform(nuisances.design.matrix(frame))[keep]
+    matrix = cast(
+        "numpy.ndarray",
+        nuisances.scaler.transform(nuisances.design.matrix(frame)),
+    )[keep]
     population = "the full population of the rows"
     if trim > 0:
         population = (

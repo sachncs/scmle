@@ -385,6 +385,7 @@ class RequestObserver(Protocol):
         Returns:
             The number of rows the observer kept from the batch.
         """
+        ...
 
 
 class HttpServing(Server):

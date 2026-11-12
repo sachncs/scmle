@@ -60,7 +60,7 @@ class StructuredKFold(model_selection.BaseCrossValidator):  # type: ignore[misc]
         self.classification = classification
         self.seed = seed
 
-    def get_n_splits(
+    def get_n_splits(  # pyright: ignore[reportIncompatibleMethodOverride]  # the base names this parameter X; scikit-learn passes it positionally
         self,
         features: Any = None,  # noqa: ARG002 -- scikit-learn cross-validator get_n_splits signature
         y: Any = None,  # noqa: ARG002 -- scikit-learn cross-validator get_n_splits signature
@@ -78,7 +78,7 @@ class StructuredKFold(model_selection.BaseCrossValidator):  # type: ignore[misc]
         """
         return self.n_splits
 
-    def split(
+    def split(  # pyright: ignore[reportIncompatibleMethodOverride]  # the base names this parameter X; scikit-learn passes it positionally
         self,
         features: Any,
         y: Any = None,

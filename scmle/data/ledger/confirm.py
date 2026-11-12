@@ -132,6 +132,7 @@ class EventLog(Protocol):
         Returns:
             The entry as stored in the log.
         """
+        ...
 
 
 class ConfirmationSource(Protocol):
@@ -142,9 +143,11 @@ class ConfirmationSource(Protocol):
     @property
     def committed(self) -> bool:
         """Whether the release is already bound to a claim set."""
+        ...
 
     def issue_token(self) -> str:
         """Returns the release token."""
+        ...
 
     def commit(self, claims_hash: str, ledger_hash: str) -> str:
         """Binds the single release to a claim set and a ledger state.
@@ -156,6 +159,7 @@ class ConfirmationSource(Protocol):
         Returns:
             The binding digest computed from the two hashes.
         """
+        ...
 
     def open(
         self,
@@ -175,6 +179,7 @@ class ConfirmationSource(Protocol):
         Returns:
             The features and target of the confirmation set.
         """
+        ...
 
 
 STAGE_TWO_STATEMENT = (

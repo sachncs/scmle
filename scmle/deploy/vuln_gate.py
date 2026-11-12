@@ -316,7 +316,9 @@ def main(arguments: list[str] | None = None) -> int:
         0 if the gate passes, 1 if it finds something blocking, 2 if the report
         or policy cannot be trusted.
     """
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(
+        description=__doc__.split("\n\n")[0]  # pyright: ignore[reportOptionalMemberAccess]  # the module docstring is always present
+    )
     parser.add_argument("report", type=Path)
     parser.add_argument("--policy", type=Path)
     parser.add_argument("--sbom", type=Path)

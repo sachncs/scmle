@@ -12,8 +12,10 @@ import dataclasses
 import importlib
 import importlib.util
 from typing import Any
+from typing import cast
 from typing import ClassVar
 
+from sklearn import base
 from sklearn import calibration
 from sklearn import compose
 from sklearn.utils import validation
@@ -435,7 +437,7 @@ class Smote(Rebalancing):
         return resampling.PreprocessedResamplingClassifier(
             preprocessing.build_front_end(plan, options),
             sampler,
-            adapter.build(task, seed, params),
+            cast("base.BaseEstimator", adapter.build(task, seed, params)),
         )
 
 

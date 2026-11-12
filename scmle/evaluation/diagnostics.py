@@ -10,6 +10,7 @@ import abc
 import dataclasses
 import time
 from typing import Any
+from typing import cast
 from typing import ClassVar
 
 import numpy
@@ -19,6 +20,7 @@ from sklearn import metrics
 
 from scmle.contracts import data
 from scmle.contracts import errors
+from scmle.contracts import models
 from scmle.contracts import tasks
 import scmle.contracts.metrics
 from scmle.evaluation import reliability
@@ -136,10 +138,16 @@ class ConfusionMatrix(Diagnostic):
         matrix = metrics.confusion_matrix(
             inputs.target, predicted, labels=labels
         )
-        precision, recall, f1, support = (
+        # scikit-learn's untyped return is inferred as a mix of float and
+        # None; at runtime these are four per-class arrays.
+        precision, recall, f1, support = cast(
+            "tuple[Any, Any, Any, Any]",
             metrics.precision_recall_fscore_support(
-                inputs.target, predicted, labels=labels, zero_division=0
-            )
+                inputs.target,
+                predicted,
+                labels=labels,
+                zero_division=0,  # pyright: ignore[reportArgumentType]  # scikit-learn infers zero_division as str from its "warn" default
+            ),
         )
         return {
             "labels": [str(label) for label in labels],
@@ -604,7 +612,10 @@ class MetricUncertainty(Diagnostic):
             if inputs.task is tasks.Task.REGRESSION
             else ClassifierReplay
         )
-        replay = replay_class(inputs.estimator, features)
+        # Scorers only call predict and predict_proba on the replay.
+        replay = cast(
+            "models.Estimator", replay_class(inputs.estimator, features)
+        )
         metric, positive = inputs.metric, inputs.positive_label
         estimate = metric.score(replay, features, target, positive)
         groups = (

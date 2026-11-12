@@ -70,11 +70,11 @@ def class_association(
     size = table.to_numpy().sum()
     smaller = min(table.shape) - 1
     effect = (
-        float(numpy.sqrt(result.statistic / (size * smaller)))
+        float(numpy.sqrt(result.statistic / (size * smaller)))  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
         if smaller
         else 0.0
     )
-    return "chi-square", float(result.pvalue), effect
+    return "chi-square", float(result.pvalue), effect  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
 
 
 def value_association(
@@ -93,8 +93,8 @@ def value_association(
     missing = target[gaps].to_numpy(dtype=float)
     present = target[~gaps].to_numpy(dtype=float)
     result = stats.mannwhitneyu(missing, present, alternative="two-sided")
-    effect = abs(2.0 * result.statistic / (len(missing) * len(present)) - 1.0)
-    return "mann-whitney", float(result.pvalue), float(effect)
+    effect = abs(2.0 * result.statistic / (len(missing) * len(present)) - 1.0)  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
+    return "mann-whitney", float(result.pvalue), float(effect)  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
 
 
 def assess(

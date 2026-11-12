@@ -8,7 +8,9 @@ the identical fitted graph.
 from collections.abc import Mapping
 import dataclasses
 from typing import Any
+from typing import cast
 
+from sklearn import base
 from sklearn import compose
 from sklearn import pipeline
 
@@ -428,7 +430,7 @@ def build_pipeline(
         )
     if plan.monotonic:
         estimator = wrappers.monotone(
-            estimator,
+            cast("base.BaseEstimator", estimator),
             adapter.monotonic_param or "",
             monotonic_signs(plan, len(special)),
         )

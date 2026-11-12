@@ -217,7 +217,7 @@ def stratified_chi2(
             skipped += 1
             continue
         statistic = stats.chi2_contingency(table, correction=False)[0]
-        total += float(statistic)
+        total += float(statistic)  # pyright: ignore[reportArgumentType]  # scipy.stats result types are untyped tuples
         df += (table.shape[0] - 1) * (table.shape[1] - 1)
     p = float(stats.chi2.sf(total, df)) if df > 0 else 1.0
     smaller = min(pooled.shape) - 1

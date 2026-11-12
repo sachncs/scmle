@@ -282,7 +282,7 @@ class EProcess:
             raise errors.ScmleError("bet totals are not initialised")
         steps = numpy.log1p(numpy.outer(unit - null_unit, grid))
         paths = self.totals + numpy.cumsum(steps, axis=0)
-        mixed = special.logsumexp(paths, axis=1) - math.log(len(grid))
+        mixed = special.logsumexp(paths, axis=1) - math.log(len(grid))  # pyright: ignore[reportOperatorIssue]  # scipy stubs allow a (value, sign) tuple without return_sign
         self.totals = paths[-1].copy()
         self.path = mixed
         self.count += int(unit.size)

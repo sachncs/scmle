@@ -43,6 +43,7 @@ import dataclasses
 import json
 from pathlib import Path
 from typing import Any
+from typing import cast
 from typing import Protocol
 
 import numpy
@@ -156,6 +157,7 @@ class Rule(Protocol):
         Returns:
             A JSON-ready mapping that identifies the rule.
         """
+        ...
 
     def actions(self, features: pandas.DataFrame) -> numpy.ndarray:
         """Computes the actions of the rule on any rows.
@@ -166,6 +168,7 @@ class Rule(Protocol):
         Returns:
             1.0 for each row the rule acts on, otherwise 0.0.
         """
+        ...
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -281,7 +284,7 @@ def freeze_rule(
         tuple(float(v) for v in means),
         tuple(float(v) for v in scales),
         tuple(float(v) for v in model.coef_[0]),
-        float(model.intercept_[0]),
+        float(cast("numpy.ndarray", model.intercept_)[0]),
         float(cut),
     )
 

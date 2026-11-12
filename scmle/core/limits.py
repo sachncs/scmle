@@ -22,6 +22,7 @@ import dataclasses
 import importlib
 import multiprocessing
 from multiprocessing import connection
+import multiprocessing.process
 import os
 import pathlib
 import signal

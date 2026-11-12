@@ -549,12 +549,12 @@ def categorical_test(
         return 0.0, 1.0, 0.0, False
     result = stats.chi2_contingency(counts, correction=False)
     total = float(counts.sum())
-    v = math.sqrt(float(result.statistic) / total) if total > 0 else 0.0
+    v = math.sqrt(float(result.statistic) / total) if total > 0 else 0.0  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
     return (
-        float(result.statistic),
-        float(result.pvalue),
+        float(result.statistic),  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
+        float(result.pvalue),  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
         min(v, 1.0),
-        bool((result.expected_freq < LOW_EXPECTED).any()),
+        bool((result.expected_freq < LOW_EXPECTED).any()),  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
     )
 
 
@@ -590,9 +590,9 @@ def feature_tests(
                 (
                     str(name),
                     "numeric",
-                    float(result.statistic),
-                    float(result.pvalue),
-                    float(result.statistic),
+                    float(result.statistic),  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
+                    float(result.pvalue),  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
+                    float(result.statistic),  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
                     False,
                 )
             )

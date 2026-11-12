@@ -40,6 +40,7 @@ class WorkflowStage(Protocol):
         Returns:
             The reason text attached to the stage's state transition.
         """
+        ...
 
     def execute(self, context: "scmle.core.context.Context") -> None:
         """Executes the stage against the shared run context.

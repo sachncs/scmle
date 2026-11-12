@@ -24,6 +24,7 @@ import re
 import sqlite3
 import time
 from typing import Any
+from typing import cast
 from typing import Literal
 from typing import TypeVar
 from urllib.parse import urlsplit
@@ -1105,7 +1106,7 @@ class DbApiConnector(SourceConnector):
             The DB-API cursor positioned on the result of ``sql``.
         """
         connection = self.connection_factory()
-        cursor: Any | None = None
+        cursor: Any = None
         try:
             if self.read_only and isinstance(connection, sqlite3.Connection):
                 connection.execute("PRAGMA query_only = ON")
@@ -1550,13 +1551,17 @@ def read_tabular_bytes(source_uri: str, payload: bytes) -> pandas.DataFrame:
     """
     name = pathlib.PurePosixPath(urlsplit(source_uri).path).name.lower()
     if name.endswith((".csv", ".csv.gz", ".csv.bz2", ".csv.xz")):
-        compression: Literal["infer", "gzip", "bz2", "xz"] = next(
-            (
-                method
-                for suffix, method in CSV_COMPRESSION.items()
-                if name.endswith(suffix)
+        # typeshed solves the default's type of next() as str, not the literal.
+        compression = cast(
+            'Literal["infer", "gzip", "bz2", "xz"]',
+            next(
+                (
+                    method
+                    for suffix, method in CSV_COMPRESSION.items()
+                    if name.endswith(suffix)
+                ),
+                "infer",
             ),
-            "infer",
         )
         return pandas.read_csv(io.BytesIO(payload), compression=compression)
     if name.endswith((".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")):

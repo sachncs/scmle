@@ -31,6 +31,7 @@ from collections.abc import Sequence
 import dataclasses
 import math
 from typing import Any
+from typing import cast
 
 import numpy
 import pandas
@@ -145,7 +146,7 @@ def model(
     return ensemble.HistGradientBoostingClassifier(
         max_iter=MAX_ITER,
         max_leaf_nodes=leaves,
-        early_stopping=False,
+        early_stopping=False,  # pyright: ignore[reportArgumentType]  # scikit-learn infers this parameter as str from its default
         random_state=seed,
     )
 
@@ -175,16 +176,21 @@ def out_of_fold_probabilities(
     folds = min(FOLDS, int(numpy.min(counts)))
     if folds < MIN_FOLDS:
         raise ValueError("every class needs at least two rows")
-    probabilities: numpy.ndarray = model_selection.cross_val_predict(
-        model(seed),
-        features,
-        codes,
-        cv=model_selection.StratifiedKFold(
-            folds,
-            shuffle=True,
-            random_state=randomness.derive_int_seed(seed, "labels.folds", 0),
+    probabilities: numpy.ndarray = cast(
+        "numpy.ndarray",
+        model_selection.cross_val_predict(
+            model(seed),
+            features,
+            codes,
+            cv=model_selection.StratifiedKFold(
+                folds,
+                shuffle=True,
+                random_state=randomness.derive_int_seed(
+                    seed, "labels.folds", 0
+                ),
+            ),
+            method="predict_proba",
         ),
-        method="predict_proba",
     )
     return probabilities
 

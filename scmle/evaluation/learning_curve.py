@@ -10,10 +10,15 @@ from collections.abc import Callable
 from collections.abc import Sequence
 import dataclasses
 from typing import Any
+from typing import cast
+from typing import TYPE_CHECKING
 
 import numpy
 import pandas
 from sklearn import base
+
+if TYPE_CHECKING:
+    from scmle.contracts import models
 
 FRACTIONS = (0.2, 0.4, 0.6, 0.8, 1.0)
 MIN_POINTS = 3
@@ -126,7 +131,7 @@ def compute(
         used = fit[: max(int(len(fit) * fraction), 2)]
         if target.iloc[used].nunique() < needed:
             continue  # An ordered prefix can miss classes.
-        fitted = base.clone(candidate).fit(
+        fitted = cast("models.Estimator", base.clone(candidate)).fit(
             features.iloc[used], target.iloc[used]
         )
         scores.append(

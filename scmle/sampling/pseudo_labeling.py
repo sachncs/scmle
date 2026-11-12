@@ -11,10 +11,15 @@ from collections.abc import Callable
 from collections.abc import Sequence
 import dataclasses
 from typing import Any
+from typing import cast
+from typing import TYPE_CHECKING
 
 import numpy
 import pandas
 from sklearn import base
+
+if TYPE_CHECKING:
+    from scmle.contracts import models
 
 DEFAULT_CONFIDENCE = 0.9
 MIN_PSEUDO_ROWS = 20
@@ -98,7 +103,9 @@ def augmented_fit(
         [target.reset_index(drop=True), labels.reset_index(drop=True)],
         ignore_index=True,
     )
-    return base.clone(plain).fit(both, labelled), len(rows)
+    return cast("models.Estimator", base.clone(plain)).fit(both, labelled), len(
+        rows
+    )
 
 
 def judge(
@@ -135,7 +142,9 @@ def judge(
             return None
         fit = numpy.asarray(fit_positions)
         held = numpy.asarray(evaluate_positions)
-        plain = base.clone(template).fit(features.iloc[fit], target.iloc[fit])
+        plain = cast("models.Estimator", base.clone(template)).fit(
+            features.iloc[fit], target.iloc[fit]
+        )
         augmented, count = augmented_fit(
             plain,
             features.iloc[fit],

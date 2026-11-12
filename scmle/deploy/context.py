@@ -181,7 +181,9 @@ def main(arguments: list[str] | None = None) -> int:
     Returns:
         1 if the scan reports findings (printed to stderr), otherwise 0.
     """
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(
+        description=__doc__.split("\n\n")[0]  # pyright: ignore[reportOptionalMemberAccess]  # the module docstring is always present
+    )
     parser.add_argument("action", choices=["check"])
     parser.add_argument("folder", type=pathlib.Path)
     options = parser.parse_args(arguments)

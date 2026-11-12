@@ -82,7 +82,9 @@ def start_helper(
 
     def accept() -> None:
         try:
-            accepted.append(listener.accept())
+            # On Windows accept() yields a PipeConnection, which has the same
+            # send/recv/poll/close surface the callers use.
+            accepted.append(listener.accept())  # pyright: ignore[reportArgumentType]  # typeshed lists PipeConnection on every platform
         except BaseException as error:  # noqa: BLE001 -- reported to the caller
             failures.append(error)
 
@@ -115,4 +117,5 @@ def connect_to_parent() -> connection.Connection:
         The authenticated connection to the parent process.
     """
     key = bytes.fromhex(sys.stdin.buffer.read().decode("ascii"))
-    return connection.Client(sys.argv[1], authkey=key)
+    # Same Windows PipeConnection note as in `start_helper`.
+    return connection.Client(sys.argv[1], authkey=key)  # pyright: ignore[reportReturnType]  # typeshed lists PipeConnection on every platform
