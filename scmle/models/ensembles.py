@@ -216,7 +216,7 @@ class ClassifierBlender(base.ClassifierMixin, GreedyBlender):  # type: ignore[mi
         Returns:
             Array of class labels, one per row.
         """
-        return self.classes_[self.blend(meta).argmax(axis=1)]
+        return numpy.asarray(self.classes_[self.blend(meta).argmax(axis=1)])
 
 
 class RegressorBlender(base.RegressorMixin, GreedyBlender):  # type: ignore[misc]  # scikit-learn ships no type information

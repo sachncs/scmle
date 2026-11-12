@@ -446,7 +446,7 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         Returns:
             Array of shape `(n_rows,)` of summed hazards.
         """
-        return self.hazards(features).sum(axis=1)
+        return numpy.asarray(self.hazards(features).sum(axis=1))
 
     def predict_survival(self, features: Any, times: Any) -> numpy.ndarray:
         """Running product of one minus the hazard, read at each time.

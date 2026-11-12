@@ -524,7 +524,7 @@ def enough_rows(y: numpy.ndarray, task: str, cfg: Config) -> bool:
     if len(y) < cfg.min_rows:
         return False
     if task == "classification":
-        return min(numpy.bincount(y).tolist()) >= cfg.folds
+        return min(numpy.bincount(y).tolist()) >= cfg.folds  # type: ignore[no-any-return, unused-ignore]  # Any on older NumPy stubs; editing code would stale the shipped certificate
     return True
 
 

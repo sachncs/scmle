@@ -419,7 +419,7 @@ def skill_statistic(problem: Problem, phi: numpy.ndarray) -> Statistic:
             positive = labels == k
             pred = oof_fit(positive.astype("float64"), phi, problem.splits)
             scores.append(auc_rows(pred, positive, tests))
-        return numpy.mean(scores, axis=0)
+        return numpy.mean(scores, axis=0)  # type: ignore[no-any-return, unused-ignore]  # Any on older NumPy stubs; editing code would stale the shipped certificate
 
     return compute
 
@@ -612,7 +612,7 @@ def purity_statistic(recorded: numpy.ndarray) -> Statistic:
     def compute(labels: numpy.ndarray) -> numpy.ndarray:
         k = int(labels.max()) + 1
         shares = [(labels == c) @ flags / count for c in range(k)]
-        return numpy.max(shares, axis=0)
+        return numpy.max(shares, axis=0)  # type: ignore[no-any-return, unused-ignore]  # Any on older NumPy stubs; editing code would stale the shipped certificate
 
     return compute
 

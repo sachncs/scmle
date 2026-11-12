@@ -192,7 +192,7 @@ class BettingTest:
     @property
     def e_value(self) -> numpy.ndarray:
         """The capital now: an e-value for the null at any stopping time."""
-        return numpy.exp(self.log_capital)
+        return numpy.asarray(numpy.exp(self.log_capital))
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready state (scalar tests only).
@@ -364,7 +364,7 @@ class MixtureTest:
     @property
     def e_value(self) -> numpy.ndarray:
         """The mixture now: an e-value at any stopping time."""
-        return numpy.exp(self.log_capital)
+        return numpy.asarray(numpy.exp(self.log_capital))
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready state (scalar tests only).
