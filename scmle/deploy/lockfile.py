@@ -49,25 +49,6 @@ def marker_applies(marker: str) -> bool:
     return bool(markers.Marker(marker).evaluate({"extra": ""}))
 
 
-def requirement_name(line: str) -> tuple[str, str]:
-    """Splits a `Requires-Dist` line into (name, marker).
-
-    Args:
-        line: A requirement such as `numpy>=1.24; python_version >= "3.10"`.
-
-    Returns:
-        The normalized distribution name and the marker text (empty if none).
-
-    Raises:
-        ArtifactError: If no name can be read from the line.
-    """
-    parts = line.partition(";")
-    match = NAME_PATTERN.match(parts[0].strip())
-    if match is None:
-        raise errors.ArtifactError(f"cannot read requirement {line!r}")
-    return canonical(match.group(0)), parts[2].strip()
-
-
 def runtime_closure(
     roots: Iterable[str],
     versions: Mapping[str, str] | None = None,
@@ -117,9 +98,13 @@ def runtime_closure(
                 unresolved.append(name)
         closure[name] = version
         for line in declared:
-            dependency, marker = requirement_name(line)
+            requirement, _, marker = line.partition(";")
+            match = NAME_PATTERN.match(requirement.strip())
+            if match is None:
+                raise errors.ArtifactError(f"cannot read requirement {line!r}")
+            marker = marker.strip()
             if not marker or marker_applies(marker):
-                pending.append(dependency)
+                pending.append(canonical(match.group(0)))
     return dict(sorted(closure.items()))
 
 

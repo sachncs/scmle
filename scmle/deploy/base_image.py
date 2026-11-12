@@ -184,19 +184,6 @@ def read_lock(path: str | pathlib.Path) -> dict[str, str]:
     return {"image": image, "digest": digest}
 
 
-def build_argument(lock: dict[str, str]) -> str:
-    """Builds the value for `--build-arg BASE_IMAGE=`.
-
-    Args:
-        lock: A lock record with `image` and `digest`.
-
-    Returns:
-        The image repository pinned to the digest, as `repository@digest`.
-    """
-    repository = lock["image"].rsplit(":", 1)[0]
-    return f"{repository}@{lock['digest']}"
-
-
 def main(arguments: list[str] | None = None) -> int:
     """Runs the command line (`resolve`, `argument` or `check`).
 
@@ -229,7 +216,8 @@ def main(arguments: list[str] | None = None) -> int:
             return 0
         lock = read_lock(options.lock)
         if options.action == "argument":
-            print(build_argument(lock))  # noqa: T201 -- command-line output
+            repository = lock["image"].rsplit(":", 1)[0]
+            print(f"{repository}@{lock['digest']}")  # noqa: T201 -- command-line output
         else:
             print(f"ok: {lock['image']} pinned to {lock['digest']}")  # noqa: T201 -- command-line output
     except (errors.ScmleError, OSError, KeyError, ValueError) as error:

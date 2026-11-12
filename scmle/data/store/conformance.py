@@ -8,6 +8,7 @@ passes by returning; it fails by raising.
 """
 
 from collections.abc import Callable
+import contextlib
 import dataclasses
 import functools
 import threading
@@ -445,7 +446,9 @@ def run_conformance(
         except Exception as error:  # noqa: BLE001 -- a failing check is reported in the result, not raised
             outcome, detail = False, f"{type(error).__name__}: {error}"
         finally:
-            cleanup(store, base)
+            with contextlib.suppress(objectstore.StoreError):
+                for meta in store.list_objects(base + "/"):
+                    store.delete(meta.key)
         results.append(
             Outcome(
                 check.__name__.removeprefix("check_"),
@@ -455,18 +458,3 @@ def run_conformance(
             )
         )
     return Conformance(f"{store.scheme}:{store.location}", tuple(results))
-
-
-def cleanup(store: objectstore.ObjectStore, base: str) -> None:
-    """Removes what a check wrote, ignoring cleanup failures.
-
-    Args:
-        store: The backend under test.
-        base: Key prefix the check wrote under; everything below it is
-            deleted. A `StoreError` stops the cleanup quietly.
-    """
-    try:
-        for meta in store.list_objects(base + "/"):
-            store.delete(meta.key)
-    except objectstore.StoreError:
-        return

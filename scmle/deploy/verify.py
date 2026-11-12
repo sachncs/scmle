@@ -76,36 +76,6 @@ def refuse_published_key(
         )
 
 
-def is_production(environ: Mapping[str, str]) -> bool:
-    """Reports whether the environment declares itself production.
-
-    Args:
-        environ: The environment; `SCMLE_ENV` is read.
-
-    Returns:
-        True if `SCMLE_ENV` is `production`, ignoring case and surrounding
-        blanks.
-    """
-    return environ.get(ENVIRONMENT, "").strip().lower() == contract.PRODUCTION
-
-
-def refuse_trusted_in_production(environ: Mapping[str, str]) -> None:
-    """Raises if `SCMLE_TRUSTED=1` is set in a production environment.
-
-    Args:
-        environ: The environment.
-
-    Raises:
-        ArtifactError: If `SCMLE_TRUSTED` is `1` and `SCMLE_ENV` is
-            `production`.
-    """
-    if environ.get(TRUSTED) == "1" and is_production(environ):
-        raise errors.ArtifactError(
-            f"{TRUSTED}=1 is refused when {ENVIRONMENT}=production: sign the "
-            "bundle and supply the signing key instead"
-        )
-
-
 def check_listed_files(model_directory: pathlib.Path) -> None:
     """Checks the checksum of every file the manifest lists, unparsed.
 
@@ -154,17 +124,23 @@ def verify_service(
     Raises:
         ArtifactError: On any failed check; nothing has been loaded.
     """
-    refuse_trusted_in_production(environ)
+    production = (
+        environ.get(ENVIRONMENT, "").strip().lower() == contract.PRODUCTION
+    )
+    trusted = environ.get(TRUSTED) == "1"
+    if trusted and production:
+        raise errors.ArtifactError(
+            f"{TRUSTED}=1 is refused when {ENVIRONMENT}=production: sign the "
+            "bundle and supply the signing key instead"
+        )
     root = pathlib.Path(folder)
     model_directory = root / "model"
-    production = is_production(environ)
     key = signing.key_from_environment(environ)
     refuse_published_key(
         key, production, environ.get(ALLOW_PUBLISHED_KEY) == "1"
     )
     digest = provenance.bundle_digest(model_directory)
     signed = bundle.verify_signature(model_directory, key)
-    trusted = environ.get(TRUSTED) == "1"
     if not signed and (production or not trusted):
         raise errors.ArtifactError(
             "refusing to load an unauthenticated bundle: it is pickle-based "

@@ -158,22 +158,6 @@ def parse_report(report: Any) -> tuple[list[dict[str, Any]], set[str], str]:
     raise GateError("unrecognised scanner report (expected pip-audit or Trivy)")
 
 
-def sbom_components(sbom: dict[str, Any]) -> set[str]:
-    """Lists the libraries of an SBOM.
-
-    Args:
-        sbom: A CycloneDX document.
-
-    Returns:
-        The `name==version` pairs of its components of type `library`.
-    """
-    return {
-        f"{item['name']}=={item['version']}"
-        for item in sbom.get("components", [])
-        if item.get("type") == "library"
-    }
-
-
 def active_entries(
     items: list[dict[str, Any]], key: str, today: datetime.date
 ) -> dict[str, str]:
@@ -289,9 +273,14 @@ def evaluate(
                 policy.get("unscanned_exceptions", []), "name", today
             )
         )
+        libraries = {
+            f"{item['name']}=={item['version']}"
+            for item in sbom.get("components", [])
+            if item.get("type") == "library"
+        }
         uncovered = sorted(
             item
-            for item in sbom_components(sbom) - scanned
+            for item in libraries - scanned
             if item.split("==")[0] not in waived
         )
     passed = not blocking and not uncovered
