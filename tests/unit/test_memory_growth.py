@@ -20,6 +20,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 ROOT = Path(__file__).parents[2]
 SMALL_ROWS = 4000
 LARGE_ROWS = 20000
@@ -103,6 +105,10 @@ def probe(rows):
     return reported["peak"] * unit, reported["table"]
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="the probe reads resource.getrusage, which Windows does not have",
+)
 def test_peak_memory_grows_by_a_bounded_amount_per_row():
     small_peak = probe(SMALL_ROWS)[0]
     large_peak, large_table = probe(LARGE_ROWS)
