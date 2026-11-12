@@ -146,22 +146,6 @@ def is_temporary(name: str) -> bool:
     )
 
 
-def check_prefix(prefix: str) -> str:
-    """Checks a listing prefix: empty, or a key optionally ending in `/`.
-
-    Args:
-        prefix: The candidate prefix.
-
-    Returns:
-        `prefix`, unchanged. `check_key` raises `StoreError` if a non-empty
-        prefix, without one trailing `/`, is not a valid key (so `/` alone
-        is refused).
-    """
-    if prefix:
-        check_key(prefix.removesuffix("/"))
-    return prefix
-
-
 def iso(moment: float | datetime.datetime) -> str:
     """Formats a moment as an ISO 8601 UTC time, to the second.
 
@@ -509,7 +493,8 @@ class LocalObjectStore(ObjectStore):
         Returns:
             The metadata of each matching object, sorted by key.
         """
-        check_prefix(prefix)
+        if prefix:
+            check_key(prefix.removesuffix("/"))
         found = []
         for path in sorted(self.root.rglob("*")):
             if not path.is_file() or is_temporary(path.name):

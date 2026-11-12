@@ -15,22 +15,6 @@ import pandas
 from scmle.evaluation import forecast
 
 
-def seasonal_lag(step: int, period: int) -> int:
-    """Rows back to the value at the same season point as `t + step`.
-
-    Args:
-        step: Steps ahead of the forecast time; at least 1.
-        period: Length of a season in rows; at least 1.
-
-    Returns:
-        The smallest non-negative lag that puts the value a whole number of
-        seasons before the forecast target (0 when `step` is a multiple of
-        `period`).
-    """
-    seasons = -(-step // period)  # Ceiling division.
-    return seasons * period - step
-
-
 def seasonal_naive(
     frame: pandas.DataFrame,
     positions: numpy.ndarray,
@@ -58,7 +42,11 @@ def seasonal_naive(
     series = frame.groupby(group, sort=False)[value] if group else frame[value]
     columns = []
     for step in range(1, steps + 1):
-        lag = seasonal_lag(step, period)
+        # The smallest non-negative lag that puts the value a whole number of
+        # seasons before the forecast target (0 when `step` is a multiple of
+        # `period`).
+        seasons = -(-step // period)  # Ceiling division.
+        lag = seasons * period - step
         shifted = series.shift(lag) if lag else frame[value]
         columns.append(shifted.to_numpy(float)[positions])
     return numpy.column_stack(columns)

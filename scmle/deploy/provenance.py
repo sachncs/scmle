@@ -17,21 +17,6 @@ from scmle.contracts import errors
 MANIFEST_FILE = "model_manifest.json"
 
 
-def canonical_bytes(payload: Mapping[str, Any]) -> bytes:
-    """Serializes a payload deterministically.
-
-    Args:
-        payload: A JSON-serializable mapping.
-
-    Returns:
-        Compact, key-sorted, ASCII-only JSON encoded as UTF-8, the bytes that
-        digests are taken over.
-    """
-    return json.dumps(
-        payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True
-    ).encode("utf-8")
-
-
 def sha256_digest(data: bytes) -> str:
     """Digests bytes.
 
@@ -53,7 +38,11 @@ def manifest_digest(manifest: Mapping[str, Any]) -> str:
     Returns:
         The bundle digest, the SHA-256 digest of its canonical JSON.
     """
-    return sha256_digest(canonical_bytes(manifest))
+    return sha256_digest(
+        json.dumps(
+            manifest, ensure_ascii=True, separators=(",", ":"), sort_keys=True
+        ).encode("utf-8")
+    )
 
 
 def bundle_digest(directory: str | pathlib.Path) -> str:

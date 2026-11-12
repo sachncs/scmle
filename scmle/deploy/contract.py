@@ -121,18 +121,6 @@ def require_positive(value: object, field_name: str) -> float:
     return value
 
 
-def looks_secret(name: str) -> bool:
-    """Reports whether an environment variable name suggests a secret value.
-
-    Args:
-        name: The variable name.
-
-    Returns:
-        True if the upper-cased name contains any of `SECRET_WORDS`.
-    """
-    return any(word in name.upper() for word in SECRET_WORDS)
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
 class ImageRef:
     """A container image pinned by digest, with the platforms it covers.
@@ -527,35 +515,13 @@ def check_config_entries(config: Mapping[str, str]) -> None:
             raise errors.ConfigError(f"config key {key!r} is not valid")
         if not isinstance(value, str):
             raise errors.ConfigError(f"config {key} must be text")
-        if looks_secret(key):
+        if any(word in key.upper() for word in SECRET_WORDS):
             raise errors.ConfigError(
                 f"config {key} looks like a secret: declare it in "
                 "`secrets` as a reference"
             )
         if PRIVATE_KEY_MARKER in value:
             raise errors.ConfigError(f"config {key} holds key material")
-
-
-def check_secret_names(
-    secrets: tuple[SecretRef, ...], config: Mapping[str, str]
-) -> None:
-    """Checks that secret names are unique and distinct from config names.
-
-    Args:
-        secrets: The secret references of a deployment.
-        config: The environment variables of a deployment.
-
-    Raises:
-        ConfigError: If secret names repeat or collide with config names.
-    """
-    names = [secret.name for secret in secrets]
-    if len(set(names)) != len(names):
-        raise errors.ConfigError("secret names must be unique")
-    clash = sorted(set(names) & set(config))
-    if clash:
-        raise errors.ConfigError(
-            f"names are both config and secret: {', '.join(clash)}"
-        )
 
 
 def check_production_rules(spec: "Deployment") -> None:
@@ -626,7 +592,14 @@ class Deployment:
         if not (0 < self.port < PORT_LIMIT):
             raise errors.ConfigError("port must be between 1 and 65535")
         check_config_entries(self.config)
-        check_secret_names(self.secrets, self.config)
+        names = [secret.name for secret in self.secrets]
+        if len(set(names)) != len(names):
+            raise errors.ConfigError("secret names must be unique")
+        clash = sorted(set(names) & set(self.config))
+        if clash:
+            raise errors.ConfigError(
+                f"names are both config and secret: {', '.join(clash)}"
+            )
         check_production_rules(self)
 
     def to_dict(self) -> dict[str, Any]:

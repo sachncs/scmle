@@ -58,25 +58,6 @@ def check_events(frame: pandas.DataFrame, column: str | None) -> None:
         )
 
 
-def encode_ordinal(
-    frame: pandas.DataFrame, column: str, order: list[str | int]
-) -> pandas.DataFrame:
-    """Copies `frame`, replacing ordinal labels by integer ranks.
-
-    Args:
-        frame: Data containing the ordinal column.
-        column: Name of the ordinal column.
-        order: Labels from lowest to highest; a label's rank is its index.
-
-    Returns:
-        A copy of `frame` whose `column` holds integer ranks.
-    """
-    ranks = {label: rank for rank, label in enumerate(order)}
-    encoded = frame.copy()
-    encoded[column] = frame[column].map(ranks).astype(int)
-    return encoded
-
-
 def check_treatment(frame: pandas.DataFrame, column: str | None) -> None:
     """Requires a complete 0/1 treatment column with both arms present.
 

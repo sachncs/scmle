@@ -52,15 +52,6 @@ SECRET_WORDS = ("SECRET", "PASSWORD", "TOKEN", "CREDENTIAL", "PRIVATE", "KEY")
 MAX_SCANNED_BYTES = 64 * 1024 * 1024
 
 
-def dockerignore_text() -> str:
-    """Builds the `.dockerignore` written beside a generated Dockerfile.
-
-    Returns:
-        One pattern per line from `IGNORED`, ending with a newline.
-    """
-    return "\n".join(IGNORED) + "\n"
-
-
 def patterns(root: pathlib.Path) -> list[str]:
     """Reads the patterns of the folder's `.dockerignore`.
 

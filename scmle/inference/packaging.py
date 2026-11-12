@@ -252,7 +252,7 @@ def write_service(
         root / "Dockerfile",
         DOCKERFILE.format(image=image, placeholder=base_image.PLACEHOLDER),
     )
-    write_text(root / ".dockerignore", context.dockerignore_text())
+    write_text(root / ".dockerignore", "\n".join(context.IGNORED) + "\n")
     build = root / "build.sh"
     write_text(
         build,

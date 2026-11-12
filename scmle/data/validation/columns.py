@@ -107,25 +107,6 @@ def to_float(values: Any) -> numpy.ndarray:
     return numpy.array(frame.to_numpy(), dtype=float, copy=True)
 
 
-def experimental_impute() -> Any:
-    """Builds the iterative imputer (scikit-learn gates it behind an import).
-
-    Returns:
-        An unfitted `IterativeImputer` with five iterations, a fixed random
-        state and empty features kept.
-    """
-    # Imported for its side effect (it enables the experimental imputer) and
-    # kept lazy so it runs only when the imputer is requested.
-    importlib.import_module("sklearn.experimental.enable_iterative_imputer")
-
-    return impute.IterativeImputer(
-        max_iter=5,
-        keep_empty_features=True,
-        random_state=0,
-        sample_posterior=False,
-    )
-
-
 def to_text(values: Any) -> numpy.ndarray:
     """Casts a one-column block to a 1-D array of strings ("" if missing).
 
@@ -407,7 +388,18 @@ class NumericKind(ColumnKind):
                 strategy="median", keep_empty_features=True, add_indicator=True
             )
         if strategy == "iterative":
-            return experimental_impute()
+            # Imported for its side effect (it enables the experimental
+            # imputer) and kept lazy so it runs only when the imputer is
+            # requested.
+            importlib.import_module(
+                "sklearn.experimental.enable_iterative_imputer"
+            )
+            return impute.IterativeImputer(
+                max_iter=5,
+                keep_empty_features=True,
+                random_state=0,
+                sample_posterior=False,
+            )
         raise errors.ConfigError(f"unknown missing-value strategy '{strategy}'")
 
     def transformer(self, options: data.Preprocessing) -> pipeline.Pipeline:

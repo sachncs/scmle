@@ -181,22 +181,6 @@ class Processing:
         return dataclasses.asdict(self)
 
 
-def row_keys(
-    frame: pandas.DataFrame, columns: tuple[str, ...]
-) -> pandas.Series:
-    """Builds one string key per row from the key columns.
-
-    Args:
-        frame: The rows to key.
-        columns: Names of the key columns, all present in `frame`.
-
-    Returns:
-        A series with the frame's index; each entry joins the row's key
-        column values, as strings, with `SEPARATOR`.
-    """
-    return frame[list(columns)].astype(str).agg(SEPARATOR.join, axis=1)
-
-
 class IncrementalProcessor:
     """Processes new input objects once each, resuming after a crash.
 
@@ -461,7 +445,11 @@ class IncrementalProcessor:
             frame = self.retrying(
                 lambda: gate.run(frame, record, self.contract, self.stage).frame
             )
-        keys = row_keys(frame, self.contract.key_columns)
+        keys = (
+            frame[list(self.contract.key_columns)]
+            .astype(str)
+            .agg(SEPARATOR.join, axis=1)
+        )
         fresh = ~keys.isin(checkpoint.seen) & ~keys.duplicated(keep="first")
         dropped = int((~fresh).sum())
         result = self.retrying(lambda: self.transform(frame[fresh.to_numpy()]))

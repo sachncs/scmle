@@ -44,21 +44,6 @@ MATERIAL_FILES = (
 )
 
 
-def material(root: pathlib.Path, name: str) -> dict[str, Any]:
-    """Describes one file of the folder by SHA-256.
-
-    Args:
-        root: Service folder.
-        name: File name relative to `root`; the file must exist.
-
-    Returns:
-        A dict with `name` and `digest`, the latter a dict whose `sha256` is the
-        hex digest without the `sha256:` prefix.
-    """
-    digest = provenance.file_digest(root / name)
-    return {"name": name, "digest": {"sha256": digest.removeprefix("sha256:")}}
-
-
 def statement(
     subject_name: str,
     subject_digest: str,
@@ -213,7 +198,14 @@ def write_provenance(
         The signed (or unsigned, without a key) document that was written.
     """
     materials = [
-        material(folder, name)
+        {
+            "name": name,
+            "digest": {
+                "sha256": provenance.file_digest(folder / name).removeprefix(
+                    "sha256:"
+                )
+            },
+        }
         for name in MATERIAL_FILES
         if (folder / name).exists()
     ]

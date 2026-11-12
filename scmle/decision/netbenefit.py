@@ -360,7 +360,10 @@ class FinalNetBenefit:
             frozen: Hash of the frozen rule. A blank or non-string value is
                 rejected with a `ValueError`.
         """
-        self.frozen = qualification_text(frozen)
+        candidate: object = frozen  # callers may pass a non-string
+        if not isinstance(candidate, str) or not candidate.strip():
+            raise ValueError("the rule hash must be a non-blank string")
+        self.frozen = frozen
         self.used = False
 
     def evaluate(
@@ -399,21 +402,3 @@ class FinalNetBenefit:
             )
         self.used = True
         return net_benefit_band(y, acts, t_range, **options)
-
-
-def qualification_text(value: str) -> str:
-    """A non-blank string.
-
-    Args:
-        value: The candidate string.
-
-    Returns:
-        `value` unchanged.
-
-    Raises:
-        ValueError: If `value` is not a string or is blank.
-    """
-    candidate: object = value  # callers may pass a non-string
-    if not isinstance(candidate, str) or not candidate.strip():
-        raise ValueError("the rule hash must be a non-blank string")
-    return value

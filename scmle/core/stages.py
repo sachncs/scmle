@@ -619,8 +619,13 @@ class ProfileStage(Stage):
                 frame, spec.data.targets, task
             )
         if task is tasks.Task.ORDINAL:
-            frame = scmle.data.validation.target.encode_ordinal(
-                frame, spec.data.target, spec.data.ordinal_order
+            ranks = {
+                label: rank
+                for rank, label in enumerate(spec.data.ordinal_order)
+            }
+            frame = frame.copy()
+            frame[spec.data.target] = (
+                frame[spec.data.target].map(ranks).astype(int)
             )
             context.frame = frame
             context.ordinal_labels = tuple(spec.data.ordinal_order)
