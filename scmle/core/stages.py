@@ -171,7 +171,9 @@ MATRIX_DIMENSIONS = 2
 class IngestStage(Stage):
     """Reads the dataset and fingerprints it."""
 
-    state = scmle.core.state.RunState.VALIDATING
+    state: ClassVar[scmle.core.state.RunState] = (
+        scmle.core.state.RunState.VALIDATING
+    )
 
     def describe(
         self,
@@ -452,8 +454,10 @@ class ProfileStage(Stage):
     them.
     """
 
-    requires = (IngestStage,)
-    state = scmle.core.state.RunState.PROFILING
+    requires: ClassVar[tuple[type, ...]] = (IngestStage,)
+    state: ClassVar[scmle.core.state.RunState] = (
+        scmle.core.state.RunState.PROFILING
+    )
 
     def describe(
         self,
@@ -2313,8 +2317,10 @@ def advise(context: scmle.core.context.Context) -> tuple[Any, ...]:
 class PlanStage(Stage):
     """Builds the experiment plan from the development-set profile."""
 
-    requires = (ProfileStage,)
-    state = scmle.core.state.RunState.PLANNING
+    requires: ClassVar[tuple[type, ...]] = (ProfileStage,)
+    state: ClassVar[scmle.core.state.RunState] = (
+        scmle.core.state.RunState.PLANNING
+    )
 
     def describe(
         self,
@@ -2367,8 +2373,10 @@ class PlanStage(Stage):
 class TrainStage(Stage):
     """Cross-validates every candidate within the time budget."""
 
-    requires = (PlanStage,)
-    state = scmle.core.state.RunState.TRAINING
+    requires: ClassVar[tuple[type, ...]] = (PlanStage,)
+    state: ClassVar[scmle.core.state.RunState] = (
+        scmle.core.state.RunState.TRAINING
+    )
 
     def describe(self, context: scmle.core.context.Context) -> str:
         """Reports the number of candidates.
@@ -2427,8 +2435,10 @@ class TrainStage(Stage):
 class SelectStage(Stage):
     """Applies the selection policy and the serving constraints."""
 
-    requires = (TrainStage,)
-    state = scmle.core.state.RunState.SELECTING
+    requires: ClassVar[tuple[type, ...]] = (TrainStage,)
+    state: ClassVar[scmle.core.state.RunState] = (
+        scmle.core.state.RunState.SELECTING
+    )
 
     def describe(self, context: scmle.core.context.Context) -> str:
         """Names the policy.
@@ -3072,8 +3082,10 @@ def choose_decision_threshold(
 class FinalEvaluationStage(Stage):
     """Refits the frozen candidate and opens the locked test set once."""
 
-    requires = (SelectStage,)
-    state = scmle.core.state.RunState.TESTING
+    requires: ClassVar[tuple[type, ...]] = (SelectStage,)
+    state: ClassVar[scmle.core.state.RunState] = (
+        scmle.core.state.RunState.TESTING
+    )
 
     def describe(self, context: scmle.core.context.Context) -> str:
         """Names the selected model.
@@ -3303,10 +3315,14 @@ class FinalEvaluationStage(Stage):
             if task.is_classification
             else replay.RegressorPredictions
         )
-        stand_in = replay_class(
-            numpy.concatenate(guesses),
-            numpy.vstack(scores) if scores else None,
-            getattr(pipeline, "classes_", None),
+        # Metrics only call predict and predict_proba on the stand-in.
+        stand_in = cast(
+            "scmle.contracts.models.Estimator",
+            replay_class(
+                numpy.concatenate(guesses),
+                numpy.vstack(scores) if scores else None,
+                getattr(pipeline, "classes_", None),
+            ),
         )
         metrics = context.catalog.evaluate(
             stand_in, pandas.DataFrame(index=truth.index), truth, task
@@ -3846,8 +3862,10 @@ class FinalEvaluationStage(Stage):
 class PackageStage(Stage):
     """Writes the model bundle, leaderboard and report."""
 
-    requires = (FinalEvaluationStage,)
-    state = scmle.core.state.RunState.PACKAGING
+    requires: ClassVar[tuple[type, ...]] = (FinalEvaluationStage,)
+    state: ClassVar[scmle.core.state.RunState] = (
+        scmle.core.state.RunState.PACKAGING
+    )
 
     def evidence_index(
         self,

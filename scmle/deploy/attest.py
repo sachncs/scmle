@@ -24,6 +24,7 @@ import json
 import pathlib
 import sys
 from typing import Any
+from typing import cast
 
 from scmle.contracts import errors
 from scmle.contracts import signing
@@ -341,7 +342,9 @@ def main(arguments: list[str] | None = None) -> int:
         0 after the image attestation is written, 1 if an input cannot be read
         or the attestation cannot be made (the error goes to stderr).
     """
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(
+        description=cast("str", __doc__).split("\n\n")[0]
+    )
     actions = parser.add_subparsers(dest="action", required=True)
     image = actions.add_parser("image", help="attest a built image")
     image.add_argument("--folder", type=pathlib.Path, required=True)

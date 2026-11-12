@@ -14,6 +14,7 @@ import fnmatch
 import pathlib
 import re
 import sys
+from typing import cast
 
 SECRET_FILE_PATTERNS = (
     ".env",
@@ -181,7 +182,9 @@ def main(arguments: list[str] | None = None) -> int:
     Returns:
         1 if the scan reports findings (printed to stderr), otherwise 0.
     """
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(
+        description=cast("str", __doc__).split("\n\n")[0]
+    )
     parser.add_argument("action", choices=["check"])
     parser.add_argument("folder", type=pathlib.Path)
     options = parser.parse_args(arguments)

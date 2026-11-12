@@ -22,6 +22,7 @@ import json
 import pathlib
 import re
 import sys
+from typing import cast
 import urllib.parse
 import urllib.request
 
@@ -206,7 +207,9 @@ def main(arguments: list[str] | None = None) -> int:
     Returns:
         0 on success, 1 if the action fails (the error goes to stderr).
     """
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(
+        description=cast("str", __doc__).split("\n\n")[0]
+    )
     actions = parser.add_subparsers(dest="action", required=True)
     resolve_parser = actions.add_parser("resolve", help="ask the registry")
     resolve_parser.add_argument("--image", required=True)

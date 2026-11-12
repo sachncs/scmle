@@ -146,7 +146,9 @@ def column_gap(sample: pandas.Series, reference: pandas.Series) -> ColumnGap:
     if pandas.api.types.is_numeric_dtype(sample):
         result = stats.ks_2samp(sample.dropna(), reference.dropna())
         return ColumnGap(
-            str(sample.name), float(result.statistic), float(result.pvalue)
+            str(sample.name),
+            float(result.statistic),
+            float(result.pvalue),  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
         )
     left = sample.astype(str).value_counts(normalize=True)
     right = reference.astype(str).value_counts(normalize=True)

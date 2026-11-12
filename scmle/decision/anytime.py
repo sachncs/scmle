@@ -49,6 +49,7 @@ lies in `[-M, M]`, `M = max(1/q, 1/(1 - q))`. `running_center` and
 
 import dataclasses
 import math
+from typing import cast
 
 import numpy
 from numpy.typing import ArrayLike
@@ -282,7 +283,12 @@ class EProcess:
             raise errors.ScmleError("bet totals are not initialised")
         steps = numpy.log1p(numpy.outer(unit - null_unit, grid))
         paths = self.totals + numpy.cumsum(steps, axis=0)
-        mixed = special.logsumexp(paths, axis=1) - math.log(len(grid))
+        # Without return_sign logsumexp returns an array; the stubs also allow
+        # the (value, sign) tuple.
+        logsum = cast(
+            "NDArray[numpy.float64]", special.logsumexp(paths, axis=1)
+        )
+        mixed = logsum - math.log(len(grid))
         self.totals = paths[-1].copy()
         self.path = mixed
         self.count += int(unit.size)

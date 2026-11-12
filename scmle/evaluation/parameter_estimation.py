@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import tempfile
 from typing import Any
+from typing import cast
 from typing import Literal
 
 import numpy
@@ -4908,7 +4909,9 @@ def reference_hierarchical_reml(
         )
     covariance = linalg.block_diag(*covariance_blocks)
     precision = linalg.solve(covariance, numpy.eye(len(values)), assume_a="pos")
-    information = design.T @ precision @ design
+    # scipy.linalg.solve is typed as returning a generic array; the product
+    # is an ndarray at runtime.
+    information = cast("numpy.ndarray", design.T @ precision @ design)
     right_hand_side = design.T @ precision @ values
     reference_coefficients = linalg.solve(
         information, right_hand_side, assume_a="pos"
@@ -5069,7 +5072,9 @@ def reference_hierarchical_random_slope_reml(
         )
     covariance = linalg.block_diag(*covariance_blocks)
     precision = linalg.solve(covariance, numpy.eye(len(values)), assume_a="pos")
-    information = design.T @ precision @ design
+    # scipy.linalg.solve is typed as returning a generic array; the product
+    # is an ndarray at runtime.
+    information = cast("numpy.ndarray", design.T @ precision @ design)
     right_hand_side = design.T @ precision @ values
     reference_coefficients = linalg.solve(
         information, right_hand_side, assume_a="pos"

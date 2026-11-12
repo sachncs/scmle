@@ -1706,7 +1706,7 @@ class Dataset:
                     float(len(coordinates)),
                 )
             )
-        values = numpy.asarray(rows, dtype=numpy.float64)
+        values: numpy.ndarray = numpy.asarray(rows, dtype=numpy.float64)
         if not numpy.isfinite(values).all():
             raise GeospatialValidationError(
                 "geospatial features must be finite",

@@ -871,7 +871,7 @@ def cramers_v(table: numpy.ndarray) -> float:
     smaller = min(table.shape) - 1
     if total == 0.0 or smaller <= 0:
         return 0.0
-    statistic = float(stats.chi2_contingency(table, correction=False)[0])
+    statistic = float(stats.chi2_contingency(table, correction=False)[0])  # pyright: ignore[reportArgumentType]  # scipy.stats result types are untyped tuples
     return math.sqrt(statistic / (total * smaller))
 
 
@@ -958,10 +958,10 @@ def missingness_test(
         stats.contingency.expected_freq(table).min() < EXPECTED_FISHER
     ):
         method = "fisher"
-        p_value = float(stats.fisher_exact(table).pvalue)
+        p_value = float(stats.fisher_exact(table).pvalue)  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
     else:
         method = "chi2"
-        p_value = float(stats.chi2_contingency(table, correction=False)[1])
+        p_value = float(stats.chi2_contingency(table, correction=False)[1])  # pyright: ignore[reportArgumentType]  # scipy.stats result types are untyped tuples
     v = cramers_v(table)
     powered = len(feature) >= cfg.min_rows
     suspect = powered and p_value <= cfg.alpha and v >= cfg.association_ceiling

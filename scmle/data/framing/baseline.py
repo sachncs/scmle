@@ -258,7 +258,7 @@ def selective_labels(observed: ArrayLike, b: ArrayLike) -> Selectivity:
     difference = rate0 - rate1
     table = [[miss0, n0 - miss0], [miss1, n1 - miss1]]
     alternative = "greater" if difference >= 0 else "less"
-    p_value = float(stats.fisher_exact(table, alternative=alternative)[1])
+    p_value = float(stats.fisher_exact(table, alternative=alternative)[1])  # pyright: ignore[reportArgumentType]  # scipy.stats result types are untyped tuples
     flagged = abs(difference) >= LABEL_TOLERANCE and p_value <= LABEL_ALPHA
     return Selectivity(
         flagged, rate0, rate1, difference, p_value, LABEL_TOLERANCE, LABEL_ALPHA
