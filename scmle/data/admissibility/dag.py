@@ -95,20 +95,6 @@ def reach(start: Collection[str], step: Mapping[str, set[str]]) -> set[str]:
     return seen
 
 
-def has_cycle(nodes: Collection[str], edges: Iterable[Edge]) -> bool:
-    """Tests whether a directed graph contains a cycle.
-
-    Args:
-        nodes: All nodes.
-        edges: Directed edges (parent, child).
-
-    Returns:
-        True if some node can reach itself by one or more edges.
-    """
-    kids = children_map(edges)
-    return any(n in reach([n], kids) for n in nodes)
-
-
 def separated(
     nodes: Collection[str],
     edges: Collection[Edge],
@@ -211,7 +197,8 @@ class Dag:
                 raise ValueError("self loops are not allowed")
         if not set(self.latent) <= names:
             raise ValueError("latent nodes must be nodes")
-        if has_cycle(self.nodes, self.edges):
+        kids = children_map(self.edges)
+        if any(node in reach([node], kids) for node in self.nodes):
             raise ValueError("the graph has a cycle")
         evidence.require_text(self.source, "source")
         evidence.require_text(self.prompt, "prompt")

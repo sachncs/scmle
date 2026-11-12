@@ -107,20 +107,6 @@ class FieldDecision:
         )
 
 
-def unverified_outcome(mode: Mode) -> Admission:
-    """Decides the admission of a field whose provenance cannot be verified.
-
-    Args:
-        mode: Strict or permissive.
-
-    Returns:
-        `quarantine` in strict mode, `admit_flagged` otherwise.
-    """
-    if mode is Mode.STRICT:
-        return Admission.QUARANTINE
-    return Admission.ADMIT_FLAGGED
-
-
 def timing_failure(
     record: provenance.FieldProvenance, declared_lag_seconds: float
 ) -> str | None:
@@ -177,10 +163,10 @@ def decide_timing(
         The decision, with the reasons that applied. A failed log check,
         unavailability at serving, or a lead below the declared lag
         quarantines the field. An unknown serving availability or an
-        unverified tier gives the unverified outcome of `mode`; for a
-        leakage suspect it becomes quarantine when `leakage_gate` is
-        gating. Otherwise a suspect with a confirmed tier is admitted and
-        one with an attested tier is admitted flagged.
+        unverified tier quarantines in strict mode and admits flagged
+        otherwise; for a leakage suspect it becomes quarantine when
+        `leakage_gate` is gating. Otherwise a suspect with a confirmed tier
+        is admitted and one with an attested tier is admitted flagged.
     """
     tier = record.tier(today)
     failure = timing_failure(record, declared_lag_seconds)
@@ -197,7 +183,11 @@ def decide_timing(
     if tier is qualification.Tier.UNVERIFIED:
         reasons.append("as-of rule is unverified")
     if unknown_serving or tier is qualification.Tier.UNVERIFIED:
-        admission = unverified_outcome(mode)
+        admission = (
+            Admission.QUARANTINE
+            if mode is Mode.STRICT
+            else Admission.ADMIT_FLAGGED
+        )
         if suspect:
             reasons.append("leakage suspicion with no as-of evidence")
             if leakage_gate is certificates.GateStatus.GATING:

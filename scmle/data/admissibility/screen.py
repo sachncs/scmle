@@ -1271,24 +1271,6 @@ def build_problem(
     return Problem(y, task, classes, folds, total)
 
 
-def skill_hypothesis(
-    problem: Problem, name: str, phi: numpy.ndarray
-) -> Pending:
-    """Builds the skill hypothesis of one column.
-
-    Args:
-        problem: The encoded outcome with its folds.
-        name: Column name.
-        phi: The column's basis.
-
-    Returns:
-        The pending hypothesis with the observed skill.
-    """
-    statistic = skill_statistic(problem, phi)
-    observed = float(statistic(problem.y[None, :])[0])
-    return Pending(name, SKILL, observed, statistic, uses_binned=False)
-
-
 def missingness_hypotheses(
     name: str,
     series: pandas.Series,
@@ -1480,7 +1462,17 @@ def scan_frame(
         phi = basis(series)
         if phi.shape[1] > 1:
             columns[str(name)] = phi
-            pending.append(skill_hypothesis(problem, str(name), phi))
+            statistic = skill_statistic(problem, phi)
+            observed = float(statistic(problem.y[None, :])[0])
+            pending.append(
+                Pending(
+                    str(name),
+                    SKILL,
+                    observed,
+                    statistic,
+                    uses_binned=False,
+                )
+            )
         pending.extend(
             missingness_hypotheses(
                 str(name),
