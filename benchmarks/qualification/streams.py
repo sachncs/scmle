@@ -202,7 +202,7 @@ def logistic(value: numpy.ndarray) -> numpy.ndarray:
     Returns:
         `1 / (1 + exp(-value))`, elementwise.
     """
-    return 1.0 / (1.0 + numpy.exp(-value))
+    return numpy.asarray(1.0 / (1.0 + numpy.exp(-value)))
 
 
 def marginal_risk(base: float, dependence: float) -> float:

@@ -851,7 +851,7 @@ def covariates(frame: pandas.DataFrame) -> numpy.ndarray:
     """
     columns = ["recency", "history", "newbie", "mens", "womens"]
     values = frame[columns].to_numpy(dtype=float)
-    return (values - values.mean(axis=0)) / values.std(axis=0)
+    return numpy.asarray((values - values.mean(axis=0)) / values.std(axis=0))
 
 
 def gate_a6(runs: int, base: int = 0) -> dict[str, Any]:

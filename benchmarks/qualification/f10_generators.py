@@ -60,7 +60,9 @@ def outcome_surface(x: numpy.ndarray, nonlinear: bool) -> numpy.ndarray:
         the first three columns.
     """
     if nonlinear:
-        return numpy.sin(x[:, 0]) + 0.5 * x[:, 1] ** 2 + 0.5 * x[:, 2]
+        return numpy.asarray(
+            numpy.sin(x[:, 0]) + 0.5 * x[:, 1] ** 2 + 0.5 * x[:, 2]
+        )
     return 1.0 * x[:, 0] - 0.5 * x[:, 1] + 0.3 * x[:, 2]
 
 
