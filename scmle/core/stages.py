@@ -1278,7 +1278,7 @@ class ProfileStage(Stage):
             for h in run.ledger.hypotheses.values()
             if h.spec.column
         }
-        skipped = {column for column, ignored in run.plan.skipped}
+        skipped = {pair[0] for pair in run.plan.skipped}
         ingest_stage.check_multiplicity(
             result.declared,
             columns,

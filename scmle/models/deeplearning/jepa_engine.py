@@ -2,6 +2,8 @@
 
 import copy
 import importlib
+import itertools
+import operator
 from typing import Any
 
 import numpy
@@ -355,12 +357,23 @@ class Trainer:
         generator = torch.Generator(device=device).manual_seed(
             self.random_state + 1
         )
-        losses = [
-            self.train_epoch(
-                torch, network, optimizer, tensor, generator, device, batch_rows
+        losses = list(
+            map(
+                operator.call,
+                itertools.repeat(
+                    lambda: self.train_epoch(
+                        torch,
+                        network,
+                        optimizer,
+                        tensor,
+                        generator,
+                        device,
+                        batch_rows,
+                    ),
+                    self.epochs,
+                ),
             )
-            for epoch in range(self.epochs)
-        ]
+        )
         network.module.eval().cpu()
         self.network_ = network
         self.n_iter_ = self.epochs

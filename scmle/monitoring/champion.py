@@ -1,6 +1,8 @@
 """Champion-challenger comparison with a paired bootstrap."""
 
 import dataclasses
+import itertools
+import operator
 
 import numpy
 import pandas
@@ -163,10 +165,17 @@ class ChampionChallenger:
         challenger_score = score(self.challenger, challenger_view, everything)
         rng = numpy.random.default_rng(self.seed)
         advantages = []
-        draws = [
-            diagnostics.resample_rows(len(target), groups, temporal, rng)
-            for count in range(self.bootstraps)
-        ]
+        draws = list(
+            map(
+                operator.call,
+                itertools.repeat(
+                    lambda: diagnostics.resample_rows(
+                        len(target), groups, temporal, rng
+                    ),
+                    self.bootstraps,
+                ),
+            )
+        )
         for rows in draws:
             try:
                 difference = score(

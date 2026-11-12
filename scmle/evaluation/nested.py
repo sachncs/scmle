@@ -9,6 +9,8 @@ numbers is the optimism of the selection.
 
 from collections.abc import Callable
 import dataclasses
+import itertools
+import operator
 import random
 from typing import Any
 from typing import cast
@@ -150,9 +152,12 @@ def nested_score(
             continue
         candidates = [{}]
         if space is not None:
-            candidates += [
-                space.sample(rng) for draw in range(max(configurations - 1, 0))
-            ]
+            candidates += map(
+                operator.call,
+                itertools.repeat(
+                    lambda: space.sample(rng), max(configurations - 1, 0)
+                ),
+            )
         scored = [
             (
                 mean_cv_score(

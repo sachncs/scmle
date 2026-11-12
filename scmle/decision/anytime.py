@@ -583,7 +583,9 @@ def confidence_bound(
         lo, hi = inside[0] + eps, inside[1] - eps
         if not exceeds(lo):
             return stream.low
-        for ignored in range(steps):
+        remaining = steps
+        while remaining > 0:
+            remaining -= 1
             mid = 0.5 * (lo + hi)
             if exceeds(mid):
                 lo = mid
@@ -593,7 +595,9 @@ def confidence_bound(
     lo, hi = inside[0] + eps, inside[1] - eps
     if not exceeds(hi):
         return stream.high
-    for ignored in range(steps):
+    remaining = steps
+    while remaining > 0:
+        remaining -= 1
         mid = 0.5 * (lo + hi)
         if exceeds(mid):
             hi = mid

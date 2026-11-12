@@ -22,7 +22,9 @@ skipped with a reason and, in the last case, `F` is not opened.
 from collections.abc import Callable
 from collections.abc import Mapping
 import dataclasses
+import itertools
 import math
+import operator
 from typing import Any
 
 import numpy
@@ -171,7 +173,14 @@ def evaluate_finding(
         return ForwardFinding(name, effect_x, None, INCONCLUSIVE, None)
     rng = randomness.component_rng(seed, f"{CHECK_ID}.{name}", 0)
     rows = len(values)
-    picks = [rng.integers(0, rows, size=rows) for index in range(bootstrap)]
+    picks = list(
+        map(
+            operator.call,
+            itertools.repeat(
+                lambda: rng.integers(0, rows, size=rows), bootstrap
+            ),
+        )
+    )
     draws = numpy.array(
         [stability.rank_effect(values[p], target[p]) for p in picks]
     )

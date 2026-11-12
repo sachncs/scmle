@@ -27,6 +27,8 @@ rather than trusting one absolute split.
 
 from collections.abc import Callable
 import dataclasses
+import itertools
+import operator
 from typing import Any
 
 import numpy
@@ -178,7 +180,9 @@ def collect(
         on it, or None when `should_stop` returned True.
     """
     rows = len(features)
-    predictions: list[list[Any]] = [[] for position in range(rows)]
+    predictions: list[list[Any]] = list(
+        map(operator.call, itertools.repeat(list, rows))
+    )
     for draw in range(replicates):
         if should_stop():
             return None

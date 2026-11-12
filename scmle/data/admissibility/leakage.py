@@ -55,7 +55,9 @@ the ceiling. The measured operating characteristics are in the certificate
 from collections.abc import Hashable
 from collections.abc import Sequence
 import dataclasses
+import itertools
 import math
+import operator
 import sys
 from typing import Any
 
@@ -484,10 +486,15 @@ def lower_bound(
         if groups is not None and labels is not None
         else None
     )
-    draws = [
-        bootstrap_skill(pred, y, task, members, rng)
-        for draw in range(cfg.bootstrap)
-    ]
+    draws = list(
+        map(
+            operator.call,
+            itertools.repeat(
+                lambda: bootstrap_skill(pred, y, task, members, rng),
+                cfg.bootstrap,
+            ),
+        )
+    )
     values = [v for v in draws if v is not None]
     if not values:
         return -math.inf
@@ -628,18 +635,23 @@ def skill_test(
         x, y, task, cfg, group_values, block_size, seed
     )
     rng = randomness.component_rng(cfg.run_seed, path, 1)
-    null = [
-        cross_fit_skill(
-            x,
-            y[permute_within(y, rng, group_values, block_size)],
-            task,
-            cfg,
-            group_values,
-            block_size,
-            seed,
-        )[0]
-        for draw in range(cfg.permutations)
-    ]
+    null = list(
+        map(
+            operator.call,
+            itertools.repeat(
+                lambda: cross_fit_skill(
+                    x,
+                    y[permute_within(y, rng, group_values, block_size)],
+                    task,
+                    cfg,
+                    group_values,
+                    block_size,
+                    seed,
+                )[0],
+                cfg.permutations,
+            ),
+        )
+    )
     p_value = permutation_p(skill, null)
     bound = lower_bound(
         pred,
@@ -812,18 +824,23 @@ def conditional_test(
     labels = strata_labels(feature, others, cfg)
     members = [numpy.flatnonzero(labels == v) for v in numpy.unique(labels)]
     rng = randomness.component_rng(cfg.run_seed, path, 1)
-    null = [
-        cross_fit_skill(
-            x[within_strata(len(y), members, rng)],
-            y,
-            task,
-            cfg,
-            group_values,
-            block_size,
-            seed,
-        )[0]
-        for draw in range(cfg.permutations)
-    ]
+    null = list(
+        map(
+            operator.call,
+            itertools.repeat(
+                lambda: cross_fit_skill(
+                    x[within_strata(len(y), members, rng)],
+                    y,
+                    task,
+                    cfg,
+                    group_values,
+                    block_size,
+                    seed,
+                )[0],
+                cfg.permutations,
+            ),
+        )
+    )
     p_value = permutation_p(skill, null)
     keeps = p_value <= cfg.alpha
     check = qualification.Check(

@@ -84,7 +84,7 @@ def spec_from_store(store: objectstore.ObjectStore, run_id: str) -> base.Job:
     Returns:
         The job spec stored at `runs/<run_id>/spec.json`.
     """
-    data, ignored = store.get(f"runs/{run_id}/spec.json")
+    data = store.get(f"runs/{run_id}/spec.json")[0]
     record = json.loads(data)
     budget = record["budget"]
     return base.Job(

@@ -329,7 +329,7 @@ class Executor:
             The record, or None if there is no such object.
         """
         try:
-            data, ignored = self.store.get(key)
+            data = self.store.get(key)[0]
         except objectstore.NotFoundError:
             return None
         record: dict[str, Any] = json.loads(data)
@@ -773,9 +773,9 @@ class Executor:
             in_flight: Running steps by their future; finished ones are
                 removed in place.
         """
-        done, ignored = concurrent.futures.wait(
+        done = concurrent.futures.wait(
             in_flight, return_when=concurrent.futures.FIRST_COMPLETED
-        )
+        ).done
         for future in done:
             step = in_flight.pop(future)
             state, result, cost = future.result()

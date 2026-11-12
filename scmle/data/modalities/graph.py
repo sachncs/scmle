@@ -1360,7 +1360,7 @@ def feature_values(
         ValueError: If a feature value is not finite.
     """
     if not (rows and width):
-        return tuple(() for row in rows)
+        return ((),) * len(rows)
     matrix = numpy.asarray(rows, dtype=numpy.float64)
     if not numpy.isfinite(matrix).all():
         raise ValueError("prepared features must be finite")

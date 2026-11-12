@@ -18,6 +18,8 @@ value where higher is better.
 
 from collections.abc import Callable
 import dataclasses
+import itertools
+import operator
 from typing import Any
 from typing import cast
 
@@ -279,17 +281,16 @@ def performance_sensitivity(
         (mean score per noise level, least-squares slope of score on level).
     """
     generator = numpy.random.default_rng(seed)
-    curve = {
-        level: float(
-            numpy.mean(
-                [
-                    scorer(model, noisy(features, level, generator), target)
-                    for unused in range(1 if level == 0 else repeats)
-                ]
-            )
+
+    def mean_score(level: float) -> float:
+        """Averages the scores of the noise draws at one level."""
+        draws = itertools.repeat(
+            lambda: scorer(model, noisy(features, level, generator), target),
+            1 if level == 0 else repeats,
         )
-        for level in levels
-    }
+        return float(numpy.mean(list(map(operator.call, draws))))
+
+    curve = {level: mean_score(level) for level in levels}
     slope = float(numpy.polyfit(list(curve), list(curve.values()), 1)[0])
     return curve, slope
 

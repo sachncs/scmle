@@ -241,8 +241,8 @@ def satisfaction_test(
         {
             str(g)
             for table in tables.values()
-            for g, (ignored, total) in table.items()
-            if total < constraint.min_group
+            for g, counts in table.items()
+            if counts[1] < constraint.min_group
         }
     )
     if small or len(names) < MIN_GROUPS:
@@ -356,8 +356,8 @@ def cluster_satisfaction_test(
         {
             str(g)
             for table in tables.values()
-            for g, (ignored, total) in table.items()
-            if total < constraint.min_group
+            for g, counts in table.items()
+            if counts[1] < constraint.min_group
         }
     )
     cluster_ids, inverse = numpy.unique(keys, return_inverse=True)
@@ -615,7 +615,8 @@ def fit_group_thresholds(
             `ValueError` by `prepared`.
     """
     s = numpy.asarray(scores, dtype=float)
-    outcomes, ignored, labels = prepared(y, numpy.zeros_like(s), groups)
+    prepared_parts = prepared(y, numpy.zeros_like(s), groups)
+    outcomes, labels = prepared_parts[0], prepared_parts[2]
     if constraint.criterion == "predictive_parity":
         raise ValueError("group thresholds cannot target predictive parity")
     bound = margin * constraint.max_gap
@@ -740,7 +741,7 @@ def price_of_constraint(
         `netbenefit.factorize`.
     """
     outcomes, free = costs.pair(y, unconstrained)
-    ignored, bound = costs.pair(y, constrained)
+    bound = costs.pair(y, constrained)[1]
     w = costs.odds(t)
     stats_matrix = numpy.column_stack(
         [
