@@ -1,229 +1,59 @@
 # Reviewed keeps for the single-use candidates of the first half of the module list (plan.md section 3a).
-scmle/api/non_tabular.py video_scope single-use 25-line body; inlining would lengthen its caller
-scmle/api/non_tabular.py raster_scope single-use 25-line body; inlining would lengthen its caller
-scmle/api/non_tabular.py check_observed_adapter single-use 31-line body; inlining would lengthen its caller
-scmle/api/project.py publish_curation_artifact single-use 16-line body; inlining would lengthen its caller
 scmle/api/project.py parameter_estimation_declaration_digest single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
-scmle/api/project.py rebuild_policy_values single-use 20-line body; inlining would lengthen its caller
 scmle/api/project.py check_manifest_matches_adapter single-use name states the intent of a 6-line step; inlining would bury it in a longer caller
 scmle/artifacts/bundle.py installed_distributions single-use name states the intent of a 6-line step; inlining would bury it in a longer caller
-scmle/artifacts/bundle.py read_manifest_and_schema single-use 21-line body; inlining would lengthen its caller
-scmle/artifacts/bundle.py check_bundle_format single-use 10-line body; inlining would lengthen its caller
-scmle/artifacts/claims_audit.py registered_rows single-use 29-line body; inlining would lengthen its caller
 scmle/artifacts/claims_audit.py check_ledger_head single-use name states the intent of a 6-line step; inlining would bury it in a longer caller
-scmle/artifacts/claims_audit.py check_replay single-use named by 3 test reference(s) as well as its caller
-scmle/artifacts/claims_audit.py custody_open_finding single-use 11-line body; inlining would lengthen its caller
-scmle/artifacts/claims_audit.py decision_file_problems single-use 15-line body; inlining would lengthen its caller
-scmle/artifacts/claims_audit.py coverage_report_problems single-use 9-line body; inlining would lengthen its caller
-scmle/artifacts/claims_audit.py unregistered_coverage_finding single-use 9-line body; inlining would lengthen its caller
 scmle/artifacts/claims_audit.py attachment_problems single-use name states the intent of a 8-line step; inlining would bury it in a longer caller
 scmle/artifacts/claims_audit.py baseline_report_problems single-use name states the intent of a 8-line step; inlining would bury it in a longer caller
-scmle/artifacts/claims_audit.py evaluate_attestations single-use 12-line body; inlining would lengthen its caller
-scmle/artifacts/reproducibility.py compare_trial_scores single-use 30-line body; inlining would lengthen its caller
-scmle/cli.py add_validation_arguments single-use 27-line body; inlining would lengthen its caller
-scmle/cli.py build_parser single-use named by 6 test reference(s) as well as its caller
-scmle/contracts/modalities.py modality_from_value single-use named by 1 test reference(s) as well as its caller
 scmle/contracts/modalities.py check_no_blank_values single-use name states the intent of a 3-line step; inlining would bury it in a longer caller
-scmle/contracts/performance.py check_same_operations single-use 11-line body; inlining would lengthen its caller
-scmle/contracts/reliability.py check_evidence_requirements single-use 10-line body; inlining would lengthen its caller
-scmle/contracts/tasks.py check_survival_and_ordinal_rules single-use 18-line body; inlining would lengthen its caller
-scmle/contracts/tasks.py check_streaming_and_fairness_rules single-use 33-line body; inlining would lengthen its caller
-scmle/contracts/tasks.py check_multi_target_rules single-use 21-line body; inlining would lengthen its caller
-scmle/core/causal_claim.py load_dag single-use 9-line body; inlining would lengthen its caller
-scmle/core/causal_claim.py verified_attestors single-use 14-line body; inlining would lengthen its caller
-scmle/core/config.py load_sections single-use named by 3 test reference(s) as well as its caller
-scmle/core/context.py supported_tabular_capability single-use 29-line body; inlining would lengthen its caller
-scmle/core/context.py experimental_tabular_capability single-use 21-line body; inlining would lengthen its caller
-scmle/core/context.py extension_capability single-use named by 1 test reference(s) as well as its caller
-scmle/core/decision_reports.py file_digests single-use named by 1 test reference(s) as well as its caller
-scmle/core/decision_reports.py decision_report single-use 26-line body; inlining would lengthen its caller
-scmle/core/ingest_stage.py load_plan single-use 10-line body; inlining would lengthen its caller
 scmle/core/ingest_stage.py rule_of single-use name states the intent of a 8-line step; inlining would bury it in a longer caller
-scmle/core/ipc.py wait_for_helper single-use 9-line body; inlining would lengthen its caller
-scmle/core/limits.py forkserver_environment single-use named by 1 test reference(s) as well as its caller
-scmle/core/limits.py proc_table single-use 15-line body; inlining would lengthen its caller
-scmle/core/limits.py ps_table single-use 12-line body; inlining would lengthen its caller
 scmle/core/limits.py psutil_table single-use name states the intent of a 8-line step; inlining would bury it in a longer caller
-scmle/core/limits.py process_table single-use named by 2 test reference(s) as well as its caller
 scmle/core/limits.py child_main single-use name states the intent of a 6-line step; inlining would bury it in a longer caller
-scmle/core/randomness.py name_words single-use named by 4 test reference(s) as well as its caller
-scmle/core/resource_observation.py observe_cpu_cores single-use named by 1 test reference(s) as well as its caller
-scmle/core/resource_observation.py observe_memory_gb single-use named by 6 test reference(s) as well as its caller
-scmle/core/resource_observation.py observe_windows_memory_gb single-use 9-line body; inlining would lengthen its caller
-scmle/core/resource_observation.py observe_disk_gb single-use named by 1 test reference(s) as well as its caller
-scmle/core/resource_observation.py project_extra_requirements single-use 19-line body; inlining would lengthen its caller
 scmle/core/resource_observation.py is_installed single-use name states the intent of a 7-line step; inlining would bury it in a longer caller
-scmle/core/scheduler.py create_backend single-use named by 4 test reference(s) as well as its caller
-scmle/core/stages.py pareto_report single-use 33-line body; inlining would lengthen its caller
-scmle/core/stages.py slice_labels single-use 11-line body; inlining would lengthen its caller
-scmle/core/stages.py default_stages single-use named by 6 test reference(s) as well as its caller
-scmle/data/admissibility/asof.py agrees single-use named by 1 test reference(s) as well as its caller
 scmle/data/admissibility/dag.py has_cycle single-use name states the intent of a 2-line step; inlining would bury it in a longer caller
 scmle/data/admissibility/independence.py is_discrete single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
-scmle/data/admissibility/independence.py implied_statements single-use named by 3 test reference(s) as well as its caller
-scmle/data/admissibility/leakage.py out_of_fold single-use 19-line body; inlining would lengthen its caller
-scmle/data/admissibility/leakage.py bootstrap_skill single-use 10-line body; inlining would lengthen its caller
 scmle/data/admissibility/leakage.py within_strata single-use name states the intent of a 4-line step; inlining would bury it in a longer caller
-scmle/data/admissibility/qualify.py finding_check single-use 23-line body; inlining would lengthen its caller
-scmle/data/admissibility/qualify.py attestation_check single-use named by 2 test reference(s) as well as its caller
 scmle/data/admissibility/rules.py unverified_outcome single-use name states the intent of a 3-line step; inlining would bury it in a longer caller
-scmle/data/admissibility/rules.py decide_causal single-use named by 1 test reference(s) as well as its caller
-scmle/data/admissibility/screen.py strata_of single-use named by 3 test reference(s) as well as its caller
-scmle/data/admissibility/screen.py fold_splits single-use named by 1 test reference(s) as well as its caller
-scmle/data/admissibility/screen.py auc_rows single-use named by 2 test reference(s) as well as its caller
-scmle/data/admissibility/screen.py skill_statistic single-use named by 1 test reference(s) as well as its caller
-scmle/data/admissibility/screen.py observed_predictions single-use 10-line body; inlining would lengthen its caller
 scmle/data/admissibility/screen.py missingness_statistic single-use name states the intent of a 6-line step; inlining would bury it in a longer caller
-scmle/data/admissibility/screen.py purity_statistic single-use 9-line body; inlining would lengthen its caller
-scmle/data/admissibility/screen.py required_permutations single-use named by 3 test reference(s) as well as its caller
-scmle/data/admissibility/screen.py gate_statuses single-use named by 9 test reference(s) as well as its caller
-scmle/data/admissibility/screen.py work_cap single-use named by 3 test reference(s) as well as its caller
 scmle/data/admissibility/screen.py skill_hypothesis single-use name states the intent of a 3-line step; inlining would bury it in a longer caller
-scmle/data/catalog.py normalize_uri single-use 13-line body; inlining would lengthen its caller
 scmle/data/catalog.py check_summaries single-use name states the intent of a 6-line step; inlining would bury it in a longer caller
-scmle/data/catalog.py check_notes single-use 9-line body; inlining would lengthen its caller
 scmle/data/catalog.py source_blockers single-use name states the intent of a 8-line step; inlining would bury it in a longer caller
 scmle/data/catalog.py is_sequence_value single-use name states the intent of a 3-line step; inlining would bury it in a longer caller
 scmle/data/catalog.py frame_for_pandas single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
-scmle/data/catalog.py frame_for_array single-use 13-line body; inlining would lengthen its caller
-scmle/data/catalog.py frame_for_mapping single-use 9-line body; inlining would lengthen its caller
 scmle/data/catalog.py frame_for_sequence single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
 scmle/data/catalog.py frame_for_other single-use name states the intent of a 6-line step; inlining would bury it in a longer caller
-scmle/data/catalog.py frame_for_data single-use 9-line body; inlining would lengthen its caller
-scmle/data/catalog.py canonical_collection single-use 11-line body; inlining would lengthen its caller
-scmle/data/catalog.py duplicates_for_frame single-use 17-line body; inlining would lengthen its caller
-scmle/data/catalog.py frame_content single-use 10-line body; inlining would lengthen its caller
 scmle/data/catalog.py bytes_content single-use name states the intent of a 1-line step; inlining would bury it in a longer caller
-scmle/data/charter/contracts.py read_charter single-use named by 3 test reference(s) as well as its caller
-scmle/data/charter/feasibility.py n_required_mean single-use named by 14 test reference(s) as well as its caller
-scmle/data/charter/feasibility.py mde_mean single-use named by 6 test reference(s) as well as its caller
-scmle/data/charter/feasibility.py power_mean single-use named by 9 test reference(s) as well as its caller
-scmle/data/charter/sealing.py write_charter single-use named by 60 test reference(s) as well as its caller
 scmle/data/curation/preprocessing.py monotonic_signs single-use name states the intent of a 3-line step; inlining would bury it in a longer caller
 scmle/data/curation/preprocessing.py adapter_params single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
 scmle/data/curation/preprocessing.py adapter_assembly single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
-scmle/data/curation/preprocessing.py wrap_estimator single-use 24-line body; inlining would lengthen its caller
 scmle/data/custody/carve.py derived_seed single-use name states the intent of a 4-line step; inlining would bury it in a longer caller
-scmle/data/custody/carve.py link_equal_codes single-use 9-line body; inlining would lengthen its caller
-scmle/data/custody/carve.py unit_labels single-use 35-line body; inlining would lengthen its caller
-scmle/data/custody/carve.py pick_units single-use named by 3 test reference(s) as well as its caller
-scmle/data/custody/carve.py close_over_units single-use named by 1 test reference(s) as well as its caller
-scmle/data/custody/carve.py autocorrelation single-use named by 4 test reference(s) as well as its caller
-scmle/data/custody/carve.py restrict_folds single-use named by 2 test reference(s) as well as its caller
 scmle/data/custody/carve.py check_inputs single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
-scmle/data/custody/manifest.py read_v1 single-use 15-line body; inlining would lengthen its caller
-scmle/data/custody/merkle.py row_hashes single-use named by 2 test reference(s) as well as its caller
-scmle/data/custody/merkle.py combine single-use named by 10 test reference(s) as well as its caller
-scmle/data/custody/merkle.py merkle_root single-use named by 10 test reference(s) as well as its caller
 scmle/data/custody/pipeline.py classes_complete single-use name states the intent of a 6-line step; inlining would bury it in a longer caller
-scmle/data/detectors/certificates.py docstring_lines single-use 19-line body; inlining would lengthen its caller
 scmle/data/detectors/certificates.py interval_pair single-use name states the intent of a 6-line step; inlining would bury it in a longer caller
 scmle/data/detectors/duplicates.py standardized_block single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
-scmle/data/detectors/labels.py confident_assignment single-use named by 2 test reference(s) as well as its caller
-scmle/data/detectors/labels.py confident_learning_flags single-use named by 2 test reference(s) as well as its caller
-scmle/data/detectors/labels.py margin_flags single-use named by 1 test reference(s) as well as its caller
-scmle/data/detectors/labels.py noise_rate single-use named by 4 test reference(s) as well as its caller
-scmle/data/detectors/labels.py hoeffding_bound single-use named by 4 test reference(s) as well as its caller
 scmle/data/detectors/missingness.py draw_holdout single-use name states the intent of a 4-line step; inlining would bury it in a longer caller
-scmle/data/detectors/missingness.py make_imputer single-use named by 1 test reference(s) as well as its caller
-scmle/data/detectors/missingness.py fold_imputers single-use named by 1 test reference(s) as well as its caller
-scmle/data/detectors/missingness.py fit_one single-use named by 1 test reference(s) as well as its caller
 scmle/data/detectors/outliers.py row_scores single-use name states the intent of a 4-line step; inlining would bury it in a longer caller
-scmle/data/detectors/pipeline.py label_step single-use 12-line body; inlining would lengthen its caller
-scmle/data/detectors/sentinels.py recode_missing single-use named by 2 test reference(s) as well as its caller
 scmle/data/framing/baseline.py rule_digest single-use name states the intent of a 1-line step; inlining would bury it in a longer caller
 scmle/data/framing/costs.py sources_from single-use name states the intent of a 4-line step; inlining would bury it in a longer caller
 scmle/data/framing/draft.py mentioned single-use name states the intent of a 8-line step; inlining would bury it in a longer caller
-scmle/data/framing/draft.py link_report single-use named by 2 test reference(s) as well as its caller
-scmle/data/framing/provenance.py claim_tier single-use named by 4 test reference(s) as well as its caller
-scmle/data/framing/questions.py gain_sign_verdict single-use named by 1 test reference(s) as well as its caller
 scmle/data/framing/refusal.py prompt_for single-use name states the intent of a 8-line step; inlining would bury it in a longer caller
 scmle/data/framing/refusal.py jaccard single-use name states the intent of a 2-line step; inlining would bury it in a longer caller
-scmle/data/identification/aipw.py weighted_smd single-use named by 1 test reference(s) as well as its caller
-scmle/data/identification/certified.py method_hashes single-use named by 1 test reference(s) as well as its caller
-scmle/data/identification/certified.py certified_gates single-use named by 3 test reference(s) as well as its caller
-scmle/data/identification/certified.py subgroup_method_hash single-use named by 2 test reference(s) as well as its caller
-scmle/data/identification/did.py wide_panel single-use named by 1 test reference(s) as well as its caller
 scmle/data/identification/did.py adoption_of single-use name states the intent of a 4-line step; inlining would bury it in a longer caller
-scmle/data/identification/did.py event_arms single-use 15-line body; inlining would lengthen its caller
 scmle/data/identification/did.py event_coefficients single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
-scmle/data/identification/did.py event_covariance single-use 15-line body; inlining would lengthen its caller
 scmle/data/identification/rd.py chosen_bandwidth single-use name states the intent of a 6-line step; inlining would bury it in a longer caller
 scmle/data/identification/rd.py placebo_fits single-use name states the intent of a 7-line step; inlining would bury it in a longer caller
 scmle/data/identification/run.py stratum_frames single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
 scmle/data/identification/run.py strata_replication single-use name states the intent of a 3-line step; inlining would bury it in a longer caller
 scmle/data/identification/run.py sensitivity_of single-use name states the intent of a 6-line step; inlining would bury it in a longer caller
-scmle/data/identification/run.py subgroup_results single-use 10-line body; inlining would lengthen its caller
 scmle/data/identification/run.py primary_verdict single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
-scmle/data/identification/run.py closing_notes single-use 12-line body; inlining would lengthen its caller
-scmle/data/identification/tier.py tier_conditions single-use 19-line body; inlining would lengthen its caller
 scmle/data/identification/tier.py failure_reasons single-use name states the intent of a 8-line step; inlining would bury it in a longer caller
-scmle/data/identification/tier.py evidence_shortfalls single-use 16-line body; inlining would lengthen its caller
 scmle/data/ingest/declared.py source_check single-use name states the intent of a 3-line step; inlining would bury it in a longer caller
-scmle/data/ingest/declared.py reconcile_source single-use named by 2 test reference(s) as well as its caller
-scmle/data/ingest/entities.py jaro_winkler single-use named by 2 test reference(s) as well as its caller
-scmle/data/ingest/entities.py candidate_pairs single-use named by 5 test reference(s) as well as its caller
-scmle/data/ingest/entities.py thresholds_from_bands single-use 12-line body; inlining would lengthen its caller
-scmle/data/ingest/grain.py unit_components single-use named by 2 test reference(s) as well as its caller
-scmle/data/ingest/grain.py scan_single_columns single-use 16-line body; inlining would lengthen its caller
-scmle/data/ingest/grain.py level_candidates single-use 17-line body; inlining would lengthen its caller
-scmle/data/ingest/grain.py level_admitted single-use 11-line body; inlining would lengthen its caller
-scmle/data/ingest/grain.py measure_level single-use 16-line body; inlining would lengthen its caller
-scmle/data/ingest/grain.py subset_verdict single-use 20-line body; inlining would lengthen its caller
-scmle/data/ingest/joins.py single_column_pairs single-use 12-line body; inlining would lengthen its caller
-scmle/data/ingest/profile.py value_kind single-use 9-line body; inlining would lengthen its caller
-scmle/data/ingest/profile.py profile_catalog single-use named by 9 test reference(s) as well as its caller
-scmle/data/ingest/profile.py has_total_order single-use named by 3 test reference(s) as well as its caller
-scmle/data/ingest/profile.py read_once single-use named by 1 test reference(s) as well as its caller
-scmle/data/ingest/synthesize.py lookup_features single-use 11-line body; inlining would lengthen its caller
-scmle/data/ingest/synthesize.py aggregate_features single-use 38-line body; inlining would lengthen its caller
-scmle/data/ingest/synthesize.py nested_features single-use 29-line body; inlining would lengthen its caller
-scmle/data/ingest/synthesize.py propose single-use 10-line body; inlining would lengthen its caller
 scmle/data/ingest/synthesize.py tables_read single-use name states the intent of a 4-line step; inlining would bury it in a longer caller
-scmle/data/ingest/synthesize.py feature_provenance single-use named by 4 test reference(s) as well as its caller
-scmle/data/ledger/bivariate.py tail_probability single-use named by 3 test reference(s) as well as its caller
-scmle/data/ledger/budget.py spend single-use named by 32 test reference(s) as well as its caller
-scmle/data/ledger/budget.py harmonic single-use named by 12 test reference(s) as well as its caller
-scmle/data/ledger/budget.py discount_weight single-use named by 4 test reference(s) as well as its caller
-scmle/data/ledger/budget.py assign_experiment single-use named by 18 test reference(s) as well as its caller
-scmle/data/ledger/budget.py start_rollback_monitor single-use named by 4 test reference(s) as well as its caller
-scmle/data/ledger/confirm.py stage_two_record single-use 20-line body; inlining would lengthen its caller
-scmle/data/ledger/confirm.py default_encoding single-use named by 2 test reference(s) as well as its caller
-scmle/data/ledger/confirm.py deny_reuse single-use 10-line body; inlining would lengthen its caller
 scmle/data/ledger/confirm.py register_runner_claims single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
-scmle/data/ledger/confirm.py blocked_outcome single-use 15-line body; inlining would lengthen its caller
-scmle/data/ledger/confirm.py withdrawn_outcome single-use 20-line body; inlining would lengthen its caller
-scmle/data/ledger/confirm.py log_selection single-use 36-line body; inlining would lengthen its caller
-scmle/data/ledger/confirm.py run_registered_claims single-use 10-line body; inlining would lengthen its caller
-scmle/data/ledger/controls.py quantile_index single-use named by 8 test reference(s) as well as its caller
-scmle/data/ledger/controls.py block_labels single-use named by 6 test reference(s) as well as its caller
-scmle/data/ledger/controls.py permuted_target_control single-use named by 14 test reference(s) as well as its caller
-scmle/data/ledger/controls.py shuffle_columns single-use named by 2 test reference(s) as well as its caller
-scmle/data/ledger/explore.py plan_exploration single-use named by 11 test reference(s) as well as its caller
-scmle/data/ledger/explore.py run_exploration single-use named by 7 test reference(s) as well as its caller
 scmle/data/ledger/multiplicity.py step_up single-use name states the intent of a 4-line step; inlining would bury it in a longer caller
 scmle/data/ledger/multiplicity.py step_down single-use name states the intent of a 4-line step; inlining would bury it in a longer caller
-scmle/data/modalities/curation.py check_card_text single-use 10-line body; inlining would lengthen its caller
-scmle/data/modalities/document.py sensitive_matches single-use named by 1 test reference(s) as well as its caller
-scmle/data/modalities/geospatial.py mask_geometry_axis single-use 39-line body; inlining would lengthen its caller
-scmle/data/modalities/geospatial.py evaluate_predicate single-use 21-line body; inlining would lengthen its caller
-scmle/data/modalities/graph.py record_weight single-use 9-line body; inlining would lengthen its caller
-scmle/data/modalities/graph.py record_event_time single-use 11-line body; inlining would lengthen its caller
-scmle/data/modalities/graph.py structural_degrees single-use 9-line body; inlining would lengthen its caller
-scmle/data/modalities/graph.py feature_values single-use 11-line body; inlining would lengthen its caller
-scmle/data/modalities/image.py check_dimensions single-use 14-line body; inlining would lengthen its caller
-scmle/data/modalities/image.py neighbor_components single-use 16-line body; inlining would lengthen its caller
 scmle/data/modalities/image.py image_content_hash single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
 scmle/data/profiling/label_noise.py label_noise_note single-use name states the intent of a 8-line step; inlining would bury it in a longer caller
-scmle/data/profiling/label_noise.py assess_label_noise single-use named by 1 test reference(s) as well as its caller
 scmle/data/profiling/missingness.py value_association single-use name states the intent of a 5-line step; inlining would bury it in a longer caller
-scmle/data/profiling/profiler.py column_exclusion_reason single-use named by 1 test reference(s) as well as its caller
-scmle/data/profiling/representativeness.py column_gap single-use 11-line body; inlining would lengthen its caller
 scmle/data/profiling/representativeness.py representativeness_report_note single-use name states the intent of a 8-line step; inlining would bury it in a longer caller
-scmle/data/readers/connectors.py decode_cursor single-use named by 1 test reference(s) as well as its caller
-scmle/data/readers/interchange.py is_tabular single-use named by 2 test reference(s) as well as its caller
 scmle/data/readers/streaming.py batch_identity single-use name states the intent of a 4-line step; inlining would bury it in a longer caller
-scmle/data/readers/streaming.py sample_caps single-use named by 2 test reference(s) as well as its caller
-scmle/data/readers/tabular.py uri_semantics single-use named by 1 test reference(s) as well as its caller
-scmle/data/readers/tabular.py replace_infinities single-use named by 2 test reference(s) as well as its caller
-scmle/data/robustness/forward.py label_for single-use named by 5 test reference(s) as well as its caller

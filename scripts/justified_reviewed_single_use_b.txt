@@ -1,230 +1,36 @@
 # Single-use candidates (second half, by module) a reviewer examined and decided to keep (2026-11-12).
 # Format: MODULE NAME SHAPE reason. One definition per line, no globs.
-scmle/data/robustness/html_report.py shift_section single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/robustness/prefilter.py diagnostic_rows single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/robustness/prefilter.py feature_checks single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/robustness/report.py shift_report single-use also named by a test
-scmle/data/robustness/report.py stability_report single-use also named by a test
-scmle/data/robustness/report.py validate_shift single-use also named by a test
-scmle/data/robustness/report.py validate_stability single-use also named by a test
-scmle/data/robustness/shift.py design_matrix single-use also named by a test
-scmle/data/robustness/shift.py feature_tests single-use also named by a test
-scmle/data/robustness/shift.py gaussian_kernel single-use also named by a test
-scmle/data/robustness/shift.py holdout_split single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/robustness/shift.py median_bandwidth single-use also named by a test
-scmle/data/robustness/shift.py pooled_codes single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/data/robustness/shift.py side_labels single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/data/robustness/stability.py applicable_choices single-use also named by a test
-scmle/data/splitting/duplicates.py fold_of_held_rows single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/store/conformance.py check_binary_and_empty single-use entry of the CHECKS registry run by the conformance suite
-scmle/data/store/conformance.py check_delete single-use entry of the CHECKS registry run by the conformance suite
-scmle/data/store/conformance.py check_head_matches_get single-use entry of the CHECKS registry run by the conformance suite
-scmle/data/store/conformance.py check_if_absent single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/store/conformance.py check_isolation single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/store/conformance.py check_key_rules single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/store/conformance.py check_large single-use entry of the CHECKS registry run by the conformance suite
-scmle/data/store/conformance.py check_missing single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/store/conformance.py check_overwrite single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/store/conformance.py check_pagination single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/store/conformance.py cleanup single-use also named by a test
 scmle/data/store/objectstore.py check_prefix single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/data/store/objectstore.py is_temporary single-use also named by a test
-scmle/data/store/objectstore.py refused_as_existing single-use also named by a test
-scmle/data/store/objectstore.py unlink_tolerantly single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/data/store/processing.py require_match single-use name states the intent of a short check; inlining would duplicate its docstring contract
 scmle/data/store/processing.py row_keys single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/data/store/snapshot.py parse_time single-use also named by a test
-scmle/data/validation/columns.py experimental_impute single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/validation/columns.py threshold_association single-use also named by a test
-scmle/data/validation/columns.py to_text single-use passed by reference to FunctionTransformer
-scmle/data/validation/target.py check_events single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/validation/target.py check_targets single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/data/validation/target.py check_treatment single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/data/validation/target.py encode_ordinal single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/decision/anytime.py centered_paths single-use also named by a test
 scmle/decision/netbenefit.py qualification_text single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/decision/ope.py support_violations single-use also named by a test
-scmle/decision/threshold.py bayes_threshold single-use also named by a test
-scmle/decision/threshold.py stable_span single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/deploy/attest.py material single-use shared with other modules and documents the attestation entry shape
-scmle/deploy/attest.py material_problems single-use also named by a test
-scmle/deploy/attest.py write_image_attestation single-use also named by a test
-scmle/deploy/attest.py write_provenance single-use also named by a test
 scmle/deploy/base_image.py build_argument single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/deploy/base_image.py read_lock single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/deploy/context.py dockerignore_text single-use called from another module and part of the generated-context contract
-scmle/deploy/contract.py check_config_entries single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/deploy/contract.py check_production_rules single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/deploy/contract.py check_secret_names single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/deploy/contract.py conformance_problems single-use also named by a test
 scmle/deploy/contract.py looks_secret single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/deploy/demo.py fail_not_ready single-use NoReturn helper; the name states why the demo stops
-scmle/deploy/demo.py process_memory_mb single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/deploy/gate.py check_problems single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/deploy/livetests.py run_checks single-use also named by a test
-scmle/deploy/lockfile.py marker_applies single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/deploy/lockfile.py requirement_name single-use also named by a test
-scmle/deploy/mocks.py put_object single-use also named by a test
-scmle/deploy/mocks.py safe_key single-use also named by a test
 scmle/deploy/provenance.py canonical_bytes single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/deploy/record.py write_record single-use also named by a test
-scmle/deploy/release.py scan_result single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/deploy/runtime.py emit_signals single-use also named by a test
-scmle/deploy/runtime.py make_loader single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/deploy/runtime.py signal_loop single-use thread target; the name documents the loop
-scmle/deploy/runtime.py signal_settings single-use also named by a test
-scmle/deploy/verify.py check_listed_files single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/deploy/verify.py refuse_published_key single-use also named by a test
 scmle/deploy/verify.py refuse_trusted_in_production single-use name states the intent of a short check; inlining would duplicate its docstring contract
 scmle/deploy/vuln_gate.py parse_report single-use name states the intent of a short check; inlining would duplicate its docstring contract
 scmle/deploy/vuln_gate.py sbom_components single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/durability.py replace_file single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/backtest.py seasonal_lag single-use name and docstring state the seasonal-lag rule behind a ceiling division
-scmle/evaluation/backtest.py seasonal_naive single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/conformal.py one_row_per_entity single-use also named by a test
-scmle/evaluation/coverage.py class_coverage single-use also named by a test
-scmle/evaluation/coverage.py coverage_tier single-use also named by a test
-scmle/evaluation/coverage_confirm.py floor_p_value single-use also named by a test
-scmle/evaluation/coverage_confirm.py inside_of single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/coverage_run.py claim_document single-use also named by a test
-scmle/evaluation/coverage_run.py run_report single-use also named by a test
-scmle/evaluation/coverage_slices.py flag_method_hash single-use also named by a test
-scmle/evaluation/coverage_slices.py labels_for single-use also named by a test
-scmle/evaluation/cv_plus.py partition_folds single-use also named by a test
-scmle/evaluation/cv_plus.py plan_scores single-use also named by a test
-scmle/evaluation/cv_plus.py serialized_size single-use also named by a test
-scmle/evaluation/diagnostics.py run_suite single-use also named by a test
-scmle/evaluation/longitudinal.py build_period_result single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/evaluation/longitudinal.py require_strictly_increasing single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/evaluation/mitigation.py group_cuts single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/multitarget.py mae_mean_scaled single-use named in the metric table by its documented metric
 scmle/evaluation/nested.py inner_splitter single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/evaluation/nested.py mean_cv_score single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/ordinal.py mean_absolute_class_error single-use also named by a test
-scmle/evaluation/ordinal.py quadratic_weighted_kappa single-use also named by a test
-scmle/evaluation/parameter_estimation.py check_prepared_rows single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/evaluation/parameter_estimation.py deterministic_fold_assignments single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/evaluation/parameter_estimation.py hierarchical_random_effect_precision single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/parameter_estimation.py hierarchical_reference single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/parameter_estimation.py reference_linear single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/parameter_estimation.py reference_logistic single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/parameter_estimation.py sensitivity_report single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/parameter_estimation.py validate_cross_fitting_support single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/evaluation/parameter_estimation.py validate_vector single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/evaluation/proper_scores.py insample_scale single-use also named by a test
-scmle/evaluation/proper_scores.py pinball_loss single-use also named by a test
-scmle/evaluation/ranking.py mean_average_precision single-use also named by a test
-scmle/evaluation/ranking.py mean_ndcg single-use also named by a test
-scmle/evaluation/ranking.py mean_reciprocal_rank single-use also named by a test
-scmle/evaluation/ranking.py per_query_ndcg single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/ranking.py precision_at single-use also named by a test
-scmle/evaluation/ranking.py recall_at single-use also named by a test
 scmle/evaluation/release.py check_count_values single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/evaluation/release.py check_kind_coverage single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/release.py diagnostic_verdict single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/release.py evidence_reference_finding single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/release.py explanation_findings single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/release.py fairness_metric_values single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/evaluation/release.py finite_real single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/evaluation/release.py normalize_measure single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/robustness.py default_stressors single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/sensitivity.py evaluation_sensitivity single-use also named by a test
-scmle/evaluation/sensitivity.py noisy single-use also named by a test
-scmle/evaluation/sensitivity.py performance_sensitivity single-use also named by a test
-scmle/evaluation/sequential.py check_propensity_support single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/evaluation/sequential.py drop_incomplete_subjects single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/evaluation/sequential.py ordered_subjects single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/evaluation/sequential.py regime_covariance single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/evaluation/sequential.py require_distinct_neighbours single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/evaluation/suite.py full_suite single-use also named by a test
-scmle/evaluation/survival.py dynamic_auc single-use also named by a test
-scmle/evaluation/survival.py integrated_brier single-use also named by a test
-scmle/evaluation/survival.py time_grid single-use also named by a test
-scmle/evaluation/uplift.py qini_coefficient single-use also named by a test
-scmle/experimentation/strategy_search.py best_default_trials single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/experimentation/trials.py guarded_evaluate single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/experimentation/trials.py lost_trial single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/experimentation/trials.py runtime_requirements single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/explainability/quality.py evaluate_ground_truth_suite single-use also named by a test
-scmle/features/feature_graph.py validate_graph single-use also named by a test
-scmle/governance/escalation.py binomial_p_value single-use also named by a test
-scmle/governance/escalation.py set_size_score single-use also named by a test
 scmle/governance/lifecycle.py read_run_config single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/governance/local_faults.py fail_connector single-use fault injection; the name states the simulated failure
-scmle/governance/local_faults.py reject_over_budget single-use fault injection; the name states the simulated disk-full failure
-scmle/governance/local_faults.py reject_over_memory_budget single-use fault injection; the name states the simulated memory failure
-scmle/governance/never_list.py question_for single-use named by the docstrings of the attestation methods as the question builder
-scmle/governance/registry.py content_id_of single-use also named by a test
 scmle/governance/release_state.py require_previous single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/governance/release_state.py stop_rollout single-use NoReturn helper; the name states why the rollout stops
-scmle/governance/review.py require_artifact_digests single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/governance/review.py require_claims single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/governance/review.py require_independence single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/governance/sbom.py component_ref single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/governance/sbom.py source_timestamp single-use also named by a test
 scmle/inference/onnx_export.py inner_model single-use name states the intent of a short check; inlining would duplicate its docstring contract
 scmle/inference/onnx_export.py input_types single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/inference/onnx_export.py unwrap single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/inference/onnx_export.py without_casts single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/inference/packaging.py lock_roots single-use name states what the closure starts from
-scmle/intelligence/fingerprint.py scale_range single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/intelligence/fingerprint.py text_like_columns single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/models/boosting/early_stopping.py wrap single-use also named by a test
-scmle/models/conformance.py check_declared_capabilities single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/models/conformance.py check_estimator_interface single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/models/conformance.py check_probabilities single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/models/conformance.py toy_problem single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/models/deeplearning/training.py resolve_batch_size single-use also named by a test
-scmle/models/modality_lifecycle.py check_checkpoint_options single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/models/modality_lifecycle.py check_package_classifier single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/models/modality_lifecycle.py check_package_signature single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/models/modality_lifecycle.py check_run_option_types single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/models/modality_lifecycle.py execute_with_performance single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/models/modality_lifecycle.py parse_checkpoint_signature single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/models/modality_lifecycle.py parse_curation_signature single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/models/modality_lifecycle.py parse_package single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/models/modality_lifecycle.py parse_stage_evidence single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/models/modality_lifecycle.py perturbed_contribution_reports single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/models/modality_lifecycle.py require_feature_names single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/models/registry.py add_user_adapter single-use documented registry API, named in the registry docstring
-scmle/models/registry.py builtin_names single-use also named by a test
-scmle/models/registry.py remove_user_adapter single-use documented registry API, named in the registry docstring
-scmle/models/wrappers.py monotone single-use documented factory whose docstring states the classifier/regressor choice
-scmle/monitoring/events.py inference_timestamp single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/monitoring/incidents.py check_transition single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/monitoring/labels.py bypass_test single-use also named by a test
-scmle/monitoring/labels.py feedback_verdict single-use also named by a test
-scmle/monitoring/labels.py is_matured single-use also named by a test
-scmle/monitoring/reference.py population_stability_index single-use also named by a test
-scmle/operations/faults.py audit_continuity single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/operations/faults.py detect_performance_loss single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/operations/faults.py metrics_destination_outage single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/operations/faults.py object_store_loss single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/operations/faults.py secret_rotation single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/operations/logs.py parse_traceparent single-use also named by a test
 scmle/operations/metrics.py cpu_seconds single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/operations/notify.py urllib_transport single-use also named by a test
-scmle/operations/signals.py zero_one_losses single-use also named by a test
-scmle/optimization/optimizers.py create_optimizer single-use also named by a test
-scmle/optimization/optimizers.py suggest_float single-use registered singledispatch implementation
-scmle/optimization/optimizers.py suggest_int single-use registered singledispatch implementation
-scmle/runners/entrypoint.py load_workload single-use also named by a test
-scmle/runners/entrypoint.py open_store single-use also named by a test
 scmle/runners/entrypoint.py require_started_spec single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/runners/entrypoint.py spec_from_store single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/runners/project.py saved_run single-use also named by a test
-scmle/runners/roles.py check_distinct single-use also named by a test
 scmle/security/access.py bearer_token single-use name states the intent of a short check; inlining would duplicate its docstring contract
 scmle/security/access.py client_key single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/security/remote.py discover single-use also named by a test
-scmle/security/remote.py revocation_list_of single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/security/tokens.py require_number single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/security/tokens.py sign_hs256 single-use also named by a test
-scmle/trail/chain.py check_steps single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/trail/inputs.py criterion_problems single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
 scmle/trail/outcomes.py case_costs single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/trail/show.py facts_lines single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/unsupervised/clustering.py score_candidate single-use body is more than a few lines and the name states its intent; inlining would lengthen the caller
-scmle/workflow/executor.py run_id_for single-use also named by a test
 scmle/workflow/executor.py signing_matches single-use name states the intent of a short check; inlining would duplicate its docstring contract
-scmle/governance/deployment_ledger.py require_object_body single-use raising inline inside the try trips ruff TRY301; the helper keeps the raise out of the try
