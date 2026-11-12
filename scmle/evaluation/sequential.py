@@ -826,8 +826,10 @@ class Estimator:
         )
         fingerprint = fingerprint_frame(frame)
         period_values = ordered_periods(prepared, self.estimand.time_column)
-        subject_values = ordered_subjects(
-            prepared, self.estimand.subject_identity
+        # Subjects of mixed types sort by type name, then by `repr`.
+        subject_values = sorted(
+            prepared[self.estimand.subject_identity].drop_duplicates().tolist(),
+            key=lambda value: (type(value).__name__, repr(value)),
         )
         matrices = build_matrices(
             prepared, self.estimand, period_values, subject_values
@@ -1090,33 +1092,6 @@ def check_subject_and_time(frame: pandas.DataFrame, estimand: Estimand) -> None:
     validate_time_order(frame, estimand)
 
 
-def drop_incomplete_subjects(
-    frame: pandas.DataFrame,
-    prepared: pandas.DataFrame,
-    missing_mask: pandas.Series,
-    subject_name: str,
-) -> tuple[pandas.DataFrame, int, int]:
-    """Removes every subject that has a missing value in any row.
-
-    Args:
-        frame: The input panel.
-        prepared: The declared columns of the panel.
-        missing_mask: True for rows with a missing value.
-        subject_name: Name of the subject column.
-
-    Returns:
-        The prepared frame without the dropped subjects, the number of
-        subjects dropped and the number of rows dropped.
-    """
-    bad_subjects = set(frame.loc[missing_mask, subject_name].tolist())
-    keep_mask = ~prepared[subject_name].isin(bad_subjects)
-    return (
-        prepared.loc[keep_mask].copy(),
-        len(bad_subjects),
-        int((~keep_mask).sum()),
-    )
-
-
 def convert_numeric_columns(
     prepared: pandas.DataFrame, value_columns: list[str]
 ) -> None:
@@ -1203,9 +1178,11 @@ def prepare_sequential_frame(
     if missing_mask.any() and policy.missingness == "reject":
         raise ValueError("missing treatment, outcome, or covariate values")
     if missing_mask.any():
-        prepared, subjects_dropped, rows_dropped = drop_incomplete_subjects(
-            frame, prepared, missing_mask, subject_name
-        )
+        dropped_subjects = set(frame.loc[missing_mask, subject_name].tolist())
+        keep_mask = ~prepared[subject_name].isin(dropped_subjects)
+        subjects_dropped = len(dropped_subjects)
+        rows_dropped = int((~keep_mask).sum())
+        prepared = prepared.loc[keep_mask].copy()
     convert_numeric_columns(prepared, value_columns)
     if prepared.empty:
         raise ValueError("missingness policy left no subjects")
@@ -1271,21 +1248,6 @@ def ordered_periods(frame: pandas.DataFrame, time_column: str) -> list[Any]:
         return frame[time_column].drop_duplicates().sort_values().tolist()
     except (TypeError, ValueError) as error:
         raise ValueError("time values have invalid ordering") from error
-
-
-def ordered_subjects(frame: pandas.DataFrame, subject_column: str) -> list[Any]:
-    """Returns subject identities in a deterministic, type-aware order.
-
-    Args:
-        frame: Long-format panel.
-        subject_column: Name of the subject column.
-
-    Returns:
-        The distinct subject identities sorted by type name, then by
-        `repr`.
-    """
-    values = frame[subject_column].drop_duplicates().tolist()
-    return sorted(values, key=lambda value: (type(value).__name__, repr(value)))
 
 
 def validate_baseline_covariates(

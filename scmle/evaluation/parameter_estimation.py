@@ -1149,7 +1149,15 @@ def fit_linear_estimator(
     covariance = covariance_matrix(
         design, residuals, policy.covariance, cluster_values, None
     )
-    reference = reference_linear(design, values, coefficients, policy)
+    reference_coefficients = numpy.linalg.lstsq(design, values, rcond=None)[0]
+    reference_difference = float(
+        numpy.max(numpy.abs(reference_coefficients - coefficients))
+    )
+    reference = {
+        "method": "numpy.linalg.lstsq",
+        "max_absolute_difference": reference_difference,
+        "passed": reference_difference <= policy.reference_tolerance,
+    }
     likelihood = "gaussian"
     degrees_of_freedom = max(len(values) - design.shape[1], 1)
     pivot = stats.t.ppf(0.5 + policy.confidence_level / 2.0, degrees_of_freedom)
@@ -1740,7 +1748,8 @@ def estimate_parameters(
     matrix = numpy.asarray(features, dtype=float)
     values = numpy.asarray(outcome, dtype=float)
     validate_matrix(matrix, len(estimand.feature_names), "features")
-    validate_vector(values, "outcome")
+    if values.ndim != 1:
+        raise ValueError("outcome must have shape (rows,)")
     input_clusters = validate_clusters(clusters, len(values))
     raw_input_fingerprint_value = raw_input_fingerprint(
         matrix, values, input_clusters
@@ -1932,20 +1941,6 @@ def validate_matrix(matrix: numpy.ndarray, columns: int, name: str) -> None:
         raise ValueError(f"{name} must have shape (rows, {columns})")
     if matrix.shape[0] <= columns:
         raise ValueError("estimation needs more rows than parameters")
-
-
-def validate_vector(values: numpy.ndarray, name: str) -> None:
-    """Checks that a vector is one-dimensional without altering it.
-
-    Args:
-        values: Vector to check.
-        name: Vector name used in the error message.
-
-    Raises:
-        ValueError: If the array is not one-dimensional.
-    """
-    if values.ndim != 1:
-        raise ValueError(f"{name} must have shape (rows,)")
 
 
 def validate_clusters(
@@ -4445,33 +4440,6 @@ def covariance_matrix(
     )
     sandwich: numpy.ndarray = correction * bread @ meat @ bread
     return sandwich
-
-
-def reference_linear(
-    design: numpy.ndarray,
-    values: numpy.ndarray,
-    coefficients: numpy.ndarray,
-    policy: Config,
-) -> dict[str, Any]:
-    """Independently verifies the linear solution with least squares.
-
-    Args:
-        design: Design matrix including the intercept column.
-        values: Outcome vector.
-        coefficients: Coefficients from the primary fit.
-        policy: Supplies the reference tolerance.
-
-    Returns:
-        A dictionary with the method name, the largest absolute coefficient
-        difference, and ``passed``, True when it is within the tolerance.
-    """
-    reference = numpy.linalg.lstsq(design, values, rcond=None)[0]
-    difference = float(numpy.max(numpy.abs(reference - coefficients)))
-    return {
-        "method": "numpy.linalg.lstsq",
-        "max_absolute_difference": difference,
-        "passed": difference <= policy.reference_tolerance,
-    }
 
 
 def reference_ipw_ate(
