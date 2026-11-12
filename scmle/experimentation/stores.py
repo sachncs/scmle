@@ -227,7 +227,10 @@ class SqliteExperimentStore(ExperimentStore):
         """
         self.path = pathlib.Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with durability.path_lock(self.path), self.session() as connection:
+        with (
+            durability.path_lock(self.path),
+            self.session(write=False) as connection,
+        ):
             connection.executescript(SCHEMA)
             self.migrate(connection)
 
@@ -283,11 +286,23 @@ class SqliteExperimentStore(ExperimentStore):
                 raise
 
     @contextlib.contextmanager
-    def session(self) -> Generator[sqlite3.Connection, None, None]:
+    def session(
+        self, write: bool = True
+    ) -> Generator[sqlite3.Connection, None, None]:
         """Opens a transaction and always closes the connection.
 
         `with sqlite3.connect(...)` only commits or rolls back; it never closes,
         which leaks a connection per call.
+
+        A write session starts with `BEGIN IMMEDIATE`, which takes the write
+        lock up front. A deferred transaction first takes a shared lock and
+        then upgrades it; two such writers can each wait for the other, and
+        SQLite then fails one with "database is locked" at once, ignoring the
+        busy timeout.
+
+        Args:
+            write: Whether the session writes. Reads and schema setup pass
+                False and keep the default deferred transaction.
 
         Yields:
             An open connection; the transaction commits when the block ends
@@ -296,6 +311,8 @@ class SqliteExperimentStore(ExperimentStore):
         connection = self.connect()
         try:
             with connection:
+                if write:
+                    connection.execute("BEGIN IMMEDIATE")
                 yield connection
         finally:
             connection.close()
@@ -395,7 +412,7 @@ class SqliteExperimentStore(ExperimentStore):
         Returns:
             One dict per run, ordered by start time and run id, descending.
         """
-        with self.session() as connection:
+        with self.session(write=False) as connection:
             rows = connection.execute(
                 "SELECT * FROM runs ORDER BY started_at DESC, run_id DESC"
             ).fetchall()
@@ -410,7 +427,7 @@ class SqliteExperimentStore(ExperimentStore):
         Returns:
             One dict per trial.
         """
-        with self.session() as connection:
+        with self.session(write=False) as connection:
             rows = connection.execute(
                 "SELECT * FROM trials WHERE run_id = ? ORDER BY trial_id",
                 (run_id,),
@@ -425,7 +442,7 @@ class SqliteExperimentStore(ExperimentStore):
             a selected model. A missing score is NaN and a missing strategy is
             `default`.
         """
-        with self.session() as connection:
+        with self.session(write=False) as connection:
             rows = connection.execute(
                 "SELECT * FROM runs WHERE state = 'COMPLETED' AND "
                 "fingerprint IS NOT NULL AND selected_model IS NOT NULL "
