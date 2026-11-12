@@ -32,6 +32,18 @@ import scmle.api.project
 from scmle.contracts import tasks
 from scmle.models import registry
 
+# The peak must not include the transient high-water mark of importing the
+# optional libraries, which can exceed the run's own peak and hide the growth.
+# Linux can reset its high-water mark; elsewhere the plain peak is reported.
+reset = False
+if sys.platform == "linux":
+    try:
+        with open("/proc/self/clear_refs", "w") as handle:
+            handle.write("5")
+        reset = True
+    except OSError:
+        reset = False
+
 rows = int(sys.argv[1])
 rng = numpy.random.default_rng(0)
 data = {f"n{i}": rng.normal(size=rows) for i in range(26)}
@@ -59,8 +71,14 @@ with tempfile.TemporaryDirectory() as directory:
         seed=7,
         metric="roc_auc",
     ).run()
+peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+if reset:
+    with open("/proc/self/status") as status:
+        for line in status:
+            if line.startswith("VmHWM:"):
+                peak = int(line.split()[1])
 print(json.dumps({
-    "peak": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+    "peak": peak,
     "table": int(frame.memory_usage(deep=True).sum()),
 }))
 """
