@@ -84,7 +84,6 @@ from fractions import Fraction
 import json
 from pathlib import Path
 from typing import Any
-from typing import NoReturn
 from typing import Protocol
 
 import pandas
@@ -868,7 +867,17 @@ def confirm(
     """
     check_policy(policy)
     if ledger.confirmation is not None:
-        deny_reuse(custody_log or (source.log if source is not None else None))
+        denied_log = custody_log or (source.log if source is not None else None)
+        if denied_log is not None:
+            denied_log.append(
+                "C",
+                "denied",
+                ACTOR,
+                {"reason": "confirmation was already performed"},
+            )
+        raise errors.LeakageError(
+            "the confirmation set was already used for the confirmation"
+        )
     if claim_runner is not None:
         for item in claim_runner.registered:
             ledger.register_claim(
@@ -879,11 +888,20 @@ def confirm(
         None if withdrawal is None else stage_two_record(ledger, withdrawal)
     )
     blocked = family_block(ledger, require_control)
-    early = blocked_outcome(
-        ledger, blocked, source, claim_runner, rule, alpha_confirm, record
-    )
-    if early is not None:
-        return early
+    if blocked is not None and (claim_runner is None or source is None):
+        outcome, reason, held = blocked
+        return finish(
+            ledger,
+            outcome=outcome,
+            reason=reason,
+            claims=held,
+            checks=(),
+            rule=rule,
+            alpha=alpha_confirm,
+            custody_head=None,
+            stage_two=record,
+            runner=claim_runner,
+        )
     if source is None:
         return finish(
             ledger,
@@ -897,11 +915,24 @@ def confirm(
             stage_two=record,
             runner=claim_runner,
         )
-    early, blocked = withdrawn_outcome(
-        ledger, blocked, claim_runner, rule, alpha_confirm, record
-    )
-    if early is not None:
-        return early
+    if blocked is None and record is not None and not record["family"]:
+        blocked = (
+            ALL_WITHDRAWN,
+            "every survivor was withdrawn before C; C was not opened",
+            tuple(withdrawn_claims(ledger, record["withdrawn"]).values()),
+        )
+        if claim_runner is None:
+            return finish(
+                ledger,
+                outcome=blocked[0],
+                reason=blocked[1],
+                claims=blocked[2],
+                checks=(),
+                rule=rule,
+                alpha=alpha_confirm,
+                custody_head=None,
+                stage_two=record,
+            )
     log = custody_log or source.log
     registered = () if claim_runner is None else claim_runner.registered
     claims_hash = log_selection(
@@ -919,118 +950,6 @@ def confirm(
         encode,
         record,
     )
-
-
-def deny_reuse(log: Any) -> NoReturn:
-    """Writes the refusal to reuse the confirmation set, and raises.
-
-    Args:
-        log: The custody log, or None when there is none.
-
-    Raises:
-        LeakageError: Always; the confirmation set was already used.
-    """
-    if log is not None:
-        log.append(
-            "C",
-            "denied",
-            ACTOR,
-            {"reason": "confirmation was already performed"},
-        )
-    raise errors.LeakageError(
-        "the confirmation set was already used for the confirmation"
-    )
-
-
-def blocked_outcome(
-    ledger: scmle.data.ledger.ledger.Ledger,
-    blocked: tuple[str, str, tuple[qualification.Claim, ...]] | None,
-    source: ConfirmationSource | None,
-    claim_runner: ClaimRunner | None,
-    rule: budget.Correction,
-    alpha_confirm: Fraction,
-    record: Mapping[str, Any] | None,
-) -> Confirmation | None:
-    """Ends the confirmation when the family is blocked and `C` is not needed.
-
-    Args:
-        ledger: The ledger with frozen survivors.
-        blocked: Why the family cannot be promoted (see `family_block`), or
-            None.
-        source: The sealed confirmation set, or None.
-        claim_runner: Registered claims, or None.
-        rule: Multiplicity rule used.
-        alpha_confirm: The confirmation level.
-        record: Withdrawal accounting, or None.
-
-    Returns:
-        The confirmation for the blocked outcome when there is no runner to
-        evaluate or no `C` to open; otherwise None.
-    """
-    if blocked is not None and (claim_runner is None or source is None):
-        outcome, reason, held = blocked
-        return finish(
-            ledger,
-            outcome=outcome,
-            reason=reason,
-            claims=held,
-            checks=(),
-            rule=rule,
-            alpha=alpha_confirm,
-            custody_head=None,
-            stage_two=record,
-            runner=claim_runner,
-        )
-    return None
-
-
-def withdrawn_outcome(
-    ledger: scmle.data.ledger.ledger.Ledger,
-    blocked: tuple[str, str, tuple[qualification.Claim, ...]] | None,
-    claim_runner: ClaimRunner | None,
-    rule: budget.Correction,
-    alpha_confirm: Fraction,
-    record: Mapping[str, Any] | None,
-) -> tuple[
-    Confirmation | None,
-    tuple[str, str, tuple[qualification.Claim, ...]] | None,
-]:
-    """Blocks the family when every survivor was withdrawn.
-
-    Args:
-        ledger: The ledger with frozen survivors.
-        blocked: Why the family cannot be promoted, or None.
-        claim_runner: Registered claims, or None.
-        rule: Multiplicity rule used.
-        alpha_confirm: The confirmation level.
-        record: Withdrawal accounting, or None.
-
-    Returns:
-        The confirmation, when every survivor was withdrawn and there is no
-        runner (otherwise None), and the reason the family is blocked, which
-        is the `all_withdrawn` outcome when it applies and `blocked` itself
-        otherwise.
-    """
-    if blocked is None and record is not None and not record["family"]:
-        blocked = (
-            ALL_WITHDRAWN,
-            "every survivor was withdrawn before C; C was not opened",
-            tuple(withdrawn_claims(ledger, record["withdrawn"]).values()),
-        )
-        if claim_runner is None:
-            done = finish(
-                ledger,
-                outcome=blocked[0],
-                reason=blocked[1],
-                claims=blocked[2],
-                checks=(),
-                rule=rule,
-                alpha=alpha_confirm,
-                custody_head=None,
-                stage_two=record,
-            )
-            return done, blocked
-    return None, blocked
 
 
 def log_selection(
@@ -1152,7 +1071,16 @@ def open_and_test(
             stage_two=record,
             runner=claim_runner,
         )
-    ran = run_registered_claims(claim_runner, rows, log)
+    ran: ClaimRun | None = None
+    if claim_runner is not None:
+        try:
+            ran = claim_runner.run(*rows)
+        except Exception as failure:  # noqa: BLE001 -- a crashing claim runner marks its claims failed and is logged, not raised
+            failed = failure_reason("evaluating the registered claims", failure)
+            log.append("C", "claims_failed", ACTOR, {"reason": failed})
+            ran = ClaimRun(
+                {i.claim_id: FAILED for i in claim_runner.registered}, {}
+            )
     if blocked is not None:
         outcome, reason, held = blocked
         return finish(
@@ -1204,34 +1132,6 @@ def open_and_test(
         runner=claim_runner,
         ran=ran,
     )
-
-
-def run_registered_claims(
-    claim_runner: ClaimRunner | None,
-    rows: tuple[pandas.DataFrame, pandas.Series],
-    log: Any,
-) -> ClaimRun | None:
-    """Evaluates the registered claims on the opened rows.
-
-    Args:
-        claim_runner: Registered claims, or None.
-        rows: The features and target of the confirmation set.
-        log: The custody log, which receives `claims_failed` on a failure.
-
-    Returns:
-        What the runner produced; every claim `failed` when it raised; None
-        when there is no runner.
-    """
-    if claim_runner is None:
-        return None
-    try:
-        return claim_runner.run(*rows)
-    except Exception as failure:  # noqa: BLE001 -- a crashing claim runner marks its claims failed and is logged, not raised
-        failed = failure_reason("evaluating the registered claims", failure)
-        log.append("C", "claims_failed", ACTOR, {"reason": failed})
-        return ClaimRun(
-            {i.claim_id: FAILED for i in claim_runner.registered}, {}
-        )
 
 
 def family_block(
