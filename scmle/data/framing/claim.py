@@ -156,6 +156,7 @@ class Rule(Protocol):
         Returns:
             A JSON-ready mapping that identifies the rule.
         """
+        ...
 
     def actions(self, features: pandas.DataFrame) -> numpy.ndarray:
         """Computes the actions of the rule on any rows.
@@ -166,6 +167,7 @@ class Rule(Protocol):
         Returns:
             1.0 for each row the rule acts on, otherwise 0.0.
         """
+        ...
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

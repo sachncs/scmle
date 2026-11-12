@@ -7,6 +7,7 @@ original distribution; this is the only leakage-safe place to resample.
 
 import abc
 from typing import Any
+from typing import cast
 from typing import ClassVar
 from typing import Self
 
@@ -243,12 +244,16 @@ class PreprocessedResamplingClassifier(
         Returns:
             The fitted wrapper.
         """
-        self.preprocessor_ = base.clone(self.preprocessor).fit(features, target)
+        self.preprocessor_ = cast("Any", base.clone(self.preprocessor)).fit(
+            features, target
+        )
         encoded = self.preprocessor_.transform(features)
-        resampled, labels = base.clone(self.sampler).fit_resample(
+        resampled, labels = cast("Any", base.clone(self.sampler)).fit_resample(
             encoded, numpy.asarray(target)
         )
-        self.estimator_ = base.clone(self.estimator).fit(resampled, labels)
+        self.estimator_ = cast("Any", base.clone(self.estimator)).fit(
+            resampled, labels
+        )
         self.classes_ = self.estimator_.classes_
         return self
 
@@ -325,7 +330,7 @@ class ResamplingClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: i
         resampled, resampled_target = self.resampler.resample(
             frame, labels, self.random_state
         )
-        self.estimator_ = base.clone(self.estimator).fit(
+        self.estimator_ = cast("Any", base.clone(self.estimator)).fit(
             resampled, resampled_target
         )
         self.classes_ = self.estimator_.classes_
@@ -423,7 +428,7 @@ class DensityWeightedRegressor(base.RegressorMixin, base.BaseEstimator):  # type
             The fitted wrapper.
         """
         values = numpy.asarray(target, dtype=float)
-        self.estimator_ = base.clone(self.estimator).fit(
+        self.estimator_ = cast("Any", base.clone(self.estimator)).fit(
             features, values, model__sample_weight=self.weights(values)
         )
         return self

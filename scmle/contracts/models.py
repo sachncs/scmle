@@ -50,6 +50,7 @@ class Estimator(Protocol):
         Returns:
             The hyper-parameters by name.
         """
+        ...
 
     def set_params(self, **params: Any) -> Any:
         """Sets hyper-parameters.
@@ -270,3 +271,4 @@ class Resolver(Protocol):
         Returns:
             The adapter.
         """
+        ...

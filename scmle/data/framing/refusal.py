@@ -67,6 +67,7 @@ class SlotSampler(Protocol):
         Returns:
             A mapping from slot name to proposed value.
         """
+        ...
 
 
 def prompt_for(request_text: str, columns: Sequence[str]) -> str:

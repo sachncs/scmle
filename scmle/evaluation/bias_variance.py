@@ -31,8 +31,9 @@ from typing import Any
 
 import numpy
 import pandas
-from sklearn import base
 from sklearn import neighbors
+
+from scmle.contracts import models
 
 MIN_PREDICTIONS = 3
 MIN_NOISE_ROWS = 50
@@ -155,7 +156,7 @@ def verdict_of(variance: float, bias: float) -> str:
 
 
 def collect(
-    build: Callable[[], base.BaseEstimator],
+    build: Callable[[], models.Estimator],
     features: pandas.DataFrame,
     target: pandas.Series,
     replicates: int,
@@ -193,7 +194,7 @@ def collect(
 
 
 def decompose(
-    build: Callable[[], base.BaseEstimator],
+    build: Callable[[], models.Estimator],
     features: pandas.DataFrame,
     target: pandas.Series,
     classification: bool,

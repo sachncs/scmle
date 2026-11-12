@@ -13,6 +13,7 @@ import importlib.metadata
 import platform
 import time
 from typing import Any
+from typing import cast
 
 import numpy
 import pandas
@@ -189,7 +190,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
             for fit_list, evaluate_list in folds:
                 fit = numpy.asarray(fit_list)
                 evaluate = numpy.asarray(evaluate_list)
-                candidate = base.clone(pipeline)
+                candidate = cast("models.Estimator", base.clone(pipeline))
                 candidate.fit(
                     payload.features.iloc[fit], payload.target.iloc[fit]
                 )

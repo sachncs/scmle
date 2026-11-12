@@ -14,6 +14,7 @@ import json
 import logging
 import time
 from typing import Any
+from typing import cast
 from typing import ClassVar
 
 import numpy
@@ -36,6 +37,7 @@ from scmle.contracts import tasks
 import scmle.contracts.data
 import scmle.contracts.evaluation
 import scmle.contracts.evidence
+import scmle.contracts.models
 from scmle.core import causal_claim
 from scmle.core import compiler
 from scmle.core import decision_reports
@@ -4361,9 +4363,9 @@ class PackageStage(Stage):
                 return None
             fit = numpy.asarray(fit_positions)
             evaluate = numpy.asarray(evaluate_positions)
-            candidate = base.clone(template).fit(
-                split.dev_features.iloc[fit], split.dev_target.iloc[fit]
-            )
+            candidate = cast(
+                "scmle.contracts.models.Estimator", base.clone(template)
+            ).fit(split.dev_features.iloc[fit], split.dev_target.iloc[fit])
             rows = split.dev_features.iloc[evaluate]
             held_labels.extend(split.dev_target.iloc[evaluate])
             if entity_column is not None:
@@ -4816,9 +4818,9 @@ class PackageStage(Stage):
                 return None
             fit = numpy.asarray(fit_positions)
             held = numpy.asarray(evaluate_positions)
-            model = base.clone(template).fit(
-                split.dev_features.iloc[fit], split.dev_target.iloc[fit]
-            )
+            model = cast(
+                "scmle.contracts.models.Estimator", base.clone(template)
+            ).fit(split.dev_features.iloc[fit], split.dev_target.iloc[fit])
             fitted.append(
                 (
                     model,

@@ -238,7 +238,7 @@ class Orchestrator:
         """
         self.apply_plan(approved)
         store = scmle.artifacts.store.RunStore.create(output_dir)
-        declaration = dict(
+        declaration: dict[str, Any] = dict(
             parameter_estimation_declaration
             or {"schema_version": 1, "enabled": False}
         )

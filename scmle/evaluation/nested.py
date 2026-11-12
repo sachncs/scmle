@@ -11,12 +11,14 @@ from collections.abc import Callable
 import dataclasses
 import random
 from typing import Any
+from typing import cast
 
 import numpy
 import pandas
 from sklearn import base
 from sklearn import model_selection
 
+from scmle.contracts import models
 from scmle.contracts import search
 
 INNER_FOLDS = 3
@@ -76,7 +78,7 @@ def inner_splitter(
 
 
 def mean_cv_score(
-    model: base.BaseEstimator,
+    model: models.Estimator,
     features: pandas.DataFrame,
     target: pandas.Series,
     scorer: Callable[..., float],
@@ -99,13 +101,15 @@ def mean_cv_score(
     folds = inner_splitter(target, classification, seed)
     scores = []
     for fit, held in folds.split(features, target):
-        fitted = base.clone(model).fit(features.iloc[fit], target.iloc[fit])
+        fitted = cast("models.Estimator", base.clone(model)).fit(
+            features.iloc[fit], target.iloc[fit]
+        )
         scores.append(scorer(fitted, features.iloc[held], target.iloc[held]))
     return float(numpy.mean(scores))
 
 
 def nested_score(
-    build: Callable[[dict[str, Any]], base.BaseEstimator],
+    build: Callable[[dict[str, Any]], models.Estimator],
     space: search.SearchSpace | None,
     features: pandas.DataFrame,
     target: pandas.Series,

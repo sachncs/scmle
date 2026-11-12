@@ -22,8 +22,9 @@ from typing import Any
 
 import numpy
 import pandas
-from sklearn import base
 from sklearn import model_selection
+
+from scmle.contracts import models
 
 MIN_ROWS = 40
 NOISE_LEVELS = (0.0, 0.1, 0.25, 0.5, 1.0)
@@ -122,7 +123,7 @@ def spread_of(scores: list[float]) -> Spread:
     )
 
 
-def reseeded(build: Callable[[], base.BaseEstimator], seed: int) -> Any:
+def reseeded(build: Callable[[], models.Estimator], seed: int) -> Any:
     """Builds a fresh estimator with its random seed set, when it has one.
 
     Args:
@@ -139,7 +140,7 @@ def reseeded(build: Callable[[], base.BaseEstimator], seed: int) -> Any:
 
 
 def training_sensitivity(
-    build: Callable[[], base.BaseEstimator],
+    build: Callable[[], models.Estimator],
     features: pandas.DataFrame,
     target: pandas.Series,
     scorer: Scorer,
@@ -185,7 +186,7 @@ def training_sensitivity(
 
 
 def evaluation_sensitivity(
-    build: Callable[[], base.BaseEstimator],
+    build: Callable[[], models.Estimator],
     features: pandas.DataFrame,
     target: pandas.Series,
     scorer: Scorer,
@@ -285,7 +286,7 @@ def performance_sensitivity(
 
 
 def analyze(
-    build: Callable[[], base.BaseEstimator],
+    build: Callable[[], models.Estimator],
     features: pandas.DataFrame,
     target: pandas.Series,
     scorer: Scorer,

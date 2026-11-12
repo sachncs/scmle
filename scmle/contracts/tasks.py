@@ -129,7 +129,7 @@ def forecast_nodes(record: dict[str, Any], value: str) -> list[dict[str, Any]]:
         is set.
     """
     period = record.get("seasonal_period")
-    lags = list(record.get("forecast_lags") or DEFAULT_LAGS)
+    lags: list[int] = list(record.get("forecast_lags") or DEFAULT_LAGS)
     if period and period not in lags:
         lags.append(int(period))
     windows = list(record.get("forecast_windows") or DEFAULT_WINDOWS)
