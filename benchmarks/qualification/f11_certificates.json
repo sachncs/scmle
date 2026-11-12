@@ -5,7 +5,7 @@
       "code_hash": "f31c5f5177073c8c93eabce9d86033a4459b1f3928b667b84b3a653af8e2c7dd",
       "passed": true,
       "replicates": 200,
-      "seconds": 7.1,
+      "seconds": 8.6,
       "seeds": [
         0,
         200
@@ -74,7 +74,7 @@
         "1.6": 1.0
       },
       "replicates": 2000,
-      "seconds": 2.7,
+      "seconds": 3.2,
       "seeds": [
         0,
         2000
@@ -88,7 +88,7 @@
       "passed": true,
       "replicates": 200,
       "se": 0.00019469819851509966,
-      "seconds": 0.1,
+      "seconds": 0.2,
       "seeds": [
         0,
         200
@@ -100,7 +100,7 @@
       "code_hash": "bbc1f705e0527b005d84d387c2026c3913619f233cbd01cc408c99f7b28deafe",
       "passed": false,
       "replicates": 2000,
-      "seconds": 109.2,
+      "seconds": 123.9,
       "seeds": [
         0,
         2000
@@ -185,7 +185,7 @@
         "1.5": 0.9133333333333333
       },
       "replicates": 2000,
-      "seconds": 41.1,
+      "seconds": 46.6,
       "seeds": [
         0,
         2000
@@ -283,7 +283,7 @@
         }
       },
       "replicates": 2000,
-      "seconds": 2.6,
+      "seconds": 2.4,
       "seeds": [
         0,
         2000
@@ -371,7 +371,7 @@
       },
       "passed": true,
       "replicates": 2000,
-      "seconds": 13.3,
+      "seconds": 12.2,
       "seeds": [
         0,
         2000
@@ -390,7 +390,7 @@
         "q95": 0.004483527626684906
       },
       "replicates": 20,
-      "seconds": 61.5,
+      "seconds": 67.8,
       "seeds": [
         0,
         20
@@ -440,7 +440,7 @@
       "passed": true,
       "rate": 0.0037,
       "replicates": 10000,
-      "seconds": 173.5,
+      "seconds": 188.1,
       "seeds": [
         0,
         10000
@@ -473,7 +473,7 @@
       "promotions": 6,
       "rate": 0.0012,
       "replicates": 5000,
-      "seconds": 12.1,
+      "seconds": 12.6,
       "seeds": [
         0,
         5000
@@ -531,7 +531,7 @@
       "passed": true,
       "rate": 0.0019,
       "replicates": 10000,
-      "seconds": 15.8,
+      "seconds": 16.1,
       "seeds": [
         0,
         10000
@@ -541,7 +541,7 @@
       "code_hash": "14009565f5d24b0a3c01b479f21fc8f00342f7165dd547acec83268ee1c11b45",
       "passed": true,
       "replicates": 2000,
-      "seconds": 0.7,
+      "seconds": 0.8,
       "seeds": [
         0,
         2000
@@ -566,7 +566,7 @@
         ]
       },
       "replicates": 1000,
-      "seconds": 6.1,
+      "seconds": 6.6,
       "seeds": [
         0,
         1000
@@ -638,7 +638,7 @@
       "promote_bound": 0.026260990336999412,
       "replicates": 2000,
       "rollback_bound": 0.014449719092257398,
-      "seconds": 70.6,
+      "seconds": 79.2,
       "seeds": [
         0,
         2000
