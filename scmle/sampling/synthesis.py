@@ -1,16 +1,14 @@
-"""Synthetic tabular data: generator contract, copula generator, evaluator.
+"""Synthetic tabular data: generator contract, copula generator, oversamplers.
 
 `SyntheticGenerator` is the plugin contract (fit on real rows, sample new
-ones); `FidelityEvaluator` is its evaluation counterpart. The shipped
-`GaussianCopulaGenerator` preserves each numeric column's marginal
-distribution and the rank correlations between columns, and samples
+ones). The shipped `GaussianCopulaGenerator` preserves each numeric column's
+marginal distribution and the rank correlations between columns, and samples
 categorical columns from their empirical frequencies. Synthetic rows only
 ever enter a *training fold*; whether they help is decided on the original
 validation distribution.
 """
 
 import abc
-import dataclasses
 from typing import Any
 from typing import ClassVar
 from typing import Self
@@ -241,99 +239,3 @@ class CopulaOverSampler(GeneratorOverSampler):
 
     name = "copula_oversample"
     generator_class = GaussianCopulaGenerator
-
-
-@dataclasses.dataclass(frozen=True)
-class Fidelity:
-    """How closely synthetic rows resemble the real ones.
-
-    Attributes:
-        max_marginal_ks: Largest two-sample KS distance over numeric columns.
-        max_category_distance: Largest total-variation distance over
-            categorical columns.
-        correlation_error: Largest absolute difference between the numeric
-            correlation matrices.
-        duplicate_share: Share of synthetic rows that exactly copy a real row
-            (a privacy / overfitting red flag).
-    """
-
-    max_marginal_ks: float
-    max_category_distance: float
-    correlation_error: float
-    duplicate_share: float
-
-
-class FidelityEvaluator:
-    """Scores synthetic data against the real data it imitates."""
-
-    def evaluate(
-        self, real: pandas.DataFrame, synthetic: pandas.DataFrame
-    ) -> Fidelity:
-        """Compares marginals, dependence structure and verbatim copying.
-
-        Args:
-            real: Real rows.
-            synthetic: Synthetic rows with the same columns.
-
-        Returns:
-            The fidelity measures; see `Fidelity` for their meaning.
-        """
-        numeric = [
-            str(c)
-            for c in real.columns
-            if pandas.api.types.is_numeric_dtype(real[c])
-            and not pandas.api.types.is_bool_dtype(real[c])
-        ]
-        categorical = [str(c) for c in real.columns if c not in numeric]
-        ks = 0.0
-        for column in numeric:
-            a = numpy.sort(real[column].dropna().to_numpy(dtype=float))
-            b = numpy.sort(synthetic[column].dropna().to_numpy(dtype=float))
-            if len(a) and len(b):
-                grid = numpy.union1d(a, b)
-                ks = max(
-                    ks,
-                    float(
-                        numpy.max(
-                            numpy.abs(
-                                numpy.searchsorted(a, grid, side="right")
-                                / len(a)
-                                - numpy.searchsorted(b, grid, side="right")
-                                / len(b)
-                            )
-                        )
-                    ),
-                )
-        tv = 0.0
-        for column in categorical:
-            p = real[column].value_counts(normalize=True)
-            q = synthetic[column].value_counts(normalize=True)
-            levels = p.index.union(q.index)
-            tv = max(
-                tv,
-                float(
-                    0.5
-                    * numpy.abs(
-                        p.reindex(levels, fill_value=0)
-                        - q.reindex(levels, fill_value=0)
-                    ).sum()
-                ),
-            )
-        error = 0.0
-        if len(numeric) > 1:
-            real_corr = (
-                real[numeric].astype(float).corr(method="spearman").to_numpy()
-            )
-            fake_corr = (
-                synthetic[numeric]
-                .astype(float)
-                .corr(method="spearman")
-                .to_numpy()
-            )
-            error = float(numpy.nanmax(numpy.abs(real_corr - fake_corr)))
-        real_keys = set(map(tuple, real.astype(str).to_numpy().tolist()))
-        copies = sum(
-            tuple(row) in real_keys
-            for row in synthetic.astype(str).to_numpy().tolist()
-        )
-        return Fidelity(ks, tv, error, copies / max(len(synthetic), 1))
