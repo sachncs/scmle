@@ -1095,63 +1095,6 @@ def read_edges(
     )
 
 
-def record_weight(
-    record: Mapping[str, Any], weight_column: str, index: int
-) -> float:
-    """Reads the weight of an edge record.
-
-    Args:
-        record: The edge record.
-        weight_column: Key of the weight; a missing key defaults to 1.0.
-        index: 1-based record number, for the message.
-
-    Returns:
-        The weight as a float.
-
-    Raises:
-        GraphInputError: If the weight is null or non-numeric.
-    """
-    weight_value = record.get(weight_column, 1.0)
-    if pandas.isna(weight_value):
-        raise GraphInputError(f"edge record {index} has an invalid weight")
-    try:
-        return float(weight_value)
-    except (TypeError, ValueError) as error:
-        raise GraphInputError(
-            f"edge record {index} has a non-numeric weight"
-        ) from error
-
-
-def record_event_time(
-    record: Mapping[str, Any], time_column: str | None, index: int
-) -> datetime | None:
-    """Reads the event time of an edge record.
-
-    Args:
-        record: The edge record.
-        time_column: Key of the event time, or None for untimed edges.
-        index: 1-based record number, for the message.
-
-    Returns:
-        The event time normalised to UTC, or None when there is no time
-        column or the value is missing or null.
-
-    Raises:
-        GraphInputError: If the event time is invalid.
-    """
-    if time_column is None:
-        return None
-    time_value = record.get(time_column)
-    if time_value is None or pandas.isna(time_value):
-        return None
-    try:
-        return canonical_event_time(time_value)
-    except GraphTemporalError as error:
-        raise GraphInputError(
-            f"edge record {index} has an invalid event time"
-        ) from error
-
-
 def edges_from_records(
     records: Iterable[Mapping[str, Any]],
     source_column: str = "source",
@@ -1192,11 +1135,27 @@ def edges_from_records(
         target = record[target_column]
         if pandas.isna(source) or pandas.isna(target):
             raise GraphInputError(f"edge record {index} has a missing endpoint")
-        weight = record_weight(record, weight_column, index)
+        weight_value = record.get(weight_column, 1.0)
+        if pandas.isna(weight_value):
+            raise GraphInputError(f"edge record {index} has an invalid weight")
+        try:
+            weight = float(weight_value)
+        except (TypeError, ValueError) as error:
+            raise GraphInputError(
+                f"edge record {index} has a non-numeric weight"
+            ) from error
         relation_value = record.get(relation_column, "default")
         if pandas.isna(relation_value):
             relation_value = "default"
-        event_time = record_event_time(record, time_column, index)
+        event_time = None
+        time_value = None if time_column is None else record.get(time_column)
+        if time_value is not None and not pandas.isna(time_value):
+            try:
+                event_time = canonical_event_time(time_value)
+            except GraphTemporalError as error:
+                raise GraphInputError(
+                    f"edge record {index} has an invalid event time"
+                ) from error
         try:
             edges.append(
                 Edge(
