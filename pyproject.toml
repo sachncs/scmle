@@ -101,8 +101,21 @@ dev = [
 [tool.basedpyright]
 include = ["scmle"]
 pythonVersion = "3.11"
-typeCheckingMode = "standard"
+typeCheckingMode = "strict"
 # No baseline: every error fails the check.
+#
+# Third-party libraries without type information (scikit-learn, scipy, pandas)
+# make every value that flows out of them partially Unknown, and ship no stubs.
+# These rules would only report that, not a defect in this code.
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
+reportUnknownParameterType = "none"
+reportUnknownLambdaType = "none"
+reportMissingTypeStubs = "none"
+# Public API inputs are validated at runtime on purpose, even where the
+# annotation already promises the type; those isinstance checks must stay.
+reportUnnecessaryIsInstance = "none"
 
 [tool.deptry]
 [tool.deptry.package_module_name_map]
