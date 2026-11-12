@@ -158,12 +158,12 @@ def test_blank_or_non_text_requirements_are_rejected_individually():
 
 def test_plan_error_messages_name_the_gap():
     with pytest.raises(
-        ValueError, match="^verification status requires execution evidence$"
+        ValueError, match=r"^verification status requires execution evidence$"
     ):
         make_plan(status=reliability.VerificationStatus.FAILED)
     with pytest.raises(
         ValueError,
-        match="^passed scenario is missing evidence requirements: "
+        match=r"^passed scenario is missing evidence requirements: "
         "checkpoint_resume$",
     ):
         make_plan(
@@ -172,7 +172,7 @@ def test_plan_error_messages_name_the_gap():
         )
     with pytest.raises(
         ValueError,
-        match="^passed scenario requires safe outcome evidence only$",
+        match=r"^passed scenario requires safe outcome evidence only$",
     ):
         make_plan(
             status=reliability.VerificationStatus.PASSED,
@@ -206,11 +206,11 @@ def test_record_evidence_validates_its_input_with_specific_messages():
     registry = reliability.Registry.production_beta()
     scenario = reliability.FaultScenario.PROCESS_DEATH
     with pytest.raises(
-        ValueError, match="^evidence must be a non-empty tuple$"
+        ValueError, match=r"^evidence must be a non-empty tuple$"
     ):
         registry.record_evidence(scenario, ())
     with pytest.raises(
-        ValueError, match="^evidence must be a non-empty tuple$"
+        ValueError, match=r"^evidence must be a non-empty tuple$"
     ):
         registry.record_evidence(
             scenario, [make_evidence("process_termination")]
@@ -220,14 +220,14 @@ def test_record_evidence_validates_its_input_with_specific_messages():
     )
     with pytest.raises(
         ValueError,
-        match="^evidence for one scenario must share an execution_id$",
+        match=r"^evidence for one scenario must share an execution_id$",
     ):
         registry.record_evidence(
             scenario, (make_evidence("process_termination"), other)
         )
     with pytest.raises(
         ValueError,
-        match="^evidence has unexpected requirements: a_extra, b_extra$",
+        match=r"^evidence has unexpected requirements: a_extra, b_extra$",
     ):
         registry.record_evidence(
             scenario,

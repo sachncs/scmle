@@ -22,7 +22,7 @@ def test_required_text_rejects_a_blank_value_and_a_non_mapping_step():
         attestation.required_text({"a": "  "}, "a")
     with pytest.raises(ValueError, match="non-empty text: a"):
         attestation.required_text({"a": 5}, "a")
-    with pytest.raises(ValueError, match="missing attestation field: a.b"):
+    with pytest.raises(ValueError, match=r"missing attestation field: a.b"):
         attestation.required_text({"a": "text"}, "a.b")
     with pytest.raises(ValueError, match="missing attestation field: x"):
         attestation.required_text({"y": "v"}, "x")
@@ -114,7 +114,7 @@ def test_from_dict_rejects_blank_or_missing_signature_values():
         attestation.ReleaseAttestation.from_dict(persisted)
     persisted["signature"] = {"algorithm": "nope", "value": "v"}
     with pytest.raises(
-        ValueError, match="^unsupported attestation signature algorithm$"
+        ValueError, match=r"^unsupported attestation signature algorithm$"
     ):
         attestation.ReleaseAttestation.from_dict(persisted)
 
