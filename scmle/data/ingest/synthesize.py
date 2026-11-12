@@ -193,32 +193,6 @@ def candidate_columns(source: Source) -> tuple[list[str], list[str]]:
     return numeric, other
 
 
-def lookup_features(
-    index: int, table: str, columns: Sequence[str]
-) -> list[Feature]:
-    """Lists the lookups of a parent source.
-
-    Args:
-        index: Position of the source.
-        table: Name of the source's view.
-        columns: The columns to look up.
-
-    Returns:
-        One lookup feature per column, taking the last value.
-    """
-    return [
-        Feature(
-            f"{table}__lookup__{column}",
-            "lookup",
-            index,
-            LAST,
-            column,
-            None,
-        )
-        for column in columns
-    ]
-
-
 def aggregate_features(
     index: int,
     table: str,
@@ -347,7 +321,17 @@ def propose(
         table = source.view.name
         numeric, other = candidate_columns(source)
         if source.role == PARENT:
-            specs.extend(lookup_features(index, table, (*numeric, *other)))
+            specs.extend(
+                Feature(
+                    f"{table}__lookup__{column}",
+                    "lookup",
+                    index,
+                    LAST,
+                    column,
+                    None,
+                )
+                for column in (*numeric, *other)
+            )
             continue
         specs.extend(aggregate_features(index, table, numeric, other, windows))
     specs.extend(nested_features(sources, nests, windows))
