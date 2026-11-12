@@ -63,14 +63,6 @@ class Log:
         self.events: list[Event] = []
         self.listeners: list[Callable[[Event], None]] = []
 
-    def subscribe(self, listener: Callable[[Event], None]) -> None:
-        """Registers a callback invoked for every emitted event.
-
-        Args:
-            listener: Function receiving each event after it is recorded.
-        """
-        self.listeners.append(listener)
-
     def emit(self, event: Event) -> None:
         """Records an event, logs it, appends it to the file and notifies.
 
