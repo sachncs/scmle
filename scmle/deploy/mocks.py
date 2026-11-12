@@ -17,7 +17,6 @@ import pathlib
 import threading
 import time
 from typing import Any
-from typing import cast
 from typing import ClassVar
 import urllib.request
 
@@ -514,7 +513,7 @@ def main(arguments: list[str] | None = None) -> int:
         0 after the service is stopped by a keyboard interrupt.
     """
     parser = argparse.ArgumentParser(
-        description=cast("str", __doc__).split("\n\n")[0]
+        description=__doc__.split("\n\n")[0]  # pyright: ignore[reportOptionalMemberAccess]  # the module docstring is always present
     )
     actions = parser.add_subparsers(dest="service", required=True)
     store = actions.add_parser("object-store")

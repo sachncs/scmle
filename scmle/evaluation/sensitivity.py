@@ -19,6 +19,7 @@ value where higher is better.
 from collections.abc import Callable
 import dataclasses
 from typing import Any
+from typing import cast
 
 import numpy
 import pandas
@@ -165,8 +166,11 @@ def training_sensitivity(
     Returns:
         (seed spread, resample spread).
     """
-    train, test = model_selection.train_test_split(
-        numpy.arange(len(target)), test_size=0.3, random_state=seed
+    train, test = cast(
+        "tuple[numpy.ndarray, numpy.ndarray]",
+        model_selection.train_test_split(
+            numpy.arange(len(target)), test_size=0.3, random_state=seed
+        ),
     )
     held = features.iloc[test], target.iloc[test]
     by_seed = []
@@ -211,8 +215,13 @@ def evaluation_sensitivity(
     """
     scores = []
     for index in range(repeats):
-        train, test = model_selection.train_test_split(
-            numpy.arange(len(target)), test_size=0.3, random_state=seed + index
+        train, test = cast(
+            "tuple[numpy.ndarray, numpy.ndarray]",
+            model_selection.train_test_split(
+                numpy.arange(len(target)),
+                test_size=0.3,
+                random_state=seed + index,
+            ),
         )
         model = reseeded(build, seed).fit(
             features.iloc[train], target.iloc[train]
@@ -321,8 +330,11 @@ def analyze(
     by_split = evaluation_sensitivity(
         build, features, target, scorer, repeats, seed
     )
-    train, test = model_selection.train_test_split(
-        numpy.arange(len(target)), test_size=0.3, random_state=seed
+    train, test = cast(
+        "tuple[numpy.ndarray, numpy.ndarray]",
+        model_selection.train_test_split(
+            numpy.arange(len(target)), test_size=0.3, random_state=seed
+        ),
     )
     model = reseeded(build, seed).fit(features.iloc[train], target.iloc[train])
     curve, slope = performance_sensitivity(

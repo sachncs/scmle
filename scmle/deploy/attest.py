@@ -24,7 +24,6 @@ import json
 import pathlib
 import sys
 from typing import Any
-from typing import cast
 
 from scmle.contracts import errors
 from scmle.contracts import signing
@@ -343,7 +342,7 @@ def main(arguments: list[str] | None = None) -> int:
         or the attestation cannot be made (the error goes to stderr).
     """
     parser = argparse.ArgumentParser(
-        description=cast("str", __doc__).split("\n\n")[0]
+        description=__doc__.split("\n\n")[0]  # pyright: ignore[reportOptionalMemberAccess]  # the module docstring is always present
     )
     actions = parser.add_subparsers(dest="action", required=True)
     image = actions.add_parser("image", help="attest a built image")

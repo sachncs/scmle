@@ -13,7 +13,6 @@ import subprocess  # nosec B404
 import sys
 import threading
 import time
-from typing import cast
 
 KEY_BYTES = 32
 CONNECT_SECONDS = 120.0
@@ -85,7 +84,7 @@ def start_helper(
         try:
             # On Windows accept() yields a PipeConnection, which has the same
             # send/recv/poll/close surface the callers use.
-            accepted.append(cast("connection.Connection", listener.accept()))
+            accepted.append(listener.accept())  # pyright: ignore[reportArgumentType]  # typeshed lists PipeConnection on every platform
         except BaseException as error:  # noqa: BLE001 -- reported to the caller
             failures.append(error)
 
@@ -119,6 +118,4 @@ def connect_to_parent() -> connection.Connection:
     """
     key = bytes.fromhex(sys.stdin.buffer.read().decode("ascii"))
     # Same Windows PipeConnection note as in `start_helper`.
-    return cast(
-        "connection.Connection", connection.Client(sys.argv[1], authkey=key)
-    )
+    return connection.Client(sys.argv[1], authkey=key)  # pyright: ignore[reportReturnType]  # typeshed lists PipeConnection on every platform

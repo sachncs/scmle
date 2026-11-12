@@ -13,6 +13,7 @@ and normalized mutual information against them.
 
 import dataclasses
 from typing import Any
+from typing import cast
 
 import numpy
 import pandas
@@ -102,7 +103,7 @@ def build(method: str, count: int, seed: int) -> base.BaseEstimator:
         ValueError: If `method` is not one of `METHODS`.
     """
     if method == "kmeans":
-        return cluster.KMeans(count, n_init=5, random_state=seed)
+        return cluster.KMeans(count, n_init=5, random_state=seed)  # pyright: ignore[reportArgumentType]  # scikit-learn infers this parameter as str from its default
     if method == "gaussian_mixture":
         return mixture.GaussianMixture(count, random_state=seed)
     if method == "agglomerative":
@@ -123,7 +124,8 @@ def assign(method: str, count: int, seed: int, matrix: numpy.ndarray) -> Any:
         The cluster label of each row, in row order. An unknown `method` makes
         the underlying `build` raise ValueError.
     """
-    return build(method, count, seed).fit_predict(matrix)
+    # Every clusterer `build` returns defines fit_predict.
+    return cast("Any", build(method, count, seed)).fit_predict(matrix)
 
 
 def stability(

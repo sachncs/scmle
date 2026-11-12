@@ -193,7 +193,7 @@ def classify(
     elif len(categories) > 1:
         verdict = Verdict.MIXED
     else:
-        verdict = Verdict(categories[0].value)
+        verdict = Verdict(categories[0].value)  # pyright: ignore[reportGeneralTypeIssues]  # pyright keeps tuple[()] after the not-categories branch
     severity = "info"
     if verdict is not Verdict.NONE:
         severity = "warning"

@@ -43,6 +43,7 @@ import dataclasses
 import json
 from pathlib import Path
 from typing import Any
+from typing import cast
 from typing import Protocol
 
 import numpy
@@ -283,7 +284,7 @@ def freeze_rule(
         tuple(float(v) for v in means),
         tuple(float(v) for v in scales),
         tuple(float(v) for v in model.coef_[0]),
-        float(model.intercept_[0]),
+        float(cast("numpy.ndarray", model.intercept_)[0]),
         float(cut),
     )
 

@@ -16,6 +16,7 @@ Two kinds of operation exist:
 import abc
 from collections.abc import Mapping
 from typing import Any
+from typing import cast
 from typing import ClassVar
 from typing import Self
 
@@ -136,10 +137,11 @@ class Log1p(FeatureOp):
         Returns:
             `log(1 + max(x, 0))` per row.
         """
-        logged: pandas.Series = numpy.log1p(
-            columns.to_finite(inputs[0]).clip(lower=0)
+        # A ufunc on a Series returns a Series; the numpy stubs say ndarray.
+        return cast(
+            "pandas.Series",
+            numpy.log1p(columns.to_finite(inputs[0]).clip(lower=0)),
         )
-        return logged
 
 
 class Sqrt(FeatureOp):
@@ -163,10 +165,10 @@ class Sqrt(FeatureOp):
         Returns:
             `sqrt(max(x, 0))` per row.
         """
-        roots: pandas.Series = numpy.sqrt(
-            columns.to_finite(inputs[0]).clip(lower=0)
+        return cast(
+            "pandas.Series",
+            numpy.sqrt(columns.to_finite(inputs[0]).clip(lower=0)),
         )
-        return roots
 
 
 class Square(FeatureOp):

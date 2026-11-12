@@ -34,7 +34,6 @@ import sys
 import tempfile
 import time
 from typing import Any
-from typing import cast
 from typing import NoReturn
 import urllib.error
 import urllib.request
@@ -1219,7 +1218,7 @@ def main(arguments: list[str] | None = None) -> int:
         0 if every recorded step held, otherwise 1.
     """
     parser = argparse.ArgumentParser(
-        description=cast("str", __doc__).split("\n\n")[0]
+        description=__doc__.split("\n\n")[0]  # pyright: ignore[reportOptionalMemberAccess]  # the module docstring is always present
     )
     actions = parser.add_subparsers(dest="action", required=True)
     for name in ("run", "prepare", "verify"):

@@ -420,7 +420,7 @@ class NumericKind(ColumnKind):
             strategy raises `ConfigError` (from `imputer`) when imputation
             is enabled.
         """
-        steps = [
+        steps: list[tuple[str, Any]] = [
             (
                 "cast",
                 preprocessing.FunctionTransformer(
@@ -692,7 +692,9 @@ class CategoricalKind(ColumnKind):
         if encoding == "target":
             return self.encoded_with(
                 preprocessing.TargetEncoder(
-                    smooth="auto", cv=5, random_state=seed
+                    smooth="auto",
+                    cv=5,
+                    random_state=seed,  # pyright: ignore[reportArgumentType]  # scikit-learn infers this parameter as str from its default
                 )
             )
         if encoding == "ordinal":

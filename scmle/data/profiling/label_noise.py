@@ -10,6 +10,7 @@ Suspects are candidates for review, not proof of error.
 
 import dataclasses
 from typing import Any
+from typing import cast
 
 import numpy
 import pandas
@@ -141,18 +142,21 @@ def find_label_noise(
     folds = min(FOLDS, int(min(counts)))
     if folds < MIN_FOLDS:
         raise ValueError("every class needs at least two rows")
-    probabilities = model_selection.cross_val_predict(
-        ensemble.HistGradientBoostingClassifier(
-            max_iter=ESTIMATOR_MAX_ITER,
-            max_leaf_nodes=ESTIMATOR_MAX_LEAF_NODES,
-            random_state=seed,
+    probabilities = cast(
+        "numpy.ndarray",
+        model_selection.cross_val_predict(
+            ensemble.HistGradientBoostingClassifier(
+                max_iter=ESTIMATOR_MAX_ITER,
+                max_leaf_nodes=ESTIMATOR_MAX_LEAF_NODES,
+                random_state=seed,
+            ),
+            features,
+            encoded,
+            cv=model_selection.StratifiedKFold(
+                folds, shuffle=True, random_state=seed
+            ),
+            method="predict_proba",
         ),
-        features,
-        encoded,
-        cv=model_selection.StratifiedKFold(
-            folds, shuffle=True, random_state=seed
-        ),
-        method="predict_proba",
     )
     own = probabilities[numpy.arange(len(encoded)), encoded]
     thresholds = numpy.array(

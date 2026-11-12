@@ -9,6 +9,7 @@ import json
 import math
 import pathlib
 from typing import Any
+from typing import cast
 
 from scmle.contracts import errors
 from scmle.contracts import experiments
@@ -157,7 +158,9 @@ class MlflowExperimentStore(stores.ExperimentStore):
                 self.client.log_metric(parent, "cv_score", float(value))
             elif name == "test_metrics":
                 metrics = (
-                    value if isinstance(value, dict) else json.loads(value)
+                    value
+                    if isinstance(value, dict)
+                    else json.loads(cast("str", value))
                 )
                 for key, number in metrics.items():
                     if not math.isnan(float(number)):  # Skip NaN.

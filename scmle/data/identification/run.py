@@ -23,6 +23,7 @@ from fractions import Fraction
 import hashlib
 import json
 from typing import Any
+from typing import cast
 
 import numpy
 import pandas
@@ -339,8 +340,11 @@ class BackdoorEstimator(Estimator):
         )
         e = self.nuisances.predict(self.x)[0]
         t = aipw.binary(self.x[spec.treatment], spec.treatment)
-        matrix = self.nuisances.scaler.transform(
-            self.nuisances.design.matrix(self.x)
+        matrix = cast(
+            "numpy.ndarray",
+            self.nuisances.scaler.transform(
+                self.nuisances.design.matrix(self.x)
+            ),
         )
         self.design = {
             "overlap_on_x": aipw.overlap_report(e, t, matrix),

@@ -9,6 +9,7 @@ A good model's curve rises above the straight line a random ranking gives.
 
 import dataclasses
 from typing import Any
+from typing import cast
 
 import numpy
 import pandas
@@ -196,13 +197,18 @@ def check_propensity(
         return Propensity(
             share, 0.5, randomized=True, note="no numeric covariates to check"
         )
-    scores = model_selection.cross_val_predict(
-        linear_model.LogisticRegression(max_iter=500),
-        (numeric - numeric.mean(0))
-        / numpy.where(numeric.std(0) > 0, numeric.std(0), 1),
-        arm,
-        cv=model_selection.StratifiedKFold(3, shuffle=True, random_state=seed),
-        method="predict_proba",
+    scores = cast(
+        "numpy.ndarray",
+        model_selection.cross_val_predict(
+            linear_model.LogisticRegression(max_iter=500),
+            (numeric - numeric.mean(0))
+            / numpy.where(numeric.std(0) > 0, numeric.std(0), 1),
+            arm,
+            cv=model_selection.StratifiedKFold(
+                3, shuffle=True, random_state=seed
+            ),
+            method="predict_proba",
+        ),
     )[:, 1]
     auc = float(metrics.roc_auc_score(arm, scores))
     found = balance.balance_test(features, arm, seed)

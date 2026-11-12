@@ -4907,7 +4907,7 @@ def reference_hierarchical_reml(
             residual_variance * numpy.eye(count)
             + random_intercept_variance * numpy.ones((count, count))
         )
-    covariance = linalg.block_diag(*covariance_blocks)
+    covariance = cast("numpy.ndarray", linalg.block_diag(*covariance_blocks))
     precision = linalg.solve(covariance, numpy.eye(len(values)), assume_a="pos")
     # scipy.linalg.solve is typed as returning a generic array; the product
     # is an ndarray at runtime.
@@ -5070,7 +5070,7 @@ def reference_hierarchical_random_slope_reml(
             @ random_effect_covariance
             @ random_effect_design.T
         )
-    covariance = linalg.block_diag(*covariance_blocks)
+    covariance = cast("numpy.ndarray", linalg.block_diag(*covariance_blocks))
     precision = linalg.solve(covariance, numpy.eye(len(values)), assume_a="pos")
     # scipy.linalg.solve is typed as returning a generic array; the product
     # is an ndarray at runtime.

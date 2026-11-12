@@ -9,6 +9,7 @@ Kolmogorov-Smirnov tests and category-share gaps point at where.
 
 import dataclasses
 from typing import Any
+from typing import cast
 
 import numpy
 import pandas
@@ -147,7 +148,7 @@ def column_gap(sample: pandas.Series, reference: pandas.Series) -> ColumnGap:
         result = stats.ks_2samp(sample.dropna(), reference.dropna())
         return ColumnGap(
             str(sample.name),
-            float(result.statistic),
+            float(result.statistic),  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
             float(result.pvalue),  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
         )
     left = sample.astype(str).value_counts(normalize=True)
@@ -184,14 +185,17 @@ def compare_to_reference(
         if not pandas.api.types.is_numeric_dtype(both[name]):
             both[name] = both[name].astype("category").cat.codes
     side = numpy.r_[numpy.zeros(len(sample)), numpy.ones(len(reference))]
-    scores = model_selection.cross_val_predict(
-        ensemble.HistGradientBoostingClassifier(random_state=seed),
-        both,
-        side,
-        cv=model_selection.StratifiedKFold(
-            FOLDS, shuffle=True, random_state=seed
+    scores = cast(
+        "numpy.ndarray",
+        model_selection.cross_val_predict(
+            ensemble.HistGradientBoostingClassifier(random_state=seed),
+            both,
+            side,
+            cv=model_selection.StratifiedKFold(
+                FOLDS, shuffle=True, random_state=seed
+            ),
+            method="predict_proba",
         ),
-        method="predict_proba",
     )[:, 1]
     auc = float(metrics.roc_auc_score(side, scores))
     gaps = sorted(

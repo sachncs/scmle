@@ -20,7 +20,6 @@ import json
 from pathlib import Path
 import sys
 from typing import Any
-from typing import cast
 
 SEVERITIES = ("UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL")
 DEFAULT_POLICY: dict[str, Any] = {
@@ -318,7 +317,7 @@ def main(arguments: list[str] | None = None) -> int:
         or policy cannot be trusted.
     """
     parser = argparse.ArgumentParser(
-        description=cast("str", __doc__).split("\n\n")[0]
+        description=__doc__.split("\n\n")[0]  # pyright: ignore[reportOptionalMemberAccess]  # the module docstring is always present
     )
     parser.add_argument("report", type=Path)
     parser.add_argument("--policy", type=Path)
