@@ -59,67 +59,6 @@ scmle/data/admissibility/screen.py observed_predictions single-use documented ou
 scmle/data/admissibility/screen.py purity_statistic single-use documented statistic builder paired with skill_statistic; hash-bound certificate source with a suppression that editing would stale
 scmle/data/admissibility/screen.py required_permutations single-use documented permutation count formula, tested directly; hash-bound certificate source
 scmle/data/admissibility/screen.py skill_statistic single-use documented statistic builder tested directly; hash-bound certificate source
-scmle/data/admissibility/screen.py strata_of single-use documented permutation stratum rule, tested directly; hash-bound certificate source
-scmle/data/admissibility/screen.py work_cap single-use documented deterministic budget formula named in comments and tested directly
-scmle/data/catalog.py canonical_collection single-use documented mapping, sequence and set canonicalisation half of canonical_value, whose sort rules it states
-scmle/data/catalog.py check_notes single-use documented validation of the catalog limitations and release blockers, kept out of the long __post_init__
-scmle/data/catalog.py duplicates_for_frame single-use documented duplicate measurement that returns a not_observed summary on unsupported equality
-scmle/data/catalog.py frame_content single-use documented canonical row serialisation that feeds the content hash
-scmle/data/catalog.py frame_for_array single-use documented array-dimension cases of the observation frame conversion
-scmle/data/catalog.py frame_for_data single-use documented dispatcher of the frame conversions with its return contract and ValueError
-scmle/data/catalog.py frame_for_mapping single-use documented columns-versus-record rule of the frame conversion
-scmle/data/catalog.py normalize_uri single-use documented URI normalisation that never fetches remote data
-scmle/data/charter/contracts.py read_charter single-use public charter reader used by the CLI and named by three tests
-scmle/data/charter/feasibility.py mde_mean single-use public closed-form MDE tested directly and cross-checked in the power tests
-scmle/data/charter/feasibility.py n_required_mean single-use public closed-form sample size, named by fourteen tests including the statistics tests
-scmle/data/charter/feasibility.py power_mean single-use public closed-form power, named by nine tests including the statistics tests
-scmle/data/charter/sealing.py write_charter single-use public charter writer named by sixty tests and by the CLI
-scmle/data/curation/preprocessing.py wrap_estimator single-use documented survival, forecast, multi-target and query wrapping order separated from pipeline assembly
-scmle/data/custody/carve.py autocorrelation single-use documented biased sample autocorrelation tested directly four times
-scmle/data/custody/carve.py close_over_units single-use documented whole-unit closure of the carve, tested by the custody mutants test
-scmle/data/custody/carve.py link_equal_codes single-use documented union-find linking of equal key codes, with the negative-code skip rule
-scmle/data/custody/carve.py pick_units single-use documented stratified whole-unit selection, tested by the custody mutants test
-scmle/data/custody/carve.py restrict_folds single-use documented fold re-expression whose ConfigError the carve docstring names; tested directly
-scmle/data/custody/carve.py unit_labels single-use documented transitive group and duplicate merging; the custody mutants notes name it
-scmle/data/custody/manifest.py read_v1 single-use documented v1 manifest reader with its 16-hex fingerprint check, the counterpart of the current-format reader
-scmle/data/custody/merkle.py combine single-use documented tagged parent hash, tested directly ten times
-scmle/data/custody/merkle.py merkle_root single-use documented Merkle fold, tested directly and named in the custody mutants notes
-scmle/data/custody/merkle.py row_hashes single-use documented leaf hashing in ascending id order, tested directly and named in the mutants notes
-scmle/data/detectors/certificates.py docstring_lines single-use documented docstring-only line finder for the source hash normalisation; hash-bound certificate source
-scmle/data/detectors/labels.py confident_assignment single-use documented confident-joint assignment tested directly
-scmle/data/detectors/labels.py confident_learning_flags single-use documented off-diagonal confident-joint flags tested directly
-scmle/data/detectors/labels.py hoeffding_bound single-use documented Hoeffding half-width tested directly against the formula
-scmle/data/detectors/labels.py margin_flags single-use documented area-under-the-margin flag rule tested directly
-scmle/data/detectors/labels.py noise_rate single-use public noise-rate interval with a documented audit contract, tested directly
-scmle/data/detectors/missingness.py fit_one single-use documented train-rows-only imputer fit tested directly for leakage
-scmle/data/detectors/missingness.py fold_imputers single-use documented per-fold imputer fit tested directly for train-only state
-scmle/data/detectors/missingness.py make_imputer single-use documented strategy-to-imputer factory whose ValueError is tested
-scmle/data/detectors/pipeline.py label_step single-use documented label-noise step that returns the decline reason instead of raising
-scmle/data/detectors/sentinels.py recode_missing single-use documented recode and log step tested directly
-scmle/data/framing/draft.py link_report single-use documented descriptive column-link report, tested directly
-scmle/data/framing/provenance.py claim_tier single-use documented tier ceiling rule that the framing docs and four tests name
-scmle/data/framing/questions.py gain_sign_verdict single-use documented verdict-function builder tested directly
-scmle/data/identification/aipw.py weighted_smd single-use documented IPW-weighted standardised difference used as a golden-test target
-scmle/data/identification/certified.py certified_gates single-use public certificate reader tested directly three times
-scmle/data/identification/certified.py method_hashes single-use documented gate-to-code-hash map also used by the F10 certification benchmark
-scmle/data/identification/certified.py subgroup_method_hash single-use documented subgroup certificate hash shared with the subgroup certification benchmark and tests
-scmle/data/identification/did.py event_arms single-use documented per-event-time arm construction that separates estimation from covariance in the event study
-scmle/data/identification/did.py event_covariance single-use documented event-study covariance estimator separated from the estimation loop
-scmle/data/identification/did.py wide_panel single-use documented balanced-panel reshape with its ValueError contract, used as a golden-test target
-scmle/data/identification/run.py closing_notes single-use documented note list for unsupported controls and unchecked adjustment sets
-scmle/data/identification/run.py subgroup_results single-use documented subgroup estimation that restores the adapter's weak flag
-scmle/data/identification/tier.py evidence_shortfalls single-use documented falsification, replication and sensitivity reasons, the counterpart of tier_conditions
-scmle/data/identification/tier.py tier_conditions single-use documented evaluation of the five tier conditions, the counterpart of evidence_shortfalls
-scmle/data/ingest/declared.py reconcile_source single-use documented source reconciliation named by the ingest stage docstring and tested directly
-scmle/data/ingest/entities.py candidate_pairs single-use documented blocking with its skipped-block count, tested directly five times
-scmle/data/ingest/entities.py jaro_winkler single-use documented similarity function tested against the standard value
-scmle/data/ingest/entities.py thresholds_from_bands single-use documented band-to-threshold rule for match and group calls
-scmle/data/ingest/grain.py level_admitted single-use documented budget admission of one lattice level
-scmle/data/ingest/grain.py level_candidates single-use documented candidate-set construction of one lattice level
-scmle/data/ingest/grain.py measure_level single-use documented query step of one lattice level that keeps the not-queried candidates in
-scmle/data/ingest/grain.py scan_single_columns single-use documented query-free level 1 of the key lattice from profile counts
-scmle/data/ingest/grain.py subset_verdict single-use documented coarser-key subset search with its unknown-on-budget-stop result
-scmle/data/ingest/grain.py unit_components single-use documented unit-text word extraction tested directly
 scmle/data/ingest/joins.py single_column_pairs single-use documented child-column to parent-key pairing, separated from the candidate scoring
 scmle/data/ingest/profile.py has_total_order single-use documented ORDER BY detection tested directly and exercised by the ingest certification benchmark
 scmle/data/ingest/profile.py profile_catalog single-use public catalog profiler with a documented table-boundary stop, named by nine tests

@@ -1,0 +1,57 @@
+scmle/data/admissibility/screen.py strata_of single-use three assertions in test_leakage_screen pin its group, time-block and single-stratum cases, and the screen driver that calls it once is already a long function of hypothesis bookkeeping
+scmle/data/admissibility/screen.py work_cap single-use formula time_budget_seconds * SCREEN_SHARE * FITS_PER_SECOND is quoted by name in the module comment above the constants and in two docstrings, and test_screen_budget pins 450_000 and 6_750_000
+scmle/data/catalog.py canonical_collection single-use canonical_value already has six returns, the ruff limit, so inlining the mapping, sequence and set returns would break PLR0911
+scmle/data/catalog.py duplicates_for_frame single-use sibling of missingness_for_frame, schema_for_frame and label_for_frame that observe_data calls in a row; the try/except inlined between them would add 17 lines to a function that already runs past 80
+scmle/data/catalog.py frame_content single-use builds the canonical rows and schema that feed digest_value, so the content identity has one named definition; inlined it would put a nested comprehension into observe_data after its other evidence steps
+scmle/data/catalog.py frame_for_array single-use frame_for_data already has six returns, so the four array-dimension returns here would break PLR0911; the 0-d, 1-d, 2-d and higher cases are one named step
+scmle/data/catalog.py frame_for_data single-use dispatcher whose return contract and ValueError are documented and which observe_data calls once; inlined it would bury observe_data's frame-less branches under an isinstance chain
+scmle/data/catalog.py frame_for_mapping single-use frame_for_data already has six returns, and the columns-versus-record rule with its equal-length ValueError is a separate documented step
+scmle/data/catalog.py normalize_uri single-use body carries the documented rule that a one-letter scheme before a colon is a Windows drive and so a path, which the Source validator should not repeat inside its field loop
+scmle/data/charter/contracts.py read_charter single-use public reader called by cli and by tests/unit/test_charter_contracts and test_charter_rules_sealing_mutants, which assert the wrapped and bare charter forms
+scmle/data/charter/feasibility.py mde_mean single-use public closed form named by six tests in test_charter_feasibility and test_charter_feasibility_mutants, including the n below 1 NaN case
+scmle/data/charter/feasibility.py n_required_mean single-use public closed form named by fourteen tests including tests/statistics/test_power_formulas and by benchmarks/qualification/framing_certify.py
+scmle/data/charter/feasibility.py power_mean single-use public closed form named by tests/statistics/test_power_formulas and eight unit assertions in the feasibility tests
+scmle/data/charter/sealing.py write_charter single-use public writer called by cli and by sixty tests that seal charters
+scmle/data/curation/preprocessing.py wrap_estimator single-use build_pipeline already has ten decision points, the C901 limit, so the five wrapper conditions here would break complexity; the survival, forecast, multi-target, uplift, query wrapping order is also fixed in one place
+scmle/data/custody/carve.py autocorrelation single-use named by tests/unit/test_custody_carve, test_custody_pipeline and MUTANTS_custody.md, which pin its zero result for a constant series
+scmle/data/custody/carve.py close_over_units single-use mutates in_c in place and returns it, a contract test_custody_mutants_data checks, and carve's time-block branch would grow a loop
+scmle/data/custody/carve.py link_equal_codes single-use inlined into unit_labels it raises complexity to 11 against a limit of 10 (checked with ruff), because of the negative-code skip and first-seen branch
+scmle/data/custody/carve.py pick_units single-use named by test_custody_mutants_data, which pins that one unit is always left unmarked and the target rounding
+scmle/data/custody/carve.py restrict_folds single-use raises the ConfigError that the carve docstring names, and test_custody_carve, test_custody_mutants_data and MUTANTS_custody.md call it directly
+scmle/data/custody/carve.py unit_labels single-use union-find with two nested closures (find, union) that MUTANTS_custody.md names; inlined into carve it would add to a function whose decision points are time-block versus stratified draw and the too-few-units note
+scmle/data/custody/merkle.py combine single-use tagged parent hash tested directly by ten assertions in test_custody_merkle, test_custody_mutants and test_reliability_contracts
+scmle/data/custody/merkle.py merkle_root single-use named by test_custody_merkle, test_custody_mutants and MUTANTS_custody.md, which pin the odd-level carry and EMPTY_ROOT
+scmle/data/custody/merkle.py row_hashes single-use named by test_custody_mutants and MUTANTS_custody.md, which pin the ascending-id ordering before hashing
+scmle/data/detectors/certificates.py docstring_lines single-use AST scan that keeps a docstring sharing a line with another statement; test_qualification_certificates pins the resulting hash_source behaviour, and the scan is non-obvious next to hash_source's tokenizer loop
+scmle/data/detectors/labels.py confident_assignment single-use tested directly in test_detector_labels, which pins the -1 result where no class reaches its threshold
+scmle/data/detectors/labels.py confident_learning_flags single-use tested directly in test_detector_labels and its caller detect is a long assembly of the Noise record
+scmle/data/detectors/labels.py hoeffding_bound single-use formula tested directly in test_detector_labels against the closed form
+scmle/data/detectors/labels.py margin_flags single-use tested directly in test_detector_labels, and its docstring states the MARGIN_LEAVES rationale for the area under the margin rule
+scmle/data/detectors/labels.py noise_rate single-use public interval with a documented audit contract (ValueError on duplicate audit positions), tested directly in test_detector_labels
+scmle/data/detectors/missingness.py fit_one single-use named in test_detector_missingness, which asserts the imputer sees train rows only
+scmle/data/detectors/missingness.py fold_imputers single-use named in test_detector_missingness, which asserts per-fold state depends only on the train rows
+scmle/data/detectors/missingness.py make_imputer single-use test_detector_missingness asserts its ValueError for an unknown strategy
+scmle/data/detectors/sentinels.py recode_missing single-use tested directly in test_detector_sentinels, which pins the integer-to-float recode and the log record
+scmle/data/framing/draft.py link_report single-use tested directly in test_framing_draft, which pins the resolved and unresolved statuses and the gating False flag
+scmle/data/framing/provenance.py claim_tier single-use named by claim.py and baseline.py docstrings and by four tests in test_framing_provenance_questions that pin the unsigned LLM and data-derived cost ceilings
+scmle/data/framing/questions.py gain_sign_verdict single-use returns a closure over y, a and b and is tested directly in test_framing_provenance_questions
+scmle/data/identification/aipw.py weighted_smd single-use golden-test target in test_identification_golden, so the IPW formula is pinned by name
+scmle/data/identification/certified.py certified_gates single-use public certificate reader tested in test_f10_certify and test_identification_run_mutants
+scmle/data/identification/certified.py method_hashes single-use also called by benchmarks/qualification/f10_certify.py to write the certificate, so the benchmark and certified_gates must share one definition
+scmle/data/identification/certified.py subgroup_method_hash single-use also called by benchmarks/qualification/subgroup_certify.py and tests, so the certificate writer and checker share one definition of the hashed code
+scmle/data/identification/did.py event_arms single-use inlined together with event_covariance it raises estimate to complexity 11 against a limit of 10 (checked with ruff); estimate is the sequence estimation, covariance, overall_att, pretrend test
+scmle/data/identification/did.py event_covariance single-use inlined together with event_arms it raises estimate to complexity 11 against a limit of 10 (checked with ruff), and its triple loop is a separate statistical step
+scmle/data/identification/did.py wide_panel single-use golden-test target in test_identification_golden with a documented ValueError contract for unbalanced or repeated unit-period pairs
+scmle/data/identification/run.py closing_notes single-use tested directly in test_identification_run_mutants (four references) for the negative-control and unchecked-adjustment notes
+scmle/data/identification/run.py subgroup_results single-use tested directly in test_identification_run_mutants (five references), which pin that adapter.weak is restored
+scmle/data/identification/tier.py evidence_shortfalls single-use inlined into decide it gives complexity 14 and 13 branches against limits of 10 and 12 (checked with ruff)
+scmle/data/identification/tier.py tier_conditions single-use its five keys are the CONDITIONS tuple that decide and Assignment report, so the name documents the tier rule; inlined it fits ruff but puts a twenty line boolean table into decide
+scmle/data/ingest/declared.py reconcile_source single-use named in the ingest stage and declared.py module docstrings and tested directly in test_ingest_declared; its caller is core/ingest_stage
+scmle/data/ingest/entities.py candidate_pairs single-use tested by five references in test_ingest_entities and used by benchmarks/qualification/ingest_certify.py, which read the skipped-block count
+scmle/data/ingest/entities.py jaro_winkler single-use tested against the standard value in test_ingest_entities
+scmle/data/ingest/entities.py thresholds_from_bands single-use the cumulative-precision scan for t_match and the half-rate scan for t_group is non-obvious, and resolve calls it in the labelled branch opposite the lowest_weight calculation of the unlabelled branch
+scmle/data/ingest/grain.py level_candidates single-use builds the apriori-style candidate sets with three comprehensions; inlined into infer_keys, which already has six decision points, it would exceed the complexity limit of 10, which measure_level alone already breaks by one
+scmle/data/ingest/grain.py measure_level single-use inlined into infer_keys it gives complexity 11 against a limit of 10 (checked with ruff)
+scmle/data/ingest/grain.py scan_single_columns single-use level 1 from profile counts with no query is a distinct documented step; inlined it passes ruff but leaves infer_keys at the complexity limit and repeats the KeyCandidate construction of measure_level
+scmle/data/ingest/grain.py subset_verdict single-use unit_verdict already has six returns, the PLR0911 limit, so the two returns here would break it
+scmle/data/ingest/grain.py unit_components single-use tested directly in test_ingest_grain, which pins stop word, joiner and number dropping
