@@ -371,14 +371,16 @@ def register(
     level = qualification.probability(alpha, "alpha")
     if not 0.0 < level < 1.0:
         raise ValueError("alpha must be strictly between 0 and 1")
-    rule_hash = hashlib.sha256(signing.canonical_payload(rule)).hexdigest()
     return Registration(
-        model.model_hash, rule_hash, level, model.t_lo, model.t_hi
+        model.model_hash, rule_digest(rule), level, model.t_lo, model.t_hi
     )
 
 
 def rule_digest(rule: Mapping[str, Any]) -> str:
-    """Hashes a rule description the way `register` does.
+    """Hashes a rule description, for registering it and for re-checking it.
+
+    `register` stores this digest and the evaluation recomputes it, so both
+    sides hash the rule one way.
 
     Args:
         rule: A JSON-ready description of the action rule.
