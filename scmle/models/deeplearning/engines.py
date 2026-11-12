@@ -455,7 +455,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
             )
             if not alive:
                 break
-            monitor.epoch(epoch_loss / plan.updates_per_epoch)
+            monitor.losses.append(epoch_loss / plan.updates_per_epoch)
             self.n_iter_ = epoch + 1
             if not held:
                 continue

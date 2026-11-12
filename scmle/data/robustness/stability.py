@@ -188,7 +188,7 @@ def prepare(
         outlier rule or by `complete_case`, and rows whose target is not
         finite, are removed from both.
     """
-    inclusion = spec.option(INCLUSION, "all")
+    inclusion = spec.to_dict().get(INCLUSION, "all")
     keep = numpy.ones(len(x), dtype=bool)
     if inclusion == "first_half":
         keep = positions < rows / 2.0
@@ -197,7 +197,7 @@ def prepare(
     values = numpy.array(x[keep], dtype=float)
     target = numpy.array(y[keep], dtype=float)
     observed = values[numpy.isfinite(values)]
-    rule = spec.option(OUTLIER_RULE, "none")
+    rule = spec.to_dict().get(OUTLIER_RULE, "none")
     if rule != "none" and observed.size:
         if rule == "winsorize":
             low, high = numpy.percentile(observed, WINSOR_TAILS)
@@ -211,7 +211,7 @@ def prepare(
                 (values < q1 - fence) | (values > q3 + fence)
             )
             values, target = values[~outside], target[~outside]
-    method = spec.option(IMPUTATION, "median")
+    method = spec.to_dict().get(IMPUTATION, "median")
     missing = ~numpy.isfinite(values)
     if method == "complete_case":
         values, target = values[~missing], target[~missing]

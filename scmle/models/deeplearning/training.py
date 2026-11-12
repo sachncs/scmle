@@ -113,14 +113,6 @@ class Monitor:
             self.clipped += 1
         return True
 
-    def epoch(self, loss: float) -> None:
-        """Records the mean training loss of an epoch.
-
-        Args:
-            loss: Mean training loss over the epoch.
-        """
-        self.losses.append(loss)
-
     def report(self) -> dict[str, Any]:
         """Summarizes the run and names the failure mode, if any.
 

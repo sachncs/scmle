@@ -121,7 +121,7 @@ def test_jepa_has_a_complete_experimental_tabular_capability():
         inference=capabilities.Inference.LIBRARY,
     )
 
-    declaration = registry.find(key)
+    declaration = registry.records.get(key)
 
     assert declaration is not None
     assert declaration.status is capabilities.Status.EXPERIMENTAL

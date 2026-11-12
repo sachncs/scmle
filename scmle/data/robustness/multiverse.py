@@ -60,19 +60,6 @@ class Specification:
         """The hex SHA-256 of the specification's (choice, option) pairs."""
         return digest([list(pair) for pair in self.values])
 
-    def option(self, choice: str, default: str) -> str:
-        """Looks up the option chosen for a choice.
-
-        Args:
-            choice: Name of the choice.
-            default: Option to return when the specification does not vary
-                the choice.
-
-        Returns:
-            The option chosen for `choice`, or `default` when absent.
-        """
-        return dict(self.values).get(choice, default)
-
     def to_dict(self) -> dict[str, str]:
         """Converts the specification to a dictionary.
 

@@ -11,7 +11,7 @@ asks for nothing more of custody.
 
 The claim is fixed first. `claim_document` states, before the rows are
 released, the levels, the methods, the tolerance and the rule; its hash
-(`claim_hash`, the digest the ledgers use) is registered by the run (the
+(its `ledger.digest`) is registered by the run (the
 custody log of a charter run, the event log always) and the report carries it,
 so a report for a different claim is detectable (`claims verify`).
 
@@ -28,7 +28,6 @@ import numpy
 import pandas
 
 from scmle.contracts import errors
-from scmle.data.ledger import ledger
 from scmle.evaluation import coverage
 from scmle.evaluation import coverage_slices
 
@@ -88,18 +87,6 @@ def claim_document(
         "charter_hash": charter_hash,
         **({"slice_columns": list(slice_columns)} if slice_columns else {}),
     }
-
-
-def claim_hash(claim: dict[str, Any]) -> str:
-    """The hash that registers the claim.
-
-    Args:
-        claim: The claim document.
-
-    Returns:
-        Its ledger digest.
-    """
-    return ledger.digest(claim)
 
 
 def declared_slices(

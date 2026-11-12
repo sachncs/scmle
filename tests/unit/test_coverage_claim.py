@@ -30,13 +30,8 @@ def test_the_claim_names_levels_methods_and_the_rule_and_hashes_stably():
     assert claim["methods"] == ["residual", "cv_plus", "quantile"]
     assert claim["tolerance"] == 0.02
     assert claim["rows_read"] == "once, by the final evaluation"
-    assert coverage_run.claim_hash(claim) == coverage_run.claim_hash(
-        make_claim()
-    )
-    assert coverage_run.claim_hash(claim) == ledger.digest(claim)
-    assert coverage_run.claim_hash(claim) != coverage_run.claim_hash(
-        make_claim(levels=(0.5, 0.95))
-    )
+    assert ledger.digest(claim) == ledger.digest(make_claim())
+    assert ledger.digest(claim) != ledger.digest(make_claim(levels=(0.5, 0.95)))
 
 
 def test_classification_claims_name_set_modes():
@@ -80,7 +75,7 @@ KEY = "k"
 def run_folder(tmp_path, order=("coverage_claim_registered",)):
     claim = make_claim()
     (tmp_path / "coverage_claim.json").write_text(json.dumps(claim))
-    report = {"claim_sha256": coverage_run.claim_hash(claim), "methods": {}}
+    report = {"claim_sha256": ledger.digest(claim), "methods": {}}
     (tmp_path / "coverage_report.json").write_text(json.dumps(report))
     log = sealed.OpenLog(tmp_path / claims_audit.CUSTODY_FILE, KEY)
     for event in order:
@@ -88,7 +83,7 @@ def run_folder(tmp_path, order=("coverage_claim_registered",)):
             "final_test",
             event,
             "scmle.coverage",
-            {"sha256": coverage_run.claim_hash(claim)},
+            {"sha256": ledger.digest(claim)},
         )
     return claim
 

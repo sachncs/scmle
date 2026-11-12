@@ -8,7 +8,6 @@ from test_decision_reports_run import run
 
 from scmle.artifacts import claims_audit
 from scmle.data.ledger import ledger
-from scmle.evaluation import coverage_run
 
 
 def read(folder, name):
@@ -29,7 +28,7 @@ def test_the_claim_is_hashed_and_registered_before_the_test_rows_open(
     claim = read(folder, "coverage_claim.json")
     report = read(folder, "coverage_report.json")
     sha = ledger.digest(claim)
-    assert report["claim_sha256"] == sha == coverage_run.claim_hash(claim)
+    assert report["claim_sha256"] == sha == ledger.digest(claim)
     order = kinds(folder)
     assert order.index("coverage.registered") < order.index("test.opened")
     assert order.index("test.opened") < order.index("coverage.reported")
@@ -61,7 +60,7 @@ def test_a_run_without_a_charter_writes_the_claim_too(tmp_path):
     claim = read(folder, "coverage_claim.json")
     assert claim["task"] == "regression"
     assert read(folder, "coverage_report.json")["claim_sha256"] == (
-        coverage_run.claim_hash(claim)
+        ledger.digest(claim)
     )
     order = kinds(folder)
     assert order.index("coverage.registered") < order.index("test.opened")
@@ -125,7 +124,7 @@ def test_the_coverage_claim_is_tested_once_on_c_after_the_model_is_frozen(
     assert document["status"] in ("confirmed", "unverified")
     assert document["rows"] > 0 and document["alpha"] == 0.05
     claim = read(folder, "coverage_claim.json")
-    assert document["coverage_claim_sha256"] == coverage_run.claim_hash(claim)
+    assert document["coverage_claim_sha256"] == ledger.digest(claim)
     registered = read(folder, "confirmed_claims.json")["registered_claims"]
     assert registered["coverage_nominal"]["status"] == document["status"]
     assert registered["coverage_nominal"]["kind"] == "coverage"

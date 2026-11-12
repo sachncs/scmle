@@ -35,7 +35,7 @@ def healthy(monitor):
     for epoch in range(6):
         for step in range(5):
             monitor.step(1.0 + 0 * step, 0.5, 5.0)
-        monitor.epoch(1.0 - 0.12 * epoch)
+        monitor.losses.append(1.0 - 0.12 * epoch)
     return monitor
 
 
@@ -58,7 +58,7 @@ def test_gradient_spikes_are_reported_as_exploding_and_counted_as_clipped():
     for norm in [0.5] * 20 + [900.0]:
         monitor.step(1.0, norm, 5.0)
     for epoch in range(3):
-        monitor.epoch(1.0 - 0.2 * epoch)
+        monitor.losses.append(1.0 - 0.2 * epoch)
 
     report = monitor.report()
 
@@ -70,7 +70,7 @@ def test_near_zero_gradients_are_vanishing():
     for step in range(30):
         monitor.step(0.7 + 0 * step, 1e-10, 5.0)
     for epoch in range(4):
-        monitor.epoch(0.7 + 0 * epoch)
+        monitor.losses.append(0.7 + 0 * epoch)
 
     assert monitor.report()["verdict"] == "vanishing"
 
@@ -80,6 +80,6 @@ def test_a_flat_loss_with_live_gradients_is_stalled():
     for step in range(30):
         monitor.step(0.7 + 0 * step, 0.4, 5.0)
     for epoch in range(5):
-        monitor.epoch(0.7 + 0 * epoch)
+        monitor.losses.append(0.7 + 0 * epoch)
 
     assert monitor.report()["verdict"] == "stalled"

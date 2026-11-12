@@ -699,17 +699,6 @@ class Registry:
             )
         self.model_families[declaration.model_family] = declaration
 
-    def find(self, key: Coordinate) -> Capability | None:
-        """Returns a declaration or ``None`` when the key is unregistered.
-
-        Args:
-            key: The capability request.
-
-        Returns:
-            The registered capability, or None.
-        """
-        return self.records.get(key)
-
     def find_model_family(
         self,
         model_family: str,
@@ -790,7 +779,7 @@ class Registry:
         if any(not isinstance(status, Status) for status in statuses):
             raise TypeError("allowed_statuses must contain Status")
 
-        capability = self.find(key)
+        capability = self.records.get(key)
         if capability is None:
             return self.undeclared_diagnostics(key, statuses)
 
@@ -1050,7 +1039,7 @@ class Registry:
             ConfigError: Defensive guard that cannot trigger in practice,
                 since an unregistered key always produces a diagnostic.
         """
-        capability = self.find(key)
+        capability = self.records.get(key)
         diagnostics = self.diagnose(
             key,
             allowed_statuses,
