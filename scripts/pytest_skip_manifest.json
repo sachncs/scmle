@@ -48,6 +48,10 @@
     {
       "category": "environment",
       "pattern": "^POSIX load average and slot directories$"
+    },
+    {
+      "category": "environment",
+      "pattern": "^the probe reads resource\\.getrusage, which Windows does not have$"
     }
   ]
 }
