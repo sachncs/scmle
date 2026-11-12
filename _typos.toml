@@ -1,0 +1,36 @@
+# Domain terms and data files that the spell checker would otherwise flag.
+[files]
+extend-exclude = [
+    "tests/fixtures/",
+    "benchmarks/sota/*.csv",
+    "uv.lock",
+]
+
+[default.extend-words]
+# e-LOND: the online false-discovery-rate procedure.
+LOND = "LOND"
+Lond = "Lond"
+lond = "lond"
+# Recovery time objective.
+RTO = "RTO"
+rto = "rto"
+# False-positive rate, mean absolute percentage error, tree-structured Parzen estimator.
+fpr = "fpr"
+mape = "mape"
+MAPE = "MAPE"
+TPE = "TPE"
+# Causal-inference term, statistical term, and accepted spellings.
+compliers = "compliers"
+squareds = "squareds"
+unparseable = "unparseable"
+writeable = "writeable"
+# Deliberate truncated words and misspellings that tests and examples use.
+opem = "opem"
+sur = "sur"
+secur = "secur"
+mis = "mis"
+fals = "fals"
+recal = "recal"
+ttest = "ttest"
+womens = "womens"
+certifi = "certifi"

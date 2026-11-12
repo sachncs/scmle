@@ -90,7 +90,73 @@ dev = [
     "mutmut>=3.8",
     "pip-audit>=2.9",
     "twine>=6.2",
+    "deptry>=0.23",
+    "vulture>=2.14",
+    "import-linter>=2.3",
+    "validate-pyproject>=0.24",
+    "check-wheel-contents>=0.6",
+    "basedpyright>=1.31",
 ]
+
+[tool.basedpyright]
+include = ["scmle"]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+# Errors that existed when this check was added are recorded in
+# .basedpyright/baseline.json; the check fails only on new ones.
+baselineFile = ".basedpyright/baseline.json"
+
+[tool.deptry]
+[tool.deptry.package_module_name_map]
+pillow = "PIL"
+imbalanced-learn = "imblearn"
+scikit-learn = "sklearn"
+
+[tool.deptry.per_rule_ignores]
+# benchmarks/qualification/make_f5_oracles.py is an offline generator that needs
+# cleanlab, which is not a dependency of the package.
+DEP001 = ["cleanlab"]
+# Optional extras are imported lazily and guarded, so deptry cannot see them.
+DEP002 = [
+    "catboost",
+    "torch",
+    "keras",
+    "filelock",
+    "tabpfn",
+    "sentence-transformers",
+    "skl2onnx",
+    "onnxruntime",
+    "onnxmltools",
+    "optuna",
+    "imbalanced-learn",
+    "polars",
+    "openpyxl",
+    "mlflow",
+    "huggingface_hub",
+    "openml",
+    "ray",
+    "pillow",
+    "scmle",
+]
+# `packaging` is imported inside a try block and its absence is handled.
+DEP003 = ["packaging"]
+
+[tool.vulture]
+paths = ["scmle"]
+min_confidence = 80
+# Parameters that an override or a callback signature must accept.
+ignore_names = ["deep", "unused", "keywords", "ignored"]
+
+[tool.importlinter]
+root_packages = ["scmle", "tests", "benchmarks", "scripts"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "The package does not import its tests, benchmarks or scripts"
+type = "forbidden"
+source_modules = ["scmle"]
+forbidden_modules = ["tests", "benchmarks", "scripts"]
+allow_indirect_imports = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["scmle"]
@@ -211,3 +277,24 @@ explicit = true
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.importlinter.contracts]]
+name = "Foundation packages import nothing else from scmle"
+type = "forbidden"
+source_modules = ["scmle.contracts", "scmle.durability", "scmle.unsupervised"]
+forbidden_modules = [
+    "scmle.api", "scmle.artifacts", "scmle.cli", "scmle.core", "scmle.data",
+    "scmle.decision", "scmle.deploy", "scmle.evaluation", "scmle.experimentation",
+    "scmle.explainability", "scmle.features", "scmle.governance", "scmle.inference",
+    "scmle.integrations", "scmle.intelligence", "scmle.models", "scmle.monitoring",
+    "scmle.operations", "scmle.optimization", "scmle.runners", "scmle.sampling",
+    "scmle.security", "scmle.trail", "scmle.workflow",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Nothing imports the command-line module"
+type = "forbidden"
+source_modules = ["scmle"]
+forbidden_modules = ["scmle.cli"]
+allow_indirect_imports = true

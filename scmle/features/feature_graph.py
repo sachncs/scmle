@@ -308,7 +308,7 @@ class Product(FeatureOp):
         params: Params,  # noqa: ARG002 -- FeatureOp interface
         state: Any,  # noqa: ARG002 -- FeatureOp interface
     ) -> pandas.Series:
-        """Multiplys the inputs.
+        """Multiplies the inputs.
 
         Args:
             inputs: Two or more columns.
