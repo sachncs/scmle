@@ -49,7 +49,12 @@ jobs:
       - run: uv run ruff check . && uv run ruff format --check .
       - run: uv run mypy scmle benchmarks
       - run: uv run python scripts/check_api_compatibility.py tests/fixtures/public_api.json
-      - run: uv run python scripts/check_justified.py --strict
+      # Single-use helpers are a judgement call (plan.md 3a), so they are
+      # reported but do not fail the build; every other shape does.
+      - run: >-
+          uv run python scripts/check_justified.py
+          --fail-on unreferenced --fail-on "tested only" --fail-on passthrough
+          --fail-on getter --fail-on "lone method" --fail-on "lone interface"
       # Keep pull requests bounded. The scheduled full-suite workflow retains
       # coverage for every integration and optional path.
       - run: >-
