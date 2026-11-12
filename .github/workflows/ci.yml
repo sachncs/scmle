@@ -27,7 +27,9 @@ jobs:
   quality:
     name: lint, types, tests (Python ${{ matrix.python }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    # The same test step took 17 to 39 minutes across the matrix on one
+    # commit, and one Python 3.12 run reached the previous 40-minute limit.
+    timeout-minutes: 60
     env:
       UV_PYTHON: ${{ matrix.python }}
       # Shared runners start a Python service several times slower than the
