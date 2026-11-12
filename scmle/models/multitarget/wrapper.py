@@ -1,6 +1,7 @@
 """Carries the other target columns beside the features into a model."""
 
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy
@@ -54,7 +55,7 @@ class MultiTargetEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-
                 frame[list(self.target_columns[1:])].to_numpy(),
             ]
         )
-        steps = base.clone(self.estimator)
+        steps = cast("Any", base.clone(self.estimator))
         self.preprocessing_ = steps[:-1]
         transformed = self.preprocessing_.fit_transform(frame, matrix[:, 0])
         self.model_ = steps[-1].fit(transformed, matrix)

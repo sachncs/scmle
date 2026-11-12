@@ -7,6 +7,7 @@ meaningful within a query.
 """
 
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy
@@ -74,7 +75,7 @@ class PointwiseRanker(base.RegressorMixin, base.BaseEstimator):  # type: ignore[
             This fitted ranker.
         """
         model = self.regressor or ensemble.HistGradientBoostingRegressor()
-        self.regressor_ = base.clone(model).fit(
+        self.regressor_ = cast("Any", base.clone(model)).fit(
             features, numpy.asarray(target, dtype=float)
         )
         return self

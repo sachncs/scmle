@@ -1,6 +1,7 @@
 """Carries the event indicator beside the features into a survival model."""
 
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy
@@ -46,7 +47,7 @@ class EventAwareEstimator(base.RegressorMixin, base.BaseEstimator):  # type: ign
         """
         frame = pandas.DataFrame(features)
         events = frame[self.event_column].to_numpy(dtype=float)
-        steps = base.clone(self.estimator)
+        steps = cast("Any", base.clone(self.estimator))
         self.preprocessing_ = steps[:-1]
         transformed = self.preprocessing_.fit_transform(
             frame, numpy.asarray(target)

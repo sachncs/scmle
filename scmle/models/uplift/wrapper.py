@@ -1,6 +1,7 @@
 """Carries the treatment column beside the features into an uplift model."""
 
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy
@@ -48,7 +49,7 @@ class TreatmentAwareEstimator(base.RegressorMixin, base.BaseEstimator):  # type:
         """
         frame = pandas.DataFrame(features)
         arm = frame[self.treatment_column].to_numpy(dtype=int)
-        steps = base.clone(self.estimator)
+        steps = cast("Any", base.clone(self.estimator))
         self.preprocessing_ = steps[:-1]
         transformed = self.preprocessing_.fit_transform(
             frame, numpy.asarray(target)

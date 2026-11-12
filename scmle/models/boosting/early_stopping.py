@@ -9,6 +9,7 @@ the right stopping arguments for each library.
 
 import inspect
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy
@@ -71,7 +72,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-
         Returns:
             The fitted wrapper.
         """
-        self.estimator_ = base.clone(self.estimator)
+        self.estimator_ = cast("Any", base.clone(self.estimator))
         self.best_iteration_: int | None = None
         if base.is_classifier(self.estimator):
             self.encoder_ = preprocessing.LabelEncoder().fit(target)

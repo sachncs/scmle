@@ -1,6 +1,7 @@
 """Estimators over a matrix of targets: one column per label or quantity."""
 
 from typing import Any
+from typing import cast
 from typing import Self
 
 import numpy
@@ -50,7 +51,7 @@ class PerTarget(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships
                 dummy.DummyClassifier(strategy="prior")
                 if self.classify
                 and len(numpy.unique(values)) < MIN_DISTINCT_VALUES
-                else base.clone(self.estimator)
+                else cast("Any", base.clone(self.estimator))
             )
             self.estimators_.append(model.fit(features, values))
         return self
@@ -123,7 +124,7 @@ class NativeMultiOutput(base.BaseEstimator):  # type: ignore[misc]  # scikit-lea
         Returns:
             This fitted estimator.
         """
-        self.estimator_ = base.clone(self.estimator).fit(
+        self.estimator_ = cast("Any", base.clone(self.estimator)).fit(
             features, numpy.asarray(targets)
         )
         return self
