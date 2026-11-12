@@ -108,6 +108,7 @@ HASH_SENSITIVE = frozenset(
         "tests/unit/test_leakage_screen.py::test_only_the_certified_target_and_settings_may_gate",
         "tests/unit/test_leakage_screen.py::test_the_shipped_certificate_is_current_for_the_screen_code",
         "tests/unit/test_leakage_screen.py::test_with_the_shipped_certificate_a_suspect_blocks",
+        "tests/unit/test_robustness_prefilter_mutants.py::test_the_applied_stage_records_every_field_and_the_fragile_reason",
         "tests/unit/test_robustness_qualify.py::test_the_shipped_certificates_are_found_from_a_checkout",
     )
 )
