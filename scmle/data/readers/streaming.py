@@ -477,30 +477,6 @@ class Checkpoint:
         )
 
 
-def batch_identity(
-    source_identity: str,
-    snapshot_sha256: str,
-    start_offset: int,
-    end_offset: int,
-) -> str:
-    """Returns the stable idempotency key for one source row range.
-
-    Args:
-        source_identity: Identity of the source.
-        snapshot_sha256: Digest of the file snapshot.
-        start_offset: Offset of the first row of the batch.
-        end_offset: Offset just past the last row of the batch.
-
-    Returns:
-        The string "batch_" followed by a SHA-256 hex digest of the four
-        arguments.
-    """
-    payload = (
-        f"{source_identity}:{snapshot_sha256}:{start_offset}:{end_offset}"
-    ).encode()
-    return f"batch_{hashlib.sha256(payload).hexdigest()}"
-
-
 def watermark_value(
     frame: pandas.DataFrame,
     column: str | None,
@@ -599,15 +575,14 @@ class Batch:
             raise ValueError("frame must contain at least one row")
         if self.next_checkpoint.offset <= self.start_offset:
             raise ValueError("checkpoint must advance past the batch start")
+        # The key is stable for one source row range: it hashes the source,
+        # the snapshot and both offsets.
+        payload = (
+            f"{self.source_identity}:{self.snapshot_sha256}:"
+            f"{self.start_offset}:{self.next_checkpoint.offset}"
+        ).encode()
         object.__setattr__(
-            self,
-            "batch_id",
-            batch_identity(
-                self.source_identity,
-                self.snapshot_sha256,
-                self.start_offset,
-                self.next_checkpoint.offset,
-            ),
+            self, "batch_id", f"batch_{hashlib.sha256(payload).hexdigest()}"
         )
 
 

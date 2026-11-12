@@ -207,28 +207,6 @@ def compare_to_reference(
     )
 
 
-def representativeness_report_note(
-    report: Representativeness,
-) -> str | None:
-    """Writes the finding text for a comparison report.
-
-    Args:
-        report: The comparison report.
-
-    Returns:
-        A sentence naming the AUC and the column with the largest gap, or
-        None when the sample is representative.
-    """
-    if report.representative:
-        return None
-    worst = report.gaps[0]
-    return (
-        f"representativeness: development rows are distinguishable from the "
-        f"reference sample (AUC {report.auc:.2f}); the largest gap is in "
-        f"'{worst.column}'"
-    )
-
-
 def assess_representativeness(
     sample: pandas.DataFrame, reference: pandas.DataFrame, seed: int = 0
 ) -> data.QualityObservation:
@@ -312,8 +290,16 @@ def assess_representativeness(
                 ],
             },
         )
+    note = None
+    if not report.representative:
+        worst = report.gaps[0]
+        note = (
+            f"representativeness: development rows are distinguishable from "
+            f"the reference sample (AUC {report.auc:.2f}); the largest gap is "
+            f"in '{worst.column}'"
+        )
     return data.QualityObservation(
-        note=representativeness_report_note(report),
+        note=note,
         evidence=report.quality_evidence(
             sample_rows,
             reference_rows,

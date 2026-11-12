@@ -563,25 +563,6 @@ def evaluate(
     return reduce_rows(outer_rows, spec.primitive, "inner_value", None, count)
 
 
-def tables_read(
-    spec: Feature, sources: Sequence[Source], nests: Sequence[Nest]
-) -> list[asof_view.AsOfView]:
-    """Lists the views a feature reads.
-
-    Args:
-        spec: The feature.
-        sources: Related tables as views.
-        nests: Depth-2 routes.
-
-    Returns:
-        The source view and, for a nested feature, the leaf view.
-    """
-    views = [sources[spec.source].view]
-    if spec.nest is not None:
-        views.append(nests[spec.nest].leaf)
-    return views
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
 class FeatureSet:
     """Kept features, the manifest, and the declared family size.
@@ -677,7 +658,9 @@ def synthesize(
     manifest: list[dict[str, Any]] = []
     seen: dict[str, str] = {}
     for position, spec in enumerate(specs):
-        views = tables_read(spec, sources, nests)
+        views = [sources[spec.source].view]
+        if spec.nest is not None:
+            views.append(nests[spec.nest].leaf)
         tier = asof_view.weakest([v.tier for v in views])
         record: dict[str, Any] = {
             "name": spec.name,

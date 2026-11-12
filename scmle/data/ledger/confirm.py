@@ -869,7 +869,11 @@ def confirm(
     check_policy(policy)
     if ledger.confirmation is not None:
         deny_reuse(custody_log or (source.log if source is not None else None))
-    register_runner_claims(ledger, claim_runner)
+    if claim_runner is not None:
+        for item in claim_runner.registered:
+            ledger.register_claim(
+                item.claim_id, item.kind, item.statement, item.sha256
+            )
     survivors = ledger.freeze()
     record = (
         None if withdrawal is None else stage_two_record(ledger, withdrawal)
@@ -936,22 +940,6 @@ def deny_reuse(log: Any) -> NoReturn:
     raise errors.LeakageError(
         "the confirmation set was already used for the confirmation"
     )
-
-
-def register_runner_claims(
-    ledger: scmle.data.ledger.ledger.Ledger, claim_runner: ClaimRunner | None
-) -> None:
-    """Registers the claims of a runner in the ledger.
-
-    Args:
-        ledger: The run's ledger.
-        claim_runner: The registered claims, or None.
-    """
-    if claim_runner is not None:
-        for item in claim_runner.registered:
-            ledger.register_claim(
-                item.claim_id, item.kind, item.statement, item.sha256
-            )
 
 
 def blocked_outcome(
