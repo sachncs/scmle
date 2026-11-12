@@ -339,39 +339,6 @@ def level_candidates(
     return candidates, runnable
 
 
-def level_admitted(
-    source: profile.SqlSource,
-    stage: str,
-    size: int,
-    rows: int,
-    runnable: Sequence[tuple[str, ...]],
-) -> bool:
-    """Asks the budget to admit a whole level before it runs.
-
-    Args:
-        source: Read-only source, which carries the budget meter.
-        stage: Budget stage name.
-        size: Size of the sets of the level.
-        rows: Row count of the table.
-        runnable: The sets that need a query.
-
-    Returns:
-        False when the budget refuses the level; True when it admits it,
-        when no set needs a query, or when there is no budget.
-    """
-    budget = source.meter
-    if not runnable or budget is None:
-        return True
-    return bool(
-        budget.admit(
-            stage,
-            f"level {size}",
-            rows * 2 * len(runnable),
-            2 * len(runnable),
-        )
-    )
-
-
 def measure_level(
     source: profile.SqlSource,
     table: profile.TableProfile,
@@ -461,7 +428,17 @@ def infer_keys(
         candidates, runnable = level_candidates(
             usable, nonkey, size, table, eps_key
         )
-        if not level_admitted(source, stage, size, table.rows, runnable):
+        budget = source.meter
+        if (
+            runnable
+            and budget is not None
+            and not budget.admit(
+                stage,
+                f"level {size}",
+                table.rows * 2 * len(runnable),
+                2 * len(runnable),
+            )
+        ):
             scan.partial = True
             break
         nonkey = measure_level(source, table, candidates, runnable, scan)

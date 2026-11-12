@@ -547,28 +547,6 @@ def check_counts(sample_count: Any, schema_version: Any) -> None:
         raise ValueError("unsupported catalog schema version")
 
 
-def check_notes(limitations: Any, release_blockers: Any) -> None:
-    """Checks the two lists of notes of a catalog.
-
-    Args:
-        limitations: The limitations to check.
-        release_blockers: The release blockers to check.
-
-    Raises:
-        ValueError: If `limitations` is empty or either has a blank or
-            non-string entry.
-    """
-    if not limitations or any(
-        not isinstance(item, str) or not item.strip() for item in limitations
-    ):
-        raise ValueError("limitations must contain non-empty strings")
-    if any(
-        not isinstance(item, str) or not item.strip()
-        for item in release_blockers
-    ):
-        raise ValueError("release_blockers must contain non-empty strings")
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
 class Catalog:
     """Versioned, model-agnostic curation evidence for one data snapshot.
@@ -629,7 +607,18 @@ class Catalog:
             raise TypeError("duplicates must be DuplicateSummary")
         if not isinstance(self.label, LabelSummary):
             raise TypeError("label must be LabelSummary")
-        check_notes(self.limitations, self.release_blockers)
+        limitation_notes: Iterable[object] = self.limitations
+        blocker_notes: Iterable[object] = self.release_blockers
+        if not self.limitations or any(
+            not isinstance(item, str) or not item.strip()
+            for item in limitation_notes
+        ):
+            raise ValueError("limitations must contain non-empty strings")
+        if any(
+            not isinstance(item, str) or not item.strip()
+            for item in blocker_notes
+        ):
+            raise ValueError("release_blockers must contain non-empty strings")
         object.__setattr__(self, "schema", fields)
         object.__setattr__(
             self,

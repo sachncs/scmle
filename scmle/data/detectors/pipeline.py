@@ -108,41 +108,22 @@ def run(
     for detector_id in registry.EXECUTION_ORDER[1:]:
         order.append(detector_id)
         if detector_id == "f5-label-noise":
-            outcome = label_step(working, target, seed)
-            if isinstance(outcome, str):
-                skipped[detector_id] = outcome
-            else:
-                results[detector_id] = outcome
+            # Label noise is declined with a reason, not raised: no target
+            # column, no numeric features, or the detector's own ValueError.
+            if target is None or target not in working.columns:
+                skipped[detector_id] = "no target column"
+                continue
+            numeric = working.drop(columns=[target]).select_dtypes("number")
+            if numeric.shape[1] == 0:
+                skipped[detector_id] = "no numeric features"
+                continue
+            try:
+                results[detector_id] = labels.detect(
+                    numeric.fillna(numeric.median()), working[target], seed
+                )
+            except ValueError as error:
+                skipped[detector_id] = str(error)
             continue
         results[detector_id] = steps[detector_id](working)
     status = {d: gate_status(store, d) for d in registry.SPECS}
     return Findings(tuple(order), results, status, tuple(log), skipped)
-
-
-def label_step(
-    frame: pandas.DataFrame, target: str | None, seed: int
-) -> labels.Noise | str:
-    """Runs the label-noise detector, or says why it was declined.
-
-    Args:
-        frame: Exploration rows, with the target column among them.
-        target: Label column, or None.
-        seed: Run seed.
-
-    Returns:
-        The label-noise report, or the reason it could not run: no target
-        column, no numeric features, or the message of the `ValueError`
-        the detector raised. Numeric features are median-filled first.
-    """
-    if target is None or target not in frame.columns:
-        return "no target column"
-    features = frame.drop(columns=[target])
-    numeric = features.select_dtypes("number")
-    if numeric.shape[1] == 0:
-        return "no numeric features"
-    try:
-        return labels.detect(
-            numeric.fillna(numeric.median()), frame[target], seed
-        )
-    except ValueError as error:
-        return str(error)
