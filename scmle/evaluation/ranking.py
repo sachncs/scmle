@@ -49,19 +49,8 @@ def mean_ndcg(
     Returns:
         The mean NDCG over the scorable queries, or NaN if there are none.
     """
-    values = []
-    for rows in query_groups(queries):
-        truth = numpy.asarray(relevance, dtype=float)[rows]
-        if len(rows) < MIN_DOCUMENTS or truth.max() <= 0:
-            continue
-        values.append(
-            metrics.ndcg_score(
-                truth[None, :],
-                numpy.asarray(scores, dtype=float)[rows][None, :],
-                k=cutoff,
-            )
-        )
-    return float(numpy.mean(values)) if values else float("nan")
+    values = per_query_ndcg(relevance, scores, queries, cutoff)[0]
+    return float(numpy.mean(values)) if values.size else float("nan")
 
 
 def per_query_ndcg(

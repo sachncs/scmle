@@ -58,27 +58,6 @@ class Scores:
         return dataclasses.asdict(self)
 
 
-def inner_splitter(
-    labels: pandas.Series, classification: bool, seed: int
-) -> Any:
-    """Shuffled folds, stratified for classes.
-
-    Args:
-        labels: Development labels.
-        classification: Whether the target holds class labels.
-        seed: Seed of the shuffle.
-
-    Returns:
-        A stratified splitter when classifying and every class has at least
-        `INNER_FOLDS` rows, otherwise a plain shuffled one.
-    """
-    if classification and labels.value_counts().min() >= INNER_FOLDS:
-        return model_selection.StratifiedKFold(
-            INNER_FOLDS, shuffle=True, random_state=seed
-        )
-    return model_selection.KFold(INNER_FOLDS, shuffle=True, random_state=seed)
-
-
 def mean_cv_score(
     model: models.Estimator,
     features: pandas.DataFrame,
@@ -100,7 +79,15 @@ def mean_cv_score(
     Returns:
         The mean score over the inner folds.
     """
-    folds = inner_splitter(target, classification, seed)
+    # Stratify only when every class has enough rows for each inner fold.
+    if classification and target.value_counts().min() >= INNER_FOLDS:
+        folds = model_selection.StratifiedKFold(
+            INNER_FOLDS, shuffle=True, random_state=seed
+        )
+    else:
+        folds = model_selection.KFold(
+            INNER_FOLDS, shuffle=True, random_state=seed
+        )
     scores = []
     for fit, held in folds.split(features, target):
         fitted = cast("models.Estimator", base.clone(model)).fit(

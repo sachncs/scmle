@@ -162,22 +162,6 @@ class UnseenCategories(Stressor):
         return damaged
 
 
-def default_stressors() -> tuple[Stressor, ...]:
-    """Returns the standard stress scenarios.
-
-    Returns:
-        10% and 30% missing values, noise of 0.1 and 0.5 standard
-        deviations, and 20% unseen categories.
-    """
-    return (
-        MissingValues(0.10),
-        MissingValues(0.30),
-        GaussianNoise(0.10),
-        GaussianNoise(0.50),
-        UnseenCategories(0.20),
-    )
-
-
 class Robustness(diagnostics.Diagnostic):
     """Score under degraded input, relative to the clean score."""
 
@@ -188,9 +172,16 @@ class Robustness(diagnostics.Diagnostic):
 
         Args:
             stressors: The scenarios to run; None or an empty tuple selects
-                `default_stressors`.
+                the standard scenarios (10% and 30% missing values, noise of
+                0.1 and 0.5 standard deviations, and 20% unseen categories).
         """
-        self.stressors = stressors or default_stressors()
+        self.stressors = stressors or (
+            MissingValues(0.10),
+            MissingValues(0.30),
+            GaussianNoise(0.10),
+            GaussianNoise(0.50),
+            UnseenCategories(0.20),
+        )
 
     def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
         """Scores the model on each degraded copy of the evaluation data.
