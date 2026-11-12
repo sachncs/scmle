@@ -2844,37 +2844,6 @@ def declared_slice_columns(
     return () if block is None else block.slice_columns
 
 
-def slice_labels(
-    context: scmle.core.context.Context, features: pandas.DataFrame
-) -> dict[str, Any]:
-    """Returns each final test row's slice label for every declared column.
-
-    A numeric column with many distinct values is cut into bands at quantiles
-    of the development rows; any other column keeps its values as text. A
-    column the rows lack, or one with too many levels that is not banded,
-    maps to None.
-
-    Args:
-        context: The run context, supplying the split and charter.
-        features: The final test rows.
-
-    Returns:
-        A mapping from each declared slice column to a series of labels
-        aligned with `features`, or to None.
-    """
-    split = scmle.core.context.require(context.split, "split")
-    found: dict[str, Any] = {}
-    for column in declared_slice_columns(context):
-        found[column] = (
-            coverage_slices.labels_for(
-                features[column], split.dev_features.get(column)
-            )
-            if column in features.columns
-            else None
-        )
-    return found
-
-
 def chartered_decision_model(
     context: scmle.core.context.Context,
 ) -> contracts.AnalysisCharter | None:
@@ -5199,12 +5168,28 @@ class PackageStage(Stage):
                 *context.test_rows, COVERAGE_LEVELS
             )
         if context.test_rows is not None:
+            # Each declared slice column becomes a label series aligned with
+            # the test rows: a numeric column with many values is banded at
+            # quantiles of the development rows, any other keeps its values as
+            # text, and a column the rows lack maps to None.
+            split = scmle.core.context.require(context.split, "split")
+            test_features = context.test_rows[0]
+            slices = {
+                column: (
+                    coverage_slices.labels_for(
+                        test_features[column], split.dev_features.get(column)
+                    )
+                    if column in test_features.columns
+                    else None
+                )
+                for column in declared_slice_columns(context)
+            }
             measured = coverage_run.run_report(
                 bundle,
                 *context.test_rows,
                 COVERAGE_LEVELS,
                 claim_sha256=context.coverage_claim_sha256,
-                slices=slice_labels(context, context.test_rows[0]),
+                slices=slices,
             )
             if measured is not None:
                 bundle.coverage_report = measured
