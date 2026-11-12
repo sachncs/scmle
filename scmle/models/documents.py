@@ -16,6 +16,7 @@ import re
 import shutil
 import tempfile
 from typing import Any
+from typing import cast
 from typing import Self
 
 import joblib
@@ -272,7 +273,7 @@ class Classifier:
             ),
             "classes": estimator.classes_.tolist(),
             "coef": estimator.coef_.tolist(),
-            "intercept": estimator.intercept_.tolist(),
+            "intercept": cast("numpy.ndarray", estimator.intercept_).tolist(),
         }
         encoded = json.dumps(
             state, ensure_ascii=True, sort_keys=True, separators=(",", ":")
@@ -360,7 +361,7 @@ class Classifier:
         estimator = self.estimator
         if estimator is None:
             raise RuntimeError("classifier is not fitted")
-        return tuple(estimator.predict(matrix).tolist())
+        return tuple(cast("numpy.ndarray", estimator.predict(matrix)).tolist())
 
     def predict_proba(
         self,
