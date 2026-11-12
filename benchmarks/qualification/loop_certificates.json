@@ -25,7 +25,7 @@
         "fixed_rule_rate": 1.0,
         "true_risk": 0.15000000000000002
       },
-      "code_hash": "c6b57bd010805867c20e3cf61f2ed67064b3bf9503ca09240300ac1abec8457d",
+      "code_hash": "0e9c59ee0bdb2f668f7f2fdd4207a472a653bf9dd2c3f491ea45ab8c87cc9eb1",
       "passed": true,
       "replicates": 2000,
       "seeds": [
@@ -59,7 +59,7 @@
           "within_d_max_lower": 0.9985032551048117
         }
       },
-      "code_hash": "22326649a37988046e0a5b1ac0ed86cdb223aa0dd32899b567e4024beaf33d04",
+      "code_hash": "ca94134dc13d30c805afe400a306bc616c2d0639745fc9c194e9712a65bf40b1",
       "coverage_after_halt": 0.0,
       "passed": false,
       "replicates": 2000,
@@ -95,7 +95,7 @@
           "within_d_max_lower": 0.9985032551048117
         }
       },
-      "code_hash": "2a30ef8f27903f4ebc982907de03e692c1c3e5b6e4f3f4ec703fdffbb0f4bcba",
+      "code_hash": "8fece275e5688de0d39c4d6cdd8c2a97942f7833cec9d46a90213544315400ba",
       "d_max": 50,
       "passed": false,
       "replicates": 2000,
@@ -105,7 +105,7 @@
       ]
     },
     "H3": {
-      "code_hash": "7852173745d3e86ea038af78bb1b7c8dc84f6c4c7fc5e6dc21d354e1bb192b3a",
+      "code_hash": "aa321a85c26f7f58d1a9d25d2ba319ffeda1e3f616afcad350bbf3538159e9bc",
       "passed": true,
       "psi_rule_flag_rate": 1.0,
       "replicates": 300,
@@ -124,7 +124,7 @@
       "bootstrap_fdr": 0.6136285926448561,
       "bootstrap_power": 1.0,
       "challengers": 200,
-      "code_hash": "7e59aeac860ff0d781683fae19dd661aa5432ee5477f0251f647e107692598a9",
+      "code_hash": "127de003a1ea35222e4008697fdeb80ef6682a78a60685bad622e206dafc99bf",
       "elond_fdr": 0.0,
       "elond_power": 1.0,
       "elond_se": 0.0,
@@ -156,7 +156,7 @@
           "worse_by": 0.1
         }
       },
-      "code_hash": "9196b9a916fad5d2df8e368bcba7e21e2f9c11f97e7a27e528bd123741a7d898",
+      "code_hash": "516140cbd71cc517059f89be3214b3c50aebb0ebba7930d85e308ff378b345df",
       "passed": true,
       "replicates": 2000,
       "seeds": [
@@ -236,6 +236,6 @@
     "ledger replay on Python 3.11 (only the environment's interpreter ran)",
     "independent confidence-sequence implementation (none pinned)"
   ],
-  "simulator_hash": "2305eaca042caa9e11b0d8d0ef97fff33a6ebb755ab2f3a7750dece158c5acb9",
+  "simulator_hash": "45044a89cf47e7fe87cc599b05ae1736339e4c116985a5cde17e0625785c154d",
   "version": 1
 }
