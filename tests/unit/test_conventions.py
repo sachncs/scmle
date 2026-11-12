@@ -10,6 +10,8 @@ import pathlib
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+# `type X = ...` statements exist only from Python 3.12; on 3.11 none can occur.
+TYPE_ALIAS_NODES = (ast.TypeAlias,) if hasattr(ast, "TypeAlias") else ()
 SOURCES = sorted(
     path
     for folder in ("scmle", "tests")
@@ -95,7 +97,7 @@ def aliases(tree):
     for node in ast.walk(tree):
         if isinstance(node, ast.alias) and node.asname:
             found.append((node.lineno, f"import {node.name} as {node.asname}"))
-        elif isinstance(node, ast.TypeAlias):
+        elif isinstance(node, TYPE_ALIAS_NODES):
             found.append((node.lineno, f"type alias {node.name.id}"))
         elif isinstance(node, ast.AnnAssign) and "TypeAlias" in ast.unparse(
             node.annotation
