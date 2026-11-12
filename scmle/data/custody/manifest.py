@@ -257,36 +257,6 @@ class Manifest:
         return manifest
 
 
-def read_v1(record: Mapping[str, Any]) -> splitters.Manifest:
-    """Rebuilds a v1 manifest and checks its 16-hex fingerprint.
-
-    Args:
-        record: A parsed v1 manifest record.
-
-    Returns:
-        The v1 manifest.
-
-    Raises:
-        ArtifactError: If the recorded fingerprint differs from the one
-            computed from the content.
-    """
-    manifest = splitters.Manifest(
-        strategy=record["strategy"],
-        seed=record["seed"],
-        train_ids=tuple(record["train_ids"]),
-        test_ids=tuple(record["test_ids"]),
-        folds=tuple(
-            (tuple(f["train"]), tuple(f["val"])) for f in record["folds"]
-        ),
-        notes=tuple(record.get("notes", ())),
-    )
-    if record.get("fingerprint") != manifest.fingerprint:
-        raise errors.ArtifactError(
-            "split manifest fingerprint mismatch: the manifest was edited"
-        )
-    return manifest
-
-
 def load_manifest(
     record: Mapping[str, Any],
 ) -> Manifest | splitters.Manifest:
@@ -305,7 +275,21 @@ def load_manifest(
     if version == MANIFEST_VERSION:
         return Manifest.from_dict(record)
     if version is None and "train_ids" in record:
-        return read_v1(record)
+        v1 = splitters.Manifest(
+            strategy=record["strategy"],
+            seed=record["seed"],
+            train_ids=tuple(record["train_ids"]),
+            test_ids=tuple(record["test_ids"]),
+            folds=tuple(
+                (tuple(f["train"]), tuple(f["val"])) for f in record["folds"]
+            ),
+            notes=tuple(record.get("notes", ())),
+        )
+        if record.get("fingerprint") != v1.fingerprint:
+            raise errors.ArtifactError(
+                "split manifest fingerprint mismatch: the manifest was edited"
+            )
+        return v1
     raise errors.ArtifactError(
         f"unsupported split manifest version: {version!r}"
     )
