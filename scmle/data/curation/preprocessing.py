@@ -241,55 +241,6 @@ def default_options(
     )
 
 
-def adapter_params(
-    plan: data.FeaturePlan, params: Mapping[str, Any] | None
-) -> Mapping[str, Any] | None:
-    """Adds the plan's ordinal levels and uplift flag to the overrides.
-
-    Args:
-        plan: Feature columns grouped by kind.
-        params: Hyperparameter overrides for the estimator.
-
-    Returns:
-        `params` with `levels` set when the plan has ordinal levels and
-        `classify` set when the plan has a treatment column; the argument
-        itself when neither applies.
-    """
-    if plan.ordinal_levels:
-        params = {**(params or {}), "levels": plan.ordinal_levels}
-    if plan.treatment_column:
-        params = {**(params or {}), "classify": plan.binary_outcome}
-    return params
-
-
-def adapter_assembly(
-    plan: data.FeaturePlan,
-    adapter: models.Model,
-    task: tasks.Task,
-    seed: int,
-    params: Mapping[str, Any] | None,
-) -> Any:
-    """Asks the model family for a pipeline it assembles itself.
-
-    Args:
-        plan: Feature columns grouped by kind.
-        adapter: Model family.
-        task: Resolved task type.
-        seed: Random seed forwarded to the estimator.
-        params: Hyperparameter overrides for the estimator.
-
-    Returns:
-        The assembled pipeline, or None when the family leaves the
-        preprocessing to this module. The dummy family on a forecast task
-        is a last-value forecaster.
-    """
-    if task is tasks.Task.FORECAST and adapter.name == "dummy":
-        return estimators.LastValueForecaster(
-            None, plan.target_columns, plan.value_column or ""
-        )
-    return adapter.assemble(plan, task, seed, params)
-
-
 def with_weights(model: Any, plan: data.FeaturePlan, seed: int) -> Any:
     """Wraps a model so that it reads the plan's weight column.
 
@@ -411,8 +362,19 @@ def build_pipeline(
         ConfigError: If the plan's monotonic constraints cannot apply to the
             layout the preprocessing produces.
     """
-    params = adapter_params(plan, params)
-    assembled = adapter_assembly(plan, adapter, task, seed, params)
+    if plan.ordinal_levels:
+        params = {**(params or {}), "levels": plan.ordinal_levels}
+    if plan.treatment_column:
+        params = {**(params or {}), "classify": plan.binary_outcome}
+    # The family may assemble its own pipeline; the dummy family on a
+    # forecast task is a last-value forecaster. None leaves it to this module.
+    assembled: Any
+    if task is tasks.Task.FORECAST and adapter.name == "dummy":
+        assembled = estimators.LastValueForecaster(
+            None, plan.target_columns, plan.value_column or ""
+        )
+    else:
+        assembled = adapter.assemble(plan, task, seed, params)
     if assembled is not None:
         return with_weights(assembled, plan, seed)
     params = dict(params or {})

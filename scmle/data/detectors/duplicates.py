@@ -91,26 +91,6 @@ def exact_flags(
     return flags
 
 
-def standardized_block(
-    values: pandas.DataFrame, spread: pandas.Series
-) -> numpy.ndarray:
-    """Scales a numeric block by column spread, filling gaps with the mean.
-
-    Args:
-        values: Numeric columns. Non-finite entries count as missing.
-        spread: Spread (standard deviation) of each column, nonzero.
-
-    Returns:
-        A float array with missing entries replaced by the column mean, then
-        divided by `spread`.
-    """
-    block = values.to_numpy(dtype=float, copy=True)
-    block[~numpy.isfinite(block)] = numpy.nan
-    centre = numpy.nanmean(block, axis=0)
-    block = numpy.where(numpy.isnan(block), centre, block)
-    return numpy.asarray(block / spread.to_numpy(dtype=float))
-
-
 def near_flags(
     frame: pandas.DataFrame, columns: Sequence[str], cut: float = DEFAULT_CUT
 ) -> numpy.ndarray:
@@ -141,7 +121,12 @@ def near_flags(
     if not numeric:
         return flags
     spread = frame[numeric].std(ddof=0).replace(0.0, 1.0).fillna(1.0)
-    block = standardized_block(frame[numeric], spread)
+    # Non-finite entries count as missing: fill them with the column mean,
+    # then scale each column by its spread.
+    block = frame[numeric].to_numpy(dtype=float, copy=True)
+    block[~numpy.isfinite(block)] = numpy.nan
+    block = numpy.where(numpy.isnan(block), numpy.nanmean(block, axis=0), block)
+    block = numpy.asarray(block / spread.to_numpy(dtype=float))
     if other:
         text = frame[other].astype(str).fillna("<missing>")
         keys = text.agg("\x1f".join, axis=1).to_numpy()
