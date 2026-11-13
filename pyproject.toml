@@ -309,3 +309,45 @@ type = "forbidden"
 source_modules = ["scmle"]
 forbidden_modules = ["scmle.cli"]
 allow_indirect_imports = true
+
+# 19 packages import each other in one cycle at package level (api, artifacts,
+# core, data, decision, deploy, evaluation, experimentation, explainability,
+# features, governance, inference, integrations, intelligence, models,
+# monitoring, operations, sampling, security), so no layering exists among
+# them. The contracts below pin the layers around that cycle.
+[[tool.importlinter.contracts]]
+name = "Top of the stack: cli above workflow above runners and trail"
+type = "layers"
+layers = ["scmle.cli", "scmle.workflow", "scmle.runners | scmle.trail"]
+
+[[tool.importlinter.contracts]]
+name = "The mutually dependent packages do not import the top of the stack"
+type = "forbidden"
+source_modules = [
+    "scmle.api", "scmle.artifacts", "scmle.core", "scmle.data",
+    "scmle.decision", "scmle.deploy", "scmle.evaluation",
+    "scmle.experimentation", "scmle.explainability", "scmle.features",
+    "scmle.governance", "scmle.inference", "scmle.integrations",
+    "scmle.intelligence", "scmle.models", "scmle.monitoring",
+    "scmle.operations", "scmle.sampling", "scmle.security",
+    "scmle.optimization",
+]
+forbidden_modules = [
+    "scmle.cli", "scmle.workflow", "scmle.runners", "scmle.trail",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Optimization depends only on the contracts package"
+type = "forbidden"
+source_modules = ["scmle.optimization"]
+forbidden_modules = [
+    "scmle.api", "scmle.artifacts", "scmle.core", "scmle.data",
+    "scmle.decision", "scmle.deploy", "scmle.evaluation",
+    "scmle.experimentation", "scmle.explainability", "scmle.features",
+    "scmle.governance", "scmle.inference", "scmle.integrations",
+    "scmle.intelligence", "scmle.models", "scmle.monitoring",
+    "scmle.operations", "scmle.sampling", "scmle.security",
+    "scmle.durability", "scmle.unsupervised",
+]
+allow_indirect_imports = true
