@@ -139,7 +139,7 @@ EXTENSION_SURFACES = {
             "Retries",
             "RetryExhaustedError",
             "TransientError",
-            "call_with_retries",
+            "call",
         ),
     ),
     "scmle.data.store.objectstore": (

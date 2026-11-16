@@ -691,7 +691,7 @@ class Runner(abc.ABC):
             if ended is not None:
                 return self.finish(spec, manifest, ended)
             if len(manifest.attempts) < policy.max_attempts:
-                self.clock.sleep(policy.delay_after(number))
+                self.clock.sleep(policy.delay(number))
         return self.finish(spec, manifest, RunState.RETRIES_EXHAUSTED)
 
     def attempt(

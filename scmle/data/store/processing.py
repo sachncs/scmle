@@ -314,7 +314,7 @@ class IncrementalProcessor:
             self.waits.append(seconds)
             self.sleep(seconds)
 
-        return retry.call_with_retries(operation, self.policy, sleep=sleeper)
+        return retry.call(operation, self.policy, sleep=sleeper)
 
     def run(self, max_objects: int | None = None) -> Processing:
         """Processes the new input objects.

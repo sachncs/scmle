@@ -75,7 +75,7 @@
         "kind": "class",
         "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
       },
-      "call_with_retries": {
+      "call": {
         "kind": "callable",
         "signature_sha256": "a29cf0a11512f6bda1d3603358b7d05132a668d3c327121f9e80fea184367a59"
       }

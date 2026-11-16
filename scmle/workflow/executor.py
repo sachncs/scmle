@@ -1181,7 +1181,7 @@ class Executor:
                     }
                 )
                 if attempt < step.retries.max_attempts:
-                    self.sleep(step.retries.delay_after(attempt))
+                    self.sleep(step.retries.delay(attempt))
             except errors.ScmleError as error:
                 # handled: scmle error saved in attempts; step recorded FAILED
                 total += context.spent
@@ -1228,7 +1228,7 @@ class Executor:
                     outputs=result,
                     cost=round(total, 6),
                 )
-                retry.call_with_retries(save, WRITES, sleep=self.sleep)
+                retry.call(save, WRITES, sleep=self.sleep)
                 return StepState.SUCCEEDED.value, result, total
         self.save_step(
             run_id,

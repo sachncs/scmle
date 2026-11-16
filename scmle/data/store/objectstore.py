@@ -666,7 +666,7 @@ class RetryingStore(ObjectStore):
         Returns:
             Whatever the operation returned on the attempt that succeeded.
         """
-        return retry.call_with_retries(operation, self.policy, sleep=self.sleep)
+        return retry.call(operation, self.policy, sleep=self.sleep)
 
     def put(
         self,

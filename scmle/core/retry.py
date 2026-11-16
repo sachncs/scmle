@@ -104,7 +104,7 @@ class Retries:
         if self.factor < 1:
             raise errors.ConfigError("factor must be at least 1")
 
-    def delay_after(self, failures: int) -> float:
+    def delay(self, failures: int) -> float:
         """Returns the wait after `failures` failed attempts (1 for the first).
 
         Args:
@@ -124,7 +124,7 @@ class Retries:
             The waits in seconds between consecutive attempts, in order; one
             fewer than the maximum number of attempts.
         """
-        return [self.delay_after(n) for n in range(1, self.max_attempts)]
+        return [self.delay(n) for n in range(1, self.max_attempts)]
 
     def to_dict(self) -> dict[str, float | int]:
         """Returns the JSON-ready form.
@@ -138,7 +138,7 @@ class Retries:
 def transient(error: BaseException) -> bool:
     """Whether a failure may succeed if the same call is made again.
 
-    The default classification for `call_with_retries` (ERR-6: before it,
+    The default classification for `call` (ERR-6: before it,
     only `TransientError`, which nothing raised, was retried).
 
     Args:
@@ -164,7 +164,7 @@ def transient(error: BaseException) -> bool:
     return False
 
 
-def call_with_retries(
+def call(
     operation: Callable[[], T],
     policy: Retries,
     *,
@@ -197,7 +197,7 @@ def call_with_retries(
                 raise
             last = error
             if attempt < policy.max_attempts:
-                sleep(policy.delay_after(attempt))
+                sleep(policy.delay(attempt))
     raise RetryExhaustedError(
         policy.max_attempts,
         f"{policy.max_attempts} attempts failed; last: {last!r}",
