@@ -584,3 +584,37 @@ def test_a_wide_multiclass_table_is_declined_quickly_and_says_so():
     assert not [f for f in report.findings if f.suspect]
     assert any("limit is" in note for note in report.notes)
     assert len(report.unchecked) == 64
+
+
+# ---- a screen that did not run is never clean (ERR-2) ----------------------
+
+
+def test_too_few_rows_list_every_column_as_unchecked():
+    frame = world(30, n=12)
+    report = run(frame)
+    assert report.findings == ()
+    assert report.unchecked == ("x0", "x1", "x2", "x3")
+    assert "NOT RUN for 4 columns" in report.warning
+    assert "add rows" in report.warning
+
+
+def test_a_degenerate_target_lists_every_column_as_unchecked():
+    frame = world(31).assign(y=0)
+    report = run(frame)
+    assert report.unchecked == ("x0", "x1", "x2", "x3")
+    assert report.unchecked_reason.startswith("screen not run")
+
+
+def test_columns_that_cannot_be_tested_are_unchecked_not_clean():
+    frame = world(32).assign(x0=1.0, x1=1.0, x2=1.0, x3=1.0)
+    report = run(frame)
+    assert report.family == 0
+    assert report.unchecked == ("x0", "x1", "x2", "x3")
+    assert "no column could be tested" in report.warning
+
+
+def test_the_budget_remedy_is_kept_for_a_declined_screen():
+    declined = screen.Screen(
+        (), 10, 0, 0, 0.05, {}, {}, (), ("a",), "work limit for a 2 s budget"
+    )
+    assert declined.remedy == "raise --time-budget or screen fewer columns"

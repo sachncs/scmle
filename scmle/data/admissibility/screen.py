@@ -932,8 +932,17 @@ class Screen:
         return (
             f"leakage screen NOT RUN for {len(self.unchecked)} columns "
             f"({self.unchecked_reason}): these columns are unchecked, not "
-            "clean; raise --time-budget or screen fewer columns"
+            f"clean; {self.remedy}"
         )
+
+    @property
+    def remedy(self) -> str:
+        """What would let the screen run, given why it did not."""
+        if "too few rows" in self.unchecked_reason:
+            return "add rows, or attest the columns"
+        if self.unchecked_reason.startswith("screen not run"):
+            return "fix the target or the columns, or attest them"
+        return "raise --time-budget or screen fewer columns"
 
     @property
     def suspects(self) -> tuple[Finding, ...]:
@@ -1331,18 +1340,23 @@ def empty_report(
     gates: Mapping[str, certificates.GateStatus],
     rows: int,
     note: str,
+    names: Sequence[Hashable] = (),
 ) -> Screen:
     """Builds a report that tested nothing, and says why.
+
+    The candidate columns are listed as unchecked, never as clean, so a
+    screen that did not run is surfaced and `block` refuses it (ERR-2).
 
     Args:
         cfg: Settings (`alpha` and the ceilings are recorded).
         gates: Gate status per mechanism.
         rows: Rows the screen saw.
         note: Why nothing was tested.
+        names: The candidate columns that went untested.
 
     Returns:
-        A report with no findings, a family of 0, and `note` as its only
-        note.
+        A report with no findings, a family of 0, `note` as its only note,
+        and `names` as its unchecked columns with `note` as the reason.
     """
     return Screen(
         (),
@@ -1353,6 +1367,8 @@ def empty_report(
         gates,
         ceilings_of(cfg),
         (note,),
+        tuple(str(n) for n in names),
+        note,
     )
 
 
@@ -1555,17 +1571,18 @@ def scan_frame(
     Returns:
         The report. It has no findings, with the reason in its notes, when
         the outcome is invalid, there are too few rows, no column could be
-        tested, or the permutations or work needed exceed the limits; in the
-        last case the candidate columns are listed in `unchecked`.
+        tested, or the permutations or work needed exceed the limits; in
+        every one of these cases the candidate columns are listed in
+        `unchecked`.
     """
     n = len(frame)
     try:
         problem = build_problem(frame[target], task, cfg, groups, block_size)
     except ValueError as error:
-        return empty_report(cfg, gates, n, f"screen not run: {error}")
+        return empty_report(cfg, gates, n, f"screen not run: {error}", names)
     if not leakage.enough_rows(problem.y, task, cfg):
         return empty_report(
-            cfg, gates, n, "screen not run: too few rows (low power)"
+            cfg, gates, n, "screen not run: too few rows (low power)", names
         )
     alpha = budget.exact(cfg.alpha, "alpha")
     strata = strata_of(n, groups, block_size)
@@ -1606,7 +1623,9 @@ def scan_frame(
     family = len(pending)
     ceilings = ceilings_of(cfg)
     if family == 0:
-        return empty_report(cfg, gates, n, "no column could be tested")
+        return empty_report(
+            cfg, gates, n, "screen not run: no column could be tested", names
+        )
     total = max(cfg.permutations, required_permutations(family, alpha))
     declined = tuple(dict.fromkeys(h.feature for h in pending))
     if total > MAX_PERMUTATIONS:
