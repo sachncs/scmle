@@ -17,6 +17,7 @@ Supervision applies when `Resources.enforcement` is `hard` (the default);
 
 from collections.abc import Callable
 from collections.abc import Generator
+from collections.abc import Mapping
 import contextlib
 import dataclasses
 import importlib
@@ -245,7 +246,8 @@ def child_main(
     """Runs `function(argument)` in the supervised process.
 
     The outcome is sent over the channel as `(True, value)` on success or
-    `(False, "ErrorType: message")` if the function raised any exception, and
+    `(False, failure)` if the function raised any exception, where `failure`
+    is `errors.Failure.dump()` with the child's traceback, and
     the channel is then closed.
 
     Args:
@@ -256,8 +258,8 @@ def child_main(
     try:
         channel.send((True, function(argument)))
     except BaseException as error:  # noqa: BLE001 -- reported to the supervisor
-        # handled: error sent to supervisor as failure tuple
-        channel.send((False, f"{type(error).__name__}: {error}"))
+        # handled: sent to the supervisor with its traceback (Failure)
+        channel.send((False, dict(errors.Failure.of(error).dump())))
     finally:
         channel.close()
 
@@ -326,7 +328,12 @@ class Supervisor:
             process.join()
             receiver.close()
         if not succeeded:
-            raise TrialLimitError(value)
+            if isinstance(value, Mapping):
+                raise TrialLimitError(
+                    f"{value.get('kind')}: {value.get('message')}",
+                    {"failure": dict(value)},
+                )
+            raise TrialLimitError(str(value))
         return value
 
     @staticmethod

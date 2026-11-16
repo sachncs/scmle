@@ -1,7 +1,9 @@
 """Experiment plan and trial result contracts."""
 
+from collections.abc import Mapping
 import dataclasses
 import enum
+import json
 from typing import Any
 from typing import Self
 
@@ -145,6 +147,8 @@ class Trial:
         fold_scores: Per-fold scores.
         fit_seconds: Wall-clock cost.
         error: Failure or skip reason, empty on success.
+        failure: The failure's type, message, traceback and causes
+            (`errors.Failure.dump`), empty unless the trial raised.
         params: Hyperparameter overrides (empty for default configuration).
         strategy: Data strategy the candidate was built with.
         observed_access: What each fold's fit and scoring actually received:
@@ -169,6 +173,7 @@ class Trial:
     fold_scores: list[float] = dataclasses.field(default_factory=list)
     fit_seconds: float = 0.0
     error: str = ""
+    failure: Mapping[str, object] = dataclasses.field(default_factory=dict)
     params: dict[str, Any] = dataclasses.field(default_factory=dict)
     strategy: str = DEFAULT_STRATEGY
     observed_access: list[dict[str, Any]] = dataclasses.field(
@@ -179,9 +184,18 @@ class Trial:
     train_scores: list[float] = dataclasses.field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping."""
+        """Returns a JSON-serializable mapping.
+
+        `failure` is written as JSON text (empty when there is none), so a
+        leaderboard of trials stays a flat table that Parquet can store.
+        """
         record = dataclasses.asdict(self)
         record["status"] = str(self.status)
+        record["failure"] = (
+            json.dumps(dict(self.failure), sort_keys=True)
+            if self.failure
+            else ""
+        )
         return record
 
 

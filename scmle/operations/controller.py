@@ -44,6 +44,7 @@ from typing import Any
 
 import pandas
 
+from scmle.contracts import errors
 from scmle.governance import deployment_ledger
 from scmle.governance import envelope
 import scmle.governance.loop
@@ -206,11 +207,16 @@ class Controller:
         try:
             return self.retrain()
         except Exception as error:  # noqa: BLE001 -- a failed training must not stop the loop
-            # handled: returned as failed finding/problem/refusal with error
-            # text
+            # handled: escalated with the message, traceback and causes
+            # (ERR-15: it used to carry the type name only)
+            failure = errors.Failure.of(error)
             loop.escalate(
                 "retrain_failed",
-                {"envelope": used, "error": type(error).__name__},
+                {
+                    "envelope": used,
+                    "error": failure.text,
+                    "failure": dict(failure.dump()),
+                },
             )
             return None
 

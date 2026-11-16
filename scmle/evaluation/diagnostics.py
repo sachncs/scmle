@@ -740,8 +740,10 @@ def run_suite(
         try:
             reports[diagnostic.name] = diagnostic.compute(limited)
         except Exception as error:  # noqa: BLE001 -- isolation: diagnostics are advisory
-            # handled: error recorded in diagnostic report
+            # handled: recorded in the diagnostic report with its traceback
+            failure = errors.Failure.of(error)
             reports[diagnostic.name] = {
-                "error": f"{type(error).__name__}: {error}"
+                "error": failure.text,
+                "failure": dict(failure.dump()),
             }
     return reports

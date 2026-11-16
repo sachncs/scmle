@@ -82,6 +82,7 @@ from collections.abc import Sequence
 import dataclasses
 from fractions import Fraction
 import json
+import logging
 from pathlib import Path
 from typing import Any
 from typing import Protocol
@@ -95,6 +96,9 @@ from scmle.data.ledger import bivariate
 from scmle.data.ledger import budget
 from scmle.data.ledger import multiplicity
 import scmle.data.ledger.ledger
+
+LOGGER = logging.getLogger(__name__)
+
 
 UNCONFIRMED = "unconfirmed"
 THRESHOLDOUT = "thresholdout"
@@ -306,9 +310,12 @@ def merge_runners(*runners: ClaimRunner | None) -> ClaimRunner | None:
         for runner in chosen:
             try:
                 found = runner.run(features, target)
-            except Exception:  # noqa: BLE001 -- a crashing runner marks its own claims failed and the others still run
-                # handled: crashing runner's claims marked FAILED in statuses
-                # (cause text dropped)
+            except Exception:
+                # ERR-8: the crash used to leave no type, message or log.
+                LOGGER.exception(
+                    "confirmation runner for %s crashed; its claims fail",
+                    [i.claim_id for i in runner.registered],
+                )
                 statuses.update({i.claim_id: FAILED for i in runner.registered})
                 continue
             clash = set(documents) & set(found.documents)

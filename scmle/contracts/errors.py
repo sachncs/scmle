@@ -5,7 +5,16 @@ Every framework failure derives from `ScmleError` and carries a stable
 programmatically instead of parsing messages.
 """
 
+from collections.abc import Mapping
+import dataclasses
+import traceback
 from typing import Any
+
+# Bounds on what a stored failure keeps: the last characters of the
+# traceback (the innermost frames, where the failure is) and the nearest
+# causes. Policy: enough to diagnose, small enough for a run record.
+TRACE = 8000
+CAUSES = 5
 
 
 class ScmleError(Exception):
@@ -77,3 +86,73 @@ class ReliabilityError(ScmleError):
     """A fault-injection execution cannot produce trustworthy evidence."""
 
     category = "reliability"
+
+
+@dataclasses.dataclass(frozen=True)
+class Failure:
+    """A stored failure: what was raised, where, and what caused it.
+
+    Records that keep only `"Type: message"` lose the traceback and the
+    cause, so a failure found in a run record cannot be diagnosed (ERR-19).
+    Every place that stores a failure stores this instead.
+
+    Attributes:
+        kind: The exception's qualified type name.
+        message: Its message.
+        trace: The formatted traceback, innermost frame last.
+        causes: `"Type: message"` of each explicit cause or implicit
+            context, nearest first.
+    """
+
+    kind: str
+    message: str
+    trace: str = ""
+    causes: tuple[str, ...] = ()
+
+    @classmethod
+    def of(cls, error: BaseException) -> "Failure":
+        """Captures a raised exception.
+
+        Args:
+            error: The exception, ideally inside its `except` block so its
+                traceback is attached.
+
+        Returns:
+            The failure, with the traceback and the chain of causes. An
+            error that carries a failure from another process in
+            `details["failure"]` (as `scmle.core.limits` and the deep-learning
+            worker raise) gets that failure as its first cause and the remote
+            traceback appended, so the child's frames are not lost.
+        """
+        causes: list[str] = []
+        trace = "".join(traceback.format_exception(error))
+        remote = getattr(error, "details", {}).get("failure")
+        if isinstance(remote, Mapping):
+            causes.append(f"{remote.get('kind')}: {remote.get('message')}")
+            trace += "\n-- in the child process --\n" + str(
+                remote.get("trace", "")
+            )
+        link = error.__cause__ or error.__context__
+        while link is not None and len(causes) < CAUSES:
+            causes.append(f"{type(link).__qualname__}: {link}")
+            link = link.__cause__ or link.__context__
+        return cls(
+            type(error).__qualname__,
+            str(error),
+            trace[-TRACE:],
+            tuple(causes),
+        )
+
+    @property
+    def text(self) -> str:
+        """The one-line form, `"Type: message"`, for messages and logs."""
+        return f"{self.kind}: {self.message}"
+
+    def dump(self) -> Mapping[str, object]:
+        """Returns a JSON-ready record of every field."""
+        return {
+            "kind": self.kind,
+            "message": self.message,
+            "trace": self.trace,
+            "causes": list(self.causes),
+        }

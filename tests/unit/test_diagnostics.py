@@ -165,7 +165,10 @@ def test_suite_selects_by_task_and_isolates_failures():
         make_inputs(tasks.Task.BINARY),
         (Broken(), diagnostics.Calibration()),
     )
-    assert reports["broken"] == {"error": "RuntimeError: boom"}
+    assert reports["broken"]["error"] == "RuntimeError: boom"
+    # ERR-19: the report keeps the traceback, not only the one-line text.
+    assert reports["broken"]["failure"]["kind"] == "RuntimeError"
+    assert "boom" in reports["broken"]["failure"]["trace"]
     assert "brier_score" in reports["calibration"]
 
 

@@ -5,6 +5,7 @@ heavy imports only happen when an adapter is actually built.
 """
 
 from importlib import metadata
+import logging
 import threading
 from typing import Any
 from typing import Self
@@ -23,6 +24,9 @@ from scmle.models.sklearn import bagging
 from scmle.models.sklearn import classical
 import scmle.models.survival.adapters
 import scmle.models.uplift.adapters
+
+LOGGER = logging.getLogger(__name__)
+
 
 ENTRY_POINT_GROUP = "scmle.models"
 USER_ADAPTERS: dict[str, models.Model] = {}
@@ -181,13 +185,12 @@ class Catalog:
                 for adapter in items:
                     conformance.check_conformance(adapter)
                     self.register(adapter, overwrite=True)
-            except Exception as error:  # noqa: BLE001 -- isolate faulty plugins
-                # handled: plugin failure listed in return and plugin_failures
-                # reasons
-                failed.append(entry.name)
-                self.plugin_failures[entry.name] = (
-                    f"{type(error).__name__}: {error}"
+            except Exception as error:
+                LOGGER.warning(
+                    "model plugin %s failed to load", entry.name, exc_info=True
                 )
+                failed.append(entry.name)
+                self.plugin_failures[entry.name] = errors.Failure.of(error).text
         return failed
 
     def get(self, name: str) -> models.Model:

@@ -11,6 +11,7 @@ from collections.abc import Callable
 from collections.abc import Mapping
 import dataclasses
 import json
+import logging
 from typing import Any
 
 from scmle.contracts import errors
@@ -18,6 +19,8 @@ from scmle.core import retry
 from scmle.runners import base
 from scmle.runners import checkpoint
 from scmle.runners import roles
+
+LOGGER = logging.getLogger(__name__)
 
 
 class JobInterruptedError(errors.ScmleError):
@@ -185,10 +188,9 @@ class Runner(base.Runner):
             status = base.JobStatus(
                 base.JobState.FAILED, f"transient: {error}", retryable=True
             )
-        except Exception as error:  # noqa: BLE001 -- job boundary
-            # handled: other error recorded as FAILED status with type and
-            # message
-            reason = f"{type(error).__name__}: {error}"[:300]
+        except Exception as error:
+            LOGGER.exception("job %s failed", handle.job_id)
+            reason = errors.Failure.of(error).text[:300]
             status = base.JobStatus(base.JobState.FAILED, reason)
         self.jobs[handle.job_id] = Outcome(status)
         return handle

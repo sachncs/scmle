@@ -149,8 +149,8 @@ def main(environ: Mapping[str, str], store: Any = None) -> int:
         )
         load_workload(environ.get("SCMLE_WORKLOAD", DEFAULT_WORKLOAD))(context)
     except Exception as error:  # noqa: BLE001 -- process boundary
-        # handled: written to stderr, exit code 1
-        sys.stderr.write(f"{type(error).__name__}: {error}\n")
+        # handled: the full traceback is written to stderr, exit code 1
+        sys.stderr.write(errors.Failure.of(error).trace)
         return 1
     return 0
 

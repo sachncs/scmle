@@ -1147,12 +1147,14 @@ class Executor:
                 # handled: transient error saved in attempts and retried; FAILED
                 # step record
                 total += context.spent
-                last_error = f"{type(error).__name__}: {error}"
+                failure = errors.Failure.of(error)
+                last_error = failure.text
                 attempts.append(
                     {
                         "attempt": attempt,
                         "state": "retryable",
                         "error": last_error,
+                        "failure": dict(failure.dump()),
                     }
                 )
                 if attempt < step.retries.max_attempts:
@@ -1160,18 +1162,30 @@ class Executor:
             except errors.ScmleError as error:
                 # handled: scmle error saved in attempts; step recorded FAILED
                 total += context.spent
-                last_error = f"{type(error).__name__}: {error}"
+                failure = errors.Failure.of(error)
+                last_error = failure.text
                 attempts.append(
-                    {"attempt": attempt, "state": "failed", "error": last_error}
+                    {
+                        "attempt": attempt,
+                        "state": "failed",
+                        "error": last_error,
+                        "failure": dict(failure.dump()),
+                    }
                 )
                 break
             except Exception as error:  # noqa: BLE001 -- handler boundary
                 # handled: handler exception saved in attempts; step recorded
                 # FAILED with error
                 total += context.spent
-                last_error = f"{type(error).__name__}: {error}"[:300]
+                failure = errors.Failure.of(error)
+                last_error = failure.text[:300]
                 attempts.append(
-                    {"attempt": attempt, "state": "failed", "error": last_error}
+                    {
+                        "attempt": attempt,
+                        "state": "failed",
+                        "error": last_error,
+                        "failure": dict(failure.dump()),
+                    }
                 )
                 break
             else:

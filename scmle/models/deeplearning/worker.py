@@ -8,6 +8,7 @@ here, and only plain numpy arrays and dictionaries cross the pipe.
 
 import atexit
 import collections
+from collections.abc import Mapping
 import importlib
 from multiprocessing import connection
 import os
@@ -118,8 +119,8 @@ def serve(channel: connection.Connection) -> None:
         try:
             channel.send(("ok", handle(cache, operation, payload)))
         except Exception as error:  # noqa: BLE001 -- isolation: report, keep serving
-            # handled: error sent back to parent
-            channel.send(("error", f"{type(error).__name__}: {error}"))
+            # handled: sent back to the parent with its traceback (Failure)
+            channel.send(("error", dict(errors.Failure.of(error).dump())))
 
 
 def main() -> None:
@@ -179,7 +180,12 @@ class Client:
                 self.shutdown()
                 raise WorkerError("the PyTorch worker process died") from error
         if status == "error":
-            raise WorkerError(value)
+            if isinstance(value, Mapping):
+                raise WorkerError(
+                    f"{value.get('kind')}: {value.get('message')}",
+                    {"failure": dict(value)},
+                )
+            raise WorkerError(str(value))
         return value
 
     def shutdown(self) -> None:

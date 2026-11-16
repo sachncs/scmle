@@ -21,6 +21,7 @@ from sklearn import base
 import threadpoolctl
 
 from scmle.contracts import data
+from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import models
 from scmle.contracts import tasks
@@ -229,8 +230,10 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
         result.score_std = float(numpy.std(scores))
         result.status = experiments.TrialStatus.OK
     except Exception as error:  # noqa: BLE001 -- isolation: any model failure is data
-        # handled: model failure stored in FAILED trial's error field
-        result.error = f"{type(error).__name__}: {error}"
+        # handled: model failure stored in the FAILED trial, with its trace
+        failure = errors.Failure.of(error)
+        result.error = failure.text
+        result.failure = failure.dump()
     result.fit_seconds = time.monotonic() - started
     return result
 
@@ -246,6 +249,7 @@ def lost_trial(payload: TrialPayload, error: Exception) -> experiments.Trial:
         A `FAILED` result whose error starts with `WorkerLost`.
     """
     job = payload.job
+    failure = errors.Failure.of(error)
     return experiments.Trial(
         job.trial_id,
         job.model_name,
@@ -253,7 +257,8 @@ def lost_trial(payload: TrialPayload, error: Exception) -> experiments.Trial:
         payload.metric.name,
         params=dict(job.params),
         strategy=job.strategy,
-        error=f"WorkerLost: {type(error).__name__}: {error}",
+        error=f"WorkerLost: {failure.text}",
+        failure=failure.dump(),
     )
 
 
@@ -285,6 +290,7 @@ def guarded_evaluate(payload: TrialPayload) -> experiments.Trial:
             params=dict(job.params),
             strategy=job.strategy,
             error=f"TrialLimitError: {error}",
+            failure=errors.Failure.of(error).dump(),
         )
     return trial
 

@@ -36,6 +36,7 @@ from collections.abc import Callable
 import dataclasses
 import hashlib
 import json
+import logging
 import time
 from typing import Any
 
@@ -46,6 +47,9 @@ from scmle.core import retry
 from scmle.data.store import objectstore
 from scmle.data.store import quality
 from scmle.data.store import snapshot
+
+LOGGER = logging.getLogger(__name__)
+
 
 FORMAT = 1
 SEPARATOR = "\x1f"
@@ -391,21 +395,16 @@ class IncrementalProcessor:
                 try:
                     self.retrying(lambda: self.save_checkpoint(checkpoint))
                 except retry.RetryExhaustedError as error:
-                    # handled: returned as failed finding/problem/refusal with
-                    # error text
-                    failed, problem = (
-                        meta.key,
-                        f"{type(error).__name__}: {error}",
-                    )
+                    LOGGER.exception("checkpoint save failed at %s", meta.key)
+                    failed, problem = meta.key, errors.Failure.of(error).text
                     break
                 duplicate_objects.append(meta.key)
                 continue
             try:
                 dropped, written, output_key = self.process(meta, checkpoint)
             except (errors.ScmleError, retry.RetryExhaustedError) as error:
-                # handled: returned as failed finding/problem/refusal with error
-                # text
-                failed, problem = meta.key, f"{type(error).__name__}: {error}"
+                LOGGER.exception("processing failed at %s", meta.key)
+                failed, problem = meta.key, errors.Failure.of(error).text
                 break
             done.append(meta.key)
             duplicate_rows += dropped
