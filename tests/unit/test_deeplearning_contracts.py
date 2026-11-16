@@ -2,16 +2,18 @@
 
 from importlib import util
 
-import joblib
 import numpy
 import pytest
 
 from scmle.contracts import capabilities
 from scmle.contracts import tasks
+import scmle.envelope
 from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import estimators
 from scmle.models.deeplearning import jepa
 from scmle.models.deeplearning import networks
+
+KEY = "checkpoint-test-key"
 
 pytestmark = pytest.mark.skipif(
     util.find_spec("torch") is None,
@@ -65,8 +67,8 @@ def test_transformer_runs_real_torch_inference_explanation_and_checkpoint(
     assert explanation.method == "gradient_x_input"
     assert explanation.target == "predicted_output"
 
-    checkpoint = model.save_checkpoint(tmp_path / "transformer.joblib")
-    restored = estimators.TorchClassifier.load_checkpoint(checkpoint)
+    checkpoint = model.save_checkpoint(tmp_path / "transformer.bin", KEY)
+    restored = estimators.TorchClassifier.load_checkpoint(checkpoint, KEY)
 
     numpy.testing.assert_allclose(
         restored.predict_proba(matrix[:6]), probabilities, rtol=0.0, atol=0.0
@@ -107,8 +109,8 @@ def test_jepa_runs_real_torch_embedding_explanation_and_checkpoint(tmp_path):
     assert explanation.method == "embedding_gradient_x_input"
     assert explanation.target == "embedding_energy"
 
-    checkpoint = model.save_checkpoint(tmp_path / "jepa.joblib")
-    restored = jepa.JepaEstimator.load_checkpoint(checkpoint)
+    checkpoint = model.save_checkpoint(tmp_path / "jepa.bin", KEY)
+    restored = jepa.JepaEstimator.load_checkpoint(checkpoint, KEY)
 
     numpy.testing.assert_allclose(
         restored.transform(matrix[:5]), embedding, rtol=0.0, atol=0.0
@@ -126,13 +128,14 @@ def test_transformer_checkpoint_metadata_tampering_is_rejected(tmp_path):
         validation_fraction=0.0,
         random_state=7,
     ).fit(matrix, labels(len(matrix)))
-    checkpoint = model.save_checkpoint(tmp_path / "transformer.joblib")
-    envelope = joblib.load(checkpoint)
-    envelope["model_family"] = "jepa"
-    joblib.dump(envelope, checkpoint)
+    checkpoint = model.save_checkpoint(tmp_path / "transformer.bin", KEY)
+    meta, payload = scmle.envelope.read(checkpoint, KEY)
+    scmle.envelope.seal(
+        checkpoint, {**meta, "model_family": "jepa"}, payload, KEY
+    )
 
     with pytest.raises(ValueError, match="metadata does not match"):
-        estimators.TorchClassifier.load_checkpoint(checkpoint)
+        estimators.TorchClassifier.load_checkpoint(checkpoint, KEY)
 
 
 def test_torch_adapters_expose_the_same_fail_closed_modality_contract():

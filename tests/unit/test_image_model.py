@@ -6,6 +6,7 @@ import math
 
 import pytest
 
+from scmle.contracts import errors
 from scmle.data.modalities import image
 from scmle.models.images import Classifier
 from scmle.models.images import Config
@@ -154,7 +155,8 @@ def test_image_classifier_package_round_trip_and_tamper_rejection(
     path = tmp_path / "image-model"
     artifact = classifier.save(path)
 
-    with pytest.raises(PermissionError, match="trusted=True"):
+    # SEC-2: an unsigned package is refused with the reason, as bundles are.
+    with pytest.raises(errors.ArtifactError, match="not signed"):
         Classifier.load(path)
 
     loaded = Classifier.load(path, trusted=True)

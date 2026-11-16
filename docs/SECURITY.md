@@ -6,9 +6,9 @@ file-write path, plus `bandit -r scmle` and `pip-audit` (both run in CI).
 
 ## Threat model
 
-* **Untrusted model bundles.** Bundles are pickle-based (joblib). Unpickling
-  executes code, so a bundle from an untrusted source is arbitrary code
-  execution. This is the principal risk.
+* **Untrusted model bundles, checkpoints and packages.** All are pickle-based
+  (joblib). Unpickling executes code, so a file from an untrusted source is
+  arbitrary code execution. This is the principal risk.
 * **Untrusted datasets.** Parsed with pandas/pyarrow; malformed files raise
   `DataError`.
 * **Unauthenticated or cross-tenant callers.** The HTTP adapters verify a
@@ -23,6 +23,7 @@ file-write path, plus `bandit -r scmle` and `pip-audit` (both run in CI).
 | --- | --- | --- |
 | Loading a malicious bundle | Loading is **refused unless authentic**: the manifest HMAC-SHA256 signature must verify (`$SCMLE_SIGNING_KEY` or `signing_key=`), or the caller vouches with `trusted=True` | `tests/unit/test_bundle.py` |
 | Tampered model file | SHA-256 per file is verified **before** unpickling; an invalid signature is an error even with `trusted=True` | tamper and swapped-model tests |
+| Malicious deep-learning checkpoint or document/image package | Checkpoints are an authenticated envelope (`scmle.envelope`): a JSON header with the payload digest and an HMAC is read and verified before any byte is unpickled. Package manifests, which record the payload digest, are signed the same way. Unsigned files, or signed files read with no key, are refused unless `trusted=True`; an invalid signature is an error even with `trusted=True` | `tests/unit/test_envelope.py` (a tripwire on `joblib.load`) |
 | Dependency drift | Bundle records Python and scikit-learn versions; mismatches are refused unless allowed | version-mismatch test |
 | SQL injection | Tracking SQL binds every value; dynamic column names come from a fixed whitelist | `tests/unit/test_tracking.py` |
 | Resource leaks | SQLite connections are closed on every call | leak test with `ResourceWarning` as error |

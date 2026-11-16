@@ -5,6 +5,7 @@ import math
 
 import pytest
 
+from scmle.contracts import errors
 from scmle.data.modalities.document import Dataset
 from scmle.data.modalities.document import Reader
 from scmle.data.modalities.document import Sample
@@ -135,7 +136,8 @@ def test_document_classifier_atomic_trusted_package_round_trip(
 
     assert artifact.path == str(path)
     assert len(artifact.digest) == 64
-    with pytest.raises(PermissionError, match="trusted=True"):
+    # SEC-2: an unsigned package is refused with the reason, as bundles are.
+    with pytest.raises(errors.ArtifactError, match="not signed"):
         Classifier.load(path)
 
     loaded = Classifier.load(path, trusted=True)

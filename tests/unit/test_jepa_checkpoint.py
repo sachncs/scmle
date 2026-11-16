@@ -1,11 +1,16 @@
 """Checkpoint and deterministic-output contracts for tabular JEPA."""
 
 import importlib.util
+import json
 
 import numpy
 import pytest
 
+from scmle import envelope
+from scmle.contracts import errors
 from scmle.models.deeplearning.jepa import JepaEstimator
+
+KEY = "checkpoint-test-key"
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("torch") is None,
@@ -35,12 +40,19 @@ def test_checkpoint_round_trip_preserves_embeddings(tmp_path):
     rows = features()
     original = estimator().fit(rows)
     before = original.transform(rows[:7])
-
-    checkpoint = original.save_checkpoint(tmp_path / "jepa.joblib")
-    restored = JepaEstimator.load_checkpoint(checkpoint)
-
+    checkpoint = original.save_checkpoint(tmp_path / "jepa.bin", KEY)
+    restored = JepaEstimator.load_checkpoint(checkpoint, KEY)
     numpy.testing.assert_allclose(restored.transform(rows[:7]), before)
     assert restored.training_report_ == original.training_report_
+
+
+def test_an_unsigned_checkpoint_needs_trust(tmp_path, monkeypatch):
+    """SEC-1: nothing is unpickled from a checkpoint nobody signed."""
+    monkeypatch.delenv("SCMLE_SIGNING_KEY", raising=False)
+    checkpoint = estimator().fit(features()).save_checkpoint(tmp_path / "j.bin")
+    with pytest.raises(errors.ArtifactError, match="not signed"):
+        JepaEstimator.load_checkpoint(checkpoint, KEY)
+    assert JepaEstimator.load_checkpoint(checkpoint, trusted=True)
 
 
 def test_same_seed_reproduces_training_and_transform_output():
@@ -58,36 +70,37 @@ def test_invalid_checkpoint_format_is_rejected(tmp_path):
 
     path = tmp_path / "invalid.joblib"
     joblib.dump({"format": "unknown"}, path)
-
-    with pytest.raises(ValueError, match="checkpoint format"):
-        JepaEstimator.load_checkpoint(path)
+    with pytest.raises(ValueError, match="not an scmle envelope"):
+        JepaEstimator.load_checkpoint(path, KEY, trusted=True)
 
 
 def test_checkpoint_payload_tampering_is_rejected(tmp_path):
     """A modified serialized payload fails the integrity check."""
-    import joblib
-
     checkpoint = (
-        estimator().fit(features()).save_checkpoint(tmp_path / "jepa.joblib")
+        estimator().fit(features()).save_checkpoint(tmp_path / "j.bin", KEY)
     )
-    payload = joblib.load(checkpoint)
-    payload["payload"] = payload["payload"][:-1] + b"x"
-    joblib.dump(payload, checkpoint)
-
-    with pytest.raises(ValueError, match="integrity check"):
-        JepaEstimator.load_checkpoint(checkpoint)
+    raw = bytearray(checkpoint.read_bytes())
+    raw[-1] ^= 1
+    checkpoint.write_bytes(bytes(raw))
+    with pytest.raises(ValueError, match="digest"):
+        JepaEstimator.load_checkpoint(checkpoint, KEY)
 
 
 def test_checkpoint_metadata_mismatch_is_rejected(tmp_path):
     """Envelope metadata cannot silently describe another representation."""
-    import joblib
-
     checkpoint = (
-        estimator().fit(features()).save_checkpoint(tmp_path / "jepa.joblib")
+        estimator().fit(features()).save_checkpoint(tmp_path / "j.bin", KEY)
     )
-    payload = joblib.load(checkpoint)
-    payload["input_width"] += 1
-    joblib.dump(payload, checkpoint)
-
+    meta, payload = envelope.read(checkpoint, KEY)
+    edited = {**meta, "input_width": meta["input_width"] + 1}
+    magic, header, body = checkpoint.read_bytes().split(b"\n", 2)
+    record = json.loads(header)
+    record["meta"] = edited
+    checkpoint.write_bytes(
+        magic + b"\n" + json.dumps(record).encode() + b"\n" + body
+    )
+    with pytest.raises(errors.ArtifactError, match="not authentic"):
+        JepaEstimator.load_checkpoint(checkpoint, KEY)
+    envelope.seal(checkpoint, edited, payload, KEY)
     with pytest.raises(ValueError, match="metadata does not match"):
-        JepaEstimator.load_checkpoint(checkpoint)
+        JepaEstimator.load_checkpoint(checkpoint, KEY)

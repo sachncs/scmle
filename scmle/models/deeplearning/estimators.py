@@ -6,11 +6,9 @@ matrix to the worker and keeps the returned weights as plain numpy arrays;
 and caches them. Pickling therefore stores only numpy data.
 """
 
-import hashlib
-import hmac
 import io
+import json
 import pathlib
-import tempfile
 from typing import Any
 import uuid
 
@@ -20,7 +18,7 @@ from scipy import sparse
 from sklearn import base
 from sklearn.utils import validation
 
-from scmle import durability
+from scmle import envelope
 from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import worker
 
@@ -291,105 +289,69 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
             feature_count=self.state_["input_width_"],
         )
 
-    def save_checkpoint(self, path: str | pathlib.Path) -> pathlib.Path:
-        """Atomically save a verified, trusted-local fitted checkpoint.
+    def save_checkpoint(
+        self,
+        path: str | pathlib.Path,
+        signing_key: str | bytes | None = None,
+    ) -> pathlib.Path:
+        """Atomically saves the fitted estimator as an authenticated envelope.
 
         An unfitted estimator raises scikit-learn's `NotFittedError`.
 
         Args:
             path: Destination file. Missing parent directories are created.
+            signing_key: HMAC key; the configured key is used when None.
+                Without any key the checkpoint can be loaded only with
+                `trusted=True` (SEC-1).
 
         Returns:
             The checkpoint path.
         """
         validation.check_is_fitted(self, attributes=["state_"])
-        destination = pathlib.Path(path)
-        destination.parent.mkdir(parents=True, exist_ok=True)
         family = self.model_contract()
         serialized = io.BytesIO()
         joblib.dump(
             {"format": family.checkpoint.format, "estimator": self},
             serialized,
         )
-        serialized_payload = serialized.getvalue()
-        envelope = {
-            **self.checkpoint_manifest(),
-            "payload_sha256": hashlib.sha256(serialized_payload).hexdigest(),
-            "payload": serialized_payload,
-        }
-        temporary: pathlib.Path | None = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                dir=destination.parent,
-                prefix=f".{destination.name}.",
-                suffix=".tmp",
-                delete=False,
-            ) as handle:
-                temporary = pathlib.Path(handle.name)
-            joblib.dump(envelope, temporary)
-            durability.sync_file(temporary)
-            pathlib.Path(temporary).replace(destination)
-            durability.sync_directory(destination.parent)
-        except BaseException:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
-            raise
-        return destination
+        return envelope.seal(
+            path, self.checkpoint_manifest(), serialized.getvalue(), signing_key
+        )
 
     @classmethod
-    def load_checkpoint(cls, path: str | pathlib.Path) -> "NetworkEstimator":
-        """Loads a verified checkpoint for this estimator class.
-
-        Checkpoints are trusted-local joblib payloads. The digest detects
-        truncation and accidental modification; it is not a protection
-        against a malicious pickle.
+    def load_checkpoint(
+        cls,
+        path: str | pathlib.Path,
+        signing_key: str | bytes | None = None,
+        trusted: bool = False,
+    ) -> "NetworkEstimator":
+        """Loads a checkpoint, authenticating it before anything is unpickled.
 
         Args:
             path: Checkpoint produced by `save_checkpoint`.
+            signing_key: HMAC key; the configured key is used when None.
+            trusted: Whether the caller vouches for an unsigned checkpoint.
 
         Returns:
             The fitted estimator stored in the checkpoint.
 
         Raises:
-            ValueError: If the file cannot be read, the envelope, metadata or
-                digest check fails, or the payload does not hold a fitted
-                estimator of this class that matches the metadata.
+            ValueError: If the file cannot be read, is not an envelope, fails
+                its digest, or does not hold a fitted estimator of this class
+                that matches the metadata.
+            ArtifactError: If the checkpoint is unsigned (or no key is set)
+                and `trusted` is false, or its signature does not verify.
         """
         try:
-            envelope = joblib.load(path)
-        except Exception as error:
+            meta, payload = envelope.read(path, signing_key, trusted)
+        except OSError as error:
             raise ValueError(
                 "could not read deep-learning checkpoint"
             ) from error
-        if not isinstance(envelope, dict):
-            raise ValueError("deep-learning checkpoint envelope is invalid")
-        required = {
-            "format",
-            "schema_version",
-            "model_family",
-            "architecture",
-            "modality",
-            "input_width",
-            "inference",
-            "explanation",
-            "payload_sha256",
-            "payload",
-        }
-        if not required.issubset(envelope):
-            raise ValueError("deep-learning checkpoint metadata is incomplete")
-        serialized_payload = envelope["payload"]
-        digest = envelope["payload_sha256"]
-        if (
-            envelope["schema_version"] != cls.CHECKPOINT_SCHEMA_VERSION
-            or not isinstance(serialized_payload, bytes)
-            or not isinstance(digest, str)
-            or not hmac.compare_digest(
-                hashlib.sha256(serialized_payload).hexdigest(), digest
-            )
-        ):
+        if meta.get("schema_version") != cls.CHECKPOINT_SCHEMA_VERSION:
             raise ValueError("deep-learning checkpoint integrity check failed")
         try:
-            serialized = joblib.load(io.BytesIO(serialized_payload))
+            serialized = joblib.load(io.BytesIO(payload))
         except Exception as error:
             raise ValueError(
                 "deep-learning checkpoint payload is invalid"
@@ -402,21 +364,11 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
         if not isinstance(estimator, cls):
             raise ValueError(f"checkpoint does not contain a {cls.__name__}")
         validation.check_is_fitted(estimator, attributes=["state_"])
-        family = estimator.model_contract()
+        expected = json.loads(json.dumps(estimator.checkpoint_manifest()))
         if (
-            serialized.get("format") != family.checkpoint.format
-            or envelope["format"] != family.checkpoint.format
-            or envelope["model_family"] != family.model_family
-            or envelope["architecture"] != estimator.architecture
-            or envelope["modality"] != family.inference.modality.value
-            or envelope["input_width"] != estimator.state_["input_width_"]
-            or envelope["inference"] != family.inference.to_dict()
-            or envelope["explanation"]
-            != (
-                None
-                if family.explanation is None
-                else family.explanation.to_dict()
-            )
+            serialized.get("format")
+            != estimator.model_contract().checkpoint.format
+            or meta != expected
         ):
             raise ValueError("deep-learning checkpoint metadata does not match")
         return estimator

@@ -28,6 +28,7 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import log_loss
 
 from scmle import durability
+from scmle import envelope
 from scmle.data.modalities import document
 
 NGRAM_BOUND_COUNT = 2
@@ -649,11 +650,18 @@ class Classifier:
             raise RuntimeError("classifier is not fitted")
         return tuple(estimator.classes_.tolist())
 
-    def save(self, path: str | pathlib.Path) -> Package:
+    def save(
+        self,
+        path: str | pathlib.Path,
+        signing_key: str | bytes | None = None,
+    ) -> Package:
         """Atomically saves this fitted classifier as a verified package.
 
         Args:
             path: Directory to create; it must not exist yet.
+            signing_key: HMAC key for the manifest, which records the
+                payload digest; the configured key is used when None. An
+                unsigned package loads only with `trusted=True` (SEC-2).
 
         Returns:
             The package path and the digest of its model payload.
@@ -684,6 +692,7 @@ class Classifier:
                 "model_digest": self.model_digest,
                 "config": self.config.to_dict(),
             }
+            manifest = dict(envelope.sign(manifest, signing_key))
             manifest_path = temporary_directory / "manifest.json"
             with manifest_path.open(
                 "w", encoding="utf-8", newline="\n"
@@ -712,28 +721,27 @@ class Classifier:
         cls,
         path: str | pathlib.Path,
         trusted: bool = False,
+        signing_key: str | bytes | None = None,
     ) -> Self:
-        """Loads a package only after an explicit caller trust decision.
+        """Loads a package, authenticating it before anything is unpickled.
 
         Args:
             path: Package directory written by `save`.
-            trusted: Must be True; loading unpickles the payload, so only
-                packages from trusted sources may be loaded.
+            trusted: Whether the caller vouches for an unsigned package;
+                a signed package that verifies needs no vouching.
+            signing_key: HMAC key; the configured key is used when None.
 
         Returns:
             The fitted classifier stored in the package.
 
         Raises:
-            PermissionError: If `trusted` is not True.
+            ArtifactError: If the manifest's signature does not verify, or
+                it is unsigned (or no key is set) and `trusted` is false.
             FileNotFoundError: If `path` is not a directory.
             ValueError: If the manifest or payload is missing, the version
                 is unsupported, or a digest does not match.
             TypeError: If the payload is not a `Classifier`.
         """
-        if not trusted:
-            raise PermissionError(
-                "loading a document model package requires trusted=True"
-            )
         target = pathlib.Path(path).expanduser()
         if not target.is_dir():
             raise FileNotFoundError(target)
@@ -749,6 +757,7 @@ class Classifier:
             raise ValueError("document model package has no model payload")
         if file_digest(model_path) != manifest.get("artifact_digest"):
             raise ValueError("document model payload digest does not match")
+        envelope.check(manifest, target, signing_key, trusted)
         loaded = joblib.load(model_path)
         if not isinstance(loaded, cls):
             raise TypeError("package does not contain a Classifier")

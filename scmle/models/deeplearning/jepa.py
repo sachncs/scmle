@@ -1,10 +1,8 @@
 """Public proxy for the optional tabular JEPA representation trainer."""
 
-import hashlib
-import hmac
 import io
+import json
 import pathlib
-import tempfile
 from typing import Any
 from typing import cast
 
@@ -13,7 +11,7 @@ import numpy
 from sklearn import base
 from sklearn.utils import validation
 
-from scmle import durability
+from scmle import envelope
 from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import estimators
 
@@ -170,121 +168,73 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
             else None,
         }
 
-    def save_checkpoint(self, path: str | pathlib.Path) -> pathlib.Path:
-        """Saves a fitted JEPA representation checkpoint.
+    def save_checkpoint(
+        self,
+        path: str | pathlib.Path,
+        signing_key: str | bytes | None = None,
+    ) -> pathlib.Path:
+        """Saves the fitted representation as an authenticated envelope.
 
-        The checkpoint contains a versioned envelope around the estimator
-        configuration, training report, and NumPy-only worker state. The
-        envelope includes a SHA-256 digest so truncated or accidentally
-        modified files fail closed before the estimator is trusted. It is
-        intended for trusted local storage; loading it uses joblib's
-        pickle-based format and is not a security boundary. An unfitted
-        estimator raises scikit-learn's `NotFittedError`.
+        The payload holds the estimator configuration, training report and
+        NumPy-only worker state; the header holds `checkpoint_manifest`, the
+        payload digest and an HMAC (`scmle.envelope`), so nothing is
+        unpickled before it is authenticated (SEC-1). An unfitted estimator
+        raises scikit-learn's `NotFittedError`.
 
         Args:
             path: Destination file. Missing parent directories are created.
+            signing_key: HMAC key; the configured key is used when None.
+                Without any key the checkpoint loads only with `trusted=True`.
 
         Returns:
             The checkpoint path.
         """
         validation.check_is_fitted(self, attributes=["state_"])
-        destination = pathlib.Path(path)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        temporary: pathlib.Path | None = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                dir=destination.parent,
-                prefix=f".{destination.name}.",
-                suffix=".tmp",
-                delete=False,
-            ) as handle:
-                temporary = pathlib.Path(handle.name)
-            serialized = io.BytesIO()
-            joblib.dump(
-                {"format": self.CHECKPOINT_FORMAT, "estimator": self},
-                serialized,
-            )
-            serialized_payload = serialized.getvalue()
-            joblib.dump(
-                {
-                    **self.checkpoint_manifest(),
-                    "payload_sha256": hashlib.sha256(
-                        serialized_payload
-                    ).hexdigest(),
-                    "payload": serialized_payload,
-                },
-                temporary,
-            )
-            durability.sync_file(temporary)
-            pathlib.Path(temporary).replace(destination)
-            durability.sync_directory(destination.parent)
-        except BaseException:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
-            raise
-        return destination
+        serialized = io.BytesIO()
+        joblib.dump(
+            {"format": self.CHECKPOINT_FORMAT, "estimator": self}, serialized
+        )
+        return envelope.seal(
+            path, self.checkpoint_manifest(), serialized.getvalue(), signing_key
+        )
 
     @classmethod
-    def load_checkpoint(cls, path: str | pathlib.Path) -> "JepaEstimator":
-        """Loads a trusted fitted tabular JEPA checkpoint.
+    def load_checkpoint(
+        cls,
+        path: str | pathlib.Path,
+        signing_key: str | bytes | None = None,
+        trusted: bool = False,
+    ) -> "JepaEstimator":
+        """Loads a checkpoint, authenticating it before anything is unpickled.
 
         Args:
             path: Checkpoint produced by `save_checkpoint`.
+            signing_key: HMAC key; the configured key is used when None.
+            trusted: Whether the caller vouches for an unsigned checkpoint.
 
         Returns:
             A fitted estimator whose transform output matches the saved model.
 
         Raises:
-            ValueError: If the file cannot be read, the format, metadata or
-                digest check fails, or the payload does not hold a matching
-                fitted `JepaEstimator`.
+            ValueError: If the file cannot be read, is not an envelope, fails
+                its digest, or does not hold a matching fitted
+                `JepaEstimator`.
+            ArtifactError: If the checkpoint is unsigned (or no key is set)
+                and `trusted` is false, or its signature does not verify.
         """
         try:
-            payload = joblib.load(path)
-        except (EOFError, OSError, ValueError, TypeError) as error:
+            meta, payload = envelope.read(path, signing_key, trusted)
+        except OSError as error:
             raise ValueError(
                 "could not read tabular JEPA checkpoint"
             ) from error
         if (
-            not isinstance(payload, dict)
-            or payload.get("format") != cls.CHECKPOINT_FORMAT
+            meta.get("format") != cls.CHECKPOINT_FORMAT
+            or meta.get("schema_version") != cls.CHECKPOINT_SCHEMA_VERSION
         ):
             raise ValueError("unsupported tabular JEPA checkpoint format")
-        required = {
-            "schema_version",
-            "scope",
-            "model_family",
-            "inference",
-            "explanation",
-            "payload_sha256",
-            "input_width",
-            "embedding_size",
-            "payload",
-        }
-        if not required.issubset(payload):
-            raise ValueError("tabular JEPA checkpoint metadata is incomplete")
-        serialized_payload = payload["payload"]
-        digest = payload["payload_sha256"]
-        explanation = contracts.TABULAR_JEPA_CONTRACT.explanation
-        if explanation is None:
-            raise ValueError("tabular JEPA explanation contract is missing")
-        if (
-            payload["schema_version"] != cls.CHECKPOINT_SCHEMA_VERSION
-            or payload["scope"] != "tabular_numeric_representation"
-            or payload["model_family"]
-            != contracts.TABULAR_JEPA_CONTRACT.model_family
-            or payload["inference"]
-            != contracts.TABULAR_JEPA_CONTRACT.inference.to_dict()
-            or payload["explanation"] != explanation.to_dict()
-            or not isinstance(serialized_payload, bytes)
-            or not isinstance(digest, str)
-            or not hmac.compare_digest(
-                hashlib.sha256(serialized_payload).hexdigest(), digest
-            )
-        ):
-            raise ValueError("tabular JEPA checkpoint integrity check failed")
         try:
-            serialized = joblib.load(io.BytesIO(serialized_payload))
+            serialized = joblib.load(io.BytesIO(payload))
         except (EOFError, OSError, ValueError, TypeError) as error:
             raise ValueError(
                 "tabular JEPA checkpoint payload is invalid"
@@ -300,10 +250,8 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
         if not isinstance(estimator, cls):
             raise ValueError("checkpoint does not contain a JepaEstimator")
         validation.check_is_fitted(estimator, attributes=["state_"])
-        if (
-            payload["input_width"] != estimator.state_.get("input_width_")
-            or payload["embedding_size"] != estimator.embedding_size
-        ):
+        expected = json.loads(json.dumps(estimator.checkpoint_manifest()))
+        if meta != expected:
             raise ValueError("tabular JEPA checkpoint metadata does not match")
         return estimator
 
