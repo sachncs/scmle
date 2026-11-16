@@ -65,11 +65,12 @@ def test_log_reloads_and_continues_the_chain(tmp_path):
 def test_a_set_opens_once_and_every_attempt_is_logged():
     log = sealed.OpenLog()
     held = sealed.SealedSet("C", resident(), log)
+    held.commit("c", "l")
     token = held.issue_token()
-    rows = held.open(token, actor="confirmation")
+    rows = held.open(token, "confirmation", claims_hash="c", ledger_hash="l")
     assert list(rows[0]["a"]) == [1.0, 2.0, 3.0]
     with pytest.raises(errors.LeakageError, match="already used"):
-        held.open(token, actor="exploration")
+        held.open(token, "exploration", claims_hash="c", ledger_hash="l")
     events = [(e["event"], e["actor"]) for e in log.entries]
     assert ("open", "confirmation") in events
     assert ("denied", "exploration") in events
@@ -83,13 +84,19 @@ def test_a_wrong_token_is_denied_and_logged_without_opening():
         held.open("guess", actor="exploration")
     assert held.opened is False
     assert [e["event"] for e in log.entries][-1] == "denied"
-    held.open(held.issue_token(), actor="confirmation")
+    held.commit("c", "l")
+    held.open(
+        held.issue_token(), "confirmation", claims_hash="c", ledger_hash="l"
+    )
 
 
 def test_the_log_never_contains_row_values():
     log = sealed.OpenLog()
     held = sealed.SealedSet("C", resident((123456.789, 2.0, 3.0)), log)
-    held.open(held.issue_token(), actor="confirmation")
+    held.commit("c", "l")
+    held.open(
+        held.issue_token(), "confirmation", claims_hash="c", ledger_hash="l"
+    )
     assert "123456.789" not in json.dumps(log.entries)
 
 
@@ -171,7 +178,10 @@ def test_a_set_commits_once_and_not_after_it_opened():
     with pytest.raises(errors.LeakageError, match="already bound"):
         held.commit("claims-2", "ledger-1")
     other = sealed.SealedSet("F", resident(), sealed.OpenLog())
-    other.open(other.issue_token())
+    other.commit("claims-0", "ledger-0")
+    other.open(
+        other.issue_token(), claims_hash="claims-0", ledger_hash="ledger-0"
+    )
     with pytest.raises(errors.LeakageError, match="already bound or used"):
         other.commit("claims-1", "ledger-1")
 
@@ -184,10 +194,14 @@ def test_the_binding_digest_depends_on_both_hashes():
     assert len(base) == 64
 
 
-def test_an_unbound_set_still_opens_without_hashes():
+def test_an_unbound_set_is_refused():
+    # GATE-3: a set that was never committed used to open with the token
+    # alone; every release is now bound to what it is released for.
     held = sealed.SealedSet("C", resident(), sealed.OpenLog())
     assert held.committed is False
-    assert len(held.open(held.issue_token())[0]) == 3
+    with pytest.raises(errors.LeakageError, match="bind it"):
+        held.open(held.issue_token())
+    assert held.opened is False
 
 
 def rechain(path, key=None):

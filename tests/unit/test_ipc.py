@@ -11,7 +11,8 @@ def test_vault_releases_rows_once_over_the_channel():
     features = pandas.DataFrame({"a": [1, 2, 3]})
     target = pandas.Series([0, 1, 0])
     sealed = vault.SealedTestSet(features, target, [10, 11, 12])
-    rows = sealed.open(sealed.issue_token())
+    sealed.bind("b")
+    rows = sealed.open(sealed.issue_token(), "b")
     assert rows[0].equals(features)
     assert rows[1].equals(target)
 

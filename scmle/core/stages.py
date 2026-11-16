@@ -7,6 +7,7 @@ side-effect-free plan preview.
 """
 
 import abc
+from collections.abc import Mapping
 import dataclasses
 import datetime
 import hashlib
@@ -3000,6 +3001,31 @@ def chartered_net_benefit(
     }
 
 
+def pin(selected: Any, decision: Mapping[str, Any] | None) -> str:
+    """Digest of the frozen selection the test set is released for.
+
+    The single release of the locked rows is bound to it (GATE-3), so the
+    release cannot serve a different model, setting or threshold.
+
+    Args:
+        selected: The selected trial.
+        decision: The chosen decision threshold, or None.
+
+    Returns:
+        SHA-256 of the trial id, model, strategy, parameters and threshold,
+        as canonical JSON.
+    """
+    frozen = {
+        "trial": selected.trial_id,
+        "model": selected.model_name,
+        "strategy": selected.strategy,
+        "params": selected.params,
+        "decision": decision,
+    }
+    text = json.dumps(frozen, sort_keys=True, default=str)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def choose_decision_threshold(
     context: scmle.core.context.Context, fitted: Any
 ) -> tuple[Any, dict[str, Any] | None]:
@@ -3679,7 +3705,9 @@ class FinalEvaluationStage(Stage):
         pipeline = self.mitigate_fairness(context, selected, pipeline, decision)
         self.register_coverage_claim(context)
         locked = split.locked_test
-        test_features, test_target = locked.open(locked.issue_token())
+        binding = pin(selected, decision)
+        locked.bind(binding)
+        test_features, test_target = locked.open(locked.issue_token(), binding)
         if (
             context.spec.data.weight_column == tasks.FAIRNESS_WEIGHT
             and tasks.FAIRNESS_WEIGHT not in test_features

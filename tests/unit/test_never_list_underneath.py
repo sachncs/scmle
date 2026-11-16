@@ -19,8 +19,9 @@ def test_a_sealed_set_opens_once_even_with_the_right_token():
         pandas.DataFrame({"a": [1.0]}), pandas.Series([1]), (0,)
     )
     try:
-        locked.open(locked.issue_token())
+        locked.bind("b")
+        locked.open(locked.issue_token(), "b")
         with pytest.raises(errors.LeakageError, match="already used"):
-            locked.open(locked.token)
+            locked.open(locked.token, "b")
     finally:
         locked.close()

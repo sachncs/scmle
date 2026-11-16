@@ -65,9 +65,9 @@ def serve(
                 channel.send(("ok", None))
         elif released:
             channel.send(("denied", "already released"))
-        elif binding is not None and not secrets.compare_digest(
-            str(extra).encode(), binding.encode()
-        ):
+        elif binding is None:
+            channel.send(("denied", "not bound to a frozen selection"))
+        elif not secrets.compare_digest(str(extra).encode(), binding.encode()):
             channel.send(("denied", "binding mismatch"))
         else:
             released = True
@@ -144,7 +144,7 @@ class SealedTestSet(splitters.LockedTestSet):
 
         Args:
             token: The token from `issue_token`.
-            binding: The digest given to `bind`, if one was set.
+            binding: The digest given to `bind`, which must come first.
 
         On success the vault process is ended after the rows are received.
 
@@ -153,8 +153,8 @@ class SealedTestSet(splitters.LockedTestSet):
 
         Raises:
             LeakageError: If the rows were already released, the vault
-                refuses (wrong token, binding mismatch) or the vault is
-                gone.
+                refuses (wrong token, never bound, binding mismatch) or the
+                vault is gone.
         """
         if self.opened:
             raise errors.LeakageError(

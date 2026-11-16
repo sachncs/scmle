@@ -156,7 +156,10 @@ def test_the_vault_seals_in_process_only_when_asked_not_to_use_one():
     held = protocol.seal("C", frame, target, (4, 5, 6))
     assert isinstance(held.locked, splitters.ResidentTestSet)
     assert protocol.level == sealed.PROTOCOL_LEVEL
-    features, labels = held.open(held.issue_token())
+    held.commit("c", "l")
+    features, labels = held.open(
+        held.issue_token(), claims_hash="c", ledger_hash="l"
+    )
     assert features.equals(frame) and labels.equals(target)
     assert held.ids == (4, 5, 6)
     process = sealed.Vault(sealed.OpenLog(), process=True)
@@ -164,7 +167,10 @@ def test_the_vault_seals_in_process_only_when_asked_not_to_use_one():
         real = process.seal("C", frame, target, (4, 5, 6))
         assert isinstance(real.locked, vault.SealedTestSet)
         assert process.level == sealed.VAULT_LEVEL
-        features, labels = real.open(real.issue_token())
+        real.commit("c", "l")
+        features, labels = real.open(
+            real.issue_token(), claims_hash="c", ledger_hash="l"
+        )
         assert features.equals(frame) and labels.equals(target)
     finally:
         process.close()
@@ -207,8 +213,12 @@ def test_vault_refusals_are_whole_messages():
         assert refusal(lambda: locked.open("guess")) == (
             "test set is locked: invalid token"
         )
-        locked.open(locked.issue_token())
-        assert refusal(lambda: locked.open(locked.token)) == (
+        assert refusal(lambda: locked.open(locked.issue_token())) == (
+            "test set is locked: not bound to a frozen selection"
+        )
+        locked.bind("b")
+        locked.open(locked.issue_token(), "b")
+        assert refusal(lambda: locked.open(locked.token, "b")) == (
             "test set was already used for final evaluation"
         )
     finally:

@@ -20,12 +20,13 @@ def sealed():
 
 
 def test_the_rows_are_released_once_to_the_token_holder(sealed):
-    features, target = sealed.open(sealed.issue_token())
+    sealed.bind("b")
+    features, target = sealed.open(sealed.issue_token(), "b")
 
     assert list(features["a"]) == [1.0, 2.0, 3.0] and list(target) == [0, 1, 0]
     assert sealed.opened is True
     with pytest.raises(errors.LeakageError, match="already used"):
-        sealed.open(sealed.issue_token())
+        sealed.open(sealed.issue_token(), "b")
 
 
 def test_a_wrong_token_is_refused_by_the_vault_process(sealed):
@@ -33,7 +34,8 @@ def test_a_wrong_token_is_refused_by_the_vault_process(sealed):
         sealed.open("guess")
 
     assert sealed.opened is False
-    released = sealed.open(sealed.issue_token())
+    sealed.bind("b")
+    released = sealed.open(sealed.issue_token(), "b")
     assert len(released[0]) == 3
 
 
@@ -92,8 +94,12 @@ def test_a_vault_binds_once(sealed):
         sealed.bind("selection-b")
 
 
-def test_an_unbound_vault_releases_without_a_binding(sealed):
-    assert len(sealed.open(sealed.issue_token())[0]) == 3
+def test_an_unbound_vault_refuses(sealed):
+    # GATE-3: an unbound vault used to release with the token alone.
+    with pytest.raises(errors.LeakageError, match="not bound"):
+        sealed.open(sealed.issue_token())
+    sealed.bind("b")
+    assert len(sealed.open(sealed.issue_token(), "b")[0]) == 3
 
 
 def test_a_bound_vault_checks_the_token_before_the_binding(sealed):

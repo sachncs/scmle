@@ -131,7 +131,8 @@ def test_pickling_the_view_leaks_neither_rows_nor_tokens():
 def test_the_open_log_and_manifest_hold_ids_but_never_values():
     frame, outcome, vault, log = build()
     held = vault.sets["C"]
-    held.open(held.issue_token(), actor="confirmation")
+    held.commit("claims-1", "ledger-1")
+    held.open(held.issue_token(), "confirmation", "claims-1", "ledger-1")
     text = json.dumps(log.entries) + json.dumps(outcome.manifest.to_dict())
     for value in frame[SENTINEL].iloc[list(held.ids)].head(50):
         assert repr(float(value)) not in text
@@ -153,10 +154,11 @@ def test_a_second_open_is_refused_and_both_attempts_are_logged():
     built = build()
     vault, log = built.vault, built.log
     held = vault.sets["C"]
+    held.commit("claims-1", "ledger-1")
     token = held.issue_token()
-    held.open(token, actor="confirmation")
+    held.open(token, "confirmation", "claims-1", "ledger-1")
     try:
-        held.open(token, actor="exploration")
+        held.open(token, "exploration", "claims-1", "ledger-1")
     except errors.LeakageError:
         pass
     else:

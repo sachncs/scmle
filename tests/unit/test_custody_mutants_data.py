@@ -377,7 +377,10 @@ def test_sealed_rows_have_a_fresh_index_and_their_own_labels():
     frame = make_frame()
     ran = run(frame)
     held = ran.vault.sets["C"]
-    features, target = held.open(held.issue_token(), actor="test")
+    held.commit("c", "l")
+    features, target = held.open(
+        held.issue_token(), "test", claims_hash="c", ledger_hash="l"
+    )
     assert isinstance(features.index, pandas.RangeIndex)
     assert isinstance(target.index, pandas.RangeIndex)
     assert list(features.columns) == ["x", "z"]

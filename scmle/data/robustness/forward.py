@@ -22,7 +22,9 @@ skipped with a reason and, in the last case, `F` is not opened.
 from collections.abc import Callable
 from collections.abc import Mapping
 import dataclasses
+import hashlib
 import itertools
+import json
 import math
 import operator
 from typing import Any
@@ -36,6 +38,9 @@ from scmle.data.ledger import confirm
 from scmle.data.robustness import stability
 
 ACTOR = "f6-forward"
+# What the forward release is committed to besides the findings: no ledger
+# is involved, so the check names itself.
+LEDGER = "f6-forward-check"
 CHECK_ID = "f6-forward"
 HOLDS = "holds"
 UNSTABLE = "unstable_over_time"
@@ -236,8 +241,10 @@ def forward_check(
 
     Returns:
         The result. `F` is opened at most once and not at all when the check
-        is skipped. A finding whose feature is missing from `F` is reported
-        as `inconclusive` with no forward effect.
+        is skipped; before opening, the release is committed to the digest
+        of `effects`, so `F` cannot be released for other findings (GATE-3).
+        A finding whose feature is missing from `F` is reported as
+        `inconclusive` with no forward effect.
     """
     if not temporal:
         return skipped("the data are not temporal: no forward check")
@@ -245,8 +252,15 @@ def forward_check(
         return skipped("no forward set was sealed")
     if not effects:
         return skipped("no surviving finding to check; F was not opened")
+    claims = hashlib.sha256(
+        json.dumps(sorted(effects.items())).encode("utf-8")
+    ).hexdigest()
+    if not source.committed:
+        source.commit(claims, LEDGER)
     token = source.issue_token()
-    features, target = source.open(token, ACTOR)
+    features, target = source.open(
+        token, ACTOR, claims_hash=claims, ledger_hash=LEDGER
+    )
     codes = encode(target)
     findings = []
     for name, effect_x in effects.items():

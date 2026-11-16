@@ -234,22 +234,29 @@ class ResidentTestSet(LockedTestSet):
 
         Args:
             token: The token from `issue_token`.
-            binding: The binding fixed by `bind`; required once one is set.
+            binding: The binding fixed by `bind`, which must come first.
 
         Returns:
             Test features and labels.
 
         Raises:
-            LeakageError: On a wrong token, a repeated release or a binding
-                that differs from the one set.
+            LeakageError: On a wrong token, a repeated release, a set that was
+                never bound, or a binding that differs from the one set. The
+                token and binding are compared in constant time (GATE-3).
         """
-        if token != self.token:
+        if not secrets.compare_digest(token.encode(), self.token.encode()):
             raise errors.LeakageError("test set is locked: invalid token")
         if self.opened:
             raise errors.LeakageError(
                 "test set was already used for final evaluation"
             )
-        if self.binding is not None and binding != self.binding:
+        if self.binding is None:
+            raise errors.LeakageError(
+                "test set is locked: bind it to the frozen selection first"
+            )
+        if binding is None or not secrets.compare_digest(
+            binding.encode(), self.binding.encode()
+        ):
             raise errors.LeakageError("test set is locked: binding mismatch")
         self.opened = True
         return self.features, self.target

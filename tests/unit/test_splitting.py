@@ -140,10 +140,15 @@ def test_locked_test_set_opens_once(frame):
     assert locked.opened is False and "features" not in repr(locked)
     with pytest.raises(errors.LeakageError, match="invalid token"):
         locked.open("guess")
-    features, target = locked.open(locked.issue_token())
+    with pytest.raises(errors.LeakageError, match="bind it"):
+        locked.open(locked.issue_token())
+    locked.bind("b")
+    with pytest.raises(errors.LeakageError, match="binding mismatch"):
+        locked.open(locked.issue_token(), "other")
+    features, target = locked.open(locked.issue_token(), "b")
     assert len(features) == len(locked) == len(target)
     with pytest.raises(errors.LeakageError, match="already used"):
-        locked.open(locked.issue_token())
+        locked.open(locked.issue_token(), "b")
 
 
 def temporal_spec(embargo):
