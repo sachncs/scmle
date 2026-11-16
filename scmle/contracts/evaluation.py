@@ -793,11 +793,22 @@ class Explanations:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class DiagnosticGate:
-    """Required diagnostic and the action taken when its evidence is absent."""
+    """Required diagnostic and the action taken when its evidence is absent.
+
+    Attributes:
+        name: The diagnostic.
+        action: What a failed or missing report does to the release.
+        required_evidence: Files the report rests on.
+        decisive: Whether the report must carry a boolean pass verdict. A
+            presence gate (a report without error, such as an interval) is
+            not decisive; a gate on a test that passes or fails is, and a
+            report that omits its verdict then fails it (ERR-5).
+    """
 
     name: str
     action: DiagnosticAction
     required_evidence: tuple[str, ...]
+    decisive: bool = False
 
     def __post_init__(self) -> None:
         """Validates the diagnostic name, action, and evidence references.
@@ -815,6 +826,8 @@ class DiagnosticGate:
         )
         if not self.required_evidence:
             raise ValueError("diagnostic gates require evidence")
+        if not isinstance(self.decisive, bool):
+            raise TypeError("diagnostic_gate.decisive must be bool")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible diagnostic gate."""
@@ -822,6 +835,7 @@ class DiagnosticGate:
             "name": self.name,
             "action": self.action.value,
             "required_evidence": list(self.required_evidence),
+            "decisive": self.decisive,
         }
 
 

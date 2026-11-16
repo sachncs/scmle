@@ -505,7 +505,13 @@ def test_attestation_gate_requires_a_signed_release_record():
         blocking_reasons=(),
     )
 
-    blocked = release.apply_attestation_gate(outcome, {})
+    blocked = release.apply_attestation_gate(outcome, {}, True)
+    unchecked = release.apply_attestation_gate(
+        outcome,
+        {"signature": {"algorithm": "hmac-sha256", "value": "digest"}},
+        verified=False,
+    )
+    assert not unchecked.passed
     signed = release.apply_attestation_gate(
         outcome,
         {

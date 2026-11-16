@@ -726,7 +726,7 @@ def apply_reliability_gate(
 def apply_attestation_gate(
     outcome: ReleaseEvaluation,
     attestation_record: Any,
-    verified: bool | None = None,
+    verified: bool,
 ) -> ReleaseEvaluation:
     """Blocks release until packaged evidence has a valid signed attestation.
 
@@ -735,13 +735,13 @@ def apply_attestation_gate(
         attestation_record: The attestation, as a mapping holding a
             `signature` with an `hmac-sha256` algorithm and a non-blank
             value.
-        verified: Result of verifying the signature; None when it was not
-            checked, which is treated as acceptable.
+        verified: Whether the signature was checked and is valid. A
+            signature that was not checked does not pass (ERR-4).
 
     Returns:
-        `outcome` unchanged when the signature is present and not known to
-        be invalid; otherwise a blocked evaluation with an added failed
-        blocking finding.
+        `outcome` unchanged when the signature is present and verified;
+        otherwise a blocked evaluation with an added failed blocking
+        finding.
 
     Raises:
         TypeError: If `outcome` is not a `ReleaseEvaluation`.
@@ -758,7 +758,7 @@ def apply_attestation_gate(
         and signature.get("algorithm") == "hmac-sha256"
         and isinstance(signature.get("value"), str)
         and bool(signature["value"].strip())
-        and (verified is None or verified)
+        and verified is True
     )
     if passed:
         return outcome
@@ -1052,6 +1052,10 @@ def diagnostic_gate_finding(
         if verdict is False:
             failed = True
             reason = f"diagnostic '{name}' reported failure"
+        elif verdict is None and diagnostic_gate.decisive:
+            failed = True
+            reason = f"diagnostic '{name}' reported no verdict"
+
     return ReleaseFinding(
         FindingKind.DIAGNOSTIC,
         name,

@@ -385,9 +385,7 @@ def attestation_record(**signature):
 
 def test_attestation_gate_accepts_only_a_valid_signature_block():
     outcome = passing_outcome()
-    assert (
-        release.apply_attestation_gate(outcome, attestation_record()) is outcome
-    )
+    # ERR-4: an unchecked signature used to pass; verification is required.
     assert (
         release.apply_attestation_gate(outcome, attestation_record(), True)
         is outcome
@@ -401,12 +399,12 @@ def test_attestation_gate_accepts_only_a_valid_signature_block():
         "text",
         None,
     ):
-        assert not release.apply_attestation_gate(outcome, record).passed
+        assert not release.apply_attestation_gate(outcome, record, True).passed
     assert not release.apply_attestation_gate(
         outcome, attestation_record(), False
     ).passed
     with pytest.raises(TypeError, match=r"^outcome must be ReleaseEvaluation$"):
-        release.apply_attestation_gate(None, attestation_record())
+        release.apply_attestation_gate(None, attestation_record(), True)
 
 
 def test_attestation_gate_finding_is_exact():
@@ -433,9 +431,9 @@ def test_attestation_gate_finding_is_exact():
     assert blocked.blocking_reasons == (blocked.findings[0].reason,)
     observed = {}
     for label, record, verified in (
-        ("signed_none", {"signature": {"algorithm": "x"}}, None),
+        ("signed_false", {"signature": {"algorithm": "x"}}, False),
         ("signed_true", {"signature": {"algorithm": "x"}}, True),
-        ("unsigned", {}, None),
+        ("unsigned", {}, True),
         ("unsigned_false", {}, False),
         ("none_record", None, False),
     ):
@@ -444,14 +442,14 @@ def test_attestation_gate_finding_is_exact():
         ).findings[0]
         observed[label] = finding.observed
     assert observed == {
-        "signed_none": "signed",
+        "signed_false": "invalid",
         "signed_true": "signed",
         "unsigned": "unsigned",
         "unsigned_false": "unsigned",
         "none_record": "unsigned",
     }
     assert release.apply_attestation_gate(
-        passing_outcome(), None
+        passing_outcome(), None, True
     ).blocking_reasons == (blocked.findings[0].reason,)
 
 
@@ -1001,3 +999,25 @@ def test_every_missing_explanation_score_is_reported():
 def test_fairness_metric_values_reads_mappings_with_mixed_key_types():
     report = {1: {"m": 0.5}, "m": 0.25, "z": [{"m": 0.75}]}
     assert release.fairness_metric_values(report, "m") == (0.25, 0.5, 0.75)
+
+
+def test_a_decisive_gate_fails_a_report_without_a_verdict():
+    # ERR-5: a verdict-bearing diagnostic that drops its verdict used to pass.
+    decisive = evaluation.DiagnosticGate(
+        "diag", evaluation.DiagnosticAction.BLOCK, ("e1",), decisive=True
+    )
+    presence = evaluation.DiagnosticGate(
+        "diag", evaluation.DiagnosticAction.BLOCK, ("e1",)
+    )
+    report = {"diag": {"value": 1.0}}
+    failed = release.diagnostic_gate_finding(decisive, report)
+    assert not failed.passed and failed.blocking
+    assert failed.reason == "diagnostic 'diag' reported no verdict"
+    assert release.diagnostic_gate_finding(presence, report).passed
+    assert release.diagnostic_gate_finding(
+        decisive, {"diag": {"passed": True}}
+    ).passed
+    with pytest.raises(TypeError, match="decisive must be bool"):
+        evaluation.DiagnosticGate(
+            "diag", evaluation.DiagnosticAction.BLOCK, ("e1",), decisive=1
+        )
