@@ -91,6 +91,7 @@ class Multitarget(models.Model):
         try:
             inner = kind(random_state=seed, **settings)
         except TypeError:
+            # handled: documented: random_state passed only when class takes it
             inner = kind(**settings)
         return estimators.PerTarget(inner, classify=classify)
 

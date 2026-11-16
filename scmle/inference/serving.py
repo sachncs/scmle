@@ -837,6 +837,7 @@ class Responder(server.BaseHTTPRequestHandler):
                 self.request_id,
             )
         except access.DeniedError as denied:
+            # handled: gateway denial sent as refusal response; returns False
             self.fail(
                 denied.status,
                 denied.body["error"],
@@ -927,6 +928,7 @@ class Responder(server.BaseHTTPRequestHandler):
         try:
             length = int(raw_length)
         except ValueError:
+            # handled: non-integer Content-Length answered with HTTP 400
             self.fail(400, "Content-Length must be an integer", "request")
             return None
         if length < 0 or length > self.adapter.max_request_bytes:
@@ -964,6 +966,7 @@ class Responder(server.BaseHTTPRequestHandler):
             with adapter.admission.admit():
                 self.predict()
         except guard.OverloadedError as error:
+            # handled: admission overload answered with HTTP 429 and Retry-After
             self.fail(
                 429,
                 str(error),
@@ -977,14 +980,18 @@ class Responder(server.BaseHTTPRequestHandler):
         try:
             self.answer_prediction()
         except guard.DeadlineError as error:
+            # handled: scoring deadline exceeded answered with HTTP 504
             self.fail(504, str(error), error.category)
         except guard.NotReadyError as error:
+            # handled: not-ready scorer answered with HTTP 503
             self.fail(503, str(error), error.category)
         except serving.SchemaChangeError as error:
+            # handled: schema change answered with HTTP 409 and details
             self.fail(409, str(error), error.category, error.details)
         except errors.ScmleError as error:
             # Rows that break the schema are well-formed requests the
             # server cannot process: 422. Anything else is a 400.
+            # handled: scmle error answered with HTTP 422 or 400
             self.fail(
                 422 if isinstance(error, errors.DataError) else 400,
                 str(error),
@@ -992,8 +999,10 @@ class Responder(server.BaseHTTPRequestHandler):
                 error.details,
             )
         except OverflowError as error:
+            # handled: overflow answered with HTTP 413
             self.fail(413, str(error), "request")
         except (KeyError, ValueError, TypeError) as error:
+            # handled: malformed request answered with HTTP 400 naming the error
             self.fail(400, f"malformed request: {error}", "request")
         except Exception:
             LOGGER.exception("internal serving failure")
@@ -1011,6 +1020,7 @@ class Responder(server.BaseHTTPRequestHandler):
         try:
             payload = json.loads(body)
         except json.JSONDecodeError as error:
+            # handled: invalid JSON body answered with HTTP 400, documented
             self.fail(400, f"invalid JSON request: {error.msg}", "request")
             return
         adapter = self.adapter

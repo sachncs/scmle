@@ -169,6 +169,7 @@ class ObjectStoreResponder(server.BaseHTTPRequestHandler):
         try:
             relative = safe_key(self.path)
         except ValueError as error:
+            # handled: 400 response sent; None documented
             self.problem(400, str(error))
             return None
         return self.store.root.joinpath(*relative.parts)
@@ -341,6 +342,7 @@ class MetricsSinkResponder(server.BaseHTTPRequestHandler):
                 for item in batch
             ]
         except (ValueError, KeyError, TypeError) as error:
+            # handled: 400 response with error
             self.reply(400, {"error": f"invalid sample: {error}"})
             return
         with self.sink.lock, self.server_file() as handle:
@@ -535,6 +537,7 @@ def main(arguments: list[str] | None = None) -> int:
         while True:
             time.sleep(3600)
     except KeyboardInterrupt:
+        # handled: Ctrl-C stops service cleanly (CLI)
         service.stop()
     return 0
 

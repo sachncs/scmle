@@ -200,6 +200,8 @@ class KeySet(tokens.KeySet):
         try:
             loaded = self.load()
         except errors.ConfigError:
+            # handled: failed JWKS fetch returns False with keys kept,
+            # documented
             return False
         self.keys = loaded.keys
         self.fetched_at = self.clock()

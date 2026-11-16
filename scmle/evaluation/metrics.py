@@ -470,6 +470,7 @@ class MetricCatalog:
                     estimator, features, target, positive, sample_weight
                 )
             except (ValueError, TypeError):
+                # handled: documented NaN score
                 results[name] = float("nan")
         return results
 

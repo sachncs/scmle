@@ -1345,6 +1345,7 @@ def replication(
             try:
                 est = adapter.estimate(part, level)
             except ValueError:
+                # handled: documented unusable stratum; may yield skipped reason
                 continue
             if numpy.isfinite(est.se) and est.se > 0:
                 values[f"{column}={stratum}"] = (est.estimate, est.se)
@@ -1413,6 +1414,8 @@ def subgroup_report(
                 try:
                     est = adapter.estimate(part, level)
                 except ValueError as error:
+                    # handled: returned as failed finding/problem/refusal with
+                    # error text
                     row["skipped"] = str(error)
                 else:
                     if numpy.isfinite(est.se) and est.se > 0:
@@ -1655,6 +1658,7 @@ def identify(
     try:
         adapter.prepare()
     except ValueError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         return refusal_outcome(
             plan, spec, f"design could not be assessed: {error}", dag_checks
         )
@@ -1663,12 +1667,14 @@ def identify(
     try:
         primary = adapter.estimate(c, level)
     except ValueError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         return refusal_outcome(plan, spec, str(error), dag_checks)
     tests: list[battery.Test] = []
     notes: list[str] = []
     try:
         tests = adapter.controls(c, level)
     except ValueError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         notes.append(f"controls could not run: {error}")
     report_battery = battery.run_battery(tests, alpha_falsify)
     rep: dict[str, Any]
@@ -1797,6 +1803,7 @@ def design_only(
     try:
         adapter.prepare()
     except ValueError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         return refusal_outcome(
             plan, spec, f"design could not be assessed: {error}", dag_checks
         )

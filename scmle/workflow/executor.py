@@ -350,6 +350,7 @@ class Executor:
         try:
             data = self.store.get(key)[0]
         except objectstore.NotFoundError:
+            # handled: missing object returned as None, documented
             return None
         record: dict[str, Any] = json.loads(data)
         return record
@@ -440,6 +441,8 @@ class Executor:
             try:
                 self.store.put(key, self.lease(run_id, 1), if_absent=True)
             except objectstore.AlreadyExistsError:
+                # handled: existing lease is expected; falls through to read and
+                # check it
                 pass
             else:
                 self.fences[run_id] = 1
@@ -447,6 +450,8 @@ class Executor:
             try:
                 data, meta = self.store.get(key)
             except objectstore.NotFoundError:
+                # handled: lease vanished mid-read; bounded retry then
+                # RunInFlightError
                 continue
             held = json.loads(data)
             if held["expires"] > self.clock():
@@ -1139,6 +1144,8 @@ class Executor:
                     cost=round(total, 6),
                 )
             except retry.TransientError as error:
+                # handled: transient error saved in attempts and retried; FAILED
+                # step record
                 total += context.spent
                 last_error = f"{type(error).__name__}: {error}"
                 attempts.append(
@@ -1151,6 +1158,7 @@ class Executor:
                 if attempt < step.retries.max_attempts:
                     self.sleep(step.retries.delay_after(attempt))
             except errors.ScmleError as error:
+                # handled: scmle error saved in attempts; step recorded FAILED
                 total += context.spent
                 last_error = f"{type(error).__name__}: {error}"
                 attempts.append(
@@ -1158,6 +1166,8 @@ class Executor:
                 )
                 break
             except Exception as error:  # noqa: BLE001 -- handler boundary
+                # handled: handler exception saved in attempts; step recorded
+                # FAILED with error
                 total += context.spent
                 last_error = f"{type(error).__name__}: {error}"[:300]
                 attempts.append(

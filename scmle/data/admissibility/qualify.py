@@ -83,6 +83,7 @@ def load_store(name: str, directory: Path | None = None) -> LoadedStore:
     try:
         return LoadedStore(certificates.Store.load(path))
     except (ValueError, KeyError, OSError) as error:
+        # handled: returned LoadedStore carries unreadable reason
         return LoadedStore(
             None, f"{name} unreadable ({error}): detectors are descriptive"
         )
@@ -303,6 +304,7 @@ def causal_admissibility(
             outcome=spec.outcome,
         )
     except ValueError as error:
+        # handled: appended to notes as graph rules not applied
         table = None
         notes.append(f"graph rules were not applied: {error}")
     refused = {
@@ -335,6 +337,7 @@ def causal_admissibility(
             graph, frame, alpha=DAG_ALPHA, run_seed=seed
         )
     except (ValueError, KeyError) as error:
+        # handled: report falsification ran False with reason, plus note
         report["falsification"] = {"ran": False, "reason": str(error)}
         notes.append(f"the declared DAG could not be tested on X: {error}")
     else:

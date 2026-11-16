@@ -124,6 +124,7 @@ def scan_result(
             vuln_gate.load_json(policy) if policy else vuln_gate.DEFAULT_POLICY,
         )
     except vuln_gate.GateError:
+        # handled: unparseable report becomes failed ImageScan, documented
         return gate.ImageScan(
             container_digest=container_digest,
             passed=False,

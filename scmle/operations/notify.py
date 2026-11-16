@@ -133,6 +133,7 @@ def verify_signature(
     try:
         age = abs(now - float(timestamp))
     except ValueError:
+        # handled: documented False for non-numeric timestamp
         return False
     if not math.isfinite(age) or age > tolerance_seconds:
         return False
@@ -169,6 +170,7 @@ def urllib_transport(timeout_seconds: float = 5.0) -> Transport:
             ) as reply:
                 return int(reply.status)
         except urllib.error.HTTPError as error:
+            # handled: HTTP status returned
             return int(error.code)
         except urllib.error.URLError as error:
             raise OSError(str(error.reason)) from error
@@ -292,6 +294,7 @@ class WebhookSender:
             try:
                 status = self.transport(request)
             except OSError as error:
+                # handled: recorded as transport error reason
                 status = None
                 reason = f"transport error: {type(error).__name__}"
             else:

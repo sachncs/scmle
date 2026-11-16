@@ -427,7 +427,7 @@ def assess(
         for name, (r2d, r2y) in fit.benchmarks.items():
             try:
                 a, b = benchmark_strength(r2d, r2y, strength, strength)
-            except ValueError:
+            except ValueError:  # handled: set infeasible; wording says so
                 a, b = INFEASIBLE, INFEASIBLE
             width = bias_bound(fit, min(a, INFEASIBLE), min(b, INFEASIBLE))
             if width > best:

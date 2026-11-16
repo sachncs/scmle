@@ -1096,6 +1096,7 @@ def load_store(
     try:
         return certificates.Store.load(target)
     except (ValueError, KeyError, OSError):
+        # handled: documented None for missing or unreadable store
         return None
 
 
@@ -1579,6 +1580,7 @@ def scan_frame(
     try:
         problem = build_problem(frame[target], task, cfg, groups, block_size)
     except ValueError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         return empty_report(cfg, gates, n, f"screen not run: {error}", names)
     if not leakage.enough_rows(problem.y, task, cfg):
         return empty_report(

@@ -9,6 +9,7 @@ when an arm has too few rows to say.
 """
 
 import dataclasses
+import math
 from typing import Any
 
 import numpy
@@ -20,6 +21,10 @@ from scmle.evaluation import replay
 
 BOOTSTRAPS = 300
 MIN_ROWS = 100
+# Share of the planned resamples that must be scorable for an interval.
+# Policy: below half, the percentiles come from a different, selected set of
+# resamples (those that kept every class), so no interval is reported.
+KEPT = 0.5
 
 
 @dataclasses.dataclass(frozen=True)
@@ -52,6 +57,8 @@ class Comparison:
         control_rows: Requests the control served.
         treatment_rows: Requests the treatment served.
         decision: `adopt`, `keep` or `inconclusive`.
+        dropped: Resamples that could not be scored (a resample missing a
+            class) and are not in the interval.
     """
 
     metric: str
@@ -62,6 +69,7 @@ class Comparison:
     control_rows: int
     treatment_rows: int
     decision: str
+    dropped: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         """Builds a JSON-ready record.
@@ -135,7 +143,9 @@ def compare_arms(
     Returns:
         The result with its 95% interval and decision: `adopt` if the whole
         interval is above zero, `keep` if it is below, otherwise (or if an arm
-        has fewer than `min_rows` requests) `inconclusive`.
+        has fewer than `min_rows` requests) `inconclusive`. Resamples that
+        cannot be scored are counted in `dropped`; when fewer than `KEPT` of
+        them remain the interval is NaN and the decision `inconclusive`.
     """
     metric = metrics.CATALOG.resolve(metric_name, task)
     sign = 1.0 if metric.greater_is_better else -1.0
@@ -160,18 +170,20 @@ def compare_arms(
                     - score_arm(control, first, metric, task)
                 )
             )
-        except ValueError:  # A resample missing a class.
+        except (
+            ValueError
+        ):  # handled: counted in `dropped`; too many make it inconclusive
             continue
-    low, high = numpy.percentile(gains, [2.5, 97.5])
+    dropped = bootstraps - len(gains)
+    scant = len(gains) < bootstraps * KEPT
+    low, high = (
+        (math.nan, math.nan) if scant else numpy.percentile(gains, [2.5, 97.5])
+    )
     thin = min(len(every["control"]), len(every["treatment"])) < min_rows
-    if thin:
+    if thin or scant or low <= 0 <= high:
         decision = "inconclusive"
-    elif low > 0:
-        decision = "adopt"
-    elif high < 0:
-        decision = "keep"
     else:
-        decision = "inconclusive"
+        decision = "adopt" if low > 0 else "keep"
     return Comparison(
         metric.name,
         control_score,
@@ -181,4 +193,5 @@ def compare_arms(
         len(every["control"]),
         len(every["treatment"]),
         decision,
+        dropped,
     )

@@ -579,6 +579,7 @@ class ReleaseRegistry:
             control.Unsupported,
             errors.ScmleError,
         ) as error:
+            # handled: recorded rejected event with reasons, restore
             restored = self.restore(plane, previous)
             reasons = (str(error),)
             self.record_event(
@@ -656,6 +657,7 @@ class ReleaseRegistry:
                     model, version, record.content_id, signing_key
                 )
             except (errors.ArtifactError, TypeError, ValueError) as error:
+                # handled: appended to reasons
                 reasons.append(f"the approval is not valid: {error}")
         return reasons
 
@@ -717,6 +719,7 @@ class ReleaseRegistry:
             control.Unsupported,
             errors.ScmleError,
         ):
+            # handled: documented False: platform did not confirm
             return False
         return True
 
@@ -896,6 +899,7 @@ class ReleaseRegistry:
             control.Unsupported,
             errors.ScmleError,
         ) as error:
+            # handled: recorded event; Outcome done False with reasons
             restored = self.restore(plane, current)
             self.record_event(
                 self.body(
@@ -916,6 +920,7 @@ class ReleaseRegistry:
                 model, environment, current, target, signing_key
             )
         except errors.ScmleError as error:
+            # handled: recorded event and restore; failure outcome
             restored = self.restore(plane, current)
             self.record_event(
                 self.body(

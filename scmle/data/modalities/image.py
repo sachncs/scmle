@@ -38,6 +38,7 @@ PillowModule: Any = None
 try:
     from PIL import Image  # pyright: ignore[reportMissingImports]  # optional extra, imported lazily and guarded; not installed in the type-check environment
 except ImportError:
+    # handled: optional Pillow absent; PILLOW_AVAILABLE flag reports it
     pass
 else:
     PillowModule = Image

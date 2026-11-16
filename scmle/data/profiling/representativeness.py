@@ -256,6 +256,7 @@ def assess_representativeness(
     try:
         report = compare_to_reference(checked_sample, checked_reference, seed)
     except ValueError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         return data.QualityObservation(
             note=None,
             evidence={

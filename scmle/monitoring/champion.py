@@ -2,6 +2,7 @@
 
 import dataclasses
 import itertools
+import math
 import operator
 
 import numpy
@@ -15,6 +16,10 @@ from scmle.evaluation import metrics
 
 BOOTSTRAPS = 300
 MIN_ROWS = 30
+# Share of the planned resamples that must be scorable for an interval.
+# Policy: below half, the percentiles come from a selected set of resamples
+# (those that kept every class), so nothing is promoted on them.
+KEPT = 0.5
 
 
 @dataclasses.dataclass(frozen=True)
@@ -31,6 +36,8 @@ class Comparison:
         interval: 95% bootstrap interval of the advantage.
         probability_better: Share of resamples where the challenger won.
         decision: `promote` or `keep`.
+        dropped: Resamples that could not be scored (a resample missing a
+            class) and are not in the interval.
     """
 
     metric: str
@@ -41,6 +48,7 @@ class Comparison:
     interval: tuple[float, float]
     probability_better: float
     decision: str
+    dropped: int = 0
 
 
 class ChampionChallenger:
@@ -181,11 +189,18 @@ class ChampionChallenger:
                 difference = score(
                     self.challenger, challenger_view, rows
                 ) - score(self.champion, champion_view, rows)
-            except ValueError:  # A resample missing a class.
+            except (
+                ValueError
+            ):  # handled: counted in `dropped`; too many keep the champion
                 continue
             advantages.append(sign * difference)
         samples = numpy.asarray(advantages)
-        low, high = numpy.percentile(samples, [2.5, 97.5])
+        scant = len(samples) < self.bootstraps * KEPT
+        low, high = (
+            (math.nan, math.nan)
+            if scant
+            else numpy.percentile(samples, [2.5, 97.5])
+        )
         return Comparison(
             metric=metric.name,
             rows=len(target),
@@ -193,6 +208,9 @@ class ChampionChallenger:
             challenger_score=challenger_score,
             advantage=sign * (challenger_score - champion_score),
             interval=(float(low), float(high)),
-            probability_better=float((samples > 0).mean()),
-            decision="promote" if low > 0 else "keep",
+            probability_better=(
+                math.nan if scant else float((samples > 0).mean())
+            ),
+            decision="promote" if not scant and low > 0 else "keep",
+            dropped=self.bootstraps - len(samples),
         )

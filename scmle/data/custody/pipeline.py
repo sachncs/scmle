@@ -258,6 +258,8 @@ def apply_custody(
             # The carve refuses explicitly (for example when it would leave a
             # validation fold empty). The run continues with no confirmation
             # set and an unconfirmed scope, as for an infeasible size.
+            # handled: carve refusal becomes empty carve with reason note,
+            # documented
             carved = empty_carve(
                 dev_ids, folds, f"confirmation set not carved: {refusal}"
             )

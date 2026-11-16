@@ -197,6 +197,8 @@ def population_ids(
                     ">=": series >= value,
                 }[op].to_numpy()
             except TypeError:
+                # handled: incompatible comparison returns None, documented as
+                # invalid predicate
                 return None
     return frozenset(int(i) for i in numpy.flatnonzero(mask))
 

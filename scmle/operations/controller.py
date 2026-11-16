@@ -196,6 +196,8 @@ class Controller:
                 {"batch": loop.batch - 1},
             )
         except envelope.EnvelopeRefused as refused:
+            # handled: returned as failed finding/problem/refusal with error
+            # text
             loop.escalate("retrain_not_authorized", {"reason": refused.reason})
             return None
         if self.retrain is None:
@@ -204,6 +206,8 @@ class Controller:
         try:
             return self.retrain()
         except Exception as error:  # noqa: BLE001 -- a failed training must not stop the loop
+            # handled: returned as failed finding/problem/refusal with error
+            # text
             loop.escalate(
                 "retrain_failed",
                 {"envelope": used, "error": type(error).__name__},
@@ -388,6 +392,8 @@ class Controller:
             else:
                 self.read(path, ("case_id", "loss"))
         except (ValueError, OSError, pandas.errors.ParserError) as error:
+            # handled: returned as failed finding/problem/refusal with error
+            # text
             self.reject(what, path, digest, str(error))
             return 0
         self.journal(

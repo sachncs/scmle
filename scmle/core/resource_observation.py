@@ -153,12 +153,15 @@ def observe_cpu_cores() -> tuple[int | None, str]:
     try:
         affinity = affinity_probe(0) if affinity_probe is not None else None
     except OSError:
+        # handled: affinity probe failure falls back; source label names
+        # os.cpu_count
         affinity = None
     if affinity:
         return len(affinity), "os.sched_getaffinity"
     try:
         count = os.cpu_count()
     except NotImplementedError:
+        # handled: cpu_count unsupported yields (None, 'unknown') source
         count = None
     return (count, "os.cpu_count") if count else (None, "unknown")
 
@@ -173,6 +176,7 @@ def observe_memory_gb() -> tuple[float | None, str]:
         pages: object = os.sysconf("SC_PHYS_PAGES")
         page_size: object = os.sysconf("SC_PAGE_SIZE")
     except (AttributeError, OSError, ValueError):
+        # handled: no sysconf: Windows psutil probe or (None, 'unknown')
         return observe_windows_memory_gb() if WINDOWS else (None, "unknown")
     if not isinstance(pages, int) or not isinstance(page_size, int):
         return None, "unknown"
@@ -188,6 +192,7 @@ def observe_windows_memory_gb() -> tuple[float | None, str]:
 
         total = psutil.virtual_memory().total
     except (ImportError, OSError, AttributeError):
+        # handled: psutil unavailable or failing reported as (None, 'unknown')
         return None, "unknown"
     if not isinstance(total, int) or total <= 0:
         return None, "unknown"
@@ -207,6 +212,7 @@ def observe_disk_gb(path: pathlib.Path) -> tuple[float | None, str]:
     try:
         free = shutil.disk_usage(path).free
     except OSError:
+        # handled: disk query failure returned as None/'unknown', documented
         return None, "unknown"
     return free / BYTES_PER_GB, f"shutil.disk_usage({path})"
 
@@ -250,8 +256,10 @@ def project_extra_requirements() -> dict[str, tuple[str, ...]]:
             importlib.metadata.requires(PROJECT_DISTRIBUTION) or ()
         )
     except importlib.metadata.PackageNotFoundError:
+        # handled: project not installed gives empty mapping, documented
         return {}
     except (ValueError, OSError):
+        # handled: unreadable project metadata gives empty mapping, documented
         return {}
     grouped: dict[str, list[str]] = {}
     for requirement in requirements:
@@ -278,7 +286,10 @@ def is_installed(package: str) -> bool:
     try:
         importlib.metadata.version(package)
     except importlib.metadata.PackageNotFoundError:
+        # handled: missing distribution reported as not installed (False)
         return False
     except (ValueError, OSError):
+        # handled: unreadable metadata returns False; docstring ties True to
+        # readability
         return False
     return True

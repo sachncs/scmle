@@ -335,6 +335,7 @@ def verify(
     try:
         document = records.read_json(path)
     except ValueError:
+        # handled: returned as failed finding/problem/refusal with error text
         found = (
             trace.Finding(trace.BROKEN_CHAIN, "trail", "trail.json is bad"),
         )

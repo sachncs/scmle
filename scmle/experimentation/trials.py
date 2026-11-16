@@ -123,6 +123,7 @@ def runtime_requirements(adapter: models.Model) -> dict[str, Any]:
         try:
             needed[module] = importlib.metadata.version(module)
         except importlib.metadata.PackageNotFoundError:
+            # handled: uninstalled library recorded as 'unknown', documented
             needed[module] = "unknown"
     return {"python": platform.python_version(), "libraries": needed}
 
@@ -228,6 +229,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
         result.score_std = float(numpy.std(scores))
         result.status = experiments.TrialStatus.OK
     except Exception as error:  # noqa: BLE001 -- isolation: any model failure is data
+        # handled: model failure stored in FAILED trial's error field
         result.error = f"{type(error).__name__}: {error}"
     result.fit_seconds = time.monotonic() - started
     return result
@@ -272,6 +274,8 @@ def guarded_evaluate(payload: TrialPayload) -> experiments.Trial:
     try:
         trial: experiments.Trial = supervisor.run(evaluate_payload, payload)
     except limits.TrialLimitError as error:
+        # handled: limit breach returned as FAILED trial with TrialLimitError
+        # text
         job = payload.job
         return experiments.Trial(
             job.trial_id,

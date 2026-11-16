@@ -249,6 +249,7 @@ class LocalFaultExecutor:
             try:
                 child.wait(timeout=0.05)
             except subprocess.TimeoutExpired:
+                # handled: a timed-out child is terminated and reported so
                 child.terminate()
                 child.wait(timeout=2)
                 terminated = True
@@ -321,6 +322,8 @@ class LocalFaultExecutor:
         try:
             checkpoint.bind("source-current")
         except ValueError:
+            # handled: expected bind rejection recorded as rejected=True
+            # evidence
             rejected = True
         self.write_json(
             self.root / "stale-checkpoint.json", checkpoint.to_dict()
@@ -371,6 +374,8 @@ class LocalFaultExecutor:
             reject_over_budget(payload)
             destination.write_bytes(payload)
         except OSError as error:
+            # handled: simulated ENOSPC recorded in disk_capacity_exhaustion
+            # evidence
             rejected = error.errno == errno.ENOSPC
         return (
             self.artifact(
@@ -545,6 +550,8 @@ class LocalFaultExecutor:
                 reject_over_memory_budget(allocation)
                 del value
         except MemoryError:
+            # handled: simulated MemoryError recorded in memory_pressure
+            # evidence
             rejected = True
         return (
             self.artifact(
@@ -724,6 +731,8 @@ class LocalFaultExecutor:
             try:
                 fail_connector()
             except OSError:
+                # handled: simulated connector failures counted in retry_history
+                # attempts
                 continue
         terminal = self.root / "retry-terminal.json"
         self.write_json(
@@ -824,6 +833,8 @@ class LocalFaultExecutor:
         try:
             graph.add_edge(lineage.Edge("raw", "curation", "produced"))
         except ValueError:
+            # handled: expected lineage rejection recorded in lineage_gap
+            # evidence
             rejected = True
         return (
             self.artifact(
@@ -876,6 +887,8 @@ class LocalFaultExecutor:
                 "local-model", 1, "bundle-digest", signing_key="local-key"
             )
         except ValueError:
+            # handled: expected approval refusal recorded in approval_rejection
+            # evidence
             rejected = True
         return (
             self.artifact(
@@ -930,6 +943,8 @@ class LocalFaultExecutor:
         try:
             registry.register(changed)
         except ValueError:
+            # handled: expected snapshot conflict recorded in run_invalidation
+            # evidence
             rejected = True
         return (
             self.artifact(

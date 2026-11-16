@@ -39,6 +39,7 @@ resource: Any  # the `resource` module, or None where it is missing
 try:
     resource = importlib.import_module("resource")
 except ImportError:  # Windows has no `resource` module.
+    # handled: optional module absent; None checked by callers (Windows)
     resource = None
 
 WINDOWS = sys.platform == "win32"
@@ -143,6 +144,7 @@ def proc_table() -> dict[int, tuple[int, int]]:
             with (entry / "statm").open(encoding="ascii") as handle:
                 resident = int(handle.read().split()[1]) * page
         except (OSError, IndexError, ValueError):
+            # handled: process vanished mid-scan; expected race, entry skipped
             continue
         table[int(name)] = (int(after_name[1]), resident)
     return table
@@ -254,6 +256,7 @@ def child_main(
     try:
         channel.send((True, function(argument)))
     except BaseException as error:  # noqa: BLE001 -- reported to the supervisor
+        # handled: error sent to supervisor as failure tuple
         channel.send((False, f"{type(error).__name__}: {error}"))
     finally:
         channel.close()
@@ -338,12 +341,15 @@ class Supervisor:
                 try:
                     os.kill(pid, KILL_SIGNAL)
                 except ProcessLookupError:
+                    # handled: process already dead on kill
                     continue
                 except PermissionError:
                     # Windows reports a process that has just exited (or one
                     # that is exiting) as access denied. A descendant we
                     # cannot signal because it is already gone is not an
                     # error; one that is alive and protected is left alone.
+                    # handled: process already exiting on kill; documented in
+                    # comment
                     continue
 
     def violation(

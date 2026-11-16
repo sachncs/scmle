@@ -714,6 +714,7 @@ def frame(
     try:
         charter, open_items = assemble(slots, request, cost_model)
     except (ValueError, KeyError, TypeError, errors.ConfigError) as error:
+        # handled: returned as refused draft with error
         return refused(
             "the draft does not form a valid charter",
             {"error": str(error)},

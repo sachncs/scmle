@@ -86,6 +86,8 @@ def start_helper(
             # send/recv/poll/close surface the callers use.
             accepted.append(listener.accept())  # pyright: ignore[reportArgumentType]  # typeshed lists PipeConnection on every platform
         except BaseException as error:  # noqa: BLE001 -- reported to the caller
+            # handled: accept failure appended to failures list reported to
+            # caller
             failures.append(error)
 
     thread = threading.Thread(target=accept, daemon=True)

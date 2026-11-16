@@ -416,6 +416,7 @@ def check_remote(
         ) as reply:
             body = json.loads(reply.read())
     except urllib.error.HTTPError as error:
+        # handled: returned as failed parity with HTTP code
         return {"passed": False, "mismatches": [f"HTTP {error.code}"]}
     tolerance = (
         golden.same_process

@@ -246,6 +246,7 @@ class Fleet:
             try:
                 handle.wait(timeout=15)
             except subprocess.TimeoutExpired:
+                # handled: counted as stray process, returned
                 stray += 1
             for stream in (getattr(handle, "stdout", None), handle.stderr):
                 if stream is not None:
@@ -271,6 +272,7 @@ def predict(base: str, count: int = 3) -> tuple[int, dict[str, Any]]:
             timeout=recovery.scaled(5.0),
         )
     except OSError:
+        # handled: documented (0, {}) for unreachable
         return 0, {}
 
 
@@ -317,6 +319,7 @@ def await_unready(
         try:
             status, body = demo.get_json(f"{instance.base}/readyz", timeout=2.0)
         except OSError:
+            # handled: expected while starting; retried until deadline
             time.sleep(0.2)
             continue
         seen = {
@@ -330,6 +333,7 @@ def await_unready(
     try:
         seen["livez"] = demo.get_json(f"{instance.base}/livez", timeout=2.0)[0]
     except OSError:
+        # handled: recorded livez status 0
         seen["livez"] = 0
     seen["predict"] = predict(instance.base)[0]
     return seen
@@ -464,6 +468,7 @@ def state_writer_trials(fleet: Fleet, base: pathlib.Path) -> dict[str, Any]:
         try:
             found = json.loads(path.read_text(encoding="utf-8"))["counter"]
         except (ValueError, KeyError, OSError):
+            # handled: counted as torn trial
             torn += 1
             found = -1
         seconds.append(time.monotonic() - started)
@@ -837,6 +842,7 @@ def object_store_loss() -> recovery.Outcome:
         try:
             mocks.get_object(url, "models/m/v1/serve.py", timeout=2.0)
         except OSError:
+            # handled: recorded as fetch_failed check
             fetch_failed = True
         served_during = predict(running.base)[0] == http.HTTPStatus.OK
         restored = time.monotonic()
@@ -863,6 +869,7 @@ def object_store_loss() -> recovery.Outcome:
                 url, "models/m/v1/serve.py", expected=etags["serve.py"]
             )
         except errors.ArtifactError:
+            # handled: recorded as mismatch check
             mismatch = True
         result.checks = {
             "the fetch failed while the store was down": fetch_failed,
@@ -1225,6 +1232,7 @@ class ProcessPlane(control.ControlPlane):
                 == http.HTTPStatus.OK
             )
         except OSError:
+            # handled: documented False when not ready
             return False
 
     def observe(self) -> observation.Observation:
@@ -1613,6 +1621,7 @@ def audit_continuity() -> recovery.Outcome:
             try:
                 reopened = audit.Log.open(path)
             except deployment_ledger.DeploymentLedgerError:
+                # handled: counted as broken trial
                 broken += 1
                 continue
             reload_seconds.append(time.monotonic() - started)

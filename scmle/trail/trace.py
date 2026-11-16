@@ -184,6 +184,7 @@ class Tracer:
             try:
                 value = records.read_json(path)
             except ValueError:
+                # handled: recorded as trace problem
                 self.problem(
                     TAMPERED, step, f"retained/{relative} is not valid JSON"
                 )
@@ -207,6 +208,7 @@ class Tracer:
         try:
             return records.read_lines(path)
         except ValueError:
+            # handled: recorded as trace problem
             self.problem(
                 TAMPERED, step, f"retained/{relative} is not valid JSON lines"
             )
@@ -412,6 +414,7 @@ class Tracer:
                 )
                 passed = records.compare(observed, item["op"], item["value"])
             except (KeyError, FileNotFoundError, ValueError, TypeError):
+                # handled: recorded as trace problem
                 self.problem(
                     MISSING_LINK,
                     step,
@@ -453,6 +456,7 @@ class Tracer:
             try:
                 stored = records.read_json(stored_path)
             except ValueError:
+                # handled: unparseable stored file reported as mismatch problem
                 stored = None
             if stored != fresh:
                 self.problem(
@@ -482,6 +486,7 @@ class Tracer:
         try:
             fresh = reports.exploratory(self.directory)
         except (OSError, ValueError, KeyError):
+            # handled: recorded as trace problem
             self.problem(
                 MISSING_LINK, name, "the exploratory report cannot be rebuilt"
             )
@@ -499,6 +504,7 @@ class Tracer:
         try:
             fresh = reports.experiments(self.directory)
         except (OSError, ValueError, KeyError):
+            # handled: recorded as trace problem
             self.problem(MISSING_LINK, name, "the comparison cannot be rebuilt")
             self.add(name, files, {}, ["question"])
             return
@@ -714,6 +720,7 @@ class Tracer:
                 signature=record.get("signature"),
             )
         except (KeyError, ValueError, TypeError) as error:
+            # handled: recorded as trace problem
             self.problem(UNAPPROVED, step, f"approval record unusable: {error}")
             return None
         if not record.get("signature"):
@@ -725,6 +732,7 @@ class Tracer:
         try:
             held.validate_target(str(model), int(version), self.content_id, key)
         except (ValueError, TypeError) as error:
+            # handled: recorded as trace problem
             self.problem(UNAPPROVED, step, str(error))
         if record["reviewer"] == self.inputs.get("builder"):
             self.problem(
@@ -744,6 +752,7 @@ class Tracer:
             try:
                 ledger = deployment_ledger.DeploymentLedger.load(path)
             except errors.ScmleError as error:
+                # handled: recorded as trace problem
                 self.problem(BROKEN_CHAIN, name, f"deployment ledger: {error}")
         if ledger is not None:
             header = ledger.header
@@ -826,6 +835,7 @@ class Tracer:
                     feed, cost, expectation, MINIMUM_CASES
                 )
             except (KeyError, ValueError, TypeError):
+                # handled: recorded as trace problem
                 self.problem(
                     MISMATCH, name, "the outcome feed cannot be evaluated"
                 )
@@ -900,6 +910,7 @@ def derive(
         try:
             tracer.inputs = records.read_json(path)
         except ValueError:
+            # handled: recorded as trace problem
             tracer.problem(TAMPERED, "stakeholder", "inputs.json is not JSON")
     else:
         tracer.problem(MISSING_LINK, "stakeholder", "inputs.json is absent")

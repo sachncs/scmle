@@ -113,10 +113,12 @@ def serve(channel: connection.Connection) -> None:
         try:
             operation, payload = channel.recv()
         except EOFError:
+            # handled: parent closed channel; worker exits
             return
         try:
             channel.send(("ok", handle(cache, operation, payload)))
         except Exception as error:  # noqa: BLE001 -- isolation: report, keep serving
+            # handled: error sent back to parent
             channel.send(("error", f"{type(error).__name__}: {error}"))
 
 

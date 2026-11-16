@@ -182,6 +182,8 @@ class Catalog:
                     conformance.check_conformance(adapter)
                     self.register(adapter, overwrite=True)
             except Exception as error:  # noqa: BLE001 -- isolate faulty plugins
+                # handled: plugin failure listed in return and plugin_failures
+                # reasons
                 failed.append(entry.name)
                 self.plugin_failures[entry.name] = (
                     f"{type(error).__name__}: {error}"

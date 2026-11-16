@@ -342,6 +342,8 @@ class WebhookAlertSink(AlertSink):
                 urllib.error.URLError,
                 TimeoutError,
             ) as error:
+                # handled: failure kept as last_reason; AlertDeliveryError after
+                # retries
                 last_reason = f"webhook delivery failed: {type(error).__name__}"
             if attempt < self.max_attempts and self.backoff_seconds:
                 time.sleep(min(self.backoff_seconds * attempt, 1.0))
@@ -433,6 +435,8 @@ class AlertDispatcher:
             try:
                 delivery = sink.deliver(alert)
             except AlertDeliveryError as error:
+                # handled: delivery error becomes journaled 'failed'
+                # AlertDelivery
                 delivery = AlertDelivery(
                     alert.alert_id,
                     alert.route,

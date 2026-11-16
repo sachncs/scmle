@@ -369,6 +369,7 @@ def raw_source_hash(uri: str | pathlib.Path) -> str:
             for chunk in iter(lambda: handle.read(1 << 20), b""):
                 digest.update(chunk)
     except OSError:
+        # handled: unreadable file returns empty hash, documented in Returns
         return ""
     return digest.hexdigest()
 

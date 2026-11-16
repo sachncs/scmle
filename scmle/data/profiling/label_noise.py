@@ -203,6 +203,7 @@ def assess_label_noise(
     try:
         report = find_label_noise(features, labels, seed)
     except ValueError as error:
+        # handled: not_evaluated observation carrying the error message
         return data.QualityObservation(
             note=None,
             evidence={

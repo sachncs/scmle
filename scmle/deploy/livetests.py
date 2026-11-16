@@ -55,6 +55,7 @@ class Response:
         try:
             value = json.loads(self.body)
         except (ValueError, UnicodeError):
+            # handled: documented: empty dict when body not JSON
             return {}
         return value if isinstance(value, dict) else {}
 
@@ -493,6 +494,7 @@ def http_fetch(base_url: str, timeout: float = 30.0) -> Fetch:
                     reply.read(),
                 )
         except urllib.error.HTTPError as error:
+            # handled: HTTP error returned as Response with status
             return Response(
                 error.code,
                 {k.lower(): v for k, v in error.headers.items()},

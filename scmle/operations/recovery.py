@@ -565,6 +565,7 @@ class Runner:
                 result = scenario()
                 result.judge()
             except Exception as error:  # noqa: BLE001 -- a crash is a failed fault
+                # handled: recorded as crashed failed outcome
                 result = Outcome(fault.id, FAILED, "crashed")
                 result.problems = [
                     f"{type(error).__name__}: {error}",

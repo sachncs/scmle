@@ -1461,5 +1461,7 @@ class Curator:
         try:
             publish_curation_artifact(path, serialized_payload)
         except FileExistsError:
+            # handled: existing artifact verified and returned (idempotent
+            # publish)
             return verify_existing_curation(path, self.signing_key, candidate)
         return candidate

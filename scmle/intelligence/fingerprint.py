@@ -251,6 +251,7 @@ def ml_difficulty(
                 }
             scores[name] = float(numpy.mean(finite))
     except ValueError as error:
+        # handled: returned available False with reason
         return {"available": False, "reason": str(error)[:200]}
     gain = scores["nonlinear"] - scores["linear"]
     return {

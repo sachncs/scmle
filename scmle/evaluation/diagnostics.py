@@ -32,6 +32,10 @@ MAX_SEGMENT_LEVELS = 12
 MAX_SEGMENT_FEATURES = 3
 SEGMENT_BANDS = 4
 MAX_ERROR_ROWS = 20
+# Share of the planned resamples that must be scorable for an interval.
+# Policy: below half, the percentiles come from a selected set of resamples
+# (those that kept every class), so the interval is reported as None.
+KEPT = 0.5
 THRESHOLDS = tuple(round(0.1 * step, 1) for step in range(1, 10))
 CLASSIFICATION = frozenset({tasks.Task.BINARY, tasks.Task.MULTICLASS})
 BINARY_ONLY = frozenset({tasks.Task.BINARY})
@@ -655,10 +659,12 @@ class MetricUncertainty(Diagnostic):
                         positive,
                     )
                 )
-            except ValueError:  # A resample missing a class.
+            except (
+                ValueError
+            ):  # handled: counted in `dropped`; too many give no interval
                 continue
         interval = None
-        if scores:
+        if len(scores) >= len(draws) * KEPT:
             low, high = numpy.percentile(
                 scores,
                 [
@@ -673,6 +679,7 @@ class MetricUncertainty(Diagnostic):
             f"ci_{self.confidence}": interval,
             "resampling_unit": unit,
             "resamples": len(scores),
+            "dropped": len(draws) - len(scores),
             "evaluation_rows": len(target),
             "independent_units": int(groups.nunique())
             if groups is not None
@@ -733,6 +740,7 @@ def run_suite(
         try:
             reports[diagnostic.name] = diagnostic.compute(limited)
         except Exception as error:  # noqa: BLE001 -- isolation: diagnostics are advisory
+            # handled: error recorded in diagnostic report
             reports[diagnostic.name] = {
                 "error": f"{type(error).__name__}: {error}"
             }

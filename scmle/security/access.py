@@ -63,6 +63,7 @@ def is_loopback(host: str) -> bool:
     try:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
+        # handled: non-IP host string returns False, documented
         return False
 
 
@@ -355,6 +356,8 @@ class Gateway:
         try:
             principal = self.verifier.verify(token or "")
         except tokens.TokenError as error:
+            # handled: token error goes to refuse(), which raises DeniedError
+            # 401
             self.refuse(401, error.reason, remote)
         required = self.routes.get((method, route))
         if required is None:

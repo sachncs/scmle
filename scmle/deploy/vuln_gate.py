@@ -317,6 +317,7 @@ def main(arguments: list[str] | None = None) -> int:
         sbom = load_json(options.sbom) if options.sbom else None
         verdict = evaluate(load_json(options.report), policy, sbom)
     except GateError as error:
+        # handled: printed failed verdict, exit code 2
         print(json.dumps({"passed": False, "error": str(error)}, indent=2))  # noqa: T201 -- command-line output
         return 2
     print(json.dumps(verdict, indent=2, sort_keys=True))  # noqa: T201 -- command-line output

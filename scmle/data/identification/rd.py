@@ -87,6 +87,7 @@ def local_fit(
     try:
         bread = numpy.linalg.inv(gram)
     except numpy.linalg.LinAlgError:
+        # handled: documented None for singular Gram matrix
         return None
     coef = bread @ (design.T @ (ws * ys))
     resid = ys - design @ coef

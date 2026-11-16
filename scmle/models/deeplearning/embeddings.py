@@ -93,6 +93,7 @@ def available() -> bool:
     try:
         importlib.import_module("sentence_transformers")
     except ImportError:
+        # handled: optional sentence_transformers absent reported as False
         return False
     return True
 

@@ -280,6 +280,7 @@ def read_optional(path: Path) -> dict[str, Any] | None:
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
+        # handled: documented None for missing/unreadable file
         return None
     return loaded if isinstance(loaded, dict) else None
 
@@ -386,6 +387,7 @@ def check_charter(
     try:
         loaded = sealing.read_verified(path, signing_key=signing_key)
     except errors.ScmleError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         return [Finding(name, FAIL, str(error))]
     if loaded.charter_hash != ledger.header.get("charter_hash"):
         return [Finding(name, FAIL, "the ledger names another charter hash")]
@@ -543,6 +545,7 @@ def check_replay(document: dict[str, Any]) -> Finding:
         TypeError,
         ZeroDivisionError,
     ) as error:
+        # handled: returned as failed finding/problem/refusal with error text
         return Finding(name, FAIL, f"cannot replay: {error!r}")
     return Finding(
         name, PASS, f"{len(tested)} hypotheses, rule {document['rule']}"
@@ -715,6 +718,7 @@ def check_custody(
     try:
         log = sealed.OpenLog(path, signing_key)
     except errors.ScmleError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         return Finding(name, FAIL, str(error))
     entries = [e for e in log.entries if e.get("set") == "C"]
     names = [e["event"] for e in entries]
@@ -747,6 +751,8 @@ def decision_file_problems(
         try:
             found = decision_reports.file_digest(run_dir / file_name)
         except ValueError as error:
+            # handled: returned as failed finding/problem/refusal with error
+            # text
             problems.append(f"{file_name}: unreadable ({error})")
             continue
         if expected is None and found is not None:
@@ -780,6 +786,8 @@ def check_decision_files(
         try:
             log = sealed.OpenLog(path, signing_key)
         except errors.ScmleError as error:
+            # handled: returned as failed finding/problem/refusal with error
+            # text
             return Finding(name, FAIL, str(error))
         entries = [
             e
@@ -817,14 +825,18 @@ def coverage_report_problems(
         claim_hash: The hash of the claim, or None if the claim is unreadable.
 
     Returns:
-        A message if the report exists and names another claim; else empty.
+        A message if the report exists and is unreadable or names another
+        claim; else empty.
     """
     if not report_path.exists():
         return []
     try:
         report = json.loads(report_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        report = {}
+    except (
+        OSError,
+        ValueError,
+    ) as error:  # handled: returned as a problem naming the error
+        return [f"{coverage_run.REPORT_FILE}: unreadable ({error})"]
     if claim_hash is not None and report.get("claim_sha256") != claim_hash:
         return [f"{coverage_run.REPORT_FILE}: names another claim"]
     return []
@@ -856,12 +868,15 @@ def check_coverage_claim(
         claim = json.loads(claim_path.read_text(encoding="utf-8"))
         found = scmle.data.ledger.ledger.digest(claim)
     except (OSError, ValueError, TypeError):
+        # handled: returned as failed finding/problem/refusal with error text
         claim, found = None, None
         problems.append(f"{coverage_run.CLAIM_FILE}: missing or unreadable")
     if log_path.exists():
         try:
             log = sealed.OpenLog(log_path, signing_key)
         except errors.ScmleError as error:
+            # handled: returned as failed finding/problem/refusal with error
+            # text
             return Finding(name, FAIL, str(error))
         entries = [
             e
@@ -983,6 +998,7 @@ def check_coverage_confirmation(
             int(document["covered"]), int(document["rows"]), choice
         )
     except (KeyError, TypeError, ValueError):
+        # handled: returned as failed finding/problem/refusal with error text
         return Finding(name, FAIL, "the document is malformed")
     if abs(redone["p_value"] - float(document["p_value"])) > TOLERANCE:
         problems.append("the p-value does not recompute from the counts")
@@ -1085,6 +1101,7 @@ def check_control(
     try:
         body = json.loads(path.read_text(encoding="utf-8"))
     except ValueError:
+        # handled: returned as failed finding/problem/refusal with error text
         return Finding(name, FAIL, f"{CONTROL_FILE} is not JSON")
     if scmle.data.ledger.ledger.digest(body) == ledger.control.get("sha256"):
         return Finding(name, PASS, "hash equal")
@@ -1116,6 +1133,7 @@ def evaluate_attestation(
     try:
         given = attest.Attestation.from_dict(item)
     except (ValueError, TypeError) as error:
+        # handled: returned as failed finding/problem/refusal with error text
         return None, [f"malformed attestation: {error}"], False
     problems = []
     if given.assumption not in allowed.get(given.attestor, set()):
@@ -1126,6 +1144,7 @@ def evaluate_attestation(
     try:
         valid = given.date <= day <= given.expires
     except TypeError:
+        # handled: returned as failed finding/problem/refusal with error text
         valid = False
     if not valid:
         problems.append(f"{given.assumption}: not valid on {day!r}")
@@ -1199,6 +1218,7 @@ def check_attestations(
     try:
         charter = contracts.charter_from_record(record.get("charter", record))
     except errors.ConfigError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         return Finding(name, FAIL, str(error))
     block = charter.estimand.causal
     if block is None:
@@ -1258,6 +1278,7 @@ def verify(
             folder / scmle.data.ledger.ledger.FILE_NAME
         )
     except scmle.data.ledger.ledger.LedgerError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         return Verification(str(folder), (Finding(chain, FAIL, str(error)),))
     findings.append(
         Finding(
@@ -1267,6 +1288,7 @@ def verify(
     try:
         document = read_claims(folder)
     except errors.ArtifactError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         findings.append(Finding("claims file reads", FAIL, str(error)))
         return Verification(str(folder), tuple(findings))
     findings.append(check_ledger_head(document, ledger))

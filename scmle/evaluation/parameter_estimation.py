@@ -3957,6 +3957,7 @@ def random_slope_reml_profile_objective(
     try:
         coefficients = numpy.linalg.solve(information, right_hand_side)
     except numpy.linalg.LinAlgError:
+        # handled: singular point scored inf; optimizer rejects it
         return float("inf")
     residuals = values - design @ coefficients
     quadratic = 0.0
@@ -4190,6 +4191,7 @@ def reml_profile_objective(
     try:
         coefficients = numpy.linalg.solve(information, right_hand_side)
     except numpy.linalg.LinAlgError:
+        # handled: singular point scored inf; optimizer rejects it
         return float("inf")
     residuals = values - design @ coefficients
     quadratic = 0.0
@@ -5585,6 +5587,8 @@ def hierarchical_bootstrap_sensitivity(
             OverflowError,
             ValueError,
         ) as error:
+            # handled: returned as failed finding/problem/refusal with error
+            # text
             failures.append(
                 {
                     "replicate": replicate,
@@ -5765,6 +5769,8 @@ def causal_bootstrap_sensitivity(
             OverflowError,
             ValueError,
         ) as error:
+            # handled: returned as failed finding/problem/refusal with error
+            # text
             failures.append(
                 {
                     "replicate": replicate,

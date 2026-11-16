@@ -146,4 +146,5 @@ class Slices(diagnostics.Diagnostic):
                 )
             )
         except ValueError:
+            # handled: documented: None when metric raises ValueError
             return None

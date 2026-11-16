@@ -101,6 +101,7 @@ class Scheduler:
         try:
             data = self.store.get(self.key)[0]
         except objectstore.NotFoundError:
+            # handled: documented None when nothing dealt with
             return None
         value = json.loads(data)["last_slot"]
         return None if value is None else float(value)
@@ -172,6 +173,7 @@ class Scheduler:
                 scmle.workflow.executor.RunInFlightError,
                 scmle.workflow.executor.ConcurrencyLimitError,
             ):
+                # handled: slot recorded as deferred
                 deferred.append(slot)
                 break
             ran.append((slot, record["state"]))

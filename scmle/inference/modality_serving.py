@@ -378,6 +378,7 @@ class Responder(server.BaseHTTPRequestHandler):
                 request_id,
             )
         except access.DeniedError as denied:
+            # handled: denied response sent to client
             self.send_json(
                 denied.status, denied.body, request_id, denied.headers
             )
@@ -519,30 +520,35 @@ class Responder(server.BaseHTTPRequestHandler):
                 )
             self.send_json(200, response, request_id)
         except RejectedRequestError as rejected:
+            # handled: error response sent to client
             self.send_json(
                 rejected.status,
                 {"error": str(rejected), "category": "request"},
                 request_id,
             )
         except guard.OverloadedError as error:
+            # handled: 429 response sent
             self.send_json(
                 429,
                 {"error": str(error), "category": error.category},
                 request_id,
             )
         except guard.DeadlineError as error:
+            # handled: 504 response sent
             self.send_json(
                 504,
                 {"error": str(error), "category": error.category},
                 request_id,
             )
         except OverflowError as error:
+            # handled: 413 response sent
             self.send_json(
                 413,
                 {"error": str(error), "category": "request"},
                 request_id,
             )
         except (TypeError, ValueError) as error:
+            # handled: 422 response sent
             self.send_json(
                 422,
                 {
@@ -552,6 +558,7 @@ class Responder(server.BaseHTTPRequestHandler):
                 request_id,
             )
         except Exception:  # noqa: BLE001 -- last boundary: answer with a 500
+            # handled: 500 response sent
             self.send_json(
                 500,
                 {

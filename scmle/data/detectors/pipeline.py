@@ -122,6 +122,7 @@ def run(
                     numeric.fillna(numeric.median()), working[target], seed
                 )
             except ValueError as error:
+                # handled: recorded in skipped map with reason
                 skipped[detector_id] = str(error)
             continue
         results[detector_id] = steps[detector_id](working)

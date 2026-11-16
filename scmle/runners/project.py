@@ -21,6 +21,7 @@ this module only moves files and calls the public API.
 from collections.abc import Callable
 from collections.abc import Mapping
 import hashlib
+import logging
 import pathlib
 import shutil
 import tempfile
@@ -32,6 +33,9 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.store import objectstore
 from scmle.runners import local
+
+LOGGER = logging.getLogger(__name__)
+
 
 SYNC_SECONDS = 30.0
 SECTIONS = {
@@ -96,7 +100,10 @@ class WorkdirSync:
             relative = path.relative_to(self.directory).as_posix()
             try:
                 data = path.read_bytes()
-            except OSError:
+            except OSError as error:
+                LOGGER.debug(
+                    "mirror skipped unreadable %s: %s", relative, error
+                )
                 continue
             digest = hashlib.sha256(data).hexdigest()
             if self.uploaded.get(relative) == digest:
@@ -139,6 +146,7 @@ class WorkdirSync:
                 try:
                     self.push()
                 except objectstore.StoreError:
+                    # handled: documented skip; retried next interval
                     continue
 
         self.thread = threading.Thread(target=loop, daemon=True)

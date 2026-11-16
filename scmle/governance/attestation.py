@@ -228,6 +228,7 @@ class ReleaseAttestation:
         try:
             expected = type(self).from_records(provenance, sbom, signing_key)
         except (TypeError, ValueError):
+            # handled: malformed records give False, documented
             return False
         if self.unsigned_dict() != expected.unsigned_dict():
             return False

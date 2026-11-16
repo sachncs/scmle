@@ -271,6 +271,7 @@ class IncrementalProcessor:
         try:
             data = self.retrying(lambda: self.store.get(self.state_key))[0]
         except objectstore.NotFoundError:
+            # handled: absent checkpoint returns documented empty checkpoint
             return Checkpoint()
         return Checkpoint.from_bytes(data)
 
@@ -390,6 +391,8 @@ class IncrementalProcessor:
                 try:
                     self.retrying(lambda: self.save_checkpoint(checkpoint))
                 except retry.RetryExhaustedError as error:
+                    # handled: returned as failed finding/problem/refusal with
+                    # error text
                     failed, problem = (
                         meta.key,
                         f"{type(error).__name__}: {error}",
@@ -400,6 +403,8 @@ class IncrementalProcessor:
             try:
                 dropped, written, output_key = self.process(meta, checkpoint)
             except (errors.ScmleError, retry.RetryExhaustedError) as error:
+                # handled: returned as failed finding/problem/refusal with error
+                # text
                 failed, problem = meta.key, f"{type(error).__name__}: {error}"
                 break
             done.append(meta.key)

@@ -5328,7 +5328,7 @@ class RecoveryAndResourceStage(Stage):
             rejected = False
             try:
                 load_package(tampered, context.signing_key)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # handled: expected rejection
                 rejected = True
             if not rejected:
                 raise ValueError("tampered package was not rejected")

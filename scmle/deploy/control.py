@@ -134,6 +134,7 @@ def confirm(
         try:
             seen = plane.observe()
         except errors.ArtifactError as error:
+            # handled: kept as reason; RuntimeUnconfirmed raised after attempts
             reasons = [f"the platform's state cannot be read yet: {error}"]
             continue
         reasons = check(seen)

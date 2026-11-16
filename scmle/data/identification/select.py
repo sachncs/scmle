@@ -265,6 +265,7 @@ def check_adjustment(
     try:
         valid = dag.backdoor_valid(spec.treatment, spec.outcome, names)
     except ValueError as error:
+        # handled: returned as reason message
         return ([f"the declared DAG cannot check the set: {error}"], False)
     if not valid:
         return (

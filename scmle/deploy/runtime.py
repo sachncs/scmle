@@ -261,6 +261,7 @@ def healthcheck(environ: Mapping[str, str]) -> int:
         ):
             return 0
     except OSError:
+        # handled: healthcheck exits 1 (unhealthy)
         return 1
 
 

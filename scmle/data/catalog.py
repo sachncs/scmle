@@ -1216,6 +1216,7 @@ def duplicates_for_frame(frame: pandas.DataFrame) -> DuplicateSummary:
     try:
         duplicate_mask = frame.duplicated(keep=False)
     except (TypeError, ValueError):
+        # handled: returned as not_observed summary; documented
         return DuplicateSummary(
             status="not_observed",
             duplicate_rows=0,

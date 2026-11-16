@@ -154,6 +154,8 @@ def regression_reports(
                     features, coverage=level, method=method
                 )
             except errors.ArtifactError:
+                # handled: unservable level ends method; omission documented in
+                # Returns
                 break
             inside = (values >= band["lower"].to_numpy()) & (
                 values <= band["upper"].to_numpy()

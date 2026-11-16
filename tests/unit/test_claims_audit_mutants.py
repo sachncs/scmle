@@ -868,16 +868,17 @@ def test_coverage_claim_findings_are_exact(tmp_path):
     assert claims_audit.check_coverage_claim(tmp_path, KEY) == finding(
         COVERAGE, "fail", "coverage_report.json: names another claim"
     )
+    # Task 2.1: an unreadable report was reported as naming another claim.
     report.write_text("{bad", encoding="utf-8")
-    assert claims_audit.check_coverage_claim(tmp_path, KEY).detail == (
-        "coverage_report.json: names another claim"
+    assert claims_audit.check_coverage_claim(tmp_path, KEY).detail.startswith(
+        "coverage_report.json: unreadable ("
     )
     (tmp_path / coverage_run.CLAIM_FILE).write_text(
         json.dumps({"levels": [0.5]}), encoding="utf-8"
     )
-    assert claims_audit.check_coverage_claim(tmp_path, KEY).detail == (
+    assert claims_audit.check_coverage_claim(tmp_path, KEY).detail.startswith(
         "coverage_claim.json: differs from the registered hash; "
-        "coverage_report.json: names another claim"
+        "coverage_report.json: unreadable ("
     )
 
 

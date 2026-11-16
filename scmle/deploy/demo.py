@@ -324,6 +324,7 @@ def get_json(url: str, timeout: float = 10.0) -> tuple[int, dict[str, Any]]:
         with urllib.request.urlopen(url, timeout=timeout) as reply:  # noqa: S310 -- URLs are http://127.0.0.1 addresses built by the demo  # nosec B310
             return reply.status, json.loads(reply.read())
     except urllib.error.HTTPError as error:
+        # handled: HTTP error status returned to caller
         return error.code, json.loads(error.read())
 
 
@@ -349,6 +350,7 @@ def post_json(
         with urllib.request.urlopen(request, timeout=timeout) as reply:  # noqa: S310 -- URLs are http://127.0.0.1 addresses built by the demo  # nosec B310
             return reply.status, json.loads(reply.read())
     except urllib.error.HTTPError as error:
+        # handled: HTTP error status returned to caller
         return error.code, json.loads(error.read())
 
 
@@ -375,6 +377,7 @@ def wait_ready(
         try:
             status = get_json(f"{base}/readyz", timeout=2.0)[0]
         except OSError:
+            # handled: not-yet-ready poll retried; timeout returns None
             status = 0
         if status == http.HTTPStatus.OK:
             return time.monotonic() - started
@@ -397,6 +400,7 @@ def stop_service(process: subprocess.Popen[bytes] | None) -> None:
     try:
         process.wait(timeout=15)
     except subprocess.TimeoutExpired:
+        # handled: graceful stop timed out; process killed
         process.kill()
         process.wait(timeout=15)
     if process.stderr is not None:
@@ -638,6 +642,7 @@ def corrupted_and_unsigned_stay_unready(
                         f"{base}/readyz", timeout=2.0
                     )
                 except OSError:
+                    # handled: not-yet-ready poll retried until deadline
                     time.sleep(0.2)
                     continue
                 if ready.get("phase") == "failed":
@@ -793,6 +798,7 @@ def process_memory_mb(process: subprocess.Popen[bytes] | None) -> float | None:
                 psutil.Process(process.pid).memory_info().rss / 1048576, 1
             )
         except psutil.Error:
+            # handled: documented None when platform reports no number
             return None
     result = subprocess.run(  # noqa: S603 -- fixed arguments  # nosec B603 B607
         ["ps", "-o", "rss=", "-p", str(process.pid)],  # noqa: S607 -- ps is looked up on PATH, as on every POSIX host
@@ -803,6 +809,7 @@ def process_memory_mb(process: subprocess.Popen[bytes] | None) -> float | None:
     try:
         return round(int(result.stdout.strip()) / 1024, 1)
     except ValueError:
+        # handled: documented None when platform reports no number
         return None
 
 
@@ -1134,6 +1141,7 @@ def run(
             startup=startup,
         )
     except Exception as error:  # noqa: BLE001 -- the transcript must show why it stopped
+        # handled: returned as failed finding/problem/refusal with error text
         transcript.record(
             "demo stopped", time.monotonic(), ok=False, error=repr(error)[:500]
         )

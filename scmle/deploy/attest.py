@@ -350,6 +350,7 @@ def main(arguments: list[str] | None = None) -> int:
             options.folder, digest, lock, signing.resolve_key(None)
         )
     except (OSError, KeyError, ValueError, errors.ScmleError) as error:
+        # handled: error printed to stderr, exit code 1, documented
         print(f"error: {error}", file=sys.stderr)  # noqa: T201 -- command-line output
         return 1
     signed = document["signature"] is not None

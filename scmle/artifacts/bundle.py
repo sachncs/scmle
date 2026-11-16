@@ -117,6 +117,8 @@ def installed_versions() -> dict[str, str]:
         try:
             module = importlib.import_module(name)
         except ImportError:
+            # handled: unimportable library left out of mapping, as docstring
+            # states
             continue
         found[name] = str(getattr(module, "__version__", "unknown"))
     return found
@@ -1118,6 +1120,8 @@ class Bundle:
             old = signing.resolve_key(current_key)
             replacement = signing.resolve_key(new_key)
         except ValueError:
+            # handled: invalid key becomes None, then ArtifactError raised just
+            # below
             old = replacement = None
         if old is None or replacement is None:
             raise errors.ArtifactError(

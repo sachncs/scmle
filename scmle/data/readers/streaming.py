@@ -1216,6 +1216,7 @@ class CommitLedger:
             self.pending_acknowledgement_path.unlink()
             durability.sync_directory(self.pending_acknowledgement_path.parent)
         except FileNotFoundError:
+            # handled: documented no-op when no acknowledgement staged
             return
 
     def validate_batch(self, batch: Batch) -> None:

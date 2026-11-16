@@ -110,6 +110,7 @@ def raises(
     try:
         operation()
     except expected:
+        # handled: expected exception is the success condition
         return
     except Exception as error:
         raise ConformanceError(
@@ -282,8 +283,10 @@ def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
             store.put(key, f"racer-{index}".encode(), if_absent=True)
             result = "won"
         except objectstore.AlreadyExistsError:
+            # handled: recorded as racer outcome 'lost'
             result = "lost"
         except Exception as error:  # noqa: BLE001 -- any backend failure is recorded as this racer's outcome
+            # handled: recorded as failed racer outcome
             result = f"failed {type(error).__name__}: {error}"
         with guard:
             outcomes.append(result)
@@ -369,8 +372,10 @@ def check_if_version_race(store: objectstore.ObjectStore, base: str) -> None:
             store.put(key, f"racer-{index}".encode(), if_version=version)
             result = "won"
         except objectstore.ConflictError:
+            # handled: recorded as racer outcome 'lost'
             result = "lost"
         except Exception as error:  # noqa: BLE001 -- any backend failure is recorded as this racer's outcome
+            # handled: recorded as failed racer outcome
             result = f"failed {type(error).__name__}: {error}"
         with guard:
             outcomes.append(result)
@@ -529,6 +534,7 @@ def run_conformance(
             check(store, base)
             outcome, detail = True, ""
         except Exception as error:  # noqa: BLE001 -- a failing check is reported in the result, not raised
+            # handled: reported as failed check result with detail
             outcome, detail = False, f"{type(error).__name__}: {error}"
         finally:
             with contextlib.suppress(objectstore.StoreError):

@@ -120,6 +120,8 @@ class TextVectorizer(base.TransformerMixin, base.BaseEstimator):  # type: ignore
         try:
             self.vectorizer_.fit(numpy.asarray(texts, dtype=str))
         except ValueError:  # Empty vocabulary: no term occurs twice.
+            # handled: documented fallback to unigram vocabulary in fit
+            # docstring
             self.vectorizer_ = text.TfidfVectorizer(
                 max_features=self.max_terms, strip_accents="unicode"
             ).fit(numpy.asarray(texts, dtype=str))

@@ -25,6 +25,7 @@ resource: Any  # the `resource` module, or None where it is missing
 try:
     resource = importlib.import_module("resource")
 except ImportError:  # Windows has no `resource` module.
+    # handled: optional module absent on Windows; None checked
     resource = None
 
 DEFAULT_BUCKETS = (

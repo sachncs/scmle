@@ -620,6 +620,7 @@ class Runner(abc.ABC):
         try:
             data = self.store.get(self.manifest_key(run_id))[0]
         except objectstore.NotFoundError:
+            # handled: documented None when run has no manifest
             return None
         return RunManifest.from_dict(json.loads(data))
 
@@ -813,6 +814,7 @@ class Runner(abc.ABC):
             try:
                 meta = self.store.get(self.result_key(spec.run_id))[1]
             except objectstore.NotFoundError:
+                # handled: run marked FAILED with reason
                 state = RunState.FAILED
                 manifest.attempts[-1].reason = "job ended without a result"
             else:

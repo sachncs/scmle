@@ -52,6 +52,7 @@ class RunStore:
                 (parent / run_id).mkdir()
                 return cls(run_id, parent / run_id)
             except FileExistsError:
+                # handled: expected collision; next run id tried
                 number += 1
 
     @classmethod

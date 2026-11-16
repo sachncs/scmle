@@ -709,6 +709,7 @@ class Loop:
         try:
             self.ledger.verify()
         except deployment_ledger.DeploymentLedgerError:
+            # handled: loop halted with reason; returns False
             self.halted_by_state = True
             self.halt_reason = HALT_LEDGER
             return False

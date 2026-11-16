@@ -217,6 +217,7 @@ def source_totals(
             source, numeric, table, measures, tolerance=tolerance
         )
     except ValueError:
+        # handled: documented: compared against zero, gap surfaces in checks
         outcome = None
     prefix = f"{table}."
     if outcome is not None:

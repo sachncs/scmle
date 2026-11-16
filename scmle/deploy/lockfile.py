@@ -45,6 +45,8 @@ def marker_applies(marker: str) -> bool:
     try:
         from packaging import markers  # noqa: PLC0415 -- optional dependency
     except ImportError:
+        # handled: packaging absent returns False, documented (marker deps then
+        # skipped)
         return False
     return bool(markers.Marker(marker).evaluate({"extra": ""}))
 
@@ -93,6 +95,8 @@ def runtime_closure(
         try:
             declared = look_up(name)
         except metadata.PackageNotFoundError:
+            # handled: uninstalled requirement metadata appended to caller's
+            # unresolved list
             declared = []
             if unresolved is not None:
                 unresolved.append(name)

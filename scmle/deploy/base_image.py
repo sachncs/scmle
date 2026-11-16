@@ -221,6 +221,7 @@ def main(arguments: list[str] | None = None) -> int:
         else:
             print(f"ok: {lock['image']} pinned to {lock['digest']}")  # noqa: T201 -- command-line output
     except (errors.ScmleError, OSError, KeyError, ValueError) as error:
+        # handled: returned as failed finding/problem/refusal with error text
         print(f"error: {error}", file=sys.stderr)  # noqa: T201 -- command-line output
         return 1
     else:

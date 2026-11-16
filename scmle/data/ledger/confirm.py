@@ -307,6 +307,8 @@ def merge_runners(*runners: ClaimRunner | None) -> ClaimRunner | None:
             try:
                 found = runner.run(features, target)
             except Exception:  # noqa: BLE001 -- a crashing runner marks its own claims failed and the others still run
+                # handled: crashing runner's claims marked FAILED in statuses
+                # (cause text dropped)
                 statuses.update({i.claim_id: FAILED for i in runner.registered})
                 continue
             clash = set(documents) & set(found.documents)
@@ -1059,6 +1061,8 @@ def open_and_test(
     except errors.LeakageError:
         raise
     except Exception as failure:  # noqa: BLE001 -- a failed opening is recorded as a pipeline-failure outcome, not raised
+        # handled: opening failure returned as pipeline_failure outcome with
+        # reason
         return finish(
             ledger,
             outcome=PIPELINE_FAILURE,
@@ -1076,6 +1080,8 @@ def open_and_test(
         try:
             ran = claim_runner.run(*rows)
         except Exception as failure:  # noqa: BLE001 -- a crashing claim runner marks its claims failed and is logged, not raised
+            # handled: claim runner crash logged to custody log; claims marked
+            # FAILED
             failed = failure_reason("evaluating the registered claims", failure)
             log.append("C", "claims_failed", ACTOR, {"reason": failed})
             ran = ClaimRun(
@@ -1101,6 +1107,8 @@ def open_and_test(
             ledger, rows, rule, alpha_confirm, encode, record
         )
     except Exception as failure:  # noqa: BLE001 -- a failed test on C is recorded as a pipeline-failure outcome, not raised
+        # handled: testing failure returned as pipeline_failure outcome with
+        # reason
         return finish(
             ledger,
             outcome=PIPELINE_FAILURE,

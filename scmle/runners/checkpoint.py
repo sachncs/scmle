@@ -146,6 +146,7 @@ class CheckpointStore:
                 return None
             return Checkpoint(step, document["state"], document["sha256"])
         except (objectstore.StoreError, ValueError, KeyError, TypeError):
+            # handled: documented None for absent or damaged checkpoint
             return None
 
     def latest(self) -> Checkpoint | None:

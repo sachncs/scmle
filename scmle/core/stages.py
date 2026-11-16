@@ -4021,6 +4021,7 @@ class PackageStage(Stage):
                 signing_key=signing.resolve_key(None),
             )
         except (KeyError, TypeError, ValueError):
+            # handled: verification=False fed to attestation gate, which blocks
             verification = False
         outcome = release.apply_attestation_gate(
             outcome, evaluation.get("release_attestation"), verification

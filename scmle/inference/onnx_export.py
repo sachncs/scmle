@@ -90,6 +90,8 @@ def register_booster_converters() -> None:
             "onnxmltools.convert.xgboost.operator_converters.XGBoost"
         )
     except ImportError:
+        # handled: optional onnxmltools stack absent; nothing registered,
+        # documented
         return
     options = {"nocl": [True, False], "zipmap": [True, False, "columns"]}
     registry.update_registered_converter(

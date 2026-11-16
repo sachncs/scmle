@@ -699,6 +699,7 @@ def frontier(
         try:
             fitted = fit_group_thresholds(scores, y, groups, trial, t)
         except InfeasibleConstraintsError:
+            # handled: recorded as infeasible row
             rows.append({"max_gap": gap, "feasible": False})
             continue
         rows.append(

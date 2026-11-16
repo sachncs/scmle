@@ -452,6 +452,7 @@ def bootstrap_skill(
     try:
         return skill_of(pred[index], y[index], task)
     except ValueError:
+        # handled: uncomputable resample skill returned as None, documented
         return None
 
 

@@ -710,6 +710,7 @@ def assess(
     try:
         check_pair(left, right)
     except ValueError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         return unverifiable(str(error))
     first = c2st(
         left,

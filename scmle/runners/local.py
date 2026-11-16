@@ -175,14 +175,19 @@ class Runner(base.Runner):
             self.workload(context)
             status = base.JobStatus(base.JobState.SUCCEEDED)
         except JobInterruptedError:
+            # handled: interruption recorded as INTERRUPTED job status
             status = base.JobStatus(base.JobState.INTERRUPTED, "interrupted")
         except JobStoppedError:
+            # handled: supervisor stop recorded as CANCELLED job status
             status = base.JobStatus(base.JobState.CANCELLED, "stopped")
         except retry.TransientError as error:
+            # handled: transient error recorded as retryable FAILED status
             status = base.JobStatus(
                 base.JobState.FAILED, f"transient: {error}", retryable=True
             )
         except Exception as error:  # noqa: BLE001 -- job boundary
+            # handled: other error recorded as FAILED status with type and
+            # message
             reason = f"{type(error).__name__}: {error}"[:300]
             status = base.JobStatus(base.JobState.FAILED, reason)
         self.jobs[handle.job_id] = Outcome(status)

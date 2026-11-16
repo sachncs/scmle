@@ -180,6 +180,7 @@ class PredictionLog:
                 error_category=type(error).__name__,
             )
             raise
+        scheme = ""
         try:
             payload = (
                 pandas.util.hash_pandas_object(frame, index=False)
@@ -187,10 +188,13 @@ class PredictionLog:
                 .tobytes()
             )
         except (TypeError, ValueError):
+            # handled: the fallback scheme is named in the fingerprint, so a
+            # JSON fingerprint is never compared with a row-hash one
+            scheme = "json:"
             payload = frame.to_json(
                 orient="split", date_format="iso", default_handler=str
             ).encode("utf-8")
-        input_fingerprint = hashlib.sha256(payload).hexdigest()
+        input_fingerprint = scheme + hashlib.sha256(payload).hexdigest()
         for event_id in ids:
             self.log_observability(
                 bundle,

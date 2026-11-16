@@ -134,6 +134,8 @@ class MetricsSpool:
             try:
                 accepted = self.send(samples)
             except (OSError, ValueError) as failure:
+                # handled: send failure stops flush; error string returned in
+                # Flush
                 error = f"{type(failure).__name__}: {failure}"
                 break
             if accepted != len(batch):

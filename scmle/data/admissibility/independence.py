@@ -406,6 +406,7 @@ def falsify(
         try:
             result = run_test(frame, statement.x, statement.y, statement.given)
         except ValueError as error:
+            # handled: recorded as SKIPPED outcome with error text
             outcomes.append(
                 Outcome(statement, Verdict.SKIPPED, None, str(error), None)
             )

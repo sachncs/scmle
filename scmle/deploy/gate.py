@@ -162,10 +162,13 @@ def model_problems(candidate: Candidate, key: str | bytes) -> list[str]:
                 key,
             )
         except (TypeError, ValueError) as error:
+            # handled: returned as failed finding/problem/refusal with error
+            # text
             problems.append(f"the model approval is not valid: {error}")
     try:
         contract.require_digest(candidate.model_digest, "model_digest")
     except errors.ConfigError as error:
+        # handled: returned as failed finding/problem/refusal with error text
         problems.append(str(error))
     return problems
 

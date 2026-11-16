@@ -301,6 +301,7 @@ class ObjectStore(abc.ABC):
         try:
             self.head(key)
         except NotFoundError:
+            # handled: NotFoundError mapped to False, documented
             return False
         return True
 
@@ -352,6 +353,8 @@ def unlink_tolerantly(path: pathlib.Path) -> None:
         try:
             path.unlink(missing_ok=True)
         except PermissionError:
+            # handled: held temp file retried; quiet give-up documented in
+            # docstring
             time.sleep(0.005 * (attempt + 1))
         else:
             return
