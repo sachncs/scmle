@@ -37,16 +37,16 @@ class FaultArtifact:
                 the content is not non-empty bytes, or the observation is blank.
         """
         if not self.evidence_type.strip():
-            raise ValueError("evidence_type must not be empty")
+            raise errors.InputError("evidence_type must not be empty")
         if "/" in self.evidence_type or "\\" in self.evidence_type:
-            raise ValueError("evidence_type must be a path-safe name")
+            raise errors.InputError("evidence_type must be a path-safe name")
         content: object = self.content  # may be any value from a caller
         if not isinstance(content, bytes) or not content:
-            raise ValueError("content must be non-empty bytes")
+            raise errors.InputError("content must be non-empty bytes")
         if not isinstance(self.observed_outcome, reliability.EvidenceOutcome):
             raise TypeError("observed_outcome must be EvidenceOutcome")
         if not self.observation.strip():
-            raise ValueError("observation must not be empty")
+            raise errors.InputError("observation must not be empty")
 
 
 class FaultInjectionHarness:
@@ -85,9 +85,9 @@ class FaultInjectionHarness:
         )
         for name, value in identity:
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{name} must not be empty")
+                raise errors.InputError(f"{name} must not be empty")
         if "/" in execution_id or "\\" in execution_id:
-            raise ValueError("execution_id must be a path-safe name")
+            raise errors.InputError("execution_id must be a path-safe name")
         self.registry = registry
         self.artifact_root = pathlib.Path(artifact_root).resolve()
         self.artifact_root.mkdir(parents=True, exist_ok=True)
@@ -146,13 +146,13 @@ class FaultInjectionHarness:
         requirements = self.registry.plans[scenario].evidence_requirements
         evidence_types = tuple(item.evidence_type for item in artifacts)
         if len(evidence_types) != len(set(evidence_types)):
-            raise ValueError(
+            raise errors.InputError(
                 "executor returned duplicate evidence types; "
                 "no artifacts were published"
             )
         unexpected = sorted(set(evidence_types) - set(requirements))
         if unexpected:
-            raise ValueError(
+            raise errors.InputError(
                 "executor evidence does not match the scenario contract; "
                 "no artifacts were published ("
                 f"unexpected={','.join(unexpected)}"

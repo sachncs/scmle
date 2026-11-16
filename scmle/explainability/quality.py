@@ -6,6 +6,8 @@ import dataclasses
 import math
 from typing import Any
 
+from scmle.contracts import errors
+
 MIN_REPORTS = 2
 
 
@@ -27,7 +29,9 @@ def validate_score(value: float, field_name: str) -> float:
         raise TypeError(f"{field_name} must be numeric")
     score = float(value)
     if not math.isfinite(score) or not 0.0 <= score <= 1.0:
-        raise ValueError(f"{field_name} must be finite and between 0 and 1")
+        raise errors.InputError(
+            f"{field_name} must be finite and between 0 and 1"
+        )
     return score
 
 
@@ -56,7 +60,9 @@ class QualityThresholds:
                 threshold is not finite or lies outside [0, 1].
         """
         if self.stability_minimum is None and self.fidelity_minimum is None:
-            raise ValueError("at least one explanation threshold is required")
+            raise errors.InputError(
+                "at least one explanation threshold is required"
+            )
         if self.stability_minimum is not None:
             validate_score(self.stability_minimum, "stability_minimum")
         if self.fidelity_minimum is not None:
@@ -109,9 +115,9 @@ class QualityEvaluation:
                 not a tuple.
         """
         if not self.method.strip():
-            raise ValueError("method must not be empty")
+            raise errors.InputError("method must not be empty")
         if self.sample_count < 1:
-            raise ValueError("sample_count must be at least 1")
+            raise errors.InputError("sample_count must be at least 1")
         if self.stability_score is not None:
             validate_score(self.stability_score, "stability_score")
         if self.fidelity_score is not None:
@@ -174,18 +180,20 @@ class ExplanationGroundTruth:
                 outside [0, 1].
         """
         if not self.method.strip():
-            raise ValueError("method must not be empty")
+            raise errors.InputError("method must not be empty")
         if not self.reference.strip():
-            raise ValueError("reference must not be empty")
+            raise errors.InputError("reference must not be empty")
         if not self.expected_features:
-            raise ValueError("expected_features must not be empty")
+            raise errors.InputError("expected_features must not be empty")
         if len(set(self.expected_features)) != len(self.expected_features):
-            raise ValueError("expected_features must be unique")
+            raise errors.InputError("expected_features must be unique")
         if any(not feature.strip() for feature in self.expected_features):
-            raise ValueError("expected_features must not contain empty values")
+            raise errors.InputError(
+                "expected_features must not contain empty values"
+            )
         validate_score(self.minimum_overlap, "minimum_overlap")
         if any(not limitation.strip() for limitation in self.limitations):
-            raise ValueError("limitations must not contain empty values")
+            raise errors.InputError("limitations must not contain empty values")
 
     def to_dict(self) -> dict[str, object]:
         """Returns the reference declaration as JSON-native evidence.
@@ -244,11 +252,11 @@ class GroundTruthEvaluation:
             TypeError: If `findings` is not a tuple.
         """
         if not self.sample_id.strip():
-            raise ValueError("sample_id must not be empty")
+            raise errors.InputError("sample_id must not be empty")
         if not self.method.strip():
-            raise ValueError("method must not be empty")
+            raise errors.InputError("method must not be empty")
         if not self.reference.strip():
-            raise ValueError("reference must not be empty")
+            raise errors.InputError("reference must not be empty")
         validate_score(self.overlap_score, "overlap_score")
         validate_score(self.minimum_overlap, "minimum_overlap")
         if not isinstance(self.findings, tuple):
@@ -306,11 +314,13 @@ class GroundTruthSuiteEvaluation:
             TypeError: If `findings` is not a tuple.
         """
         if self.sample_count < 1:
-            raise ValueError("sample_count must be at least 1")
+            raise errors.InputError("sample_count must be at least 1")
         if self.reference_count < 0 or self.reference_count > self.sample_count:
-            raise ValueError("reference_count must be within sample_count")
+            raise errors.InputError(
+                "reference_count must be within sample_count"
+            )
         if self.reference_count != len(self.evaluations):
-            raise ValueError("reference_count must match evaluations")
+            raise errors.InputError("reference_count must match evaluations")
         if not isinstance(self.findings, tuple):
             raise TypeError("findings must be a tuple")
 
@@ -371,16 +381,22 @@ def explanation_ranking(report: Mapping[str, Any]) -> tuple[str, ...]:
     """
     features = report.get("features")
     if not isinstance(features, list) or not features:
-        raise ValueError("explanation report needs a non-empty features list")
+        raise errors.InputError(
+            "explanation report needs a non-empty features list"
+        )
     ranking: list[str] = []
     for item in features:
         if not isinstance(item, Mapping) or not isinstance(
             item.get("feature"), str
         ):
-            raise ValueError("explanation features need string feature names")
+            raise errors.InputError(
+                "explanation features need string feature names"
+            )
         feature = item["feature"].strip()
         if not feature or feature in ranking:
-            raise ValueError("explanation feature names must be unique and set")
+            raise errors.InputError(
+                "explanation feature names must be unique and set"
+            )
         ranking.append(feature)
     return tuple(ranking)
 
@@ -466,9 +482,9 @@ def evaluate_ground_truth_suite(
             references than samples.
     """
     if sample_count < 1:
-        raise ValueError("sample_count must be at least 1")
+        raise errors.InputError("sample_count must be at least 1")
     if len(references) > sample_count:
-        raise ValueError("references cannot exceed sample_count")
+        raise errors.InputError("references cannot exceed sample_count")
     evaluations = tuple(
         evaluate_ground_truth(ground_truth, report, sample_id)
         for ground_truth, report, sample_id in references
@@ -526,21 +542,23 @@ def linear_contribution_report(
             are blank or repeated, or a contribution is not finite.
     """
     if not sample_id.strip():
-        raise ValueError("sample_id must not be empty")
+        raise errors.InputError("sample_id must not be empty")
     if not 1 <= top_k <= len(feature_names):
-        raise ValueError("top_k must be within the feature-name count")
+        raise errors.InputError("top_k must be within the feature-name count")
     if len(feature_names) != len(values) or len(values) != len(coefficients):
-        raise ValueError("feature names, values, and coefficients must align")
+        raise errors.InputError(
+            "feature names, values, and coefficients must align"
+        )
     names = tuple(feature_names)
     if len(set(names)) != len(names) or any(not name.strip() for name in names):
-        raise ValueError("feature names must be unique and non-empty")
+        raise errors.InputError("feature names must be unique and non-empty")
     contributions = []
     for name, value, coefficient in zip(
         names, values, coefficients, strict=True
     ):
         contribution = float(value) * float(coefficient)
         if not math.isfinite(contribution):
-            raise ValueError("linear contributions must be finite")
+            raise errors.InputError("linear contributions must be finite")
         contributions.append((name, contribution))
     ranked = sorted(
         contributions,
@@ -581,13 +599,13 @@ def ranking_stability(
             exceeds the feature count of any report.
     """
     if len(reports) < MIN_REPORTS:
-        raise ValueError("at least two explanation reports are required")
+        raise errors.InputError("at least two explanation reports are required")
     rankings = [explanation_ranking(report) for report in reports]
     limit = top_k or min(len(ranking) for ranking in rankings)
     if limit < 1:
-        raise ValueError("top_k must be at least 1")
+        raise errors.InputError("top_k must be at least 1")
     if any(limit > len(ranking) for ranking in rankings):
-        raise ValueError("top_k cannot exceed a report's feature count")
+        raise errors.InputError("top_k cannot exceed a report's feature count")
     selected = [set(ranking[:limit]) for ranking in rankings]
     overlaps: list[float] = []
     for left in range(len(selected)):
@@ -620,14 +638,16 @@ def fidelity_score(
             value is not finite.
     """
     if len(reference) == 0 or len(reference) != len(reconstruction):
-        raise ValueError("reference and reconstruction must have equal values")
+        raise errors.InputError(
+            "reference and reconstruction must have equal values"
+        )
     reference_values = [float(value) for value in reference]
     reconstruction_values = [float(value) for value in reconstruction]
     if any(
         not math.isfinite(value)
         for value in (*reference_values, *reconstruction_values)
     ):
-        raise ValueError("fidelity values must be finite")
+        raise errors.InputError("fidelity values must be finite")
     mean = sum(reference_values) / len(reference_values)
     baseline_error = math.sqrt(
         sum((value - mean) ** 2 for value in reference_values)

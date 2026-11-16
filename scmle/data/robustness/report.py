@@ -8,6 +8,7 @@ and the choice-to-result attribution are inside each finding.
 
 from typing import Any
 
+from scmle.contracts import errors
 from scmle.data.robustness import qualify
 from scmle.data.robustness import shift
 from scmle.data.robustness import stability
@@ -179,9 +180,9 @@ def require_keys(
     """
     missing = [k for k in keys if k not in document]
     if missing:
-        raise ValueError(f"{name} is missing {missing}")
+        raise errors.InputError(f"{name} is missing {missing}")
     if document["schema_version"] != SCHEMA_VERSION:
-        raise ValueError(f"{name} has an unsupported schema_version")
+        raise errors.InputError(f"{name} has an unsupported schema_version")
 
 
 def validate_stability(document: dict[str, Any]) -> None:
@@ -196,7 +197,7 @@ def validate_stability(document: dict[str, Any]) -> None:
     """
     require_keys(document, STABILITY_KEYS, "stability report")
     if document["status"] not in STABILITY_STATUSES:
-        raise ValueError("stability report has an unknown status")
+        raise errors.InputError("stability report has an unknown status")
     for finding in document["findings"]:
         require_keys(
             {"schema_version": SCHEMA_VERSION, **finding},
@@ -204,7 +205,7 @@ def validate_stability(document: dict[str, Any]) -> None:
             "finding",
         )
         if finding["status"] not in FINDING_STATUSES:
-            raise ValueError("a finding has an unknown status")
+            raise errors.InputError("a finding has an unknown status")
 
 
 def validate_shift(document: dict[str, Any]) -> None:
@@ -220,6 +221,6 @@ def validate_shift(document: dict[str, Any]) -> None:
     require_keys(document, SHIFT_KEYS, "shift report")
     status = document["status"]
     if status not in {s.value for s in shift.Status}:
-        raise ValueError("shift report has an unknown status")
+        raise errors.InputError("shift report has an unknown status")
     if status == shift.Status.PASS.value and document["c2st"] is None:
-        raise ValueError("a pass needs a deployment sample and a test")
+        raise errors.InputError("a pass needs a deployment sample and a test")

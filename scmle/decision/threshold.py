@@ -26,6 +26,7 @@ from numpy.typing import NDArray
 from scipy import optimize
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.framing import costs
@@ -57,7 +58,7 @@ def bayes_threshold(c_fp: float, c_fn: float) -> float:
     fp = qualification.finite(c_fp, "c_fp")
     fn = qualification.finite(c_fn, "c_fn")
     if fp <= 0 or fn <= 0:
-        raise ValueError("c_fp and c_fn must both be positive")
+        raise errors.InputError("c_fp and c_fn must both be positive")
     return fp / (fp + fn)
 
 
@@ -101,9 +102,9 @@ def probabilities_and_labels(
     risk = numpy.asarray(p, dtype=float)
     labels = costs.binary_vector(y, "y")
     if risk.shape != labels.shape:
-        raise ValueError("p and y must have the same length")
+        raise errors.InputError("p and y must have the same length")
     if not numpy.isfinite(risk).all() or (risk < 0).any() or (risk > 1).any():
-        raise ValueError("p must lie in [0, 1]")
+        raise errors.InputError("p must lie in [0, 1]")
     return risk, labels
 
 
@@ -131,10 +132,10 @@ def calibration_check(
     """
     risk, labels = probabilities_and_labels(p, y)
     if not 0.0 < level < 1.0:
-        raise ValueError("level must be strictly between 0 and 1")
+        raise errors.InputError("level must be strictly between 0 and 1")
     qualification.count(bins, "bins", minimum=2)
     if len(risk) < 5 * bins:
-        raise ValueError("too few rows for the calibration check")
+        raise errors.InputError("too few rows for the calibration check")
     order = numpy.argsort(risk, kind="stable")
     statistic = 0.0
     for part in numpy.array_split(order, bins):

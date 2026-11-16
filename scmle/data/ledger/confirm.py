@@ -223,7 +223,9 @@ class Withdrawal:
             ValueError: If `reasons` is not empty while `accounted` is False.
         """
         if self.reasons and not self.accounted:
-            raise ValueError("a withdrawal with reasons must be accounted")
+            raise errors.InputError(
+                "a withdrawal with reasons must be accounted"
+            )
 
 
 NOT_EVALUATED = "not_evaluated"
@@ -302,7 +304,7 @@ def merge_runners(*runners: ClaimRunner | None) -> ClaimRunner | None:
     registered = tuple(item for r in chosen for item in r.registered)
     names = [item.claim_id for item in registered]
     if len(set(names)) != len(names):
-        raise ValueError("claim ids must be unique across runners")
+        raise errors.InputError("claim ids must be unique across runners")
 
     def run_all(features: pandas.DataFrame, target: pandas.Series) -> ClaimRun:
         statuses: dict[str, str] = {}
@@ -320,7 +322,7 @@ def merge_runners(*runners: ClaimRunner | None) -> ClaimRunner | None:
                 continue
             clash = set(documents) & set(found.documents)
             if clash:
-                raise ValueError(f"two claims wrote {sorted(clash)}")
+                raise errors.InputError(f"two claims wrote {sorted(clash)}")
             statuses.update(found.statuses)
             documents.update(found.documents)
         return ClaimRun(statuses, documents)

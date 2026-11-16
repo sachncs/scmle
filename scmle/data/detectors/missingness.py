@@ -39,6 +39,7 @@ from scipy import stats
 from sklearn import impute
 from sklearn import model_selection
 
+import scmle.contracts.errors
 from scmle.core import randomness
 
 MAX_ROWS = 5000
@@ -199,11 +200,15 @@ def em_normal(
         ValueError: If a column is entirely missing or `values` is not 2-D.
     """
     if values.ndim != MATRIX_DIMENSIONS:
-        raise ValueError("values must be two-dimensional")
+        raise scmle.contracts.errors.InputError(
+            "values must be two-dimensional"
+        )
     n, p = values.shape
     seen = ~numpy.isnan(values)
     if not seen.any(axis=0).all():
-        raise ValueError("every column needs at least one observed value")
+        raise scmle.contracts.errors.InputError(
+            "every column needs at least one observed value"
+        )
     mean = numpy.nanmean(values, axis=0)
     variance = numpy.nanvar(values, axis=0)
     covariance = numpy.diag(numpy.where(variance > 0, variance, 1.0))
@@ -374,11 +379,15 @@ def little_mcar_test(
         ValueError: On an unknown transform or non-numeric column.
     """
     if transform not in ("normal_scores", "none"):
-        raise ValueError("transform must be 'normal_scores' or 'none'")
+        raise scmle.contracts.errors.InputError(
+            "transform must be 'normal_scores' or 'none'"
+        )
     names = list(columns) if columns is not None else numeric_columns(frame)
     for name in names:
         if not pandas.api.types.is_numeric_dtype(frame[name]):
-            raise ValueError(f"column '{name}' is not numeric")
+            raise scmle.contracts.errors.InputError(
+                f"column '{name}' is not numeric"
+            )
     values = frame[names].to_numpy(dtype=float, copy=True)
     values[~numpy.isfinite(values)] = numpy.nan
     values = values[~numpy.isnan(values).all(axis=1)]
@@ -471,7 +480,9 @@ def indicator_model_test(
         ValueError: If `permutations` is below 1 or `folds` is below 2.
     """
     if permutations < 1 or folds < MIN_FOLDS:
-        raise ValueError("need permutations >= 1 and folds >= 2")
+        raise scmle.contracts.errors.InputError(
+            "need permutations >= 1 and folds >= 2"
+        )
     flag = frame[column].isna().to_numpy()
     others = [c for c in numeric_columns(frame) if c != column]
     missing = int(flag.sum())
@@ -531,7 +542,7 @@ def assess_mechanism(
         ValueError: If `alpha` is not strictly between 0 and 1.
     """
     if not 0.0 < alpha < 1.0:
-        raise ValueError("alpha must be within (0, 1)")
+        raise scmle.contracts.errors.InputError("alpha must be within (0, 1)")
     skipped: list[str] = []
     input_rows = len(frame)
     if input_rows > MAX_ROWS:
@@ -630,9 +641,13 @@ def tipping_point(
     """
     values = numpy.asarray(observed, dtype=float)
     if values.size == 0 or n_missing < 1:
-        raise ValueError("need observed values and at least one missing")
+        raise scmle.contracts.errors.InputError(
+            "need observed values and at least one missing"
+        )
     if not low < high or steps < MIN_STEPS:
-        raise ValueError("need low < high and steps >= 2")
+        raise scmle.contracts.errors.InputError(
+            "need low < high and steps >= 2"
+        )
     centre = float(values.mean())
     filler = numpy.full(n_missing, centre)
     baseline = bool(conclusion(numpy.concatenate([values, filler])))
@@ -662,7 +677,9 @@ def make_imputer(strategy: str) -> Any:
         return impute.SimpleImputer(strategy=strategy, keep_empty_features=True)
     if strategy == "knn":
         return impute.KNNImputer(n_neighbors=5, keep_empty_features=True)
-    raise ValueError(f"strategy must be one of {STRATEGIES}")
+    raise scmle.contracts.errors.InputError(
+        f"strategy must be one of {STRATEGIES}"
+    )
 
 
 def fold_imputers(
@@ -733,7 +750,7 @@ def imputation_errors(
         ValueError: If `share` is not strictly between 0 and 1.
     """
     if not 0.0 < share < 1.0:
-        raise ValueError("share must be within (0, 1)")
+        raise scmle.contracts.errors.InputError("share must be within (0, 1)")
     spread = numpy.nanstd(values, axis=0)
     spread = numpy.where(spread > 0, spread, 1.0)
     errors: dict[str, float] = {}

@@ -8,6 +8,8 @@ from typing import Any
 
 import numpy
 
+from scmle.contracts import errors
+
 FEATURE_MATRIX_RANK = 2
 MIN_FIT_ROWS = 8
 
@@ -130,17 +132,21 @@ class Trainer:
         try:
             matrix = numpy.asarray(features, dtype=numpy.float32)
         except (TypeError, ValueError) as error:
-            raise ValueError(
+            raise errors.InputError(
                 "tabular JEPA requires a numeric 2-D feature matrix"
             ) from error
         if matrix.ndim != FEATURE_MATRIX_RANK:
-            raise ValueError("tabular JEPA requires a 2-D feature matrix")
+            raise errors.InputError(
+                "tabular JEPA requires a 2-D feature matrix"
+            )
         if len(matrix) < MIN_FIT_ROWS:
-            raise ValueError("tabular JEPA needs at least 8 rows")
+            raise errors.InputError("tabular JEPA needs at least 8 rows")
         if matrix.shape[1] < 1:
-            raise ValueError("tabular JEPA needs at least one feature")
+            raise errors.InputError("tabular JEPA needs at least one feature")
         if not numpy.isfinite(matrix).all():
-            raise ValueError("tabular JEPA requires finite numeric features")
+            raise errors.InputError(
+                "tabular JEPA requires finite numeric features"
+            )
         return matrix
 
     def check_hyperparameters(self) -> None:
@@ -163,44 +169,52 @@ class Trainer:
             or isinstance(embedding_size, bool)
             or embedding_size < 1
         ):
-            raise ValueError("JEPA layer sizes must be positive integers")
+            raise errors.InputError(
+                "JEPA layer sizes must be positive integers"
+            )
         if (
             not numpy.isfinite(self.mask_probability)
             or not 0.0 < self.mask_probability < 1.0
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "mask_probability must be finite and lie strictly between "
                 "0 and 1"
             )
         if not numpy.isfinite(self.ema_decay) or not 0.0 < self.ema_decay < 1.0:
-            raise ValueError(
+            raise errors.InputError(
                 "ema_decay must be finite and lie strictly between 0 and 1"
             )
         if not numpy.isfinite(self.learning_rate) or self.learning_rate <= 0.0:
-            raise ValueError("learning_rate must be finite and positive")
+            raise errors.InputError("learning_rate must be finite and positive")
         if not numpy.isfinite(self.weight_decay) or self.weight_decay < 0.0:
-            raise ValueError("weight_decay must be finite and non-negative")
+            raise errors.InputError(
+                "weight_decay must be finite and non-negative"
+            )
         if (
             not isinstance(epochs, (int, numpy.integer))
             or isinstance(epochs, bool)
             or epochs < 1
         ):
-            raise ValueError("epochs must be a positive integer")
+            raise errors.InputError("epochs must be a positive integer")
         if self.batch_size != "auto" and (
             not isinstance(self.batch_size, (int, numpy.integer))
             or isinstance(self.batch_size, bool)
             or self.batch_size < 1
         ):
-            raise ValueError("batch_size must be auto or a positive integer")
+            raise errors.InputError(
+                "batch_size must be auto or a positive integer"
+            )
         if (
             not numpy.isfinite(self.variance_weight)
             or self.variance_weight < 0.0
         ):
-            raise ValueError("variance_weight must be finite and non-negative")
+            raise errors.InputError(
+                "variance_weight must be finite and non-negative"
+            )
         if self.device not in {"auto", "cpu"} and not str(
             self.device
         ).startswith("cuda"):
-            raise ValueError("device must be auto, cpu, or cuda")
+            raise errors.InputError("device must be auto, cpu, or cuda")
 
     def resolve_device(self, torch: Any) -> str:
         """Chooses the device the training runs on.
@@ -335,7 +349,7 @@ class Trainer:
             str(self.device).startswith("cuda")
             and not torch.cuda.is_available()
         ):
-            raise ValueError("requested CUDA device is not available")
+            raise errors.InputError("requested CUDA device is not available")
         torch.manual_seed(self.random_state)
         device = self.resolve_device(torch)
         self.input_width_ = matrix.shape[1]
@@ -407,7 +421,7 @@ class Trainer:
         try:
             matrix = numpy.asarray(features, dtype=numpy.float32)
         except (TypeError, ValueError) as error:
-            raise ValueError(
+            raise errors.InputError(
                 "tabular JEPA requires a numeric 2-D feature matrix"
             ) from error
         if (
@@ -415,7 +429,7 @@ class Trainer:
             or matrix.shape[1] != self.input_width_
             or not numpy.isfinite(matrix).all()
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "features must be finite and have shape "
                 f"(rows, {self.input_width_})"
             )
@@ -445,7 +459,7 @@ class Trainer:
         try:
             matrix = numpy.asarray(features, dtype=numpy.float32)
         except (TypeError, ValueError) as error:
-            raise ValueError(
+            raise errors.InputError(
                 "tabular JEPA requires a numeric 2-D feature matrix"
             ) from error
         if (
@@ -453,7 +467,7 @@ class Trainer:
             or matrix.shape[1] != self.input_width_
             or not numpy.isfinite(matrix).all()
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "features must be finite and have shape "
                 f"(rows, {self.input_width_})"
             )

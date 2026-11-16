@@ -16,6 +16,7 @@ import inspect
 import textwrap
 from typing import Any
 
+from scmle.contracts import errors
 from scmle.data.detectors import certificates
 
 PACKAGE = "scmle"
@@ -131,7 +132,9 @@ def digest(*entries: Any) -> str:
     """
     unwrapped = [inspect.unwrap(e) if callable(e) else e for e in entries]
     if not unwrapped or not all(owned(e) or steady(e) for e in unwrapped):
-        raise ValueError("digest needs entries of package code or constants")
+        raise errors.InputError(
+            "digest needs entries of package code or constants"
+        )
     queue = [e for e in unwrapped if owned(e)]
     parts = {
         f"entry:{index}": repr(e)

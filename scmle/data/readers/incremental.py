@@ -95,13 +95,13 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
     """
     candidate: object = value
     if not isinstance(candidate, str) or not candidate.strip():
-        raise ValueError(f"{field_name} must not be empty")
+        raise errors.InputError(f"{field_name} must not be empty")
     try:
         parsed = datetime.datetime.fromisoformat(value)
     except ValueError as error:
-        raise ValueError(f"{field_name} must be ISO-8601") from error
+        raise errors.InputError(f"{field_name} must be ISO-8601") from error
     if parsed.tzinfo is None:
-        raise ValueError(f"{field_name} must include a timezone")
+        raise errors.InputError(f"{field_name} must include a timezone")
     return parsed.astimezone(datetime.UTC)
 
 
@@ -144,13 +144,13 @@ class Event:
         """
         event_id: object = self.event_id
         if not isinstance(event_id, str) or not event_id.strip():
-            raise ValueError("event_id must not be empty")
+            raise errors.InputError("event_id must not be empty")
         if isinstance(self.sequence, bool) or not isinstance(
             self.sequence, int
         ):
             raise TypeError("sequence must be an integer")
         if self.sequence < 1:
-            raise ValueError("sequence must be a positive integer")
+            raise errors.InputError("sequence must be a positive integer")
         parse_timestamp(self.event_time, "event_time")
         if self.ingest_time:
             parse_timestamp(self.ingest_time, "ingest_time")
@@ -219,13 +219,13 @@ class EventCheckpoint:
             TypeError: If the sequence is not an integer.
         """
         if not self.source_identity.strip():
-            raise ValueError("source_identity must not be empty")
+            raise errors.InputError("source_identity must not be empty")
         if isinstance(self.sequence, bool) or not isinstance(
             self.sequence, int
         ):
             raise TypeError("sequence must be an integer")
         if self.sequence < 0:
-            raise ValueError("sequence must be a non-negative integer")
+            raise errors.InputError("sequence must be a non-negative integer")
         if self.watermark:
             parse_timestamp(self.watermark, "watermark")
 
@@ -243,7 +243,7 @@ class EventCheckpoint:
             ValueError: If the checkpoint belongs to a different source.
         """
         if self.source_identity != source_identity:
-            raise ValueError("checkpoint belongs to a different source")
+            raise errors.InputError("checkpoint belongs to a different source")
         return self
 
     def to_dict(self) -> dict[str, Any]:
@@ -308,15 +308,19 @@ class EventBatch:
                 values.
         """
         if self.next_checkpoint.source_identity != self.source_identity:
-            raise ValueError("batch and checkpoint source identities differ")
+            raise errors.InputError(
+                "batch and checkpoint source identities differ"
+            )
         if any(not isinstance(event, Event) for event in self.events):
             raise TypeError("events must contain Event values")
         if tuple(sorted(set(self.duplicate_event_ids))) != (
             self.duplicate_event_ids
         ):
-            raise ValueError("duplicate_event_ids must be sorted and unique")
+            raise errors.InputError(
+                "duplicate_event_ids must be sorted and unique"
+            )
         if tuple(sorted(set(self.late_event_ids))) != self.late_event_ids:
-            raise ValueError("late_event_ids must be sorted and unique")
+            raise errors.InputError("late_event_ids must be sorted and unique")
 
     @property
     def event_ids(self) -> tuple[str, ...]:
@@ -351,15 +355,17 @@ class EventCommitReceipt:
                 sorted and unique, or the two collections overlap.
         """
         if not self.source_identity.strip():
-            raise ValueError("source_identity must not be empty")
+            raise errors.InputError("source_identity must not be empty")
         if self.checkpoint.source_identity != self.source_identity:
-            raise ValueError("receipt and checkpoint source identities differ")
+            raise errors.InputError(
+                "receipt and checkpoint source identities differ"
+            )
         for name in ("accepted_event_ids", "duplicate_event_ids"):
             values = getattr(self, name)
             if tuple(sorted(set(values))) != values:
-                raise ValueError(f"{name} must be sorted and unique")
+                raise errors.InputError(f"{name} must be sorted and unique")
         if set(self.accepted_event_ids) & set(self.duplicate_event_ids):
-            raise ValueError(
+            raise errors.InputError(
                 "accepted and duplicate event IDs must be disjoint"
             )
 
@@ -409,13 +415,13 @@ class EventAcknowledgement:
                 belongs to another source.
         """
         if not self.source_identity.strip():
-            raise ValueError("source_identity must not be empty")
+            raise errors.InputError("source_identity must not be empty")
         if not self.consumer_group.strip():
-            raise ValueError("consumer_group must not be empty")
+            raise errors.InputError("consumer_group must not be empty")
         if tuple(sorted(set(self.event_ids))) != self.event_ids:
-            raise ValueError("event_ids must be sorted and unique")
+            raise errors.InputError("event_ids must be sorted and unique")
         if self.checkpoint.source_identity != self.source_identity:
-            raise ValueError(
+            raise errors.InputError(
                 "acknowledgement and checkpoint source identities differ"
             )
 
@@ -447,7 +453,9 @@ class EventAcknowledgement:
             ValueError: If the record's schema version is not 1.
         """
         if record.get("schema_version") != 1:
-            raise ValueError("unsupported acknowledgement schema version")
+            raise errors.InputError(
+                "unsupported acknowledgement schema version"
+            )
         return cls(
             source_identity=str(record["source_identity"]),
             consumer_group=str(record["consumer_group"]),
@@ -482,13 +490,17 @@ class Consumption:
                 and unique.
         """
         if self.receipt.source_identity != self.source_identity:
-            raise ValueError("result and receipt source identities differ")
+            raise errors.InputError(
+                "result and receipt source identities differ"
+            )
         if not self.consumer_group.strip():
-            raise ValueError("consumer_group must not be empty")
+            raise errors.InputError("consumer_group must not be empty")
         if tuple(sorted(set(self.acknowledged_event_ids))) != (
             self.acknowledged_event_ids
         ):
-            raise ValueError("acknowledged_event_ids must be sorted and unique")
+            raise errors.InputError(
+                "acknowledged_event_ids must be sorted and unique"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible consume evidence.
@@ -608,7 +620,7 @@ class EventSource(abc.ABC):
                 IncrementalError, from `validate_checkpoint`.
         """
         if limit <= 0:
-            raise ValueError("limit must be positive")
+            raise errors.InputError("limit must be positive")
         current = self.validate_checkpoint(checkpoint)
         committed = frozenset(seen_event_ids)
         values = tuple(records)
@@ -825,7 +837,7 @@ class EventStreamSource(EventSource):
                 returns more than `limit` events.
         """
         if limit <= 0:
-            raise ValueError("limit must be positive")
+            raise errors.InputError("limit must be positive")
         records = connectors.execute_with_retries(
             lambda: tuple(
                 self.event_reader(self.source_uri, checkpoint, limit)
@@ -884,7 +896,7 @@ class CommittedState:
             ValueError: If `seen_event_ids` is not sorted and unique.
         """
         if tuple(sorted(set(self.seen_event_ids))) != self.seen_event_ids:
-            raise ValueError("seen_event_ids must be sorted and unique")
+            raise errors.InputError("seen_event_ids must be sorted and unique")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns durable state as JSON-compatible data.
@@ -913,7 +925,9 @@ class CommittedState:
             ValueError: If the record's schema version is not 1.
         """
         if record.get("schema_version") != 1:
-            raise ValueError("unsupported incremental state schema version")
+            raise errors.InputError(
+                "unsupported incremental state schema version"
+            )
         return cls(
             checkpoint=EventCheckpoint.from_dict(record["checkpoint"]),
             seen_event_ids=tuple(
@@ -1361,7 +1375,7 @@ class EventConsumer:
         """
         group = consumer_group.strip()
         if not group:
-            raise ValueError("consumer_group must not be empty")
+            raise errors.InputError("consumer_group must not be empty")
         if source.source_identity != ledger.source_identity:
             raise IncrementalError(
                 "source_mismatch",

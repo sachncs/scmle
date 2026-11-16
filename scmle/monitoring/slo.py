@@ -7,6 +7,7 @@ import enum
 import math
 from typing import Any
 
+from scmle.contracts import errors
 from scmle.contracts import observability
 
 
@@ -40,7 +41,7 @@ def require_text(value: object, field_name: str) -> str:
         ValueError: If the value is not a string or is blank.
     """
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{field_name} must not be empty")
+        raise errors.InputError(f"{field_name} must not be empty")
     return value.strip()
 
 
@@ -60,9 +61,11 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
     try:
         parsed = datetime.datetime.fromisoformat(value)
     except ValueError as error:
-        raise ValueError(f"{field_name} must be ISO-8601") from error
+        raise errors.InputError(f"{field_name} must be ISO-8601") from error
     if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError(f"{field_name} must include timezone information")
+        raise errors.InputError(
+            f"{field_name} must include timezone information"
+        )
     return parsed
 
 
@@ -111,11 +114,11 @@ class SLOTarget:
         if not isinstance(kind, observability.SignalKind):
             object.__setattr__(self, "kind", observability.SignalKind(kind))
         if not math.isfinite(self.maximum) or self.maximum < 0:
-            raise ValueError("maximum must be finite and non-negative")
+            raise errors.InputError("maximum must be finite and non-negative")
         if self.window_days < 1:
-            raise ValueError("window_days must be at least 1")
+            raise errors.InputError("window_days must be at least 1")
         if self.minimum_samples < 1:
-            raise ValueError("minimum_samples must be at least 1")
+            raise errors.InputError("minimum_samples must be at least 1")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns deterministic SLO policy metadata.
@@ -177,19 +180,25 @@ class SLOEvaluation:
         if not isinstance(status, SLOStatus):
             object.__setattr__(self, "status", SLOStatus(status))
         if self.sample_count < 0 or self.in_window_count < 0:
-            raise ValueError("sample counts must not be negative")
+            raise errors.InputError("sample counts must not be negative")
         if self.in_window_count > self.sample_count:
-            raise ValueError("in_window_count cannot exceed sample_count")
+            raise errors.InputError(
+                "in_window_count cannot exceed sample_count"
+            )
         if self.observed_maximum is not None and (
             not math.isfinite(self.observed_maximum)
             or self.observed_maximum < 0
         ):
-            raise ValueError("observed_maximum must be finite and non-negative")
+            raise errors.InputError(
+                "observed_maximum must be finite and non-negative"
+            )
         if (
             self.error_budget_remaining is not None
             and not 0 <= self.error_budget_remaining <= 1
         ):
-            raise ValueError("error_budget_remaining must be between 0 and 1")
+            raise errors.InputError(
+                "error_budget_remaining must be between 0 and 1"
+            )
         require_text(self.reason, "reason")
 
     @property

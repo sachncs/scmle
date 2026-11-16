@@ -37,6 +37,7 @@ from collections.abc import Sequence
 import dataclasses
 from fractions import Fraction
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.ledger import budget
 
@@ -99,9 +100,9 @@ def adjust(
             outside [0, 1].
     """
     if not isinstance(rule, budget.Correction):
-        raise ValueError("rule must be a Correction")
+        raise errors.InputError("rule must be a Correction")
     if not 0 < alpha < 1:
-        raise ValueError("alpha must be strictly between 0 and 1")
+        raise errors.InputError("alpha must be strictly between 0 and 1")
     values = [qualification.probability(p, "p-value") for p in pvalues]
     m = len(values)
     if m == 0:

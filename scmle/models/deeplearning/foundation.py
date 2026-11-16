@@ -13,6 +13,8 @@ from typing import Any
 import numpy
 from scipy import sparse
 
+from scmle.contracts import errors
+
 MAX_ROWS = 10000
 MAX_FEATURES = 500
 
@@ -77,12 +79,12 @@ class Learner:
                 weight rows, and ignoring the weights silently would be wrong).
         """
         if sample_weight is not None:
-            raise ValueError("TabPFN does not support sample weights")
+            raise errors.InputError("TabPFN does not support sample weights")
         if sparse.issparse(features):
             features = features.toarray()
         matrix = numpy.asarray(features, dtype=numpy.float32)
         if len(matrix) > MAX_ROWS or matrix.shape[1] > MAX_FEATURES:
-            raise ValueError(
+            raise errors.InputError(
                 f"TabPFN supports up to {MAX_ROWS} rows and {MAX_FEATURES} "
                 f"features, got {matrix.shape}"
             )

@@ -16,6 +16,7 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.contracts import errors
 from scmle.evaluation import conformal
 
 LOWER_LEVEL = 0.05
@@ -97,7 +98,9 @@ class QuantileBand:
             ValueError: If `coverage` is not strictly between 0 and 1.
         """
         if not 0.0 < coverage < 1.0:
-            raise ValueError("coverage must lie strictly between 0 and 1")
+            raise errors.InputError(
+                "coverage must lie strictly between 0 and 1"
+            )
         return conformal.finite_sample_quantile(
             numpy.asarray(self.scores), coverage
         )

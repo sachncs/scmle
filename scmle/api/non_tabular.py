@@ -74,15 +74,19 @@ class Scope:
         ):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{name} must be a non-empty string")
+                raise errors.InputError(f"{name} must be a non-empty string")
         if self.status != "experimental":
-            raise ValueError("non-tabular model paths must remain experimental")
+            raise errors.InputError(
+                "non-tabular model paths must remain experimental"
+            )
         limitations: tuple[object, ...] = self.limitations
         if not limitations or any(
             not isinstance(value, str) or not value.strip()
             for value in limitations
         ):
-            raise ValueError("limitations must contain non-empty strings")
+            raise errors.InputError(
+                "limitations must contain non-empty strings"
+            )
         object.__setattr__(self, "limitations", tuple(self.limitations))
 
     def to_dict(self) -> dict[str, object]:
@@ -123,9 +127,13 @@ class Predictor:
                 predictor was trained on a different dataset than the report.
         """
         if self.report.modality != self.capability.modality:
-            raise ValueError("report and capability modalities do not match")
+            raise errors.InputError(
+                "report and capability modalities do not match"
+            )
         if self.predictor.training_dataset_hash != self.report.dataset_hash:
-            raise ValueError("predictor and report dataset identities differ")
+            raise errors.InputError(
+                "predictor and report dataset identities differ"
+            )
 
     @property
     def modality(self) -> str:
@@ -517,7 +525,7 @@ class Modeler:
                 },
             )
         if not signing_key:
-            raise ValueError("signing_key must not be empty")
+            raise errors.InputError("signing_key must not be empty")
         if isinstance(seed, bool) or not isinstance(seed, int):
             raise TypeError("seed must be an integer")
         if not isinstance(require_independent_ground_truth, bool):
@@ -573,7 +581,7 @@ class Modeler:
                 the project.
         """
         if self.output_dir.exists() and not self.output_dir.is_dir():
-            raise ValueError("output_dir must be a directory")
+            raise errors.InputError("output_dir must be a directory")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.lifecycle.run(
             self.adapter,
@@ -608,9 +616,13 @@ class Modeler:
             self.report_path, self.signing_key
         )
         if report.modality != self.capability.modality:
-            raise ValueError("lifecycle report modality does not match project")
+            raise errors.InputError(
+                "lifecycle report modality does not match project"
+            )
         if report.dataset_hash != self.adapter.dataset_hash:
-            raise ValueError("lifecycle report dataset does not match project")
+            raise errors.InputError(
+                "lifecycle report dataset does not match project"
+            )
         predictor = modality_lifecycle.Predictor.from_package(
             self.adapter,
             report.package.path,

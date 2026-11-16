@@ -850,6 +850,17 @@ marked `Breaking:` and listed first in their group.
 
 ### Changed
 
+- Input problems raise `errors.InputError` instead of a bare `ValueError`
+  (ERR-20): 1,874 raises across the package. `InputError` subclasses both
+  `DataError` and `ValueError`, so `except ValueError` still catches them.
+  What callers see: the CLI reports bad input as an input error with exit 1
+  (it was "internal error (a defect)", exit 70); a run that fails on bad
+  input is FAILED with category `input` rather than `internal`; a rejected
+  rollback now restores the previous plane; recorded failure kinds read
+  `InputError`. Request-shape errors in the HTTP server stay `ValueError` so
+  malformed requests keep answering 400. About ten raises that guard internal
+  invariants stay `ValueError`.
+
 - A run holds the table once less. The ingest stage shares the project's frame
   instead of deep-copying it (pandas 3 is copy-on-write, so a write to either
   side still copies first); outputs are identical. On a 30-column table the

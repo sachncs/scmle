@@ -39,6 +39,7 @@ from scipy import stats
 from sklearn import ensemble
 from sklearn import model_selection
 
+from scmle.contracts import errors
 from scmle.core import randomness
 from scmle.data.detectors import certificates
 
@@ -170,12 +171,12 @@ def out_of_fold_probabilities(
     """
     counts = numpy.bincount(codes)
     if len(codes) < MIN_ROWS or len(counts) < MIN_CLASSES:
-        raise ValueError(
+        raise errors.InputError(
             f"label-noise detection needs {MIN_ROWS}+ rows and two classes"
         )
     folds = min(FOLDS, int(numpy.min(counts)))
     if folds < MIN_FOLDS:
-        raise ValueError("every class needs at least two rows")
+        raise errors.InputError("every class needs at least two rows")
     probabilities: numpy.ndarray = cast(
         "numpy.ndarray",
         model_selection.cross_val_predict(
@@ -339,9 +340,9 @@ def ppi_mean(
     y_small = numpy.asarray(truth_labeled, dtype=float)
     n, big = len(f_small), len(f_big)
     if n < MIN_AUDIT_ROWS or big < MIN_UNAUDITED_ROWS or len(y_small) != n:
-        raise ValueError("need 2+ audited and 2+ unaudited rows")
+        raise errors.InputError("need 2+ audited and 2+ unaudited rows")
     if not 0.0 < confidence < 1.0:
-        raise ValueError("confidence must be within (0, 1)")
+        raise errors.InputError("confidence must be within (0, 1)")
     rectifier = f_small - y_small
     estimate = float(f_big.mean() - rectifier.mean())
     variance = f_big.var(ddof=1) / big + rectifier.var(ddof=1) / n
@@ -380,7 +381,7 @@ def noise_rate(
     ):
         positions = numpy.asarray(audit.index, dtype=int)
         if len(numpy.unique(positions)) != len(positions):
-            raise ValueError("audit positions must be unique")
+            raise errors.InputError("audit positions must be unique")
         mask = numpy.zeros(n, dtype=bool)
         mask[positions] = True
         estimate, (low, high) = ppi_mean(

@@ -8,6 +8,7 @@ import math
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.contracts import explanations
 
@@ -63,7 +64,7 @@ class QualityObservation:
             ValueError: If the note is given but blank.
         """
         if self.note is not None and not self.note.strip():
-            raise ValueError("note must not be empty")
+            raise errors.InputError("note must not be empty")
         object.__setattr__(
             self,
             "evidence",
@@ -133,19 +134,19 @@ class CurationFinding:
                 the severity or disposition is not a valid value.
         """
         if not self.finding_id.strip():
-            raise ValueError("finding_id must not be empty")
+            raise errors.InputError("finding_id must not be empty")
         if not self.rule_version.strip():
-            raise ValueError("rule_version must not be empty")
+            raise errors.InputError("rule_version must not be empty")
         if not math.isfinite(self.confidence) or not 0 <= self.confidence <= 1:
-            raise ValueError(
+            raise errors.InputError(
                 "confidence must be finite and between zero and one"
             )
         if not self.remediation.strip():
-            raise ValueError("remediation must not be empty")
+            raise errors.InputError("remediation must not be empty")
         if not self.owner.strip():
-            raise ValueError("owner must not be empty")
+            raise errors.InputError("owner must not be empty")
         if not self.timestamp.strip():
-            raise ValueError("timestamp must not be empty")
+            raise errors.InputError("timestamp must not be empty")
         severity: Any = self.severity  # may be a raw value at runtime
         if not isinstance(severity, FindingSeverity):
             object.__setattr__(self, "severity", FindingSeverity(severity))
@@ -200,9 +201,9 @@ class CurationFinding:
         observation = message.strip()
         finding_category = category.strip().lower()
         if not observation:
-            raise ValueError("message must not be empty")
+            raise errors.InputError("message must not be empty")
         if not finding_category:
-            raise ValueError("category must not be empty")
+            raise errors.InputError("category must not be empty")
         digest = hashlib.sha256(observation.encode("utf-8")).hexdigest()
         return cls(
             finding_id=f"{finding_category}.{digest[:16]}",
@@ -500,7 +501,7 @@ class DatasetManifest:
         )
         for field_name, field_value in text_fields:
             if not isinstance(field_value, str) or not field_value.strip():
-                raise ValueError(f"{field_name} must not be empty")
+                raise errors.InputError(f"{field_name} must not be empty")
         for count_name, count_value in (
             ("row_count", self.row_count),
             ("column_count", self.column_count),
@@ -511,11 +512,11 @@ class DatasetManifest:
             ):
                 raise TypeError(f"{count_name} must be an integer")
         if self.row_count < 0:
-            raise ValueError("row_count must not be negative")
+            raise errors.InputError("row_count must not be negative")
         if self.column_count < 0:
-            raise ValueError("column_count must not be negative")
+            raise errors.InputError("column_count must not be negative")
         if self.schema_version < 1:
-            raise ValueError("schema_version must be positive")
+            raise errors.InputError("schema_version must be positive")
         for component_name, component, expected in (
             ("source", self.source, SourceMetadata),
             ("lineage", self.lineage, LineageMetadata),
@@ -622,20 +623,20 @@ class ModalityManifest:
             ("content_hash", self.content_hash),
         ):
             if not value.strip():
-                raise ValueError(f"{name} must not be empty")
+                raise errors.InputError(f"{name} must not be empty")
         if isinstance(self.sample_count, bool) or not isinstance(
             self.sample_count, int
         ):
             raise TypeError("sample_count must be an integer")
         if self.sample_count < 0:
-            raise ValueError("sample_count must not be negative")
+            raise errors.InputError("sample_count must not be negative")
         if self.schema_version < 1:
-            raise ValueError("schema_version must be positive")
+            raise errors.InputError("schema_version must be positive")
         if len(self.content_hash) != SHA256_HEX_LENGTH or any(
             character not in "0123456789abcdef"
             for character in self.content_hash
         ):
-            raise ValueError("content_hash must be a SHA-256 hex digest")
+            raise errors.InputError("content_hash must be a SHA-256 hex digest")
         if not isinstance(self.source, SourceMetadata):
             raise TypeError("source must be SourceMetadata")
         if not isinstance(self.lineage, LineageMetadata):
@@ -990,15 +991,15 @@ class DatasetCard:
             ("generated_at", self.generated_at),
         ):
             if not value.strip():
-                raise ValueError(f"{name} must not be empty")
+                raise errors.InputError(f"{name} must not be empty")
         if self.schema_version < 1:
-            raise ValueError("schema_version must be positive")
+            raise errors.InputError("schema_version must be positive")
         if any(value < 0 for value in self.composition.values()):
-            raise ValueError("composition counts must not be negative")
+            raise errors.InputError("composition counts must not be negative")
         if not self.out_of_scope:
-            raise ValueError("out_of_scope must not be empty")
+            raise errors.InputError("out_of_scope must not be empty")
         if not self.limitations:
-            raise ValueError("limitations must not be empty")
+            raise errors.InputError("limitations must not be empty")
 
     @classmethod
     def from_curation(cls, report: Curation) -> Self:

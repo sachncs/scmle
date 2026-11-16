@@ -193,7 +193,7 @@ class ChunkSource(abc.ABC):
                 timestamps.
         """
         if rows <= 0:
-            raise ValueError("rows must be positive")
+            raise errors.InputError("rows must be positive")
         identity = self.source_identity()
         observed_snapshot = self.snapshot_sha256()
         current = self.validate_checkpoint(checkpoint, observed_snapshot)
@@ -372,7 +372,7 @@ def validate_digest(value: str, field_name: str) -> None:
     if len(value) != SHA256_HEX_LENGTH or any(
         character not in "0123456789abcdef" for character in value
     ):
-        raise ValueError(f"{field_name} must be a SHA-256 hex digest")
+        raise errors.InputError(f"{field_name} must be a SHA-256 hex digest")
 
 
 def validate_timestamp(value: str, field_name: str) -> datetime.datetime:
@@ -391,9 +391,9 @@ def validate_timestamp(value: str, field_name: str) -> datetime.datetime:
     try:
         parsed = datetime.datetime.fromisoformat(value)
     except ValueError as error:
-        raise ValueError(f"{field_name} must be ISO-8601") from error
+        raise errors.InputError(f"{field_name} must be ISO-8601") from error
     if parsed.tzinfo is None:
-        raise ValueError(f"{field_name} must include a timezone")
+        raise errors.InputError(f"{field_name} must include a timezone")
     return parsed.astimezone(datetime.UTC)
 
 
@@ -429,14 +429,14 @@ class Checkpoint:
             TypeError: If the offset is not an integer.
         """
         if not self.source_identity.strip():
-            raise ValueError("source_identity must not be empty")
+            raise errors.InputError("source_identity must not be empty")
         validate_digest(self.snapshot_sha256, "snapshot_sha256")
         if isinstance(self.offset, bool) or not isinstance(self.offset, int):
             raise TypeError("offset must be an integer")
         if self.offset < 0:
-            raise ValueError("offset must be non-negative")
+            raise errors.InputError("offset must be non-negative")
         if self.watermark_column is not None and not self.watermark_column:
-            raise ValueError("watermark_column must not be empty")
+            raise errors.InputError("watermark_column must not be empty")
         if self.watermark:
             validate_timestamp(self.watermark, "watermark")
 
@@ -565,16 +565,18 @@ class Batch:
                 start offset.
         """
         if self.next_checkpoint.source_identity != self.source_identity:
-            raise ValueError("batch and checkpoint sources differ")
+            raise errors.InputError("batch and checkpoint sources differ")
         if self.next_checkpoint.snapshot_sha256 != self.snapshot_sha256:
-            raise ValueError("batch and checkpoint snapshots differ")
+            raise errors.InputError("batch and checkpoint snapshots differ")
         if self.start_offset < 0:
-            raise ValueError("start_offset must be non-negative")
+            raise errors.InputError("start_offset must be non-negative")
         frame: object = self.frame
         if not isinstance(frame, pandas.DataFrame) or frame.empty:
-            raise ValueError("frame must contain at least one row")
+            raise errors.InputError("frame must contain at least one row")
         if self.next_checkpoint.offset <= self.start_offset:
-            raise ValueError("checkpoint must advance past the batch start")
+            raise errors.InputError(
+                "checkpoint must advance past the batch start"
+            )
         # The key is stable for one source row range: it hashes the source,
         # the snapshot and both offsets.
         payload = (
@@ -611,13 +613,17 @@ class Acknowledgement:
                 belongs to another source.
         """
         if not self.source_identity.strip():
-            raise ValueError("source_identity must not be empty")
+            raise errors.InputError("source_identity must not be empty")
         if not self.consumer_group.strip():
-            raise ValueError("consumer_group must not be empty")
+            raise errors.InputError("consumer_group must not be empty")
         if not self.batch_id.startswith("batch_"):
-            raise ValueError("batch_id must be a streaming batch identity")
+            raise errors.InputError(
+                "batch_id must be a streaming batch identity"
+            )
         if self.checkpoint.source_identity != self.source_identity:
-            raise ValueError("acknowledgement and checkpoint sources differ")
+            raise errors.InputError(
+                "acknowledgement and checkpoint sources differ"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible acknowledgement evidence.
@@ -647,7 +653,9 @@ class Acknowledgement:
             ValueError: If the record's schema version is not supported.
         """
         if record.get("schema_version") != STREAM_ACKNOWLEDGEMENT_SCHEMA:
-            raise ValueError("unsupported streaming acknowledgement schema")
+            raise errors.InputError(
+                "unsupported streaming acknowledgement schema"
+            )
         return cls(
             source_identity=str(record["source_identity"]),
             consumer_group=str(record["consumer_group"]),
@@ -681,13 +689,15 @@ class SinkCommitReceipt:
                 belongs to another source.
         """
         if not self.source_identity.strip():
-            raise ValueError("source_identity must not be empty")
+            raise errors.InputError("source_identity must not be empty")
         if not self.batch_id.startswith("batch_"):
-            raise ValueError("batch_id must be a streaming batch identity")
+            raise errors.InputError(
+                "batch_id must be a streaming batch identity"
+            )
         if not self.receipt.strip():
-            raise ValueError("receipt must not be empty")
+            raise errors.InputError("receipt must not be empty")
         if self.checkpoint.source_identity != self.source_identity:
-            raise ValueError("receipt and checkpoint sources differ")
+            raise errors.InputError("receipt and checkpoint sources differ")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible sink receipt evidence.
@@ -768,15 +778,19 @@ class CommitEvidence:
                 evidence in source or batch, or their checkpoints differ.
         """
         if self.sink_receipt.source_identity != self.source_identity:
-            raise ValueError("evidence and sink receipt sources differ")
+            raise errors.InputError("evidence and sink receipt sources differ")
         if self.acknowledgement.source_identity != self.source_identity:
-            raise ValueError("evidence and acknowledgement sources differ")
+            raise errors.InputError(
+                "evidence and acknowledgement sources differ"
+            )
         if self.sink_receipt.batch_id != self.batch_id:
-            raise ValueError("evidence and sink receipt batches differ")
+            raise errors.InputError("evidence and sink receipt batches differ")
         if self.acknowledgement.batch_id != self.batch_id:
-            raise ValueError("evidence and acknowledgement batches differ")
+            raise errors.InputError(
+                "evidence and acknowledgement batches differ"
+            )
         if self.sink_receipt.checkpoint != self.acknowledgement.checkpoint:
-            raise ValueError(
+            raise errors.InputError(
                 "sink receipt and acknowledgement checkpoints differ"
             )
 
@@ -808,7 +822,7 @@ class CommitEvidence:
             ValueError: If the record's schema version is not supported.
         """
         if record.get("schema_version") != STREAM_TRANSACTION_SCHEMA:
-            raise ValueError("unsupported streaming transaction schema")
+            raise errors.InputError("unsupported streaming transaction schema")
         return cls(
             source_identity=str(record["source_identity"]),
             batch_id=str(record["batch_id"]),
@@ -846,14 +860,18 @@ class CommittedState:
         if tuple(sorted(set(self.committed_batch_ids))) != (
             self.committed_batch_ids
         ):
-            raise ValueError("committed_batch_ids must be sorted and unique")
+            raise errors.InputError(
+                "committed_batch_ids must be sorted and unique"
+            )
         evidence_ids = tuple(
             evidence.batch_id for evidence in self.transaction_evidence
         )
         if tuple(sorted(set(evidence_ids))) != evidence_ids:
-            raise ValueError("transaction_evidence must be sorted by batch_id")
+            raise errors.InputError(
+                "transaction_evidence must be sorted by batch_id"
+            )
         if not set(evidence_ids).issubset(self.committed_batch_ids):
-            raise ValueError(
+            raise errors.InputError(
                 "transaction evidence must identify committed batches"
             )
 
@@ -888,7 +906,7 @@ class CommittedState:
             ValueError: If the record's schema version is not supported.
         """
         if record.get("schema_version") not in (1, STREAM_STATE_SCHEMA):
-            raise ValueError("unsupported streaming state schema")
+            raise errors.InputError("unsupported streaming state schema")
         return cls(
             checkpoint=Checkpoint.from_dict(record["checkpoint"]),
             committed_batch_ids=tuple(
@@ -933,21 +951,21 @@ class CommitReceipt:
                 commit.
         """
         if self.accepted == self.duplicate:
-            raise ValueError("a commit must be accepted or duplicate")
+            raise errors.InputError("a commit must be accepted or duplicate")
         if self.checkpoint.source_identity != self.source_identity:
-            raise ValueError("receipt and checkpoint sources differ")
+            raise errors.InputError("receipt and checkpoint sources differ")
         if self.sink_receipt is not None and (
             self.sink_receipt.source_identity != self.source_identity
             or self.sink_receipt.batch_id != self.batch_id
             or self.sink_receipt.checkpoint != self.checkpoint
         ):
-            raise ValueError("receipt does not match the commit")
+            raise errors.InputError("receipt does not match the commit")
         if self.acknowledgement is not None and (
             self.acknowledgement.source_identity != self.source_identity
             or self.acknowledgement.batch_id != self.batch_id
             or self.acknowledgement.checkpoint != self.checkpoint
         ):
-            raise ValueError("acknowledgement does not match the commit")
+            raise errors.InputError("acknowledgement does not match the commit")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -1578,7 +1596,7 @@ class Consumer:
             TypeError: If `writer` or `acknowledge` is not callable.
         """
         if not consumer_group.strip():
-            raise ValueError("consumer_group must not be empty")
+            raise errors.InputError("consumer_group must not be empty")
         writer_candidate: object = writer
         acknowledge_candidate: object = acknowledge
         if not callable(writer_candidate) or not callable(

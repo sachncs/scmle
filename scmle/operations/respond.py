@@ -25,6 +25,7 @@ import time
 from typing import Any
 
 from scmle import durability
+from scmle.contracts import errors
 from scmle.operations import classify
 from scmle.operations import logs
 from scmle.operations import notify
@@ -254,7 +255,7 @@ class ResponseDesk:
                 opened in this ledger.
         """
         if action not in {"acknowledged", "mitigated", "resolved"}:
-            raise ValueError("unknown operator action")
+            raise errors.InputError("unknown operator action")
         opened = [
             row
             for row in self.audit.rows(scmle.security.audit.ADMIN)
@@ -262,7 +263,7 @@ class ResponseDesk:
             and row["body"].get("action") == "incident_opened"
         ]
         if not opened:
-            raise ValueError(f"{incident_id} was not opened here")
+            raise errors.InputError(f"{incident_id} was not opened here")
         return self.audit.admin(
             operator,
             f"incident_{action}",

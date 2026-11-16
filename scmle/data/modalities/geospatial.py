@@ -66,7 +66,7 @@ def check_digest(field_name: str, value: str) -> None:
     if len(value) != SHA256_HEX_LENGTH or any(
         character not in "0123456789abcdef" for character in value
     ):
-        raise ValueError(f"{field_name} must be a SHA-256 hex digest")
+        raise errors.InputError(f"{field_name} must be a SHA-256 hex digest")
 
 
 class GeospatialTemporalError(GeospatialValidationError):
@@ -239,16 +239,20 @@ def moran_statistic(
     """
     numeric = numpy.asarray(values, dtype=numpy.float64)
     if numeric.ndim != 1 or len(numeric) < MIN_OBSERVATIONS:
-        raise ValueError("values must contain at least three observations")
+        raise errors.InputError(
+            "values must contain at least three observations"
+        )
     if not numpy.isfinite(numeric).all():
-        raise ValueError("values must be finite")
+        raise errors.InputError("values must be finite")
     centered = numeric - numeric.mean()
     denominator = float(numpy.dot(centered, centered))
     if denominator == 0.0:
-        raise ValueError("values must contain more than one unique value")
+        raise errors.InputError(
+            "values must contain more than one unique value"
+        )
     weight_total = 2 * len(edges)
     if weight_total == 0:
-        raise ValueError("edges must contain at least one neighbor pair")
+        raise errors.InputError("edges must contain at least one neighbor pair")
     numerator = sum(
         centered[first] * centered[second] * 2 for first, second in edges
     )
@@ -282,9 +286,9 @@ def mask_geometry_axis(
         ValueError: If ``axis`` is not 0 or 1 or ``baseline`` is not finite.
     """
     if axis not in (0, 1):
-        raise ValueError("axis must be 0 for x or 1 for y")
+        raise errors.InputError("axis must be 0 for x or 1 for y")
     if not math.isfinite(float(baseline)):
-        raise ValueError("baseline must be finite")
+        raise errors.InputError("baseline must be finite")
 
     def masked_coordinates(value: Any) -> list[Any]:
         if not isinstance(value, (list, tuple)) or not value:
@@ -360,7 +364,7 @@ class GeoFeature:
                 ``GeospatialTemporalError``.
         """
         if not self.feature_id.strip():
-            raise ValueError("feature_id must not be empty")
+            raise errors.InputError("feature_id must not be empty")
         if not isinstance(self.geometry, Mapping):
             raise GeospatialValidationError(
                 "geometry must be an object", {"code": "invalid_geometry"}
@@ -482,9 +486,9 @@ class SpatialJoinMatch:
             ValueError: If either feature ID is empty.
         """
         if not self.left_feature_id.strip():
-            raise ValueError("left_feature_id must not be empty")
+            raise errors.InputError("left_feature_id must not be empty")
         if not self.right_feature_id.strip():
-            raise ValueError("right_feature_id must not be empty")
+            raise errors.InputError("right_feature_id must not be empty")
 
     def to_dict(self) -> dict[str, str]:
         """Returns JSON-native join-match evidence.
@@ -545,18 +549,18 @@ class SpatialJoin:
         ):
             check_digest(field_name, value)
         if not self.crs.strip():
-            raise ValueError("crs must not be empty")
+            raise errors.InputError("crs must not be empty")
         if not self.predicate_name.strip():
-            raise ValueError("predicate_name must not be empty")
+            raise errors.InputError("predicate_name must not be empty")
         self.check_counts()
         if self.comparison_limit < 1 or self.match_limit < 1:
-            raise ValueError("join limits must be positive")
+            raise errors.InputError("join limits must be positive")
         identities = tuple(
             (match.left_feature_id, match.right_feature_id)
             for match in self.matches
         )
         if len(identities) != len(set(identities)):
-            raise ValueError("join matches must be unique")
+            raise errors.InputError("join matches must be unique")
 
     def check_counts(self) -> None:
         """Checks that the join counts are positive and consistent.
@@ -567,7 +571,7 @@ class SpatialJoin:
                 ``match_count`` differs from the number of matches.
         """
         if min(self.left_feature_count, self.right_feature_count) < 1:
-            raise ValueError("join feature counts must be positive")
+            raise errors.InputError("join feature counts must be positive")
         if (
             min(
                 self.comparison_count,
@@ -577,17 +581,21 @@ class SpatialJoin:
             )
             < 0
         ):
-            raise ValueError("join counts must not be negative")
+            raise errors.InputError("join counts must not be negative")
         if self.comparison_count < self.match_count:
-            raise ValueError("comparison_count must cover every match")
+            raise errors.InputError("comparison_count must cover every match")
         if self.unmatched_left_count > self.left_feature_count:
-            raise ValueError("unmatched_left_count exceeds left feature count")
+            raise errors.InputError(
+                "unmatched_left_count exceeds left feature count"
+            )
         if self.unmatched_right_count > self.right_feature_count:
-            raise ValueError(
+            raise errors.InputError(
                 "unmatched_right_count exceeds right feature count"
             )
         if self.match_count != len(self.matches):
-            raise ValueError("match_count must match the recorded matches")
+            raise errors.InputError(
+                "match_count must match the recorded matches"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native join evidence without raw geometry.
@@ -653,11 +661,11 @@ class Provenance:
             ("transformer_name", self.transformer_name),
         ):
             if not value.strip():
-                raise ValueError(f"{field_name} must not be empty")
+                raise errors.InputError(f"{field_name} must not be empty")
         if self.source_crs == self.target_crs:
-            raise ValueError("source_crs and target_crs must differ")
+            raise errors.InputError("source_crs and target_crs must differ")
         if self.feature_count < 1:
-            raise ValueError("feature_count must be positive")
+            raise errors.InputError("feature_count must be positive")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native reprojection evidence.
@@ -702,24 +710,30 @@ class SpatialBoundaryLeakage:
                 sets are not nested within the reported features.
         """
         if not math.isfinite(self.block_size) or self.block_size <= 0:
-            raise ValueError("block_size must be a positive finite number")
+            raise errors.InputError(
+                "block_size must be a positive finite number"
+            )
         if self.feature_count < 1:
-            raise ValueError("feature_count must be positive")
+            raise errors.InputError("feature_count must be positive")
         if self.max_blocks_per_feature < 1:
-            raise ValueError("max_blocks_per_feature must be positive")
+            raise errors.InputError("max_blocks_per_feature must be positive")
         if len(self.feature_block_counts) != self.feature_count:
-            raise ValueError("feature block counts must match feature count")
+            raise errors.InputError(
+                "feature block counts must match feature count"
+            )
         feature_ids = tuple(item[0] for item in self.feature_block_counts)
         if len(set(feature_ids)) != len(feature_ids):
-            raise ValueError("feature block counts must have unique IDs")
+            raise errors.InputError("feature block counts must have unique IDs")
         if any(item[1] < 1 for item in self.feature_block_counts):
-            raise ValueError("feature block counts must be positive")
+            raise errors.InputError("feature block counts must be positive")
         crossing = set(self.crossing_feature_ids)
         truncated = set(self.truncated_feature_ids)
         if not crossing.issubset(feature_ids):
-            raise ValueError("crossing feature IDs must belong to the report")
+            raise errors.InputError(
+                "crossing feature IDs must belong to the report"
+            )
         if not truncated.issubset(crossing):
-            raise ValueError(
+            raise errors.InputError(
                 "truncated feature IDs must cross block boundaries"
             )
 
@@ -826,12 +840,16 @@ class TemporalSplit:
                 observation time.
         """
         if self.cutoff.tzinfo is None or self.cutoff.utcoffset() is None:
-            raise ValueError("cutoff must be timezone-aware")
+            raise errors.InputError("cutoff must be timezone-aware")
         object.__setattr__(self, "cutoff", self.cutoff.astimezone(UTC))
         if any(feature.observation_time is None for feature in self.train):
-            raise ValueError("train features must contain observation times")
+            raise errors.InputError(
+                "train features must contain observation times"
+            )
         if any(feature.observation_time is None for feature in self.future):
-            raise ValueError("future features must contain observation times")
+            raise errors.InputError(
+                "future features must contain observation times"
+            )
 
     @property
     def has_future_leakage(self) -> bool:
@@ -876,17 +894,19 @@ class SpatialAutocorrelation:
                 negative, or the p-value is outside ``[0, 1]``.
         """
         if self.feature_count < MIN_OBSERVATIONS:
-            raise ValueError("feature_count must be at least three")
+            raise errors.InputError("feature_count must be at least three")
         if not 1 <= self.neighbor_count < self.feature_count:
-            raise ValueError("neighbor_count must be in [1, feature_count)")
+            raise errors.InputError(
+                "neighbor_count must be in [1, feature_count)"
+            )
         if self.edge_count < 1:
-            raise ValueError("edge_count must contain at least one edge")
+            raise errors.InputError("edge_count must contain at least one edge")
         if not math.isfinite(self.statistic):
-            raise ValueError("statistic must be finite")
+            raise errors.InputError("statistic must be finite")
         if self.permutation_count < 0:
-            raise ValueError("permutation_count must not be negative")
+            raise errors.InputError("permutation_count must not be negative")
         if self.p_value is not None and not 0.0 <= self.p_value <= 1.0:
-            raise ValueError("p_value must be in [0, 1]")
+            raise errors.InputError("p_value must be in [0, 1]")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native autocorrelation evidence.
@@ -1290,7 +1310,9 @@ class Dataset:
                 {"code": "missing_crs"},
             )
         if not 1 <= neighbor_count < len(self.features):
-            raise ValueError("neighbor_count must be in [1, feature_count)")
+            raise errors.InputError(
+                "neighbor_count must be in [1, feature_count)"
+            )
         centroids = numpy.asarray(
             [feature.centroid for feature in self.features],
             dtype=numpy.float64,
@@ -1345,9 +1367,9 @@ class Dataset:
         if not callable(predicate):
             raise TypeError("predicate must be callable")
         if not predicate_name.strip():
-            raise ValueError("predicate_name must not be empty")
+            raise errors.InputError("predicate_name must not be empty")
         if comparison_limit < 1 or match_limit < 1:
-            raise ValueError("join limits must be positive")
+            raise errors.InputError("join limits must be positive")
         if not self.crs.strip() or not other.crs.strip():
             raise GeospatialValidationError(
                 "spatial joins require a declared CRS on both datasets",
@@ -1494,14 +1516,16 @@ class Dataset:
             )
         candidate_crs: object = target_crs
         if not isinstance(candidate_crs, str) or not candidate_crs.strip():
-            raise ValueError("target_crs must be a non-empty string")
+            raise errors.InputError("target_crs must be a non-empty string")
         canonical_target_crs = target_crs.strip()
         if canonical_target_crs == self.crs:
-            raise ValueError("target_crs must differ from the source CRS")
+            raise errors.InputError(
+                "target_crs must differ from the source CRS"
+            )
         if not callable(transformer):
             raise TypeError("transformer must be callable")
         if not transformer_name.strip():
-            raise ValueError("transformer_name must not be empty")
+            raise errors.InputError("transformer_name must not be empty")
         transformed_features: list[GeoFeature] = []
         for feature in self.features:
             try:
@@ -1627,14 +1651,14 @@ class Dataset:
                 statistic is not estimable.
         """
         if permutations < 0 or permutations > MAX_PERMUTATIONS:
-            raise ValueError("permutations must be in [0, 10000]")
+            raise errors.InputError("permutations must be in [0, 10000]")
         if len(self.features) < MIN_OBSERVATIONS:
             raise GeospatialValidationError(
                 "spatial autocorrelation requires at least three features",
                 {"code": "insufficient_features"},
             )
         if neighbor_count < 1:
-            raise ValueError("neighbor_count must be positive")
+            raise errors.InputError("neighbor_count must be positive")
         effective_neighbor_count = min(neighbor_count, len(self.features) - 1)
         numeric = self.moran_values(values)
         edges = self.spatial_neighbors(effective_neighbor_count)
@@ -1749,7 +1773,9 @@ class Dataset:
                 {"code": "missing_crs"},
             )
         if not math.isfinite(block_size) or block_size <= 0:
-            raise ValueError("block_size must be a positive finite number")
+            raise errors.InputError(
+                "block_size must be a positive finite number"
+            )
         dataset_bounds = self.profile().bounds
         origin_x, origin_y = dataset_bounds[:2]
         envelopes: dict[str, tuple[int, int, int, int]] = {}
@@ -1791,7 +1817,7 @@ class Dataset:
                 ``block_size`` is not positive and finite.
         """
         if max_blocks_per_feature < 1:
-            raise ValueError("max_blocks_per_feature must be positive")
+            raise errors.InputError("max_blocks_per_feature must be positive")
         envelopes = self.spatial_block_envelopes(block_size)
         block_counts: list[tuple[str, int]] = []
         crossing_feature_ids: list[str] = []
@@ -1854,7 +1880,9 @@ class Dataset:
                 one or more.
         """
         if not math.isfinite(block_size) or block_size <= 0:
-            raise ValueError("block_size must be a positive finite number")
+            raise errors.InputError(
+                "block_size must be a positive finite number"
+            )
         check_split_fractions(validation_fraction, test_fraction)
         dataset_bounds = self.profile().bounds
         origin_x = dataset_bounds[0]
@@ -1961,11 +1989,13 @@ class Reprojection:
                 dataset's.
         """
         if self.report.target_dataset_hash != self.dataset.content_hash:
-            raise ValueError(
+            raise errors.InputError(
                 "reprojection report must match the transformed dataset"
             )
         if self.report.target_crs != self.dataset.crs:
-            raise ValueError("reprojection report CRS must match the dataset")
+            raise errors.InputError(
+                "reprojection report CRS must match the dataset"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the transformed identity and its reprojection evidence.
@@ -2032,18 +2062,22 @@ class RasterSample:
             or not self.crs.strip()
             or not self.dtype.strip()
         ):
-            raise ValueError("source, crs, and dtype must not be empty")
+            raise errors.InputError("source, crs, and dtype must not be empty")
         if min(self.width, self.height, self.bands) < 1:
-            raise ValueError("raster dimensions and bands must be positive")
+            raise errors.InputError(
+                "raster dimensions and bands must be positive"
+            )
         if len(self.transform) not in {0, 6, 9}:
-            raise ValueError("transform must be empty or an affine transform")
+            raise errors.InputError(
+                "transform must be empty or an affine transform"
+            )
         self.check_nodata()
         if not raw:
             raise GeospatialValidationError(
                 "raster payload is empty", {"code": "empty_payload"}
             )
         if hashlib.sha256(raw).hexdigest() != self.file_hash:
-            raise ValueError("file_hash does not match encoded_bytes")
+            raise errors.InputError("file_hash does not match encoded_bytes")
         object.__setattr__(self, "byte_size", len(raw))
 
     def check_nodata(self) -> None:
@@ -2056,19 +2090,19 @@ class RasterSample:
         if self.nodata_value is not None:
             nodata: object = self.nodata_value
             if isinstance(nodata, bool) or not isinstance(nodata, Real):
-                raise ValueError("nodata_value must be numeric")
+                raise errors.InputError("nodata_value must be numeric")
             if not math.isfinite(float(nodata)):
-                raise ValueError("nodata_value must be finite")
+                raise errors.InputError("nodata_value must be finite")
             object.__setattr__(self, "nodata_value", float(nodata))
         if (
             self.nodata_fraction is not None
             and not 0.0 <= float(self.nodata_fraction) <= 1.0
         ):
-            raise ValueError("nodata_fraction must be in [0, 1]")
+            raise errors.InputError("nodata_fraction must be in [0, 1]")
         if self.nodata_fraction is not None and not math.isfinite(
             float(self.nodata_fraction)
         ):
-            raise ValueError("nodata_fraction must be finite")
+            raise errors.InputError("nodata_fraction must be finite")
 
     @property
     def nodata_status(self) -> str:
@@ -2113,7 +2147,9 @@ class RasterSample:
             0 <= row_start < row_end <= self.height
             and 0 <= column_start < column_end <= self.width
         ):
-            raise ValueError("pixel window must be non-empty and in bounds")
+            raise errors.InputError(
+                "pixel window must be non-empty and in bounds"
+            )
         if not self.transform:
             return None
         corners = (
@@ -2192,7 +2228,7 @@ class RasterSample:
         if not callable(decoder):
             raise TypeError("decoder must be callable")
         if max_pixels < 1:
-            raise ValueError("max_pixels must be positive")
+            raise errors.InputError("max_pixels must be positive")
         try:
             decoded = numpy.asarray(decoder(self.encoded_bytes))
         except Exception as error:

@@ -23,6 +23,8 @@ import inspect
 import numpy
 from scipy import stats
 
+from scmle.contracts import errors
+
 TWO_SIDED = "two-sided"
 GREATER = "greater"
 LESS = "less"
@@ -84,7 +86,9 @@ def complete_pairs(
     xs = numpy.asarray(x, dtype=float)
     ys = numpy.asarray(y, dtype=float)
     if xs.shape != ys.shape or xs.ndim != 1:
-        raise ValueError("x and y must be one-dimensional and equally long")
+        raise errors.InputError(
+            "x and y must be one-dimensional and equally long"
+        )
     keep = numpy.isfinite(xs) & numpy.isfinite(ys)
     return xs[keep], ys[keep]
 
@@ -131,7 +135,7 @@ def spearman(
             or are not one-dimensional.
     """
     if direction not in DIRECTIONS:
-        raise ValueError(f"direction must be one of {DIRECTIONS}")
+        raise errors.InputError(f"direction must be one of {DIRECTIONS}")
     xs, ys = complete_pairs(x, y)
     n = len(xs)
     if n < MIN_PAIRS:
@@ -174,7 +178,9 @@ def kruskal(
             differ in shape or are not one-dimensional.
     """
     if direction != TWO_SIDED:
-        raise ValueError("kruskal supports only the two-sided alternative")
+        raise errors.InputError(
+            "kruskal supports only the two-sided alternative"
+        )
     xs, ls = complete_pairs(x, labels)
     n = len(xs)
     groups = [xs[ls == code] for code in numpy.unique(ls)]
@@ -226,7 +232,9 @@ def lookup(statistic: str) -> Callable[..., Outcome]:
         ValueError: If no statistic is registered under that name.
     """
     if statistic not in STATISTICS:
-        raise ValueError(f"statistic must be one of {sorted(STATISTICS)}")
+        raise errors.InputError(
+            f"statistic must be one of {sorted(STATISTICS)}"
+        )
     return STATISTICS[statistic]
 
 

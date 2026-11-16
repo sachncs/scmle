@@ -28,6 +28,8 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.contracts import errors
+
 MIN_COUNT = 5
 MIN_WINDOW = 30
 WINDOW_SHARE = 0.05
@@ -239,7 +241,7 @@ def find_sentinels(
         ValueError: If `alpha` is not strictly between 0 and 1.
     """
     if not 0.0 < alpha < 1.0:
-        raise ValueError("alpha must be within (0, 1)")
+        raise errors.InputError("alpha must be within (0, 1)")
     names = list(frame.columns) if columns is None else list(columns)
     candidates: list[SentinelFinding] = []
     declared = [float(c) for c in numeric_codes]

@@ -71,6 +71,7 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.tree import DecisionTreeRegressor
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.detectors import certificates
@@ -144,16 +145,16 @@ class Config:
         for name in ("skill_ceiling", "association_ceiling"):
             value = qualification.finite(getattr(self, name), name)
             if not 0.0 < value <= 1.0:
-                raise ValueError(f"{name} must be within (0, 1]")
+                raise errors.InputError(f"{name} must be within (0, 1]")
         for name in ("alpha", "confidence"):
             value = qualification.finite(getattr(self, name), name)
             if not 0.0 < value < 1.0:
-                raise ValueError(f"{name} must be within (0, 1)")
+                raise errors.InputError(f"{name} must be within (0, 1)")
         qualification.count(
             self.permutations, "permutations", budget.MIN_PERMUTATIONS
         )
         if self.permutations + 1 < 1.0 / self.alpha:
-            raise ValueError(
+            raise errors.InputError(
                 "permutations too few to reach alpha: need B + 1 >= 1 / alpha"
             )
         qualification.count(self.folds, "folds", minimum=2)
@@ -205,14 +206,14 @@ def encode_target(y: pandas.Series, task: str) -> numpy.ndarray:
         ValueError: On a bad task, missing values, or fewer than 2 classes.
     """
     if task not in TASKS:
-        raise ValueError(f"task must be one of {TASKS}")
+        raise errors.InputError(f"task must be one of {TASKS}")
     if y.isna().any():
-        raise ValueError("the target must not have missing values")
+        raise errors.InputError("the target must not have missing values")
     if task == "regression":
         return y.to_numpy(dtype="float64")
     codes, uniques = pandas.factorize(y, sort=True)
     if len(uniques) < MIN_CLASSES:
-        raise ValueError("a classification target needs two classes")
+        raise errors.InputError("a classification target needs two classes")
     return codes.astype("int64")
 
 
@@ -353,7 +354,7 @@ def binary_auc(truth: numpy.ndarray, score: numpy.ndarray) -> float:
     n1 = int(positive.sum())
     n0 = len(truth) - n1
     if n1 == 0 or n0 == 0:
-        raise ValueError("both classes are needed for an AUC")
+        raise errors.InputError("both classes are needed for an AUC")
     ranks = stats.rankdata(score)
     return float((ranks[positive].sum() - n1 * (n1 + 1) / 2.0) / (n1 * n0))
 
@@ -378,7 +379,7 @@ def skill_of(pred: numpy.ndarray, y: numpy.ndarray, task: str) -> float:
     if task == "regression":
         total = float(((y - y.mean()) ** 2).sum())
         if total == 0.0:
-            raise ValueError("a constant target has no R^2")
+            raise errors.InputError("a constant target has no R^2")
         return 1.0 - float(((y - pred) ** 2).sum()) / total
     if pred.shape[1] == BINARY_CLASSES:
         return binary_auc(y, pred[:, 1])
@@ -623,9 +624,9 @@ def skill_test(
             `encode_target`).
     """
     if groups is not None and block_size is not None:
-        raise ValueError("use groups or block_size, not both")
+        raise errors.InputError("use groups or block_size, not both")
     if len(feature) != len(target):
-        raise ValueError("feature and target must have the same length")
+        raise errors.InputError("feature and target must have the same length")
     name = str(feature.name)
     y = encode_target(target, task)
     group_values = None if groups is None else groups.to_numpy()
@@ -814,7 +815,7 @@ def conditional_test(
             target is invalid (see `encode_target`).
     """
     if groups is not None and block_size is not None:
-        raise ValueError("use groups or block_size, not both")
+        raise errors.InputError("use groups or block_size, not both")
     name = str(feature.name)
     y = encode_target(target, task)
     group_values = None if groups is None else groups.to_numpy()
@@ -964,7 +965,7 @@ def missingness_test(
         ValueError: If `feature` and `target` differ in length.
     """
     if len(feature) != len(target):
-        raise ValueError("feature and target must have the same length")
+        raise errors.InputError("feature and target must have the same length")
     missing = feature.isna().to_numpy()
     if missing.all() or not missing.any():
         return None
@@ -1187,7 +1188,7 @@ def scan(
     chosen = names if features is None else list(features)
     unknown = [c for c in chosen if c not in names]
     if unknown:
-        raise ValueError(f"not feature columns: {unknown}")
+        raise errors.InputError(f"not feature columns: {unknown}")
     outcomes = frame[target]
     assessments = tuple(
         assess_feature(

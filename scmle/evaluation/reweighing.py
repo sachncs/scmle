@@ -13,6 +13,8 @@ sensitive column only at training time.
 import numpy
 import pandas
 
+from scmle.contracts import errors
+
 
 def weigh(groups: pandas.Series, labels: pandas.Series) -> numpy.ndarray:
     """Returns row weights that remove the association of group and label.
@@ -28,7 +30,9 @@ def weigh(groups: pandas.Series, labels: pandas.Series) -> numpy.ndarray:
         ValueError: If the inputs differ in length or are empty.
     """
     if len(groups) != len(labels) or len(groups) == 0:
-        raise ValueError("groups and labels must be the same non-zero length")
+        raise errors.InputError(
+            "groups and labels must be the same non-zero length"
+        )
     frame = pandas.DataFrame(
         {"group": groups.to_numpy(), "label": labels.to_numpy()}
     )

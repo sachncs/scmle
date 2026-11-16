@@ -346,7 +346,7 @@ class Vault:
             ValueError: If a set of that name is already sealed.
         """
         if set_id in self.sets:
-            raise ValueError(f"set {set_id} is already sealed")
+            raise errors.InputError(f"set {set_id} is already sealed")
         held = SealedSet(set_id, locked, self.log)
         self.sets[set_id] = held
         return held

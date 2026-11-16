@@ -8,6 +8,8 @@ import json
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
+
 
 class FaultScenario(enum.StrEnum):
     """Fault condition that must have a safe, reviewable response."""
@@ -122,7 +124,7 @@ class Evidence:
         ):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{name} must not be empty")
+                raise errors.InputError(f"{name} must not be empty")
         if not isinstance(self.observed_outcome, EvidenceOutcome):
             raise TypeError("observed_outcome must be EvidenceOutcome")
 
@@ -172,15 +174,15 @@ def check_evidence_requirements(requirements: tuple[str, ...]) -> None:
             repeated.
     """
     if not requirements:
-        raise ValueError("evidence_requirements must not be empty")
+        raise errors.InputError("evidence_requirements must not be empty")
     supplied: Iterable[object] = requirements  # may hold non-strings
     if any(
         not isinstance(requirement, str) or not requirement.strip()
         for requirement in supplied
     ):
-        raise ValueError("evidence_requirements must contain text")
+        raise errors.InputError("evidence_requirements must contain text")
     if len(set(requirements)) != len(requirements):
-        raise ValueError("evidence_requirements must be unique")
+        raise errors.InputError("evidence_requirements must be unique")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -239,17 +241,21 @@ class Plan:
             raise TypeError("release_blocking must be bool")
         evidence_types = [item.evidence_type for item in self.evidence]
         if len(set(evidence_types)) != len(evidence_types):
-            raise ValueError("evidence types must be unique per scenario")
+            raise errors.InputError(
+                "evidence types must be unique per scenario"
+            )
         if (
             self.verification_status is not VerificationStatus.PLANNED
             and not self.evidence
         ):
-            raise ValueError("verification status requires execution evidence")
+            raise errors.InputError(
+                "verification status requires execution evidence"
+            )
         if self.verification_status is VerificationStatus.PASSED:
             missing = set(self.evidence_requirements) - set(evidence_types)
             if missing:
                 missing_text = ", ".join(sorted(missing))
-                raise ValueError(
+                raise errors.InputError(
                     "passed scenario is missing evidence requirements: "
                     f"{missing_text}"
                 )
@@ -258,7 +264,7 @@ class Plan:
                 is not EvidenceOutcome.SAFE_OUTCOME_OBSERVED
                 for item in self.evidence
             ):
-                raise ValueError(
+                raise errors.InputError(
                     "passed scenario requires safe outcome evidence only"
                 )
 
@@ -350,7 +356,9 @@ class Registry:
         if not isinstance(plan, Plan):
             raise TypeError("plan must be Plan")
         if plan.scenario in self.plans:
-            raise ValueError(f"scenario already registered: {plan.scenario}")
+            raise errors.InputError(
+                f"scenario already registered: {plan.scenario}"
+            )
         self.plans[plan.scenario] = plan
 
     def record_evidence(
@@ -390,12 +398,12 @@ class Registry:
             raise TypeError("scenario must be FaultScenario")
         supplied: object = evidence  # callers may pass a non-tuple
         if not isinstance(supplied, tuple) or not supplied:
-            raise ValueError("evidence must be a non-empty tuple")
+            raise errors.InputError("evidence must be a non-empty tuple")
         if not all(isinstance(item, Evidence) for item in evidence):
             raise TypeError("evidence must contain Evidence values")
         execution_ids = {item.execution_id for item in evidence}
         if len(execution_ids) != 1:
-            raise ValueError(
+            raise errors.InputError(
                 "evidence for one scenario must share an execution_id"
             )
         plan = self.plans[scenario]
@@ -403,7 +411,9 @@ class Registry:
         unexpected = evidence_types - set(plan.evidence_requirements)
         if unexpected:
             names = ", ".join(sorted(unexpected))
-            raise ValueError(f"evidence has unexpected requirements: {names}")
+            raise errors.InputError(
+                f"evidence has unexpected requirements: {names}"
+            )
         missing = set(plan.evidence_requirements) - evidence_types
         has_unsafe = any(
             item.observed_outcome is EvidenceOutcome.UNSAFE_OUTCOME_OBSERVED
@@ -435,7 +445,7 @@ class Registry:
                 item.value
                 for item in sorted(missing, key=lambda value: value.value)
             )
-            raise ValueError(
+            raise errors.InputError(
                 f"fault-injection plan is incomplete: {missing_text}"
             )
 
@@ -488,10 +498,12 @@ class Registry:
                 invalid, or a required scenario is missing.
         """
         if record.get("schema_version") != 1:
-            raise ValueError("unsupported fault-injection plan schema version")
+            raise errors.InputError(
+                "unsupported fault-injection plan schema version"
+            )
         scenarios = record.get("scenarios")
         if not isinstance(scenarios, list):
-            raise ValueError("scenarios must be a list")
+            raise errors.InputError("scenarios must be a list")
         registry = cls()
         for item in scenarios:
             if not isinstance(item, Mapping):

@@ -326,9 +326,11 @@ def validate_text(value: str, field_name: str) -> str:
         raise TypeError(f"{field_name} must be a string")
     result = value.strip()
     if not result:
-        raise ValueError(f"{field_name} must not be empty")
+        raise errors.InputError(f"{field_name} must not be empty")
     if result != value:
-        raise ValueError(f"{field_name} must not have surrounding whitespace")
+        raise errors.InputError(
+            f"{field_name} must not have surrounding whitespace"
+        )
     return result
 
 
@@ -354,7 +356,7 @@ def validate_evidence(
     for value in values:
         validate_text(value, field_name)
     if len(values) != len(set(values)):
-        raise ValueError(f"{field_name} must not contain duplicates")
+        raise errors.InputError(f"{field_name} must not contain duplicates")
     return values
 
 
@@ -376,7 +378,7 @@ def validate_finite(value: float, field_name: str) -> float:
         raise TypeError(f"{field_name} must be numeric")
     result = float(value)
     if not math.isfinite(result):
-        raise ValueError(f"{field_name} must be finite")
+        raise errors.InputError(f"{field_name} must be finite")
     return result
 
 
@@ -405,7 +407,7 @@ class MetricDeclaration:
             raise TypeError("metric.direction must be MetricDirection")
         validate_evidence(self.evidence, "metric.evidence")
         if self.custom and not self.evidence:
-            raise ValueError("custom metrics require evidence")
+            raise errors.InputError("custom metrics require evidence")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible metric declaration."""
@@ -462,7 +464,7 @@ def check_open_unit_interval(value: float, field_name: str) -> None:
     """
     checked = validate_finite(value, field_name)
     if not 0 < checked < 1:
-        raise ValueError(f"{field_name} must be between 0 and 1")
+        raise errors.InputError(f"{field_name} must be between 0 and 1")
 
 
 def check_explanation_threshold(
@@ -482,9 +484,9 @@ def check_explanation_threshold(
     """
     value = validate_finite(threshold, f"explanation.{name}")
     if not 0.0 <= value <= 1.0:
-        raise ValueError(f"explanation.{name} must be between 0 and 1")
+        raise errors.InputError(f"explanation.{name} must be between 0 and 1")
     if not required:
-        raise ValueError(f"{name} requires {requirement}")
+        raise errors.InputError(f"{name} requires {requirement}")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -511,7 +513,7 @@ class Uncertainty:
         if not isinstance(self.method, UncertaintyMethod):
             raise TypeError("uncertainty.method must be UncertaintyMethod")
         if self.method is UncertaintyMethod.NONE and self.required:
-            raise ValueError(
+            raise errors.InputError(
                 "uncertainty cannot be required when method is none"
             )
         if self.confidence_level is not None:
@@ -523,10 +525,14 @@ class Uncertainty:
                 self.coverage_target, "uncertainty.coverage_target"
             )
         if self.minimum_rows is not None and self.minimum_rows < 1:
-            raise ValueError("uncertainty.minimum_rows must be at least 1")
+            raise errors.InputError(
+                "uncertainty.minimum_rows must be at least 1"
+            )
         if self.method is not UncertaintyMethod.NONE and self.required:
             if self.confidence_level is None:
-                raise ValueError("required uncertainty needs confidence_level")
+                raise errors.InputError(
+                    "required uncertainty needs confidence_level"
+                )
             if (
                 self.method
                 in {
@@ -536,7 +542,7 @@ class Uncertainty:
                 }
                 and self.coverage_target is None
             ):
-                raise ValueError(
+                raise errors.InputError(
                     "required interval uncertainty needs coverage_target"
                 )
 
@@ -572,17 +578,19 @@ class Calibration:
             raise TypeError("calibration.method must be CalibrationMethod")
         if self.method is CalibrationMethod.NONE:
             if self.required or self.maximum_error is not None:
-                raise ValueError(
+                raise errors.InputError(
                     "calibration requirements need a calibration method"
                 )
         elif self.required and self.maximum_error is None:
-            raise ValueError("required calibration needs maximum_error")
+            raise errors.InputError("required calibration needs maximum_error")
         if (
             self.maximum_error is not None
             and validate_finite(self.maximum_error, "calibration.maximum_error")
             < 0
         ):
-            raise ValueError("calibration.maximum_error must not be negative")
+            raise errors.InputError(
+                "calibration.maximum_error must not be negative"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible calibration declaration."""
@@ -617,14 +625,14 @@ class Fairness:
         if self.method is FairnessMethod.NONE and (
             self.sensitive_columns or self.metrics
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "fairness fields must be empty when method is none"
             )
         if self.method is not FairnessMethod.NONE:
             if not self.sensitive_columns:
-                raise ValueError("fairness requires sensitive_columns")
+                raise errors.InputError("fairness requires sensitive_columns")
             if not self.metrics:
-                raise ValueError("fairness requires metrics")
+                raise errors.InputError("fairness requires metrics")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible fairness declaration."""
@@ -654,19 +662,21 @@ class FairnessGate:
         """
         validate_text(self.metric, "fairness_gate.metric")
         if (self.maximum is None) == (self.minimum is None):
-            raise ValueError("fairness gate needs exactly one bound")
+            raise errors.InputError("fairness gate needs exactly one bound")
         if (
             self.maximum is not None
             and validate_finite(self.maximum, "fairness_gate.maximum") < 0
         ):
-            raise ValueError("fairness_gate.maximum must not be negative")
+            raise errors.InputError(
+                "fairness_gate.maximum must not be negative"
+            )
         if self.minimum is not None:
             validate_finite(self.minimum, "fairness_gate.minimum")
         validate_evidence(
             self.required_evidence, "fairness_gate.required_evidence"
         )
         if not self.required_evidence:
-            raise ValueError("fairness gates require evidence")
+            raise errors.InputError("fairness gates require evidence")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible fairness gate."""
@@ -693,12 +703,14 @@ class SmallGroups:
                 threshold is not between one and the warning threshold.
         """
         if self.warning_threshold < 1:
-            raise ValueError("small-group warning_threshold must be at least 1")
+            raise errors.InputError(
+                "small-group warning_threshold must be at least 1"
+            )
         if (
             self.blocking_threshold is not None
             and not 1 <= self.blocking_threshold <= self.warning_threshold
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "small-group blocking_threshold must be between one and "
                 "warning_threshold"
             )
@@ -756,9 +768,11 @@ class Explanations:
                 "require_fidelity",
             )
         if self.require_stability and self.stability_threshold is None:
-            raise ValueError("require_stability needs stability_threshold")
+            raise errors.InputError(
+                "require_stability needs stability_threshold"
+            )
         if self.require_fidelity and self.fidelity_threshold is None:
-            raise ValueError("require_fidelity needs fidelity_threshold")
+            raise errors.InputError("require_fidelity needs fidelity_threshold")
         if self.availability is ExplanationAvailability.NONE and (
             self.required_methods
             or self.required_evidence
@@ -767,14 +781,14 @@ class Explanations:
             or self.stability_threshold is not None
             or self.fidelity_threshold is not None
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "explanation requirements need an availability level"
             )
         if (
             self.availability is not ExplanationAvailability.NONE
             and not self.required_methods
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "explanation availability requires required_methods"
             )
 
@@ -825,7 +839,7 @@ class DiagnosticGate:
             self.required_evidence, "diagnostic_gate.required_evidence"
         )
         if not self.required_evidence:
-            raise ValueError("diagnostic gates require evidence")
+            raise errors.InputError("diagnostic gates require evidence")
         if not isinstance(self.decisive, bool):
             raise TypeError("diagnostic_gate.decisive must be bool")
 
@@ -858,26 +872,28 @@ class Gates:
                 the same metric or diagnostic twice.
         """
         if not self.metric_gates:
-            raise ValueError("release policy requires metric_gates")
+            raise errors.InputError("release policy requires metric_gates")
         if not self.diagnostic_gates:
-            raise ValueError("release policy requires diagnostic_gates")
+            raise errors.InputError("release policy requires diagnostic_gates")
         validate_evidence(self.required_evidence, "release.required_evidence")
         if not self.required_evidence:
-            raise ValueError("release policy requires evidence")
+            raise errors.InputError("release policy requires evidence")
         if not any(
             gate.action is DiagnosticAction.BLOCK
             for gate in self.diagnostic_gates
         ):
-            raise ValueError("release policy requires a blocking diagnostic")
+            raise errors.InputError(
+                "release policy requires a blocking diagnostic"
+            )
         metric_names = [gate.metric for gate in self.metric_gates]
         if len(metric_names) != len(set(metric_names)):
-            raise ValueError("release metric gates must be unique")
+            raise errors.InputError("release metric gates must be unique")
         diagnostic_names = [gate.name for gate in self.diagnostic_gates]
         if len(diagnostic_names) != len(set(diagnostic_names)):
-            raise ValueError("release diagnostic gates must be unique")
+            raise errors.InputError("release diagnostic gates must be unique")
         fairness_names = [gate.metric for gate in self.fairness_gates]
         if len(fairness_names) != len(set(fairness_names)):
-            raise ValueError("release fairness gates must be unique")
+            raise errors.InputError("release fairness gates must be unique")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible release policy."""
@@ -927,22 +943,22 @@ class Criteria:
         if not isinstance(self.task, tasks.Task):
             raise TypeError("policy.task must be Task")
         if self.schema_version < 1:
-            raise ValueError("policy.schema_version must be at least 1")
+            raise errors.InputError("policy.schema_version must be at least 1")
         validate_text(self.primary_metric, "policy.primary_metric")
         if not self.metrics:
-            raise ValueError("evaluation policy requires metrics")
+            raise errors.InputError("evaluation policy requires metrics")
         metric_names = [metric.name for metric in self.metrics]
         if len(metric_names) != len(set(metric_names)):
-            raise ValueError("evaluation metrics must be unique")
+            raise errors.InputError("evaluation metrics must be unique")
         if self.primary_metric not in metric_names:
-            raise ValueError("primary_metric must be one of metrics")
+            raise errors.InputError("primary_metric must be one of metrics")
         primary = next(
             metric
             for metric in self.metrics
             if metric.name == self.primary_metric
         )
         if not primary.required:
-            raise ValueError("primary_metric must be required")
+            raise errors.InputError("primary_metric must be required")
         supported_metrics = SUPPORTED_METRICS[self.task]
         for metric in self.metrics:
             if not metric.custom and metric.name not in supported_metrics:
@@ -954,7 +970,7 @@ class Criteria:
                 not metric.custom
                 and METRIC_DIRECTIONS[metric.name] is not metric.direction
             ):
-                raise ValueError(
+                raise errors.InputError(
                     f"metric '{metric.name}' has direction "
                     f"{METRIC_DIRECTIONS[metric.name].value}, not "
                     f"{metric.direction.value}"
@@ -1043,11 +1059,11 @@ class Criteria:
                         f"metric '{gate.metric}' is unsupported for task "
                         f"'{self.task.value}'"
                     )
-                raise ValueError(
+                raise errors.InputError(
                     f"release metric gate '{gate.metric}' is undeclared"
                 )
             if declaration.direction is not gate.direction:
-                raise ValueError(
+                raise errors.InputError(
                     f"release metric gate '{gate.metric}' has a mismatched "
                     "direction"
                 )
@@ -1068,7 +1084,7 @@ class Criteria:
         self.validate_metric_gates()
         for fairness_gate in self.release.fairness_gates:
             if fairness_gate.metric not in self.fairness.metrics:
-                raise ValueError(
+                raise errors.InputError(
                     f"release fairness gate '{fairness_gate.metric}' is "
                     "undeclared"
                 )
@@ -1084,14 +1100,14 @@ class Criteria:
             self.fairness.method is FairnessMethod.NONE
             and self.release.fairness_gates
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "fairness release gates need a fairness declaration"
             )
         if (
             self.fairness.method is not FairnessMethod.NONE
             and not self.release.fairness_gates
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "fairness declaration needs release fairness gates"
             )
 

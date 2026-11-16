@@ -33,6 +33,7 @@ import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.contracts import signing
 
@@ -95,9 +96,11 @@ class DecisionCostModel:
         low = qualification.finite(self.t_lo, "t_lo")
         high = qualification.finite(self.t_hi, "t_hi")
         if not 0.0 < low <= high < 1.0:
-            raise ValueError("the range must satisfy 0 < t_lo <= t_hi < 1")
+            raise errors.InputError(
+                "the range must satisfy 0 < t_lo <= t_hi < 1"
+            )
         if not low <= self.threshold <= high:
-            raise ValueError(
+            raise errors.InputError(
                 f"the implied threshold {self.threshold:.4f} lies outside "
                 f"the range [{low}, {high}]"
             )
@@ -105,9 +108,9 @@ class DecisionCostModel:
         if len(self.sources) != len(ENTRY_NAMES) or not all(
             isinstance(s, CostSource) for s in self.sources
         ):
-            raise ValueError("sources must hold four CostSource values")
+            raise errors.InputError("sources must hold four CostSource values")
         if not isinstance(self.range_source, CostSource):
-            raise ValueError("range_source must be a CostSource")
+            raise errors.InputError("range_source must be a CostSource")
 
     @property
     def c_fp(self) -> float:
@@ -175,7 +178,7 @@ class DecisionCostModel:
         qualification.require(cls, record)
         sources = tuple(CostSource(v) for v in record["sources"])
         if len(sources) != len(ENTRY_NAMES):
-            raise ValueError("sources must hold one entry per cost")
+            raise errors.InputError("sources must hold one entry per cost")
         return cls(
             c_00=record["c_00"],
             c_01=record["c_01"],
@@ -202,7 +205,7 @@ def odds(t: float) -> float:
     """
     threshold = qualification.finite(t, "t")
     if not 0.0 < threshold < 1.0:
-        raise ValueError("t must be strictly between 0 and 1")
+        raise errors.InputError("t must be strictly between 0 and 1")
     return threshold / (1.0 - threshold)
 
 
@@ -222,9 +225,9 @@ def binary_vector(values: ArrayLike, name: str) -> NDArray[numpy.float64]:
     """
     array = numpy.asarray(values, dtype=float)
     if array.ndim != 1 or array.size == 0:
-        raise ValueError(f"{name} must be a non-empty 1-d array")
+        raise errors.InputError(f"{name} must be a non-empty 1-d array")
     if not numpy.isin(array, (0.0, 1.0)).all():
-        raise ValueError(f"{name} must hold only 0 and 1")
+        raise errors.InputError(f"{name} must hold only 0 and 1")
     return array
 
 
@@ -247,7 +250,7 @@ def pair(
     outcomes = binary_vector(y, "y")
     actions = binary_vector(a, "a")
     if outcomes.shape != actions.shape:
-        raise ValueError("y and a must have the same length")
+        raise errors.InputError("y and a must have the same length")
     return outcomes, actions
 
 

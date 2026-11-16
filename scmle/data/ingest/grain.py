@@ -21,6 +21,7 @@ import itertools
 import re
 from typing import Any
 
+from scmle.contracts import errors
 from scmle.data.ingest import profile
 
 LEVELS = 3
@@ -406,9 +407,9 @@ def infer_keys(
     """
     for name, value in (("eps_key", eps_key), ("eps_null", eps_null)):
         if not 0.0 <= value <= 1.0:
-            raise ValueError(f"{name} must be in [0, 1]")
+            raise errors.InputError(f"{name} must be in [0, 1]")
     if max_size < 1:
-        raise ValueError("max_size must be at least 1")
+        raise errors.InputError("max_size must be at least 1")
     scan = KeyScan(
         table=table.name,
         rows=table.rows,

@@ -8,6 +8,7 @@ near the end of a series, whose future is unknown, are dropped from training.
 
 import pandas
 
+from scmle.contracts import errors
 from scmle.contracts import tasks
 
 
@@ -27,7 +28,9 @@ def augment(frame: pandas.DataFrame, data: tasks.Dataset) -> pandas.DataFrame:
     """
     value, horizon = data.value_column, data.horizon
     if value is None or horizon is None:
-        raise ValueError("a forecasting spec needs value_column and horizon")
+        raise errors.InputError(
+            "a forecasting spec needs value_column and horizon"
+        )
     keys = [c for c in (data.group_column, data.time_column) if c]
     ordered = frame.sort_values(keys, kind="stable").reset_index(drop=True)
     series = (

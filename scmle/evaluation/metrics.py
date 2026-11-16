@@ -51,7 +51,7 @@ def positive_label(target: pandas.Series, task: tasks.Task) -> Any:
         return None
     labels = sorted(target.dropna().unique())
     if len(labels) < BINARY_CLASSES:
-        raise ValueError(
+        raise errors.InputError(
             "a binary target needs at least two distinct labels to name "
             f"the positive class; found {len(labels)}"
         )

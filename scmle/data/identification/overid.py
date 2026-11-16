@@ -31,6 +31,8 @@ from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import stats
 
+from scmle.contracts import errors
+
 NOTE = (
     "a rejection means some instrument is invalid or the instruments "
     "identify different effects, not which one; a pass does not show "
@@ -72,7 +74,9 @@ def prepare(
     if z.ndim == 1:
         z = z[:, None]
     if not len(outcome) == len(regressor) == len(z):
-        raise ValueError("y, d and the instruments must have the same length")
+        raise errors.InputError(
+            "y, d and the instruments must have the same length"
+        )
     rows = len(outcome)
     base = numpy.ones((rows, 1))
     if controls is not None:
@@ -80,7 +84,7 @@ def prepare(
         if extra.ndim == 1:
             extra = extra[:, None]
         if len(extra) != rows:
-            raise ValueError("controls must have the length of y")
+            raise errors.InputError("controls must have the length of y")
         base = numpy.column_stack([base, extra])
 
     def residual(values: NDArray[numpy.float64]) -> NDArray[numpy.float64]:

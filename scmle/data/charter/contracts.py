@@ -152,7 +152,7 @@ class AnalysisEstimand:
                 a causal block is given and `kind` is not `causal`.
         """
         if self.kind not in ESTIMAND_KINDS:
-            raise ValueError(f"kind must be one of {ESTIMAND_KINDS}")
+            raise errors.InputError(f"kind must be one of {ESTIMAND_KINDS}")
         evidence.require_text(self.population, "population")
         evidence.require_text(self.target, "target")
         evidence.require_text(self.prediction_moment, "prediction_moment")
@@ -161,12 +161,12 @@ class AnalysisEstimand:
             self.intercurrent_events, "intercurrent_events"
         )
         if not self.intercurrent_events:
-            raise ValueError(
+            raise errors.InputError(
                 "intercurrent_events must not be empty: state a strategy "
                 "for each event, or declare 'none' as not applicable"
             )
         if self.causal is not None and self.kind != "causal":
-            raise ValueError("a causal block needs kind='causal'")
+            raise errors.InputError("a causal block needs kind='causal'")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the estimand.
@@ -251,7 +251,7 @@ class DecisionRow:
         evidence.require_text(self.check_id, "check_id")
         evidence.require_text(self.trigger, "trigger")
         if not isinstance(self.action, DecisionAction):
-            raise ValueError("action must be a DecisionAction")
+            raise errors.InputError("action must be a DecisionAction")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the row.
@@ -316,7 +316,7 @@ class SetSizes:
             self.confirmation_fraction, "confirmation_fraction"
         )
         if not 0 < fraction <= MAX_CONFIRMATION_FRACTION:
-            raise ValueError(
+            raise errors.InputError(
                 "confirmation_fraction must be in (0, "
                 f"{MAX_CONFIRMATION_FRACTION}] so exploration keeps a majority"
             )
@@ -372,9 +372,9 @@ class Choice:
         evidence.require_text(self.name, "name")
         qualification.require_tuple(self.options, "options")
         if not self.options or len(set(self.options)) != len(self.options):
-            raise ValueError("options must be non-empty and distinct")
+            raise errors.InputError("options must be non-empty and distinct")
         if self.default not in self.options:
-            raise ValueError("default must be one of the options")
+            raise errors.InputError("default must be one of the options")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the choice.
@@ -425,7 +425,7 @@ def positive(value: Any, name: str) -> float:
     """
     number = qualification.finite(value, name)
     if number <= 0:
-        raise ValueError(f"{name} must be greater than 0")
+        raise errors.InputError(f"{name} must be greater than 0")
     return number
 
 
@@ -520,19 +520,19 @@ class AnalysisCharter:
         qualification.count(self.k_max, "k_max", minimum=1)
         power = qualification.finite(self.power, "power")
         if not 0 < power < 1:
-            raise ValueError("power must be strictly between 0 and 1")
+            raise errors.InputError("power must be strictly between 0 and 1")
         qualification.count(self.seed, "seed")
         names = [c.name for c in self.multiverse]
         if len(set(names)) != len(names):
-            raise ValueError("duplicate name in multiverse")
+            raise errors.InputError("duplicate name in multiverse")
         self.check_decision_map()
         if self.decision is not None and self.cost_model is None:
-            raise ValueError("a decision layer needs a cost_model")
+            raise errors.InputError("a decision layer needs a cost_model")
         if (
             self.unit_of_prediction is not None
             and self.unit_of_prediction not in UNITS_OF_PREDICTION
         ):
-            raise ValueError(
+            raise errors.InputError(
                 f"unit_of_prediction must be one of {UNITS_OF_PREDICTION}"
             )
 
@@ -546,14 +546,18 @@ class AnalysisCharter:
         rows: dict[str, DecisionRow] = {}
         for row in self.decision_map:
             if row.check_id in rows:
-                raise ValueError(f"duplicate decision row for {row.check_id}")
+                raise errors.InputError(
+                    f"duplicate decision row for {row.check_id}"
+                )
             rows[row.check_id] = row
         for check_id in self.gating_checks:
             bound = rows.get(check_id)
             if bound is None:
-                raise ValueError(f"gating check {check_id} has no decision row")
+                raise errors.InputError(
+                    f"gating check {check_id} has no decision row"
+                )
             if not bound.certificate_id.strip():
-                raise ValueError(
+                raise errors.InputError(
                     f"gating check {check_id} needs a certificate_id"
                 )
 
@@ -573,7 +577,9 @@ class AnalysisCharter:
             *self.gating_checks,
         ):
             if check_id not in known:
-                raise ValueError(f"unknown check {check_id} in the charter")
+                raise errors.InputError(
+                    f"unknown check {check_id} in the charter"
+                )
 
     @property
     def charter_hash(self) -> str:

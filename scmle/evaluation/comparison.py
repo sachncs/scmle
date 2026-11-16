@@ -14,6 +14,8 @@ import math
 import numpy
 from scipy import stats
 
+from scmle.contracts import errors
+
 MIN_FOLDS = 3
 
 
@@ -69,9 +71,9 @@ def pair(
         ValueError: If the score lists differ in length or are too short.
     """
     if len(first) != len(second):
-        raise ValueError("both candidates need scores on the same folds")
+        raise errors.InputError("both candidates need scores on the same folds")
     if len(first) < MIN_FOLDS:
-        raise ValueError(f"need at least {MIN_FOLDS} folds to compare")
+        raise errors.InputError(f"need at least {MIN_FOLDS} folds to compare")
     differences = numpy.asarray(first, dtype=float) - numpy.asarray(
         second, dtype=float
     )

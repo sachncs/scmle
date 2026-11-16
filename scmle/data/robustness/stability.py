@@ -51,6 +51,7 @@ from typing import Any
 import numpy
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.charter import contracts
@@ -112,9 +113,9 @@ class Thresholds:
         for name in ("s_min", "q_min"):
             share = qualification.finite(getattr(self, name), name)
             if not 0.0 < share <= 1.0:
-                raise ValueError(f"{name} must be within (0, 1]")
+                raise errors.InputError(f"{name} must be within (0, 1]")
         if qualification.finite(self.band, "band") <= 0.0:
-            raise ValueError("band must be positive")
+            raise errors.InputError("band must be positive")
 
     def to_dict(self) -> dict[str, float]:
         """Converts the rule to a JSON-ready dictionary.
@@ -705,7 +706,7 @@ def assess_finding(
     values = numpy.asarray(x, dtype=float)
     codes = numpy.asarray(y, dtype=float)
     if len(values) != len(codes):
-        raise ValueError("x and y must have one entry per row")
+        raise errors.InputError("x and y must have one entry per row")
     options = {} if clock is None else {"clock": clock}
     ran = multiverse.run_grid(
         grid,

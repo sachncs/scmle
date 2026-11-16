@@ -31,6 +31,8 @@ import time
 import traceback
 from typing import Any
 
+from scmle.contracts import errors
+
 PASSED = "passed"
 FAILED = "failed"
 NOT_RUN = "not_run"
@@ -53,11 +55,13 @@ def time_scale() -> float:
     try:
         scale = float(text)
     except ValueError:
-        raise ValueError(
+        raise errors.InputError(
             f"{TIME_SCALE_ENV} is not a number: {text!r}"
         ) from None
     if not math.isfinite(scale) or scale <= 0:
-        raise ValueError(f"{TIME_SCALE_ENV} must be positive, not {text!r}")
+        raise errors.InputError(
+            f"{TIME_SCALE_ENV} must be positive, not {text!r}"
+        )
     return scale
 
 
@@ -532,9 +536,9 @@ class Runner:
         known = {fault.id: fault for fault in catalogue}
         for name in scenarios:
             if name not in known:
-                raise ValueError(f"{name} is not in the catalogue")
+                raise errors.InputError(f"{name} is not in the catalogue")
             if not known[name].local:
-                raise ValueError(f"{name} cannot run locally")
+                raise errors.InputError(f"{name} cannot run locally")
         self.scenarios = dict(scenarios)
         self.catalogue = tuple(catalogue)
         self.clock = clock

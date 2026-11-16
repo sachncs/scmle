@@ -24,7 +24,7 @@
       ]
     },
     "G11i": {
-      "code_hash": "1474cc9d7dae9a936c29333f20cdade086c948df689a3589add4b57968fd7e28",
+      "code_hash": "8b32c06718c4a31b094bccac93d20e9607ee3cde3a8c35c719dcc946a52a3b9f",
       "covariate_censoring_bias": -0.002747989662342687,
       "marginal_km_bias": -0.017488983865733942,
       "mean_floored_share": 0.005306666666666667,
@@ -65,7 +65,7 @@
       ]
     },
     "G2": {
-      "code_hash": "3e14a7e33b3a44ce4354c2f3e01a6db49dab2e2d2f126c086b903f0073c9616b",
+      "code_hash": "1cf3b384e77200031d04abacb761846d558273edd3795d8e05e8a15481ca3b2e",
       "passed": true,
       "replicates": 200,
       "seeds": [
@@ -112,7 +112,7 @@
       }
     },
     "G3": {
-      "code_hash": "035a94d35a5071f3b4461a51c172634aa4090ff1f29b64a4d1736355da042b8d",
+      "code_hash": "0a31371270af941e514424476c8a4ce81d8491daa141349bfaa81b1b30e18d49",
       "constant_width_marginal": 0.9004366666666666,
       "constant_width_top_decile": 0.72125,
       "cqr_marginal": {
@@ -162,7 +162,7 @@
           "se": 0.002993726540942771
         }
       ],
-      "code_hash": "e0303ebbf1ec477c3cf511eafa4528397d0c7ce2aa52ec24b04329651098c844",
+      "code_hash": "ddd05812ae94f32d5ab74caad187b77bcc95cffef93eeecb71c6454c474300ff",
       "passed": true,
       "pooled_control": [
         {
@@ -320,7 +320,7 @@
       ]
     },
     "G6": {
-      "code_hash": "63ec3e22321042ab864b3cc2c1c6468b1e7204a8040d1593abc9e388d442688b",
+      "code_hash": "62c97f55d4dfb36aa187824b1930b9110763980d6225c50be73394c99a550b6e",
       "estimated_passed": true,
       "estimated_ratio": {
         "effective_size_mean": 269.6513654196562,

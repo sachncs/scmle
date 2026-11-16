@@ -16,6 +16,7 @@ from numbers import Real
 import types
 from typing import Any
 
+from scmle.contracts import errors
 from scmle.contracts import evaluation
 from scmle.contracts import evidence
 
@@ -76,7 +77,7 @@ def normalize_measure(field_name: str, value: Any) -> float | str | None:
     if isinstance(value, Real):
         numeric = float(value)
         if not math.isfinite(numeric):
-            raise ValueError(f"{field_name} must be finite")
+            raise errors.InputError(f"{field_name} must be finite")
         return numeric
     if value is not None and not isinstance(value, str):
         raise TypeError(f"{field_name} must be numeric, text, or None")
@@ -127,23 +128,23 @@ class ReleaseFinding:
             raise TypeError("kind must be FindingKind")
         name: object = self.name  # may be a non-string at runtime
         if not isinstance(name, str) or not name.strip():
-            raise ValueError("name must not be empty")
+            raise errors.InputError("name must not be empty")
         if not isinstance(self.passed, bool):
             raise TypeError("passed must be bool")
         if not isinstance(self.blocking, bool):
             raise TypeError("blocking must be bool")
         reason: object = self.reason  # may be a non-string at runtime
         if not isinstance(reason, str) or not reason.strip():
-            raise ValueError("reason must not be empty")
+            raise errors.InputError("reason must not be empty")
         if not isinstance(self.evidence, tuple):
             raise TypeError("evidence must be a tuple of strings")
         entries: Iterable[object] = self.evidence  # may hold non-strings
         if any(
             not isinstance(item, str) or not item.strip() for item in entries
         ):
-            raise ValueError("evidence must contain non-empty strings")
+            raise errors.InputError("evidence must contain non-empty strings")
         if len(self.evidence) != len(set(self.evidence)):
-            raise ValueError("evidence must not contain duplicates")
+            raise errors.InputError("evidence must not contain duplicates")
         for field_name in ("observed", "expected"):
             object.__setattr__(
                 self,
@@ -211,15 +212,19 @@ class FindingCounts:
             if isinstance(value, bool) or not isinstance(value, int):
                 raise TypeError(f"{name} must be a non-negative integer")
             if value < 0:
-                raise ValueError(f"{name} must be a non-negative integer")
+                raise errors.InputError(
+                    f"{name} must be a non-negative integer"
+                )
         if self.total != self.passed + self.failed:
-            raise ValueError("total must equal passed plus failed")
+            raise errors.InputError("total must equal passed plus failed")
         if self.blocking > self.total:
-            raise ValueError("blocking must not exceed total")
+            raise errors.InputError("blocking must not exceed total")
         if self.blocking_failures > self.failed:
-            raise ValueError("blocking_failures must not exceed failed")
+            raise errors.InputError("blocking_failures must not exceed failed")
         if self.blocking_failures > self.blocking:
-            raise ValueError("blocking_failures must not exceed blocking")
+            raise errors.InputError(
+                "blocking_failures must not exceed blocking"
+            )
 
     def to_dict(self) -> dict[str, int]:
         """Returns deterministic JSON-compatible aggregate counts.
@@ -250,7 +255,7 @@ def check_count_values(values: Mapping[str, Any]) -> None:
         if isinstance(value, bool) or not isinstance(value, int):
             raise TypeError(f"{name} must be a non-negative integer")
         if value < 0:
-            raise ValueError(f"{name} must be a non-negative integer")
+            raise errors.InputError(f"{name} must be a non-negative integer")
 
 
 def check_kind_coverage(counts_by_kind: Any) -> None:
@@ -267,7 +272,9 @@ def check_kind_coverage(counts_by_kind: Any) -> None:
         raise TypeError("counts_by_kind must be a mapping")
     expected_kinds = {kind.value for kind in FindingKind}
     if set(counts_by_kind) != expected_kinds:
-        raise ValueError("counts_by_kind must contain every finding kind")
+        raise errors.InputError(
+            "counts_by_kind must contain every finding kind"
+        )
     if not all(
         isinstance(kind, str) and isinstance(counts, FindingCounts)
         for kind, counts in counts_by_kind.items()
@@ -324,14 +331,16 @@ class ReleaseReadinessSummary:
         """
         task: object = self.task  # may be a non-string at runtime
         if not isinstance(task, str) or not task.strip():
-            raise ValueError("task must not be empty")
+            raise errors.InputError("task must not be empty")
         schema_version: object = self.policy_schema_version  # may be non-int
         if (
             isinstance(schema_version, bool)
             or not isinstance(schema_version, int)
             or schema_version < 0
         ):
-            raise ValueError("policy_schema_version must be non-negative")
+            raise errors.InputError(
+                "policy_schema_version must be non-negative"
+            )
         if not isinstance(self.status, ReleaseStatus):
             raise TypeError("status must be ReleaseStatus")
         values = {
@@ -344,15 +353,17 @@ class ReleaseReadinessSummary:
         }
         check_count_values(values)
         if self.total_findings != self.passed_findings + self.failed_findings:
-            raise ValueError("total_findings must equal passed plus failed")
+            raise errors.InputError(
+                "total_findings must equal passed plus failed"
+            )
         if self.failed_findings != (
             self.blocking_failures + self.non_blocking_failures
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "failed_findings must equal blocking plus non-blocking failures"
             )
         if self.blocking_failures > self.blocking_findings:
-            raise ValueError(
+            raise errors.InputError(
                 "blocking_failures must not exceed blocking_findings"
             )
         expected_status = (
@@ -361,7 +372,7 @@ class ReleaseReadinessSummary:
             else ReleaseStatus.READY
         )
         if self.status is not expected_status:
-            raise ValueError("status does not match blocking_failures")
+            raise errors.InputError("status does not match blocking_failures")
         check_kind_coverage(self.counts_by_kind)
         object.__setattr__(
             self,
@@ -383,7 +394,9 @@ class ReleaseReadinessSummary:
             blocking=sum(item.blocking for item in by_kind),
             blocking_failures=sum(item.blocking_failures for item in by_kind),
         ):
-            raise ValueError("aggregate counts do not match counts_by_kind")
+            raise errors.InputError(
+                "aggregate counts do not match counts_by_kind"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns deterministic JSON-compatible readiness data.
@@ -456,9 +469,11 @@ class ReleaseEvaluation:
         """
         task: object = self.task  # may be a non-string at runtime
         if not isinstance(task, str) or not task.strip():
-            raise ValueError("task must not be empty")
+            raise errors.InputError("task must not be empty")
         if self.policy_schema_version < 0:
-            raise ValueError("policy_schema_version must not be negative")
+            raise errors.InputError(
+                "policy_schema_version must not be negative"
+            )
         if not isinstance(self.passed, bool):
             raise TypeError("passed must be bool")
         if not isinstance(self.findings, tuple):
@@ -473,9 +488,9 @@ class ReleaseEvaluation:
             if not item.passed and item.blocking
         )
         if self.blocking_reasons != expected_reasons:
-            raise ValueError("blocking_reasons do not match findings")
+            raise errors.InputError("blocking_reasons do not match findings")
         if self.passed != (not expected_reasons):
-            raise ValueError("passed does not match blocking findings")
+            raise errors.InputError("passed does not match blocking findings")
 
     @property
     def blocked(self) -> bool:
@@ -1104,7 +1119,7 @@ def explanation_findings(
                 continue
             name = f"{method}.{label}"
             if threshold is None:
-                raise ValueError(
+                raise errors.InputError(
                     f"explanation '{method}' has no {label} threshold"
                 )
             score = explanation_quality_value(report, field_name)

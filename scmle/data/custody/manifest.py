@@ -46,7 +46,7 @@ def ids(value: Any, name: str) -> tuple[int, ...]:
     """
     qualification.require_tuple(value, name)
     if not all(isinstance(i, int) and not isinstance(i, bool) for i in value):
-        raise ValueError(f"{name} must hold integers")
+        raise errors.InputError(f"{name} must hold integers")
     members: tuple[int, ...] = value
     return members
 
@@ -106,7 +106,7 @@ class Manifest:
         qualification.count(self.seed, "seed")
         qualification.count(self.embargo_rows, "embargo_rows")
         if self.scope not in SCOPES:
-            raise ValueError(f"scope must be one of {SCOPES}")
+            raise errors.InputError(f"scope must be one of {SCOPES}")
         groups = {
             "exploration_ids": ids(self.exploration_ids, "exploration_ids"),
             "confirmation_ids": ids(self.confirmation_ids, "confirmation_ids"),
@@ -116,9 +116,9 @@ class Manifest:
         seen: set[int] = set()
         for name, members in groups.items():
             if len(set(members)) != len(members):
-                raise ValueError(f"{name} repeats a row")
+                raise errors.InputError(f"{name} repeats a row")
             if seen & set(members):
-                raise ValueError(f"{name} overlap another set")
+                raise errors.InputError(f"{name} overlap another set")
             seen |= set(members)
         qualification.require_tuple(self.folds, "folds")
         qualification.require_tuple(self.isolation, "isolation")

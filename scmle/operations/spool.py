@@ -18,6 +18,7 @@ import json
 import pathlib
 
 from scmle import durability
+from scmle.contracts import errors
 from scmle.contracts import observability
 
 Send = Callable[[list[observability.MetricSample]], int]
@@ -58,7 +59,7 @@ class MetricsSpool:
             ValueError: If ``batch_size`` is not positive.
         """
         if batch_size < 1:
-            raise ValueError("batch_size must be positive")
+            raise errors.InputError("batch_size must be positive")
         self.path = pathlib.Path(path)
         self.send = send
         self.batch_size = batch_size

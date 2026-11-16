@@ -21,6 +21,8 @@ import threading
 import time
 from typing import Any
 
+from scmle.contracts import errors
+
 resource: Any  # the `resource` module, or None where it is missing
 try:
     resource = importlib.import_module("resource")
@@ -64,7 +66,7 @@ def freeze(labels: Mapping[str, str] | None) -> Labels:
     items = tuple(sorted((labels or {}).items()))
     for key, value in items:
         if not LABEL_PATTERN.match(key) or key.startswith("__"):
-            raise ValueError(f"invalid label name {key!r}")
+            raise errors.InputError(f"invalid label name {key!r}")
         if not isinstance(value, str):
             raise TypeError("label values must be text")
     return items
@@ -188,7 +190,7 @@ class MetricsRegistry:
                 duplicates.
         """
         if not buckets or list(buckets) != sorted(set(buckets)):
-            raise ValueError("buckets must be non-empty and ascending")
+            raise errors.InputError("buckets must be non-empty and ascending")
         self.buckets = buckets
         self.lock = threading.Lock()
         self.help: dict[str, str] = {}
@@ -210,10 +212,10 @@ class MetricsRegistry:
                 different kind.
         """
         if not NAME_PATTERN.match(name):
-            raise ValueError(f"invalid metric name {name!r}")
+            raise errors.InputError(f"invalid metric name {name!r}")
         known = self.kinds.get(name)
         if known is not None and known != kind:
-            raise ValueError(f"{name} is already a {known}")
+            raise errors.InputError(f"{name} is already a {known}")
         self.kinds[name] = kind
         self.help.setdefault(name, text)
 
@@ -238,7 +240,7 @@ class MetricsRegistry:
             TypeError: If a label value is not text.
         """
         if amount < 0:
-            raise ValueError("a counter only goes up")
+            raise errors.InputError("a counter only goes up")
         with self.lock:
             self.declare(name, "counter", text)
             series = self.values.setdefault(name, {})
@@ -267,7 +269,7 @@ class MetricsRegistry:
             TypeError: If a label value is not text.
         """
         if not math.isfinite(value):
-            raise ValueError("a gauge value must be finite")
+            raise errors.InputError("a gauge value must be finite")
         with self.lock:
             self.declare(name, "gauge", text)
             self.values.setdefault(name, {})[freeze(labels)] = value
@@ -294,7 +296,9 @@ class MetricsRegistry:
             TypeError: If a label value is not text.
         """
         if not math.isfinite(value) or value < 0:
-            raise ValueError("an observation must be finite and not negative")
+            raise errors.InputError(
+                "an observation must be finite and not negative"
+            )
         with self.lock:
             self.declare(name, "histogram", text)
             series = self.histograms.setdefault(name, {})

@@ -146,7 +146,7 @@ class ModelFamilyDeclaration:
         if not self.model_family or self.model_family != (
             self.model_family.strip().lower()
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "model_family must be lowercase and must not have surrounding "
                 "whitespace"
             )
@@ -155,7 +155,9 @@ class ModelFamilyDeclaration:
         if not isinstance(self.resources, ResourceAssumptions):
             raise TypeError("resources must be ResourceAssumptions")
         if not self.modalities:
-            raise ValueError("modalities must declare at least one value")
+            raise errors.InputError(
+                "modalities must declare at least one value"
+            )
         if any(not isinstance(item, Modality) for item in self.modalities):
             raise TypeError("modalities must contain Modality values")
         object.__setattr__(
@@ -176,7 +178,9 @@ class ModelFamilyDeclaration:
                 not isinstance(value, str) or not value.strip()
                 for value in entries
             ):
-                raise ValueError(f"{name} must contain non-empty strings")
+                raise errors.InputError(
+                    f"{name} must contain non-empty strings"
+                )
             object.__setattr__(self, name, tuple(sorted(set(values))))
 
     def to_dict(self) -> dict[str, object]:
@@ -237,20 +241,24 @@ class Environment:
         if any(
             not isinstance(extra, str) or not extra.strip() for extra in extras
         ):
-            raise ValueError("available_extras must contain non-empty strings")
+            raise errors.InputError(
+                "available_extras must contain non-empty strings"
+            )
         object.__setattr__(
             self,
             "available_extras",
             frozenset(self.available_extras),
         )
         if self.cpu_cores is not None and self.cpu_cores < 1:
-            raise ValueError("cpu_cores must be at least 1")
+            raise errors.InputError("cpu_cores must be at least 1")
         for name, value in (
             ("memory_gb", self.memory_gb),
             ("disk_gb", self.disk_gb),
         ):
             if value is not None and (not math.isfinite(value) or value < 0):
-                raise ValueError(f"{name} must be finite and non-negative")
+                raise errors.InputError(
+                    f"{name} must be finite and non-negative"
+                )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -320,9 +328,9 @@ class Coordinate:
         if not isinstance(self.model_family, str):
             raise TypeError("model_family must be a string")
         if not self.model_family:
-            raise ValueError("model_family must not be empty")
+            raise errors.InputError("model_family must not be empty")
         if self.model_family != self.model_family.strip().lower():
-            raise ValueError(
+            raise errors.InputError(
                 "model_family must be lowercase and must not have surrounding "
                 "whitespace"
             )
@@ -375,16 +383,16 @@ class ResourceAssumptions:
         if not isinstance(self.cpu_cores, int):
             raise TypeError("cpu_cores must be an integer")
         if self.cpu_cores < 1:
-            raise ValueError("cpu_cores must be at least 1")
+            raise errors.InputError("cpu_cores must be at least 1")
         if not math.isfinite(self.memory_gb) or self.memory_gb <= 0:
-            raise ValueError("memory_gb must be greater than 0")
+            raise errors.InputError("memory_gb must be greater than 0")
         if not math.isfinite(self.disk_gb) or self.disk_gb < 0:
-            raise ValueError("disk_gb must not be negative")
+            raise errors.InputError("disk_gb must not be negative")
         if self.max_rows is not None and self.max_rows < 1:
-            raise ValueError("max_rows must be at least 1")
+            raise errors.InputError("max_rows must be at least 1")
         notes: Iterable[object] = self.notes  # may hold non-strings at runtime
         if any(not isinstance(note, str) or not note.strip() for note in notes):
-            raise ValueError("resource notes must not be empty")
+            raise errors.InputError("resource notes must not be empty")
         object.__setattr__(self, "notes", tuple(sorted(set(self.notes))))
 
     def to_dict(self) -> dict[str, object]:
@@ -441,7 +449,9 @@ class Capability:
         object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
         object.__setattr__(self, "limitations", tuple(self.limitations))
         if not self.failure_modes:
-            raise ValueError("failure_modes must declare at least one value")
+            raise errors.InputError(
+                "failure_modes must declare at least one value"
+            )
         for name, values in (
             ("required_extras", self.required_extras),
             ("failure_modes", self.failure_modes),
@@ -455,9 +465,11 @@ class Capability:
                 not isinstance(value, str) or not value.strip()
                 for value in entries
             ):
-                raise ValueError(f"{name} must contain non-empty strings")
+                raise errors.InputError(
+                    f"{name} must contain non-empty strings"
+                )
         if self.status is Status.SUPPORTED and not self.evidence_links:
-            raise ValueError(
+            raise errors.InputError(
                 "supported capabilities must declare evidence_links"
             )
 

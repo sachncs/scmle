@@ -138,17 +138,21 @@ class FeatureBatch:
         """
         matrix = numpy.asarray(self.values, dtype=numpy.float64)
         if matrix.ndim != MATRIX_RANK:
-            raise ValueError("feature values must be a two-dimensional matrix")
+            raise errors.InputError(
+                "feature values must be a two-dimensional matrix"
+            )
         if matrix.shape[0] != len(self.sample_ids):
-            raise ValueError("feature rows must match sample IDs")
+            raise errors.InputError("feature rows must match sample IDs")
         if matrix.shape[1] != len(self.feature_names):
-            raise ValueError("feature columns must match feature names")
+            raise errors.InputError("feature columns must match feature names")
         if not numpy.isfinite(matrix).all():
-            raise ValueError("feature values must be finite")
+            raise errors.InputError("feature values must be finite")
         if len(set(self.sample_ids)) != len(self.sample_ids):
-            raise ValueError("sample IDs must be unique within a feature batch")
+            raise errors.InputError(
+                "sample IDs must be unique within a feature batch"
+            )
         if any(not name.strip() for name in self.feature_names):
-            raise ValueError("feature names must not be empty")
+            raise errors.InputError("feature names must not be empty")
         frozen = matrix.copy()
         frozen.setflags(write=False)
         object.__setattr__(self, "sample_ids", tuple(self.sample_ids))
@@ -211,13 +215,17 @@ class Package:
         model_sha256: object = self.model_sha256
         signature: object = self.signature
         if not isinstance(path, str) or not path.strip():
-            raise ValueError("package path must be non-empty")
+            raise errors.InputError("package path must be non-empty")
         if not isinstance(model_sha256, str) or not is_sha256(model_sha256):
-            raise ValueError("package model_sha256 must be a SHA-256 digest")
+            raise errors.InputError(
+                "package model_sha256 must be a SHA-256 digest"
+            )
         if not isinstance(signature, str) or not signature.strip():
-            raise ValueError("package signature must be non-empty")
+            raise errors.InputError("package signature must be non-empty")
         if self.schema_version != PACKAGE_SCHEMA_VERSION:
-            raise ValueError("unsupported modality package schema version")
+            raise errors.InputError(
+                "unsupported modality package schema version"
+            )
 
     def to_dict(self) -> dict[str, object]:
         """Converts the package identity to JSON-native values.
@@ -277,15 +285,21 @@ class Predictor:
         """
         dataset_hash, model_digest, signature_value = identity
         if report.modality != modalities.serialise(adapter.modality):
-            raise ValueError("lifecycle report modality does not match")
+            raise errors.InputError("lifecycle report modality does not match")
         if report.dataset_hash != dataset_hash:
-            raise ValueError("lifecycle report dataset identity does not match")
+            raise errors.InputError(
+                "lifecycle report dataset identity does not match"
+            )
         if Path(report.package.path).resolve() != package_path.resolve():
-            raise ValueError("lifecycle report package path does not match")
+            raise errors.InputError(
+                "lifecycle report package path does not match"
+            )
         if report.package.model_sha256 != model_digest:
-            raise ValueError("lifecycle report model digest does not match")
+            raise errors.InputError(
+                "lifecycle report model digest does not match"
+            )
         if report.package.signature != signature_value:
-            raise ValueError(
+            raise errors.InputError(
                 "lifecycle report package signature does not match"
             )
 
@@ -325,30 +339,34 @@ class Predictor:
         manifest_path = Path(package_path) / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if not isinstance(manifest, dict):
-            raise ValueError("modality package manifest must be an object")
+            raise errors.InputError(
+                "modality package manifest must be an object"
+            )
         if manifest.get("modality") != modalities.serialise(adapter.modality):
-            raise ValueError("package modality does not match adapter")
+            raise errors.InputError("package modality does not match adapter")
         raw_features = manifest.get("feature_names")
         if not isinstance(raw_features, list) or not all(
             isinstance(name, str) and name.strip() for name in raw_features
         ):
-            raise ValueError("package feature_names are invalid")
+            raise errors.InputError("package feature_names are invalid")
         feature_names = tuple(raw_features)
         if getattr(model, "n_features_in_", len(feature_names)) != len(
             feature_names
         ):
-            raise ValueError("package model and feature schema do not match")
+            raise errors.InputError(
+                "package model and feature schema do not match"
+            )
         dataset_hash = manifest.get("dataset_hash")
         model_digest = manifest.get("model_sha256")
         signature = manifest.get("signature")
         if not isinstance(dataset_hash, str) or not dataset_hash.strip():
-            raise ValueError("package dataset_hash is invalid")
+            raise errors.InputError("package dataset_hash is invalid")
         if not isinstance(model_digest, str) or not model_digest.strip():
-            raise ValueError("package model_sha256 is invalid")
+            raise errors.InputError("package model_sha256 is invalid")
         if not isinstance(signature, dict) or not isinstance(
             signature.get("value"), str
         ):
-            raise ValueError("package signature is invalid")
+            raise errors.InputError("package signature is invalid")
         report_digest: str | None = None
         if lifecycle_report_path is not None:
             report = Record.read_verified(lifecycle_report_path, signing_key)
@@ -388,10 +406,12 @@ class Predictor:
         """
         values = tuple(samples)
         if not values:
-            raise ValueError("samples must not be empty")
+            raise errors.InputError("samples must not be empty")
         batch = self.adapter.features(values)
         if batch.feature_names != self.feature_names:
-            raise ValueError("new sample feature schema does not match package")
+            raise errors.InputError(
+                "new sample feature schema does not match package"
+            )
         return batch
 
     def predict(self, samples: Sequence[Any]) -> numpy.ndarray:
@@ -464,27 +484,33 @@ def parse_stage_evidence(
             stage, evidence links, evidence mapping or notes.
     """
     if not isinstance(raw_stage_evidence, list):
-        raise ValueError("lifecycle report stage_evidence must be a list")
+        raise errors.InputError(
+            "lifecycle report stage_evidence must be a list"
+        )
     stage_evidence: list[modalities.StageEvidence] = []
     for item in raw_stage_evidence:
         if not isinstance(item, Mapping):
-            raise ValueError("lifecycle report stage evidence is invalid")
+            raise errors.InputError(
+                "lifecycle report stage evidence is invalid"
+            )
         stage = item.get("stage")
         evidence_links = item.get("evidence_links")
         evidence = item.get("evidence")
         notes = item.get("notes")
         if not isinstance(stage, str):
-            raise ValueError("lifecycle report stage is invalid")
+            raise errors.InputError("lifecycle report stage is invalid")
         if not isinstance(evidence_links, list) or not all(
             isinstance(value, str) for value in evidence_links
         ):
-            raise ValueError("lifecycle report evidence_links are invalid")
+            raise errors.InputError(
+                "lifecycle report evidence_links are invalid"
+            )
         if not isinstance(evidence, Mapping):
-            raise ValueError("lifecycle report evidence is invalid")
+            raise errors.InputError("lifecycle report evidence is invalid")
         if not isinstance(notes, list) or not all(
             isinstance(value, str) for value in notes
         ):
-            raise ValueError("lifecycle report notes are invalid")
+            raise errors.InputError("lifecycle report notes are invalid")
         stage_evidence.append(
             modalities.StageEvidence(
                 stage=modalities.LifecycleStage(stage),
@@ -511,7 +537,7 @@ def parse_package(raw_package: object) -> Package:
             integer.
     """
     if not isinstance(raw_package, Mapping):
-        raise ValueError("lifecycle report package is invalid")
+        raise errors.InputError("lifecycle report package is invalid")
     package_values = {
         "path": raw_package.get("path"),
         "model_sha256": raw_package.get("model_sha256"),
@@ -522,9 +548,9 @@ def parse_package(raw_package: object) -> Package:
         isinstance(package_values[field_name], str)
         for field_name in ("path", "model_sha256", "signature")
     ):
-        raise ValueError("lifecycle report package identity is invalid")
+        raise errors.InputError("lifecycle report package identity is invalid")
     if not isinstance(package_values["schema_version"], int):
-        raise ValueError("lifecycle report package schema is invalid")
+        raise errors.InputError("lifecycle report package schema is invalid")
     return Package(
         path=cast("str", package_values["path"]),
         model_sha256=cast("str", package_values["model_sha256"]),
@@ -549,12 +575,12 @@ def parse_signature(raw_signature: object) -> str | None:
     if raw_signature is None:
         return None
     if not isinstance(raw_signature, Mapping):
-        raise ValueError("lifecycle report signature is invalid")
+        raise errors.InputError("lifecycle report signature is invalid")
     if raw_signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
-        raise ValueError("unsupported lifecycle report signature")
+        raise errors.InputError("unsupported lifecycle report signature")
     signature_value = raw_signature.get("value")
     if not isinstance(signature_value, str) or not signature_value.strip():
-        raise ValueError("lifecycle report signature is invalid")
+        raise errors.InputError("lifecycle report signature is invalid")
     return signature_value
 
 
@@ -574,7 +600,7 @@ def require_string_list(value: object, message: str) -> list[str]:
     if not isinstance(value, list) or not all(
         isinstance(item, str) for item in value
     ):
-        raise ValueError(message)
+        raise errors.InputError(message)
     return value
 
 
@@ -627,7 +653,7 @@ class Record:
         for field_name in ("modality", "dataset_hash"):
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{field_name} must not be empty")
+                raise errors.InputError(f"{field_name} must not be empty")
         if not isinstance(self.package, Package):
             raise TypeError("package must be Package")
         stages = tuple(self.stage_evidence)
@@ -639,12 +665,12 @@ class Record:
         expected_stages = modalities.REQUIRED_LIFECYCLE_STAGES
         actual_stages = tuple(evidence.stage for evidence in stages)
         if actual_stages != expected_stages:
-            raise ValueError(
+            raise errors.InputError(
                 "lifecycle report stage evidence must contain every required "
                 "stage exactly once in order"
             )
         if any(not evidence.evidenced for evidence in stages):
-            raise ValueError(
+            raise errors.InputError(
                 "lifecycle report stages must contain evidence links"
             )
         object.__setattr__(self, "stage_evidence", stages)
@@ -662,7 +688,7 @@ class Record:
                 normalize_json_object(getattr(self, field_name), field_name),
             )
         if self.signature is not None and not is_sha256(self.signature):
-            raise ValueError("signature must be a SHA-256 digest")
+            raise errors.InputError("signature must be a SHA-256 digest")
 
     def unsigned_dict(self) -> dict[str, object]:
         """Builds the exact report content covered by the signature.
@@ -730,7 +756,9 @@ class Record:
                 missing or has the wrong shape.
         """
         if record.get("schema_version") != REPORT_SCHEMA_VERSION:
-            raise ValueError("unsupported lifecycle report schema version")
+            raise errors.InputError(
+                "unsupported lifecycle report schema version"
+            )
 
         stage_evidence = parse_stage_evidence(record.get("stage_evidence"))
         package = parse_package(record.get("package"))
@@ -738,7 +766,9 @@ class Record:
         def mapping_field(name: str) -> dict[str, object]:
             value = record.get(name)
             if not isinstance(value, Mapping):
-                raise ValueError(f"lifecycle report {name} must be an object")
+                raise errors.InputError(
+                    f"lifecycle report {name} must be an object"
+                )
             return dict(value)
 
         signature = parse_signature(record.get("signature"))
@@ -746,7 +776,7 @@ class Record:
         modality = record.get("modality")
         dataset_hash = record.get("dataset_hash")
         if not isinstance(modality, str) or not isinstance(dataset_hash, str):
-            raise ValueError("lifecycle report identity is invalid")
+            raise errors.InputError("lifecycle report identity is invalid")
         return cls(
             modality=modality,
             dataset_hash=dataset_hash,
@@ -776,7 +806,7 @@ class Record:
         """
         record = json.loads(Path(path).read_text(encoding="utf-8"))
         if not isinstance(record, Mapping):
-            raise ValueError("lifecycle report must be a JSON object")
+            raise errors.InputError("lifecycle report must be a JSON object")
         return cls.from_dict(record)
 
     @classmethod
@@ -795,7 +825,9 @@ class Record:
         """
         report = cls.read(path)
         if not report.verify_signature(signing_key):
-            raise ValueError("lifecycle report signature does not verify")
+            raise errors.InputError(
+                "lifecycle report signature does not verify"
+            )
         return report
 
     def to_dict(self) -> dict[str, object]:
@@ -882,19 +914,23 @@ class Checkpoint:
         ):
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{field_name} must not be empty")
+                raise errors.InputError(f"{field_name} must not be empty")
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
             raise TypeError("seed must be an integer")
         if not isinstance(self.require_independent_ground_truth, bool):
             raise TypeError("require_independent_ground_truth must be bool")
         if self.status not in ("running", "completed"):
-            raise ValueError("checkpoint status must be running or completed")
+            raise errors.InputError(
+                "checkpoint status must be running or completed"
+            )
         if self.manifest_digest is not None and not (
             self.manifest_digest.strip()
         ):
-            raise ValueError("manifest_digest must be non-empty when provided")
+            raise errors.InputError(
+                "manifest_digest must be non-empty when provided"
+            )
         if self.signature is not None and not self.signature.strip():
-            raise ValueError("signature must be non-empty when provided")
+            raise errors.InputError("signature must be non-empty when provided")
         self.check_stage_progress()
 
     def check_stage_progress(self) -> None:
@@ -909,17 +945,17 @@ class Checkpoint:
             stage.value for stage in modalities.REQUIRED_LIFECYCLE_STAGES
         )[: len(self.completed_stages)]
         if tuple(self.completed_stages) != expected_stages:
-            raise ValueError(
+            raise errors.InputError(
                 "completed stages must be an ordered lifecycle prefix"
             )
         if len(self.stage_digests) != len(self.completed_stages):
-            raise ValueError("stage digests must match completed stages")
+            raise errors.InputError("stage digests must match completed stages")
         if any(not digest.strip() for digest in self.stage_digests):
-            raise ValueError("stage digests must not be empty")
+            raise errors.InputError("stage digests must not be empty")
         if self.status == "completed" and len(self.completed_stages) != len(
             modalities.REQUIRED_LIFECYCLE_STAGES
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "completed checkpoint must contain every lifecycle stage"
             )
 
@@ -992,9 +1028,11 @@ class Checkpoint:
                 field is unsupported, missing or malformed.
         """
         if record.get("schema_version") != 1:
-            raise ValueError("unsupported lifecycle checkpoint schema version")
+            raise errors.InputError(
+                "unsupported lifecycle checkpoint schema version"
+            )
         if record.get("record_type") != "modality_lifecycle_checkpoint":
-            raise ValueError("invalid lifecycle checkpoint record type")
+            raise errors.InputError("invalid lifecycle checkpoint record type")
         completed = require_string_list(
             record.get("completed_stages"),
             "checkpoint completed_stages must be a list",
@@ -1005,24 +1043,28 @@ class Checkpoint:
         )
         seed = record.get("seed")
         if isinstance(seed, bool) or not isinstance(seed, int):
-            raise ValueError("checkpoint seed is invalid")
+            raise errors.InputError("checkpoint seed is invalid")
         require_ground_truth = record.get("require_independent_ground_truth")
         if not isinstance(require_ground_truth, bool):
-            raise ValueError("checkpoint ground-truth requirement is invalid")
+            raise errors.InputError(
+                "checkpoint ground-truth requirement is invalid"
+            )
         status = record.get("status")
         if status not in ("running", "completed"):
-            raise ValueError("checkpoint status is invalid")
+            raise errors.InputError("checkpoint status is invalid")
         signature = record.get("signature")
         if not isinstance(signature, Mapping):
-            raise ValueError("checkpoint signature is missing")
+            raise errors.InputError("checkpoint signature is missing")
         if signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
-            raise ValueError("unsupported lifecycle checkpoint signature")
+            raise errors.InputError(
+                "unsupported lifecycle checkpoint signature"
+            )
         signature_value = signature.get("value")
         if not isinstance(signature_value, str) or not signature_value.strip():
-            raise ValueError("lifecycle checkpoint signature is invalid")
+            raise errors.InputError("lifecycle checkpoint signature is invalid")
         manifest_digest = record.get("manifest_digest")
         if manifest_digest is not None and not isinstance(manifest_digest, str):
-            raise ValueError("checkpoint manifest_digest is invalid")
+            raise errors.InputError("checkpoint manifest_digest is invalid")
         return cls(
             modality=str(record.get("modality", "")),
             dataset_hash=str(record.get("dataset_hash", "")),
@@ -1068,7 +1110,9 @@ class Checkpoint:
         """
         record = json.loads(Path(path).read_text(encoding="utf-8"))
         if not isinstance(record, Mapping):
-            raise ValueError("lifecycle checkpoint must be a JSON object")
+            raise errors.InputError(
+                "lifecycle checkpoint must be a JSON object"
+            )
         return cls.from_dict(record)
 
     @classmethod
@@ -1087,7 +1131,9 @@ class Checkpoint:
         """
         checkpoint = cls.read(path)
         if not checkpoint.verify_signature(signing_key):
-            raise ValueError("lifecycle checkpoint signature does not verify")
+            raise errors.InputError(
+                "lifecycle checkpoint signature does not verify"
+            )
         return checkpoint
 
 
@@ -1129,7 +1175,7 @@ class Curation:
         for field_name in ("modality", "dataset_hash", "path"):
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{field_name} must be non-empty")
+                raise errors.InputError(f"{field_name} must be non-empty")
         sample_count: object = self.sample_count
         signature: object = self.signature
         if (
@@ -1137,9 +1183,11 @@ class Curation:
             or not isinstance(sample_count, int)
             or sample_count < 0
         ):
-            raise ValueError("sample_count must be a non-negative integer")
+            raise errors.InputError(
+                "sample_count must be a non-negative integer"
+            )
         if not isinstance(signature, str) or not is_sha256(signature):
-            raise ValueError("signature must be a SHA-256 digest")
+            raise errors.InputError("signature must be a SHA-256 digest")
         normalized_curation = normalize_json_object(self.curation, "curation")
         normalized_card = normalize_json_object(
             self.dataset_card, "dataset_card"
@@ -1149,11 +1197,11 @@ class Curation:
             ("dataset_card", normalized_card),
         ):
             if "modality" in record and record.get("modality") != self.modality:
-                raise ValueError(f"{name} does not match modality")
+                raise errors.InputError(f"{name} does not match modality")
             if record.get("dataset_hash") != self.dataset_hash:
-                raise ValueError(f"{name} does not match dataset_hash")
+                raise errors.InputError(f"{name} does not match dataset_hash")
             if record.get("sample_count") != self.sample_count:
-                raise ValueError(f"{name} does not match sample_count")
+                raise errors.InputError(f"{name} does not match sample_count")
         object.__setattr__(self, "curation", normalized_curation)
         object.__setattr__(self, "dataset_card", normalized_card)
 
@@ -1225,9 +1273,11 @@ class Curation:
                 not match.
         """
         if record.get("schema_version") != CURATION_SCHEMA_VERSION:
-            raise ValueError("unsupported modality curation schema version")
+            raise errors.InputError(
+                "unsupported modality curation schema version"
+            )
         if record.get("record_type") != "modality_curation":
-            raise ValueError("invalid modality curation record type")
+            raise errors.InputError("invalid modality curation record type")
         modality = record.get("modality")
         dataset_hash = record.get("dataset_hash")
         path = record.get("path")
@@ -1236,25 +1286,25 @@ class Curation:
             isinstance(value, str) and value.strip()
             for value in (modality, dataset_hash, path)
         ):
-            raise ValueError("modality curation identity is invalid")
+            raise errors.InputError("modality curation identity is invalid")
         if isinstance(sample_count, bool) or not isinstance(sample_count, int):
-            raise ValueError("modality curation sample_count is invalid")
+            raise errors.InputError("modality curation sample_count is invalid")
         curation = record.get("curation")
         dataset_card = record.get("dataset_card")
         if not isinstance(curation, Mapping) or not isinstance(
             dataset_card, Mapping
         ):
-            raise ValueError("modality curation evidence is invalid")
+            raise errors.InputError("modality curation evidence is invalid")
         signature = record.get("signature")
         if not isinstance(signature, Mapping):
-            raise ValueError("modality curation signature is missing")
+            raise errors.InputError("modality curation signature is missing")
         if signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
-            raise ValueError("unsupported modality curation signature")
+            raise errors.InputError("unsupported modality curation signature")
         signature_value = signature.get("value")
         if not isinstance(signature_value, str) or not is_sha256(
             signature_value
         ):
-            raise ValueError("modality curation signature is invalid")
+            raise errors.InputError("modality curation signature is invalid")
         result = cls(
             modality=cast("str", modality),
             dataset_hash=cast("str", dataset_hash),
@@ -1280,9 +1330,11 @@ class Curation:
                 digest of this result's content.
         """
         if not isinstance(content_digest, str) or not is_sha256(content_digest):
-            raise ValueError("modality curation content_digest is invalid")
+            raise errors.InputError(
+                "modality curation content_digest is invalid"
+            )
         if not hmac.compare_digest(content_digest, self.content_digest):
-            raise ValueError(
+            raise errors.InputError(
                 "modality curation content_digest does not match evidence"
             )
 
@@ -1301,7 +1353,9 @@ class Curation:
         """
         record = json.loads(Path(path).read_text(encoding="utf-8"))
         if not isinstance(record, Mapping):
-            raise ValueError("modality curation record must be an object")
+            raise errors.InputError(
+                "modality curation record must be an object"
+            )
         return cls.from_dict(record)
 
     @classmethod
@@ -1320,7 +1374,9 @@ class Curation:
         """
         result = cls.read(path)
         if not result.verify_signature(signing_key):
-            raise ValueError("modality curation signature does not verify")
+            raise errors.InputError(
+                "modality curation signature does not verify"
+            )
         return result
 
 
@@ -1397,13 +1453,13 @@ class ExtensionCurator(Curator):
         if not isinstance(self.extension, modalities.ExtensionModality):
             raise TypeError("extension must be ExtensionModality")
         if not self.dataset_hash_value.strip():
-            raise ValueError("dataset_hash_value must not be empty")
+            raise errors.InputError("dataset_hash_value must not be empty")
         if not callable(self.curation_callback):
             raise TypeError("curation_callback must be callable")
         if not self.limitations or any(
             not value.strip() for value in self.limitations
         ):
-            raise ValueError("limitations must contain non-empty values")
+            raise errors.InputError("limitations must contain non-empty values")
         object.__setattr__(self, "sample_values", tuple(self.sample_values))
         object.__setattr__(self, "limitations", tuple(self.limitations))
 
@@ -1440,13 +1496,17 @@ class ExtensionCurator(Curator):
             raise TypeError("curation_callback must return a curation report")
         expected_modality = modalities.serialise(self.extension)
         if report.modality != expected_modality:
-            raise ValueError(
+            raise errors.InputError(
                 "curation report modality does not match extension"
             )
         if report.dataset_hash != self.dataset_hash_value:
-            raise ValueError("curation report hash does not match extension")
+            raise errors.InputError(
+                "curation report hash does not match extension"
+            )
         if report.sample_count != len(self.sample_values):
-            raise ValueError("curation report count does not match extension")
+            raise errors.InputError(
+                "curation report count does not match extension"
+            )
         return report
 
     def modality_notes(self) -> tuple[str, ...]:
@@ -2029,7 +2089,9 @@ class ImagePreparer(Preparer):
             raise TypeError("sample must be an Sample")
         features = self.features((sample,)).values
         if features.shape[1] != 16 * 16 * 3:
-            raise ValueError("image lifecycle expects 16x16 RGB features")
+            raise errors.InputError(
+                "image lifecycle expects 16x16 RGB features"
+            )
         decision = numpy.asarray(model.decision_function(features))
         if decision.ndim == 1:
             selected_class = 0
@@ -2125,7 +2187,9 @@ class ImagePreparer(Preparer):
         source_pixels = sample.decode("RGB")
         source_height, source_width, source_channels = source_pixels.shape
         if source_channels != RGB_CHANNEL_COUNT:
-            raise ValueError("decoded RGB image must have three channels")
+            raise errors.InputError(
+                "decoded RGB image must have three channels"
+            )
         image_library = image.require_pillow("raw image explanation")
         row_step = max(1, int(numpy.ceil(source_height / 4)))
         column_step = max(1, int(numpy.ceil(source_width / 4)))
@@ -2462,12 +2526,16 @@ class AudioPreparer(Preparer):
                 "reason": "an explicit WAV decoder is required",
             }
         if not snr_db or len(snr_db) > MAX_SNR_VALUES:
-            raise ValueError("snr_db must contain between one and eight values")
+            raise errors.InputError(
+                "snr_db must contain between one and eight values"
+            )
         if any(
             not numpy.isfinite(value) or value < 0.0 or value > MAX_SNR_DB
             for value in snr_db
         ):
-            raise ValueError("snr_db values must be finite and in [0, 120]")
+            raise errors.InputError(
+                "snr_db values must be finite and in [0, 120]"
+            )
         parameters, values = audio.wav_pcm_values(sample.encoded_bytes)
         signal_rms = float(numpy.sqrt(numpy.mean(numpy.square(values))))
         if signal_rms <= 0.0:
@@ -2658,7 +2726,7 @@ class VideoPreparer(Preparer):
             ValueError: If `max_frames` or `max_frame_pixels` is below 1.
         """
         if max_frames < 1 or max_frame_pixels < 1:
-            raise ValueError("frame bounds must be positive")
+            raise errors.InputError("frame bounds must be positive")
         self.dataset = dataset
         self.frame_decoder = frame_decoder
         self.max_frames = max_frames
@@ -3056,7 +3124,9 @@ class GraphPreparer(Preparer):
             ValueError: If the graph declares no node features.
         """
         if not self.dataset.feature_names:
-            raise ValueError("graph baseline requires declared node features")
+            raise errors.InputError(
+                "graph baseline requires declared node features"
+            )
         rows = numpy.asarray(
             [sample.features for sample in samples], dtype=float
         )
@@ -3115,13 +3185,13 @@ class GraphPreparer(Preparer):
             ValueError: If `node_id` is blank or unknown, or a limit is below 1.
         """
         if not node_id.strip():
-            raise ValueError("node_id must not be empty")
+            raise errors.InputError("node_id must not be empty")
         if max_nodes < 1:
-            raise ValueError("max_nodes must be positive")
+            raise errors.InputError("max_nodes must be positive")
         if max_edges < 1:
-            raise ValueError("max_edges must be positive")
+            raise errors.InputError("max_edges must be positive")
         if node_id not in self.dataset.node_ids:
-            raise ValueError(f"unknown graph node: {node_id}")
+            raise errors.InputError(f"unknown graph node: {node_id}")
 
         incident_edges = tuple(
             edge
@@ -3345,7 +3415,7 @@ class GeospatialPreparer(Preparer):
             ValueError: If `block_size` is not positive.
         """
         if block_size <= 0:
-            raise ValueError("block_size must be positive")
+            raise errors.InputError("block_size must be positive")
         self.dataset = dataset
         self.block_size = block_size
 
@@ -3671,22 +3741,26 @@ class RasterPreparer(Preparer):
         """
         normalized = tuple(samples)
         if not normalized:
-            raise ValueError("raster samples must not be empty")
+            raise errors.InputError("raster samples must not be empty")
         if decoder is not None and not callable(decoder):
             raise TypeError("decoder must be callable")
         if decoder is None and decoder_name is not None:
-            raise ValueError("decoder_name requires a caller-owned decoder")
+            raise errors.InputError(
+                "decoder_name requires a caller-owned decoder"
+            )
         if decoder is not None and not decoder_name:
-            raise ValueError(
+            raise errors.InputError(
                 "decoder_name must identify a caller-owned decoder and version"
             )
         if max_pixels < 1:
-            raise ValueError("max_pixels must be positive")
+            raise errors.InputError("max_pixels must be positive")
         sources = tuple(sample.source for sample in normalized)
         if len(set(sources)) != len(sources):
-            raise ValueError("raster sources must be unique")
+            raise errors.InputError("raster sources must be unique")
         if any(source not in labels for source in sources):
-            raise ValueError("raster labels must cover every sample source")
+            raise errors.InputError(
+                "raster labels must cover every sample source"
+            )
         self.dataset = normalized
         self.labels_by_source = dict(labels)
         self.decoder = decoder
@@ -3967,7 +4041,7 @@ class RasterPreparer(Preparer):
             ValueError: If `band_count` is below 1.
         """
         if band_count < 1:
-            raise ValueError("band_count must be positive")
+            raise errors.InputError("band_count must be positive")
         return tuple(
             f"pixel_band_{band}_{statistic}"
             for band in range(band_count)
@@ -4091,9 +4165,11 @@ class RasterPreparer(Preparer):
             self.pixel_feature_values(pixels, sample.bands), dtype=numpy.float64
         )
         if tuple(feature_names) != self.pixel_feature_names(sample.bands):
-            raise ValueError("raster explanation feature schema does not match")
+            raise errors.InputError(
+                "raster explanation feature schema does not match"
+            )
         if original_values.shape[0] != coefficients.shape[0]:
-            raise ValueError(
+            raise errors.InputError(
                 "raster explanation coefficients do not match features"
             )
         original_features = original_values.reshape(1, -1)
@@ -4370,7 +4446,7 @@ class IngestionStage(Stage):
             ValueError: If the dataset has no samples.
         """
         if not context.adapter.samples:
-            raise ValueError("modality dataset must not be empty")
+            raise errors.InputError("modality dataset must not be empty")
         context.record(
             self.stage,
             {
@@ -4397,9 +4473,13 @@ class ValidationStage(Stage):
         """
         labels = context.adapter.labels(context.adapter.samples)
         if any(label is None for label in labels):
-            raise ValueError("complete modality lifecycle requires labels")
+            raise errors.InputError(
+                "complete modality lifecycle requires labels"
+            )
         if len(set(labels)) < MIN_CLASS_COUNT:
-            raise ValueError("classification lifecycle requires two labels")
+            raise errors.InputError(
+                "classification lifecycle requires two labels"
+            )
         context.record(
             self.stage,
             {"label_count": len(labels), "class_count": len(set(labels))},
@@ -4448,7 +4528,7 @@ class CurationStage(Stage):
                     for finding in report.unresolved_blocking_findings
                 ]
             )
-            raise ValueError(
+            raise errors.InputError(
                 f"unresolved blocking curation findings: {findings}"
             )
         context.record(self.stage, {"release_ready": True, "unresolved": []})
@@ -4471,7 +4551,7 @@ class SplittingStage(Stage):
         """
         partitions = context.adapter.split(context.seed)
         if not partitions.train or not partitions.test:
-            raise ValueError(
+            raise errors.InputError(
                 "lifecycle split requires non-empty train and test partitions"
             )
         groups = [
@@ -4483,7 +4563,9 @@ class SplittingStage(Stage):
             for index, left in enumerate(groups)
             for right in groups[index + 1 :]
         ):
-            raise ValueError("lifecycle split contains overlapping groups")
+            raise errors.InputError(
+                "lifecycle split contains overlapping groups"
+            )
         context.partitions = partitions
         context.record(
             self.stage,
@@ -4523,7 +4605,7 @@ class FeaturePreparationStage(Stage):
         }
         names = batches["train"].feature_names
         if any(batch.feature_names != names for batch in batches.values()):
-            raise ValueError("partition feature schemas do not match")
+            raise errors.InputError("partition feature schemas do not match")
         context.feature_batches = batches
         context.record(
             self.stage,
@@ -4893,7 +4975,7 @@ def linear_decision_fidelity(
     if decision_values.ndim == MATRIX_RANK and decision_values.shape[1] == 1:
         decision_values = decision_values[:, 0]
     if decision_values.shape != reference_values.shape:
-        raise ValueError(
+        raise errors.InputError(
             "linear explanation reference shape does not match model "
             "decision output"
         )
@@ -4962,7 +5044,7 @@ class ModelExplainabilityStage(Stage):
             ground_truth_evidence["status"] != "available"
             or ground_truth_evidence["passed"] is not True
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "independent explanation ground-truth suite is required "
                 "before packaging"
             )
@@ -5112,12 +5194,12 @@ class PackagingStage(Stage):
             )
             expected_features = context.feature_batches["train"].feature_names
             if predictor.training_dataset_hash != context.adapter.dataset_hash:
-                raise ValueError(
+                raise errors.InputError(
                     "checkpoint package dataset identity does not match "
                     "the resumed adapter"
                 )
             if predictor.feature_names != expected_features:
-                raise ValueError(
+                raise errors.InputError(
                     "checkpoint package feature schema does not match "
                     "the resumed adapter"
                 )
@@ -5128,7 +5210,7 @@ class PackagingStage(Stage):
                     predictor.model.intercept_, model.intercept_
                 )
             ):
-                raise ValueError(
+                raise errors.InputError(
                     "checkpoint package model does not match deterministic "
                     "stage replay"
                 )
@@ -5385,13 +5467,13 @@ def check_checkpoint_options(
             are the same.
     """
     if resume and checkpoint_target is None:
-        raise ValueError("resume requires checkpoint_path")
+        raise errors.InputError("resume requires checkpoint_path")
     if checkpoint_target is not None and report_target is None:
-        raise ValueError(
+        raise errors.InputError(
             "checkpoint_path requires report_path so completion can be verified"
         )
     if checkpoint_target is not None and checkpoint_target == report_target:
-        raise ValueError("checkpoint_path and report_path must differ")
+        raise errors.InputError("checkpoint_path and report_path must differ")
 
 
 def execute_with_performance(context: Context, stage: Stage) -> None:
@@ -5489,7 +5571,7 @@ class RunPlan:
             ValueError: If the observed adapter's modality differs.
         """
         if self.observed.modality != self.adapter.modality:
-            raise ValueError(
+            raise errors.InputError(
                 "observed adapter modality must match reference modality"
             )
 
@@ -5504,11 +5586,11 @@ class RunPlan:
         if manifest is None:
             return
         if manifest.modality != modalities.serialise(self.adapter.modality):
-            raise ValueError("manifest modality must match adapter")
+            raise errors.InputError("manifest modality must match adapter")
         if manifest.content_hash != self.adapter.dataset_hash:
-            raise ValueError("manifest content_hash must match adapter")
+            raise errors.InputError("manifest content_hash must match adapter")
         if manifest.sample_count != len(self.adapter.samples):
-            raise ValueError("manifest sample_count must match adapter")
+            raise errors.InputError("manifest sample_count must match adapter")
 
     def check_checkpoint_presence(self, *, resume: bool) -> None:
         """Checks that the checkpoint file exists exactly when resuming.
@@ -5576,7 +5658,7 @@ class RunPlan:
             "manifest_digest": checkpoint.manifest_digest,
         }
         if actual_identity != self.identity():
-            raise ValueError(
+            raise errors.InputError(
                 "lifecycle checkpoint identity does not match the "
                 "requested resume"
             )
@@ -5584,7 +5666,7 @@ class RunPlan:
             checkpoint.completed_stages
             != stage_names[: len(checkpoint.completed_stages)]
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "lifecycle checkpoint stage order does not match "
                 "the current lifecycle"
             )
@@ -5601,7 +5683,9 @@ class RunPlan:
         """
         report_target = self.report_target
         if report_target is None or not report_target.is_file():
-            raise ValueError("completed lifecycle checkpoint has no report")
+            raise errors.InputError(
+                "completed lifecycle checkpoint has no report"
+            )
         completed_report = Record.read_verified(report_target, self.signing_key)
         if (
             completed_report.modality
@@ -5609,7 +5693,7 @@ class RunPlan:
             or completed_report.dataset_hash != self.adapter.dataset_hash
             or Path(completed_report.package.path) != self.package_target
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "completed lifecycle report does not match the requested resume"
             )
         Predictor.from_package(
@@ -5728,7 +5812,7 @@ class RunPlan:
         }
         if performance_result is not None and not performance_result.passed:
             self.remove_package()
-            raise ValueError(
+            raise errors.InputError(
                 "performance budget failed: "
                 + "; ".join(performance_result.violations)
             )
@@ -5737,7 +5821,7 @@ class RunPlan:
             and not performance_comparison.passed
         ):
             self.remove_package()
-            raise ValueError(
+            raise errors.InputError(
                 "performance baseline failed: "
                 + "; ".join(performance_comparison.violations)
             )
@@ -5802,7 +5886,7 @@ class Lifecycle:
             )
             if stage_index < resume_count:
                 if stage_digest != resume_digests[stage_index]:
-                    raise ValueError(
+                    raise errors.InputError(
                         "lifecycle checkpoint replay diverged at stage "
                         f"{stage.stage.value}"
                     )
@@ -6060,11 +6144,11 @@ def require_feature_names(feature_names: object) -> list[str]:
             strings.
     """
     if not isinstance(feature_names, list) or not feature_names:
-        raise ValueError("modality package feature_names are invalid")
+        raise errors.InputError("modality package feature_names are invalid")
     if any(
         not isinstance(name, str) or not name.strip() for name in feature_names
     ) or len(set(feature_names)) != len(feature_names):
-        raise ValueError("modality package feature_names are invalid")
+        raise errors.InputError("modality package feature_names are invalid")
     return feature_names
 
 
@@ -6086,13 +6170,15 @@ def check_package_signature(
         not isinstance(signature, dict)
         or signature.get("algorithm") != signing.SIGNATURE_ALGORITHM
     ):
-        raise ValueError("modality package signature is missing or unsupported")
+        raise errors.InputError(
+            "modality package signature is missing or unsupported"
+        )
     value = signature.get("value")
     if not isinstance(value, str) or not value.strip():
-        raise ValueError("modality package signature is empty")
+        raise errors.InputError("modality package signature is empty")
     expected = signing.sign_payload(unsigned, signing_key)
     if not hmac.compare_digest(value, expected):
-        raise ValueError("modality package signature does not verify")
+        raise errors.InputError("modality package signature does not verify")
 
 
 def verify_package_manifest(
@@ -6114,26 +6200,26 @@ def verify_package_manifest(
             or signature is missing, malformed or does not verify.
     """
     if not isinstance(manifest, Mapping):
-        raise ValueError("modality package manifest must be an object")
+        raise errors.InputError("modality package manifest must be an object")
     unsigned = dict(manifest)
     signature = unsigned.pop("signature", None)
     schema_version = unsigned.get("schema_version")
     if isinstance(schema_version, bool) or schema_version != (
         PACKAGE_SCHEMA_VERSION
     ):
-        raise ValueError("unsupported modality package schema version")
+        raise errors.InputError("unsupported modality package schema version")
     modality = unsigned.get("modality")
     if not isinstance(modality, str) or not modality.strip():
-        raise ValueError("modality package modality is invalid")
+        raise errors.InputError("modality package modality is invalid")
     dataset_hash = unsigned.get("dataset_hash")
     if not isinstance(dataset_hash, str) or not dataset_hash.strip():
-        raise ValueError("modality package dataset_hash is invalid")
+        raise errors.InputError("modality package dataset_hash is invalid")
     feature_names = require_feature_names(unsigned.get("feature_names"))
     model_digest = unsigned.get("model_sha256")
     if not isinstance(model_digest, str) or not is_sha256(model_digest):
-        raise ValueError("modality package model_sha256 is invalid")
+        raise errors.InputError("modality package model_sha256 is invalid")
     if not isinstance(unsigned.get("evaluation"), Mapping):
-        raise ValueError("modality package evaluation is invalid")
+        raise errors.InputError("modality package evaluation is invalid")
     check_package_signature(signature, unsigned, signing_key)
     return feature_names, model_digest
 
@@ -6155,18 +6241,18 @@ def check_package_classifier(loaded: object, feature_count: int) -> None:
             "modality package does not contain the expected classifier"
         )
     if getattr(loaded, "n_features_in_", None) != feature_count:
-        raise ValueError(
+        raise errors.InputError(
             "modality package model and feature schema do not match"
         )
     if len(getattr(loaded, "classes_", ())) < MIN_CLASS_COUNT:
-        raise ValueError(
+        raise errors.InputError(
             "modality package classifier has fewer than two classes"
         )
     if (
         not numpy.isfinite(loaded.coef_).all()
         or not numpy.isfinite(loaded.intercept_).all()
     ):
-        raise ValueError(
+        raise errors.InputError(
             "modality package classifier contains non-finite values"
         )
 
@@ -6192,11 +6278,11 @@ def load_package(
     manifest_path = target / "manifest.json"
     model_path = target / "model.joblib"
     if not manifest_path.is_file() or not model_path.is_file():
-        raise ValueError("modality package is incomplete")
+        raise errors.InputError("modality package is incomplete")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     feature_names, model_digest = verify_package_manifest(manifest, signing_key)
     if file_digest(model_path) != model_digest:
-        raise ValueError("modality package model digest does not verify")
+        raise errors.InputError("modality package model digest does not verify")
     loaded = joblib.load(model_path)
     check_package_classifier(loaded, len(feature_names))
     return loaded
@@ -6240,9 +6326,9 @@ def normalize_json_object(
             json.dumps(dict(value), allow_nan=False, sort_keys=True)
         )
     except (TypeError, ValueError) as error:
-        raise ValueError(f"{name} must be JSON-native") from error
+        raise errors.InputError(f"{name} must be JSON-native") from error
     if not isinstance(normalized, dict):
-        raise ValueError(f"{name} must serialize to an object")
+        raise errors.InputError(f"{name} must serialize to an object")
     return normalized
 
 

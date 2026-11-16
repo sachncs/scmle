@@ -98,6 +98,7 @@ from typing import Any
 from typing import ClassVar
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.ledger import budget
 
@@ -170,7 +171,7 @@ class Discount:
             ValueError: If `index` is below 1.
         """
         if index < 1:
-            raise ValueError("index must be at least 1")
+            raise errors.InputError("index must be at least 1")
         if self.horizon is None:
             return Fraction(1, index * (index + 1))
         return (
@@ -215,13 +216,13 @@ class Evidence:
                 `qualification` checks.
         """
         if self.p is None and self.e is None:
-            raise ValueError("evidence needs a p-value or an e-value")
+            raise errors.InputError("evidence needs a p-value or an e-value")
         if self.p is not None:
             qualification.probability(self.p, "p")
         if self.e is not None:
             value = qualification.finite(self.e, "e")
             if value < 0.0:
-                raise ValueError("e must be non-negative")
+                raise errors.InputError("e must be non-negative")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -283,7 +284,7 @@ def calibrate(p: float, kappa: float = DEFAULT_KAPPA) -> float:
     qualification.probability(p, "p")
     level = qualification.finite(kappa, "kappa")
     if not 0.0 < level < 1.0:
-        raise ValueError("kappa must be strictly between 0 and 1")
+        raise errors.InputError("kappa must be strictly between 0 and 1")
     floored = max(p, P_FLOOR)
     if level == DEFAULT_KAPPA:
         return 0.5 / math.sqrt(floored)
@@ -308,7 +309,7 @@ def exact_alpha(value: Any, name: str) -> Fraction:
     """
     amount = budget.exact(value, name)
     if not 0 <= amount <= 1:
-        raise ValueError(f"{name} must be within [0, 1]")
+        raise errors.InputError(f"{name} must be within [0, 1]")
     return amount
 
 
@@ -501,7 +502,7 @@ class ELond(Tester):
         super().__init__(alpha, discount)
         level = qualification.finite(kappa, "kappa")
         if not 0.0 < level < 1.0:
-            raise ValueError("kappa must be strictly between 0 and 1")
+            raise errors.InputError("kappa must be strictly between 0 and 1")
         self.kappa = level
 
     def level(self, state: State) -> Fraction:
@@ -553,7 +554,7 @@ class ELond(Tester):
         elif evidence.p is not None:
             e_value = calibrate(evidence.p, self.kappa)
         else:  # pragma: no cover - Evidence forbids this
-            raise ValueError("evidence needs a p-value or an e-value")
+            raise errors.InputError("evidence needs a p-value or an e-value")
         return Fraction(e_value) * level >= 1, False, e_value
 
 
@@ -579,7 +580,7 @@ class PValueTester(Tester):
         super().__init__(alpha, discount)
         start = self.alpha / 2 if w0 is None else exact_alpha(w0, "w0")
         if not 0 <= start <= self.alpha:
-            raise ValueError("w0 must be within [0, alpha]")
+            raise errors.InputError("w0 must be within [0, alpha]")
         self.w0 = start
 
     def credit(self, state: State) -> Fraction:
@@ -608,7 +609,7 @@ class PValueTester(Tester):
             ValueError: If the evidence has no p-value.
         """
         if evidence.p is None:
-            raise ValueError(f"{self.name} needs a p-value")
+            raise errors.InputError(f"{self.name} needs a p-value")
         return Fraction(evidence.p)
 
 
@@ -725,7 +726,7 @@ class Saffron(PValueTester):
         super().__init__(alpha, discount, w0)
         threshold = budget.exact(lam, "lambda")
         if not 0 < threshold < 1:
-            raise ValueError("lambda must be strictly between 0 and 1")
+            raise errors.InputError("lambda must be strictly between 0 and 1")
         self.lam = threshold
 
     def level(self, state: State) -> Fraction:
@@ -840,7 +841,7 @@ class RuleConfig:
             return LordPlusPlus(self.alpha, discount, self.w0)
         if self.rule == SAFFRON:
             return Saffron(self.alpha, discount, self.w0, self.lam)
-        raise ValueError(f"rule must be one of {RULE_NAMES}")
+        raise errors.InputError(f"rule must be one of {RULE_NAMES}")
 
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
@@ -877,7 +878,7 @@ class RuleConfig:
         """
         names = {"rule", "alpha", "horizon", "w0", "lambda", "kappa"}
         if set(record) != names:
-            raise ValueError("unexpected or missing rule fields")
+            raise errors.InputError("unexpected or missing rule fields")
         w0 = record["w0"]
         return cls(
             rule=record["rule"],

@@ -26,6 +26,7 @@ import numpy
 from numpy.typing import ArrayLike
 import pandas
 
+from scmle.contracts import errors
 from scmle.core import randomness
 
 LEVEL = 0.05
@@ -68,11 +69,13 @@ def balance_test(
     """
     arm = numpy.asarray(treatment).astype(int)
     if len(features) != len(arm):
-        raise ValueError("features and treatment must have the same length")
+        raise errors.InputError(
+            "features and treatment must have the same length"
+        )
     if permutations < 1:
-        raise ValueError("permutations must be positive")
+        raise errors.InputError("permutations must be positive")
     if not 0.0 < level < 1.0:
-        raise ValueError("level must lie in (0, 1)")
+        raise errors.InputError("level must lie in (0, 1)")
     numeric = features.select_dtypes("number")
     matrix = numeric.to_numpy(dtype=float)
     if matrix.size:

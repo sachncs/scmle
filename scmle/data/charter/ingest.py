@@ -17,6 +17,7 @@ import re
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 
@@ -42,7 +43,7 @@ def non_negative(value: Any, name: str) -> float:
     """
     number = qualification.finite(value, name)
     if number < 0:
-        raise ValueError(f"{name} must not be negative")
+        raise errors.InputError(f"{name} must not be negative")
     return number
 
 
@@ -113,7 +114,7 @@ class EntityPass:
         """
         evidence.require_text(self.field, "field")
         if self.kind not in PASS_KINDS:
-            raise ValueError(f"kind must be one of {PASS_KINDS}")
+            raise errors.InputError(f"kind must be one of {PASS_KINDS}")
         qualification.count(self.size, "size", minimum=1)
 
     def to_dict(self) -> dict[str, Any]:
@@ -167,10 +168,10 @@ class Entity:
         qualification.require_tuple(self.fields, "fields")
         qualification.require_tuple(self.passes, "passes")
         if not self.fields or not self.passes:
-            raise ValueError("an entity block needs fields and passes")
+            raise errors.InputError("an entity block needs fields and passes")
         names = [f.name for f in self.fields]
         if len(set(names)) != len(names):
-            raise ValueError("duplicate entity field")
+            raise errors.InputError("duplicate entity field")
         evidence.require_text(self.column, "column")
 
     def to_dict(self) -> dict[str, Any]:
@@ -287,11 +288,13 @@ class TableTotals:
         if self.rows is not None:
             qualification.count(self.rows, "rows")
         if (self.checksum_column is None) != (self.checksum is None):
-            raise ValueError("checksum and checksum_column go together")
+            raise errors.InputError("checksum and checksum_column go together")
         if self.checksum is not None and not HEX64.match(self.checksum):
-            raise ValueError("checksum must be 64 lower-case hex digits")
+            raise errors.InputError("checksum must be 64 lower-case hex digits")
         if self.rows is None and not self.sums and self.checksum is None:
-            raise ValueError(f"nothing is declared for view {self.view!r}")
+            raise errors.InputError(
+                f"nothing is declared for view {self.view!r}"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.
@@ -351,10 +354,12 @@ class Expectation:
         """
         qualification.require_tuple(self.tables, "tables")
         if not self.tables:
-            raise ValueError("a reconcile block needs at least one table")
+            raise errors.InputError(
+                "a reconcile block needs at least one table"
+            )
         names = [t.view for t in self.tables]
         if len(set(names)) != len(names):
-            raise ValueError("duplicate view in the reconcile block")
+            raise errors.InputError("duplicate view in the reconcile block")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the block.
@@ -441,10 +446,10 @@ class Ingestion:
         qualification.count(self.feature_budget, "feature_budget", minimum=1)
         qualification.require_tuple(self.windows, "windows")
         if not self.windows or len(set(self.windows)) != len(self.windows):
-            raise ValueError("windows must be non-empty and distinct")
+            raise errors.InputError("windows must be non-empty and distinct")
         for window in self.windows:
             if qualification.finite(window, "window") <= 0:
-                raise ValueError("windows must be positive")
+                raise errors.InputError("windows must be positive")
         for name in ("lag", "delta_rec", "eps_key", "eps_null", "eps_fk"):
             non_negative(getattr(self, name), name)
 

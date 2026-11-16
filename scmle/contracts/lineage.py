@@ -15,6 +15,8 @@ import json
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
+
 
 class Kind(enum.StrEnum):
     """Evidence object categories in the lifecycle graph."""
@@ -47,7 +49,7 @@ def require_text(value: str, name: str) -> str:
     """
     result = value.strip()
     if not result:
-        raise ValueError(f"{name} must not be empty")
+        raise errors.InputError(f"{name} must not be empty")
     return result
 
 
@@ -75,7 +77,7 @@ class Node:
             object.__setattr__(self, "kind", Kind(kind))
         normalized = dict(self.attributes)
         if any(not key.strip() for key in normalized):
-            raise ValueError("attribute names must not be empty")
+            raise errors.InputError("attribute names must not be empty")
         if any(not isinstance(value, str) for value in normalized.values()):
             raise TypeError("attribute values must be strings")
         object.__setattr__(self, "attributes", normalized)
@@ -126,7 +128,7 @@ class Edge:
         require_text(self.target_id, "target_id")
         require_text(self.relationship, "relationship")
         if self.source_id == self.target_id:
-            raise ValueError("evidence edges must not be self-loops")
+            raise errors.InputError("evidence edges must not be self-loops")
 
     def to_dict(self) -> dict[str, str]:
         """Returns a JSON-compatible edge record."""
@@ -188,7 +190,9 @@ class Graph:
             raise TypeError("node must be Node")
         existing = self.nodes.get(node.node_id)
         if existing is not None and existing != node:
-            raise ValueError(f"conflicting evidence node: {node.node_id}")
+            raise errors.InputError(
+                f"conflicting evidence node: {node.node_id}"
+            )
         self.nodes[node.node_id] = node
 
     def connect(self, edge: Edge) -> None:
@@ -207,11 +211,11 @@ class Graph:
         if not isinstance(edge, Edge):
             raise TypeError("edge must be Edge")
         if edge.source_id not in self.nodes or edge.target_id not in self.nodes:
-            raise ValueError("evidence edge refers to an unknown node")
+            raise errors.InputError("evidence edge refers to an unknown node")
         if edge in self.edges:
             return
         if self.path_exists(edge.target_id, edge.source_id):
-            raise ValueError("evidence graph must remain acyclic")
+            raise errors.InputError("evidence graph must remain acyclic")
         self.edges.append(edge)
 
     def path_exists(self, source_id: str, target_id: str) -> bool:
@@ -279,7 +283,7 @@ class Graph:
                     ready.append(target)
                     ready.sort()
         if len(order) != len(self.nodes):
-            raise ValueError("evidence graph contains a cycle")
+            raise errors.InputError("evidence graph contains a cycle")
         return tuple(order)
 
     def validate(self) -> None:
@@ -295,9 +299,13 @@ class Graph:
                 edge.source_id not in self.nodes
                 or edge.target_id not in self.nodes
             ):
-                raise ValueError("evidence graph contains a dangling edge")
+                raise errors.InputError(
+                    "evidence graph contains a dangling edge"
+                )
             if edge in seen:
-                raise ValueError("evidence graph contains duplicate edges")
+                raise errors.InputError(
+                    "evidence graph contains duplicate edges"
+                )
             seen.add(edge)
         self.topological_order_without_validation()
 
@@ -331,7 +339,7 @@ class Graph:
                     ready.append(target)
                     ready.sort()
         if len(order) != len(self.nodes):
-            raise ValueError("evidence graph contains a cycle")
+            raise errors.InputError("evidence graph contains a cycle")
         return tuple(order)
 
     def to_dict(self) -> dict[str, Any]:
@@ -395,14 +403,16 @@ class Graph:
                 topological order differs from the graph's.
         """
         if int(record.get("schema_version", 0)) != cls.schema_version:
-            raise ValueError("unsupported evidence graph schema version")
+            raise errors.InputError("unsupported evidence graph schema version")
         graph = cls(Node.from_dict(item) for item in record.get("nodes", ()))
         for item in record.get("edges", ()):
             graph.connect(Edge.from_dict(item))
         graph.validate()
         expected_order = tuple(record.get("topological_order", ()))
         if expected_order and expected_order != graph.topological_order():
-            raise ValueError("evidence graph topological order is invalid")
+            raise errors.InputError(
+                "evidence graph topological order is invalid"
+            )
         return graph
 
 

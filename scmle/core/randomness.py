@@ -11,6 +11,7 @@ import hashlib
 
 import numpy
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 
 NAME_WORDS = 4
@@ -38,7 +39,7 @@ def validate_key(run_seed: int, component: str, index: int) -> str:
     qualification.count(index, "index")
     name = component.strip()
     if not name:
-        raise ValueError("component must not be empty")
+        raise errors.InputError("component must not be empty")
     return name
 
 

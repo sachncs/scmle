@@ -110,13 +110,13 @@ class KnownTime:
                 the three modes, or if `delta_rec_days` is negative.
         """
         if self.mode == TRANSACTION and not self.known_column:
-            raise ValueError("transaction mode needs known_column")
+            raise errors.InputError("transaction mode needs known_column")
         if self.mode == EVENT_DELAY and self.delta_rec_days is None:
-            raise ValueError("event_delay mode needs delta_rec_days")
+            raise errors.InputError("event_delay mode needs delta_rec_days")
         if self.mode not in (TRANSACTION, EVENT_DELAY, NON_VERSIONED):
-            raise ValueError(f"unknown mode: {self.mode}")
+            raise errors.InputError(f"unknown mode: {self.mode}")
         if self.delta_rec_days is not None and self.delta_rec_days < 0:
-            raise ValueError("delta_rec_days must be non-negative")
+            raise errors.InputError("delta_rec_days must be non-negative")
 
     def tier(self, today: datetime.date | None = None) -> qualification.Tier:
         """Gives the evidence tier of the rule.
@@ -192,15 +192,15 @@ class AsOfView:
         """
         clash = [c for c in RESERVED if c in frame.columns]
         if clash:
-            raise ValueError(f"table uses reserved column(s): {clash}")
+            raise errors.InputError(f"table uses reserved column(s): {clash}")
         needed = [key] + ([event_time] if event_time else [])
         if rule.known_column:
             needed.append(rule.known_column)
         missing = [c for c in needed if c not in frame.columns]
         if missing:
-            raise ValueError(f"table lacks column(s): {missing}")
+            raise errors.InputError(f"table lacks column(s): {missing}")
         if rule.mode != NON_VERSIONED and event_time is None:
-            raise ValueError("a versioned table needs event_time")
+            raise errors.InputError("a versioned table needs event_time")
         self.name = name or key
         self.key = key
         self.rule = rule

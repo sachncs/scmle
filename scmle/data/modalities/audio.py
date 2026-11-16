@@ -73,15 +73,17 @@ class Metadata:
                 frame_count or a given sample_width is below one.
         """
         if not self.format.strip():
-            raise ValueError("format must not be empty")
+            raise errors.InputError("format must not be empty")
         if self.sample_rate < 1:
-            raise ValueError("sample_rate must be positive")
+            raise errors.InputError("sample_rate must be positive")
         if self.channels < 1:
-            raise ValueError("channels must be positive")
+            raise errors.InputError("channels must be positive")
         if self.frame_count < 1:
-            raise ValueError("frame_count must be positive")
+            raise errors.InputError("frame_count must be positive")
         if self.sample_width is not None and self.sample_width < 1:
-            raise ValueError("sample_width must be positive when provided")
+            raise errors.InputError(
+                "sample_width must be positive when provided"
+            )
 
     @property
     def duration_seconds(self) -> float:
@@ -119,15 +121,17 @@ class TranscriptSegment:
             or self.start_seconds < 0
             or self.end_seconds <= self.start_seconds
         ):
-            raise ValueError("transcript segment time bounds are invalid")
+            raise errors.InputError(
+                "transcript segment time bounds are invalid"
+            )
         if not self.text.strip():
-            raise ValueError("transcript segment text must not be empty")
+            raise errors.InputError("transcript segment text must not be empty")
         if self.confidence is not None and (
             isinstance(self.confidence, bool)
             or not math.isfinite(self.confidence)
             or not 0.0 <= self.confidence <= 1.0
         ):
-            raise ValueError("transcript confidence must be in [0, 1]")
+            raise errors.InputError("transcript confidence must be in [0, 1]")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -170,13 +174,15 @@ class Transcript:
             ("language", self.language),
         ):
             if not value.strip():
-                raise ValueError(f"transcript {field_name} must not be empty")
+                raise errors.InputError(
+                    f"transcript {field_name} must not be empty"
+                )
         if self.confidence is not None and (
             isinstance(self.confidence, bool)
             or not math.isfinite(self.confidence)
             or not 0.0 <= self.confidence <= 1.0
         ):
-            raise ValueError("transcript confidence must be in [0, 1]")
+            raise errors.InputError("transcript confidence must be in [0, 1]")
         if not isinstance(self.segments, tuple):
             raise TypeError("segments must be a tuple")
         if not all(
@@ -189,7 +195,7 @@ class Transcript:
                 self.segments, self.segments[1:], strict=False
             )
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "transcript segments must be ordered by start time"
             )
 
@@ -378,9 +384,9 @@ def wav_signal_features(
             or a statistic is not finite.
     """
     if max_frames < 1:
-        raise ValueError("max_frames must be at least one")
+        raise errors.InputError("max_frames must be at least one")
     if start_frame < 0:
-        raise ValueError("start_frame must not be negative")
+        raise errors.InputError("start_frame must not be negative")
     try:
         with wave.open(io.BytesIO(encoded_bytes), "rb") as opened:
             sample_width = opened.getsampwidth()
@@ -567,7 +573,9 @@ def wav_payload_from_pcm(
     """
     matrix = numpy.asarray(values, dtype=numpy.float64)
     if matrix.ndim != MATRIX_DIMENSIONS or not numpy.isfinite(matrix).all():
-        raise ValueError("PCM values must be a finite frame-by-channel matrix")
+        raise errors.InputError(
+            "PCM values must be a finite frame-by-channel matrix"
+        )
     sample_width = parameters[1]
     clipped = numpy.clip(matrix, -1.0, 1.0)
     if sample_width == 1:
@@ -632,9 +640,9 @@ class Sample:
         raw = bytes(self.encoded_bytes)
         object.__setattr__(self, "encoded_bytes", raw)
         if not self.source.strip():
-            raise ValueError("source must not be empty")
+            raise errors.InputError("source must not be empty")
         if self.group_id is not None and not self.group_id.strip():
-            raise ValueError("group_id must not be empty when provided")
+            raise errors.InputError("group_id must not be empty when provided")
         if self.transcript is not None and any(
             segment.end_seconds > self.metadata.duration_seconds + 1e-9
             for segment in self.transcript.segments
@@ -650,9 +658,9 @@ class Sample:
         if len(self.file_hash) != SHA256_HEX_LENGTH or any(
             character not in "0123456789abcdef" for character in self.file_hash
         ):
-            raise ValueError("file_hash must be a SHA-256 hex digest")
+            raise errors.InputError("file_hash must be a SHA-256 hex digest")
         if hashlib.sha256(raw).hexdigest() != self.file_hash:
-            raise ValueError("file_hash does not match encoded_bytes")
+            raise errors.InputError("file_hash does not match encoded_bytes")
         object.__setattr__(self, "byte_size", len(raw))
 
     @classmethod
@@ -826,9 +834,9 @@ class Dataset:
             AudioDependencyError: If a sample is not in WAV format.
         """
         if max_frames < 1:
-            raise ValueError("max_frames must be at least one")
+            raise errors.InputError("max_frames must be at least one")
         if start_frame < 0:
-            raise ValueError("start_frame must not be negative")
+            raise errors.InputError("start_frame must not be negative")
         feature_names = (
             "mean_amplitude",
             "mean_absolute_amplitude",

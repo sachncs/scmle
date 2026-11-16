@@ -5,6 +5,7 @@ import dataclasses
 import datetime
 from typing import Any
 
+from scmle.contracts import errors
 from scmle.contracts import observability
 
 
@@ -129,7 +130,9 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
     try:
         parsed = datetime.datetime.fromisoformat(value)
     except ValueError as error:
-        raise ValueError(f"{field_name} must be ISO-8601") from error
+        raise errors.InputError(f"{field_name} must be ISO-8601") from error
     if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError(f"{field_name} must include timezone information")
+        raise errors.InputError(
+            f"{field_name} must include timezone information"
+        )
     return parsed

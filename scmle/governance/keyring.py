@@ -21,6 +21,7 @@ from typing import Any
 from typing import Self
 
 from scmle import durability
+from scmle.contracts import errors
 from scmle.contracts import signing
 
 
@@ -46,7 +47,7 @@ def require_text(value: object, field_name: str) -> str:
         ValueError: If `value` is not a string or is blank.
     """
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{field_name} must not be empty")
+        raise errors.InputError(f"{field_name} must not be empty")
     return value.strip()
 
 
@@ -65,7 +66,9 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
     """
     timestamp = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))  # noqa: FURB162 -- keeps the exact set of accepted inputs
     if timestamp.tzinfo is None or timestamp.utcoffset() is None:
-        raise ValueError(f"{field_name} must include timezone information")
+        raise errors.InputError(
+            f"{field_name} must include timezone information"
+        )
     return timestamp
 
 
@@ -100,23 +103,29 @@ class SigningKeyRecord:
         if self.expires_at is not None:
             expires = parse_timestamp(self.expires_at, "expires_at")
             if expires <= created:
-                raise ValueError("expires_at must be after created_at")
+                raise errors.InputError("expires_at must be after created_at")
         state: Any = self.state  # may be text from a persisted record
         if not isinstance(state, KeyState):
             object.__setattr__(self, "state", KeyState(state))
         if self.state is not KeyState.ACTIVE:
             if self.state_changed_at is None:
-                raise ValueError("non-active keys require state_changed_at")
+                raise errors.InputError(
+                    "non-active keys require state_changed_at"
+                )
             parse_timestamp(self.state_changed_at, "state_changed_at")
             require_text(self.reason, "reason")
         if self.state_changed_at is not None:
             changed = parse_timestamp(self.state_changed_at, "state_changed_at")
             if changed < created:
-                raise ValueError("state_changed_at must not precede created_at")
+                raise errors.InputError(
+                    "state_changed_at must not precede created_at"
+                )
         if self.replacement_key_id is not None:
             require_text(self.replacement_key_id, "replacement_key_id")
             if self.replacement_key_id == self.key_id:
-                raise ValueError("replacement_key_id must differ from key_id")
+                raise errors.InputError(
+                    "replacement_key_id must differ from key_id"
+                )
 
     def signs(self, observed_at: str) -> bool:
         """Returns whether this key may create a signature at a given time.
@@ -253,7 +262,7 @@ class SignatureEnvelope:
         parse_timestamp(self.signed_at, "signed_at")
         require_text(self.value, "value")
         if self.algorithm != signing.SIGNATURE_ALGORITHM:
-            raise ValueError("unsupported signature algorithm")
+            raise errors.InputError("unsupported signature algorithm")
 
     def to_dict(self) -> dict[str, str]:
         """Returns a JSON-compatible signature envelope."""
@@ -313,7 +322,9 @@ class SigningKeyRegistry:
             raise TypeError("record must be SigningKeyRecord")
         with self.lock:
             if record.key_id in self.records:
-                raise ValueError(f"key already registered: {record.key_id}")
+                raise errors.InputError(
+                    f"key already registered: {record.key_id}"
+                )
             self.records[record.key_id] = record
 
     def get(self, key_id: str) -> SigningKeyRecord:
@@ -331,7 +342,7 @@ class SigningKeyRegistry:
         try:
             return self.records[key_id]
         except KeyError as error:
-            raise ValueError(f"unknown signing key: {key_id}") from error
+            raise errors.InputError(f"unknown signing key: {key_id}") from error
 
     def retire(
         self,
@@ -413,11 +424,11 @@ class SigningKeyRegistry:
             if current.state is not KeyState.ACTIVE and not (
                 current.state is KeyState.RETIRED and state is KeyState.REVOKED
             ):
-                raise ValueError(
+                raise errors.InputError(
                     f"key is already {current.state.value}: {key_id}"
                 )
             if state is KeyState.ACTIVE:
-                raise ValueError("active is not a terminal transition")
+                raise errors.InputError("active is not a terminal transition")
             updated = dataclasses.replace(
                 current,
                 state=state,
@@ -432,7 +443,7 @@ class SigningKeyRegistry:
             if replacement_key_id is not None:
                 replacement = self.get(replacement_key_id)
                 if replacement.state is not KeyState.ACTIVE:
-                    raise ValueError("replacement key must be active")
+                    raise errors.InputError("replacement key must be active")
             self.records[key_id] = updated
             return updated
 
@@ -461,7 +472,7 @@ class SigningKeyRegistry:
         """
         record = self.get(key_id)
         if not record.signs(signed_at):
-            raise ValueError(f"signing key cannot sign: {key_id}")
+            raise errors.InputError(f"signing key cannot sign: {key_id}")
         return SignatureEnvelope(
             key_id=key_id,
             signed_at=signed_at,
@@ -538,10 +549,12 @@ class SigningKeyRegistry:
                 `KeyError`) or a key id appears twice.
         """
         if record.get("schema_version") != 1:
-            raise ValueError("unsupported signing-key registry schema version")
+            raise errors.InputError(
+                "unsupported signing-key registry schema version"
+            )
         keys = record.get("keys")
         if not isinstance(keys, list):
-            raise ValueError("signing-key registry keys must be a list")
+            raise errors.InputError("signing-key registry keys must be a list")
         return cls(SigningKeyRecord.from_dict(item) for item in keys)
 
     @classmethod
@@ -560,7 +573,7 @@ class SigningKeyRegistry:
         """
         record = json.loads(value)
         if not isinstance(record, Mapping):
-            raise ValueError("signing-key registry must be an object")
+            raise errors.InputError("signing-key registry must be an object")
         return cls.from_dict(record)
 
     def write(self, path: str | Path) -> None:

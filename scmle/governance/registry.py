@@ -74,21 +74,23 @@ class PromotionApproval:
         ):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{name} must not be empty")
+                raise errors.InputError(f"{name} must not be empty")
         if self.version < 1:
-            raise ValueError("version must be positive")
+            raise errors.InputError("version must be positive")
         decision: Any = self.decision  # may be text from a persisted record
         if not isinstance(decision, PromotionDecision):
             object.__setattr__(self, "decision", PromotionDecision(decision))
         if not self.evidence or any(not item.strip() for item in self.evidence):
-            raise ValueError("evidence must contain non-empty references")
+            raise errors.InputError(
+                "evidence must contain non-empty references"
+            )
         if not isinstance(self.independent, bool):
             raise TypeError("independent must be bool")
         signature: object = self.signature  # may be any value from a record
         if signature is not None and (
             not isinstance(signature, str) or not signature.strip()
         ):
-            raise ValueError("signature must be non-empty text")
+            raise errors.InputError("signature must be non-empty text")
 
     def unsigned_dict(self) -> dict[str, Any]:
         """Returns the approval fields covered by its signature."""
@@ -166,15 +168,19 @@ class PromotionApproval:
             version,
             content_id,
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "promotion approval does not match bundle identity"
             )
         if self.decision is not PromotionDecision.APPROVED:
-            raise ValueError("promotion was rejected by the reviewer")
+            raise errors.InputError("promotion was rejected by the reviewer")
         if not self.independent:
-            raise ValueError("champion promotion requires independent review")
+            raise errors.InputError(
+                "champion promotion requires independent review"
+            )
         if not self.verify(signing_key):
-            raise ValueError("champion promotion requires a valid signature")
+            raise errors.InputError(
+                "champion promotion requires a valid signature"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the complete approval record for durable audit evidence."""

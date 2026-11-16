@@ -23,6 +23,7 @@ import numpy
 import pandas
 
 from scmle import durability
+from scmle.contracts import errors
 
 CATALOG_SCHEMA_VERSION = 1
 DIGEST_LENGTH = 64
@@ -109,11 +110,13 @@ def validate_digest(value: str, field_name: str) -> str:
     """
     normalized = value.removeprefix("sha256:")
     if len(normalized) != DIGEST_LENGTH:
-        raise ValueError(f"{field_name} must be a SHA-256 digest")
+        raise errors.InputError(f"{field_name} must be a SHA-256 digest")
     try:
         int(normalized, 16)
     except ValueError as error:
-        raise ValueError(f"{field_name} must be a SHA-256 digest") from error
+        raise errors.InputError(
+            f"{field_name} must be a SHA-256 digest"
+        ) from error
     return f"sha256:{normalized.lower()}"
 
 
@@ -137,7 +140,7 @@ class Source:
         """
         uri_value = str(self.uri)
         if not uri_value.strip():
-            raise ValueError("uri must not be empty")
+            raise errors.InputError("uri must not be empty")
         object.__setattr__(self, "uri", normalize_uri(uri_value))
         for field_name in (
             "version",
@@ -209,7 +212,9 @@ class Source:
         )
         expected = record.get("source_identity")
         if expected != source.source_identity:
-            raise ValueError("source_identity does not match source fields")
+            raise errors.InputError(
+                "source_identity does not match source fields"
+            )
         return source
 
 
@@ -230,9 +235,9 @@ class Field:
         name: object = self.name
         data_type: object = self.data_type
         if not isinstance(name, str) or not name.strip():
-            raise ValueError("field name must not be empty")
+            raise errors.InputError("field name must not be empty")
         if not isinstance(data_type, str) or not data_type.strip():
-            raise ValueError("field data_type must not be empty")
+            raise errors.InputError("field data_type must not be empty")
         object.__setattr__(self, "name", self.name.strip())
         object.__setattr__(self, "data_type", self.data_type.strip())
 
@@ -277,7 +282,7 @@ class MissingnessSummary:
                 has a blank name or a negative or non-integer count.
         """
         if not self.status.strip():
-            raise ValueError("missingness status must not be empty")
+            raise errors.InputError("missingness status must not be empty")
         for field_name, field_value in (
             ("total_values", self.total_values),
             ("missing_values", self.missing_values),
@@ -288,9 +293,9 @@ class MissingnessSummary:
             ):
                 raise TypeError(f"{field_name} must be an integer")
             if field_value < 0:
-                raise ValueError(f"{field_name} must not be negative")
+                raise errors.InputError(f"{field_name} must not be negative")
         if self.missing_values > self.total_values:
-            raise ValueError("missing_values cannot exceed total_values")
+            raise errors.InputError("missing_values cannot exceed total_values")
         by_field_items: Iterable[tuple[object, object]] = self.by_field.items()
         if any(
             not isinstance(name, str)
@@ -300,7 +305,9 @@ class MissingnessSummary:
             or count < 0
             for name, count in by_field_items
         ):
-            raise ValueError("by_field must contain non-negative named counts")
+            raise errors.InputError(
+                "by_field must contain non-negative named counts"
+            )
         object.__setattr__(
             self, "by_field", dict(sorted(self.by_field.items()))
         )
@@ -361,7 +368,9 @@ class MissingnessSummary:
         if observed_fraction is not None and not math.isclose(
             float(observed_fraction), result.fraction
         ):
-            raise ValueError("missing_fraction does not match missing values")
+            raise errors.InputError(
+                "missing_fraction does not match missing values"
+            )
         return result
 
 
@@ -385,18 +394,22 @@ class DuplicateSummary:
                 rejected).
         """
         if not self.status.strip() or not self.method.strip():
-            raise ValueError("duplicate status and method must not be empty")
+            raise errors.InputError(
+                "duplicate status and method must not be empty"
+            )
         if isinstance(self.duplicate_rows, bool) or not isinstance(
             self.duplicate_rows, int
         ):
             raise TypeError("duplicate_rows must be an integer")
         if self.duplicate_rows < 0:
-            raise ValueError("duplicate_rows must not be negative")
+            raise errors.InputError("duplicate_rows must not be negative")
         if (
             not math.isfinite(self.duplicate_fraction)
             or not 0 <= (self.duplicate_fraction) <= 1
         ):
-            raise ValueError("duplicate_fraction must be between zero and one")
+            raise errors.InputError(
+                "duplicate_fraction must be between zero and one"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native duplicate evidence.
@@ -452,9 +465,9 @@ class LabelSummary:
             TypeError: If a count is not an integer (booleans are rejected).
         """
         if not self.status.strip():
-            raise ValueError("label status must not be empty")
+            raise errors.InputError("label status must not be empty")
         if self.field is not None and not self.field.strip():
-            raise ValueError("label field must not be empty")
+            raise errors.InputError("label field must not be empty")
         for field_name, field_value in (
             ("observed_count", self.observed_count),
             ("missing_count", self.missing_count),
@@ -465,9 +478,11 @@ class LabelSummary:
             ):
                 raise TypeError(f"{field_name} must be an integer")
             if field_value < 0:
-                raise ValueError(f"{field_name} must not be negative")
+                raise errors.InputError(f"{field_name} must not be negative")
         if self.distinct_count > self.observed_count:
-            raise ValueError("distinct_count cannot exceed observed_count")
+            raise errors.InputError(
+                "distinct_count cannot exceed observed_count"
+            )
         distribution_items: Iterable[tuple[object, object]] = (
             self.distribution.items()
         )
@@ -479,9 +494,13 @@ class LabelSummary:
             or value < 0
             for key, value in distribution_items
         ):
-            raise ValueError("distribution must contain non-negative counts")
+            raise errors.InputError(
+                "distribution must contain non-negative counts"
+            )
         if sum(self.distribution.values()) != self.observed_count:
-            raise ValueError("distribution does not match observed_count")
+            raise errors.InputError(
+                "distribution does not match observed_count"
+            )
         object.__setattr__(
             self, "distribution", dict(sorted(self.distribution.items()))
         )
@@ -540,11 +559,11 @@ def check_counts(sample_count: Any, schema_version: Any) -> None:
     if isinstance(sample_count, bool) or not isinstance(sample_count, int):
         raise TypeError("sample_count must be an integer")
     if sample_count < 0:
-        raise ValueError("sample_count must not be negative")
+        raise errors.InputError("sample_count must not be negative")
     if isinstance(schema_version, bool) or not isinstance(schema_version, int):
         raise TypeError("schema_version must be an integer")
     if schema_version != CATALOG_SCHEMA_VERSION:
-        raise ValueError("unsupported catalog schema version")
+        raise errors.InputError("unsupported catalog schema version")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -588,7 +607,7 @@ class Catalog:
             raise TypeError("source must be Source")
         data_kind: object = self.data_kind
         if not isinstance(data_kind, str) or not data_kind.strip():
-            raise ValueError("data_kind must not be empty")
+            raise errors.InputError("data_kind must not be empty")
         check_counts(self.sample_count, self.schema_version)
         dimensions: Iterable[object] = self.shape
         if any(
@@ -597,7 +616,7 @@ class Catalog:
             or dimension < 0
             for dimension in dimensions
         ):
-            raise ValueError("shape must contain non-negative integers")
+            raise errors.InputError("shape must contain non-negative integers")
         fields = tuple(self.schema)
         if any(not isinstance(field, Field) for field in fields):
             raise TypeError("schema must contain Field records")
@@ -613,12 +632,16 @@ class Catalog:
             not isinstance(item, str) or not item.strip()
             for item in limitation_notes
         ):
-            raise ValueError("limitations must contain non-empty strings")
+            raise errors.InputError(
+                "limitations must contain non-empty strings"
+            )
         if any(
             not isinstance(item, str) or not item.strip()
             for item in blocker_notes
         ):
-            raise ValueError("release_blockers must contain non-empty strings")
+            raise errors.InputError(
+                "release_blockers must contain non-empty strings"
+            )
         object.__setattr__(self, "schema", fields)
         object.__setattr__(
             self,
@@ -835,24 +858,30 @@ class Catalog:
         try:
             record = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
         except (OSError, TypeError, ValueError) as error:
-            raise ValueError(
+            raise errors.InputError(
                 "catalog evidence is missing or invalid JSON"
             ) from error
         if not isinstance(record, dict):
-            raise ValueError("catalog evidence must be a JSON object")
+            raise errors.InputError("catalog evidence must be a JSON object")
         expected_digest = record.get("catalog_digest")
         if not isinstance(expected_digest, str):
-            raise ValueError("catalog evidence is missing catalog_digest")
+            raise errors.InputError(
+                "catalog evidence is missing catalog_digest"
+            )
         payload = dict(record)
         del payload["catalog_digest"]
         try:
             catalog = cls.from_dict(payload)
         except (KeyError, TypeError, ValueError) as error:
-            raise ValueError("catalog evidence schema is invalid") from error
+            raise errors.InputError(
+                "catalog evidence schema is invalid"
+            ) from error
         if validate_digest(expected_digest, "catalog_digest") != (
             catalog.catalog_digest
         ):
-            raise ValueError("catalog digest does not match catalog content")
+            raise errors.InputError(
+                "catalog digest does not match catalog content"
+            )
         return catalog
 
     @classmethod
@@ -872,7 +901,7 @@ class Catalog:
             ValueError: If ``schema_version`` is missing or unsupported.
         """
         if int(record.get("schema_version", 0)) != CATALOG_SCHEMA_VERSION:
-            raise ValueError("unsupported catalog schema version")
+            raise errors.InputError("unsupported catalog schema version")
         return cls(
             source=Source.from_dict(record["source"]),
             data_kind=str(record["data_kind"]),
@@ -998,7 +1027,7 @@ def frame_for_mapping(
     if values and all(is_sequence_value(value) for value in values):
         lengths = {len(value) for value in values}
         if len(lengths) != 1:
-            raise ValueError("mapping columns must have equal lengths")
+            raise errors.InputError("mapping columns must have equal lengths")
         frame = pandas.DataFrame(data)
         return frame, "column_mapping", frame_shape(frame)
     frame = pandas.DataFrame([dict(data)])

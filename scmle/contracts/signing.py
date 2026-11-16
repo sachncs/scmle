@@ -82,7 +82,7 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
         return None
     resolved = key.encode() if isinstance(key, str) else key
     if not resolved:
-        raise ValueError("signing key must not be empty")
+        raise errors.InputError("signing key must not be empty")
     return resolved
 
 
@@ -118,7 +118,7 @@ def sign_payload(payload: Mapping[str, Any], key: str | bytes) -> str:
     """
     resolved = resolve_key(key)
     if resolved is None:
-        raise ValueError("signing key must not be empty")
+        raise errors.InputError("signing key must not be empty")
     return hmac.new(
         resolved,
         canonicalise(payload),

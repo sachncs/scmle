@@ -28,6 +28,7 @@ from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.core import randomness
 from scmle.data.charter import decision
 from scmle.data.framing import costs
@@ -71,7 +72,7 @@ def prepared(
     outcomes, actions = costs.pair(y, acts)
     labels = numpy.asarray(groups)
     if labels.shape != outcomes.shape:
-        raise ValueError("groups must have the length of y")
+        raise errors.InputError("groups must have the length of y")
     return outcomes, actions, labels
 
 
@@ -234,7 +235,7 @@ def satisfaction_test(
     """
     outcomes, actions, labels = prepared(y, acts, groups)
     if not 0.0 < alpha < 1.0:
-        raise ValueError("alpha must be strictly between 0 and 1")
+        raise errors.InputError("alpha must be strictly between 0 and 1")
     tables = rate_tables(outcomes, actions, labels, constraint.criterion)
     names = sorted(str(g) for g in numpy.unique(labels))
     small = sorted(
@@ -345,11 +346,11 @@ def cluster_satisfaction_test(
     outcomes, actions, labels = prepared(y, acts, groups)
     keys = numpy.asarray(clusters)
     if keys.shape != outcomes.shape:
-        raise ValueError("clusters must have the length of y")
+        raise errors.InputError("clusters must have the length of y")
     if not 0.0 < alpha < 1.0:
-        raise ValueError("alpha must be strictly between 0 and 1")
+        raise errors.InputError("alpha must be strictly between 0 and 1")
     if draws < 1:
-        raise ValueError("draws must be positive")
+        raise errors.InputError("draws must be positive")
     tables = rate_tables(outcomes, actions, labels, constraint.criterion)
     names = sorted(numpy.unique(labels).tolist())
     small = sorted(
@@ -441,7 +442,7 @@ def base_rates(
     outcomes = costs.binary_vector(y, "y")
     labels = numpy.asarray(groups)
     if labels.shape != outcomes.shape:
-        raise ValueError("groups and y must have the same length")
+        raise errors.InputError("groups and y must have the same length")
     return {
         str(g): (
             float(outcomes[labels == g].sum()),
@@ -618,7 +619,9 @@ def fit_group_thresholds(
     prepared_parts = prepared(y, numpy.zeros_like(s), groups)
     outcomes, labels = prepared_parts[0], prepared_parts[2]
     if constraint.criterion == "predictive_parity":
-        raise ValueError("group thresholds cannot target predictive parity")
+        raise errors.InputError(
+            "group thresholds cannot target predictive parity"
+        )
     bound = margin * constraint.max_gap
     common = (s >= t).astype(float)
     names = sorted(str(g) for g in numpy.unique(labels))

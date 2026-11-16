@@ -83,7 +83,7 @@ class ObjectPayload:
             TypeError: If `payload` is not ``bytes``.
         """
         if not self.source_uri.strip():
-            raise ValueError("source_uri must not be empty")
+            raise errors.InputError("source_uri must not be empty")
         if not isinstance(self.payload, bytes):
             raise TypeError("payload must be bytes")
         object.__setattr__(
@@ -256,9 +256,11 @@ class RetryBudget:
                 negative or not finite.
         """
         if self.max_retries < 0:
-            raise ValueError("max_retries must be non-negative")
+            raise errors.InputError("max_retries must be non-negative")
         if not math.isfinite(self.delay_seconds) or self.delay_seconds < 0:
-            raise ValueError("delay_seconds must be finite and non-negative")
+            raise errors.InputError(
+                "delay_seconds must be finite and non-negative"
+            )
 
     @property
     def max_attempts(self) -> int:
@@ -285,7 +287,7 @@ def canonical_source_uri(source_uri: str | pathlib.Path) -> str:
     """
     value = str(source_uri).strip()
     if not value:
-        raise ValueError("source_uri must not be empty")
+        raise errors.InputError("source_uri must not be empty")
     parsed = urlsplit(value)
     if parsed.scheme and not (len(parsed.scheme) == 1 and value[1:2] == ":"):
         return urlunsplit(
@@ -331,9 +333,9 @@ def cursor_for(source_identity_value: str, offset: int) -> str:
         ValueError: If the identity is empty or the offset is negative.
     """
     if not source_identity_value:
-        raise ValueError("source_identity_value must not be empty")
+        raise errors.InputError("source_identity_value must not be empty")
     if offset < 0:
-        raise ValueError("offset must be non-negative")
+        raise errors.InputError("offset must be non-negative")
     payload = f"{source_identity_value}:{offset}".encode()
     return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
 
@@ -352,16 +354,18 @@ def decode_cursor(cursor: str) -> tuple[str, int]:
             an empty identity or a negative offset.
     """
     if not cursor:
-        raise ValueError("cursor must not be empty")
+        raise errors.InputError("cursor must not be empty")
     padding = "=" * (-len(cursor) % 4)
     try:
         payload = base64.urlsafe_b64decode(cursor + padding).decode("utf-8")
         identity, offset_value = payload.rsplit(":", maxsplit=1)
         offset = int(offset_value)
     except (ValueError, UnicodeDecodeError) as error:
-        raise ValueError("cursor is not a valid connector cursor") from error
+        raise errors.InputError(
+            "cursor is not a valid connector cursor"
+        ) from error
     if not identity or offset < 0:
-        raise ValueError("cursor contains an invalid source or offset")
+        raise errors.InputError("cursor contains an invalid source or offset")
     return identity, offset
 
 
@@ -405,7 +409,7 @@ class SourceCheckpoint:
                 with the checkpoint.
         """
         if self.offset < 0:
-            raise ValueError("offset must be non-negative")
+            raise errors.InputError("offset must be non-negative")
         if self.content_sha256 is not None and (
             len(self.content_sha256) != SHA256_HEX_LENGTH
             or any(
@@ -413,14 +417,20 @@ class SourceCheckpoint:
                 for character in self.content_sha256
             )
         ):
-            raise ValueError("content_sha256 must be a SHA-256 hex digest")
+            raise errors.InputError(
+                "content_sha256 must be a SHA-256 hex digest"
+            )
         if self.cursor is None:
             return
         cursor_identity, cursor_offset = decode_cursor(self.cursor)
         if self.source_identity and self.source_identity != cursor_identity:
-            raise ValueError("cursor source identity does not match checkpoint")
+            raise errors.InputError(
+                "cursor source identity does not match checkpoint"
+            )
         if self.offset and self.offset != cursor_offset:
-            raise ValueError("cursor offset does not match checkpoint offset")
+            raise errors.InputError(
+                "cursor offset does not match checkpoint offset"
+            )
         if not self.source_identity:
             object.__setattr__(self, "source_identity", cursor_identity)
         if not self.offset:
@@ -441,7 +451,7 @@ class SourceCheckpoint:
                 source.
         """
         if self.source_identity and self.source_identity != identity:
-            raise ValueError("checkpoint belongs to a different source")
+            raise errors.InputError("checkpoint belongs to a different source")
         return SourceCheckpoint(
             offset=self.offset,
             cursor=self.cursor or cursor_for(identity, self.offset),
@@ -463,7 +473,9 @@ class SourceCheckpoint:
                 digest.
         """
         if self.content_sha256 and self.content_sha256 != content_sha256:
-            raise ValueError("checkpoint content digest does not match source")
+            raise errors.InputError(
+                "checkpoint content digest does not match source"
+            )
         return SourceCheckpoint(
             offset=self.offset,
             cursor=self.cursor,
@@ -486,10 +498,10 @@ class SourceCheckpoint:
                 bound to a source.
         """
         if rows < 0:
-            raise ValueError("rows must be non-negative")
+            raise errors.InputError("rows must be non-negative")
         identity = self.source_identity
         if not identity:
-            raise ValueError("checkpoint must be bound before advancing")
+            raise errors.InputError("checkpoint must be bound before advancing")
         next_offset = self.offset + rows
         return SourceCheckpoint(
             offset=next_offset,
@@ -518,9 +530,9 @@ class SourceColumn:
             ValueError: If `name` or `type_name` is empty.
         """
         if not self.name:
-            raise ValueError("column name must not be empty")
+            raise errors.InputError("column name must not be empty")
         if not self.type_name:
-            raise ValueError("column type_name must not be empty")
+            raise errors.InputError("column type_name must not be empty")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -542,9 +554,13 @@ class SourceSchema:
         """
         names = tuple(column.name for column in self.columns)
         if not names:
-            raise ValueError("source schema must contain at least one column")
+            raise errors.InputError(
+                "source schema must contain at least one column"
+            )
         if len(names) != len(set(names)):
-            raise ValueError("source schema contains duplicate column names")
+            raise errors.InputError(
+                "source schema contains duplicate column names"
+            )
 
     def as_dict(self) -> dict[str, Any]:
         """Serializes the schema.
@@ -831,7 +847,7 @@ class SourceConnector(abc.ABC):
             ValueError: If `limit` is not positive.
         """
         if limit <= 0:
-            raise ValueError("limit must be positive")
+            raise errors.InputError("limit must be positive")
 
 
 def file_content_sha256(
@@ -850,7 +866,7 @@ def file_content_sha256(
         ValueError: If `chunk_bytes` is less than 1.
     """
     if chunk_bytes < 1:
-        raise ValueError("chunk_bytes must be positive")
+        raise errors.InputError("chunk_bytes must be positive")
     digest = hashlib.sha256()
     with path.open("rb") as opened:
         while chunk := opened.read(chunk_bytes):
@@ -1075,7 +1091,7 @@ class DbApiConnector(SourceConnector):
                 value, scheme, self.supported_schemes
             )
         if not query.strip():
-            raise ValueError("query must not be empty")
+            raise errors.InputError("query must not be empty")
         if not callable(connection_factory):
             raise TypeError("connection_factory must be callable")
         if read_only:
@@ -1258,7 +1274,7 @@ class DbApiConnector(SourceConnector):
             ValueError: If the description is None or empty.
         """
         if not description:
-            raise ValueError("query did not provide a result schema")
+            raise errors.InputError("query did not provide a result schema")
         return SourceSchema(
             tuple(
                 SourceColumn(
@@ -1374,7 +1390,7 @@ class WarehouseConnector(SourceConnector):
                 value, scheme, self.supported_schemes
             )
         if not query.strip():
-            raise ValueError("query must not be empty")
+            raise errors.InputError("query must not be empty")
         schema_candidate: object = schema_reader
         batch_candidate: object = batch_reader
         if not callable(schema_candidate) or not callable(batch_candidate):
@@ -1635,16 +1651,18 @@ class ObjectStoreConnector(SourceConnector):
         if not callable(read_bytes):
             raise TypeError("read_bytes must be callable")
         if max_bytes < 1:
-            raise ValueError("max_bytes must be positive")
+            raise errors.InputError("max_bytes must be positive")
         if decoder is not None and not callable(decoder):
             raise TypeError("decoder must be callable")
         if decoder is None:
             if decoder_name is not None:
-                raise ValueError("decoder_name requires a caller-owned decoder")
+                raise errors.InputError(
+                    "decoder_name requires a caller-owned decoder"
+                )
             decoder = read_tabular_bytes
             decoder_name = "tabular-auto-v1"
         elif not decoder_name or not decoder_name.strip():
-            raise ValueError(
+            raise errors.InputError(
                 "decoder_name must identify a caller-owned decoder and version"
             )
         self.read_bytes = read_bytes
@@ -1863,9 +1881,9 @@ class StreamingObjectStoreConnector(SourceConnector):
         if not callable(range_candidate) or not callable(size_candidate):
             raise TypeError("read_range and size_bytes must be callable")
         if chunk_bytes < 1:
-            raise ValueError("chunk_bytes must be positive")
+            raise errors.InputError("chunk_bytes must be positive")
         if max_record_bytes < 1:
-            raise ValueError("max_record_bytes must be positive")
+            raise errors.InputError("max_record_bytes must be positive")
         self.read_range = read_range
         self.size_bytes = size_bytes
         self.chunk_bytes = chunk_bytes

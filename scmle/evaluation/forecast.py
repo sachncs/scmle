@@ -18,6 +18,7 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.contracts import errors
 from scmle.contracts import metrics
 
 SCALE_FLOOR = 1e-12
@@ -151,7 +152,7 @@ class ForecastMetric(metrics.Metric):
         sign = 1.0 if self.greater_is_better else -1.0
         scale = self.scale
         if kind == "mase_insample" and (scale is None or scale <= 0):
-            raise ValueError("mase_insample needs a positive scale")
+            raise errors.InputError("mase_insample needs a positive scale")
 
         def score(
             estimator: Any,

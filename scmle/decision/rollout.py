@@ -51,6 +51,7 @@ import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 
+from scmle.contracts import errors
 import scmle.data.charter.decision
 from scmle.decision import anytime
 from scmle.decision import design
@@ -203,7 +204,7 @@ class Rollout:
             ValueError: If `level` is not strictly between 0 and 1.
         """
         if not 0.0 < level < 1.0:
-            raise ValueError("level must be strictly between 0 and 1")
+            raise errors.InputError("level must be strictly between 0 and 1")
         self.plan = plan
         self.experiment_id = experiment_id
         self.level = level
@@ -264,7 +265,7 @@ class Rollout:
             g.name for g in self.plan.guardrails if g.name not in supplied
         ]
         if missing:
-            raise ValueError(f"missing guardrail outcomes: {missing}")
+            raise errors.InputError(f"missing guardrail outcomes: {missing}")
         paths = []
         for name, guard in zip(self.names, self.guards, strict=True):
             raw = primary if guard is None else supplied[name]

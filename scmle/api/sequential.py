@@ -5,6 +5,7 @@ import pathlib
 import pandas
 
 from scmle.artifacts import reproducibility
+from scmle.contracts import errors
 from scmle.data.readers import tabular
 from scmle.evaluation import sequential
 
@@ -105,7 +106,9 @@ class Estimation:
         expected_digest = estimate.write(self.artifact_path)
         verified = sequential.Estimation.read(self.artifact_path)
         if verified.digest() != expected_digest:
-            raise ValueError("persisted sequential report failed verification")
+            raise errors.InputError(
+                "persisted sequential report failed verification"
+            )
         self.result = verified
         return verified
 

@@ -17,6 +17,7 @@ from collections.abc import Sequence
 import dataclasses
 from typing import Any
 
+from scmle.contracts import errors
 from scmle.data.ingest import grain
 from scmle.data.ingest import profile
 
@@ -55,7 +56,7 @@ class DeclaredKey:
         if not self.child_columns or len(self.child_columns) != len(
             self.parent_columns
         ):
-            raise ValueError("declared key columns must pair up")
+            raise errors.InputError("declared key columns must pair up")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

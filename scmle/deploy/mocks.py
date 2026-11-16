@@ -48,7 +48,7 @@ def safe_key(raw: str) -> pathlib.PurePosixPath:
     if len(path.parts) < MINIMUM_KEY_PARTS or any(
         part in {"", ".", ".."} or "\\" in part for part in path.parts
     ):
-        raise ValueError("path must be /<bucket>/<key> without '..'")
+        raise errors.InputError("path must be /<bucket>/<key> without '..'")
     return path
 
 

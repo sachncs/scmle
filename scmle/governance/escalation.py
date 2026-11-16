@@ -54,6 +54,8 @@ from typing import Any
 import numpy
 from scipy import stats
 
+import scmle.contracts.errors
+
 ANSWERED = "answered"
 ESCALATED = "escalated"
 SAFE_DEFAULT = "safe_default"
@@ -82,7 +84,9 @@ def set_size_score(set_sizes: Any, novel: Any = None) -> numpy.ndarray:
     if novel is not None:
         flags = numpy.asarray(novel, dtype=bool)
         if flags.shape != score.shape:
-            raise ValueError("novel must be aligned with set_sizes")
+            raise scmle.contracts.errors.InputError(
+                "novel must be aligned with set_sizes"
+            )
         score = numpy.where(flags, 0.0, score)
     return score
 
@@ -195,11 +199,17 @@ def validate_calibration(
     g = numpy.asarray(score, dtype=float)
     l_values = numpy.asarray(loss, dtype=float)
     if g.shape != l_values.shape or g.ndim != 1:
-        raise ValueError("score and loss must be aligned one-dimensional")
+        raise scmle.contracts.errors.InputError(
+            "score and loss must be aligned one-dimensional"
+        )
     if numpy.any(~numpy.isfinite(g)) or numpy.any(g < 0) or numpy.any(g > 1):
-        raise ValueError("score must be finite and within [0, 1]")
+        raise scmle.contracts.errors.InputError(
+            "score must be finite and within [0, 1]"
+        )
     if numpy.any(~numpy.isfinite(l_values)) or numpy.any(l_values < 0):
-        raise ValueError("loss must be finite and non-negative")
+        raise scmle.contracts.errors.InputError(
+            "loss must be finite and non-negative"
+        )
     w = None
     if weights is not None:
         w = numpy.asarray(weights, dtype=float)
@@ -208,7 +218,9 @@ def validate_calibration(
             or numpy.any(~numpy.isfinite(w))
             or numpy.any(w <= 0)
         ):
-            raise ValueError("weights must be positive and aligned")
+            raise scmle.contracts.errors.InputError(
+                "weights must be positive and aligned"
+            )
     return g, l_values, w
 
 
@@ -255,7 +267,9 @@ def select_threshold(
             or the grid is empty or not strictly decreasing.
     """
     if not 0.0 < r_star < 1.0 or not 0.0 < delta < 1.0:
-        raise ValueError("r_star and delta must be strictly between 0 and 1")
+        raise scmle.contracts.errors.InputError(
+            "r_star and delta must be strictly between 0 and 1"
+        )
     g, losses, w = validate_calibration(score, loss, weights)
     points = (
         numpy.linspace(1.0, 0.0, DEFAULT_GRID)
@@ -263,7 +277,9 @@ def select_threshold(
         else numpy.asarray(grid, dtype=float)
     )
     if points.size == 0 or numpy.any(numpy.diff(points) >= 0):
-        raise ValueError("grid must be strictly decreasing")
+        raise scmle.contracts.errors.InputError(
+            "grid must be strictly decreasing"
+        )
     steps: list[Step] = []
     chosen = math.inf
     needed = max(minimum, math.ceil(math.log(delta) / math.log1p(-r_star)))
@@ -375,7 +391,7 @@ def risk_coverage(
     """
     g, losses, w = validate_calibration(score, loss, weights)
     if g.size == 0:
-        raise ValueError("calibration set is empty")
+        raise scmle.contracts.errors.InputError("calibration set is empty")
     grid = numpy.linspace(1.0, 0.0, points)
     weight = numpy.ones_like(g) if w is None else w
     coverage = numpy.empty(points)
@@ -455,11 +471,13 @@ def chow_check(
             are not aligned.
     """
     if review_cost <= 0 or error_cost <= 0:
-        raise ValueError("costs must be positive")
+        raise scmle.contracts.errors.InputError("costs must be positive")
     p = numpy.asarray(confidence, dtype=float)
     g = numpy.asarray(score, dtype=float)
     if p.shape != g.shape:
-        raise ValueError("confidence and score must be aligned")
+        raise scmle.contracts.errors.InputError(
+            "confidence and score must be aligned"
+        )
     cut = review_cost / error_cost
     by_chow = (1.0 - p) > cut
     by_score = g < tau
@@ -521,7 +539,7 @@ def route(
     """
     g = numpy.asarray(score, dtype=float)
     if not 0.0 <= c_max <= 1.0:
-        raise ValueError("c_max must be within [0, 1]")
+        raise scmle.contracts.errors.InputError("c_max must be within [0, 1]")
     keep = numpy.zeros(g.shape, dtype=bool) if halted else g >= tau
     if blocked is not None:
         keep &= ~numpy.asarray(blocked, dtype=bool)

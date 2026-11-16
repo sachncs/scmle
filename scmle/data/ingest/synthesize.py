@@ -90,7 +90,7 @@ class Source:
             ValueError: If `role` is neither `child` nor `parent`.
         """
         if self.role not in (CHILD, PARENT):
-            raise ValueError("role must be child or parent")
+            raise errors.InputError("role must be child or parent")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -391,7 +391,7 @@ def reduce_rows(
             and `value` is None.
     """
     if primitive not in PRIMITIVES:
-        raise ValueError(f"unknown primitive: {primitive}")
+        raise errors.InputError(f"unknown primitive: {primitive}")
     if window is not None:
         rows = rows.loc[
             rows[asof_view.EVENT_COLUMN]
@@ -411,7 +411,7 @@ def reduce_rows(
         cutoff = rows.groupby(label)[asof_view.CUTOFF_COLUMN].first()
         return (cutoff - latest).reindex(index).astype(float)
     if value is None:
-        raise ValueError(f"{primitive} needs a value column")
+        raise errors.InputError(f"{primitive} needs a value column")
     if primitive == LAST:
         valid = rows.loc[rows[value].notna()]
         ordered = valid.sort_values(
@@ -461,7 +461,7 @@ def reduce_numeric(
         return grouped.std(ddof=1).reindex(index).astype(float)
     if primitive == SLOPE:
         return slope(numbers, value).reindex(index).astype(float)
-    raise ValueError(f"unknown primitive: {primitive}")
+    raise errors.InputError(f"unknown primitive: {primitive}")
 
 
 def slope(rows: pandas.DataFrame, value: str) -> pandas.Series:
@@ -636,7 +636,7 @@ def synthesize(
         ValueError: If `lag_days` is negative.
     """
     if lag_days < 0:
-        raise ValueError("lag_days must be non-negative")
+        raise errors.InputError("lag_days must be non-negative")
     specs = propose(sources, nests, windows)
     columns: dict[str, pandas.Series] = {}
     manifest: list[dict[str, Any]] = []

@@ -181,7 +181,7 @@ class Server(abc.ABC):
             ValueError: If no records were supplied.
         """
         if not records:
-            raise ValueError("records must not be empty")
+            raise errors.InputError("records must not be empty")
         required = self.bundle.features
         absent = sorted(
             {
@@ -467,7 +467,9 @@ class HttpServing(Server):
             or max_records < 1
             or request_timeout_seconds <= 0
         ):
-            raise ValueError("request bounds and timeout must be positive")
+            raise errors.InputError(
+                "request bounds and timeout must be positive"
+            )
         access.require_authentication_for(host, gateway)
         super().__init__(bundle, on_null, on_unseen, warmup_records)
         self.gateway = gateway

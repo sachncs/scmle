@@ -28,6 +28,7 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.contracts import errors
 from scmle.contracts import observability
 from scmle.monitoring import monitor
 import scmle.monitoring.reference
@@ -123,9 +124,11 @@ class Window:
                 positive, or the sample rate is outside (0, 1].
         """
         if self.window_seconds <= 0 or self.min_samples < 1:
-            raise ValueError("window_seconds and min_samples must be positive")
+            raise errors.InputError(
+                "window_seconds and min_samples must be positive"
+            )
         if not 0.0 < self.sample_rate <= 1.0:
-            raise ValueError("sample_rate must be in (0, 1]")
+            raise errors.InputError("sample_rate must be in (0, 1]")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -303,7 +306,7 @@ class SignalMonitor:
             or values.min() < 0
             or values.max() > 1
         ):
-            raise ValueError("losses must be finite and within [0, 1]")
+            raise errors.InputError("losses must be finite and within [0, 1]")
         with self.lock:
             self.outcomes.append((at, values))
 
@@ -562,7 +565,7 @@ def zero_one_losses(
         ValueError: If the lengths differ.
     """
     if len(predictions) != len(labels):
-        raise ValueError("predictions and labels must align")
+        raise errors.InputError("predictions and labels must align")
     return numpy.array(
         [
             0.0 if p == y else 1.0

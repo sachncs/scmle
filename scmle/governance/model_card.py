@@ -7,6 +7,7 @@ from typing import Any
 
 import scmle.artifacts.bundle
 from scmle.contracts import data
+from scmle.contracts import errors
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -55,13 +56,13 @@ class ModelCard:
             "generated_at",
         ):
             if not getattr(self, name).strip():
-                raise ValueError(f"{name} must not be empty")
+                raise errors.InputError(f"{name} must not be empty")
         if self.schema_version < 1:
-            raise ValueError("schema_version must be positive")
+            raise errors.InputError("schema_version must be positive")
         if not self.out_of_scope:
-            raise ValueError("out_of_scope must not be empty")
+            raise errors.InputError("out_of_scope must not be empty")
         if not self.limitations:
-            raise ValueError("limitations must not be empty")
+            raise errors.InputError("limitations must not be empty")
 
     @classmethod
     def from_run(

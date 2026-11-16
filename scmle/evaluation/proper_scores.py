@@ -20,6 +20,8 @@ from collections.abc import Sequence
 
 import numpy
 
+from scmle.contracts import errors
+
 SCALE_FLOOR = 1e-12
 
 
@@ -40,7 +42,7 @@ def pinball_loss(
         ValueError: If `level` is not strictly between 0 and 1.
     """
     if not 0.0 < level < 1.0:
-        raise ValueError("level must lie strictly between 0 and 1")
+        raise errors.InputError("level must lie strictly between 0 and 1")
     gap = numpy.asarray(truth, dtype=float) - numpy.asarray(
         forecast, dtype=float
     )
@@ -71,7 +73,7 @@ def interval_score(
         ValueError: If `alpha` is not strictly between 0 and 1.
     """
     if not 0.0 < alpha < 1.0:
-        raise ValueError("alpha must lie strictly between 0 and 1")
+        raise errors.InputError("alpha must lie strictly between 0 and 1")
     y = numpy.asarray(truth, dtype=float)
     low = numpy.asarray(lower, dtype=float)
     high = numpy.asarray(upper, dtype=float)
@@ -103,7 +105,7 @@ def weighted_interval_score(
             strictly between 0 and 1 (rejected by `interval_score`).
     """
     if not intervals:
-        raise ValueError("need at least one interval")
+        raise errors.InputError("need at least one interval")
     y = numpy.asarray(truth, dtype=float)
     total = 0.5 * float(
         numpy.mean(numpy.abs(y - numpy.asarray(median, dtype=float)))
@@ -134,7 +136,7 @@ def crps_from_quantiles(
     values = numpy.asarray(quantiles, dtype=float)
     grid = list(levels)
     if values.shape[1] != len(grid):
-        raise ValueError("one column per level is required")
+        raise errors.InputError("one column per level is required")
     return 2.0 * float(
         numpy.mean(
             [
@@ -161,7 +163,7 @@ def insample_scale(history: numpy.ndarray, season: int = 1) -> float:
     """
     series = numpy.asarray(history, dtype=float)
     if season < 1 or len(series) <= season:
-        raise ValueError("history must be longer than the season")
+        raise errors.InputError("history must be longer than the season")
     return float(numpy.mean(numpy.abs(series[season:] - series[:-season])))
 
 

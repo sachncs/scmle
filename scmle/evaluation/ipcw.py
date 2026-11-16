@@ -22,6 +22,7 @@ import dataclasses
 
 import numpy
 
+from scmle.contracts import errors
 from scmle.models.survival import estimators
 
 MIN_CENSORING_PROBABILITY = 0.05
@@ -74,11 +75,11 @@ def censoring_weights(
             `duration`, `event` and `features` differ in length.
     """
     if not 0.0 < floor < 1.0:
-        raise ValueError("floor must lie strictly between 0 and 1")
+        raise errors.InputError("floor must lie strictly between 0 and 1")
     time = numpy.asarray(duration, dtype=float)
     seen = numpy.asarray(event, dtype=float)
     if len(time) != len(seen):
-        raise ValueError("duration and event differ in length")
+        raise errors.InputError("duration and event differ in length")
     censored = 1.0 - seen
     if features is None:
         curve = estimators.kaplan_meier(time, censored)
@@ -94,7 +95,7 @@ def censoring_weights(
     else:
         matrix = numpy.asarray(features, dtype=float)
         if len(matrix) != len(time):
-            raise ValueError("features and duration differ in length")
+            raise errors.InputError("features and duration differ in length")
         model = estimators.CoxRegressor(penalty).fit(matrix, time, censored)
         cumulative = estimators.step_lookup(
             model.moments_, model.baseline_, time, 0.0

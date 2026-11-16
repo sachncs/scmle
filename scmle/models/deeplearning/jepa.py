@@ -12,6 +12,7 @@ from sklearn import base
 from sklearn.utils import validation
 
 from scmle import envelope
+from scmle.contracts import errors
 from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import estimators
 
@@ -130,7 +131,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
         """
         explanation = self.model_contract().explanation
         if explanation is None:
-            raise ValueError("tabular JEPA has no explanation contract")
+            raise errors.InputError("tabular JEPA has no explanation contract")
         return explanation
 
     def explain(self, features: Any) -> contracts.FeatureExplanation:
@@ -225,34 +226,40 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
         try:
             meta, payload = envelope.read(path, signing_key, trusted)
         except OSError as error:
-            raise ValueError(
+            raise errors.InputError(
                 "could not read tabular JEPA checkpoint"
             ) from error
         if (
             meta.get("format") != cls.CHECKPOINT_FORMAT
             or meta.get("schema_version") != cls.CHECKPOINT_SCHEMA_VERSION
         ):
-            raise ValueError("unsupported tabular JEPA checkpoint format")
+            raise errors.InputError(
+                "unsupported tabular JEPA checkpoint format"
+            )
         try:
             serialized = joblib.load(io.BytesIO(payload))
         except (EOFError, OSError, ValueError, TypeError) as error:
-            raise ValueError(
+            raise errors.InputError(
                 "tabular JEPA checkpoint payload is invalid"
             ) from error
         if (
             not isinstance(serialized, dict)
             or serialized.get("format") != cls.CHECKPOINT_FORMAT
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "tabular JEPA checkpoint payload format is invalid"
             )
         estimator = serialized.get("estimator")
         if not isinstance(estimator, cls):
-            raise ValueError("checkpoint does not contain a JepaEstimator")
+            raise errors.InputError(
+                "checkpoint does not contain a JepaEstimator"
+            )
         validation.check_is_fitted(estimator, attributes=["state_"])
         expected = json.loads(json.dumps(estimator.checkpoint_manifest()))
         if meta != expected:
-            raise ValueError("tabular JEPA checkpoint metadata does not match")
+            raise errors.InputError(
+                "tabular JEPA checkpoint metadata does not match"
+            )
         return estimator
 
 

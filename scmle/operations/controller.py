@@ -78,7 +78,7 @@ class Limits:
             ValueError: If a tick limit is below one.
         """
         if self.max_idle_ticks < 1 or self.max_unlabelled_ticks < 1:
-            raise ValueError("tick limits must be at least 1")
+            raise errors.InputError("tick limits must be at least 1")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -309,9 +309,9 @@ class Controller:
         frame = pandas.read_csv(path)
         for name in required:
             if name not in frame.columns:
-                raise ValueError(f"missing column {name!r}")
+                raise errors.InputError(f"missing column {name!r}")
         if frame.empty:
-            raise ValueError("the file has no rows")
+            raise errors.InputError("the file has no rows")
         return frame
 
     def run_batch(self, path: pathlib.Path) -> None:

@@ -10,6 +10,8 @@ from urllib.parse import urlparse
 
 import pydantic
 
+from scmle.contracts import errors
+
 EXPLANATION_SCHEMA_VERSION = 1
 PrivacyStatus = Literal["allowed", "redacted", "denied"]
 
@@ -29,7 +31,7 @@ def require_text(value: str, field_name: str) -> str:
     """
     stripped = value.strip()
     if not stripped:
-        raise ValueError(f"{field_name} must not be empty")
+        raise errors.InputError(f"{field_name} must not be empty")
     return stripped
 
 
@@ -55,7 +57,7 @@ def validate_json_value(value: Any, field_name: str = "value") -> object:
         return value
     if type(value) is float:
         if not math.isfinite(value):
-            raise ValueError(f"{field_name} contains a non-finite float")
+            raise errors.InputError(f"{field_name} contains a non-finite float")
         return value
     if type(value) is str:
         return value
@@ -167,9 +169,9 @@ class Method(Contract):
         try:
             normalized = validate_json_value(value, "method.parameters")
         except (TypeError, ValueError) as error:
-            raise ValueError(str(error)) from error
+            raise errors.InputError(str(error)) from error
         if not isinstance(normalized, dict):
-            raise ValueError("method.parameters must be a JSON object")
+            raise errors.InputError("method.parameters must be a JSON object")
         return normalized
 
 
@@ -251,7 +253,9 @@ class EvidenceLink(Contract):
         """
         scheme = urlparse(value).scheme.casefold()
         if scheme in {"data", "javascript", "vbscript"}:
-            raise ValueError(f"unsupported evidence link scheme: {scheme}")
+            raise errors.InputError(
+                f"unsupported evidence link scheme: {scheme}"
+            )
         return value
 
     @pydantic.field_validator("digest")
@@ -355,7 +359,7 @@ class Evidence(Contract):
         try:
             return validate_json_value(value, info.field_name)
         except (TypeError, ValueError) as error:
-            raise ValueError(str(error)) from error
+            raise errors.InputError(str(error)) from error
 
     @pydantic.field_validator("uncertainty", "stability")
     @classmethod
@@ -375,7 +379,7 @@ class Evidence(Contract):
             ValueError: If the mapping is empty.
         """
         if not value:
-            raise ValueError(f"{info.field_name} must not be empty")
+            raise errors.InputError(f"{info.field_name} must not be empty")
         return value
 
     @pydantic.field_validator("limitations")
@@ -393,7 +397,9 @@ class Evidence(Contract):
             ValueError: If there is none, or an item is blank.
         """
         if not value:
-            raise ValueError("limitations must contain at least one item")
+            raise errors.InputError(
+                "limitations must contain at least one item"
+            )
         return tuple(require_text(item, "limitations") for item in value)
 
     @pydantic.field_validator("causal_warning")
@@ -426,7 +432,9 @@ class Evidence(Contract):
             ValueError: If there is no link.
         """
         if not value:
-            raise ValueError("evidence_links must contain at least one item")
+            raise errors.InputError(
+                "evidence_links must contain at least one item"
+            )
         return value
 
     @pydantic.field_validator("timestamp")
@@ -444,7 +452,9 @@ class Evidence(Contract):
             ValueError: If the timestamp has no timezone.
         """
         if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("timestamp must include timezone information")
+            raise errors.InputError(
+                "timestamp must include timezone information"
+            )
         return value.astimezone(datetime.UTC)
 
     def to_dict(self) -> dict[str, object]:

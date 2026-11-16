@@ -481,7 +481,7 @@ class LocalObjectStore(ObjectStore):
             ValueError: If both conditions are given.
         """
         if if_absent and if_version is not None:
-            raise ValueError("use if_absent or if_version, not both")
+            raise errors.InputError("use if_absent or if_version, not both")
         path = self.path_of(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         if if_absent:

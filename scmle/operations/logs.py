@@ -23,6 +23,7 @@ import time
 from typing import Any
 
 from scmle import durability
+from scmle.contracts import errors
 
 LEVELS = ("debug", "info", "warning", "error", "critical")
 RESERVED = frozenset(
@@ -91,7 +92,7 @@ def traceparent_for(trace_id: str) -> str:
             zeros.
     """
     if not re.fullmatch(r"[0-9a-f]{32}", trace_id) or trace_id == ZERO_TRACE:
-        raise ValueError("trace_id must be 32 lowercase hex digits")
+        raise errors.InputError("trace_id must be 32 lowercase hex digits")
     return f"00-{trace_id}-{secrets.token_hex(8)}-01"
 
 
@@ -157,7 +158,7 @@ class StructuredLog:
             ValueError: If neither or both of ``path`` and ``sink`` are given.
         """
         if (path is None) == (sink is None):
-            raise ValueError("give exactly one of path and sink")
+            raise errors.InputError("give exactly one of path and sink")
         self.service = service
         self.model_version = model_version
         self.artifact_digest = artifact_digest
@@ -188,10 +189,10 @@ class StructuredLog:
             ValueError: If the level is unknown or a field name is reserved.
         """
         if level not in LEVELS:
-            raise ValueError(f"level must be one of {LEVELS}")
+            raise errors.InputError(f"level must be one of {LEVELS}")
         clash = RESERVED & set(fields)
         if clash:
-            raise ValueError(f"reserved field names: {sorted(clash)}")
+            raise errors.InputError(f"reserved field names: {sorted(clash)}")
         record = {
             "ts": round(self.clock(), 3),
             "level": level,

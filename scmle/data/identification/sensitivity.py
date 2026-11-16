@@ -59,6 +59,8 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.contracts import errors
+
 D_TO_RR = 0.91
 INFEASIBLE = 0.999
 MIN_RESIDUAL_DOF = 3
@@ -79,7 +81,7 @@ def evalue(rr: float) -> float:
         ValueError: If `rr` is not positive.
     """
     if not rr > 0:
-        raise ValueError("a risk ratio must be positive")
+        raise errors.InputError("a risk ratio must be positive")
     ratio = rr if rr >= 1 else 1.0 / rr
     return ratio + math.sqrt(ratio * (ratio - 1.0))
 
@@ -103,7 +105,7 @@ def evalue_interval(
         ValueError: If the estimate does not lie within its limits.
     """
     if not low <= estimate <= high:
-        raise ValueError("the estimate must lie within its limits")
+        raise errors.InputError("the estimate must lie within its limits")
     nearest = low if estimate >= 1 else high
     return {
         "point": evalue(estimate),
@@ -193,7 +195,7 @@ def ols_fit(
     full = numpy.column_stack([numpy.ones(n), d, x])
     dof = n - full.shape[1]
     if dof < MIN_RESIDUAL_DOF:
-        raise ValueError("too few rows for the regression")
+        raise errors.InputError("too few rows for the regression")
     coef = numpy.linalg.lstsq(full, y, rcond=None)[0]
     resid = y - full @ coef
     sigma2 = float(resid @ resid) / dof
@@ -262,7 +264,7 @@ def bias_bound(fit: OlsFit, r2yz: float, r2dz: float) -> float:
         ValueError: If either partial R-squared is outside [0, 1).
     """
     if not (0 <= r2yz < 1 and 0 <= r2dz < 1):
-        raise ValueError("partial R-squareds must lie in [0, 1)")
+        raise errors.InputError("partial R-squareds must lie in [0, 1)")
     return fit.se * math.sqrt(fit.dof) * math.sqrt(r2yz * r2dz / (1 - r2dz))
 
 
@@ -318,12 +320,12 @@ def benchmark_strength(
     """
     r2dz = kd * r2dxj / (1 - r2dxj)
     if r2dz >= 1:
-        raise ValueError(
+        raise errors.InputError(
             "the benchmark multiple is too large for this covariate"
         )
     r2zx = kd * r2dxj**2 / ((1 - kd * r2dxj) * (1 - r2dxj))
     if r2zx >= 1:
-        raise ValueError(
+        raise errors.InputError(
             "the benchmark multiple is too large for this covariate"
         )
     r2yz = (
@@ -332,7 +334,7 @@ def benchmark_strength(
         / (1 - r2yxj)
     )
     if r2yz >= 1:
-        raise ValueError(
+        raise errors.InputError(
             "the benchmark multiple is too large for this covariate"
         )
     return r2yz, r2dz
@@ -421,7 +423,7 @@ def assess(
         words = f"fixed partial R2 {strength} with treatment and outcome"
     else:
         if not covariates:
-            raise ValueError("benchmarking needs at least one covariate")
+            raise errors.InputError("benchmarking needs at least one covariate")
         best = -1.0
         r2yz = r2dz = 0.0
         for name, (r2d, r2y) in fit.benchmarks.items():

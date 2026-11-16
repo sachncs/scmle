@@ -18,6 +18,7 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.contracts import errors
 from scmle.data.ledger import bivariate
 from scmle.data.ledger import online_fdr
 import scmle.data.ledger.ledger
@@ -99,7 +100,7 @@ def encode_target(
         codes = {label: float(i) for i, label in enumerate(order)}
         return target.map(codes).astype(float)
     if not pandas.api.types.is_numeric_dtype(target):
-        raise ValueError("a regression target must be numeric")
+        raise errors.InputError("a regression target must be numeric")
     return target.astype(float)
 
 

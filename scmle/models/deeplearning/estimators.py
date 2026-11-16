@@ -19,6 +19,7 @@ from sklearn import base
 from sklearn.utils import validation
 
 from scmle import envelope
+from scmle.contracts import errors
 from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import worker
 
@@ -163,7 +164,7 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
         """
         explanation = self.model_contract().explanation
         if explanation is None:
-            raise ValueError(
+            raise errors.InputError(
                 f"{self.model_contract().model_family} has no explanation "
                 "contract"
             )
@@ -345,15 +346,17 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
         try:
             meta, payload = envelope.read(path, signing_key, trusted)
         except OSError as error:
-            raise ValueError(
+            raise errors.InputError(
                 "could not read deep-learning checkpoint"
             ) from error
         if meta.get("schema_version") != cls.CHECKPOINT_SCHEMA_VERSION:
-            raise ValueError("deep-learning checkpoint integrity check failed")
+            raise errors.InputError(
+                "deep-learning checkpoint integrity check failed"
+            )
         try:
             serialized = joblib.load(io.BytesIO(payload))
         except Exception as error:
-            raise ValueError(
+            raise errors.InputError(
                 "deep-learning checkpoint payload is invalid"
             ) from error
         estimator = (
@@ -362,7 +365,9 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
             else None
         )
         if not isinstance(estimator, cls):
-            raise ValueError(f"checkpoint does not contain a {cls.__name__}")
+            raise errors.InputError(
+                f"checkpoint does not contain a {cls.__name__}"
+            )
         validation.check_is_fitted(estimator, attributes=["state_"])
         expected = json.loads(json.dumps(estimator.checkpoint_manifest()))
         if (
@@ -370,7 +375,9 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
             != estimator.model_contract().checkpoint.format
             or meta != expected
         ):
-            raise ValueError("deep-learning checkpoint metadata does not match")
+            raise errors.InputError(
+                "deep-learning checkpoint metadata does not match"
+            )
         return estimator
 
 

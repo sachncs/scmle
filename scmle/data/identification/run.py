@@ -28,6 +28,7 @@ from typing import cast
 import numpy
 import pandas
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 import scmle.data.admissibility.dag
 from scmle.data.charter import causal
@@ -356,7 +357,7 @@ class BackdoorEstimator(Estimator):
                 are also `ValueError`.
         """
         if self.nuisances is None:
-            raise ValueError("prepare() must run first")
+            raise errors.InputError("prepare() must run first")
         spec = self.spec
         result = aipw.estimate(
             self.nuisances,
@@ -488,7 +489,7 @@ class BackdoorEstimator(Estimator):
         if not self.covariates:
             return {"holds": None, "note": "benchmarking needs a covariate"}
         if self.nuisances is None:
-            raise ValueError("prepare() must run first")
+            raise errors.InputError("prepare() must run first")
         design = self.nuisances.design
         matrix = design.matrix(c)
         names = [f"x{j}" for j in range(matrix.shape[1])]
@@ -606,7 +607,7 @@ class DidEstimator(Estimator):
         """
         s = self.spec
         if not (s.unit and s.time and s.adoption):
-            raise ValueError("did needs unit, time and adoption")
+            raise errors.InputError("did needs unit, time and adoption")
         return s.unit, s.time, s.adoption
 
     def prepare(self) -> None:
@@ -781,7 +782,7 @@ class IvEstimator(Estimator):
         """
         spec = self.spec
         if not spec.instrument:
-            raise ValueError("iv needs an instrument")
+            raise errors.InputError("iv needs an instrument")
         return iv.estimate(
             frame,
             spec.treatment,
@@ -913,7 +914,7 @@ class RdEstimator(Estimator):
         """
         spec = self.spec
         if not spec.running_variable or spec.cutoff is None:
-            raise ValueError("rd needs a running variable and cutoff")
+            raise errors.InputError("rd needs a running variable and cutoff")
         fit = rd.estimate(
             self.x,
             spec.running_variable,
@@ -958,7 +959,7 @@ class RdEstimator(Estimator):
         """
         spec = self.spec
         if not spec.running_variable or spec.cutoff is None:
-            raise ValueError("rd needs a running variable and cutoff")
+            raise errors.InputError("rd needs a running variable and cutoff")
         return rd.estimate(
             c,
             spec.running_variable,
@@ -1110,12 +1111,14 @@ class SynthEstimator(Estimator):
         """
         spec = self.spec
         if not (spec.unit and spec.time):
-            raise ValueError("synth needs unit and time")
+            raise errors.InputError("synth needs unit and time")
         frame = self.x
         flag = frame[spec.treatment].to_numpy(dtype=float) > 0
         treated_units = frame.loc[flag, spec.unit].unique()
         if len(treated_units) != 1:
-            raise ValueError("synthetic control needs exactly one treated unit")
+            raise errors.InputError(
+                "synthetic control needs exactly one treated unit"
+            )
         first = frame.loc[flag, spec.time].min()
         result = synth.estimate(
             frame,

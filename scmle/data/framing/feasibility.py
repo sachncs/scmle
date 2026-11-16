@@ -18,6 +18,7 @@ import numpy
 from numpy.typing import ArrayLike
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.data.charter import feasibility
 from scmle.data.framing import baseline
 
@@ -162,11 +163,11 @@ def assess(
     """
     values = baseline.vector(d, "d")
     if delta_min <= 0:
-        raise ValueError("delta_min must be greater than 0")
+        raise errors.InputError("delta_min must be greater than 0")
     n = values.size
     s_d = float(values.std(ddof=1))
     if n < MIN_GAIN_ROWS or s_d == 0.0:
-        raise ValueError("s_d cannot be estimated from these gains")
+        raise errors.InputError("s_d cannot be estimated from these gains")
     rho, m = intraclass(values, clusters)
     deff = 1.0 + (m - 1.0) * rho
     tail = (1.0 - CONFIDENCE) / 2.0

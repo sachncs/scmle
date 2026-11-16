@@ -19,6 +19,7 @@ import enum
 import numpy
 import pandas
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.admissibility import provenance
 
@@ -51,7 +52,7 @@ def to_seconds(values: pandas.Series) -> numpy.ndarray:
             missing times.
     """
     if values.isna().any():
-        raise ValueError("times must not be missing")
+        raise errors.InputError("times must not be missing")
     if pandas.api.types.is_datetime64_any_dtype(values):
         naive = values.dt.tz_localize(None) if values.dt.tz else values
         return ((naive - EPOCH) / SECOND).to_numpy(dtype="float64")
@@ -59,7 +60,7 @@ def to_seconds(values: pandas.Series) -> numpy.ndarray:
         pandas.api.types.is_bool_dtype(values)
     ):
         return values.to_numpy(dtype="float64")
-    raise ValueError("times must be datetimes or numbers")
+    raise errors.InputError("times must be datetimes or numbers")
 
 
 def point_in_time(

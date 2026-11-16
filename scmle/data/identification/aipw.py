@@ -38,6 +38,7 @@ from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import preprocessing
 
+from scmle.contracts import errors
 from scmle.evaluation import sequential
 
 LEARNERS = ("linear", "boosted")
@@ -114,7 +115,7 @@ class Design:
             )
         matrix = numpy.hstack(parts) if parts else numpy.empty((len(frame), 0))
         if not numpy.isfinite(matrix).all():
-            raise ValueError("covariates must not hold missing values")
+            raise errors.InputError("covariates must not hold missing values")
         return matrix
 
 
@@ -188,7 +189,7 @@ def make_learners(learner: str, seed: int) -> tuple[Any, Any]:
                 n_estimators=100, max_depth=2, random_state=seed
             ),
         )
-    raise ValueError(f"learner must be one of {LEARNERS}")
+    raise errors.InputError(f"learner must be one of {LEARNERS}")
 
 
 def binary(values: pandas.Series, name: str) -> numpy.ndarray:
@@ -206,7 +207,7 @@ def binary(values: pandas.Series, name: str) -> numpy.ndarray:
     """
     array = values.to_numpy(dtype=float)
     if not numpy.isin(array, (0.0, 1.0)).all():
-        raise ValueError(f"{name} must be binary (0 or 1)")
+        raise errors.InputError(f"{name} must be binary (0 or 1)")
     return array
 
 
@@ -241,9 +242,9 @@ def fit_nuisances(
     t = binary(frame[treatment], treatment)
     y = frame[outcome].to_numpy(dtype=float)
     if not numpy.isfinite(y).all():
-        raise ValueError("the outcome must not hold missing values")
+        raise errors.InputError("the outcome must not hold missing values")
     if min(t.sum(), len(t) - t.sum()) < MIN_ARM:
-        raise ValueError(f"each arm needs at least {MIN_ARM} rows")
+        raise errors.InputError(f"each arm needs at least {MIN_ARM} rows")
     design = Design.build(frame, covariates)
     raw = design.matrix(frame)
     if raw.shape[1] == 0:
@@ -421,7 +422,7 @@ def scores(
         theta = float(raw.mean() / p)
         phi = (t * (y - m0 - theta) - (1 - t) * e / (1 - e) * (y - m0)) / p
         return theta, phi
-    raise ValueError("estimand must be ATE or ATT")
+    raise errors.InputError("estimand must be ATE or ATT")
 
 
 def estimate(
@@ -459,18 +460,18 @@ def estimate(
     t = binary(frame[treatment], treatment)
     y = frame[outcome].to_numpy(dtype=float)
     if not numpy.isfinite(y).all():
-        raise ValueError("the outcome must not hold missing values")
+        raise errors.InputError("the outcome must not hold missing values")
     e, m0, m1 = nuisances.predict(frame)
     keep = (
         (e >= trim) & (e <= 1 - trim) if trim > 0 else numpy.ones(len(e), bool)
     )
     if keep.mean() < min_share:
-        raise ValueError(
+        raise errors.InputError(
             f"trimming at {trim} keeps {keep.mean():.3f} of the rows, below "
             f"the declared minimum share {min_share}"
         )
     if min(t[keep].sum(), keep.sum() - t[keep].sum()) < MIN_SCORED_ARM_ROWS:
-        raise ValueError("each arm needs at least two scored rows")
+        raise errors.InputError("each arm needs at least two scored rows")
     t, y, e, m0, m1 = (a[keep] for a in (t, y, e, m0, m1))
     theta, influence = scores(estimand, t, y, e, m0, m1)
     n = int(keep.sum())
@@ -552,7 +553,7 @@ def difference_in_means(
     y = frame[outcome].to_numpy(dtype=float)
     y1, y0 = y[t == 1], y[t == 0]
     if min(len(y1), len(y0)) < MIN_SCORED_ARM_ROWS:
-        raise ValueError("each arm needs at least two rows")
+        raise errors.InputError("each arm needs at least two rows")
     v1, v0 = y1.var(ddof=1) / len(y1), y0.var(ddof=1) / len(y0)
     se = float(numpy.sqrt(v1 + v0))
     df = (v1 + v0) ** 2 / (v1**2 / (len(y1) - 1) + v0**2 / (len(y0) - 1))

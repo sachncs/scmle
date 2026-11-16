@@ -29,6 +29,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from scmle.contracts import errors
+
 SIGNATURE_HEADER = "X-Scmle-Signature"
 TIMESTAMP_HEADER = "X-Scmle-Timestamp"
 IDEMPOTENCY_HEADER = "X-Scmle-Idempotency-Key"
@@ -99,7 +101,7 @@ def sign(secret: str | bytes, timestamp: str, body: bytes) -> str:
         ValueError: If the secret is empty.
     """
     if not secret:
-        raise ValueError("a signing secret is required")
+        raise errors.InputError("a signing secret is required")
     key = secret.encode() if isinstance(secret, str) else secret
     mac = hmac.new(key, timestamp.encode() + b"." + body, hashlib.sha256)
     return "sha256=" + mac.hexdigest()
@@ -157,7 +159,7 @@ def urllib_transport(timeout_seconds: float = 5.0) -> Transport:
     def send(request: Request) -> int:
         parsed = urllib.parse.urlparse(request.url)
         if parsed.scheme != "https":
-            raise ValueError("webhook URL must use HTTPS")
+            raise errors.InputError("webhook URL must use HTTPS")
         outgoing = urllib.request.Request(  # noqa: S310 -- the scheme was checked to be https above
             request.url,
             data=request.body,
@@ -209,11 +211,13 @@ class WebhookSender:
             ValueError: For an unknown kind, an empty secret or bad bounds.
         """
         if kind not in KINDS:
-            raise ValueError(f"kind must be one of {KINDS}")
+            raise errors.InputError(f"kind must be one of {KINDS}")
         if not secret:
-            raise ValueError("a signing secret is required")
+            raise errors.InputError("a signing secret is required")
         if max_attempts < 1 or backoff_seconds < 0:
-            raise ValueError("max_attempts >= 1 and backoff >= 0 required")
+            raise errors.InputError(
+                "max_attempts >= 1 and backoff >= 0 required"
+            )
         self.kind = kind
         self.url = url
         self.secret = secret
@@ -242,14 +246,14 @@ class WebhookSender:
         """
         severity = notification.get("severity", "")
         if severity not in SEVERITIES:
-            raise ValueError(f"severity must be one of {SEVERITIES}")
+            raise errors.InputError(f"severity must be one of {SEVERITIES}")
         body = json.dumps(
             {**notification, "kind": self.kind},
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
         if len(body) > MAX_BODY_BYTES:
-            raise ValueError("notification is too large")
+            raise errors.InputError("notification is too large")
         return body
 
     def send(self, notification: Mapping[str, Any]) -> Delivery:

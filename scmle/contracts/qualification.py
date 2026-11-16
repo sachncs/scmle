@@ -16,6 +16,7 @@ from typing import Self
 
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.contracts import evidence
 
 SeedPath = tuple[str | int, ...]
@@ -64,10 +65,10 @@ def finite(value: Any, name: str) -> float:
             finite.
     """
     if isinstance(value, bool) or not isinstance(value, int | float):
-        raise ValueError(f"{name} must be a finite number")
+        raise errors.InputError(f"{name} must be a finite number")
     number = float(value)
     if not math.isfinite(number):
-        raise ValueError(f"{name} must be a finite number")
+        raise errors.InputError(f"{name} must be a finite number")
     return number
 
 
@@ -86,7 +87,7 @@ def probability(value: Any, name: str) -> float:
     """
     number = finite(value, name)
     if not 0.0 <= number <= 1.0:
-        raise ValueError(f"{name} must be within [0, 1]")
+        raise errors.InputError(f"{name} must be within [0, 1]")
     return number
 
 
@@ -106,10 +107,10 @@ def count(value: Any, name: str, minimum: int = 0) -> int:
             is below the minimum.
     """
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"{name} must be an integer")
+        raise errors.InputError(f"{name} must be an integer")
     if value < minimum:
         label = "non-negative" if minimum == 0 else f"at least {minimum}"
-        raise ValueError(f"{name} must be {label}")
+        raise errors.InputError(f"{name} must be {label}")
     return value
 
 
@@ -127,9 +128,9 @@ def require(cls: type, record: Mapping[str, Any]) -> None:
     unexpected = sorted(set(record) - names)
     missing = sorted(names - set(record))
     if unexpected:
-        raise ValueError(f"unexpected field(s): {unexpected}")
+        raise errors.InputError(f"unexpected field(s): {unexpected}")
     if missing:
-        raise ValueError(f"missing field(s): {missing}")
+        raise errors.InputError(f"missing field(s): {missing}")
 
 
 def require_tuple(value: Any, name: str) -> None:
@@ -143,7 +144,7 @@ def require_tuple(value: Any, name: str) -> None:
         ValueError: If the value is not a tuple.
     """
     if not isinstance(value, tuple):
-        raise ValueError(f"{name} must be a tuple")
+        raise errors.InputError(f"{name} must be a tuple")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -198,13 +199,13 @@ class Check:
         if self.interval is not None:
             require_tuple(self.interval, "interval")
             if len(self.interval) != INTERVAL_LENGTH:
-                raise ValueError("interval must hold (low, high)")
+                raise errors.InputError("interval must hold (low, high)")
             low = finite(self.interval[0], "interval")
             high = finite(self.interval[1], "interval")
             if low > high:
-                raise ValueError("interval must satisfy low <= high")
+                raise errors.InputError("interval must satisfy low <= high")
         if self.p_value is None and self.interval is None:
-            raise ValueError("a check needs a p_value or interval")
+            raise errors.InputError("a check needs a p_value or interval")
         require_tuple(self.seed_path, "seed_path")
         for decision, kind in (
             (self.decision, Decision),
@@ -212,10 +213,12 @@ class Check:
             (self.tier, Tier),
         ):
             if not isinstance(decision, kind):
-                raise ValueError(f"expected a {kind.__name__}")
+                raise errors.InputError(f"expected a {kind.__name__}")
         on_confirmation = self.set_id is SetId.CONFIRMATION
         if self.tier is Tier.CONFIRMED and not on_confirmation:
-            raise ValueError("confirmed tier requires the confirmation set 'C'")
+            raise errors.InputError(
+                "confirmed tier requires the confirmation set 'C'"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-ready record.
@@ -302,16 +305,16 @@ class Claim:
         require_tuple(self.check_ids, "check_ids")
         require_tuple(self.assumptions, "assumptions")
         if not self.check_ids:
-            raise ValueError("check_ids must not be empty")
+            raise errors.InputError("check_ids must not be empty")
         for check_id in self.check_ids:
             evidence.require_text(check_id, "check_ids")
         if self.adjusted_p_value is not None:
             probability(self.adjusted_p_value, "adjusted_p_value")
         finite(self.effect, "effect")
         if not isinstance(self.tier, Tier):
-            raise ValueError("expected a Tier")
+            raise errors.InputError("expected a Tier")
         if self.tier is Tier.CONFIRMED and self.adjusted_p_value is None:
-            raise ValueError("confirmed claims need an adjusted_p_value")
+            raise errors.InputError("confirmed claims need an adjusted_p_value")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-ready record.
@@ -393,11 +396,13 @@ class Certificate:
         count(self.planted, "planted", minimum=1)
         count(self.detected, "detected")
         if self.detected > self.planted:
-            raise ValueError("detected must be between 0 and planted")
+            raise errors.InputError("detected must be between 0 and planted")
         count(self.clean_rows, "clean_rows", minimum=1)
         count(self.false_alarms, "false_alarms")
         if self.false_alarms > self.clean_rows:
-            raise ValueError("false_alarms must be between 0 and clean_rows")
+            raise errors.InputError(
+                "false_alarms must be between 0 and clean_rows"
+            )
         require_tuple(self.seed_path, "seed_path")
 
     @property
@@ -425,7 +430,7 @@ class Certificate:
             ValueError: If `confidence` is outside (0, 1).
         """
         if not 0.0 < confidence < 1.0:
-            raise ValueError("confidence must be within (0, 1)")
+            raise errors.InputError("confidence must be within (0, 1)")
         z = float(stats.norm.ppf(1.0 - (1.0 - confidence) / 2.0))
         n = self.planted
         p = self.recall

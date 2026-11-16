@@ -16,6 +16,7 @@ import dataclasses
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 
 
@@ -52,13 +53,15 @@ class Uncertainty:
                 is not an integer of at least 1.
         """
         if not isinstance(self.coverage_on_confirmation, bool):
-            raise ValueError("coverage_on_confirmation must be a bool")
+            raise errors.InputError("coverage_on_confirmation must be a bool")
         qualification.require_tuple(self.slice_columns, "slice_columns")
         columns: Iterable[object] = self.slice_columns
         if len(set(self.slice_columns)) != len(self.slice_columns) or any(
             not isinstance(c, str) or not c.strip() for c in columns
         ):
-            raise ValueError("slice_columns are distinct, non-blank names")
+            raise errors.InputError(
+                "slice_columns are distinct, non-blank names"
+            )
         if self.cv_plus_max_bytes is not None:
             qualification.count(
                 self.cv_plus_max_bytes, "cv_plus_max_bytes", minimum=1
@@ -104,7 +107,9 @@ class Uncertainty:
             "coverage_on_confirmation",
         }
         if unknown:
-            raise ValueError(f"unknown uncertainty fields {sorted(unknown)}")
+            raise errors.InputError(
+                f"unknown uncertainty fields {sorted(unknown)}"
+            )
         return cls(
             record.get("cv_plus_max_bytes"),
             tuple(record.get("slice_columns", ())),

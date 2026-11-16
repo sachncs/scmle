@@ -5,6 +5,7 @@ from collections.abc import Sequence
 import datetime
 from typing import Any
 
+from scmle.contracts import errors
 from scmle.contracts import explanations
 from scmle.evaluation import diagnostics
 from scmle.explainability import dependence
@@ -70,7 +71,7 @@ def build_evidence(
     """
     method_name = getattr(diagnostic, "name", None)
     if not isinstance(method_name, str) or not method_name.strip():
-        raise ValueError("diagnostic.name must be a non-empty string")
+        raise errors.InputError("diagnostic.name must be a non-empty string")
     if isinstance(limitations, str):
         raise TypeError("limitations must be a sequence of strings")
     supplied_links: object = evidence_links  # callers may pass a string

@@ -87,20 +87,22 @@ def read(
     """
     data = pathlib.Path(path).read_bytes()
     if not data.startswith(MAGIC):
-        raise ValueError(f"{path} is not an scmle envelope")
+        raise errors.InputError(f"{path} is not an scmle envelope")
     end = data.find(b"\n", len(MAGIC), len(MAGIC) + LIMIT)
     if end < 0:
-        raise ValueError(f"{path} has no envelope header")
+        raise errors.InputError(f"{path} has no envelope header")
     try:
         header = json.loads(data[len(MAGIC) : end])
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ValueError(f"{path} has a malformed envelope header") from error
+        raise errors.InputError(
+            f"{path} has a malformed envelope header"
+        ) from error
     if not isinstance(header, dict) or not isinstance(header.get("meta"), dict):
-        raise ValueError(f"{path} has a malformed envelope header")
+        raise errors.InputError(f"{path} has a malformed envelope header")
     payload = data[end + 1 :]
     digest = str(header.get("sha256", ""))
     if not hmac.compare_digest(hashlib.sha256(payload).hexdigest(), digest):
-        raise ValueError(f"{path} does not match its digest")
+        raise errors.InputError(f"{path} does not match its digest")
     key = signing.resolve_key(signing_key)
     signed = isinstance(header.get("mac"), str)
     if signed and key is not None:

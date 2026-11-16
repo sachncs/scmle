@@ -21,6 +21,7 @@ import dataclasses
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 
@@ -87,12 +88,12 @@ def check_assumption(item: str) -> None:
             covariates_of([item]) is None
             or not item[len(UNCONFOUNDEDNESS_PREFIX) :].strip()
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "unconfoundedness_given needs covariates, or 'none' for an "
                 "attestation that no adjustment is needed"
             )
         return
-    raise ValueError(
+    raise errors.InputError(
         f"unknown assumption {item!r}; allowed: {FIXED_ASSUMPTIONS} and "
         f"'{UNCONFOUNDEDNESS_PREFIX}<columns>'"
     )
@@ -119,7 +120,9 @@ class NegativeControl:
                 `variable` is blank.
         """
         if self.kind not in NEGATIVE_CONTROL_KINDS:
-            raise ValueError(f"kind must be one of {NEGATIVE_CONTROL_KINDS}")
+            raise errors.InputError(
+                f"kind must be one of {NEGATIVE_CONTROL_KINDS}"
+            )
         evidence.require_text(self.variable, "variable")
 
     def to_dict(self) -> dict[str, Any]:
@@ -173,11 +176,11 @@ class Subgroup:
         evidence.require_text(self.column, "column")
         qualification.require_tuple(self.values, "values")
         if not self.values:
-            raise ValueError("a subgroup needs at least one value")
+            raise errors.InputError("a subgroup needs at least one value")
         for value in self.values:
             evidence.require_text(value, "value")
         if len(set(self.values)) != len(self.values):
-            raise ValueError("duplicate subgroup value")
+            raise errors.InputError("duplicate subgroup value")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.
@@ -230,11 +233,11 @@ class Attestor:
         evidence.require_text(self.role, "role")
         qualification.require_tuple(self.assumptions, "assumptions")
         if not self.assumptions:
-            raise ValueError("an attestor needs at least one assumption")
+            raise errors.InputError("an attestor needs at least one assumption")
         for item in self.assumptions:
             check_assumption(item)
         if len(set(self.assumptions)) != len(self.assumptions):
-            raise ValueError("duplicate assumption for an attestor")
+            raise errors.InputError("duplicate assumption for an attestor")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.
@@ -293,14 +296,14 @@ class Confounding:
                 `fixed` benchmark), or `m_max` is not finite or is negative.
         """
         if self.benchmark not in BENCHMARKS:
-            raise ValueError(f"benchmark must be one of {BENCHMARKS}")
+            raise errors.InputError(f"benchmark must be one of {BENCHMARKS}")
         value = qualification.finite(self.strength, "strength")
         if value <= 0:
-            raise ValueError("strength must be positive")
+            raise errors.InputError("strength must be positive")
         if self.benchmark == "fixed" and value >= 1:
-            raise ValueError("a fixed strength is a partial R2 below 1")
+            raise errors.InputError("a fixed strength is a partial R2 below 1")
         if qualification.finite(self.m_max, "m_max") < 0:
-            raise ValueError("m_max must not be negative")
+            raise errors.InputError("m_max must not be negative")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.
@@ -402,7 +405,9 @@ class Question:
         evidence.require_text(self.treatment, "treatment")
         evidence.require_text(self.outcome, "outcome")
         if self.estimand not in CAUSAL_ESTIMANDS:
-            raise ValueError(f"estimand must be one of {CAUSAL_ESTIMANDS}")
+            raise errors.InputError(
+                f"estimand must be one of {CAUSAL_ESTIMANDS}"
+            )
         for name in (
             "assumptions",
             "strategies",
@@ -418,17 +423,19 @@ class Question:
         self.check_attestors()
         columns = [g.column for g in self.subgroups]
         if len(set(columns)) != len(columns):
-            raise ValueError("duplicate subgroup column")
+            raise errors.InputError("duplicate subgroup column")
         if {self.treatment, self.outcome} & set(columns):
-            raise ValueError("a subgroup cannot be defined by the treatment")
+            raise errors.InputError(
+                "a subgroup cannot be defined by the treatment"
+            )
         if self.cutoff is not None:
             qualification.finite(self.cutoff, "cutoff")
         trim = qualification.finite(self.trim, "trim")
         if not 0.0 <= trim < MAX_TRIM_EXCLUSIVE:
-            raise ValueError("trim must be within [0, 0.5)")
+            raise errors.InputError("trim must be within [0, 0.5)")
         share = qualification.finite(self.min_share, "min_share")
         if not 0.0 < share <= 1.0:
-            raise ValueError("min_share must be within (0, 1]")
+            raise errors.InputError("min_share must be within (0, 1]")
 
     def check_repeats(self) -> None:
         """Checks that no assumption or strategy is repeated.
@@ -437,9 +444,9 @@ class Question:
             ValueError: If an assumption or a strategy is repeated.
         """
         if len(set(self.assumptions)) != len(self.assumptions):
-            raise ValueError("duplicate assumption")
+            raise errors.InputError("duplicate assumption")
         if len(set(self.strategies)) != len(self.strategies):
-            raise ValueError("duplicate strategy")
+            raise errors.InputError("duplicate strategy")
 
     def check_attestors(self) -> None:
         """Checks the attestors against the rest of the block.
@@ -452,17 +459,17 @@ class Question:
         """
         names = [a.name for a in self.attestors]
         if len(set(names)) != len(names):
-            raise ValueError("duplicate attestor")
+            raise errors.InputError("duplicate attestor")
         if self.attestors and not self.attestations:
-            raise ValueError("attestors need an attestations file")
+            raise errors.InputError("attestors need an attestations file")
         if self.attestations is not None:
             evidence.require_text(self.attestations, "attestations")
             if not self.attestors:
-                raise ValueError("an attestations file needs attestors")
+                raise errors.InputError("an attestations file needs attestors")
         for attestor in self.attestors:
             unknown = set(attestor.assumptions) - set(self.assumptions)
             if unknown:
-                raise ValueError(
+                raise errors.InputError(
                     f"attestor {attestor.name} names assumptions the block "
                     f"does not declare: {sorted(unknown)}"
                 )

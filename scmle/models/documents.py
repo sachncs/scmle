@@ -29,6 +29,7 @@ from sklearn.metrics import log_loss
 
 from scmle import durability
 from scmle import envelope
+from scmle.contracts import errors
 from scmle.data.modalities import document
 
 NGRAM_BOUND_COUNT = 2
@@ -66,17 +67,19 @@ class Config:
                 `regularization` is not positive.
         """
         if self.max_features < 1:
-            raise ValueError("max_features must be positive")
+            raise errors.InputError("max_features must be positive")
         if len(self.ngram_range) != NGRAM_BOUND_COUNT or not (
             1 <= self.ngram_range[0] <= self.ngram_range[1]
         ):
-            raise ValueError("ngram_range must contain positive ordered bounds")
+            raise errors.InputError(
+                "ngram_range must contain positive ordered bounds"
+            )
         if self.min_df < 1:
-            raise ValueError("min_df must be positive")
+            raise errors.InputError("min_df must be positive")
         if self.regularization <= 0:
-            raise ValueError("regularization must be positive")
+            raise errors.InputError("regularization must be positive")
         if self.max_iter < 1:
-            raise ValueError("max_iter must be positive")
+            raise errors.InputError("max_iter must be positive")
 
     def to_dict(self) -> dict[str, Any]:
         """Converts the configuration to JSON-compatible values.
@@ -300,11 +303,11 @@ class Classifier:
         """
         values = tuple(training_samples)
         if not values:
-            raise ValueError("training_samples must not be empty")
+            raise errors.InputError("training_samples must not be empty")
         dataset = document.Dataset(values)
         report = dataset.curate()
         if report.unresolved_blocking_findings:
-            raise ValueError(
+            raise errors.InputError(
                 "document curation has unresolved blocking findings: "
                 + ", ".join(
                     finding.finding_id
@@ -312,10 +315,12 @@ class Classifier:
                 )
             )
         if any(sample.label is None for sample in values):
-            raise ValueError("every training document must have a label")
+            raise errors.InputError("every training document must have a label")
         labels = [sample.label for sample in values]
         if len(set(labels)) < MIN_CLASS_COUNT:
-            raise ValueError("training documents must contain two classes")
+            raise errors.InputError(
+                "training documents must contain two classes"
+            )
 
         vectorizer = TfidfVectorizer(
             lowercase=True,
@@ -328,7 +333,9 @@ class Classifier:
             [sample.content for sample in values]
         )
         if matrix.shape[1] == 0:
-            raise ValueError("training documents contain no usable tokens")
+            raise errors.InputError(
+                "training documents contain no usable tokens"
+            )
         estimator = LogisticRegression(
             C=self.config.regularization,
             max_iter=self.config.max_iter,
@@ -411,9 +418,11 @@ class Classifier:
         """
         values = tuple(samples)
         if not values:
-            raise ValueError("evaluation samples must not be empty")
+            raise errors.InputError("evaluation samples must not be empty")
         if any(sample.label is None for sample in values):
-            raise ValueError("every evaluation document must have a label")
+            raise errors.InputError(
+                "every evaluation document must have a label"
+            )
         labels = tuple(str(value) for value in self.classes)
         actual = [sample.label for sample in values]
         predicted = self.predict(values)
@@ -443,7 +452,7 @@ class Classifier:
             RuntimeError: If the classifier has not been fitted.
         """
         if top_k < 1:
-            raise ValueError("top_k must be positive")
+            raise errors.InputError("top_k must be positive")
         self.require_fitted()
         vectorizer = self.vectorizer
         estimator = self.estimator
@@ -491,7 +500,7 @@ class Classifier:
             RuntimeError: If the classifier has not been fitted.
         """
         if top_k < 1:
-            raise ValueError("top_k must be positive")
+            raise errors.InputError("top_k must be positive")
         self.require_fitted()
         vectorizer = self.vectorizer
         estimator = self.estimator
@@ -561,9 +570,9 @@ class Classifier:
             RuntimeError: If the classifier has not been fitted.
         """
         if top_k < 1:
-            raise ValueError("top_k must be positive")
+            raise errors.InputError("top_k must be positive")
         if max_terms < 1:
-            raise ValueError("max_terms must be positive")
+            raise errors.InputError("max_terms must be positive")
         self.require_fitted()
         vectorizer = self.vectorizer
         estimator = self.estimator
@@ -747,23 +756,31 @@ class Classifier:
             raise FileNotFoundError(target)
         manifest_path = target / "manifest.json"
         if not manifest_path.is_file():
-            raise ValueError("document model package has no manifest")
+            raise errors.InputError("document model package has no manifest")
         with manifest_path.open(encoding="utf-8") as stream:
             manifest = json.load(stream)
         if manifest.get("schema_version") != 1:
-            raise ValueError("unsupported document model package version")
+            raise errors.InputError(
+                "unsupported document model package version"
+            )
         model_path = target / str(manifest.get("model_path", ""))
         if not model_path.is_file():
-            raise ValueError("document model package has no model payload")
+            raise errors.InputError(
+                "document model package has no model payload"
+            )
         if file_digest(model_path) != manifest.get("artifact_digest"):
-            raise ValueError("document model payload digest does not match")
+            raise errors.InputError(
+                "document model payload digest does not match"
+            )
         envelope.check(manifest, target, signing_key, trusted)
         loaded = joblib.load(model_path)
         if not isinstance(loaded, cls):
             raise TypeError("package does not contain a Classifier")
         loaded.require_fitted()
         if loaded.model_digest != manifest.get("model_digest"):
-            raise ValueError("document model digest does not match manifest")
+            raise errors.InputError(
+                "document model digest does not match manifest"
+            )
         return loaded
 
     def transform(self, samples: Sequence[document.Sample]) -> Any:
@@ -818,7 +835,7 @@ class Monitor:
             ValueError: If `threshold` is outside (0, 1].
         """
         if not 0 < threshold <= 1:
-            raise ValueError("threshold must be in (0, 1]")
+            raise errors.InputError("threshold must be in (0, 1]")
         self.reference = reference
         self.threshold = threshold
 

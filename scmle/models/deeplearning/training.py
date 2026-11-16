@@ -10,6 +10,8 @@ from typing import Any
 
 import numpy
 
+from scmle.contracts import errors
+
 AUTO = "auto"
 MIN_BATCH = 32
 MAX_BATCH = 512
@@ -44,7 +46,7 @@ def resolve_batch_size(setting: int | str, rows: int) -> int:
         return int(min(max(size, MIN_BATCH), MAX_BATCH, max(rows, 1)))
     if isinstance(setting, int) and setting > 0:
         return min(setting, max(rows, 1))
-    raise ValueError(
+    raise errors.InputError(
         f"batch size must be a positive integer or 'auto': {setting!r}"
     )
 
@@ -68,7 +70,7 @@ def learning_rate_at(
         ValueError: For an unknown schedule.
     """
     if kind not in {"constant", "cosine"}:
-        raise ValueError(f"unknown learning-rate schedule '{kind}'")
+        raise errors.InputError(f"unknown learning-rate schedule '{kind}'")
     if warmup_steps and step < warmup_steps:
         return base * (step + 1) / warmup_steps
     if kind == "constant":

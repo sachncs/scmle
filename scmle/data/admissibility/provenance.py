@@ -26,6 +26,7 @@ import json
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 
@@ -104,13 +105,13 @@ class AsOf:
                 has a lead, or if a known rule has no finite lead.
         """
         if not isinstance(self.kind, AsOfKind):
-            raise ValueError("kind must be an AsOfKind")
+            raise errors.InputError("kind must be an AsOfKind")
         if self.kind is AsOfKind.UNKNOWN:
             if self.lead_seconds is not None:
-                raise ValueError("an unknown as-of rule has no lead")
+                raise errors.InputError("an unknown as-of rule has no lead")
         else:
             if self.lead_seconds is None:
-                raise ValueError("a known as-of rule needs lead_seconds")
+                raise errors.InputError("a known as-of rule needs lead_seconds")
             qualification.finite(self.lead_seconds, "lead_seconds")
 
     @classmethod
@@ -167,7 +168,9 @@ def parse_date(value: str, name: str) -> datetime.date:
     try:
         return datetime.date.fromisoformat(value)
     except (TypeError, ValueError) as error:
-        raise ValueError(f"{name} must be an ISO date (YYYY-MM-DD)") from error
+        raise errors.InputError(
+            f"{name} must be an ISO date (YYYY-MM-DD)"
+        ) from error
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -208,11 +211,11 @@ class Attestation:
             "scope",
         ):
             if not isinstance(getattr(self, name), str):
-                raise ValueError(f"{name} must be text")
+                raise errors.InputError(f"{name} must be text")
             evidence.require_text(getattr(self, name), name)
         issued = parse_date(self.date, "date")
         if parse_date(self.expires, "expires") < issued:
-            raise ValueError("expires must not precede date")
+            raise errors.InputError("expires must not precede date")
 
     def valid_on(self, day: datetime.date) -> bool:
         """Tests whether the statement counts on a day.
@@ -274,7 +277,7 @@ class LogCheck:
         qualification.count(self.rows, "rows", minimum=1)
         qualification.count(self.mismatched, "mismatched")
         if self.mismatched > self.rows:
-            raise ValueError("mismatched must not exceed rows")
+            raise errors.InputError("mismatched must not exceed rows")
         qualification.probability(self.tolerance, "tolerance")
 
     @property
@@ -366,19 +369,25 @@ class FieldProvenance:
             (self.as_of, AsOf),
         ):
             if not isinstance(value, kind):
-                raise ValueError(f"expected a {kind.__name__}")
+                raise errors.InputError(f"expected a {kind.__name__}")
         known = self.as_of.is_known
         if known and self.as_of_source is AsOfSource.NONE:
-            raise ValueError("a known as-of rule needs a source")
+            raise errors.InputError("a known as-of rule needs a source")
         if not known and self.as_of_source is not AsOfSource.NONE:
-            raise ValueError("an unknown as-of rule cannot have a source")
+            raise errors.InputError(
+                "an unknown as-of rule cannot have a source"
+            )
         if (
             self.as_of_source is AsOfSource.ATTESTED
             and self.attestation is None
         ):
-            raise ValueError("an attested as-of rule needs an attestation")
+            raise errors.InputError(
+                "an attested as-of rule needs an attestation"
+            )
         if self.as_of_source is AsOfSource.LOG and self.log_check is None:
-            raise ValueError("a log-derived as-of rule needs a log_check")
+            raise errors.InputError(
+                "a log-derived as-of rule needs a log_check"
+            )
 
     def tier(self, today: datetime.date | None = None) -> qualification.Tier:
         """Returns the evidence tier of the field's as-of rule.
@@ -508,7 +517,7 @@ class Dictionary:
         qualification.require_tuple(self.fields, "fields")
         names = [f.name for f in self.fields]
         if len(set(names)) != len(names):
-            raise ValueError("field names must be unique")
+            raise errors.InputError("field names must be unique")
 
     @classmethod
     def covering(
@@ -532,10 +541,12 @@ class Dictionary:
         """
         by_name = {f.name: f for f in declared}
         if len(by_name) != len(declared):
-            raise ValueError("declared field names must be unique")
+            raise errors.InputError("declared field names must be unique")
         unknown = sorted(set(by_name) - set(columns))
         if unknown:
-            raise ValueError(f"declared fields not in the data: {unknown}")
+            raise errors.InputError(
+                f"declared fields not in the data: {unknown}"
+            )
         return cls(tuple(by_name.get(c) or undeclared(c) for c in columns))
 
     def get(self, name: str) -> FieldProvenance:
@@ -596,14 +607,14 @@ class Dictionary:
                 field record is invalid.
         """
         if document.get("format_version") != FORMAT_VERSION:
-            raise ValueError(
+            raise errors.InputError(
                 f"unsupported format_version: {document.get('format_version')}"
             )
         extra = sorted(set(document) - {"format_version", "fields"})
         if extra:
-            raise ValueError(f"unexpected field(s): {extra}")
+            raise errors.InputError(f"unexpected field(s): {extra}")
         if "fields" not in document:
-            raise ValueError("missing field(s): ['fields']")
+            raise errors.InputError("missing field(s): ['fields']")
         return cls(
             tuple(FieldProvenance.from_dict(f) for f in document["fields"])
         )

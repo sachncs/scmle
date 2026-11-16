@@ -59,7 +59,7 @@ class UncertaintyFeed:
             ValueError: If `nominal` is not strictly between 0 and 1.
         """
         if not 0.0 < nominal < 1.0:
-            raise ValueError("nominal must lie strictly between 0 and 1")
+            raise errors.InputError("nominal must lie strictly between 0 and 1")
         self.loop = loop
         self.bundle = bundle
         self.nominal = nominal
@@ -93,7 +93,7 @@ class UncertaintyFeed:
             ValueError: If there is not one case id per row.
         """
         if len(case_ids) != len(features):
-            raise ValueError("one case id per row")
+            raise errors.InputError("one case id per row")
         found = self.bundle.predict_set(features, self.nominal)
         sizes = [max(len(item), 1) for item in found]
         novelty = getattr(self.bundle, "novelty", None)

@@ -26,6 +26,7 @@ from sklearn.metrics import log_loss
 
 from scmle import durability
 from scmle import envelope
+from scmle.contracts import errors
 from scmle.data.modalities import curation
 from scmle.data.modalities import image
 
@@ -64,9 +65,9 @@ class Config:
         """
         image.validate_feature_options(self.target_size, self.mode)
         if self.regularization <= 0:
-            raise ValueError("regularization must be positive")
+            raise errors.InputError("regularization must be positive")
         if self.max_iter < 1:
-            raise ValueError("max_iter must be positive")
+            raise errors.InputError("max_iter must be positive")
 
     def to_dict(self) -> dict[str, Any]:
         """Converts the configuration to JSON-compatible values.
@@ -295,29 +296,29 @@ class Classifier:
                 if "risk.image-conflicting-duplicate-labels" in blocking_ids
                 else "curation policy requires review"
             )
-            raise ValueError(
+            raise errors.InputError(
                 "image curation has unresolved blocking findings ("
                 + detail
                 + "): "
                 + ", ".join(blocking_ids)
             )
         if report.profile["duplicate_count"]:
-            raise ValueError(
+            raise errors.InputError(
                 "training images contain duplicate content; deduplicate "
                 "before fitting"
             )
         labels = tuple(sample.label for sample in training_data.samples)
         if any(label is None for label in labels):
-            raise ValueError("every training image must have a label")
+            raise errors.InputError("every training image must have a label")
         if len(set(labels)) < MIN_CLASS_COUNT:
-            raise ValueError("training images must contain two classes")
+            raise errors.InputError("training images must contain two classes")
         features = training_data.prepare_tabular_features(
             self.config.target_size,
             self.config.mode,
             self.config.normalize,
         )
         if features.shape[1] == 0:
-            raise ValueError("training images contain no usable pixels")
+            raise errors.InputError("training images contain no usable pixels")
         estimator = LogisticRegression(
             C=self.config.regularization,
             max_iter=self.config.max_iter,
@@ -396,10 +397,10 @@ class Classifier:
             RuntimeError: If the classifier has not been fitted.
         """
         if not dataset.samples:
-            raise ValueError("evaluation images must not be empty")
+            raise errors.InputError("evaluation images must not be empty")
         labels = tuple(sample.label for sample in dataset.samples)
         if any(label is None for label in labels):
-            raise ValueError("every evaluation image must have a label")
+            raise errors.InputError("every evaluation image must have a label")
         actual = list(labels)
         predicted = self.predict(dataset)
         probabilities = self.predict_proba(dataset)
@@ -428,7 +429,7 @@ class Classifier:
             RuntimeError: If the classifier has not been fitted.
         """
         if top_k < 1:
-            raise ValueError("top_k must be positive")
+            raise errors.InputError("top_k must be positive")
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
@@ -473,7 +474,7 @@ class Classifier:
             RuntimeError: If the classifier has not been fitted.
         """
         if top_k < 1:
-            raise ValueError("top_k must be positive")
+            raise errors.InputError("top_k must be positive")
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
@@ -534,11 +535,13 @@ class Classifier:
                 invalid.
         """
         if top_k < 1:
-            raise ValueError("top_k must be positive")
+            raise errors.InputError("top_k must be positive")
         if len(patch_size) != PATCH_DIMENSION_COUNT or any(
             size < 1 for size in patch_size
         ):
-            raise ValueError("patch_size must contain positive dimensions")
+            raise errors.InputError(
+                "patch_size must contain positive dimensions"
+            )
         self.require_fitted()
         features = self.transform(image.Dataset((sample,)))
         original_score = self.predicted_class_score(features)
@@ -700,23 +703,25 @@ class Classifier:
             raise FileNotFoundError(target)
         manifest_path = target / "manifest.json"
         if not manifest_path.is_file():
-            raise ValueError("image model package has no manifest")
+            raise errors.InputError("image model package has no manifest")
         with manifest_path.open(encoding="utf-8") as stream:
             manifest = json.load(stream)
         if manifest.get("schema_version") != 1:
-            raise ValueError("unsupported image model package version")
+            raise errors.InputError("unsupported image model package version")
         model_path = target / str(manifest.get("model_path", ""))
         if not model_path.is_file():
-            raise ValueError("image model package has no model payload")
+            raise errors.InputError("image model package has no model payload")
         if file_digest(model_path) != manifest.get("artifact_digest"):
-            raise ValueError("image model payload digest does not match")
+            raise errors.InputError("image model payload digest does not match")
         envelope.check(manifest, target, signing_key, trusted)
         loaded = joblib.load(model_path)
         if not isinstance(loaded, cls):
             raise TypeError("package does not contain an Classifier")
         loaded.require_fitted()
         if loaded.model_digest != manifest.get("model_digest"):
-            raise ValueError("image model digest does not match manifest")
+            raise errors.InputError(
+                "image model digest does not match manifest"
+            )
         return loaded
 
     def transform(self, dataset: image.Dataset) -> numpy.ndarray:
@@ -787,7 +792,7 @@ class Monitor:
             ValueError: If `threshold` is outside (0, 1].
         """
         if not 0 < threshold <= 1:
-            raise ValueError("threshold must be in (0, 1]")
+            raise errors.InputError("threshold must be in (0, 1]")
         self.reference = reference
         self.threshold = threshold
 

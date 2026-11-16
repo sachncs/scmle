@@ -45,6 +45,7 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.data.charter import contracts
 import scmle.data.charter.decision
@@ -82,7 +83,7 @@ def file_digest(path: Path) -> str | None:
         return None
     body = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(body, dict):
-        raise ValueError(f"{path.name} is not a JSON object")
+        raise errors.InputError(f"{path.name} is not a JSON object")
     return ledger.digest(body)
 
 

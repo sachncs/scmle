@@ -11,6 +11,7 @@ from typing import Self
 
 from scmle import durability
 from scmle.contracts import data
+from scmle.contracts import errors
 from scmle.data.readers import connectors
 
 
@@ -60,16 +61,16 @@ class SourceSnapshot:
             "captured_at",
         ):
             if not getattr(self, name).strip():
-                raise ValueError(f"{name} must not be empty")
+                raise errors.InputError(f"{name} must not be empty")
         if self.row_count < 0:
-            raise ValueError("row_count must not be negative")
+            raise errors.InputError("row_count must not be negative")
         if not self.schema:
-            raise ValueError("schema must not be empty")
+            raise errors.InputError("schema must not be empty")
         if any(
             not name.strip() or not type_name.strip()
             for name, type_name in self.schema.items()
         ):
-            raise ValueError("schema names and types must not be empty")
+            raise errors.InputError("schema names and types must not be empty")
 
     @classmethod
     def from_manifest(
@@ -293,7 +294,7 @@ class SourceRegistry:
                     and existing.watermark == snapshot.watermark
                 )
                 if not same_content:
-                    raise ValueError(
+                    raise errors.InputError(
                         "snapshot id is already registered with different "
                         "evidence"
                     )
@@ -376,10 +377,12 @@ class SourceRegistry:
             TypeError: If an entry of ``sources`` is not a mapping.
         """
         if record.get("schema_version") != 1:
-            raise ValueError("unsupported source registry schema version")
+            raise errors.InputError(
+                "unsupported source registry schema version"
+            )
         sources = record.get("sources")
         if not isinstance(sources, list):
-            raise ValueError("sources must be a list")
+            raise errors.InputError("sources must be a list")
         registry = cls()
         for source in sources:
             if not isinstance(source, Mapping):
@@ -387,11 +390,11 @@ class SourceRegistry:
             source_id = str(source["source_id"])
             snapshots = source.get("snapshots")
             if not isinstance(snapshots, list):
-                raise ValueError("source snapshots must be a list")
+                raise errors.InputError("source snapshots must be a list")
             for item in snapshots:
                 snapshot = SourceSnapshot.from_dict(item)
                 if snapshot.source_id != source_id:
-                    raise ValueError(
+                    raise errors.InputError(
                         "snapshot source id does not match registry"
                     )
                 registry.register(snapshot)

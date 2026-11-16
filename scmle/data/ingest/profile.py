@@ -23,6 +23,7 @@ from typing import Any
 
 import pandas
 
+from scmle.contracts import errors
 from scmle.data.ingest import budget
 from scmle.data.readers import connectors
 
@@ -42,7 +43,7 @@ def quote(name: str) -> str:
         ValueError: On an empty name or one with a NUL or double quote.
     """
     if not name or "\x00" in name or '"' in name:
-        raise ValueError(f"unsafe identifier: {name!r}")
+        raise errors.InputError(f"unsafe identifier: {name!r}")
     return f'"{name}"'
 
 

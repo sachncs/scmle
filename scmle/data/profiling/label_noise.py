@@ -18,6 +18,7 @@ from sklearn import ensemble
 from sklearn import model_selection
 
 from scmle.contracts import data
+from scmle.contracts import errors
 
 MIN_CLASSES = 2
 MIN_FOLDS = 2
@@ -135,13 +136,13 @@ def find_label_noise(
     values = numpy.asarray(labels)
     classes, encoded = numpy.unique(values, return_inverse=True)
     if len(values) < MIN_ROWS or len(classes) < MIN_CLASSES:
-        raise ValueError(
+        raise errors.InputError(
             f"label-noise detection needs {MIN_ROWS}+ rows and two classes"
         )
     counts = list(numpy.bincount(numpy.asarray(encoded).ravel()))
     folds = min(FOLDS, int(min(counts)))
     if folds < MIN_FOLDS:
-        raise ValueError("every class needs at least two rows")
+        raise errors.InputError("every class needs at least two rows")
     probabilities = cast(
         "numpy.ndarray",
         model_selection.cross_val_predict(

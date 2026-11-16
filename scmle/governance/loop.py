@@ -183,15 +183,21 @@ class Preregistration:
         """
         for name in ("alpha_alarm", "alpha_rb", "r_star", "delta"):
             if not 0.0 < getattr(self, name) < 1.0:
-                raise ValueError(f"{name} must be strictly between 0 and 1")
+                raise errors.InputError(
+                    f"{name} must be strictly between 0 and 1"
+                )
         if not 0.0 <= self.epsilon < 1.0 or not 0.0 <= self.c_max <= 1.0:
-            raise ValueError("epsilon must be in [0, 1) and c_max in [0, 1]")
+            raise errors.InputError(
+                "epsilon must be in [0, 1) and c_max in [0, 1]"
+            )
         if self.loss_bound <= 0.0 or self.outcome_window < 0:
-            raise ValueError("loss_bound must be positive, window >= 0")
+            raise errors.InputError("loss_bound must be positive, window >= 0")
         if not 0.0 < self.reference_risk + self.tolerance < self.scale:
-            raise ValueError("reference_risk + tolerance must be in (0, scale)")
+            raise errors.InputError(
+                "reference_risk + tolerance must be in (0, scale)"
+            )
         if not self.safe_default.strip() or not self.scope.strip():
-            raise ValueError("safe_default and scope are required")
+            raise errors.InputError("safe_default and scope are required")
 
     @property
     def promo_level(self) -> float:
@@ -856,7 +862,9 @@ class Loop:
         """
         size = len(batch)
         if len(predictions) != size or len(decisions) != size or size == 0:
-            raise ValueError("batch, predictions and decisions must align")
+            raise errors.InputError(
+                "batch, predictions and decisions must align"
+            )
         self.verify_ledger()
         frame = batch.reset_index(drop=True)
         ids = (
@@ -1620,7 +1628,7 @@ class Loop:
             ValueError: If the policy declares no bypass slice.
         """
         if self.policy.bypass_rate <= 0.0:
-            raise ValueError(
+            raise errors.InputError(
                 "no bypass slice is declared (policy.bypass_rate is 0): "
                 "feedback cannot be tested"
             )
@@ -1981,7 +1989,7 @@ class Loop:
         names = {f.name for f in dataclasses.fields(Preregistration)}
         unknown = set(changes) - names
         if unknown:
-            raise ValueError(f"unknown policy fields: {sorted(unknown)}")
+            raise errors.InputError(f"unknown policy fields: {sorted(unknown)}")
         for field, new in changes.items():
             old = getattr(self.policy, field)
             orientation = NUMERIC_ORIENTATION.get(field)

@@ -23,7 +23,7 @@
           0.05826609175151162
         ]
       },
-      "method_hash": "8a250fdb5fb8348fd0d647e507f8f703ccfa7f312ab4c2fb7abc1df141987b20",
+      "method_hash": "fba803593520e0b1a13db207ee1081f18482f69e89d71648cad1851cf5c77051",
       "min_certified_rows": 400,
       "passed": true,
       "power_at_effect_half_sd": {
@@ -117,7 +117,7 @@
       },
       "power_replicates": 500,
       "replicates": 2000,
-      "seconds": 20.8,
+      "seconds": 19.6,
       "seeds": [
         0,
         2000

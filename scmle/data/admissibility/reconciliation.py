@@ -23,6 +23,7 @@ import enum
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.data.detectors import certificates
@@ -73,7 +74,7 @@ class Explanation:
                 finite.
         """
         if not isinstance(self.mechanism, Mechanism):
-            raise ValueError("mechanism must be a Mechanism")
+            raise errors.InputError("mechanism must be a Mechanism")
         evidence.require_text(self.detail, "detail")
         qualification.finite(self.amount, "amount")
         if self.attested_by is not None:
@@ -143,7 +144,9 @@ class Item:
         evidence.require_text(self.source_name, "source_name")
         qualification.finite(self.extract, "extract")
         if qualification.finite(self.source, "source") == 0.0:
-            raise ValueError("source must be non-zero to form a gap ratio")
+            raise errors.InputError(
+                "source must be non-zero to form a gap ratio"
+            )
         qualification.require_tuple(self.explanations, "explanations")
 
     @property
@@ -318,10 +321,10 @@ def reconcile(
             outside [0, 1].
     """
     if not items:
-        raise ValueError("at least one item is required")
+        raise errors.InputError("at least one item is required")
     names = [i.name for i in items]
     if len(set(names)) != len(names):
-        raise ValueError("item names must be unique")
+        raise errors.InputError("item names must be unique")
     results = tuple(
         reconcile_item(i, tolerance, gate, set_id, (0, DETECTOR_ID, k))
         for k, i in enumerate(items)

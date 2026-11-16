@@ -20,6 +20,8 @@ from typing import Any
 import numpy
 from scipy import stats
 
+from scmle.contracts import errors
+
 DEFAULT_TOLERANCE = 0.02
 DEFAULT_FAMILYWISE = 0.05
 SLICE_MARGIN = 0.05
@@ -47,9 +49,9 @@ def clopper_pearson(
             level outside (0, 1).
     """
     if not 0 <= covered <= rows:
-        raise ValueError("need 0 <= covered <= rows")
+        raise errors.InputError("need 0 <= covered <= rows")
     if not 0.0 < level < 1.0:
-        raise ValueError("level must lie strictly between 0 and 1")
+        raise errors.InputError("level must lie strictly between 0 and 1")
     if rows == 0:
         return 0.0, 1.0
     tail = (1.0 - level) / 2.0

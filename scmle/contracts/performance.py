@@ -9,6 +9,8 @@ import statistics
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
+
 MIN_REFERENCE_RUNS = 2
 
 
@@ -37,7 +39,9 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
     """
     timestamp = datetime.datetime.fromisoformat(value)
     if timestamp.tzinfo is None or timestamp.utcoffset() is None:
-        raise ValueError(f"{field_name} must include timezone information")
+        raise errors.InputError(
+            f"{field_name} must include timezone information"
+        )
     return timestamp
 
 
@@ -66,21 +70,23 @@ class Observation:
         if not isinstance(operation, Operation):
             object.__setattr__(self, "operation", Operation(operation))
         if not math.isfinite(self.elapsed_seconds) or self.elapsed_seconds < 0:
-            raise ValueError("elapsed_seconds must be finite and non-negative")
+            raise errors.InputError(
+                "elapsed_seconds must be finite and non-negative"
+            )
         if self.peak_memory_gb is not None and (
             not math.isfinite(self.peak_memory_gb) or self.peak_memory_gb < 0
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "peak_memory_gb must be finite and non-negative when present"
             )
         if isinstance(self.sample_count, bool) or self.sample_count < 0:
-            raise ValueError("sample_count must be non-negative")
+            raise errors.InputError("sample_count must be non-negative")
         machine: object = self.machine  # may be a non-string at runtime
         if not isinstance(machine, str) or not machine.strip():
-            raise ValueError("machine must not be empty")
+            raise errors.InputError("machine must not be empty")
         software: object = self.software  # may be a non-string at runtime
         if not isinstance(software, str) or not software.strip():
-            raise ValueError("software must not be empty")
+            raise errors.InputError("software must not be empty")
         parse_timestamp(self.observed_at, "observed_at")
 
     def to_dict(self) -> dict[str, Any]:
@@ -137,13 +143,13 @@ class Run:
         """
         run_id: object = self.run_id  # may be a non-string at runtime
         if not isinstance(run_id, str) or not run_id.strip():
-            raise ValueError("run_id must not be empty")
+            raise errors.InputError("run_id must not be empty")
         normalized = tuple(self.observations)
         operations = [observation.operation for observation in normalized]
         if not normalized:
-            raise ValueError("performance run must contain observations")
+            raise errors.InputError("performance run must contain observations")
         if len(set(operations)) != len(operations):
-            raise ValueError(
+            raise errors.InputError(
                 "performance run observations must be unique per operation"
             )
         environments = {
@@ -151,7 +157,7 @@ class Run:
             for observation in normalized
         }
         if len(environments) != 1:
-            raise ValueError(
+            raise errors.InputError(
                 "performance run observations must share one environment"
             )
         object.__setattr__(self, "observations", normalized)
@@ -241,14 +247,14 @@ class Baseline:
         """
         runs = tuple(self.reference_runs)
         if len(runs) < MIN_REFERENCE_RUNS:
-            raise ValueError(
+            raise errors.InputError(
                 "performance baseline requires at least two reference runs"
             )
         if (
             not math.isfinite(self.max_relative_regression)
             or self.max_relative_regression < 0
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "max_relative_regression must be finite and non-negative"
             )
         expected = {
@@ -259,7 +265,7 @@ class Baseline:
             for observation in runs[0].observations
         }
         if not expected:
-            raise ValueError(
+            raise errors.InputError(
                 "performance baseline operations must not be empty"
             )
         if any(
@@ -267,14 +273,14 @@ class Baseline:
             != expected
             for run in runs[1:]
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "performance baseline runs must share the same operations"
             )
         for run in runs[1:]:
             for operation in expected:
                 observation = run.observation(operation)
                 if observation is None:
-                    raise ValueError(
+                    raise errors.InputError(
                         "performance baseline runs must share the same "
                         "operations"
                     )
@@ -282,7 +288,7 @@ class Baseline:
                     observation.sample_count
                     != expected_sample_counts[operation]
                 ):
-                    raise ValueError(
+                    raise errors.InputError(
                         "performance baseline runs must share sample counts"
                     )
         environments = {
@@ -291,7 +297,7 @@ class Baseline:
             for observation in run.observations
         }
         if len(environments) != 1:
-            raise ValueError(
+            raise errors.InputError(
                 "performance baseline runs must share one environment"
             )
         object.__setattr__(self, "reference_runs", runs)
@@ -338,7 +344,7 @@ class Baseline:
                 details.append(f"missing={missing}")
             if extra:
                 details.append(f"extra={extra}")
-            raise ValueError(
+            raise errors.InputError(
                 "performance comparison operations differ: "
                 + ", ".join(details)
             )
@@ -556,17 +562,19 @@ class Budget:
                 named if isinstance(named, Operation) else Operation(named)
             )
             if not math.isfinite(limit) or limit <= 0:
-                raise ValueError(
+                raise errors.InputError(
                     f"performance limit must be positive: {resolved.value}"
                 )
             normalized[resolved] = float(limit)
         if not normalized:
-            raise ValueError("max_seconds must not be empty")
+            raise errors.InputError("max_seconds must not be empty")
         if self.max_peak_memory_gb is not None and (
             not math.isfinite(self.max_peak_memory_gb)
             or self.max_peak_memory_gb <= 0
         ):
-            raise ValueError("max_peak_memory_gb must be positive when present")
+            raise errors.InputError(
+                "max_peak_memory_gb must be positive when present"
+            )
         object.__setattr__(self, "max_seconds", normalized)
 
     def evaluate(self, observations: tuple[Observation, ...]) -> "Verdict":
@@ -589,7 +597,7 @@ class Budget:
         violations: list[str] = []
         for observation in observations:
             if observation.operation in by_operation:
-                raise ValueError(
+                raise errors.InputError(
                     "performance observations must be unique per operation"
                 )
             by_operation[observation.operation] = observation

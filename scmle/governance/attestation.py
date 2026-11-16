@@ -8,6 +8,7 @@ import json
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts.signing import resolve_key
 from scmle.contracts.signing import sign_payload
 from scmle.contracts.signing import SIGNATURE_ALGORITHM
@@ -48,10 +49,12 @@ def required_text(record: Mapping[str, Any], path: str) -> str:
     value: Any = record
     for component in path.split("."):
         if not isinstance(value, Mapping) or component not in value:
-            raise ValueError(f"missing attestation field: {path}")
+            raise errors.InputError(f"missing attestation field: {path}")
         value = value[component]
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"attestation field must be non-empty text: {path}")
+        raise errors.InputError(
+            f"attestation field must be non-empty text: {path}"
+        )
     return value
 
 
@@ -82,7 +85,7 @@ class ReleaseAttestation:
         ):
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{field_name} must not be empty")
+                raise errors.InputError(f"{field_name} must not be empty")
         if not isinstance(self.signature_present, bool):
             raise TypeError("signature_present must be bool")
         attestation_signature: object = self.attestation_signature
@@ -90,7 +93,9 @@ class ReleaseAttestation:
             not isinstance(attestation_signature, str)
             or not attestation_signature.strip()
         ):
-            raise ValueError("attestation_signature must be non-empty text")
+            raise errors.InputError(
+                "attestation_signature must be non-empty text"
+            )
 
     @classmethod
     def from_records(
@@ -119,7 +124,7 @@ class ReleaseAttestation:
         if not isinstance(signature, Mapping) or not isinstance(
             signature.get("present"), bool
         ):
-            raise ValueError("provenance.signature.present must be bool")
+            raise errors.InputError("provenance.signature.present must be bool")
         record = cls(
             run_id=required_text(provenance, "run_id"),
             model_manifest_sha256=required_text(
@@ -158,17 +163,21 @@ class ReleaseAttestation:
         """
         subjects = record.get("subjects")
         if not isinstance(subjects, Mapping):
-            raise ValueError("attestation.subjects must be an object")
+            raise errors.InputError("attestation.subjects must be an object")
         signature = record.get("signature")
         signature_value: str | None = None
         if signature is not None:
             if not isinstance(signature, Mapping):
-                raise ValueError("attestation.signature must be an object")
+                raise errors.InputError(
+                    "attestation.signature must be an object"
+                )
             if signature.get("algorithm") != SIGNATURE_ALGORITHM:
-                raise ValueError("unsupported attestation signature algorithm")
+                raise errors.InputError(
+                    "unsupported attestation signature algorithm"
+                )
             value = signature.get("value")
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(
+                raise errors.InputError(
                     "attestation signature value must be non-empty"
                 )
             signature_value = value

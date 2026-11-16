@@ -21,6 +21,7 @@ from numpy.typing import NDArray
 from scipy import special
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.charter import decision
@@ -54,9 +55,11 @@ def assign(
     """
     q = qualification.finite(assignment_prob, "assignment_prob")
     if not 0.0 < q < 1.0:
-        raise ValueError("assignment_prob must be strictly between 0 and 1")
+        raise errors.InputError(
+            "assignment_prob must be strictly between 0 and 1"
+        )
     if not salt.strip():
-        raise ValueError("salt must not be blank")
+        raise errors.InputError("salt must not be blank")
     out = []
     for unit in numpy.asarray(unit_ids).ravel():
         digest = hashlib.sha256(f"{salt}|{unit}".encode()).digest()
@@ -98,7 +101,7 @@ def fixed_horizon_rows(
             `feasibility.n_required_two_proportions` with a `ValueError`.
     """
     if design_effect < 1.0:
-        raise ValueError("design_effect must be at least 1")
+        raise errors.InputError("design_effect must be at least 1")
     per_arm = feasibility.n_required_two_proportions(
         p_control, p_control + delta, alpha=alpha, k_max=1, power=power
     )
@@ -124,7 +127,7 @@ def srm_p_value(challenger: int, total: int, assignment_prob: float) -> float:
     """
     qualification.count(total, "total", minimum=1)
     if not 0 <= challenger <= total:
-        raise ValueError("challenger count must lie in [0, total]")
+        raise errors.InputError("challenger count must lie in [0, total]")
     return float(stats.binomtest(challenger, total, assignment_prob).pvalue)
 
 

@@ -26,6 +26,7 @@ import pandas
 from scipy import stats
 from sklearn import neighbors
 
+from scmle.contracts import errors
 import scmle.data.splitting.duplicates
 
 DEFAULT_CUT = 0.01
@@ -109,7 +110,7 @@ def near_flags(
         ValueError: If `cut` is not positive and finite.
     """
     if not math.isfinite(cut) or cut <= 0.0:
-        raise ValueError("cut must be positive and finite")
+        raise errors.InputError("cut must be positive and finite")
     flags = numpy.zeros(len(frame), dtype=bool)
     numeric = [
         c

@@ -23,6 +23,8 @@ from sklearn import metrics
 from sklearn import mixture
 from sklearn import preprocessing
 
+from scmle.contracts import errors
+
 MIN_ROWS = 30
 MIN_CLUSTER_COUNT = 2
 STABLE_ARI = 0.7
@@ -108,7 +110,7 @@ def build(method: str, count: int, seed: int) -> base.BaseEstimator:
         return mixture.GaussianMixture(count, random_state=seed)
     if method == "agglomerative":
         return cluster.AgglomerativeClustering(count)
-    raise ValueError(f"unknown method '{method}'; use one of {METHODS}")
+    raise errors.InputError(f"unknown method '{method}'; use one of {METHODS}")
 
 
 def assign(method: str, count: int, seed: int, matrix: numpy.ndarray) -> Any:
@@ -122,7 +124,7 @@ def assign(method: str, count: int, seed: int, matrix: numpy.ndarray) -> Any:
 
     Returns:
         The cluster label of each row, in row order. An unknown `method` makes
-        the underlying `build` raise ValueError.
+        the underlying `build` raise errors.InputError.
     """
     # Every clusterer `build` returns defines fit_predict.
     return cast("Any", build(method, count, seed)).fit_predict(matrix)
@@ -227,9 +229,9 @@ def find_clusters(
             2, or a method is unknown.
     """
     if len(features) < MIN_ROWS:
-        raise ValueError(f"clustering needs at least {MIN_ROWS} rows")
+        raise errors.InputError(f"clustering needs at least {MIN_ROWS} rows")
     if min(counts) < MIN_CLUSTER_COUNT:
-        raise ValueError("cluster counts start at 2")
+        raise errors.InputError("cluster counts start at 2")
     numeric = features.select_dtypes("number").dropna()
     matrix = preprocessing.StandardScaler().fit_transform(numeric)
     scored = [

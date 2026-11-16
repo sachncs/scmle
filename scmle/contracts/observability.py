@@ -10,6 +10,8 @@ import math
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
+
 
 class SignalKind(enum.StrEnum):
     """Operational or statistical signal emitted by a run or model."""
@@ -41,7 +43,7 @@ def require_text(value: str, field_name: str) -> str:
     """
     result = value.strip()
     if not result:
-        raise ValueError(f"{field_name} must not be empty")
+        raise errors.InputError(f"{field_name} must not be empty")
     return result
 
 
@@ -62,9 +64,11 @@ def validate_timestamp(value: str, field_name: str) -> str:
     try:
         parsed = datetime.datetime.fromisoformat(value)
     except ValueError as error:
-        raise ValueError(f"{field_name} must be ISO-8601") from error
+        raise errors.InputError(f"{field_name} must be ISO-8601") from error
     if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError(f"{field_name} must include timezone information")
+        raise errors.InputError(
+            f"{field_name} must include timezone information"
+        )
     return value
 
 
@@ -94,12 +98,12 @@ class MetricSample:
         if not isinstance(kind, SignalKind):
             object.__setattr__(self, "kind", SignalKind(kind))
         if not math.isfinite(self.value):
-            raise ValueError("metric.value must be finite")
+            raise errors.InputError("metric.value must be finite")
         if any(
             not key.strip() or not value.strip()
             for key, value in self.labels.items()
         ):
-            raise ValueError("metric labels must not contain empty text")
+            raise errors.InputError("metric labels must not contain empty text")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a deterministic JSON-compatible metric."""
@@ -168,13 +172,19 @@ class InferenceEvent:
             require_text(value, f"event.{field_name}")
         validate_timestamp(self.timestamp, "event.timestamp")
         if not math.isfinite(self.latency_ms) or self.latency_ms < 0:
-            raise ValueError("event.latency_ms must be finite and non-negative")
+            raise errors.InputError(
+                "event.latency_ms must be finite and non-negative"
+            )
         if self.outcome == "error" and not self.error_category:
-            raise ValueError("error events require error_category")
+            raise errors.InputError("error events require error_category")
         if self.outcome != "error" and self.error_category is not None:
-            raise ValueError("successful events must not carry error_category")
+            raise errors.InputError(
+                "successful events must not carry error_category"
+            )
         if any(not field.strip() for field in self.redacted_fields):
-            raise ValueError("redacted_fields must not contain empty values")
+            raise errors.InputError(
+                "redacted_fields must not contain empty values"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns redacted, JSON-compatible event metadata."""
@@ -210,23 +220,25 @@ class Requirements:
                 threshold is unnamed, not finite or negative.
         """
         if self.retention_days < 1:
-            raise ValueError("retention_days must be at least 1")
+            raise errors.InputError("retention_days must be at least 1")
         if not self.required_signals:
-            raise ValueError("required_signals must not be empty")
+            raise errors.InputError("required_signals must not be empty")
         if any(
             not isinstance(signal, SignalKind)
             for signal in self.required_signals
         ):
             raise TypeError("required_signals must contain SignalKind values")
         if len(self.required_signals) != len(set(self.required_signals)):
-            raise ValueError("required_signals must be unique")
+            raise errors.InputError("required_signals must be unique")
         if any(not field.strip() for field in self.redacted_fields):
-            raise ValueError("redacted_fields must not contain empty values")
+            raise errors.InputError(
+                "redacted_fields must not contain empty values"
+            )
         if any(
             not name.strip() or not math.isfinite(value) or value < 0
             for name, value in self.alert_thresholds.items()
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "alert thresholds must be named, finite, and non-negative"
             )
 

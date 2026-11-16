@@ -11,13 +11,13 @@
     "within_budget": 100
   },
   "code_hashes": {
-    "budget": "8c9d3c7f61e110eac7d310521d49a1ca0634366cca5f2cf08923d73f56110f36",
-    "entities": "a52fa1ff01c39d6159e1e35b4f0647c3d415f159210173a48fc96d3e54665ffd",
-    "grain": "e2e6b6edf7b2ef4a8dfdb80509be7f0eb38cf684f5f10a9a79c86d6c0d7baade",
-    "joins": "0b3d88e74def3af8765062e52439968e0107fe5c6c8a9ff6164b823c8ef096b4",
-    "point_in_time": "ee49c5fb7b4d0777b37ebd2194b539039140ba602277a3a378206df2dd739ff5",
-    "reconcile": "7b65d92c613a564235f9187335b734a45a49df8c10dbfb0686ff8c87970d80f2",
-    "torn_read": "141ef64bc2d691a5fa855009318b7264bafea638e9902c229b0e3cb801c3d124"
+    "budget": "d40c9882ab758fe404a1d24890f54d2b415c421102c6624e54a3483d7399a380",
+    "entities": "382777b37a201e0f57a7430d4a110cba077def662b2c34bf8eccbdd2527aeaa0",
+    "grain": "a00c44872fa0e87735870b2ea1709f9fc09322a41d7533e63fcf91b1d56313eb",
+    "joins": "810681bee13f88291f89941a74783d124de2cbb389f5f51ced2ddbfae05f0c76",
+    "point_in_time": "26ebf4d36bf8e61fd8d06a0ddfe0712c4a532f8e75d294b949e4b2700b974f41",
+    "reconcile": "bb361f72cf3d8e88eab51a781d26eca447b98623c015432c4e57db6c4bad8ccd",
+    "torn_read": "fb2081575fb0d9413a6db6fc331dcbbcdbd47ab62d0905c992bf958b5caa0045"
   },
   "development_seed_base": 10000,
   "entities": {
@@ -105,7 +105,7 @@
     "seed_offset": 0,
     "tolerance": 0.0
   },
-  "seconds": 62.1,
+  "seconds": 19.8,
   "torn_read": {
     "batch_rows": 5,
     "detected": 500,

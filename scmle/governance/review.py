@@ -14,6 +14,7 @@ from typing import Any
 from typing import Self
 
 from scmle import durability
+from scmle.contracts import errors
 from scmle.contracts import signing
 
 
@@ -48,7 +49,7 @@ def require_text(value: object, field_name: str) -> str:
         ValueError: If `value` is not a string or is blank.
     """
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{field_name} must not be empty")
+        raise errors.InputError(f"{field_name} must not be empty")
     return value.strip()
 
 
@@ -139,14 +140,14 @@ def require_independence(
             the reviewer is one of them.
     """
     if not implementer_ids:
-        raise ValueError("implementer_ids must not be empty")
+        raise errors.InputError("implementer_ids must not be empty")
     if any(
         not isinstance(item, str) or not item.strip()
         for item in implementer_ids
     ):
-        raise ValueError("implementer_ids must contain non-empty values")
+        raise errors.InputError("implementer_ids must contain non-empty values")
     if reviewer_id in implementer_ids:
-        raise ValueError("reviewer must be independent of implementers")
+        raise errors.InputError("reviewer must be independent of implementers")
 
 
 def require_claims(claims: tuple[ReviewClaim, ...]) -> None:
@@ -160,12 +161,12 @@ def require_claims(claims: tuple[ReviewClaim, ...]) -> None:
         ValueError: If there are no claims or a criterion repeats.
     """
     if not claims:
-        raise ValueError("claims must not be empty")
+        raise errors.InputError("claims must not be empty")
     if not all(isinstance(item, ReviewClaim) for item in claims):
         raise TypeError("claims must contain ReviewClaim values")
     claim_ids = [claim.criterion_id for claim in claims]
     if len(claim_ids) != len(set(claim_ids)):
-        raise ValueError("claims must not contain duplicate criteria")
+        raise errors.InputError("claims must not contain duplicate criteria")
 
 
 def require_artifact_digests(artifact_digests: Mapping[Any, Any]) -> None:
@@ -179,7 +180,7 @@ def require_artifact_digests(artifact_digests: Mapping[Any, Any]) -> None:
             text.
     """
     if not artifact_digests:
-        raise ValueError("artifact_digests must not be empty")
+        raise errors.InputError("artifact_digests must not be empty")
     if any(
         not isinstance(name, str)
         or not name.strip()
@@ -187,7 +188,7 @@ def require_artifact_digests(artifact_digests: Mapping[Any, Any]) -> None:
         or not digest.strip()
         for name, digest in artifact_digests.items()
     ):
-        raise ValueError("artifact_digests must contain named digests")
+        raise errors.InputError("artifact_digests must contain named digests")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -232,7 +233,9 @@ class IndependentReleaseReview:
             require_text(getattr(self, field_name), field_name)
         require_independence(self.reviewer_id, self.implementer_ids)
         if not self.commands or any(not item.strip() for item in self.commands):
-            raise ValueError("commands must contain reproducible commands")
+            raise errors.InputError(
+                "commands must contain reproducible commands"
+            )
         require_claims(self.claims)
         require_artifact_digests(self.artifact_digests)
         decision: Any = self.decision  # may be text from a persisted record
@@ -244,7 +247,9 @@ class IndependentReleaseReview:
             self.observed_at.replace("Z", "+00:00")  # noqa: FURB162 -- keeps the exact set of accepted inputs
         )
         if timestamp.tzinfo is None or timestamp.utcoffset() is None:
-            raise ValueError("observed_at must include timezone information")
+            raise errors.InputError(
+                "observed_at must include timezone information"
+            )
 
     def unsigned_dict(self) -> dict[str, Any]:
         """Returns the content covered by the review signature."""
@@ -391,7 +396,7 @@ class IndependentReleaseReview:
         """
         record = json.loads(Path(path).read_text(encoding="utf-8"))
         if not isinstance(record, Mapping):
-            raise ValueError("release review must be a JSON object")
+            raise errors.InputError("release review must be a JSON object")
         return cls.from_dict(record)
 
     def accepted(

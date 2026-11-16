@@ -21,6 +21,7 @@ and `Numbers` write each type for their kind of target:
 import numpy
 import pandas
 
+from scmle.contracts import errors
 from scmle.core import randomness
 
 DEFECTS = {
@@ -174,7 +175,7 @@ def table(
     """
     clashes = [d for d in DEFECTS if d in frame.columns]
     if clashes:
-        raise ValueError(f"columns already named as plants: {clashes}")
+        raise errors.InputError(f"columns already named as plants: {clashes}")
     return frame.assign(
         **{d: plant(frame[target], d, seed, continuous) for d in DEFECTS}
     )

@@ -16,6 +16,7 @@ import dataclasses
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.ledger import budget
 from scmle.data.ledger import confirm
@@ -67,25 +68,27 @@ class Procedure:
                 positive.
         """
         if self.ledger_rule not in online_fdr.RULE_NAMES:
-            raise ValueError(
+            raise errors.InputError(
                 f"ledger_rule must be one of {online_fdr.RULE_NAMES}"
             )
         allowed = tuple(r.value for r in budget.Correction)
         if self.confirmation_rule not in allowed:
-            raise ValueError(f"confirmation_rule must be one of {allowed}")
+            raise errors.InputError(
+                f"confirmation_rule must be one of {allowed}"
+            )
         if self.failure_policy != confirm.UNCONFIRMED:
-            raise ValueError(
+            raise errors.InputError(
                 f"failure_policy must be '{confirm.UNCONFIRMED}': no other "
                 "policy is implemented"
             )
         if not isinstance(self.stability_filter, bool):
-            raise ValueError("stability_filter must be a boolean")
+            raise errors.InputError("stability_filter must be a boolean")
         for name in ("s_min", "q_min"):
             share = qualification.finite(getattr(self, name), name)
             if not 0.0 < share <= 1.0:
-                raise ValueError(f"{name} must be within (0, 1]")
+                raise errors.InputError(f"{name} must be within (0, 1]")
         if qualification.finite(self.band, "band") <= 0.0:
-            raise ValueError("band must be positive")
+            raise errors.InputError("band must be positive")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.

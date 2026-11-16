@@ -27,6 +27,7 @@ import joblib
 import numpy
 import pandas
 
+from scmle.contracts import errors
 from scmle.evaluation import conformal
 
 MAX_BYTES = 200_000_000
@@ -163,9 +164,11 @@ class CvPlusEnsemble:
                 calibration rows, or a row names a fold that has no model.
         """
         if len(self.fold_of_row) != len(self.residuals):
-            raise ValueError("fold_of_row and residuals differ in length")
+            raise errors.InputError(
+                "fold_of_row and residuals differ in length"
+            )
         if len(self.residuals) < conformal.MIN_CALIBRATION_ROWS:
-            raise ValueError(
+            raise errors.InputError(
                 f"need at least {conformal.MIN_CALIBRATION_ROWS} "
                 "calibration rows"
             )
@@ -173,7 +176,7 @@ class CvPlusEnsemble:
             self.fold_of_row.min() < 0
             or self.fold_of_row.max() >= len(self.models)
         ):
-            raise ValueError("fold_of_row names a fold without a model")
+            raise errors.InputError("fold_of_row names a fold without a model")
 
     def interval(
         self,

@@ -401,7 +401,7 @@ def check_remote(
         ValueError: If `url` does not use http or https.
     """
     if urllib.parse.urlsplit(url).scheme not in REMOTE_URL_SCHEMES:
-        raise ValueError(f"url must use http or https, got {url!r}")
+        raise errors.InputError(f"url must use http or https, got {url!r}")
     root = pathlib.Path(directory)
     golden = load_golden(root)
     expected = read_json(root / "expected.json")

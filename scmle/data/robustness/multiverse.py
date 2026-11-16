@@ -26,6 +26,7 @@ import json
 from pathlib import Path
 import time
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.charter import contracts
 
@@ -153,7 +154,7 @@ def enumerate_grid(
     qualification.count(max_specs, "max_specs", minimum=1)
     ordered = sorted(choices, key=lambda c: c.name)
     if len({c.name for c in ordered}) != len(ordered):
-        raise ValueError("choice names must be distinct")
+        raise errors.InputError("choice names must be distinct")
     names = [c.name for c in ordered]
     everything = [
         Specification(tuple(zip(names, combo, strict=True)))

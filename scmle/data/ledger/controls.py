@@ -49,6 +49,7 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.ledger import budget
@@ -96,7 +97,7 @@ def percentile(counts: tuple[int, ...], q: float = QUANTILE) -> int:
         ValueError: If `counts` is empty.
     """
     if not counts:
-        raise ValueError("counts must not be empty")
+        raise errors.InputError("counts must not be empty")
     return sorted(counts)[quantile_index(len(counts), q)]
 
 
@@ -124,7 +125,7 @@ def percentile_interval(
     """
     b = len(counts)
     if b == 0:
-        raise ValueError("counts must not be empty")
+        raise errors.InputError("counts must not be empty")
     ordered = sorted(counts)
     tail = (1.0 - confidence) / 2.0
     low = int(stats.binom.ppf(tail, b, q))
@@ -161,7 +162,7 @@ def interval_coverage(
         ValueError: If `b` is not positive.
     """
     if b <= 0:
-        raise ValueError("b must be positive")
+        raise errors.InputError("b must be positive")
     tail = (1.0 - confidence) / 2.0
     low = int(stats.binom.ppf(tail, b, q))
     high = int(stats.binom.ppf(1.0 - tail, b, q)) + 1
@@ -198,7 +199,7 @@ def permute_within(
         return out[rng.permutation(len(out))]
     labels = numpy.asarray(strata)
     if len(labels) != len(out):
-        raise ValueError("strata needs one label per row")
+        raise errors.InputError("strata needs one label per row")
     order = numpy.argsort(labels, kind="stable")
     sorted_labels = labels[order]
     cuts = numpy.flatnonzero(sorted_labels[1:] != sorted_labels[:-1]) + 1
@@ -345,7 +346,7 @@ def summarize(
     """
     qualification.count(observed, "observed")
     if len(counts) < budget.MIN_PERMUTATIONS:
-        raise ValueError(
+        raise errors.InputError(
             f"a control needs at least {budget.MIN_PERMUTATIONS} re-runs"
         )
     p95 = percentile(counts)
@@ -399,7 +400,7 @@ def permuted_target_control(
     """
     qualification.count(b, "b", minimum=budget.MIN_PERMUTATIONS)
     if strata is not None and len(strata) != len(target):
-        raise ValueError("strata needs one label per row")
+        raise errors.InputError("strata needs one label per row")
     counts = []
     for repeat in range(b):
         rng = randomness.component_rng(seed, component, repeat)
@@ -512,9 +513,9 @@ def resampling_control(
     """
     qualification.count(b, "b", minimum=budget.MIN_PERMUTATIONS)
     if mode not in ("columns", "blocks"):
-        raise ValueError("mode must be 'columns' or 'blocks'")
+        raise errors.InputError("mode must be 'columns' or 'blocks'")
     if mode == "blocks" and blocks is None:
-        raise ValueError("blocks mode needs block labels")
+        raise errors.InputError("blocks mode needs block labels")
     labels = blocks
     counts = []
     for repeat in range(b):

@@ -81,27 +81,27 @@ class LoggedBandit:
         """
         n = len(self.actions)
         if self.rewards.shape != (n,) or n == 0:
-            raise ValueError("rewards must align with actions")
+            raise errors.InputError("rewards must align with actions")
         for name in ("behaviour", "target"):
             matrix = getattr(self, name)
             if matrix.ndim != MATRIX_NDIM or matrix.shape[0] != n:
-                raise ValueError(f"{name} must have shape (n, K)")
+                raise errors.InputError(f"{name} must have shape (n, K)")
             if (matrix < 0).any() or not numpy.allclose(
                 matrix.sum(axis=1), 1.0
             ):
-                raise ValueError(f"{name} rows must be probabilities")
+                raise errors.InputError(f"{name} rows must be probabilities")
         k = self.behaviour.shape[1]
         if self.target.shape[1] != k:
-            raise ValueError("behaviour and target need the same K")
+            raise errors.InputError("behaviour and target need the same K")
         if ((self.actions < 0) | (self.actions >= k)).any():
-            raise ValueError("an action index is out of range")
+            raise errors.InputError("an action index is out of range")
         if self.outcome_model is not None and self.outcome_model.shape != (
             n,
             k,
         ):
-            raise ValueError("outcome_model must have shape (n, K)")
+            raise errors.InputError("outcome_model must have shape (n, K)")
         if self.clusters is not None and self.clusters.shape != (n,):
-            raise ValueError("clusters must align with actions")
+            raise errors.InputError("clusters must align with actions")
 
     @property
     def rows(self) -> int:
@@ -221,7 +221,7 @@ def terms(
         value = float(numpy.sum(w * log.rewards) / numpy.sum(w))
         return w * (log.rewards - value) / float(numpy.mean(w)) + value, share
     if log.outcome_model is None:
-        raise ValueError("dr needs an outcome model")
+        raise errors.InputError("dr needs an outcome model")
     direct = (log.target * log.outcome_model).sum(axis=1)
     resid = log.rewards - log.taken(log.outcome_model)
     return direct + w * resid, share
@@ -296,9 +296,9 @@ def estimate_value(
             without an outcome model when neither gate refuses.
     """
     if estimator not in ESTIMATORS:
-        raise ValueError(f"estimator must be one of {ESTIMATORS}")
+        raise errors.InputError(f"estimator must be one of {ESTIMATORS}")
     if not 0.0 < level < 1.0:
-        raise ValueError("level must be strictly between 0 and 1")
+        raise errors.InputError("level must be strictly between 0 and 1")
     qualification.finite(min_propensity, "min_propensity")
     raw = weights(log, None)[0]
     ess = sequential.effective_sample_size(raw) / log.rows
@@ -462,7 +462,9 @@ def fit_outcome_model(
     for k in range(n_actions):
         rows = a == k
         if not rows.any():
-            raise ValueError(f"action {k} never appears in the fitting log")
+            raise errors.InputError(
+                f"action {k} never appears in the fitting log"
+            )
         d = design[rows]
         coefficients.append(
             numpy.linalg.solve(d.T @ d + penalty, d.T @ r[rows])
@@ -547,7 +549,9 @@ def fit_threshold_policy(
     """
     effect = numpy.asarray(tau, dtype=float)
     if log.outcome_model is None or log.behaviour.shape[1] != BINARY_ACTIONS:
-        raise ValueError("policy fitting needs a binary action and a q model")
+        raise errors.InputError(
+            "policy fitting needs a binary action and a q model"
+        )
     ratio = 1.0 / log.taken(log.behaviour)
     if clip is not None:
         ratio = numpy.minimum(ratio, clip)

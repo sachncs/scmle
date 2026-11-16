@@ -141,9 +141,11 @@ class Test:
         ):
             scmle.contracts.evidence.require_text(value, field)
         if self.direction not in bivariate.DIRECTIONS:
-            raise ValueError(f"direction must be one of {bivariate.DIRECTIONS}")
+            raise errors.InputError(
+                f"direction must be one of {bivariate.DIRECTIONS}"
+            )
         if not isinstance(self.set_id, qualification.SetId):
-            raise ValueError("set_id must be a SetId")
+            raise errors.InputError("set_id must be a SetId")
 
     @classmethod
     def create(
@@ -227,7 +229,7 @@ class Test:
             "code_hash",
         }
         if set(record) != names:
-            raise ValueError("unexpected or missing hypothesis fields")
+            raise errors.InputError("unexpected or missing hypothesis fields")
         return cls(
             name=record["name"],
             family=record["family"],

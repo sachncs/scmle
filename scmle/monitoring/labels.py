@@ -40,6 +40,7 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.robustness import shift
 
@@ -86,7 +87,7 @@ def is_matured(batch: int, now: int, window: int) -> bool:
         ValueError: If `window` is negative.
     """
     if window < 0:
-        raise ValueError("window must not be negative")
+        raise errors.InputError("window must not be negative")
     return now - batch >= window
 
 
@@ -188,11 +189,13 @@ def estimate_batch(
     losses = numpy.asarray(loss, dtype=float)
     seen = numpy.asarray(observed, dtype=bool)
     if losses.shape != seen.shape or losses.size == 0:
-        raise ValueError("loss and observed must be aligned and non-empty")
+        raise errors.InputError(
+            "loss and observed must be aligned and non-empty"
+        )
     if propensity is not None and numpy.shape(propensity) != seen.shape:
-        raise ValueError("propensity must be aligned with the cases")
+        raise errors.InputError("propensity must be aligned with the cases")
     if audit is not None and numpy.shape(audit) != seen.shape:
-        raise ValueError("audit must be aligned with the cases")
+        raise errors.InputError("audit must be aligned with the cases")
     used = losses[seen]
     floor = -bound if signed else 0.0
     if (
@@ -200,7 +203,9 @@ def estimate_batch(
         or numpy.any(used < floor)
         or numpy.any(used > bound)
     ):
-        raise ValueError("observed losses must be finite and within [0, bound]")
+        raise errors.InputError(
+            "observed losses must be finite and within [0, bound]"
+        )
     mechanism = classify(seen, propensity, audit, epsilon)
     cases = int(seen.size)
     if mechanism is Mechanism.UNVERIFIED:
@@ -269,7 +274,7 @@ def check_randomization(
     """
     flags = numpy.asarray(audit, dtype=bool)
     if not 0.0 < rate < 1.0:
-        raise ValueError("rate must be strictly between 0 and 1")
+        raise errors.InputError("rate must be strictly between 0 and 1")
     result = stats.binomtest(int(flags.sum()), int(flags.size), rate)
     return RandomizationCheck(
         int(flags.sum()),

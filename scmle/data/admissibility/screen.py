@@ -104,6 +104,7 @@ import pandas
 from scipy import stats
 
 import scmle.certificates
+from scmle.contracts import errors
 from scmle.core import randomness
 from scmle.data.admissibility import leakage
 from scmle.data.admissibility import plants
@@ -1401,7 +1402,7 @@ def build_problem(
     folds = fold_splits(len(y), cfg.folds, groups, block_size, cfg.run_seed)
     total = float(((y - y.mean()) ** 2).sum()) if task == "regression" else 0.0
     if task == "regression" and total == 0.0:
-        raise ValueError("a constant target has no R^2")
+        raise errors.InputError("a constant target has no R^2")
     classes = int(y.max()) + 1 if task == "classification" else 0
     return Problem(y, task, classes, folds, total)
 
@@ -1748,14 +1749,14 @@ def screen(
             that is missing or is the target.
     """
     if groups is not None and block_size is not None:
-        raise ValueError("use groups or block_size, not both")
+        raise errors.InputError("use groups or block_size, not both")
     if groups is not None and len(groups) != len(frame):
-        raise ValueError("groups and frame must have the same length")
+        raise errors.InputError("groups and frame must have the same length")
     names = [c for c in frame.columns if c != target]
     chosen = names if features is None else list(features)
     unknown = [c for c in chosen if c not in names]
     if unknown:
-        raise ValueError(f"not feature columns: {unknown}")
+        raise errors.InputError(f"not feature columns: {unknown}")
     chosen_gates = dict.fromkeys(
         MECHANISM_DEFECTS, certificates.GateStatus.DESCRIPTIVE
     )

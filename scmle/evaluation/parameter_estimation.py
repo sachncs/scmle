@@ -29,6 +29,8 @@ from scipy import optimize
 from scipy import special
 from scipy import stats
 
+from scmle.contracts import errors
+
 EstimatorKind = Literal[
     "linear",
     "logistic",
@@ -146,19 +148,19 @@ class Estimand:
                 no assumptions are declared.
         """
         if not self.name.strip():
-            raise ValueError("estimand name must not be empty")
+            raise errors.InputError("estimand name must not be empty")
         if not self.outcome.strip():
-            raise ValueError("estimand outcome must not be empty")
+            raise errors.InputError("estimand outcome must not be empty")
         if not self.population.strip():
-            raise ValueError("estimand population must not be empty")
+            raise errors.InputError("estimand population must not be empty")
         if not self.likelihood.strip():
-            raise ValueError("estimand likelihood must not be empty")
+            raise errors.InputError("estimand likelihood must not be empty")
         if not self.feature_names:
-            raise ValueError("estimand needs at least one feature")
+            raise errors.InputError("estimand needs at least one feature")
         if len(set(self.feature_names)) != len(self.feature_names):
-            raise ValueError("estimand feature names must be unique")
+            raise errors.InputError("estimand feature names must be unique")
         if not self.assumptions:
-            raise ValueError("estimand needs explicit assumptions")
+            raise errors.InputError("estimand needs explicit assumptions")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible scientific metadata."""
@@ -197,31 +199,35 @@ class BayesianPrior:
                 or scale is not a positive finite number.
         """
         if not self.mean:
-            raise ValueError("Bayesian prior needs a coefficient mean")
+            raise errors.InputError("Bayesian prior needs a coefficient mean")
         prior_mean = numpy.asarray(self.mean, dtype=float)
         prior_precision = numpy.asarray(self.precision, dtype=float)
         if prior_mean.ndim != 1:
-            raise ValueError("Bayesian prior mean must be one-dimensional")
+            raise errors.InputError(
+                "Bayesian prior mean must be one-dimensional"
+            )
         if prior_precision.shape != (len(self.mean), len(self.mean)):
-            raise ValueError("Bayesian prior precision must be square")
+            raise errors.InputError("Bayesian prior precision must be square")
         if not numpy.isfinite(prior_mean).all():
-            raise ValueError("Bayesian prior mean must be finite")
+            raise errors.InputError("Bayesian prior mean must be finite")
         if not numpy.isfinite(prior_precision).all():
-            raise ValueError("Bayesian prior precision must be finite")
+            raise errors.InputError("Bayesian prior precision must be finite")
         if not numpy.allclose(
             prior_precision, prior_precision.T, rtol=1e-10, atol=1e-12
         ):
-            raise ValueError("Bayesian prior precision must be symmetric")
+            raise errors.InputError(
+                "Bayesian prior precision must be symmetric"
+            )
         try:
             numpy.linalg.cholesky(prior_precision)
         except numpy.linalg.LinAlgError as error:
-            raise ValueError(
+            raise errors.InputError(
                 "Bayesian prior precision must be positive definite"
             ) from error
         if not math.isfinite(self.shape) or self.shape <= 0.0:
-            raise ValueError("Bayesian prior shape must be positive")
+            raise errors.InputError("Bayesian prior shape must be positive")
         if not math.isfinite(self.scale) or self.scale <= 0.0:
-            raise ValueError("Bayesian prior scale must be positive")
+            raise errors.InputError("Bayesian prior scale must be positive")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible prior metadata."""
@@ -316,7 +322,7 @@ class Config:
         elif self.estimator == "hierarchical_linear":
             self.check_hierarchical_policy()
         elif self.prior is not None:
-            raise ValueError(
+            raise errors.InputError(
                 "a Bayesian prior is supported only by bayesian_linear or "
                 "bayesian_ate"
             )
@@ -339,27 +345,27 @@ class Config:
             "continuous_ipw_ate",
             "hierarchical_linear",
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "estimator must be linear, logistic, bayesian_linear, "
                 "bayesian_ate, ipw_ate, aipw_ate, continuous_ipw_ate, or "
                 "hierarchical_linear"
             )
         if self.covariance not in ("iid", "hc3", "clustered"):
-            raise ValueError("covariance must be iid, hc3, or clustered")
+            raise errors.InputError("covariance must be iid, hc3, or clustered")
         if self.missing not in ("reject", "complete_case"):
-            raise ValueError("missing must be reject or complete_case")
+            raise errors.InputError("missing must be reject or complete_case")
         if not 0.0 < self.confidence_level < 1.0:
-            raise ValueError(
+            raise errors.InputError(
                 "confidence_level must lie strictly between 0 and 1"
             )
         if self.covariance == "clustered" and not self.cluster_name:
-            raise ValueError("clustered covariance needs cluster_name")
+            raise errors.InputError("clustered covariance needs cluster_name")
         if self.bootstrap_replicates < 0:
-            raise ValueError("bootstrap_replicates must not be negative")
+            raise errors.InputError("bootstrap_replicates must not be negative")
         if self.max_iterations < 1:
-            raise ValueError("max_iterations must be positive")
+            raise errors.InputError("max_iterations must be positive")
         if self.tolerance <= 0.0 or self.reference_tolerance <= 0.0:
-            raise ValueError("estimation tolerances must be positive")
+            raise errors.InputError("estimation tolerances must be positive")
 
     def check_ranges(self) -> None:
         """Validates the numeric ranges and the hierarchical options.
@@ -368,26 +374,32 @@ class Config:
             ValueError: If a value is outside its range.
         """
         if not 0.0 < self.propensity_clip < PROPENSITY_CLIP_CEILING:
-            raise ValueError(
+            raise errors.InputError(
                 "propensity_clip must lie strictly between 0 and 0.5"
             )
         if (
             not math.isfinite(self.continuous_weight_cap)
             or self.continuous_weight_cap <= 1.0
         ):
-            raise ValueError("continuous_weight_cap must be greater than 1")
+            raise errors.InputError(
+                "continuous_weight_cap must be greater than 1"
+            )
         folds: object = self.cross_fitting_folds  # may be a non-integer
         if isinstance(folds, bool) or not isinstance(folds, int) or folds < 1:
-            raise ValueError("cross_fitting_folds must be a positive integer")
+            raise errors.InputError(
+                "cross_fitting_folds must be a positive integer"
+            )
         if self.hierarchical_method not in ("moment_gls", "reml"):
-            raise ValueError("hierarchical_method must be moment_gls or reml")
+            raise errors.InputError(
+                "hierarchical_method must be moment_gls or reml"
+            )
         slope_position: object = self.random_slope_position  # may be non-int
         if slope_position is not None and (
             isinstance(slope_position, bool)
             or not isinstance(slope_position, int)
             or slope_position < 0
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "random_slope_position must be a non-negative integer or None"
             )
 
@@ -403,7 +415,7 @@ class Config:
                 float(value) for value in self.reml_variance_bounds
             )
         except (TypeError, ValueError) as error:
-            raise ValueError(
+            raise errors.InputError(
                 "reml_variance_bounds must contain two finite positive "
                 "values in increasing order"
             ) from error
@@ -413,7 +425,7 @@ class Config:
             or lower_variance_bound <= 0.0
             or lower_variance_bound >= upper_variance_bound
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "reml_variance_bounds must contain two finite positive "
                 "values in increasing order"
             )
@@ -429,7 +441,7 @@ class Config:
             self.estimator not in CAUSAL_ESTIMATORS
             and self.treatment_position is not None
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "treatment_position is supported only by bayesian_ate, "
                 "ipw_ate, aipw_ate, or continuous_ipw_ate"
             )
@@ -437,11 +449,11 @@ class Config:
             self.estimator not in PROPENSITY_ESTIMATORS
             and self.propensity_clip != DEFAULT_PROPENSITY_CLIP
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "propensity_clip is supported only by ipw_ate or aipw_ate"
             )
         if self.estimator not in CAUSAL_ESTIMATORS and self.causal_assumptions:
-            raise ValueError(
+            raise errors.InputError(
                 "causal assumptions are supported only by bayesian_ate, "
                 "ipw_ate, or aipw_ate"
             )
@@ -449,7 +461,7 @@ class Config:
             self.estimator != "continuous_ipw_ate"
             and self.continuous_treatment_assumptions
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "continuous treatment assumptions are supported only by "
                 "continuous_ipw_ate"
             )
@@ -457,18 +469,18 @@ class Config:
             self.estimator != "continuous_ipw_ate"
             and self.continuous_weight_cap != DEFAULT_CONTINUOUS_WEIGHT_CAP
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "continuous_weight_cap is supported only by continuous_ipw_ate"
             )
         if self.estimator != "aipw_ate" and self.cross_fitting_folds != 1:
-            raise ValueError(
+            raise errors.InputError(
                 "cross_fitting_folds is supported only by aipw_ate"
             )
         if (
             self.estimator != "hierarchical_linear"
             and self.hierarchical_assumptions
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "hierarchical assumptions are supported only by "
                 "hierarchical_linear"
             )
@@ -482,33 +494,37 @@ class Config:
                 estimator.
         """
         if self.prior is None:
-            raise ValueError(
+            raise errors.InputError(
                 f"{self.estimator} estimation requires an explicit prior"
             )
         if self.covariance != "iid":
-            raise ValueError(
+            raise errors.InputError(
                 f"{self.estimator} estimation supports only iid covariance"
             )
         if self.bootstrap_replicates:
-            raise ValueError(
+            raise errors.InputError(
                 f"{self.estimator} bootstrap sensitivity is unsupported"
             )
         if self.estimator == "bayesian_ate":
             if self.treatment_position is None:
-                raise ValueError("bayesian_ate requires treatment_position")
+                raise errors.InputError(
+                    "bayesian_ate requires treatment_position"
+                )
             if (
                 len(self.causal_assumptions)
                 != len(set(self.causal_assumptions))
                 or frozenset(self.causal_assumptions)
                 != REQUIRED_BAYESIAN_ATE_ASSUMPTIONS
             ):
-                raise ValueError(
+                raise errors.InputError(
                     "bayesian_ate requires consistency, "
                     "conditional_exchangeability, positivity, and "
                     "linearity assumptions"
                 )
             if self.cluster_name is not None:
-                raise ValueError("bayesian_ate does not support clustered data")
+                raise errors.InputError(
+                    "bayesian_ate does not support clustered data"
+                )
 
     def check_causal_policy(self) -> None:
         """Validates the policy of a frequentist causal estimator.
@@ -518,19 +534,21 @@ class Config:
                 assumption set does not suit the estimator.
         """
         if self.prior is not None:
-            raise ValueError(
+            raise errors.InputError(
                 f"a Bayesian prior is not valid for {self.estimator}"
             )
         if self.covariance == "hc3":
-            raise ValueError(
+            raise errors.InputError(
                 f"{self.estimator} supports only iid or clustered "
                 "covariance; hc3 is unsupported"
             )
         if self.treatment_position is None:
-            raise ValueError(f"{self.estimator} requires treatment_position")
+            raise errors.InputError(
+                f"{self.estimator} requires treatment_position"
+            )
         if self.estimator == "continuous_ipw_ate":
             if self.causal_assumptions:
-                raise ValueError(
+                raise errors.InputError(
                     "continuous_ipw_ate requires "
                     "continuous_treatment_assumptions"
                 )
@@ -540,7 +558,7 @@ class Config:
                 or frozenset(self.continuous_treatment_assumptions)
                 != REQUIRED_CONTINUOUS_TREATMENT_ASSUMPTIONS
             ):
-                raise ValueError(
+                raise errors.InputError(
                     "continuous_ipw_ate requires consistency, "
                     "conditional_exchangeability, "
                     "continuous_treatment_positivity, "
@@ -551,7 +569,7 @@ class Config:
             len(self.causal_assumptions) != len(set(self.causal_assumptions))
             or frozenset(self.causal_assumptions) != REQUIRED_CAUSAL_ASSUMPTIONS
         ):
-            raise ValueError(
+            raise errors.InputError(
                 f"{self.estimator} requires consistency, "
                 "conditional_exchangeability, "
                 "and positivity assumptions"
@@ -565,15 +583,15 @@ class Config:
                 set does not suit the estimator.
         """
         if self.prior is not None:
-            raise ValueError(
+            raise errors.InputError(
                 "a Bayesian prior is not valid for hierarchical_linear"
             )
         if self.covariance != "iid":
-            raise ValueError(
+            raise errors.InputError(
                 "hierarchical_linear supplies its own covariance model"
             )
         if not self.cluster_name:
-            raise ValueError("hierarchical_linear requires cluster_name")
+            raise errors.InputError("hierarchical_linear requires cluster_name")
         required_hierarchical_assumptions = (
             REQUIRED_HIERARCHICAL_RANDOM_SLOPE_ASSUMPTIONS
             if self.random_slope_position is not None
@@ -585,7 +603,7 @@ class Config:
             or frozenset(self.hierarchical_assumptions)
             != required_hierarchical_assumptions
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "hierarchical_linear requires all assumptions for its "
                 "declared random-effects structure"
             )
@@ -599,17 +617,17 @@ class Config:
         """
         if self.estimator != "hierarchical_linear":
             if self.random_slope_position is not None:
-                raise ValueError(
+                raise errors.InputError(
                     "random_slope_position is supported only by "
                     "hierarchical_linear"
                 )
             if self.hierarchical_method != "moment_gls":
-                raise ValueError(
+                raise errors.InputError(
                     "hierarchical_method is supported only by "
                     "hierarchical_linear"
                 )
             if self.reml_variance_bounds != DEFAULT_REML_VARIANCE_BOUNDS:
-                raise ValueError(
+                raise errors.InputError(
                     "reml_variance_bounds is supported only by "
                     "hierarchical_linear"
                 )
@@ -673,7 +691,7 @@ class ParameterEstimate:
                 ``[0, 1]``, or the interval is not ordered.
         """
         if not self.name.strip():
-            raise ValueError("parameter name must not be empty")
+            raise errors.InputError("parameter name must not be empty")
         for name, value in (
             ("estimate", self.estimate),
             ("standard_error", self.standard_error),
@@ -682,13 +700,13 @@ class ParameterEstimate:
             ("interval_upper", self.interval[1]),
         ):
             if not math.isfinite(float(value)):
-                raise ValueError(f"{name} must be finite")
+                raise errors.InputError(f"{name} must be finite")
         if self.standard_error < 0.0:
-            raise ValueError("standard_error must not be negative")
+            raise errors.InputError("standard_error must not be negative")
         if not 0.0 <= self.p_value <= 1.0:
-            raise ValueError("p_value must lie between 0 and 1")
+            raise errors.InputError("p_value must lie between 0 and 1")
         if self.interval[0] > self.interval[1]:
-            raise ValueError("parameter interval must be ordered")
+            raise errors.InputError("parameter interval must be ordered")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible coefficient evidence."""
@@ -760,10 +778,10 @@ class Estimation:
         if not isinstance(self.policy, Config):
             raise TypeError("policy must be Config")
         if not self.parameters:
-            raise ValueError("estimation result needs parameters")
+            raise errors.InputError("estimation result needs parameters")
         names = tuple(item.name for item in self.parameters)
         if len(set(names)) != len(names):
-            raise ValueError("parameter names must be unique")
+            raise errors.InputError("parameter names must be unique")
         self.check_covariance()
         self.check_row_accounting()
         for mapping_name, mapping_value in (
@@ -781,7 +799,7 @@ class Estimation:
                 character not in "0123456789abcdef" for character in fingerprint
             )
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "raw_input_fingerprint must be a lowercase SHA-256 digest"
             )
 
@@ -799,9 +817,13 @@ class Estimation:
         )
         for name, count in counts:
             if not isinstance(count, int) or count < 0:
-                raise ValueError(f"{name} must be a non-negative integer")
+                raise errors.InputError(
+                    f"{name} must be a non-negative integer"
+                )
         if self.rows_used + self.rows_dropped != self.rows_input:
-            raise ValueError("row accounting must reconcile to rows_input")
+            raise errors.InputError(
+                "row accounting must reconcile to rows_input"
+            )
 
     def check_covariance(self) -> None:
         """Checks that the covariance is square, finite and symmetric.
@@ -814,12 +836,14 @@ class Estimation:
         if len(self.covariance) != expected or any(
             len(row) != expected for row in self.covariance
         ):
-            raise ValueError("covariance must be square over all parameters")
+            raise errors.InputError(
+                "covariance must be square over all parameters"
+            )
         covariance = numpy.asarray(self.covariance, dtype=float)
         if not numpy.isfinite(covariance).all():
-            raise ValueError("covariance must contain finite values")
+            raise errors.InputError("covariance must contain finite values")
         if not numpy.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12):
-            raise ValueError("covariance must be symmetric")
+            raise errors.InputError("covariance must be symmetric")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible estimation report.
@@ -915,19 +939,21 @@ class Estimation:
         """
         envelope = json.loads(Path(path).read_text(encoding="utf-8"))
         if envelope.get("schema_version") != 1:
-            raise ValueError("unsupported estimation report schema")
+            raise errors.InputError("unsupported estimation report schema")
         record = envelope.get("report")
         if not isinstance(record, Mapping):
-            raise ValueError("estimation report must contain a mapping")
+            raise errors.InputError("estimation report must contain a mapping")
         canonical = json.dumps(
             record, sort_keys=True, separators=(",", ":")
         ).encode("utf-8")
         digest = hashlib.sha256(canonical).hexdigest()
         if envelope.get("digest") != digest:
-            raise ValueError("estimation report digest mismatch")
+            raise errors.InputError("estimation report digest mismatch")
         report = cls.from_dict(record)
         if report.digest() != digest:
-            raise ValueError("estimation report canonicalization mismatch")
+            raise errors.InputError(
+                "estimation report canonicalization mismatch"
+            )
         return report
 
     @classmethod
@@ -1050,22 +1076,26 @@ def check_estimation_request(
             estimand likelihood does not match the estimator.
     """
     if matrix.shape[0] != len(values):
-        raise ValueError("features and outcome must have the same row count")
+        raise errors.InputError(
+            "features and outcome must have the same row count"
+        )
     if policy.covariance == "clustered" and input_clusters is None:
-        raise ValueError("clustered covariance needs cluster labels")
+        raise errors.InputError("clustered covariance needs cluster labels")
     if policy.estimator == "hierarchical_linear" and input_clusters is None:
-        raise ValueError("hierarchical_linear requires cluster labels")
+        raise errors.InputError("hierarchical_linear requires cluster labels")
     if (
         policy.random_slope_position is not None
         and policy.random_slope_position >= matrix.shape[1]
     ):
-        raise ValueError("random_slope_position is outside the feature matrix")
+        raise errors.InputError(
+            "random_slope_position is outside the feature matrix"
+        )
     if (
         policy.estimator in {"ipw_ate", "aipw_ate", "continuous_ipw_ate"}
         and input_clusters is not None
         and policy.covariance != "clustered"
     ):
-        raise ValueError(
+        raise errors.InputError(
             f"{policy.estimator} cluster labels require covariance='clustered'"
         )
     expected_likelihood = {
@@ -1079,7 +1109,7 @@ def check_estimation_request(
         "hierarchical_linear": "gaussian",
     }[policy.estimator]
     if estimand.likelihood != expected_likelihood:
-        raise ValueError(
+        raise errors.InputError(
             "estimand likelihood does not match estimator: "
             f"expected {expected_likelihood}, got {estimand.likelihood}"
         )
@@ -1107,19 +1137,23 @@ def check_prepared_rows(
     if policy.estimator == "logistic" and not set(
         numpy.unique(values)
     ).issubset({0.0, 1.0}):
-        raise ValueError("logistic outcome must contain only 0 and 1")
+        raise errors.InputError("logistic outcome must contain only 0 and 1")
     if (
         policy.estimator in {"bayesian_linear", "bayesian_ate"}
         and clusters is not None
     ):
-        raise ValueError(
+        raise errors.InputError(
             f"{policy.estimator} estimation does not accept clusters"
         )
     if policy.estimator in CAUSAL_ESTIMATORS:
         if policy.treatment_position is None:
-            raise ValueError(f"{policy.estimator} requires treatment_position")
+            raise errors.InputError(
+                f"{policy.estimator} requires treatment_position"
+            )
         if not 0 <= policy.treatment_position < matrix.shape[1]:
-            raise ValueError("treatment_position is outside the feature matrix")
+            raise errors.InputError(
+                "treatment_position is outside the feature matrix"
+            )
 
 
 def fit_linear_estimator(
@@ -1254,15 +1288,17 @@ def check_bayesian_treatment(
     """
     treatment_position = policy.treatment_position
     if treatment_position is None:
-        raise ValueError("bayesian_ate requires treatment_position")
+        raise errors.InputError("bayesian_ate requires treatment_position")
     treatment_position = int(treatment_position)
     treatment = matrix[:, treatment_position]
     if not set(numpy.unique(treatment)).issubset({0.0, 1.0}):
-        raise ValueError("bayesian_ate treatment must contain only 0 and 1")
+        raise errors.InputError(
+            "bayesian_ate treatment must contain only 0 and 1"
+        )
     treated_rows = int(numpy.sum(treatment == 1.0))
     control_rows = int(numpy.sum(treatment == 0.0))
     if treated_rows < MIN_ROWS_PER_ARM or control_rows < MIN_ROWS_PER_ARM:
-        raise ValueError(
+        raise errors.InputError(
             "bayesian_ate needs at least two rows per treatment arm"
         )
     return treatment_position, treated_rows, control_rows
@@ -1295,7 +1331,7 @@ def fit_bayesian_estimator(
             Bayesian average treatment effect is invalid.
     """
     if policy.prior is None:
-        raise ValueError(
+        raise errors.InputError(
             f"{policy.estimator} estimation requires an explicit prior"
         )
     treatment_position, treated_rows, control_rows = 0, 0, 0
@@ -1476,7 +1512,9 @@ def fit_continuous_estimator(
         ValueError: If the policy has no treatment position.
     """
     if policy.treatment_position is None:
-        raise ValueError("continuous_ipw_ate requires treatment_position")
+        raise errors.InputError(
+            "continuous_ipw_ate requires treatment_position"
+        )
     coefficients, covariance, diagnostics = fit_continuous_ipw_effect(
         matrix,
         values,
@@ -1619,7 +1657,7 @@ def fit_hierarchical_estimator(
         ValueError: If there are no cluster labels.
     """
     if cluster_values is None:
-        raise ValueError("hierarchical_linear requires cluster labels")
+        raise errors.InputError("hierarchical_linear requires cluster labels")
     (
         coefficients,
         covariance,
@@ -1749,7 +1787,7 @@ def estimate_parameters(
     values = numpy.asarray(outcome, dtype=float)
     validate_matrix(matrix, len(estimand.feature_names), "features")
     if values.ndim != 1:
-        raise ValueError("outcome must have shape (rows,)")
+        raise errors.InputError("outcome must have shape (rows,)")
     input_clusters = validate_clusters(clusters, len(values))
     raw_input_fingerprint_value = raw_input_fingerprint(
         matrix, values, input_clusters
@@ -1777,7 +1815,7 @@ def estimate_parameters(
     }
     if policy.covariance == "clustered":
         if cluster_values is None:
-            raise ValueError(
+            raise errors.InputError(
                 "cluster labels are required for cluster diagnostics"
             )
         diagnostics["cluster_uncertainty"] = cluster_uncertainty_diagnostics(
@@ -1938,9 +1976,9 @@ def validate_matrix(matrix: numpy.ndarray, columns: int, name: str) -> None:
             columns, or does not have more rows than `columns`.
     """
     if matrix.ndim != MATRIX_NDIM or matrix.shape[1] != columns:
-        raise ValueError(f"{name} must have shape (rows, {columns})")
+        raise errors.InputError(f"{name} must have shape (rows, {columns})")
     if matrix.shape[0] <= columns:
-        raise ValueError("estimation needs more rows than parameters")
+        raise errors.InputError("estimation needs more rows than parameters")
 
 
 def validate_clusters(
@@ -1964,9 +2002,11 @@ def validate_clusters(
         return None
     cluster_values = numpy.asarray(clusters, dtype=object)
     if cluster_values.ndim != 1:
-        raise ValueError("clusters must have shape (rows,)")
+        raise errors.InputError("clusters must have shape (rows,)")
     if len(cluster_values) != rows:
-        raise ValueError("clusters must have the same row count as outcome")
+        raise errors.InputError(
+            "clusters must have the same row count as outcome"
+        )
     return cluster_values
 
 
@@ -1992,13 +2032,13 @@ def validate_covariance(
     matrix = numpy.asarray(covariance, dtype=float)
     expected_shape = (dimension, dimension)
     if matrix.shape != expected_shape:
-        raise ValueError(
+        raise errors.InputError(
             f"covariance must have shape ({dimension}, {dimension})"
         )
     if not numpy.isfinite(matrix).all():
-        raise ValueError("covariance must contain finite values")
+        raise errors.InputError("covariance must contain finite values")
     if not numpy.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-12):
-        raise ValueError("covariance must be symmetric")
+        raise errors.InputError("covariance must be symmetric")
     singular_values = numpy.linalg.svd(matrix, compute_uv=False)
     scale = float(singular_values[0]) if singular_values.size else 0.0
     rank_tolerance = numpy.finfo(float).eps * max(expected_shape) * scale
@@ -2060,17 +2100,17 @@ def prepare_rows(
         cluster_array = numpy.asarray(clusters, dtype=object)
         cluster_missing = numpy.asarray(pandas.isna(cluster_array))
         if cluster_missing.ndim != 1:
-            raise ValueError("cluster labels must be scalar values")
+            raise errors.InputError("cluster labels must be scalar values")
         valid &= ~cluster_missing.astype(bool)
     else:
         cluster_array = None
     dropped = int((~valid).sum())
     if dropped and missing == "reject":
-        raise ValueError(
+        raise errors.InputError(
             "missing or non-finite values require an explicit policy"
         )
     if valid.sum() <= matrix.shape[1] + 1:
-        raise ValueError("complete rows are insufficient for estimation")
+        raise errors.InputError("complete rows are insufficient for estimation")
     kept_clusters = None
     if cluster_array is not None:
         kept_clusters = cluster_array[valid]
@@ -2101,7 +2141,7 @@ def fit_linear(
     del max_iterations, tolerance
     gram = design.T @ design
     if numpy.linalg.matrix_rank(gram) != gram.shape[0]:
-        raise ValueError("linear design matrix is rank deficient")
+        raise errors.InputError("linear design matrix is rank deficient")
     coefficients = numpy.linalg.solve(gram, design.T @ values)
     return coefficients, {"converged": True, "iterations": 1}
 
@@ -2128,7 +2168,7 @@ def fit_treatment_density(
         (numpy.ones(len(confounders)), confounders)
     )
     if numpy.linalg.matrix_rank(density_design) != density_design.shape[1]:
-        raise ValueError(
+        raise errors.InputError(
             "continuous treatment density design matrix is rank deficient"
         )
     density_coefficients, residual_sum, rank, singular_values = (
@@ -2136,14 +2176,14 @@ def fit_treatment_density(
     )
     del residual_sum, singular_values
     if rank != density_design.shape[1]:
-        raise ValueError(
+        raise errors.InputError(
             "continuous treatment density model is not identifiable"
         )
     conditional_mean = density_design @ density_coefficients
     density_residuals = treatment - conditional_mean
     residual_degrees = len(treatment) - density_design.shape[1]
     if residual_degrees < 1:
-        raise ValueError(
+        raise errors.InputError(
             "continuous treatment density model needs residual degrees of "
             "freedom"
         )
@@ -2151,7 +2191,7 @@ def fit_treatment_density(
         numpy.sqrt(numpy.sum(density_residuals**2) / residual_degrees)
     )
     if not math.isfinite(conditional_scale) or conditional_scale <= SCALE_FLOOR:
-        raise ValueError(
+        raise errors.InputError(
             "continuous treatment density has non-positive residual scale"
         )
     return conditional_mean, density_residuals, conditional_scale
@@ -2191,12 +2231,14 @@ def fit_continuous_ipw_effect(
     treatment = matrix[:, treatment_position]
     unique_treatment = numpy.unique(treatment)
     if len(unique_treatment) < MIN_TREATMENT_LEVELS:
-        raise ValueError(
+        raise errors.InputError(
             "continuous_ipw_ate needs at least four distinct treatment values"
         )
     marginal_scale = float(numpy.std(treatment, ddof=1))
     if not math.isfinite(marginal_scale) or marginal_scale <= SCALE_FLOOR:
-        raise ValueError("continuous_ipw_ate needs positive treatment variance")
+        raise errors.InputError(
+            "continuous_ipw_ate needs positive treatment variance"
+        )
 
     confounders = numpy.delete(matrix, treatment_position, axis=1)
     conditional_mean, density_residuals, conditional_scale = (
@@ -2212,14 +2254,16 @@ def fit_continuous_ipw_effect(
     log_weight = log_marginal_density - log_conditional_density
     raw_weights = numpy.exp(numpy.clip(log_weight, -745.0, 709.0))
     if not numpy.isfinite(raw_weights).all() or numpy.any(raw_weights <= 0.0):
-        raise ValueError("continuous treatment density weights are invalid")
+        raise errors.InputError(
+            "continuous treatment density weights are invalid"
+        )
     weights = numpy.minimum(raw_weights, policy.continuous_weight_cap)
     capped = raw_weights > policy.continuous_weight_cap
     effective_sample_size = float(
         numpy.sum(weights) ** 2 / numpy.sum(weights**2)
     )
     if effective_sample_size < MIN_EFFECTIVE_SAMPLE_SIZE:
-        raise ValueError(
+        raise errors.InputError(
             "continuous treatment weights leave fewer than two effective "
             "observations"
         )
@@ -2228,7 +2272,9 @@ def fit_continuous_ipw_effect(
     weighted_design = dose_design * numpy.sqrt(weights)[:, None]
     weighted_outcome = values * numpy.sqrt(weights)
     if numpy.linalg.matrix_rank(weighted_design) != weighted_design.shape[1]:
-        raise ValueError("weighted dose-response design is rank deficient")
+        raise errors.InputError(
+            "weighted dose-response design is rank deficient"
+        )
     coefficients = numpy.linalg.solve(
         weighted_design.T @ weighted_design,
         weighted_design.T @ weighted_outcome,
@@ -2426,15 +2472,19 @@ def cluster_uncertainty_diagnostics(
             there are fewer than two clusters.
     """
     if clusters is None:
-        raise ValueError("cluster labels are required for cluster diagnostics")
+        raise errors.InputError(
+            "cluster labels are required for cluster diagnostics"
+        )
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
     except TypeError as error:
-        raise ValueError(
+        raise errors.InputError(
             "cluster labels must be hashable scalar values"
         ) from error
     if len(labels) < MIN_CLUSTERS:
-        raise ValueError("clustered covariance needs at least two clusters")
+        raise errors.InputError(
+            "clustered covariance needs at least two clusters"
+        )
     sizes = [int(numpy.sum(clusters == label)) for label in labels]
     return {
         "method": "finite_sample_cluster_robust_sandwich",
@@ -2478,14 +2528,16 @@ def fit_ipw_ate(
             propensity fit and variance calculation also propagate.
     """
     if treatment_position is None:
-        raise ValueError("ipw_ate requires treatment_position")
+        raise errors.InputError("ipw_ate requires treatment_position")
     treatment = matrix[:, treatment_position]
     if not set(numpy.unique(treatment)).issubset({0.0, 1.0}):
-        raise ValueError("ipw_ate treatment must contain only 0 and 1")
+        raise errors.InputError("ipw_ate treatment must contain only 0 and 1")
     treated_count = int(numpy.sum(treatment == 1.0))
     control_count = int(numpy.sum(treatment == 0.0))
     if treated_count < MIN_ROWS_PER_ARM or control_count < MIN_ROWS_PER_ARM:
-        raise ValueError("ipw_ate needs at least two rows per treatment arm")
+        raise errors.InputError(
+            "ipw_ate needs at least two rows per treatment arm"
+        )
     confounders = numpy.delete(matrix, treatment_position, axis=1)
     propensity_design = numpy.column_stack(
         (numpy.ones(confounders.shape[0]), confounders)
@@ -2594,14 +2646,16 @@ def fit_aipw_ate(
             also propagate.
     """
     if treatment_position is None:
-        raise ValueError("aipw_ate requires treatment_position")
+        raise errors.InputError("aipw_ate requires treatment_position")
     treatment = matrix[:, treatment_position]
     if not set(numpy.unique(treatment)).issubset({0.0, 1.0}):
-        raise ValueError("aipw_ate treatment must contain only 0 and 1")
+        raise errors.InputError("aipw_ate treatment must contain only 0 and 1")
     treated_count = int(numpy.sum(treatment == 1.0))
     control_count = int(numpy.sum(treatment == 0.0))
     if treated_count < MIN_ROWS_PER_ARM or control_count < MIN_ROWS_PER_ARM:
-        raise ValueError("aipw_ate needs at least two rows per treatment arm")
+        raise errors.InputError(
+            "aipw_ate needs at least two rows per treatment arm"
+        )
 
     confounders = numpy.delete(matrix, treatment_position, axis=1)
     nuisance_design = numpy.column_stack(
@@ -2818,7 +2872,7 @@ def fit_aipw_nuisance_models(
         int(numpy.sum(treated)) < MIN_ROWS_PER_ARM
         or int(numpy.sum(control)) < MIN_ROWS_PER_ARM
     ):
-        raise ValueError(
+        raise errors.InputError(
             "aipw_ate each training fold needs at least two rows per "
             "treatment arm"
         )
@@ -2847,7 +2901,7 @@ def fit_aipw_nuisance_models(
         numpy.linalg.matrix_rank(treated_design) != treated_design.shape[1]
         or numpy.linalg.matrix_rank(control_design) != control_design.shape[1]
     ):
-        raise ValueError("aipw_ate outcome design is not identifiable")
+        raise errors.InputError("aipw_ate outcome design is not identifiable")
     treated_coefficients = numpy.linalg.lstsq(
         treated_design, training_values[treated], rcond=None
     )[0]
@@ -2887,9 +2941,9 @@ def deterministic_fold_assignments(rows: int, fold_count: int) -> numpy.ndarray:
         ValueError: If `fold_count` is below 2 or exceeds `rows`.
     """
     if fold_count < MIN_FOLDS:
-        raise ValueError("cross-fitting needs at least two folds")
+        raise errors.InputError("cross-fitting needs at least two folds")
     if fold_count > rows:
-        raise ValueError("cross_fitting_folds must not exceed rows")
+        raise errors.InputError("cross_fitting_folds must not exceed rows")
     return numpy.arange(rows, dtype=int) % fold_count
 
 
@@ -2922,7 +2976,7 @@ def validate_cross_fitting_support(
         training_treated = int(numpy.sum(treatment[training] == 1.0))
         training_control = int(numpy.sum(treatment[training] == 0.0))
         if validation_treated < 1 or validation_control < 1:
-            raise ValueError(
+            raise errors.InputError(
                 "aipw_ate cross-fitting needs both treatment arms in every "
                 "validation fold"
             )
@@ -2930,7 +2984,7 @@ def validate_cross_fitting_support(
             training_treated < MIN_ROWS_PER_ARM
             or training_control < MIN_ROWS_PER_ARM
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "aipw_ate cross-fitting needs at least two rows per "
                 "treatment arm in every training fold"
             )
@@ -2987,11 +3041,13 @@ def center_influence(influence: numpy.ndarray) -> numpy.ndarray:
     """
     centered_influence = numpy.asarray(influence, dtype=float)
     if centered_influence.ndim != 1:
-        raise ValueError("influence scores must have shape (rows,)")
+        raise errors.InputError("influence scores must have shape (rows,)")
     if len(centered_influence) < MIN_INFLUENCE_ROWS:
-        raise ValueError("influence uncertainty needs at least two rows")
+        raise errors.InputError("influence uncertainty needs at least two rows")
     if not numpy.isfinite(centered_influence).all():
-        raise ValueError("influence scores must contain only finite values")
+        raise errors.InputError(
+            "influence scores must contain only finite values"
+        )
     centered: numpy.ndarray = centered_influence - numpy.mean(
         centered_influence
     )
@@ -3041,25 +3097,27 @@ def influence_variance(
             "centered": True,
         }
     if covariance != "clustered":
-        raise ValueError(
+        raise errors.InputError(
             "causal influence uncertainty supports only iid or clustered "
             "covariance"
         )
     if clusters is None:
-        raise ValueError("clustered covariance needs cluster labels")
+        raise errors.InputError("clustered covariance needs cluster labels")
     cluster_values = validate_clusters(
         clusters.tolist(), len(centered_influence)
     )
     if cluster_values is None:
-        raise ValueError("clustered covariance needs cluster labels")
+        raise errors.InputError("clustered covariance needs cluster labels")
     try:
         labels = tuple(dict.fromkeys(cluster_values.tolist()))
     except TypeError as error:
-        raise ValueError(
+        raise errors.InputError(
             "cluster labels must be hashable scalar values"
         ) from error
     if len(labels) < MIN_CLUSTERS:
-        raise ValueError("clustered covariance needs at least two clusters")
+        raise errors.InputError(
+            "clustered covariance needs at least two clusters"
+        )
     cluster_sums = []
     cluster_sizes = []
     for label in labels:
@@ -3075,7 +3133,7 @@ def influence_variance(
         correction * numpy.sum(cluster_sum_array**2) / row_count**2
     )
     if not math.isfinite(variance) or variance < 0.0:
-        raise ValueError("clustered influence variance must be finite")
+        raise errors.InputError("clustered influence variance must be finite")
     return variance, {
         "method": "clustered_centered_influence_function",
         "centered": True,
@@ -3117,7 +3175,9 @@ def hajek_ipw_statistics(
     treated_denominator = float(numpy.sum(treated_weights))
     control_denominator = float(numpy.sum(control_weights))
     if treated_denominator <= 0.0 or control_denominator <= 0.0:
-        raise ValueError("ipw_ate treatment weights must have positive support")
+        raise errors.InputError(
+            "ipw_ate treatment weights must have positive support"
+        )
     treated_mean = float(
         numpy.sum(treated_weights * values) / treated_denominator
     )
@@ -3188,7 +3248,7 @@ def fit_bayesian_linear(
             factor, numpy.eye(design.shape[1])
         )
     except numpy.linalg.LinAlgError as error:
-        raise ValueError(
+        raise errors.InputError(
             "Bayesian posterior precision is not identifiable"
         ) from error
     posterior_shape = prior.shape + len(values) / 2.0
@@ -3198,10 +3258,10 @@ def fit_bayesian_linear(
         - posterior_mean @ posterior_precision @ posterior_mean
     )
     if not math.isfinite(posterior_scale) or posterior_scale <= 0.0:
-        raise ValueError("Bayesian posterior variance scale is invalid")
+        raise errors.InputError("Bayesian posterior variance scale is invalid")
     posterior_degrees = 2.0 * posterior_shape
     if posterior_degrees <= MIN_VARIANCE_DEGREES:
-        raise ValueError(
+        raise errors.InputError(
             "Bayesian posterior needs more than two degrees of freedom"
         )
     posterior_covariance = (
@@ -3244,7 +3304,7 @@ def validate_bayesian_prior_shape(prior: BayesianPrior, dimension: int) -> None:
     precision_shape = numpy.asarray(prior.precision, dtype=float).shape
     expected_shape = (dimension, dimension)
     if mean_shape != (dimension,) or precision_shape != expected_shape:
-        raise ValueError(
+        raise errors.InputError(
             "Bayesian prior dimension must match intercept and features"
         )
 
@@ -3294,13 +3354,15 @@ def fit_hierarchical_linear(
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
     except TypeError as error:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical cluster labels must be hashable"
         ) from error
     if len(labels) < MIN_CLUSTERS:
-        raise ValueError("hierarchical_linear needs at least two clusters")
+        raise errors.InputError(
+            "hierarchical_linear needs at least two clusters"
+        )
     if numpy.linalg.matrix_rank(design) != design.shape[1]:
-        raise ValueError("hierarchical design matrix is rank deficient")
+        raise errors.InputError("hierarchical design matrix is rank deficient")
     initial_coefficients = numpy.linalg.lstsq(design, values, rcond=None)[0]
     initial_residuals = values - design @ initial_coefficients
     cluster_means = []
@@ -3317,7 +3379,7 @@ def fit_hierarchical_linear(
         len(values) - len(labels), 1
     )
     if not math.isfinite(residual_variance) or residual_variance <= SCALE_FLOOR:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical_linear needs positive within-cluster variance"
         )
     between_variance = float(numpy.var(cluster_means, ddof=1))
@@ -3349,7 +3411,7 @@ def fit_hierarchical_linear(
         coefficients = numpy.linalg.solve(information, right_hand_side)
         covariance = numpy.linalg.solve(information, numpy.eye(design.shape[1]))
     except numpy.linalg.LinAlgError as error:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical GLS system is not identifiable"
         ) from error
     random_effects = []
@@ -3433,17 +3495,19 @@ def fit_hierarchical_random_slope(
     """
     random_slope_position = policy.random_slope_position
     if random_slope_position is None:
-        raise ValueError("random slope position must be declared")
+        raise errors.InputError("random slope position must be declared")
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
     except TypeError as error:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical cluster labels must be hashable"
         ) from error
     if len(labels) < MIN_CLUSTERS:
-        raise ValueError("hierarchical_linear needs at least two clusters")
+        raise errors.InputError(
+            "hierarchical_linear needs at least two clusters"
+        )
     if numpy.linalg.matrix_rank(design) != design.shape[1]:
-        raise ValueError("hierarchical design matrix is rank deficient")
+        raise errors.InputError("hierarchical design matrix is rank deficient")
     initial_coefficients = numpy.linalg.lstsq(design, values, rcond=None)[0]
     initial_residuals = values - design @ initial_coefficients
     random_effect_estimates = []
@@ -3463,7 +3527,7 @@ def fit_hierarchical_random_slope(
             numpy.linalg.matrix_rank(random_effect_design)
             != RANDOM_EFFECT_COLUMNS
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "each hierarchical cluster needs within-cluster variation "
                 "for the declared random slope"
             )
@@ -3483,7 +3547,7 @@ def fit_hierarchical_random_slope(
         len(values) - len(labels), 1
     )
     if not math.isfinite(residual_variance) or residual_variance <= SCALE_FLOOR:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical_linear needs positive within-cluster variance"
         )
     effects = numpy.asarray(random_effect_estimates, dtype=float)
@@ -3522,7 +3586,7 @@ def fit_hierarchical_random_slope(
         coefficients = numpy.linalg.solve(information, right_hand_side)
         covariance = numpy.linalg.solve(information, numpy.eye(design.shape[1]))
     except numpy.linalg.LinAlgError as error:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical GLS system is not identifiable"
         ) from error
     diagnostics = hierarchical_random_slope_diagnostics(
@@ -3640,7 +3704,7 @@ def hierarchical_random_effect_precision(
             covariance, numpy.eye(count), assume_a="pos"
         )
     except numpy.linalg.LinAlgError as error:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical random-effect covariance is not positive definite"
         ) from error
     return precision
@@ -3833,7 +3897,7 @@ def fit_hierarchical_random_slope_reml(
         coefficients = numpy.linalg.solve(information, right_hand_side)
         covariance = numpy.linalg.solve(information, numpy.eye(design.shape[1]))
     except numpy.linalg.LinAlgError as error:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical REML GLS system is not identifiable"
         ) from error
     diagnostics = hierarchical_random_slope_diagnostics(
@@ -3930,7 +3994,7 @@ def random_slope_reml_profile_objective(
     """
     point = numpy.asarray(parameters, dtype=float)
     if point.shape != (4,):
-        raise ValueError(
+        raise errors.InputError(
             "random-slope REML needs four bounded covariance parameters"
         )
     variance_components = numpy.exp(point[:3])
@@ -4080,7 +4144,7 @@ def fit_hierarchical_reml(
         coefficients = numpy.linalg.solve(information, right_hand_side)
         covariance = numpy.linalg.solve(information, numpy.eye(design.shape[1]))
     except numpy.linalg.LinAlgError as error:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical REML GLS system is not identifiable"
         ) from error
     fitted_residuals = values - design @ coefficients
@@ -4172,7 +4236,9 @@ def reml_profile_objective(
         ValueError: If `log_variances` does not have exactly two values.
     """
     if numpy.asarray(log_variances).shape != (2,):
-        raise ValueError("REML needs residual and random-intercept variances")
+        raise errors.InputError(
+            "REML needs residual and random-intercept variances"
+        )
     variances = numpy.exp(numpy.asarray(log_variances, dtype=float))
     if not numpy.isfinite(variances).all() or numpy.any(variances <= 0.0):
         return float("inf")
@@ -4246,7 +4312,7 @@ def validate_reml_optimizer_result(
             the wrong length.
     """
     if not bool(getattr(optimizer_result, "success", False)):
-        raise ValueError(
+        raise errors.InputError(
             "REML optimizer did not converge: "
             f"{getattr(optimizer_result, 'message', 'unknown failure')}"
         )
@@ -4268,16 +4334,20 @@ def validate_reml_optimizer_result(
         )
     point = numpy.asarray(getattr(optimizer_result, "x", ()), dtype=float)
     if point.shape != (dimension,) or not numpy.isfinite(point).all():
-        raise ValueError("REML optimizer returned invalid variance components")
+        raise errors.InputError(
+            "REML optimizer returned invalid variance components"
+        )
     for value, bounds in zip(point, log_bounds, strict=True):
         if value < bounds[0] or value > bounds[1]:
             raise ValueError("REML optimizer returned out-of-bounds components")
     objective = float(getattr(optimizer_result, "fun", float("nan")))
     if not math.isfinite(objective):
-        raise ValueError("REML optimizer returned an invalid objective")
+        raise errors.InputError("REML optimizer returned an invalid objective")
     gradient = numpy.asarray(getattr(optimizer_result, "jac", ()), dtype=float)
     if gradient.shape != (dimension,) or not numpy.isfinite(gradient).all():
-        raise ValueError("REML optimizer returned invalid gradient diagnostics")
+        raise errors.InputError(
+            "REML optimizer returned invalid gradient diagnostics"
+        )
 
 
 def hierarchical_gls_system(
@@ -4357,7 +4427,7 @@ def fit_logistic(
                 hessian, design.T @ (values - probabilities)
             )
         except numpy.linalg.LinAlgError as error:
-            raise ValueError(
+            raise errors.InputError(
                 "logistic design matrix is not identifiable"
             ) from error
         coefficients += step
@@ -4375,7 +4445,7 @@ def fit_logistic(
                     "log_likelihood": log_likelihood,
                 },
             )
-    raise ValueError("logistic estimation did not converge")
+    raise errors.InputError("logistic estimation did not converge")
 
 
 def covariance_matrix(
@@ -4428,14 +4498,16 @@ def covariance_matrix(
         scores = design * adjusted[:, None]
         return numpy.asarray(bread @ (scores.T @ scores) @ bread)
     if clusters is None:
-        raise ValueError("cluster labels are required")
+        raise errors.InputError("cluster labels are required")
     adjusted = residuals
     groups = []
     for label in dict.fromkeys(clusters.tolist()):
         group = clusters == label
         groups.append(design[group].T @ adjusted[group])
     if len(groups) < MIN_CLUSTERS:
-        raise ValueError("clustered covariance needs at least two clusters")
+        raise errors.InputError(
+            "clustered covariance needs at least two clusters"
+        )
     meat = sum(numpy.outer(score, score) for score in groups)
     correction = (len(groups) / (len(groups) - 1)) * (
         (len(design) - 1) / max(len(design) - design.shape[1], 1)
@@ -4720,7 +4792,7 @@ def reference_cross_fitted_aipw_ate(
             or numpy.linalg.matrix_rank(control_design)
             != control_design.shape[1]
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "aipw_ate reference outcome design is not identifiable"
             )
         treated_coefficients = numpy.linalg.lstsq(
@@ -4805,7 +4877,7 @@ def reference_hierarchical_linear(
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
     except TypeError as error:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical cluster labels must be hashable"
         ) from error
     information = numpy.zeros((design.shape[1], design.shape[1]))
@@ -4867,7 +4939,7 @@ def reference_hierarchical_reml(
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
     except TypeError as error:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical cluster labels must be hashable"
         ) from error
     covariance_blocks = []
@@ -4890,7 +4962,9 @@ def reference_hierarchical_reml(
     sign_covariance, logdet_covariance = numpy.linalg.slogdet(covariance)
     sign_information, logdet_information = numpy.linalg.slogdet(information)
     if sign_covariance <= 0.0 or sign_information <= 0.0:
-        raise ValueError("reference REML covariance is not positive definite")
+        raise errors.InputError(
+            "reference REML covariance is not positive definite"
+        )
     reference_objective = 0.5 * (
         logdet_covariance
         + logdet_information
@@ -4947,7 +5021,7 @@ def reference_hierarchical_random_slope(
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
     except TypeError as error:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical cluster labels must be hashable"
         ) from error
     information = numpy.zeros((design.shape[1], design.shape[1]))
@@ -5023,7 +5097,7 @@ def reference_hierarchical_random_slope_reml(
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
     except TypeError as error:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical cluster labels must be hashable"
         ) from error
     covariance_blocks = []
@@ -5053,7 +5127,9 @@ def reference_hierarchical_random_slope_reml(
     sign_covariance, logdet_covariance = numpy.linalg.slogdet(covariance)
     sign_information, logdet_information = numpy.linalg.slogdet(information)
     if sign_covariance <= 0.0 or sign_information <= 0.0:
-        raise ValueError("reference REML covariance is not positive definite")
+        raise errors.InputError(
+            "reference REML covariance is not positive definite"
+        )
     reference_objective = 0.5 * (
         logdet_covariance
         + logdet_information
@@ -5152,7 +5228,7 @@ def reference_bayesian_ate(
     difference = float(numpy.max(numpy.abs(reference - coefficients)))
     treatment_index = policy.treatment_position
     if treatment_index is None:
-        raise ValueError("bayesian_ate requires treatment_position")
+        raise errors.InputError("bayesian_ate requires treatment_position")
     coefficient_index = treatment_index + 1
     return {
         "method": "scipy.linalg.solve:positive_definite_causal_gaussian",
@@ -5283,7 +5359,9 @@ def prior_sensitivity(
         }
         if policy.estimator == "bayesian_ate":
             if policy.treatment_position is None:
-                raise ValueError("bayesian_ate requires treatment_position")
+                raise errors.InputError(
+                    "bayesian_ate requires treatment_position"
+                )
             target_index = policy.treatment_position + 1
             alternative_record["treatment_coefficient_change"] = float(
                 alternative[target_index] - baseline[target_index]
@@ -5316,7 +5394,9 @@ def shift_sensitivity(
     reference = numpy.asarray(shift_reference, dtype=float)
     validate_matrix(reference, matrix.shape[1], "shift_reference")
     if not numpy.isfinite(reference).all():
-        raise ValueError("shift_reference must contain only finite values")
+        raise errors.InputError(
+            "shift_reference must contain only finite values"
+        )
     pooled = numpy.sqrt((matrix.var(axis=0) + reference.var(axis=0)) / 2.0)
     difference = numpy.abs(reference.mean(axis=0) - matrix.mean(axis=0)) / (
         numpy.maximum(pooled, 1e-12)
@@ -5413,7 +5493,9 @@ def sensitivity_report(
         and policy.estimator == "hierarchical_linear"
     ):
         if clusters is None:
-            raise ValueError("hierarchical_linear requires cluster labels")
+            raise errors.InputError(
+                "hierarchical_linear requires cluster labels"
+            )
         report["sampling"] = hierarchical_bootstrap_sensitivity(
             matrix,
             values,
@@ -5494,9 +5576,11 @@ def bootstrap_replicate_estimate(
             "bootstrap replicate returned an unexpected parameter shape"
         )
     if not numpy.isfinite(estimate).all():
-        raise ValueError("bootstrap replicate returned non-finite estimates")
+        raise errors.InputError(
+            "bootstrap replicate returned non-finite estimates"
+        )
     if result.reference.get("passed") is not True:
-        raise ValueError(
+        raise errors.InputError(
             "bootstrap replicate independent reference check failed"
         )
     return estimate
@@ -5599,7 +5683,7 @@ def hierarchical_bootstrap_sensitivity(
             )
 
     if len(estimates) < MIN_REPLICATES:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical bootstrap needs at least two successful replicates; "
             f"received {len(estimates)} of {policy.bootstrap_replicates}"
         )
@@ -5662,11 +5746,11 @@ def draw_hierarchical_bootstrap_sample(
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
     except TypeError as error:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical cluster labels must be hashable for bootstrap"
         ) from error
     if len(labels) < MIN_CLUSTERS:
-        raise ValueError(
+        raise errors.InputError(
             "hierarchical bootstrap needs at least two source clusters"
         )
     source_indices = rng.integers(0, len(labels), size=len(labels))
@@ -5781,7 +5865,7 @@ def causal_bootstrap_sensitivity(
             )
 
     if len(estimates) < MIN_REPLICATES:
-        raise ValueError(
+        raise errors.InputError(
             "causal bootstrap needs at least two successful replicates; "
             f"received {len(estimates)} of {policy.bootstrap_replicates}"
         )
@@ -5858,11 +5942,11 @@ def draw_causal_bootstrap_sample(
     try:
         labels = tuple(dict.fromkeys(clusters.tolist()))
     except TypeError as error:
-        raise ValueError(
+        raise errors.InputError(
             "cluster labels must be hashable for clustered bootstrap"
         ) from error
     if len(labels) < MIN_CLUSTERS:
-        raise ValueError(
+        raise errors.InputError(
             "clustered bootstrap needs at least two source clusters"
         )
     source_indices = rng.integers(0, len(labels), size=len(labels))

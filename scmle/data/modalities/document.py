@@ -146,13 +146,13 @@ class Span:
                 page number.
         """
         if self.kind not in {"page", "section"}:
-            raise ValueError("kind must be 'page' or 'section'")
+            raise errors.InputError("kind must be 'page' or 'section'")
         if self.start < 0 or self.end <= self.start:
-            raise ValueError("span must have a positive character range")
+            raise errors.InputError("span must have a positive character range")
         if self.kind == "page" and (
             self.page_number is None or self.page_number < 1
         ):
-            raise ValueError("page spans require a positive page_number")
+            raise errors.InputError("page spans require a positive page_number")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -186,17 +186,21 @@ class Citation:
                 empty or starts below zero, or page_number is below one.
         """
         if not self.document_id.strip():
-            raise ValueError("document_id must not be empty")
+            raise errors.InputError("document_id must not be empty")
         if not self.source_uri.strip():
-            raise ValueError("source_uri must not be empty")
+            raise errors.InputError("source_uri must not be empty")
         if not re.fullmatch(r"[0-9a-f]{64}", self.source_digest):
-            raise ValueError("source_digest must be a lowercase SHA-256 digest")
+            raise errors.InputError(
+                "source_digest must be a lowercase SHA-256 digest"
+            )
         if self.start < 0 or self.end <= self.start:
-            raise ValueError("citation must have a positive character range")
+            raise errors.InputError(
+                "citation must have a positive character range"
+            )
         if not self.locator.strip():
-            raise ValueError("locator must not be empty")
+            raise errors.InputError("locator must not be empty")
         if self.page_number is not None and self.page_number < 1:
-            raise ValueError("page_number must be positive")
+            raise errors.InputError("page_number must be positive")
 
     def to_dict(self) -> dict[str, object]:
         """Returns JSON-native citation evidence.
@@ -239,25 +243,33 @@ class Element:
                 column counts, or a given count is below one.
         """
         if self.kind not in {"text", "heading", "table", "image", "ocr"}:
-            raise ValueError("unsupported document element kind")
+            raise errors.InputError("unsupported document element kind")
         if self.start < 0 or self.end <= self.start:
-            raise ValueError("document element must have a positive range")
+            raise errors.InputError(
+                "document element must have a positive range"
+            )
         if self.page_number < 1:
-            raise ValueError("document elements require a positive page_number")
+            raise errors.InputError(
+                "document elements require a positive page_number"
+            )
         if self.confidence is not None and (
             isinstance(self.confidence, bool)
             or not math.isfinite(self.confidence)
             or not 0.0 <= self.confidence <= 1.0
         ):
-            raise ValueError("document element confidence must be in [0, 1]")
+            raise errors.InputError(
+                "document element confidence must be in [0, 1]"
+            )
         if self.kind == "table" and (
             self.table_rows is None or self.table_columns is None
         ):
-            raise ValueError("table elements require row and column counts")
+            raise errors.InputError(
+                "table elements require row and column counts"
+            )
         if self.table_rows is not None and self.table_rows < 1:
-            raise ValueError("table_rows must be positive")
+            raise errors.InputError("table_rows must be positive")
         if self.table_columns is not None and self.table_columns < 1:
-            raise ValueError("table_columns must be positive")
+            raise errors.InputError("table_columns must be positive")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -296,7 +308,7 @@ class Layout:
             ("provider_version", self.provider_version),
         ):
             if not value.strip():
-                raise ValueError(
+                raise errors.InputError(
                     f"document layout {field_name} must not be empty"
                 )
         if not isinstance(self.elements, tuple):
@@ -308,11 +320,13 @@ class Layout:
             or not math.isfinite(self.ocr_confidence)
             or not 0.0 <= self.ocr_confidence <= 1.0
         ):
-            raise ValueError("OCR confidence must be in [0, 1]")
+            raise errors.InputError("OCR confidence must be in [0, 1]")
         if self.source_digest is not None and not re.fullmatch(
             r"[0-9a-f]{64}", self.source_digest
         ):
-            raise ValueError("source_digest must be a lowercase SHA-256 digest")
+            raise errors.InputError(
+                "source_digest must be a lowercase SHA-256 digest"
+            )
 
     @property
     def table_count(self) -> int:
@@ -355,11 +369,11 @@ class Profile:
                 negative.
         """
         if not self.document_id.strip():
-            raise ValueError("document_id must not be empty")
+            raise errors.InputError("document_id must not be empty")
         if self.character_count < 0 or self.token_count < 0:
-            raise ValueError("profile counts must not be negative")
+            raise errors.InputError("profile counts must not be negative")
         if not self.language.strip():
-            raise ValueError("language must not be empty")
+            raise errors.InputError("language must not be empty")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -647,7 +661,7 @@ class Sample:
             ValueError: If either bound is not positive.
         """
         if max_characters < 1 or max_tokens < 1:
-            raise ValueError("profiling bounds must be positive")
+            raise errors.InputError("profiling bounds must be positive")
         sample = self.content[:max_characters]
         tokens = re.findall(r"\b\w+\b", sample, flags=re.UNICODE)
         truncated = (
@@ -845,7 +859,7 @@ class Dataset:
             ValueError: If either bound is not positive.
         """
         if max_characters < 1 or max_tokens < 1:
-            raise ValueError("curation bounds must be positive")
+            raise errors.InputError("curation bounds must be positive")
 
         profiles = self.profile(max_characters, max_tokens)
         duplicate_groups = self.duplicate_groups()
@@ -1209,7 +1223,7 @@ class Reader:
             ValueError: If ``max_bytes`` is not positive.
         """
         if max_bytes < 1:
-            raise ValueError("max_bytes must be positive")
+            raise errors.InputError("max_bytes must be positive")
         self.max_bytes = max_bytes
         self.pdf_reader = pdf_reader
         self.layout_reader = layout_reader

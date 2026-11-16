@@ -96,11 +96,11 @@ class Stream:
         high = qualification.finite(self.high, "high")
         null = qualification.finite(self.null, "null")
         if not low < high:
-            raise ValueError("low must be below high")
+            raise errors.InputError("low must be below high")
         if not low < null < high:
-            raise ValueError("null must lie strictly inside (low, high)")
+            raise errors.InputError("null must lie strictly inside (low, high)")
         if self.direction not in DIRECTIONS:
-            raise ValueError("direction must be 'greater' or 'less'")
+            raise errors.InputError("direction must be 'greater' or 'less'")
 
     def rescaled_null(self) -> float:
         """Returns the null in the orientation where larger values are evidence.
@@ -129,14 +129,14 @@ class Stream:
         """
         array = numpy.asarray(values, dtype=float)
         if array.ndim != 1:
-            raise ValueError("values must be one-dimensional")
+            raise errors.InputError("values must be one-dimensional")
         if not numpy.isfinite(array).all():
-            raise ValueError("values must be finite")
+            raise errors.InputError("values must be finite")
         tolerance = 1e-9 * (self.high - self.low)
         if (array < self.low - tolerance).any() or (
             array > self.high + tolerance
         ).any():
-            raise ValueError("a value lies outside [low, high]")
+            raise errors.InputError("a value lies outside [low, high]")
         unit = numpy.clip((array - self.low) / (self.high - self.low), 0.0, 1.0)
         return unit if self.direction == "greater" else 1.0 - unit
 
@@ -157,7 +157,7 @@ def bet_grid(null_unit: float, size: int = GRID_SIZE) -> NDArray[numpy.float64]:
             `qualification.count`.
     """
     if not 0.0 < null_unit < 1.0:
-        raise ValueError("null_unit must be strictly between 0 and 1")
+        raise errors.InputError("null_unit must be strictly between 0 and 1")
     qualification.count(size, "size", minimum=1)
     grid: NDArray[numpy.float64] = (GRID_TOP / null_unit) * 0.5 ** numpy.arange(
         size, dtype=float
@@ -341,7 +341,7 @@ def positive_level(level: float) -> float:
     """
     value = qualification.finite(level, "level")
     if not 0.0 < value < 1.0:
-        raise ValueError("level must be strictly between 0 and 1")
+        raise errors.InputError("level must be strictly between 0 and 1")
     return value
 
 
@@ -376,24 +376,28 @@ def pseudo_outcomes(
     """
     q = qualification.finite(assignment_prob, "assignment_prob")
     if not 0.0 < q < 1.0:
-        raise ValueError("assignment_prob must be strictly between 0 and 1")
+        raise errors.InputError(
+            "assignment_prob must be strictly between 0 and 1"
+        )
     a = numpy.asarray(arm, dtype=float)
     y = numpy.asarray(outcome, dtype=float)
     if a.shape != y.shape or a.ndim not in (1, 2):
-        raise ValueError(
+        raise errors.InputError(
             "arm and outcome must be arrays of equal shape (1-d or 2-d)"
         )
     if not numpy.isin(a, (0.0, 1.0)).all():
-        raise ValueError("arm must hold only 0 and 1")
+        raise errors.InputError("arm must hold only 0 and 1")
     if (y < 0).any() or (y > 1).any() or not numpy.isfinite(y).all():
-        raise ValueError("outcome must lie in [0, 1]")
+        raise errors.InputError("outcome must lie in [0, 1]")
     c = (
         numpy.zeros_like(y)
         if center is None
         else numpy.asarray(center, dtype=float)
     )
     if c.shape != y.shape or (c < 0).any() or (c > 1).any():
-        raise ValueError("center must lie in [0, 1] and match the outcome")
+        raise errors.InputError(
+            "center must lie in [0, 1] and match the outcome"
+        )
     shifted = y - c
     result: NDArray[numpy.float64] = a * shifted / q - (1.0 - a) * shifted / (
         1.0 - q
@@ -507,7 +511,9 @@ def difference_stream(
     """
     q = assignment_prob
     if not 0.0 < q < 1.0:
-        raise ValueError("assignment_prob must be strictly between 0 and 1")
+        raise errors.InputError(
+            "assignment_prob must be strictly between 0 and 1"
+        )
     return Stream(-1.0 / (1.0 - q), 1.0 / q, null, direction)
 
 
@@ -531,7 +537,7 @@ def bound_stream(
     """
     b = qualification.finite(bound, "bound")
     if b <= 0:
-        raise ValueError("bound must be positive")
+        raise errors.InputError("bound must be positive")
     return Stream(-b, b, null, direction)
 
 

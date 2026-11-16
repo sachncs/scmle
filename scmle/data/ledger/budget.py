@@ -18,6 +18,7 @@ import math
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 
@@ -56,14 +57,14 @@ def exact(value: Any, name: str) -> Fraction:
             number.
     """
     if isinstance(value, bool):
-        raise ValueError(f"{name} must be a finite number")
+        raise errors.InputError(f"{name} must be a finite number")
     if isinstance(value, Fraction):
         return value
     if isinstance(value, int):
         return Fraction(value)
     if isinstance(value, float) and math.isfinite(value):
         return Fraction(repr(value))
-    raise ValueError(f"{name} must be a finite number")
+    raise errors.InputError(f"{name} must be a finite number")
 
 
 def parse_fraction(text: Any, name: str) -> Fraction:
@@ -84,7 +85,7 @@ def parse_fraction(text: Any, name: str) -> Fraction:
     try:
         return Fraction(str(text))
     except (ValueError, ZeroDivisionError) as error:
-        raise ValueError(f"{name}: invalid fraction {text!r}") from error
+        raise errors.InputError(f"{name}: invalid fraction {text!r}") from error
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -104,7 +105,9 @@ class ConfirmationBudget:
             ValueError: If `alpha_confirm` is not strictly between 0 and 1.
         """
         if not 0 < self.alpha_confirm < 1:
-            raise ValueError("alpha_confirm must be strictly between 0 and 1")
+            raise errors.InputError(
+                "alpha_confirm must be strictly between 0 and 1"
+            )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -127,9 +130,9 @@ class ExplorationBudget:
                 [0, initial].
         """
         if not 0 <= self.initial <= 1:
-            raise ValueError("initial must be within [0, 1]")
+            raise errors.InputError("initial must be within [0, 1]")
         if not 0 <= self.wealth <= self.initial:
-            raise ValueError("wealth must be between 0 and initial")
+            raise errors.InputError("wealth must be between 0 and initial")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -217,7 +220,9 @@ class ErrorBudget:
         )
         names = [t.detector_id for t in self.detector_tolerances]
         if len(set(names)) != len(names):
-            raise ValueError("duplicate detector_id in detector_tolerances")
+            raise errors.InputError(
+                "duplicate detector_id in detector_tolerances"
+            )
 
     @classmethod
     def create(
@@ -244,7 +249,7 @@ class ErrorBudget:
         alpha = exact(alpha_confirm, "alpha_confirm")
         wealth = exact(wealth_exploration, "wealth_exploration")
         if not 0 <= wealth <= 1:
-            raise ValueError("wealth_exploration must be within [0, 1]")
+            raise errors.InputError("wealth_exploration must be within [0, 1]")
         return cls(
             confirmation=ConfirmationBudget(alpha),
             exploration=ExplorationBudget(initial=wealth, wealth=wealth),
@@ -292,9 +297,9 @@ class ErrorBudget:
         exploration = record["exploration"]
         names = {"alpha_confirm"}
         if set(confirmation) != names:
-            raise ValueError("unexpected or missing confirmation fields")
+            raise errors.InputError("unexpected or missing confirmation fields")
         if set(exploration) != {"initial", "wealth"}:
-            raise ValueError("unexpected or missing exploration fields")
+            raise errors.InputError("unexpected or missing exploration fields")
         return cls(
             confirmation=ConfirmationBudget(
                 parse_fraction(confirmation["alpha_confirm"], "alpha_confirm")
@@ -340,7 +345,7 @@ def spend(budget: ErrorBudget, amount: Number) -> ErrorBudget:
     """
     cost = exact(amount, "amount")
     if cost < 0:
-        raise ValueError("amount must be non-negative")
+        raise errors.InputError("amount must be non-negative")
     left = budget.exploration.wealth
     if cost > left:
         raise BudgetExhaustedError(
@@ -375,13 +380,13 @@ def split_budget(
             a positive finite number.
     """
     if not weights:
-        raise ValueError("weights must not be empty")
+        raise errors.InputError("weights must not be empty")
     exact_weights: dict[str, Fraction] = {}
     for name, weight in weights.items():
         evidence.require_text(name, "family name")
         value = exact(weight, f"weight[{name}]")
         if value <= 0:
-            raise ValueError(f"weight[{name}] must be positive")
+            raise errors.InputError(f"weight[{name}] must be positive")
         exact_weights[name] = value
     total = sum(exact_weights.values(), Fraction(0))
     parts = {}
@@ -441,7 +446,7 @@ def confirmation_alpha(
     """
     qualification.count(n_survivors, "n_survivors")
     if not isinstance(rule, Correction):
-        raise ValueError("rule must be a Correction")
+        raise errors.InputError("rule must be a Correction")
     alpha = budget.confirmation.alpha_confirm
     if n_survivors == 0:
         return float(alpha)
@@ -511,18 +516,20 @@ class DecisionBudget:
         """
         for name in ("alpha_promote", "alpha_rollback"):
             if not 0 < getattr(self, name) < 1:
-                raise ValueError(f"{name} must be strictly between 0 and 1")
+                raise errors.InputError(
+                    f"{name} must be strictly between 0 and 1"
+                )
         if self.horizon is not None:
             qualification.count(self.horizon, "horizon", minimum=1)
         ids = [pair[0] for pair in self.assigned]
         if len(set(ids)) != len(ids):
-            raise ValueError("duplicate experiment id in assigned")
+            raise errors.InputError("duplicate experiment id in assigned")
         if any(pair[1] <= 0 for pair in self.assigned):
-            raise ValueError("assigned levels must be positive")
+            raise errors.InputError("assigned levels must be positive")
         if self.spent > self.alpha_promote:
-            raise ValueError("assigned levels exceed alpha_promote")
+            raise errors.InputError("assigned levels exceed alpha_promote")
         if len(set(self.monitored)) != len(self.monitored):
-            raise ValueError("duplicate champion in monitored")
+            raise errors.InputError("duplicate champion in monitored")
 
     @classmethod
     def create(
@@ -630,7 +637,9 @@ def assign_experiment(
     """
     evidence.require_text(experiment_id, "experiment_id")
     if any(pair[0] == experiment_id for pair in budget.assigned):
-        raise ValueError(f"experiment {experiment_id} already has a level")
+        raise errors.InputError(
+            f"experiment {experiment_id} already has a level"
+        )
     if level is None:
         gamma = discount_weight(len(budget.assigned) + 1, budget.horizon)
         chosen = budget.alpha_promote * gamma
@@ -639,7 +648,7 @@ def assign_experiment(
     else:
         chosen = exact(level, "level")
         if chosen <= 0:
-            raise ValueError("level must be positive")
+            raise errors.InputError("level must be positive")
     if chosen > budget.remaining:
         raise BudgetExhaustedError(
             f"level {float(chosen):.6g} exceeds the remaining promotion "
@@ -674,7 +683,7 @@ def start_rollback_monitor(
     """
     evidence.require_text(champion_id, "champion_id")
     if champion_id in budget.monitored:
-        raise ValueError(f"champion {champion_id} is already monitored")
+        raise errors.InputError(f"champion {champion_id} is already monitored")
     return (
         dataclasses.replace(budget, monitored=(*budget.monitored, champion_id)),
         budget.alpha_rollback,

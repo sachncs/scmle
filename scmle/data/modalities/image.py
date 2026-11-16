@@ -238,9 +238,11 @@ def validate_feature_options(
         not isinstance(value, int) or isinstance(value, bool) or value <= 0
         for value in sizes
     ):
-        raise ValueError("target_size must contain two positive integers")
+        raise errors.InputError(
+            "target_size must contain two positive integers"
+        )
     if mode not in SUPPORTED_FEATURE_MODES:
-        raise ValueError(
+        raise errors.InputError(
             f"mode must be one of {SUPPORTED_FEATURE_MODES}, got {mode!r}"
         )
     return target_size
@@ -298,10 +300,10 @@ class Augmentation:
         operation = self.operation.strip()
         tool = self.tool.strip()
         if not operation:
-            raise ValueError("augmentation operation must not be empty")
+            raise errors.InputError("augmentation operation must not be empty")
         keys: Iterable[object] = self.parameters
         if any(not isinstance(key, str) or not key.strip() for key in keys):
-            raise ValueError(
+            raise errors.InputError(
                 "augmentation parameter keys must be non-empty text"
             )
         try:
@@ -311,7 +313,7 @@ class Augmentation:
                 )
             )
         except (TypeError, ValueError) as error:
-            raise ValueError(
+            raise errors.InputError(
                 "augmentation parameters must be JSON-native"
             ) from error
         object.__setattr__(self, "parent_source", parent)
@@ -398,9 +400,9 @@ class Sample:
         """
         object.__setattr__(self, "encoded_bytes", bytes(self.encoded_bytes))
         if not self.source.strip():
-            raise ValueError("source must not be empty")
+            raise errors.InputError("source must not be empty")
         if self.group_id is not None and not self.group_id.strip():
-            raise ValueError("group_id must not be empty when provided")
+            raise errors.InputError("group_id must not be empty when provided")
         object.__setattr__(self, "exif_tags", tuple(self.exif_tags))
         object.__setattr__(
             self, "sensitive_metadata", tuple(self.sensitive_metadata)
@@ -410,16 +412,16 @@ class Sample:
         ):
             raise TypeError("augmentation must be Augmentation or None")
         if len(self.encoded_bytes) != self.byte_size:
-            raise ValueError("byte_size does not match encoded_bytes")
+            raise errors.InputError("byte_size does not match encoded_bytes")
         if self.width <= 0 or self.height <= 0:
-            raise ValueError("image dimensions must be positive")
+            raise errors.InputError("image dimensions must be positive")
         if self.channels <= 0:
-            raise ValueError("channels must be positive")
+            raise errors.InputError("channels must be positive")
         if (
             len(self.file_hash) != SHA256_HEX_LENGTH
             or len(self.content_hash) != SHA256_HEX_LENGTH
         ):
-            raise ValueError("image hashes must be SHA-256 hex digests")
+            raise errors.InputError("image hashes must be SHA-256 hex digests")
 
     @classmethod
     def from_bytes(
@@ -605,7 +607,9 @@ class Sample:
             or isinstance(candidate, bool)
             or not MIN_HASH_SIZE <= candidate <= MAX_HASH_SIZE
         ):
-            raise ValueError("hash_size must be an integer between 2 and 32")
+            raise errors.InputError(
+                "hash_size must be an integer between 2 and 32"
+            )
         pixels = self.decode("L", (hash_size, hash_size))[..., 0]
         quantized = numpy.asarray(pixels, dtype=numpy.uint8) // 16
         return "".join(f"{int(value):x}" for value in quantized.flat)
@@ -634,7 +638,9 @@ class Sample:
                 or isinstance(candidate, bool)
                 or candidate <= 0
             ):
-                raise ValueError(f"{name} must be a positive integer or None")
+                raise errors.InputError(
+                    f"{name} must be a positive integer or None"
+                )
 
     def decode(
         self,
@@ -658,7 +664,7 @@ class Sample:
         image_library = require_pillow("image decoding")
         selected_mode = mode or self.mode
         if selected_mode not in SUPPORTED_FEATURE_MODES:
-            raise ValueError(
+            raise errors.InputError(
                 f"mode must be one of {SUPPORTED_FEATURE_MODES}, got "
                 f"{selected_mode!r}"
             )
@@ -900,16 +906,16 @@ class Dataset:
         if not isinstance(samples_limit, int) or isinstance(
             samples_limit, bool
         ):
-            raise ValueError("max_samples must be a positive integer")
+            raise errors.InputError("max_samples must be a positive integer")
         if max_samples <= 0:
-            raise ValueError("max_samples must be a positive integer")
+            raise errors.InputError("max_samples must be a positive integer")
         distance_limit: object = max_hamming_distance
         if (
             not isinstance(distance_limit, int)
             or isinstance(distance_limit, bool)
             or distance_limit < 0
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "max_hamming_distance must be a non-negative integer"
             )
         candidates = self.samples[:max_samples]
@@ -957,9 +963,9 @@ class Dataset:
         if not isinstance(samples_limit, int) or isinstance(
             samples_limit, bool
         ):
-            raise ValueError("max_samples must be a positive integer")
+            raise errors.InputError("max_samples must be a positive integer")
         if max_samples <= 0:
-            raise ValueError("max_samples must be a positive integer")
+            raise errors.InputError("max_samples must be a positive integer")
         validate_feature_options(profile_size, "RGB")
         profiled = self.samples[:max_samples]
         if not profiled:
@@ -1255,7 +1261,7 @@ class Dataset:
                 [0, 1), or the fractions sum to 1 or more.
         """
         if not self.samples:
-            raise ValueError("cannot split an empty image dataset")
+            raise errors.InputError("cannot split an empty image dataset")
         check_split_fractions(validation_fraction, test_fraction)
         grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:

@@ -11,6 +11,7 @@ import tempfile
 from typing import Any
 
 from scmle import durability
+from scmle.contracts import errors
 from scmle.contracts import lineage
 
 
@@ -51,10 +52,10 @@ class Link:
         ):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{name} must not be empty")
+                raise errors.InputError(f"{name} must not be empty")
         parsed = datetime.datetime.fromisoformat(self.timestamp)
         if parsed.tzinfo is None:
-            raise ValueError("timestamp must include a timezone")
+            raise errors.InputError("timestamp must include a timezone")
 
     def to_dict(self) -> dict[str, str]:
         """Converts the link to a JSON-native record.
@@ -118,9 +119,11 @@ class Linker:
         graph = self.load(path)
         bundle = graph.nodes.get("bundle")
         if bundle is None or bundle.kind is not lineage.Kind.BUNDLE:
-            raise ValueError("evidence graph has no bundle node")
+            raise errors.InputError("evidence graph has no bundle node")
         if bundle.digest != bundle_digest:
-            raise ValueError("inference bundle digest does not match graph")
+            raise errors.InputError(
+                "inference bundle digest does not match graph"
+            )
         node_id = f"inference:{event_id}"
         payload = {
             "event_id": candidate.event_id,
@@ -184,7 +187,9 @@ class Linker:
         graph = lineage.Graph.from_dict(record)
         expected_digest = record.get("graph_digest")
         if expected_digest is not None and expected_digest != graph.digest():
-            raise ValueError("evidence graph digest does not match content")
+            raise errors.InputError(
+                "evidence graph digest does not match content"
+            )
         return graph
 
     @staticmethod

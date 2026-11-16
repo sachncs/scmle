@@ -45,6 +45,7 @@ from scipy.spatial import distance
 from sklearn import ensemble
 from sklearn import metrics
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.detectors import certificates
@@ -110,14 +111,14 @@ def auc_delong(
         ValueError: If a class has fewer than two rows or the level is bad.
     """
     if not 0.0 < confidence < 1.0:
-        raise ValueError("confidence must be within (0, 1)")
+        raise errors.InputError("confidence must be within (0, 1)")
     values = numpy.asarray(scores, dtype=float)
     labels = numpy.asarray(side)
     positive = values[labels == 1]
     negative = values[labels == 0]
     m, n = len(positive), len(negative)
     if min(m, n) < MIN_CLASS_ROWS:
-        raise ValueError("each class needs at least two rows")
+        raise errors.InputError("each class needs at least two rows")
     pooled = stats.rankdata(numpy.r_[positive, negative])
     v10 = (pooled[:m] - stats.rankdata(positive)) / n
     v01 = 1.0 - (pooled[m:] - stats.rankdata(negative)) / m
@@ -296,9 +297,11 @@ def check_pair(sample: pandas.DataFrame, reference: pandas.DataFrame) -> None:
             has fewer than `MIN_ROWS` rows.
     """
     if set(sample.columns) != set(reference.columns):
-        raise ValueError("sample and reference must have the same columns")
+        raise errors.InputError(
+            "sample and reference must have the same columns"
+        )
     if min(len(sample), len(reference)) < MIN_ROWS:
-        raise ValueError(f"each side needs at least {MIN_ROWS} rows")
+        raise errors.InputError(f"each side needs at least {MIN_ROWS} rows")
 
 
 def design_matrix(both: pandas.DataFrame, rows: int) -> numpy.ndarray:

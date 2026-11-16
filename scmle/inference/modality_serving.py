@@ -108,12 +108,12 @@ class ModalityHttpServing:
                 no lifecycle report digest.
         """
         if max_request_bytes < 1 or max_samples < 1:
-            raise ValueError("request bounds must be positive")
+            raise errors.InputError("request bounds must be positive")
         self.gateway: access.Gateway | None = None
         if require_lifecycle_report and (
             predictor.lifecycle_report_digest is None
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "release-bound serving requires a verified lifecycle report"
             )
         self.predictor = predictor
@@ -183,7 +183,7 @@ class ModalityHttpServing:
         """
         samples = self.decoder.decode(payload)
         if not samples:
-            raise ValueError("samples must not be empty")
+            raise errors.InputError("samples must not be empty")
         if len(samples) > self.max_samples:
             raise OverflowError(
                 f"request contains more than {self.max_samples} samples"

@@ -23,6 +23,7 @@ import pandas
 
 from scmle import durability
 import scmle.artifacts.bundle
+from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.contracts import observability
 import scmle.monitoring.observability
@@ -78,9 +79,11 @@ def inference_timestamp(line: str) -> datetime.datetime:
     """
     record = json.loads(line)
     if not isinstance(record, dict):
-        raise ValueError("observability records must be JSON objects")
+        raise errors.InputError("observability records must be JSON objects")
     if record.get("type") != "inference":
-        raise ValueError("observability records must have type inference")
+        raise errors.InputError(
+            "observability records must have type inference"
+        )
     return scmle.monitoring.observability.parse_timestamp(
         str(record["timestamp"]), "event.timestamp"
     )
@@ -155,7 +158,7 @@ class PredictionLog:
         """
         started = time.perf_counter()
         if event_ids is not None and len(event_ids) != len(data):
-            raise ValueError("event_ids must have one id per input row")
+            raise errors.InputError("event_ids must have one id per input row")
         ids = event_ids or list(
             map(
                 operator.call,
@@ -306,7 +309,7 @@ class PredictionLog:
                 is not a JSON object of type `inference`.
         """
         if self.observability_policy is None:
-            raise ValueError(
+            raise errors.InputError(
                 "retention enforcement requires an observability policy"
             )
         observed_text = observed_at or events.utc_timestamp()

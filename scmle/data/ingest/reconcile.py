@@ -23,6 +23,7 @@ from typing import Any
 
 import pandas
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.admissibility import reconciliation
 from scmle.data.detectors import certificates
@@ -170,7 +171,9 @@ def reconcile_extract(
             source.scalar(total_check.sql),
         )
     if not items:
-        raise ValueError("nothing could be reconciled: all source totals zero")
+        raise errors.InputError(
+            "nothing could be reconciled: all source totals zero"
+        )
     result = reconciliation.reconcile(items, tolerance, gate)
     return ExtractReconciliation(result, tuple(skipped))
 

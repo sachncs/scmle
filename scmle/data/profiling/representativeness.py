@@ -19,6 +19,7 @@ from sklearn import metrics
 from sklearn import model_selection
 
 from scmle.contracts import data
+from scmle.contracts import errors
 
 MIN_ROWS = 50
 UNREPRESENTATIVE_AUC = 0.65
@@ -174,9 +175,11 @@ def compare_to_reference(
         ValueError: On differing columns or too few rows.
     """
     if set(sample.columns) != set(reference.columns):
-        raise ValueError("sample and reference must have the same columns")
+        raise errors.InputError(
+            "sample and reference must have the same columns"
+        )
     if min(len(sample), len(reference)) < MIN_ROWS:
-        raise ValueError(f"each side needs at least {MIN_ROWS} rows")
+        raise errors.InputError(f"each side needs at least {MIN_ROWS} rows")
     columns = list(sample.columns)
     both = pandas.concat(
         [sample[columns], reference[columns]], ignore_index=True

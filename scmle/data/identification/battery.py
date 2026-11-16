@@ -26,6 +26,7 @@ from typing import Any
 import numpy
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.evaluation import coverage
 
 MIN_STRATA = 2
@@ -76,7 +77,7 @@ def wald_test(name: str, kind: str, estimate: float, se: float) -> Test:
         ValueError: If `se` is not positive.
     """
     if not se > 0:
-        raise ValueError("a Wald test needs a positive standard error")
+        raise errors.InputError("a Wald test needs a positive standard error")
     p = float(2 * stats.norm.sf(abs(estimate) / se))
     return Test(name, kind, p, estimate, se)
 
@@ -130,7 +131,7 @@ def run_battery(tests: list[Test], alpha: float) -> Battery:
         ValueError: If `alpha` is not strictly between 0 and 1.
     """
     if not 0 < alpha < 1:
-        raise ValueError("alpha must be within (0, 1)")
+        raise errors.InputError("alpha must be within (0, 1)")
     flags = (
         coverage.holm_rejections([t.p_value for t in tests], alpha)
         if tests
@@ -199,11 +200,13 @@ def replicate(
             is not positive.
     """
     if len(strata) < MIN_STRATA:
-        raise ValueError(f"replication needs at least {MIN_STRATA} strata")
+        raise errors.InputError(
+            f"replication needs at least {MIN_STRATA} strata"
+        )
     est = numpy.array([v[0] for v in strata.values()])
     se = numpy.array([v[1] for v in strata.values()])
     if not (se > 0).all():
-        raise ValueError("stratum standard errors must be positive")
+        raise errors.InputError("stratum standard errors must be positive")
     weight = 1.0 / se**2
     center = float((weight * est).sum() / weight.sum())
     q = float((weight * (est - center) ** 2).sum())

@@ -13,6 +13,8 @@ import dataclasses
 import time
 from typing import Any
 
+from scmle.contracts import errors
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Budget:
@@ -40,11 +42,11 @@ class Budget:
         for name in ("max_queries", "max_rows_scanned"):
             value = getattr(self, name)
             if value is not None and value < 0:
-                raise ValueError(f"{name} must be non-negative")
+                raise errors.InputError(f"{name} must be non-negative")
         if self.max_seconds is not None and self.max_seconds < 0:
-            raise ValueError("max_seconds must be non-negative")
+            raise errors.InputError("max_seconds must be non-negative")
         if self.max_features < 0:
-            raise ValueError("max_features must be non-negative")
+            raise errors.InputError("max_features must be non-negative")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the limits.

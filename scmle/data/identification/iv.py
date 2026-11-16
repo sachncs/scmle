@@ -34,6 +34,8 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.contracts import errors
+
 F_THRESHOLD = 10.0
 FIRST_STAGE_TOLERANCE = 1e-12
 
@@ -212,14 +214,14 @@ def estimate(
     names = [treatment, outcome, instrument, *controls]
     data = frame[names].to_numpy(dtype=float)
     if not numpy.isfinite(data).all():
-        raise ValueError("IV columns must not hold missing values")
+        raise errors.InputError("IV columns must not hold missing values")
     n = len(data)
     d, y, z = data[:, 0], data[:, 1], data[:, 2]
     w = data[:, 3:] if controls else numpy.empty((n, 0))
     d, y, z = residualise([d, y, z], w)
     szd, szz = float(z @ d), float(z @ z)
     if szz <= FIRST_STAGE_TOLERANCE or abs(szd) <= FIRST_STAGE_TOLERANCE:
-        raise ValueError("the instrument has no first-stage variation")
+        raise errors.InputError("the instrument has no first-stage variation")
     scale = n / (n - 2 - w.shape[1])
     beta = float(z @ y) / szd
     u = y - beta * d

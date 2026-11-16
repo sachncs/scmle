@@ -26,6 +26,8 @@ import numpy
 import pandas
 from scipy import optimize
 
+from scmle.contracts import errors
+
 MIN_PRE_PERIODS = 2
 MIN_DONOR_WEIGHT = 1e-6
 
@@ -178,16 +180,18 @@ def estimate(
         index=time, columns=unit, values=outcome
     ).sort_index()
     if wide.isna().any().any():
-        raise ValueError("the panel must be balanced with no missing outcomes")
+        raise errors.InputError(
+            "the panel must be balanced with no missing outcomes"
+        )
     if treated_unit not in wide.columns:
-        raise ValueError("the treated unit is not in the panel")
+        raise errors.InputError("the treated unit is not in the panel")
     is_pre = wide.index < first_treated
     if is_pre.sum() < MIN_PRE_PERIODS or (~is_pre).sum() < 1:
-        raise ValueError("need two pre-periods and one post-period")
+        raise errors.InputError("need two pre-periods and one post-period")
     units = list(wide.columns)
     donors = [u for u in units if u != treated_unit]
     if len(donors) < min_donors(alpha):
-        raise ValueError(
+        raise errors.InputError(
             f"{len(donors)} donors cannot reach p <= {alpha}: at least "
             f"{min_donors(alpha)} are needed"
         )

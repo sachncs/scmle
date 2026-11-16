@@ -55,6 +55,7 @@ from typing import Any
 
 import numpy
 
+from scmle.contracts import errors
 from scmle.data.ledger import online_fdr
 
 GREATER = "greater"
@@ -84,7 +85,7 @@ def validate_unit(value: Any, name: str) -> numpy.ndarray:
         or numpy.any(array < 0)
         or numpy.any(array > 1)
     ):
-        raise ValueError(f"{name} must be finite and within [0, 1]")
+        raise errors.InputError(f"{name} must be finite and within [0, 1]")
     return array
 
 
@@ -117,14 +118,16 @@ class BettingTest:
             ValueError: On an invalid argument.
         """
         if direction not in DIRECTIONS:
-            raise ValueError(f"direction must be one of {DIRECTIONS}")
+            raise errors.InputError(f"direction must be one of {DIRECTIONS}")
         if not 0.0 < alpha < 1.0:
-            raise ValueError("alpha must be strictly between 0 and 1")
+            raise errors.InputError("alpha must be strictly between 0 and 1")
         if not 0.0 < cap < 1.0:
-            raise ValueError("cap must be strictly between 0 and 1")
+            raise errors.InputError("cap must be strictly between 0 and 1")
         mean = numpy.asarray(null_mean, dtype=float)
         if numpy.any(mean <= 0.0) or numpy.any(mean >= 1.0):
-            raise ValueError("null_mean must be strictly between 0 and 1")
+            raise errors.InputError(
+                "null_mean must be strictly between 0 and 1"
+            )
         self.null_mean = mean
         self.direction = direction
         self.alpha = alpha
@@ -205,7 +208,7 @@ class BettingTest:
             ValueError: If the test has more than one null mean.
         """
         if self.null_mean.ndim != 0:
-            raise ValueError("only a single test can be serialized")
+            raise errors.InputError("only a single test can be serialized")
         return {
             "null_mean": float(self.null_mean),
             "direction": self.direction,
@@ -288,7 +291,7 @@ class MixtureTest:
             ValueError: If `stride` or `terms` is not positive.
         """
         if stride < 1 or terms < 1:
-            raise ValueError("stride and terms must be positive")
+            raise errors.InputError("stride and terms must be positive")
         self.null_mean = numpy.asarray(null_mean, dtype=float)
         self.direction = direction
         self.alpha = alpha
@@ -377,7 +380,7 @@ class MixtureTest:
             ValueError: If the test has more than one null mean.
         """
         if self.null_mean.ndim != 0:
-            raise ValueError("only a single test can be serialized")
+            raise errors.InputError("only a single test can be serialized")
         return {
             "null_mean": float(self.null_mean),
             "direction": self.direction,
@@ -447,7 +450,7 @@ class ConfidenceSequence:
             ValueError: If `points` is below 3.
         """
         if points < MINIMUM_GRID_POINTS:
-            raise ValueError("points must be at least 3")
+            raise errors.InputError("points must be at least 3")
         self.alpha = alpha
         self.grid = (numpy.arange(points) + 1.0) / (points + 1.0)
         self.upper_tests = BettingTest(self.grid, GREATER, alpha / 2.0)
@@ -517,7 +520,9 @@ class RiskAlarm:
         """
         null = (reference_risk + tolerance) / scale
         if not 0.0 < null < 1.0:
-            raise ValueError("reference_risk + tolerance must be in (0, scale)")
+            raise errors.InputError(
+                "reference_risk + tolerance must be in (0, scale)"
+            )
         self.scale = scale
         self.test = MixtureTest(null, GREATER, alpha)
 
@@ -598,7 +603,9 @@ class PairedEProcess:
                 within ``(-scale, scale)``.
         """
         if scale <= 0.0 or not -scale < margin < scale:
-            raise ValueError("margin must lie strictly within (-scale, scale)")
+            raise errors.InputError(
+                "margin must lie strictly within (-scale, scale)"
+            )
         self.margin = margin
         self.scale = scale
         self.test = MixtureTest((margin / scale + 1.0) / 2.0, GREATER, alpha)
@@ -621,7 +628,9 @@ class PairedEProcess:
         first = validate_unit(champion_loss, "champion_loss")
         second = validate_unit(other_loss, "other_loss")
         if first.shape != second.shape or first.size == 0:
-            raise ValueError("paired losses must be non-empty and aligned")
+            raise errors.InputError(
+                "paired losses must be non-empty and aligned"
+            )
         return self.update_gap(float(numpy.mean(first - second)))
 
     def update_gap(self, gap: float) -> bool:
@@ -638,7 +647,9 @@ class PairedEProcess:
                 scale]``.
         """
         if not numpy.isfinite(gap) or abs(gap) > self.scale + 1e-12:
-            raise ValueError("gap must be finite and within [-scale, scale]")
+            raise errors.InputError(
+                "gap must be finite and within [-scale, scale]"
+            )
         unit = min(max((gap / self.scale + 1.0) / 2.0, 0.0), 1.0)
         self.test.update(unit)
         return bool(self.test.crossed)
@@ -726,7 +737,9 @@ class PromotionSequence:
             ValueError: If the challenger is already registered.
         """
         if name in self.names:
-            raise ValueError(f"challenger {name!r} is already registered")
+            raise errors.InputError(
+                f"challenger {name!r} is already registered"
+            )
         self.names.append(name)
         return len(self.names)
 
@@ -744,12 +757,12 @@ class PromotionSequence:
             ValueError: If `name` is unregistered, decided, or not next.
         """
         if name not in self.names:
-            raise ValueError(f"challenger {name!r} was not registered")
+            raise errors.InputError(f"challenger {name!r} was not registered")
         if name in self.decisions:
-            raise ValueError(f"challenger {name!r} is already decided")
+            raise errors.InputError(f"challenger {name!r} is already decided")
         pending = [n for n in self.names if n not in self.decisions]
         if pending[0] != name:
-            raise ValueError(
+            raise errors.InputError(
                 f"decisions follow registration order; {pending[0]!r} is next"
             )
         step = self.rule.step(self.state, online_fdr.Evidence(e=e_value))

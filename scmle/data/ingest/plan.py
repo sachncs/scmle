@@ -18,6 +18,7 @@ import sqlite3
 from typing import Any
 
 from scmle import durability
+from scmle.contracts import errors
 from scmle.data.ingest import grain
 from scmle.data.ingest import joins
 from scmle.data.ingest import profile
@@ -62,9 +63,9 @@ class Config:
                 `target_table` is not one of `tables`.
         """
         if not self.tables:
-            raise ValueError("tables must not be empty")
+            raise errors.InputError("tables must not be empty")
         if self.unit is not None and self.target_table not in self.tables:
-            raise ValueError("target_table must be one of tables")
+            raise errors.InputError("target_table must be one of tables")
 
 
 def write_artifact(

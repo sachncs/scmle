@@ -21,6 +21,8 @@ from typing import Any
 
 from scipy import stats
 
+from scmle.contracts import errors
+
 MIN_CONFIRMATION_ROWS = 30
 FISHER_Z_OFFSET = 3
 DEFAULT_CONFIDENCE = 0.95
@@ -58,7 +60,7 @@ def open_unit(value: float, name: str, low: float = 0.0) -> float:
         or not low < candidate < 1
         or not math.isfinite(candidate)
     ):
-        raise ValueError(f"{name} must be strictly between {low} and 1")
+        raise errors.InputError(f"{name} must be strictly between {low} and 1")
     return float(value)
 
 
@@ -83,7 +85,9 @@ def positive_delta(value: float, name: str) -> float:
         or not math.isfinite(candidate)
         or candidate <= 0
     ):
-        raise ValueError(f"{name} must be a finite number greater than 0")
+        raise errors.InputError(
+            f"{name} must be a finite number greater than 0"
+        )
     return float(value)
 
 
@@ -105,7 +109,7 @@ def check_k(k_max: int) -> int:
         or not isinstance(candidate, int)
         or candidate < 1
     ):
-        raise ValueError("k_max must be an integer of at least 1")
+        raise errors.InputError("k_max must be an integer of at least 1")
     return k_max
 
 
@@ -269,7 +273,7 @@ def n_required_two_proportions(
     open_unit(p1, "p1")
     open_unit(p2, "p2")
     if p1 == p2:
-        raise ValueError("p1 and p2 must differ")
+        raise errors.InputError("p1 and p2 must differ")
     open_unit(alpha, "alpha")
     open_unit(power, "power")
     check_k(k_max)

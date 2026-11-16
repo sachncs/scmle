@@ -56,6 +56,7 @@ from pathlib import Path
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.admissibility import provenance
 
@@ -87,7 +88,7 @@ class LeakageAttestation:
                 `lead_seconds` is not a finite number.
         """
         if not self.column or not isinstance(self.column, str):
-            raise ValueError("column must be a non-empty string")
+            raise errors.InputError("column must be a non-empty string")
         qualification.finite(self.lead_seconds, "lead_seconds")
 
     def field(self) -> provenance.FieldProvenance:
@@ -145,7 +146,7 @@ class LeakageAttestation:
         own = {k: record[k] for k in OWN_FIELDS if k in record}
         missing = sorted(set(OWN_FIELDS) - set(own))
         if missing:
-            raise ValueError(f"missing field(s): {missing}")
+            raise errors.InputError(f"missing field(s): {missing}")
         return cls(
             own["column"],
             provenance.Attestation.from_dict(body),
@@ -182,21 +183,25 @@ def load(path: str | Path) -> tuple[LeakageAttestation, ...]:
     try:
         document = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise ValueError(f"cannot read attestations {path}: {error}") from error
+        raise errors.InputError(
+            f"cannot read attestations {path}: {error}"
+        ) from error
     if not isinstance(document, dict) or (
         document.get("format_version") != FORMAT_VERSION
     ):
-        raise ValueError(
+        raise errors.InputError(
             f"attestations must be an object with format_version "
             f"{FORMAT_VERSION}"
         )
     records = document.get("attestations")
     if not isinstance(records, list):
-        raise ValueError("attestations must hold a list under 'attestations'")
+        raise errors.InputError(
+            "attestations must hold a list under 'attestations'"
+        )
     found = tuple(LeakageAttestation.from_dict(r) for r in records)
     names = [a.column for a in found]
     if len(set(names)) != len(names):
-        raise ValueError("at most one attestation per column")
+        raise errors.InputError("at most one attestation per column")
     return found
 
 

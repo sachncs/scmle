@@ -27,6 +27,7 @@ import numpy
 import pandas
 from sklearn import model_selection
 
+from scmle.contracts import errors
 from scmle.contracts import models
 
 MIN_ROWS = 40
@@ -324,7 +325,7 @@ def analyze(
         ValueError: With fewer than `MIN_ROWS` rows.
     """
     if len(target) < MIN_ROWS:
-        raise ValueError(f"sensitivity analysis needs {MIN_ROWS}+ rows")
+        raise errors.InputError(f"sensitivity analysis needs {MIN_ROWS}+ rows")
     by_seed, by_resample = training_sensitivity(
         build, features, target, scorer, repeats, seed
     )

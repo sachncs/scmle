@@ -57,12 +57,12 @@ class ExtensionModality:
         if not isinstance(self.name, str):
             raise TypeError("extension modality name must be a string")
         if not re.fullmatch(r"[a-z0-9][a-z0-9./-]*[a-z0-9]", self.name):
-            raise ValueError(
+            raise errors.InputError(
                 "extension modality name must use lowercase namespaced "
                 "characters such as 'acme/point-cloud'"
             )
         if self.name in {item.value for item in Modality}:
-            raise ValueError(
+            raise errors.InputError(
                 "extension modality name conflicts with a built-in"
             )
 
@@ -109,13 +109,15 @@ def restore(value: str) -> ModalityIdentity:
     """
     candidate: object = value  # callers may pass a non-string
     if not isinstance(candidate, str) or not candidate.strip():
-        raise ValueError("modality value must be a non-empty string")
+        raise errors.InputError("modality value must be a non-empty string")
     try:
         return Modality(value)
     except ValueError:
         prefix = "extension:"
         if not value.startswith(prefix):
-            raise ValueError(f"unknown modality value: {value}") from None
+            raise errors.InputError(
+                f"unknown modality value: {value}"
+            ) from None
         return ExtensionModality(value.removeprefix(prefix))
 
 
@@ -194,9 +196,9 @@ class StageEvidence:
                 )
             )
         except (TypeError, ValueError) as error:
-            raise ValueError("evidence must be JSON-native") from error
+            raise errors.InputError("evidence must be JSON-native") from error
         if not isinstance(normalized, dict):
-            raise ValueError("evidence must serialize to an object")
+            raise errors.InputError("evidence must serialize to an object")
         object.__setattr__(self, "evidence", normalized)
         object.__setattr__(self, "notes", tuple(self.notes))
         for field_name, values in (
@@ -204,7 +206,9 @@ class StageEvidence:
             ("notes", self.notes),
         ):
             if any(not value.strip() for value in values):
-                raise ValueError(f"{field_name} must not contain empty values")
+                raise errors.InputError(
+                    f"{field_name} must not contain empty values"
+                )
 
     @property
     def evidenced(self) -> bool:
@@ -234,7 +238,9 @@ def check_no_blank_values(
     """
     for field_name, values in fields:
         if any(not value.strip() for value in values):
-            raise ValueError(f"{field_name} must not contain empty values")
+            raise errors.InputError(
+                f"{field_name} must not contain empty values"
+            )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -292,7 +298,9 @@ class Declaration:
             raise TypeError("stage_evidence must contain StageEvidence records")
         stages = [record.stage for record in self.stage_evidence]
         if len(stages) != len(set(stages)):
-            raise ValueError("stage_evidence must not contain duplicate stages")
+            raise errors.InputError(
+                "stage_evidence must not contain duplicate stages"
+            )
         check_no_blank_values(
             (
                 ("required_extras", self.required_extras),
@@ -301,17 +309,19 @@ class Declaration:
             )
         )
         if not self.failure_modes:
-            raise ValueError("failure_modes must declare at least one value")
+            raise errors.InputError(
+                "failure_modes must declare at least one value"
+            )
         if (
             isinstance(self.modality, ExtensionModality)
             and self.status is not Status.EXTENSION_ONLY
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "extension modalities must use extension-only status"
             )
         if self.status is Status.SUPPORTED and self.missing_stages:
             missing = ", ".join(stage.value for stage in self.missing_stages)
-            raise ValueError(
+            raise errors.InputError(
                 "supported modalities require evidenced lifecycle stages: "
                 f"{missing}"
             )

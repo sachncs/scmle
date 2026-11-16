@@ -10,6 +10,8 @@ from typing import Any
 import numpy
 from sklearn import base
 
+from scmle.contracts import errors
+
 
 class PredictionReplay(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn is untyped
     """Returns stored predictions whatever rows it is handed.
@@ -61,7 +63,7 @@ class PredictionReplay(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
             ValueError: If no probabilities were stored.
         """
         if self.probabilities is None:
-            raise ValueError("no probabilities were stored")
+            raise errors.InputError("no probabilities were stored")
         return self.probabilities
 
 

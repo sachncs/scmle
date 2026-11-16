@@ -77,13 +77,13 @@ class Metadata:
                 negative (tolerance).
         """
         if not self.format.strip() or not self.codec.strip():
-            raise ValueError("format and codec must not be empty")
+            raise errors.InputError("format and codec must not be empty")
         if self.width < 1 or self.height < 1:
-            raise ValueError("video dimensions must be positive")
+            raise errors.InputError("video dimensions must be positive")
         if self.frame_count < 1 or self.frames_per_second <= 0:
-            raise ValueError("video frame timing must be positive")
+            raise errors.InputError("video frame timing must be positive")
         if self.audio_tracks < 0:
-            raise ValueError("audio_tracks must not be negative")
+            raise errors.InputError("audio_tracks must not be negative")
         if self.audio_tracks == 0 and any(
             value is not None
             for value in (
@@ -92,23 +92,25 @@ class Metadata:
                 self.sync_tolerance_seconds,
             )
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "synchronization metadata requires at least one audio track"
             )
         if self.audio_duration_seconds is not None and (
             not math.isfinite(self.audio_duration_seconds)
             or self.audio_duration_seconds <= 0
         ):
-            raise ValueError("audio_duration_seconds must be positive")
+            raise errors.InputError("audio_duration_seconds must be positive")
         if self.sync_offset_seconds is not None and not math.isfinite(
             self.sync_offset_seconds
         ):
-            raise ValueError("sync_offset_seconds must be finite")
+            raise errors.InputError("sync_offset_seconds must be finite")
         if self.sync_tolerance_seconds is not None and (
             not math.isfinite(self.sync_tolerance_seconds)
             or self.sync_tolerance_seconds < 0
         ):
-            raise ValueError("sync_tolerance_seconds must not be negative")
+            raise errors.InputError(
+                "sync_tolerance_seconds must not be negative"
+            )
 
     @property
     def duration_seconds(self) -> float:
@@ -202,21 +204,25 @@ class Features:
                 index is negative.
         """
         if len(self.values) != len(self.sources):
-            raise ValueError("feature rows must match video sources")
+            raise errors.InputError("feature rows must match video sources")
         if any(len(row) != len(self.feature_names) for row in self.values):
-            raise ValueError("feature columns must match feature names")
+            raise errors.InputError("feature columns must match feature names")
         if not numpy.isfinite(
             numpy.asarray(self.values, dtype=numpy.float64)
         ).all():
-            raise ValueError("video features must be finite")
+            raise errors.InputError("video features must be finite")
         sampled = tuple(
             tuple(int(index) for index in indices)
             for indices in self.sampled_frame_indices
         )
         if sampled and len(sampled) != len(self.sources):
-            raise ValueError("sampled frame metadata must match video sources")
+            raise errors.InputError(
+                "sampled frame metadata must match video sources"
+            )
         if any(index < 0 for indices in sampled for index in indices):
-            raise ValueError("sampled frame indices must not be negative")
+            raise errors.InputError(
+                "sampled frame indices must not be negative"
+            )
         object.__setattr__(self, "sources", tuple(self.sources))
         object.__setattr__(self, "feature_names", tuple(self.feature_names))
         object.__setattr__(
@@ -296,12 +302,16 @@ class TemporalSplit:
                 either partition has no observation time.
         """
         if self.cutoff.tzinfo is None or self.cutoff.utcoffset() is None:
-            raise ValueError("cutoff must be timezone-aware")
+            raise errors.InputError("cutoff must be timezone-aware")
         object.__setattr__(self, "cutoff", self.cutoff.astimezone(UTC))
         if any(sample.observation_time is None for sample in self.train):
-            raise ValueError("train videos must contain observation times")
+            raise errors.InputError(
+                "train videos must contain observation times"
+            )
         if any(sample.observation_time is None for sample in self.future):
-            raise ValueError("future videos must contain observation times")
+            raise errors.InputError(
+                "future videos must contain observation times"
+            )
 
     @property
     def has_future_leakage(self) -> bool:
@@ -409,9 +419,9 @@ class Sample:
         raw = bytes(self.encoded_bytes)
         object.__setattr__(self, "encoded_bytes", raw)
         if not self.source.strip():
-            raise ValueError("source must not be empty")
+            raise errors.InputError("source must not be empty")
         if self.group_id is not None and not self.group_id.strip():
-            raise ValueError("group_id must not be empty when provided")
+            raise errors.InputError("group_id must not be empty when provided")
         if self.observation_time is not None:
             object.__setattr__(
                 self,
@@ -425,9 +435,9 @@ class Sample:
         if len(self.file_hash) != SHA256_HEX_LENGTH or any(
             character not in "0123456789abcdef" for character in self.file_hash
         ):
-            raise ValueError("file_hash must be a SHA-256 hex digest")
+            raise errors.InputError("file_hash must be a SHA-256 hex digest")
         if hashlib.sha256(raw).hexdigest() != self.file_hash:
-            raise ValueError("file_hash does not match encoded_bytes")
+            raise errors.InputError("file_hash does not match encoded_bytes")
         object.__setattr__(self, "byte_size", len(raw))
 
     @classmethod
@@ -662,7 +672,7 @@ class Dataset:
         if not callable(decoder):
             raise TypeError("decoder must be callable")
         if max_frames < 1 or max_frame_pixels < 1:
-            raise ValueError("frame bounds must be positive")
+            raise errors.InputError("frame bounds must be positive")
         slot_names = ("mean", "std", "min", "max", "observed")
         feature_names = tuple(
             f"frame[{slot}].{name}"
@@ -773,7 +783,7 @@ class Dataset:
             ValueError: If ``max_frames`` is below one.
         """
         if max_frames < 1:
-            raise ValueError("max_frames must be positive")
+            raise errors.InputError("max_frames must be positive")
         count = min(max_frames, sample.metadata.frame_count)
         return tuple(
             int(index)

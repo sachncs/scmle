@@ -9,6 +9,8 @@ import re
 from typing import Any
 import uuid
 
+from scmle.contracts import errors
+
 COMPONENT_NAME = "scmle"
 CYCLONEDX_VERSION = "1.5"
 SBOM_SCHEMA = "https://cyclonedx.org/schema/bom-1.5.schema.json"
@@ -45,20 +47,22 @@ def build(
             distributions are empty, or a name or version is invalid.
     """
     if not run_id.strip():
-        raise ValueError("run_id must not be empty")
+        raise errors.InputError("run_id must not be empty")
     if not software_version.strip():
-        raise ValueError("software_version must not be empty")
+        raise errors.InputError("software_version must not be empty")
     if not distributions:
-        raise ValueError("distributions must not be empty")
+        raise errors.InputError("distributions must not be empty")
     components = []
     ordered = sorted(distributions.items(), key=lambda item: item[0])
     for name, version in ordered:
         normalized = name.strip().lower().replace("_", "-")
         if not normalized or PACKAGE_NAME.fullmatch(normalized) is None:
-            raise ValueError(f"invalid distribution name: {name!r}")
+            raise errors.InputError(f"invalid distribution name: {name!r}")
         pinned = str(version).strip()
         if not pinned:
-            raise ValueError(f"version for {normalized!r} must not be empty")
+            raise errors.InputError(
+                f"version for {normalized!r} must not be empty"
+            )
         reference = f"pkg:pypi/{normalized}@{pinned}"
         components.append(
             {
@@ -156,7 +160,7 @@ def build_service(
             underlying SBOM inputs are invalid.
     """
     if not bundle_digest.startswith("sha256:"):
-        raise ValueError("bundle_digest must be a sha256: digest")
+        raise errors.InputError("bundle_digest must be a sha256: digest")
     document = build(
         distributions,
         run_id=bundle_digest,

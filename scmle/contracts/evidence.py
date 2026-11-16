@@ -10,6 +10,7 @@ import json
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import signing
 
 
@@ -44,7 +45,7 @@ def require_text(value: str, field_name: str) -> str:
     """
     result = value.strip()
     if not result:
-        raise ValueError(f"{field_name} must not be empty")
+        raise errors.InputError(f"{field_name} must not be empty")
     return result
 
 
@@ -96,15 +97,15 @@ class Record:
         ):
             require_text(value, field_name)
         if not self.scope:
-            raise ValueError("scope must not be empty")
+            raise errors.InputError("scope must not be empty")
         if not self.raw_inputs:
-            raise ValueError("raw_inputs must not be empty")
+            raise errors.InputError("raw_inputs must not be empty")
         if not self.artifact:
-            raise ValueError("artifact must not be empty")
+            raise errors.InputError("artifact must not be empty")
         if not self.limitations:
-            raise ValueError("limitations must state known uncertainty")
+            raise errors.InputError("limitations must state known uncertainty")
         if not all(item.strip() for item in self.limitations):
-            raise ValueError("limitations must not contain empty values")
+            raise errors.InputError("limitations must not contain empty values")
         result: Any = self.result  # may be a raw value at runtime
         if not isinstance(result, Outcome):
             object.__setattr__(self, "result", Outcome(result))
@@ -113,7 +114,9 @@ class Record:
             object.__setattr__(self, "decision", Disposition(decision))
         timestamp = datetime.datetime.fromisoformat(self.observed_at)
         if timestamp.tzinfo is None or timestamp.utcoffset() is None:
-            raise ValueError("observed_at must include timezone information")
+            raise errors.InputError(
+                "observed_at must include timezone information"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible release evidence record."""
@@ -192,9 +195,9 @@ class Index:
                 registered.
         """
         if self.signature is not None:
-            raise ValueError("a signed evidence index cannot be changed")
+            raise errors.InputError("a signed evidence index cannot be changed")
         if record.criterion_id in self.records:
-            raise ValueError(
+            raise errors.InputError(
                 f"duplicate evidence criterion: {record.criterion_id}"
             )
         self.records[record.criterion_id] = record
@@ -280,17 +283,19 @@ class Index:
                 unsupported algorithm.
         """
         if record.get("schema_version") != 1:
-            raise ValueError("unsupported evidence index schema version")
+            raise errors.InputError("unsupported evidence index schema version")
         raw_records = record.get("records")
         if not isinstance(raw_records, list):
-            raise ValueError("evidence index records must be a list")
+            raise errors.InputError("evidence index records must be a list")
         signature_record = record.get("signature")
         signature: str | None = None
         if signature_record is not None:
             if not isinstance(signature_record, Mapping):
-                raise ValueError("evidence index signature must be an object")
+                raise errors.InputError(
+                    "evidence index signature must be an object"
+                )
             if signature_record.get("algorithm") != signing.SIGNATURE_ALGORITHM:
-                raise ValueError(
+                raise errors.InputError(
                     "unsupported evidence index signature algorithm"
                 )
             signature = require_text(

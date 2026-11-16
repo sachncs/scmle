@@ -22,6 +22,7 @@ import numpy
 import pandas
 
 from scmle.contracts import data
+from scmle.contracts import errors
 from scmle.data.modalities.curation import build_finding
 from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import label_counts
@@ -82,11 +83,11 @@ class Node:
         """
         node_id: object = self.node_id
         if not isinstance(node_id, str) or not node_id.strip():
-            raise ValueError("node_id must be a non-empty string")
+            raise errors.InputError("node_id must be a non-empty string")
         if any(not isinstance(value, (int, float)) for value in self.features):
             raise TypeError("node features must be numeric")
         if any(not math.isfinite(float(value)) for value in self.features):
-            raise ValueError("node features must be finite")
+            raise errors.InputError("node features must be finite")
         object.__setattr__(
             self,
             "features",
@@ -125,16 +126,16 @@ class Edge:
         source: object = self.source
         target: object = self.target
         if not isinstance(source, str) or not source.strip():
-            raise ValueError("edge source must be a non-empty string")
+            raise errors.InputError("edge source must be a non-empty string")
         if not isinstance(target, str) or not target.strip():
-            raise ValueError("edge target must be a non-empty string")
+            raise errors.InputError("edge target must be a non-empty string")
         if not isinstance(self.weight, (int, float)):
             raise TypeError("edge weight must be numeric")
         if not math.isfinite(float(self.weight)):
-            raise ValueError("edge weight must be finite")
+            raise errors.InputError("edge weight must be finite")
         relation: object = self.relation
         if not isinstance(relation, str) or not relation.strip():
-            raise ValueError("edge relation must be a non-empty string")
+            raise errors.InputError("edge relation must be a non-empty string")
         if self.event_time is not None:
             if not isinstance(self.event_time, datetime):
                 raise TypeError("event_time must be a datetime")
@@ -142,7 +143,7 @@ class Edge:
                 self.event_time.tzinfo is None
                 or self.event_time.utcoffset() is None
             ):
-                raise ValueError("event_time must be timezone-aware")
+                raise errors.InputError("event_time must be timezone-aware")
             object.__setattr__(
                 self,
                 "event_time",
@@ -173,16 +174,16 @@ class TemporalSplit:
                 either partition has no event time.
         """
         if self.cutoff.tzinfo is None or self.cutoff.utcoffset() is None:
-            raise ValueError("cutoff must be timezone-aware")
+            raise errors.InputError("cutoff must be timezone-aware")
         object.__setattr__(
             self,
             "cutoff",
             self.cutoff.astimezone(UTC),
         )
         if any(edge.event_time is None for edge in self.train_edges):
-            raise ValueError("train_edges must contain event times")
+            raise errors.InputError("train_edges must contain event times")
         if any(edge.event_time is None for edge in self.future_edges):
-            raise ValueError("future_edges must contain event times")
+            raise errors.InputError("future_edges must contain event times")
 
     @property
     def has_future_leakage(self) -> bool:
@@ -485,10 +486,10 @@ class Dataset:
             )
         )
         if len({node.node_id for node in nodes}) != len(nodes):
-            raise ValueError("node identifiers must be unique")
+            raise errors.InputError("node identifiers must be unique")
         dimensions = {len(node.features) for node in nodes if node.features}
         if len(dimensions) > 1:
-            raise ValueError(
+            raise errors.InputError(
                 "all populated node feature vectors must have equal length"
             )
         if (
@@ -496,11 +497,13 @@ class Dataset:
             and dimensions
             and len(self.feature_names) != next(iter(dimensions))
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "feature_names must match the node feature dimension"
             )
         if any(not name.strip() for name in self.feature_names):
-            raise ValueError("feature_names must not contain empty names")
+            raise errors.InputError(
+                "feature_names must not contain empty names"
+            )
         object.__setattr__(self, "nodes", nodes)
         object.__setattr__(self, "edges", edges)
         object.__setattr__(self, "feature_names", tuple(self.feature_names))
@@ -1205,9 +1208,11 @@ def inductive_node_split(
     graph.require_valid()
     fractions = (train_fraction, validation_fraction, test_fraction)
     if any(value < 0 or not math.isfinite(value) for value in fractions):
-        raise ValueError("split fractions must be finite and non-negative")
+        raise errors.InputError(
+            "split fractions must be finite and non-negative"
+        )
     if not math.isclose(sum(fractions), 1.0, rel_tol=0.0, abs_tol=1e-9):
-        raise ValueError("split fractions must sum to one")
+        raise errors.InputError("split fractions must sum to one")
     node_ids = numpy.asarray(graph.node_ids, dtype=object)
     generator = numpy.random.default_rng(seed)
     shuffled = node_ids[generator.permutation(len(node_ids))]
@@ -1322,7 +1327,7 @@ def feature_values(
         return ((),) * len(rows)
     matrix = numpy.asarray(rows, dtype=numpy.float64)
     if not numpy.isfinite(matrix).all():
-        raise ValueError("prepared features must be finite")
+        raise errors.InputError("prepared features must be finite")
     if standardize:
         means = matrix.mean(axis=0)
         scales = matrix.std(axis=0)
@@ -1364,7 +1369,9 @@ def prepare_features(
     """
     graph.require_valid()
     if max_nodes < 1 or max_features < 1:
-        raise ValueError("max_nodes and max_features must be at least one")
+        raise errors.InputError(
+            "max_nodes and max_features must be at least one"
+        )
     nodes = graph.nodes[:max_nodes]
     feature_dimension = max((len(node.features) for node in nodes), default=0)
     names = list(graph.feature_names)

@@ -508,7 +508,9 @@ class ModelMonitor:
         if propensity is not None:
             chosen = propensity.reset_index(drop=True)[known].to_numpy(float)
             if not numpy.all((chosen > 0.0) & (chosen <= 1.0)):
-                raise ValueError("propensity must be above 0 and at most 1")
+                raise errors.InputError(
+                    "propensity must be above 0 and at most 1"
+                )
             weight = 1.0 / chosen
             rows_drawn = numpy.random.default_rng(0).choice(
                 labeled, size=labeled, p=weight / weight.sum()

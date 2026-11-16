@@ -37,6 +37,8 @@ import numpy
 import pandas
 from scipy import stats
 
+import scmle.contracts.errors
+
 GRID = (0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0)
 CV_POINTS = 40
 MIN_SIDE = 15
@@ -290,14 +292,20 @@ def estimate(
     x = frame[running].to_numpy(dtype=float)
     y = frame[outcome].to_numpy(dtype=float)
     if not (numpy.isfinite(x).all() and numpy.isfinite(y).all()):
-        raise ValueError("RD columns must not hold missing values")
+        raise scmle.contracts.errors.InputError(
+            "RD columns must not hold missing values"
+        )
     left = x < cutoff
     if min(left.sum(), (~left).sum()) < MIN_SIDE:
-        raise ValueError(f"each side needs at least {MIN_SIDE} rows")
+        raise scmle.contracts.errors.InputError(
+            f"each side needs at least {MIN_SIDE} rows"
+        )
     h = chosen_bandwidth(x, y, left, cutoff, bandwidth)
     main = discontinuity(x, y, cutoff, h, level)
     if main is None:
-        raise ValueError("too few rows inside the bandwidth to fit")
+        raise scmle.contracts.errors.InputError(
+            "too few rows inside the bandwidth to fit"
+        )
     inside_left = int(((x < cutoff) & (x > cutoff - h)).sum())
     inside_right = int(((x >= cutoff) & (x < cutoff + h)).sum())
     total = inside_left + inside_right

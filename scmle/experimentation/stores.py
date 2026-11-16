@@ -15,6 +15,7 @@ import sqlite3
 from typing import Any
 
 from scmle import durability
+from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.contracts import experiments
 
@@ -362,7 +363,7 @@ class SqliteExperimentStore(ExperimentStore):
         """
         unknown = set(fields) - self.COLUMNS
         if unknown:
-            raise ValueError(f"unknown run columns: {sorted(unknown)}")
+            raise errors.InputError(f"unknown run columns: {sorted(unknown)}")
         values = {
             k: json.dumps(v) if isinstance(v, dict) else v
             for k, v in fields.items()

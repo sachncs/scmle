@@ -19,6 +19,7 @@ from typing import Any
 import pandas
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.data.robustness import shift
 
 ALPHA = 0.05
@@ -102,10 +103,10 @@ def subgroup_coverage(
         ValueError: On an alpha outside (0, 1) or an empty sample.
     """
     if not 0.0 < alpha < 1.0:
-        raise ValueError("alpha must be within (0, 1)")
+        raise errors.InputError("alpha must be within (0, 1)")
     rows = len(sample)
     if rows == 0:
-        raise ValueError("the sample is empty")
+        raise errors.InputError("the sample is empty")
     labels = sample.astype("object").where(sample.notna(), MISSING_LEVEL)
     counts = labels.astype(str).value_counts()
     levels = sorted(set(counts.index) | set(deployment or {}))

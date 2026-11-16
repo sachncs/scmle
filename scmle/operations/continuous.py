@@ -40,6 +40,7 @@ import pandas
 from scipy import stats
 
 from scmle import durability
+from scmle.contracts import errors
 from scmle.deploy import control
 from scmle.deploy import gate
 from scmle.governance import deployment_ledger
@@ -111,7 +112,7 @@ def load_dataset(
         float_precision="round_trip",
     )
     if dataset_version(frame) != version:
-        raise ValueError(f"the stored copy of {version} has changed")
+        raise errors.InputError(f"the stored copy of {version} has changed")
     return frame
 
 
@@ -154,7 +155,9 @@ class TrainingHistory:
                 or row["prev"] != previous
                 or (row["hash"] != digest)
             ):
-                raise ValueError(f"training history broken at row {number}")
+                raise errors.InputError(
+                    f"training history broken at row {number}"
+                )
             previous = row["hash"]
             found.append(row)
         return found
@@ -236,11 +239,13 @@ class RetrainPolicy:
                 positive.
         """
         if self.mode not in MODES:
-            raise ValueError(f"mode must be one of {MODES}")
+            raise errors.InputError(f"mode must be one of {MODES}")
         if self.min_outcomes < 1 or self.cooldown_batches < 0:
-            raise ValueError("min_outcomes >= 1 and cooldown_batches >= 0")
+            raise errors.InputError(
+                "min_outcomes >= 1 and cooldown_batches >= 0"
+            )
         if self.max_age_days is not None and self.max_age_days <= 0:
-            raise ValueError("max_age_days must be positive")
+            raise errors.InputError("max_age_days must be positive")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -366,11 +371,11 @@ class Indicator:
                 is not higher or lower, or the margin is negative or not finite.
         """
         if self.kind not in {"operational", "business"}:
-            raise ValueError("kind must be operational or business")
+            raise errors.InputError("kind must be operational or business")
         if self.better not in {"higher", "lower"}:
-            raise ValueError("better must be higher or lower")
+            raise errors.InputError("better must be higher or lower")
         if self.margin < 0 or not math.isfinite(self.margin):
-            raise ValueError("margin must be finite and not negative")
+            raise errors.InputError("margin must be finite and not negative")
 
 
 def bootstrap_difference(
@@ -444,12 +449,14 @@ def post_promotion_check(
             empty.
     """
     if not specs:
-        raise ValueError("name at least one metric")
+        raise errors.InputError("name at least one metric")
     adjusted = alpha / len(specs)
     results = []
     for spec in specs:
         if spec.name not in before or spec.name not in after:
-            raise ValueError(f"no values for {spec.name} in both periods")
+            raise errors.InputError(
+                f"no values for {spec.name} in both periods"
+            )
         old = numpy.asarray(before[spec.name], dtype=float)
         new = numpy.asarray(after[spec.name], dtype=float)
         if min(len(old), len(new)) < min_samples:
@@ -539,7 +546,7 @@ def holdback_assignment(
         ValueError: If `fraction` is not strictly between 0 and 1.
     """
     if not 0.0 < fraction < 1.0:
-        raise ValueError("fraction must lie strictly between 0 and 1")
+        raise errors.InputError("fraction must lie strictly between 0 and 1")
     draws = numpy.array(
         [
             int.from_bytes(
@@ -605,7 +612,9 @@ def holdback_check(
             ``expected_fraction`` outside the open unit interval.
     """
     if not 0.0 < expected_fraction < 1.0:
-        raise ValueError("expected_fraction must lie strictly between 0 and 1")
+        raise errors.InputError(
+            "expected_fraction must lie strictly between 0 and 1"
+        )
     first = specs[0].name if specs else ""
     held = len(holdback.get(first, ()))
     moved = len(promoted.get(first, ()))
@@ -796,7 +805,9 @@ class ContinuousEvaluation:
             ValueError: If ``cap`` is not positive or an outcome is negative.
         """
         if cap <= 0 or any(v < 0 for v in outcomes.values()):
-            raise ValueError("cap must be positive and outcomes not negative")
+            raise errors.InputError(
+                "cap must be positive and outcomes not negative"
+            )
         losses = {str(k): min(v / cap, 1.0) for k, v in outcomes.items()}
         paired = {
             name: {str(k): min(v / cap, 1.0) for k, v in theirs.items()}
@@ -960,7 +971,7 @@ class ContinuousEvaluation:
                 in never_list.ALLOWING
             ):
                 return self.start_challenger(("approved recommendation",))
-        raise ValueError(f"{escalation_id} has no approving reply")
+        raise errors.InputError(f"{escalation_id} has no approving reply")
 
     # -- history -----------------------------------------------------------
 

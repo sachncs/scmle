@@ -38,6 +38,7 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.detectors import certificates
@@ -205,7 +206,7 @@ class Pass:
             return text[: self.size]
         if self.kind == "soundex":
             return soundex(text)
-        raise ValueError(f"unknown blocking kind: {self.kind}")
+        raise errors.InputError(f"unknown blocking kind: {self.kind}")
 
 
 def candidate_pairs(
@@ -662,7 +663,7 @@ def resolve(
         ValueError: If a labeler is given without a non-blank reviewer.
     """
     if labeler is not None and not reviewer.strip():
-        raise ValueError("a labeler needs a named reviewer")
+        raise errors.InputError("a labeler needs a named reviewer")
     count = len(records)
     pairs, skipped = candidate_pairs(records, passes)
     total = count * (count - 1) / 2

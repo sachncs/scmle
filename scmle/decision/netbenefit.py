@@ -27,6 +27,7 @@ import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.framing import costs
@@ -165,7 +166,7 @@ def factorize(clusters: ArrayLike | None) -> NDArray[numpy.intp] | None:
         return None
     labels = numpy.asarray(clusters)
     if labels.ndim != 1:
-        raise ValueError("clusters must be one-dimensional")
+        raise errors.InputError("clusters must be one-dimensional")
     return numpy.unique(labels, return_inverse=True)[1].astype(numpy.intp)
 
 
@@ -285,19 +286,19 @@ def net_benefit_band(
     outcomes, actions = costs.pair(y, acts)
     base = None if incumbent is None else costs.binary_vector(incumbent, "b")
     if base is not None and base.shape != outcomes.shape:
-        raise ValueError("incumbent must have the length of y")
+        raise errors.InputError("incumbent must have the length of y")
     low, high = t_range
     if not 0.0 < low <= high < 1.0:
-        raise ValueError("t_range must satisfy 0 < t_lo <= t_hi < 1")
+        raise errors.InputError("t_range must satisfy 0 < t_lo <= t_hi < 1")
     if not 0.0 < alpha < 1.0:
-        raise ValueError("alpha must be strictly between 0 and 1")
+        raise errors.InputError("alpha must be strictly between 0 and 1")
     qualification.count(replicates, "replicates", minimum=20)
     grid = numpy.linspace(low, high, 1 if low == high else points)
     weights = grid / (1.0 - grid)
     stats = columns(outcomes, actions, base)
     groups = factorize(clusters)
     if groups is not None and groups.shape != outcomes.shape:
-        raise ValueError("clusters must have the length of y")
+        raise errors.InputError("clusters must have the length of y")
     rng = randomness.component_rng(seed, "decision.netbenefit", 0)
     point = diffs(stats.mean(axis=0, keepdims=True), weights, base is not None)[
         0
@@ -362,7 +363,7 @@ class FinalNetBenefit:
         """
         candidate: object = frozen  # callers may pass a non-string
         if not isinstance(candidate, str) or not candidate.strip():
-            raise ValueError("the rule hash must be a non-blank string")
+            raise errors.InputError("the rule hash must be a non-blank string")
         self.frozen = frozen
         self.used = False
 

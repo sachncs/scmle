@@ -29,6 +29,7 @@ from scipy import special
 from scipy import stats
 
 from scmle import durability
+from scmle.contracts import errors
 
 PROPENSITY_CLIP_CEILING = 0.5
 MIN_PERIODS = 2
@@ -94,7 +95,7 @@ class Estimand:
         """
         name: object = self.name  # may be a non-string at runtime
         if not isinstance(name, str) or not name.strip():
-            raise ValueError("estimand name must not be empty")
+            raise errors.InputError("estimand name must not be empty")
         names: tuple[object, ...] = (
             self.subject_identity,
             self.time_column,
@@ -104,26 +105,30 @@ class Estimand:
             *self.time_varying_covariates,
         )
         if any(not isinstance(name, str) or not name.strip() for name in names):
-            raise ValueError("estimand column names must be non-empty strings")
+            raise errors.InputError(
+                "estimand column names must be non-empty strings"
+            )
         if len(set(names)) != len(names):
-            raise ValueError("estimand columns must be unique")
+            raise errors.InputError("estimand columns must be unique")
         population: object = self.population  # may be a non-string at runtime
         if not isinstance(population, str) or not population.strip():
-            raise ValueError("estimand population must not be empty")
+            raise errors.InputError("estimand population must not be empty")
         if not self.assumptions:
-            raise ValueError("estimand needs explicit assumptions")
+            raise errors.InputError("estimand needs explicit assumptions")
         missing = REQUIRED_ASSUMPTIONS.difference(self.assumptions)
         if missing:
-            raise ValueError(
+            raise errors.InputError(
                 "estimand is missing required assumptions: "
                 + ", ".join(sorted(missing))
             )
         if self.target_treatment not in (0, 1):
-            raise ValueError("target_treatment must be 0 or 1")
+            raise errors.InputError("target_treatment must be 0 or 1")
         if self.comparator_treatment not in (0, 1):
-            raise ValueError("comparator_treatment must be 0 or 1")
+            raise errors.InputError("comparator_treatment must be 0 or 1")
         if self.target_treatment == self.comparator_treatment:
-            raise ValueError("target and comparator treatments must differ")
+            raise errors.InputError(
+                "target and comparator treatments must differ"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible estimand metadata.
@@ -183,20 +188,24 @@ class Config:
                 attributes, or `missingness` is not a recognised value.
         """
         if not 0.0 < self.confidence_level < 1.0:
-            raise ValueError(
+            raise errors.InputError(
                 "confidence_level must lie strictly between 0 and 1"
             )
         if not 0.0 < self.propensity_clip < PROPENSITY_CLIP_CEILING:
-            raise ValueError(
+            raise errors.InputError(
                 "propensity_clip must lie strictly between 0 and 0.5"
             )
         if not math.isfinite(self.maximum_weight) or self.maximum_weight <= 1.0:
-            raise ValueError("maximum_weight must be finite and greater than 1")
+            raise errors.InputError(
+                "maximum_weight must be finite and greater than 1"
+            )
         if self.missingness not in ("reject", "complete_case"):
-            raise ValueError("missingness must be reject or complete_case")
+            raise errors.InputError(
+                "missingness must be reject or complete_case"
+            )
         seed: object = self.seed  # may be a non-integer at runtime
         if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
-            raise ValueError("seed must be a non-negative integer")
+            raise errors.InputError("seed must be a non-negative integer")
         self.check_limits()
 
     def check_limits(self) -> None:
@@ -212,7 +221,7 @@ class Config:
             ("reference_tolerance", self.reference_tolerance),
         ):
             if not math.isfinite(float(value)) or value <= 0.0:
-                raise ValueError(f"{name} must be positive and finite")
+                raise errors.InputError(f"{name} must be positive and finite")
         counts: tuple[tuple[str, object], ...] = (
             ("max_iterations", self.max_iterations),
             ("minimum_subjects", self.minimum_subjects),
@@ -224,12 +233,14 @@ class Config:
                 or not isinstance(count, int)
                 or count < 1
             ):
-                raise ValueError(f"{name} must be a positive integer")
+                raise errors.InputError(f"{name} must be a positive integer")
         if (
             not math.isfinite(self.minimum_effective_sample_size)
             or self.minimum_effective_sample_size <= 0.0
         ):
-            raise ValueError("minimum_effective_sample_size must be positive")
+            raise errors.InputError(
+                "minimum_effective_sample_size must be positive"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible policy metadata.
@@ -285,14 +296,14 @@ class PeriodDiagnostics:
                 effective sample size is not positive.
         """
         if not self.period:
-            raise ValueError("period label must not be empty")
+            raise errors.InputError("period label must not be empty")
         if self.rows < 1 or self.treated_rows < 1 or self.control_rows < 1:
-            raise ValueError("period row counts must be positive")
+            raise errors.InputError("period row counts must be positive")
         if self.treated_rows + self.control_rows != self.rows:
-            raise ValueError("period arm counts must reconcile to rows")
+            raise errors.InputError("period arm counts must reconcile to rows")
         self.check_finite()
         if not 0.0 <= self.fraction_weight_truncated <= 1.0:
-            raise ValueError(
+            raise errors.InputError(
                 "fraction_weight_truncated must lie between 0 and 1"
             )
         for name, value in (
@@ -302,11 +313,13 @@ class PeriodDiagnostics:
             ("numerator_propensity_max", self.numerator_propensity_max),
         ):
             if not 0.0 < value < 1.0:
-                raise ValueError(f"{name} must lie strictly between 0 and 1")
+                raise errors.InputError(
+                    f"{name} must lie strictly between 0 and 1"
+                )
         if self.maximum_untruncated_weight <= 0.0 or self.maximum_weight <= 0.0:
-            raise ValueError("weight bounds must be positive")
+            raise errors.InputError("weight bounds must be positive")
         if self.effective_sample_size <= 0.0:
-            raise ValueError("effective_sample_size must be positive")
+            raise errors.InputError("effective_sample_size must be positive")
 
     def check_finite(self) -> None:
         """Checks that every numeric field of the period is finite.
@@ -325,7 +338,7 @@ class PeriodDiagnostics:
             ("effective_sample_size", self.effective_sample_size),
         ):
             if not math.isfinite(float(value)):
-                raise ValueError(f"{name} must be finite")
+                raise errors.InputError(f"{name} must be finite")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible period diagnostics.
@@ -370,13 +383,15 @@ class RegimeEstimate:
                 standard error is negative, or the interval is reversed.
         """
         if not self.regime:
-            raise ValueError("regime name must not be empty")
+            raise errors.InputError("regime name must not be empty")
         if self.treatment not in (0, 1):
-            raise ValueError("regime treatment must be 0 or 1")
+            raise errors.InputError("regime treatment must be 0 or 1")
         if self.rows < 1 or self.weight_sum <= 0.0:
-            raise ValueError("regime needs positive rows and weight sum")
+            raise errors.InputError("regime needs positive rows and weight sum")
         if self.effective_sample_size <= 0.0:
-            raise ValueError("regime effective sample size must be positive")
+            raise errors.InputError(
+                "regime effective sample size must be positive"
+            )
         for name, value in (
             ("estimate", self.estimate),
             ("standard_error", self.standard_error),
@@ -384,9 +399,9 @@ class RegimeEstimate:
             ("interval_upper", self.interval[1]),
         ):
             if not math.isfinite(float(value)):
-                raise ValueError(f"{name} must be finite")
+                raise errors.InputError(f"{name} must be finite")
         if self.standard_error < 0.0 or self.interval[0] > self.interval[1]:
-            raise ValueError(
+            raise errors.InputError(
                 "regime uncertainty must be ordered and non-negative"
             )
 
@@ -481,9 +496,11 @@ class Estimation:
                 not a mapping.
         """
         if len(self.periods) < MIN_PERIODS:
-            raise ValueError("sequential result needs at least two periods")
+            raise errors.InputError(
+                "sequential result needs at least two periods"
+            )
         if len(self.regimes) != REGIME_COUNT:
-            raise ValueError(
+            raise errors.InputError(
                 "sequential result needs target and comparator regimes"
             )
         self.check_covariance()
@@ -504,7 +521,7 @@ class Estimation:
                 character not in "0123456789abcdef" for character in fingerprint
             )
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "raw_input_fingerprint must be a lowercase SHA-256 digest"
             )
 
@@ -518,12 +535,12 @@ class Estimation:
         if len(self.covariance) != COVARIANCE_DIMENSION or any(
             len(row) != COVARIANCE_DIMENSION for row in self.covariance
         ):
-            raise ValueError("covariance must be a 2 by 2 matrix")
+            raise errors.InputError("covariance must be a 2 by 2 matrix")
         covariance = numpy.asarray(self.covariance, dtype=float)
         if not numpy.isfinite(covariance).all() or not numpy.allclose(
             covariance, covariance.T, rtol=1e-10, atol=1e-12
         ):
-            raise ValueError("covariance must be finite and symmetric")
+            raise errors.InputError("covariance must be finite and symmetric")
 
     def check_counts(self) -> None:
         """Checks the row and subject counts and their accounting.
@@ -546,11 +563,15 @@ class Estimation:
                 or not isinstance(count, int)
                 or count < 0
             ):
-                raise ValueError(f"{name} must be a non-negative integer")
+                raise errors.InputError(
+                    f"{name} must be a non-negative integer"
+                )
         if self.rows_used + self.rows_dropped != self.rows_input:
-            raise ValueError("row accounting must reconcile to rows_input")
+            raise errors.InputError(
+                "row accounting must reconcile to rows_input"
+            )
         if self.subjects_used + self.subjects_dropped != self.subjects_input:
-            raise ValueError(
+            raise errors.InputError(
                 "subject accounting must reconcile to subjects_input"
             )
 
@@ -568,11 +589,13 @@ class Estimation:
             ("contrast_interval_upper", self.contrast_interval[1]),
         ):
             if not math.isfinite(float(metric_value)):
-                raise ValueError(f"{metric_name} must be finite")
+                raise errors.InputError(f"{metric_name} must be finite")
         if self.contrast_standard_error < 0.0:
-            raise ValueError("contrast_standard_error must not be negative")
+            raise errors.InputError(
+                "contrast_standard_error must not be negative"
+            )
         if self.contrast_interval[0] > self.contrast_interval[1]:
-            raise ValueError("contrast interval must be ordered")
+            raise errors.InputError("contrast interval must be ordered")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible sequential report.
@@ -687,19 +710,21 @@ class Estimation:
         """
         envelope = json.loads(Path(path).read_text(encoding="utf-8"))
         if envelope.get("schema_version") != 1:
-            raise ValueError("unsupported sequential report schema")
+            raise errors.InputError("unsupported sequential report schema")
         record = envelope.get("report")
         if not isinstance(record, Mapping):
-            raise ValueError("sequential report must contain a mapping")
+            raise errors.InputError("sequential report must contain a mapping")
         canonical = json.dumps(
             record, sort_keys=True, separators=(",", ":")
         ).encode("utf-8")
         digest = hashlib.sha256(canonical).hexdigest()
         if envelope.get("digest") != digest:
-            raise ValueError("sequential report digest mismatch")
+            raise errors.InputError("sequential report digest mismatch")
         result = cls.from_dict(record)
         if result.digest() != digest:
-            raise ValueError("sequential report canonicalization mismatch")
+            raise errors.InputError(
+                "sequential report canonicalization mismatch"
+            )
         return result
 
     @classmethod
@@ -850,7 +875,7 @@ class Estimator:
                 treated_rows < self.policy.minimum_arm_rows
                 or control_rows < self.policy.minimum_arm_rows
             ):
-                raise ValueError(
+                raise errors.InputError(
                     f"period {value!r} has insufficient treatment support"
                 )
             history = treatment[:, :index]
@@ -898,7 +923,7 @@ class Estimator:
                 period_diagnostic.effective_sample_size
                 < self.policy.minimum_effective_sample_size
             ):
-                raise ValueError(
+                raise errors.InputError(
                     f"period {value!r} has insufficient effective sample size"
                 )
             period_diagnostics.append(period_diagnostic)
@@ -1058,7 +1083,7 @@ def check_declared_columns(
     ]
     missing_columns = [name for name in required if name not in frame.columns]
     if missing_columns:
-        raise ValueError(
+        raise errors.InputError(
             f"sequential frame is missing columns: {missing_columns}"
         )
     return required
@@ -1079,16 +1104,18 @@ def check_subject_and_time(frame: pandas.DataFrame, estimand: Estimand) -> None:
     subject_name = estimand.subject_identity
     time_name = estimand.time_column
     if frame[subject_name].isna().any() or frame[time_name].isna().any():
-        raise ValueError(
+        raise errors.InputError(
             "subject identities and time values must not be missing"
         )
     for name in (subject_name, time_name):
         if pandas.api.types.is_numeric_dtype(frame[name]):
             values = frame[name].to_numpy(dtype=float)
             if not numpy.isfinite(values).all():
-                raise ValueError(f"column {name!r} contains non-finite values")
+                raise errors.InputError(
+                    f"column {name!r} contains non-finite values"
+                )
     if frame.duplicated([subject_name, time_name]).any():
-        raise ValueError("duplicate subject-time rows are not allowed")
+        raise errors.InputError("duplicate subject-time rows are not allowed")
     validate_time_order(frame, estimand)
 
 
@@ -1108,10 +1135,14 @@ def convert_numeric_columns(
         try:
             prepared[name] = pandas.to_numeric(prepared[name], errors="raise")
         except (TypeError, ValueError) as error:
-            raise ValueError(f"column {name!r} must be numeric") from error
+            raise errors.InputError(
+                f"column {name!r} must be numeric"
+            ) from error
         values = prepared[name].to_numpy(dtype=float)
         if not numpy.isfinite(values).all():
-            raise ValueError(f"column {name!r} contains non-finite values")
+            raise errors.InputError(
+                f"column {name!r} contains non-finite values"
+            )
 
 
 def require_distinct_neighbours(values: list[Any]) -> None:
@@ -1124,7 +1155,9 @@ def require_distinct_neighbours(values: list[Any]) -> None:
         ValueError: If two consecutive values are equal.
     """
     if any(left == right for left, right in pairwise(values)):
-        raise ValueError("time values must be strictly increasing per subject")
+        raise errors.InputError(
+            "time values must be strictly increasing per subject"
+        )
 
 
 def prepare_sequential_frame(
@@ -1159,7 +1192,7 @@ def prepare_sequential_frame(
     if not isinstance(frame, pandas.DataFrame):
         raise TypeError("frame must be a pandas DataFrame")
     if frame.empty:
-        raise ValueError("sequential frame must not be empty")
+        raise errors.InputError("sequential frame must not be empty")
     required = check_declared_columns(frame, estimand)
     subject_name = estimand.subject_identity
     time_name = estimand.time_column
@@ -1176,7 +1209,9 @@ def prepare_sequential_frame(
     rows_dropped = 0
     prepared = frame[required].copy()
     if missing_mask.any() and policy.missingness == "reject":
-        raise ValueError("missing treatment, outcome, or covariate values")
+        raise errors.InputError(
+            "missing treatment, outcome, or covariate values"
+        )
     if missing_mask.any():
         dropped_subjects = set(frame.loc[missing_mask, subject_name].tolist())
         keep_mask = ~prepared[subject_name].isin(dropped_subjects)
@@ -1185,20 +1220,24 @@ def prepare_sequential_frame(
         prepared = prepared.loc[keep_mask].copy()
     convert_numeric_columns(prepared, value_columns)
     if prepared.empty:
-        raise ValueError("missingness policy left no subjects")
+        raise errors.InputError("missingness policy left no subjects")
     treatment_values = set(
         prepared[estimand.treatment_column].unique().tolist()
     )
     if not treatment_values.issubset({0, 1}):
-        raise ValueError("treatment must be binary with values 0 and 1")
+        raise errors.InputError("treatment must be binary with values 0 and 1")
     period_values = ordered_periods(prepared, time_name)
     if len(period_values) < MIN_PERIODS:
-        raise ValueError("sequential estimation needs at least two periods")
+        raise errors.InputError(
+            "sequential estimation needs at least two periods"
+        )
     counts = prepared.groupby(subject_name, sort=False).size()
     if not (counts == len(period_values)).all():
-        raise ValueError("each subject must have one row at every period")
+        raise errors.InputError(
+            "each subject must have one row at every period"
+        )
     if len(prepared[subject_name].unique()) < policy.minimum_subjects:
-        raise ValueError("sequential frame has insufficient subjects")
+        raise errors.InputError("sequential frame has insufficient subjects")
     validate_baseline_covariates(prepared, estimand)
     return prepared, rows_dropped, subjects_input, subjects_dropped
 
@@ -1228,7 +1267,7 @@ def validate_time_order(frame: pandas.DataFrame, estimand: Estimand) -> None:
     except (TypeError, ValueError) as error:
         if "strictly increasing" in str(error):
             raise
-        raise ValueError("time values have invalid ordering") from error
+        raise errors.InputError("time values have invalid ordering") from error
 
 
 def ordered_periods(frame: pandas.DataFrame, time_column: str) -> list[Any]:
@@ -1247,7 +1286,7 @@ def ordered_periods(frame: pandas.DataFrame, time_column: str) -> list[Any]:
     try:
         return frame[time_column].drop_duplicates().sort_values().tolist()
     except (TypeError, ValueError) as error:
-        raise ValueError("time values have invalid ordering") from error
+        raise errors.InputError("time values have invalid ordering") from error
 
 
 def validate_baseline_covariates(
@@ -1266,7 +1305,7 @@ def validate_baseline_covariates(
     grouped = frame.groupby(estimand.subject_identity, sort=False)
     for name in estimand.baseline_covariates:
         if (grouped[name].nunique(dropna=False) > 1).any():  # noqa: PD101 -- per-subject distinct counts; Series.is_unique does not apply
-            raise ValueError(
+            raise errors.InputError(
                 f"baseline covariate {name!r} varies within a subject"
             )
 
@@ -1360,9 +1399,11 @@ def fit_propensity(
             `policy.max_iterations`.
     """
     if covariates.ndim != MATRIX_NDIM:
-        raise ValueError("covariates must be a two-dimensional matrix")
+        raise errors.InputError("covariates must be a two-dimensional matrix")
     if len(covariates) != len(treatment):
-        raise ValueError("covariates and treatment must have matching rows")
+        raise errors.InputError(
+            "covariates and treatment must have matching rows"
+        )
     design = numpy.column_stack((numpy.ones(len(treatment)), covariates))
     coefficients = numpy.zeros(design.shape[1], dtype=float)
     ridge = 1e-8
@@ -1375,15 +1416,19 @@ def fit_propensity(
         try:
             step = numpy.linalg.solve(hessian, gradient)
         except numpy.linalg.LinAlgError as error:
-            raise ValueError("propensity model is not identifiable") from error
+            raise errors.InputError(
+                "propensity model is not identifiable"
+            ) from error
         if not numpy.isfinite(step).all():
-            raise ValueError(
+            raise errors.InputError(
                 "propensity model produced non-finite coefficients"
             )
         coefficients -= step
         if float(numpy.max(numpy.abs(step))) <= policy.tolerance:
             return special.expit(design @ coefficients), iteration
-    raise ValueError("propensity model did not converge within policy bound")
+    raise errors.InputError(
+        "propensity model did not converge within policy bound"
+    )
 
 
 def check_propensity_support(
@@ -1404,7 +1449,7 @@ def check_propensity_support(
     lower = float(numpy.min(propensity))
     upper = float(numpy.max(propensity))
     if lower < minimum or upper > 1.0 - minimum:
-        raise ValueError(
+        raise errors.InputError(
             f"period {period!r} violates declared positivity support "
             f"[{minimum}, {1.0 - minimum}]"
         )
@@ -1460,15 +1505,15 @@ def build_regime_estimate(
     selected_weights = weights[mask]
     selected_outcome = outcome[mask]
     if len(selected_weights) < policy.minimum_arm_rows:
-        raise ValueError(
+        raise errors.InputError(
             f"regime {regime!r} has insufficient treatment-history support"
         )
     weight_sum = float(numpy.sum(selected_weights))
     if weight_sum <= 0.0:
-        raise ValueError(f"regime {regime!r} has no weighted support")
+        raise errors.InputError(f"regime {regime!r} has no weighted support")
     ess = effective_sample_size(selected_weights)
     if ess < policy.minimum_effective_sample_size:
-        raise ValueError(
+        raise errors.InputError(
             f"regime {regime!r} has insufficient effective sample size"
         )
     estimate = float(
@@ -1645,7 +1690,7 @@ def fingerprint_frame(frame: pandas.DataFrame) -> str:
             .tobytes()
         )
     except (TypeError, ValueError) as error:
-        raise ValueError(
+        raise errors.InputError(
             "frame values must be hashable for fingerprinting"
         ) from error
     descriptor = json.dumps(

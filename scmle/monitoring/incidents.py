@@ -13,6 +13,7 @@ from typing import Any
 from typing import TypeVar
 
 from scmle import durability
+from scmle.contracts import errors
 from scmle.monitoring import slo
 
 Method = TypeVar("Method", bound=Callable[..., Any])
@@ -77,7 +78,7 @@ def require_text(value: object, field_name: str) -> str:
         ValueError: If the value is not a string or is blank.
     """
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{field_name} must not be empty")
+        raise errors.InputError(f"{field_name} must not be empty")
     return value.strip()
 
 
@@ -180,14 +181,18 @@ class Incident:
             require_text(self.resolution or "", "resolution")
             require_text(self.evidence_digest or "", "evidence_digest")
         if self.status is IncidentStatus.OPEN and self.acknowledged_at:
-            raise ValueError("open incidents must not have acknowledgement")
+            raise errors.InputError(
+                "open incidents must not have acknowledgement"
+            )
         if (
             self.status is IncidentStatus.ACKNOWLEDGED
             and not self.acknowledged_at
         ):
-            raise ValueError("acknowledged incidents require acknowledgement")
+            raise errors.InputError(
+                "acknowledged incidents require acknowledgement"
+            )
         if self.status is IncidentStatus.RESOLVED and not self.resolved_at:
-            raise ValueError("resolved incidents require resolution")
+            raise errors.InputError("resolved incidents require resolution")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns deterministic incident evidence.
@@ -275,7 +280,7 @@ def check_transition(incident: Incident, previous: Incident) -> None:
             previous state.
     """
     if incident.opened_at != previous.opened_at:
-        raise ValueError("incident journal identity changed")
+        raise errors.InputError("incident journal identity changed")
     transition_at = (
         incident.acknowledged_at
         if incident.status is IncidentStatus.ACKNOWLEDGED
@@ -287,11 +292,11 @@ def check_transition(incident: Incident, previous: Incident) -> None:
         else previous.acknowledged_at
     )
     if transition_at is None or previous_at is None:
-        raise ValueError("incident journal timestamps are invalid")
+        raise errors.InputError("incident journal timestamps are invalid")
     if slo.parse_timestamp(
         transition_at, "incident.transition_at"
     ) < slo.parse_timestamp(previous_at, "incident.previous_at"):
-        raise ValueError("incident journal timestamps are invalid")
+        raise errors.InputError("incident journal timestamps are invalid")
 
 
 class IncidentWorkflow:
@@ -335,11 +340,15 @@ class IncidentWorkflow:
         for line in self.path.read_text(encoding="utf-8").splitlines():
             record = json.loads(line)
             if not isinstance(record, dict):
-                raise ValueError("incident journal events must be objects")
+                raise errors.InputError(
+                    "incident journal events must be objects"
+                )
             if record.get("previous_digest") != previous_digest:
-                raise ValueError("incident journal chain is invalid")
+                raise errors.InputError("incident journal chain is invalid")
             if record.get("event_digest") != event_digest(record):
-                raise ValueError("incident journal event digest is invalid")
+                raise errors.InputError(
+                    "incident journal event digest is invalid"
+                )
             incident = Incident.from_dict(record["incident"])
             event_type = str(record.get("event_type", ""))
             expected_status = {
@@ -351,7 +360,9 @@ class IncidentWorkflow:
                 expected_status is None
                 or incident.status is not expected_status
             ):
-                raise ValueError("incident journal event type is invalid")
+                raise errors.InputError(
+                    "incident journal event type is invalid"
+                )
             previous_status = statuses.get(incident.incident_id)
             allowed_previous = {
                 IncidentStatus.OPEN: (None,),
@@ -359,7 +370,9 @@ class IncidentWorkflow:
                 IncidentStatus.RESOLVED: (IncidentStatus.ACKNOWLEDGED,),
             }[incident.status]
             if previous_status not in allowed_previous:
-                raise ValueError("incident journal transition is invalid")
+                raise errors.InputError(
+                    "incident journal transition is invalid"
+                )
             if previous_status is not None:
                 check_transition(
                     incident, previous_records[incident.incident_id]
@@ -411,7 +424,7 @@ class IncidentWorkflow:
         if not isinstance(evaluation, slo.SLOEvaluation):
             raise TypeError("evaluation must be SLOEvaluation")
         if not evaluation.incident_required:
-            raise ValueError("a passing SLO cannot open an incident")
+            raise errors.InputError("a passing SLO cannot open an incident")
         slo.parse_timestamp(opened_at, "opened_at")
         require_text(run_id, "run_id")
         require_text(rollback_target, "rollback_target")
@@ -461,11 +474,11 @@ class IncidentWorkflow:
         if incident.status is IncidentStatus.ACKNOWLEDGED:
             return incident
         if incident.status is not IncidentStatus.OPEN:
-            raise ValueError("only open incidents can be acknowledged")
+            raise errors.InputError("only open incidents can be acknowledged")
         require_text(actor, "actor")
         timestamp = slo.parse_timestamp(acknowledged_at, "acknowledged_at")
         if timestamp < slo.parse_timestamp(incident.opened_at, "opened_at"):
-            raise ValueError("acknowledgement cannot precede opening")
+            raise errors.InputError("acknowledgement cannot precede opening")
         updated = dataclasses.replace(
             incident,
             status=IncidentStatus.ACKNOWLEDGED,
@@ -505,7 +518,9 @@ class IncidentWorkflow:
         if incident.status is IncidentStatus.RESOLVED:
             return incident
         if incident.status is not IncidentStatus.ACKNOWLEDGED:
-            raise ValueError("only acknowledged incidents can be resolved")
+            raise errors.InputError(
+                "only acknowledged incidents can be resolved"
+            )
         require_text(actor, "actor")
         require_text(resolution, "resolution")
         require_text(evidence_digest, "evidence_digest")
@@ -513,7 +528,7 @@ class IncidentWorkflow:
         if timestamp < slo.parse_timestamp(
             incident.acknowledged_at or "", "acknowledged_at"
         ):
-            raise ValueError("resolution cannot precede acknowledgement")
+            raise errors.InputError("resolution cannot precede acknowledgement")
         updated = dataclasses.replace(
             incident,
             status=IncidentStatus.RESOLVED,

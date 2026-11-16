@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.contracts import signing
@@ -98,7 +99,7 @@ class Attestation:
             evidence.require_text(getattr(self, name), name)
         issued = provenance.parse_date(self.date, "date")
         if provenance.parse_date(self.expires, "expires") < issued:
-            raise ValueError("expires must not precede date")
+            raise errors.InputError("expires must not precede date")
 
     def payload(self) -> dict[str, Any]:
         """Returns the content covered by the signature.
@@ -211,22 +212,26 @@ def load(path: str | Path) -> tuple[Attestation, ...]:
     try:
         document = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
-        raise ValueError(f"cannot read attestations {path}: {error}") from error
+        raise errors.InputError(
+            f"cannot read attestations {path}: {error}"
+        ) from error
     if (
         not isinstance(document, dict)
         or document.get("format_version") != FORMAT_VERSION
     ):
-        raise ValueError(
+        raise errors.InputError(
             f"attestations must be an object with format_version "
             f"{FORMAT_VERSION}"
         )
     records = document.get("attestations")
     if not isinstance(records, list):
-        raise ValueError("attestations must hold a list under 'attestations'")
+        raise errors.InputError(
+            "attestations must hold a list under 'attestations'"
+        )
     found = tuple(Attestation.from_dict(r) for r in records)
     names = [a.assumption for a in found]
     if len(set(names)) != len(names):
-        raise ValueError("at most one attestation per assumption")
+        raise errors.InputError("at most one attestation per assumption")
     return found
 
 

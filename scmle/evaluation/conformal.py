@@ -40,6 +40,8 @@ from typing import Self
 
 import numpy
 
+import scmle.contracts.errors
+
 MIN_CALIBRATION_ROWS = 20
 DEFAULT_COVERAGE = 0.9
 
@@ -93,9 +95,11 @@ def weighted_quantile(
     values = numpy.asarray(scores, dtype=float)
     mass = numpy.asarray(weights, dtype=float)
     if len(values) != len(mass):
-        raise ValueError("scores and weights must have the same length")
+        raise scmle.contracts.errors.InputError(
+            "scores and weights must have the same length"
+        )
     if (mass < 0).any() or test_weight < 0:
-        raise ValueError("weights must be non-negative")
+        raise scmle.contracts.errors.InputError("weights must be non-negative")
     total = float(mass.sum()) + float(test_weight)
     if total <= 0:
         return math.inf
@@ -138,9 +142,11 @@ def weighted_margins(
     mass = numpy.asarray(weights, dtype=float)
     ratios = numpy.asarray(test_weights, dtype=float)
     if len(values) != len(mass):
-        raise ValueError("scores and weights must have the same length")
+        raise scmle.contracts.errors.InputError(
+            "scores and weights must have the same length"
+        )
     if (mass < 0).any() or (ratios < 0).any():
-        raise ValueError("weights must be non-negative")
+        raise scmle.contracts.errors.InputError("weights must be non-negative")
     order = numpy.argsort(values, kind="stable")
     ordered = values[order]
     cumulative = numpy.cumsum(mass[order])
@@ -184,14 +190,20 @@ def cv_plus_bounds(
             lies outside `0 .. K-1`.
     """
     if not 0.0 < coverage < 1.0:
-        raise ValueError("coverage must lie strictly between 0 and 1")
+        raise scmle.contracts.errors.InputError(
+            "coverage must lie strictly between 0 and 1"
+        )
     predictions = numpy.atleast_2d(numpy.asarray(fold_predictions, dtype=float))
     folds = numpy.asarray(fold_of_row, dtype=int)
     errors = numpy.asarray(residuals, dtype=float)
     if len(folds) != len(errors):
-        raise ValueError("fold_of_row and residuals must have equal length")
+        raise scmle.contracts.errors.InputError(
+            "fold_of_row and residuals must have equal length"
+        )
     if folds.size and (folds.min() < 0 or folds.max() >= predictions.shape[1]):
-        raise ValueError("fold_of_row names a fold without a model")
+        raise scmle.contracts.errors.InputError(
+            "fold_of_row names a fold without a model"
+        )
     count = len(errors)
     centres = predictions[:, folds]
     upper_rank = math.ceil(coverage * (count + 1))
@@ -297,7 +309,9 @@ class ConformalCalibrator:
         """
         position = {label: index for index, label in enumerate(classes)}
         if any(label not in position for label in labels):
-            raise ValueError("labels outside the known classes")
+            raise scmle.contracts.errors.InputError(
+                "labels outside the known classes"
+            )
         true_probability = numpy.asarray(probabilities)[
             numpy.arange(len(labels)), [position[label] for label in labels]
         ]
@@ -327,7 +341,7 @@ class ConformalCalibrator:
                 scores.
         """
         if len(scores) < MIN_CALIBRATION_ROWS:
-            raise ValueError(
+            raise scmle.contracts.errors.InputError(
                 f"need at least {MIN_CALIBRATION_ROWS} calibration rows"
             )
         return tuple(float(s) for s in scores)
@@ -346,7 +360,9 @@ class ConformalCalibrator:
             ValueError: If coverage is not strictly between 0 and 1.
         """
         if not 0.0 < coverage < 1.0:
-            raise ValueError("coverage must lie strictly between 0 and 1")
+            raise scmle.contracts.errors.InputError(
+                "coverage must lie strictly between 0 and 1"
+            )
         return finite_sample_quantile(numpy.asarray(self.scores), coverage)
 
     def interval(
@@ -369,7 +385,9 @@ class ConformalCalibrator:
                 strictly between 0 and 1.
         """
         if self.kind != "regression":
-            raise ValueError("intervals need a regression calibrator")
+            raise scmle.contracts.errors.InputError(
+                "intervals need a regression calibrator"
+            )
         values = numpy.asarray(predictions, dtype=float)
         margin = self.margin(coverage)
         return values - margin, values + margin
@@ -392,9 +410,13 @@ class ConformalCalibrator:
             ValueError: Without per-class scores or with a bad coverage.
         """
         if not 0.0 < coverage < 1.0:
-            raise ValueError("coverage must lie strictly between 0 and 1")
+            raise scmle.contracts.errors.InputError(
+                "coverage must lie strictly between 0 and 1"
+            )
         if self.kind != "classification" or not self.class_scores:
-            raise ValueError("this calibrator has no per-class scores")
+            raise scmle.contracts.errors.InputError(
+                "this calibrator has no per-class scores"
+            )
         return tuple(
             finite_sample_quantile(numpy.asarray(scores), coverage)
             for scores in self.class_scores
@@ -446,11 +468,15 @@ class ConformalCalibrator:
                 differ in length, or if a weight is negative.
         """
         if self.kind != "regression":
-            raise ValueError("intervals need a regression calibrator")
+            raise scmle.contracts.errors.InputError(
+                "intervals need a regression calibrator"
+            )
         values = numpy.asarray(predictions, dtype=float)
         ratios = numpy.asarray(test_weights, dtype=float)
         if len(values) != len(ratios):
-            raise ValueError("predictions and test_weights differ in length")
+            raise scmle.contracts.errors.InputError(
+                "predictions and test_weights differ in length"
+            )
         margins = weighted_margins(
             numpy.asarray(self.scores),
             numpy.asarray(calibration_weights),
@@ -483,9 +509,13 @@ class ConformalCalibrator:
                 per-class scores; an invalid coverage is also rejected.
         """
         if self.kind != "classification":
-            raise ValueError("sets need a classification calibrator")
+            raise scmle.contracts.errors.InputError(
+                "sets need a classification calibrator"
+            )
         if conditional not in (None, "class"):
-            raise ValueError("conditional must be None or 'class'")
+            raise scmle.contracts.errors.InputError(
+                "conditional must be None or 'class'"
+            )
         margin: float | numpy.ndarray = (
             numpy.asarray(self.class_margins(coverage))
             if conditional == "class"

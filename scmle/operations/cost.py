@@ -11,6 +11,8 @@ import dataclasses
 import math
 from typing import Any
 
+from scmle.contracts import errors
+
 GIB = 1024**3
 STATEMENT = (
     "Estimate: measured usage times declared rates. Not a bill; discounts, "
@@ -53,9 +55,11 @@ class Rates:
         ):
             value = getattr(self, name)
             if not math.isfinite(value) or value < 0:
-                raise ValueError(f"{name} must be finite and not negative")
+                raise errors.InputError(
+                    f"{name} must be finite and not negative"
+                )
         if not self.source.strip():
-            raise ValueError("say where the rates come from")
+            raise errors.InputError("say where the rates come from")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -87,7 +91,9 @@ class Usage:
         for name in ("vcpu_seconds", "gib_seconds", "requests", "egress_gb"):
             value = getattr(self, name)
             if not math.isfinite(value) or value < 0:
-                raise ValueError(f"{name} must be finite and not negative")
+                raise errors.InputError(
+                    f"{name} must be finite and not negative"
+                )
 
     @classmethod
     def from_allocation(

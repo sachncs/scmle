@@ -13,6 +13,7 @@ from typing import Any
 import numpy
 
 from scmle.contracts import capabilities
+from scmle.contracts import errors
 
 ATTRIBUTION_MATRIX_RANK = 2
 
@@ -41,9 +42,11 @@ class CheckpointContract:
             ValueError: If the format is blank or the schema version is below 1.
         """
         if not self.format.strip():
-            raise ValueError("checkpoint format must not be empty")
+            raise errors.InputError("checkpoint format must not be empty")
         if self.schema_version < 1:
-            raise ValueError("checkpoint schema version must be positive")
+            raise errors.InputError(
+                "checkpoint schema version must be positive"
+            )
 
     def to_dict(self) -> dict[str, object]:
         """Returns a stable JSON-compatible description."""
@@ -83,13 +86,17 @@ class InferenceContract:
                 blank, or no method (or a blank method) is declared.
         """
         if self.input_rank < 1:
-            raise ValueError("inference input rank must be positive")
+            raise errors.InputError("inference input rank must be positive")
         if not self.input_dtype.strip() or not self.output.strip():
-            raise ValueError("inference dtype and output must not be empty")
+            raise errors.InputError(
+                "inference dtype and output must not be empty"
+            )
         if not self.methods or any(
             not method.strip() for method in self.methods
         ):
-            raise ValueError("inference must declare at least one method")
+            raise errors.InputError(
+                "inference must declare at least one method"
+            )
         object.__setattr__(self, "methods", tuple(sorted(set(self.methods))))
 
     def to_dict(self) -> dict[str, object]:
@@ -128,11 +135,13 @@ class ExplanationContract:
                 limitation is blank.
         """
         if not self.method.strip() or not self.scope.strip():
-            raise ValueError("explanation method and scope must not be empty")
+            raise errors.InputError(
+                "explanation method and scope must not be empty"
+            )
         if not self.output.strip():
-            raise ValueError("explanation output must not be empty")
+            raise errors.InputError("explanation output must not be empty")
         if any(not item.strip() for item in self.limitations):
-            raise ValueError("explanation limitations must not be empty")
+            raise errors.InputError("explanation limitations must not be empty")
         object.__setattr__(
             self, "limitations", tuple(sorted(set(self.limitations)))
         )
@@ -174,15 +183,19 @@ class FeatureExplanation:
         """
         values = numpy.asarray(self.values, dtype=numpy.float64)
         if values.ndim != ATTRIBUTION_MATRIX_RANK:
-            raise ValueError(
+            raise errors.InputError(
                 "explanation values must be a two-dimensional matrix"
             )
         if values.shape[1] != self.feature_count:
-            raise ValueError("explanation feature count does not match values")
+            raise errors.InputError(
+                "explanation feature count does not match values"
+            )
         if not numpy.isfinite(values).all():
-            raise ValueError("explanation values must be finite")
+            raise errors.InputError("explanation values must be finite")
         if not self.method.strip() or not self.target.strip():
-            raise ValueError("explanation method and target must not be empty")
+            raise errors.InputError(
+                "explanation method and target must not be empty"
+            )
         object.__setattr__(self, "values", values)
 
     def to_dict(self) -> dict[str, object]:
@@ -230,18 +243,20 @@ class ModelFamilyContract:
             TypeError: If a modality is not a `Modality` value.
         """
         if not self.model_family.strip():
-            raise ValueError("model family must not be empty")
+            raise errors.InputError("model family must not be empty")
         if not self.modalities:
-            raise ValueError("model family must declare a modality")
+            raise errors.InputError("model family must declare a modality")
         if any(
             not isinstance(item, capabilities.Modality)
             for item in self.modalities
         ):
             raise TypeError("model family modalities must use Modality values")
         if any(not item.strip() for item in self.required_extras):
-            raise ValueError("required extras must not be empty")
+            raise errors.InputError("required extras must not be empty")
         if any(not item.strip() for item in self.limitations):
-            raise ValueError("model family limitations must not be empty")
+            raise errors.InputError(
+                "model family limitations must not be empty"
+            )
         object.__setattr__(
             self,
             "modalities",
@@ -284,7 +299,7 @@ class ModelFamilyContract:
                 wrong, or it contains non-finite values.
         """
         if not self.supports_modality(capabilities.Modality.TABULAR):
-            raise ValueError(
+            raise errors.InputError(
                 f"{self.model_family} has no numeric tabular input contract"
             )
         try:
@@ -292,21 +307,23 @@ class ModelFamilyContract:
                 features = features.toarray()
             matrix = numpy.asarray(features, dtype=numpy.float32)
         except (TypeError, ValueError) as error:
-            raise ValueError(
+            raise errors.InputError(
                 f"{self.model_family} requires a finite numeric 2-D matrix"
             ) from error
         if matrix.ndim != self.inference.input_rank:
-            raise ValueError(
+            raise errors.InputError(
                 f"{self.model_family} requires a {self.inference.input_rank}-D "
                 f"numeric matrix, received {matrix.ndim}-D input"
             )
         if expected_width is not None and matrix.shape[1] != expected_width:
-            raise ValueError(
+            raise errors.InputError(
                 f"{self.model_family} expected {expected_width} features, "
                 f"received {matrix.shape[1]}"
             )
         if not numpy.isfinite(matrix).all():
-            raise ValueError(f"{self.model_family} requires finite features")
+            raise errors.InputError(
+                f"{self.model_family} requires finite features"
+            )
         return matrix
 
     def to_dict(self) -> dict[str, object]:

@@ -32,6 +32,7 @@ from typing import Self
 
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 
@@ -91,9 +92,9 @@ def wilson_interval(
     qualification.count(n, "n", minimum=1)
     qualification.count(successes, "successes")
     if successes > n:
-        raise ValueError("successes must be between 0 and n")
+        raise errors.InputError("successes must be between 0 and n")
     if not 0.0 < confidence < 1.0:
-        raise ValueError("confidence must be within (0, 1)")
+        raise errors.InputError("confidence must be within (0, 1)")
     z = float(stats.norm.ppf(1.0 - (1.0 - confidence) / 2.0))
     p = successes / n
     scale = 1.0 + z * z / n
@@ -180,7 +181,7 @@ def code_hash(*objects: Any) -> str:
         ValueError: If no object is given.
     """
     if not objects:
-        raise ValueError("code_hash needs at least one object")
+        raise errors.InputError("code_hash needs at least one object")
     parts = [hash_source(inspect.getsource(item)) for item in objects]
     return hashlib.sha256("\n".join(parts).encode("ascii")).hexdigest()
 
@@ -199,7 +200,7 @@ def corpus_hash(parts: Iterable[str]) -> str:
     """
     members = sorted(parts)
     if not members:
-        raise ValueError("corpus_hash needs at least one part")
+        raise errors.InputError("corpus_hash needs at least one part")
     for part in members:
         require_digest(part, "corpus part")
     return hashlib.sha256("\n".join(members).encode("ascii")).hexdigest()
@@ -219,7 +220,9 @@ def require_digest(value: Any, name: str) -> str:
         ValueError: If `value` is not a 64-character lowercase hex string.
     """
     if not isinstance(value, str) or not SHA256_HEX.fullmatch(value):
-        raise ValueError(f"{name} must be a 64-character lowercase SHA-256")
+        raise errors.InputError(
+            f"{name} must be a 64-character lowercase SHA-256"
+        )
     return value
 
 
@@ -251,7 +254,7 @@ class Standard:
         )
         confidence = qualification.finite(self.confidence, "confidence")
         if not 0.0 < confidence < 1.0:
-            raise ValueError("confidence must be within (0, 1)")
+            raise errors.InputError("confidence must be within (0, 1)")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the policy as a JSON-ready record.
@@ -360,7 +363,7 @@ class DefectOutcome:
                 not isinstance(limits, list | tuple)
                 or len(limits) != PAIR_LENGTH
             ):
-                raise ValueError(f"{name} must hold (low, high)")
+                raise errors.InputError(f"{name} must hold (low, high)")
             stored = (
                 qualification.finite(limits[0], name),
                 qualification.finite(limits[1], name),
@@ -417,18 +420,20 @@ class Certification:
         require_digest(self.corpus_hash, "corpus_hash")
         qualification.require_tuple(self.seeds, "seeds")
         if not self.seeds:
-            raise ValueError("seeds must not be empty")
+            raise errors.InputError("seeds must not be empty")
         for seed in self.seeds:
             qualification.count(seed, "seeds")
         qualification.require_tuple(self.outcomes, "outcomes")
         if not self.outcomes:
-            raise ValueError("outcomes must not be empty")
+            raise errors.InputError("outcomes must not be empty")
         kinds = [o.certificate.defect_type for o in self.outcomes]
         if len(set(kinds)) != len(kinds):
-            raise ValueError("defect types must be unique")
+            raise errors.InputError("defect types must be unique")
         for outcome in self.outcomes:
             if outcome.certificate.detector_id != self.detector_id:
-                raise ValueError("outcome belongs to a different detector")
+                raise errors.InputError(
+                    "outcome belongs to a different detector"
+                )
 
     @property
     def key(self) -> tuple[str, str, str, tuple[int, ...]]:
@@ -723,7 +728,7 @@ class Store:
             )
         extra = sorted(set(document) - {"schema_version", "certificates"})
         if extra:
-            raise ValueError(f"unexpected field(s): {extra}")
+            raise errors.InputError(f"unexpected field(s): {extra}")
         return cls(
             Certification.from_dict(item) for item in document["certificates"]
         )

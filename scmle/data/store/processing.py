@@ -68,7 +68,7 @@ def require_match(digest: str, expected: str, document: dict[str, Any]) -> None:
         ValueError: If the digest differs or the format is not `FORMAT`.
     """
     if digest != expected or document["format"] != FORMAT:
-        raise ValueError("digest or format mismatch")
+        raise errors.InputError("digest or format mismatch")
 
 
 class CheckpointCorruptError(errors.DataError):

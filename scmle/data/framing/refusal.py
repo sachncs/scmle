@@ -276,7 +276,7 @@ def consensus(
         ValueError: If there are no samples.
     """
     if not samples:
-        raise ValueError("at least one sample is needed")
+        raise errors.InputError("at least one sample is needed")
     values: dict[str, Any] = {}
     agreement: dict[str, float] = {}
     for slot in SLOT_NAMES:

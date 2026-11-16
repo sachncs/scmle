@@ -95,7 +95,7 @@ def vector(values: ArrayLike, name: str) -> NDArray[numpy.float64]:
     """
     array = numpy.asarray(values, dtype=float)
     if array.ndim != 1 or array.size == 0:
-        raise ValueError(f"{name} must be a non-empty 1-d array")
+        raise errors.InputError(f"{name} must be a non-empty 1-d array")
     return array
 
 
@@ -121,7 +121,7 @@ def paired_difference(
     model = costs.binary_vector(a, "a")
     base = costs.binary_vector(b, "b")
     if not outcomes.shape == model.shape == base.shape:
-        raise ValueError("y, a and b must have the same length")
+        raise errors.InputError("y, a and b must have the same length")
     w = costs.odds(t)
     return (model - base) * (outcomes - (1.0 - outcomes) * w)
 
@@ -148,10 +148,10 @@ def cluster_test(d: ArrayLike, clusters: ArrayLike) -> ClusterTest:
     values = vector(d, "d")
     codes = factorize(clusters)[0]
     if codes.shape != values.shape:
-        raise ValueError("d and clusters must have the same length")
+        raise errors.InputError("d and clusters must have the same length")
     g = int(numpy.max(codes)) + 1
     if g < MIN_VARIANCE_CLUSTERS:
-        raise ValueError("at least two clusters are needed")
+        raise errors.InputError("at least two clusters are needed")
     n = values.size
     mean = float(values.mean())
     sums = numpy.bincount(codes, weights=values - mean, minlength=g)
@@ -183,7 +183,7 @@ def factorize(clusters: ArrayLike) -> tuple[NDArray[numpy.intp], int]:
     """
     labels = numpy.asarray(clusters)
     if labels.ndim != 1:
-        raise ValueError("clusters must be 1-d")
+        raise errors.InputError("clusters must be 1-d")
     codes = numpy.unique(labels, return_inverse=True)[1]
     return codes.astype(numpy.intp), int(
         numpy.max(codes)
@@ -240,7 +240,7 @@ def selective_labels(observed: ArrayLike, b: ArrayLike) -> Selectivity:
     seen = numpy.asarray(observed).astype(bool)
     base = costs.binary_vector(b, "b").astype(bool)
     if seen.shape != base.shape:
-        raise ValueError("observed and b must have the same length")
+        raise errors.InputError("observed and b must have the same length")
     n1, n0 = int(base.sum()), int((~base).sum())
     if min(n1, n0) < MIN_ARM_ROWS:
         return Selectivity(
@@ -370,7 +370,7 @@ def register(
     """
     level = qualification.probability(alpha, "alpha")
     if not 0.0 < level < 1.0:
-        raise ValueError("alpha must be strictly between 0 and 1")
+        raise errors.InputError("alpha must be strictly between 0 and 1")
     return Registration(
         model.model_hash, rule_digest(rule), level, model.t_lo, model.t_hi
     )

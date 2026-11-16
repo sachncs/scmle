@@ -1171,7 +1171,7 @@ class ModalityProject:
         if not isinstance(adapter, modality_lifecycle.Preparer):
             raise TypeError("adapter must be a Preparer")
         if not signing_key:
-            raise ValueError("signing_key must not be empty")
+            raise errors.InputError("signing_key must not be empty")
         if isinstance(seed, bool) or not isinstance(seed, int):
             raise TypeError("seed must be an integer")
         if not isinstance(require_independent_ground_truth, bool):
@@ -1218,7 +1218,7 @@ class ModalityProject:
             ValueError: If `output_dir` exists and is not a directory.
         """
         if self.output_dir.exists() and not self.output_dir.is_dir():
-            raise ValueError("output_dir must be a directory")
+            raise errors.InputError("output_dir must be a directory")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.report = self.lifecycle.run(
             self.adapter,
@@ -1274,11 +1274,11 @@ def check_manifest_matches_adapter(
             differs from the adapter's.
     """
     if manifest.modality != modality:
-        raise ValueError("manifest modality must match adapter")
+        raise errors.InputError("manifest modality must match adapter")
     if manifest.content_hash != dataset_hash:
-        raise ValueError("manifest content_hash must match adapter")
+        raise errors.InputError("manifest content_hash must match adapter")
     if manifest.sample_count != sample_count:
-        raise ValueError("manifest sample_count must match adapter")
+        raise errors.InputError("manifest sample_count must match adapter")
 
 
 def verify_existing_curation(
@@ -1303,29 +1303,31 @@ def verify_existing_curation(
     """
     existing = modality_lifecycle.Curation.read_verified(path, signing_key)
     if existing.modality != candidate.modality:
-        raise ValueError(
+        raise errors.InputError(
             "existing curation modality does not match current adapter"
         ) from None
     if existing.dataset_hash != candidate.dataset_hash:
-        raise ValueError(
+        raise errors.InputError(
             "existing curation dataset_hash does not match current adapter"
         ) from None
     if existing.sample_count != candidate.sample_count:
-        raise ValueError(
+        raise errors.InputError(
             "existing curation sample_count does not match current adapter"
         ) from None
     try:
         existing_record = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, TypeError, ValueError) as error:
-        raise ValueError("existing curation artifact is unreadable") from error
+        raise errors.InputError(
+            "existing curation artifact is unreadable"
+        ) from error
     if not isinstance(existing_record, dict):
-        raise ValueError(
+        raise errors.InputError(
             "existing curation artifact must be an object"
         ) from None
     if attestation.canonical_digest(existing_record) != (
         attestation.canonical_digest(candidate.to_dict())
     ):
-        raise ValueError(
+        raise errors.InputError(
             "existing curation canonical content does not match current adapter"
         ) from None
     return existing
@@ -1368,7 +1370,7 @@ class Curator:
         if not isinstance(adapter, modality_lifecycle.Curator):
             raise TypeError("adapter must be a Curator")
         if not signing_key:
-            raise ValueError("signing_key must not be empty")
+            raise errors.InputError("signing_key must not be empty")
         if manifest is not None and not isinstance(
             manifest, scmle.contracts.data.ModalityManifest
         ):
@@ -1399,7 +1401,7 @@ class Curator:
                 curation report.
         """
         if self.output_dir.exists() and not self.output_dir.is_dir():
-            raise ValueError("output_dir must be a directory")
+            raise errors.InputError("output_dir must be a directory")
         samples = self.adapter.samples
         modality = modalities.serialise(self.adapter.modality)
         dataset_hash = self.adapter.dataset_hash
@@ -1423,9 +1425,9 @@ class Curator:
         reported_dataset_hash = curation_payload.get("dataset_hash")
         reported_sample_count = curation_payload.get("sample_count")
         if reported_dataset_hash != dataset_hash:
-            raise ValueError("curation dataset_hash must match adapter")
+            raise errors.InputError("curation dataset_hash must match adapter")
         if reported_sample_count != sample_count:
-            raise ValueError("curation sample_count must match adapter")
+            raise errors.InputError("curation sample_count must match adapter")
         card = curation.DatasetCard.from_report(
             modality,
             curation_payload,

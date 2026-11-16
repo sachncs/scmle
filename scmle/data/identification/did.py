@@ -37,6 +37,8 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.contracts import errors
+
 MIN_PERIODS = 3
 MIN_NEVER_TREATED = 2
 
@@ -94,7 +96,9 @@ class Estimate:
             ValueError: If fewer than two pre-periods exist.
         """
         if self.max_pre_change is None:
-            raise ValueError("sensitivity needs at least two pre-periods")
+            raise errors.InputError(
+                "sensitivity needs at least two pre-periods"
+            )
         bias = m * self.max_pre_change * self.mean_horizon
         return self.low - bias, self.high + bias
 
@@ -148,7 +152,9 @@ def wide_panel(
         index=unit, columns=time, values=outcome
     )
     if table.isna().any().any():
-        raise ValueError("the panel must be balanced with no missing outcomes")
+        raise errors.InputError(
+            "the panel must be balanced with no missing outcomes"
+        )
     return table.sort_index(axis=1)
 
 
@@ -362,20 +368,20 @@ def estimate(
     wide = wide_panel(frame, unit, time, outcome)
     periods = list(wide.columns)
     if len(periods) < MIN_PERIODS:
-        raise ValueError(f"at least {MIN_PERIODS} periods are needed")
+        raise errors.InputError(f"at least {MIN_PERIODS} periods are needed")
     per_unit = frame.groupby(unit)[adoption]
     if (per_unit.nunique(dropna=False) > 1).any():  # noqa: PD101 -- a per-unit count on a SeriesGroupBy, not a check that one Series is constant
-        raise ValueError("adoption must be constant within a unit")
+        raise errors.InputError("adoption must be constant within a unit")
     adopt = per_unit.first().reindex(wide.index)
     never = adopt.isna().to_numpy()
     if never.sum() < MIN_NEVER_TREATED:
-        raise ValueError("at least two never-treated units are needed")
+        raise errors.InputError("at least two never-treated units are needed")
     y = wide.to_numpy(dtype=float)
     index = {p: i for i, p in enumerate(periods)}
     groups = sorted(g for g in adopt.dropna().unique() if g in index)
     groups = [g for g in groups if index[g] >= 1]
     if not groups:
-        raise ValueError("no adoption group has a pre-period")
+        raise errors.InputError("no adoption group has a pre-period")
     members = {g: (adopt == g).to_numpy() for g in groups}
     sizes = {g: int(members[g].sum()) for g in groups}
     events = sorted(

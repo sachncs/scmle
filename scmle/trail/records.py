@@ -13,6 +13,7 @@ import operator
 from pathlib import Path
 from typing import Any
 
+from scmle.contracts import errors
 from scmle.contracts import signing
 
 FORMAT = 1
@@ -172,7 +173,7 @@ def compare(value: Any, op: str, bound: Any) -> bool:
         ValueError: For an unknown operator.
     """
     if op not in OPERATORS:
-        raise ValueError(f"unknown operator {op!r}")
+        raise errors.InputError(f"unknown operator {op!r}")
     return bool(OPERATORS[op](value, bound))
 
 

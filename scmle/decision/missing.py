@@ -26,6 +26,7 @@ from typing import Any
 import numpy
 from numpy.typing import ArrayLike
 
+from scmle.contracts import errors
 from scmle.decision import design
 
 LABEL = "missingness_not_handled"
@@ -65,11 +66,13 @@ def contrast(
     a = numpy.asarray(arm, dtype=float)
     seen = numpy.asarray(observed, dtype=bool)
     if a.shape != seen.shape or a.ndim != 1:
-        raise ValueError("arm and observed must be one-dimensional and equal")
+        raise errors.InputError(
+            "arm and observed must be one-dimensional and equal"
+        )
     if numpy.any((a != 0.0) & (a != 1.0)):
-        raise ValueError("arm must be 0 or 1")
+        raise errors.InputError("arm must be 0 or 1")
     if not 0.0 < assignment_prob < 1.0 or not 0.0 < level < 1.0:
-        raise ValueError("assignment_prob and level must lie in (0, 1)")
+        raise errors.InputError("assignment_prob and level must lie in (0, 1)")
     gone = ~seen
     totals = numpy.cumsum(gone)
     challenger = numpy.cumsum(a * gone)

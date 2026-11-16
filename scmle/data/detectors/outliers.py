@@ -28,6 +28,8 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.contracts import errors
+
 MAD_SCALE = 1.4826
 CANDIDATE_Z = 6.0
 CLASSES = ("error", "population", "real_extreme", "unclassified", "none")
@@ -160,7 +162,7 @@ def triage(
     permitted = pandas.Series(data=False, index=frame.index)
     for name, info in known.items():
         if name not in frame.columns:
-            raise ValueError(f"provenance names unknown column '{name}'")
+            raise errors.InputError(f"provenance names unknown column '{name}'")
         if info.instrument_range is not None:
             error |= outside(frame[name], info.instrument_range)
         if info.population_range is not None:
@@ -171,7 +173,7 @@ def triage(
     for check in (contracts or {}).values():
         violated: object = check(frame)
         if not isinstance(violated, pandas.Series) or violated.dtype != bool:
-            raise ValueError("a contract must return a boolean Series")
+            raise errors.InputError("a contract must return a boolean Series")
         error |= violated.reindex(frame.index, fill_value=False)
     classes = pandas.Series("none", index=frame.index, dtype=object)
     classes[candidate] = "unclassified"

@@ -16,6 +16,7 @@ import urllib.error
 import urllib.request
 
 from scmle import durability
+from scmle.contracts import errors
 
 
 class AlertDeliveryError(RuntimeError):
@@ -62,11 +63,11 @@ class Alert:
         ):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{name} must not be empty")
+                raise errors.InputError(f"{name} must not be empty")
         try:
             datetime.datetime.fromisoformat(self.created_at)
         except ValueError as error:
-            raise ValueError("created_at must be ISO-8601") from error
+            raise errors.InputError("created_at must be ISO-8601") from error
         if not isinstance(self.details, Mapping):
             raise TypeError("details must be a mapping")
         object.__setattr__(self, "details", dict(self.details))
@@ -167,11 +168,11 @@ class AlertDelivery:
                 the reason is blank.
         """
         if self.status not in {"delivered", "failed", "deduplicated"}:
-            raise ValueError("unsupported alert delivery status")
+            raise errors.InputError("unsupported alert delivery status")
         if self.attempts < 0:
-            raise ValueError("attempts must not be negative")
+            raise errors.InputError("attempts must not be negative")
         if not self.reason.strip():
-            raise ValueError("reason must not be empty")
+            raise errors.InputError("reason must not be empty")
 
     def to_dict(self) -> dict[str, object]:
         """Returns JSON-native delivery evidence.
@@ -287,9 +288,11 @@ class WebhookAlertSink(AlertSink):
             if not (
                 allow_insecure_localhost and parsed.scheme == "http" and local
             ):
-                raise ValueError("webhook URL must use HTTPS")
+                raise errors.InputError("webhook URL must use HTTPS")
         if timeout_seconds <= 0 or max_attempts < 1 or backoff_seconds < 0:
-            raise ValueError("webhook retry and timeout bounds are invalid")
+            raise errors.InputError(
+                "webhook retry and timeout bounds are invalid"
+            )
         self.url = url
         self.token = token
         self.timeout_seconds = timeout_seconds
@@ -375,9 +378,9 @@ class AlertDispatcher:
             ValueError: If there are no sinks or a route name is blank.
         """
         if not sinks:
-            raise ValueError("at least one alert sink is required")
+            raise errors.InputError("at least one alert sink is required")
         if any(not route.strip() for route in sinks):
-            raise ValueError("alert routes must not be empty")
+            raise errors.InputError("alert routes must not be empty")
         self.sinks = dict(sinks)
         self.journal = Path(journal)
         self.lock = durability.path_lock(self.journal)

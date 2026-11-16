@@ -10,6 +10,7 @@ from typing import Any
 from typing import Self
 
 from scmle.contracts import data
+from scmle.contracts import errors
 
 MIN_HOLDOUT_GROUPS = 3
 
@@ -111,15 +112,15 @@ def check_card_text(
             empty or holds a blank item.
     """
     if not modality.strip():
-        raise ValueError("modality must not be empty")
+        raise errors.InputError("modality must not be empty")
     if not dataset_hash.strip():
-        raise ValueError("dataset_hash must not be empty")
+        raise errors.InputError("dataset_hash must not be empty")
     if isinstance(sample_count, bool) or sample_count < 0:
-        raise ValueError("sample_count must not be negative")
+        raise errors.InputError("sample_count must not be negative")
     if not intended_use.strip():
-        raise ValueError("intended_use must not be empty")
+        raise errors.InputError("intended_use must not be empty")
     if not limitations or any(not item.strip() for item in limitations):
-        raise ValueError("limitations must contain non-empty values")
+        raise errors.InputError("limitations must contain non-empty values")
 
 
 def normalized_curation(curation: Mapping[str, Any]) -> dict[str, Any]:
@@ -140,9 +141,9 @@ def normalized_curation(curation: Mapping[str, Any]) -> dict[str, Any]:
             json.dumps(dict(curation), allow_nan=False, sort_keys=True)
         )
     except (TypeError, ValueError) as error:
-        raise ValueError("curation must be JSON-native") from error
+        raise errors.InputError("curation must be JSON-native") from error
     if not isinstance(normalized, dict):
-        raise ValueError("curation must serialize to an object")
+        raise errors.InputError("curation must serialize to an object")
     return normalized
 
 
@@ -165,7 +166,7 @@ def check_governance(name: str, values: Mapping[str, str]) -> None:
         or not value.strip()
         for key, value in entries
     ):
-        raise ValueError(f"{name} must contain non-empty values")
+        raise errors.InputError(f"{name} must contain non-empty values")
 
 
 def check_manifest(
@@ -190,11 +191,11 @@ def check_manifest(
     if not isinstance(manifest, data.ModalityManifest):
         raise TypeError("manifest must be ModalityManifest")
     if manifest.content_hash != dataset_hash:
-        raise ValueError("manifest does not match dataset_hash")
+        raise errors.InputError("manifest does not match dataset_hash")
     if manifest.sample_count != sample_count:
-        raise ValueError("manifest does not match sample_count")
+        raise errors.InputError("manifest does not match sample_count")
     if manifest.modality != modality:
-        raise ValueError("manifest does not match modality")
+        raise errors.InputError("manifest does not match modality")
 
 
 def check_split_fractions(
@@ -211,11 +212,13 @@ def check_split_fractions(
             1 or more.
     """
     if not 0 <= validation_fraction < 1:
-        raise ValueError("validation_fraction must be in [0, 1)")
+        raise errors.InputError("validation_fraction must be in [0, 1)")
     if not 0 <= test_fraction < 1:
-        raise ValueError("test_fraction must be in [0, 1)")
+        raise errors.InputError("test_fraction must be in [0, 1)")
     if validation_fraction + test_fraction >= 1:
-        raise ValueError("validation_fraction + test_fraction must be < 1")
+        raise errors.InputError(
+            "validation_fraction + test_fraction must be < 1"
+        )
 
 
 def partition_group_ids(
@@ -320,9 +323,13 @@ class DatasetCard:
         )
         object.__setattr__(self, "curation", normalized_curation(self.curation))
         if self.curation.get("dataset_hash") != self.dataset_hash:
-            raise ValueError("curation report does not match dataset_hash")
+            raise errors.InputError(
+                "curation report does not match dataset_hash"
+            )
         if self.curation.get("sample_count") != self.sample_count:
-            raise ValueError("curation report does not match sample_count")
+            raise errors.InputError(
+                "curation report does not match sample_count"
+            )
         check_governance("provenance", self.provenance)
         check_governance("privacy", self.privacy)
         if self.manifest is not None:
@@ -373,9 +380,9 @@ class DatasetCard:
         dataset_hash_value = report.get("dataset_hash")
         sample_count_value = report.get("sample_count")
         if not isinstance(dataset_hash_value, str):
-            raise ValueError("curation report must contain dataset_hash")
+            raise errors.InputError("curation report must contain dataset_hash")
         if not isinstance(sample_count_value, int):
-            raise ValueError("curation report must contain sample_count")
+            raise errors.InputError("curation report must contain sample_count")
         if manifest is None:
             manifest = data.ModalityManifest(
                 dataset_id=f"{modality}-{dataset_hash_value[:16]}",
@@ -393,11 +400,11 @@ class DatasetCard:
                 ),
             )
         if manifest.content_hash != dataset_hash_value:
-            raise ValueError("manifest does not match dataset_hash")
+            raise errors.InputError("manifest does not match dataset_hash")
         if manifest.sample_count != sample_count_value:
-            raise ValueError("manifest does not match sample_count")
+            raise errors.InputError("manifest does not match sample_count")
         if manifest.modality != modality:
-            raise ValueError("manifest does not match modality")
+            raise errors.InputError("manifest does not match modality")
         declared_provenance = {
             "status": "declared",
             "manifest": "source, lineage, and ownership are in manifest",

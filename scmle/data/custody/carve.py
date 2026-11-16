@@ -363,10 +363,12 @@ def check_inputs(
             array does not have `size` entries.
     """
     if not 0 < fraction <= MAX_FRACTION:
-        raise ValueError(f"fraction must be in (0, {MAX_FRACTION}]")
+        raise errors.InputError(f"fraction must be in (0, {MAX_FRACTION}]")
     for name, values in arrays.items():
         if values is not None and len(values) != size:
-            raise ValueError(f"{name} must have one entry per development row")
+            raise errors.InputError(
+                f"{name} must have one entry per development row"
+            )
 
 
 def carve_confirmation(

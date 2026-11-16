@@ -17,6 +17,7 @@ from fractions import Fraction
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 import scmle.data.ledger.budget
@@ -50,7 +51,7 @@ def positive_number(value: Any, name: str) -> float:
     """
     number = qualification.finite(value, name)
     if number <= 0:
-        raise ValueError(f"{name} must be greater than 0")
+        raise errors.InputError(f"{name} must be greater than 0")
     return number
 
 
@@ -70,7 +71,7 @@ def open_unit(value: Any, name: str) -> float:
     """
     number = qualification.finite(value, name)
     if not 0 < number < 1:
-        raise ValueError(f"{name} must be strictly between 0 and 1")
+        raise errors.InputError(f"{name} must be strictly between 0 and 1")
     return number
 
 
@@ -101,11 +102,11 @@ class Gates:
                 (0, 1), or `penalty` is not finite or is negative.
         """
         if self.clip is not None and positive_number(self.clip, "clip") < 1:
-            raise ValueError("clip must be at least 1")
+            raise errors.InputError("clip must be at least 1")
         open_unit(self.min_propensity, "min_propensity")
         open_unit(self.ess_floor, "ess_floor")
         if qualification.finite(self.penalty, "penalty") < 0:
-            raise ValueError("penalty must be non-negative")
+            raise errors.InputError("penalty must be non-negative")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.
@@ -165,10 +166,10 @@ class DecisionModel:
         if not self.baselines or len(set(self.baselines)) != len(
             self.baselines
         ):
-            raise ValueError("baselines must be non-empty and distinct")
+            raise errors.InputError("baselines must be non-empty and distinct")
         for name in self.baselines:
             if name not in BASELINES:
-                raise ValueError(f"unknown baseline {name!r}")
+                raise errors.InputError(f"unknown baseline {name!r}")
         if self.treatment_cost is not None:
             qualification.finite(self.treatment_cost, "treatment_cost")
         open_unit(self.calibration_level, "calibration_level")
@@ -245,14 +246,14 @@ class FairnessConstraint:
         """
         evidence.require_text(self.attribute, "attribute")
         if self.criterion not in CRITERIA:
-            raise ValueError(f"unknown criterion {self.criterion!r}")
+            raise errors.InputError(f"unknown criterion {self.criterion!r}")
         open_unit(self.max_gap, "max_gap")
         if self.mechanism not in MECHANISMS:
-            raise ValueError(f"unknown mechanism {self.mechanism!r}")
+            raise errors.InputError(f"unknown mechanism {self.mechanism!r}")
         if self.mechanism == "group_thresholds" and not (
             self.attestation and self.attestation.strip()
         ):
-            raise ValueError(
+            raise errors.InputError(
                 "group thresholds need an attestation that they are permitted"
             )
         qualification.count(self.min_group, "min_group", minimum=2)
@@ -314,7 +315,7 @@ class Guardrail:
         if not qualification.finite(self.low, "low") < qualification.finite(
             self.high, "high"
         ):
-            raise ValueError("low must be below high")
+            raise errors.InputError("low must be below high")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.
@@ -401,18 +402,24 @@ class RolloutPlan:
         qualification.count(self.n_max, "n_max", minimum=2)
         for name in ("alpha_promote", "alpha_rollback"):
             if not 0 < getattr(self, name) < 1:
-                raise ValueError(f"{name} must be strictly between 0 and 1")
+                raise errors.InputError(
+                    f"{name} must be strictly between 0 and 1"
+                )
         if not qualification.finite(self.low, "low") < qualification.finite(
             self.high, "high"
         ):
-            raise ValueError("low must be below high")
+            raise errors.InputError("low must be below high")
         if self.delta_min >= self.high - self.low:
-            raise ValueError("delta_min must be smaller than the metric range")
+            raise errors.InputError(
+                "delta_min must be smaller than the metric range"
+            )
         open_unit(self.srm_level, "srm_level")
         qualification.require_tuple(self.guardrails, "guardrails")
         names = [g.name for g in self.guardrails]
         if len(set(names)) != len(names) or self.primary in names:
-            raise ValueError("guardrail names must be distinct from each other")
+            raise errors.InputError(
+                "guardrail names must be distinct from each other"
+            )
 
     def budget(self) -> scmle.data.ledger.budget.DecisionBudget:
         """Builds a decision budget from the rollout's levels.
