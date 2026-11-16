@@ -7,6 +7,7 @@ development rows, so confirmed claims never shape the model that `C` scores.
 """
 
 import dataclasses
+import logging
 
 import numpy
 import pandas
@@ -21,6 +22,9 @@ from scmle.data.custody import sealed
 import scmle.data.custody.manifest
 from scmle.data.splitting import duplicates
 from scmle.data.splitting import splitters
+
+LOGGER = logging.getLogger(__name__)
+
 
 TEMPORAL = frozenset({"temporal", "rolling"})
 
@@ -282,6 +286,12 @@ def apply_custody(
         carved = empty_carve(dev_ids, folds, actual.reason)
         actual = assess(charter, 0, None)
     if not len(carved.confirmation_ids):
+        # ERR-11: the run continues unconfirmed, so it says so loudly.
+        LOGGER.warning(
+            "WARNING no confirmation set was carved; the run's scope is "
+            "unconfirmed: %s",
+            "; ".join(carved.notes) or actual.reason,
+        )
         embargo_rows = charter.sets.embargo_rows
     elif acf_note:
         carved = dataclasses.replace(carved, notes=(*carved.notes, acf_note))

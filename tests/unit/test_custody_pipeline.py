@@ -248,3 +248,17 @@ def test_an_independent_target_keeps_the_charter_embargo():
     )
     assert outcome.manifest.embargo_rows == 0
     assert not any("autocorrelation" in n for n in outcome.manifest.notes)
+
+
+def test_a_run_without_a_confirmation_set_says_so_loudly(caplog):
+    # ERR-11: the run continued unconfirmed with nothing in the log.
+    frame = make_frame(rows=120)
+    with caplog.at_level("WARNING", logger=pipeline.__name__):
+        outcome, ignored, vault = run(frame)
+    vault.close()
+    assert outcome.manifest.scope == "exploratory_unconfirmed"
+    assert any(
+        "no confirmation set was carved" in r.getMessage()
+        and r.levelname == "WARNING"
+        for r in caplog.records
+    )
