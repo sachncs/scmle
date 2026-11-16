@@ -1,9 +1,9 @@
 {
-  "modules_over": 56,
+  "modules_over": 55,
   "classes_over": 54,
-  "functions_over": 186,
+  "functions_over": 184,
   "compound_functions": 2862,
-  "compound_classes": 763,
+  "compound_classes": 730,
   "private_names": 0,
   "loose_dicts": 1156,
   "largest_module": 6280

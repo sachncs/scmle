@@ -46,12 +46,16 @@ def span(node: ast.AST) -> int:
 
 
 def compound(name: str) -> bool:
-    """Whether a name joins several words (snake_case or CamelCase)."""
+    """Whether a name joins several words (snake_case or CamelCase).
+
+    The `Error` suffix Google style requires on exception names is a marker,
+    not a word of the name, so `ConflictError` counts as one word.
+    """
     if name.startswith("__") and name.endswith("__"):
         return False
     if "_" in name.strip("_"):
         return True
-    return len(CAPITALS.findall(name)) > 1
+    return len(CAPITALS.findall(name.removesuffix("Error") or name)) > 1
 
 
 def measure() -> dict[str, int]:

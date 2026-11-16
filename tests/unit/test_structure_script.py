@@ -24,6 +24,8 @@ def test_compound_names_are_snake_or_camel_joins():
     assert not module.compound("Store")
     assert not module.compound("__init__")
     assert not module.compound("F5")
+    assert not module.compound("ConflictError")
+    assert module.compound("LeaseLostError")
 
 
 def test_the_limits_come_from_the_thresholds_file():
