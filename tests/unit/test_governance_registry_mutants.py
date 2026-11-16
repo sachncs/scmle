@@ -126,7 +126,8 @@ def test_a_signature_verifies_only_with_the_same_key_and_content(monkeypatch):
     assert signed.verify("another-key") is False
     assert review().verify(KEY) is False
     assert signed.verify() is False
-    assert signed.verify("") is False
+    with pytest.raises(ValueError, match="empty"):
+        signed.verify("")
     tampered = dataclasses.replace(signed, reason="changed")
     assert tampered.verify(KEY) is False
     monkeypatch.setenv("SCMLE_SIGNING_KEY", KEY)

@@ -267,3 +267,18 @@ def test_head_is_the_newest_hash_and_genesis_when_empty():
     assert log.head == sealed.GENESIS
     entry = log.append("C", "sealed", "o")
     assert log.head == entry["hash"]
+
+
+def test_an_unsigned_log_says_so(caplog):
+    with caplog.at_level("WARNING", logger=sealed.__name__):
+        sealed.OpenLog(signing_key=None)
+    assert any("not signed" in r.getMessage() for r in caplog.records)
+
+
+def test_a_signed_log_cannot_be_verified_without_its_key(tmp_path):
+    path = tmp_path / "log.jsonl"
+    signed = sealed.OpenLog(path, signing_key="k")
+    signed.append("C", "sealed", "orchestrator")
+    with pytest.raises(errors.ArtifactError, match="cannot be verified"):
+        sealed.OpenLog(path, signing_key=None)
+    assert len(sealed.OpenLog(path, signing_key="k").entries) == 1

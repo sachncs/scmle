@@ -32,6 +32,7 @@ import scmle
 from scmle import durability
 from scmle.contracts import artifacts
 from scmle.contracts import errors
+from scmle.contracts import signing
 from scmle.contracts import tasks
 import scmle.contracts.data
 from scmle.data.readers import interchange
@@ -70,7 +71,6 @@ NOVELTY_FILE = "novelty.joblib"
 HISTORY_FILE = "series_history.parquet"
 PARITY_TOLERANCE = 1e-9
 SIGNATURE_FILE = "signature.json"
-SIGNING_KEY_ENV = "SCMLE_SIGNING_KEY"
 SIGNATURE_ALGORITHM = "hmac-sha256"
 MANIFEST_FILE = "model_manifest.json"
 BINARY_CLASSES = 2
@@ -171,34 +171,6 @@ def minor_version(version: str) -> list[str]:
     return version.split(".")[:2]
 
 
-def resolve_key(signing_key: str | bytes | None) -> bytes | None:
-    """Returns the signing key from the argument or the environment.
-
-    Args:
-        signing_key: The key, or None to read `$SCMLE_SIGNING_KEY`.
-
-    Returns:
-        The key as bytes, or None if neither the argument nor the
-        environment variable gives one or the key is an empty string. A key
-        passed explicitly, even an empty string, never falls back to the
-        environment.
-
-    Raises:
-        ValueError: If the key is empty bytes.
-    """
-    key = (
-        signing_key
-        if signing_key is not None
-        else os.environ.get(SIGNING_KEY_ENV)
-    )
-    if key is None or key == "":
-        return None
-    resolved = key.encode() if isinstance(key, str) else key
-    if not resolved:
-        raise ValueError("signing key must not be empty")
-    return resolved
-
-
 def sign_manifest(manifest_bytes: bytes, key: bytes) -> str:
     """Computes the HMAC-SHA256 of the manifest.
 
@@ -235,7 +207,7 @@ def verify_signature(
             unsupported algorithm or does not verify.
     """
     signature_path = root / SIGNATURE_FILE
-    key = resolve_key(signing_key)
+    key = signing.resolve_key(signing_key)
     if not signature_path.exists() or key is None:
         return False
     try:
@@ -428,8 +400,8 @@ def verify_core_files(
         raise errors.ArtifactError(
             "refusing to load an unauthenticated bundle: it is pickle-"
             "based and loading executes code. Sign bundles with "
-            f"${SIGNING_KEY_ENV}, or pass trusted=True if you trust its "
-            "source."
+            f"${signing.SIGNING_KEY_ENV}, or pass trusted=True if you trust "
+            "its source."
         )
     model_path = root / MODEL_FILE
     if not model_path.exists():
@@ -1100,7 +1072,7 @@ class Bundle:
             manifest_text, encoding="utf-8", newline="\n"
         )
         signature_path = root / SIGNATURE_FILE
-        key = resolve_key(signing_key)
+        key = signing.resolve_key(signing_key)
         if key is not None:
             signature = sign_manifest(manifest_text.encode(), key)
             signature_path.write_text(
@@ -1143,8 +1115,8 @@ class Bundle:
         """
         root = pathlib.Path(directory)
         try:
-            old = resolve_key(current_key)
-            replacement = resolve_key(new_key)
+            old = signing.resolve_key(current_key)
+            replacement = signing.resolve_key(new_key)
         except ValueError:
             old = replacement = None
         if old is None or replacement is None:

@@ -81,14 +81,17 @@ def test_a_consistent_run_verifies_every_step(tmp_path):
     )
 
 
-def test_without_a_key_the_charter_is_hash_checked_only(tmp_path):
+def test_a_signed_run_cannot_pass_the_audit_without_its_key(tmp_path):
+    # ERR-3: auditing a signed run without the key used to skip the MAC
+    # checks and pass as "hash-checked only"; a signed custody log now
+    # refuses to verify without its key, so the audit fails and says why.
     make_run(tmp_path, withdraw=False)
     result = claims_audit.verify(tmp_path)
-    assert result.ok
-    assert (
-        statuses(result)["second-stage accounting is consistent"] == "skipped"
+    assert not result.ok
+    assert any(
+        "signed and no key was given" in f.detail for f in result.findings
     )
-    assert any("not signed" in f.detail for f in result.findings)
+    assert claims_audit.verify(tmp_path, KEY).ok
 
 
 def test_chartered_rules_are_checked_against_the_ledger(tmp_path):

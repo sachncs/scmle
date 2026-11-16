@@ -17,6 +17,7 @@ import dataclasses
 import hashlib
 import hmac
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,8 @@ from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.data.splitting import splitters
 from scmle.governance import vault
+
+LOGGER = logging.getLogger(__name__)
 
 GENESIS = "0" * 64
 ORCHESTRATOR = "orchestrator"
@@ -101,10 +104,17 @@ class OpenLog:
             path: File to persist to (one JSON object per line), or None for
                 an in-memory log.
             signing_key: HMAC key; the environment key is used when None.
-                Without any key the log is hash-chained but not MAC-ed.
+                Without any key the log is hash-chained but not MAC-ed, and
+                a WARNING says so (ERR-3).
         """
         self.path = Path(path) if path is not None else None
         self.key = signing.resolve_key(signing_key)
+        if self.key is None:
+            LOGGER.warning(
+                "WARNING custody log %s is not signed: set %s to MAC it",
+                self.path or "(in memory)",
+                signing.SIGNING_KEY_ENV,
+            )
         self.entries: list[dict[str, Any]] = []
         if self.path is not None and self.path.exists():
             self.entries = [
@@ -169,6 +179,11 @@ class OpenLog:
             ):
                 raise errors.ArtifactError(
                     f"custody log chain broken at entry {index}"
+                )
+            if self.key is None and "mac" in entry:
+                raise errors.ArtifactError(
+                    f"custody log entry {index} is signed and no key was "
+                    "given: it cannot be verified"
                 )
             if self.key is not None and not hmac.compare_digest(
                 str(entry.get("mac", "")), entry_mac(entry["hash"], self.key)

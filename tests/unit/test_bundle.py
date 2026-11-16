@@ -13,6 +13,7 @@ import scmle.artifacts.store
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
+import scmle.contracts.signing
 from scmle.data.curation import preprocessing
 import scmle.inference.mapping
 import scmle.models.registry
@@ -257,7 +258,7 @@ def test_bundle_without_reference_still_loads(trained, tmp_path):
 def test_unsigned_bundles_are_refused_unless_trusted(
     trained, tmp_path, monkeypatch
 ):
-    monkeypatch.delenv(scmle.artifacts.bundle.SIGNING_KEY_ENV, raising=False)
+    monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
     bundle, features = trained
     directory = bundle.save(tmp_path / "m")
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
@@ -272,7 +273,7 @@ def test_unsigned_bundles_are_refused_unless_trusted(
 def test_signed_bundles_load_without_trust_and_detect_tampering(
     trained, tmp_path, monkeypatch
 ):
-    monkeypatch.delenv(scmle.artifacts.bundle.SIGNING_KEY_ENV, raising=False)
+    monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
     bundle, features = trained
     directory = bundle.save(tmp_path / "m", signing_key="s3cret")
     assert (directory / scmle.artifacts.bundle.SIGNATURE_FILE).exists()
@@ -289,7 +290,7 @@ def test_signed_bundles_load_without_trust_and_detect_tampering(
 def test_a_swapped_model_file_cannot_ride_a_valid_signature(
     trained, tmp_path, monkeypatch
 ):
-    monkeypatch.delenv(scmle.artifacts.bundle.SIGNING_KEY_ENV, raising=False)
+    monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
     bundle = trained[0]
     good = bundle.save(tmp_path / "good", signing_key="k")
     evil = bundle.save(tmp_path / "evil", signing_key="k")
@@ -308,12 +309,12 @@ def test_key_from_environment_signs_and_verifies(
     trained, tmp_path, monkeypatch
 ):
     bundle, features = trained
-    monkeypatch.setenv(scmle.artifacts.bundle.SIGNING_KEY_ENV, "env-key")
+    monkeypatch.setenv(scmle.contracts.signing.SIGNING_KEY_ENV, "env-key")
     directory = bundle.save(tmp_path / "m")
     assert len(
         scmle.artifacts.bundle.Bundle.load(directory).predict(features)
     ) == len(features)
-    monkeypatch.delenv(scmle.artifacts.bundle.SIGNING_KEY_ENV)
+    monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV)
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
         scmle.artifacts.bundle.Bundle.load(directory)
 
@@ -337,7 +338,7 @@ def test_signing_key_rotation_preserves_bundle_and_rejects_old_key(
 def test_resaving_unsigned_removes_a_stale_signature(
     trained, tmp_path, monkeypatch
 ):
-    monkeypatch.delenv(scmle.artifacts.bundle.SIGNING_KEY_ENV, raising=False)
+    monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
     bundle = trained[0]
     directory = bundle.save(tmp_path / "m", signing_key="k")
     bundle.save(directory)
@@ -530,5 +531,6 @@ def test_a_version_mismatch_arrives_with_the_lock_attached(trained, tmp_path):
 
 def test_an_empty_bytes_key_is_rejected_when_resolved():
     with pytest.raises(ValueError, match="empty"):
-        scmle.artifacts.bundle.resolve_key(b"")
-    assert scmle.artifacts.bundle.resolve_key("") is None
+        scmle.contracts.signing.resolve_key(b"")
+    with pytest.raises(ValueError, match="empty"):
+        scmle.contracts.signing.resolve_key("")

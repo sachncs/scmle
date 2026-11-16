@@ -8,6 +8,8 @@ import os
 import pathlib
 from typing import Any
 
+from scmle.contracts import errors
+
 SIGNING_KEY_ENV = "SCMLE_SIGNING_KEY"
 SIGNING_KEY_FILE_ENV = "SCMLE_SIGNING_KEY_FILE"
 SIGNATURE_ALGORITHM = "hmac-sha256"
@@ -24,18 +26,34 @@ def key_from_environment(environ: Mapping[str, str]) -> str | None:
         environ: The environment variables.
 
     Returns:
-        The key from the variable if it is non-empty, else the stripped
-        content of the file named by the file variable, or None if neither
-        yields a non-empty key. An unreadable file raises `OSError`.
+        The key from the variable, else the stripped content of the file
+        named by the file variable, or None when neither variable is set.
+
+    Raises:
+        ConfigError: If a variable is set but empty, the file cannot be
+            read, or the file is empty. Each of these used to mean "no key"
+            and left records unsigned without a word (ERR-3).
     """
     direct = environ.get(SIGNING_KEY_ENV)
-    if direct:
+    if direct is not None:
+        if not direct:
+            raise errors.ConfigError(f"{SIGNING_KEY_ENV} is set but empty")
         return direct
     path = environ.get(SIGNING_KEY_FILE_ENV)
-    if path:
-        with pathlib.Path(path).open(encoding="utf-8") as handle:
-            return handle.read().strip() or None
-    return None
+    if path is None:
+        return None
+    if not path:
+        raise errors.ConfigError(f"{SIGNING_KEY_FILE_ENV} is set but empty")
+    try:
+        text = pathlib.Path(path).read_text(encoding="utf-8").strip()
+    except OSError as error:
+        raise errors.ConfigError(
+            f"cannot read the signing key file named by "
+            f"{SIGNING_KEY_FILE_ENV}: {error}"
+        ) from error
+    if not text:
+        raise errors.ConfigError(f"the signing key file {path} is empty")
+    return text
 
 
 def resolve_key(signing_key: str | bytes | None) -> bytes | None:
@@ -45,19 +63,22 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
         signing_key: The explicit key, or None to use the configured one.
 
     Returns:
-        The key as bytes (a string is UTF-8 encoded), or None if there is
-        no key or it is the empty string.
+        The key as bytes (a string is UTF-8 encoded), or None if no key is
+        given or configured.
 
     Raises:
-        ValueError: If the key is empty bytes; an empty HMAC key would sign
-            with a publicly known secret.
+        ValueError: If the key is empty; an empty HMAC key would sign with a
+            publicly known secret, and treating it as "no key" left records
+            unsigned silently (ERR-3).
+        ConfigError: If the configured key is unusable (see
+            `key_from_environment`).
     """
     key = (
         signing_key
         if signing_key is not None
         else key_from_environment(os.environ)
     )
-    if key is None or key == "":
+    if key is None:
         return None
     resolved = key.encode() if isinstance(key, str) else key
     if not resolved:

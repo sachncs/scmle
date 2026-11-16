@@ -4,6 +4,7 @@ import dataclasses
 
 import pytest
 
+from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.governance import attestation
 
@@ -85,5 +86,30 @@ def test_an_empty_bytes_signing_key_is_rejected():
         signing.resolve_key(b"")
     with pytest.raises(ValueError, match="empty"):
         signing.sign_payload({"a": 1}, b"")
-    assert signing.resolve_key("") is None
+    # ERR-3: an empty string used to mean "no key" and left records unsigned.
+    with pytest.raises(ValueError, match="empty"):
+        signing.resolve_key("")
     assert signing.resolve_key(b"k") == b"k"
+
+
+def test_an_unusable_configured_key_is_refused_and_named(tmp_path):
+    with pytest.raises(errors.ConfigError, match="set but empty"):
+        signing.key_from_environment({signing.SIGNING_KEY_ENV: ""})
+    with pytest.raises(errors.ConfigError, match="set but empty"):
+        signing.key_from_environment({signing.SIGNING_KEY_FILE_ENV: ""})
+    missing = tmp_path / "absent.key"
+    with pytest.raises(errors.ConfigError, match="cannot read"):
+        signing.key_from_environment(
+            {signing.SIGNING_KEY_FILE_ENV: str(missing)}
+        )
+    empty = tmp_path / "empty.key"
+    empty.write_text("  \n", encoding="utf-8")
+    with pytest.raises(errors.ConfigError, match="is empty"):
+        signing.key_from_environment({signing.SIGNING_KEY_FILE_ENV: str(empty)})
+    good = tmp_path / "good.key"
+    good.write_text("secret\n", encoding="utf-8")
+    assert (
+        signing.key_from_environment({signing.SIGNING_KEY_FILE_ENV: str(good)})
+        == "secret"
+    )
+    assert signing.key_from_environment({}) is None
