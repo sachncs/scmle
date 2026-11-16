@@ -97,7 +97,7 @@ class BaselineFeasibility:
         return record
 
 
-def verdict_at(
+def judge(
     s_d: float,
     *,
     delta_min: float,
@@ -180,10 +180,10 @@ def assess(
         "k_max": k_max,
         "power": power,
     }
-    point = verdict_at(s_d, **settings)
+    point = judge(s_d, **settings)
     ends = {
-        verdict_at(low, **settings).verdict,
-        verdict_at(high, **settings).verdict,
+        judge(low, **settings).verdict,
+        judge(high, **settings).verdict,
     }
     verdict = point.verdict.value
     scope = point.scope

@@ -141,7 +141,7 @@ class Client:
         self.process: subprocess.Popen[bytes] | None = None
         self.channel: connection.Connection | None = None
 
-    def ensure_running(self) -> connection.Connection:
+    def start(self) -> connection.Connection:
         """Starts (or restarts) the worker process.
 
         Returns:
@@ -172,7 +172,7 @@ class Client:
             WorkerError: If the worker reports an error or dies.
         """
         with self.lock:
-            channel = self.ensure_running()
+            channel = self.start()
             try:
                 channel.send((operation, payload))
                 status, value = channel.recv()

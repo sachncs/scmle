@@ -24,7 +24,7 @@ selection of outcomes on `X` and on the rows set aside for a missing target is
 checked on those rows (`C` has no unlabeled rows, they are removed before the
 split), and a flag there makes the claim `not_issued` without a test.
 
-The tier a baseline claim may reach is capped by `provenance.claim_tier`: an
+The tier a baseline claim may reach is capped by `provenance.grade`: an
 unsigned charter with an LLM-filled field, or a cost that came from data or a
 template, leaves it `unverified`. The cap is read from `framing_draft.json`
 when the data spec names it.
@@ -337,7 +337,7 @@ def source_ceiling(
         )
     sources = [provenance.FieldSource(v) for v in fields.values()]
     from_data = bool(model.unverified_entries)
-    tier = provenance.claim_tier(
+    tier = provenance.grade(
         qualification.Tier.CONFIRMED,
         sources,
         signed=signed,

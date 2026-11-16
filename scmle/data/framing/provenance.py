@@ -21,7 +21,7 @@ class FieldSource(enum.StrEnum):
     HUMAN = "human"
 
 
-def claim_tier(
+def grade(
     ceiling: qualification.Tier,
     sources: Iterable[FieldSource],
     *,

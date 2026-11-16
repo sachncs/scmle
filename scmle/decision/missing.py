@@ -36,7 +36,7 @@ NOTE = (
 )
 
 
-def differential_missingness(
+def contrast(
     arm: ArrayLike,
     observed: ArrayLike,
     assignment_prob: float,

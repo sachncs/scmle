@@ -282,7 +282,7 @@ class IngestStage(Stage):
         else:
             frame = tabular.read_table(data.uri)
         if data.horizon:
-            frame = forecasting.add_targets(frame, data)
+            frame = forecasting.augment(frame, data)
         context.read_seconds = time.monotonic() - started
         context.manifest = tabular.build_manifest(
             frame, data.target, data.uri, data.modality
@@ -1856,7 +1856,7 @@ class ProfileStage(Stage):
                 "reweighing applies to binary and multiclass tasks only",
             )
             return
-        weights = reweighing.reweighing_weights(
+        weights = reweighing.weigh(
             split.dev_features[column].astype(str), split.dev_target
         )
         split.dev_features[tasks.FAIRNESS_WEIGHT] = weights
@@ -3965,7 +3965,7 @@ class PackageStage(Stage):
         """
         task = scmle.core.context.require(context.task, "task")
         metric = scmle.core.context.require(context.metric, "metric")
-        policy = policies.release_policy_from_criteria(
+        policy = policies.derive(
             task,
             metric.name,
             metric.greater_is_better,

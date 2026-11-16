@@ -9,7 +9,7 @@ label, so every subset keeps roughly the label proportions of the whole data.
 import numpy
 
 
-def iterative_assignment(
+def assign(
     labels: numpy.ndarray, proportions: list[float], seed: int
 ) -> numpy.ndarray:
     """Assigns each row to one of several subsets.

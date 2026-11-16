@@ -488,7 +488,7 @@ class Evaluator:
             model: The cost model that was registered.
             observed: Observation mask; defaults to `y` not NaN.
             input_tier: Highest tier the inputs allow (see
-                `provenance.claim_tier`).
+                `provenance.grade`).
             seed: Run seed, recorded in the checks.
 
         Returns:

@@ -20,6 +20,13 @@ marked `Breaking:` and listed first in their group.
   is `optimise`, `reports.with_hash` is `stamp`, `context.included_files` is
   `include`, `synthesis.estimate_correlation` is `correlate`,
   `builder.copy_present` is `collect`, `classify.caveats_for` is `caveat`.
+  Also: `comparison.compare_paired` is `pair`, `shift.most_shifted` is `rank`
+  (the report key stays `most_shifted`), `policies.release_policy_from_criteria`
+  is `derive`, `missing.differential_missingness` is `contrast`,
+  `iterative.iterative_assignment` is `assign`, `feasibility.verdict_at` is
+  `judge`, `provenance.claim_tier` is `grade`, `worker.ensure_running` is
+  `start`, `forecasting.add_targets` is `augment`,
+  `reweighing.reweighing_weights` is `weigh`.
   Migration: replace the old names; the signatures are unchanged.
 * **No package-root exports.** `scmle` exports only `__version__`. Every public
   name is imported from the module that defines it: `scmle.api.project.Project`,

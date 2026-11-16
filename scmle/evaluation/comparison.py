@@ -39,7 +39,7 @@ class Comparison:
     folds: int
 
 
-def compare_paired(
+def pair(
     first: Sequence[float],
     second: Sequence[float],
     rope: float = 0.0,

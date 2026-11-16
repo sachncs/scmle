@@ -14,7 +14,7 @@ def labels(rows=1000, seed=0):
 def test_every_subset_gets_its_share_of_every_label():
     matrix = labels()
 
-    assigned = iterative.iterative_assignment(matrix, [0.2] * 5, seed=0)
+    assigned = iterative.assign(matrix, [0.2] * 5, seed=0)
 
     for subset in range(5):
         rows = assigned == subset
@@ -24,7 +24,7 @@ def test_every_subset_gets_its_share_of_every_label():
 
 
 def test_every_row_is_assigned_exactly_once():
-    assigned = iterative.iterative_assignment(labels(), [0.7, 0.3], seed=1)
+    assigned = iterative.assign(labels(), [0.7, 0.3], seed=1)
 
     assert set(assigned) == {0, 1} and len(assigned) == 1000
 
@@ -32,9 +32,9 @@ def test_every_row_is_assigned_exactly_once():
 def test_the_result_depends_only_on_the_seed():
     matrix = labels()
 
-    first = iterative.iterative_assignment(matrix, [0.5, 0.5], seed=3)
-    second = iterative.iterative_assignment(matrix, [0.5, 0.5], seed=3)
-    other = iterative.iterative_assignment(matrix, [0.5, 0.5], seed=4)
+    first = iterative.assign(matrix, [0.5, 0.5], seed=3)
+    second = iterative.assign(matrix, [0.5, 0.5], seed=3)
+    other = iterative.assign(matrix, [0.5, 0.5], seed=4)
 
     assert (first == second).all() and (first != other).any()
 
@@ -42,6 +42,6 @@ def test_the_result_depends_only_on_the_seed():
 def test_rows_with_no_label_are_still_placed():
     matrix = numpy.zeros((50, 3), dtype=int)
 
-    assigned = iterative.iterative_assignment(matrix, [0.5, 0.5], seed=0)
+    assigned = iterative.assign(matrix, [0.5, 0.5], seed=0)
 
     assert abs((assigned == 0).sum() - 25) <= 1

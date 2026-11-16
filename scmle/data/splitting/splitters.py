@@ -610,7 +610,7 @@ class MultilabelStratifiedSplit(RandomSplit):
         """
         labels = self.label_matrix(frame)
         share = self.validation.test_fraction
-        side = iterative.iterative_assignment(
+        side = iterative.assign(
             labels, [1.0 - share, share], self.validation.seed
         )
         dev_ids = numpy.flatnonzero(side == 0)
@@ -635,7 +635,7 @@ class MultilabelStratifiedSplit(RandomSplit):
             for each configured fold.
         """
         count = self.validation.folds
-        assignment = iterative.iterative_assignment(
+        assignment = iterative.assign(
             self.label_matrix(frame)[dev_ids],
             [1.0 / count] * count,
             self.validation.seed,

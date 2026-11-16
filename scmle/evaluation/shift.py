@@ -44,7 +44,7 @@ class AdversarialValidation(diagnostics.Diagnostic):
             when `inputs` has no reference rows. Otherwise a mapping with
             `available` true, the out-of-fold separability `auc` (0.5 means
             indistinguishable), its `verdict`, the `odds` summary, the
-            `most_shifted` features and the sampled `rows` counts for the
+            `rank` features and the sampled `rows` counts for the
             reference and evaluation sets.
         """
         reference = inputs.reference_features
@@ -77,7 +77,7 @@ class AdversarialValidation(diagnostics.Diagnostic):
             "auc": auc,
             "verdict": self.verdict(auc),
             "odds": self.odds(scores, len(old)),
-            "most_shifted": self.most_shifted(old, new, inputs),
+            "most_shifted": self.rank(old, new, inputs),
             "rows": {"reference": len(old), "evaluation": len(new)},
         }
 
@@ -204,7 +204,7 @@ class AdversarialValidation(diagnostics.Diagnostic):
         return "no meaningful shift"
 
     @staticmethod
-    def most_shifted(
+    def rank(
         old: pandas.DataFrame,
         new: pandas.DataFrame,
         inputs: diagnostics.DiagnosticInput,

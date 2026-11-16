@@ -11,9 +11,7 @@ import pandas
 from scmle.contracts import tasks
 
 
-def add_targets(
-    frame: pandas.DataFrame, data: tasks.Dataset
-) -> pandas.DataFrame:
+def augment(frame: pandas.DataFrame, data: tasks.Dataset) -> pandas.DataFrame:
     """Sorts the series and adds the future-value target columns.
 
     Args:

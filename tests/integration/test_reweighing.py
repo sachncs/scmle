@@ -24,7 +24,7 @@ def biased(rows=1600, seed=0):
 
 def test_weights_make_group_and_label_independent():
     frame = biased()
-    weights = reweighing.reweighing_weights(frame.group, frame.y)
+    weights = reweighing.weigh(frame.group, frame.y)
     weighted = frame.assign(w=weights)
 
     rates = weighted.groupby("group").apply(
@@ -39,14 +39,12 @@ def test_weights_make_group_and_label_independent():
 
 def test_bad_inputs_are_refused():
     with pytest.raises(ValueError, match="same non-zero length"):
-        reweighing.reweighing_weights(
-            pandas.Series(["a"]), pandas.Series([1, 0])
-        )
+        reweighing.weigh(pandas.Series(["a"]), pandas.Series([1, 0]))
 
 
 def test_a_project_trained_on_the_weights_selects_more_evenly():
     frame = biased()
-    frame["w"] = reweighing.reweighing_weights(frame.group, frame.y)
+    frame["w"] = reweighing.weigh(frame.group, frame.y)
 
     def gap(weight_column):
         result = scmle.api.project.Project(

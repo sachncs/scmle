@@ -142,7 +142,7 @@ class MeanSelector(Selector):
             or len(best.fold_scores) < comparison.MIN_FOLDS
         ):
             return False
-        verdict = comparison.compare_paired(
+        verdict = comparison.pair(
             [sign * s for s in best.fold_scores],
             [sign * s for s in other.fold_scores],
             rope=self.rule.rope,

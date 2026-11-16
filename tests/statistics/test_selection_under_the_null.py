@@ -2,7 +2,7 @@
 
 Three layers, all with a known truth:
 
-* a pre-specified paired comparison (`comparison.compare_paired`, the
+* a pre-specified paired comparison (`comparison.pair`, the
   correlated Bayesian t test) of two models with the same expected loss, scored
   on real cross-validation folds, must call one of them better with
   probability at most the stated 0.05;
@@ -62,7 +62,7 @@ def test_a_prespecified_comparison_of_equal_models_stays_within_its_level(
             rng.normal(size=(rows, features)) for ignored in range(2)
         )
         losses = cross_validated_losses(rng, [first, second], target, folds)
-        verdict = comparison.compare_paired(
+        verdict = comparison.pair(
             [-loss for loss in losses[0]], [-loss for loss in losses[1]]
         )
         claims += verdict.probability_first_better >= CONFIDENCE

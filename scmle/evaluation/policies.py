@@ -6,7 +6,7 @@ from scmle.contracts import evaluation
 from scmle.contracts import tasks
 
 
-def release_policy_from_criteria(
+def derive(
     task: tasks.Task,
     primary_metric: str,
     primary_greater_is_better: bool,

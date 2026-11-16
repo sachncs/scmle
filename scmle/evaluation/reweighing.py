@@ -14,9 +14,7 @@ import numpy
 import pandas
 
 
-def reweighing_weights(
-    groups: pandas.Series, labels: pandas.Series
-) -> numpy.ndarray:
+def weigh(groups: pandas.Series, labels: pandas.Series) -> numpy.ndarray:
     """Returns row weights that remove the association of group and label.
 
     Args:

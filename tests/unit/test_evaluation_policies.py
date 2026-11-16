@@ -8,16 +8,11 @@ from scmle.evaluation import policies
 
 
 def test_empty_criteria_do_not_invent_release_thresholds():
-    assert (
-        policies.release_policy_from_criteria(
-            tasks.Task.BINARY, "roc_auc", True, {}
-        )
-        is None
-    )
+    assert policies.derive(tasks.Task.BINARY, "roc_auc", True, {}) is None
 
 
 def test_criteria_become_directional_metric_and_evidence_gates():
-    policy = policies.release_policy_from_criteria(
+    policy = policies.derive(
         tasks.Task.BINARY,
         "roc_auc",
         True,
@@ -43,6 +38,4 @@ def test_unknown_metric_direction_fails_closed():
         evaluation.UnsupportedEvaluationPolicyError,
         match="no declared release direction",
     ):
-        policies.release_policy_from_criteria(
-            tasks.Task.BINARY, "roc_auc", True, {"unknown": 0.8}
-        )
+        policies.derive(tasks.Task.BINARY, "roc_auc", True, {"unknown": 0.8})
