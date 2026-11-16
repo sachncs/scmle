@@ -47,16 +47,16 @@
         ]
       },
       "leak_noisy_copy": {
-        "detected": 199,
-        "detected_any_mechanism": 199,
-        "old_rule_detected": 5,
+        "detected": 197,
+        "detected_any_mechanism": 197,
+        "old_rule_detected": 3,
         "old_rule_wilson_95": [
-          0.010724719651761264,
-          0.05717834040664198
+          0.00511423779325831,
+          0.04316572879269026
         ],
         "wilson_95": [
-          0.9722262956021069,
-          0.9991168312843989
+          0.9568342712073097,
+          0.9948857622067417
         ]
       },
       "leak_rare_record": {
@@ -75,10 +75,10 @@
       "leak_threshold": {
         "detected": 200,
         "detected_any_mechanism": 200,
-        "old_rule_detected": 5,
+        "old_rule_detected": 4,
         "old_rule_wilson_95": [
-          0.010724719651761264,
-          0.05717834040664198
+          0.0078044264163494685,
+          0.050287086905826436
         ],
         "wilson_95": [
           0.9811546736227335,
@@ -163,10 +163,10 @@
       "leak_noisy_copy": {
         "detected": 200,
         "detected_any_mechanism": 200,
-        "old_rule_detected": 59,
+        "old_rule_detected": 57,
         "old_rule_wilson_95": [
-          0.23613943856849148,
-          0.36158714524618774
+          0.22695003004617292,
+          0.3511534602960517
         ],
         "wilson_95": [
           0.9811546736227335,

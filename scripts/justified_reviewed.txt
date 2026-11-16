@@ -33,3 +33,4 @@ scmle/models/modality_lifecycle.py modality_notes getter adapter hook documented
 scmle/operations/faults.py run_all passthrough shown in docs/OPERATIONS.md and the website observability page
 scmle/runners/base.py Runner lone-interface local.Runner implements it; pinned in the public API
 scmle/sampling/synthesis.py SyntheticGenerator lone-interface GaussianCopulaGenerator and a test double; documented in docs/ARCHITECTURE.md
+scmle/data/admissibility/plants.py copy getter one of the five leak-type methods that plant() dispatches to by name (scmle/data/admissibility/plants.py plant); Numbers.copy overrides it, so it is polymorphic, not a getter

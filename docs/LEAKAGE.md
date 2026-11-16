@@ -139,12 +139,10 @@ Read this carefully:
 * The screen has a certificate per kind of target, each measured on a real
   table with the same floors (1,000 null worlds, 200 plants per leak type):
   two classes on breast cancer, up to ten classes on digits, and a
-  continuous target on diabetes. On each, 0 of 1,000 null worlds raised a
-  suspect and at least 199 of 200 plants of every type were found
-  (`benchmarks/qualification/screen_measurements.json`). A target with more
-  than ten classes is not certified: under `leakage_policy="block"` such a run
-  is refused, and under `warn` it trains and logs that the screen is
-  descriptive.
+  continuous target on diabetes (`benchmarks/qualification/screen_measurements.json`).
+  The certificates are evidence about the screen, reported in every run's
+  notes; they do not switch it on or off. What decides whether a flag may stop
+  a run is the probe on that run's rows.
 * A field derived by splitting a continuous target at its median explains
   about 60 percent of the target's variance, which an honest strong predictor
   can also reach, so the skill mechanism does not call it a suspect. A field
@@ -208,10 +206,21 @@ tier to every claim and never hands you a silent verdict. For leakage:
   Titanic because of two leaks. Loud, labelled, and settled by a person is the
   middle path.
 * **It lets you stop.** `--leakage-policy block` (opt-in) refuses a run that has
-  a flagged column whose test is certified. Use it when you cannot attest where
-  each value comes from, and in regulated settings where an unexplained column
-  must not reach a model.
-* **In a charter run it withholds.** A certified suspect is left out of the
+  a flagged column. A flag is a column whose test is significant after the
+  Benjamini-Yekutieli step over permutation p-values and whose effect bound is
+  above the pre-registered ceiling; the false-alarm control holds by
+  construction on any rows that can be shuffled within their groups or time
+  blocks, so no certificate is needed to act on a flag. What a clean result
+  means is measured on each run's own rows: the screen also screens a copy
+  with one planted leak of each type (a copy, a noisy copy, a field derived
+  from the target, a value recorded for part of the target's range, a value
+  recorded for a few rows of one class or band), with the same settings,
+  groups, time blocks and budget. A plant it did not find is logged as a
+  WARNING and recorded in the run: a leak of that kind may remain undetected
+  on these rows (usually because there are too few of them). Use `block` when
+  you cannot attest where each value comes from, and in regulated settings
+  where an unexplained column must not reach a model.
+* **In a charter run it withholds.** A suspect is left out of the
   features until a person attests it. With a valid attestation the column is
   kept and recorded at tier `attested`, never `confirmed`.
 
@@ -317,14 +326,14 @@ Choose `--leakage-policy block` when:
   model;
 * you would rather stop and ask than read a label.
 
-The price is false stops on honest analyses, and for tables with more than two
-classes or regression the screen is not certified, so `block` cannot stop them.
+The price is false stops on honest analyses: strong legitimate predictors can
+be flagged, and a person settles them with an attestation.
 
 ## Summary
 
 | Claim | True? |
 | --- | --- |
-| The screen finds planted leaks | yes: 199 to 200 of 200 per type, certified |
+| The screen finds planted leaks | yes: 197 to 200 of 200 per type on each certification table; every run reports which plants it finds on its own rows |
 | The screen almost never flags a world with no dependence | yes: 0 of 1000 |
 | A flag means leakage | no: a flag is a suspicion |
 | The screen flags legitimate strong predictors | yes: 2 of 30 on breast cancer |

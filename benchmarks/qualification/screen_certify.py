@@ -18,11 +18,11 @@ fixed before measuring and not tuned.
 * Plants: `PLANT_REPLICATES` tables per leak type, each the real outcome with
   `TABLE_COLUMNS - 1` real columns and one planted column. A plant counts as
   found when the column is a suspect by the mechanism that type belongs to
-  (`screen.MECHANISM_DEFECTS`). Types: a copy of the target, a copy with 2
-  percent of labels flipped, a threshold rule with noise, a value recorded
-  only when the target is not one class, and a value recorded for a random
-  quarter of one class only (so a column recorded for about 9 percent of the
-  rows, all of one class).
+  (`screen.MECHANISM_DEFECTS`). The plants are the product's own
+  (`scmle.data.admissibility.plants`), the same every run probes for: a copy
+  of the target, a noisy copy, a field derived from the target with noise, a
+  value recorded only for part of the target's range, and a value recorded
+  for about 9 percent of the rows, all of one class or band.
 * The old profiler rule (association at least 0.98, or a missingness score
   of at least 0.9) is scored on the same worlds and plants as a baseline.
 
@@ -51,6 +51,7 @@ from scmle.contracts import qualification
 from scmle.contracts import tasks
 from scmle.core import randomness
 from scmle.data.admissibility import leakage
+from scmle.data.admissibility import plants
 from scmle.data.admissibility import screen
 from scmle.data.detectors import certificates
 from scmle.data.validation import columns
@@ -63,10 +64,6 @@ GROUP_SIZE = 10
 TABLE_COLUMNS = 10
 GAP_COLUMNS = 2
 GAP_RATE = 0.2
-RARE_SHARE = 0.25
-RARE_TOP = 0.9
-CONTINUOUS_NOISE = 0.1
-BANDS = 10
 OLD_ASSOCIATION = 0.98
 OLD_MISSINGNESS = 0.9
 DEFECTS = tuple(d for ds in screen.MECHANISM_DEFECTS.values() for d in ds)
@@ -101,55 +98,13 @@ TABLES = {
 KINDS = tuple(TABLES)
 
 
-def continuous(
-    frame: pandas.DataFrame, defect: str, seed: int
-) -> pandas.Series:
-    """The planted leak column for a continuous target.
-
-    The same five leak types as for classes, written for a number: a copy;
-    a copy with noise of `CONTINUOUS_NOISE` standard deviations; a
-    threshold rule (above the median) with noise; a value recorded only
-    when the target is at or below its median; and a value recorded for
-    `RARE_TOP` of the rows in the target's top decile, so about 9 percent of
-    the rows, as for classes, all in one band of the target.
-
-    Args:
-        frame: The clean table, including the target.
-        defect: A leak type in `DEFECTS`.
-        seed: Run seed.
-
-    Returns:
-        The planted column, aligned to `frame`.
-
-    Raises:
-        KeyError: For an unknown leak type.
-    """
-    if defect not in DEFECTS:
-        raise KeyError(defect)
-    target = frame[f4_certify.TARGET].astype(float)
-    rng = randomness.component_rng(
-        seed, "screen.continuous", DEFECTS.index(defect)
-    )
-    noise = pandas.Series(rng.normal(size=len(frame)), index=frame.index)
-    middle = float(target.median())
-    if defect == "leak_copy":
-        return target.copy()
-    if defect == "leak_noisy_copy":
-        return target + CONTINUOUS_NOISE * float(target.std()) * noise
-    if defect == "leak_threshold":
-        band = pandas.qcut(target, BANDS, labels=False, duplicates="drop")
-        return band.astype(float) + f4_certify.THRESHOLD_NOISE * noise
-    if defect == "leak_missing_for_class":
-        return noise.where(target <= middle)
-    top = target >= float(target.quantile(0.9))
-    kept = pandas.Series(rng.random(len(frame)) < RARE_TOP, index=frame.index)
-    return noise.where(top & kept)
-
-
 def plant_column(
     frame: pandas.DataFrame, defect: str, seed: int, kind: str = "binary"
 ) -> pandas.Series:
     """The planted leak column for one defect type.
+
+    The product's own plants (`scmle.data.admissibility.plants`), so the
+    certificate measures the leaks every run probes for.
 
     Args:
         frame: The clean table, including the target.
@@ -158,22 +113,11 @@ def plant_column(
         kind: `binary`, `multiclass` or `regression`.
 
     Returns:
-        The planted column, aligned to `frame`; for classes and
-        `leak_rare_record` it is standard normal noise recorded only for a
-        random quarter of the rows that share the first row's class
-        (missing elsewhere); for a continuous target see `continuous`.
+        The planted column, aligned to `frame`.
     """
-    if kind == "regression":
-        return continuous(frame, defect, seed)
-    if defect != "leak_rare_record":
-        return f4_certify.plant_leak(frame, defect, seed)
-    rng = randomness.component_rng(seed, "screen.rare", 0)
-    values = pandas.Series(rng.normal(size=len(frame)), index=frame.index)
-    first = frame[f4_certify.TARGET] == frame[f4_certify.TARGET].iloc[0]
-    kept = first & pandas.Series(
-        rng.random(len(frame)) < RARE_SHARE, frame.index
+    return plants.plant(
+        frame[f4_certify.TARGET], defect, seed, kind == "regression"
     )
-    return values.where(kept)
 
 
 def real_columns(frame: pandas.DataFrame, count: int, seed: int) -> list[str]:

@@ -22,7 +22,6 @@ quotes one committed file.
 
 import argparse
 from collections.abc import Sequence
-import dataclasses
 import json
 from pathlib import Path
 import sys
@@ -62,7 +61,7 @@ def sklearn_table(loader: Any) -> pandas.DataFrame:
 
 
 def screened(frame: pandas.DataFrame, target: str) -> screen.Screen:
-    """Runs the certified screen with the shipped certificates.
+    """Runs the screen as a run does: certified settings, probed gates.
 
     Args:
         frame: Table to screen, including the target column.
@@ -70,11 +69,14 @@ def screened(frame: pandas.DataFrame, target: str) -> screen.Screen:
 
     Returns:
         The screen report, computed with `leakage.CERTIFIED` at run seed 0
-        for a classification task.
+        for a classification task, with gates from the probe on `frame`.
     """
-    cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=0)
-    return screen.screen(
-        frame, target, "classification", cfg, store=screen.shipped_store()
+    return screen.screen_table(
+        frame,
+        target,
+        "classification",
+        [c for c in frame.columns if c != target],
+        0,
     )
 
 

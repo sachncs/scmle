@@ -56,10 +56,11 @@ the share of true nulls, under arbitrary dependence between columns. Under
 the global null (no column is associated with the outcome) this is the
 probability of at least one false alarm, at most `alpha`. The suspect list is
 a subset of the significant list, so its false discoveries cannot exceed those
-of the significant list. Gating follows the certificate rule: only
-a mechanism whose leak types have a current, passing certificate
-(`screen_certificates.json`, `benchmarks.qualification.screen_certify`) may
-block a run; anything else is reported as a warning with its p-values.
+of the significant list, which is why a suspect may block a run without a
+certificate (the certificates, `screen_certificates.json` from
+`benchmarks.qualification.screen_certify`, are evidence about recall and
+false flags on real tables). Without gates (`screen` called directly) every
+suspect is reported as a warning with its p-values.
 
 What is not guaranteed
 ----------------------
@@ -74,6 +75,17 @@ together is not seen. Candidate columns of kind datetime or text are not
 screened. Wide tables pay in power: the more columns, the more permutations a
 rejection needs. A run without a charter has no custody, so the training
 rows are all the screen has; it says nothing about rows it never saw.
+
+In a run (`screen_table`) every suspect may block: a suspect is significant
+after the Benjamini-Yekutieli step over permutation p-values, whose
+false-alarm control holds for any rows that can be shuffled within their
+groups or time blocks, and its effect bound exceeds the pre-registered
+ceiling. What a clean result means is measured on the run's own rows: the
+probe screens a copy with one planted column per leak type (`plants`), with
+the same settings, structure and budget, and the report records which plants
+were found, so a run states the kinds of leak the screen would have missed
+there. The published certificates are evidence about the screen, reported in
+the notes; they decide nothing.
 """
 
 from collections.abc import Callable
@@ -85,7 +97,6 @@ from fractions import Fraction
 import functools
 import math
 from pathlib import Path
-import sys
 from typing import Any
 
 import numpy
@@ -95,7 +106,9 @@ from scipy import stats
 import scmle.certificates
 from scmle.core import randomness
 from scmle.data.admissibility import leakage
+from scmle.data.admissibility import plants
 from scmle.data.detectors import certificates
+from scmle.data.detectors import trace
 from scmle.data.ledger import budget
 from scmle.data.ledger import multiplicity
 import scmle.data.ledger.budget
@@ -829,7 +842,8 @@ class Finding:
             computed for significant columns only.
         suspect: Significant and the bound exceeds the ceiling.
         complete: Whether all permutations were drawn.
-        gate: Whether this mechanism has a current, passing certificate.
+        gate: Whether this suspicion may block: `gating` in a run's screen
+            (`screen_table`), `descriptive` when the caller gave no gates.
     """
 
     feature: str
@@ -894,6 +908,8 @@ class Screen:
         unchecked: Columns the screen declined to test; they are unchecked,
             not clean.
         unchecked_reason: Why they were declined, for the warning.
+        probe: Leak type to whether its plant was found on these rows; empty
+            when no probe ran.
     """
 
     findings: tuple[Finding, ...]
@@ -906,6 +922,7 @@ class Screen:
     notes: tuple[str, ...] = ()
     unchecked: tuple[str, ...] = ()
     unchecked_reason: str = ""
+    probe: Mapping[str, bool] = dataclasses.field(default_factory=dict)
 
     @property
     def warning(self) -> str:
@@ -958,6 +975,7 @@ class Screen:
             "family": self.family,
             "permutations": self.permutations,
             "gates": {k: v.value for k, v in self.gates.items()},
+            "probe": dict(self.probe),
             "ceilings": dict(self.ceilings),
             "notes": list(self.notes),
             "unchecked": list(self.unchecked),
@@ -1051,54 +1069,6 @@ def family(task: str, n_classes: int) -> str | None:
     return None
 
 
-def gate_statuses(
-    store: certificates.Store | None,
-    cfg: leakage.Config,
-    task: str,
-    n_classes: int,
-) -> dict[str, certificates.GateStatus]:
-    """Determines the gate status per mechanism from the certificates on file.
-
-    A mechanism gates only when the screen's current code has a passing
-    certificate for every leak type of that mechanism, for the target's
-    kind (`family`), and the settings equal the certified ones (any run
-    seed). Anything else is descriptive.
-
-    Args:
-        store: Certificates on file, or None.
-        cfg: The settings the screen will run with.
-        task: `classification` or `regression`.
-        n_classes: Number of classes of the target.
-
-    Returns:
-        `GATING` or `DESCRIPTIVE` for each mechanism.
-    """
-    descriptive = dict.fromkeys(
-        MECHANISM_DEFECTS, certificates.GateStatus.DESCRIPTIVE
-    )
-    kind = family(task, n_classes)
-    if store is None or kind is None:
-        return descriptive
-    if (
-        dataclasses.replace(cfg, run_seed=leakage.CERTIFIED.run_seed)
-        != leakage.CERTIFIED
-    ):
-        return descriptive
-    digest = code_digest()
-    return {
-        mechanism: (
-            certificates.GateStatus.GATING
-            if all(
-                store.status(DETECTORS[kind], digest, defect)
-                is certificates.GateStatus.GATING
-                for defect in defects
-            )
-            else certificates.GateStatus.DESCRIPTIVE
-        )
-        for mechanism, defects in MECHANISM_DEFECTS.items()
-    }
-
-
 def load_store(
     path: Path | None = None,
 ) -> certificates.Store | None:
@@ -1156,7 +1126,6 @@ def screen_table(
     seed: int,
     group_column: str | None = None,
     time_column: str | None = None,
-    store: certificates.Store | None = None,
     time_budget_seconds: float | None = None,
 ) -> Screen:
     """Screens training data with the certified settings.
@@ -1164,6 +1133,9 @@ def screen_table(
     Groups keep entities whole. A time column orders the rows (stable sort)
     and defines consecutive blocks of `len(frame) // TIME_BLOCKS` rows, at
     least 2; groups win when both are given.
+
+    Every suspect may block; `probe` records what a clean result means on
+    these rows (see the module docstring).
 
     Args:
         frame: Training rows including the target and any structure columns.
@@ -1175,7 +1147,6 @@ def screen_table(
             column of `frame`.
         time_column: Time column, or None. Ignored when it is not a column
             of `frame` or when `group_column` is used.
-        store: Certificates for gating; defaults to the shipped ones.
         time_budget_seconds: The project's declared time budget; it bounds
             the screen's work by `work_cap`. None means no cap beyond
             `MAX_PERMUTATIONS`.
@@ -1187,7 +1158,6 @@ def screen_table(
         `screen`.
     """
     cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=seed)
-    chosen = store if store is not None else shipped_store()
     groups = (
         frame[group_column].astype(str)
         if group_column and group_column in frame.columns
@@ -1198,29 +1168,145 @@ def screen_table(
     if groups is None and time_column and time_column in frame.columns:
         order = frame[time_column].argsort(kind="stable").to_numpy()
         block_size = max(2, len(frame) // TIME_BLOCKS)
-    return screen(
-        frame.iloc[order],
+    rows = frame.iloc[order]
+    grouping = None if groups is None else groups.iloc[order]
+    report = screen(
+        rows,
         target,
         task,
         cfg,
         features,
-        None if groups is None else groups.iloc[order],
+        grouping,
         block_size,
-        chosen,
+        dict.fromkeys(MECHANISM_DEFECTS, certificates.GateStatus.GATING),
         time_budget_seconds,
     )
+    found = probe(
+        rows,
+        target,
+        task,
+        list(features),
+        cfg,
+        grouping,
+        block_size,
+        time_budget_seconds,
+    )
+    classes = int(frame[target].nunique()) if len(frame) else 0
+    return disclose(report, found, evidence(task, classes))
+
+
+def disclose(report: Screen, found: dict[str, bool], published: str) -> Screen:
+    """Attaches what the probe found and the published evidence to a report.
+
+    Args:
+        report: The real screen's report.
+        found: Leak type to whether its plant was found, from `probe`.
+        published: The sentence from `evidence`.
+
+    Returns:
+        The report with `probe` set and two notes added: the published
+        evidence, and the planted leaks that were not found, if any.
+    """
+    missed = [d for d, hit in found.items() if not hit]
+    notes = [*report.notes, published]
+    if missed:
+        notes.append(
+            "on these rows the screen did not find the planted "
+            + ", ".join(missed)
+            + ": a leak of that kind may remain undetected"
+        )
+    return dataclasses.replace(report, notes=tuple(notes), probe=found)
+
+
+def probe(
+    rows: pandas.DataFrame,
+    target: str,
+    task: str,
+    features: list[Hashable],
+    cfg: leakage.Config,
+    groups: pandas.Series | None,
+    block_size: int | None,
+    time_budget_seconds: float | None = None,
+) -> dict[str, bool]:
+    """Finds whether the screen catches each planted leak on these rows.
+
+    The planted copy is screened with the same settings, structure and
+    budget as the real one. Each plant is found when it is a suspect by the
+    mechanism its type belongs to.
+
+    Args:
+        rows: The rows to screen, in screening order, with the target.
+        target: Target column.
+        task: `classification` or `regression`.
+        features: Candidate columns.
+        cfg: Settings of the real screen.
+        groups: Group label per row, or None.
+        block_size: Rows per time block, or None.
+        time_budget_seconds: The declared budget, as for the real screen.
+
+    Returns:
+        Leak type to whether its plant was found.
+    """
+    planted = plants.table(
+        rows[[*features, target]], target, cfg.run_seed, task == "regression"
+    )
+    report = screen(
+        planted,
+        target,
+        task,
+        cfg,
+        [*features, *plants.DEFECTS],
+        groups,
+        block_size,
+        None,
+        time_budget_seconds,
+    )
+    owner = {d: m for m, ds in MECHANISM_DEFECTS.items() for d in ds}
+    return {
+        defect: any(
+            f.suspect and f.feature == defect and f.mechanism == owner[defect]
+            for f in report.findings
+        )
+        for defect in plants.DEFECTS
+    }
+
+
+def evidence(task: str, n_classes: int) -> str:
+    """States the published certificate for this kind of target.
+
+    Args:
+        task: `classification` or `regression`.
+        n_classes: Number of classes of the target.
+
+    Returns:
+        One sentence naming the kind and whether its certificate is current,
+        stale or missing.
+    """
+    kind = family(task, n_classes)
+    if kind is None:
+        return "no published certificate covers this kind of target"
+    store = shipped_store()
+    state = (
+        "missing"
+        if store is None
+        else store.state(DETECTORS[kind], code_digest()).value
+    )
+    return f"published certificate for {kind} targets: {state}"
 
 
 def code_digest() -> str:
     """Hash of the code the screen's decisions depend on.
 
-    The key of its certificate: this module, the leakage helpers it reuses
-    and the multiplicity step.
+    The key of its certificate: `screen` and every function, class and
+    constant of the package it reaches, the plants it is measured on and the
+    certified settings (`trace.digest`). Run wiring the certificate
+    does not measure, such as `screen_table`, is outside the hash, so it can
+    change without staling the certificate.
 
     Returns:
-        The combined code hash of those modules.
+        The traced hash.
     """
-    return certificates.code_hash(sys.modules[__name__], leakage, multiplicity)
+    return trace.digest(screen, plants.plant, leakage.CERTIFIED)
 
 
 def ceilings_of(cfg: leakage.Config) -> dict[str, float]:
@@ -1610,7 +1696,7 @@ def screen(
     features: Sequence[Hashable] | None = None,
     groups: pandas.Series | None = None,
     block_size: int | None = None,
-    store: certificates.Store | None = None,
+    gates: Mapping[str, certificates.GateStatus] | None = None,
     time_budget_seconds: float | None = None,
 ) -> Screen:
     """Screens the candidate columns of training data for leakage suspicion.
@@ -1626,8 +1712,8 @@ def screen(
         groups: Group label per row; permutations and folds keep groups
             whole.
         block_size: Consecutive rows per time block; exclusive with `groups`.
-        store: Certificates for gating; None means every mechanism is
-            descriptive.
+        gates: Gate status per mechanism; None means every mechanism is
+            descriptive. `screen_table` sets it from the probe.
         time_budget_seconds: Declared time budget; bounds the work through
             `work_cap`. None means no cap beyond `MAX_PERMUTATIONS`.
 
@@ -1649,8 +1735,10 @@ def screen(
     unknown = [c for c in chosen if c not in names]
     if unknown:
         raise ValueError(f"not feature columns: {unknown}")
-    n_classes = int(frame[target].nunique()) if len(frame) else 0
-    gates = gate_statuses(store, cfg, task, n_classes)
+    chosen_gates = dict.fromkeys(
+        MECHANISM_DEFECTS, certificates.GateStatus.DESCRIPTIVE
+    )
+    chosen_gates.update(gates or {})
     group_values = None if groups is None else groups.to_numpy()
     rows, blocks = subsample(len(frame), group_values, block_size, cfg.run_seed)
     sample = frame.iloc[rows].reset_index(drop=True)
@@ -1663,6 +1751,6 @@ def screen(
         chosen,
         sample_groups,
         blocks,
-        gates,
+        chosen_gates,
         time_budget_seconds,
     )

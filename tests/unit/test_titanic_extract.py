@@ -22,12 +22,12 @@ def frame():
 
 @pytest.fixture(scope="module")
 def report(frame):
-    return screen.screen(
+    return screen.screen_table(
         frame,
         "survived",
         "classification",
-        leakage.CERTIFIED,
-        store=screen.shipped_store(),
+        [c for c in frame.columns if c != "survived"],
+        leakage.CERTIFIED.run_seed,
     )
 
 

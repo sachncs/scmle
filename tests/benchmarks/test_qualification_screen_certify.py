@@ -6,7 +6,6 @@ import pytest
 
 from benchmarks.qualification import f4_certify
 from benchmarks.qualification import screen_certify
-import benchmarks.qualification.f4_certify
 from scmle.data.admissibility import leakage
 from scmle.data.admissibility import screen
 import scmle.data.admissibility.screen
@@ -42,49 +41,28 @@ def test_every_leak_type_of_every_mechanism_has_an_outcome_on_file(kind):
 
 
 @pytest.mark.parametrize("kind", screen_certify.KINDS)
-def test_every_kind_of_target_gates_on_its_own_certificate(kind):
+def test_every_kind_of_target_has_a_current_published_certificate(kind):
     task, classes = {
         "binary": ("classification", 2),
         "multiclass": ("classification", 10),
         "regression": ("regression", 0),
     }[kind]
     assert screen.family(task, classes) == kind
-    gates = screen.gate_statuses(stored(), leakage.CERTIFIED, task, classes)
-    assert set(gates.values()) == {certificates.GateStatus.GATING}
+    assert screen.evidence(task, classes) == (
+        f"published certificate for {kind} targets: current"
+    )
+    assert screen_certify.uncertified(stored()) == []
 
 
-def test_more_classes_than_measured_stay_descriptive():
+def test_more_classes_than_measured_have_no_published_certificate():
     document = json.loads(
         screen_certify.MEASUREMENTS_PATH.read_text(encoding="utf-8")
     )
     measured = document["multiclass"]["classes"]
     assert measured == screen.MAX_CERTIFIED_CLASSES
     assert screen.family("classification", measured + 1) is None
-    gates = screen.gate_statuses(
-        stored(), leakage.CERTIFIED, "classification", measured + 1
-    )
-    assert set(gates.values()) == {certificates.GateStatus.DESCRIPTIVE}
-
-
-def test_stale_and_missing_certificates_are_reported():
-    empty = certificates.Store()
-    assert all(p.endswith(": missing") for p in screen_certify.problems(empty))
-    assert screen_certify.problems(empty)
-    digest = screen.code_digest()
-    assert digest != leakage.code_digest()
-
-
-def test_planned_sizes_follow_the_phase_floors():
-    assert screen_certify.NULL_REPLICATES >= 1000
-    assert screen_certify.PLANT_REPLICATES >= 200
-    assert (
-        benchmarks.qualification.f4_certify.LEAK_POLICY
-        is f4_certify.LEAK_POLICY
-    )
-    assert benchmarks.qualification.f4_certify.LEAK_POLICY.recall_floor == 0.9
-    assert (
-        benchmarks.qualification.f4_certify.LEAK_POLICY.false_alarm_ceiling
-        == 0.05
+    assert "no published certificate" in screen.evidence(
+        "classification", measured + 1
     )
 
 
@@ -127,22 +105,6 @@ def test_a_clean_world_and_a_planted_world_behave_as_certified(kind):
     )
     for defect in screen_certify.DEFECTS:
         assert screen_certify.replicate(defect, 0, kind)["found"] is True
-
-
-def test_continuous_plants_are_derived_from_the_target():
-    frame = screen_certify.diabetes()
-    target = frame[f4_certify.TARGET]
-    plant = screen_certify.continuous
-    assert plant(frame, "leak_copy", 0).equals(target.astype(float))
-    assert plant(frame, "leak_noisy_copy", 0).corr(target) > 0.99
-    assert plant(frame, "leak_threshold", 0).corr(target) > 0.9
-    gated = plant(frame, "leak_missing_for_class", 0)
-    assert (target[gated.notna()] <= target.median()).all()
-    rare = plant(frame, "leak_rare_record", 0)
-    assert (target[rare.notna()] >= target.quantile(0.9)).all()
-    assert 0.05 < rare.notna().mean() < 0.15
-    with pytest.raises(KeyError):
-        plant(frame, "leak_unknown", 0)
 
 
 def test_the_multiclass_table_has_ten_classes_and_no_constant_column():

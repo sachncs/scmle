@@ -1,11 +1,13 @@
-"""A screen without a current certificate cannot pass `block` silently (ERR-1).
+"""`block` stops every flagged column and says what it could not see (ERR-1).
 
-Before the fix, a stale or missing certificate made every mechanism
-descriptive, so no suspicion could block and `leakage_policy="block"` trained
-as if the screen had passed.
+Before, a stale or missing certificate made every mechanism descriptive, so
+no suspicion could block and `leakage_policy="block"` trained as if the
+screen had passed. Now every suspect may block, because its false-alarm
+control holds by construction, and the screen probes each run's rows with
+planted leaks, so a clean result states which kinds of leak it would have
+missed there. Certificates are evidence and decide nothing.
 """
 
-import dataclasses
 import logging
 
 import numpy
@@ -15,67 +17,52 @@ import support
 
 from scmle.contracts import errors
 from scmle.core import stages
+from scmle.data.admissibility import plants
 from scmle.data.admissibility import screen
-from scmle.data.detectors import certificates
 
 
-def table(seed=0, rows=240):
+def table(rows=240, seed=0, leak=False):
     rng = numpy.random.default_rng(seed)
     frame = pandas.DataFrame({f"x{i}": rng.normal(size=rows) for i in range(4)})
     frame["y"] = (frame["x0"] + rng.normal(size=rows) > 0).astype(int)
+    if leak:
+        frame["leak"] = frame["y"] * 1.0
     return frame
 
 
-def stale():
-    """The shipped store, reissued for code that is not the current code."""
-    shipped = screen.load_store()
-    return certificates.Store(
-        dataclasses.replace(c, code_hash="0" * 64) for c in shipped.certificates
-    )
-
-
-def build(tmp_path, policy):
+def build(tmp_path, policy, frame):
     return support.make_project(
-        table(), "y", output_dir=tmp_path, leakage_policy=policy
+        frame, "y", output_dir=tmp_path, leakage_policy=policy
     )
 
 
-def test_the_shipped_certificate_is_current():
-    assert stages.certification() == "not passing"
+def test_block_stops_a_flagged_column_even_with_a_stale_certificate(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
+    with pytest.raises(errors.BlockedError, match="leak") as raised:
+        build(tmp_path, "block", table(leak=True)).run()
+    assert raised.value.details["leakage"]["blocking"] == ["leak"]
+    assert any("stale" in n for n in raised.value.details["leakage"]["notes"])
 
 
-def test_block_refuses_a_stale_certificate(monkeypatch, tmp_path):
-    store = stale()
-    monkeypatch.setattr(screen, "shipped_store", lambda: store)
-    assert stages.certification() == "stale"
-    with pytest.raises(
-        errors.BlockedError, match="certificate stale"
-    ) as raised:
-        build(tmp_path, "block").run()
-    assert "'warn'" in str(raised.value)
-    assert set(raised.value.details["leakage"]["gates"].values()) == {
-        "descriptive"
-    }
+def test_block_runs_a_clean_table_and_records_the_probe(tmp_path):
+    result = build(tmp_path, "block", table(rows=600)).run()
+    assert set(result.profile.leakage["probe"]) == set(plants.DEFECTS)
+    assert set(result.profile.leakage["gates"].values()) == {"gating"}
 
 
-def test_block_refuses_a_missing_certificate(monkeypatch, tmp_path):
-    monkeypatch.setattr(screen, "shipped_store", lambda: None)
-    with pytest.raises(errors.BlockedError, match="certificate missing"):
-        build(tmp_path, "block").run()
-
-
-def test_warn_proceeds_and_says_so(monkeypatch, tmp_path, caplog):
-    store = stale()
-    monkeypatch.setattr(screen, "shipped_store", lambda: store)
+def test_a_missed_plant_is_said_loudly_and_does_not_refuse(
+    monkeypatch, tmp_path, caplog
+):
+    found = {**dict.fromkeys(plants.DEFECTS, True), "leak_rare_record": False}
+    monkeypatch.setattr(screen, "probe", lambda *a, **k: found)
     with caplog.at_level(logging.WARNING, logger=stages.__name__):
-        build(tmp_path, "warn").run()
+        result = build(tmp_path, "block", table()).run()
+    assert result.profile.leakage["probe"]["leak_rare_record"] is False
     assert any(
-        "certificate stale" in r.getMessage() and r.levelno == logging.WARNING
+        "leak_rare_record" in r.getMessage()
+        and "may remain undetected" in r.getMessage()
+        and r.levelno == logging.WARNING
         for r in caplog.records
     )
-
-
-def test_block_runs_with_the_shipped_certificate(tmp_path):
-    result = build(tmp_path, "block").run()
-    assert result.profile.leakage["gates"]
-    assert set(result.profile.leakage["gates"].values()) == {"gating"}

@@ -262,27 +262,20 @@ def test_the_curation_report_and_card_list_the_final_feature_plan(
     assert "quarantined by admissibility" in curation["dropped_columns"]["echo"]
 
 
-def test_an_uncertified_mechanism_logs_the_suspicion_but_keeps_the_field(
+def test_a_stale_certificate_no_longer_keeps_a_suspect_field(
     binary_frame, tmp_path, monkeypatch
 ):
+    # ERR-1: a stale certificate used to make the screen descriptive, so the
+    # suspect field stayed in the features. Flags now act regardless; the
+    # stale certificate is only reported.
     from scmle.data.admissibility import screen
-    from scmle.data.detectors import certificates
 
-    monkeypatch.setattr(
-        screen,
-        "gate_statuses",
-        lambda *args, **kwargs: dict.fromkeys(
-            screen.MECHANISM_DEFECTS, certificates.GateStatus.DESCRIPTIVE
-        ),
-    )
+    monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
     result = run(leaky_frame(binary_frame), tmp_path, write_charter(tmp_path))
-    folder = pathlib.Path(result.run_dir)
 
     done = event(result.run_dir, "admissibility.completed")["data"]
-    assert done["leakage_gate"] == "descriptive"
-    assert "echo" in done["suspects"] and done["quarantined"] == {}
-    plan = json.loads((folder / "dataset_profile.json").read_text())
-    assert "echo" in plan["feature_plan"]["numeric"]
+    assert done["leakage_gate"] == "gating"
+    assert "echo" in done["suspects"] and "echo" in done["quarantined"]
 
 
 def test_a_valid_attestation_keeps_a_certified_suspect_and_is_ledgered(

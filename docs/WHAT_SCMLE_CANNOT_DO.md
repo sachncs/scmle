@@ -138,9 +138,12 @@ against planted problems and is on file as a certificate. Everything else is
 * The certificate files ship inside the package (`scmle/certificates/`), so
   an installed copy gates exactly as a source checkout does
   ([`ARTIFACTS.md`](ARTIFACTS.md)). A certificate that is missing, or was
-  issued for other code, makes its check descriptive; under
-  `leakage_policy="block"` an uncertified leakage screen refuses the run
-  instead of training as if it had passed.
+  issued for other code, makes its check descriptive. The leakage screen is
+  the exception: its flags may always block, because its false-alarm
+  control holds by construction, and its certificates are reported as
+  evidence. Each run also probes its own rows with planted leaks; a kind of
+  leak it could not find there (usually on small tables) is logged as a
+  WARNING and recorded: such a leak may remain undetected.
 
 ## The closed loop and escalation
 

@@ -14,8 +14,7 @@ The charter declares no per-field provenance and no leakage ceilings, so
 fields are undeclared (tier `unverified`) and decided in permissive mode:
 an unverified field is admitted with a flag, never quarantined for lack of
 provenance. The only route to quarantine in a charter run is a leakage
-suspicion on a field with no as-of evidence, and only when the leakage
-screen has a current, passing certificate for the mechanism that raised it.
+suspicion on a field with no as-of evidence.
 
 The leakage test is the one used without a charter (`screen.py`: a
 Benjamini-Yekutieli family over cross-fitted skill, missingness and record
@@ -45,7 +44,6 @@ from scmle.data.detectors import certificates
 from scmle.data.detectors import pipeline
 
 F5_STORE = "detector_certificates.json"
-SCREEN_STORE = "screen_certificates.json"
 ATTESTATION_SOURCE = "f4-leakage-attestation"
 DAG_SOURCE = "f4-dag-falsification"
 DAG_ALPHA = 0.05
@@ -395,8 +393,7 @@ def run(
         structure: Group and time columns, which are not candidates.
         group_column: Entity column, so permutations keep entities whole.
         time_column: Time column, so permutations stay within time blocks.
-        directory: Folder of the certificate stores, for tests. The detector
-            store and the screen store are read from it.
+        directory: Folder of the detector certificate store, for tests.
         attestations: Per-column statements that a strong predictor is
             legitimate; each counts only if its scope equals `scope` and it
             is valid on `today`.
@@ -439,13 +436,6 @@ def run(
             frame, candidates, causal, dag, seed, day, result, f5.store, notes
         )
     task = "classification" if classification else "regression"
-    store = (
-        screen.shipped_store()
-        if directory is None
-        else screen.load_store(directory / SCREEN_STORE)
-    )
-    if store is None:
-        notes.append("screen certificates unusable: leakage is descriptive")
     report = screen.screen_table(
         frame,
         str(target.name),
@@ -454,12 +444,13 @@ def run(
         seed,
         group_column,
         time_column,
-        store=store or certificates.Store(),
     )
     if not any(
         g is certificates.GateStatus.GATING for g in report.gates.values()
     ):
-        notes.append("leakage suspicion is descriptive: no certificate gates")
+        notes.append(
+            "leakage suspicion is descriptive: the screen gave no gate"
+        )
     notes.extend(report.notes)
     applied = scmle.data.admissibility.attestations.apply(
         attestations, scope, day.isoformat()

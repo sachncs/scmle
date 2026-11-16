@@ -53,11 +53,10 @@ variables = []
 site = "scmle.core.stages:ProfileStage.enforce_leakage_policy"
 error = "BlockedError"
 claim = "C2"
-passes = "leakage_policy is warn, or under block every screened column was checked, every screen mechanism is gating and no certified blocking leak was found."
-blocks = "Under leakage_policy block: the profile has unchecked columns; a screen mechanism's gate is not GATING (certificate missing, stale or not passing); the profile has certified blocking leaks."
+passes = "leakage_policy is warn, or under block every screened column was checked and no column is a suspect (significant after Benjamini-Yekutieli over permutation p-values, effect bound above the ceiling); planted leaks the probe did not find on these rows are logged as a WARNING and recorded, not refused."
+blocks = "Under leakage_policy block: the profile has unchecked columns, or a column is a suspect and no valid attestation keeps it."
 override = "Set leakage_policy to 'warn' (the default), which logs warnings instead of raising."
 variables = ["leakage_policy"]
-certificate = "screen_certificates.json: f4-leakage-screen"
 
 [admissibility.quarantine_all]
 site = "scmle.core.stages:ProfileStage.qualify_exploration"
@@ -67,7 +66,7 @@ passes = "At least one feature of the feature plan is not quarantined by admissi
 blocks = "Admissibility quarantined fields and no feature of the plan is left."
 override = "A valid per-column attestation in the file named by leakage_attestations keeps a suspect field (tier attested)."
 variables = ["leakage_attestations", "data.group_column", "data.time_column"]
-certificate = "screen_certificates.json: f4-leakage-screen; detector_certificates.json: F5 detectors"
+certificate = "detector_certificates.json: F5 detectors (the leakage screen gates on its run-time probe; its certificates are reported evidence)"
 
 [curation.blocking_findings]
 site = "scmle.core.stages:ProfileStage.record_curation"

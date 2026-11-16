@@ -47,7 +47,6 @@ import scmle.core.context
 import scmle.core.state
 from scmle.data.admissibility import attestations
 from scmle.data.admissibility import qualify
-from scmle.data.admissibility import screen
 from scmle.data.charter import contracts
 from scmle.data.charter import ingest
 from scmle.data.charter import sealing
@@ -55,7 +54,6 @@ from scmle.data.curation import forecasting
 from scmle.data.curation import preprocessing
 import scmle.data.custody.pipeline
 import scmle.data.custody.sealed
-from scmle.data.detectors import certificates
 from scmle.data.framing import draft
 import scmle.data.framing.baseline
 import scmle.data.framing.claim
@@ -132,22 +130,6 @@ BASELINE = "dummy"
 
 
 LOGGER = logging.getLogger(__name__)
-
-
-def certification() -> str:
-    """Says why the shipped screen certificate does not gate.
-
-    Returns:
-        `missing`, `stale` (issued for other code), or `not passing` (current
-        but not certified for the mechanism).
-    """
-    store = screen.shipped_store()
-    if store is None:
-        return "missing"
-    state = store.state(screen.DETECTOR_ID, screen.code_digest())
-    if state is certificates.Freshness.CURRENT:
-        return "not passing"
-    return str(state)
 
 
 class Stage(abc.ABC):
@@ -828,9 +810,8 @@ class ProfileStage(Stage):
 
         Raises:
             BlockedError: If `leakage_policy` is `block` and a leakage
-                hypothesis was raised, a screened column could not be
-                checked, or a mechanism of the screen has no current passing
-                certificate (so its suspicions could not block).
+                hypothesis was raised or a screened column could not be
+                checked.
         """
         if profile.unchecked_columns:
             if spec.leakage_policy == "block":
@@ -844,30 +825,19 @@ class ProfileStage(Stage):
                 "WARNING %s; the test score is provisional",
                 profile.screen_warning,
             )
-        uncertified = sorted(
-            mechanism
-            for mechanism, gate in profile.leakage.get("gates", {}).items()
-            if gate != certificates.GateStatus.GATING.value
-        )
-        if uncertified:
-            reason = (
-                f"leakage screen certificate {certification()} for "
-                f"{', '.join(uncertified)}: its suspicions are descriptive "
-                "and cannot block"
+        probe = profile.leakage.get("probe", {})
+        missed = sorted(d for d, hit in probe.items() if not hit)
+        if missed:
+            LOGGER.warning(
+                "WARNING on these rows the leakage screen did not find the "
+                "planted %s: a leak of that kind may remain undetected",
+                ", ".join(missed),
             )
-            if spec.leakage_policy == "block":
-                raise errors.BlockedError(
-                    f"{reason}; leakage_policy='block' needs a current "
-                    "certificate (regenerate it, or use 'warn' to proceed "
-                    "with descriptive suspicion)",
-                    {"leakage": dict(profile.leakage)},
-                )
-            LOGGER.warning("WARNING %s", reason)
         if spec.leakage_policy == "block":
             leaks = profile.blocking_leaks
             if leaks:
                 raise errors.BlockedError(
-                    "unresolved leakage risk (certified screen, "
+                    "unresolved leakage risk (permutation screen, "
                     f"Benjamini-Yekutieli level {profile.leakage['alpha']}): "
                     + ", ".join(leaks),
                     {"leakage": dict(profile.leakage)},

@@ -48,7 +48,9 @@ def test_the_shipped_stores_are_found_from_a_checkout():
     assert screen.shipped_store() is not None
 
 
-def test_without_certificates_nothing_is_quarantined(tmp_path):
+def test_without_detector_certificates_only_the_screen_gates(tmp_path):
+    # The detectors still need their certificates; the leakage screen does
+    # not, because its false alarms are bounded by construction (ERR-1).
     features, target = leaky()
 
     found = qualify.run(
@@ -60,13 +62,11 @@ def test_without_certificates_nothing_is_quarantined(tmp_path):
         directory=tmp_path,
     )
 
-    assert found.leakage_gate is certificates.GateStatus.DESCRIPTIVE
+    assert found.leakage_gate is certificates.GateStatus.GATING
     assert "copy" in found.suspects
-    assert found.quarantined == {}
-    assert found.table is not None
-    assert not found.table.names(qualify.rules.Admission.QUARANTINE)
+    assert "copy" in found.quarantined
     assert found.f5_store is None
-    assert any("unusable" in note for note in found.notes)
+    assert any("detectors are descriptive" in note for note in found.notes)
     assert all(
         s is certificates.GateStatus.DESCRIPTIVE
         for by_defect in found.detectors.status.values()
@@ -116,31 +116,21 @@ def test_a_certified_suspect_is_quarantined_and_ledgered():
     )
 
 
-def test_an_uncertified_mechanism_only_warns(monkeypatch):
+def test_a_suspect_without_a_gate_only_warns():
     features, target = leaky()
-    monkeypatch.setattr(
-        screen,
-        "gate_statuses",
-        lambda *args, **kwargs: dict.fromkeys(
-            screen.MECHANISM_DEFECTS, certificates.GateStatus.DESCRIPTIVE
-        ),
+    frame = features.assign(y=target)
+    report = screen.screen(
+        frame, "y", "classification", screen.leakage.CERTIFIED
     )
-
-    found = qualify.run(
-        features, target, kind="predictive", classification=True, seed=0
-    )
-
-    assert found.suspects == {"copy": True}
-    assert found.quarantined == {}
-    copy = next(
-        c for source, c in found.checks if c.check_id.endswith("skill:copy")
-    )
-    assert copy.decision is qualification.Decision.WARN
+    (finding,) = [f for f in report.suspects if f.feature == "copy"]
+    assert finding.gate is certificates.GateStatus.DESCRIPTIVE
+    check = qualify.finding_check(finding, report.rows, 0, 0)
+    assert check.decision is qualification.Decision.WARN
 
 
-def test_a_regression_target_is_gated_by_its_own_certificate():
-    # ERR-1: regression has its own screen certificate, so a leak in a
-    # continuous target gates and is quarantined; before, it never gated.
+def test_a_regression_leak_is_gated_and_quarantined():
+    # ERR-1: a leak in a continuous target gates and is quarantined;
+    # before, regression never gated.
     features, target = leaky()
     target = target.astype(float) + numpy.arange(len(target)) * 1e-3
     features["copy"] = target.to_numpy()
