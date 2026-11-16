@@ -1,7 +1,17 @@
 # Command line
 
-The `scmle` command mirrors the Python API. Global option:
-`--log-level {DEBUG,INFO,WARNING,ERROR}` (before the sub-command).
+The `scmle` command mirrors the Python API. Global options (before the
+sub-command): `--log-level {DEBUG,INFO,WARNING,ERROR}`, and `--debug`, which
+logs every failure with its traceback, its chain of causes and its details.
+Log lines carry the time, the level and the logger.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | Done. |
+| 1 | Failed: a handled error (bad data, a missing file, an invalid configuration). |
+| 2 | Blocked: a gate refused the run (for example a leakage suspicion under `--leakage-policy block`, or a locked test set opened twice). |
+| 64 | Usage: the command line is wrong. |
+| 70 | Internal: an unexpected error, which is a defect; the traceback is always logged. |
 
 | Command | Purpose |
 | --- | --- |

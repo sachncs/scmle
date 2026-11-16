@@ -16,6 +16,7 @@ import threading
 import types
 from typing import cast
 from typing import ClassVar
+from typing import NoReturn
 
 import pandas
 
@@ -59,9 +60,31 @@ from scmle.trail import chain
 import scmle.trail.show
 
 LOGGER = logging.getLogger(__name__)
+# Exit codes (ERR-21): each outcome has its own, so a script can tell a
+# refused run from a failed one, a wrong command line and a defect. Usage and
+# internal errors take the conventional sysexits values.
 EXIT_OK = 0
-EXIT_BLOCKED = 2
 EXIT_FAILED = 1
+EXIT_BLOCKED = 2
+EXIT_USAGE = 64
+EXIT_INTERNAL = 70
+LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+
+
+class Parser(argparse.ArgumentParser):
+    """The argument parser, exiting with `EXIT_USAGE` on a bad command line.
+
+    argparse exits 2 by default, which is the code for a blocked run here.
+    """
+
+    def error(self, message: str) -> NoReturn:
+        """Reports a usage error and exits with `EXIT_USAGE`.
+
+        Args:
+            message: What is wrong with the command line.
+        """
+        self.print_usage(sys.stderr)
+        self.exit(EXIT_USAGE, f"{self.prog}: error: {message}\n")
 
 
 class Command(abc.ABC):
@@ -2008,14 +2031,21 @@ def build_parser() -> argparse.ArgumentParser:
     Returns:
         The parser, with a sub-command for each registered command.
     """
-    parser = argparse.ArgumentParser(prog="scmle")
+    parser = Parser(prog="scmle")
     parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="INFO",
         help="verbosity of the log written to standard error",
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="on failure, show the traceback, the cause chain and details",
+    )
+    subparsers = parser.add_subparsers(
+        dest="command", required=True, parser_class=Parser
+    )
     for command in COMMANDS:
         command.configure(
             subparsers.add_parser(command.name, help=command.help)
@@ -2030,20 +2060,53 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: Arguments; defaults to `sys.argv[1:]`.
 
     Returns:
-        The command's own status on success, 2 if it raised a blocked error
-        and 1 if it raised any other `ScmleError`. Other exceptions propagate.
+        The command's own status on success; `EXIT_BLOCKED` if it was refused
+        (a `BlockedError` or `LeakageError`); `EXIT_FAILED` for any other
+        `ScmleError`; `EXIT_INTERNAL` for any other exception, which is a
+        defect. A bad command line exits with `EXIT_USAGE`. With `--debug`
+        every failure is logged with its traceback, causes and details.
     """
     args = build_parser().parse_args(argv)
-    logging.basicConfig(level=args.log_level, format="%(message)s")
+    level = logging.DEBUG if args.debug else args.log_level
+    logging.basicConfig(level=level, format=LOG_FORMAT)
     command = next(c for c in COMMANDS if c.name == args.command)
     try:
         return command.execute(args)
-    except errors.BlockedError as error:
-        LOGGER.error("blocked: %s", error)  # noqa: TRY400 -- one-line report; a traceback is noise
+    except (errors.BlockedError, errors.LeakageError) as error:
+        # handled: logged by `report`, exit code EXIT_BLOCKED
+        report("blocked", error, debug=args.debug)
         return EXIT_BLOCKED
     except errors.ScmleError as error:
-        LOGGER.error("%s error: %s", error.category, error)  # noqa: TRY400 -- one-line report; a traceback is noise
+        # handled: logged by `report`, exit code EXIT_FAILED
+        report(f"{error.category} error", error, debug=args.debug)
         return EXIT_FAILED
+    except Exception as error:  # noqa: BLE001 -- the process boundary: any other failure is a defect, reported with its traceback
+        # handled: logged with its traceback by `report`, EXIT_INTERNAL
+        report("internal error (a defect; please report it)", error, debug=True)
+        return EXIT_INTERNAL
+
+
+def report(label: str, error: BaseException, *, debug: bool) -> None:
+    """Logs a failure: one line, or the whole story with `--debug`.
+
+    Args:
+        label: What kind of failure it is.
+        error: The failure.
+        debug: Whether to add the traceback, the causes and the details.
+    """
+    if not debug:
+        LOGGER.error("%s: %s", label, error)
+        return
+    failure = errors.Failure.of(error)
+    details = getattr(error, "details", None) or {}
+    LOGGER.error(
+        "%s: %s\ncauses: %s\ndetails: %s\n%s",
+        label,
+        error,
+        list(failure.causes) or "none",
+        details or "none",
+        failure.trace,
+    )
 
 
 if __name__ == "__main__":
