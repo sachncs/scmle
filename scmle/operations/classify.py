@@ -108,7 +108,7 @@ class Classification:
         }
 
 
-def caveats_for(
+def caveat(
     verdict: Verdict,
     breached: Mapping[str, scmle.operations.signals.Signal],
     unobserved: Sequence[str],
@@ -209,7 +209,7 @@ def classify(
         categories,
         tuple(sorted(breached)),
         unobserved,
-        tuple(caveats_for(verdict, breached, unobserved)),
+        tuple(caveat(verdict, breached, unobserved)),
         severity,
         RESPONSE.get(
             verdict,

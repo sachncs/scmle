@@ -90,7 +90,7 @@ class Orchestrator:
             registry.load_plugins()
         self.registry = registry
         self.policy = policy or selection.MeanSelector(spec.selection)
-        self.stages = compiler.compile_workflow(
+        self.stages = compiler.assemble(
             stages or scmle.core.stages.default_stages()
         )
         self.tracker = tracker

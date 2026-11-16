@@ -102,10 +102,10 @@ class GaussianCopulaGenerator(SyntheticGenerator):
             c: features[c].value_counts(normalize=True, dropna=True)
             for c in self.categorical
         }
-        self.correlation = self.estimate_correlation(features)
+        self.correlation = self.correlate(features)
         return self
 
-    def estimate_correlation(self, features: pandas.DataFrame) -> numpy.ndarray:
+    def correlate(self, features: pandas.DataFrame) -> numpy.ndarray:
         """Estimates the correlation of the numeric columns' normal scores.
 
         Args:

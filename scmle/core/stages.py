@@ -139,7 +139,7 @@ class Stage(abc.ABC):
     Attributes:
         state: Lifecycle state the run is in while the stage executes.
         requires: Stages that must run before this one (the workflow is
-            ordered by `compiler.compile_workflow`).
+            ordered by `compiler.assemble`).
     """
 
     state: ClassVar[scmle.core.state.RunState]
@@ -2524,7 +2524,7 @@ class SelectStage(Stage):
         sign = 1.0 if metric.greater_is_better else -1.0
         rows = []
         for trial in checked:
-            candidate = strategies.get_strategy(trial.strategy).build(
+            candidate = strategies.lookup(trial.strategy).build(
                 plan,
                 context.registry.get(trial.model_name),
                 task,
@@ -2617,7 +2617,7 @@ class SelectStage(Stage):
         """
         pipeline = context.refits.get(selected.trial_id)
         if pipeline is None:
-            pipeline = strategies.get_strategy(selected.strategy).build(
+            pipeline = strategies.lookup(selected.strategy).build(
                 scmle.core.context.require(
                     context.profile, "profile"
                 ).feature_plan,
@@ -2682,7 +2682,7 @@ class SelectStage(Stage):
             self.select_on_front(context, checked, limits)
             return
         for trial in checked:
-            candidate = strategies.get_strategy(trial.strategy).build(
+            candidate = strategies.lookup(trial.strategy).build(
                 plan,
                 context.registry.get(trial.model_name),
                 task,
@@ -3047,7 +3047,7 @@ def choose_decision_threshold(
         return fitted, None
     split = scmle.core.context.require(context.split, "split")
     selected = scmle.core.context.require(context.selected, "selected")
-    strategy = strategies.get_strategy(selected.strategy)
+    strategy = strategies.lookup(selected.strategy)
     adapter = context.registry.get(selected.model_name)
     plan = scmle.core.context.require(context.profile, "profile").feature_plan
     seed = context.spec.validation.seed
@@ -3183,7 +3183,7 @@ class FinalEvaluationStage(Stage):
             )
             return pipeline
         split = scmle.core.context.require(context.split, "split")
-        strategy = strategies.get_strategy(selected.strategy)
+        strategy = strategies.lookup(selected.strategy)
         adapter = context.registry.get(selected.model_name)
         plan = scmle.core.context.require(
             context.profile, "profile"
@@ -3455,7 +3455,7 @@ class FinalEvaluationStage(Stage):
         split = scmle.core.context.require(context.split, "split")
         task = scmle.core.context.require(context.task, "task")
         metric = scmle.core.context.require(context.metric, "metric")
-        template = strategies.get_strategy(selected.strategy).build(
+        template = strategies.lookup(selected.strategy).build(
             scmle.core.context.require(context.profile, "profile").feature_plan,
             context.registry.get(selected.model_name),
             task,
@@ -3681,7 +3681,7 @@ class FinalEvaluationStage(Stage):
         metric = scmle.core.context.require(context.metric, "metric")
         pipeline = context.refits.get(selected.trial_id)
         if pipeline is None:
-            pipeline = strategies.get_strategy(selected.strategy).build(
+            pipeline = strategies.lookup(selected.strategy).build(
                 scmle.core.context.require(
                     context.profile, "profile"
                 ).feature_plan,
@@ -4285,7 +4285,7 @@ class PackageStage(Stage):
         if context.resource_governor.skip_reason(first=False):
             return None
         split = scmle.core.context.require(context.split, "split")
-        template = strategies.get_strategy(selected.strategy).build(
+        template = strategies.lookup(selected.strategy).build(
             scmle.core.context.require(context.profile, "profile").feature_plan,
             context.registry.get(selected.model_name),
             scmle.core.context.require(context.task, "task"),
@@ -4366,7 +4366,7 @@ class PackageStage(Stage):
             self.note_conformal_skipped(context, reason)
             return None
         split = scmle.core.context.require(context.split, "split")
-        template = strategies.get_strategy(selected.strategy).build(
+        template = strategies.lookup(selected.strategy).build(
             scmle.core.context.require(context.profile, "profile").feature_plan,
             context.registry.get(selected.model_name),
             task,
@@ -4671,7 +4671,7 @@ class PackageStage(Stage):
             return {"skipped": f"not defined for {task.value}"}
         split = scmle.core.context.require(context.split, "split")
         adapter = context.registry.get(selected.model_name)
-        strategy = strategies.get_strategy(selected.strategy)
+        strategy = strategies.lookup(selected.strategy)
         plan = scmle.core.context.require(
             context.profile, "profile"
         ).feature_plan
@@ -4725,7 +4725,7 @@ class PackageStage(Stage):
         if len(split.dev_target) < sensitivity.MIN_ROWS:
             return {"skipped": "too few rows"}
         adapter = context.registry.get(selected.model_name)
-        strategy = strategies.get_strategy(selected.strategy)
+        strategy = strategies.lookup(selected.strategy)
         plan = scmle.core.context.require(
             context.profile, "profile"
         ).feature_plan
@@ -4774,7 +4774,7 @@ class PackageStage(Stage):
             return {"skipped": "time budget spent"}
         task = scmle.core.context.require(context.task, "task")
         adapter = context.registry.get(selected.model_name)
-        strategy = strategies.get_strategy(selected.strategy)
+        strategy = strategies.lookup(selected.strategy)
         plan = scmle.core.context.require(
             context.profile, "profile"
         ).feature_plan
@@ -4828,7 +4828,7 @@ class PackageStage(Stage):
             return None
         split = scmle.core.context.require(context.split, "split")
         data = context.spec.data
-        template = strategies.get_strategy(selected.strategy).build(
+        template = strategies.lookup(selected.strategy).build(
             scmle.core.context.require(context.profile, "profile").feature_plan,
             context.registry.get(selected.model_name),
             scmle.core.context.require(context.task, "task"),
@@ -5271,7 +5271,7 @@ class PackageStage(Stage):
 
 def default_stages() -> tuple[Stage, ...]:
     """Returns the standard stage sequence, one per lifecycle state."""
-    return compiler.compile_workflow(
+    return compiler.assemble(
         (
             IngestStage(),
             ProfileStage(),

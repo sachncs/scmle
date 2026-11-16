@@ -346,7 +346,7 @@ class Tracer:
                 )
             facts["costs"] = {k: cost[k] for k in sorted(cost) if k[:2] == "c_"}
             facts["cost_sources"] = list(cost.get("sources", []))
-            facts["threshold"] = outcomes.optimal_threshold(cost)
+            facts["threshold"] = outcomes.optimise(cost)
         self.add(name, files, facts, ["question"])
 
     def stakeholder(self) -> None:
@@ -839,7 +839,7 @@ class Tracer:
                 self.problem(
                     MISMATCH, name, "the outcome feed cannot be evaluated"
                 )
-            expected_cut = outcomes.optimal_threshold(cost)
+            expected_cut = outcomes.optimise(cost)
             if (
                 abs(float(feed.get("threshold", -1)) - expected_cut)
                 > CUT_TOLERANCE
@@ -849,7 +849,7 @@ class Tracer:
                     name,
                     "the served decision rule is not the chartered cut",
                 )
-        tracking = reports.with_hash({"kind": "outcome_tracking", **tracking})
+        tracking = reports.stamp({"kind": "outcome_tracking", **tracking})
         self.derived["outcomes"] = tracking
         self.report_step(
             name,

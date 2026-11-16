@@ -344,7 +344,7 @@ class TrialRunner:
         return TrialPayload(
             job=job,
             adapter=context.registry.get(job.model_name),
-            strategy=strategies.get_strategy(job.strategy),
+            strategy=strategies.lookup(job.strategy),
             feature_plan=self.feature_plan,
             task=self.task,
             seed=context.spec.validation.seed,

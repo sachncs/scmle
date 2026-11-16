@@ -15,6 +15,11 @@ marked `Breaking:` and listed first in their group.
 * **Single-word names (owner's naming rule).** Names are renamed to single
   words module by module; each rename is listed here. `scmle.core.retry`:
   `call_with_retries` is `call`, `Retries.delay_after` is `Retries.delay`.
+  Also: `compiler.compile_workflow` is `assemble`, `strategies.get_strategy`
+  is `lookup`, `serving.parse_request` is `parse`, `outcomes.optimal_threshold`
+  is `optimise`, `reports.with_hash` is `stamp`, `context.included_files` is
+  `include`, `synthesis.estimate_correlation` is `correlate`,
+  `builder.copy_present` is `collect`, `classify.caveats_for` is `caveat`.
   Migration: replace the old names; the signatures are unchanged.
 * **No package-root exports.** `scmle` exports only `__version__`. Every public
   name is imported from the module that defines it: `scmle.api.project.Project`,

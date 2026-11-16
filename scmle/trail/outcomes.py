@@ -28,7 +28,7 @@ UNCERTAINTY = (
 )
 
 
-def optimal_threshold(costs: Mapping[str, float]) -> float:
+def optimise(costs: Mapping[str, float]) -> float:
     """Computes the cut on the probability that minimises expected cost.
 
     Args:

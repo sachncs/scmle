@@ -312,7 +312,7 @@ def test_inputs_structure_problems_are_listed():
 
 def test_the_interval_and_the_status_follow_the_expectation():
     costs = {"c_00": 0.0, "c_01": 5.0, "c_10": 1.0, "c_11": 0.0}
-    assert outcomes.optimal_threshold(costs) == pytest.approx(1 / 6)
+    assert outcomes.optimise(costs) == pytest.approx(1 / 6)
     feed = {
         "threshold": 1 / 6,
         "batches": [{"batch": 0, "probability": [0.9] * 40, "label": [1] * 40}],

@@ -351,7 +351,7 @@ def test_the_context_scan_finds_planted_secrets(signed_service, tmp_path):
     folder = copy_of(signed_service, tmp_path)
     (folder / ".env").write_text("TOKEN=abc")
     (folder / "id_rsa").write_text("x")
-    assert ".env" not in {p.name for p in context.included_files(folder)}
+    assert ".env" not in {p.name for p in context.include(folder)}
     assert context.scan(folder, [KEY]) == []
     (folder / "notes.txt").write_text(f"the key is {KEY}")
     (folder / "deploy.pem.txt").write_text(

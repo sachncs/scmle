@@ -179,11 +179,11 @@ def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
     kinds = [type(s) for s in default]
     assert kinds[0] is stages.IngestStage and kinds[-1] is stages.PackageStage
     shuffled = list(reversed(default))
-    assert [type(s) for s in compiler.compile_workflow(shuffled)] == kinds
+    assert [type(s) for s in compiler.assemble(shuffled)] == kinds
     with pytest.raises(errors.ConfigError, match="requires"):
-        compiler.compile_workflow(default[1:])
+        compiler.assemble(default[1:])
     with pytest.raises(errors.ConfigError, match="more than once"):
-        compiler.compile_workflow([*default, default[0]])
+        compiler.assemble([*default, default[0]])
 
     class Left:
         requires = ()
@@ -193,7 +193,7 @@ def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
 
     Left.requires = (Right,)
     with pytest.raises(errors.ConfigError, match="cycle"):
-        compiler.compile_workflow([Left(), Right()])
+        compiler.assemble([Left(), Right()])
 
 
 def test_a_replacement_stage_subclass_satisfies_dependencies():
@@ -206,5 +206,5 @@ def test_a_replacement_stage_subclass_satisfies_dependencies():
         Custom() if isinstance(s, stages.TrainStage) else s
         for s in stages.default_stages()
     ]
-    ordered = compiler.compile_workflow(swapped)
+    ordered = compiler.assemble(swapped)
     assert [type(s) for s in ordered].count(Custom) == 1

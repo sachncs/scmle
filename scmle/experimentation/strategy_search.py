@@ -84,7 +84,7 @@ class StrategySearch:
         adapter = self.context.registry.get(leader.model_name)
         chosen: list[str] = []
         for name in names:
-            strategy = strategies.get_strategy(name)
+            strategy = strategies.lookup(name)
             reason = strategy.applicability(self.profile, self.task, adapter)
             if reason is None:
                 chosen.append(name)

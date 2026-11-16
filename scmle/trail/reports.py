@@ -14,7 +14,7 @@ from scmle.trail import records
 BAR_WIDTH = 30
 
 
-def with_hash(body: dict[str, Any]) -> dict[str, Any]:
+def stamp(body: dict[str, Any]) -> dict[str, Any]:
     """Adds the digest of ``body`` under ``sha256``.
 
     Args:
@@ -85,7 +85,7 @@ def exploratory(directory: Path) -> dict[str, Any]:
             "checks_by_tier": dict(sorted(tiers.items())),
         },
     }
-    return with_hash(body)
+    return stamp(body)
 
 
 def bar(score: float, top: float) -> str:
@@ -178,4 +178,4 @@ def experiments(directory: Path) -> dict[str, Any]:
             "after selection was frozen."
         ),
     }
-    return with_hash(body)
+    return stamp(body)

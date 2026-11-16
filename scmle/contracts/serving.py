@@ -59,7 +59,7 @@ def schema_digest(schema: Mapping[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def parse_request(payload: object, max_records: int) -> ScoreRequest:
+def parse(payload: object, max_records: int) -> ScoreRequest:
     """Validates a decoded JSON body against request schema version 1.
 
     Args:

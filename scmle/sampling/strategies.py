@@ -1007,7 +1007,7 @@ OPT_IN = frozenset({"jitter_augment", "copula_augment"})
 DEFAULT_NAMES = tuple(n for n in EXPERIMENTAL if n not in OPT_IN)
 
 
-def get_strategy(name: str) -> Strategy:
+def lookup(name: str) -> Strategy:
     """Looks up a registered data strategy.
 
     Args:

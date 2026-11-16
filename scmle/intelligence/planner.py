@@ -605,7 +605,7 @@ class StrategyRecorder(Refiner):
         """
         spec = context.spec.effective_strategies()
         for name in spec.names:
-            strategy = strategies.get_strategy(name)
+            strategy = strategies.lookup(name)
             reasons = {
                 a.name: strategy.applicability(context.profile, context.task, a)
                 for a in candidates

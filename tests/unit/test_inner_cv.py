@@ -69,7 +69,7 @@ def plan(**kwargs):
 
 def test_calibration_strategy_uses_the_structured_splitter():
     registry = scmle.models.registry.Catalog.with_builtins()
-    strategy = strategies.get_strategy("calibrated")
+    strategy = strategies.lookup("calibrated")
     candidate = strategy.build(
         plan(group_column="unit"),
         registry.get("random_forest"),

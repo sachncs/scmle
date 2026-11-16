@@ -47,7 +47,7 @@ def balanced():
 
 
 def reason(name, profile, model, task=tasks.Task.BINARY):
-    return strategies.get_strategy(name).applicability(
+    return strategies.lookup(name).applicability(
         profile, task, REGISTRY.get(model)
     )
 
@@ -83,7 +83,7 @@ def test_class_weight_requires_estimator_support(skewed_imbalanced):
 
     profile = profile_of(skewed_imbalanced)
     assert reason("class_weight", profile, "random_forest") is None
-    strategy = strategies.get_strategy("class_weight")
+    strategy = strategies.lookup("class_weight")
     found = strategy.applicability(profile, tasks.Task.BINARY, NoWeights())
     assert found == "no_weights has no class_weight parameter"
 
@@ -136,7 +136,7 @@ def test_builds_produce_fittable_candidates(skewed_imbalanced):
         if name in {"rare_target_weighting", "target_transform"}:
             continue  # regression only; covered by their own tests
         adapter = REGISTRY.get("logistic_regression")
-        candidate = strategies.get_strategy(name).build(
+        candidate = strategies.lookup(name).build(
             plan, adapter, tasks.Task.BINARY, 0
         )
         candidate.fit(features, target)
@@ -145,7 +145,7 @@ def test_builds_produce_fittable_candidates(skewed_imbalanced):
 
 def test_resampling_strategy_wraps_the_pipeline(skewed_imbalanced):
     plan = profile_of(skewed_imbalanced).feature_plan
-    candidate = strategies.get_strategy("random_undersample").build(
+    candidate = strategies.lookup("random_undersample").build(
         plan, REGISTRY.get("random_forest"), tasks.Task.BINARY, 3
     )
     assert isinstance(candidate, resampling.ResamplingClassifier)
@@ -154,7 +154,7 @@ def test_resampling_strategy_wraps_the_pipeline(skewed_imbalanced):
 
 def test_class_weight_is_injected_over_other_params(skewed_imbalanced):
     plan = profile_of(skewed_imbalanced).feature_plan
-    candidate = strategies.get_strategy("class_weight").build(
+    candidate = strategies.lookup("class_weight").build(
         plan,
         REGISTRY.get("logistic_regression"),
         tasks.Task.BINARY,
@@ -188,7 +188,7 @@ def test_registry_and_unknown_strategy():
     )
     assert "jitter_augment" not in strategies.DEFAULT_NAMES
     with pytest.raises(errors.ConfigError, match="unknown strategy"):
-        strategies.get_strategy("nope")
+        strategies.lookup("nope")
 
 
 def smote_profile():
@@ -231,7 +231,7 @@ def test_smote_candidates_fit_and_resample_only_the_training_fold(name):
     pytest.importorskip("imblearn")
     frame, profile = smote_profile()
     adapter = REGISTRY.get("logistic_regression")
-    candidate = strategies.get_strategy(name).build(
+    candidate = strategies.lookup(name).build(
         profile.feature_plan, adapter, tasks.Task.BINARY, 0
     )
     assert isinstance(candidate, resampling.PreprocessedResamplingClassifier)
@@ -292,7 +292,7 @@ def cross_validated(frame, strategy_name, model):
     from sklearn import model_selection
 
     profile = profile_of(frame)
-    strategy = strategies.get_strategy(strategy_name)
+    strategy = strategies.lookup(strategy_name)
     estimator = strategy.build(
         profile.feature_plan, REGISTRY.get(model), tasks.Task.BINARY, 0
     )
@@ -325,7 +325,7 @@ def test_constructed_ratios_let_a_linear_model_learn_a_ratio_target():
     )
 
     def r2(name):
-        estimator = strategies.get_strategy(name).build(
+        estimator = strategies.lookup(name).build(
             profile.feature_plan,
             REGISTRY.get("ridge"),
             tasks.Task.REGRESSION,
@@ -341,7 +341,7 @@ def test_constructed_ratios_let_a_linear_model_learn_a_ratio_target():
 def test_feature_selection_keeps_the_signal_and_drops_noise_columns():
     frame = wide_problem()
     profile = profile_of(frame)
-    pipeline = strategies.get_strategy("select_features").build(
+    pipeline = strategies.lookup("select_features").build(
         profile.feature_plan,
         REGISTRY.get("logistic_regression"),
         tasks.Task.BINARY,
@@ -416,7 +416,7 @@ def informative_gap_problem(rows=900, seed=7):
 def test_missing_indicators_append_a_flag_for_features_with_informative_gaps():
     frame = informative_gap_problem()
     profile = profile_of(frame)
-    pipeline = strategies.get_strategy("missing_indicators").build(
+    pipeline = strategies.lookup("missing_indicators").build(
         profile.feature_plan,
         REGISTRY.get("logistic_regression"),
         tasks.Task.BINARY,
@@ -440,7 +440,7 @@ def test_iterative_imputation_recovers_values_better_than_the_median():
     profile = profile_of(frame)
 
     def error(strategy):
-        pipeline = strategies.get_strategy(strategy).build(
+        pipeline = strategies.lookup(strategy).build(
             profile.feature_plan,
             REGISTRY.get("logistic_regression"),
             tasks.Task.BINARY,
@@ -490,7 +490,7 @@ def test_target_transform_helps_a_linear_model_on_a_long_tailed_target():
     )
 
     def mae(name):
-        estimator = strategies.get_strategy(name).build(
+        estimator = strategies.lookup(name).build(
             profile.feature_plan,
             REGISTRY.get("ridge"),
             tasks.Task.REGRESSION,

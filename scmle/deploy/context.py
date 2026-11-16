@@ -91,7 +91,7 @@ def excluded(relative: str, ignore: Iterable[str]) -> bool:
     return False
 
 
-def included_files(root: str | pathlib.Path) -> list[pathlib.Path]:
+def include(root: str | pathlib.Path) -> list[pathlib.Path]:
     """Lists the files that would be sent to the builder.
 
     Args:
@@ -128,7 +128,7 @@ def scan(
     findings = []
     if not (base / ".dockerignore").exists():
         findings.append(".dockerignore is missing: everything would be sent")
-    for relative in included_files(base):
+    for relative in include(base):
         name = relative.as_posix()
         if any(
             fnmatch.fnmatch(part, pattern)
@@ -183,7 +183,7 @@ def main(arguments: list[str] | None = None) -> int:
         print(finding, file=sys.stderr)  # noqa: T201 -- command-line output
     if not findings:
         print(  # noqa: T201 -- command-line output
-            f"{len(included_files(options.folder))} files in the context; "
+            f"{len(include(options.folder))} files in the context; "
             "nothing suspicious found"
         )
     return 1 if findings else 0

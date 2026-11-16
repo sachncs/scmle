@@ -8,7 +8,7 @@ from scmle.trail import chain
 from scmle.trail import records
 
 
-def copy_present(source: Path, target: Path, names: tuple[str, ...]) -> None:
+def collect(source: Path, target: Path, names: tuple[str, ...]) -> None:
     """Copies the named files that exist, keeping their relative paths.
 
     Args:
@@ -56,14 +56,12 @@ def build(
     """
     folder = Path(output)
     base = folder / records.RETAINED
-    copy_present(Path(run_dir), base / "run", records.RUN_FILES)
+    collect(Path(run_dir), base / "run", records.RUN_FILES)
     for trial in sorted((Path(run_dir) / "trials").glob("trial_*.json")):
-        copy_present(Path(run_dir), base / "run", (f"trials/{trial.name}",))
-    copy_present(Path(framing_dir), base / "framing", records.FRAMING_FILES)
-    copy_present(Path(registry_dir), base / "registry", records.REGISTRY_FILES)
-    copy_present(
-        Path(deployment_dir), base / "deployment", records.DEPLOYMENT_FILES
-    )
+        collect(Path(run_dir), base / "run", (f"trials/{trial.name}",))
+    collect(Path(framing_dir), base / "framing", records.FRAMING_FILES)
+    collect(Path(registry_dir), base / "registry", records.REGISTRY_FILES)
+    collect(Path(deployment_dir), base / "deployment", records.DEPLOYMENT_FILES)
     folder.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(inputs_file, folder / records.INPUTS)
     return chain.seal(folder, keys)

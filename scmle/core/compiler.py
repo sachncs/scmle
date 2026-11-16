@@ -53,7 +53,7 @@ class WorkflowStage(Protocol):
 StageT = TypeVar("StageT", bound=WorkflowStage)
 
 
-def compile_workflow(
+def assemble(
     stages: Sequence[StageT],
 ) -> tuple[StageT, ...]:
     """Orders stages so every stage runs after the stages it requires.

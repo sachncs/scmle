@@ -46,7 +46,7 @@ def test_weights_favour_sparse_regions_of_the_target_range():
 
 
 def test_strategy_applies_only_to_long_tailed_regression(registry):
-    strategy = strategies.get_strategy("rare_target_weighting")
+    strategy = strategies.lookup("rare_target_weighting")
     forest = registry.get("random_forest")
     assert (
         strategy.applicability(profile_with(3.0), tasks.Task.REGRESSION, forest)
@@ -67,7 +67,7 @@ def test_strategy_applies_only_to_long_tailed_regression(registry):
 def test_classification_resampling_strategies_never_touch_regression(registry):
     forest = registry.get("random_forest")
     for name in ("random_oversample", "smote", "class_weight"):
-        reason = strategies.get_strategy(name).applicability(
+        reason = strategies.lookup(name).applicability(
             profile_with(3.0), tasks.Task.REGRESSION, forest
         )
         assert reason is not None
@@ -76,7 +76,7 @@ def test_classification_resampling_strategies_never_touch_regression(registry):
 def test_weighted_pipeline_fits_and_predicts(registry):
     features, target = long_tailed()
     plan = data.FeaturePlan(("x",), ())
-    candidate = strategies.get_strategy("rare_target_weighting").build(
+    candidate = strategies.lookup("rare_target_weighting").build(
         plan, registry.get("random_forest"), tasks.Task.REGRESSION, 0
     )
     candidate.fit(features, target)

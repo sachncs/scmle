@@ -92,7 +92,7 @@ def test_sparse_capable_models_get_sparse_one_hot_on_high_cardinality(
 
 def test_target_encoding_strategy_is_cross_fitted_and_conditional(registry):
     features, target = high_cardinality_frame()
-    strategy = strategies.get_strategy("target_encoding")
+    strategy = strategies.lookup("target_encoding")
     adapter = registry.get("logistic_regression")
     pipeline_ = strategy.build(PLAN, adapter, tasks.Task.BINARY, 0)
     pipeline_.fit(features, target)

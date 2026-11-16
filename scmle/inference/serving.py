@@ -1024,7 +1024,7 @@ class Responder(server.BaseHTTPRequestHandler):
             self.fail(400, f"invalid JSON request: {error.msg}", "request")
             return
         adapter = self.adapter
-        request = serving.parse_request(payload, adapter.max_records)
+        request = serving.parse(payload, adapter.max_records)
         response = adapter.admission.run(lambda: adapter.score(request))
         response["request_id"] = self.request_id
         self.send_json(200, response)
