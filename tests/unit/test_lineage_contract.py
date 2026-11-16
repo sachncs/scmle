@@ -25,9 +25,9 @@ def graph() -> lineage.Graph:
             node("bundle", lineage.Kind.BUNDLE),
         )
     )
-    result.add_edge(lineage.Edge("source", "snapshot", "materializes"))
-    result.add_edge(lineage.Edge("snapshot", "curation", "curated"))
-    result.add_edge(lineage.Edge("curation", "bundle", "packages"))
+    result.connect(lineage.Edge("source", "snapshot", "materializes"))
+    result.connect(lineage.Edge("snapshot", "curation", "curated"))
+    result.connect(lineage.Edge("curation", "bundle", "packages"))
     return result
 
 
@@ -47,7 +47,7 @@ def test_graph_is_deterministic_and_content_addressed():
         lineage.Edge("source", "snapshot", "materializes"),
         lineage.Edge("snapshot", "curation", "curated"),
     ):
-        second.add_edge(edge)
+        second.connect(edge)
 
     assert first.path_exists("source", "bundle")
     assert first.topological_order() == (
@@ -75,9 +75,9 @@ def test_graph_rejects_conflicts_dangling_edges_and_cycles():
     with pytest.raises(ValueError, match="conflicting evidence node"):
         result.add_node(node("source", lineage.Kind.SNAPSHOT))
     with pytest.raises(ValueError, match="unknown node"):
-        result.add_edge(lineage.Edge("bundle", "missing", "points"))
+        result.connect(lineage.Edge("bundle", "missing", "points"))
     with pytest.raises(ValueError, match="acyclic"):
-        result.add_edge(lineage.Edge("bundle", "source", "loops"))
+        result.connect(lineage.Edge("bundle", "source", "loops"))
 
 
 def test_graph_rejects_invalid_node_and_edge_metadata():

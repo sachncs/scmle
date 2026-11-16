@@ -120,7 +120,7 @@ class Gates:
         """Rebuilds the rules from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -128,7 +128,7 @@ class Gates:
         Returns:
             The rebuilt rules.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -193,7 +193,7 @@ class DecisionModel:
         """Rebuilds the model from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -201,7 +201,7 @@ class DecisionModel:
         Returns:
             The rebuilt model.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(
             unit=record["unit"],
             baselines=tuple(record["baselines"]),
@@ -270,7 +270,7 @@ class FairnessConstraint:
         """Rebuilds the constraint from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -278,7 +278,7 @@ class FairnessConstraint:
         Returns:
             The rebuilt constraint.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -329,7 +329,7 @@ class Guardrail:
         """Rebuilds the guardrail from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -337,7 +337,7 @@ class Guardrail:
         Returns:
             The rebuilt guardrail.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -457,7 +457,7 @@ class RolloutPlan:
         """Rebuilds the rollout from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`; an alpha level
+        the `ValueError` of `qualification.require`; an alpha level
         that is not a valid fraction string raises `ValueError` from
         `budget.parse_fraction`.
 
@@ -467,7 +467,7 @@ class RolloutPlan:
         Returns:
             The rebuilt rollout.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(
             unit=record["unit"],
             primary=record["primary"],
@@ -536,7 +536,7 @@ class DecisionLayer:
 
         `rollout` may be absent and then defaults to None. Other missing
         fields, and keys that are not fields, are rejected with the
-        `ValueError` of `qualification.require_fields`.
+        `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -545,7 +545,7 @@ class DecisionLayer:
             The rebuilt block.
         """
         record = {"rollout": None, **record}
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         plan = record["rollout"]
         return cls(
             model=DecisionModel.from_dict(record["model"]),

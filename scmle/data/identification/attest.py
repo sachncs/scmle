@@ -160,7 +160,7 @@ class Attestation:
             field (including `signature`), has an extra one or fails the
             checks of `__post_init__` raises `ValueError`.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 

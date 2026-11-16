@@ -75,7 +75,7 @@ class ExtensionModality:
 ModalityIdentity = Modality | ExtensionModality
 
 
-def modality_value(modality: ModalityIdentity) -> str:
+def serialise(modality: ModalityIdentity) -> str:
     """Returns the stable serialized value for a modality identity.
 
     Args:
@@ -93,11 +93,11 @@ def modality_value(modality: ModalityIdentity) -> str:
     return modality.value
 
 
-def modality_from_value(value: str) -> ModalityIdentity:
+def restore(value: str) -> ModalityIdentity:
     """Restores a built-in or extension modality from evidence text.
 
     Args:
-        value: The serialized value, as returned by `modality_value`.
+        value: The serialized value, as returned by `serialise`.
 
     Returns:
         The matching built-in or extension modality.
@@ -335,7 +335,7 @@ class Declaration:
         """Returns a stable JSON-compatible declaration."""
         stage_records = {record.stage: record for record in self.stage_evidence}
         return {
-            "modality": modality_value(self.modality),
+            "modality": serialise(self.modality),
             "status": self.status.value,
             "stage_evidence": [
                 stage_records[stage].to_dict()
@@ -394,7 +394,7 @@ class Registry:
         if declaration.modality in self.records:
             raise errors.ConfigError(
                 "modality already registered: "
-                f"{modality_value(declaration.modality)}"
+                f"{serialise(declaration.modality)}"
             )
         self.records[declaration.modality] = declaration
 
@@ -504,16 +504,15 @@ class Registry:
         diagnostic: dict[str, object] = {
             "status": "unsupported",
             "reason": reason,
-            "modality": modality_value(modality),
+            "modality": serialise(modality),
             "registered_modalities": [
-                modality_value(item.modality)
-                for item in self.list_declarations()
+                serialise(item.modality) for item in self.list_declarations()
             ],
         }
         if details:
             diagnostic.update(details)
         raise UnsupportedModalityError(
             f"unsupported modality before execution: {reason}; "
-            f"modality={modality_value(modality)}",
+            f"modality={serialise(modality)}",
             diagnostic,
         )

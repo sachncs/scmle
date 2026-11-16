@@ -306,7 +306,7 @@ def tabular_beta_capability_registry() -> capabilities.Registry:
                 )
                 for fairness in fairness_options(task)
             )
-    return capabilities.Registry.with_declared_model_families(records)
+    return capabilities.Registry.seed(records)
 
 
 def extension_capability(
@@ -524,7 +524,7 @@ class Context:
     def __post_init__(self) -> None:
         """Binds the captured facts to the registry used by planning."""
         if self.capability_observation is not None:
-            self.capability_registry.bind_runtime_environment(
+            self.capability_registry.bind(
                 self.capability_observation.environment
             )
 
@@ -626,7 +626,7 @@ class Context:
                 )
             )
 
-    def allocate_trial_ids(self, count: int) -> list[str]:
+    def allocate(self, count: int) -> list[str]:
         """Hands out the next `count` sequential trial identifiers.
 
         Args:

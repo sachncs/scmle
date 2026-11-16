@@ -47,7 +47,7 @@ def binding_digest(claims_hash: str, ledger_hash: str) -> str:
         The SHA-256 hex digest of the canonical JSON of both hashes.
     """
     return hashlib.sha256(
-        signing.canonical_payload(
+        signing.canonicalise(
             {"claims_hash": claims_hash, "ledger_hash": ledger_hash}
         )
     ).hexdigest()
@@ -62,7 +62,7 @@ def entry_hash(body: Mapping[str, Any]) -> str:
     Returns:
         The SHA-256 hex digest of the canonical JSON of `body`.
     """
-    return hashlib.sha256(signing.canonical_payload(body)).hexdigest()
+    return hashlib.sha256(signing.canonicalise(body)).hexdigest()
 
 
 def entry_mac(entry_hash_value: str, key: bytes) -> str:

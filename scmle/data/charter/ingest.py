@@ -78,7 +78,7 @@ class EntityField:
         """Rebuilds the record from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -86,7 +86,7 @@ class EntityField:
         Returns:
             The rebuilt record.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -129,7 +129,7 @@ class EntityPass:
         """Rebuilds the record from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -137,7 +137,7 @@ class EntityPass:
         Returns:
             The rebuilt record.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -191,7 +191,7 @@ class Entity:
         """Rebuilds the block from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -199,7 +199,7 @@ class Entity:
         Returns:
             The rebuilt block.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(
             tuple(EntityField.from_dict(f) for f in record["fields"]),
             tuple(EntityPass.from_dict(p) for p in record["passes"]),
@@ -241,7 +241,7 @@ class ColumnTotal:
         """Rebuilds the record from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -249,7 +249,7 @@ class ColumnTotal:
         Returns:
             The rebuilt record.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -313,7 +313,7 @@ class TableTotals:
         """Rebuilds the record from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -321,7 +321,7 @@ class TableTotals:
         Returns:
             The rebuilt record.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(
             record["view"],
             record["rows"],
@@ -369,7 +369,7 @@ class Expectation:
         """Rebuilds the block from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -377,7 +377,7 @@ class Expectation:
         Returns:
             The rebuilt block.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(tuple(TableTotals.from_dict(t) for t in record["tables"]))
 
 
@@ -471,7 +471,7 @@ class Ingestion:
 
         `entity` and `reconcile` may be absent and then default to None.
         Other missing fields, and keys that are not fields, are rejected
-        with the `ValueError` of `qualification.require_fields`.
+        with the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -480,7 +480,7 @@ class Ingestion:
             The rebuilt block.
         """
         values: dict[str, Any] = {"entity": None, "reconcile": None, **record}
-        qualification.require_fields(cls, values)
+        qualification.require(cls, values)
         values["windows"] = tuple(values["windows"])
         block = values["entity"]
         values["entity"] = None if block is None else Entity.from_dict(block)

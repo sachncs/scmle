@@ -221,10 +221,10 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
                         ),
                     }
                 )
-        scores = [metric.to_natural(float(s)) for s in raw_scores]
+        scores = [metric.naturalise(float(s)) for s in raw_scores]
         result.fold_scores = scores
         result.train_scores = [
-            metric.to_natural(float(s)) for s in raw_train_scores
+            metric.naturalise(float(s)) for s in raw_train_scores
         ]
         result.score_mean = float(numpy.mean(scores))
         result.score_std = float(numpy.std(scores))

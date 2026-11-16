@@ -75,7 +75,7 @@ def test_extension_modality_has_stable_namespaced_identity():
     identity = modalities.ExtensionModality("acme/point-cloud")
 
     assert identity.value == "extension:acme/point-cloud"
-    assert modalities.modality_from_value(identity.value) == identity
+    assert modalities.restore(identity.value) == identity
     with pytest.raises(ValueError, match="lowercase namespaced"):
         modalities.ExtensionModality("Acme point cloud")
     with pytest.raises(ValueError, match="conflicts"):

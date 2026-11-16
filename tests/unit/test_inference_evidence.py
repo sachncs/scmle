@@ -24,7 +24,7 @@ def build_graph() -> lineage.Graph:
             ),
         )
     )
-    result.add_edge(lineage.Edge("source", "bundle", "packages"))
+    result.connect(lineage.Edge("source", "bundle", "packages"))
     return result
 
 

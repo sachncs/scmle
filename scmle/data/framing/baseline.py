@@ -345,7 +345,7 @@ class Registration:
     def registration_hash(self) -> str:
         """The SHA-256 hex digest of the registration."""
         return hashlib.sha256(
-            signing.canonical_payload(dataclasses.asdict(self))
+            signing.canonicalise(dataclasses.asdict(self))
         ).hexdigest()
 
 
@@ -388,7 +388,7 @@ def rule_digest(rule: Mapping[str, Any]) -> str:
     Returns:
         The SHA-256 hex digest of the canonical payload of `rule`.
     """
-    return hashlib.sha256(signing.canonical_payload(rule)).hexdigest()
+    return hashlib.sha256(signing.canonicalise(rule)).hexdigest()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

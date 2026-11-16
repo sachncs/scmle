@@ -362,11 +362,11 @@ def bind_parameter_estimation_evidence(
         )
     )
     for edge in graph.edges:
-        updated.add_edge(edge)
-    updated.add_edge(
+        updated.connect(edge)
+    updated.connect(
         lineage.Edge("snapshot", "parameter-estimation", "estimates")
     )
-    updated.add_edge(
+    updated.connect(
         lineage.Edge("evaluation", "parameter-estimation", "records")
     )
     record = updated.to_dict()
@@ -1401,7 +1401,7 @@ class Curator:
         if self.output_dir.exists() and not self.output_dir.is_dir():
             raise ValueError("output_dir must be a directory")
         samples = self.adapter.samples
-        modality = modalities.modality_value(self.adapter.modality)
+        modality = modalities.serialise(self.adapter.modality)
         dataset_hash = self.adapter.dataset_hash
         sample_count = len(samples)
         if self.manifest is not None:

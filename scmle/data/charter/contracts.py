@@ -105,7 +105,7 @@ class IntercurrentEvent:
         """Rebuilds the event from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -113,7 +113,7 @@ class IntercurrentEvent:
         Returns:
             The rebuilt event.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -195,7 +195,7 @@ class AnalysisEstimand:
 
         `causal` may be absent and then defaults to None. Other missing
         fields, and keys that are not fields, are rejected with the
-        `ValueError` of `qualification.require_fields`.
+        `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -204,7 +204,7 @@ class AnalysisEstimand:
             The rebuilt estimand.
         """
         record = {"causal": None, **record}
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         block = record["causal"]
         return cls(
             kind=record["kind"],
@@ -272,7 +272,7 @@ class DecisionRow:
         """Rebuilds the row from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`; an `action`
+        the `ValueError` of `qualification.require`; an `action`
         that is not a `DecisionAction` value also raises `ValueError`.
 
         Args:
@@ -281,7 +281,7 @@ class DecisionRow:
         Returns:
             The rebuilt row.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(
             check_id=record["check_id"],
             trigger=record["trigger"],
@@ -335,7 +335,7 @@ class SetSizes:
         """Rebuilds the sizes from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -343,7 +343,7 @@ class SetSizes:
         Returns:
             The rebuilt sizes.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -393,7 +393,7 @@ class Choice:
         """Rebuilds the choice from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -401,7 +401,7 @@ class Choice:
         Returns:
             The rebuilt choice.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(
             name=record["name"],
             options=tuple(record["options"]),
@@ -578,9 +578,7 @@ class AnalysisCharter:
     @property
     def charter_hash(self) -> str:
         """SHA-256 of the canonical JSON of the charter (64 hex digits)."""
-        return hashlib.sha256(
-            signing.canonical_payload(self.to_dict())
-        ).hexdigest()
+        return hashlib.sha256(signing.canonicalise(self.to_dict())).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the charter.
@@ -665,7 +663,7 @@ class AnalysisCharter:
         `unit_of_prediction`, `ingest` and `uncertainty` may be absent and
         then default to None. Other missing fields, and keys that are not
         fields, are rejected with the `ValueError` of
-        `qualification.require_fields`.
+        `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -682,7 +680,7 @@ class AnalysisCharter:
             "uncertainty": None,
             **record,
         }
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         cost = record["cost_model"]
         chosen = record["rules"]
         layer = record["decision"]

@@ -708,7 +708,7 @@ class Config(FrozenModel):
 
     @pydantic.model_validator(mode="before")
     @classmethod
-    def expand_forecast(cls, values: Any) -> Any:
+    def expand(cls, values: Any) -> Any:
         """Turns a forecasting request into targets and series features.
 
         `data.target` is the series value; the expansion points the target at

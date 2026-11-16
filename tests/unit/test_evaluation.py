@@ -29,8 +29,8 @@ def test_unknown_and_incompatible_metrics():
 
 
 def test_orientation_natural_units():
-    assert metrics.CATALOG.metrics["rmse"].to_natural(-2.0) == 2.0
-    assert metrics.CATALOG.metrics["roc_auc"].to_natural(0.8) == 0.8
+    assert metrics.CATALOG.metrics["rmse"].naturalise(-2.0) == 2.0
+    assert metrics.CATALOG.metrics["roc_auc"].naturalise(0.8) == 0.8
 
 
 def test_evaluate_classification_and_regression():

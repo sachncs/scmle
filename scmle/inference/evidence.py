@@ -150,7 +150,7 @@ class Linker:
             },
         )
         graph.add_node(node)
-        graph.add_edge(lineage.Edge("bundle", node_id, "serves"))
+        graph.connect(lineage.Edge("bundle", node_id, "serves"))
         graph_record = graph.to_dict()
         graph_record["graph_digest"] = graph.digest()
         self.write_atomically(path, graph_record)

@@ -86,7 +86,7 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
     return resolved
 
 
-def canonical_payload(payload: Mapping[str, Any]) -> bytes:
+def canonicalise(payload: Mapping[str, Any]) -> bytes:
     """Returns the canonical JSON bytes covered by a signature.
 
     Args:
@@ -121,6 +121,6 @@ def sign_payload(payload: Mapping[str, Any], key: str | bytes) -> str:
         raise ValueError("signing key must not be empty")
     return hmac.new(
         resolved,
-        canonical_payload(payload),
+        canonicalise(payload),
         hashlib.sha256,
     ).hexdigest()

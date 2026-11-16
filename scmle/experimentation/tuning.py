@@ -195,7 +195,7 @@ class Tuner:
         proposals = list(
             map(operator.call, itertools.repeat(optimizer.ask, size))
         )
-        ids = self.context.allocate_trial_ids(len(proposals))
+        ids = self.context.allocate(len(proposals))
         current = self.runner.run_many(
             [
                 trials.TrialJob(trial_id, name, params, rungs[0], strategy)
@@ -260,7 +260,7 @@ class Tuner:
         proposals = list(
             map(operator.call, itertools.repeat(optimizer.ask, size))
         )
-        ids = self.context.allocate_trial_ids(len(proposals))
+        ids = self.context.allocate(len(proposals))
         first_rung = self.runner.run_many(
             [
                 trials.TrialJob(trial_id, name, params, rung_folds, strategy)

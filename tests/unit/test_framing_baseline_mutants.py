@@ -320,7 +320,7 @@ def test_registration_hash_covers_every_field_and_the_rule_digest_is_sha256():
     assert registration.alpha == 0.05
     assert (registration.t_lo, registration.t_hi) == (0.1, 0.4)
     assert registration.cost_model_hash == MODEL.model_hash
-    expected_rule = hashlib.sha256(signing.canonical_payload(RULE)).hexdigest()
+    expected_rule = hashlib.sha256(signing.canonicalise(RULE)).hexdigest()
     assert registration.rule_hash == expected_rule == baseline.rule_digest(RULE)
     payload = {
         "cost_model_hash": MODEL.model_hash,
@@ -331,7 +331,7 @@ def test_registration_hash_covers_every_field_and_the_rule_digest_is_sha256():
     }
     assert (
         registration.registration_hash
-        == hashlib.sha256(signing.canonical_payload(payload)).hexdigest()
+        == hashlib.sha256(signing.canonicalise(payload)).hexdigest()
     )
     assert baseline.register(MODEL, RULE, 0.06).registration_hash != (
         registration.registration_hash

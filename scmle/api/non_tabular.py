@@ -267,7 +267,7 @@ def fixed_scope(
         modality_lifecycle.TextPreparer,
     }:
         return Scope(
-            modality=modalities.modality_value(adapter.modality),
+            modality=modalities.serialise(adapter.modality),
             representation="bounded_character_and_token_counts",
             decoder_policy="caller-decoded text or document samples",
             limitations=(
@@ -373,7 +373,7 @@ def capability_for_adapter(
             "adapter_type": (
                 f"{adapter_type.__module__}.{adapter_type.__qualname__}"
             ),
-            "modality": modalities.modality_value(adapter.modality),
+            "modality": modalities.serialise(adapter.modality),
             "supported_boundary": "exact built-in Preparer types",
         },
     )

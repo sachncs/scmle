@@ -82,7 +82,7 @@ def digest(value: Any) -> str:
     Returns:
         The hex SHA-256 digest.
     """
-    return hashlib.sha256(signing.canonical_payload(value)).hexdigest()
+    return hashlib.sha256(signing.canonicalise(value)).hexdigest()
 
 
 def read_json(path: Path) -> Any:

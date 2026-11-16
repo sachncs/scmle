@@ -146,7 +146,7 @@ class AsOf:
             The rule. Unexpected or missing fields, an unknown `kind` and
             an invalid rule are rejected with a `ValueError`.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(AsOfKind(record["kind"]), record["lead_seconds"])
 
 
@@ -245,7 +245,7 @@ class Attestation:
             The record. Unexpected or missing fields, empty text and invalid
             dates are rejected with a `ValueError`.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -306,7 +306,7 @@ class LogCheck:
             The record. Unexpected or missing fields and invalid values are
             rejected with a `ValueError`.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -445,7 +445,7 @@ class FieldProvenance:
             value and an inconsistent record are rejected with a
             `ValueError`.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         attestation = record["attestation"]
         log_check = record["log_check"]
         return cls(

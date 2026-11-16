@@ -619,7 +619,7 @@ class Registry:
         records: Registered capabilities keyed by their complete coordinate.
         model_families: Registered family declarations keyed by family name.
         runtime_environment: The bound runtime environment, or None until
-            :meth:`bind_runtime_environment` is called.
+            :meth:`bind` is called.
     """
 
     def __init__(
@@ -642,7 +642,7 @@ class Registry:
             self.register_model_family(declaration)
 
     @classmethod
-    def with_declared_model_families(
+    def seed(
         cls,
         capabilities: Iterable[Capability] = (),
     ) -> "Registry":
@@ -699,7 +699,7 @@ class Registry:
             )
         self.model_families[declaration.model_family] = declaration
 
-    def find_model_family(
+    def find(
         self,
         model_family: str,
     ) -> ModelFamilyDeclaration | None:
@@ -718,7 +718,7 @@ class Registry:
             raise TypeError("model_family must be a string")
         return self.model_families.get(model_family)
 
-    def bind_runtime_environment(self, environment: Environment) -> None:
+    def bind(self, environment: Environment) -> None:
         """Binds observed facts used when a caller omits an environment.
 
         Args:
@@ -781,7 +781,7 @@ class Registry:
 
         capability = self.records.get(key)
         if capability is None:
-            return self.undeclared_diagnostics(key, statuses)
+            return self.reject(key, statuses)
 
         diagnostics: list[Reason] = []
         if capability.status not in statuses:
@@ -806,7 +806,7 @@ class Registry:
             )
         return tuple(diagnostics)
 
-    def undeclared_diagnostics(
+    def reject(
         self, key: Coordinate, statuses: frozenset[Status]
     ) -> tuple[Reason, ...]:
         """Returns the rejections for a request that has no declaration.
@@ -820,7 +820,7 @@ class Registry:
             catalogued, an entry for an unsupported modality or a disallowed
             family status.
         """
-        family = self.find_model_family(key.model_family)
+        family = self.find(key.model_family)
         family_status = None if family is None else family.status.value
         family_diagnostics = [
             Reason(
@@ -903,9 +903,7 @@ class Registry:
                         observed=sorted(environment.available_extras),
                     )
                 )
-            diagnostics.extend(
-                self.numeric_resource_diagnostics(capability, environment)
-            )
+            diagnostics.extend(self.quantify(capability, environment))
         if capability.resources.max_rows is not None:
             if row_count is None:
                 diagnostics.append(
@@ -930,7 +928,7 @@ class Registry:
                 )
         return tuple(diagnostics)
 
-    def numeric_resource_diagnostics(
+    def quantify(
         self,
         capability: Capability,
         environment: Environment,

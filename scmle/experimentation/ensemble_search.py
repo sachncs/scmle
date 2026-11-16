@@ -99,7 +99,7 @@ class EnsembleSearch:
             if self.context.resource_governor.skip_reason(first=False):
                 return
             self.context.check_cancelled()
-            trial_id = self.context.allocate_trial_ids(1)[0]
+            trial_id = self.context.allocate(1)[0]
             outcome = self.runner.run(trial_id, combiner, params)
             self.context.record_trial(outcome)
             self.judge(

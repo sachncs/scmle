@@ -98,7 +98,7 @@ class FieldDecision:
             The decision. Unexpected or missing fields and unknown enum
             values are rejected with a `ValueError`.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(
             record["name"],
             Admission(record["admission"]),

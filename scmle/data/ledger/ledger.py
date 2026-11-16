@@ -97,7 +97,7 @@ def digest(body: Mapping[str, Any]) -> str:
     Returns:
         The SHA-256 hex digest of the canonical JSON form of `body`.
     """
-    return hashlib.sha256(signing.canonical_payload(body)).hexdigest()
+    return hashlib.sha256(signing.canonicalise(body)).hexdigest()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

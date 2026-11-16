@@ -182,9 +182,7 @@ class Draft:
     @property
     def draft_hash(self) -> str:
         """The SHA-256 hex digest of the stored draft document."""
-        return hashlib.sha256(
-            signing.canonical_payload(self.to_dict())
-        ).hexdigest()
+        return hashlib.sha256(signing.canonicalise(self.to_dict())).hexdigest()
 
 
 def normalise(name: str) -> str:

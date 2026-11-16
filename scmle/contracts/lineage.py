@@ -191,7 +191,7 @@ class Graph:
             raise ValueError(f"conflicting evidence node: {node.node_id}")
         self.nodes[node.node_id] = node
 
-    def add_edge(self, edge: Edge) -> None:
+    def connect(self, edge: Edge) -> None:
         """Registers one edge and rejects dangling or cyclic lineage.
 
         An edge that is already registered is ignored.
@@ -398,7 +398,7 @@ class Graph:
             raise ValueError("unsupported evidence graph schema version")
         graph = cls(Node.from_dict(item) for item in record.get("nodes", ()))
         for item in record.get("edges", ()):
-            graph.add_edge(Edge.from_dict(item))
+            graph.connect(Edge.from_dict(item))
         graph.validate()
         expected_order = tuple(record.get("topological_order", ()))
         if expected_order and expected_order != graph.topological_order():

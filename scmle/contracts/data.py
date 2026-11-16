@@ -15,7 +15,7 @@ HIGH_CARDINALITY_LEVELS = 20
 SHA256_HEX_LENGTH = 64
 
 
-def normalize_quality_evidence(
+def normalise(
     evidence: Mapping[str, Any], field_name: str = "quality_evidence"
 ) -> dict[str, object]:
     """Validates and normalizes one JSON-native quality evidence record.
@@ -57,7 +57,7 @@ class QualityObservation:
         """Validates and detaches the evidence from mutable caller state.
 
         The evidence is replaced by a normalized copy; invalid evidence is
-        rejected as described for `normalize_quality_evidence`.
+        rejected as described for `normalise`.
 
         Raises:
             ValueError: If the note is given but blank.
@@ -67,7 +67,7 @@ class QualityObservation:
         object.__setattr__(
             self,
             "evidence",
-            normalize_quality_evidence(self.evidence, "evidence"),
+            normalise(self.evidence, "evidence"),
         )
 
 
@@ -851,7 +851,7 @@ class DatasetProfile:
     def __post_init__(self) -> None:
         """Validates and detaches structured quality evidence."""
         normalized = tuple(
-            normalize_quality_evidence(item, f"quality_evidence[{index}]")
+            normalise(item, f"quality_evidence[{index}]")
             for index, item in enumerate(self.quality_evidence)
         )
         object.__setattr__(self, "quality_evidence", normalized)

@@ -178,9 +178,9 @@ class DetectorTolerance:
         Returns:
             The tolerance described by the record. A record with an unknown
             or missing field, or with values the constructor refuses, raises
-            a `ValueError` from `require_fields` or the constructor.
+            a `ValueError` from `require` or the constructor.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -287,7 +287,7 @@ class ErrorBudget:
             ValueError: If the record or its confirmation or exploration
                 part has unexpected or missing fields.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         confirmation = record["confirmation"]
         exploration = record["exploration"]
         names = {"alpha_confirm"}
@@ -586,10 +586,10 @@ class DecisionBudget:
         Returns:
             The budget described by the record. An unknown or missing
             field, an invalid fraction or an overspent state raises a
-            `ValueError` from `require_fields`, `parse_fraction` or the
+            `ValueError` from `require`, `parse_fraction` or the
             constructor.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(
             alpha_promote=parse_fraction(
                 record["alpha_promote"], "alpha_promote"

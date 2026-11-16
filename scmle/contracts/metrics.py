@@ -29,7 +29,7 @@ class Metric:
     greater_is_better: bool
     tasks: frozenset[tasks.Task]
 
-    def to_natural(self, scorer_value: float) -> float:
+    def naturalise(self, scorer_value: float) -> float:
         """Converts a sign-adjusted scorer value to natural units.
 
         Args:
@@ -89,7 +89,7 @@ class Metric:
         extra = (
             {} if sample_weight is None else {"sample_weight": sample_weight}
         )
-        return self.to_natural(
+        return self.naturalise(
             float(scorer(estimator, features, target, **extra))
         )
 

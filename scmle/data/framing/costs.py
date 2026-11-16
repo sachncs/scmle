@@ -139,9 +139,7 @@ class DecisionCostModel:
     @property
     def model_hash(self) -> str:
         """SHA-256 of the canonical JSON of the model."""
-        return hashlib.sha256(
-            signing.canonical_payload(self.to_dict())
-        ).hexdigest()
+        return hashlib.sha256(signing.canonicalise(self.to_dict())).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the model as a JSON-ready record.
@@ -174,7 +172,7 @@ class DecisionCostModel:
         Returns:
             The model.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         sources = tuple(CostSource(v) for v in record["sources"])
         if len(sources) != len(ENTRY_NAMES):
             raise ValueError("sources must hold one entry per cost")

@@ -276,7 +276,7 @@ class Predictor:
                 digest or package signature differ.
         """
         dataset_hash, model_digest, signature_value = identity
-        if report.modality != modalities.modality_value(adapter.modality):
+        if report.modality != modalities.serialise(adapter.modality):
             raise ValueError("lifecycle report modality does not match")
         if report.dataset_hash != dataset_hash:
             raise ValueError("lifecycle report dataset identity does not match")
@@ -326,9 +326,7 @@ class Predictor:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if not isinstance(manifest, dict):
             raise ValueError("modality package manifest must be an object")
-        if manifest.get("modality") != modalities.modality_value(
-            adapter.modality
-        ):
+        if manifest.get("modality") != modalities.serialise(adapter.modality):
             raise ValueError("package modality does not match adapter")
         raw_features = manifest.get("feature_names")
         if not isinstance(raw_features, list) or not all(
@@ -435,7 +433,7 @@ class Predictor:
         """
         health: dict[str, object] = {
             "package_verified": True,
-            "modality": modalities.modality_value(self.adapter.modality),
+            "modality": modalities.serialise(self.adapter.modality),
             "training_dataset_hash": self.training_dataset_hash,
             "feature_names": list(self.feature_names),
             "model_sha256": self.package.model_sha256,
@@ -1440,7 +1438,7 @@ class ExtensionCurator(Curator):
         report = self.curation_callback()
         if not isinstance(report, curation.Curation):
             raise TypeError("curation_callback must return a curation report")
-        expected_modality = modalities.modality_value(self.extension)
+        expected_modality = modalities.serialise(self.extension)
         if report.modality != expected_modality:
             raise ValueError(
                 "curation report modality does not match extension"
@@ -1546,7 +1544,7 @@ class Preparer(Curator):
         """
         return {
             "status": "not_available",
-            "modality": modalities.modality_value(self.modality),
+            "modality": modalities.serialise(self.modality),
             "reason": "the adapter has no modality-specific explanation policy",
             "limitations": [
                 "The lifecycle explanation remains in feature space.",
@@ -4078,7 +4076,7 @@ class RasterPreparer(Preparer):
         if self.decoder is None:
             return {
                 "status": "not_available",
-                "modality": modalities.modality_value(self.modality),
+                "modality": modalities.serialise(self.modality),
                 "reason": "an explicit named raster decoder is required",
                 "limitations": [
                     (
@@ -5149,7 +5147,7 @@ class PackagingStage(Stage):
             durability.sync_file(model_path)
             unsigned = {
                 "schema_version": 1,
-                "modality": modalities.modality_value(context.adapter.modality),
+                "modality": modalities.serialise(context.adapter.modality),
                 "dataset_hash": context.adapter.dataset_hash,
                 "feature_names": list(
                     context.feature_batches["train"].feature_names
@@ -5268,13 +5266,13 @@ class DocumentationStage(Stage):
         if context.curation_report is None:
             raise RuntimeError("profiling must precede documentation")
         dataset_card = curation.DatasetCard.from_report(
-            modalities.modality_value(context.adapter.modality),
+            modalities.serialise(context.adapter.modality),
             context.curation_report.to_dict(),
             context.adapter.modality_notes(),
             manifest=context.manifest,
         )
         context.documentation = {
-            "modality": modalities.modality_value(context.adapter.modality),
+            "modality": modalities.serialise(context.adapter.modality),
             "status": (
                 "extension-only"
                 if isinstance(
@@ -5505,9 +5503,7 @@ class RunPlan:
         manifest = self.manifest
         if manifest is None:
             return
-        if manifest.modality != modalities.modality_value(
-            self.adapter.modality
-        ):
+        if manifest.modality != modalities.serialise(self.adapter.modality):
             raise ValueError("manifest modality must match adapter")
         if manifest.content_hash != self.adapter.dataset_hash:
             raise ValueError("manifest content_hash must match adapter")
@@ -5539,7 +5535,7 @@ class RunPlan:
             The identity fields a checkpoint of this run has to match.
         """
         return {
-            "modality": modalities.modality_value(self.adapter.modality),
+            "modality": modalities.serialise(self.adapter.modality),
             "dataset_hash": self.adapter.dataset_hash,
             "observed_dataset_hash": self.observed.dataset_hash,
             "package_path": str(self.package_target),
@@ -5609,7 +5605,7 @@ class RunPlan:
         completed_report = Record.read_verified(report_target, self.signing_key)
         if (
             completed_report.modality
-            != modalities.modality_value(self.adapter.modality)
+            != modalities.serialise(self.adapter.modality)
             or completed_report.dataset_hash != self.adapter.dataset_hash
             or Path(completed_report.package.path) != self.package_target
         ):
@@ -5642,7 +5638,7 @@ class RunPlan:
         if self.checkpoint_target is None:
             return
         record = Checkpoint(
-            modality=modalities.modality_value(self.adapter.modality),
+            modality=modalities.serialise(self.adapter.modality),
             dataset_hash=self.adapter.dataset_hash,
             observed_dataset_hash=self.observed.dataset_hash,
             package_path=str(self.package_target),
@@ -5973,7 +5969,7 @@ class Lifecycle:
             context, performance_budget, performance_baseline
         )
         report = Record(
-            modality=modalities.modality_value(adapter.modality),
+            modality=modalities.serialise(adapter.modality),
             dataset_hash=adapter.dataset_hash,
             stage_evidence=records,
             evaluation=context.evaluation,
@@ -6011,7 +6007,7 @@ class Lifecycle:
             and experimental otherwise.
         """
         return modalities.Declaration(
-            modality=modalities.modality_from_value(report.modality),
+            modality=modalities.restore(report.modality),
             status=(
                 modalities.Status.EXTENSION_ONLY
                 if report.modality.startswith("extension:")

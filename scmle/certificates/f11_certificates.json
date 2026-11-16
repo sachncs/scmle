@@ -538,10 +538,10 @@
       ]
     },
     "B5": {
-      "code_hash": "14009565f5d24b0a3c01b479f21fc8f00342f7165dd547acec83268ee1c11b45",
+      "code_hash": "d14be9336c9ae0d46c99a21d969938e473eebeb00b24ba0bc2fea5bb7c58fa41",
       "passed": true,
       "replicates": 2000,
-      "seconds": 0.8,
+      "seconds": 0.7,
       "seeds": [
         0,
         2000

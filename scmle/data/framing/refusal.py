@@ -156,7 +156,7 @@ def samples_hash(model_id: str, prompt: str, samples: Sequence[Any]) -> str:
         The SHA-256 hex digest of their canonical payload.
     """
     body = {"model": model_id, "prompt": prompt, "samples": list(samples)}
-    return hashlib.sha256(signing.canonical_payload(body)).hexdigest()
+    return hashlib.sha256(signing.canonicalise(body)).hexdigest()
 
 
 def population_ids(

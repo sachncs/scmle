@@ -94,7 +94,7 @@ class StrategySearch:
                     experiments.DecisionAction.REJECT,
                     f"not applicable: {reason}",
                 )
-        ids = self.context.allocate_trial_ids(len(chosen))
+        ids = self.context.allocate(len(chosen))
         jobs = [
             trials.TrialJob(trial_id, leader.model_name, {}, None, name)
             for trial_id, name in zip(ids, chosen, strict=True)

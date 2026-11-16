@@ -831,7 +831,7 @@ class LocalFaultExecutor:
         )
         rejected = False
         try:
-            graph.add_edge(lineage.Edge("raw", "curation", "produced"))
+            graph.connect(lineage.Edge("raw", "curation", "produced"))
         except ValueError:
             # handled: expected lineage rejection recorded in lineage_gap
             # evidence

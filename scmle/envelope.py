@@ -29,9 +29,7 @@ LIMIT = 1 << 20
 def mac(header: Mapping[str, Any], key: bytes) -> str:
     """HMAC-SHA256 of the canonical JSON of the header without its MAC."""
     body = {k: v for k, v in header.items() if k != "mac"}
-    return hmac.new(
-        key, signing.canonical_payload(body), hashlib.sha256
-    ).hexdigest()
+    return hmac.new(key, signing.canonicalise(body), hashlib.sha256).hexdigest()
 
 
 def seal(

@@ -31,8 +31,8 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
   <p>The capability registry separates a known model family from a complete end-to-end capability. Transformer families are catalogued with their modality, extra, resource, and failure boundaries; JEPA is explicitly declared as <strong>tabular-only and experimental</strong>. A caller still needs a full eight-dimensional declaration—modality, task, model family, evaluation, uncertainty, fairness, explainability, and inference—before a run can cross the support gate.</p>
   <pre><code>{`from scmle.contracts.capabilities import Registry
 
-registry = Registry.with_declared_model_families()
-family = registry.find_model_family("jepa")
+registry = Registry.seed()
+family = registry.find("jepa")
 assert family.status.value == "experimental"
 assert family.modalities == (Modality.TABULAR,)
 

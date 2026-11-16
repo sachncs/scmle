@@ -104,7 +104,7 @@ class Explanation:
             The explanation. Unexpected or missing fields, an unknown
             mechanism and invalid values are rejected with a `ValueError`.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(
             Mechanism(record["mechanism"]),
             record["detail"],

@@ -157,9 +157,7 @@ def test_contract_rejects_noncanonical_dimensions_and_resources():
 
 def test_registry_serialization_is_canonical_across_registration_order():
     """Registry evidence does not depend on insertion order."""
-    first = capabilities.Registry.with_declared_model_families(
-        (make_capability(),)
-    )
+    first = capabilities.Registry.seed((make_capability(),))
     second = capabilities.Registry(
         (make_capability(),),
         tuple(reversed(capabilities.DEFAULT_MODEL_FAMILY_DECLARATIONS)),
@@ -172,7 +170,7 @@ def test_registry_serialization_is_canonical_across_registration_order():
 
 def test_transformer_and_jepa_family_statuses_are_explicit():
     """Family metadata records implemented boundaries without promotion."""
-    registry = capabilities.Registry.with_declared_model_families()
+    registry = capabilities.Registry.seed()
 
     families = {
         item.model_family: item for item in registry.list_model_families()
@@ -241,7 +239,7 @@ def test_unsupported_family_modality_reports_structured_diagnostic(
     model_family, modality
 ):
     """Known families reject undeclared modalities before training."""
-    registry = capabilities.Registry.with_declared_model_families()
+    registry = capabilities.Registry.seed()
     key = make_key(model_family=model_family, modality=modality)
 
     diagnostics = registry.diagnose(key)
@@ -263,7 +261,7 @@ def test_unsupported_family_modality_reports_structured_diagnostic(
 
 def test_experimental_family_requires_explicit_status_opt_in():
     """A catalog entry never becomes training support by being known."""
-    registry = capabilities.Registry.with_declared_model_families()
+    registry = capabilities.Registry.seed()
     key = make_key(
         model_family=capabilities.ModelFamily.TRANSFORMER.value,
         modality=capabilities.Modality.TABULAR,

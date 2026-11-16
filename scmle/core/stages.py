@@ -2416,7 +2416,7 @@ class TrainStage(Stage):
         for start in range(0, len(names), runner.workers):
             context.check_cancelled()
             chunk = names[start : start + runner.workers]
-            ids = context.allocate_trial_ids(len(chunk))
+            ids = context.allocate(len(chunk))
             reason = context.resource_governor.skip_reason(first=start == 0)
             if reason is not None:
                 outcomes = [
@@ -4910,7 +4910,7 @@ class PackageStage(Stage):
                 {"dataset_id": manifest.dataset_id},
             )
         )
-        graph.add_edge(lineage.Edge("raw-source", "snapshot", "materializes"))
+        graph.connect(lineage.Edge("raw-source", "snapshot", "materializes"))
         graph.add_node(
             lineage.Node(
                 "curation",
@@ -4921,7 +4921,7 @@ class PackageStage(Stage):
                 {"artifact": "curation_report.json"},
             )
         )
-        graph.add_edge(lineage.Edge("snapshot", "curation", "curated"))
+        graph.connect(lineage.Edge("snapshot", "curation", "curated"))
 
         if context.spec.feature_graph.nodes:
             graph.add_node(
@@ -4932,7 +4932,7 @@ class PackageStage(Stage):
                     {"version": str(context.spec.feature_graph.version)},
                 )
             )
-            graph.add_edge(
+            graph.connect(
                 lineage.Edge("curation", "feature-graph", "transforms")
             )
             split_parent = "feature-graph"
@@ -4947,7 +4947,7 @@ class PackageStage(Stage):
                 {"artifact": "validation_manifest.json"},
             )
         )
-        graph.add_edge(lineage.Edge(split_parent, "split", "partitions"))
+        graph.connect(lineage.Edge(split_parent, "split", "partitions"))
 
         pipeline_path = store.path("model/pipeline.joblib")
         model_manifest_path = store.path(
@@ -4961,7 +4961,7 @@ class PackageStage(Stage):
                 {"model_family": selected.model_name},
             )
         )
-        graph.add_edge(lineage.Edge("split", "model", "trains"))
+        graph.connect(lineage.Edge("split", "model", "trains"))
         graph.add_node(
             lineage.Node(
                 "evaluation",
@@ -4972,7 +4972,7 @@ class PackageStage(Stage):
                 {"artifact": "evaluation.json"},
             )
         )
-        graph.add_edge(lineage.Edge("model", "evaluation", "evaluates"))
+        graph.connect(lineage.Edge("model", "evaluation", "evaluates"))
 
         explanation_paths = sorted(
             store.path("explanations").glob("*.json")
@@ -4994,8 +4994,8 @@ class PackageStage(Stage):
                     {"artifact_count": str(len(explanation_paths))},
                 )
             )
-            graph.add_edge(lineage.Edge("model", "explanations", "explains"))
-            graph.add_edge(
+            graph.connect(lineage.Edge("model", "explanations", "explains"))
+            graph.connect(
                 lineage.Edge("evaluation", "explanations", "contextualizes")
             )
 
@@ -5007,10 +5007,10 @@ class PackageStage(Stage):
                 {"artifact": "model/" + scmle.artifacts.bundle.MANIFEST_FILE},
             )
         )
-        graph.add_edge(lineage.Edge("model", "bundle", "packages"))
-        graph.add_edge(lineage.Edge("evaluation", "bundle", "gates"))
+        graph.connect(lineage.Edge("model", "bundle", "packages"))
+        graph.connect(lineage.Edge("evaluation", "bundle", "gates"))
         if explanation_paths:
-            graph.add_edge(lineage.Edge("explanations", "bundle", "includes"))
+            graph.connect(lineage.Edge("explanations", "bundle", "includes"))
         graph.validate()
         context.evidence_graph = graph
         return graph

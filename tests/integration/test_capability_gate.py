@@ -69,7 +69,7 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
     assert {declaration.key.inference for declaration in declarations} == {
         capabilities.Inference.LIBRARY
     }
-    family = context.capability_registry.find_model_family(
+    family = context.capability_registry.find(
         capabilities.ModelFamily.JEPA.value
     )
     assert family is not None
@@ -107,7 +107,7 @@ def test_ft_transformer_uses_an_experimental_tabular_boundary():
     assert adapter.capability_family == "transformer"
 
     registry = scmle.core.context.tabular_beta_capability_registry()
-    declaration = registry.find_model_family("transformer")
+    declaration = registry.find("transformer")
     assert declaration is not None
     assert declaration.status is capabilities.Status.EXPERIMENTAL
     assert declaration.modalities == (capabilities.Modality.TABULAR,)

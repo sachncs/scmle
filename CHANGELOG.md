@@ -36,6 +36,16 @@ marked `Breaking:` and listed first in their group.
   `split`, `ipc.start_helper` is `launch`, `verify.refuse_published_key` is
   `refuse`, `verify.check_listed_files` is `audit`,
   `performance.operation_regression` is `regress`.
+  Also: `capabilities.bind_runtime_environment` is `bind`,
+  `find_model_family` is `find`, `numeric_resource_diagnostics` is
+  `quantify`, `undeclared_diagnostics` is `reject`,
+  `with_declared_model_families` is `seed`; `data.normalize_quality_evidence`
+  is `normalise`; `lineage.add_edge` is `connect`; `metrics.to_natural` is
+  `naturalise`; `modalities.modality_from_value` is `restore`,
+  `modality_value` is `serialise`; `qualification.require_fields` is
+  `require`; `signing.canonical_payload` is `canonicalise`;
+  `tasks.expand_forecast` is `expand`; `context.allocate_trial_ids` is
+  `allocate`.
   Migration: replace the old names; the signatures are unchanged.
 * **No package-root exports.** `scmle` exports only `__version__`. Every public
   name is imported from the module that defines it: `scmle.api.project.Project`,

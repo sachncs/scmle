@@ -832,9 +832,7 @@ def test_the_draft_hash_is_the_sha256_of_the_canonical_document():
     result = draft.frame(request(frame), frame)
     assert (
         result.draft_hash
-        == hashlib.sha256(
-            signing.canonical_payload(result.to_dict())
-        ).hexdigest()
+        == hashlib.sha256(signing.canonicalise(result.to_dict())).hexdigest()
     )
 
 

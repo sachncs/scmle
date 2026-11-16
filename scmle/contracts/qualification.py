@@ -113,7 +113,7 @@ def count(value: Any, name: str, minimum: int = 0) -> int:
     return value
 
 
-def require_fields(cls: type, record: Mapping[str, Any]) -> None:
+def require(cls: type, record: Mapping[str, Any]) -> None:
     """Requires `record` to hold exactly the dataclass fields of `cls`.
 
     Args:
@@ -248,7 +248,7 @@ class Check:
         Returns:
             The check.
         """
-        require_fields(cls, record)
+        require(cls, record)
         interval = record["interval"]
         return cls(
             check_id=record["check_id"],
@@ -340,7 +340,7 @@ class Claim:
         Returns:
             The claim.
         """
-        require_fields(cls, record)
+        require(cls, record)
         return cls(
             claim_id=record["claim_id"],
             statement=record["statement"],
@@ -460,7 +460,7 @@ class Certificate:
         Returns:
             The certificate.
         """
-        require_fields(cls, record)
+        require(cls, record)
         return cls(
             detector_id=record["detector_id"],
             defect_type=record["defect_type"],

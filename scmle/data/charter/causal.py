@@ -135,7 +135,7 @@ class NegativeControl:
         """Rebuilds the control from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -143,7 +143,7 @@ class NegativeControl:
         Returns:
             The rebuilt control.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -192,7 +192,7 @@ class Subgroup:
         """Rebuilds the subgroup from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -200,7 +200,7 @@ class Subgroup:
         Returns:
             The rebuilt subgroup.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(record["column"], tuple(record["values"]))
 
 
@@ -254,7 +254,7 @@ class Attestor:
         """Rebuilds the attestor from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -262,7 +262,7 @@ class Attestor:
         Returns:
             The rebuilt attestor.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(record["name"], record["role"], tuple(record["assumptions"]))
 
 
@@ -315,7 +315,7 @@ class Confounding:
         """Rebuilds the record from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -323,7 +323,7 @@ class Confounding:
         Returns:
             The rebuilt record.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -501,7 +501,7 @@ class Question:
 
         Fields that have a default may be absent from `record` and then take
         that default. Other missing fields, and keys that are not fields,
-        are rejected with the `ValueError` of `qualification.require_fields`.
+        are rejected with the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -515,7 +515,7 @@ class Question:
             if f.default is not dataclasses.MISSING
         }
         record = {**defaults, **record}
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         sensitivity = record["sensitivity"]
         return cls(
             treatment=record["treatment"],

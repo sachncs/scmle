@@ -227,9 +227,7 @@ def rollout_design(
     plan = layer.rollout if layer is not None else None
     if layer is None or plan is None:
         return None
-    plan_hash = hashlib.sha256(
-        signing.canonical_payload(plan.to_dict())
-    ).hexdigest()
+    plan_hash = hashlib.sha256(signing.canonicalise(plan.to_dict())).hexdigest()
     budget = plan.budget()
     level = float(plan.alpha_promote) / 2.0
     record: dict[str, Any] = {

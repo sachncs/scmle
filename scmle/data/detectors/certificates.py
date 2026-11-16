@@ -272,7 +272,7 @@ class Standard:
             The policy. A record with unexpected or missing fields, or
             invalid values, raises `ValueError`.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)
 
 
@@ -351,7 +351,7 @@ class DefectOutcome:
             CertificateError: If a stored interval or verdict disagrees with
                 the value recomputed from the counts.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         certificate = qualification.Certificate.from_dict(record["certificate"])
         expected = cls.measure(certificate, policy)
         for name in ("recall_interval", "false_alarm_interval"):
@@ -476,7 +476,7 @@ class Certification:
             verdict disagrees with its counts, raises `ValueError` or
             `CertificateError`.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         policy = Standard.from_dict(record["policy"])
         return cls(
             detector_id=record["detector_id"],

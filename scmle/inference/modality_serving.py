@@ -195,9 +195,7 @@ class ModalityHttpServing:
             "schema_version": serving.SCHEMA_VERSION,
             "model_version": self.artifact_digest,
             "artifact_digest": self.artifact_digest,
-            "modality": modalities.modality_value(
-                self.predictor.adapter.modality
-            ),
+            "modality": modalities.serialise(self.predictor.adapter.modality),
             "predictions": numpy.asarray(predictions).tolist(),
             "probabilities": numpy.asarray(probabilities).tolist(),
             "sample_count": len(samples),
@@ -442,9 +440,7 @@ class Responder(server.BaseHTTPRequestHandler):
                 {
                     "schema_version": serving.SCHEMA_VERSION,
                     "modality": (
-                        modalities.modality_value(
-                            adapter.predictor.adapter.modality
-                        )
+                        modalities.serialise(adapter.predictor.adapter.modality)
                     ),
                     "decoder": adapter.decoder.schema(),
                     "feature_names": list(adapter.predictor.feature_names),

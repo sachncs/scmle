@@ -100,7 +100,7 @@ class Procedure:
         """Rebuilds the rules from a dict.
 
         Keys other than the fields, and missing fields, are rejected with
-        the `ValueError` of `qualification.require_fields`.
+        the `ValueError` of `qualification.require`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -108,5 +108,5 @@ class Procedure:
         Returns:
             The rebuilt rules.
         """
-        qualification.require_fields(cls, record)
+        qualification.require(cls, record)
         return cls(**record)

@@ -157,9 +157,7 @@ class Manifest:
     @property
     def sha256(self) -> str:
         """SHA-256 of the canonical JSON of the manifest (64 hex digits)."""
-        return hashlib.sha256(
-            signing.canonical_payload(self.body())
-        ).hexdigest()
+        return hashlib.sha256(signing.canonicalise(self.body())).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record including the hash.
@@ -206,7 +204,7 @@ class Manifest:
         """Rebuilds the manifest and verifies its hash.
 
         Unknown or missing fields raise ValueError from
-        `qualification.require_fields`, as does any invalid value from the
+        `qualification.require`, as does any invalid value from the
         constructor; only `notes` and `row_roots` may be absent. The version
         is checked before the fields.
 
@@ -224,7 +222,7 @@ class Manifest:
         claimed = values.pop(HASH_FIELD, None)
         if values.pop("manifest_version", None) != MANIFEST_VERSION:
             raise errors.ArtifactError("unsupported split manifest version")
-        qualification.require_fields(
+        qualification.require(
             cls,
             {
                 **values,
