@@ -167,3 +167,20 @@ def test_path_of_is_lexical_and_never_leaves_the_root(tmp_path):
     for bad in ("../x", "a/../../x", "/abs"):
         with pytest.raises(objectstore.StoreError):
             local.path_of(bad)
+
+
+def test_a_temp_file_that_cannot_be_removed_is_logged(
+    tmp_path, monkeypatch, caplog
+):
+    # ERR-18: giving up on a held temp file used to be silent.
+    held = tmp_path / ".put-held"
+    held.write_bytes(b"x")
+
+    def refuse(self, missing_ok=False):
+        raise PermissionError("in use")
+
+    monkeypatch.setattr(type(held), "unlink", refuse)
+    monkeypatch.setattr(objectstore.time, "sleep", lambda seconds: None)
+    with caplog.at_level("WARNING", logger=objectstore.__name__):
+        objectstore.unlink_tolerantly(held)
+    assert any("left behind" in r.getMessage() for r in caplog.records)

@@ -22,6 +22,7 @@ import contextlib
 import dataclasses
 import datetime
 import hashlib
+import logging
 import os
 import pathlib
 import re
@@ -38,6 +39,8 @@ else:
 from scmle import durability
 from scmle.contracts import errors
 from scmle.core import retry
+
+LOGGER = logging.getLogger(__name__)
 
 T = TypeVar("T")
 MAX_KEY_LENGTH = 1024
@@ -344,7 +347,9 @@ def refused_as_existing(error: OSError, path: pathlib.Path) -> bool:
 def unlink_tolerantly(path: pathlib.Path) -> None:
     """Removes a temp file, retrying while Windows still holds it open.
 
-    Gives up quietly after 20 attempts that fail with PermissionError.
+    After `RETRY_ATTEMPTS` attempts that fail with PermissionError it gives
+    up and logs the leaked file (ERR-18); listings skip temp files, so the
+    leak costs disk space, not correctness.
 
     Args:
         path: The temp file to remove; a missing file is not an error.
@@ -353,11 +358,11 @@ def unlink_tolerantly(path: pathlib.Path) -> None:
         try:
             path.unlink(missing_ok=True)
         except PermissionError:
-            # handled: held temp file retried; quiet give-up documented in
-            # docstring
+            # handled: a held temp file is retried; giving up is logged below
             time.sleep(0.005 * (attempt + 1))
         else:
             return
+    LOGGER.warning("temp file %s could not be removed and is left behind", path)
 
 
 @contextlib.contextmanager
