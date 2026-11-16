@@ -66,7 +66,6 @@ production until those exist.
 import argparse
 import json
 import math
-from pathlib import Path
 import sys
 import tempfile
 import types
@@ -76,6 +75,7 @@ import numpy
 import pandas
 
 from benchmarks.qualification import streams
+import scmle.certificates
 from scmle.data.detectors import certificates
 from scmle.evaluation import coverage
 from scmle.governance import escalation
@@ -85,7 +85,7 @@ from scmle.monitoring import reference
 from scmle.monitoring import sequential_tests
 import scmle.monitoring.monitor
 
-STORE_PATH = Path(__file__).with_name("loop_certificates.json")
+STORE_PATH = scmle.certificates.DIRECTORY / "loop_certificates.json"
 DEV_SEED_BASE = 10_000
 R_REF = 0.10
 DELTA = 0.05

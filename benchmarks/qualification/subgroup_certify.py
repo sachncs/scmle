@@ -56,7 +56,6 @@ and data of a real trial.
 import argparse
 import json
 import math
-from pathlib import Path
 import sys
 import time
 from typing import Any
@@ -64,12 +63,13 @@ from typing import Any
 import numpy
 import pandas
 
+import scmle.certificates
 from scmle.data.charter import causal
 from scmle.data.detectors import certificates
 from scmle.data.identification import certified
 from scmle.data.identification import run
 
-STORE_PATH = Path(__file__).with_name("subgroup_certificates.json")
+STORE_PATH = scmle.certificates.DIRECTORY / "subgroup_certificates.json"
 DEV_SEED_BASE = 10_000
 LEVELS = 8
 # share of rows treated

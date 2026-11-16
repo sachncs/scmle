@@ -61,7 +61,6 @@ Gates (`R` is the replicate count):
 import argparse
 import json
 import math
-from pathlib import Path
 import sys
 from typing import Any
 
@@ -69,6 +68,7 @@ import numpy
 import pandas
 
 from benchmarks.qualification import f10_generators
+import scmle.certificates
 import scmle.data.admissibility.dag
 from scmle.data.charter import causal
 from scmle.data.detectors import certificates
@@ -84,7 +84,7 @@ from scmle.data.identification import sensitivity
 from scmle.data.identification import synth
 from scmle.data.ledger import budget
 
-STORE_PATH = Path(__file__).with_name("f10_certificates.json")
+STORE_PATH = scmle.certificates.DIRECTORY / "f10_certificates.json"
 DEV_SEED_BASE = 10_000
 ALPHA_FALSIFY = 0.01
 LEVEL = 0.95

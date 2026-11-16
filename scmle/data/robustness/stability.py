@@ -35,7 +35,7 @@ is more than chance without treating specifications as independent.
 Stability is relative to the declared set. It says nothing about analyses that
 were not declared, and a `stable` verdict is not a confirmation: confirmation
 comes only from the single test on `C`. The rule's operating characteristics
-are in `benchmarks/qualification/f6_certificates.json`; until a current
+are in `scmle/certificates/f6_certificates.json`; until a current
 certificate passes, a `fragile` verdict is a warning, not a quarantine.
 """
 

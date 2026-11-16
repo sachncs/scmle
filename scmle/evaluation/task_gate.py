@@ -3,7 +3,7 @@
 `task_gate_status.json` lists every `Task` as `passed`, `failed` or
 `no_referent`. A type that has not passed may still run, but its outputs are
 capped at the `unverified` tier. The file is written by hand from the
-certificates in `benchmarks/qualification/uncertainty_certificates.json`; a
+certificates in `scmle/certificates/uncertainty_certificates.json`; a
 test keeps it complete.
 """
 

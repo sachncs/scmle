@@ -161,6 +161,7 @@ import scipy.stats
 
 from benchmarks.qualification import f11_generators
 from scmle.artifacts import bundle
+import scmle.certificates
 from scmle.contracts import tasks
 import scmle.contracts.data
 from scmle.core import randomness
@@ -184,7 +185,7 @@ import scmle.governance.registry
 import scmle.models.registry
 from scmle.monitoring import abtest
 
-STORE_PATH = Path(__file__).with_name("f11_certificates.json")
+STORE_PATH = scmle.certificates.DIRECTORY / "f11_certificates.json"
 DEV_SEED_BASE = 10_000
 HILLSTROM_ENV = "SCMLE_HILLSTROM"
 HILLSTROM_SHA256 = (

@@ -33,13 +33,13 @@ as such. One corpus is used; other dataset families are uncertified.
 from collections.abc import Callable
 from collections.abc import Sequence
 import dataclasses
-from pathlib import Path
 
 import pandas
 
 from benchmarks.qualification import certify
 from benchmarks.qualification import inject
 from benchmarks.qualification import standins
+import scmle.certificates
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.detectors import certificates
@@ -50,7 +50,7 @@ from scmle.data.detectors import outliers
 from scmle.data.detectors import registry
 from scmle.data.detectors import sentinels
 
-CERT_PATH = Path(__file__).with_name("detector_certificates.json")
+CERT_PATH = scmle.certificates.DIRECTORY / "detector_certificates.json"
 POLICY = certificates.Standard(
     recall_floor=0.80, false_alarm_ceiling=0.05, confidence=0.95
 )

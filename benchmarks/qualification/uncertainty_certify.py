@@ -85,7 +85,6 @@ sets, a near-duplicate split, an encoder baseline and a MAPIE differential
 import argparse
 import json
 import math
-from pathlib import Path
 import sys
 from typing import Any
 
@@ -95,6 +94,7 @@ from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import neighbors
 
+import scmle.certificates
 from scmle.data.detectors import certificates
 from scmle.evaluation import conformal
 from scmle.evaluation import coverage
@@ -104,7 +104,7 @@ from scmle.evaluation import quantile
 from scmle.evaluation import reconcile
 from scmle.evaluation import shift_weights
 
-STORE_PATH = Path(__file__).with_name("uncertainty_certificates.json")
+STORE_PATH = scmle.certificates.DIRECTORY / "uncertainty_certificates.json"
 DEV_SEED_BASE = 10_000
 ALPHA = 0.1
 LEVEL = 1.0 - ALPHA

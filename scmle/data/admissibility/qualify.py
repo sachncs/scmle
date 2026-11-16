@@ -4,12 +4,11 @@ This is the wiring between the feature packages and a charter run. It reads
 the exploration view only and returns plain results; the caller
 decides what to write and what to drop.
 
-Certificates are stored beside the qualification harness
-(`benchmarks/qualification/*.json`). That directory is not part of the
-installed `scmle` package, so the stores are found by path relative to a
-source checkout. When a store cannot be found or read, every detector it
-covers is treated as descriptive and the reason is returned, never hidden:
-descriptive suspicions raise warnings and cannot quarantine.
+Certificates are written by the qualification harness and shipped with the
+package (`scmle/certificates/*.json`), so an installed wheel reads the same
+stores as a source checkout. When a store cannot be found or read, every
+detector it covers is treated as descriptive and the reason is returned,
+never hidden: descriptive suspicions raise warnings and cannot quarantine.
 
 The charter declares no per-field provenance and no leakage ceilings, so
 fields are undeclared (tier `unverified`) and decided in permissive mode:
@@ -33,6 +32,7 @@ from pathlib import Path
 
 import pandas
 
+import scmle.certificates
 from scmle.contracts import qualification
 from scmle.data.admissibility import independence
 from scmle.data.admissibility import provenance
@@ -44,9 +44,6 @@ import scmle.data.charter.causal
 from scmle.data.detectors import certificates
 from scmle.data.detectors import pipeline
 
-STORE_DIRECTORY = (
-    Path(__file__).resolve().parents[3] / "benchmarks" / "qualification"
-)
 F5_STORE = "detector_certificates.json"
 SCREEN_STORE = "screen_certificates.json"
 ATTESTATION_SOURCE = "f4-leakage-attestation"
@@ -72,15 +69,15 @@ def load_store(name: str, directory: Path | None = None) -> LoadedStore:
 
     Args:
         name: File name of the store.
-        directory: Folder holding it; defaults to the qualification folder
-            of the source checkout.
+        directory: Folder holding it; defaults to the stores shipped with
+            the package.
 
     Returns:
         A `LoadedStore` holding the store, or None and a note saying
         that the file is missing or unreadable (the detectors it covers are
         then descriptive).
     """
-    path = (directory or STORE_DIRECTORY) / name
+    path = (directory or scmle.certificates.DIRECTORY) / name
     if not path.is_file():
         return LoadedStore(
             None, f"{name} not found at {path}: detectors are descriptive"

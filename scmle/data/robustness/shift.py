@@ -26,7 +26,7 @@ covariate shift, not label or concept shift, and a non-rejection is a
 failure to detect, never evidence of equivalence.
 
 Operating characteristics (size and power at a planted shift) are on file in
-`benchmarks/qualification/f6_certificates.json`; until a current certificate
+`scmle/certificates/f6_certificates.json`; until a current certificate
 passes, decisions are demoted to warnings.
 """
 

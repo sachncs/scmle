@@ -1,11 +1,11 @@
 """Which causal-identification gates have a current, passing certificate.
 
 A gate may only count toward `confirmed` if its simulation certificate in
-`benchmarks/qualification/f10_certificates.json` passed its pre-registered
+`scmle/certificates/f10_certificates.json` passed its pre-registered
 floor and was measured on the current method code. A certificate stores a
 `method_hash` over the package functions it measured; this module recomputes
 it, so a changed estimator makes its gates descriptive until re-measured.
-The certificate file is not part of the installed package: without it no gate
+The certificate file ships with the package; without it no gate
 is certified and every causal claim stays at most `attested`.
 """
 
@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import scmle.certificates
 from scmle.data.detectors import certificates
 from scmle.data.identification import aipw
 from scmle.data.identification import battery
@@ -26,12 +27,7 @@ from scmle.data.identification import synth
 from scmle.data.identification import tier
 from scmle.data.ledger import multiplicity
 
-STORE_PATH = (
-    Path(__file__).resolve().parents[3]
-    / "benchmarks"
-    / "qualification"
-    / "f10_certificates.json"
-)
+STORE_PATH = scmle.certificates.DIRECTORY / "f10_certificates.json"
 METHOD_SOURCES: dict[str, list[Any]] = {
     "selector": [select.select, select.judge, select.check_adjustment],
     "coverage_aipw": [

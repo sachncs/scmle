@@ -20,12 +20,10 @@ def stored():
 def test_the_shipped_store_is_inside_the_package():
     assert scmle.data.admissibility.screen.STORE_PATH == screen.STORE_PATH
     assert (
-        scmle.data.admissibility.screen.STORE_PATH.parent.name
-        == "admissibility"
+        scmle.data.admissibility.screen.STORE_PATH.parent.name == "certificates"
     )
     assert (
-        scmle.data.admissibility.screen.STORE_PATH.parent.parent.parent.name
-        == "scmle"
+        scmle.data.admissibility.screen.STORE_PATH.parent.parent.name == "scmle"
     )
 
 

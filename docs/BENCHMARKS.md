@@ -22,7 +22,7 @@ next to the threshold.
 
 The coverage and problem-type methods have their own measured gates in
 `benchmarks/qualification/uncertainty_certify.py`, written to
-`benchmarks/qualification/uncertainty_certificates.json` and checked by
+`scmle/certificates/uncertainty_certificates.json` and checked by
 `python -m benchmarks.qualification --check` (stale when the code changed).
 Two gates missed their pre-registered floors and are listed as descriptive:
 CQR conditional coverage in the highest-noise decile and the slice flag's

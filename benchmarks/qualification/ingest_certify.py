@@ -62,6 +62,7 @@ import pandas
 
 from benchmarks.qualification import ingest_checks
 from benchmarks.qualification import ingest_worlds
+import scmle.certificates
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.detectors import certificates
@@ -76,7 +77,7 @@ from scmle.data.ingest import synthesize
 import scmle.data.ingest.plan
 from scmle.data.readers import connectors
 
-STORE_PATH = Path(__file__).with_name("ingest_certificates.json")
+STORE_PATH = scmle.certificates.DIRECTORY / "ingest_certificates.json"
 MEASUREMENTS_PATH = Path(__file__).with_name("ingest_measurements.json")
 TORN_ID = "ingest-torn-read"
 TORN_DEFECT = "torn_read"

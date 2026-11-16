@@ -92,6 +92,7 @@ import numpy
 import pandas
 from scipy import stats
 
+import scmle.certificates
 from scmle.core import randomness
 from scmle.data.admissibility import leakage
 from scmle.data.detectors import certificates
@@ -108,7 +109,7 @@ MECHANISM_DEFECTS: Mapping[str, tuple[str, ...]] = {
     MISSING: ("leak_missing_for_class",),
     PURITY: ("leak_rare_record",),
 }
-STORE_PATH = Path(__file__).with_name("screen_certificates.json")
+STORE_PATH = scmle.certificates.DIRECTORY / "screen_certificates.json"
 KNOTS = 10
 MAX_ROWS = 2000
 MAX_PERMUTATIONS = 100_000

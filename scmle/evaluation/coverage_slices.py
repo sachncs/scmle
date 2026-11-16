@@ -31,6 +31,7 @@ from typing import Any
 import numpy
 import pandas
 
+import scmle.certificates
 from scmle.data.detectors import certificates
 from scmle.evaluation import coverage
 
@@ -39,12 +40,7 @@ BANDS = 4
 GATING = "gating"
 DESCRIPTIVE = "descriptive"
 GATE = "G5b"
-STORE_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "benchmarks"
-    / "qualification"
-    / "uncertainty_certificates.json"
-)
+STORE_PATH = scmle.certificates.DIRECTORY / "uncertainty_certificates.json"
 NOTE = (
     "per-slice coverage with its exact interval; the flag marks a slice "
     "whose coverage is below nominal by more than the margin (Holm over the "
@@ -93,7 +89,7 @@ def flag_method_hash() -> str:
 def flag_gate(path: Path | None = None) -> FlagGate:
     """Whether the stored slice-flag certificate is current and passing.
 
-    The certificate file is not part of the installed package: without it the
+    The certificate file ships with the package; without it the
     flag is descriptive.
 
     Args:

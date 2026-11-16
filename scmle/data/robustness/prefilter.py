@@ -19,7 +19,7 @@ verdict is a statement about the declared grid, not about truth.
 
 When the verdicts may gate. The stability rule's operating characteristics
 were measured for `stability.DEFAULT_RULE` only
-(`benchmarks/qualification/f6_certificates.json`). The filter acts only if a
+(`scmle/certificates/f6_certificates.json`). The filter acts only if a
 current passing certificate exists and the chartered thresholds equal that
 rule; otherwise the request is recorded as not applied, with the reason, and
 the verdicts stay warnings. Findings the estimator cannot assess

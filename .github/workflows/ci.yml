@@ -456,6 +456,11 @@ jobs:
           uv pip install --python /tmp/wheel-env/bin/python dist/*.whl
           /tmp/wheel-env/bin/scmle --help
           /tmp/wheel-env/bin/python -c "import scmle; print(scmle.__version__)"
+      - name: Every gate has the same status installed as in the checkout
+        run: |
+          uv run --python 3.14 python scripts/parity.py > /tmp/checkout.json
+          (cd /tmp && /tmp/wheel-env/bin/python -I "$GITHUB_WORKSPACE/scripts/parity.py" > /tmp/installed.json)
+          diff /tmp/checkout.json /tmp/installed.json
       - name: Install the source distribution into a clean environment
         run: |
           uv venv --python 3.14 /tmp/sdist-env

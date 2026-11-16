@@ -73,6 +73,7 @@ from scipy import stats
 from sklearn.datasets import load_breast_cancer
 
 from benchmarks.qualification import certify
+import scmle.certificates
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.charter import contracts
@@ -81,7 +82,7 @@ from scmle.data.robustness import multiverse
 from scmle.data.robustness import shift
 from scmle.data.robustness import stability
 
-STORE_PATH = Path(__file__).with_name("f6_certificates.json")
+STORE_PATH = scmle.certificates.DIRECTORY / "f6_certificates.json"
 MEASUREMENTS_PATH = Path(__file__).with_name("f6_measurements.json")
 DEV_SEED_BASE = 10_000
 Z_99 = 2.5758293035489004

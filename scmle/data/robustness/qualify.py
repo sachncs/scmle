@@ -6,11 +6,10 @@ it never touches `C`, and it does not open `F` (the final-test set is opened
 by the final evaluation only, so the forward check is reported as not run
 here; `forward.forward_check` is the function that opens `F`, once).
 
-Certificates live beside the qualification harness
-(`benchmarks/qualification/f6_certificates.json`), which the installed
-package does not ship. When the file is missing, unreadable or stale for the
-current code, the checks are descriptive: a `fragile` finding is a warning,
-not a quarantine.
+Certificates are shipped with the package
+(`scmle/certificates/f6_certificates.json`). When the file is missing,
+unreadable or stale for the current code, the checks are descriptive: a
+`fragile` finding is a warning, not a quarantine.
 
 The stability verdicts are reported. They remove findings from the
 confirmation family only through the pre-registered second stage

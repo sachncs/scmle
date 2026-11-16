@@ -57,6 +57,7 @@ import numpy
 import pandas
 from scipy import stats
 
+import scmle.certificates
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.charter import contracts
@@ -67,7 +68,7 @@ from scmle.data.framing import costs
 from scmle.data.framing import draft
 from scmle.data.framing import feasibility
 
-STORE_PATH = Path(__file__).with_name("framing_certificates.json")
+STORE_PATH = scmle.certificates.DIRECTORY / "framing_certificates.json"
 MEASUREMENTS_PATH = Path(__file__).with_name("framing_measurements.json")
 DEV_SEED_BASE = 10_000
 ALPHA = 0.05
