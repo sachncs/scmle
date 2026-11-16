@@ -63,13 +63,13 @@ def test_the_store_wrapper_retries_a_busy_file(tmp_path):
 def test_a_succeeded_handler_is_not_run_again_when_its_record_fails_once(
     tmp_path,
 ):
-    from tests.unit import test_workflow as flows
+    from tests.unit import test_workflow
 
     store = objectstore.LocalObjectStore(tmp_path / "state")
-    clock = flows.Clock()
-    recorder = flows.Recorder(clock)
-    flow = flows.pipeline()
-    executor = flows.executor_for(store, flow, recorder, clock)
+    clock = test_workflow.Clock()
+    recorder = test_workflow.Recorder(clock)
+    flow = test_workflow.pipeline()
+    executor = test_workflow.executor_for(store, flow, recorder, clock)
     real = executor.save_step
     failed = {"done": False}
 
