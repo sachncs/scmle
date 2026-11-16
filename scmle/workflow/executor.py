@@ -67,6 +67,33 @@ LOGGER = logging.getLogger(__name__)
 CHANGED = (objectstore.ConflictError, objectstore.NotFoundError)
 
 
+def parse(key: str, data: bytes) -> dict[str, Any]:
+    """Decodes a stored run, step, approval or lease record.
+
+    Args:
+        key: The object key, named in the error.
+        data: The stored bytes.
+
+    Returns:
+        The record.
+
+    Raises:
+        ArtifactError: If the bytes are not a JSON object; a raw
+            `JSONDecodeError` used to escape with no key (ERR-17).
+    """
+    try:
+        record = json.loads(data)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise errors.ArtifactError(
+            f"workflow record {key} is corrupt: {error}", {"key": key}
+        ) from error
+    if not isinstance(record, dict):
+        raise errors.ArtifactError(
+            f"workflow record {key} is not a JSON object", {"key": key}
+        )
+    return record
+
+
 class RunState(enum.StrEnum):
     """Where a run is.
 
@@ -346,14 +373,16 @@ class Executor:
 
         Returns:
             The record, or None if there is no such object.
+
+        Raises:
+            ArtifactError: If the object is not a JSON object (see `parse`).
         """
         try:
             data = self.store.get(key)[0]
         except objectstore.NotFoundError:
             # handled: missing object returned as None, documented
             return None
-        record: dict[str, Any] = json.loads(data)
-        return record
+        return parse(key, data)
 
     def write(self, key: str, record: Mapping[str, Any]) -> None:
         """Stores a JSON record atomically, fenced by the run's lease.
@@ -453,7 +482,7 @@ class Executor:
                 # handled: lease vanished mid-read; bounded retry then
                 # RunInFlightError
                 continue
-            held = json.loads(data)
+            held = parse(key, data)
             if held["expires"] > self.clock():
                 raise RunInFlightError(
                     f"run {run_id} is held by {held['owner']}"
@@ -493,7 +522,7 @@ class Executor:
             data, meta = self.store.get(self.base(run_id) + "lock")
         except objectstore.NotFoundError:
             raise EvictionError(f"the lease on run {run_id} is gone") from None
-        held = json.loads(data)
+        held = parse(self.base(run_id) + "lock", data)
         if (
             fence is None
             or held.get("owner") != self.owner

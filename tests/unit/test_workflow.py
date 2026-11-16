@@ -773,3 +773,23 @@ def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
     saved = executor.step_record(record["run_id"], "train")
     assert saved["outputs"]["attempts"] == 2
     assert record["cost"] > 0
+
+
+def test_a_corrupt_record_names_its_key(store):
+    # ERR-17: a corrupt lease, run or step file raised a raw JSONDecodeError.
+    clock = Clock()
+    flow = pipeline()
+    executor = executor_for(store, flow, Recorder(clock), clock)
+    key = f"workflows/{flow.name}/runs/run-c/run.json"
+    store.put(key, b"{torn")
+    with pytest.raises(
+        errors.ArtifactError, match=r"run-c/run\.json is corrupt"
+    ):
+        executor.run_record("run-c")
+    store.put(key, b"[1, 2]")
+    with pytest.raises(errors.ArtifactError, match="not a JSON object"):
+        executor.run_record("run-c")
+    lock = f"workflows/{flow.name}/runs/run-c/lock"
+    store.put(lock, b"{torn")
+    with pytest.raises(errors.ArtifactError, match="corrupt"):
+        executor.take_lease("run-c")
