@@ -38,6 +38,9 @@ STAGES = (
 )
 # macOS reports peak resident memory in bytes, Linux in kilobytes.
 SCALE = 1 if sys.platform == "darwin" else 1024
+# Per-stage times of the current run, filled by the wrappers `instrument`
+# installs once and cleared by `measure` before each run.
+TIMES: dict[str, dict[str, float]] = {}
 
 
 def peak() -> int:
@@ -82,9 +85,12 @@ def instrument(found: dict[str, dict[str, float]]) -> None:
 
 
 def measure(rows: int) -> dict[str, object]:
-    """Profiles one run of `rows` rows."""
-    found: dict[str, dict[str, float]] = {}
-    instrument(found)
+    """Profiles one run of `rows` rows.
+
+    The stages must be instrumented once, before the first run, with
+    `instrument(TIMES)`; wrapping them again would nest the wrappers.
+    """
+    TIMES.clear()
     frame = table(rows)
     started = time.perf_counter()
     with tempfile.TemporaryDirectory() as folder:
@@ -105,7 +111,7 @@ def measure(rows: int) -> dict[str, object]:
         "data_mb": round(frame.memory_usage(deep=True).sum() / 2**20, 2),
         "total_seconds": round(time.perf_counter() - started, 3),
         "peak_mb": round(peak() / 2**20, 1),
-        "stages": found,
+        "stages": dict(TIMES),
     }
 
 
@@ -122,6 +128,7 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--rows", type=int, nargs="+", default=[2000])
     parser.add_argument("--output", type=pathlib.Path, default=None)
     options = parser.parse_args(arguments)
+    instrument(TIMES)
     record = {
         "machine": {
             "platform": platform.platform(),
