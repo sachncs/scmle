@@ -6,9 +6,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Every commit on master gets a complete run (its own group, never
+# cancelled), so no master commit is left untested (TST-4); other refs
+# cancel a superseded run.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref == 'refs/heads/master' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 permissions:
   contents: read
