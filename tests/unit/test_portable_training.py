@@ -331,3 +331,25 @@ def test_reproducibility_is_reported_against_declared_tolerances():
     assert not missing["within_tolerance"]
     with pytest.raises(errors.ConfigError):
         reproducibility.Tolerances({"a": -1})
+
+
+def test_a_checkpoint_load_tells_absent_damaged_and_outage_apart(
+    store, monkeypatch, caplog
+):
+    # ERR-10: absent, corrupt and backend-down all returned None, so an
+    # outage looked like "no checkpoint" and the work restarted from zero.
+    held = checkpoint.CheckpointStore(store, "run-x")
+    assert held.load(3) is None
+    held.save(3, {"epoch": 3})
+    assert held.load(3).state == {"epoch": 3}
+    store.put(held.key(4), b"{not json")
+    with caplog.at_level("WARNING", logger=checkpoint.__name__):
+        assert held.load(4) is None
+    assert any("malformed" in r.getMessage() for r in caplog.records)
+
+    def down(key):
+        raise objectstore.TransientStoreError("backend unavailable")
+
+    monkeypatch.setattr(store, "get", down)
+    with pytest.raises(objectstore.TransientStoreError):
+        held.load(3)

@@ -83,6 +83,7 @@ class WorkdirSync:
         self.directory = directory
         self.uploaded: dict[str, str] = {}
         self.stop = threading.Event()
+        self.failures = 0
         self.thread: threading.Thread | None = None
 
     def push(self) -> int:
@@ -133,8 +134,8 @@ class WorkdirSync:
     def start(self, interval: float) -> None:
         """Pushes every `interval` seconds on a daemon thread.
 
-        A push that fails with a store error is skipped and tried again at the
-        next interval.
+        A push that fails with a store error is logged, counted in `failures`
+        (pushes failed in a row) and tried again at the next interval.
 
         Args:
             interval: Seconds between pushes.
@@ -146,8 +147,15 @@ class WorkdirSync:
                 try:
                     self.push()
                 except objectstore.StoreError:
-                    # handled: documented skip; retried next interval
+                    self.failures += 1
+                    LOGGER.warning(
+                        "evidence push failed (%d in a row); retrying in %ss",
+                        self.failures,
+                        interval,
+                        exc_info=True,
+                    )
                     continue
+                self.failures = 0
 
         self.thread = threading.Thread(target=loop, daemon=True)
         self.thread.start()

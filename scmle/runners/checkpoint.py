@@ -12,10 +12,14 @@ its last good checkpoint.
 import dataclasses
 import hashlib
 import json
+import logging
 from typing import Any
 
 from scmle.contracts import errors
 from scmle.data.store import objectstore
+
+LOGGER = logging.getLogger(__name__)
+
 
 STEP_WIDTH = 10
 
@@ -135,18 +139,35 @@ class CheckpointStore:
 
         Returns:
             The checkpoint, or None if it is absent or damaged (unreadable, not
-            JSON, a different step, or a digest that does not match).
+            JSON, a different step, or a digest that does not match); a
+            damaged one is logged as a warning.
+
+        Raises:
+            StoreError: If the store fails for another reason (for example
+                the backend is down): an outage is not "no checkpoint", which
+                would restart the work from the beginning (ERR-10).
         """
+        key = self.key(step)
         try:
-            data = self.store.get(self.key(step))[0]
+            data = self.store.get(key)[0]
+        except objectstore.NotFoundError:
+            # handled: an absent checkpoint is None, as documented
+            return None
+        except objectstore.CorruptObjectError:
+            LOGGER.warning("checkpoint %s is corrupt; passed over", key)
+            return None
+        try:
             document = json.loads(data)
             if document["step"] != step or document["sha256"] != content_digest(
                 step, document["state"]
             ):
+                LOGGER.warning(
+                    "checkpoint %s does not verify; passed over", key
+                )
                 return None
             return Checkpoint(step, document["state"], document["sha256"])
-        except (objectstore.StoreError, ValueError, KeyError, TypeError):
-            # handled: documented None for absent or damaged checkpoint
+        except (ValueError, KeyError, TypeError):
+            LOGGER.warning("checkpoint %s is malformed; passed over", key)
             return None
 
     def latest(self) -> Checkpoint | None:
