@@ -182,7 +182,9 @@ def test_unhashable_cells_fall_back_to_a_json_fingerprint(
         orient="split", date_format="iso", default_handler=str
     ).encode("utf-8")
     assert second["input_fingerprint"] == first["input_fingerprint"]
-    assert first["input_fingerprint"] == hashlib.sha256(payload).hexdigest()
+    # The prefix marks the fallback so it never equals a pandas-hash print.
+    expected = "json:" + hashlib.sha256(payload).hexdigest()
+    assert first["input_fingerprint"] == expected
 
 
 def test_a_failure_is_logged_as_an_error_event_and_propagates(tmp_path):
