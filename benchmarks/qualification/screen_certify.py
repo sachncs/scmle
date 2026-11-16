@@ -1,9 +1,11 @@
 """Certificate for the leakage screen with multiplicity control.
 
-The detector is `scmle.data.admissibility.screen` (id `f4-leakage-screen`),
-the test that replaced the profiler's fixed cutoffs. It is measured on the
-breast-cancer table that ships with scikit-learn, with the settings
-`leakage.CERTIFIED`, fixed before measuring and not tuned.
+The detector is `scmle.data.admissibility.screen`, the test that replaced the
+profiler's fixed cutoffs. It is measured once per kind of target, each on a
+real table that ships with scikit-learn: two classes on breast cancer (id
+`f4-leakage-screen`), ten classes on digits (`-multiclass`) and a continuous
+target on diabetes (`-regression`), with the settings `leakage.CERTIFIED`,
+fixed before measuring and not tuned.
 
 * Clean side: `NULL_REPLICATES` null worlds. Each keeps `TABLE_COLUMNS` real
   feature columns (a random subset), two of them with 20 percent of values
@@ -39,6 +41,8 @@ from typing import Any
 
 import numpy
 import pandas
+from sklearn.datasets import load_diabetes
+from sklearn.datasets import load_digits
 
 from benchmarks.qualification import certify
 from benchmarks.qualification import f4_certify
@@ -60,15 +64,54 @@ TABLE_COLUMNS = 10
 GAP_COLUMNS = 2
 GAP_RATE = 0.2
 RARE_SHARE = 0.25
+RARE_TOP = 0.9
+CONTINUOUS_NOISE = 0.1
+BANDS = 10
 OLD_ASSOCIATION = 0.98
 OLD_MISSINGNESS = 0.9
 DEFECTS = tuple(d for ds in screen.MECHANISM_DEFECTS.values() for d in ds)
 
 
-def plant_column(
+def digits() -> pandas.DataFrame:
+    """The scikit-learn digits table: ten classes, 1,797 rows.
+
+    Returns:
+        The pixel columns that vary, and `target`.
+    """
+    frame: pandas.DataFrame = load_digits(as_frame=True).frame
+    spread = frame.drop(columns=f4_certify.TARGET).std() > 0
+    return frame[[*spread[spread].index, f4_certify.TARGET]]
+
+
+def diabetes() -> pandas.DataFrame:
+    """The scikit-learn diabetes table: a continuous target, 442 rows.
+
+    Returns:
+        Its ten features and `target`.
+    """
+    frame: pandas.DataFrame = load_diabetes(as_frame=True).frame
+    return frame
+
+
+TABLES = {
+    "binary": (f4_certify.breast_cancer, "classification", tasks.Task.BINARY),
+    "multiclass": (digits, "classification", tasks.Task.MULTICLASS),
+    "regression": (diabetes, "regression", tasks.Task.REGRESSION),
+}
+KINDS = tuple(TABLES)
+
+
+def continuous(
     frame: pandas.DataFrame, defect: str, seed: int
 ) -> pandas.Series:
-    """The planted leak column for one defect type.
+    """The planted leak column for a continuous target.
+
+    The same five leak types as for classes, written for a number: a copy;
+    a copy with noise of `CONTINUOUS_NOISE` standard deviations; a
+    threshold rule (above the median) with noise; a value recorded only
+    when the target is at or below its median; and a value recorded for
+    `RARE_TOP` of the rows in the target's top decile, so about 9 percent of
+    the rows, as for classes, all in one band of the target.
 
     Args:
         frame: The clean table, including the target.
@@ -76,10 +119,52 @@ def plant_column(
         seed: Run seed.
 
     Returns:
-        The planted column, aligned to `frame`; for `leak_rare_record` it is
-        standard normal noise recorded only for a random quarter of the rows
-        that share the first row's class (missing elsewhere).
+        The planted column, aligned to `frame`.
+
+    Raises:
+        KeyError: For an unknown leak type.
     """
+    if defect not in DEFECTS:
+        raise KeyError(defect)
+    target = frame[f4_certify.TARGET].astype(float)
+    rng = randomness.component_rng(
+        seed, "screen.continuous", DEFECTS.index(defect)
+    )
+    noise = pandas.Series(rng.normal(size=len(frame)), index=frame.index)
+    middle = float(target.median())
+    if defect == "leak_copy":
+        return target.copy()
+    if defect == "leak_noisy_copy":
+        return target + CONTINUOUS_NOISE * float(target.std()) * noise
+    if defect == "leak_threshold":
+        band = pandas.qcut(target, BANDS, labels=False, duplicates="drop")
+        return band.astype(float) + f4_certify.THRESHOLD_NOISE * noise
+    if defect == "leak_missing_for_class":
+        return noise.where(target <= middle)
+    top = target >= float(target.quantile(0.9))
+    kept = pandas.Series(rng.random(len(frame)) < RARE_TOP, index=frame.index)
+    return noise.where(top & kept)
+
+
+def plant_column(
+    frame: pandas.DataFrame, defect: str, seed: int, kind: str = "binary"
+) -> pandas.Series:
+    """The planted leak column for one defect type.
+
+    Args:
+        frame: The clean table, including the target.
+        defect: A leak type in `DEFECTS`.
+        seed: Run seed.
+        kind: `binary`, `multiclass` or `regression`.
+
+    Returns:
+        The planted column, aligned to `frame`; for classes and
+        `leak_rare_record` it is standard normal noise recorded only for a
+        random quarter of the rows that share the first row's class
+        (missing elsewhere); for a continuous target see `continuous`.
+    """
+    if kind == "regression":
+        return continuous(frame, defect, seed)
     if defect != "leak_rare_record":
         return f4_certify.plant_leak(frame, defect, seed)
     rng = randomness.component_rng(seed, "screen.rare", 0)
@@ -127,12 +212,15 @@ def with_gaps(features: pandas.DataFrame, seed: int) -> pandas.DataFrame:
     return out
 
 
-def old_rule(frame: pandas.DataFrame, names: Sequence[str]) -> dict[str, bool]:
+def old_rule(
+    frame: pandas.DataFrame, names: Sequence[str], kind: str = "binary"
+) -> dict[str, bool]:
     """The retired profiler cutoffs, per column.
 
     Args:
         frame: Table including the target column.
         names: Columns to judge.
+        kind: `binary`, `multiclass` or `regression`.
 
     Returns:
         Mapping of column name to True when its association with the target
@@ -140,49 +228,55 @@ def old_rule(frame: pandas.DataFrame, names: Sequence[str]) -> dict[str, bool]:
         least `OLD_MISSINGNESS`.
     """
     target = frame[f4_certify.TARGET]
+    task = TABLES[kind][2]
     flagged = {}
     for name in names:
-        kind = columns.kind_of(frame[name])
-        task = tasks.Task.BINARY
+        column = columns.kind_of(frame[name])
         flagged[name] = (
-            kind.association(frame[name], target, task) >= OLD_ASSOCIATION
-            or kind.missingness_association(frame[name], target, task)
+            column.association(frame[name], target, task) >= OLD_ASSOCIATION
+            or column.missingness_association(frame[name], target, task)
             >= OLD_MISSINGNESS
         )
     return flagged
 
 
-def run_screen(frame: pandas.DataFrame, seed: int, groups: Any = None) -> Any:
+def run_screen(
+    frame: pandas.DataFrame, seed: int, groups: Any = None, kind: str = "binary"
+) -> Any:
     """Screens every column but the target with the certified settings.
 
     Args:
         frame: Table including the target column.
         seed: Run seed of the screen.
         groups: Optional row groups for grouped permutation.
+        kind: `binary`, `multiclass` or `regression`.
 
     Returns:
         The screen report.
     """
     cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=seed)
     return screen.screen(
-        frame, f4_certify.TARGET, "classification", cfg, groups=groups
+        frame, f4_certify.TARGET, TABLES[kind][1], cfg, groups=groups
     )
 
 
-def null_replicate(seed: int, grouped: bool = False) -> dict[str, Any]:
+def null_replicate(
+    seed: int, grouped: bool = False, kind: str = "binary"
+) -> dict[str, Any]:
     """One null world: permuted outcome, gaps in two columns.
 
     Args:
         seed: Replicate seed.
         grouped: Whether rows come in groups of `GROUP_SIZE` that are
             permuted together.
+        kind: `binary`, `multiclass` or `regression`.
 
     Returns:
         Whether the screen found any suspect or any significant column, the
         size of the tested family, and whether the old rule flagged any
         column.
     """
-    frame = f4_certify.breast_cancer()
+    frame = TABLES[kind][0]()
     names = real_columns(frame, TABLE_COLUMNS, seed)
     groups = (
         pandas.Series(numpy.arange(len(frame)) // GROUP_SIZE, index=frame.index)
@@ -190,12 +284,15 @@ def null_replicate(seed: int, grouped: bool = False) -> dict[str, Any]:
         else None
     )
     world = simulate.null_world(
-        frame[names], frame[f4_certify.TARGET], seed, groups=groups
+        frame[names].astype(float),
+        frame[f4_certify.TARGET],
+        seed,
+        groups=groups,
     )
     features = with_gaps(world.features, seed)
     table = features.assign(**{f4_certify.TARGET: world.outcome})
-    report = run_screen(table, seed, groups)
-    old = old_rule(table, list(features.columns))
+    report = run_screen(table, seed, groups, kind)
+    old = old_rule(table, list(features.columns), kind)
     return {
         "suspect": bool(report.suspects),
         "significant": any(f.significant for f in report.findings),
@@ -204,24 +301,27 @@ def null_replicate(seed: int, grouped: bool = False) -> dict[str, Any]:
     }
 
 
-def plant_replicate(defect: str, seed: int) -> dict[str, Any]:
+def plant_replicate(
+    defect: str, seed: int, kind: str = "binary"
+) -> dict[str, Any]:
     """One planted leak among real columns.
 
     Args:
         defect: Leak type to plant.
         seed: Replicate seed.
+        kind: `binary`, `multiclass` or `regression`.
 
     Returns:
         Whether the planted column was found by the mechanism of its type,
         whether it was a suspect by any mechanism, and whether the old rule
         flagged it.
     """
-    frame = f4_certify.breast_cancer()
+    frame = TABLES[kind][0]()
     names = real_columns(frame, TABLE_COLUMNS - 1, seed)
     table = frame[[*names, f4_certify.TARGET]].assign(
-        **{defect: plant_column(frame, defect, seed)}
+        **{defect: plant_column(frame, defect, seed, kind)}
     )
-    report = run_screen(table, seed)
+    report = run_screen(table, seed, kind=kind)
     mechanisms = {
         m for m, kinds in screen.MECHANISM_DEFECTS.items() if defect in kinds
     }
@@ -232,7 +332,7 @@ def plant_replicate(defect: str, seed: int) -> dict[str, Any]:
     any_mechanism = any(
         f.suspect and f.feature == defect for f in report.findings
     )
-    old = old_rule(table, [defect])
+    old = old_rule(table, [defect], kind)
     return {
         "found": bool(found),
         "found_any_mechanism": bool(any_mechanism),
@@ -240,31 +340,32 @@ def plant_replicate(defect: str, seed: int) -> dict[str, Any]:
     }
 
 
-def replicate(kind: str, seed: int) -> dict[str, Any]:
+def replicate(defect: str, seed: int, kind: str = "binary") -> dict[str, Any]:
     """A null (`""`), grouped null (`"grouped"`) or planted replicate.
 
     Args:
-        kind: `""` for a null world, `"grouped"` for a grouped null world,
+        defect: `""` for a null world, `"grouped"` for a grouped null world,
             otherwise a leak type to plant.
         seed: Replicate seed.
+        kind: `binary`, `multiclass` or `regression`.
 
     Returns:
         The result of `null_replicate` or `plant_replicate`.
     """
-    if kind == "":
-        return null_replicate(seed)
-    if kind == "grouped":
-        return null_replicate(seed, grouped=True)
-    return plant_replicate(kind, seed)
+    if defect == "":
+        return null_replicate(seed, kind=kind)
+    if defect == "grouped":
+        return null_replicate(seed, grouped=True, kind=kind)
+    return plant_replicate(defect, seed, kind)
 
 
 def run_parallel(
-    jobs: Sequence[tuple[str, int]], workers: int
+    jobs: Sequence[tuple[str, int, str]], workers: int
 ) -> list[dict[str, Any]]:
     """Runs the replicates in order.
 
     Args:
-        jobs: (kind, seed) pairs as accepted by `replicate`.
+        jobs: (defect, seed, kind) triples as accepted by `replicate`.
         workers: Number of parallel workers.
 
     Returns:
@@ -274,7 +375,7 @@ def run_parallel(
     from joblib import Parallel
 
     return list(
-        Parallel(n_jobs=workers)(delayed(replicate)(k, s) for k, s in jobs)
+        Parallel(n_jobs=workers)(delayed(replicate)(*job) for job in jobs)
     )
 
 
@@ -304,20 +405,23 @@ def band_99(alpha: float, runs: int) -> tuple[float, float]:
     return f4_certify.band_99(alpha, runs)
 
 
-def certify_screen(workers: int = 1) -> tuple[Any, dict[str, Any]]:
-    """Measures the screen on null worlds and planted leaks.
+def measure(kind: str, workers: int = 1) -> tuple[Any, dict[str, Any]]:
+    """Measures the screen on null worlds and planted leaks for one kind.
 
     Args:
+        kind: `binary`, `multiclass` or `regression`.
         workers: Number of parallel workers.
 
     Returns:
         (certificate, measurements).
     """
-    frame = f4_certify.breast_cancer()
-    jobs: list[tuple[str, int]] = [("", s) for s in range(NULL_REPLICATES)]
-    jobs += [("grouped", s) for s in range(GROUPED_REPLICATES)]
+    frame = TABLES[kind][0]()
+    jobs: list[tuple[str, int, str]] = [
+        ("", s, kind) for s in range(NULL_REPLICATES)
+    ]
+    jobs += [("grouped", s, kind) for s in range(GROUPED_REPLICATES)]
     for defect in DEFECTS:
-        jobs += [(defect, s) for s in range(PLANT_REPLICATES)]
+        jobs += [(defect, s, kind) for s in range(PLANT_REPLICATES)]
     outcomes = run_parallel(jobs, workers)
     nulls = outcomes[:NULL_REPLICATES]
     grouped = outcomes[NULL_REPLICATES : NULL_REPLICATES + GROUPED_REPLICATES]
@@ -342,7 +446,7 @@ def certify_screen(workers: int = 1) -> tuple[Any, dict[str, Any]]:
         }
         results.append(
             qualification.Certificate(
-                detector_id=screen.DETECTOR_ID,
+                detector_id=screen.DETECTORS[kind],
                 defect_type=defect,
                 planted=PLANT_REPLICATES,
                 detected=detected,
@@ -352,7 +456,7 @@ def certify_screen(workers: int = 1) -> tuple[Any, dict[str, Any]]:
             )
         )
     cert = certificates.certify(
-        screen.DETECTOR_ID,
+        screen.DETECTORS[kind],
         screen.code_digest(),
         certificates.corpus_hash([certify.frame_digest(frame)]),
         [0],
@@ -364,6 +468,13 @@ def certify_screen(workers: int = 1) -> tuple[Any, dict[str, Any]]:
     old_false = sum(item["old"] for item in nulls)
     low, high = band_99(alpha, NULL_REPLICATES)
     measurements = {
+        "table": TABLES[kind][0].__name__,
+        "rows": len(frame),
+        "classes": (
+            int(frame[f4_certify.TARGET].nunique())
+            if TABLES[kind][1] == "classification"
+            else 0
+        ),
         "alpha": alpha,
         "rule": "benjamini-yekutieli",
         "null_replicates": NULL_REPLICATES,
@@ -393,6 +504,19 @@ def certify_screen(workers: int = 1) -> tuple[Any, dict[str, Any]]:
     return cert, measurements
 
 
+def certify_screen(workers: int = 1) -> tuple[list[Any], dict[str, Any]]:
+    """Measures the screen for every kind of target.
+
+    Args:
+        workers: Number of parallel workers.
+
+    Returns:
+        (one certificate per kind, measurements keyed by kind).
+    """
+    found = {kind: measure(kind, workers) for kind in KINDS}
+    return [c for c, _ in found.values()], {k: m for k, (_, m) in found.items()}
+
+
 def problems(store: certificates.Store) -> list[str]:
     """Why the certificate file is unusable: missing or stale entries.
 
@@ -400,36 +524,37 @@ def problems(store: certificates.Store) -> list[str]:
         store: The loaded certificate store.
 
     Returns:
-        A message per leak type whose certificate is missing or stale; empty
-        when all are current.
+        A message per kind and leak type whose certificate is missing or
+        stale; empty when all are current.
     """
     found = []
     digest = screen.code_digest()
-    for defect in DEFECTS:
-        report = certificates.audit(
-            store, {screen.DETECTOR_ID: (digest, defect)}
-        )
-        if report.missing:
-            found.append(f"{screen.DETECTOR_ID}/{defect}: missing")
-        if report.stale:
-            found.append(f"{screen.DETECTOR_ID}/{defect}: stale")
+    for kind in KINDS:
+        detector = screen.DETECTORS[kind]
+        for defect in DEFECTS:
+            report = certificates.audit(store, {detector: (digest, defect)})
+            if report.missing:
+                found.append(f"{detector}/{defect}: missing")
+            if report.stale:
+                found.append(f"{detector}/{defect}: stale")
     return found
 
 
 def uncertified(store: certificates.Store) -> list[str]:
-    """Defect types that were measured and did not meet the policy.
+    """Kinds and leak types that were measured and did not meet the policy.
 
     Args:
         store: The loaded certificate store.
 
     Returns:
-        The leak types whose status is not gating.
+        `kind/defect` for every pair whose status is not gating.
     """
     digest = screen.code_digest()
     return [
-        defect
+        f"{kind}/{defect}"
+        for kind in KINDS
         for defect in DEFECTS
-        if store.status(screen.DETECTOR_ID, digest, defect)
+        if store.status(screen.DETECTORS[kind], digest, defect)
         is not certificates.GateStatus.GATING
     ]
 
@@ -464,8 +589,8 @@ def main(arguments: list[str] | None = None) -> int:
             )
         )
         return 1 if found else 0
-    cert, measurements = certify_screen(options.workers)
-    certificates.Store([cert]).save(screen.STORE_PATH)
+    certs, measurements = certify_screen(options.workers)
+    certificates.Store(certs).save(screen.STORE_PATH)
     MEASUREMENTS_PATH.write_text(
         json.dumps(measurements, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

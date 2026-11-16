@@ -78,10 +78,12 @@ def regression_leak():
     return frame
 
 
-def test_an_uncertified_target_blocks_under_block(tmp_path):
-    # ERR-1: the screen has no passing certificate for regression, so its
-    # suspicion cannot block; `block` used to train on the leak regardless.
-    with pytest.raises(errors.BlockedError, match="certificate not passing"):
+def test_a_regression_leak_blocks_under_block(tmp_path):
+    # ERR-1: the screen is certified for regression, so the copied target
+    # blocks by name; before, regression was uncertified and trained.
+    with pytest.raises(
+        errors.BlockedError, match="unresolved leakage risk"
+    ) as raised:
         support.make_project(
             regression_leak(),
             "y",
@@ -89,9 +91,10 @@ def test_an_uncertified_target_blocks_under_block(tmp_path):
             output_dir=tmp_path,
             leakage_policy="block",
         ).run()
+    assert raised.value.details["leakage"]["blocking"] == ["leak"]
 
 
-def test_an_uncertified_target_warns_under_warn(tmp_path):
+def test_a_regression_leak_warns_under_warn(tmp_path):
     result = support.make_project(
         regression_leak(),
         "y",
@@ -100,8 +103,7 @@ def test_an_uncertified_target_warns_under_warn(tmp_path):
         leakage_policy="warn",
     ).run()
     assert any("'leak'" in w for w in result.profile.risk_findings)
-    assert "warning only" in " ".join(result.profile.risk_findings)
-    assert result.profile.blocking_leaks == ()
+    assert result.profile.blocking_leaks == ("leak",)
 
 
 def test_groups_never_straddle_the_test_boundary(binary_frame, tmp_path):

@@ -115,6 +115,16 @@ MAX_ROWS = 2000
 MAX_PERMUTATIONS = 100_000
 BINARY_CLASSES = 2
 MIN_CLASSES = 2
+# Each kind of target has its own certificate, measured on a real table of
+# that kind (`benchmarks.qualification.screen_certify`). Multiclass targets
+# are certified up to the number of classes measured; more classes stay
+# descriptive until measured.
+DETECTORS: Mapping[str, str] = {
+    "binary": DETECTOR_ID,
+    "multiclass": f"{DETECTOR_ID}-multiclass",
+    "regression": f"{DETECTOR_ID}-regression",
+}
+MAX_CERTIFIED_CLASSES = 10
 # Cross-fitted fits needed by the permutation test: permutations x skill
 # columns x classes (one-vs-rest when there are more than two). The screen
 # runs inside the declared time budget by a deterministic cap, never by a
@@ -1021,6 +1031,26 @@ def subsample(
     return numpy.sort(rng.choice(n, MAX_ROWS, replace=False)), block_size
 
 
+def family(task: str, n_classes: int) -> str | None:
+    """Names the kind of target, as the certificates are keyed.
+
+    Args:
+        task: `classification` or `regression`.
+        n_classes: Number of classes of the target.
+
+    Returns:
+        `binary`, `multiclass` (up to `MAX_CERTIFIED_CLASSES` classes) or
+        `regression`; None for a kind no certificate covers.
+    """
+    if task == "regression":
+        return "regression"
+    if n_classes == BINARY_CLASSES:
+        return "binary"
+    if BINARY_CLASSES < n_classes <= MAX_CERTIFIED_CLASSES:
+        return "multiclass"
+    return None
+
+
 def gate_statuses(
     store: certificates.Store | None,
     cfg: leakage.Config,
@@ -1030,9 +1060,9 @@ def gate_statuses(
     """Determines the gate status per mechanism from the certificates on file.
 
     A mechanism gates only when the screen's current code has a passing
-    certificate for every leak type of that mechanism, the settings equal the
-    certified ones (any run seed), and the target is the one that was
-    certified (binary classification). Anything else is descriptive.
+    certificate for every leak type of that mechanism, for the target's
+    kind (`family`), and the settings equal the certified ones (any run
+    seed). Anything else is descriptive.
 
     Args:
         store: Certificates on file, or None.
@@ -1046,7 +1076,8 @@ def gate_statuses(
     descriptive = dict.fromkeys(
         MECHANISM_DEFECTS, certificates.GateStatus.DESCRIPTIVE
     )
-    if store is None or task != "classification" or n_classes != BINARY_CLASSES:
+    kind = family(task, n_classes)
+    if store is None or kind is None:
         return descriptive
     if (
         dataclasses.replace(cfg, run_seed=leakage.CERTIFIED.run_seed)
@@ -1058,7 +1089,7 @@ def gate_statuses(
         mechanism: (
             certificates.GateStatus.GATING
             if all(
-                store.status(DETECTOR_ID, digest, defect)
+                store.status(DETECTORS[kind], digest, defect)
                 is certificates.GateStatus.GATING
                 for defect in defects
             )

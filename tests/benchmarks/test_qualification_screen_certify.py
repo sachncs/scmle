@@ -33,11 +33,37 @@ def test_the_stored_certificate_is_for_the_current_code():
     assert screen_certify.problems(stored()) == []
 
 
-def test_every_leak_type_of_every_mechanism_has_an_outcome_on_file():
-    (cert,) = stored().current(screen.DETECTOR_ID, screen.code_digest())
+@pytest.mark.parametrize("kind", screen_certify.KINDS)
+def test_every_leak_type_of_every_mechanism_has_an_outcome_on_file(kind):
+    (cert,) = stored().current(screen.DETECTORS[kind], screen.code_digest())
     types = {o.certificate.defect_type for o in cert.outcomes}
     wanted = {d for ds in screen.MECHANISM_DEFECTS.values() for d in ds}
     assert types == wanted == set(screen_certify.DEFECTS)
+
+
+@pytest.mark.parametrize("kind", screen_certify.KINDS)
+def test_every_kind_of_target_gates_on_its_own_certificate(kind):
+    task, classes = {
+        "binary": ("classification", 2),
+        "multiclass": ("classification", 10),
+        "regression": ("regression", 0),
+    }[kind]
+    assert screen.family(task, classes) == kind
+    gates = screen.gate_statuses(stored(), leakage.CERTIFIED, task, classes)
+    assert set(gates.values()) == {certificates.GateStatus.GATING}
+
+
+def test_more_classes_than_measured_stay_descriptive():
+    document = json.loads(
+        screen_certify.MEASUREMENTS_PATH.read_text(encoding="utf-8")
+    )
+    measured = document["multiclass"]["classes"]
+    assert measured == screen.MAX_CERTIFIED_CLASSES
+    assert screen.family("classification", measured + 1) is None
+    gates = screen.gate_statuses(
+        stored(), leakage.CERTIFIED, "classification", measured + 1
+    )
+    assert set(gates.values()) == {certificates.GateStatus.DESCRIPTIVE}
 
 
 def test_stale_and_missing_certificates_are_reported():
@@ -62,11 +88,12 @@ def test_planned_sizes_follow_the_phase_floors():
     )
 
 
-def test_measurements_agree_with_the_certificate():
+@pytest.mark.parametrize("kind", screen_certify.KINDS)
+def test_measurements_agree_with_the_certificate(kind):
     document = json.loads(
         screen_certify.MEASUREMENTS_PATH.read_text(encoding="utf-8")
-    )
-    (cert,) = stored().current(screen.DETECTOR_ID, screen.code_digest())
+    )[kind]
+    (cert,) = stored().current(screen.DETECTORS[kind], screen.code_digest())
     for outcome in cert.outcomes:
         c = outcome.certificate
         assert c.false_alarms == document["suspect_false_alarms"]
@@ -80,24 +107,48 @@ def test_measurements_agree_with_the_certificate():
     assert document["alpha"] == leakage.CERTIFIED.alpha
 
 
-def test_the_global_null_size_is_inside_its_band_and_nothing_is_hidden():
+@pytest.mark.parametrize("kind", screen_certify.KINDS)
+def test_the_global_null_size_is_inside_its_band_and_nothing_is_hidden(kind):
     document = json.loads(
         screen_certify.MEASUREMENTS_PATH.read_text(encoding="utf-8")
-    )
+    )[kind]
     assert document["significant_rate_within_alpha"]
     assert document["significant_rate"] <= document["band_99"][1]
     assert document["suspect_false_alarm_wilson_95"][1] <= 0.05
     assert document["old_rule_false_alarms"] >= 0
 
 
-def test_a_clean_world_and_a_planted_world_behave_as_certified():
-    clean = screen_certify.replicate("", 0)
+@pytest.mark.parametrize("kind", ["binary", "regression"])
+def test_a_clean_world_and_a_planted_world_behave_as_certified(kind):
+    clean = screen_certify.replicate("", 0, kind)
     assert (
         clean["suspect"] is False
         and clean["family"] > screen_certify.TABLE_COLUMNS
     )
     for defect in screen_certify.DEFECTS:
-        assert screen_certify.replicate(defect, 0)["found"] is True
+        assert screen_certify.replicate(defect, 0, kind)["found"] is True
+
+
+def test_continuous_plants_are_derived_from_the_target():
+    frame = screen_certify.diabetes()
+    target = frame[f4_certify.TARGET]
+    plant = screen_certify.continuous
+    assert plant(frame, "leak_copy", 0).equals(target.astype(float))
+    assert plant(frame, "leak_noisy_copy", 0).corr(target) > 0.99
+    assert plant(frame, "leak_threshold", 0).corr(target) > 0.9
+    gated = plant(frame, "leak_missing_for_class", 0)
+    assert (target[gated.notna()] <= target.median()).all()
+    rare = plant(frame, "leak_rare_record", 0)
+    assert (target[rare.notna()] >= target.quantile(0.9)).all()
+    assert 0.05 < rare.notna().mean() < 0.15
+    with pytest.raises(KeyError):
+        plant(frame, "leak_unknown", 0)
+
+
+def test_the_multiclass_table_has_ten_classes_and_no_constant_column():
+    frame = screen_certify.digits()
+    assert frame[f4_certify.TARGET].nunique() == 10
+    assert (frame.drop(columns=f4_certify.TARGET).std() > 0).all()
 
 
 def test_the_rare_record_plant_is_recorded_for_one_class_only():

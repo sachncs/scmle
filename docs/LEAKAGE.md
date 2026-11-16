@@ -136,12 +136,19 @@ Read this carefully:
   a charter run on its exploration rows flagged `worst area`.
 * On Titanic as shipped the screen found both real leaks (2 of 2) and flagged
   nothing legitimate (0 of 7). Without the two leaks, it flagged nothing.
-* For wine, iris and digits the target has more than two classes. The screen is
-  only certified for a two-class target, so for these it is **descriptive**: it
-  may report suspects (iris did) but cannot decide which column to stop on.
-  Under `leakage_policy="block"` such a run is refused, because `block` cannot
-  keep its promise without a passing certificate; under `warn` it trains and
-  logs that the screen is descriptive.
+* The screen has a certificate per kind of target, each measured on a real
+  table with the same floors (1,000 null worlds, 200 plants per leak type):
+  two classes on breast cancer, up to ten classes on digits, and a
+  continuous target on diabetes. On each, 0 of 1,000 null worlds raised a
+  suspect and at least 199 of 200 plants of every type were found
+  (`benchmarks/qualification/screen_measurements.json`). A target with more
+  than ten classes is not certified: under `leakage_policy="block"` such a run
+  is refused, and under `warn` it trains and logs that the screen is
+  descriptive.
+* A field derived by splitting a continuous target at its median explains
+  about 60 percent of the target's variance, which an honest strong predictor
+  can also reach, so the skill mechanism does not call it a suspect. A field
+  derived by finer bucketing (deciles) is found.
 * This is six tables, and only breast cancer combines a two-class target with
   very strong honest predictors. Do not read 6.7 percent as a general rate. It
   says: where honest predictors are very strong, expect some false flags.

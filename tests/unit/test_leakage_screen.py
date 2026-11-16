@@ -459,9 +459,11 @@ def test_the_shipped_certificate_is_current_for_the_screen_code():
 
 def test_only_the_certified_target_and_settings_may_gate():
     store = passing_store()
-    for task, classes in ((CLS, 3), ("regression", 0)):
+    for task, classes in ((CLS, 3), (CLS, 10), ("regression", 0)):
         gates = screen.gate_statuses(store, leakage.CERTIFIED, task, classes)
-        assert set(gates.values()) == {certificates.GateStatus.DESCRIPTIVE}
+        assert set(gates.values()) == {certificates.GateStatus.GATING}
+    gates = screen.gate_statuses(store, leakage.CERTIFIED, CLS, 11)
+    assert set(gates.values()) == {certificates.GateStatus.DESCRIPTIVE}
     other = dataclasses.replace(leakage.CERTIFIED, skill_ceiling=0.5)
     gates = screen.gate_statuses(store, other, CLS, 2)
     assert set(gates.values()) == {certificates.GateStatus.DESCRIPTIVE}

@@ -138,16 +138,19 @@ def test_an_uncertified_mechanism_only_warns(monkeypatch):
     assert copy.decision is qualification.Decision.WARN
 
 
-def test_a_regression_target_is_never_gated():
+def test_a_regression_target_is_gated_by_its_own_certificate():
+    # ERR-1: regression has its own screen certificate, so a leak in a
+    # continuous target gates and is quarantined; before, it never gated.
     features, target = leaky()
     target = target.astype(float) + numpy.arange(len(target)) * 1e-3
+    features["copy"] = target.to_numpy()
 
     found = qualify.run(
         features, target, kind="predictive", classification=False, seed=0
     )
 
-    assert found.leakage_gate is certificates.GateStatus.DESCRIPTIVE
-    assert found.quarantined == {}
+    assert found.leakage_gate is certificates.GateStatus.GATING
+    assert "copy" in found.quarantined
 
 
 def test_a_causal_estimand_without_a_graph_skips_admissibility():
