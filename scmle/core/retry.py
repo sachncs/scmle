@@ -8,13 +8,43 @@ transient are injected.
 
 from collections.abc import Callable
 import dataclasses
+import errno
 import math
 import time
 from typing import TypeVar
+import urllib.error
 
 from scmle.contracts import errors
 
 T = TypeVar("T")
+# Error numbers of failures that pass: the resource is busy, the call was
+# interrupted, or the network dropped or timed out. Missing files, denied
+# permissions and a full disk are not here: retrying cannot fix them.
+PASSING = frozenset(
+    code
+    for code in (
+        getattr(errno, name, None)
+        for name in (
+            "EAGAIN",
+            "EWOULDBLOCK",
+            "EBUSY",
+            "EINTR",
+            "ETIMEDOUT",
+            "ECONNRESET",
+            "ECONNABORTED",
+            "EPIPE",
+            "ENETDOWN",
+            "ENETUNREACH",
+            "ENETRESET",
+            "EHOSTUNREACH",
+        )
+    )
+    if code is not None
+)
+# Windows sharing and lock violations: another process holds the file.
+SHARING = frozenset({32, 33})
+# HTTP statuses a client may retry: throttling and server-side failures.
+RETRYABLE_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 
 
 class TransientError(errors.ScmleError):
@@ -105,6 +135,35 @@ class Retries:
         return dataclasses.asdict(self)
 
 
+def transient(error: BaseException) -> bool:
+    """Whether a failure may succeed if the same call is made again.
+
+    The default classification for `call_with_retries` (ERR-6: before it,
+    only `TransientError`, which nothing raised, was retried).
+
+    Args:
+        error: The failure.
+
+    Returns:
+        True for `TransientError`, timeouts, dropped connections, an
+        `OSError` whose errno passes (`PASSING`) or that is a Windows sharing
+        violation, and an HTTP error with a retryable status; False for
+        anything else, including missing files and denied permissions.
+    """
+    if isinstance(error, (TransientError, TimeoutError, ConnectionError)):
+        return True
+    if isinstance(error, urllib.error.HTTPError):
+        return error.code in RETRYABLE_STATUS
+    if isinstance(error, urllib.error.URLError):
+        return isinstance(error.reason, (TimeoutError, ConnectionError))
+    if isinstance(error, OSError):
+        return (
+            error.errno in PASSING
+            or getattr(error, "winerror", None) in SHARING
+        )
+    return False
+
+
 def call_with_retries(
     operation: Callable[[], T],
     policy: Retries,
@@ -118,7 +177,7 @@ def call_with_retries(
         operation: Zero-argument callable.
         policy: Attempts and backoff.
         is_transient: Whether an exception may be retried; anything else
-            propagates at once. By default only `TransientError`.
+            propagates at once. By default `transient`.
         sleep: Called with each wait in seconds between attempts, not after
             the last one.
 
@@ -129,14 +188,12 @@ def call_with_retries(
         RetryExhaustedError: If every attempt failed with a transient error.
     """
     last: Exception | None = None
-    transient = is_transient or (
-        lambda error: isinstance(error, TransientError)
-    )
+    judge = is_transient or transient
     for attempt in range(1, policy.max_attempts + 1):
         try:
             return operation()
         except Exception as error:
-            if not transient(error):
+            if not judge(error):
                 raise
             last = error
             if attempt < policy.max_attempts:

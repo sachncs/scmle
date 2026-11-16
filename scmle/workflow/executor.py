@@ -44,6 +44,7 @@ import concurrent.futures
 import contextlib
 import dataclasses
 import enum
+import functools
 import hashlib
 import hmac
 import json
@@ -65,6 +66,10 @@ LEASE_ATTEMPTS = 3
 LOGGER = logging.getLogger(__name__)
 # A conditional write on a lease that changed or vanished under us.
 CHANGED = (objectstore.ConflictError, objectstore.NotFoundError)
+# Retries for writing a step's success record after the handler succeeded:
+# store writes only, never the handler (ERR-7). Policy: three attempts over
+# about three seconds ride out a throttled or briefly unreachable store.
+WRITES = retry.Retries(3, 1.0, 2.0, 4.0)
 
 
 def parse(key: str, data: bytes) -> dict[str, Any]:
@@ -1161,17 +1166,6 @@ class Executor:
             try:
                 result = dict(handler(context) or {})
                 context.check()
-                total += context.spent
-                attempts.append({"attempt": attempt, "state": "succeeded"})
-                self.save_step(
-                    run_id,
-                    step,
-                    StepState.SUCCEEDED,
-                    idempotency_key=key,
-                    attempts=attempts,
-                    outputs=result,
-                    cost=round(total, 6),
-                )
             except retry.TransientError as error:
                 # handled: transient error saved in attempts and retried; FAILED
                 # step record
@@ -1218,6 +1212,23 @@ class Executor:
                 )
                 break
             else:
+                # ERR-7: the success record is written outside the handler's
+                # retry, with its own retries for the store; a write that
+                # still fails propagates, so a handler that succeeded is
+                # neither run again nor recorded as failed.
+                total += context.spent
+                attempts.append({"attempt": attempt, "state": "succeeded"})
+                save = functools.partial(
+                    self.save_step,
+                    run_id,
+                    step,
+                    StepState.SUCCEEDED,
+                    idempotency_key=key,
+                    attempts=attempts,
+                    outputs=result,
+                    cost=round(total, 6),
+                )
+                retry.call_with_retries(save, WRITES, sleep=self.sleep)
                 return StepState.SUCCEEDED.value, result, total
         self.save_step(
             run_id,
