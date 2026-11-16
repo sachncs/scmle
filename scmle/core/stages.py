@@ -730,7 +730,12 @@ class ProfileStage(Stage):
         development: pandas.DataFrame,
         profile: Any,
     ) -> None:
-        """Writes the curation report and dataset card and checks them.
+        """Writes the curation report and dataset card.
+
+        Curation findings are advisory observations for a person to review;
+        the conditions that stop a run are the registered validation and
+        split gates (`gates.toml`). A blocking check here could never fire,
+        because every observation is recorded as non-blocking (GATE-1).
 
         Args:
             context: The run context; receives the profile, the curation
@@ -738,9 +743,6 @@ class ProfileStage(Stage):
             frame: The whole loaded data.
             development: The development rows that were profiled.
             profile: The dataset profile.
-
-        Raises:
-            BlockedError: If curation leaves unresolved blocking findings.
         """
         source_rows = (
             context.stream[1].rows if context.stream is not None else len(frame)
@@ -792,15 +794,6 @@ class ProfileStage(Stage):
                 "risk_findings": len(profile.risk_findings),
             },
         )
-        if not curation.release_ready:
-            finding_ids = tuple(
-                finding.finding_id
-                for finding in curation.unresolved_blocking_findings
-            )
-            raise errors.BlockedError(
-                "unresolved blocking curation findings",
-                {"finding_ids": list(finding_ids)},
-            )
 
     def enforce_leakage_policy(self, spec: tasks.Config, profile: Any) -> None:
         """Applies the leakage policy to the profile's leakage evidence.

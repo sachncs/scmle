@@ -68,14 +68,6 @@ override = "A valid per-column attestation in the file named by leakage_attestat
 variables = ["leakage_attestations", "data.group_column", "data.time_column"]
 certificate = "detector_certificates.json: F5 detectors (the leakage screen gates on its run-time probe; its certificates are reported evidence)"
 
-[curation.blocking_findings]
-site = "scmle.core.stages:ProfileStage.record_curation"
-error = "BlockedError"
-claim = "C1, C5"
-passes = "The curation report has no blocking finding without a resolved, waived or false_positive disposition."
-blocks = "Curation.release_ready is false, that is a quality or risk finding is blocking and its disposition is not resolved, waived or false_positive."
-override = "Record a disposition of resolved, waived or false_positive on the finding."
-variables = []
 
 [data.unlabeled]
 site = "scmle.core.stages:ProfileStage.set_aside_unlabeled"
