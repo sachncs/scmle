@@ -50,6 +50,8 @@ jobs:
       - run: uv run mypy scmle benchmarks
       - name: Every scorecard threshold is a validated variable with a derivation
         run: uv run python -m benchmarks.acceptance > /dev/null
+      - name: No structure count is worse than its budget
+        run: uv run python scripts/structure.py > /dev/null
       - run: uv run python scripts/check_api_compatibility.py tests/fixtures/public_api.json
       # Single-use helpers are a judgement call (plan.md 3a), so they are
       # reported but do not fail the build; every other shape does.

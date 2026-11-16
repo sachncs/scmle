@@ -1,0 +1,10 @@
+{
+  "modules_over": 56,
+  "classes_over": 54,
+  "functions_over": 186,
+  "compound_functions": 2862,
+  "compound_classes": 763,
+  "private_names": 0,
+  "loose_dicts": 1156,
+  "largest_module": 6280
+}
