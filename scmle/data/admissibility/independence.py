@@ -36,6 +36,7 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.core import randomness
 from scmle.data.admissibility import dag
@@ -156,7 +157,9 @@ def partial_correlation(
     sx = float(numpy.sqrt(rx @ rx))
     sy = float(numpy.sqrt(ry @ ry))
     if sx == 0.0 or sy == 0.0:
-        raise ValueError("a variable has no spread given the conditioning set")
+        raise errors.InputError(
+            "a variable has no spread given the conditioning set"
+        )
     return float(max(-1.0, min(1.0, (rx @ ry) / (sx * sy))))
 
 
@@ -182,7 +185,7 @@ def fisher_z(
     n = len(frame)
     dof = n - len(given) - 3
     if dof <= 0:
-        raise ValueError("too few rows for this conditioning set")
+        raise errors.InputError("too few rows for this conditioning set")
     r = partial_correlation(frame, x, y, given)
     if abs(r) >= 1.0:
         return CITest(CIKind.FISHER_Z, math.inf, 0.0, r, n, 0, 0)
@@ -266,15 +269,19 @@ def run_test(
     names = [x, y, *given]
     sub = frame[names]
     if sub.isna().any().any():
-        raise ValueError("conditional-independence tests need complete rows")
+        raise errors.InputError(
+            "conditional-independence tests need complete rows"
+        )
     flags = [is_discrete(sub[c]) for c in names]
     if all(flags):
         if any(sub[c].nunique() > MAX_DISCRETE_LEVELS for c in names):
-            raise ValueError("too many levels for the chi-square test")
+            raise errors.InputError("too many levels for the chi-square test")
         return stratified_chi2(sub, x, y, given)
     if not any(flags):
         return fisher_z(sub.astype("float64"), x, y, given)
-    raise ValueError("mixed numeric and categorical columns are unsupported")
+    raise errors.InputError(
+        "mixed numeric and categorical columns are unsupported"
+    )
 
 
 def implied_statements(
@@ -395,10 +402,10 @@ def falsify(
     """
     level_in = qualification.finite(alpha, "alpha")
     if not 0.0 < level_in < 1.0:
-        raise ValueError("alpha must be within (0, 1)")
+        raise errors.InputError("alpha must be within (0, 1)")
     missing = [n for n in graph.observed if n not in frame.columns]
     if missing:
-        raise ValueError(f"observed nodes not in the data: {missing}")
+        raise errors.InputError(f"observed nodes not in the data: {missing}")
     statements, skipped_nodes = implied_statements(graph)
     level = level_in / max(1, len(statements))
     outcomes: list[Outcome] = []

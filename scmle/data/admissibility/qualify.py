@@ -32,6 +32,7 @@ from pathlib import Path
 import pandas
 
 import scmle.certificates
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.admissibility import independence
 from scmle.data.admissibility import provenance
@@ -303,7 +304,7 @@ def causal_admissibility(
             treatment=spec.treatment,
             outcome=spec.outcome,
         )
-    except ValueError as error:
+    except errors.InputError as error:
         # handled: appended to notes as graph rules not applied
         table = None
         notes.append(f"graph rules were not applied: {error}")
@@ -336,7 +337,7 @@ def causal_admissibility(
         found = independence.falsify(
             graph, frame, alpha=DAG_ALPHA, run_seed=seed
         )
-    except (ValueError, KeyError) as error:
+    except (errors.InputError, KeyError) as error:
         # handled: report falsification ran False with reason, plus note
         report["falsification"] = {"ran": False, "reason": str(error)}
         notes.append(f"the declared DAG could not be tested on X: {error}")

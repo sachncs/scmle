@@ -52,6 +52,17 @@ class DataError(ScmleError):
     category = "data"
 
 
+class InputError(DataError, ValueError):
+    """The input is unusable for this step: a user or data problem, not a bug.
+
+    It is also a `ValueError`, so code that catches `ValueError` still works
+    while a module moves to it; a gate catches `InputError` alone and lets a
+    plain `ValueError`, which marks a defect, propagate (ERR-20).
+    """
+
+    category = "input"
+
+
 class SchemaError(DataError):
     """Input data does not match the schema a model was trained on."""
 

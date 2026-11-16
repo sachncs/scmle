@@ -4,6 +4,7 @@ import numpy
 import pandas
 import pytest
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.admissibility import qualify
 from scmle.data.admissibility import screen
@@ -347,3 +348,40 @@ def test_a_diagnostic_that_read_c_is_refused():
         scmle.data.ledger.ledger.LedgerError, match="exploration"
     ):
         ledger.record_diagnostic(check, "f4-leakage-skill")
+
+
+def causal_run():
+    features, target = causal_world()
+    return qualify.run(
+        features,
+        target,
+        kind="causal",
+        classification=False,
+        seed=0,
+        causal=spec(("unconfoundedness_given:x1", "positivity")),
+        dag=graph(),
+    )
+
+
+def test_an_input_problem_is_a_note_and_a_defect_is_not(monkeypatch):
+    # ERR-20: the gate caught every ValueError, so a bug in the graph rules
+    # became a note that the rules "were not applied".
+    def unusable(*args, **kwargs):
+        raise errors.InputError("the graph names no treatment")
+
+    monkeypatch.setattr(qualify.rules, "build_table", unusable)
+    found = causal_run()
+    assert any("graph rules were not applied" in n for n in found.notes)
+
+    def broken(*args, **kwargs):
+        raise ValueError("a defect")
+
+    monkeypatch.setattr(qualify.rules, "build_table", broken)
+    with pytest.raises(ValueError, match="a defect"):
+        causal_run()
+
+
+def test_an_input_error_is_still_a_value_error_and_a_data_error():
+    error = errors.InputError("bad")
+    assert isinstance(error, ValueError) and isinstance(error, errors.DataError)
+    assert error.category == "input"

@@ -25,6 +25,7 @@ PACKAGE = ROOT / "scmle"
 BUDGET = pathlib.Path(__file__).with_name("structure.json")
 LOOSE = re.compile(r"dict\[str, *(Any|object)\]")
 CAPITALS = re.compile(r"[A-Z][a-z0-9]*")
+BARE = frozenset({"ValueError", "TypeError", "RuntimeError"})
 
 
 def limits() -> dict[str, int]:
@@ -58,6 +59,28 @@ def compound(name: str) -> bool:
     return len(CAPITALS.findall(name.removesuffix("Error") or name)) > 1
 
 
+def bare(node: ast.AST) -> bool:
+    """Whether a node raises a built-in error a gate cannot tell from a bug.
+
+    `ValueError`, `TypeError` and `RuntimeError` mix bad input with defects;
+    input problems raise `errors.InputError` instead (ERR-20).
+    """
+    if not isinstance(node, ast.Raise) or not isinstance(node.exc, ast.Call):
+        return False
+    target = node.exc.func
+    name = target.attr if isinstance(target, ast.Attribute) else ""
+    name = name or (target.id if isinstance(target, ast.Name) else "")
+    return name in BARE
+
+
+def catches(node: ast.AST) -> bool:
+    """Whether a node is a handler that catches a bare `ValueError`."""
+    if not isinstance(node, ast.ExceptHandler) or node.type is None:
+        return False
+    kinds = node.type.elts if isinstance(node.type, ast.Tuple) else [node.type]
+    return any(ast.unparse(kind) == "ValueError" for kind in kinds)
+
+
 def measure() -> dict[str, int]:
     """Counts every budgeted quantity over the package.
 
@@ -75,6 +98,8 @@ def measure() -> dict[str, int]:
             "private_names",
             "loose_dicts",
             "largest_module",
+            "bare_raises",
+            "value_catches",
         ),
         0,
     )
@@ -85,6 +110,8 @@ def measure() -> dict[str, int]:
         found["largest_module"] = max(found["largest_module"], lines)
         found["loose_dicts"] += len(LOOSE.findall(text))
         for node in ast.walk(ast.parse(text)):
+            found["bare_raises"] += bare(node)
+            found["value_catches"] += catches(node)
             if isinstance(node, ast.ClassDef):
                 found["classes_over"] += span(node) > bound["class"]
                 found["compound_classes"] += compound(node.name)

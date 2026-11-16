@@ -30,6 +30,7 @@ import json
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 
@@ -122,9 +123,9 @@ def separated(
     """
     sets = [set(xs), set(ys), set(zs)]
     if not set().union(*sets) <= set(nodes):
-        raise ValueError("sets name nodes that are not in the graph")
+        raise errors.InputError("sets name nodes that are not in the graph")
     if (sets[0] & sets[1]) or (sets[0] & sets[2]) or (sets[1] & sets[2]):
-        raise ValueError("the three sets must be disjoint")
+        raise errors.InputError("the three sets must be disjoint")
     parents = parents_map(edges)
     keep = set().union(*sets)
     keep |= reach(keep, parents)
@@ -185,21 +186,21 @@ class Dag:
             for item in values:
                 evidence.require_text(item, name)
             if list(values) != sorted(set(values)):
-                raise ValueError(f"{name} must be sorted and unique")
+                raise errors.InputError(f"{name} must be sorted and unique")
         qualification.require_tuple(self.edges, "edges")
         if list(self.edges) != sorted(set(self.edges)):
-            raise ValueError("edges must be sorted and unique")
+            raise errors.InputError("edges must be sorted and unique")
         names = set(self.nodes)
         for edge in self.edges:
             if len(edge) != EDGE_LENGTH or not set(edge) <= names:
-                raise ValueError(f"edge {edge} names an unknown node")
+                raise errors.InputError(f"edge {edge} names an unknown node")
             if edge[0] == edge[1]:
-                raise ValueError("self loops are not allowed")
+                raise errors.InputError("self loops are not allowed")
         if not set(self.latent) <= names:
-            raise ValueError("latent nodes must be nodes")
+            raise errors.InputError("latent nodes must be nodes")
         kids = children_map(self.edges)
         if any(node in reach([node], kids) for node in self.nodes):
-            raise ValueError("the graph has a cycle")
+            raise errors.InputError("the graph has a cycle")
         evidence.require_text(self.source, "source")
         evidence.require_text(self.prompt, "prompt")
 
@@ -313,7 +314,7 @@ class Dag:
         chosen = set(adjustment)
         self.require_nodes([treatment, outcome, *chosen])
         if treatment == outcome:
-            raise ValueError("treatment and outcome must differ")
+            raise errors.InputError("treatment and outcome must differ")
         if chosen & ({treatment, outcome} | self.descendants(treatment)):
             return False
         cut = tuple(e for e in self.edges if e[0] != treatment)
@@ -330,7 +331,7 @@ class Dag:
         """
         unknown = sorted(set(names) - set(self.nodes))
         if unknown:
-            raise ValueError(f"not nodes of the graph: {unknown}")
+            raise errors.InputError(f"not nodes of the graph: {unknown}")
 
     def candidates(self, treatment: str, outcome: str) -> list[str]:
         """Lists the observed nodes that may be adjusted for.
@@ -370,7 +371,7 @@ class Dag:
         self.require_nodes([treatment, outcome])
         pool = self.candidates(treatment, outcome)
         if len(pool) > MAX_SEARCH_CANDIDATES:
-            raise ValueError(
+            raise errors.InputError(
                 f"more than {MAX_SEARCH_CANDIDATES} candidate covariates"
             )
         for size in range(len(pool) + 1):
@@ -440,11 +441,13 @@ class Dag:
             "hash",
         }
         if set(document) != names:
-            raise ValueError("unexpected or missing field(s) in dag artifact")
+            raise errors.InputError(
+                "unexpected or missing field(s) in dag artifact"
+            )
         if document["format_version"] != FORMAT_VERSION:
-            raise ValueError("unsupported format_version")
+            raise errors.InputError("unsupported format_version")
         if document["status"] != STATUS:
-            raise ValueError("a DAG can only be stored as a hypothesis")
+            raise errors.InputError("a DAG can only be stored as a hypothesis")
         graph = cls(
             tuple(document["nodes"]),
             tuple((str(a), str(b)) for a, b in document["edges"]),
@@ -453,5 +456,5 @@ class Dag:
             document["prompt"],
         )
         if graph.digest() != document["hash"]:
-            raise ValueError("hash does not match the DAG content")
+            raise errors.InputError("hash does not match the DAG content")
         return graph

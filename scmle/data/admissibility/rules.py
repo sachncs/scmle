@@ -30,6 +30,7 @@ import enum
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.admissibility import dag
 from scmle.data.admissibility import provenance
@@ -237,7 +238,7 @@ def decide_predictive(
     """
     lag = qualification.finite(declared_lag_seconds, "declared_lag_seconds")
     if lag < 0.0:
-        raise ValueError("declared_lag_seconds must be non-negative")
+        raise errors.InputError("declared_lag_seconds must be non-negative")
     return decide_timing(record, mode, lag, today, suspect, leakage_gate)
 
 
@@ -383,10 +384,10 @@ class Admissibility:
                 names repeat.
         """
         if self.kind not in KINDS:
-            raise ValueError(f"kind must be one of {KINDS}")
+            raise errors.InputError(f"kind must be one of {KINDS}")
         names = [d.name for d in self.decisions]
         if len(set(names)) != len(names):
-            raise ValueError("field names must be unique")
+            raise errors.InputError("field names must be unique")
 
     def names(self, admission: Admission) -> tuple[str, ...]:
         """Lists the fields that received an admission.
@@ -456,7 +457,7 @@ def build_table(
             graph, treatment or outcome.
     """
     if kind not in KINDS:
-        raise ValueError(f"kind must be one of {KINDS}")
+        raise errors.InputError(f"kind must be one of {KINDS}")
     flags = suspects or {}
 
     def gate_of(name: str) -> certificates.GateStatus:
@@ -478,7 +479,9 @@ def build_table(
         )
         return Admissibility(kind, mode, decisions, None, None)
     if graph is None or treatment is None or outcome is None:
-        raise ValueError("a causal estimand needs a graph, treatment, outcome")
+        raise errors.InputError(
+            "a causal estimand needs a graph, treatment, outcome"
+        )
     decisions = tuple(
         decide_causal(
             f,
