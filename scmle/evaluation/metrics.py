@@ -5,6 +5,7 @@ Scores are always reported in natural units (log loss is positive);
 """
 
 from collections.abc import Callable
+import logging
 import threading
 from typing import Any
 
@@ -22,6 +23,8 @@ from scmle.evaluation import ordinal
 from scmle.evaluation import ranking
 from scmle.evaluation import survival
 from scmle.evaluation import uplift
+
+LOGGER = logging.getLogger(__name__)
 
 CLASSIFICATION = frozenset({tasks.Task.BINARY, tasks.Task.MULTICLASS})
 BINARY_CLASSES = 2
@@ -469,8 +472,8 @@ class MetricCatalog:
                 results[name] = table[name].score(
                     estimator, features, target, positive, sample_weight
                 )
-            except (ValueError, TypeError):
-                # handled: documented NaN score
+            except (ValueError, TypeError) as error:
+                LOGGER.warning("metric %s is undefined here: %s", name, error)
                 results[name] = float("nan")
         return results
 

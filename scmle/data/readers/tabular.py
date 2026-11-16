@@ -354,8 +354,11 @@ def raw_source_hash(uri: str | pathlib.Path) -> str:
 
     Returns:
         The SHA-256 hex digest of the file's bytes, or an empty string if
-        the source is not a local file, is not an existing regular file, or
-        cannot be read.
+        the source is not a local file or not an existing regular file.
+
+    Raises:
+        DataError: If the file exists but cannot be read; an empty digest
+            would be indistinguishable from "not a file" (ERR-14).
     """
     parsed = urlsplit(canonical_uri(uri))
     if parsed.scheme != "file":
@@ -368,9 +371,10 @@ def raw_source_hash(uri: str | pathlib.Path) -> str:
         with path.open("rb") as handle:
             for chunk in iter(lambda: handle.read(1 << 20), b""):
                 digest.update(chunk)
-    except OSError:
-        # handled: unreadable file returns empty hash, documented in Returns
-        return ""
+    except OSError as error:
+        raise errors.DataError(
+            f"cannot read {path} to hash it: {error}"
+        ) from error
     return digest.hexdigest()
 
 

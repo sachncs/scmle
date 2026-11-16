@@ -23,6 +23,7 @@ answer is as good as the connection to it; the check is about aggregates too.
 from collections.abc import Callable
 from collections.abc import Mapping
 import hashlib
+import logging
 from typing import Any
 
 import pandas
@@ -31,6 +32,8 @@ from scmle.contracts import errors
 from scmle.data.charter import ingest
 from scmle.data.ingest import profile
 import scmle.data.ingest.reconcile
+
+LOGGER = logging.getLogger(__name__)
 
 FILE = "extract_reconciliation.json"
 
@@ -216,8 +219,13 @@ def source_totals(
         outcome = scmle.data.ingest.reconcile.reconcile_extract(
             source, numeric, table, measures, tolerance=tolerance
         )
-    except ValueError:
-        # handled: documented: compared against zero, gap surfaces in checks
+    except ValueError as error:
+        LOGGER.warning(
+            "reconciliation of %s could not run (%s); its checks compare "
+            "against zero",
+            table,
+            error,
+        )
         outcome = None
     prefix = f"{table}."
     if outcome is not None:

@@ -22,6 +22,7 @@ and nothing here tunes a level or an interval after seeing the rows.
 
 from collections.abc import Mapping
 from collections.abc import Sequence
+import logging
 from typing import Any
 
 import numpy
@@ -30,6 +31,8 @@ import pandas
 from scmle.contracts import errors
 from scmle.evaluation import coverage
 from scmle.evaluation import coverage_slices
+
+LOGGER = logging.getLogger(__name__)
 
 REGRESSION_METHODS = ("residual", "cv_plus", "quantile")
 SET_MODES = (None, "class")
@@ -153,9 +156,10 @@ def regression_reports(
                 band = bundle.predict_interval(
                     features, coverage=level, method=method
                 )
-            except errors.ArtifactError:
-                # handled: unservable level ends method; omission documented in
-                # Returns
+            except errors.ArtifactError as error:
+                LOGGER.info(
+                    "coverage of %s stops at level %g: %s", method, level, error
+                )
                 break
             inside = (values >= band["lower"].to_numpy()) & (
                 values <= band["upper"].to_numpy()

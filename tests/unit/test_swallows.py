@@ -108,3 +108,43 @@ def test_a_fallback_fingerprint_names_its_scheme(tmp_path, monkeypatch):
     seen.clear()
     log.log_predictions(Bundle(), frame, ["r3", "r4"])
     assert seen and all(f.startswith("json:") for f in seen)
+
+
+def test_an_unreadable_source_file_is_not_hashed_as_no_file(
+    tmp_path, monkeypatch
+):
+    # ERR-14: an unreadable file hashed to "", the value for "not a file".
+    from scmle.contracts import errors
+    from scmle.data.readers import tabular
+
+    source = tmp_path / "data.csv"
+    source.write_text("a\n1\n", encoding="utf-8")
+    assert len(tabular.raw_source_hash(source)) == 64
+
+    def refuse(self, *args, **kwargs):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(type(source), "open", refuse)
+    import pytest
+
+    with pytest.raises(errors.DataError, match="cannot read"):
+        tabular.raw_source_hash(source)
+    assert tabular.raw_source_hash("memory://frame") == ""
+
+
+def test_an_undefined_metric_says_why_it_is_nan(caplog):
+    # ERR-14: a metric that could not be computed became NaN with no reason.
+    from sklearn.linear_model import LogisticRegression
+
+    from scmle.evaluation import metrics
+
+    model = LogisticRegression().fit([[0.0], [1.0], [2.0], [3.0]], [0, 0, 1, 1])
+    features = pandas.DataFrame({"x": [0.0, 1.0, 2.0]})
+    target = pandas.Series([0, 0, 0])
+    with caplog.at_level("WARNING", logger=metrics.__name__):
+        scores = metrics.CATALOG.evaluate(
+            model, features, target, tasks.Task.BINARY
+        )
+    undefined = [name for name, value in scores.items() if numpy.isnan(value)]
+    assert undefined
+    assert any("is undefined here" in r.getMessage() for r in caplog.records)
