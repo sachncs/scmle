@@ -48,6 +48,8 @@ jobs:
       - run: uv sync --python ${{ matrix.python }} --extra boosting --extra optimization --extra multimodal
       - run: uv run ruff check . && uv run ruff format --check .
       - run: uv run mypy scmle benchmarks
+      - name: Every scorecard threshold is a validated variable with a derivation
+        run: uv run python -m benchmarks.acceptance > /dev/null
       - run: uv run python scripts/check_api_compatibility.py tests/fixtures/public_api.json
       # Single-use helpers are a judgement call (plan.md 3a), so they are
       # reported but do not fail the build; every other shape does.

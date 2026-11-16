@@ -1,0 +1,380 @@
+# Thresholds of the scorecard (plan/scmle_plan.md, sections 5 and 7).
+#
+# Every threshold the gates, the evidence harness and CI use is one table
+# here: a value, its unit, its kind, the claim it decides and a derivation.
+# `benchmarks/acceptance.py` reads and validates this file; a run stores the
+# values it used. Defaults are starting values, not fixed choices: change a
+# value here, with its reason in `derivation`, and record the change in the
+# changelog.
+#
+# Kinds:
+#   statistical  a rate decided by a one-sided Clopper-Pearson bound at
+#                `alpha`; `rule` is "ceiling" (rate at most the value) or
+#                "floor" (rate at least the value), so the harness can
+#                compute the smallest sample that can pass at all
+#   service      a ratio to a hardware reference or an absolute objective,
+#                always with its load profile
+#   response     an interactive limit from human factors (0.1 s, 1 s, 10 s)
+#   policy       an engineering budget or the owner's choice, with a reason
+
+# Decision rule shared by every statistical row.
+
+[alpha]
+value = 0.05
+unit = "probability"
+kind = "policy"
+claim = "all"
+derivation = "Conventional one-sided error rate; Holm applies across a stage's rows, so the familywise rate per stage is alpha."
+
+[power]
+value = 0.80
+unit = "probability"
+kind = "policy"
+claim = "all"
+derivation = "Conventional power; with alpha and an assumed true rate it fixes the planned sample size: the smallest n whose exact chance of passing reaches it (the normal formula [z(1-alpha) sqrt(p0 (1-p0)) + z(power) sqrt(p1 (1-p1))]^2 / (p0 - p1)^2 underpowers near 0 and 1)."
+
+[bootstrap_resamples]
+value = 10000
+unit = "resamples"
+kind = "policy"
+claim = "all"
+derivation = "Monte Carlo error of a 0.05 quantile at 10,000 resamples is about sqrt(0.05 * 0.95 / 10000) = 0.0022, below every margin it decides."
+
+[practitioners]
+value = 1
+unit = "people"
+kind = "policy"
+claim = "C4, C13"
+derivation = "The owner is the one practitioner; claims are worded to this count."
+
+# Right.
+
+[leak_recall_min]
+value = 0.90
+unit = "share of leaks"
+kind = "statistical"
+rule = "floor"
+claim = "C2"
+derivation = "A screen that misses more than one leak in ten is not a safeguard; n >= ln(alpha) / ln(0.90) = 29 leaks to pass at all."
+
+[false_block_max]
+value = 0.05
+unit = "share of clean datasets"
+kind = "statistical"
+rule = "ceiling"
+claim = "C2"
+derivation = "At most one clean dataset in twenty blocked; n >= ln(alpha) / ln(0.95) = 59 clean datasets to pass at all."
+
+[refusal_rate_max]
+value = 0.05
+unit = "share of in-envelope tasks"
+kind = "statistical"
+rule = "ceiling"
+claim = "C14"
+derivation = "The product may not meet C1 by refusing: at most one in-envelope task in twenty refused; 59 tasks to pass at all."
+
+[refusal_precision_min]
+value = 0.90
+unit = "share of reviewed refusals"
+kind = "statistical"
+rule = "floor"
+claim = "C14"
+derivation = "Nine in ten refusals justified against the validator's rubric; 29 reviewed refusals to pass at all."
+
+[gate_fault_block_min]
+value = 1.0
+unit = "share of injected faults"
+kind = "policy"
+claim = "C1"
+derivation = "Every injected failure ends in a block or a recorded override; one silent pass fails the row."
+
+# Honest.
+
+[reference_rel_tol]
+value = 1e-8
+unit = "relative error"
+kind = "policy"
+claim = "C3"
+derivation = "Float64 statistics computed in a different order agree to about 1e-12; 1e-8 leaves room for iterative solvers at their default tolerance."
+
+[interval_coverage_min]
+value = 0.93
+unit = "share of intervals"
+kind = "statistical"
+rule = "floor"
+claim = "C3"
+derivation = "Nominal 95 percent intervals, allowed two points of shortfall for finite-sample effects; 42 fresh-data checks to pass at all."
+
+[null_skill_max]
+value = 0.05
+unit = "share of null tasks"
+kind = "statistical"
+rule = "ceiling"
+claim = "C3"
+derivation = "Skill claimed on a null task at no more than the nominal alpha; the plan uses at least 200 null tasks, above the 59 needed to pass at all."
+
+[null_tasks_min]
+value = 200
+unit = "tasks"
+kind = "policy"
+claim = "C3"
+derivation = "Power 0.8 to detect a true false-skill rate of 0.10 against 0.05 needs 150 tasks by the power formula; 200 leaves room for tasks that fail to run."
+
+[cross_platform_tol]
+value = 1e-6
+unit = "relative error"
+kind = "policy"
+claim = "C6"
+derivation = "Set by observation until measured: BLAS and libm differ across platforms by more than the reference tolerance; replaced by the measured spread plus a margin after the first Linux, macOS and Windows runs."
+
+# Good.
+
+[benchmark_median_gap_max]
+value = 0.02
+unit = "normalised score"
+kind = "policy"
+claim = "C4"
+derivation = "Two points of normalised score is below the spread between strong open baselines on TabArena-style suites."
+
+[benchmark_gap_upper_max]
+value = 0.05
+unit = "normalised score"
+kind = "policy"
+claim = "C4"
+derivation = "The paired bootstrap upper bound of the gap; five points caps the worst plausible shortfall."
+
+[practitioner_noninferiority_margin]
+value = 0.02
+unit = "normalised score"
+kind = "policy"
+claim = "C4"
+derivation = "Same scale as the benchmark gap, so the study and the benchmarks decide on one notion of 'as good as'."
+
+[practitioner_time_budget]
+value = 0
+unit = "hours (0 = unlimited)"
+kind = "policy"
+claim = "C4, C13"
+derivation = "Owner's decision: the study's budget is not constrained by default; wall time is always recorded."
+
+[study_look_every]
+value = 4
+unit = "tasks"
+kind = "policy"
+claim = "C4, C13"
+derivation = "Group-sequential looks with O'Brien-Fleming boundaries; four tasks per look keeps the number of looks small at the expected 20 to 40 tasks."
+
+[study_pilot_tasks]
+value = 3
+unit = "tasks"
+kind = "policy"
+claim = "C4, C13"
+derivation = "Pilot used only to estimate the spread of paired differences for the maximum sample size; not reused as study tasks."
+
+# Fast.
+
+[perf_repeats]
+value = 5
+unit = "runs"
+kind = "policy"
+claim = "C13"
+derivation = "Median of five with a bootstrap upper bound; five is the smallest odd count whose median ignores two outliers."
+
+[speedup_min]
+value = 5
+unit = "ratio of practitioner time"
+kind = "policy"
+claim = "C13"
+derivation = "Owner's meaning of 'on steroids': the practitioner is at least five times faster with scmle at equal quality."
+
+[ingest_overhead_max]
+value = 1.5
+unit = "ratio to a plain Arrow read"
+kind = "service"
+claim = "C13"
+derivation = "Ratio to the hardware's own read speed; half again allows validation and typing."
+
+[memory_multiplier_max]
+value = 3
+unit = "ratio to in-memory data size"
+kind = "service"
+claim = "C13"
+derivation = "Input, one working copy and output."
+
+[first_feedback_seconds_max]
+value = 10
+unit = "seconds"
+kind = "response"
+claim = "C13"
+derivation = "Human-factors limit for keeping attention on a task."
+
+[progress_seconds_max]
+value = 1
+unit = "seconds"
+kind = "response"
+claim = "C13"
+derivation = "Human-factors limit for an uninterrupted flow of thought."
+
+[profile_seconds_max]
+value = 30
+unit = "seconds at 1M rows by 100 columns"
+kind = "service"
+claim = "C13"
+derivation = "Three response-time limits; set by observation until the stage A profile."
+
+[profile_recall_min]
+value = 0.90
+unit = "share of planted defects"
+kind = "statistical"
+rule = "floor"
+claim = "C13"
+derivation = "Same rule as leak recall (C2)."
+
+[profile_false_max]
+value = 0.05
+unit = "false findings per clean table"
+kind = "statistical"
+rule = "ceiling"
+claim = "C13"
+derivation = "Same rule as false blocks (C2)."
+
+[fe_win_share_min]
+value = 0.60
+unit = "share of benchmark tasks"
+kind = "statistical"
+rule = "floor"
+claim = "C13"
+derivation = "Automatic features beat raw features clearly more often than chance; a one-sided binomial test against 0.5 at alpha."
+
+[fe_loss_max]
+value = 0.01
+unit = "normalised score"
+kind = "policy"
+claim = "C13"
+derivation = "Half the benchmark gap: generated features must never cost a visible amount of quality."
+
+[estimate_minutes_max]
+value = 5
+unit = "minutes at 1M rows"
+kind = "policy"
+claim = "C13"
+derivation = "Owner's policy for 'while you wait'."
+
+[near_best_gap]
+value = 0.01
+unit = "normalised score"
+kind = "policy"
+claim = "C13"
+derivation = "Anytime behaviour: within one point of the final score."
+
+[time_to_near_best_fraction]
+value = 0.25
+unit = "share of budget"
+kind = "policy"
+claim = "C13"
+derivation = "A usable model in the first quarter of the budget."
+
+[batch_throughput_fraction_min]
+value = 0.5
+unit = "ratio to bare model predict"
+kind = "service"
+claim = "C13"
+derivation = "Validation, transforms and records may at most double scoring time."
+
+[extras_cost_max]
+value = 3
+unit = "ratio to plain scoring"
+kind = "service"
+claim = "C13"
+derivation = "Intervals and explanations cost at most twice plain scoring on top of it."
+
+[rerun_fraction_max]
+value = 0.2
+unit = "share of first run time"
+kind = "service"
+claim = "C13"
+derivation = "Only affected stages recompute; one change in five stages bounds the share at about one fifth."
+
+[user_task_minutes_max]
+value = 60
+unit = "minutes"
+kind = "policy"
+claim = "C11"
+derivation = "One working hour from raw files to a served model."
+
+[comprehension_min]
+value = 0.90
+unit = "share of answers"
+kind = "statistical"
+rule = "floor"
+claim = "C11"
+derivation = "Nine in ten readings of a result are correct."
+
+[non_specialists]
+value = 5
+unit = "people"
+kind = "policy"
+claim = "C11"
+derivation = "Five users find most usability problems; arranged by the owner."
+
+# Safe to run.
+
+[budget_compliance_min]
+value = 0.99
+unit = "share of runs"
+kind = "statistical"
+rule = "floor"
+claim = "C7"
+derivation = "One run in a hundred may exceed its declared budget; 299 runs to pass at all."
+
+[openssf_score_min]
+value = 8
+unit = "OpenSSF Scorecard points"
+kind = "policy"
+claim = "C9"
+derivation = "Upper band of the Scorecard scale for maintained projects."
+
+# Changeable.
+
+[change_cost_files_max]
+value = 3
+unit = "files outside the new package"
+kind = "policy"
+claim = "C10"
+derivation = "A registry entry, a test list and a doc page; anything more means a missing seam."
+
+[module_lines_max]
+value = 800
+unit = "lines"
+kind = "policy"
+claim = "C10"
+derivation = "A module a reader can hold in one sitting."
+
+[class_lines_max]
+value = 300
+unit = "lines"
+kind = "policy"
+claim = "C10"
+derivation = "A class with one responsibility rarely needs more."
+
+[function_lines_max]
+value = 80
+unit = "lines"
+kind = "policy"
+claim = "C10"
+derivation = "Two screens; longer functions hide branches from review."
+
+[mutation_score_min]
+value = 0.85
+unit = "share of mutants killed"
+kind = "statistical"
+rule = "floor"
+claim = "C10"
+derivation = "Crashes classified; equivalent mutants removed before scoring."
+
+[ci_minutes_max]
+value = 15
+unit = "minutes"
+kind = "policy"
+claim = "C10"
+derivation = "A pull request's checks finish within one break."
