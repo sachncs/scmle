@@ -577,3 +577,28 @@ def test_the_framework_may_be_unscanned_only_while_its_exception_lives(
     ]
     no_waiver = vuln_gate.evaluate(scanned, POLICY, document, TODAY)
     assert not no_waiver["passed"]
+
+
+def test_a_lock_is_refused_rather_than_cut_short(monkeypatch):
+    # ERR-12: a missing `packaging` made every marker false and an unreadable
+    # distribution's requirements were skipped, both without a word.
+    from importlib import metadata
+
+    def unreadable(name):
+        raise metadata.PackageNotFoundError(name)
+
+    with pytest.raises(errors.ArtifactError, match="cannot be read"):
+        lockfile.runtime_closure(
+            ["root"], versions={"root": "1.0"}, requires=unreadable
+        )
+    missed = []
+    closure = lockfile.runtime_closure(
+        ["root"],
+        versions={"root": "1.0"},
+        requires=unreadable,
+        unresolved=missed,
+    )
+    assert closure == {"root": "1.0"} and missed == ["root"]
+    monkeypatch.setitem(sys.modules, "packaging", None)
+    with pytest.raises(errors.ArtifactError, match="install 'packaging'"):
+        lockfile.marker_applies('python_version >= "3.8"')

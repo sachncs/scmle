@@ -38,16 +38,22 @@ def marker_applies(marker: str) -> bool:
 
     Returns:
         True if the marker holds for this environment; False if it mentions an
-        extra or if the `packaging` library is not installed.
+        extra.
+
+    Raises:
+        ArtifactError: If the `packaging` library is not installed: the
+            marker cannot be evaluated, and treating it as false dropped the
+            dependency from the lock without a word (ERR-12).
     """
     if "extra" in marker:
         return False
     try:
         from packaging import markers  # noqa: PLC0415 -- optional dependency
-    except ImportError:
-        # handled: packaging absent returns False, documented (marker deps then
-        # skipped)
-        return False
+    except ImportError as error:
+        raise errors.ArtifactError(
+            f"cannot evaluate the environment marker {marker!r}: install "
+            "'packaging' to build a complete runtime lock"
+        ) from error
     return bool(markers.Marker(marker).evaluate({"extra": ""}))
 
 
@@ -69,13 +75,16 @@ def runtime_closure(
         unresolved: If given, receives the names whose own requirements could
             not be read because they are not installed here; they are still
             pinned (from `versions`) but their dependencies are not followed.
+            Without it such a name is an error, never silently cut short.
 
     Returns:
         The pinned versions of the roots and of their dependencies whose markers
         hold here, sorted by name.
 
     Raises:
-        ArtifactError: If a distribution is neither installed nor in `versions`.
+        ArtifactError: If a distribution is neither installed nor in
+            `versions`, or its requirements cannot be read and no
+            `unresolved` list was given to record it (ERR-12).
     """
     look_up = requires or (lambda name: metadata.requires(name) or [])
     find = installed or metadata.version
@@ -94,12 +103,15 @@ def runtime_closure(
             ) from error
         try:
             declared = look_up(name)
-        except metadata.PackageNotFoundError:
-            # handled: uninstalled requirement metadata appended to caller's
-            # unresolved list
+        except metadata.PackageNotFoundError as error:
+            if unresolved is None:
+                raise errors.ArtifactError(
+                    f"the requirements of {name} cannot be read here, so the "
+                    "lock would miss its dependencies"
+                ) from error
+            # handled: recorded in the caller's `unresolved` list
             declared = []
-            if unresolved is not None:
-                unresolved.append(name)
+            unresolved.append(name)
         closure[name] = version
         for line in declared:
             parts = line.partition(";")
