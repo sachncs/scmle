@@ -31,7 +31,7 @@ def sample(seed=0, rows=(300, 200), shift=0.5):
 
 
 def test_the_defaults_are_the_documented_ones():
-    parameters = inspect.signature(shift_weights.estimate_weights).parameters
+    parameters = inspect.signature(shift_weights.weigh).parameters
     assert shift_weights.MIN_EFFECTIVE_SIZE == 50.0
     assert shift_weights.DEFAULT_CLIP == 20.0
     assert parameters["clip"].default == 20.0
@@ -43,7 +43,7 @@ def test_the_defaults_are_the_documented_ones():
 
 def test_the_weights_are_the_clipped_size_corrected_odds_of_the_fit():
     calibration, target = sample()
-    result = shift_weights.estimate_weights(calibration, target, clip=3.0)
+    result = shift_weights.weigh(calibration, target, clip=3.0)
     matrix = numpy.vstack([calibration, target])
     probability = result.discriminator.predict_proba(matrix)[:, 1]
     expected = numpy.minimum(probability / (1.0 - probability) * 1.5, 3.0)
@@ -59,9 +59,7 @@ def test_the_weights_are_the_clipped_size_corrected_odds_of_the_fit():
 
 def test_the_discriminator_separates_calibration_from_target():
     calibration, target = sample(seed=1, shift=2.0)
-    result = shift_weights.estimate_weights(
-        calibration, target, clip=50.0, minimum=0.0
-    )
+    result = shift_weights.weigh(calibration, target, clip=50.0, minimum=0.0)
     model = result.discriminator
     assert isinstance(model, linear_model.LogisticRegression)
     assert model.max_iter == 1000
@@ -74,7 +72,7 @@ def test_the_discriminator_separates_calibration_from_target():
 
 def test_the_effective_size_is_that_of_the_calibration_weights():
     calibration, target = sample(seed=2)
-    result = shift_weights.estimate_weights(calibration, target, minimum=1.0)
+    result = shift_weights.weigh(calibration, target, minimum=1.0)
     assert result.effective_size == pytest.approx(
         shift_weights.effective_sample_size(result.calibration)
     )
@@ -87,9 +85,7 @@ def test_the_effective_size_is_that_of_the_calibration_weights():
 def test_a_perfectly_separated_target_is_pinned_at_the_clip():
     calibration = numpy.linspace(-3.0, -1.0, 200).reshape(-1, 1)
     target = numpy.linspace(1.0, 3.0, 200).reshape(-1, 1)
-    result = shift_weights.estimate_weights(
-        calibration, target, clip=7.0, minimum=0.0
-    )
+    result = shift_weights.weigh(calibration, target, clip=7.0, minimum=0.0)
     assert result.target.max() == 7.0
     assert result.target[-1] == 7.0
     assert result.calibration.min() >= 0.0
@@ -97,13 +93,11 @@ def test_a_perfectly_separated_target_is_pinned_at_the_clip():
 
 def test_the_minimum_is_inclusive_and_the_refusal_says_both_sizes():
     calibration, target = sample(seed=3)
-    size = shift_weights.estimate_weights(
-        calibration, target, minimum=0.0
-    ).effective_size
-    kept = shift_weights.estimate_weights(calibration, target, minimum=size)
+    size = shift_weights.weigh(calibration, target, minimum=0.0).effective_size
+    kept = shift_weights.weigh(calibration, target, minimum=size)
     assert kept.effective_size == size
     with pytest.raises(shift_weights.WeightRefusedError) as raised:
-        shift_weights.estimate_weights(calibration, target, minimum=size + 1)
+        shift_weights.weigh(calibration, target, minimum=size + 1)
     assert str(raised.value) == (
         f"effective sample size {size:.1f} is below {size + 1:.0f}; "
         "weighted conformal is refused"
@@ -113,7 +107,7 @@ def test_the_minimum_is_inclusive_and_the_refusal_says_both_sizes():
 def test_the_default_minimum_refuses_a_handful_of_effective_rows():
     calibration, target = sample(seed=4, rows=(30, 30), shift=0.0)
     with pytest.raises(shift_weights.WeightRefusedError, match="below 50;"):
-        shift_weights.estimate_weights(calibration, target)
+        shift_weights.weigh(calibration, target)
 
 
 def test_the_effective_size_of_known_weights():

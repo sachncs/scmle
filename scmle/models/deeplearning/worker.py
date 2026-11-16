@@ -154,7 +154,7 @@ class Client:
         ):
             return self.channel
         self.shutdown()
-        self.process, parent = ipc.start_helper("scmle.models.deeplearning")
+        self.process, parent = ipc.launch("scmle.models.deeplearning")
         self.channel = parent
         return parent
 

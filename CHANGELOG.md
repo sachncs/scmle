@@ -27,6 +27,15 @@ marked `Breaking:` and listed first in their group.
   `judge`, `provenance.claim_tier` is `grade`, `worker.ensure_running` is
   `start`, `forecasting.add_targets` is `augment`,
   `reweighing.reweighing_weights` is `weigh`.
+  Also: `images` model `occlusion_explanation` is `occlude`,
+  `mlflow_store.artifact_location` is `locate`, `find_parent` is `climb`,
+  `ledger.build_ledger` is `compose`, `keyring.can_sign` is `signs`,
+  `fairness.binary_summary` is `summarise`, `shift_weights.estimate_weights`
+  is `weigh`, `nested.mean_cv_score` is `average`, `nested.nested_score` is
+  `nest`, `registry.compare_schemas` is `diff`, `uplift.split_arms` is
+  `split`, `ipc.start_helper` is `launch`, `verify.refuse_published_key` is
+  `refuse`, `verify.check_listed_files` is `audit`,
+  `performance.operation_regression` is `regress`.
   Migration: replace the old names; the signatures are unchanged.
 * **No package-root exports.** `scmle` exports only `__version__`. Every public
   name is imported from the module that defines it: `scmle.api.project.Project`,

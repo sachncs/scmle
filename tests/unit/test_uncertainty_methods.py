@@ -296,13 +296,13 @@ def test_query_bootstrap_counts_excluded_queries() -> None:
 def test_shift_weights_estimate_and_refuse() -> None:
     rng = numpy.random.default_rng(10)
     first = rng.standard_normal((600, 2))
-    same = shift_weights.estimate_weights(first, rng.standard_normal((600, 2)))
+    same = shift_weights.weigh(first, rng.standard_normal((600, 2)))
     assert same.effective_size > 400
     assert same.ratio(first[:3]).shape == (3,)
     small = rng.standard_normal((60, 2))
     far = rng.standard_normal((600, 2)) + numpy.array([2.5, 0.0])
     with pytest.raises(shift_weights.WeightRefusedError):
-        shift_weights.estimate_weights(small, far)
+        shift_weights.weigh(small, far)
 
 
 def test_every_task_type_has_a_gate_status() -> None:

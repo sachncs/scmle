@@ -118,7 +118,7 @@ class SigningKeyRecord:
             if self.replacement_key_id == self.key_id:
                 raise ValueError("replacement_key_id must differ from key_id")
 
-    def can_sign(self, observed_at: str) -> bool:
+    def signs(self, observed_at: str) -> bool:
         """Returns whether this key may create a signature at a given time.
 
         Args:
@@ -460,7 +460,7 @@ class SigningKeyRegistry:
                 `ValueError`.
         """
         record = self.get(key_id)
-        if not record.can_sign(signed_at):
+        if not record.signs(signed_at):
             raise ValueError(f"signing key cannot sign: {key_id}")
         return SignatureEnvelope(
             key_id=key_id,

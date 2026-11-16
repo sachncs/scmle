@@ -168,7 +168,7 @@ train = Dataset((
 model = Classifier(Config(target_size=(16, 16))).fit(train)
 prediction = model.predict(train)
 explanation = model.local_explanation(train.samples[0])
-occlusion = model.occlusion_explanation(
+occlusion = model.occlude(
     train.samples[0], patch_size=(4, 4), top_k=5
 )
 artifact = model.save("artifacts/image-model")

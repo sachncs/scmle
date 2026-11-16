@@ -67,8 +67,8 @@ def test_schema_compatibility_allows_additive_and_rejects_breaking_changes():
         {"value": "float64", "label": "int64"},
     )
 
-    additive_result = registry.compare_schemas(first, additive)
-    breaking_result = registry.compare_schemas(first, breaking)
+    additive_result = registry.diff(first, additive)
+    breaking_result = registry.diff(first, breaking)
 
     assert additive_result.compatible
     assert additive_result.status == "additive"

@@ -622,7 +622,7 @@ def gate_g6(replicates: int, base: int = 0) -> dict[str, Any]:
             score = numpy.abs(ec)
             if estimated:
                 unlabeled, _ = world(rng, 1000, shift=True)
-                est = shift_weights.estimate_weights(xc, unlabeled)
+                est = shift_weights.weigh(xc, unlabeled)
                 wc = est.calibration
                 wt = est.ratio(xt)
                 sizes.append(est.effective_size)
@@ -861,7 +861,7 @@ def sources() -> dict[str, list[Any]]:
         "G6": [
             conformal.weighted_margins,
             conformal.weighted_quantile,
-            shift_weights.estimate_weights,
+            shift_weights.weigh,
             gate_g6,
         ],
         "G9": [reconcile.mint, reconcile.shrunk_covariance, gate_g9],

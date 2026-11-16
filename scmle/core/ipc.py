@@ -52,7 +52,7 @@ def wait_for_helper(
             raise StartError(f"{module} did not connect in time")
 
 
-def start_helper(
+def launch(
     module: str,
 ) -> tuple[subprocess.Popen[bytes], connection.Connection]:
     """Starts `python -m module ADDRESS` and connects to it.
@@ -119,5 +119,5 @@ def connect_to_parent() -> connection.Connection:
         The authenticated connection to the parent process.
     """
     key = bytes.fromhex(sys.stdin.buffer.read().decode("ascii"))
-    # Same Windows PipeConnection note as in `start_helper`.
+    # Same Windows PipeConnection note as in `launch`.
     return connection.Client(sys.argv[1], authkey=key)  # pyright: ignore[reportReturnType]  # typeshed lists PipeConnection on every platform

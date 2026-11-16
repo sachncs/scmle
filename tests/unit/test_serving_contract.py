@@ -672,7 +672,7 @@ def test_the_demo_override_is_explicit_and_named():
     from scmle.deploy import verify
 
     demo = next(iter(verify.PUBLISHED_KEYS))
-    verify.refuse_published_key(demo, True, allowed=True)
+    verify.refuse(demo, True, allowed=True)
 
 
 def serve_json(answer):

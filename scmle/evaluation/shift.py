@@ -88,7 +88,7 @@ class AdversarialValidation(diagnostics.Diagnostic):
         The out-of-fold probability `p` that a row is an evaluation row
         gives the odds `p / (1 - p)`, corrected for the sample sizes and
         clipped at `shift_weights.DEFAULT_CLIP`, the ratio estimate of
-        `scmle.evaluation.shift_weights.estimate_weights` (which uses a
+        `scmle.evaluation.shift_weights.weigh` (which uses a
         logistic discriminator fitted on all rows; this one is the boosted
         classifier of the report, scored out of fold). Descriptive.
 

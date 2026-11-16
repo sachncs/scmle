@@ -125,7 +125,7 @@ scmle/models/documents.py local_explanation documented: website/src/pages/docs/a
 scmle/models/documents.py term_ablation_explanation documented: website/src/pages/docs/api.astro (document model explanations)
 scmle/models/images.py global_explanation kept in doubt: sibling of the documented local_explanation (website/src/pages/docs/api.astro)
 scmle/models/images.py local_explanation documented: website/src/pages/docs/api.astro (image model explanations)
-scmle/models/images.py occlusion_explanation documented: website/src/pages/docs/api.astro (image model explanations)
+scmle/models/images.py occlude documented: website/src/pages/docs/api.astro (image model explanations)
 scmle/monitoring/abtest.py compare_arms called by benchmarks/qualification/f11_certify.py
 scmle/monitoring/alerts.py from_evidence documented: website/src/pages/docs/operations.astro (Alert example)
 scmle/monitoring/alerts.py dispatch documented: website/src/pages/docs/operations.astro (Alert example)

@@ -51,9 +51,7 @@ PUBLISHED_KEYS = frozenset({"scmle-local-demo-signing-key-published-fixture"})
 ALLOW_PUBLISHED_KEY = "SCMLE_ALLOW_PUBLISHED_KEY"
 
 
-def refuse_published_key(
-    key: str | None, production: bool, allowed: bool = False
-) -> None:
+def refuse(key: str | None, production: bool, allowed: bool = False) -> None:
     """Raises when production is given a key that is published in the repo.
 
     `allowed` is the explicit, named opt-out the local demo sets; nothing else
@@ -76,7 +74,7 @@ def refuse_published_key(
         )
 
 
-def check_listed_files(model_directory: pathlib.Path) -> None:
+def audit(model_directory: pathlib.Path) -> None:
     """Checks the checksum of every file the manifest lists, unparsed.
 
     Args:
@@ -136,9 +134,7 @@ def verify_service(
     root = pathlib.Path(folder)
     model_directory = root / "model"
     key = signing.key_from_environment(environ)
-    refuse_published_key(
-        key, production, environ.get(ALLOW_PUBLISHED_KEY) == "1"
-    )
+    refuse(key, production, environ.get(ALLOW_PUBLISHED_KEY) == "1")
     digest = provenance.bundle_digest(model_directory)
     signed = bundle.verify_signature(model_directory, key)
     if not signed and (production or not trusted):
@@ -147,7 +143,7 @@ def verify_service(
             f"and loading executes code. Sign the bundle and set "
             f"${SIGNING_KEY}"
         )
-    check_listed_files(model_directory)
+    audit(model_directory)
     verified = False
     statement_path = root / attest.PROVENANCE_FILE
     if statement_path.exists():

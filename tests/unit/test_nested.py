@@ -33,7 +33,7 @@ def folds(rows):
 def test_the_honest_estimate_on_pure_noise_is_near_chance_and_optimism_shows():
     features, target = noise()
 
-    result = nested.nested_score(
+    result = nested.nest(
         build,
         SPACE,
         features,
@@ -55,7 +55,7 @@ def test_a_real_signal_survives_the_nested_check():
         0, 0.5, len(target)
     )
 
-    result = nested.nested_score(
+    result = nested.nest(
         build,
         SPACE,
         features,
@@ -71,7 +71,7 @@ def test_a_real_signal_survives_the_nested_check():
 def test_stopping_early_returns_nothing():
     features, target = noise()
 
-    result = nested.nested_score(
+    result = nested.nest(
         build,
         SPACE,
         features,

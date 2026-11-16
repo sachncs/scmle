@@ -74,7 +74,7 @@ def observed_access(
     }
 
 
-def build_ledger(
+def compose(
     split: splitters.Split,
     trials: list[experiments.Trial],
     test_opens: int,

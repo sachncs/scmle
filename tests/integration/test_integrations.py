@@ -126,13 +126,10 @@ def test_mlflow_artifacts_stay_beside_the_sqlite_store(tmp_path, monkeypatch):
     from scmle.integrations import mlflow_store
 
     monkeypatch.chdir(tmp_path)
-    location = mlflow_store.MlflowExperimentStore.artifact_location(
+    location = mlflow_store.MlflowExperimentStore.locate(
         f"sqlite:///{tmp_path / 'tracking' / 'mlflow.db'}"
     )
 
     assert location == (tmp_path / "tracking" / "mlflow-artifacts").as_uri()
-    assert mlflow_store.MlflowExperimentStore.artifact_location(None) is None
-    assert (
-        mlflow_store.MlflowExperimentStore.artifact_location("http://host:5000")
-        is None
-    )
+    assert mlflow_store.MlflowExperimentStore.locate(None) is None
+    assert mlflow_store.MlflowExperimentStore.locate("http://host:5000") is None

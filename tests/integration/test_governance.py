@@ -87,9 +87,9 @@ def test_ledger_detects_violations(binary_frame, tmp_path):
     spec = support.make_project(binary_frame, "y").spec
     task = tasks.Task(result.plan.task)
     split = splitters.Splitter(spec, task).split(binary_frame)
-    honest = ledger.build_ledger(split, result.trials, 1, False)
+    honest = ledger.compose(split, result.trials, 1, False)
     assert all(honest["verified"].values())
-    reopened = ledger.build_ledger(split, result.trials, 2, False)
+    reopened = ledger.compose(split, result.trials, 2, False)
     assert not reopened["verified"]["test_set_opened_exactly_once"]
 
 
@@ -104,7 +104,7 @@ def test_ledger_checks_what_trials_actually_received(binary_frame, tmp_path):
         for t in observed
         if t.status == "ok" and len(t.observed_access) > 2
     )
-    honest = ledger.build_ledger(split, result.trials, 1, False)
+    honest = ledger.compose(split, result.trials, 1, False)
     assert honest["observed"]["folds_checked"] > 0
     assert honest["verified"][
         "observed_fit_and_scoring_rows_match_the_manifest"
@@ -120,7 +120,7 @@ def test_ledger_checks_what_trials_actually_received(binary_frame, tmp_path):
         ],
     )
     swapped = [forged if t is observed[0] else t for t in result.trials]
-    caught = ledger.build_ledger(split, swapped, 1, False)
+    caught = ledger.compose(split, swapped, 1, False)
     assert not caught["verified"][
         "observed_fit_and_scoring_rows_match_the_manifest"
     ]

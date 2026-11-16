@@ -76,7 +76,7 @@ def effective_sample_size(weights: numpy.ndarray) -> float:
     return float(values.sum() ** 2 / squares) if squares > 0 else 0.0
 
 
-def estimate_weights(
+def weigh(
     calibration: numpy.ndarray,
     target: numpy.ndarray,
     clip: float = DEFAULT_CLIP,

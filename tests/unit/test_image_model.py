@@ -91,7 +91,7 @@ def test_image_classifier_fits_evaluates_and_explains(
     )
     assert local_explanation.terms
 
-    occlusion = classifier.occlusion_explanation(
+    occlusion = classifier.occlude(
         evaluation_data.samples[0], top_k=3, patch_size=(1, 1)
     )
     assert occlusion.method == "occlusion_pixel_region"
@@ -108,9 +108,9 @@ def test_image_occlusion_rejects_invalid_configuration(training_data):
     sample_value = training_data.samples[0]
 
     with pytest.raises(ValueError, match="top_k"):
-        classifier.occlusion_explanation(sample_value, top_k=0)
+        classifier.occlude(sample_value, top_k=0)
     with pytest.raises(ValueError, match="patch_size"):
-        classifier.occlusion_explanation(sample_value, patch_size=(0, 1))
+        classifier.occlude(sample_value, patch_size=(0, 1))
 
 
 @PILLOW_SKIP

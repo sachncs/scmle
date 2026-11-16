@@ -4783,7 +4783,7 @@ class PackageStage(Stage):
         positive = scmle.evaluation.metrics.positive_label(
             split.dev_target, task
         )
-        result = nested.nested_score(
+        result = nested.nest(
             lambda params: strategy.build(plan, adapter, task, seed, params),
             adapter.search_space,
             split.dev_features,
@@ -5123,7 +5123,7 @@ class PackageStage(Stage):
         )
         store.write_json(
             "diagnostics/data_access.json",
-            ledger.build_ledger(
+            ledger.compose(
                 split,
                 context.trials,
                 int(split.locked_test.opened),

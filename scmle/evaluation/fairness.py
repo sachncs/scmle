@@ -142,7 +142,7 @@ class Fairness(diagnostics.Diagnostic):
             positive: The positive class.
 
         Returns:
-            The `binary_summary` of those per-group statistics, with the
+            The `summarise` of those per-group statistics, with the
             groups below `MIN_GROUP_ROWS` rows reported as excluded. A
             true-positive or false-positive rate with no actual positives or
             negatives in the group is None.
@@ -173,7 +173,7 @@ class Fairness(diagnostics.Diagnostic):
                 else None,
                 "accuracy": float((chosen[rows] == actual[rows]).mean()),
             }
-        return self.binary_summary(stats, excluded)
+        return self.summarise(stats, excluded)
 
     def small_groups(self, groups: pandas.Series) -> dict[str, int]:
         """Returns groups excluded because their cell size is too small.
@@ -191,7 +191,7 @@ class Fairness(diagnostics.Diagnostic):
             if int((groups == level).sum()) < MIN_GROUP_ROWS
         }
 
-    def binary_summary(
+    def summarise(
         self,
         stats: dict[str, dict[str, Any]],
         excluded: dict[str, int] | None = None,

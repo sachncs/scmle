@@ -377,7 +377,7 @@ class Baseline:
         regressions: dict[str, dict[str, float | None]] = {}
         violations: list[str] = []
         for operation in sorted(expected, key=lambda item: item.value):
-            regressions[operation.value], found = self.operation_regression(
+            regressions[operation.value], found = self.regress(
                 operation, current
             )
             violations.extend(found)
@@ -426,7 +426,7 @@ class Baseline:
                 )
         return tuple(violations)
 
-    def operation_regression(
+    def regress(
         self, operation: Operation, current: Run
     ) -> tuple[dict[str, float | None], list[str]]:
         """Compares one operation of a run with the baseline median.

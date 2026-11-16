@@ -110,7 +110,7 @@ class SealedTestSet(splitters.LockedTestSet):
         self.ids = tuple(ids)
         self.token = secrets.token_hex(16)
         self.opened = False
-        self.process, parent = ipc.start_helper("scmle.governance")
+        self.process, parent = ipc.launch("scmle.governance")
         self.channel = parent
         parent.send((self.token, (features, target)))
 

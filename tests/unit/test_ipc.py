@@ -19,4 +19,4 @@ def test_vault_releases_rows_once_over_the_channel():
 
 def test_a_helper_that_exits_before_connecting_is_reported():
     with pytest.raises(ipc.StartError):
-        ipc.start_helper("scmle.nonexistent_module")
+        ipc.launch("scmle.nonexistent_module")

@@ -59,13 +59,13 @@ class MlflowExperimentStore(stores.ExperimentStore):
             if existing is not None
             else self.client.create_experiment(
                 experiment,
-                artifact_location=self.artifact_location(tracking_uri),
+                locate=self.locate(tracking_uri),
             )
         )
         self.parents: dict[str, str] = {}
 
     @staticmethod
-    def artifact_location(tracking_uri: str | None) -> str | None:
+    def locate(tracking_uri: str | None) -> str | None:
         """Keeps artifacts beside a SQLite store instead of the working dir.
 
         Args:
@@ -83,7 +83,7 @@ class MlflowExperimentStore(stores.ExperimentStore):
             (database.parent / f"{database.stem}-artifacts").resolve().as_uri()
         )
 
-    def find_parent(self, run_id: str) -> str | None:
+    def climb(self, run_id: str) -> str | None:
         """Finds the MLflow run of a scmle run, across processes.
 
         The answer is cached after the first lookup; otherwise MLflow is
@@ -119,7 +119,7 @@ class MlflowExperimentStore(stores.ExperimentStore):
             run_dir: Run directory, stored as a tag.
             started_at: Start timestamp, stored as a tag.
         """
-        parent = self.find_parent(run_id)
+        parent = self.climb(run_id)
         if parent is None:
             created = self.client.create_run(
                 self.experiment_id,
@@ -150,7 +150,7 @@ class MlflowExperimentStore(stores.ExperimentStore):
             **fields: Run fields to record. `test_metrics` may be a dict or a
                 JSON string.
         """
-        parent = self.find_parent(run_id)
+        parent = self.climb(run_id)
         if parent is None:
             return
         for name, value in fields.items():
@@ -192,7 +192,7 @@ class MlflowExperimentStore(stores.ExperimentStore):
             run_id: Identifier of the scmle run the trial belongs to.
             trial: The trial result to log.
         """
-        parent = self.find_parent(run_id)
+        parent = self.climb(run_id)
         if parent is None:
             return
         child = self.client.create_run(

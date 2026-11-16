@@ -507,7 +507,7 @@ class Classifier:
             ),
         )
 
-    def occlusion_explanation(
+    def occlude(
         self,
         sample: image.Sample,
         top_k: int = 10,

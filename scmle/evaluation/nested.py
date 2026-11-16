@@ -58,7 +58,7 @@ class Scores:
         return dataclasses.asdict(self)
 
 
-def mean_cv_score(
+def average(
     model: models.Estimator,
     features: pandas.DataFrame,
     target: pandas.Series,
@@ -97,7 +97,7 @@ def mean_cv_score(
     return float(numpy.mean(scores))
 
 
-def nested_score(
+def nest(
     build: Callable[[dict[str, Any]], models.Estimator],
     space: search.SearchSpace | None,
     features: pandas.DataFrame,
@@ -147,7 +147,7 @@ def nested_score(
             )
         scored = [
             (
-                mean_cv_score(
+                average(
                     build(params),
                     x_train,
                     y_train,

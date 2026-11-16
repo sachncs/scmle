@@ -60,7 +60,7 @@ def expected(model: Any, features: Any, classify: bool) -> numpy.ndarray:
     return probabilities[:, list(model.classes_).index(1)]
 
 
-def split_arms(
+def split(
     treatment: Any,
 ) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Boolean masks of the treated and control rows.
@@ -108,7 +108,7 @@ class TwoModelLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn
         Returns:
             This fitted learner.
         """
-        treated, control = split_arms(
+        treated, control = split(
             numpy.zeros(len(outcome)) if treatment is None else treatment
         )
         values = numpy.asarray(outcome)
@@ -246,7 +246,7 @@ class CrossLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn sh
         """
         matrix = numpy.asarray(features)
         values = numpy.asarray(outcome, dtype=float)
-        treated, control = split_arms(
+        treated, control = split(
             numpy.zeros(len(values)) if treatment is None else treatment
         )
         self.degenerate_ = not (treated.any() and control.any())

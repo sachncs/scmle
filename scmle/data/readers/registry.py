@@ -216,7 +216,7 @@ class SchemaCompatibility:
         }
 
 
-def compare_schemas(
+def diff(
     previous: SourceSnapshot | None, current: SourceSnapshot
 ) -> SchemaCompatibility:
     """Compares two snapshots without silently accepting breaking changes.
@@ -322,7 +322,7 @@ class SourceRegistry:
             The schema decision against the latest registered snapshot of
             the same source; ``initial`` if there is none.
         """
-        return compare_schemas(self.latest(snapshot.source_id), snapshot)
+        return diff(self.latest(snapshot.source_id), snapshot)
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the registry.

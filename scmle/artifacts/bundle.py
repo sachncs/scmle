@@ -1602,7 +1602,7 @@ class Bundle:
             raise errors.ArtifactError(
                 "shift weights need numeric feature columns of the schema"
             )
-        found = shift_weights.estimate_weights(
+        found = shift_weights.weigh(
             calibration_rows[list(chosen)].to_numpy(float),
             target_rows[list(chosen)].to_numpy(float),
             clip,
