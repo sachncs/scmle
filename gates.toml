@@ -1,0 +1,403 @@
+# Gate registry (claim C1): every function in scmle that refuses a run by
+# raising BlockedError or LeakageError, with when it passes, when it blocks,
+# how a user proceeds anyway, the variables it reads and its certificate.
+# benchmarks/registry.py checks this file against the code; CI fails on an
+# unregistered or stale entry.
+
+[ingest.cli.unit_verdict]
+site = "scmle.cli:IngestCommand.execute"
+error = "BlockedError"
+claim = "C5, C1"
+passes = "The ingest plan ran and the unit verdict is None, match or finer."
+blocks = "The unit verdict computed by the plan is coarser or unknown (UnitVerdict.blocks); it is raised after the JSON summary is printed."
+override = "none; the verdict is only computed when --unit is given, so omitting --unit skips the check."
+variables = ["--unit", "--target-table", "--eps-key", "--eps-null", "--max-key-size", "--max-queries", "--max-rows-scanned", "--max-seconds"]
+
+[ingest.multiplicity]
+site = "scmle.core.ingest_stage:check_multiplicity"
+error = "BlockedError"
+claim = "C3"
+passes = "The declared family size equals the number of synthesized columns and the ledger registered exactly the non-excluded synthesized columns."
+blocks = "The declared family size differs from the number of synthesized columns; the synthesized columns registered in the ledger are not exactly those not quarantined or skipped."
+override = "none"
+variables = []
+
+[ingest.stage.run]
+site = "scmle.core.ingest_stage:run"
+error = "BlockedError"
+claim = "C5, C7"
+passes = "The unit verdict is None, match or finer, and, when the charter has a reconcile block, every declared and source-queried total is reproduced by the extract."
+blocks = "The unit verdict is coarser or unknown; a declared or source-queried reconciliation check failed (raised by declared.require)."
+override = "none; the unit check runs only when the ingest plan sets unit, and reconciliation runs only when the charter sets reconcile."
+variables = ["unit", "target_table", "eps_key", "eps_null", "eps_fk", "max_queries", "max_rows_scanned", "max_seconds", "feature_budget", "reconcile", "delta_rec"]
+
+[policy.checkpoints]
+site = "scmle.core.orchestrator:Orchestrator.consult_checkpoints"
+error = "BlockedError"
+claim = "C8"
+passes = "Every checkpoint registered for the completed stage's state approves its review."
+blocks = "A checkpoint whose gates include the stage's state returns a verdict that is not approved."
+override = "none; only checkpoints passed to Orchestrator(checkpoints=...) are consulted, and the default is none."
+variables = ["checkpoints"]
+
+[robustness.assessment_present]
+site = "scmle.core.stages:ProfileStage.assess_robustness"
+error = "BlockedError"
+claim = "C1"
+passes = "The stability stage holds an assessment (stage.found is set)."
+blocks = "stage.found is None, meaning the second stage did not run; this is a type guard marked pragma no cover."
+override = "none"
+variables = []
+
+[leakage.policy]
+site = "scmle.core.stages:ProfileStage.enforce_leakage_policy"
+error = "BlockedError"
+claim = "C2"
+passes = "leakage_policy is warn, or under block every screened column was checked, every screen mechanism is gating and no certified blocking leak was found."
+blocks = "Under leakage_policy block: the profile has unchecked columns; a screen mechanism's gate is not GATING (certificate missing, stale or not passing); the profile has certified blocking leaks."
+override = "Set leakage_policy to 'warn' (the default), which logs warnings instead of raising."
+variables = ["leakage_policy"]
+certificate = "screen_certificates.json: f4-leakage-screen"
+
+[admissibility.quarantine_all]
+site = "scmle.core.stages:ProfileStage.qualify_exploration"
+error = "BlockedError"
+claim = "C2"
+passes = "At least one feature of the feature plan is not quarantined by admissibility."
+blocks = "Admissibility quarantined fields and no feature of the plan is left."
+override = "A valid per-column attestation in the file named by leakage_attestations keeps a suspect field (tier attested)."
+variables = ["leakage_attestations", "data.group_column", "data.time_column"]
+certificate = "screen_certificates.json: f4-leakage-screen; detector_certificates.json: F5 detectors"
+
+[curation.blocking_findings]
+site = "scmle.core.stages:ProfileStage.record_curation"
+error = "BlockedError"
+claim = "C1, C5"
+passes = "The curation report has no blocking finding without a resolved, waived or false_positive disposition."
+blocks = "Curation.release_ready is false, that is a quality or risk finding is blocking and its disposition is not resolved, waived or false_positive."
+override = "Record a disposition of resolved, waived or false_positive on the finding."
+variables = []
+
+[data.unlabeled]
+site = "scmle.core.stages:ProfileStage.set_aside_unlabeled"
+error = "BlockedError"
+claim = "C5"
+passes = "data.unlabeled is ignore or pseudo_label, so rows with a missing target are set aside."
+blocks = "data.unlabeled is block (the default) and the method is called because the target has missing values."
+override = "Set data.unlabeled to 'ignore' or 'pseudo_label'."
+variables = ["data.unlabeled", "data.target"]
+
+[select.serving_limits]
+site = "scmle.core.stages:SelectStage.choose"
+error = "BlockedError"
+claim = "C1"
+passes = "No serving limit is set and pareto is off, or one of the top max_candidates_checked trials, refit and measured, is within every limit."
+blocks = "Serving limits are active, pareto is off, and none of the checked candidates meets every limit."
+override = "Relax selection.max_model_mb or selection.max_p95_latency_ms, or raise selection.max_candidates_checked."
+variables = ["selection.max_model_mb", "selection.max_p95_latency_ms", "selection.latency_safety_factor", "selection.max_candidates_checked", "selection.pareto"]
+
+[select.pareto_front]
+site = "scmle.core.stages:SelectStage.select_on_front"
+error = "BlockedError"
+claim = "C1"
+passes = "At least one checked candidate, refit and measured, meets the serving limits."
+blocks = "Every checked candidate violates a serving limit."
+override = "Relax selection.max_model_mb or selection.max_p95_latency_ms, or raise selection.max_candidates_checked."
+variables = ["selection.max_model_mb", "selection.max_p95_latency_ms", "selection.latency_safety_factor", "selection.max_candidates_checked", "selection.pareto_tolerance"]
+
+[ingest.reconcile]
+site = "scmle.data.ingest.declared:require"
+error = "BlockedError"
+claim = "C5, C7"
+passes = "Every check in the reconciliation report and every source check passed."
+blocks = "Any declared check or any source-queried check in the report has passed false."
+override = "none"
+variables = ["reconcile", "delta_rec"]
+
+[confirm.single_use]
+site = "scmle.data.ledger.confirm:confirm"
+error = "LeakageError"
+claim = "C2, C3"
+passes = "The ledger has no confirmation recorded yet."
+blocks = "ledger.confirmation is not None, so the confirmation was already performed; the attempt is logged as denied; a LeakageError from opening the set also propagates."
+override = "none"
+variables = []
+
+[profile.monotonic_columns]
+site = "scmle.data.profiling.profiler:Profiler.monotonic_features"
+error = "BlockedError"
+claim = "C1"
+passes = "Every column in data.monotonic_constraints is a numeric feature."
+blocks = "A column in data.monotonic_constraints is missing, excluded or not numeric."
+override = "none"
+variables = ["data.monotonic_constraints"]
+
+[profile.target_and_features]
+site = "scmle.data.profiling.profiler:Profiler.profile"
+error = "BlockedError"
+claim = "C5"
+passes = "The target has no missing values, a usable numeric, categorical, datetime or text feature remains, and the monotonic constraints name numeric features."
+blocks = "The target has missing values; no numeric, categorical, datetime or text feature remains after exclusions; a monotonic constraint names a column that is not a numeric feature."
+override = "none"
+variables = ["data.target", "data.monotonic_constraints"]
+
+[split.event.folds]
+site = "scmle.data.splitting.splitters:EventStratifiedSplit.cross_validation_folds"
+error = "BlockedError"
+claim = "C5"
+passes = "Events and censored rows each number at least MIN_STRATUM_ROWS among the development rows; folds are reduced to the rarest count if needed."
+blocks = "The rarer of events and censored rows in the development partition is below MIN_STRATUM_ROWS."
+override = "none"
+variables = ["MIN_STRATUM_ROWS", "validation.folds", "data.event_column"]
+
+[split.event.stratify]
+site = "scmle.data.splitting.splitters:EventStratifiedSplit.stratify_labels"
+error = "BlockedError"
+claim = "C5"
+passes = "Events and censored rows each number at least MIN_STRATUM_ROWS in the full data."
+blocks = "The count of events or of censored rows is below MIN_STRATUM_ROWS."
+override = "none"
+variables = ["MIN_STRATUM_ROWS", "data.event_column"]
+
+[split.group.class_complete_folds]
+site = "scmle.data.splitting.splitters:GroupSplit.class_complete_folds"
+error = "BlockedError"
+claim = "C5"
+passes = "Some fold count from validation.folds down to 2 gives group-disjoint folds whose training and validation parts each contain every class."
+blocks = "No StratifiedGroupKFold split with 2 to validation.folds folds keeps every class in every training and validation part."
+override = "none"
+variables = ["validation.folds", "validation.seed"]
+
+[split.group.partition]
+site = "scmle.data.splitting.splitters:GroupSplit.partition"
+error = "BlockedError"
+claim = "C5"
+passes = "The group column has no missing values, there are at least folds + 2 groups, and for classification class-complete group folds exist."
+blocks = "The group (or query) column has missing values; there are fewer than validation.folds + 2 distinct groups; for classification, class_complete_folds finds no valid split."
+override = "none"
+variables = ["data.group_column", "data.query_column", "validation.folds", "validation.test_fraction"]
+
+[split.task_supported]
+site = "scmle.data.splitting.splitters:Partitioner.check_task"
+error = "BlockedError"
+claim = "C5"
+passes = "The resolved task is in the strategy's supported_tasks."
+blocks = "The resolved task is not in the strategy's supported_tasks."
+override = "none"
+variables = ["validation.strategy", "task"]
+
+[split.resident.bind]
+site = "scmle.data.splitting.splitters:ResidentTestSet.bind"
+error = "LeakageError"
+claim = "C2, C8"
+passes = "No binding is set and the rows were not released."
+blocks = "A binding is already set or the test rows were already released."
+override = "none"
+variables = []
+
+[split.resident.open]
+site = "scmle.data.splitting.splitters:ResidentTestSet.open"
+error = "LeakageError"
+claim = "C2, C8"
+passes = "The token matches, the rows were not released before, and either no binding is set or the given binding equals it."
+blocks = "The token differs from the set's token; the rows were already released; a binding is set and the given binding differs."
+override = "none"
+variables = []
+
+[split.rolling.partition]
+site = "scmle.data.splitting.splitters:RollingSplit.partition"
+error = "BlockedError"
+claim = "C5"
+passes = "The time column orders the rows and at least MIN_ROLLING_FOLDS windows, each with at least MIN_ROLLING_TRAIN training rows, fit."
+blocks = "The time column has unparseable or missing values (from chronological_holdout); fewer than MIN_ROLLING_FOLDS rolling windows fit."
+override = "Shorten validation.horizon_rows, validation.window_rows or validation.embargo_rows, as the error message says."
+variables = ["MIN_ROLLING_FOLDS", "MIN_ROLLING_TRAIN", "validation.folds", "validation.horizon_rows", "validation.window_rows", "validation.embargo_rows", "validation.test_fraction", "data.time_column", "data.horizon"]
+
+[split.stratified.folds]
+site = "scmle.data.splitting.splitters:StratifiedSplit.cross_validation_folds"
+error = "BlockedError"
+claim = "C5"
+passes = "Every class has at least MIN_STRATUM_ROWS development rows; folds are reduced to the minority class size if needed."
+blocks = "The smallest class in the development partition has fewer than MIN_STRATUM_ROWS rows."
+override = "none"
+variables = ["MIN_STRATUM_ROWS", "validation.folds"]
+
+[split.stratified.stratify]
+site = "scmle.data.splitting.splitters:StratifiedSplit.stratify_labels"
+error = "BlockedError"
+claim = "C5"
+passes = "Every class has at least MIN_STRATUM_ROWS rows in the full data."
+blocks = "A class has fewer than MIN_STRATUM_ROWS rows."
+override = "none"
+variables = ["MIN_STRATUM_ROWS", "data.target"]
+
+[split.temporal.holdout]
+site = "scmle.data.splitting.splitters:TemporalSplit.chronological_holdout"
+error = "BlockedError"
+claim = "C5"
+passes = "Every value of the time column parses as a datetime."
+blocks = "The time column has values that are missing or do not parse as datetimes."
+override = "none"
+variables = ["data.time_column", "validation.test_fraction", "validation.embargo_rows", "data.horizon"]
+
+[split.temporal.partition]
+site = "scmle.data.splitting.splitters:TemporalSplit.partition"
+error = "BlockedError"
+claim = "C5"
+passes = "The time column orders the rows and there are at least folds + 1 + embargo development rows."
+blocks = "The time column has unparseable or missing values; the development rows number fewer than validation.folds + 1 + embargo."
+override = "none"
+variables = ["validation.folds", "validation.embargo_rows", "data.horizon", "data.group_column", "data.time_column"]
+
+[split.treatment.folds]
+site = "scmle.data.splitting.splitters:TreatmentStratifiedSplit.cross_validation_folds"
+error = "BlockedError"
+claim = "C5"
+passes = "The rarest treatment / outcome cell in the development rows allows at least MIN_FOLDS folds."
+blocks = "min(validation.folds, rarest cell count) is below MIN_FOLDS."
+override = "none"
+variables = ["MIN_FOLDS", "validation.folds", "data.treatment_column"]
+
+[split.treatment.stratify]
+site = "scmle.data.splitting.splitters:TreatmentStratifiedSplit.stratify_labels"
+error = "BlockedError"
+claim = "C5"
+passes = "Every treatment / outcome cell has at least MIN_STRATUM_ROWS rows."
+blocks = "A treatment / outcome cell has fewer than MIN_STRATUM_ROWS rows."
+override = "none"
+variables = ["MIN_STRATUM_ROWS", "data.treatment_column"]
+
+[task.resolve]
+site = "scmle.data.validation.target:TaskResolver.resolve"
+error = "BlockedError"
+claim = "C1, C5"
+passes = "The target has a non-missing value and the handler for the requested task accepts it."
+blocks = "Every target value is missing; otherwise the handler for the requested task raises."
+override = "none"
+variables = ["task"]
+
+[task.auto]
+site = "scmle.data.validation.target:TaskResolver.resolve_auto"
+error = "BlockedError"
+claim = "C1"
+passes = "The target has at least MIN_CLASSES values and is neither an identifier-like text column nor an ambiguous small-cardinality integer."
+blocks = "Fewer than MIN_CLASSES distinct values; non-numeric with more than TEXT_TARGET_MIN_CLASSES values and a value-to-row ratio above TEXT_TARGET_MAX_RATIO; numeric, integral, not binary, with at most AMBIGUOUS_MAX_VALUES values and a ratio below AMBIGUOUS_MAX_RATIO."
+override = "Set task explicitly instead of 'auto', as the error message says."
+variables = ["task", "MIN_CLASSES", "BINARY_CLASSES", "TEXT_TARGET_MIN_CLASSES", "TEXT_TARGET_MAX_RATIO", "AMBIGUOUS_MAX_VALUES", "AMBIGUOUS_MAX_RATIO"]
+
+[task.classification]
+site = "scmle.data.validation.target:TaskResolver.resolve_classification"
+error = "BlockedError"
+claim = "C1"
+passes = "The target has at least two classes and the class count matches a binary or multiclass request."
+blocks = "Fewer than MIN_CLASSES classes; binary_classification requested without exactly two classes; multiclass_classification requested with two classes."
+override = "none"
+variables = ["task", "MIN_CLASSES", "BINARY_CLASSES"]
+
+[task.ordinal]
+site = "scmle.data.validation.target:TaskResolver.resolve_ordinal"
+error = "BlockedError"
+claim = "C5"
+passes = "The labels in the data are exactly those listed in data.ordinal_order."
+blocks = "A label present in the data is missing from data.ordinal_order; a listed label has no rows."
+override = "none"
+variables = ["data.ordinal_order"]
+
+[task.ranking]
+site = "scmle.data.validation.target:TaskResolver.resolve_ranking"
+error = "BlockedError"
+claim = "C5"
+passes = "Every relevance grade parses as a non-negative whole number."
+blocks = "A grade is missing or unparseable, negative, or not a whole number."
+override = "none"
+variables = []
+
+[task.regression]
+site = "scmle.data.validation.target:TaskResolver.resolve_regression"
+error = "BlockedError"
+claim = "C1"
+passes = "The target is numeric."
+blocks = "Regression was requested and the target is not numeric."
+override = "none"
+variables = ["task"]
+
+[task.survival]
+site = "scmle.data.validation.target:TaskResolver.resolve_survival"
+error = "BlockedError"
+claim = "C5"
+passes = "The duration target is numeric and every value is greater than zero."
+blocks = "The target is not numeric or a value is zero or negative."
+override = "none"
+variables = []
+
+[task.uplift]
+site = "scmle.data.validation.target:TaskResolver.resolve_uplift"
+error = "BlockedError"
+claim = "C5"
+passes = "The outcome is numeric."
+blocks = "The outcome is not numeric."
+override = "none"
+variables = []
+
+[target.events]
+site = "scmle.data.validation.target:check_events"
+error = "BlockedError"
+claim = "C5"
+passes = "The event column exists, holds 0 or 1 in every row and records at least MIN_EVENTS events."
+blocks = "The event column is not configured or not found; it has a missing, unparseable or non 0/1 value; it records fewer than MIN_EVENTS events."
+override = "none"
+variables = ["data.event_column", "MIN_EVENTS"]
+
+[target.columns]
+site = "scmle.data.validation.target:check_targets"
+error = "BlockedError"
+claim = "C5"
+passes = "Every target column exists, has no missing values and holds 0/1 (multilabel) or numeric values (other tasks)."
+blocks = "A target column is not found; it has missing values; for multilabel a value is not 0 or 1; otherwise the column is not numeric."
+override = "none"
+variables = ["data.targets"]
+
+[target.treatment]
+site = "scmle.data.validation.target:check_treatment"
+error = "BlockedError"
+claim = "C5"
+passes = "The treatment column exists, holds 0 or 1 in every row and each arm has at least MIN_ARM_ROWS rows."
+blocks = "The treatment column is not configured or not found; it has a missing, unparseable or non 0/1 value; the smaller arm has fewer than MIN_ARM_ROWS rows."
+override = "none"
+variables = ["data.treatment_column", "MIN_ARM_ROWS"]
+
+[vault.bind]
+site = "scmle.governance.vault:SealedTestSet.bind"
+error = "LeakageError"
+claim = "C2, C8"
+passes = "The rows were not released and the vault process answers ok to the bind message."
+blocks = "The rows were already released; the channel fails with EOFError or OSError (vault gone); the vault answers not ok (invalid token, or already bound or released)."
+override = "none"
+variables = []
+
+[vault.open]
+site = "scmle.governance.vault:SealedTestSet.open"
+error = "LeakageError"
+claim = "C2, C8"
+passes = "The rows were not released and the vault process answers ok, after which the vault is closed."
+blocks = "The rows were already released; the channel fails with EOFError or OSError (vault gone); the vault answers not ok (invalid token or binding mismatch)."
+override = "none"
+variables = []
+
+[plan.gpu_required]
+site = "scmle.intelligence.planner:GpuFilter.apply"
+error = "BlockedError"
+claim = "C1"
+passes = "resources.gpu is not required, or at least one candidate can use a GPU."
+blocks = "resources.gpu is required and no candidate model can use a GPU."
+override = "Set resources.gpu to 'auto' (or install a GPU-capable adapter), as the error message says."
+variables = ["resources.gpu"]
+
+[plan.monotonic]
+site = "scmle.intelligence.planner:MonotonicFilter.apply"
+error = "BlockedError"
+claim = "C1"
+passes = "No monotonic constraint is set, or the task is not multiclass and a candidate can enforce the constraints."
+blocks = "Monotonic constraints are set and the task is multiclass; no remaining candidate has a monotonic parameter."
+override = "Relax data.monotonic_constraints or install the 'boosting' extra, as the error message says."
+variables = ["data.monotonic_constraints", "task"]
