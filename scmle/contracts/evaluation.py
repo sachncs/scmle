@@ -323,7 +323,7 @@ def validate_text(value: str, field_name: str) -> str:
         ValueError: If the text is empty or has surrounding whitespace.
     """
     if not isinstance(value, str):
-        raise TypeError(f"{field_name} must be a string")
+        raise errors.KindError(f"{field_name} must be a string")
     result = value.strip()
     if not result:
         raise errors.InputError(f"{field_name} must not be empty")
@@ -352,7 +352,7 @@ def validate_evidence(
             reference repeats.
     """
     if not isinstance(values, tuple):
-        raise TypeError(f"{field_name} must be a tuple of strings")
+        raise errors.KindError(f"{field_name} must be a tuple of strings")
     for value in values:
         validate_text(value, field_name)
     if len(values) != len(set(values)):
@@ -375,7 +375,7 @@ def validate_finite(value: float, field_name: str) -> float:
         ValueError: If the value is not finite.
     """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise TypeError(f"{field_name} must be numeric")
+        raise errors.KindError(f"{field_name} must be numeric")
     result = float(value)
     if not math.isfinite(result):
         raise errors.InputError(f"{field_name} must be finite")
@@ -404,7 +404,7 @@ class MetricDeclaration:
         """
         validate_text(self.name, "metric.name")
         if not isinstance(self.direction, MetricDirection):
-            raise TypeError("metric.direction must be MetricDirection")
+            raise errors.KindError("metric.direction must be MetricDirection")
         validate_evidence(self.evidence, "metric.evidence")
         if self.custom and not self.evidence:
             raise errors.InputError("custom metrics require evidence")
@@ -439,7 +439,9 @@ class MetricGate:
         """
         validate_text(self.metric, "metric_gate.metric")
         if not isinstance(self.direction, MetricDirection):
-            raise TypeError("metric_gate.direction must be MetricDirection")
+            raise errors.KindError(
+                "metric_gate.direction must be MetricDirection"
+            )
         validate_finite(self.threshold, "metric_gate.threshold")
 
     def to_dict(self) -> dict[str, Any]:
@@ -511,7 +513,9 @@ class Uncertainty:
                 conformal or survival-curve method has no coverage target.
         """
         if not isinstance(self.method, UncertaintyMethod):
-            raise TypeError("uncertainty.method must be UncertaintyMethod")
+            raise errors.KindError(
+                "uncertainty.method must be UncertaintyMethod"
+            )
         if self.method is UncertaintyMethod.NONE and self.required:
             raise errors.InputError(
                 "uncertainty cannot be required when method is none"
@@ -575,7 +579,9 @@ class Calibration:
                 error is negative or not finite.
         """
         if not isinstance(self.method, CalibrationMethod):
-            raise TypeError("calibration.method must be CalibrationMethod")
+            raise errors.KindError(
+                "calibration.method must be CalibrationMethod"
+            )
         if self.method is CalibrationMethod.NONE:
             if self.required or self.maximum_error is not None:
                 raise errors.InputError(
@@ -619,7 +625,7 @@ class Fairness:
                 method comes without sensitive columns or metrics.
         """
         if not isinstance(self.method, FairnessMethod):
-            raise TypeError("fairness.method must be FairnessMethod")
+            raise errors.KindError("fairness.method must be FairnessMethod")
         validate_evidence(self.sensitive_columns, "fairness.sensitive_columns")
         validate_evidence(self.metrics, "fairness.metrics")
         if self.method is FairnessMethod.NONE and (
@@ -746,7 +752,7 @@ class Explanations:
                 availability level other than none has no required methods.
         """
         if not isinstance(self.availability, ExplanationAvailability):
-            raise TypeError(
+            raise errors.KindError(
                 "explanation.availability must be ExplanationAvailability"
             )
         validate_evidence(self.required_methods, "explanation.required_methods")
@@ -834,14 +840,16 @@ class DiagnosticGate:
         """
         validate_text(self.name, "diagnostic_gate.name")
         if not isinstance(self.action, DiagnosticAction):
-            raise TypeError("diagnostic_gate.action must be DiagnosticAction")
+            raise errors.KindError(
+                "diagnostic_gate.action must be DiagnosticAction"
+            )
         validate_evidence(
             self.required_evidence, "diagnostic_gate.required_evidence"
         )
         if not self.required_evidence:
             raise errors.InputError("diagnostic gates require evidence")
         if not isinstance(self.decisive, bool):
-            raise TypeError("diagnostic_gate.decisive must be bool")
+            raise errors.KindError("diagnostic_gate.decisive must be bool")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible diagnostic gate."""
@@ -941,7 +949,7 @@ class Criteria:
                 declarations.
         """
         if not isinstance(self.task, tasks.Task):
-            raise TypeError("policy.task must be Task")
+            raise errors.KindError("policy.task must be Task")
         if self.schema_version < 1:
             raise errors.InputError("policy.schema_version must be at least 1")
         validate_text(self.primary_metric, "policy.primary_metric")
@@ -1183,7 +1191,7 @@ class Registry:
                 task.
         """
         if not isinstance(task, tasks.Task):
-            raise TypeError("task must be Task")
+            raise errors.KindError("task must be Task")
         policy = self.records.get(task)
         if policy is None:
             raise UndeclaredEvaluationPolicyError(

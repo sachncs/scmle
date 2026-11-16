@@ -70,10 +70,12 @@ def validate_json_value(value: Any, field_name: str = "value") -> object:
         normalized: dict[str, object] = {}
         for key, item in value.items():
             if type(key) is not str:
-                raise TypeError(f"{field_name} has a non-string key: {key!r}")
+                raise errors.KindError(
+                    f"{field_name} has a non-string key: {key!r}"
+                )
             normalized[key] = validate_json_value(item, f"{field_name}.{key}")
         return normalized
-    raise TypeError(
+    raise errors.KindError(
         f"{field_name} must contain only JSON-native values, got "
         f"{type(value).__name__}"
     )
@@ -471,7 +473,9 @@ class Evidence(Contract):
         record = self.model_dump(mode="json")
         normalized = validate_json_value(record, "evidence")
         if not isinstance(normalized, dict):
-            raise TypeError("serialized explanation evidence must be an object")
+            raise errors.KindError(
+                "serialized explanation evidence must be an object"
+            )
         return normalized
 
     def canonical_json(self) -> str:

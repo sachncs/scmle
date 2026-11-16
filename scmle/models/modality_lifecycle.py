@@ -655,13 +655,15 @@ class Record:
             if not isinstance(value, str) or not value.strip():
                 raise errors.InputError(f"{field_name} must not be empty")
         if not isinstance(self.package, Package):
-            raise TypeError("package must be Package")
+            raise errors.KindError("package must be Package")
         stages = tuple(self.stage_evidence)
         if any(
             not isinstance(evidence, modalities.StageEvidence)
             for evidence in stages
         ):
-            raise TypeError("stage_evidence must contain StageEvidence records")
+            raise errors.KindError(
+                "stage_evidence must contain StageEvidence records"
+            )
         expected_stages = modalities.REQUIRED_LIFECYCLE_STAGES
         actual_stages = tuple(evidence.stage for evidence in stages)
         if actual_stages != expected_stages:
@@ -916,9 +918,11 @@ class Checkpoint:
             if not isinstance(value, str) or not value.strip():
                 raise errors.InputError(f"{field_name} must not be empty")
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
-            raise TypeError("seed must be an integer")
+            raise errors.KindError("seed must be an integer")
         if not isinstance(self.require_independent_ground_truth, bool):
-            raise TypeError("require_independent_ground_truth must be bool")
+            raise errors.KindError(
+                "require_independent_ground_truth must be bool"
+            )
         if self.status not in ("running", "completed"):
             raise errors.InputError(
                 "checkpoint status must be running or completed"
@@ -1451,11 +1455,11 @@ class ExtensionCurator(Curator):
                 empty or contain blank values.
         """
         if not isinstance(self.extension, modalities.ExtensionModality):
-            raise TypeError("extension must be ExtensionModality")
+            raise errors.KindError("extension must be ExtensionModality")
         if not self.dataset_hash_value.strip():
             raise errors.InputError("dataset_hash_value must not be empty")
         if not callable(self.curation_callback):
-            raise TypeError("curation_callback must be callable")
+            raise errors.KindError("curation_callback must be callable")
         if not self.limitations or any(
             not value.strip() for value in self.limitations
         ):
@@ -1493,7 +1497,9 @@ class ExtensionCurator(Curator):
         """
         report = self.curation_callback()
         if not isinstance(report, curation.Curation):
-            raise TypeError("curation_callback must return a curation report")
+            raise errors.KindError(
+                "curation_callback must return a curation report"
+            )
         expected_modality = modalities.serialise(self.extension)
         if report.modality != expected_modality:
             raise errors.InputError(
@@ -1790,7 +1796,7 @@ class DocumentPreparer(Preparer):
             TypeError: If `sample` is not a `Sample`.
         """
         if not isinstance(sample, document.Sample):
-            raise TypeError("sample must be a Sample")
+            raise errors.KindError("sample must be a Sample")
         raw_occlusion = self.raw_span_occlusion_scores(sample, model)
         return {
             "status": "available",
@@ -1933,7 +1939,9 @@ class DocumentPreparer(Preparer):
             TypeError: If `observed` is not a `DocumentPreparer`.
         """
         if not isinstance(observed, DocumentPreparer):
-            raise TypeError("observed adapter must be a DocumentPreparer")
+            raise errors.KindError(
+                "observed adapter must be a DocumentPreparer"
+            )
         current = self.dataset.curate()
         report = documents.Monitor(current).observe(observed.dataset)
         return report.to_dict()
@@ -2086,7 +2094,7 @@ class ImagePreparer(Preparer):
             ValueError: If the features are not 16 x 16 RGB.
         """
         if not isinstance(sample, image.Sample):
-            raise TypeError("sample must be an Sample")
+            raise errors.KindError("sample must be an Sample")
         features = self.features((sample,)).values
         if features.shape[1] != 16 * 16 * 3:
             raise errors.InputError(
@@ -2248,7 +2256,7 @@ class ImagePreparer(Preparer):
             TypeError: If `observed` is not an `ImagePreparer`.
         """
         if not isinstance(observed, ImagePreparer):
-            raise TypeError("observed adapter must be an ImagePreparer")
+            raise errors.KindError("observed adapter must be an ImagePreparer")
         report = images.Monitor(self.dataset.curate()).observe(observed.dataset)
         return report.to_dict()
 
@@ -2366,7 +2374,7 @@ class AudioPreparer(Preparer):
             TypeError: If `observed` is not an `AudioPreparer`.
         """
         if not isinstance(observed, AudioPreparer):
-            raise TypeError("observed adapter must be an AudioPreparer")
+            raise errors.KindError("observed adapter must be an AudioPreparer")
         current = observed.dataset.curate()
         reference = self.dataset.curate()
         return {
@@ -2421,7 +2429,7 @@ class AudioPreparer(Preparer):
             TypeError: If `sample` is not an `Sample`.
         """
         if not isinstance(sample, audio.Sample):
-            raise TypeError("sample must be an Sample")
+            raise errors.KindError("sample must be an Sample")
         if sample.metadata.format.lower() != "wav":
             return {
                 "status": "not_available",
@@ -2855,7 +2863,7 @@ class VideoPreparer(Preparer):
             TypeError: If `observed` is not a `VideoPreparer`.
         """
         if not isinstance(observed, VideoPreparer):
-            raise TypeError("observed adapter must be a VideoPreparer")
+            raise errors.KindError("observed adapter must be a VideoPreparer")
         reference = self.dataset.curate()
         current = observed.dataset.curate()
         return {
@@ -2914,7 +2922,7 @@ class VideoPreparer(Preparer):
             TypeError: If `sample` is not a `Sample`.
         """
         if not isinstance(sample, video.Sample):
-            raise TypeError("sample must be a Sample")
+            raise errors.KindError("sample must be a Sample")
         if self.frame_decoder is None:
             return {
                 "status": "not_available",
@@ -3264,7 +3272,7 @@ class GraphPreparer(Preparer):
             TypeError: If `sample` is not a `Node`.
         """
         if not isinstance(sample, graph.Node):
-            raise TypeError("sample must be a Node")
+            raise errors.KindError("sample must be a Node")
         subgraph = self.one_hop_subgraph(sample.node_id)
         subgraph_node_ids = cast("list[str]", subgraph["node_ids"])
         neighbors = subgraph_node_ids[1:]
@@ -3362,7 +3370,7 @@ class GraphPreparer(Preparer):
             TypeError: If `observed` is not a `GraphPreparer`.
         """
         if not isinstance(observed, GraphPreparer):
-            raise TypeError("observed adapter must be a GraphPreparer")
+            raise errors.KindError("observed adapter must be a GraphPreparer")
         reference = self.dataset.profile().to_dict()
         current = observed.dataset.profile().to_dict()
         return {
@@ -3559,7 +3567,7 @@ class GeospatialPreparer(Preparer):
             TypeError: If `sample` is not a `GeoFeature`.
         """
         if not isinstance(sample, geospatial.GeoFeature):
-            raise TypeError("sample must be a GeoFeature")
+            raise errors.KindError("sample must be a GeoFeature")
         feature_index = next(
             index
             for index, item in enumerate(self.dataset.features)
@@ -3668,7 +3676,9 @@ class GeospatialPreparer(Preparer):
             TypeError: If `observed` is not a `GeospatialPreparer`.
         """
         if not isinstance(observed, GeospatialPreparer):
-            raise TypeError("observed adapter must be a GeospatialPreparer")
+            raise errors.KindError(
+                "observed adapter must be a GeospatialPreparer"
+            )
         reference = self.dataset.profile().to_dict()
         current = observed.dataset.profile().to_dict()
         return {
@@ -3743,7 +3753,7 @@ class RasterPreparer(Preparer):
         if not normalized:
             raise errors.InputError("raster samples must not be empty")
         if decoder is not None and not callable(decoder):
-            raise TypeError("decoder must be callable")
+            raise errors.KindError("decoder must be callable")
         if decoder is None and decoder_name is not None:
             raise errors.InputError(
                 "decoder_name requires a caller-owned decoder"
@@ -4146,7 +4156,7 @@ class RasterPreparer(Preparer):
                 raster's pixel features.
         """
         if not isinstance(sample, geospatial.RasterSample):
-            raise TypeError("sample must be a RasterSample")
+            raise errors.KindError("sample must be a RasterSample")
         if self.decoder is None:
             return {
                 "status": "not_available",
@@ -4268,7 +4278,7 @@ class RasterPreparer(Preparer):
             TypeError: If `observed` is not a `RasterPreparer`.
         """
         if not isinstance(observed, RasterPreparer):
-            raise TypeError("observed adapter must be a RasterPreparer")
+            raise errors.KindError("observed adapter must be a RasterPreparer")
         reference = self.curate()
         current = observed.curate()
         return {
@@ -4597,7 +4607,9 @@ class FeaturePreparationStage(Stage):
         """
         partitions = context.partitions
         if partitions is None:
-            raise RuntimeError("splitting must precede feature preparation")
+            raise errors.OrderError(
+                "splitting must precede feature preparation"
+            )
         batches = {
             "train": context.adapter.features(partitions.train),
             "validation": context.adapter.features(partitions.validation),
@@ -4668,7 +4680,7 @@ class EvaluationStage(Stage):
         model = context.model
         partitions = context.partitions
         if model is None or partitions is None:
-            raise RuntimeError(
+            raise errors.OrderError(
                 "modelling and splitting must precede evaluation"
             )
         batch = context.feature_batches["test"]
@@ -4705,7 +4717,7 @@ class DataExplainabilityStage(Stage):
         batch = context.feature_batches["train"]
         partitions = context.partitions
         if partitions is None:
-            raise RuntimeError("splitting must precede data explanation")
+            raise errors.OrderError("splitting must precede data explanation")
         labels = context.adapter.labels(partitions.train)
         label_counts: dict[str, int] = {}
         for label in labels:
@@ -5064,7 +5076,7 @@ class ModelExplainabilityStage(Stage):
         batch = context.feature_batches["test"]
         partitions = context.partitions
         if model is None or partitions is None or not len(batch.sample_ids):
-            raise RuntimeError(
+            raise errors.OrderError(
                 "model, partitions, and test features are required"
             )
         strength = numpy.mean(numpy.abs(model.coef_), axis=0)
@@ -5186,7 +5198,7 @@ class PackagingStage(Stage):
         """
         model = context.model
         if model is None:
-            raise RuntimeError("model is required before packaging")
+            raise errors.OrderError("model is required before packaging")
         target = context.package_path
         if context.resume_replay and target.exists():
             predictor = Predictor.from_package(
@@ -5285,7 +5297,7 @@ class InferenceStage(Stage):
                 evaluation predictions.
         """
         if context.package is None or context.partitions is None:
-            raise RuntimeError(
+            raise errors.OrderError(
                 "package and partitions are required before inference"
             )
         started = time.perf_counter()
@@ -5346,7 +5358,7 @@ class DocumentationStage(Stage):
             RuntimeError: If the data has not been profiled yet.
         """
         if context.curation_report is None:
-            raise RuntimeError("profiling must precede documentation")
+            raise errors.OrderError("profiling must precede documentation")
         dataset_card = curation.DatasetCard.from_report(
             modalities.serialise(context.adapter.modality),
             context.curation_report.to_dict(),
@@ -5394,7 +5406,7 @@ class RecoveryAndResourceStage(Stage):
             ValueError: If a tampered copy of the package is not rejected.
         """
         if context.package is None:
-            raise RuntimeError("package is required before recovery tests")
+            raise errors.OrderError("package is required before recovery tests")
         temporary = Path(tempfile.mkdtemp(prefix="scmle-lifecycle-recovery-"))
         tampered = temporary / "package"
         try:
@@ -5444,11 +5456,11 @@ def check_run_option_types(
             callable.
     """
     if not isinstance(require_independent_ground_truth, bool):
-        raise TypeError("require_independent_ground_truth must be bool")
+        raise errors.KindError("require_independent_ground_truth must be bool")
     if cancellation_check is not None and not callable(cancellation_check):
-        raise TypeError("cancellation_check must be callable")
+        raise errors.KindError("cancellation_check must be callable")
     if not isinstance(resume, bool):
-        raise TypeError("resume must be bool")
+        raise errors.KindError("resume must be bool")
 
 
 def check_checkpoint_options(
@@ -6237,7 +6249,7 @@ def check_package_classifier(loaded: object, feature_count: int) -> None:
             two classes or it holds non-finite values.
     """
     if not isinstance(loaded, LogisticRegression):
-        raise TypeError(
+        raise errors.KindError(
             "modality package does not contain the expected classifier"
         )
     if getattr(loaded, "n_features_in_", None) != feature_count:
@@ -6320,7 +6332,7 @@ def normalize_json_object(
             does not serialize to an object.
     """
     if not isinstance(value, Mapping):
-        raise TypeError(f"{name} must be a mapping")
+        raise errors.KindError(f"{name} must be a mapping")
     try:
         normalized = json.loads(
             json.dumps(dict(value), allow_nan=False, sort_keys=True)

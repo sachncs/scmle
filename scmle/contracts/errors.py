@@ -63,6 +63,24 @@ class InputError(DataError, ValueError):
     category = "input"
 
 
+class KindError(InputError, TypeError):
+    """An input of the wrong kind: a user problem, not a bug.
+
+    It is also a `TypeError`, so code that catches `TypeError` still works,
+    and an `InputError`, so a gate treats it like any other bad input
+    (ERR-20).
+    """
+
+
+class OrderError(InputError, RuntimeError):
+    """A step was called before the step it needs: a caller's mistake.
+
+    Predicting before fitting is one example; it is not a bug. It is also
+    a `RuntimeError`, so code that catches `RuntimeError` still works
+    (ERR-20). A plain `RuntimeError` is kept for real defects.
+    """
+
+
 class SchemaError(DataError):
     """Input data does not match the schema a model was trained on."""
 

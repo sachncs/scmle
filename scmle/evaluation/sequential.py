@@ -512,7 +512,7 @@ class Estimation:
             ("reference", self.reference),
         ):
             if not isinstance(mapping_value, Mapping):
-                raise TypeError(f"{mapping_name} must be a mapping")
+                raise errors.KindError(f"{mapping_name} must be a mapping")
         fingerprint: object = self.raw_input_fingerprint  # may be non-text
         if (
             not isinstance(fingerprint, str)
@@ -822,9 +822,9 @@ class Estimator:
                 `policy` is neither None nor a `Config`.
         """
         if not isinstance(estimand, Estimand):
-            raise TypeError("estimand must be Estimand")
+            raise errors.KindError("estimand must be Estimand")
         if policy is not None and not isinstance(policy, Config):
-            raise TypeError("policy must be Config")
+            raise errors.KindError("policy must be Config")
         self.estimand = estimand
         self.policy = policy or Config()
 
@@ -1190,7 +1190,7 @@ def prepare_sequential_frame(
             within a subject.
     """
     if not isinstance(frame, pandas.DataFrame):
-        raise TypeError("frame must be a pandas DataFrame")
+        raise errors.KindError("frame must be a pandas DataFrame")
     if frame.empty:
         raise errors.InputError("sequential frame must not be empty")
     required = check_declared_columns(frame, estimand)

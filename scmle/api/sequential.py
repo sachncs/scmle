@@ -32,7 +32,7 @@ def resolve_tabular_input(
         return data.copy(deep=True)
     if isinstance(data, (str, pathlib.Path)):
         return tabular.DatasetLoader().load(pathlib.Path(data))
-    raise TypeError(
+    raise errors.KindError(
         "data must be a pandas DataFrame or a path to a supported tabular file"
     )
 
@@ -74,14 +74,14 @@ class Estimation:
             TypeError: If the input, estimand, or policy is unsupported.
         """
         if not isinstance(data, (pandas.DataFrame, str, pathlib.Path)):
-            raise TypeError(
+            raise errors.KindError(
                 "data must be a pandas DataFrame or a path to a supported "
                 "tabular file"
             )
         if not isinstance(estimand, sequential.Estimand):
-            raise TypeError("estimand must be Estimand")
+            raise errors.KindError("estimand must be Estimand")
         if not isinstance(policy, sequential.Config):
-            raise TypeError("policy must be Config")
+            raise errors.KindError("policy must be Config")
         self.data = data
         self.estimand = estimand
         self.policy = policy

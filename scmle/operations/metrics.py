@@ -68,7 +68,7 @@ def freeze(labels: Mapping[str, str] | None) -> Labels:
         if not LABEL_PATTERN.match(key) or key.startswith("__"):
             raise errors.InputError(f"invalid label name {key!r}")
         if not isinstance(value, str):
-            raise TypeError("label values must be text")
+            raise errors.KindError("label values must be text")
     return items
 
 

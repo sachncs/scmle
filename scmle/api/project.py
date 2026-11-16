@@ -1169,23 +1169,25 @@ class ModalityProject:
             ValueError: If the signing key is empty.
         """
         if not isinstance(adapter, modality_lifecycle.Preparer):
-            raise TypeError("adapter must be a Preparer")
+            raise errors.KindError("adapter must be a Preparer")
         if not signing_key:
             raise errors.InputError("signing_key must not be empty")
         if isinstance(seed, bool) or not isinstance(seed, int):
-            raise TypeError("seed must be an integer")
+            raise errors.KindError("seed must be an integer")
         if not isinstance(require_independent_ground_truth, bool):
-            raise TypeError("require_independent_ground_truth must be bool")
+            raise errors.KindError(
+                "require_independent_ground_truth must be bool"
+            )
         if not isinstance(resume, bool):
-            raise TypeError("resume must be bool")
+            raise errors.KindError("resume must be bool")
         if cancellation is not None and not isinstance(
             cancellation, modality_lifecycle.Cancellation
         ):
-            raise TypeError("cancellation must be a Cancellation")
+            raise errors.KindError("cancellation must be a Cancellation")
         if observed_adapter is not None and not isinstance(
             observed_adapter, modality_lifecycle.Preparer
         ):
-            raise TypeError("observed_adapter must be a Preparer")
+            raise errors.KindError("observed_adapter must be a Preparer")
         self.adapter = adapter
         self.signing_key = signing_key
         self.output_dir = pathlib.Path(output_dir)
@@ -1251,7 +1253,7 @@ class ModalityProject:
             RuntimeError: If `run` has not completed.
         """
         if self.report is None:
-            raise RuntimeError("run must complete before declaration")
+            raise errors.OrderError("run must complete before declaration")
         return self.lifecycle.declaration(self.report)
 
 
@@ -1368,13 +1370,13 @@ class Curator:
             ValueError: If the signing key is empty.
         """
         if not isinstance(adapter, modality_lifecycle.Curator):
-            raise TypeError("adapter must be a Curator")
+            raise errors.KindError("adapter must be a Curator")
         if not signing_key:
             raise errors.InputError("signing_key must not be empty")
         if manifest is not None and not isinstance(
             manifest, scmle.contracts.data.ModalityManifest
         ):
-            raise TypeError("manifest must be ModalityManifest")
+            raise errors.KindError("manifest must be ModalityManifest")
         self.adapter = adapter
         self.signing_key = signing_key
         self.output_dir = pathlib.Path(output_dir)
@@ -1418,7 +1420,7 @@ class Curator:
                 document.Curation,
             ),
         ):
-            raise TypeError(
+            raise errors.KindError(
                 "adapter curate() must return a modality curation report"
             )
         curation_payload = report.to_dict()

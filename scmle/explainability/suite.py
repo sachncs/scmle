@@ -73,10 +73,10 @@ def build_evidence(
     if not isinstance(method_name, str) or not method_name.strip():
         raise errors.InputError("diagnostic.name must be a non-empty string")
     if isinstance(limitations, str):
-        raise TypeError("limitations must be a sequence of strings")
+        raise errors.KindError("limitations must be a sequence of strings")
     supplied_links: object = evidence_links  # callers may pass a string
     if isinstance(supplied_links, str):
-        raise TypeError(
+        raise errors.KindError(
             "evidence_links must be a sequence of EvidenceLink values"
         )
 

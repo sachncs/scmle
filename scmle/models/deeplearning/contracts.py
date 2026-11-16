@@ -250,7 +250,9 @@ class ModelFamilyContract:
             not isinstance(item, capabilities.Modality)
             for item in self.modalities
         ):
-            raise TypeError("model family modalities must use Modality values")
+            raise errors.KindError(
+                "model family modalities must use Modality values"
+            )
         if any(not item.strip() for item in self.required_extras):
             raise errors.InputError("required extras must not be empty")
         if any(not item.strip() for item in self.limitations):

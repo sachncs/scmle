@@ -87,7 +87,7 @@ class ReviewClaim:
         if not isinstance(kind, ReviewClaimKind):
             object.__setattr__(self, "kind", ReviewClaimKind(kind))
         if not isinstance(self.passed, bool):
-            raise TypeError("passed must be bool")
+            raise errors.KindError("passed must be bool")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a deterministic JSON-native claim."""
@@ -163,7 +163,7 @@ def require_claims(claims: tuple[ReviewClaim, ...]) -> None:
     if not claims:
         raise errors.InputError("claims must not be empty")
     if not all(isinstance(item, ReviewClaim) for item in claims):
-        raise TypeError("claims must contain ReviewClaim values")
+        raise errors.KindError("claims must contain ReviewClaim values")
     claim_ids = [claim.criterion_id for claim in claims]
     if len(claim_ids) != len(set(claim_ids)):
         raise errors.InputError("claims must not contain duplicate criteria")

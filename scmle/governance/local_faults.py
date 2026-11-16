@@ -20,6 +20,7 @@ from typing import Any
 from typing import NoReturn
 from typing import TYPE_CHECKING
 
+from scmle.contracts import errors
 from scmle.contracts import lineage
 from scmle.contracts import reliability
 from scmle.data.readers import incremental
@@ -106,7 +107,7 @@ class LocalFaultExecutor:
                 plan requires or repeat.
         """
         if not isinstance(scenario, reliability.FaultScenario):
-            raise TypeError("scenario must be FaultScenario")
+            raise errors.KindError("scenario must be FaultScenario")
         handlers: dict[
             reliability.FaultScenario,
             Callable[

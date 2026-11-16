@@ -774,9 +774,9 @@ class Estimation:
                 fingerprint is not a lowercase SHA-256 digest.
         """
         if not isinstance(self.estimand, Estimand):
-            raise TypeError("estimand must be Estimand")
+            raise errors.KindError("estimand must be Estimand")
         if not isinstance(self.policy, Config):
-            raise TypeError("policy must be Config")
+            raise errors.KindError("policy must be Config")
         if not self.parameters:
             raise errors.InputError("estimation result needs parameters")
         names = tuple(item.name for item in self.parameters)
@@ -790,7 +790,7 @@ class Estimation:
             ("reference", self.reference),
         ):
             if not isinstance(mapping_value, Mapping):
-                raise TypeError(f"{mapping_name} must be a mapping")
+                raise errors.KindError(f"{mapping_name} must be a mapping")
         fingerprint: object = self.raw_input_fingerprint  # may be non-text
         if (
             not isinstance(fingerprint, str)

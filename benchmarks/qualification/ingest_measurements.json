@@ -17,7 +17,7 @@
     "joins": "810681bee13f88291f89941a74783d124de2cbb389f5f51ced2ddbfae05f0c76",
     "point_in_time": "26ebf4d36bf8e61fd8d06a0ddfe0712c4a532f8e75d294b949e4b2700b974f41",
     "reconcile": "bb361f72cf3d8e88eab51a781d26eca447b98623c015432c4e57db6c4bad8ccd",
-    "torn_read": "fb2081575fb0d9413a6db6fc331dcbbcdbd47ab62d0905c992bf958b5caa0045"
+    "torn_read": "1a48ed82c7afbe1183a9d6ccc0d9f40a069ab0c4f7508e334cae090393043379"
   },
   "development_seed_base": 10000,
   "entities": {
@@ -105,7 +105,7 @@
     "seed_offset": 0,
     "tolerance": 0.0
   },
-  "seconds": 19.8,
+  "seconds": 20.3,
   "torn_read": {
     "batch_rows": 5,
     "detected": 500,

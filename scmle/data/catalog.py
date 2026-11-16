@@ -150,7 +150,7 @@ class Source:
         ):
             field_value = getattr(self, field_name)
             if not isinstance(field_value, str):
-                raise TypeError(f"{field_name} must be a string")
+                raise errors.KindError(f"{field_name} must be a string")
             object.__setattr__(self, field_name, field_value.strip())
 
     @property
@@ -291,7 +291,7 @@ class MissingnessSummary:
             if isinstance(field_value, bool) or not isinstance(
                 field_value, int
             ):
-                raise TypeError(f"{field_name} must be an integer")
+                raise errors.KindError(f"{field_name} must be an integer")
             if field_value < 0:
                 raise errors.InputError(f"{field_name} must not be negative")
         if self.missing_values > self.total_values:
@@ -400,7 +400,7 @@ class DuplicateSummary:
         if isinstance(self.duplicate_rows, bool) or not isinstance(
             self.duplicate_rows, int
         ):
-            raise TypeError("duplicate_rows must be an integer")
+            raise errors.KindError("duplicate_rows must be an integer")
         if self.duplicate_rows < 0:
             raise errors.InputError("duplicate_rows must not be negative")
         if (
@@ -476,7 +476,7 @@ class LabelSummary:
             if isinstance(field_value, bool) or not isinstance(
                 field_value, int
             ):
-                raise TypeError(f"{field_name} must be an integer")
+                raise errors.KindError(f"{field_name} must be an integer")
             if field_value < 0:
                 raise errors.InputError(f"{field_name} must not be negative")
         if self.distinct_count > self.observed_count:
@@ -557,11 +557,11 @@ def check_counts(sample_count: Any, schema_version: Any) -> None:
             not the supported version.
     """
     if isinstance(sample_count, bool) or not isinstance(sample_count, int):
-        raise TypeError("sample_count must be an integer")
+        raise errors.KindError("sample_count must be an integer")
     if sample_count < 0:
         raise errors.InputError("sample_count must not be negative")
     if isinstance(schema_version, bool) or not isinstance(schema_version, int):
-        raise TypeError("schema_version must be an integer")
+        raise errors.KindError("schema_version must be an integer")
     if schema_version != CATALOG_SCHEMA_VERSION:
         raise errors.InputError("unsupported catalog schema version")
 
@@ -604,7 +604,7 @@ class Catalog:
                 ``content_identity`` is not a SHA-256 digest.
         """
         if not isinstance(self.source, Source):
-            raise TypeError("source must be Source")
+            raise errors.KindError("source must be Source")
         data_kind: object = self.data_kind
         if not isinstance(data_kind, str) or not data_kind.strip():
             raise errors.InputError("data_kind must not be empty")
@@ -619,13 +619,13 @@ class Catalog:
             raise errors.InputError("shape must contain non-negative integers")
         fields = tuple(self.schema)
         if any(not isinstance(field, Field) for field in fields):
-            raise TypeError("schema must contain Field records")
+            raise errors.KindError("schema must contain Field records")
         if not isinstance(self.missingness, MissingnessSummary):
-            raise TypeError("missingness must be MissingnessSummary")
+            raise errors.KindError("missingness must be MissingnessSummary")
         if not isinstance(self.duplicates, DuplicateSummary):
-            raise TypeError("duplicates must be DuplicateSummary")
+            raise errors.KindError("duplicates must be DuplicateSummary")
         if not isinstance(self.label, LabelSummary):
-            raise TypeError("label must be LabelSummary")
+            raise errors.KindError("label must be LabelSummary")
         limitation_notes: Iterable[object] = self.limitations
         blocker_notes: Iterable[object] = self.release_blockers
         if not self.limitations or any(
@@ -1179,7 +1179,7 @@ def canonical_scalar(value: Any) -> Any:
         return value
     if isinstance(value, numpy.ndarray):
         return [canonical_value(item) for item in value.tolist()]
-    raise TypeError(
+    raise errors.KindError(
         f"cannot deterministically catalog value of type {type(value).__name__}"
     )
 
@@ -1444,7 +1444,7 @@ def observe_data(
             release_blockers=tuple(blockers),
         )
     if supplied_identity is None:
-        raise TypeError(
+        raise errors.KindError(
             "opaque data needs a caller-supplied SHA-256 content_identity"
         )
     content_identity = validate_digest(supplied_identity, "content_identity")

@@ -405,7 +405,7 @@ class Estimation:
             ("reference", self.reference),
         ):
             if not isinstance(item_value, Mapping):
-                raise TypeError(f"{name} must be a mapping")
+                raise errors.KindError(f"{name} must be a mapping")
         fingerprint: object = self.raw_input_fingerprint  # may be non-text
         if (
             not isinstance(fingerprint, str)
@@ -667,7 +667,7 @@ class Estimator:
             TypeError: If `estimand` is not a `Estimand`.
         """
         if not isinstance(estimand, Estimand):
-            raise TypeError("estimand must be Estimand")
+            raise errors.KindError("estimand must be Estimand")
         self.estimand = estimand
         self.policy = policy or Config()
 
@@ -1025,7 +1025,7 @@ def prepare_longitudinal_frame(
             rows remain, or a covariate varies within a subject.
     """
     if not isinstance(frame, pandas.DataFrame):
-        raise TypeError("frame must be a pandas DataFrame")
+        raise errors.KindError("frame must be a pandas DataFrame")
     if frame.empty:
         raise errors.InputError("longitudinal frame must not be empty")
     required = check_declared_columns(frame, estimand)

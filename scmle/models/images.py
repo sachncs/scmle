@@ -246,7 +246,7 @@ class Classifier:
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         return tuple(estimator.classes_.tolist())
 
     @property
@@ -259,7 +259,7 @@ class Classifier:
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         state = {
             "config": self.config.to_dict(),
             "feature_names": self.feature_names,
@@ -349,7 +349,7 @@ class Classifier:
             return ()
         estimator = self.estimator
         if estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         return tuple(
             cast(
                 "numpy.ndarray", estimator.predict(self.transform(dataset))
@@ -377,7 +377,7 @@ class Classifier:
             return ()
         estimator = self.estimator
         if estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         probabilities = estimator.predict_proba(self.transform(dataset))
         return tuple(tuple(row) for row in probabilities)
 
@@ -433,7 +433,7 @@ class Classifier:
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         strengths = numpy.mean(numpy.abs(estimator.coef_), axis=0)
         selected = sorted(
             zip(self.feature_names, strengths, strict=True),
@@ -478,7 +478,7 @@ class Classifier:
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         matrix = self.transform(image.Dataset((sample,)))
         predicted_label = estimator.predict(matrix)[0]
         class_index = int(
@@ -600,7 +600,7 @@ class Classifier:
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         predicted = estimator.predict(features)[0]
         class_index = int(numpy.flatnonzero(estimator.classes_ == predicted)[0])
         decision = numpy.asarray(estimator.decision_function(features))
@@ -716,7 +716,7 @@ class Classifier:
         envelope.check(manifest, target, signing_key, trusted)
         loaded = joblib.load(model_path)
         if not isinstance(loaded, cls):
-            raise TypeError("package does not contain an Classifier")
+            raise errors.KindError("package does not contain an Classifier")
         loaded.require_fitted()
         if loaded.model_digest != manifest.get("model_digest"):
             raise errors.InputError(
@@ -765,7 +765,7 @@ class Classifier:
             RuntimeError: If it has not been fitted.
         """
         if not self.fitted:
-            raise RuntimeError("image classifier has not been fitted")
+            raise errors.OrderError("image classifier has not been fitted")
 
 
 class Monitor:

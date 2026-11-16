@@ -69,7 +69,7 @@ class Alert:
         except ValueError as error:
             raise errors.InputError("created_at must be ISO-8601") from error
         if not isinstance(self.details, Mapping):
-            raise TypeError("details must be a mapping")
+            raise errors.KindError("details must be a mapping")
         object.__setattr__(self, "details", dict(self.details))
 
     def to_dict(self) -> dict[str, object]:

@@ -85,7 +85,7 @@ class ObjectPayload:
         if not self.source_uri.strip():
             raise errors.InputError("source_uri must not be empty")
         if not isinstance(self.payload, bytes):
-            raise TypeError("payload must be bytes")
+            raise errors.KindError("payload must be bytes")
         object.__setattr__(
             self,
             "content_sha256",
@@ -1093,7 +1093,7 @@ class DbApiConnector(SourceConnector):
         if not query.strip():
             raise errors.InputError("query must not be empty")
         if not callable(connection_factory):
-            raise TypeError("connection_factory must be callable")
+            raise errors.KindError("connection_factory must be callable")
         if read_only:
             refuse_writes(query, value)
             if snapshot_query is not None:
@@ -1394,7 +1394,9 @@ class WarehouseConnector(SourceConnector):
         schema_candidate: object = schema_reader
         batch_candidate: object = batch_reader
         if not callable(schema_candidate) or not callable(batch_candidate):
-            raise TypeError("schema_reader and batch_reader must be callable")
+            raise errors.KindError(
+                "schema_reader and batch_reader must be callable"
+            )
         self.query = query
         self.schema_reader = schema_reader
         self.batch_reader = batch_reader
@@ -1649,11 +1651,11 @@ class ObjectStoreConnector(SourceConnector):
                 value, scheme, self.supported_schemes
             )
         if not callable(read_bytes):
-            raise TypeError("read_bytes must be callable")
+            raise errors.KindError("read_bytes must be callable")
         if max_bytes < 1:
             raise errors.InputError("max_bytes must be positive")
         if decoder is not None and not callable(decoder):
-            raise TypeError("decoder must be callable")
+            raise errors.KindError("decoder must be callable")
         if decoder is None:
             if decoder_name is not None:
                 raise errors.InputError(
@@ -1879,7 +1881,7 @@ class StreamingObjectStoreConnector(SourceConnector):
         range_candidate: object = read_range
         size_candidate: object = size_bytes
         if not callable(range_candidate) or not callable(size_candidate):
-            raise TypeError("read_range and size_bytes must be callable")
+            raise errors.KindError("read_range and size_bytes must be callable")
         if chunk_bytes < 1:
             raise errors.InputError("chunk_bytes must be positive")
         if max_record_bytes < 1:

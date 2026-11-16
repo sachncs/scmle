@@ -6,7 +6,7 @@
   "compound_classes": 730,
   "private_names": 0,
   "loose_dicts": 1156,
-  "largest_module": 6362,
-  "bare_raises": 276,
+  "largest_module": 6374,
+  "bare_raises": 26,
   "value_catches": 170
 }

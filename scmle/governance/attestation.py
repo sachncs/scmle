@@ -87,7 +87,7 @@ class ReleaseAttestation:
             if not isinstance(value, str) or not value.strip():
                 raise errors.InputError(f"{field_name} must not be empty")
         if not isinstance(self.signature_present, bool):
-            raise TypeError("signature_present must be bool")
+            raise errors.KindError("signature_present must be bool")
         attestation_signature: object = self.attestation_signature
         if attestation_signature is not None and (
             not isinstance(attestation_signature, str)

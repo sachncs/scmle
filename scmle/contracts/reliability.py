@@ -126,7 +126,7 @@ class Evidence:
             if not isinstance(value, str) or not value.strip():
                 raise errors.InputError(f"{name} must not be empty")
         if not isinstance(self.observed_outcome, EvidenceOutcome):
-            raise TypeError("observed_outcome must be EvidenceOutcome")
+            raise errors.KindError("observed_outcome must be EvidenceOutcome")
 
     def to_dict(self) -> dict[str, str]:
         """Returns a deterministic JSON-compatible evidence record."""
@@ -235,10 +235,10 @@ class Plan:
         )
         for name, value, expected in enum_fields:
             if not isinstance(value, expected):
-                raise TypeError(f"{name} must be {expected.__name__}")
+                raise errors.KindError(f"{name} must be {expected.__name__}")
         check_evidence_requirements(self.evidence_requirements)
         if not isinstance(self.release_blocking, bool):
-            raise TypeError("release_blocking must be bool")
+            raise errors.KindError("release_blocking must be bool")
         evidence_types = [item.evidence_type for item in self.evidence]
         if len(set(evidence_types)) != len(evidence_types):
             raise errors.InputError(
@@ -354,7 +354,7 @@ class Registry:
             ValueError: If the scenario is already registered.
         """
         if not isinstance(plan, Plan):
-            raise TypeError("plan must be Plan")
+            raise errors.KindError("plan must be Plan")
         if plan.scenario in self.plans:
             raise errors.InputError(
                 f"scenario already registered: {plan.scenario}"
@@ -395,12 +395,12 @@ class Registry:
                 plan an unsafe or inconclusive outcome.
         """
         if not isinstance(scenario, FaultScenario):
-            raise TypeError("scenario must be FaultScenario")
+            raise errors.KindError("scenario must be FaultScenario")
         supplied: object = evidence  # callers may pass a non-tuple
         if not isinstance(supplied, tuple) or not supplied:
             raise errors.InputError("evidence must be a non-empty tuple")
         if not all(isinstance(item, Evidence) for item in evidence):
-            raise TypeError("evidence must contain Evidence values")
+            raise errors.KindError("evidence must contain Evidence values")
         execution_ids = {item.execution_id for item in evidence}
         if len(execution_ids) != 1:
             raise errors.InputError(
@@ -507,7 +507,7 @@ class Registry:
         registry = cls()
         for item in scenarios:
             if not isinstance(item, Mapping):
-                raise TypeError("each scenario must be a mapping")
+                raise errors.KindError("each scenario must be a mapping")
             registry.register(Plan.from_dict(item))
         registry.validate_complete()
         return registry
@@ -528,7 +528,7 @@ class Registry:
         """
         record = json.loads(serialized)
         if not isinstance(record, Mapping):
-            raise TypeError("serialized plan must contain a JSON object")
+            raise errors.KindError("serialized plan must contain a JSON object")
         return cls.from_dict(record)
 
 

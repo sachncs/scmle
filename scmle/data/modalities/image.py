@@ -410,7 +410,7 @@ class Sample:
         if self.augmentation is not None and not isinstance(
             self.augmentation, Augmentation
         ):
-            raise TypeError("augmentation must be Augmentation or None")
+            raise errors.KindError("augmentation must be Augmentation or None")
         if len(self.encoded_bytes) != self.byte_size:
             raise errors.InputError("byte_size does not match encoded_bytes")
         if self.width <= 0 or self.height <= 0:
@@ -823,7 +823,7 @@ class Dataset:
         """
         normalized = tuple(self.samples)
         if any(not isinstance(sample, Sample) for sample in normalized):
-            raise TypeError("samples must contain only Sample objects")
+            raise errors.KindError("samples must contain only Sample objects")
         object.__setattr__(self, "samples", normalized)
         identities = (
             f"{sample.source}\0{sample.content_hash}"

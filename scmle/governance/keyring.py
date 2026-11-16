@@ -319,7 +319,7 @@ class SigningKeyRegistry:
             ValueError: If the key id is already registered.
         """
         if not isinstance(record, SigningKeyRecord):
-            raise TypeError("record must be SigningKeyRecord")
+            raise errors.KindError("record must be SigningKeyRecord")
         with self.lock:
             if record.key_id in self.records:
                 raise errors.InputError(
@@ -505,7 +505,7 @@ class SigningKeyRegistry:
             TypeError: If `envelope` is not a `SignatureEnvelope`.
         """
         if not isinstance(envelope, SignatureEnvelope):
-            raise TypeError("envelope must be SignatureEnvelope")
+            raise errors.KindError("envelope must be SignatureEnvelope")
         record = self.records.get(envelope.key_id)
         secret = secrets.get(envelope.key_id)
         if record is None or secret is None:

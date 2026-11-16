@@ -148,14 +148,14 @@ class Event:
         if isinstance(self.sequence, bool) or not isinstance(
             self.sequence, int
         ):
-            raise TypeError("sequence must be an integer")
+            raise errors.KindError("sequence must be an integer")
         if self.sequence < 1:
             raise errors.InputError("sequence must be a positive integer")
         parse_timestamp(self.event_time, "event_time")
         if self.ingest_time:
             parse_timestamp(self.ingest_time, "ingest_time")
         if not isinstance(self.payload, Mapping):
-            raise TypeError("payload must be a mapping")
+            raise errors.KindError("payload must be a mapping")
         object.__setattr__(self, "payload", dict(self.payload))
 
     def to_dict(self) -> dict[str, Any]:
@@ -223,7 +223,7 @@ class EventCheckpoint:
         if isinstance(self.sequence, bool) or not isinstance(
             self.sequence, int
         ):
-            raise TypeError("sequence must be an integer")
+            raise errors.KindError("sequence must be an integer")
         if self.sequence < 0:
             raise errors.InputError("sequence must be a non-negative integer")
         if self.watermark:
@@ -312,7 +312,7 @@ class EventBatch:
                 "batch and checkpoint source identities differ"
             )
         if any(not isinstance(event, Event) for event in self.events):
-            raise TypeError("events must contain Event values")
+            raise errors.KindError("events must contain Event values")
         if tuple(sorted(set(self.duplicate_event_ids))) != (
             self.duplicate_event_ids
         ):
@@ -625,7 +625,7 @@ class EventSource(abc.ABC):
         committed = frozenset(seen_event_ids)
         values = tuple(records)
         if any(not isinstance(event, Event) for event in values):
-            raise TypeError("transport records must yield Event values")
+            raise errors.KindError("transport records must yield Event values")
         ordered = tuple(
             sorted(values, key=lambda event: (event.sequence, event.event_id))
         )
@@ -797,7 +797,7 @@ class EventStreamSource(EventSource):
                 value, scheme, self.supported_schemes
             )
         if not callable(event_reader):
-            raise TypeError("event_reader must be callable")
+            raise errors.KindError("event_reader must be callable")
         super().__init__(value, late_data_policy)
         self.event_reader = event_reader
         self.retry_budget = retry_budget or connectors.RetryBudget()
@@ -1263,9 +1263,9 @@ class IngestionLedger:
         """
         records = tuple(events)
         if not all(isinstance(event, Event) for event in records):
-            raise TypeError("events must contain Event values")
+            raise errors.KindError("events must contain Event values")
         if not callable(writer):
-            raise TypeError("writer must be callable")
+            raise errors.KindError("writer must be callable")
         if (
             acknowledgement is not None
             and acknowledgement.source_identity != self.source_identity
@@ -1384,9 +1384,9 @@ class EventConsumer:
                 {"source_identity": source.source_identity},
             )
         if not callable(writer):
-            raise TypeError("writer must be callable")
+            raise errors.KindError("writer must be callable")
         if not callable(acknowledge):
-            raise TypeError("acknowledge must be callable")
+            raise errors.KindError("acknowledge must be callable")
         self.source = source
         self.ledger = ledger
         self.consumer_group = group

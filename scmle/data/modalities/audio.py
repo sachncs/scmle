@@ -184,11 +184,11 @@ class Transcript:
         ):
             raise errors.InputError("transcript confidence must be in [0, 1]")
         if not isinstance(self.segments, tuple):
-            raise TypeError("segments must be a tuple")
+            raise errors.KindError("segments must be a tuple")
         if not all(
             isinstance(segment, TranscriptSegment) for segment in self.segments
         ):
-            raise TypeError("segments must contain transcript segments")
+            raise errors.KindError("segments must contain transcript segments")
         if any(
             current.start_seconds < previous.start_seconds
             for previous, current in zip(

@@ -11,6 +11,7 @@ from typing import Any
 from typing import TYPE_CHECKING
 
 from scmle.contracts import capabilities
+from scmle.contracts import errors
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -58,7 +59,7 @@ class Observation:
             TypeError: If `environment` is not a `Environment`.
         """
         if not isinstance(environment, capabilities.Environment):
-            raise TypeError("environment must be Environment")
+            raise errors.KindError("environment must be Environment")
         self.environment = environment
         self.captured_at = captured_at
         self.disk_path = disk_path

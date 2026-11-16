@@ -670,7 +670,7 @@ class Dataset:
                 or cannot be converted to finite numeric values.
         """
         if not callable(decoder):
-            raise TypeError("decoder must be callable")
+            raise errors.KindError("decoder must be callable")
         if max_frames < 1 or max_frame_pixels < 1:
             raise errors.InputError("frame bounds must be positive")
         slot_names = ("mean", "std", "min", "max", "observed")

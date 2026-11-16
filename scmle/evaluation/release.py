@@ -73,14 +73,14 @@ def normalize_measure(field_name: str, value: Any) -> float | str | None:
         ValueError: If `value` is a number that is not finite.
     """
     if isinstance(value, bool):
-        raise TypeError(f"{field_name} must not be bool")
+        raise errors.KindError(f"{field_name} must not be bool")
     if isinstance(value, Real):
         numeric = float(value)
         if not math.isfinite(numeric):
             raise errors.InputError(f"{field_name} must be finite")
         return numeric
     if value is not None and not isinstance(value, str):
-        raise TypeError(f"{field_name} must be numeric, text, or None")
+        raise errors.KindError(f"{field_name} must be numeric, text, or None")
     return value
 
 
@@ -125,19 +125,19 @@ class ReleaseFinding:
                 or a numeric `observed` or `expected` is not finite.
         """
         if not isinstance(self.kind, FindingKind):
-            raise TypeError("kind must be FindingKind")
+            raise errors.KindError("kind must be FindingKind")
         name: object = self.name  # may be a non-string at runtime
         if not isinstance(name, str) or not name.strip():
             raise errors.InputError("name must not be empty")
         if not isinstance(self.passed, bool):
-            raise TypeError("passed must be bool")
+            raise errors.KindError("passed must be bool")
         if not isinstance(self.blocking, bool):
-            raise TypeError("blocking must be bool")
+            raise errors.KindError("blocking must be bool")
         reason: object = self.reason  # may be a non-string at runtime
         if not isinstance(reason, str) or not reason.strip():
             raise errors.InputError("reason must not be empty")
         if not isinstance(self.evidence, tuple):
-            raise TypeError("evidence must be a tuple of strings")
+            raise errors.KindError("evidence must be a tuple of strings")
         entries: Iterable[object] = self.evidence  # may hold non-strings
         if any(
             not isinstance(item, str) or not item.strip() for item in entries
@@ -210,7 +210,7 @@ class FindingCounts:
         }
         for name, value in values.items():
             if isinstance(value, bool) or not isinstance(value, int):
-                raise TypeError(f"{name} must be a non-negative integer")
+                raise errors.KindError(f"{name} must be a non-negative integer")
             if value < 0:
                 raise errors.InputError(
                     f"{name} must be a non-negative integer"
@@ -253,7 +253,7 @@ def check_count_values(values: Mapping[str, Any]) -> None:
     """
     for name, value in values.items():
         if isinstance(value, bool) or not isinstance(value, int):
-            raise TypeError(f"{name} must be a non-negative integer")
+            raise errors.KindError(f"{name} must be a non-negative integer")
         if value < 0:
             raise errors.InputError(f"{name} must be a non-negative integer")
 
@@ -269,7 +269,7 @@ def check_kind_coverage(counts_by_kind: Any) -> None:
         ValueError: If its keys are not exactly the finding kinds.
     """
     if not isinstance(counts_by_kind, Mapping):
-        raise TypeError("counts_by_kind must be a mapping")
+        raise errors.KindError("counts_by_kind must be a mapping")
     expected_kinds = {kind.value for kind in FindingKind}
     if set(counts_by_kind) != expected_kinds:
         raise errors.InputError(
@@ -279,7 +279,9 @@ def check_kind_coverage(counts_by_kind: Any) -> None:
         isinstance(kind, str) and isinstance(counts, FindingCounts)
         for kind, counts in counts_by_kind.items()
     ):
-        raise TypeError("counts_by_kind must map strings to FindingCounts")
+        raise errors.KindError(
+            "counts_by_kind must map strings to FindingCounts"
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -342,7 +344,7 @@ class ReleaseReadinessSummary:
                 "policy_schema_version must be non-negative"
             )
         if not isinstance(self.status, ReleaseStatus):
-            raise TypeError("status must be ReleaseStatus")
+            raise errors.KindError("status must be ReleaseStatus")
         values = {
             "total_findings": self.total_findings,
             "passed_findings": self.passed_findings,
@@ -475,13 +477,15 @@ class ReleaseEvaluation:
                 "policy_schema_version must not be negative"
             )
         if not isinstance(self.passed, bool):
-            raise TypeError("passed must be bool")
+            raise errors.KindError("passed must be bool")
         if not isinstance(self.findings, tuple):
-            raise TypeError("findings must be a tuple")
+            raise errors.KindError("findings must be a tuple")
         if not all(isinstance(item, ReleaseFinding) for item in self.findings):
-            raise TypeError("findings must contain ReleaseFinding values")
+            raise errors.KindError(
+                "findings must contain ReleaseFinding values"
+            )
         if not isinstance(self.blocking_reasons, tuple):
-            raise TypeError("blocking_reasons must be a tuple")
+            raise errors.KindError("blocking_reasons must be a tuple")
         expected_reasons = tuple(
             item.reason
             for item in self.findings
@@ -696,7 +700,7 @@ def apply_reliability_gate(
         TypeError: If `outcome` is not a `ReleaseEvaluation`.
     """
     if not isinstance(outcome, ReleaseEvaluation):
-        raise TypeError("outcome must be ReleaseEvaluation")
+        raise errors.KindError("outcome must be ReleaseEvaluation")
     passed = (
         isinstance(reliability_plan, Mapping)
         and reliability_plan.get("execution_status") == "passed"
@@ -762,7 +766,7 @@ def apply_attestation_gate(
         TypeError: If `outcome` is not a `ReleaseEvaluation`.
     """
     if not isinstance(outcome, ReleaseEvaluation):
-        raise TypeError("outcome must be ReleaseEvaluation")
+        raise errors.KindError("outcome must be ReleaseEvaluation")
     signature = (
         attestation_record.get("signature")
         if isinstance(attestation_record, Mapping)
@@ -832,7 +836,7 @@ def apply_evidence_index_gate(
         TypeError: If `outcome` is not a `ReleaseEvaluation`.
     """
     if not isinstance(outcome, ReleaseEvaluation):
-        raise TypeError("outcome must be ReleaseEvaluation")
+        raise errors.KindError("outcome must be ReleaseEvaluation")
     passed = (
         isinstance(index, evidence.Index)
         and index.signature is not None

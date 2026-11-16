@@ -183,7 +183,7 @@ class Linker:
         """
         record = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
         if not isinstance(record, Mapping):
-            raise TypeError("evidence graph must be a JSON object")
+            raise errors.KindError("evidence graph must be a JSON object")
         graph = lineage.Graph.from_dict(record)
         expected_digest = record.get("graph_digest")
         if expected_digest is not None and expected_digest != graph.digest():

@@ -174,7 +174,7 @@ class SLOEvaluation:
                 the error budget is outside [0, 1], or the reason is blank.
         """
         if not isinstance(self.target, SLOTarget):
-            raise TypeError("target must be SLOTarget")
+            raise errors.KindError("target must be SLOTarget")
         parse_timestamp(self.observed_at, "observed_at")
         status: Any = self.status  # may be text from a persisted record
         if not isinstance(status, SLOStatus):
@@ -262,7 +262,7 @@ def evaluate(
         TypeError: If `target` is not an `SLOTarget`.
     """
     if not isinstance(target, SLOTarget):
-        raise TypeError("target must be SLOTarget")
+        raise errors.KindError("target must be SLOTarget")
     observed_timestamp = parse_timestamp(observed_at, "observed_at")
     window_start = observed_timestamp - datetime.timedelta(
         days=target.window_days

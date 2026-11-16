@@ -85,7 +85,7 @@ class Node:
         if not isinstance(node_id, str) or not node_id.strip():
             raise errors.InputError("node_id must be a non-empty string")
         if any(not isinstance(value, (int, float)) for value in self.features):
-            raise TypeError("node features must be numeric")
+            raise errors.KindError("node features must be numeric")
         if any(not math.isfinite(float(value)) for value in self.features):
             raise errors.InputError("node features must be finite")
         object.__setattr__(
@@ -130,7 +130,7 @@ class Edge:
         if not isinstance(target, str) or not target.strip():
             raise errors.InputError("edge target must be a non-empty string")
         if not isinstance(self.weight, (int, float)):
-            raise TypeError("edge weight must be numeric")
+            raise errors.KindError("edge weight must be numeric")
         if not math.isfinite(float(self.weight)):
             raise errors.InputError("edge weight must be finite")
         relation: object = self.relation
@@ -138,7 +138,7 @@ class Edge:
             raise errors.InputError("edge relation must be a non-empty string")
         if self.event_time is not None:
             if not isinstance(self.event_time, datetime):
-                raise TypeError("event_time must be a datetime")
+                raise errors.KindError("event_time must be a datetime")
             if (
                 self.event_time.tzinfo is None
                 or self.event_time.utcoffset() is None

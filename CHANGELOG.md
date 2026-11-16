@@ -850,6 +850,17 @@ marked `Breaking:` and listed first in their group.
 
 ### Changed
 
+- Wrong-kind inputs raise `errors.KindError` and calls made out of order
+  (predicting before fitting, a stage before the stage it needs) raise
+  `errors.OrderError` (ERR-20): 223 former `TypeError` and 27 former
+  `RuntimeError` raises. `KindError` subclasses `InputError` and `TypeError`;
+  `OrderError` subclasses `InputError` and `RuntimeError`, so existing
+  `except TypeError` and `except RuntimeError` still catch them, and they
+  now get the same input-error handling as `InputError`. Kept as built-ins:
+  `TypeError` that Python protocols require, the HTTP request parser's
+  errors (malformed requests stay 400), and `RuntimeError` that marks a
+  defect (a report or package that was not produced, an invalid internal
+  stage order).
 - Input problems raise `errors.InputError` instead of a bare `ValueError`
   (ERR-20): 1,874 raises across the package. `InputError` subclasses both
   `DataError` and `ValueError`, so `except ValueError` still catches them.

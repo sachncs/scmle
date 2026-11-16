@@ -79,7 +79,7 @@ class Node:
         if any(not key.strip() for key in normalized):
             raise errors.InputError("attribute names must not be empty")
         if any(not isinstance(value, str) for value in normalized.values()):
-            raise TypeError("attribute values must be strings")
+            raise errors.KindError("attribute values must be strings")
         object.__setattr__(self, "attributes", normalized)
 
     def to_dict(self) -> dict[str, Any]:
@@ -187,7 +187,7 @@ class Graph:
             ValueError: If a different node already has the same id.
         """
         if not isinstance(node, Node):
-            raise TypeError("node must be Node")
+            raise errors.KindError("node must be Node")
         existing = self.nodes.get(node.node_id)
         if existing is not None and existing != node:
             raise errors.InputError(
@@ -209,7 +209,7 @@ class Graph:
                 would create a cycle.
         """
         if not isinstance(edge, Edge):
-            raise TypeError("edge must be Edge")
+            raise errors.KindError("edge must be Edge")
         if edge.source_id not in self.nodes or edge.target_id not in self.nodes:
             raise errors.InputError("evidence edge refers to an unknown node")
         if edge in self.edges:

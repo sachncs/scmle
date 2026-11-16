@@ -227,7 +227,9 @@ class Requirements:
             not isinstance(signal, SignalKind)
             for signal in self.required_signals
         ):
-            raise TypeError("required_signals must contain SignalKind values")
+            raise errors.KindError(
+                "required_signals must contain SignalKind values"
+            )
         if len(self.required_signals) != len(set(self.required_signals)):
             raise errors.InputError("required_signals must be unique")
         if any(not field.strip() for field in self.redacted_fields):

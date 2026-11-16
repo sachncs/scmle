@@ -386,7 +386,7 @@ class SourceRegistry:
         registry = cls()
         for source in sources:
             if not isinstance(source, Mapping):
-                raise TypeError("each source must be a mapping")
+                raise errors.KindError("each source must be a mapping")
             source_id = str(source["source_id"])
             snapshots = source.get("snapshots")
             if not isinstance(snapshots, list):
@@ -415,7 +415,7 @@ class SourceRegistry:
         """
         record = json.loads(serialized)
         if not isinstance(record, Mapping):
-            raise TypeError("serialized registry must contain an object")
+            raise errors.KindError("serialized registry must contain an object")
         return cls.from_dict(record)
 
 
@@ -453,7 +453,7 @@ class SourceRegistryStore:
             TypeError: If `registry` is not a `SourceRegistry`.
         """
         if not isinstance(registry, SourceRegistry):
-            raise TypeError("registry must be SourceRegistry")
+            raise errors.KindError("registry must be SourceRegistry")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(
             prefix=f".{self.path.name}.", dir=self.path.parent

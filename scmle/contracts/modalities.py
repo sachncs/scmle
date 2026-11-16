@@ -55,7 +55,7 @@ class ExtensionModality:
                 ``acme/point-cloud``), or equals a built-in modality value.
         """
         if not isinstance(self.name, str):
-            raise TypeError("extension modality name must be a string")
+            raise errors.KindError("extension modality name must be a string")
         if not re.fullmatch(r"[a-z0-9][a-z0-9./-]*[a-z0-9]", self.name):
             raise errors.InputError(
                 "extension modality name must use lowercase namespaced "
@@ -89,7 +89,7 @@ def serialise(modality: ModalityIdentity) -> str:
         TypeError: If `modality` is not a `Modality` or `ExtensionModality`.
     """
     if not isinstance(modality, (Modality, ExtensionModality)):
-        raise TypeError("modality must be Modality or ExtensionModality")
+        raise errors.KindError("modality must be Modality or ExtensionModality")
     return modality.value
 
 
@@ -183,10 +183,10 @@ class StageEvidence:
                 is blank.
         """
         if not isinstance(self.stage, LifecycleStage):
-            raise TypeError("stage must be LifecycleStage")
+            raise errors.KindError("stage must be LifecycleStage")
         object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
         if not isinstance(self.evidence, Mapping):
-            raise TypeError("evidence must be a mapping")
+            raise errors.KindError("evidence must be a mapping")
         try:
             normalized = json.loads(
                 json.dumps(
@@ -280,11 +280,13 @@ class Declaration:
                 stage.
         """
         if not isinstance(self.modality, (Modality, ExtensionModality)):
-            raise TypeError("modality must be Modality or ExtensionModality")
+            raise errors.KindError(
+                "modality must be Modality or ExtensionModality"
+            )
         if not isinstance(self.status, Status):
-            raise TypeError("status must be Status")
+            raise errors.KindError("status must be Status")
         if not isinstance(self.resources, capabilities.ResourceAssumptions):
-            raise TypeError(
+            raise errors.KindError(
                 "resources must be capabilities.ResourceAssumptions"
             )
         object.__setattr__(self, "stage_evidence", tuple(self.stage_evidence))
@@ -295,7 +297,9 @@ class Declaration:
             not isinstance(record, StageEvidence)
             for record in self.stage_evidence
         ):
-            raise TypeError("stage_evidence must contain StageEvidence records")
+            raise errors.KindError(
+                "stage_evidence must contain StageEvidence records"
+            )
         stages = [record.stage for record in self.stage_evidence]
         if len(stages) != len(set(stages)):
             raise errors.InputError(
@@ -400,7 +404,7 @@ class Registry:
             errors.ConfigError: If the modality is already registered.
         """
         if not isinstance(declaration, Declaration):
-            raise TypeError("declaration must be Declaration")
+            raise errors.KindError("declaration must be Declaration")
         if declaration.modality in self.records:
             raise errors.ConfigError(
                 "modality already registered: "
@@ -421,7 +425,9 @@ class Registry:
             TypeError: If `modality` is not a `Modality` or `ExtensionModality`.
         """
         if not isinstance(modality, (Modality, ExtensionModality)):
-            raise TypeError("modality must be Modality or ExtensionModality")
+            raise errors.KindError(
+                "modality must be Modality or ExtensionModality"
+            )
         return self.records.get(modality)
 
     def require(

@@ -1059,7 +1059,7 @@ class Dataset:
                 {"code": "empty_dataset"},
             )
         if not isinstance(self.crs, str):
-            raise TypeError("crs must be a string")
+            raise errors.KindError("crs must be a string")
         canonical_crs_value = self.crs.strip()
         ids = [feature.feature_id for feature in normalized]
         if len(ids) != len(set(ids)):
@@ -1363,9 +1363,9 @@ class Dataset:
                 CRS values differ.
         """
         if not isinstance(other, Dataset):
-            raise TypeError("other must be a Dataset")
+            raise errors.KindError("other must be a Dataset")
         if not callable(predicate):
-            raise TypeError("predicate must be callable")
+            raise errors.KindError("predicate must be callable")
         if not predicate_name.strip():
             raise errors.InputError("predicate_name must not be empty")
         if comparison_limit < 1 or match_limit < 1:
@@ -1523,7 +1523,7 @@ class Dataset:
                 "target_crs must differ from the source CRS"
             )
         if not callable(transformer):
-            raise TypeError("transformer must be callable")
+            raise errors.KindError("transformer must be callable")
         if not transformer_name.strip():
             raise errors.InputError("transformer_name must not be empty")
         transformed_features: list[GeoFeature] = []
@@ -2226,7 +2226,7 @@ class RasterSample:
                 not real numeric, or contains non-finite values.
         """
         if not callable(decoder):
-            raise TypeError("decoder must be callable")
+            raise errors.KindError("decoder must be callable")
         if max_pixels < 1:
             raise errors.InputError("max_pixels must be positive")
         try:

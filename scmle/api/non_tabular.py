@@ -365,7 +365,7 @@ def capability_for_adapter(
         UnsupportedNonTabularModelError: If its exact type is not allowlisted.
     """
     if not isinstance(adapter, modality_lifecycle.Preparer):
-        raise TypeError("adapter must be a Preparer")
+        raise errors.KindError("adapter must be a Preparer")
     adapter_type = type(adapter)
     if adapter_type is modality_lifecycle.VideoPreparer:
         return video_scope(cast("modality_lifecycle.VideoPreparer", adapter))
@@ -514,7 +514,7 @@ class Modeler:
         """
         self.capability = capability_for_adapter(adapter)
         if not isinstance(experimental_opt_in, bool):
-            raise TypeError("experimental_opt_in must be bool")
+            raise errors.KindError("experimental_opt_in must be bool")
         if not experimental_opt_in:
             raise UnsupportedNonTabularModelError(
                 "non-tabular modelling is experimental; set "
@@ -527,17 +527,19 @@ class Modeler:
         if not signing_key:
             raise errors.InputError("signing_key must not be empty")
         if isinstance(seed, bool) or not isinstance(seed, int):
-            raise TypeError("seed must be an integer")
+            raise errors.KindError("seed must be an integer")
         if not isinstance(require_independent_ground_truth, bool):
-            raise TypeError("require_independent_ground_truth must be bool")
+            raise errors.KindError(
+                "require_independent_ground_truth must be bool"
+            )
         if not isinstance(resume, bool):
-            raise TypeError("resume must be bool")
+            raise errors.KindError("resume must be bool")
         if observed_adapter is not None:
             check_observed_adapter(adapter, observed_adapter, self.capability)
         if cancellation is not None and not isinstance(
             cancellation, modality_lifecycle.Cancellation
         ):
-            raise TypeError("cancellation must be a Cancellation")
+            raise errors.KindError("cancellation must be a Cancellation")
         self.adapter = adapter
         self.signing_key = signing_key
         self.output_dir = Path(output_dir)

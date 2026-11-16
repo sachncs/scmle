@@ -422,7 +422,7 @@ class IncidentWorkflow:
             ValueError: If the SLO passed, so no incident is required.
         """
         if not isinstance(evaluation, slo.SLOEvaluation):
-            raise TypeError("evaluation must be SLOEvaluation")
+            raise errors.KindError("evaluation must be SLOEvaluation")
         if not evaluation.incident_required:
             raise errors.InputError("a passing SLO cannot open an incident")
         slo.parse_timestamp(opened_at, "opened_at")

@@ -189,7 +189,7 @@ def check_manifest(
             sample count or modality.
     """
     if not isinstance(manifest, data.ModalityManifest):
-        raise TypeError("manifest must be ModalityManifest")
+        raise errors.KindError("manifest must be ModalityManifest")
     if manifest.content_hash != dataset_hash:
         raise errors.InputError("manifest does not match dataset_hash")
     if manifest.sample_count != sample_count:

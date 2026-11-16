@@ -81,6 +81,7 @@ from pathlib import Path
 from typing import Any
 from typing import Self
 
+from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.data.ledger import ledger
 from scmle.monitoring import sequential_tests
@@ -169,7 +170,7 @@ def require_object_body(body: Any) -> None:
         TypeError: If `body` is not a dict.
     """
     if not isinstance(body, dict):
-        raise TypeError("body must be an object")
+        raise errors.KindError("body must be an object")
 
 
 def key_fingerprint(key: str | bytes) -> str:

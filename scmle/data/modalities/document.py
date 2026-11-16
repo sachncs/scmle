@@ -312,9 +312,9 @@ class Layout:
                     f"document layout {field_name} must not be empty"
                 )
         if not isinstance(self.elements, tuple):
-            raise TypeError("document layout elements must be a tuple")
+            raise errors.KindError("document layout elements must be a tuple")
         if not all(isinstance(element, Element) for element in self.elements):
-            raise TypeError("elements must contain Element values")
+            raise errors.KindError("elements must contain Element values")
         if self.ocr_confidence is not None and (
             isinstance(self.ocr_confidence, bool)
             or not math.isfinite(self.ocr_confidence)
@@ -786,7 +786,7 @@ class Dataset:
                 "empty_dataset",
             )
         if any(not isinstance(sample, Sample) for sample in normalized_samples):
-            raise TypeError("samples must contain only Sample values")
+            raise errors.KindError("samples must contain only Sample values")
         identities = sorted(
             f"{sample.document_id}\0{sample.content_hash}"
             for sample in normalized_samples

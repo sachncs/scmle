@@ -26,7 +26,7 @@ def validate_score(value: float, field_name: str) -> float:
         ValueError: If `value` is not finite or lies outside [0, 1].
     """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise TypeError(f"{field_name} must be numeric")
+        raise errors.KindError(f"{field_name} must be numeric")
     score = float(value)
     if not math.isfinite(score) or not 0.0 <= score <= 1.0:
         raise errors.InputError(
@@ -123,7 +123,7 @@ class QualityEvaluation:
         if self.fidelity_score is not None:
             validate_score(self.fidelity_score, "fidelity_score")
         if not isinstance(self.findings, tuple):
-            raise TypeError("findings must be a tuple")
+            raise errors.KindError("findings must be a tuple")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a deterministic JSON-compatible evaluation.
@@ -260,7 +260,7 @@ class GroundTruthEvaluation:
         validate_score(self.overlap_score, "overlap_score")
         validate_score(self.minimum_overlap, "minimum_overlap")
         if not isinstance(self.findings, tuple):
-            raise TypeError("findings must be a tuple")
+            raise errors.KindError("findings must be a tuple")
 
     def to_dict(self) -> dict[str, object]:
         """Returns the comparison as deterministic JSON-native evidence.
@@ -322,7 +322,7 @@ class GroundTruthSuiteEvaluation:
         if self.reference_count != len(self.evaluations):
             raise errors.InputError("reference_count must match evaluations")
         if not isinstance(self.findings, tuple):
-            raise TypeError("findings must be a tuple")
+            raise errors.KindError("findings must be a tuple")
 
     @property
     def status(self) -> str:
@@ -430,7 +430,7 @@ def evaluate_ground_truth(
         TypeError: If `ground_truth` is not an `ExplanationGroundTruth`.
     """
     if not isinstance(ground_truth, ExplanationGroundTruth):
-        raise TypeError("ground_truth must be ExplanationGroundTruth")
+        raise errors.KindError("ground_truth must be ExplanationGroundTruth")
     ranking = explanation_ranking(report)
     observed = ranking[: len(ground_truth.expected_features)]
     expected = set(ground_truth.expected_features)

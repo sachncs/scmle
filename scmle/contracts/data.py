@@ -37,7 +37,7 @@ def normalise(
     """
     normalized = explanations.validate_json_value(evidence, field_name)
     if not isinstance(normalized, dict):
-        raise TypeError(f"{field_name} must serialize to an object")
+        raise errors.KindError(f"{field_name} must serialize to an object")
     return normalized
 
 
@@ -258,7 +258,7 @@ def check_findings(findings: tuple[Any, ...]) -> None:
         TypeError: If an entry is not a `CurationFinding`.
     """
     if any(not isinstance(finding, CurationFinding) for finding in findings):
-        raise TypeError("findings must contain CurationFinding records")
+        raise errors.KindError("findings must contain CurationFinding records")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -510,7 +510,7 @@ class DatasetManifest:
             if isinstance(count_value, bool) or not isinstance(
                 count_value, int
             ):
-                raise TypeError(f"{count_name} must be an integer")
+                raise errors.KindError(f"{count_name} must be an integer")
         if self.row_count < 0:
             raise errors.InputError("row_count must not be negative")
         if self.column_count < 0:
@@ -523,7 +523,9 @@ class DatasetManifest:
             ("privacy", self.privacy, PrivacyMetadata),
         ):
             if not isinstance(component, expected):
-                raise TypeError(f"{component_name} must be {expected.__name__}")
+                raise errors.KindError(
+                    f"{component_name} must be {expected.__name__}"
+                )
         object.__setattr__(self, "findings", tuple(self.findings))
         check_findings(self.findings)
 
@@ -627,7 +629,7 @@ class ModalityManifest:
         if isinstance(self.sample_count, bool) or not isinstance(
             self.sample_count, int
         ):
-            raise TypeError("sample_count must be an integer")
+            raise errors.KindError("sample_count must be an integer")
         if self.sample_count < 0:
             raise errors.InputError("sample_count must not be negative")
         if self.schema_version < 1:
@@ -638,11 +640,11 @@ class ModalityManifest:
         ):
             raise errors.InputError("content_hash must be a SHA-256 hex digest")
         if not isinstance(self.source, SourceMetadata):
-            raise TypeError("source must be SourceMetadata")
+            raise errors.KindError("source must be SourceMetadata")
         if not isinstance(self.lineage, LineageMetadata):
-            raise TypeError("lineage must be LineageMetadata")
+            raise errors.KindError("lineage must be LineageMetadata")
         if not isinstance(self.privacy, PrivacyMetadata):
-            raise TypeError("privacy must be PrivacyMetadata")
+            raise errors.KindError("privacy must be PrivacyMetadata")
         object.__setattr__(self, "findings", tuple(self.findings))
         check_findings(self.findings)
 

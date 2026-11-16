@@ -268,7 +268,7 @@ class Classifier:
         vectorizer = self.vectorizer
         estimator = self.estimator
         if vectorizer is None or estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         state = {
             "config": self.config.to_dict(),
             "vocabulary": sorted(
@@ -370,7 +370,7 @@ class Classifier:
         matrix = self.transform(samples)
         estimator = self.estimator
         if estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         return tuple(cast("numpy.ndarray", estimator.predict(matrix)).tolist())
 
     def predict_proba(
@@ -395,7 +395,7 @@ class Classifier:
         matrix = self.transform(samples)
         estimator = self.estimator
         if estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         return tuple(tuple(row) for row in estimator.predict_proba(matrix))
 
     def evaluate(
@@ -457,7 +457,7 @@ class Classifier:
         vectorizer = self.vectorizer
         estimator = self.estimator
         if vectorizer is None or estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         terms = vectorizer.get_feature_names_out()
         strengths = numpy.mean(numpy.abs(estimator.coef_), axis=0)
         selected = sorted(
@@ -505,7 +505,7 @@ class Classifier:
         vectorizer = self.vectorizer
         estimator = self.estimator
         if vectorizer is None or estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         matrix = self.transform((sample,))
         predicted_label = estimator.predict(matrix)[0]
         class_index = int(
@@ -577,7 +577,7 @@ class Classifier:
         vectorizer = self.vectorizer
         estimator = self.estimator
         if vectorizer is None or estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         matrix = self.transform((sample,))
         terms = vectorizer.get_feature_names_out()
         row = matrix.toarray()[0]
@@ -637,7 +637,7 @@ class Classifier:
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         predicted = estimator.predict(matrix)[0]
         class_index = int(numpy.flatnonzero(estimator.classes_ == predicted)[0])
         decision = numpy.asarray(estimator.decision_function(matrix))
@@ -656,7 +656,7 @@ class Classifier:
         self.require_fitted()
         estimator = self.estimator
         if estimator is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         return tuple(estimator.classes_.tolist())
 
     def save(
@@ -775,7 +775,7 @@ class Classifier:
         envelope.check(manifest, target, signing_key, trusted)
         loaded = joblib.load(model_path)
         if not isinstance(loaded, cls):
-            raise TypeError("package does not contain a Classifier")
+            raise errors.KindError("package does not contain a Classifier")
         loaded.require_fitted()
         if loaded.model_digest != manifest.get("model_digest"):
             raise errors.InputError(
@@ -798,7 +798,7 @@ class Classifier:
         self.require_fitted()
         vectorizer = self.vectorizer
         if vectorizer is None:
-            raise RuntimeError("classifier is not fitted")
+            raise errors.OrderError("classifier is not fitted")
         return vectorizer.transform([sample.content for sample in samples])
 
     def require_fitted(self) -> None:
@@ -808,7 +808,7 @@ class Classifier:
             RuntimeError: If it has not been fitted.
         """
         if not self.fitted:
-            raise RuntimeError("document classifier has not been fitted")
+            raise errors.OrderError("document classifier has not been fitted")
 
 
 class Monitor:

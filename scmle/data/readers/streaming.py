@@ -432,7 +432,7 @@ class Checkpoint:
             raise errors.InputError("source_identity must not be empty")
         validate_digest(self.snapshot_sha256, "snapshot_sha256")
         if isinstance(self.offset, bool) or not isinstance(self.offset, int):
-            raise TypeError("offset must be an integer")
+            raise errors.KindError("offset must be an integer")
         if self.offset < 0:
             raise errors.InputError("offset must be non-negative")
         if self.watermark_column is not None and not self.watermark_column:
@@ -1374,9 +1374,9 @@ class CommitLedger:
                 SinkCommitReceipt.
         """
         if not isinstance(sink, TransactionalSink):
-            raise TypeError("sink must implement TransactionalSink")
+            raise errors.KindError("sink must implement TransactionalSink")
         if not isinstance(acknowledgement, Acknowledgement):
-            raise TypeError("acknowledgement must be Acknowledgement")
+            raise errors.KindError("acknowledgement must be Acknowledgement")
         self.validate_batch(batch)
         self.validate_acknowledgement(batch, acknowledgement)
         with self.lock():
@@ -1495,7 +1495,7 @@ class CommitLedger:
                 the durable checkpoint.
         """
         if not callable(writer):
-            raise TypeError("writer must be callable")
+            raise errors.KindError("writer must be callable")
         if batch.source_identity != self.source.source_identity():
             raise StreamingError(
                 "batch_source_mismatch",
@@ -1602,7 +1602,7 @@ class Consumer:
         if not callable(writer_candidate) or not callable(
             acknowledge_candidate
         ):
-            raise TypeError("writer and acknowledge must be callable")
+            raise errors.KindError("writer and acknowledge must be callable")
         self.ledger = ledger
         self.consumer_group = consumer_group
         self.writer = writer

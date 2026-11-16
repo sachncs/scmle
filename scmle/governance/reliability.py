@@ -44,7 +44,7 @@ class FaultArtifact:
         if not isinstance(content, bytes) or not content:
             raise errors.InputError("content must be non-empty bytes")
         if not isinstance(self.observed_outcome, reliability.EvidenceOutcome):
-            raise TypeError("observed_outcome must be EvidenceOutcome")
+            raise errors.KindError("observed_outcome must be EvidenceOutcome")
         if not self.observation.strip():
             raise errors.InputError("observation must not be empty")
 
@@ -77,7 +77,7 @@ class FaultInjectionHarness:
                 execution id is not a path-safe name.
         """
         if not isinstance(registry, reliability.Registry):
-            raise TypeError("registry must be Registry")
+            raise errors.KindError("registry must be Registry")
         identity: tuple[tuple[str, object], ...] = (
             ("execution_id", execution_id),
             ("reviewer", reviewer),
@@ -131,7 +131,7 @@ class FaultInjectionHarness:
                 types the scenario does not declare; nothing is published.
         """
         if not isinstance(scenario, reliability.FaultScenario):
-            raise TypeError("scenario must be FaultScenario")
+            raise errors.KindError("scenario must be FaultScenario")
         try:
             artifacts: object = executor(scenario)  # an injected callable
         except Exception as error:
@@ -142,7 +142,7 @@ class FaultInjectionHarness:
         if not isinstance(artifacts, tuple) or not all(
             isinstance(item, FaultArtifact) for item in artifacts
         ):
-            raise TypeError("executor must return FaultArtifact values")
+            raise errors.KindError("executor must return FaultArtifact values")
         requirements = self.registry.plans[scenario].evidence_requirements
         evidence_types = tuple(item.evidence_type for item in artifacts)
         if len(evidence_types) != len(set(evidence_types)):

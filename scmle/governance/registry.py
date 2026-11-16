@@ -85,7 +85,7 @@ class PromotionApproval:
                 "evidence must contain non-empty references"
             )
         if not isinstance(self.independent, bool):
-            raise TypeError("independent must be bool")
+            raise errors.KindError("independent must be bool")
         signature: object = self.signature  # may be any value from a record
         if signature is not None and (
             not isinstance(signature, str) or not signature.strip()

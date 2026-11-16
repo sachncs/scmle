@@ -142,7 +142,7 @@ class ModelFamilyDeclaration:
                 entry is blank.
         """
         if not isinstance(self.model_family, str):
-            raise TypeError("model_family must be a string")
+            raise errors.KindError("model_family must be a string")
         if not self.model_family or self.model_family != (
             self.model_family.strip().lower()
         ):
@@ -151,15 +151,15 @@ class ModelFamilyDeclaration:
                 "whitespace"
             )
         if not isinstance(self.status, Status):
-            raise TypeError("status must be Status")
+            raise errors.KindError("status must be Status")
         if not isinstance(self.resources, ResourceAssumptions):
-            raise TypeError("resources must be ResourceAssumptions")
+            raise errors.KindError("resources must be ResourceAssumptions")
         if not self.modalities:
             raise errors.InputError(
                 "modalities must declare at least one value"
             )
         if any(not isinstance(item, Modality) for item in self.modalities):
-            raise TypeError("modalities must contain Modality values")
+            raise errors.KindError("modalities must contain Modality values")
         object.__setattr__(
             self,
             "modalities",
@@ -209,7 +209,7 @@ class ModelFamilyDeclaration:
             TypeError: If `modality` is not a `Modality`.
         """
         if not isinstance(modality, Modality):
-            raise TypeError("modality must be Modality")
+            raise errors.KindError("modality must be Modality")
         return modality in self.modalities
 
 
@@ -324,9 +324,9 @@ class Coordinate:
         )
         for name, value, expected in dimensions:
             if not isinstance(value, expected):
-                raise TypeError(f"{name} must be {expected.__name__}")
+                raise errors.KindError(f"{name} must be {expected.__name__}")
         if not isinstance(self.model_family, str):
-            raise TypeError("model_family must be a string")
+            raise errors.KindError("model_family must be a string")
         if not self.model_family:
             raise errors.InputError("model_family must not be empty")
         if self.model_family != self.model_family.strip().lower():
@@ -381,7 +381,7 @@ class ResourceAssumptions:
                 row limit is below one, or a note is blank.
         """
         if not isinstance(self.cpu_cores, int):
-            raise TypeError("cpu_cores must be an integer")
+            raise errors.KindError("cpu_cores must be an integer")
         if self.cpu_cores < 1:
             raise errors.InputError("cpu_cores must be at least 1")
         if not math.isfinite(self.memory_gb) or self.memory_gb <= 0:
@@ -439,11 +439,11 @@ class Capability:
                 or a supported capability has no evidence links.
         """
         if not isinstance(self.key, Coordinate):
-            raise TypeError("key must be Coordinate")
+            raise errors.KindError("key must be Coordinate")
         if not isinstance(self.status, Status):
-            raise TypeError("status must be Status")
+            raise errors.KindError("status must be Status")
         if not isinstance(self.resources, ResourceAssumptions):
-            raise TypeError("resources must be ResourceAssumptions")
+            raise errors.KindError("resources must be ResourceAssumptions")
         object.__setattr__(self, "required_extras", tuple(self.required_extras))
         object.__setattr__(self, "failure_modes", tuple(self.failure_modes))
         object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
@@ -683,7 +683,7 @@ class Registry:
             errors.ConfigError: If the key is already registered.
         """
         if not isinstance(capability, Capability):
-            raise TypeError("capability must be Capability")
+            raise errors.KindError("capability must be Capability")
         if capability.key in self.records:
             raise errors.ConfigError(
                 f"capability already registered: {capability.key.to_dict()}"
@@ -704,7 +704,7 @@ class Registry:
             TypeError: If `declaration` is not a `ModelFamilyDeclaration`.
         """
         if not isinstance(declaration, ModelFamilyDeclaration):
-            raise TypeError("declaration must be ModelFamilyDeclaration")
+            raise errors.KindError("declaration must be ModelFamilyDeclaration")
         if declaration.model_family in self.model_families:
             raise errors.ConfigError(
                 f"model family already registered: {declaration.model_family}"
@@ -727,7 +727,7 @@ class Registry:
             TypeError: If `model_family` is not a string.
         """
         if not isinstance(model_family, str):
-            raise TypeError("model_family must be a string")
+            raise errors.KindError("model_family must be a string")
         return self.model_families.get(model_family)
 
     def bind(self, environment: Environment) -> None:
@@ -740,7 +740,7 @@ class Registry:
             TypeError: If `environment` is not a `Environment`.
         """
         if not isinstance(environment, Environment):
-            raise TypeError("environment must be Environment")
+            raise errors.KindError("environment must be Environment")
         self.runtime_environment = environment
 
     def diagnose(
@@ -778,9 +778,9 @@ class Registry:
             TypeError: If `key`, `environment` or a status has the wrong type.
         """
         if not isinstance(key, Coordinate):
-            raise TypeError("key must be Coordinate")
+            raise errors.KindError("key must be Coordinate")
         if environment is not None and not isinstance(environment, Environment):
-            raise TypeError("environment must be Environment")
+            raise errors.KindError("environment must be Environment")
         if environment is None:
             environment = self.runtime_environment
         statuses = (
@@ -789,7 +789,7 @@ class Registry:
             else frozenset(allowed_statuses)
         )
         if any(not isinstance(status, Status) for status in statuses):
-            raise TypeError("allowed_statuses must contain Status")
+            raise errors.KindError("allowed_statuses must contain Status")
 
         capability = self.records.get(key)
         if capability is None:
@@ -893,9 +893,9 @@ class Registry:
             TypeError: If `capability` or `environment` has the wrong type.
         """
         if not isinstance(capability, Capability):
-            raise TypeError("capability must be Capability")
+            raise errors.KindError("capability must be Capability")
         if environment is not None and not isinstance(environment, Environment):
-            raise TypeError("environment must be Environment")
+            raise errors.KindError("environment must be Environment")
         if environment is None:
             environment = self.runtime_environment
         diagnostics: list[Reason] = []
