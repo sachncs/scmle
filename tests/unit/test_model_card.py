@@ -29,3 +29,32 @@ def test_model_card_requires_review_and_preserves_evaluation_context():
     assert record["review_status"] == "machine_generated_unreviewed"
     assert record["evaluation"]["test_metrics"]["roc_auc"] == 0.91
     assert json.loads(json.dumps(record)) == record
+
+
+def build(evaluation):
+    import types
+
+    manifest = types.SimpleNamespace(dataset_id="ds_1", snapshot_id="snap_1")
+    plan = types.SimpleNamespace(features=("amount",), text=(), extra_inputs=())
+    profile = types.SimpleNamespace(feature_plan=plan)
+    bundle = types.SimpleNamespace(
+        info=types.SimpleNamespace(
+            model_name="m", model_version="v1", metric="roc_auc"
+        ),
+        schema=types.SimpleNamespace(task="binary_classification"),
+    )
+    return model_card.ModelCard.from_run(
+        manifest, profile, bundle, evaluation, "sha256:x"
+    )
+
+
+def test_a_missing_release_evaluation_is_stated_not_read_as_passed():
+    # ERR-23: a missing evaluation used to read as "not blocked".
+    unknown = build({"test_metrics": {}})
+    assert any("status is unknown" in item for item in unknown.limitations)
+    blocked = build({"release_evaluation": {"blocked": True}})
+    assert any("is blocked" in item for item in blocked.limitations)
+    passed = build({"release_evaluation": {"blocked": False}})
+    assert not any(
+        "unknown" in item or "is blocked" in item for item in passed.limitations
+    )

@@ -89,10 +89,10 @@ class ModelCard:
             texts and the review status ``machine_generated_unreviewed``. Its
             feature names are the profile's features, text columns and extra
             inputs without repeats. Its limitations state that the card needs
-            human review, and, when the release evaluation is blocked, that
-            it is blocked.
+            human review, and, when the release evaluation is blocked or
+            missing, that it is blocked or that its status is unknown.
         """
-        release = evaluation.get("release_evaluation", {})
+        release = evaluation.get("release_evaluation")
         limitations = [
             "This machine-generated card requires human review before release.",
             (
@@ -101,7 +101,13 @@ class ModelCard:
             ),
             "Associational explanations are not causal claims.",
         ]
-        if release.get("blocked", False):
+        if not isinstance(release, dict) or "blocked" not in release:
+            # ERR-23: a missing evaluation read as "not blocked".
+            limitations.append(
+                "No release evaluation was recorded, so the release status is "
+                "unknown; treat the model as not approved for release."
+            )
+        elif release["blocked"]:
             limitations.append(
                 "The release evaluation is blocked until explicit success "
                 "criteria and reviewed evidence are present."
