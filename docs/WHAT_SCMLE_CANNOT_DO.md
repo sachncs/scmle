@@ -135,10 +135,12 @@ against planted problems and is on file as a certificate. Everything else is
   report with no deployment sample). They inform; they do not certify.
 * Stability results are warnings unless a passing certificate for your
   thresholds exists. Without a charter that asks for it, nothing is withdrawn.
-* The certificate files live in `benchmarks/qualification/` in a source
-  checkout. A package installed from pip does not carry them, so detectors there
-  are descriptive until you have the files
-  ([`ARTIFACTS.md`](ARTIFACTS.md)).
+* The certificate files ship inside the package (`scmle/certificates/`), so
+  an installed copy gates exactly as a source checkout does
+  ([`ARTIFACTS.md`](ARTIFACTS.md)). A certificate that is missing, or was
+  issued for other code, makes its check descriptive; under
+  `leakage_policy="block"` an uncertified leakage screen refuses the run
+  instead of training as if it had passed.
 
 ## The closed loop and escalation
 

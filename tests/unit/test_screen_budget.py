@@ -127,8 +127,10 @@ def test_block_refuses_an_unchecked_screen_and_warn_proceeds(tmp_path):
         ).run()
     assert raised.value.details["leakage"]["unchecked"]
     assert "'warn'" in str(raised.value)
+    # Only the binary screen has a passing certificate, so a screened run
+    # under `block` is a binary one (ERR-1).
     ok = support.make_project(
-        wide(),
+        wide(classes=2),
         "y",
         output_dir=tmp_path,
         time_budget=LARGE_BUDGET,

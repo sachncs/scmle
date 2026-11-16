@@ -138,8 +138,10 @@ Read this carefully:
   nothing legitimate (0 of 7). Without the two leaks, it flagged nothing.
 * For wine, iris and digits the target has more than two classes. The screen is
   only certified for a two-class target, so for these it is **descriptive**: it
-  may report suspects (iris did) but it can never stop a run, whatever the
-  policy.
+  may report suspects (iris did) but cannot decide which column to stop on.
+  Under `leakage_policy="block"` such a run is refused, because `block` cannot
+  keep its promise without a passing certificate; under `warn` it trains and
+  logs that the screen is descriptive.
 * This is six tables, and only breast cancer combines a two-class target with
   very strong honest predictors. Do not read 6.7 percent as a general rate. It
   says: where honest predictors are very strong, expect some false flags.

@@ -69,18 +69,35 @@ def test_strong_legitimate_signal_is_not_blocked(binary_frame, tmp_path):
     assert not result.profile.risk_findings
 
 
-def test_an_uncertified_target_warns_but_does_not_block(tmp_path):
+def regression_leak():
     rng = numpy.random.default_rng(2)
     rows = 400
     frame = pandas.DataFrame({"a": rng.normal(size=rows)})
     frame["y"] = rng.normal(size=rows)
     frame["leak"] = frame.y * 2.0
+    return frame
+
+
+def test_an_uncertified_target_blocks_under_block(tmp_path):
+    # ERR-1: the screen has no passing certificate for regression, so its
+    # suspicion cannot block; `block` used to train on the leak regardless.
+    with pytest.raises(errors.BlockedError, match="certificate not passing"):
+        support.make_project(
+            regression_leak(),
+            "y",
+            task="regression",
+            output_dir=tmp_path,
+            leakage_policy="block",
+        ).run()
+
+
+def test_an_uncertified_target_warns_under_warn(tmp_path):
     result = support.make_project(
-        frame,
+        regression_leak(),
         "y",
         task="regression",
         output_dir=tmp_path,
-        leakage_policy="block",
+        leakage_policy="warn",
     ).run()
     assert any("'leak'" in w for w in result.profile.risk_findings)
     assert "warning only" in " ".join(result.profile.risk_findings)
