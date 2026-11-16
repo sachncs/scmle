@@ -157,7 +157,7 @@ def test_rotation_is_picked_up_for_an_unknown_kid_but_not_every_call():
         assert documents.hits["/jwks.json"] == 2
 
 
-def test_a_key_set_that_cannot_be_fetched_fails_closed_after_max_stale():
+def test_a_key_set_that_cannot_be_fetched_fails_closed_after_max_stale(caplog):
     clock = support_identity.Clock()
     documents = Documents()
     with serve(documents) as base:
@@ -171,7 +171,10 @@ def test_a_key_set_that_cannot_be_fetched_fails_closed_after_max_stale():
         )
         documents.broken = True
         clock.now += 100  # past the ttl, inside max_stale: the cache serves
-        assert keys.get("rs-k1").kid == "rs-k1"
+        with caplog.at_level("WARNING", logger=remote.__name__):
+            assert keys.get("rs-k1").kid == "rs-k1"
+        # ERR-16: the failed refresh used to be invisible until max_stale.
+        assert any("did not refresh" in r.getMessage() for r in caplog.records)
         clock.now += 400  # past max_stale: nothing is trusted
         with pytest.raises(tokens.TokenError) as raised:
             keys.get("rs-k1")

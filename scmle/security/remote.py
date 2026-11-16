@@ -26,6 +26,7 @@ provider or inside a cloud.
 
 from collections.abc import Callable
 import json
+import logging
 import time
 from typing import Any
 import urllib.error
@@ -34,6 +35,8 @@ import urllib.request
 
 from scmle.contracts import errors
 from scmle.security import tokens
+
+LOGGER = logging.getLogger(__name__)
 
 KEYS_UNAVAILABLE = "keys_unavailable"
 TIMEOUT_SECONDS = 5.0
@@ -199,9 +202,13 @@ class KeySet(tokens.KeySet):
         """
         try:
             loaded = self.load()
-        except errors.ConfigError:
-            # handled: failed JWKS fetch returns False with keys kept,
-            # documented
+        except errors.ConfigError as error:
+            LOGGER.warning(
+                "WARNING key set %s did not refresh; the cached keys stay in "
+                "use: %s",
+                self.uri,
+                error,
+            )
             return False
         self.keys = loaded.keys
         self.fetched_at = self.clock()
@@ -324,11 +331,18 @@ class Revocations:
             fresh = revocation_list_of(
                 self.fetcher(self.url, allow_http=self.allow_http)
             )
-        except errors.ConfigError:
+        except errors.ConfigError as error:
             if (
                 self.current is not None
                 and now - self.fetched_at < self.ttl + self.max_stale
             ):
+                LOGGER.warning(
+                    "WARNING revocation list %s did not refresh; the cached "
+                    "list is used until it is %ss stale: %s",
+                    self.url,
+                    self.max_stale,
+                    error,
+                )
                 return self.current
             raise
         self.current, self.fetched_at = fresh, now
