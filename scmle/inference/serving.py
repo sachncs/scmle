@@ -9,6 +9,7 @@ validation, the same preprocessing, the same model call, the same response.
 
 import abc
 from collections.abc import Callable
+from collections.abc import Mapping
 import functools
 from http import server
 import json
@@ -216,7 +217,8 @@ class Server(abc.ABC):
 
         The policies are enforced after scoring and before the rows are
         remembered, so a rejected batch leaves the history unchanged and
-        `PolicyError` propagates.
+        `PolicyError` propagates. Rows of a request whose caller already got
+        a 504 are not remembered either (SRV-2).
 
         Returns:
             The bundle's score response extended with the schema version,
@@ -228,7 +230,7 @@ class Server(abc.ABC):
             rows = validation.InputValidator(bundle.schema).row_report(frame)
             response = bundle.score(frame)
             self.enforce_policy(rows)
-            if remember:
+            if remember and not guard.abandoned():
                 bundle.remember(frame)
         response.update(
             {
@@ -482,6 +484,23 @@ class HttpServing(Server):
         self.httpd: server.ThreadingHTTPServer | None = None
         self.thread: threading.Thread | None = None
         self.loading: threading.Thread | None = None
+
+    def health(self) -> Mapping[str, Any]:
+        """Readiness, which a timed-out call still running takes away.
+
+        Returns:
+            The readiness snapshot, with `ready` false and the reason set
+            while any timed-out call holds a worker (SRV-1), and the
+            admission counts under `workers`.
+        """
+        snapshot = self.readiness.snapshot()
+        workers = self.admission.state()
+        if snapshot["ready"] and workers["stuck"]:
+            snapshot["ready"] = False
+            snapshot["reason"] = (
+                f"{workers['stuck']} timed-out call(s) still running"
+            )
+        return {**snapshot, "workers": workers}
 
     @property
     def address(self) -> str:
@@ -833,9 +852,16 @@ class Responder(server.BaseHTTPRequestHandler):
         if not self.identify() or not self.authorize("GET"):
             return
         adapter = self.adapter
-        readiness = adapter.readiness.snapshot()
+        readiness = adapter.health()
         if self.path == "/livez":
-            self.send_json(200, {"status": "alive"})
+            alive = adapter.admission.alive
+            self.send_json(
+                200 if alive else 503,
+                {
+                    "status": "alive" if alive else "wedged",
+                    **adapter.admission.state(),
+                },
+            )
         elif self.path == "/readyz":
             self.send_json(
                 200 if readiness["ready"] else 503,
@@ -847,7 +873,7 @@ class Responder(server.BaseHTTPRequestHandler):
                 503,
                 "service is not ready",
                 "not_ready",
-                readiness,
+                dict(readiness),
                 {"Retry-After": "1"},
             )
         elif self.path == "/health":
@@ -924,12 +950,13 @@ class Responder(server.BaseHTTPRequestHandler):
         if self.path not in serving.PREDICT_PATHS:
             self.fail(404, "not found", "request")
             return
-        if not adapter.readiness.ready:
+        readiness = adapter.health()
+        if not readiness["ready"]:
             self.fail(
                 503,
                 "service is not ready",
                 "not_ready",
-                adapter.readiness.snapshot(),
+                dict(readiness),
                 {"Retry-After": "1"},
             )
             return

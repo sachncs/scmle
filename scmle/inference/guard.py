@@ -4,7 +4,9 @@
 process may take traffic" (readiness): it becomes true only after the bundle
 was verified, loaded and warmed up, in that order. `AdmissionControl` bounds
 concurrent requests and the time one request may take, so an overloaded or
-stuck model answers quickly instead of queueing without limit.
+stuck model answers quickly instead of queueing without limit; a call that
+timed out makes the replica not ready until it returns, and `STRIKES` of them
+in a row make it not alive, so the platform restarts it.
 """
 
 from collections.abc import Callable
@@ -12,6 +14,7 @@ from collections.abc import Generator
 import concurrent.futures
 import contextlib
 import enum
+import functools
 import re
 import threading
 import time
@@ -21,6 +24,25 @@ import uuid
 from scmle.contracts import errors
 
 REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
+# Consecutive timed-out calls after which the replica reports itself not
+# alive, so the platform restarts it. Policy: one or two slow requests are
+# noise; three in a row with no success between them means the model or a
+# worker is wedged, and a computation cannot be cancelled in-process.
+STRIKES = 3
+CURRENT = threading.local()
+
+
+def abandoned() -> bool:
+    """Whether the caller of the work running on this thread gave up.
+
+    Work run by `AdmissionControl.run` checks this before it mutates state,
+    so a request answered with a 504 changes nothing (SRV-2).
+
+    Returns:
+        True once the call has timed out; False outside such work.
+    """
+    flag = getattr(CURRENT, "abandoned", None)
+    return bool(flag is not None and flag.is_set())
 
 
 class Phase(enum.StrEnum):
@@ -156,26 +178,59 @@ class Readiness:
 class AdmissionControl:
     """Bounds concurrent requests and the time one request may take."""
 
-    def __init__(self, max_concurrent: int, timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        max_concurrent: int,
+        timeout_seconds: float,
+        strikes: int = STRIKES,
+    ) -> None:
         """Creates the concurrency slots and a worker pool of that size.
 
         Args:
             max_concurrent: Requests allowed in flight; more get a 429.
             timeout_seconds: Time a scoring call may take before the caller
                 gets a 504. The computation itself cannot be cancelled, so a
-                timed-out call keeps its worker until it returns.
+                timed-out call keeps its worker until it returns; while it
+                does the replica is not ready (SRV-1).
+            strikes: Consecutive timeouts after which `alive` is false.
 
         Raises:
             ConfigError: If a limit is not positive.
         """
-        if max_concurrent < 1 or timeout_seconds <= 0:
+        if max_concurrent < 1 or timeout_seconds <= 0 or strikes < 1:
             raise errors.ConfigError("limits must be positive")
         self.max_concurrent = max_concurrent
         self.timeout_seconds = timeout_seconds
+        self.strikes = strikes
         self.slots = threading.BoundedSemaphore(max_concurrent)
         self.pool = concurrent.futures.ThreadPoolExecutor(
             max_workers=max_concurrent, thread_name_prefix="score"
         )
+        self.lock = threading.Lock()
+        self.busy = 0
+        self.stuck = 0
+        self.misses = 0
+
+    @property
+    def clear(self) -> bool:
+        """Whether no timed-out call is still holding a worker."""
+        with self.lock:
+            return self.stuck == 0
+
+    @property
+    def alive(self) -> bool:
+        """Whether fewer than `strikes` calls in a row have timed out."""
+        with self.lock:
+            return self.misses < self.strikes
+
+    def state(self) -> dict[str, int]:
+        """Counts for the probes: busy and stuck workers, timeouts in a row."""
+        with self.lock:
+            return {
+                "busy": self.busy,
+                "stuck": self.stuck,
+                "misses": self.misses,
+            }
 
     @contextlib.contextmanager
     def admit(self) -> Generator[None, None, None]:
@@ -209,18 +264,62 @@ class AdmissionControl:
             Whatever `work` returns.
 
         Raises:
+            OverloadedError: If every worker is busy, for example with calls
+                that timed out and are still running: the request is refused
+                at once instead of queueing behind them (SRV-1).
             DeadlineError: If `work` does not finish within the timeout. The
-                call keeps running on its worker.
+                call keeps running on its worker, is marked abandoned (see
+                `abandoned`), and counts as stuck until it returns.
         """
-        future = self.pool.submit(work)
+        flag = threading.Event()
+
+        def guarded() -> Any:
+            CURRENT.abandoned = flag
+            try:
+                return work()
+            finally:
+                CURRENT.abandoned = None
+
+        with self.lock:
+            if self.busy >= self.max_concurrent:
+                raise OverloadedError(
+                    f"all {self.max_concurrent} workers are busy"
+                )
+            self.busy += 1
+        future = self.pool.submit(guarded)
+        future.add_done_callback(functools.partial(self.release, flag))
         try:
-            return future.result(timeout=self.timeout_seconds)
+            result = future.result(timeout=self.timeout_seconds)
         except concurrent.futures.TimeoutError as error:
-            if future.done():
+            with self.lock:
+                if not future.done():
+                    flag.set()
+                    self.stuck += 1
+                    self.misses += 1
+            if not flag.is_set():
                 return future.result()
             raise DeadlineError(
                 f"request exceeded {self.timeout_seconds} seconds"
             ) from error
+        with self.lock:
+            self.misses = 0
+        return result
+
+    def release(
+        self, flag: threading.Event, done: concurrent.futures.Future[Any]
+    ) -> None:
+        """Frees the worker of a finished call, stuck or not.
+
+        Args:
+            flag: The call's abandoned flag.
+            done: The finished call, as the executor passes it; whether it
+                succeeded does not matter here.
+        """
+        del done
+        with self.lock:
+            self.busy -= 1
+            if flag.is_set():
+                self.stuck -= 1
 
     def close(self) -> None:
         """Releases the workers without waiting for stuck calls.

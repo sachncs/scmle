@@ -478,6 +478,13 @@ a wrong key, `SCMLE_ENV=production` with the published demo key
 Fix the cause and restart. Remember `/livez` is "the process runs" and
 `/readyz` is "the model is checked and loaded".
 
+If `reason` says timed-out calls are still running, a scoring call took longer
+than the scoring time limit and is still holding a worker; the replica takes no
+traffic until it returns. `workers` shows how many are busy and stuck. After
+three timeouts in a row, `/livez` also answers 503 (`status: wedged`) so the
+platform restarts the replica. Look for a slow input (very large request) or a
+model that hangs on some rows.
+
 ### Request errors (From the code, one was Seen)
 
 | Status | Meaning | What to do |

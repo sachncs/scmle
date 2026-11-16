@@ -3,6 +3,7 @@
 import json
 import pathlib
 import threading
+import time
 import urllib.error
 import urllib.request
 
@@ -366,6 +367,103 @@ def test_a_scoring_call_past_its_deadline_answers_504(
     finally:
         gate.release.set()
         adapter.stop()
+
+
+def settle(adapter, seconds=10.0):
+    """Waits until no worker is busy; returns whether that happened."""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if adapter.admission.state()["busy"] == 0:
+            return True
+        time.sleep(0.02)
+    return False
+
+
+def test_a_hung_call_makes_the_replica_unready_until_it_returns(
+    golden, bundle, monkeypatch
+):
+    # SRV-1: a timed-out call kept its worker and the lock while readiness
+    # stayed true, so traffic kept arriving and queued behind it.
+    adapter = serving.HttpServing(
+        bundle, max_concurrent=2, scoring_timeout_seconds=0.2
+    )
+    gate = SlowGate()
+    original = adapter.respond
+
+    def hung(records):
+        gate.release.wait(20)
+        return original(records)
+
+    monkeypatch.setattr(adapter, "respond", hung)
+    adapter.start()
+    url = f"{adapter.address}/predict"
+    try:
+        assert call(url, {"records": golden.records[:1]})[0] == 504
+        status, body = call(f"{adapter.address}/readyz")
+        assert status == 503
+        assert "still running" in body["reason"]
+        assert body["workers"]["stuck"] == 1
+        started = time.monotonic()
+        status, body = call(url, {"records": golden.records[:1]})
+        assert status == 503 and body["category"] == "not_ready"
+        assert time.monotonic() - started < 2
+        assert call(f"{adapter.address}/livez")[0] == 200
+        gate.release.set()
+        assert settle(adapter)
+        assert call(f"{adapter.address}/readyz")[0] == 200
+        assert call(url, {"records": golden.records[:1]})[0] == 200
+        assert adapter.admission.state()["misses"] == 0
+    finally:
+        gate.release.set()
+        adapter.stop()
+
+
+def test_consecutive_timeouts_fail_liveness_and_never_queue():
+    control = guard.AdmissionControl(2, 0.05, strikes=2)
+    release = threading.Event()
+    try:
+        for ignored in range(2):
+            with pytest.raises(guard.DeadlineError):
+                control.run(lambda: release.wait(20))
+        assert not control.alive and not control.clear
+        assert control.state() == {"busy": 2, "stuck": 2, "misses": 2}
+        with pytest.raises(guard.OverloadedError, match="workers are busy"):
+            control.run(lambda: 1)
+        release.set()
+        deadline = time.monotonic() + 10
+        while not control.clear and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert control.clear
+        assert control.run(lambda: 1) == 1
+        assert control.alive and control.state()["misses"] == 0
+    finally:
+        release.set()
+        control.close()
+
+
+def test_an_abandoned_call_knows_before_it_mutates_anything():
+    # SRV-2: work reported as failed still ran and mutated series history.
+    control = guard.AdmissionControl(1, 0.05)
+    release = threading.Event()
+    seen = []
+
+    def work():
+        release.wait(20)
+        seen.append(guard.abandoned())
+
+    try:
+        with pytest.raises(guard.DeadlineError):
+            control.run(work)
+        release.set()
+        deadline = time.monotonic() + 10
+        while not seen and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert seen == [True]
+        assert control.run(guard.abandoned) is False
+        assert guard.abandoned() is False
+    finally:
+        release.set()
+        control.close()
 
 
 def test_readiness_follows_verify_then_load_then_warm_up(golden, bundle):

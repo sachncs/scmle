@@ -68,7 +68,7 @@ or retypes a field needs a new schema version; the service refuses a
 | Request body | 16 MiB | 413 |
 | Records per request | 10,000 | 413 |
 | Requests in flight | 8 | 429 with `Retry-After: 1`; the request is not queued |
-| Scoring time | 30 s | 504; the caller is answered, the computation itself cannot be cancelled and holds its worker until it returns |
+| Scoring time | 30 s | 504; the caller is answered, the computation itself cannot be cancelled and holds its worker until it returns. While it does, `/readyz` answers 503 (`reason` says how many timed-out calls are still running) and `/predict` answers 503, so traffic moves to other replicas; a request that would only queue behind busy workers gets 429 at once. A request answered with 504 does not change the series history. Three timeouts in a row with no success between them make `/livez` answer 503 (`status: wedged`), so the platform restarts the replica |
 | Request I/O | 10 s | connection closed |
 
 Scoring is serialized by a lock because the bundle may update its series
