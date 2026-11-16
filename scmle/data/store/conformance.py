@@ -303,6 +303,89 @@ def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
     require(outcomes.count("lost") == RACERS - 1, "losers were not refused")
 
 
+def check_if_version(store: objectstore.ObjectStore, base: str) -> None:
+    """A versioned put or delete acts only on the version it names.
+
+    The check fails with `ConformanceError` (through `require`) if a put
+    or delete with a stale version, or on a missing object, does not raise
+    `ConflictError` or changes the object, or one with the current version
+    does not act.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
+    key = f"{base}/swap"
+    first = store.put(key, b"first")
+    require(first.version is not None, "the backend reports no version")
+    second = store.put(key, b"second", if_version=first.version)
+    require(store.get(key)[0] == b"second", "a matching swap did not write")
+    raises(
+        objectstore.ConflictError,
+        lambda: store.put(key, b"third", if_version=first.version),
+        "swap from a stale version",
+    )
+    require(store.get(key)[0] == b"second", "a refused swap changed the object")
+    raises(
+        objectstore.ConflictError,
+        lambda: store.delete(key, if_version=first.version),
+        "delete of a stale version",
+    )
+    require(store.exists(key), "a refused delete removed the object")
+    store.delete(key, if_version=second.version)
+    require(not store.exists(key), "a matching delete kept the object")
+    raises(
+        objectstore.ConflictError,
+        lambda: store.put(key, b"x", if_version=second.version),
+        "swap of a missing object",
+    )
+
+
+def check_if_version_race(store: objectstore.ObjectStore, base: str) -> None:
+    """Of several swaps from the same version exactly one wins.
+
+    The check fails with `ConformanceError` (through `require`) if a racer
+    fails with any error other than `ConflictError`, or the outcomes are
+    not one winner and the rest refused.
+
+    Args:
+        store: The backend under test.
+        base: Key prefix reserved for this check.
+    """
+    key = f"{base}/race"
+    version = store.put(key, b"start").version
+    outcomes: list[str] = []
+    guard = threading.Lock()
+    start = threading.Barrier(RACERS)
+
+    def racer(index: int) -> None:
+        """Swaps from the shared version and records the outcome.
+
+        Args:
+            index: Number of this racer, used in the payload it writes.
+        """
+        start.wait()
+        try:
+            store.put(key, f"racer-{index}".encode(), if_version=version)
+            result = "won"
+        except objectstore.ConflictError:
+            result = "lost"
+        except Exception as error:  # noqa: BLE001 -- any backend failure is recorded as this racer's outcome
+            result = f"failed {type(error).__name__}: {error}"
+        with guard:
+            outcomes.append(result)
+
+    threads = [threading.Thread(target=racer, args=(n,)) for n in range(RACERS)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    broken = [item for item in outcomes if item.startswith("failed")]
+    require(not broken, f"racers failed: {broken}")
+    require(outcomes.count("won") == 1, f"winners: {outcomes.count('won')}")
+    require(outcomes.count("lost") == RACERS - 1, "losers were not refused")
+
+
 def check_listing(store: objectstore.ObjectStore, base: str) -> None:
     """Listing is by prefix, sorted by key, and sees nested keys.
 
@@ -415,6 +498,8 @@ CHECKS: tuple[Callable[[objectstore.ObjectStore, str], None], ...] = (
     check_head_matches_get,
     check_if_absent,
     check_if_absent_race,
+    check_if_version,
+    check_if_version_race,
     check_listing,
     check_pagination,
     check_delete,

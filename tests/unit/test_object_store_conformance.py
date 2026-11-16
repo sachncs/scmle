@@ -32,13 +32,24 @@ def test_the_suite_leaves_nothing_behind(store):
 
 def test_the_suite_catches_a_backend_that_breaks_a_promise(tmp_path):
     class Overwriting(objectstore.LocalObjectStore):
-        def put(self, key, data, *, if_absent=False):
-            return super().put(key, data, if_absent=False)
+        def put(self, key, data, *, if_absent=False, if_version=None):
+            return super().put(key, data, if_version=if_version)
 
     report = conformance.run_conformance(Overwriting(tmp_path / "bad"))
     failed = {r.name for r in report.results if not r.passed}
     assert failed == {"if_absent", "if_absent_race"}
     assert not report.passed
+
+
+def test_the_suite_catches_a_backend_without_compare_and_swap(tmp_path):
+    # CON-1: leases need a swap that refuses a stale version.
+    class Blind(objectstore.LocalObjectStore):
+        def put(self, key, data, *, if_absent=False, if_version=None):
+            return super().put(key, data, if_absent=if_absent)
+
+    report = conformance.run_conformance(Blind(tmp_path / "blind"))
+    failed = {r.name for r in report.results if not r.passed}
+    assert failed == {"if_version", "if_version_race"}
 
 
 def test_the_uri_names_the_backend_and_prefix(tmp_path):
@@ -61,11 +72,13 @@ class Flaky(objectstore.LocalObjectStore):
         self.failures = list(failures)
         self.puts = 0
 
-    def put(self, key, data, *, if_absent=False):
+    def put(self, key, data, *, if_absent=False, if_version=None):
         self.puts += 1
         if self.failures:
             raise self.failures.pop(0)
-        return super().put(key, data, if_absent=if_absent)
+        return super().put(
+            key, data, if_absent=if_absent, if_version=if_version
+        )
 
 
 def test_transient_failures_are_retried_with_the_declared_backoff(tmp_path):

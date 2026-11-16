@@ -9,20 +9,31 @@ the shared conformance suite in `tests/unit/test_object_store_conformance.py`.
 Delivery semantics: `put` replaces atomically (a reader sees the old or the
 new object, never a mix); `put(..., if_absent=True)` creates only if no
 object exists and otherwise raises `AlreadyExistsError`, which is the
-building block for locks and for idempotent writers.
+building block for locks and for idempotent writers; `put(...,
+if_version=v)` and `delete(..., if_version=v)` act only if the object's
+current version is `v` and otherwise raise `ConflictError`, which is the
+compare-and-swap leases need (CON-1).
 """
 
 import abc
 from collections.abc import Callable
+from collections.abc import Generator
+import contextlib
 import dataclasses
 import datetime
 import hashlib
 import os
 import pathlib
 import re
+import sys
 import tempfile
 import time
 from typing import TypeVar
+
+if sys.platform == "win32":
+    import msvcrt
+else:
+    import fcntl
 
 from scmle import durability
 from scmle.contracts import errors
@@ -49,6 +60,12 @@ class AlreadyExistsError(StoreError):
     """An object already exists and the write was conditional."""
 
     category = "store_exists"
+
+
+class ConflictError(StoreError):
+    """A conditional write found another version than the one expected."""
+
+    category = "conflict"
 
 
 class CorruptObjectError(StoreError):
@@ -131,7 +148,8 @@ def is_temporary(name: str) -> bool:
 
     Both the exclusive-create path (``.put-*``) and
     `scmle.durability.write_atomically` (``.<name>.<random>.tmp``) write a
-    temp file first. A writer killed between the two steps leaves one behind;
+    temp file first, and a conditional write holds a lock file
+    (``.lock-*``). A writer killed between the two steps leaves one behind;
     it must not make the store unlistable.
 
     Args:
@@ -141,7 +159,7 @@ def is_temporary(name: str) -> bool:
         True if the name is one of the two temp-file shapes, False for a
         name that may be an object.
     """
-    return name.startswith(".put-") or (
+    return name.startswith((".put-", ".lock-")) or (
         name.startswith(".") and name.endswith(".tmp")
     )
 
@@ -194,20 +212,29 @@ class ObjectStore(abc.ABC):
 
     @abc.abstractmethod
     def put(
-        self, key: str, data: bytes, *, if_absent: bool = False
+        self,
+        key: str,
+        data: bytes,
+        *,
+        if_absent: bool = False,
+        if_version: str | None = None,
     ) -> ObjectMeta:
-        """Stores `data`, replacing any object unless `if_absent`.
+        """Stores `data`, replacing any object unless a condition fails.
 
         Args:
             key: The object key.
             data: The content to store.
             if_absent: Create the object only if none exists.
+            if_version: Replace the object only if its current version is
+                this one (compare-and-swap).
 
         Returns:
             The metadata of the stored object.
 
         Raises:
             AlreadyExistsError: With `if_absent` and an existing object.
+            ConflictError: With `if_version` and a missing object or another
+                version.
             TransientStoreError: On a retryable service failure.
         """
 
@@ -252,11 +279,14 @@ class ObjectStore(abc.ABC):
         """
 
     @abc.abstractmethod
-    def delete(self, key: str) -> None:
+    def delete(self, key: str, *, if_version: str | None = None) -> None:
         """Removes an object; removing a missing object is not an error.
 
         Args:
             key: The object key.
+            if_version: Remove the object only if its current version is
+                this one; a missing object or another version raises
+                `ConflictError`.
         """
 
     def exists(self, key: str) -> bool:
@@ -327,6 +357,35 @@ def unlink_tolerantly(path: pathlib.Path) -> None:
             return
 
 
+@contextlib.contextmanager
+def locked(path: pathlib.Path) -> Generator[None, None, None]:
+    """Holds an exclusive lock on a key's file, across processes.
+
+    The lock is a file beside the object (``.lock-<name>``); `flock` on
+    POSIX and `msvcrt.locking` on Windows block until it is free.
+
+    Args:
+        path: The object's file; its directory must exist.
+
+    Yields:
+        None, while the lock is held.
+    """
+    with path.with_name(f".lock-{path.name}").open("a+b") as handle:
+        if sys.platform == "win32":
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if sys.platform == "win32":
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 class LocalObjectStore(ObjectStore):
     """Objects as files under a root directory.
 
@@ -376,39 +435,75 @@ class LocalObjectStore(ObjectStore):
             data: The file's content; its length and hash are reported.
 
         Returns:
-            The metadata, with the file's modification time and no version.
+            The metadata, with the file's modification time; the version is
+            the content's SHA-256, which is what a conditional write
+            compares.
         """
         stat = path.stat()
-        return ObjectMeta(
-            key, len(data), sha256_of(data), iso(stat.st_mtime), None
-        )
+        digest = sha256_of(data)
+        return ObjectMeta(key, len(data), digest, iso(stat.st_mtime), digest)
 
     def put(
-        self, key: str, data: bytes, *, if_absent: bool = False
+        self,
+        key: str,
+        data: bytes,
+        *,
+        if_absent: bool = False,
+        if_version: str | None = None,
     ) -> ObjectMeta:
         """Stores `data` atomically.
 
         An unconditional put replaces the file through
-        `scmle.durability.write_atomically`; a conditional one links a
-        fully written temp file into place only if no object exists, and
-        raises `AlreadyExistsError` if one does. An invalid key raises
-        `StoreError`.
+        `scmle.durability.write_atomically`; `if_absent` links a fully
+        written temp file into place only if no object exists, and raises
+        `AlreadyExistsError` if one does; `if_version` compares and replaces
+        under an exclusive lock that other processes respect. An invalid
+        key raises `StoreError`.
 
         Args:
             key: The object key.
             data: The content to store.
             if_absent: Create the object only if none exists.
+            if_version: Replace only if the current version is this one.
 
         Returns:
             The metadata of the stored object.
+
+        Raises:
+            ValueError: If both conditions are given.
         """
+        if if_absent and if_version is not None:
+            raise ValueError("use if_absent or if_version, not both")
         path = self.path_of(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         if if_absent:
             self.create_exclusive(path, data)
+        elif if_version is not None:
+            with locked(path):
+                self.expect(key, path, if_version)
+                durability.write_atomically(path, data)
         else:
             durability.write_atomically(path, data)
         return self.meta_of(key, path, data)
+
+    def expect(self, key: str, path: pathlib.Path, version: str) -> None:
+        """Raises `ConflictError` unless the file holds `version`.
+
+        Args:
+            key: The object key, for the message.
+            path: Its file.
+            version: The version the caller expects.
+        """
+        try:
+            current = sha256_of(path.read_bytes())
+        except FileNotFoundError:
+            raise ConflictError(
+                f"no object {key!r} to replace", {"key": key}
+            ) from None
+        if current != version:
+            raise ConflictError(
+                f"object {key!r} changed", {"key": key, "version": current}
+            )
 
     def create_exclusive(self, path: pathlib.Path, data: bytes) -> None:
         """Writes a temp file, then links it into place only if absent.
@@ -504,15 +599,22 @@ class LocalObjectStore(ObjectStore):
                 found.append(self.head(key))
         return sorted(found, key=lambda meta: meta.key)
 
-    def delete(self, key: str) -> None:
+    def delete(self, key: str, *, if_version: str | None = None) -> None:
         """Removes an object if present.
 
         An invalid key raises `StoreError`.
 
         Args:
             key: The object key.
+            if_version: Remove only if the current version is this one.
         """
-        self.path_of(key).unlink(missing_ok=True)
+        path = self.path_of(key)
+        if if_version is None:
+            path.unlink(missing_ok=True)
+            return
+        with locked(path):
+            self.expect(key, path, if_version)
+            path.unlink()
 
 
 class RetryingStore(ObjectStore):
@@ -559,23 +661,33 @@ class RetryingStore(ObjectStore):
         return retry.call_with_retries(operation, self.policy, sleep=self.sleep)
 
     def put(
-        self, key: str, data: bytes, *, if_absent: bool = False
+        self,
+        key: str,
+        data: bytes,
+        *,
+        if_absent: bool = False,
+        if_version: str | None = None,
     ) -> ObjectMeta:
         """See `ObjectStore.put`.
 
         A conditional put whose first try landed but was reported as a
-        timeout fails on the retry with `AlreadyExistsError`; that is
-        reported as it is, not hidden.
+        timeout fails on the retry with `AlreadyExistsError` or
+        `ConflictError`; that is reported as it is, not hidden.
 
         Args:
             key: The object key.
             data: The content to store.
             if_absent: Create the object only if none exists.
+            if_version: Replace only if the current version is this one.
 
         Returns:
             The metadata of the stored object.
         """
-        return self.run(lambda: self.inner.put(key, data, if_absent=if_absent))
+        return self.run(
+            lambda: self.inner.put(
+                key, data, if_absent=if_absent, if_version=if_version
+            )
+        )
 
     def get(self, key: str) -> tuple[bytes, ObjectMeta]:
         """Reads an object, retrying transient failures.
@@ -610,10 +722,11 @@ class RetryingStore(ObjectStore):
         """
         return self.run(lambda: self.inner.list_objects(prefix))
 
-    def delete(self, key: str) -> None:
+    def delete(self, key: str, *, if_version: str | None = None) -> None:
         """Removes an object, retrying transient failures.
 
         Args:
             key: The object key.
+            if_version: Remove only if the current version is this one.
         """
-        self.run(lambda: self.inner.delete(key))
+        self.run(lambda: self.inner.delete(key, if_version=if_version))

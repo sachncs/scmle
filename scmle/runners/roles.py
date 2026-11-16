@@ -162,7 +162,12 @@ class RoleStore(objectstore.ObjectStore):
             raise RoleDeniedError(f"role {self.role.name} may not write {key}")
 
     def put(
-        self, key: str, data: bytes, *, if_absent: bool = False
+        self,
+        key: str,
+        data: bytes,
+        *,
+        if_absent: bool = False,
+        if_version: str | None = None,
     ) -> objectstore.ObjectMeta:
         """Stores `data` if the role may write `key` (see `ObjectStore.put`).
 
@@ -170,12 +175,15 @@ class RoleStore(objectstore.ObjectStore):
             key: The object key.
             data: The content to store.
             if_absent: Create the object only if none exists.
+            if_version: Replace only if the current version is this one.
 
         Returns:
             The metadata of the stored object.
         """
         self.need_write(key)
-        return self.inner.put(key, data, if_absent=if_absent)
+        return self.inner.put(
+            key, data, if_absent=if_absent, if_version=if_version
+        )
 
     def get(self, key: str) -> tuple[bytes, objectstore.ObjectMeta]:
         """Reads an object if the role may read it (see `ObjectStore.get`).
@@ -216,11 +224,12 @@ class RoleStore(objectstore.ObjectStore):
         self.need_read(prefix)
         return self.inner.list_objects(prefix)
 
-    def delete(self, key: str) -> None:
+    def delete(self, key: str, *, if_version: str | None = None) -> None:
         """Deletes an object if the role may write the key (see `ObjectStore`).
 
         Args:
             key: The object key.
+            if_version: Remove only if the current version is this one.
         """
         self.need_write(key)
-        self.inner.delete(key)
+        self.inner.delete(key, if_version=if_version)

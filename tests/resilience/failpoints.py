@@ -247,11 +247,13 @@ class FailpointStore(objectstore.ObjectStore):
             raise
         return result
 
-    def put(self, key, data, *, if_absent=False):
+    def put(self, key, data, *, if_absent=False, if_version=None):
         return self.around(
             "put",
             key,
-            lambda: self.inner.put(key, data, if_absent=if_absent),
+            lambda: self.inner.put(
+                key, data, if_absent=if_absent, if_version=if_version
+            ),
             if_absent,
         )
 
@@ -266,8 +268,10 @@ class FailpointStore(objectstore.ObjectStore):
             "list", prefix, lambda: self.inner.list_objects(prefix)
         )
 
-    def delete(self, key):
-        return self.around("delete", key, lambda: self.inner.delete(key))
+    def delete(self, key, *, if_version=None):
+        return self.around(
+            "delete", key, lambda: self.inner.delete(key, if_version=if_version)
+        )
 
 
 def checkpoint_of(store):

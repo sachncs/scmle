@@ -359,6 +359,105 @@ def test_a_crashed_executor_is_taken_over_after_its_lease(store):
     assert recorder.names().count("train") == 2
 
 
+def test_an_executor_that_outlives_its_lease_cannot_write_over_the_successor(
+    store,
+):
+    # CON-1: a slow executor whose lease expired kept writing after another
+    # took the run over; renew and release never checked the owner, and the
+    # take-over was delete-then-create with no fencing token.
+    clock = Clock()
+    slow, fresh = Recorder(clock), Recorder(clock)
+    flow = pipeline()
+    first = executor_for(store, flow, slow, clock, lease_seconds=300.0)
+    second = executor_for(store, flow, fresh, clock, owner="second")
+    run_id = scmle.workflow.executor.run_id_for(flow, "req-1")
+    lock = f"workflows/{flow.name}/runs/{run_id}/lock"
+    taken = []
+
+    def outlives(context):
+        clock.now += 301
+        taken.append(second.resume(run_id)["state"])
+        taken.append(
+            json.loads(store.get(lock)[0]) if store.exists(lock) else None
+        )
+        return {"by": "first"}
+
+    slow.behaviour["train"] = outlives
+    with pytest.raises(scmle.workflow.executor.EvictionError):
+        first.start("req-1", "alice")
+    assert taken[0] == "waiting_approval"
+    assert fresh.names().count("train") == 1
+    saved = json.loads(
+        store.get(f"workflows/{flow.name}/runs/{run_id}/steps/train.json")[0]
+    )
+    assert saved["outputs"] != {"by": "first"}
+    record = json.loads(
+        store.get(f"workflows/{flow.name}/runs/{run_id}/run.json")[0]
+    )
+    assert record["state"] == "waiting_approval"
+
+
+def test_a_lease_is_renewed_and_released_only_by_its_holder(store):
+    clock = Clock()
+    flow = pipeline()
+    first = executor_for(store, flow, Recorder(clock), clock)
+    second = executor_for(store, flow, Recorder(clock), clock, owner="second")
+    run_id = "run-a"
+    lock = f"workflows/{flow.name}/runs/{run_id}/lock"
+    first.take_lease(run_id)
+    assert json.loads(store.get(lock)[0])["fence"] == 1
+    with pytest.raises(scmle.workflow.executor.RunInFlightError):
+        second.take_lease(run_id)
+    second.fences[run_id] = 1
+    with pytest.raises(scmle.workflow.executor.EvictionError):
+        second.renew_lease(run_id)
+    second.release_lease(run_id)
+    assert store.exists(lock)
+    clock.now += 301
+    second.take_lease(run_id)
+    assert json.loads(store.get(lock)[0]) == {
+        "owner": "second",
+        "expires": clock.now + 300.0,
+        "fence": 2,
+    }
+    with pytest.raises(scmle.workflow.executor.EvictionError):
+        first.renew_lease(run_id)
+    first.release_lease(run_id)
+    assert json.loads(store.get(lock)[0])["owner"] == "second"
+    second.release_lease(run_id)
+    assert not store.exists(lock)
+
+
+def test_of_two_executors_racing_for_an_expired_lease_one_wins(store):
+    clock = Clock()
+    flow = pipeline()
+    run_id = "run-b"
+    lock = f"workflows/{flow.name}/runs/{run_id}/lock"
+    store.put(lock, json.dumps({"owner": "dead", "expires": 0.0}).encode())
+    racers = [
+        executor_for(store, flow, Recorder(clock), clock, owner=f"e{n}")
+        for n in range(8)
+    ]
+    outcomes = []
+    start = threading.Barrier(len(racers))
+
+    def race(executor):
+        start.wait()
+        try:
+            executor.take_lease(run_id)
+            outcomes.append("won")
+        except scmle.workflow.executor.RunInFlightError:
+            outcomes.append("lost")
+
+    threads = [threading.Thread(target=race, args=(e,)) for e in racers]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert outcomes.count("won") == 1
+    assert json.loads(store.get(lock)[0])["fence"] == 1
+
+
 def test_timeouts_budgets_and_the_run_budget(store):
     clock = Clock()
     recorder = Recorder(clock)

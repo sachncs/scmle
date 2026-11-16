@@ -57,9 +57,11 @@ class FaultyStore(objectstore.ObjectStore):
             if self.skip <= number < self.skip + self.failures:
                 raise self.error()
 
-    def put(self, key, data, *, if_absent=False):
+    def put(self, key, data, *, if_absent=False, if_version=None):
         self.strike("put", key)
-        return self.inner.put(key, data, if_absent=if_absent)
+        return self.inner.put(
+            key, data, if_absent=if_absent, if_version=if_version
+        )
 
     def get(self, key):
         self.strike("get", key)
@@ -73,6 +75,6 @@ class FaultyStore(objectstore.ObjectStore):
         self.strike("list_objects", prefix)
         return self.inner.list_objects(prefix)
 
-    def delete(self, key):
+    def delete(self, key, *, if_version=None):
         self.strike("delete", key)
-        self.inner.delete(key)
+        self.inner.delete(key, if_version=if_version)

@@ -26,22 +26,28 @@ leaves a consistent record and a new one continues from it.
 * **Approval.** An approval step waits (`waiting_approval`) until a signed
   decision from a listed approver, who must not be the requester, is recorded;
   a rejection or expiry ends the run without the approved actions.
-* **Leases.** A run holds a lease it renews as it works. A second executor
-  gets `RunInFlightError` while it is valid and may take over after it
-  expires (the first one is presumed dead). Take-over is a check, delete and
-  conditional create; two executors racing for an expired lease cannot both
-  win, but a first executor that is merely slow can still write after losing
-  its lease, so handlers must be idempotent.
+* **Leases.** A run holds a lease with an owner and a fencing token, renewed
+  by a heartbeat while steps run. A second executor gets `RunInFlightError`
+  while it is valid and may take over after it expires (the first one is
+  presumed dead) with one compare-and-swap that raises the token, so two
+  executors racing for it cannot both win. Renewal and release check owner
+  and token, and every run record is written only after that check
+  (`EvictionError` otherwise), so a slow first executor stops instead of
+  overwriting the new holder's state (CON-1). The check and the write are
+  two store calls, so handlers must still be idempotent.
 """
 
 from collections.abc import Callable
+from collections.abc import Generator
 from collections.abc import Mapping
 import concurrent.futures
+import contextlib
 import dataclasses
 import enum
 import hashlib
 import hmac
 import json
+import logging
 import threading
 import time
 from typing import Any
@@ -53,6 +59,12 @@ from scmle.data.store import objectstore
 from scmle.workflow import definition
 
 LEASE_SECONDS = 300.0
+# Tries at taking a lease that changes hands under us (deleted between the
+# failed create and the read); more means someone else keeps winning.
+LEASE_ATTEMPTS = 3
+LOGGER = logging.getLogger(__name__)
+# A conditional write on a lease that changed or vanished under us.
+CHANGED = (objectstore.ConflictError, objectstore.NotFoundError)
 
 
 class RunState(enum.StrEnum):
@@ -117,6 +129,12 @@ class RunInFlightError(errors.ScmleError):
     """Another executor holds a valid lease on the run."""
 
     category = "run_in_flight"
+
+
+class EvictionError(RunInFlightError):
+    """This executor no longer holds the run's lease and must stop writing."""
+
+    category = "lease_lost"
 
 
 class ConcurrencyLimitError(errors.ScmleError):
@@ -305,6 +323,7 @@ class Executor:
         self.lease_seconds = lease_seconds
         self.owner = owner
         self.guard = threading.Lock()
+        self.fences: dict[str, int] = {}
 
     # ---- keys and records -------------------------------------------------
 
@@ -336,12 +355,24 @@ class Executor:
         return record
 
     def write(self, key: str, record: Mapping[str, Any]) -> None:
-        """Stores a JSON record atomically.
+        """Stores a JSON record atomically, fenced by the run's lease.
+
+        A record under a run this executor leases is written only after
+        `hold` confirms the lease is still ours, so an executor that lost
+        its lease stops instead of overwriting the new holder's state.
 
         Args:
             key: Object key.
             record: The record to store.
+
+        Raises:
+            EvictionError: If the run's lease is no longer ours.
         """
+        prefix = f"workflows/{self.workflow.name}/runs/"
+        if key.startswith(prefix) and not key.endswith("/lock"):
+            run_id = key[len(prefix) :].split("/", 1)[0]
+            if run_id in self.fences:
+                self.hold(run_id)
         body = json.dumps(record, indent=2, sort_keys=True).encode()
         self.store.put(key, body)
 
@@ -370,59 +401,183 @@ class Executor:
 
     # ---- leases and concurrency ------------------------------------------
 
+    def lease(self, run_id: str, fence: int) -> bytes:
+        """The body of this executor's lease on a run.
+
+        Args:
+            run_id: The run.
+            fence: The fencing token: one more than the lease it replaced.
+
+        Returns:
+            The JSON bytes to store.
+        """
+        del run_id
+        return json.dumps(
+            {
+                "owner": self.owner,
+                "expires": self.clock() + self.lease_seconds,
+                "fence": fence,
+            }
+        ).encode()
+
     def take_lease(self, run_id: str) -> None:
         """Acquires the run's lease, or raises `RunInFlightError`.
 
-        An expired lease is taken over; the take-over is a delete followed by a
-        conditional create.
+        A free run is taken with a conditional create. An expired lease is
+        taken over with one compare-and-swap from the version just read, so
+        of two executors racing for it exactly one wins (CON-1); the winner's
+        fencing token is one more than the expired lease's.
 
         Args:
             run_id: The run.
 
         Raises:
-            RunInFlightError: If another executor holds a valid lease, or wins a
-                race for an expired one.
+            RunInFlightError: If another executor holds a valid lease, or wins
+                the race for an expired one.
         """
         key = self.base(run_id) + "lock"
-        body = json.dumps(
-            {"owner": self.owner, "expires": self.clock() + self.lease_seconds}
-        ).encode()
-        try:
-            self.store.put(key, body, if_absent=True)
-        except objectstore.AlreadyExistsError:
-            pass
-        else:
+        for ignored in range(LEASE_ATTEMPTS):
+            try:
+                self.store.put(key, self.lease(run_id, 1), if_absent=True)
+            except objectstore.AlreadyExistsError:
+                pass
+            else:
+                self.fences[run_id] = 1
+                return
+            try:
+                data, meta = self.store.get(key)
+            except objectstore.NotFoundError:
+                continue
+            held = json.loads(data)
+            if held["expires"] > self.clock():
+                raise RunInFlightError(
+                    f"run {run_id} is held by {held['owner']}"
+                )
+            fence = int(held.get("fence", 0)) + 1
+            try:
+                self.store.put(
+                    key, self.lease(run_id, fence), if_version=meta.version
+                )
+            except (
+                objectstore.ConflictError,
+                objectstore.NotFoundError,
+            ) as error:
+                raise RunInFlightError(
+                    f"run {run_id} was just taken"
+                ) from error
+            self.fences[run_id] = fence
             return
-        held = self.read(key) or {"expires": 0.0}
-        if held["expires"] > self.clock():
-            raise RunInFlightError(f"run {run_id} is held by {held['owner']}")
-        self.store.delete(key)
+        raise RunInFlightError(f"run {run_id} is changing hands; retry")
+
+    def hold(self, run_id: str) -> objectstore.ObjectMeta:
+        """Checks that this executor still holds the run's lease.
+
+        Args:
+            run_id: The run.
+
+        Returns:
+            The lease object's metadata, whose version a renewal or release
+            must match.
+
+        Raises:
+            EvictionError: If the lease is gone, or another executor or a
+                later fencing token holds it.
+        """
+        fence = self.fences.get(run_id)
         try:
-            self.store.put(key, body, if_absent=True)
-        except objectstore.AlreadyExistsError as error:
-            raise RunInFlightError(f"run {run_id} was just taken") from error
+            data, meta = self.store.get(self.base(run_id) + "lock")
+        except objectstore.NotFoundError:
+            raise EvictionError(f"the lease on run {run_id} is gone") from None
+        held = json.loads(data)
+        if (
+            fence is None
+            or held.get("owner") != self.owner
+            or held.get("fence") != fence
+        ):
+            raise EvictionError(
+                f"run {run_id} is now held by {held.get('owner')} "
+                f"(fence {held.get('fence')}, ours {fence})"
+            )
+        return meta
 
     def renew_lease(self, run_id: str) -> None:
-        """Extends the lease.
+        """Extends the lease, only if this executor still holds it.
 
         Args:
             run_id: The run.
+
+        Raises:
+            EvictionError: If the lease was taken over or changed between
+                the check and the renewal.
         """
-        self.write(
-            self.base(run_id) + "lock",
-            {
-                "owner": self.owner,
-                "expires": self.clock() + self.lease_seconds,
-            },
-        )
+        meta = self.hold(run_id)
+        try:
+            self.store.put(
+                self.base(run_id) + "lock",
+                self.lease(run_id, self.fences[run_id]),
+                if_version=meta.version,
+            )
+        except CHANGED as error:
+            raise EvictionError(
+                f"the lease on run {run_id} changed while renewing"
+            ) from error
 
     def release_lease(self, run_id: str) -> None:
-        """Gives the lease up.
+        """Gives the lease up, never one another executor now holds.
 
         Args:
             run_id: The run.
         """
-        self.store.delete(self.base(run_id) + "lock")
+        try:
+            meta = self.hold(run_id)
+            self.store.delete(
+                self.base(run_id) + "lock", if_version=meta.version
+            )
+        except (EvictionError, objectstore.ConflictError):
+            LOGGER.warning(
+                "WARNING run %s: the lease was no longer ours at release",
+                run_id,
+            )
+        finally:
+            self.fences.pop(run_id, None)
+
+    @contextlib.contextmanager
+    def pulse(self, run_id: str) -> Generator[None, None, None]:
+        """Keeps the run's lease renewed by a heartbeat while steps run.
+
+        Args:
+            run_id: The run.
+
+        Yields:
+            None, while the heartbeat runs; it stops on exit.
+        """
+        stop = threading.Event()
+        heartbeat = threading.Thread(
+            target=self.beat, args=(run_id, stop), daemon=True
+        )
+        heartbeat.start()
+        try:
+            yield
+        finally:
+            stop.set()
+            heartbeat.join()
+
+    def beat(self, run_id: str, stop: threading.Event) -> None:
+        """Renews the lease every third of its validity until `stop` is set.
+
+        A failed renewal is logged and ends the heartbeat; the next write
+        under the run then refuses (`hold`), so a lost lease never writes.
+
+        Args:
+            run_id: The run.
+            stop: Set when the run's steps are done.
+        """
+        while not stop.wait(self.lease_seconds / 3):
+            try:
+                self.renew_lease(run_id)
+            except EvictionError:
+                LOGGER.warning("WARNING run %s: the lease was lost", run_id)
+                return
 
     def active_runs(self) -> list[str]:
         """Lists the runs of this workflow whose lease is valid.
@@ -562,14 +717,17 @@ class Executor:
         """
         states, outputs = self.saved_progress(run_id)
         record["cost"] = self.recorded_cost(run_id)
-        budget_hit = False
         group_use: dict[str, int] = {}
         in_flight: dict[
             concurrent.futures.Future[Outcome], definition.Step
         ] = {}
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.workflow.max_parallel
-        ) as pool:
+        budget_hit = False
+        with (
+            self.pulse(run_id),
+            concurrent.futures.ThreadPoolExecutor(
+                max_workers=self.workflow.max_parallel
+            ) as pool,
+        ):
             while True:
                 self.renew_lease(run_id)
                 budget = self.workflow.cost_budget
