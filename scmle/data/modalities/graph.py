@@ -36,7 +36,7 @@ class GraphInputError(GraphError):
     """Raised when a graph input file cannot be parsed."""
 
 
-class GraphTemporalError(GraphError):
+class TemporalError(GraphError):
     """Raised when temporal graph evidence is incomplete or invalid."""
 
 
@@ -195,7 +195,7 @@ class TemporalSplit:
         )
 
 
-def canonical_event_time(value: datetime | str) -> datetime:
+def normalize(value: datetime | str) -> datetime:
     """Parses and normalizes a timezone-aware graph event timestamp to UTC.
 
     Args:
@@ -205,7 +205,7 @@ def canonical_event_time(value: datetime | str) -> datetime:
         The same instant as a UTC datetime.
 
     Raises:
-        GraphTemporalError: If the text is not ISO 8601, the value is
+        TemporalError: If the text is not ISO 8601, the value is
             neither datetime nor text, or the time has no timezone.
     """
     if isinstance(value, str):
@@ -215,15 +215,15 @@ def canonical_event_time(value: datetime | str) -> datetime:
         try:
             parsed = datetime.fromisoformat(normalized)
         except ValueError as error:
-            raise GraphTemporalError(
+            raise TemporalError(
                 f"invalid graph event time: {value!r}"
             ) from error
     elif isinstance(value, datetime):
         parsed = value
     else:
-        raise GraphTemporalError("graph event time must be datetime or text")
+        raise TemporalError("graph event time must be datetime or text")
     if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise GraphTemporalError("graph event time must be timezone-aware")
+        raise TemporalError("graph event time must be timezone-aware")
     return parsed.astimezone(UTC)
 
 
@@ -414,7 +414,7 @@ class InductiveNodeSplit:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PreparedFeatures:
+class Features:
     """Bounded numeric features for a graph baseline.
 
     Attributes:
@@ -666,7 +666,7 @@ class Dataset:
                         (edge.source, edge.target),
                     )
                 )
-            key = self.edge_key(edge)
+            key = self.canonicalize(edge)
             duplicate_counts[key] += 1
         for key, count in sorted(duplicate_counts.items()):
             if count > 1:
@@ -690,7 +690,7 @@ class Dataset:
         if not report.is_valid:
             raise GraphValidationError(report)
 
-    def edge_key(self, edge: Edge) -> tuple[str, str, str, str]:
+    def canonicalize(self, edge: Edge) -> tuple[str, str, str, str]:
         """Returns the canonical duplicate-detection key for an edge.
 
         Args:
@@ -779,7 +779,7 @@ class Dataset:
         """
         weights = tuple(edge.weight for edge in self.edges)
         duplicate_count = sum(
-            max(0, count - 1) for count in self.edge_key_counts().values()
+            max(0, count - 1) for count in self.tally().values()
         )
         return EdgeProfile(
             edge_count=len(self.edges),
@@ -792,15 +792,15 @@ class Dataset:
             weight_mean=float(numpy.mean(weights)) if weights else None,
         )
 
-    def edge_key_counts(self) -> dict[tuple[str, str, str, str], int]:
+    def tally(self) -> dict[tuple[str, str, str, str], int]:
         """Returns canonical edge multiplicities.
 
         Returns:
-            A dict from `edge_key` to the number of edges with that key.
+            A dict from `canonicalize` to the number of edges with that key.
         """
         counts: defaultdict[tuple[str, str, str, str], int] = defaultdict(int)
         for edge in self.edges:
-            counts[self.edge_key(edge)] += 1
+            counts[self.canonicalize(edge)] += 1
         return dict(counts)
 
     def profile(self) -> Profile:
@@ -1154,8 +1154,8 @@ def edges_from_records(
         time_value = None if time_column is None else record.get(time_column)
         if time_value is not None and not pandas.isna(time_value):
             try:
-                event_time = canonical_event_time(time_value)
-            except GraphTemporalError as error:
+                event_time = normalize(time_value)
+            except TemporalError as error:
                 raise GraphInputError(
                     f"edge record {index} has an invalid event time"
                 ) from error
@@ -1342,7 +1342,7 @@ def prepare_features(
     max_features: int = 512,
     standardize: bool = False,
     include_structural: bool = True,
-) -> PreparedFeatures:
+) -> Features:
     """Prepares bounded numeric node features for a baseline model.
 
     User-provided features are followed by deterministic degree features when
@@ -1386,7 +1386,7 @@ def prepare_features(
     width = min(max_features, max((len(row) for row in rows), default=0))
     rows = [row[:width] for row in rows]
     names = names[:width]
-    return PreparedFeatures(
+    return Features(
         node_ids=tuple(node.node_id for node in nodes),
         feature_names=tuple(names),
         values=feature_values(rows, width, standardize=standardize),
@@ -1398,21 +1398,21 @@ __all__ = [
     "Dataset",
     "Edge",
     "EdgeProfile",
+    "Features",
     "GraphError",
-    "GraphTemporalError",
     "GraphValidationError",
     "InductiveNodeSplit",
     "Issue",
     "Node",
     "NodeProfile",
-    "PreparedFeatures",
     "Profile",
+    "TemporalError",
     "TemporalSplit",
     "Validation",
-    "canonical_event_time",
     "edges_from_records",
     "graph_identity",
     "inductive_node_split",
+    "normalize",
     "prepare_features",
     "read_edges",
 ]

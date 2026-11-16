@@ -199,7 +199,7 @@ def approval_for(
     ).sign(DEMO_SIGNING_KEY)
 
 
-def start_service(
+def launch(
     folder: pathlib.Path, port: int, environment: str = "production"
 ) -> subprocess.Popen[bytes]:
     """Starts a generated `serve.py` as the container would.
@@ -273,9 +273,7 @@ class Authenticator(urllib.request.BaseHandler):
         return request
 
 
-def install_bearer(
-    environ: Mapping[str, str], prefixes: tuple[str, ...]
-) -> bool:
+def authenticate(environ: Mapping[str, str], prefixes: tuple[str, ...]) -> bool:
     """Makes `urllib` authenticate to the compose services.
 
     The token is minted from the published demo key in `deploy/local/demo.env`
@@ -385,7 +383,7 @@ def wait_ready(
     return None
 
 
-def stop_service(process: subprocess.Popen[bytes] | None) -> None:
+def halt(process: subprocess.Popen[bytes] | None) -> None:
     """Terminates a started service.
 
     The process is terminated, then killed if it has not exited after 15
@@ -547,7 +545,7 @@ def prepare(
     return {"service": service, "golden_service": golden_service}
 
 
-def predict_checks(
+def compare(
     base: str,
     model_directory: pathlib.Path,
     data: pathlib.Path,
@@ -605,9 +603,7 @@ def predict_checks(
     }
 
 
-def corrupted_and_unsigned_stay_unready(
-    service: pathlib.Path, workdir: pathlib.Path
-) -> dict[str, Any]:
+def tamper(service: pathlib.Path, workdir: pathlib.Path) -> dict[str, Any]:
     """Checks that a modified and an unsigned copy are alive but never ready.
 
     Args:
@@ -630,7 +626,7 @@ def corrupted_and_unsigned_stay_unready(
     (unsigned / "model" / bundle.SIGNATURE_FILE).unlink()
     for label, folder in (("corrupted", corrupt), ("unsigned", unsigned)):
         port = free_port()
-        process = start_service(folder, port)
+        process = launch(folder, port)
         base = f"http://127.0.0.1:{port}"
         try:
             deadline = time.monotonic() + 30
@@ -659,11 +655,11 @@ def corrupted_and_unsigned_stay_unready(
                 "reason": ready.get("reason"),
             }
         finally:
-            stop_service(process)
+            halt(process)
     return outcomes
 
 
-def rollback_drill(
+def rollback(
     workdir: pathlib.Path, data: pathlib.Path = DATA_DIRECTORY
 ) -> dict[str, Any]:
     """Promotes the bad release, monitors it, rolls back, serves the result.
@@ -676,12 +672,12 @@ def rollback_drill(
         data: Directory holding `fresh.csv`.
 
     Returns:
-        The findings of `drill_steps`.
+        The findings of `drill`.
     """
     previous = os.environ.get("SCMLE_SIGNING_KEY")
     os.environ["SCMLE_SIGNING_KEY"] = DEMO_SIGNING_KEY
     try:
-        return drill_steps(workdir, data)
+        return drill(workdir, data)
     finally:
         if previous is None:
             os.environ.pop("SCMLE_SIGNING_KEY", None)
@@ -689,7 +685,7 @@ def rollback_drill(
             os.environ["SCMLE_SIGNING_KEY"] = previous
 
 
-def drill_steps(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
+def drill(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
     """Runs the drill itself: promote, monitor, roll back, serve.
 
     Args:
@@ -813,7 +809,7 @@ def process_memory_mb(process: subprocess.Popen[bytes] | None) -> float | None:
         return None
 
 
-def measure_latency(
+def measure(
     base: str, rows: list[dict[str, Any]], count: int = LATENCY_REQUESTS
 ) -> dict[str, float]:
     """Measures latency for sequential requests of `rows`.
@@ -864,7 +860,7 @@ def measure_latency(
     }
 
 
-def push_metrics(
+def push(
     sink: str, values: dict[str, tuple[float, str]], model_version: str
 ) -> int:
     """Sends named values to the metrics sink.
@@ -897,7 +893,7 @@ def push_metrics(
     return mocks.post_metrics(sink, samples)
 
 
-def round_trip_object_store(
+def mirror(
     transcript: Transcript,
     store_url: str,
     service: pathlib.Path,
@@ -933,7 +929,7 @@ def round_trip_object_store(
     return fetched
 
 
-def check_golden_parity(
+def corroborate(
     transcript: Transcript,
     golden_service: pathlib.Path,
     processes: list[subprocess.Popen[bytes]],
@@ -949,7 +945,7 @@ def check_golden_parity(
     started = time.monotonic()
     golden_port = free_port()
     golden_base = f"http://127.0.0.1:{golden_port}"
-    golden_process = start_service(golden_service, golden_port)
+    golden_process = launch(golden_service, golden_port)
     processes.append(golden_process)
     golden_ready = wait_ready(golden_base, golden_process)
     report: dict[str, Any] = {"passed": False}
@@ -1003,10 +999,10 @@ def measure_and_ship_metrics(
     """
     started = time.monotonic()
     frame = pandas.read_csv(data / "fresh.csv").drop(columns=[TARGET])
-    single = measure_latency(base, records_of(frame.head(1)))
-    hundred = measure_latency(base, records_of(frame.head(100)), 40)
+    single = measure(base, records_of(frame.head(1)))
+    hundred = measure(base, records_of(frame.head(100)), 40)
     memory = process_memory_mb(process)
-    accepted = push_metrics(
+    accepted = push(
         metrics_url,
         {
             "latency_single_p95": (single["p95_ms"], "ms"),
@@ -1068,14 +1064,12 @@ def run(
         paths = prepare(workdir, data, transcript)
         service, golden_service = paths["service"], paths["golden_service"]
 
-        fetched = round_trip_object_store(
-            transcript, store_url, service, workdir
-        )
+        fetched = mirror(transcript, store_url, service, workdir)
 
         started = time.monotonic()
         port = free_port()
         base = f"http://127.0.0.1:{port}"
-        process = start_service(fetched, port)
+        process = launch(fetched, port)
         processes.append(process)
         startup = wait_ready(base, process)
         status, ready = get_json(f"{base}/readyz") if startup else (0, {})
@@ -1091,7 +1085,7 @@ def run(
             fail_not_ready(process)
 
         started = time.monotonic()
-        checks = predict_checks(base, fetched / "model", data, workdir)
+        checks = compare(base, fetched / "model", data, workdir)
         transcript.record(
             "predict (online and batch)",
             started,
@@ -1102,10 +1096,10 @@ def run(
             **checks,
         )
 
-        check_golden_parity(transcript, golden_service, processes)
+        corroborate(transcript, golden_service, processes)
 
         started = time.monotonic()
-        negatives = corrupted_and_unsigned_stay_unready(service, workdir)
+        negatives = tamper(service, workdir)
         transcript.record(
             "corrupted and unsigned bundles never become ready",
             started,
@@ -1119,7 +1113,7 @@ def run(
         )
 
         started = time.monotonic()
-        drill = rollback_drill(workdir, data)
+        drill = rollback(workdir, data)
         transcript.record(
             "monitor and rollback drill",
             started,
@@ -1147,14 +1141,14 @@ def run(
         )
     finally:
         for process in processes:
-            stop_service(process)
+            halt(process)
         for mock in (own_store, own_sink):
             if mock is not None:
                 mock.stop()
     return transcript
 
 
-def verify_remote(
+def verify(
     api: str,
     golden_api: str,
     workdir: pathlib.Path,
@@ -1175,14 +1169,14 @@ def verify_remote(
         become ready.
     """
     transcript = Transcript()
-    install_bearer(os.environ, (api, golden_api))
+    authenticate(os.environ, (api, golden_api))
     started = time.monotonic()
     ready = wait_ready(api) is not None and wait_ready(golden_api) is not None
     transcript.record("services ready", started, ok=ready)
     if not ready:
         return transcript
     started = time.monotonic()
-    checks = predict_checks(api, workdir / "service" / "model", data, workdir)
+    checks = compare(api, workdir / "service" / "model", data, workdir)
     transcript.record(
         "predict (online and batch)",
         started,
@@ -1199,7 +1193,7 @@ def verify_remote(
         "golden-record parity", started, ok=bool(report["passed"])
     )
     started = time.monotonic()
-    drill = rollback_drill(workdir, data)
+    drill = rollback(workdir, data)
     transcript.record(
         "monitor and rollback drill",
         started,
@@ -1207,9 +1201,7 @@ def verify_remote(
         **drill,
     )
     started = time.monotonic()
-    accepted = push_metrics(
-        metrics_url, {"drift_rollback_drill": (1.0, "bool")}, "v1"
-    )
+    accepted = push(metrics_url, {"drift_rollback_drill": (1.0, "bool")}, "v1")
     transcript.record("ship metrics", started, ok=accepted == 1)
     return transcript
 
@@ -1244,7 +1236,7 @@ def main(arguments: list[str] | None = None) -> int:
         prepare(options.workdir, options.data, log)
         transcript = log
     elif options.action == "verify":
-        transcript = verify_remote(
+        transcript = verify(
             options.api_url,
             options.golden_api_url,
             options.workdir,

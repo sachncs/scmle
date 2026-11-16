@@ -222,7 +222,7 @@ class ModalityHttpServing:
         )
 
     @staticmethod
-    def new_server_request_id() -> str:
+    def mint() -> str:
         """Returns a bounded, opaque request ID with no request data.
 
         Returns:
@@ -262,7 +262,7 @@ class ModalityHttpServing:
         self.thread = None
 
 
-class RejectedRequestError(Exception):
+class RejectedError(Exception):
     """Raised when a request is refused with a client-error status.
 
     Attributes:
@@ -302,7 +302,7 @@ class Responder(server.BaseHTTPRequestHandler):
         self.adapter = adapter
         super().__init__(*args, **kwargs)
 
-    def request_identity(self) -> tuple[str, str | None]:
+    def identify(self) -> tuple[str, str | None]:
         """Resolves the request ID of the current request.
 
         Returns:
@@ -312,11 +312,11 @@ class Responder(server.BaseHTTPRequestHandler):
         """
         caller_request_id = self.headers.get("X-Request-ID")
         if caller_request_id is None:
-            return self.adapter.new_server_request_id(), None
+            return self.adapter.mint(), None
         if self.adapter.is_valid_request_id(caller_request_id):
             return caller_request_id, None
         return (
-            self.adapter.new_server_request_id(),
+            self.adapter.mint(),
             (
                 "X-Request-ID must be 1-128 ASCII characters from "
                 "A-Z, a-z, 0-9, '.', '_', ':', or '-': request rejected"
@@ -383,7 +383,7 @@ class Responder(server.BaseHTTPRequestHandler):
             return False
         return True
 
-    def admit_request(self, method: str) -> str | None:
+    def screen(self, method: str) -> str | None:
         """Resolves the request ID and applies the gateway.
 
         Args:
@@ -393,7 +393,7 @@ class Responder(server.BaseHTTPRequestHandler):
             The request ID when the request may proceed; None after a 400
             for an invalid `X-Request-ID` or a gateway refusal was sent.
         """
-        request_id, identity_error = self.request_identity()
+        request_id, identity_error = self.identify()
         if identity_error is not None:
             self.send_json(
                 400,
@@ -412,7 +412,7 @@ class Responder(server.BaseHTTPRequestHandler):
         gateway check with its own status, and any other path
         with 404.
         """
-        request_id = self.admit_request("GET")
+        request_id = self.screen("GET")
         if request_id is None:
             return
         adapter = self.adapter
@@ -450,14 +450,14 @@ class Responder(server.BaseHTTPRequestHandler):
         else:
             self.send_json(404, {"error": "not found"}, request_id)
 
-    def read_payload(self) -> object:
+    def receive(self) -> object:
         """Reads and parses the JSON body after checking its headers.
 
         Returns:
             The parsed JSON request body.
 
         Raises:
-            RejectedRequestError: If the `Content-Type` is not JSON (415),
+            RejectedError: If the `Content-Type` is not JSON (415),
                 `Content-Length` is missing (411) or not an integer (400),
                 the body is incomplete (400) or is not valid JSON (400).
             OverflowError: If `Content-Length` is negative or above the
@@ -467,16 +467,14 @@ class Responder(server.BaseHTTPRequestHandler):
         if content_type.split(";", 1)[0].strip().lower() != (
             "application/json"
         ):
-            raise RejectedRequestError(
-                415, "Content-Type must be application/json"
-            )
+            raise RejectedError(415, "Content-Type must be application/json")
         raw_length = self.headers.get("Content-Length")
         if raw_length is None:
-            raise RejectedRequestError(411, "Content-Length is required")
+            raise RejectedError(411, "Content-Length is required")
         try:
             length = int(raw_length)
         except ValueError as error:
-            raise RejectedRequestError(
+            raise RejectedError(
                 400, "Content-Length must be an integer"
             ) from error
         if length < 0 or length > self.adapter.max_request_bytes:
@@ -485,11 +483,11 @@ class Responder(server.BaseHTTPRequestHandler):
             )
         body = self.rfile.read(length)
         if len(body) != length:
-            raise RejectedRequestError(400, "request body is incomplete")
+            raise RejectedError(400, "request body is incomplete")
         try:
             return json.loads(body)
         except json.JSONDecodeError as error:
-            raise RejectedRequestError(
+            raise RejectedError(
                 400, f"invalid JSON request: {error.msg}"
             ) from error
 
@@ -501,7 +499,7 @@ class Responder(server.BaseHTTPRequestHandler):
         answered with an error response (415, 411, 400, 413, 422,
         429, 504 or 500 as appropriate) and not propagated.
         """
-        request_id = self.admit_request("POST")
+        request_id = self.screen("POST")
         if request_id is None:
             return
         if self.path != "/predict":
@@ -509,13 +507,13 @@ class Responder(server.BaseHTTPRequestHandler):
             return
         adapter = self.adapter
         try:
-            payload = self.read_payload()
+            payload = self.receive()
             with adapter.admission.admit():
                 response = adapter.admission.run(
                     lambda: adapter.response(payload)
                 )
             self.send_json(200, response, request_id)
-        except RejectedRequestError as rejected:
+        except RejectedError as rejected:
             # handled: error response sent to client
             self.send_json(
                 rejected.status,

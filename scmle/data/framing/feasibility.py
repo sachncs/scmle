@@ -61,7 +61,7 @@ def intraclass(d: ArrayLike, clusters: ArrayLike) -> tuple[float, float]:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class BaselineFeasibility:
+class Verdict:
     """The verdict for the baseline claim, with its uncertainty.
 
     Attributes:
@@ -139,7 +139,7 @@ def assess(
     alpha: float,
     k_max: int,
     power: float,
-) -> BaselineFeasibility:
+) -> Verdict:
     """Estimates feasibility from the gains measured on `X`.
 
     Args:
@@ -196,7 +196,7 @@ def assess(
             f"[{low:.4f}, {high:.4f}]; collect more exploration rows or "
             "treat the claim as unconfirmed"
         )
-    return BaselineFeasibility(
+    return Verdict(
         verdict,
         scope,
         s_d,

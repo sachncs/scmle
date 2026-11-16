@@ -37,7 +37,7 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):  # type: ig
         self.estimator = estimator
         self.regularization = regularization
 
-    def log_probabilities(self, features: Any) -> numpy.ndarray:
+    def featurise(self, features: Any) -> numpy.ndarray:
         """Log of the wrapped model's probabilities, floored.
 
         Args:
@@ -65,7 +65,7 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):  # type: ig
         """
         self.map_ = linear_model.LogisticRegression(
             C=1.0 / max(self.regularization, 1e-9), max_iter=1000
-        ).fit(self.log_probabilities(features), numpy.asarray(labels))
+        ).fit(self.featurise(features), numpy.asarray(labels))
         self.classes_ = self.map_.classes_
         return self
 
@@ -80,7 +80,7 @@ class DirichletCalibrator(base.BaseEstimator, base.ClassifierMixin):  # type: ig
             order.
         """
         probabilities: numpy.ndarray = self.map_.predict_proba(
-            self.log_probabilities(features)
+            self.featurise(features)
         )
         return probabilities
 

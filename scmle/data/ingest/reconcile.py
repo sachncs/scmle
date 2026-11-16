@@ -69,7 +69,7 @@ class FeatureTotal:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ExtractReconciliation:
+class Report:
     """Reconciliation plus the quantities it could not form.
 
     Attributes:
@@ -109,7 +109,7 @@ def reconcile_extract(
     feature_totals: Sequence[FeatureTotal] = (),
     tolerance: float = 0.0,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
-) -> ExtractReconciliation:
+) -> Report:
     """Compares an assembled table with the source it came from.
 
     Args:
@@ -175,7 +175,7 @@ def reconcile_extract(
             "nothing could be reconciled: all source totals zero"
         )
     result = reconciliation.reconcile(items, tolerance, gate)
-    return ExtractReconciliation(result, tuple(skipped))
+    return Report(result, tuple(skipped))
 
 
 def code_digest() -> str:
@@ -187,7 +187,7 @@ def code_digest() -> str:
     return certificates.code_hash(sys.modules[__name__])
 
 
-def blocks(report: ExtractReconciliation) -> bool:
+def blocks(report: Report) -> bool:
     """Checks whether the reconciliation should stop the run.
 
     Args:

@@ -36,7 +36,7 @@ class Tolerances:
         if any(not math.isfinite(v) or v < 0 for v in values):
             raise errors.ConfigError("tolerances must be finite and >= 0")
 
-    def for_metric(self, name: str) -> float:
+    def lookup(self, name: str) -> float:
         """Looks up the tolerance of one metric.
 
         Args:
@@ -69,7 +69,7 @@ def compare(
     """
     rows = []
     for name in sorted(set(reference) | set(candidate)):
-        tolerance = tolerances.for_metric(name)
+        tolerance = tolerances.lookup(name)
         if name not in reference or name not in candidate:
             rows.append({"metric": name, "within": False, "reason": "missing"})
             continue

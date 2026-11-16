@@ -93,7 +93,7 @@ class PerTarget(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships
         return numpy.column_stack(columns)
 
 
-class NativeMultiOutput(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Ensemble(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """A tree ensemble that models all targets jointly.
 
     Attributes:
@@ -161,7 +161,7 @@ class NativeMultiOutput(base.BaseEstimator):  # type: ignore[misc]  # scikit-lea
         )
 
 
-def forest(classify: bool, seed: int) -> NativeMultiOutput:
+def forest(classify: bool, seed: int) -> Ensemble:
     """Random forest over all targets together.
 
     Args:
@@ -176,4 +176,4 @@ def forest(classify: bool, seed: int) -> NativeMultiOutput:
         if classify
         else ensemble.RandomForestRegressor(n_estimators=150, random_state=seed)
     )
-    return NativeMultiOutput(inner, classify)
+    return Ensemble(inner, classify)

@@ -251,7 +251,7 @@ def attestation_check(
     )
 
 
-def causal_admissibility(
+def admit(
     frame: pandas.DataFrame,
     candidates: Sequence[str],
     spec: scmle.data.charter.causal.Question,
@@ -436,7 +436,7 @@ def run(
                 "not run"
             )
             return Qualification(None, None, result, f5.store, tuple(notes))
-        return causal_admissibility(
+        return admit(
             frame, candidates, causal, dag, seed, day, result, f5.store, notes
         )
     task = "classification" if classification else "regression"

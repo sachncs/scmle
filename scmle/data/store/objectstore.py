@@ -114,7 +114,7 @@ def sha256_of(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def check_key(key: str) -> str:
+def validate(key: str) -> str:
     """Checks that a key is a safe relative key.
 
     A key is `/`-separated segments; no empty segment, no `.` or `..`, no
@@ -208,10 +208,10 @@ class ObjectStore(abc.ABC):
             key: The object key.
 
         Returns:
-            The store's location, `/` and the key. `check_key` raises
+            The store's location, `/` and the key. `validate` raises
             `StoreError` if the key is not valid.
         """
-        return f"{self.location}/{check_key(key)}"
+        return f"{self.location}/{validate(key)}"
 
     @abc.abstractmethod
     def put(
@@ -416,7 +416,7 @@ class LocalObjectStore(ObjectStore):
         """The file for a key, never outside the root.
 
         The check is lexical on the normalised absolute path: keys are
-        validated by `check_key`, and resolving the target would depend on
+        validated by `validate`, and resolving the target would depend on
         which directories exist at that instant (and on 8.3 short names on
         Windows), which a concurrent writer can change.
 
@@ -429,12 +429,12 @@ class LocalObjectStore(ObjectStore):
         Raises:
             StoreError: If the key is not valid or its path leaves the root.
         """
-        target = pathlib.Path(os.path.abspath(self.root / check_key(key)))  # noqa: PTH100 -- abspath normalises `..` without following symlinks; resolve() would also follow them and change which keys are accepted
+        target = pathlib.Path(os.path.abspath(self.root / validate(key)))  # noqa: PTH100 -- abspath normalises `..` without following symlinks; resolve() would also follow them and change which keys are accepted
         if self.root not in target.parents:
             raise StoreError(f"key {key!r} escapes the store root")
         return target
 
-    def meta_of(self, key: str, path: pathlib.Path, data: bytes) -> ObjectMeta:
+    def describe(self, key: str, path: pathlib.Path, data: bytes) -> ObjectMeta:
         """Builds the metadata of a file whose bytes are known.
 
         Args:
@@ -485,14 +485,14 @@ class LocalObjectStore(ObjectStore):
         path = self.path_of(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         if if_absent:
-            self.create_exclusive(path, data)
+            self.claim(path, data)
         elif if_version is not None:
             with locked(path):
                 self.expect(key, path, if_version)
                 durability.write_atomically(path, data)
         else:
             durability.write_atomically(path, data)
-        return self.meta_of(key, path, data)
+        return self.describe(key, path, data)
 
     def expect(self, key: str, path: pathlib.Path, version: str) -> None:
         """Raises `ConflictError` unless the file holds `version`.
@@ -513,7 +513,7 @@ class LocalObjectStore(ObjectStore):
                 f"object {key!r} changed", {"key": key, "version": current}
             )
 
-    def create_exclusive(self, path: pathlib.Path, data: bytes) -> None:
+    def claim(self, path: pathlib.Path, data: bytes) -> None:
         """Writes a temp file, then links it into place only if absent.
 
         Args:
@@ -568,7 +568,7 @@ class LocalObjectStore(ObjectStore):
             data = path.read_bytes()
         except (FileNotFoundError, IsADirectoryError, NotADirectoryError):
             raise NotFoundError(f"no object {key!r}") from None
-        return data, self.meta_of(key, path, data)
+        return data, self.describe(key, path, data)
 
     def head(self, key: str) -> ObjectMeta:
         """Reads an object's metadata; the file is read to hash it.
@@ -597,7 +597,7 @@ class LocalObjectStore(ObjectStore):
             The metadata of each matching object, sorted by key.
         """
         if prefix:
-            check_key(prefix.removesuffix("/"))
+            validate(prefix.removesuffix("/"))
         found = []
         for path in sorted(self.root.rglob("*")):
             if not path.is_file() or is_temporary(path.name):

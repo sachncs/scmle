@@ -53,7 +53,7 @@ class GeospatialValidationError(errors.DataError):
     category = "geospatial_validation"
 
 
-def check_digest(field_name: str, value: str) -> None:
+def verify(field_name: str, value: str) -> None:
     """Checks that a value is a lowercase SHA-256 hex digest.
 
     Args:
@@ -133,7 +133,7 @@ def canonical_observation_time(value: datetime | str) -> datetime:
     return parsed.astimezone(UTC)
 
 
-def validate_coordinates(value: Any) -> tuple[float, ...]:
+def flatten(value: Any) -> tuple[float, ...]:
     """Validates a nested coordinate array and return its numeric leaves.
 
     Args:
@@ -169,7 +169,7 @@ def validate_coordinates(value: Any) -> tuple[float, ...]:
             return numbers
         flattened: list[float] = []
         for item in value:
-            flattened.extend(validate_coordinates(item))
+            flattened.extend(flatten(item))
         return tuple(flattened)
     raise GeospatialValidationError(
         "coordinates must be nested numeric arrays",
@@ -177,7 +177,7 @@ def validate_coordinates(value: Any) -> tuple[float, ...]:
     )
 
 
-def geometry_coordinates(geometry: Mapping[str, Any]) -> tuple[float, ...]:
+def unpack(geometry: Mapping[str, Any]) -> tuple[float, ...]:
     """Validates a GeoJSON geometry and return all coordinate leaves.
 
     Args:
@@ -213,12 +213,12 @@ def geometry_coordinates(geometry: Mapping[str, Any]) -> tuple[float, ...]:
                     "geometry collection members must be objects",
                     {"code": "invalid_geometry_collection"},
                 )
-            values.extend(geometry_coordinates(nested))
+            values.extend(unpack(nested))
         return tuple(values)
-    return validate_coordinates(geometry.get("coordinates"))
+    return flatten(geometry.get("coordinates"))
 
 
-def moran_statistic(
+def autocorrelate(
     values: numpy.ndarray, edges: Sequence[tuple[int, int]]
 ) -> float:
     """Calculates global Moran's I for an undirected binary graph.
@@ -290,7 +290,7 @@ def mask_geometry_axis(
     if not math.isfinite(float(baseline)):
         raise errors.InputError("baseline must be finite")
 
-    def masked_coordinates(value: Any) -> list[Any]:
+    def overwrite(value: Any) -> list[Any]:
         if not isinstance(value, (list, tuple)) or not value:
             raise GeospatialValidationError(
                 "coordinates must be non-empty nested arrays",
@@ -304,9 +304,9 @@ def mask_geometry_axis(
                 float(baseline) if index == axis else float(item)
                 for index, item in enumerate(value)
             ]
-        return [masked_coordinates(item) for item in value]
+        return [overwrite(item) for item in value]
 
-    def masked_geometry(value: Mapping[str, Any]) -> dict[str, Any]:
+    def mask(value: Mapping[str, Any]) -> dict[str, Any]:
         geometry_type = value.get("type")
         result = dict(value)
         if geometry_type == "GeometryCollection":
@@ -316,14 +316,12 @@ def mask_geometry_axis(
                     "geometry collection must contain geometries",
                     {"code": "empty_geometry_collection"},
                 )
-            result["geometries"] = [
-                masked_geometry(item) for item in geometries
-            ]
+            result["geometries"] = [mask(item) for item in geometries]
         else:
-            result["coordinates"] = masked_coordinates(value.get("coordinates"))
+            result["coordinates"] = overwrite(value.get("coordinates"))
         return result
 
-    return masked_geometry(geometry)
+    return mask(geometry)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -369,7 +367,7 @@ class GeoFeature:
             raise GeospatialValidationError(
                 "geometry must be an object", {"code": "invalid_geometry"}
             )
-        geometry_coordinates(self.geometry)
+        unpack(self.geometry)
         if self.observation_time is not None:
             object.__setattr__(
                 self,
@@ -434,7 +432,7 @@ class GeoFeature:
     @property
     def bounds(self) -> tuple[float, float, float, float]:
         """The x/y bounds of the geometry as (min x, min y, max x, max y)."""
-        coordinates = geometry_coordinates(self.geometry)
+        coordinates = unpack(self.geometry)
         xs = coordinates[0::2]
         ys = coordinates[1::2]
         return min(xs), min(ys), max(xs), max(ys)
@@ -500,7 +498,7 @@ class SpatialJoinMatch:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SpatialJoin:
+class Join:
     """Bounded, same-CRS evidence from a caller-owned spatial predicate.
 
     Attributes:
@@ -547,7 +545,7 @@ class SpatialJoin:
             ("left_dataset_hash", self.left_dataset_hash),
             ("right_dataset_hash", self.right_dataset_hash),
         ):
-            check_digest(field_name, value)
+            verify(field_name, value)
         if not self.crs.strip():
             raise errors.InputError("crs must not be empty")
         if not self.predicate_name.strip():
@@ -654,7 +652,7 @@ class Provenance:
             ("source_dataset_hash", self.source_dataset_hash),
             ("target_dataset_hash", self.target_dataset_hash),
         ):
-            check_digest(field_name, value)
+            verify(field_name, value)
         for field_name, value in (
             ("source_crs", self.source_crs),
             ("target_crs", self.target_crs),
@@ -677,7 +675,7 @@ class Provenance:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SpatialBoundaryLeakage:
+class Leakage:
     """Potential envelope leakage across CRS-unit spatial blocks.
 
     Attributes:
@@ -791,7 +789,7 @@ class Profile:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SpatialSplit:
+class Partition:
     """Spatial-block split that keeps nearby feature blocks together.
 
     Attributes:
@@ -862,7 +860,7 @@ class TemporalSplit:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SpatialAutocorrelation:
+class Autocorrelation:
     """Bounded global Moran's I evidence for a numeric spatial variable.
 
     Attributes:
@@ -1020,7 +1018,7 @@ def permutation_p_value(
     permutation_index = 0
     while permutation_index < permutations:
         shuffled = randomizer.permutation(numeric)
-        permuted_statistic = moran_statistic(shuffled, edges)
+        permuted_statistic = autocorrelate(shuffled, edges)
         if abs(permuted_statistic) >= abs(statistic):
             exceedances += 1
         permutation_index += 1
@@ -1282,9 +1280,7 @@ class Dataset:
             risk_findings=tuple(risk_findings),
         )
 
-    def spatial_neighbors(
-        self, neighbor_count: int = 4
-    ) -> tuple[tuple[int, int], ...]:
+    def connect(self, neighbor_count: int = 4) -> tuple[tuple[int, int], ...]:
         """Builds deterministic symmetric k-nearest-neighbor edges.
 
         Distances are measured between envelope centroids in the declared
@@ -1337,7 +1333,7 @@ class Dataset:
                 )
         return tuple(sorted(edges))
 
-    def check_join_request(
+    def vet(
         self,
         other: "Dataset",
         predicate: SpatialJoinPredicate,
@@ -1393,7 +1389,7 @@ class Dataset:
         predicate_name: str,
         comparison_limit: int = 100_000,
         match_limit: int = 100_000,
-    ) -> SpatialJoin:
+    ) -> Join:
         """Joins two same-CRS datasets through a bounded caller predicate.
 
         The core package does not choose a geometry engine, infer CRS
@@ -1423,7 +1419,7 @@ class Dataset:
                 ``comparison_limit``, the predicate raises or returns a
                 non-boolean, or the matches exceed ``match_limit``.
         """
-        self.check_join_request(
+        self.vet(
             other, predicate, predicate_name, comparison_limit, match_limit
         )
         total_comparisons = len(self.features) * len(other.features)
@@ -1458,7 +1454,7 @@ class Dataset:
                         )
         matched_left = {match.left_feature_id for match in matches}
         matched_right = {match.right_feature_id for match in matches}
-        return SpatialJoin(
+        return Join(
             left_dataset_hash=self.content_hash,
             right_dataset_hash=other.content_hash,
             crs=self.crs.strip(),
@@ -1578,7 +1574,7 @@ class Dataset:
         )
         return Reprojection(dataset=dataset, report=report)
 
-    def moran_values(self, values: Sequence[Real] | None) -> numpy.ndarray:
+    def collect(self, values: Sequence[Real] | None) -> numpy.ndarray:
         """Collects and checks the values that Moran's I is computed on.
 
         Args:
@@ -1621,7 +1617,7 @@ class Dataset:
         neighbor_count: int = 4,
         permutations: int = 99,
         seed: int = 0,
-    ) -> SpatialAutocorrelation:
+    ) -> Autocorrelation:
         """Measures global Moran's I with optional deterministic permutations.
 
         When ``values`` is omitted, numeric feature labels are used. This
@@ -1660,10 +1656,10 @@ class Dataset:
         if neighbor_count < 1:
             raise errors.InputError("neighbor_count must be positive")
         effective_neighbor_count = min(neighbor_count, len(self.features) - 1)
-        numeric = self.moran_values(values)
-        edges = self.spatial_neighbors(effective_neighbor_count)
+        numeric = self.collect(values)
+        edges = self.connect(effective_neighbor_count)
         try:
-            statistic = moran_statistic(numeric, edges)
+            statistic = autocorrelate(numeric, edges)
         except ValueError as error:
             raise GeospatialValidationError(
                 str(error), {"code": "statistic_not_estimable"}
@@ -1672,7 +1668,7 @@ class Dataset:
         p_value = permutation_p_value(
             numeric, edges, statistic, permutations, seed
         )
-        return SpatialAutocorrelation(
+        return Autocorrelation(
             feature_count=len(self.features),
             neighbor_count=effective_neighbor_count,
             edge_count=len(edges),
@@ -1716,7 +1712,7 @@ class Dataset:
         rows = []
         for feature in self.features:
             minimum_x, minimum_y, maximum_x, maximum_y = feature.bounds
-            coordinates = geometry_coordinates(feature.geometry)
+            coordinates = unpack(feature.geometry)
             rows.append(
                 (
                     minimum_x,
@@ -1745,7 +1741,7 @@ class Dataset:
             crs=self.crs,
         )
 
-    def spatial_block_envelopes(
+    def envelop(
         self, block_size: float
     ) -> dict[str, tuple[int, int, int, int]]:
         """Returns each feature envelope in CRS-unit block coordinates.
@@ -1793,7 +1789,7 @@ class Dataset:
         self,
         block_size: float,
         max_blocks_per_feature: int = 10_000,
-    ) -> SpatialBoundaryLeakage:
+    ) -> Leakage:
         """Measures conservative envelope crossings for a spatial split.
 
         A crossing feature is not automatically leaking: the geometry may not
@@ -1818,7 +1814,7 @@ class Dataset:
         """
         if max_blocks_per_feature < 1:
             raise errors.InputError("max_blocks_per_feature must be positive")
-        envelopes = self.spatial_block_envelopes(block_size)
+        envelopes = self.envelop(block_size)
         block_counts: list[tuple[str, int]] = []
         crossing_feature_ids: list[str] = []
         truncated_feature_ids: list[str] = []
@@ -1834,7 +1830,7 @@ class Dataset:
                 crossing_feature_ids.append(feature.feature_id)
             if block_count > max_blocks_per_feature:
                 truncated_feature_ids.append(feature.feature_id)
-        return SpatialBoundaryLeakage(
+        return Leakage(
             block_size=block_size,
             feature_count=len(self.features),
             feature_block_counts=tuple(block_counts),
@@ -1849,7 +1845,7 @@ class Dataset:
         validation_fraction: float = 0.2,
         test_fraction: float = 0.2,
         seed: int = 0,
-    ) -> SpatialSplit:
+    ) -> Partition:
         """Splits features by CRS-unit spatial blocks.
 
         ``block_size`` is expressed in the dataset CRS units. The method uses
@@ -1888,7 +1884,7 @@ class Dataset:
         origin_x = dataset_bounds[0]
         origin_y = dataset_bounds[1]
 
-        def block_for(feature: GeoFeature) -> str:
+        def locate(feature: GeoFeature) -> str:
             minimum_x, minimum_y, maximum_x, maximum_y = feature.bounds
             centroid_x = (minimum_x + maximum_x) / 2
             centroid_y = (minimum_y + maximum_y) / 2
@@ -1898,7 +1894,7 @@ class Dataset:
 
         grouped: dict[str, list[GeoFeature]] = {}
         for feature in self.features:
-            grouped.setdefault(block_for(feature), []).append(feature)
+            grouped.setdefault(locate(feature), []).append(feature)
         blocks = sorted(grouped)
         validation_blocks, test_blocks = partition_group_ids(
             grouped, validation_fraction, test_fraction, seed
@@ -1908,10 +1904,10 @@ class Dataset:
             return tuple(
                 feature
                 for feature in self.features
-                if block_for(feature) in selected
+                if locate(feature) in selected
             )
 
-        return SpatialSplit(
+        return Partition(
             train=features_for(set(blocks) - test_blocks - validation_blocks),
             validation=features_for(validation_blocks),
             test=features_for(test_blocks),
@@ -2071,7 +2067,7 @@ class RasterSample:
             raise errors.InputError(
                 "transform must be empty or an affine transform"
             )
-        self.check_nodata()
+        self.normalize()
         if not raw:
             raise GeospatialValidationError(
                 "raster payload is empty", {"code": "empty_payload"}
@@ -2080,7 +2076,7 @@ class RasterSample:
             raise errors.InputError("file_hash does not match encoded_bytes")
         object.__setattr__(self, "byte_size", len(raw))
 
-    def check_nodata(self) -> None:
+    def normalize(self) -> None:
         """Validates the nodata value and fraction, normalising the value.
 
         Raises:
@@ -2308,20 +2304,20 @@ class RasterSample:
 
 __all__ = [
     "GEOMETRY_TYPES",
+    "Autocorrelation",
     "Dataset",
     "Features",
     "GeoFeature",
     "GeospatialTemporalError",
     "GeospatialValidationError",
+    "Partition",
     "Profile",
     "RasterDecoder",
     "RasterSample",
-    "SpatialAutocorrelation",
-    "SpatialSplit",
     "TemporalSplit",
+    "autocorrelate",
     "canonical_observation_time",
     "canonical_source",
-    "geometry_coordinates",
-    "moran_statistic",
-    "validate_coordinates",
+    "flatten",
+    "unpack",
 ]

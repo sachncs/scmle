@@ -85,13 +85,13 @@ def censoring_weights(
         curve = estimators.kaplan_meier(time, censored)
         raw = estimators.step_lookup(curve[0], curve[1], time, 1.0)
 
-        def marginal_at(moment: float, rows: numpy.ndarray) -> numpy.ndarray:
+        def survive(moment: float, rows: numpy.ndarray) -> numpy.ndarray:
             level = estimators.step_lookup(
                 curve[0], curve[1], numpy.array([moment]), 1.0
             )[0]
             return numpy.full(len(rows), level)
 
-        survival_of = marginal_at
+        survival_of = survive
     else:
         matrix = numpy.asarray(features, dtype=float)
         if len(matrix) != len(time):
@@ -103,14 +103,14 @@ def censoring_weights(
         relative = numpy.exp(model.predict(matrix) - model.scale_)
         raw = numpy.exp(-cumulative * relative)
 
-        def cox_at(moment: float, rows: numpy.ndarray) -> numpy.ndarray:
+        def survive(moment: float, rows: numpy.ndarray) -> numpy.ndarray:
             level = estimators.step_lookup(
                 model.moments_, model.baseline_, numpy.array([moment]), 0.0
             )[0]
             survival: numpy.ndarray = numpy.exp(-level * relative[rows])
             return survival
 
-        survival_of = cox_at
+        survival_of = survive
     floored = raw < floor
     return CensoringWeights(
         1.0 / numpy.maximum(raw, floor),

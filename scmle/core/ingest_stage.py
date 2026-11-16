@@ -192,7 +192,7 @@ def read_frame(entry: dict[str, Any], factory: Any) -> pandas.DataFrame:
     return profile.consistent_read(connector, BATCH_ROWS).frame
 
 
-def read_view(
+def load(
     entry: dict[str, Any],
     factory: Any,
     spec: ingest.Ingestion,
@@ -315,7 +315,7 @@ def run(
         declared.require(report)
     count = len(plan_document["views"])
     views = [
-        read_view(v, factory, spec, extract)
+        load(v, factory, spec, extract)
         for v, extract in zip(
             plan_document["views"], extracts[:count], strict=True
         )
@@ -329,7 +329,7 @@ def run(
         for view, entry in zip(views, plan_document["views"], strict=True)
     ]
     leaves = [
-        read_view(n, factory, spec, extract)
+        load(n, factory, spec, extract)
         for n, extract in zip(
             plan_document.get("nests", []), extracts[count:], strict=True
         )

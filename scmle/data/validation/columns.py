@@ -302,7 +302,7 @@ class ColumnKind(abc.ABC):
         )
         return max(gain, 1.0 if one_sided else 0.0)
 
-    def usable_rows(
+    def align(
         self, series: pandas.Series, target: pandas.Series
     ) -> tuple[pandas.Series, pandas.Series] | None:
         """Aligns non-missing rows; None when too few rows to judge.
@@ -457,7 +457,7 @@ class NumericKind(ColumnKind):
         Returns:
             The association score in [0, 1]; 0.0 when too few usable rows.
         """
-        rows = self.usable_rows(series, target)
+        rows = self.align(series, target)
         if rows is None:
             return 0.0
         values, labels = rows
@@ -631,7 +631,7 @@ class CategoricalKind(ColumnKind):
             An unfitted pipeline ending in a one-hot encoder that groups
             rare levels and keeps at most 50 categories.
         """
-        return self.encoded_with(
+        return self.encode(
             preprocessing.OneHotEncoder(
                 handle_unknown="infrequent_if_exist",
                 min_frequency=0.005,
@@ -640,7 +640,7 @@ class CategoricalKind(ColumnKind):
             )
         )
 
-    def encoded_with(self, encoder: Any) -> pipeline.Pipeline:
+    def encode(self, encoder: Any) -> pipeline.Pipeline:
         """Casts to object, imputes a missing token, then applies `encoder`.
 
         Args:
@@ -685,7 +685,7 @@ class CategoricalKind(ColumnKind):
             other encoding.
         """
         if encoding == "target":
-            return self.encoded_with(
+            return self.encode(
                 preprocessing.TargetEncoder(
                     smooth="auto",
                     cv=5,
@@ -693,7 +693,7 @@ class CategoricalKind(ColumnKind):
                 )
             )
         if encoding == "ordinal":
-            return self.encoded_with(
+            return self.encode(
                 preprocessing.OrdinalEncoder(
                     handle_unknown="use_encoded_value", unknown_value=-1
                 )
@@ -715,7 +715,7 @@ class CategoricalKind(ColumnKind):
             too few usable rows, or when more than half the usable rows
             hold distinct values (near-unique keys).
         """
-        rows = self.usable_rows(series, target)
+        rows = self.align(series, target)
         if rows is None or not task.is_classification:
             return 0.0
         values, labels = rows

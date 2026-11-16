@@ -260,9 +260,7 @@ def contained(
     return int(source.scalar(sql) or 0)
 
 
-def distinct_of(
-    source: profile.SqlSource, table: str, columns: Sequence[str]
-) -> int:
+def count(source: profile.SqlSource, table: str, columns: Sequence[str]) -> int:
     """Counts the distinct non-null combinations of a column set.
 
     Args:
@@ -287,7 +285,7 @@ def distinct_of(
     )
 
 
-def kinds_match(
+def match(
     catalog: profile.Catalog,
     child: str,
     child_columns: Sequence[str],
@@ -388,7 +386,7 @@ def discover(
             partial = True
             break
         for child, a, parent, b in work:
-            link = measure_link(
+            link = measure(
                 source,
                 catalog,
                 scans,
@@ -401,10 +399,10 @@ def discover(
             )
             if link is not None:
                 measured.append(link)
-    return JoinGraph(tuple(resolve_competition(measured)), partial)
+    return JoinGraph(tuple(arbitrate(measured)), partial)
 
 
-def measure_link(
+def measure(
     source: profile.SqlSource,
     catalog: profile.Catalog,
     scans: Mapping[str, grain.KeyScan],
@@ -434,9 +432,9 @@ def measure_link(
         values, the parent columns are not a key, or an undeclared pair's
         containment is below `1 - eps_fk`.
     """
-    if not is_declared and not kinds_match(catalog, child, a, parent, b):
+    if not is_declared and not match(catalog, child, a, parent, b):
         return None
-    distinct = distinct_of(source, child, a)
+    distinct = count(source, child, a)
     if distinct == 0:
         return None
     missing = contained(source, child, a, parent, b)
@@ -483,7 +481,7 @@ def measure_link(
     )
 
 
-def resolve_competition(links: Sequence[Link]) -> list[Link]:
+def arbitrate(links: Sequence[Link]) -> list[Link]:
     """Demotes automatic accepts that compete for one child column.
 
     If several parents are accepted for the same child columns without a
@@ -563,9 +561,7 @@ def many_to_many(
                 keyed = a in {
                     k.columns for k in scans[left.name].keys
                 } or a in {k.columns for k in scans[right.name].keys}
-                if keyed or not kinds_match(
-                    catalog, left.name, a, right.name, a
-                ):
+                if keyed or not match(catalog, left.name, a, right.name, a):
                     continue
                 if source.meter is not None and not source.meter.admit(
                     "many_to_many",
@@ -574,7 +570,7 @@ def many_to_many(
                     2,
                 ):
                     return found
-                distinct = distinct_of(source, left.name, a)
+                distinct = count(source, left.name, a)
                 if not distinct:
                     continue
                 missing = contained(source, left.name, a, right.name, a)

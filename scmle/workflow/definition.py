@@ -67,7 +67,7 @@ class CatchUp(enum.StrEnum):
     SKIP = "skip"
 
 
-def check_name(name: str, what: str) -> str:
+def vet(name: str, what: str) -> str:
     """Returns `name` if it is 1-64 letters, digits, `-` or `_`.
 
     Args:
@@ -128,7 +128,7 @@ class Step:
             ConfigError: If a value is out of range or an approval step has
                 no approvers.
         """
-        check_name(self.name, "step name")
+        vet(self.name, "step name")
         if self.timeout_seconds <= 0 or self.expires_seconds <= 0:
             raise errors.ConfigError("timeouts must be positive")
         if self.cost_budget is not None and self.cost_budget <= 0:
@@ -224,7 +224,7 @@ class Workflow:
             ConfigError: On duplicate names, unknown or cyclic dependencies,
                 an approved step with no approval upstream, or bad limits.
         """
-        check_name(self.name, "workflow name")
+        vet(self.name, "workflow name")
         if not self.version or not self.steps:
             raise errors.ConfigError("a workflow needs a version and steps")
         if self.max_concurrent_runs < 1 or self.max_parallel < 1:

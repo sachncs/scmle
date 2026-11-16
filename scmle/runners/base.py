@@ -453,7 +453,7 @@ class BudgetMeter:
         self.spec = spec
         self.spent = spent
 
-    def cost_of(self, seconds: float) -> float:
+    def estimate(self, seconds: float) -> float:
         """Estimates the run's cost including a running attempt.
 
         Args:
@@ -475,11 +475,11 @@ class BudgetMeter:
             seconds: Elapsed seconds of the current attempt.
 
         Returns:
-            True if the job has a budget and `cost_of(seconds)` is above its
+            True if the job has a budget and `estimate(seconds)` is above its
             ceiling.
         """
         budget = self.spec.budget
-        return budget is not None and self.cost_of(seconds) > budget.max_cost
+        return budget is not None and self.estimate(seconds) > budget.max_cost
 
     def close(self, seconds: float) -> float:
         """Adds a finished attempt's cost.
@@ -490,7 +490,7 @@ class BudgetMeter:
         Returns:
             The new total cost.
         """
-        self.spent = self.cost_of(seconds)
+        self.spent = self.estimate(seconds)
         return self.spent
 
 
@@ -747,7 +747,7 @@ class Runner(abc.ABC):
             stopped = watch()
             if stopped is not None:
                 self.cancel(handle, stopped.value)
-                status = self.confirm_stopped(handle)
+                status = self.confirm(handle)
                 break
             self.clock.sleep(self.poll_seconds)
         elapsed = self.clock.now() - started
@@ -769,7 +769,7 @@ class Runner(abc.ABC):
             return None
         return RunState.FAILED
 
-    def confirm_stopped(self, handle: JobHandle) -> JobStatus:
+    def confirm(self, handle: JobHandle) -> JobStatus:
         """Polls a cancelled attempt a few times for its terminal state.
 
         Args:

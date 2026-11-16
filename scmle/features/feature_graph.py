@@ -219,7 +219,7 @@ class Absolute(FeatureOp):
         return columns.to_finite(inputs[0]).abs()
 
 
-class IsMissing(FeatureOp):
+class Missingness(FeatureOp):
     """1 where the input is missing, else 0."""
 
     name = "is_missing"
@@ -487,7 +487,7 @@ class Bin(FeatureOp):
         )
 
 
-class DatePart(FeatureOp):
+class Calendar(FeatureOp):
     """A component of a datetime column."""
 
     name = "datepart"
@@ -727,7 +727,7 @@ class RollingMean(OrderedOp):
         return int(params["window"])
 
 
-class RollingStd(OrderedOp):
+class Volatility(OrderedOp):
     """Standard deviation of the last `window` rows."""
 
     name = "rolling_std"
@@ -799,7 +799,7 @@ OPS: dict[str, FeatureOp] = {
         Sqrt(),
         Square(),
         Absolute(),
-        IsMissing(),
+        Missingness(),
         Sum(),
         Difference(),
         Product(),
@@ -807,17 +807,17 @@ OPS: dict[str, FeatureOp] = {
         Clip(),
         Standardize(),
         Bin(),
-        DatePart(),
+        Calendar(),
         Lag(),
         Diff(),
         RollingMean(),
-        RollingStd(),
+        Volatility(),
         ExpandingMean(),
     )
 }
 
 
-def get_op(name: str) -> FeatureOp:
+def lookup(name: str) -> FeatureOp:
     """Looks up a registered operation.
 
     Args:
@@ -846,10 +846,10 @@ def split_nodes(
 
     Returns:
         The ordered nodes and the row-wise nodes, each in graph order. An
-        unknown operation name propagates `get_op`'s `ConfigError`.
+        unknown operation name propagates `lookup`'s `ConfigError`.
     """
-    ordered = [n for n in spec.nodes if get_op(n.op).ordered]
-    rowwise = [n for n in spec.nodes if not get_op(n.op).ordered]
+    ordered = [n for n in spec.nodes if lookup(n.op).ordered]
+    rowwise = [n for n in spec.nodes if not lookup(n.op).ordered]
     return ordered, rowwise
 
 
@@ -875,7 +875,7 @@ def validate_graph(
     ordered_names: set[str] = set()
     rowwise_names: set[str] = set()
     for node in spec.nodes:
-        op = get_op(node.op)
+        op = lookup(node.op)
         op.validate(node)
         if node.name in available:
             raise errors.ConfigError(
@@ -977,7 +977,7 @@ class SeriesFeatureBuilder:
         """
         total = 0
         for node in self.nodes:
-            op = get_op(node.op)
+            op = lookup(node.op)
             if not isinstance(op, OrderedOp):
                 raise errors.ConfigError(f"{node.op} is not an ordered op")
             needed = op.lookback(op.resolved(node))
@@ -986,7 +986,7 @@ class SeriesFeatureBuilder:
             total += needed
         return total
 
-    def entity_keys(self, frame: pandas.DataFrame) -> numpy.ndarray:
+    def identify(self, frame: pandas.DataFrame) -> numpy.ndarray:
         """Computes the entity key of every row.
 
         Args:
@@ -1016,7 +1016,7 @@ class SeriesFeatureBuilder:
         times = pandas.to_datetime(subset[self.time_column], errors="coerce")
         subset = subset[times.notna().to_numpy()]
         times = times[times.notna()]
-        keys = self.entity_keys(subset)
+        keys = self.identify(subset)
         order = numpy.lexsort(
             (numpy.arange(len(subset)), times.to_numpy(), keys)
         )
@@ -1041,7 +1041,7 @@ class SeriesFeatureBuilder:
         Returns:
             A copy of `frame` with one column per node; `frame` itself when
             there are no nodes. Errors from `compute` or
-            `compute_with_history` propagate: `DataError` when the time
+            `backfill` propagate: `DataError` when the time
             column is missing, `ConfigError` when it has unparseable values
             or a node is not an ordered operation.
         """
@@ -1049,9 +1049,9 @@ class SeriesFeatureBuilder:
             return frame
         if self.history is None or self.history.empty:
             return self.compute(frame)
-        return self.compute_with_history(frame)
+        return self.backfill(frame)
 
-    def compute_with_history(self, frame: pandas.DataFrame) -> pandas.DataFrame:
+    def backfill(self, frame: pandas.DataFrame) -> pandas.DataFrame:
         """Appends the features, adding stored history before the batch.
 
         Only history strictly earlier than an entity's first row in `frame`
@@ -1079,13 +1079,11 @@ class SeriesFeatureBuilder:
                 f"time column '{self.time_column}' has unparseable values"
             )
         earliest = (
-            pandas.Series(times.to_numpy())
-            .groupby(self.entity_keys(frame))
-            .min()
+            pandas.Series(times.to_numpy()).groupby(self.identify(frame)).min()
         )
         history = self.history if self.history is not None else frame.iloc[:0]
         past_times = pandas.to_datetime(history[self.time_column])
-        limits = pandas.Series(self.entity_keys(history)).map(earliest)
+        limits = pandas.Series(self.identify(history)).map(earliest)
         keep = (past_times.to_numpy() < limits.to_numpy()) & limits.notna()
         past = history[numpy.asarray(keep)][
             [c for c in self.history_columns if c in frame.columns]
@@ -1134,7 +1132,7 @@ class SeriesFeatureBuilder:
         for node in self.nodes:
             values = columns.to_finite(result[node.inputs[0]]).to_numpy()[order]
             grouped = pandas.Series(values).groupby(sorted_groups)
-            op = get_op(node.op)
+            op = lookup(node.op)
             if not isinstance(op, OrderedOp):
                 raise errors.ConfigError(f"{node.op} is not an ordered op")
             computed = op.compute(grouped, op.resolved(node))
@@ -1177,7 +1175,7 @@ class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):  # typ
         frame = pandas.DataFrame(features).copy()
         self.states_: dict[str, Any] = {}
         for node in self.nodes:
-            op = get_op(node.op)
+            op = lookup(node.op)
             params = op.resolved(node)
             inputs = [frame[c] for c in node.inputs]
             self.states_[node.name] = op.fit(inputs, params)
@@ -1195,7 +1193,7 @@ class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):  # typ
         """
         frame = pandas.DataFrame(features).copy()
         for node in self.nodes:
-            op = get_op(node.op)
+            op = lookup(node.op)
             params = op.resolved(node)
             inputs = [frame[c] for c in node.inputs]
             frame[node.name] = op.apply(inputs, params, self.states_[node.name])

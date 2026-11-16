@@ -286,7 +286,7 @@ class Outcome:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SurvivorSet:
+class Selection:
     """The frozen selection that goes to the confirmation set.
 
     Attributes:
@@ -298,7 +298,7 @@ class SurvivorSet:
     sha256: str
 
 
-def survivors_hash(ids: tuple[str, ...], specs: Mapping[str, Test]) -> str:
+def fingerprint(ids: tuple[str, ...], specs: Mapping[str, Test]) -> str:
     """Hashes the survivor ids together with their specifications.
 
     Args:
@@ -326,7 +326,7 @@ class Ledger:
         self.rule: online_fdr.Tester | None = None
         self.config: online_fdr.RuleConfig | None = None
         self.state = online_fdr.State()
-        self.survivor_set: SurvivorSet | None = None
+        self.survivor_set: Selection | None = None
         self.control: dict[str, Any] | None = None
         self.diagnostics: list[qualification.Check] = []
         self.confirmation: dict[str, Any] | None = None
@@ -814,9 +814,9 @@ class Ledger:
         specs = {i: h.spec for i, h in self.hypotheses.items()}
         if tuple(body["ids"]) != ids:
             raise LedgerError("survivors differ from the rejected hypotheses")
-        if body["sha256"] != survivors_hash(ids, specs):
+        if body["sha256"] != fingerprint(ids, specs):
             raise LedgerError("survivor hash does not match")
-        self.survivor_set = SurvivorSet(ids, str(body["sha256"]))
+        self.survivor_set = Selection(ids, str(body["sha256"]))
 
     def apply_confirmation(self, body: Mapping[str, Any]) -> None:
         """Seals the ledger with the confirmation outcome.
@@ -947,7 +947,7 @@ class Ledger:
         self.require_registered(hypothesis)
         rule = self.require_rule()
         if rule.level(self.state) == 0:
-            return self.record_not_tested(
+            return self.abstain(
                 hypothesis, "wealth exhausted: descriptive only"
             )
         spec = hypothesis.spec
@@ -996,11 +996,11 @@ class Ledger:
             ),
             tier=qualification.Tier.UNVERIFIED,
         )
-        return self.commit_result(
+        return self.settle(
             hypothesis, check, outcome.p, step, decision, outcome.note
         )
 
-    def record_not_tested(self, hypothesis: Hypothesis, reason: str) -> Outcome:
+    def abstain(self, hypothesis: Hypothesis, reason: str) -> Outcome:
         """Logs a hypothesis that could not be tested (no level left).
 
         It still uses its place in the sequence, as an untestable hypothesis
@@ -1016,11 +1016,9 @@ class Ledger:
         self.require_registered(hypothesis)
         rule = self.require_rule()
         step = rule.step(self.state, online_fdr.Evidence(p=1.0))
-        return self.commit_result(
-            hypothesis, None, 1.0, step, NOT_TESTED, reason
-        )
+        return self.settle(hypothesis, None, 1.0, step, NOT_TESTED, reason)
 
-    def commit_result(
+    def settle(
         self,
         hypothesis: Hypothesis,
         check: qualification.Check | None,
@@ -1107,7 +1105,7 @@ class Ledger:
         """
         self.commit(DIAGNOSTIC, {"source": source, "check": check.to_dict()})
 
-    def freeze(self) -> SurvivorSet:
+    def freeze(self) -> Selection:
         """Freezes the survivor set before the confirmation set is opened.
 
         Calling it again returns the same set.
@@ -1127,7 +1125,7 @@ class Ledger:
         ids = tuple(h.hypothesis_id for h in kept)
         specs = {h.hypothesis_id: h.spec for h in kept}
         self.commit(
-            SURVIVORS, {"ids": list(ids), "sha256": survivors_hash(ids, specs)}
+            SURVIVORS, {"ids": list(ids), "sha256": fingerprint(ids, specs)}
         )
         if self.survivor_set is None:  # pragma: no cover - ingest sets it
             raise LedgerError("survivors were not frozen")

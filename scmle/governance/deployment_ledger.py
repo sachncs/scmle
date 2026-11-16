@@ -686,22 +686,22 @@ class DeploymentLedger:
             raise DeploymentLedgerError("a ledger has exactly one 'open' row")
         handlers: dict[str, Callable[[Mapping[str, Any]], None]] = {
             OPEN: self.apply_open,
-            CHALLENGER_RESULT: self.apply_challenger,
-            ESCALATION: self.apply_escalation,
-            ATTESTATION: self.apply_attestation,
-            ATTESTATION_USED: self.apply_used,
-            HALT: self.apply_halt,
-            ROLLOUT_EXPERIMENT: self.apply_experiment,
-            ROLLOUT_ASSIGNMENT: self.apply_assignment,
-            ROLLOUT_DECISION: self.apply_rollout_decision,
-            ENVELOPE: self.apply_envelope,
-            ENVELOPE_USED: self.apply_envelope_used,
-            ENVELOPE_REVOKED: self.apply_envelope_revoked,
-            CONTROLLER: self.apply_controller,
+            CHALLENGER_RESULT: self.replay,
+            ESCALATION: self.escalate,
+            ATTESTATION: self.attest,
+            ATTESTATION_USED: self.spend,
+            HALT: self.halt,
+            ROLLOUT_EXPERIMENT: self.start,
+            ROLLOUT_ASSIGNMENT: self.assign,
+            ROLLOUT_DECISION: self.confirm,
+            ENVELOPE: self.issue,
+            ENVELOPE_USED: self.consume,
+            ENVELOPE_REVOKED: self.revoke,
+            CONTROLLER: self.journal,
         }
         try:
             require_object_body(body)
-            handlers.get(kind, self.apply_free)(body)
+            handlers.get(kind, self.accept)(body)
         except DeploymentLedgerError:
             raise
         except (KeyError, TypeError, ValueError, ZeroDivisionError) as error:
@@ -710,7 +710,7 @@ class DeploymentLedger:
             ) from error
         self.rows.append(dict(row))
 
-    def apply_free(self, body: Mapping[str, Any]) -> None:
+    def accept(self, body: Mapping[str, Any]) -> None:
         """Rows without a state machine are chained as they are.
 
         Args:
@@ -748,7 +748,7 @@ class DeploymentLedger:
             raise DeploymentLedgerError("ledger has no open row")
         return self.promotion
 
-    def apply_challenger(self, body: Mapping[str, Any]) -> None:
+    def replay(self, body: Mapping[str, Any]) -> None:
         """Registration precedes the decision; the decision is replayed.
 
         Args:
@@ -789,7 +789,7 @@ class DeploymentLedger:
             )
         self.decided[name] = dict(body)
 
-    def apply_escalation(self, body: Mapping[str, Any]) -> None:
+    def escalate(self, body: Mapping[str, Any]) -> None:
         """Opens an escalation or closes it with the safe default.
 
         Args:
@@ -823,7 +823,7 @@ class DeploymentLedger:
             raise DeploymentLedgerError(f"{identity!r} is not pending")
         self.closed[identity] = PHASE_TIMEOUT
 
-    def apply_attestation(self, body: Mapping[str, Any]) -> None:
+    def attest(self, body: Mapping[str, Any]) -> None:
         """Binds a reply to one pending escalation and its question hash.
 
         Args:
@@ -852,7 +852,7 @@ class DeploymentLedger:
         self.closed[reply.escalation_id] = ATTESTATION
         self.attestations[reply.escalation_id] = dict(body)
 
-    def apply_used(self, body: Mapping[str, Any]) -> None:
+    def spend(self, body: Mapping[str, Any]) -> None:
         """Marks an answered escalation's attestation as spent, once.
 
         Args:
@@ -871,7 +871,7 @@ class DeploymentLedger:
             raise DeploymentLedgerError("the attestation is already spent")
         self.used[identity] = dict(body)
 
-    def apply_envelope(self, body: Mapping[str, Any]) -> None:
+    def issue(self, body: Mapping[str, Any]) -> None:
         """Records a granted envelope once, never under a system key.
 
         Args:
@@ -894,7 +894,7 @@ class DeploymentLedger:
         self.envelopes[grant.envelope_id] = grant.to_dict()
         self.envelope_uses[grant.envelope_id] = {}
 
-    def apply_envelope_used(self, body: Mapping[str, Any]) -> None:
+    def consume(self, body: Mapping[str, Any]) -> None:
         """Counts one use, refusing what the envelope does not allow.
 
         The envelope's expiry is not checked here.
@@ -928,7 +928,7 @@ class DeploymentLedger:
             )
         self.envelope_uses[identity][action] = used + 1
 
-    def apply_envelope_revoked(self, body: Mapping[str, Any]) -> None:
+    def revoke(self, body: Mapping[str, Any]) -> None:
         """Removes an envelope's authority, once.
 
         Args:
@@ -945,7 +945,7 @@ class DeploymentLedger:
             raise DeploymentLedgerError(f"envelope {identity!r} is revoked")
         self.envelope_revoked[identity] = dict(body)
 
-    def apply_controller(self, body: Mapping[str, Any]) -> None:
+    def journal(self, body: Mapping[str, Any]) -> None:
         """Keeps the controller's journal: each input digest is applied once.
 
         A `tick` row is accepted without any check and changes nothing.
@@ -987,7 +987,7 @@ class DeploymentLedger:
         else:
             self.rejected[digest] = dict(body)
 
-    def apply_experiment(self, body: Mapping[str, Any]) -> None:
+    def start(self, body: Mapping[str, Any]) -> None:
         """Starts an experiment once, at a level strictly between 0 and 1.
 
         Args:
@@ -1004,7 +1004,7 @@ class DeploymentLedger:
             raise DeploymentLedgerError("an experiment level lies in (0, 1)")
         self.experiments[name] = dict(body)
 
-    def apply_assignment(self, body: Mapping[str, Any]) -> None:
+    def assign(self, body: Mapping[str, Any]) -> None:
         """Checks a batch of propensity-logged assignments.
 
         Args:
@@ -1030,7 +1030,7 @@ class DeploymentLedger:
                 "arms are 0 or 1 and probabilities lie strictly in (0, 1)"
             )
 
-    def apply_rollout_decision(self, body: Mapping[str, Any]) -> None:
+    def confirm(self, body: Mapping[str, Any]) -> None:
         """Requires the experiment a rollout decision names to have started.
 
         Nothing is recorded; a rollback decision also names its experiment.
@@ -1047,7 +1047,7 @@ class DeploymentLedger:
                 f"decision for {name!r}, which was not started"
             )
 
-    def apply_halt(self, body: Mapping[str, Any]) -> None:
+    def halt(self, body: Mapping[str, Any]) -> None:
         """Enters or leaves the halted state.
 
         Args:

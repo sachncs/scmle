@@ -43,7 +43,7 @@ class Tuner:
         self.search = context.spec.effective_search()
         self.metric = scmle.core.context.require(context.metric, "metric")
 
-    def promising_candidates(
+    def shortlist(
         self, screened: list[experiments.Trial]
     ) -> list[tuple[str, str]]:
         """Picks the best (model, strategy) per model, best models first.
@@ -80,12 +80,10 @@ class Tuner:
         """
         if self.search.top_models == 0:
             return
-        for index, (name, strategy) in enumerate(
-            self.promising_candidates(screened)
-        ):
-            self.tune_model(name, strategy, index)
+        for index, (name, strategy) in enumerate(self.shortlist(screened)):
+            self.optimize(name, strategy, index)
 
-    def tune_model(self, name: str, strategy: str, index: int) -> None:
+    def optimize(self, name: str, strategy: str, index: int) -> None:
         """Runs batched, pruned search for one model under one strategy.
 
         Args:
@@ -173,9 +171,9 @@ class Tuner:
             )
             size = min(share, remaining)
             remaining -= size
-            self.run_bracket(name, strategy, optimizer, size, rungs)
+            self.ascend(name, strategy, optimizer, size, rungs)
 
-    def run_bracket(
+    def ascend(
         self,
         name: str,
         strategy: str,
@@ -267,7 +265,7 @@ class Tuner:
                 for trial_id, params in zip(ids, proposals, strict=True)
             ]
         )
-        survivors = self.survivor_ids(first_rung) if multi_fold else None
+        survivors = self.promote(first_rung) if multi_fold else None
         finished = {}
         if survivors:
             winners = [t for t in first_rung if t.trial_id in survivors]
@@ -294,7 +292,7 @@ class Tuner:
                 trial.error = "pruned after the first rung"
                 self.complete(trial, optimizer)
 
-    def survivor_ids(self, first_rung: list[experiments.Trial]) -> set[str]:
+    def promote(self, first_rung: list[experiments.Trial]) -> set[str]:
         """Selects the first-rung trials that advance.
 
         Args:

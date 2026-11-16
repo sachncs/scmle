@@ -115,7 +115,7 @@ def encode_segment(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
-def int_from_segment(text: str) -> int:
+def unpack(text: str) -> int:
     """Decodes a big-endian unsigned integer from a base64url segment.
 
     Args:
@@ -200,8 +200,8 @@ class Key:
         try:
             kid = str(entry["kid"])
             kind = entry["kty"]
-            not_before = optional_float(entry.get("nbf"))
-            expires = optional_float(entry.get("exp"))
+            not_before = coerce(entry.get("nbf"))
+            expires = coerce(entry.get("exp"))
             if kind == "oct":
                 return cls(
                     kid,
@@ -214,8 +214,8 @@ class Key:
                 return cls(
                     kid,
                     RS256,
-                    modulus=int_from_segment(entry["n"]),
-                    exponent=int_from_segment(entry["e"]),
+                    modulus=unpack(entry["n"]),
+                    exponent=unpack(entry["e"]),
                     not_before=not_before,
                     expires=expires,
                 )
@@ -223,7 +223,7 @@ class Key:
             raise errors.ConfigError("malformed JWK entry") from error
         raise errors.ConfigError(f"unsupported JWK type {kind!r}")
 
-    def check_window(self, now: float) -> None:
+    def validate(self, now: float) -> None:
         """Raises if the key is outside its validity window.
 
         Args:
@@ -266,7 +266,7 @@ class Key:
         return hmac.compare_digest(recovered, expected)
 
 
-def optional_float(value: Any) -> float | None:
+def coerce(value: Any) -> float | None:
     """Converts a value to a float unless it is absent.
 
     Args:
@@ -539,7 +539,7 @@ class Verifier:
         parts = token.split(".")
         if len(parts) != TOKEN_PARTS or not all(parts):
             raise TokenError(MALFORMED)
-        header = self.parse_object(parts[0])
+        header = self.parse(parts[0])
         algorithm = header.get("alg")
         kid = header.get("kid")
         if algorithm not in ALGORITHMS:
@@ -550,14 +550,14 @@ class Verifier:
         if key.algorithm != algorithm:
             raise TokenError(BAD_ALGORITHM)
         now = self.clock()
-        key.check_window(now)
+        key.validate(now)
         signing_input = f"{parts[0]}.{parts[1]}".encode("ascii", "replace")
         if not key.verify(signing_input, decode_segment(parts[2])):
             raise TokenError(BAD_SIGNATURE)
-        claims = self.parse_object(parts[1])
-        return self.check_claims(header, claims, key, now)
+        claims = self.parse(parts[1])
+        return self.admit(header, claims, key, now)
 
-    def parse_object(self, segment: str) -> dict[str, Any]:
+    def parse(self, segment: str) -> dict[str, Any]:
         """Parses a JSON object from a base64url segment.
 
         Args:
@@ -577,7 +577,7 @@ class Verifier:
             raise TokenError(MALFORMED)
         return value
 
-    def check_claims(
+    def admit(
         self,
         header: Mapping[str, Any],
         claims: Mapping[str, Any],
@@ -613,20 +613,20 @@ class Verifier:
         subject = claims.get("sub")
         if not isinstance(subject, str) or not subject:
             raise TokenError(MISSING_CLAIM, "sub")
-        expiry = number_claim(claims, "exp")
+        expiry = quantify(claims, "exp")
         if expiry is None:
             raise TokenError(MISSING_CLAIM, "exp")
         if now >= expiry + self.leeway:
             raise TokenError(EXPIRED)
         for name in ("nbf", "iat"):
-            value = number_claim(claims, name)
+            value = quantify(claims, name)
             if value is not None and value > now + self.leeway:
                 raise TokenError(NOT_YET_VALID, name)
         revocations = self.current_revocations()
         if revocations is not None and revocations.revokes(header, claims):
             raise TokenError(REVOKED)
         tenant = claims.get(self.tenant_claim)
-        scopes = scopes_of(claims)
+        scopes = collect(claims)
         return Principal(
             subject=subject,
             tenant=tenant if isinstance(tenant, str) and tenant else None,
@@ -637,7 +637,7 @@ class Verifier:
         )
 
 
-def number_claim(claims: Mapping[str, Any], name: str) -> float | None:
+def quantify(claims: Mapping[str, Any], name: str) -> float | None:
     """Reads an optional numeric claim.
 
     Args:
@@ -658,7 +658,7 @@ def number_claim(claims: Mapping[str, Any], name: str) -> float | None:
     return float(value)
 
 
-def scopes_of(claims: Mapping[str, Any]) -> frozenset[str]:
+def collect(claims: Mapping[str, Any]) -> frozenset[str]:
     """Collects scopes from `scope` (space separated) or `scp` (list).
 
     Args:

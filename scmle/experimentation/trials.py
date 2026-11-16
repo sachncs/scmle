@@ -94,7 +94,7 @@ class TrialPayload:
 TRAIN_SCORE_ROWS = 2000
 
 
-def access_record(row_ids: pandas.Index) -> dict[str, Any]:
+def summarise(row_ids: pandas.Index) -> dict[str, Any]:
     """Summarizes the rows a fit or scoring call received.
 
     Args:
@@ -215,8 +215,8 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
                 )
                 result.observed_access.append(
                     {
-                        "fit": access_record(payload.features.index.take(fit)),
-                        "evaluate": access_record(
+                        "fit": summarise(payload.features.index.take(fit)),
+                        "evaluate": summarise(
                             payload.features.index.take(evaluate)
                         ),
                     }

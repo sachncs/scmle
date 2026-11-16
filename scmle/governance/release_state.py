@@ -459,7 +459,7 @@ class ReleaseRegistry:
 
     # -- the ledger --------------------------------------------------------
 
-    def record_event(self, body: dict[str, Any]) -> None:
+    def log(self, body: dict[str, Any]) -> None:
         """Appends a deployment row to the ledger, if there is one.
 
         The event is always written to the store's audit trail.
@@ -529,7 +529,7 @@ class ReleaseRegistry:
             raise errors.ConfigError("steps must increase and end in 100")
         refusal = self.refusal(model, version, signing_key)
         if refusal:
-            self.record_event(
+            self.log(
                 self.body(
                     model,
                     version,
@@ -582,7 +582,7 @@ class ReleaseRegistry:
             # handled: recorded rejected event with reasons, restore
             restored = self.restore(plane, previous)
             reasons = (str(error),)
-            self.record_event(
+            self.log(
                 self.body(
                     model,
                     version,
@@ -596,7 +596,7 @@ class ReleaseRegistry:
                 )
             )
             return Outcome(done=False, reasons=reasons, restored=restored)
-        self.record_event(
+        self.log(
             self.body(
                 model,
                 version,
@@ -901,7 +901,7 @@ class ReleaseRegistry:
         ) as error:
             # handled: recorded event; Outcome done False with reasons
             restored = self.restore(plane, current)
-            self.record_event(
+            self.log(
                 self.body(
                     model,
                     target["version"],
@@ -922,7 +922,7 @@ class ReleaseRegistry:
         except errors.ScmleError as error:
             # handled: recorded event and restore; failure outcome
             restored = self.restore(plane, current)
-            self.record_event(
+            self.log(
                 self.body(
                     model,
                     target["version"],
@@ -936,7 +936,7 @@ class ReleaseRegistry:
                 )
             )
             return Outcome(done=False, reasons=(str(error),), restored=restored)
-        self.record_event(
+        self.log(
             self.body(
                 model,
                 target["version"],
@@ -1065,9 +1065,7 @@ class ReleaseRegistry:
 
     # -- reconcile ---------------------------------------------------------
 
-    def last_ledger_event(
-        self, model: str, environment: str
-    ) -> dict[str, Any] | None:
+    def recall(self, model: str, environment: str) -> dict[str, Any] | None:
         """Returns the newest confirmed ledger event for the environment.
 
         Args:
@@ -1091,7 +1089,7 @@ class ReleaseRegistry:
                 return dict(body)
         return None
 
-    def recorded_findings(
+    def compare(
         self,
         model: str,
         environment: str,
@@ -1195,9 +1193,7 @@ class ReleaseRegistry:
                 )
             )
         else:
-            findings.extend(
-                self.recorded_findings(model, environment, recorded, seen)
-            )
+            findings.extend(self.compare(model, environment, recorded, seen))
         if not seen.ready:
             findings.append(
                 Finding("not_ready", "the platform does not report ready")
@@ -1213,7 +1209,7 @@ class ReleaseRegistry:
                         f"runtime has not confirmed (confirmed: {expected})",
                     )
                 )
-        event = self.last_ledger_event(model, environment)
+        event = self.recall(model, environment)
         if self.ledger is not None:
             if event is None and recorded is not None:
                 findings.append(

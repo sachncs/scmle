@@ -144,7 +144,7 @@ class Orchestrator:
             approved_plan=approved_plan,
         )
 
-    def load_history(
+    def recall(
         self, tracker: stores.ExperimentStore | None
     ) -> tuple[experiments.HistoricalRun, ...]:
         """Reads past runs for meta-learning without creating a database.
@@ -163,7 +163,7 @@ class Orchestrator:
             tracker = stores.SqliteExperimentStore(path)
         return tuple(tracker.history())
 
-    def apply_plan(self, approved: experiments.Plan | None) -> None:
+    def adopt(self, approved: experiments.Plan | None) -> None:
         """Makes an approved or modified plan binding on the specification.
 
         Replaces `self.spec` with a copy whose validation strategy, time
@@ -195,15 +195,15 @@ class Orchestrator:
         Args:
             approved: Plan restricting which models may be considered.
 
-        Applies `approved` to the specification first (see `apply_plan`).
+        Applies `approved` to the specification first (see `adopt`).
 
         Returns:
             A context, with no run store or log, whose `profile` and `plan`
             are populated.
         """
-        self.apply_plan(approved)
+        self.adopt(approved)
         context = self.new_context(approved_plan=approved)
-        context.history = self.load_history(self.tracker)
+        context.history = self.recall(self.tracker)
         scmle.core.stages.IngestStage().execute(context)
         scmle.core.stages.ProfileStage().execute(context)
         context.plan = scmle.core.stages.build_plan(context)
@@ -236,7 +236,7 @@ class Orchestrator:
         Returns:
             The completed run.
         """
-        self.apply_plan(approved)
+        self.adopt(approved)
         store = scmle.artifacts.store.RunStore.create(output_dir)
         declaration: dict[str, Any] = dict(
             parameter_estimation_declaration
@@ -298,7 +298,7 @@ class Orchestrator:
             if plan_path.exists()
             else None
         )
-        checkpoints = self.load_checkpoints(store)
+        checkpoints = self.restore(store)
         return self.execute(store, approved, checkpoints, "run resumed")
 
     @classmethod
@@ -320,7 +320,7 @@ class Orchestrator:
         )
         return cls(spec, **kwargs)
 
-    def load_checkpoints(
+    def restore(
         self, store: scmle.artifacts.store.RunStore
     ) -> dict[str, experiments.Trial]:
         """Reads completed trial checkpoints from a run directory.
@@ -427,7 +427,7 @@ class Orchestrator:
         )
         context = self.new_context(store=store, log=log, approved_plan=approved)
         context.tracker = tracker
-        context.history = self.load_history(tracker)
+        context.history = self.recall(tracker)
         context.checkpoints = checkpoints
         for name, failure in self.registry.plugin_failures.items():
             context.emit("plugin.rejected", f"{name}: {failure}")

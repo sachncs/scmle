@@ -88,12 +88,10 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):  # 
         self.thresholds_ = numpy.maximum.accumulate(
             numpy.quantile(scores, shares)
         )
-        self.scale_ = self.best_scale(scores, ranks)
+        self.scale_ = self.tune(scores, ranks)
         return self
 
-    def level_probabilities(
-        self, scores: numpy.ndarray, scale: float
-    ) -> numpy.ndarray:
+    def apportion(self, scores: numpy.ndarray, scale: float) -> numpy.ndarray:
         """Probability of each level for latent `scores`.
 
         Args:
@@ -111,7 +109,7 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):  # 
         )
         return clipped
 
-    def best_scale(self, scores: numpy.ndarray, ranks: numpy.ndarray) -> float:
+    def tune(self, scores: numpy.ndarray, ranks: numpy.ndarray) -> float:
         """The link width with the highest likelihood on the fitted scores.
 
         Args:
@@ -126,7 +124,7 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):  # 
         best, best_value = spread, -numpy.inf
         for factor in SCALE_GRID:
             scale = factor * spread
-            probabilities = self.level_probabilities(scores, scale)
+            probabilities = self.apportion(scores, scale)
             value = float(
                 numpy.log(probabilities[numpy.arange(len(ranks)), ranks]).mean()
             )
@@ -144,7 +142,7 @@ class CumulativeThresholdRegressor(base.RegressorMixin, base.BaseEstimator):  # 
             Array of shape `(n_rows, levels)` whose rows sum to one.
         """
         scores = numpy.asarray(self.regressor_.predict(features), dtype=float)
-        probabilities = self.level_probabilities(scores, self.scale_)
+        probabilities = self.apportion(scores, self.scale_)
         normalized: numpy.ndarray = probabilities / probabilities.sum(
             axis=1, keepdims=True
         )

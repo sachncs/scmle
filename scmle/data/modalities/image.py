@@ -457,7 +457,7 @@ class Sample:
         require_pillow("image ingestion")
         raw = bytes(encoded_bytes)
         stable_source = canonical_source(source)
-        cls.validate_limits(max_bytes, max_pixels)
+        cls.validate(max_bytes, max_pixels)
         if not raw:
             raise ImageValidationError(
                 "image payload is empty",
@@ -560,7 +560,7 @@ class Sample:
                 code="not_a_file",
                 source=source,
             )
-        cls.validate_limits(max_bytes, max_pixels)
+        cls.validate(max_bytes, max_pixels)
         file_size = file_path.stat().st_size
         if max_bytes is not None and file_size > max_bytes:
             raise ImageValidationError(
@@ -587,7 +587,7 @@ class Sample:
             augmentation,
         )
 
-    def perceptual_hash(self, hash_size: int = 8) -> str:
+    def fingerprint(self, hash_size: int = 8) -> str:
         """Returns a bounded luminance signature for near-duplicate review.
 
         Args:
@@ -615,7 +615,7 @@ class Sample:
         return "".join(f"{int(value):x}" for value in quantized.flat)
 
     @staticmethod
-    def validate_limits(
+    def validate(
         max_bytes: int | None,
         max_pixels: int | None,
     ) -> None:
@@ -900,7 +900,7 @@ class Dataset:
             ValueError: If ``max_samples`` is not a positive integer or
                 ``max_hamming_distance`` is not a non-negative integer. An
                 invalid ``hash_size`` also raises ValueError, from
-                `Sample.perceptual_hash`.
+                `Sample.fingerprint`.
         """
         samples_limit: object = max_samples
         if not isinstance(samples_limit, int) or isinstance(
@@ -920,7 +920,7 @@ class Dataset:
             )
         candidates = self.samples[:max_samples]
         signatures = [
-            int(sample.perceptual_hash(hash_size), 16) for sample in candidates
+            int(sample.fingerprint(hash_size), 16) for sample in candidates
         ]
         neighbors: dict[int, set[int]] = {
             index: set() for index in range(len(candidates))

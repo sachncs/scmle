@@ -338,7 +338,7 @@ def select_threshold(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RiskCoverage:
+class Curve:
     """The empirical risk-coverage curve and its area.
 
     Attributes:
@@ -373,7 +373,7 @@ class RiskCoverage:
 
 def risk_coverage(
     score: Any, loss: Any, weights: Any = None, points: int = DEFAULT_GRID
-) -> RiskCoverage:
+) -> Curve:
     """Risk-coverage curve on a fixed grid, optionally weighted.
 
     Inputs are validated as in `validate_calibration`, which raises
@@ -412,11 +412,11 @@ def risk_coverage(
         if valid.sum() > 1
         else math.nan
     )
-    return RiskCoverage(grid, coverage, risk, area)
+    return Curve(grid, coverage, risk, area)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ChowCheck:
+class Comparison:
     """Comparison of the threshold with Chow's rule.
 
     Attributes:
@@ -438,7 +438,7 @@ def chow_check(
     review_cost: float,
     error_cost: float,
     tolerance: float = 0.1,
-) -> ChowCheck:
+) -> Comparison:
     """Cross-checks ``tau`` against Chow's rule.
 
     Chow (1957, 1970) was not available to the author. What El-Yaniv and
@@ -482,7 +482,7 @@ def chow_check(
     by_chow = (1.0 - p) > cut
     by_score = g < tau
     share = float(numpy.mean(by_chow != by_score))
-    return ChowCheck(cut, share, share <= tolerance)
+    return Comparison(cut, share, share <= tolerance)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

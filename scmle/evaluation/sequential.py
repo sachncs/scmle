@@ -846,17 +846,17 @@ class Estimator:
                 propensity fits, positivity violations, and unsupported
                 regimes raise `ValueError` from the helper functions.
         """
-        prepared, rows_dropped, subjects_input, subjects_dropped = (
-            prepare_sequential_frame(frame, self.estimand, self.policy)
+        prepared, rows_dropped, subjects_input, subjects_dropped = prepare(
+            frame, self.estimand, self.policy
         )
         fingerprint = fingerprint_frame(frame)
-        period_values = ordered_periods(prepared, self.estimand.time_column)
+        period_values = order(prepared, self.estimand.time_column)
         # Subjects of mixed types sort by type name, then by `repr`.
         subject_values = sorted(
             prepared[self.estimand.subject_identity].drop_duplicates().tolist(),
             key=lambda value: (type(value).__name__, repr(value)),
         )
-        matrices = build_matrices(
+        matrices = tabulate(
             prepared, self.estimand, period_values, subject_values
         )
         treatment = matrices["treatment"]
@@ -887,10 +887,10 @@ class Estimator:
                     matrices["time_varying"][:, index, :],
                 )
             )
-            numerator, numerator_iterations = fit_propensity(
+            numerator, numerator_iterations = regress(
                 numerator_features, current_treatment, self.policy
             )
-            denominator, denominator_iterations = fit_propensity(
+            denominator, denominator_iterations = regress(
                 denominator_features, current_treatment, self.policy
             )
             check_propensity_support(
@@ -939,7 +939,7 @@ class Estimator:
         comparator_mask = numpy.all(
             treatment == self.estimand.comparator_treatment, axis=1
         )
-        target = build_regime_estimate(
+        target = average(
             "always_treated"
             if self.estimand.target_treatment == 1
             else "always_control",
@@ -950,7 +950,7 @@ class Estimator:
             self.policy,
             critical_value,
         )
-        comparator = build_regime_estimate(
+        comparator = average(
             "always_treated"
             if self.estimand.comparator_treatment == 1
             else "always_control",
@@ -1160,7 +1160,7 @@ def require_distinct_neighbours(values: list[Any]) -> None:
         )
 
 
-def prepare_sequential_frame(
+def prepare(
     frame: pandas.DataFrame,
     estimand: Estimand,
     policy: Config,
@@ -1226,7 +1226,7 @@ def prepare_sequential_frame(
     )
     if not treatment_values.issubset({0, 1}):
         raise errors.InputError("treatment must be binary with values 0 and 1")
-    period_values = ordered_periods(prepared, time_name)
+    period_values = order(prepared, time_name)
     if len(period_values) < MIN_PERIODS:
         raise errors.InputError(
             "sequential estimation needs at least two periods"
@@ -1270,7 +1270,7 @@ def validate_time_order(frame: pandas.DataFrame, estimand: Estimand) -> None:
         raise errors.InputError("time values have invalid ordering") from error
 
 
-def ordered_periods(frame: pandas.DataFrame, time_column: str) -> list[Any]:
+def order(frame: pandas.DataFrame, time_column: str) -> list[Any]:
     """Returns stable sorted period values.
 
     Args:
@@ -1310,7 +1310,7 @@ def validate_baseline_covariates(
             )
 
 
-def build_matrices(
+def tabulate(
     frame: pandas.DataFrame,
     estimand: Estimand,
     period_values: Sequence[Any],
@@ -1375,7 +1375,7 @@ def build_matrices(
     }
 
 
-def fit_propensity(
+def regress(
     covariates: numpy.ndarray,
     treatment: numpy.ndarray,
     policy: Config,
@@ -1472,7 +1472,7 @@ def effective_sample_size(weights: numpy.ndarray) -> float:
     return total**2 / squared
 
 
-def build_regime_estimate(
+def average(
     regime: str,
     treatment: int,
     mask: numpy.ndarray,

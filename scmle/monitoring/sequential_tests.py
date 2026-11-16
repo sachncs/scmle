@@ -304,9 +304,9 @@ class MixtureTest:
         self.log_weights: list[float] = []
         self.peak = numpy.zeros_like(self.null_mean)
         self.log_capital = numpy.zeros_like(self.null_mean)
-        self.start_term()
+        self.spawn()
 
-    def start_term(self) -> None:
+    def spawn(self) -> None:
         """Adds a term that starts with the next observation.
 
         The oldest term is dropped when more than `terms` are kept.
@@ -339,7 +339,7 @@ class MixtureTest:
             The log of the weighted sum of the terms' capitals.
         """
         if self.count > 0 and self.count % self.stride == 0:
-            self.start_term()
+            self.spawn()
         for test in self.inner:
             test.update(observation)
         self.count += 1

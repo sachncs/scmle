@@ -109,7 +109,7 @@ class Sensitivity:
         return max(spreads, key=lambda name: spreads[name])
 
 
-def spread_of(scores: list[float]) -> Spread:
+def summarise(scores: list[float]) -> Spread:
     """Summarizes repeated scores.
 
     Args:
@@ -189,7 +189,7 @@ def training_sensitivity(
             features.iloc[rows], target.iloc[rows]
         )
         by_resample.append(scorer(model, *held))
-    return spread_of(by_seed), spread_of(by_resample)
+    return summarise(by_seed), summarise(by_resample)
 
 
 def evaluation_sensitivity(
@@ -230,7 +230,7 @@ def evaluation_sensitivity(
             features.iloc[train], target.iloc[train]
         )
         scores.append(scorer(model, features.iloc[test], target.iloc[test]))
-    return spread_of(scores)
+    return summarise(scores)
 
 
 def noisy(

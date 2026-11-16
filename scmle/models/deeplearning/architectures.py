@@ -40,7 +40,7 @@ class Architecture(abc.ABC):
         """
 
 
-class MlpArchitecture(Architecture):
+class Mlp(Architecture):
     """Fully connected layers with ReLU and dropout."""
 
     name = "mlp"
@@ -79,7 +79,7 @@ class MlpArchitecture(Architecture):
         return torch.nn.Sequential(*layers)
 
 
-class ResidualArchitecture(Architecture):
+class Residual(Architecture):
     """An input projection, residual blocks, then a linear head.
 
     Every block is `x + Dropout(Linear(ReLU(LayerNorm(x))))`; the width is
@@ -146,7 +146,7 @@ ENSEMBLE_MEMBERS = 8
 ATTENTION_HEADS = 4
 
 
-class EnsembleArchitecture(Architecture):
+class Ensemble(Architecture):
     """A BatchEnsemble MLP in the spirit of TabM.
 
     Several sub-networks share one weight matrix per layer and differ only in
@@ -246,7 +246,7 @@ class EnsembleArchitecture(Architecture):
         return Network()
 
 
-class TransformerArchitecture(Architecture):
+class Transformer(Architecture):
     """An experimental tabular-only FT-Transformer.
 
     Each scalar feature is embedded as `value * weight + bias`, a learned
@@ -377,7 +377,7 @@ class RobustMlpArchitecture(Architecture):
                 """
                 return features * self.scale
 
-        class SmoothClip(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
+        class Saturation(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
             """Soft saturation of large magnitudes."""
 
             def forward(self, features: Any) -> Any:
@@ -391,7 +391,7 @@ class RobustMlpArchitecture(Architecture):
                 """
                 return features / torch.sqrt(1.0 + (features / 3.0) ** 2)
 
-        layers: list[Any] = [Scaling(), SmoothClip()]
+        layers: list[Any] = [Scaling(), Saturation()]
         width = inputs
         for size in hidden_sizes:
             layers += [
@@ -407,10 +407,10 @@ class RobustMlpArchitecture(Architecture):
 ARCHITECTURES: dict[str, Architecture] = {
     architecture.name: architecture
     for architecture in (
-        MlpArchitecture(),
-        ResidualArchitecture(),
-        EnsembleArchitecture(),
-        TransformerArchitecture(),
+        Mlp(),
+        Residual(),
+        Ensemble(),
+        Transformer(),
         RobustMlpArchitecture(),
     )
 }

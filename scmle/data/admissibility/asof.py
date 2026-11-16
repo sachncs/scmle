@@ -29,7 +29,7 @@ EPOCH = pandas.Timestamp("1970-01-01")
 SECOND = pandas.Timedelta(seconds=1)
 
 
-class RowStatus(enum.StrEnum):
+class Status(enum.StrEnum):
     """How a row's stored value relates to the log."""
 
     MATCH = "match"
@@ -159,16 +159,16 @@ def classify_rows(
         joined: Output of `point_in_time`, aligned to `stored`.
 
     Returns:
-        A series of `RowStatus` values (as strings) on the index of
+        A series of `Status` values (as strings) on the index of
         `stored`: `match` where the values agree, `not_yet_written` where
         no log entry precedes the moment but a value is stored, and
         `overwritten` otherwise.
     """
     match = agrees(stored, joined["reconstructed"])
     not_yet = (~joined["has_entry"]) & stored.notna()
-    status = pandas.Series(RowStatus.OVERWRITTEN.value, index=stored.index)
-    status[match] = RowStatus.MATCH.value
-    status[not_yet] = RowStatus.NOT_YET_WRITTEN.value
+    status = pandas.Series(Status.OVERWRITTEN.value, index=stored.index)
+    status[match] = Status.MATCH.value
+    status[not_yet] = Status.NOT_YET_WRITTEN.value
     return status
 
 
@@ -199,14 +199,14 @@ def reconstruction_mismatch(
     joined = point_in_time(rows, log, key, moment, written_at, value)
     status = classify_rows(rows[stored], joined)
     return pandas.Series(
-        (status != RowStatus.MATCH.value).to_numpy(),
+        (status != Status.MATCH.value).to_numpy(),
         index=rows.index,
         dtype=bool,
     )
 
 
 @dataclasses.dataclass(frozen=True, eq=False)
-class AsOfAudit:
+class Audit:
     """Outcome of reconstructing one field from its log.
 
     Attributes:
@@ -231,5 +231,5 @@ class AsOfAudit:
         """Rows per status."""
         return {
             kind.value: int((self.status == kind.value).sum())
-            for kind in RowStatus
+            for kind in Status
         }

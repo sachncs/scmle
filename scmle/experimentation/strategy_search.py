@@ -69,9 +69,9 @@ class StrategySearch:
             if self.context.resource_governor.skip_reason(first=False):
                 break
             self.context.check_cancelled()
-            self.search_model(leader, spec.names)
+            self.tune(leader, spec.names)
 
-    def search_model(self, leader: experiments.Trial, names: list[str]) -> None:
+    def tune(self, leader: experiments.Trial, names: list[str]) -> None:
         """Tries every applicable strategy for one model.
 
         Inapplicable strategies are rejected with the reason; the others are

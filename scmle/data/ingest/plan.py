@@ -1,11 +1,11 @@
 """`Plan`: runs the ingestion stages in order and writes their artifacts.
 
-Stages: `profile` (catalog), `infer_grain` (keys and the unit verdict),
-`discover_joins` (link graph), each under one budget. Artifacts, written
+Stages: `profile` (catalog), `infer` (keys and the unit verdict),
+`link` (link graph), each under one budget. Artifacts, written
 atomically into the run directory: `ingest_catalog.json`, `grain_report.json`,
 `join_graph.json`, `ingest_budget.json`. Entity resolution, the as-of views
 and synthesis take frames and views and are called from code
-(`entities.resolve`, `synthesize.synthesize`); `write_artifact` records
+(`entities.resolve`, `synthesize.synthesize`); `persist` records
 their artifacts.
 """
 
@@ -68,7 +68,7 @@ class Config:
             raise errors.InputError("target_table must be one of tables")
 
 
-def write_artifact(
+def persist(
     run_dir: pathlib.Path, name: str, document: dict[str, Any]
 ) -> pathlib.Path:
     """Writes a JSON artifact atomically.
@@ -134,10 +134,10 @@ class Plan:
         self.catalog = profile.profile_catalog(
             self.source, self.settings.tables
         )
-        write_artifact(self.run_dir, CATALOG, self.catalog.to_dict())
+        persist(self.run_dir, CATALOG, self.catalog.to_dict())
         return self.catalog
 
-    def infer_grain(self) -> dict[str, grain.KeyScan]:
+    def infer(self) -> dict[str, grain.KeyScan]:
         """Finds keys per table, judges the unit, writes `grain_report.json`.
 
         Profiles first if that has not been done.
@@ -184,10 +184,10 @@ class Plan:
                 ("raise the ingest budget",),
             )
             document["verdict"] = self.verdict.to_dict()
-        write_artifact(self.run_dir, GRAIN, document)
+        persist(self.run_dir, GRAIN, document)
         return self.scans
 
-    def discover_joins(self) -> joins.JoinGraph:
+    def link(self) -> joins.JoinGraph:
         """Measures links, writes `join_graph.json`.
 
         Profiles and infers grain first if that has not been done.
@@ -197,7 +197,7 @@ class Plan:
         """
         catalog = self.catalog or self.run_profile()
         if not self.scans:
-            self.infer_grain()
+            self.infer()
         keyed = profile.Catalog(
             tuple(t for t in catalog.tables if t.name in self.scans),
             catalog.partial,
@@ -209,7 +209,7 @@ class Plan:
             self.settings.declared,
             self.settings.eps_fk,
         )
-        write_artifact(self.run_dir, JOINS, self.graph.to_dict())
+        persist(self.run_dir, JOINS, self.graph.to_dict())
         return self.graph
 
     def run_all(self) -> dict[str, Any]:
@@ -219,8 +219,8 @@ class Plan:
             The summary from `finish`.
         """
         self.run_profile()
-        self.infer_grain()
-        self.discover_joins()
+        self.infer()
+        self.link()
         return self.finish()
 
     def finish(self) -> dict[str, Any]:
@@ -233,7 +233,7 @@ class Plan:
         """
         document = self.meter.to_dict()
         document["source_queries"] = self.source.queries
-        write_artifact(self.run_dir, BUDGET, document)
+        persist(self.run_dir, BUDGET, document)
         return {
             "partial": self.meter.partial,
             "source_queries": self.source.queries,

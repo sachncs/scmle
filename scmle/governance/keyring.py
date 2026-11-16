@@ -150,7 +150,7 @@ class SigningKeyRecord:
             and (expires is None or observed < expires)
         )
 
-    def can_verify(
+    def verifies(
         self,
         signed_at: str,
         observed_at: str,
@@ -510,7 +510,7 @@ class SigningKeyRegistry:
         secret = secrets.get(envelope.key_id)
         if record is None or secret is None:
             return False
-        if not record.can_verify(envelope.signed_at, observed_at, historical):
+        if not record.verifies(envelope.signed_at, observed_at, historical):
             return False
         expected = signing.sign_payload(payload, secret)
         return hmac.compare_digest(envelope.value, expected)

@@ -69,7 +69,7 @@ def covariates_of(assumptions: Iterable[str]) -> tuple[str, ...] | None:
     return None
 
 
-def check_assumption(item: str) -> None:
+def vet(item: str) -> None:
     """Checks an assumption word against the closed vocabulary.
 
     Args:
@@ -226,7 +226,7 @@ class Attestor:
 
         Raises:
             ValueError: If `name` or `role` is blank, `assumptions` is not
-                a tuple, is empty, holds a word `check_assumption` rejects,
+                a tuple, is empty, holds a word `vet` rejects,
                 or contains a duplicate.
         """
         evidence.require_text(self.name, "name")
@@ -235,7 +235,7 @@ class Attestor:
         if not self.assumptions:
             raise errors.InputError("an attestor needs at least one assumption")
         for item in self.assumptions:
-            check_assumption(item)
+            vet(item)
         if len(set(self.assumptions)) != len(self.assumptions):
             raise errors.InputError("duplicate assumption for an attestor")
 
@@ -397,7 +397,7 @@ class Question:
                 not in `CAUSAL_ESTIMANDS`; a tuple-valued field is not a
                 tuple; an assumption is outside the vocabulary or repeated;
                 a strategy is repeated; the attestors are inconsistent (see
-                `check_attestors`); two subgroups share a column or a
+                `reconcile`); two subgroups share a column or a
                 subgroup column is the treatment or the outcome; `cutoff`
                 is not finite; `trim` is not finite or outside [0, 0.5);
                 or `min_share` is not finite or outside (0, 1].
@@ -418,9 +418,9 @@ class Question:
         ):
             qualification.require_tuple(getattr(self, name), name)
         for item in self.assumptions:
-            check_assumption(item)
+            vet(item)
         self.check_repeats()
-        self.check_attestors()
+        self.reconcile()
         columns = [g.column for g in self.subgroups]
         if len(set(columns)) != len(columns):
             raise errors.InputError("duplicate subgroup column")
@@ -448,7 +448,7 @@ class Question:
         if len(set(self.strategies)) != len(self.strategies):
             raise errors.InputError("duplicate strategy")
 
-    def check_attestors(self) -> None:
+    def reconcile(self) -> None:
         """Checks the attestors against the rest of the block.
 
         Raises:

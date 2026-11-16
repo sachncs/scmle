@@ -1023,7 +1023,7 @@ class Estimation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EstimatorFit:
+class Fit:
     """The fitted quantities of one estimator, before they are reported.
 
     Attributes:
@@ -1054,7 +1054,7 @@ class EstimatorFit:
     interval_errors: numpy.ndarray | None = None
 
 
-def check_estimation_request(
+def admit(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     input_clusters: numpy.ndarray | None,
@@ -1162,7 +1162,7 @@ def fit_linear_estimator(
     policy: Config,
     cluster_values: numpy.ndarray | None,
     names: tuple[str, ...],
-) -> EstimatorFit:
+) -> Fit:
     """Fits ordinary least squares and its reference calculation.
 
     Args:
@@ -1175,7 +1175,7 @@ def fit_linear_estimator(
     Returns:
         The fitted quantities.
     """
-    coefficients, diagnostics = fit_linear(
+    coefficients, diagnostics = regress(
         design, values, policy.max_iterations, policy.tolerance
     )
     fitted = design @ coefficients
@@ -1209,7 +1209,7 @@ def fit_linear_estimator(
         "rmse": float(numpy.sqrt(numpy.mean(residuals**2))),
         "degrees_of_freedom": degrees_of_freedom,
     }
-    return EstimatorFit(
+    return Fit(
         names,
         coefficients,
         covariance,
@@ -1227,7 +1227,7 @@ def fit_logistic_estimator(
     policy: Config,
     cluster_values: numpy.ndarray | None,
     names: tuple[str, ...],
-) -> EstimatorFit:
+) -> Fit:
     """Fits logistic regression and its reference calculation.
 
     Args:
@@ -1257,7 +1257,7 @@ def fit_logistic_estimator(
         )
     )
     diagnostics = {**diagnostics, "likelihood": likelihood}
-    return EstimatorFit(
+    return Fit(
         names,
         coefficients,
         covariance,
@@ -1311,7 +1311,7 @@ def fit_bayesian_estimator(
     policy: Config,
     estimand: Estimand,
     names: tuple[str, ...],
-) -> EstimatorFit:
+) -> Fit:
     """Fits the conjugate Bayesian linear model or its causal variant.
 
     Args:
@@ -1403,7 +1403,7 @@ def fit_bayesian_estimator(
             "scale_matrix": posterior_scale.tolist(),
         },
     }
-    return EstimatorFit(
+    return Fit(
         names,
         coefficients,
         covariance,
@@ -1422,7 +1422,7 @@ def fit_propensity_estimator(
     values: numpy.ndarray,
     policy: Config,
     cluster_values: numpy.ndarray | None,
-) -> EstimatorFit:
+) -> Fit:
     """Fits the inverse-probability-weighted or doubly robust effect.
 
     Args:
@@ -1477,7 +1477,7 @@ def fit_propensity_estimator(
         / numpy.maximum(numpy.sqrt(numpy.diag(covariance)), 1e-15)
     )
     diagnostics = {**diagnostics, "likelihood": likelihood}
-    return EstimatorFit(
+    return Fit(
         ("ate",),
         coefficients,
         covariance,
@@ -1495,7 +1495,7 @@ def fit_continuous_estimator(
     policy: Config,
     estimand: Estimand,
     cluster_values: numpy.ndarray | None,
-) -> EstimatorFit:
+) -> Fit:
     """Fits the continuous-treatment inverse-probability-weighted effect.
 
     Args:
@@ -1550,7 +1550,7 @@ def fit_continuous_estimator(
             "assumptions"
         ),
     }
-    return EstimatorFit(
+    return Fit(
         names,
         coefficients,
         covariance,
@@ -1640,7 +1640,7 @@ def fit_hierarchical_estimator(
     policy: Config,
     cluster_values: numpy.ndarray | None,
     names: tuple[str, ...],
-) -> EstimatorFit:
+) -> Fit:
     """Fits the hierarchical linear model and its reference calculation.
 
     Args:
@@ -1694,7 +1694,7 @@ def fit_hierarchical_estimator(
         "likelihood": likelihood,
         "degrees_of_freedom": degrees_of_freedom,
     }
-    return EstimatorFit(
+    return Fit(
         names,
         coefficients,
         covariance,
@@ -1713,7 +1713,7 @@ def fit_estimator(
     estimand: Estimand,
     policy: Config,
     cluster_values: numpy.ndarray | None,
-) -> EstimatorFit:
+) -> Fit:
     """Fits the estimator the policy names.
 
     Args:
@@ -1793,8 +1793,8 @@ def estimate_parameters(
         matrix, values, input_clusters
     )
     input_rows = matrix.shape[0]
-    check_estimation_request(matrix, values, input_clusters, policy, estimand)
-    matrix, values, kept, dropped = prepare_rows(
+    admit(matrix, values, input_clusters, policy, estimand)
+    matrix, values, kept, dropped = prepare(
         matrix, values, policy.missing, input_clusters
     )
     check_prepared_rows(matrix, values, clusters, policy)
@@ -1909,17 +1909,17 @@ def raw_input_fingerprint(
     matrix = numpy.asarray(features, dtype=float)
     values = numpy.asarray(outcome, dtype=float).reshape(-1)
     digest = hashlib.sha256()
-    update_input_digest(digest, "features", matrix)
-    update_input_digest(digest, "outcome", values)
+    absorb(digest, "features", matrix)
+    absorb(digest, "outcome", values)
     if clusters is None:
         digest.update(b"clusters:none")
     else:
         cluster_values = numpy.asarray(clusters, dtype=object)
-        update_input_digest(digest, "clusters", cluster_values)
+        absorb(digest, "clusters", cluster_values)
     return digest.hexdigest()
 
 
-def update_input_digest(digest: Any, name: str, values: numpy.ndarray) -> None:
+def absorb(digest: Any, name: str, values: numpy.ndarray) -> None:
     """Adds one shape-, dtype-, and value-bound input to a digest.
 
     Args:
@@ -2069,7 +2069,7 @@ def validate_covariance(
     }
 
 
-def prepare_rows(
+def prepare(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     missing: MissingPolicy,
@@ -2117,7 +2117,7 @@ def prepare_rows(
     return matrix[valid], values[valid], kept_clusters, dropped
 
 
-def fit_linear(
+def regress(
     design: numpy.ndarray,
     values: numpy.ndarray,
     max_iterations: int,
@@ -3026,7 +3026,7 @@ def aipw_limitations(cross_fitted: bool) -> list[str]:
     return limitations
 
 
-def center_influence(influence: numpy.ndarray) -> numpy.ndarray:
+def center(influence: numpy.ndarray) -> numpy.ndarray:
     """Validates observation-level influence scores and centers them.
 
     Args:
@@ -3085,7 +3085,7 @@ def influence_variance(
             clusters; or if the clustered variance is not finite and
             non-negative.
     """
-    centered_influence = center_influence(influence)
+    centered_influence = center(influence)
     if covariance == "iid":
         variance = float(
             numpy.sum(centered_influence**2)
@@ -3558,9 +3558,7 @@ def fit_hierarchical_random_slope(
     effect_covariance -= residual_variance * numpy.mean(
         numpy.asarray(random_effect_inverse_matrices), axis=0
     )
-    random_effect_covariance = project_random_effect_covariance(
-        effect_covariance
-    )
+    random_effect_covariance = project(effect_covariance)
     if policy.hierarchical_method == "reml":
         return fit_hierarchical_random_slope_reml(
             design,
@@ -3607,7 +3605,7 @@ def fit_hierarchical_random_slope(
     )
 
 
-def project_random_effect_covariance(
+def project(
     covariance: numpy.ndarray,
 ) -> numpy.ndarray:
     """Projects a moment covariance to the positive-semidefinite cone.
@@ -5511,7 +5509,7 @@ def sensitivity_report(
         while bootstrap_replicate < policy.bootstrap_replicates:
             sample = rng.integers(0, len(values), size=len(values))
             if policy.estimator == "linear":
-                linear_fit = fit_linear(design[sample], values[sample], 1, 1e-8)
+                linear_fit = regress(design[sample], values[sample], 1, 1e-8)
                 estimate = linear_fit[0]
             else:
                 logistic_fit = fit_logistic(
@@ -5535,7 +5533,7 @@ def sensitivity_report(
     return report
 
 
-def bootstrap_replicate_estimate(
+def rerun(
     sampled_matrix: numpy.ndarray,
     sampled_values: numpy.ndarray,
     estimand: Estimand,
@@ -5656,7 +5654,7 @@ def hierarchical_bootstrap_sensitivity(
         )
         try:
             estimates.append(
-                bootstrap_replicate_estimate(
+                rerun(
                     sampled_matrix,
                     sampled_values,
                     estimand,
@@ -5838,7 +5836,7 @@ def causal_bootstrap_sensitivity(
         draws.append(draw_record)
         try:
             estimates.append(
-                bootstrap_replicate_estimate(
+                rerun(
                     sampled_matrix,
                     sampled_values,
                     estimand,

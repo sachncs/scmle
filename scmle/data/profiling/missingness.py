@@ -23,7 +23,7 @@ MIN_EFFECT = 0.05
 
 
 @dataclasses.dataclass(frozen=True)
-class MissingnessFinding:
+class Finding:
     """Association between one column's gaps and the target.
 
     Attributes:
@@ -102,7 +102,7 @@ def assess(
     columns: list[str],
     target: pandas.Series,
     classification: bool,
-) -> list[MissingnessFinding]:
+) -> list[Finding]:
     """Tests every column whose gaps are numerous enough to judge.
 
     Args:
@@ -134,7 +134,7 @@ def assess(
             else value_association(gaps, target)
         )
         findings.append(
-            MissingnessFinding(
+            Finding(
                 column,
                 float(gaps.mean()),
                 test,

@@ -22,7 +22,7 @@ DEFAULT_STRATEGY = "default"
 
 
 @dataclasses.dataclass(frozen=True)
-class FitHealth:
+class Health:
     """The assessment of one candidate.
 
     Attributes:
@@ -56,7 +56,7 @@ def assess(
     train_scores: Sequence[float],
     validation_scores: Sequence[float],
     baseline_score: float,
-) -> FitHealth:
+) -> Health:
     """Judges a candidate from its per-fold scores.
 
     Args:
@@ -109,12 +109,12 @@ def assess(
         )
     else:
         verdict, note = "healthy", "training gain carries over to validation"
-    return FitHealth(verdict, train, held_out, retained, noise, note)
+    return Health(verdict, train, held_out, retained, noise, note)
 
 
 def assess_trial(
     trial: Any, trials: Sequence[Any], greater_is_better: bool
-) -> FitHealth | None:
+) -> Health | None:
     """Judges a trial against the constant baseline trained in the same run.
 
     Args:

@@ -317,7 +317,7 @@ class SpecEffect:
         }
 
 
-def estimate_spec(
+def estimate(
     x: numpy.ndarray,
     y: numpy.ndarray,
     spec: multiverse.Specification,
@@ -494,7 +494,7 @@ def attribution(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CurveTest:
+class Curve:
     """Joint test of the whole specification curve against permuted targets.
 
     Attributes:
@@ -521,7 +521,7 @@ class CurveTest:
         return dataclasses.asdict(self)
 
 
-def curve_statistics(
+def summarize(
     x: numpy.ndarray, y: numpy.ndarray, grid: multiverse.Grid
 ) -> tuple[float, float]:
     """Summarises the specification curve.
@@ -562,7 +562,7 @@ def curve_test(
     *,
     permutations: int,
     strata: numpy.ndarray | None = None,
-) -> CurveTest:
+) -> Curve:
     """Specification-curve test by permuting the target within strata.
 
     The permutation is exact under exchangeability within strata (global
@@ -583,13 +583,13 @@ def curve_test(
         ``(1 + #{permuted >= observed}) / (permutations + 1)``.
     """
     qualification.count(permutations, "permutations", minimum=1)
-    median, share = curve_statistics(x, y, grid)
+    median, share = summarize(x, y, grid)
     rng = randomness.component_rng(seed, f"f6.curve.{finding}", 0)
     curves = list(
         map(
             operator.call,
             itertools.repeat(
-                lambda: curve_statistics(
+                lambda: summarize(
                     x, controls.permute_within(y, strata, rng), grid
                 ),
                 permutations,
@@ -598,7 +598,7 @@ def curve_test(
     )
     medians = [curve[0] for curve in curves]
     shares = [curve[1] for curve in curves]
-    return CurveTest(
+    return Curve(
         permutations,
         median,
         share,
@@ -633,7 +633,7 @@ class Stability:
     specs: tuple[SpecEffect, ...]
     skipped: tuple[tuple[str, str], ...]
     attribution: dict[str, dict[str, Any]]
-    curve: CurveTest | None
+    curve: Curve | None
     check: qualification.Check | None
 
     def to_dict(self) -> dict[str, Any]:
@@ -710,7 +710,7 @@ def assess_finding(
     options = {} if clock is None else {"clock": clock}
     ran = multiverse.run_grid(
         grid,
-        lambda spec: estimate_spec(
+        lambda spec: estimate(
             values, codes, spec, seed, name, strata, bootstrap
         ),
         finding=name,

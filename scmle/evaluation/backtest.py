@@ -52,7 +52,7 @@ def seasonal_naive(
     return numpy.column_stack(columns)
 
 
-def per_step_errors(truth: numpy.ndarray, guess: numpy.ndarray) -> list[float]:
+def score(truth: numpy.ndarray, guess: numpy.ndarray) -> list[float]:
     """Mean absolute error at each step ahead.
 
     Args:
@@ -89,13 +89,11 @@ def report(
     """
     truth = forecast.truth_matrix(estimator, features, primary)
     steps = truth.shape[1]
-    model = per_step_errors(
+    model = score(
         truth, numpy.asarray(estimator.predict(features), dtype=float)
     )
-    last = per_step_errors(
-        truth, forecast.last_value(estimator, features, steps)
-    )
-    season = None if seasonal is None else per_step_errors(truth, seasonal)
+    last = score(truth, forecast.last_value(estimator, features, steps))
+    season = None if seasonal is None else score(truth, seasonal)
     return [
         {
             "step": step + 1,

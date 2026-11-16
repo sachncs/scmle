@@ -76,7 +76,7 @@ def column_exclusion_reason(
     return kind.exclusion_reason(series)
 
 
-def summarize_target(
+def summarize(
     target: pandas.Series, task: tasks.Task
 ) -> tuple[dict[str, Any], list[str]]:
     """Summarizes the target distribution and imbalance risk.
@@ -125,7 +125,7 @@ class Profiler:
         """
         self.spec = spec
 
-    def role_columns(self, frame: pandas.DataFrame) -> dict[str, str]:
+    def exclude(self, frame: pandas.DataFrame) -> dict[str, str]:
         """Maps configured non-feature columns to why they are excluded.
 
         Args:
@@ -187,7 +187,7 @@ class Profiler:
                 "positive total"
             )
 
-    def inspect_columns(
+    def inspect(
         self, frame: pandas.DataFrame, roles: dict[str, str]
     ) -> tuple[
         dict[str, dict[str, Any]],
@@ -258,7 +258,7 @@ class Profiler:
         return dict(wanted)
 
     @staticmethod
-    def datetime_nodes(
+    def derive(
         frame: pandas.DataFrame, stamps: tuple[str, ...]
     ) -> list[tasks.FeatureNode]:
         """Builds calendar and trend features for each datetime column.
@@ -374,7 +374,7 @@ class Profiler:
                 )
         return findings
 
-    def describe_associations(
+    def describe(
         self,
         frame: pandas.DataFrame,
         statistics: dict[str, dict[str, Any]],
@@ -457,7 +457,7 @@ class Profiler:
         """Profiles the dataset.
 
         A configured column that is absent from the data raises DataError
-        from `role_columns`.
+        from `exclude`.
 
         Args:
             frame: The rows to profile (the development partition when the
@@ -481,17 +481,15 @@ class Profiler:
                 f"target '{target.name}' has {int(target.isna().sum())} "
                 "missing values"
             )
-        roles = self.role_columns(frame)
-        statistics, dropped, features, quality = self.inspect_columns(
-            frame, roles
-        )
+        roles = self.exclude(frame)
+        statistics, dropped, features, quality = self.inspect(frame, roles)
         usable = features["numeric"] + features["categorical"]
         if not (usable or features["datetime"] or features["text"]):
             raise errors.BlockedError(
                 "no usable feature columns remain after exclusions"
             )
         stamps = tuple(features["datetime"])
-        derived = tuple(self.datetime_nodes(frame, stamps))
+        derived = tuple(self.derive(frame, stamps))
         quality += self.duplicate_findings(frame, usable, task)
         quality += self.balance_findings(target, task)
         gaps = missingness.assess(frame, usable, target, task.is_classification)
@@ -502,14 +500,14 @@ class Profiler:
             for f in gaps
             if f.informative
         ]
-        self.describe_associations(frame, statistics, usable, task)
+        self.describe(frame, statistics, usable, task)
         report = self.leakage_screen(frame, usable, task)
         risks = [] if report is None else list(report.sentences())
         if report is not None and report.warning:
             risks.insert(0, report.warning)
         if report is not None:
             quality += [f"leakage screen: {note}" for note in report.notes]
-        target_summary, target_risks = summarize_target(target, task)
+        target_summary, target_risks = summarize(target, task)
         base_plan = scmle.contracts.data.FeaturePlan(
             numeric=tuple(features["numeric"]),
             categorical=tuple(features["categorical"]),

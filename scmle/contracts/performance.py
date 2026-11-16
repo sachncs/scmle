@@ -368,16 +368,14 @@ class Baseline:
                 ),
             )
 
-        sample_count_violations = self.sample_count_violations(
-            current, expected
-        )
-        if sample_count_violations:
+        tally = self.tally(current, expected)
+        if tally:
             return Comparison(
                 passed=False,
                 baseline_run_count=len(self.reference_runs),
                 current_run_id=current.run_id,
                 relative_regressions={},
-                violations=sample_count_violations,
+                violations=tally,
             )
 
         regressions: dict[str, dict[str, float | None]] = {}
@@ -395,9 +393,7 @@ class Baseline:
             violations=tuple(violations),
         )
 
-    def sample_count_violations(
-        self, current: Run, expected: set[Operation]
-    ) -> tuple[str, ...]:
+    def tally(self, current: Run, expected: set[Operation]) -> tuple[str, ...]:
         """Lists the operations whose sample count differs from the baseline.
 
         Args:

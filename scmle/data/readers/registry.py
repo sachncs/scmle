@@ -159,7 +159,7 @@ class SourceSnapshot:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SchemaCompatibility:
+class Compatibility:
     """Decision describing how one source schema changed from another.
 
     Attributes:
@@ -219,7 +219,7 @@ class SchemaCompatibility:
 
 def diff(
     previous: SourceSnapshot | None, current: SourceSnapshot
-) -> SchemaCompatibility:
+) -> Compatibility:
     """Compares two snapshots without silently accepting breaking changes.
 
     Args:
@@ -233,7 +233,7 @@ def diff(
         names of added, removed and type-changed columns.
     """
     if previous is None:
-        return SchemaCompatibility(None, current.snapshot_id, (), (), ())
+        return Compatibility(None, current.snapshot_id, (), (), ())
     previous_names = set(previous.schema)
     current_names = set(current.schema)
     added = tuple(sorted(current_names - previous_names))
@@ -245,7 +245,7 @@ def diff(
             if previous.schema[name] != current.schema[name]
         )
     )
-    return SchemaCompatibility(
+    return Compatibility(
         previous.snapshot_id,
         current.snapshot_id,
         added,
@@ -313,7 +313,7 @@ class SourceRegistry:
         history = self.snapshots.get(source_id, ())
         return history[-1] if history else None
 
-    def compatibility(self, snapshot: SourceSnapshot) -> SchemaCompatibility:
+    def compatibility(self, snapshot: SourceSnapshot) -> Compatibility:
         """Compares a candidate snapshot with the source's latest snapshot.
 
         Args:
@@ -472,7 +472,7 @@ class SourceRegistryStore:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
             raise
 
-    def register(self, snapshot: SourceSnapshot) -> SchemaCompatibility:
+    def register(self, snapshot: SourceSnapshot) -> Compatibility:
         """Compares, registers, and durably publishes one source snapshot.
 
         Args:

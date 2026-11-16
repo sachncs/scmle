@@ -81,7 +81,7 @@ class Refiner(abc.ABC):
         """
 
 
-class MemoryFilter(Refiner):
+class Memory(Refiner):
     """Rejects models whose estimated training memory exceeds the limit.
 
     The estimate is `rows x features x 8 bytes x memory_factor`, where the
@@ -170,7 +170,7 @@ class GpuFilter(Refiner):
         return capable
 
 
-class BudgetFilter(Refiner):
+class Budget(Refiner):
     """Prefers fast models when the time budget is small."""
 
     def apply(
@@ -222,7 +222,7 @@ class BudgetFilter(Refiner):
         return kept
 
 
-class IncrementalFilter(Refiner):
+class Streaming(Refiner):
     """Keeps only models that can learn from batches when streaming."""
 
     def apply(
@@ -276,7 +276,7 @@ class IncrementalFilter(Refiner):
         return kept
 
 
-class SerializableFilter(Refiner):
+class Persistence(Refiner):
     """Rejects models that cannot be persisted in a bundle."""
 
     def apply(
@@ -311,7 +311,7 @@ class SerializableFilter(Refiner):
         return kept
 
 
-class CategoricalPrioritizer(Refiner):
+class Cardinality(Refiner):
     """Plans for categorical features with many levels.
 
     Native-categorical models are searched first, and regularized target
@@ -387,7 +387,7 @@ class CategoricalPrioritizer(Refiner):
         return baselines + native + rest
 
 
-class ExclusionFilter(Refiner):
+class Exclusion(Refiner):
     """Removes the models and families the specification excludes."""
 
     def apply(
@@ -477,7 +477,7 @@ class MonotonicFilter(Refiner):
         return kept
 
 
-class ApprovalFilter(Refiner):
+class Approval(Refiner):
     """Restricts candidates to a human-approved subset."""
 
     def apply(
@@ -522,7 +522,7 @@ class ApprovalFilter(Refiner):
         return [a for a in candidates if a.name in approved]
 
 
-class HistoryPrioritizer(Refiner):
+class History(Refiner):
     """Searches models that won on similar past datasets first.
 
     Only the order changes; every candidate is still evaluated, and runs on
@@ -584,7 +584,7 @@ class HistoryPrioritizer(Refiner):
         return baselines + preferred + rest
 
 
-class StrategyRecorder(Refiner):
+class Strategy(Refiner):
     """Records which data strategies will be evaluated and which cannot."""
 
     def apply(
@@ -646,7 +646,7 @@ class StrategyRecorder(Refiner):
         return candidates
 
 
-class TuningRecorder(Refiner):
+class Tuning(Refiner):
     """Records whether hyperparameter search will run after screening."""
 
     def apply(
@@ -689,7 +689,7 @@ class TuningRecorder(Refiner):
         return candidates
 
 
-class EnsembleRecorder(Refiner):
+class Ensemble(Refiner):
     """Records whether a stacking ensemble will be assembled."""
 
     def apply(
@@ -738,19 +738,19 @@ def default_rules() -> tuple[Refiner, ...]:
         One instance of each rule, in the order they are applied.
     """
     return (
-        ExclusionFilter(),
+        Exclusion(),
         MonotonicFilter(),
         GpuFilter(),
-        MemoryFilter(),
-        SerializableFilter(),
-        IncrementalFilter(),
-        BudgetFilter(),
-        ApprovalFilter(),
-        CategoricalPrioritizer(),
-        HistoryPrioritizer(),
-        StrategyRecorder(),
-        TuningRecorder(),
-        EnsembleRecorder(),
+        Memory(),
+        Persistence(),
+        Streaming(),
+        Budget(),
+        Approval(),
+        Cardinality(),
+        History(),
+        Strategy(),
+        Tuning(),
+        Ensemble(),
     )
 
 

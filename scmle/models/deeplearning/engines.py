@@ -25,7 +25,7 @@ SINGLE_MEMBER_OUTPUT_DIMS = 2
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class UpdatePlan:
+class Plan:
     """How one training run cuts its epochs into optimizer updates.
 
     Attributes:
@@ -229,7 +229,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
             features = features.toarray()
         return numpy.asarray(features, dtype=numpy.float32)
 
-    def plan_updates(self, training_rows: int) -> UpdatePlan:
+    def apportion(self, training_rows: int) -> Plan:
         """Works out how the epochs are cut into optimizer updates.
 
         Args:
@@ -250,7 +250,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         accumulate = 1 if second_order else self.accumulation_steps
         batches_per_epoch = max(math.ceil(training_rows / batch_rows), 1)
         updates_per_epoch = max(math.ceil(batches_per_epoch / accumulate), 1)
-        return UpdatePlan(
+        return Plan(
             batch_rows=batch_rows,
             second_order=second_order,
             accumulate=accumulate,
@@ -259,7 +259,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
             warmup_steps=updates_per_epoch * self.warmup_epochs,
         )
 
-    def training_arrays(
+    def prepare(
         self, features: Any, target: Any, sample_weight: Any
     ) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
         """Converts the inputs to float32 matrix, encoded target and weights.
@@ -282,9 +282,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
             )
         return matrix, encoded, weights
 
-    def set_learning_rate(
-        self, optimizer: Any, step: int, plan: UpdatePlan
-    ) -> None:
+    def adjust(self, optimizer: Any, step: int, plan: Plan) -> None:
         """Applies the scheduled learning rate to every parameter group.
 
         Args:
@@ -309,7 +307,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         optimizer: Any,
         tensors: dict[str, Any],
         monitor: scmle.models.deeplearning.training.Monitor,
-        plan: UpdatePlan,
+        plan: Plan,
         batches: tuple[Any, int],
     ) -> tuple[float, bool, int]:
         """Runs one pass over the shuffled training rows.
@@ -345,7 +343,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
                 step += 1
                 continue
             if pending == 0:
-                self.set_learning_rate(optimizer, step, plan)
+                self.adjust(optimizer, step, plan)
                 optimizer.zero_grad()
             loss = self.weighted_loss(torch, network, tensors, batch)
             (loss / plan.accumulate).backward()
@@ -393,7 +391,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         """Trains the network.
 
         An unknown optimizer or loss, or a non-positive accumulation count,
-        raises `ConfigError` from `check_options`.
+        raises `ConfigError` from `vet`.
 
         Args:
             features: Numeric matrix.
@@ -410,11 +408,9 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
             raise errors.ConfigError(
                 f"unknown architecture '{self.architecture}'"
             )
-        self.check_options()
+        self.vet()
         torch = importlib.import_module("torch")
-        matrix, encoded, weights = self.training_arrays(
-            features, target, sample_weight
-        )
+        matrix, encoded, weights = self.prepare(features, target, sample_weight)
         order = numpy.random.default_rng(self.random_state).permutation(
             len(matrix)
         )
@@ -427,14 +423,14 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         torch.manual_seed(self.random_state)
         device = self.resolve_device(torch)
         self.input_width_ = matrix.shape[1]
-        network = self.new_network(torch).to(device)
+        network = self.construct(torch).to(device)
         tensors = {
             "x": torch.from_numpy(matrix).to(device),
             "y": torch.from_numpy(encoded).to(device),
             "w": torch.from_numpy(weights.astype(numpy.float32)).to(device),
         }
         optimizer = self.new_optimizer(torch, network)
-        plan = self.plan_updates(len(training))
+        plan = self.apportion(len(training))
         monitor = scmle.models.deeplearning.training.Monitor()
         generator = numpy.random.default_rng(self.random_state + 1)
         best, best_state, stale, step = numpy.inf, None, 0, 0
@@ -481,7 +477,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
     REGRESSOR_LOSSES = ("default", "huber")
     losses: tuple[str, ...] = ("default",)
 
-    def check_options(self) -> None:
+    def vet(self) -> None:
         """Rejects unknown optimizers and losses before any work is done.
 
         Raises:
@@ -565,7 +561,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         )
         return float(loss.detach()), norm
 
-    def new_network(self, torch: Any) -> Any:
+    def construct(self, torch: Any) -> Any:
         """Creates an untrained network of the configured architecture.
 
         Args:
@@ -609,7 +605,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         super().__setstate__(state)
         if weights is not None:
             torch = importlib.import_module("torch")
-            network = self.new_network(torch)
+            network = self.construct(torch)
             network.load_state_dict(
                 {name: torch.from_numpy(w) for name, w in weights.items()}
             )

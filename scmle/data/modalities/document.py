@@ -584,7 +584,7 @@ class Sample:
             object.__setattr__(self, "format", Format(declared_format))
         normalized_provenance = tuple(self.provenance)
         if not normalized_provenance:
-            normalized_provenance = provenance_for_content(self.content)
+            normalized_provenance = segment(self.content)
         object.__setattr__(self, "provenance", normalized_provenance)
         if self.layout is not None and any(
             element.end > len(self.content) for element in self.layout.elements
@@ -654,7 +654,7 @@ class Sample:
 
         Returns:
             A deterministic bounded profile. Tokens are word characters
-            runs; the language comes from `language_heuristic` over the
+            runs; the language comes from `detect` over the
             inspected characters.
 
         Raises:
@@ -671,7 +671,7 @@ class Sample:
             document_id=self.document_id,
             character_count=len(sample),
             token_count=min(len(tokens), max_tokens),
-            language=language_heuristic(sample),
+            language=detect(sample),
             truncated=truncated,
         )
 
@@ -882,10 +882,10 @@ class Dataset:
             if layout.ocr_confidence is not None
         ]
         sensitive_counts, sensitive_document_ids = self.sensitive_summary()
-        quality_findings = self.collect_quality_findings(
+        quality_findings = self.inspect(
             profiles, duplicate_groups, layouts, max_characters, max_tokens
         )
-        risk_findings = self.collect_risk_findings(
+        risk_findings = self.assess(
             duplicate_groups,
             label_counts,
             sensitive_counts,
@@ -950,7 +950,7 @@ class Dataset:
                     sensitive_counts[name] += count
         return sensitive_counts, sensitive_document_ids
 
-    def collect_quality_findings(
+    def inspect(
         self,
         profiles: tuple[Profile, ...],
         duplicate_groups: tuple[tuple[str, ...], ...],
@@ -1069,7 +1069,7 @@ class Dataset:
             )
         return findings
 
-    def collect_risk_findings(
+    def assess(
         self,
         duplicate_groups: tuple[tuple[str, ...], ...],
         label_counts: Mapping[str, int],
@@ -1228,7 +1228,7 @@ class Reader:
         self.pdf_reader = pdf_reader
         self.layout_reader = layout_reader
 
-    def format_for(
+    def sniff(
         self,
         source: str | pathlib.Path,
         document_format: Format | str | None = None,
@@ -1285,7 +1285,7 @@ class Reader:
 
         Returns:
             An immutable decoded document sample. A PDF without a supplied
-            reader raises DocumentDependencyError from `read_pdf`.
+            reader raises DocumentDependencyError from `extract`.
 
         Raises:
             DocumentValidationError: If a path is not an existing file, the
@@ -1305,7 +1305,7 @@ class Reader:
                     "source_not_found",
                     {"source": str(path)},
                 )
-            resolved_format = self.format_for(path, document_format)
+            resolved_format = self.sniff(path, document_format)
             source_size = path.stat().st_size
             if source_size > self.max_bytes:
                 raise DocumentValidationError(
@@ -1326,9 +1326,9 @@ class Reader:
                 "size_limit",
                 {"actual_bytes": len(raw_bytes), "max_bytes": self.max_bytes},
             )
-        resolved_id = document_id or self.default_document_id(raw_bytes, path)
+        resolved_id = document_id or self.fingerprint(raw_bytes, path)
         if resolved_format is Format.PDF:
-            content = self.read_pdf(raw_bytes)
+            content = self.extract(raw_bytes)
         else:
             content = self.decode_utf8(raw_bytes, resolved_id)
         resolved_layout = layout
@@ -1376,7 +1376,7 @@ class Reader:
             ) from error
         return content
 
-    def read_pdf(self, raw_bytes: bytes) -> str:
+    def extract(self, raw_bytes: bytes) -> str:
         """Reads PDF pages through the optional injected parser.
 
         Args:
@@ -1470,9 +1470,7 @@ class Reader:
             )
         return layout
 
-    def default_document_id(
-        self, raw_bytes: bytes, path: pathlib.Path | None
-    ) -> str:
+    def fingerprint(self, raw_bytes: bytes, path: pathlib.Path | None) -> str:
         """Returns a deterministic fallback identity for an unlabelled source.
 
         The identity is stable for the same path name or source bytes.
@@ -1490,7 +1488,7 @@ class Reader:
         return f"document-{hashlib.sha256(raw_bytes).hexdigest()[:16]}"
 
 
-def language_heuristic(content: str) -> str:
+def detect(content: str) -> str:
     """Returns a conservative language code using Unicode script ratios.
 
     Args:
@@ -1513,7 +1511,7 @@ def language_heuristic(content: str) -> str:
     return "unknown"
 
 
-def provenance_for_content(content: str) -> tuple[Span, ...]:
+def segment(content: str) -> tuple[Span, ...]:
     """Builds page and Markdown-heading spans from character offsets.
 
     Args:

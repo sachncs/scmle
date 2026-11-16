@@ -286,7 +286,7 @@ def overall_att(
     return theta, float(numpy.sqrt(variance))
 
 
-def pretrend_p_value(
+def pretest(
     events: Sequence[int],
     coefficients: Sequence[float],
     covariance: numpy.ndarray,
@@ -414,7 +414,7 @@ def estimate(
         y, index, post_cells, weights, members, sizes, never
     )
     z = float(stats.norm.ppf(0.5 + level / 2))
-    pretrend_p = pretrend_p_value(events, coefficients, covariance)
+    pretrend_p = pretest(events, coefficients, covariance)
     max_change = max_pre_event_change(events, coefficients)
     horizon = float(
         numpy.average(

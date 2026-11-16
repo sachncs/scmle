@@ -219,7 +219,7 @@ class Check(abc.ABC):
             The rule's finding.
         """
 
-    def dataset_finding(self, ok: bool, detail: str) -> Finding:
+    def judge(self, ok: bool, detail: str) -> Finding:
         """Builds a finding about the dataset as a whole.
 
         Args:
@@ -239,7 +239,7 @@ class Check(abc.ABC):
             detail=detail,
         )
 
-    def row_finding(self, bad: pandas.Series, detail: str) -> Finding:
+    def pinpoint(self, bad: pandas.Series, detail: str) -> Finding:
         """Builds a finding about the rows where `bad` is true.
 
         Args:
@@ -286,7 +286,7 @@ class SchemaCheck(Check):
             empty; its detail lists up to five mismatches.
         """
         problems = contract.mismatches(frame)
-        return self.dataset_finding(not problems, "; ".join(problems[:5]))
+        return self.judge(not problems, "; ".join(problems[:5]))
 
 
 class FreshnessCheck(Check):
@@ -312,7 +312,7 @@ class FreshnessCheck(Check):
             is `stale`; its detail gives the age and the limit.
         """
         stale = record.freshness == snapshot.STALE
-        return self.dataset_finding(
+        return self.judge(
             not stale,
             f"{record.age_seconds:.0f}s old, limit {record.max_age_seconds}s",
         )
@@ -350,7 +350,7 @@ class MinRowsCheck(Check):
             A dataset-level finding that passes when the frame has at least
             `minimum` rows.
         """
-        return self.dataset_finding(
+        return self.judge(
             len(frame) >= self.minimum,
             f"{len(frame)} rows, need {self.minimum}",
         )
@@ -392,13 +392,11 @@ class NullFractionCheck(Check):
             frame (its fraction counts as 1.0) unless `maximum` is 1 or more.
         """
         if self.column not in frame.columns:
-            return self.dataset_finding(
-                ok=False, detail=f"no column {self.column}"
-            )
+            return self.judge(ok=False, detail=f"no column {self.column}")
         fraction = (
             float(frame[self.column].isna().mean()) if len(frame) else 1.0
         )
-        return self.dataset_finding(
+        return self.judge(
             fraction <= self.maximum,
             f"{self.column}: {fraction:.3f} null, limit {self.maximum}",
         )
@@ -437,10 +435,8 @@ class NoNullsCheck(Check):
             failing dataset-level finding if the column is missing.
         """
         if self.column not in frame.columns:
-            return self.dataset_finding(
-                ok=False, detail=f"no column {self.column}"
-            )
-        return self.row_finding(
+            return self.judge(ok=False, detail=f"no column {self.column}")
+        return self.pinpoint(
             frame[self.column].isna().reset_index(drop=True),
             f"null {self.column}",
         )
@@ -472,11 +468,9 @@ class UniqueKeyCheck(Check):
         """
         keys = list(contract.key_columns)
         if not keys or any(k not in frame.columns for k in keys):
-            return self.dataset_finding(
-                ok=False, detail="no usable key columns"
-            )
+            return self.judge(ok=False, detail="no usable key columns")
         repeated = frame.duplicated(subset=keys, keep="first")
-        return self.row_finding(
+        return self.pinpoint(
             repeated.reset_index(drop=True), f"repeated key {keys}"
         )
 
@@ -528,16 +522,14 @@ class RangeCheck(Check):
             missing.
         """
         if self.column not in frame.columns:
-            return self.dataset_finding(
-                ok=False, detail=f"no column {self.column}"
-            )
+            return self.judge(ok=False, detail=f"no column {self.column}")
         values = pandas.to_numeric(frame[self.column], errors="coerce")
         bad = pandas.Series(data=False, index=values.index)
         if self.minimum is not None:
             bad |= values < self.minimum
         if self.maximum is not None:
             bad |= values > self.maximum
-        return self.row_finding(
+        return self.pinpoint(
             bad.reset_index(drop=True),
             f"{self.column} outside [{self.minimum}, {self.maximum}]",
         )
@@ -583,12 +575,10 @@ class AllowedValuesCheck(Check):
             missing.
         """
         if self.column not in frame.columns:
-            return self.dataset_finding(
-                ok=False, detail=f"no column {self.column}"
-            )
+            return self.judge(ok=False, detail=f"no column {self.column}")
         column = frame[self.column]
         bad = (~column.isin(self.allowed)) & column.notna()
-        return self.row_finding(
+        return self.pinpoint(
             bad.reset_index(drop=True),
             f"{self.column} not in {list(self.allowed)}",
         )
@@ -624,7 +614,7 @@ class QualityGate:
         self.rules = tuple(rules)
         self.store = store
 
-    def marker_key(self, snapshot_id: str) -> str:
+    def locate(self, snapshot_id: str) -> str:
         """Names the object that records a whole-snapshot quarantine.
 
         Args:
@@ -644,7 +634,7 @@ class QualityGate:
             snapshot_id: The snapshot whose marker is removed.
         """
         if self.store is not None:
-            self.store.delete(self.marker_key(snapshot_id))
+            self.store.delete(self.locate(snapshot_id))
 
     def run(
         self,
@@ -674,7 +664,7 @@ class QualityGate:
         stage = Stage(stage)
         applicable = [rule for rule in self.rules if stage in rule.stages]
         if self.store is not None and self.store.exists(
-            self.marker_key(record.snapshot_id)
+            self.locate(record.snapshot_id)
         ):
             report = Assessment(
                 stage.value,
@@ -778,7 +768,7 @@ class QualityGate:
         Does nothing if the gate has no store. The report goes to
         `quality/<snapshot id>-<stage>.json`, any held rows to
         `quarantine/<snapshot id>/rows-<stage>.csv`, and, for a
-        whole-snapshot quarantine, the marker from `marker_key`.
+        whole-snapshot quarantine, the marker from `locate`.
 
         Args:
             report: The gate report.
@@ -800,6 +790,6 @@ class QualityGate:
         if whole_snapshot:
             marker = {"snapshot_id": record.snapshot_id, "stage": report.stage}
             self.store.put(
-                self.marker_key(record.snapshot_id),
+                self.locate(record.snapshot_id),
                 json.dumps(marker, sort_keys=True).encode(),
             )

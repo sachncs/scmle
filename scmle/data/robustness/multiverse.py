@@ -268,7 +268,7 @@ class ResultCache:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GridRun:
+class Sweep:
     """What a run over the grid produced.
 
     Attributes:
@@ -294,7 +294,7 @@ def run_grid(
     cache: ResultCache | None = None,
     budget_seconds: float | None = None,
     clock: Callable[[], float] = time.monotonic,
-) -> GridRun:
+) -> Sweep:
     """Evaluates every specification of the grid.
 
     Args:
@@ -328,4 +328,4 @@ def run_grid(
         results[spec.sha256] = found
         if cache is not None:
             cache.put(finding, spec, seed, found)
-    return GridRun(results, tuple(skipped), hits, clock() - start)
+    return Sweep(results, tuple(skipped), hits, clock() - start)

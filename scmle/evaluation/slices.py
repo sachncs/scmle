@@ -53,7 +53,7 @@ class Slices(diagnostics.Diagnostic):
         for feature, labels in self.assignments(inputs):
             for level in labels.dropna().unique():
                 rows = (labels == level).to_numpy()
-                score = self.slice_score(inputs, rows)
+                score = self.grade(inputs, rows)
                 if score is None:
                     skipped += 1
                     continue
@@ -114,7 +114,7 @@ class Slices(diagnostics.Diagnostic):
                 found.append((column, bands.where(values.notna())))
         return found[:MAX_FEATURES]
 
-    def slice_score(
+    def grade(
         self, inputs: diagnostics.DiagnosticInput, rows: numpy.ndarray
     ) -> float | None:
         """Scores one slice, or None when it cannot be scored reliably.

@@ -114,7 +114,7 @@ PIPELINE_FAILURE = "pipeline_failure"
 NO_CONTROL = "no_negative_control"
 
 
-class EventLog(Protocol):
+class Log(Protocol):
     """The part of the custody log the confirmation writes to."""
 
     def append(
@@ -486,7 +486,7 @@ def statement(spec: scmle.data.ledger.ledger.Test) -> str:
     return f"{spec.name}: evidence against '{spec.null}'"
 
 
-def unverified_claims(
+def disclaim(
     ledger: scmle.data.ledger.ledger.Ledger, why: str
 ) -> tuple[qualification.Claim, ...]:
     """Builds claims for survivors that were not (or could not be) confirmed.
@@ -636,7 +636,7 @@ def check_policy(policy: str) -> None:
         raise errors.ConfigError(f"failure policy must be one of {POLICIES}")
 
 
-def withdrawn_claims(
+def withdraw(
     ledger: scmle.data.ledger.ledger.Ledger, reasons: Mapping[str, str]
 ) -> dict[str, qualification.Claim]:
     """Builds unverified claims for survivors withdrawn before `C` opened.
@@ -709,7 +709,7 @@ def stage_two_record(
     }
 
 
-def run_confirmation(
+def verify(
     ledger: scmle.data.ledger.ledger.Ledger,
     rows: tuple[pandas.DataFrame, pandas.Series],
     rule: budget.Correction,
@@ -802,7 +802,7 @@ def run_confirmation(
         )
     if withdrawn:
         by_id = {c.claim_id: c for c in claims}
-        by_id.update(withdrawn_claims(ledger, withdrawn))
+        by_id.update(withdraw(ledger, withdrawn))
         claims = [by_id[i] for i in survivors.hypothesis_ids]
     return tuple(claims), tuple(checks)
 
@@ -832,7 +832,7 @@ def confirm(
     rule: budget.Correction = budget.Correction.BY,
     policy: str = UNCONFIRMED,
     require_control: bool = True,
-    custody_log: EventLog | None = None,
+    custody_log: Log | None = None,
     encode: Callable[[pandas.Series], Any] = default_encoding,
     withdrawal: Withdrawal | None = None,
     claim_runner: ClaimRunner | None = None,
@@ -898,7 +898,7 @@ def confirm(
     record = (
         None if withdrawal is None else stage_two_record(ledger, withdrawal)
     )
-    blocked = family_block(ledger, require_control)
+    blocked = block(ledger, require_control)
     if blocked is not None and (claim_runner is None or source is None):
         outcome, reason, held = blocked
         return finish(
@@ -918,7 +918,7 @@ def confirm(
             ledger,
             outcome=NO_CONFIRMATION_SET,
             reason="no confirmation set exists for this run",
-            claims=unverified_claims(ledger, "no confirmation set"),
+            claims=disclaim(ledger, "no confirmation set"),
             checks=(),
             rule=rule,
             alpha=alpha_confirm,
@@ -930,7 +930,7 @@ def confirm(
         blocked = (
             ALL_WITHDRAWN,
             "every survivor was withdrawn before C; C was not opened",
-            tuple(withdrawn_claims(ledger, record["withdrawn"]).values()),
+            tuple(withdraw(ledger, record["withdrawn"]).values()),
         )
         if claim_runner is None:
             return finish(
@@ -949,7 +949,7 @@ def confirm(
     claims_hash = log_selection(
         log, ledger, survivors, rule, record, registered
     )
-    return open_and_test(
+    return unseal(
         ledger,
         source,
         log,
@@ -1023,7 +1023,7 @@ def log_selection(
     return str(claims_hash)
 
 
-def open_and_test(
+def unseal(
     ledger: scmle.data.ledger.ledger.Ledger,
     source: ConfirmationSource,
     log: Any,
@@ -1075,8 +1075,8 @@ def open_and_test(
         return finish(
             ledger,
             outcome=PIPELINE_FAILURE,
-            reason=failure_reason("opening C", failure),
-            claims=unverified_claims(ledger, "confirmation crashed"),
+            reason=phrase("opening C", failure),
+            claims=disclaim(ledger, "confirmation crashed"),
             checks=(),
             rule=rule,
             alpha=alpha_confirm,
@@ -1091,7 +1091,7 @@ def open_and_test(
         except Exception as failure:  # noqa: BLE001 -- a crashing claim runner marks its claims failed and is logged, not raised
             # handled: claim runner crash logged to custody log; claims marked
             # FAILED
-            failed = failure_reason("evaluating the registered claims", failure)
+            failed = phrase("evaluating the registered claims", failure)
             log.append("C", "claims_failed", ACTOR, {"reason": failed})
             ran = ClaimRun(
                 {i.claim_id: FAILED for i in claim_runner.registered}, {}
@@ -1112,7 +1112,7 @@ def open_and_test(
             ran=ran,
         )
     try:
-        claims, checks = run_confirmation(
+        claims, checks = verify(
             ledger, rows, rule, alpha_confirm, encode, record
         )
     except Exception as failure:  # noqa: BLE001 -- a failed test on C is recorded as a pipeline-failure outcome, not raised
@@ -1121,8 +1121,8 @@ def open_and_test(
         return finish(
             ledger,
             outcome=PIPELINE_FAILURE,
-            reason=failure_reason("testing on C", failure),
-            claims=unverified_claims(ledger, "confirmation crashed"),
+            reason=phrase("testing on C", failure),
+            claims=disclaim(ledger, "confirmation crashed"),
             checks=(),
             rule=rule,
             alpha=alpha_confirm,
@@ -1151,7 +1151,7 @@ def open_and_test(
     )
 
 
-def family_block(
+def block(
     ledger: scmle.data.ledger.ledger.Ledger,
     require_control: bool,
 ) -> tuple[str, str, tuple[qualification.Claim, ...]] | None:
@@ -1180,20 +1180,20 @@ def family_block(
         return (
             NO_CONTROL,
             "no negative control was recorded; no claim is promoted",
-            unverified_claims(ledger, "no negative control"),
+            disclaim(ledger, "no negative control"),
         )
     if control is not None and not control["exceeds"]:
         return (
             FLOOR_NOT_EXCEEDED,
             str(control["message"]) + "; no claim is promoted",
-            unverified_claims(
+            disclaim(
                 ledger, "findings do not exceed the false-discovery floor"
             ),
         )
     return None
 
 
-def failure_reason(stage: str, failure: Exception) -> str:
+def phrase(stage: str, failure: Exception) -> str:
     """Phrases why the confirmation crashed, under the 'unconfirmed' policy.
 
     Args:

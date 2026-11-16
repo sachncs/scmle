@@ -52,7 +52,7 @@ TEXT_CODES = (
 
 
 @dataclasses.dataclass(frozen=True)
-class SentinelFinding:
+class Suspect:
     """One suspected sentinel value in one column.
 
     Attributes:
@@ -84,7 +84,7 @@ class Sentinels:
         tier: Always `unverified`: no provenance confirms a code.
     """
 
-    findings: tuple[SentinelFinding, ...]
+    findings: tuple[Suspect, ...]
     rows: int
     tier: str = "unverified"
 
@@ -139,9 +139,9 @@ def expected_share(
     return min(1.0, inside / len(others) * spacing / width)
 
 
-def numeric_spikes(
+def spot(
     column: str, series: pandas.Series, min_count: int = MIN_COUNT
-) -> list[SentinelFinding]:
+) -> list[Suspect]:
     """Finds candidate spikes of one numeric column.
 
     Args:
@@ -176,7 +176,7 @@ def numeric_spikes(
             stats.binomtest(int(count), len(values), share, "greater").pvalue
         )
         found.append(
-            SentinelFinding(
+            Suspect(
                 column,
                 float(value),
                 int(count),
@@ -188,9 +188,9 @@ def numeric_spikes(
     return found
 
 
-def text_findings(
+def scour(
     column: str, series: pandas.Series, codes: Sequence[str]
-) -> list[SentinelFinding]:
+) -> list[Suspect]:
     """Finds dictionary matches in a text column.
 
     Args:
@@ -211,9 +211,7 @@ def text_findings(
         if hits:
             original = str(present[cleaned == token].iloc[0])
             out.append(
-                SentinelFinding(
-                    column, original, hits, None, None, "dictionary"
-                )
+                Suspect(column, original, hits, None, None, "dictionary")
             )
     return out
 
@@ -243,21 +241,21 @@ def find_sentinels(
     if not 0.0 < alpha < 1.0:
         raise errors.InputError("alpha must be within (0, 1)")
     names = list(frame.columns) if columns is None else list(columns)
-    candidates: list[SentinelFinding] = []
+    candidates: list[Suspect] = []
     declared = [float(c) for c in numeric_codes]
-    findings: list[SentinelFinding] = []
+    findings: list[Suspect] = []
     for name in names:
         series = frame[name]
         if pandas.api.types.is_bool_dtype(series):
             continue
         if pandas.api.types.is_numeric_dtype(series):
-            candidates += numeric_spikes(str(name), series)
+            candidates += spot(str(name), series)
             numbers = series.to_numpy(dtype=float)
             for code in declared:
                 hits = int((numbers == code).sum())
                 if hits:
                     findings.append(
-                        SentinelFinding(
+                        Suspect(
                             str(name),
                             code,
                             hits,
@@ -267,7 +265,7 @@ def find_sentinels(
                         )
                     )
         elif pandas.api.types.is_string_dtype(series) or series.dtype == object:
-            findings += text_findings(str(name), series, text_codes)
+            findings += scour(str(name), series, text_codes)
     threshold = alpha / max(len(candidates), 1)
     seen = {(f.column, f.value) for f in findings}
     for finding in candidates:

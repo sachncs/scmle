@@ -185,7 +185,7 @@ class WeightedClassifier(base.ClassifierMixin, WeightedEstimator):  # type: igno
         return probabilities
 
 
-class WeightedRegressor(base.RegressorMixin, WeightedEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Regressor(base.RegressorMixin, WeightedEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Weighted fitting for regressors."""
 
 
@@ -204,9 +204,5 @@ def weighted(
         A weighted classifier if `estimator` is a classifier, otherwise a
         weighted regressor.
     """
-    kind = (
-        WeightedClassifier
-        if base.is_classifier(estimator)
-        else WeightedRegressor
-    )
+    kind = WeightedClassifier if base.is_classifier(estimator) else Regressor
     return kind(estimator, column, seed)

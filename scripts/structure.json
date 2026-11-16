@@ -1,12 +1,12 @@
 {
-  "modules_over": 55,
-  "classes_over": 56,
+  "modules_over": 54,
+  "classes_over": 55,
   "functions_over": 187,
-  "compound_functions": 2812,
-  "compound_classes": 730,
+  "compound_functions": 2405,
+  "compound_classes": 574,
   "private_names": 0,
   "loose_dicts": 1156,
-  "largest_module": 6374,
+  "largest_module": 6352,
   "bare_raises": 26,
   "value_catches": 170
 }

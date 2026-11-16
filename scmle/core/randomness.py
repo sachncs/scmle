@@ -18,7 +18,7 @@ NAME_WORDS = 4
 UINT32_BYTES = 4
 
 
-def validate_key(run_seed: int, component: str, index: int) -> str:
+def vet(run_seed: int, component: str, index: int) -> str:
     """Checks a stream key and returns the trimmed component name.
 
     Args:
@@ -73,7 +73,7 @@ def component_seed_sequence(
     Returns:
         A sequence that depends only on the three arguments.
     """
-    name = validate_key(run_seed, component, index)
+    name = vet(run_seed, component, index)
     return numpy.random.SeedSequence(
         entropy=run_seed, spawn_key=(*name_words(name), index)
     )
@@ -129,4 +129,4 @@ def seed_path(
         The triple (run seed, trimmed component name, index) that identifies
         the random stream.
     """
-    return (run_seed, validate_key(run_seed, component, index), index)
+    return (run_seed, vet(run_seed, component, index), index)

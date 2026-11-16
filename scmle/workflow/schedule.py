@@ -92,7 +92,7 @@ class Scheduler:
         self.store = store
         self.key = f"workflows/{workflow.name}/schedule/state.json"
 
-    def last_slot(self) -> float | None:
+    def load(self) -> float | None:
         """Reads the newest slot already dealt with.
 
         Returns:
@@ -132,7 +132,7 @@ class Scheduler:
         newest = schedule.start_epoch + schedule.interval_seconds * int(
             (now - schedule.start_epoch) // schedule.interval_seconds
         )
-        last = self.last_slot()
+        last = self.load()
         if last is None:
             return [newest]
         count = round((newest - last) / schedule.interval_seconds)

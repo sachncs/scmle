@@ -192,7 +192,7 @@ class IngestStage(Stage):
         return "ingest dataset"
 
     @staticmethod
-    def must_stream(data: tasks.Dataset) -> bool:
+    def overflows(data: tasks.Dataset) -> bool:
         """Returns whether the file is bigger than the memory budget.
 
         Args:
@@ -250,8 +250,8 @@ class IngestStage(Stage):
         values are treated as missing and noted. The source snapshot and the
         dataset manifest are written. A schema change that is incompatible
         with the stored snapshot, or checkpoints computed on different data,
-        raise `ConfigError` (through `persist_source_snapshot` and
-        `refuse_stale_resume`).
+        raise `ConfigError` (through `enrol` and
+        `forbid`).
 
         Args:
             context: The run context; receives the frame, manifest and cleaning
@@ -277,7 +277,7 @@ class IngestStage(Stage):
         started = time.monotonic()
         if context.input_frame is not None:
             frame = context.input_frame.copy(deep=False)
-        elif self.must_stream(data):
+        elif self.overflows(data):
             frame = self.read_stream(context, data)
         else:
             frame = tabular.read_table(data.uri)
@@ -287,7 +287,7 @@ class IngestStage(Stage):
         context.manifest = tabular.build_manifest(
             frame, data.target, data.uri, data.modality
         )
-        self.persist_source_snapshot(context, frame)
+        self.enrol(context, frame)
         frame, infinite = tabular.replace_infinities(frame)
         context.cleaning_notes = [
             f"column '{name}': {count} infinite value(s) treated as missing"
@@ -315,14 +315,14 @@ class IngestStage(Stage):
                 },
             )
         context.frame = frame
-        self.refuse_stale_resume(context)
+        self.forbid(context)
         context.write_json("dataset_manifest.json", context.manifest.to_dict())
         context.track(
             dataset_id=context.manifest.dataset_id,
             data_hash=context.manifest.data_hash,
         )
 
-    def persist_source_snapshot(
+    def enrol(
         self, context: scmle.core.context.Context, frame: pandas.DataFrame
     ) -> None:
         """Records the source identity and refuses incompatible schema changes.
@@ -379,7 +379,7 @@ class IngestStage(Stage):
             },
         )
 
-    def refuse_stale_resume(self, context: scmle.core.context.Context) -> None:
+    def forbid(self, context: scmle.core.context.Context) -> None:
         """Rejects resuming trials computed on different data.
 
         Args:
@@ -409,7 +409,7 @@ class IngestStage(Stage):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PendingLedger:
+class Escrow:
     """A charter run's exploration, finished, with `C` still sealed.
 
     Attributes:
@@ -536,15 +536,13 @@ class ProfileStage(Stage):
         """
         spec = context.spec
         frame = scmle.core.context.require(context.frame, "frame")
-        frame, task = self.resolve_task(context, frame)
-        self.check_role_columns(spec, frame)
+        frame, task = self.infer(context, frame)
+        self.vet(spec, frame)
         frame = self.synthesize_features(context, frame)
-        split = self.make_split(context, task, frame)
+        split = self.divide(context, task, frame)
         spec = context.spec  # reweighing may have set the weight column
-        profile, development = self.profile_development(
-            context, spec, task, frame, split
-        )
-        self.record_curation(context, frame, development, profile)
+        profile, development = self.survey(context, spec, task, frame, split)
+        self.curate(context, frame, development, profile)
         context.emit(
             "features.selected",
             "feature set and exclusions fixed from the profile",
@@ -561,7 +559,7 @@ class ProfileStage(Stage):
         self.enforce_leakage_policy(spec, profile)
         self.run_claim_ledger(context, task)
 
-    def resolve_task(
+    def infer(
         self, context: scmle.core.context.Context, frame: pandas.DataFrame
     ) -> tuple[pandas.DataFrame, tasks.Task]:
         """Resolves the task and validates the target columns it needs.
@@ -643,9 +641,7 @@ class ProfileStage(Stage):
             )
         return frame, task
 
-    def check_role_columns(
-        self, spec: tasks.Config, frame: pandas.DataFrame
-    ) -> None:
+    def vet(self, spec: tasks.Config, frame: pandas.DataFrame) -> None:
         """Checks that the declared group, time and weight columns exist.
 
         Args:
@@ -667,7 +663,7 @@ class ProfileStage(Stage):
                     f"columns: {list(frame.columns)[:20]}"
                 )
 
-    def profile_development(
+    def survey(
         self,
         context: scmle.core.context.Context,
         spec: tasks.Config,
@@ -699,7 +695,7 @@ class ProfileStage(Stage):
             context.read_seconds,
             total_rows=len(frame),
         )
-        profile = attach_feature_graph(spec, profile)
+        profile = graft(spec, profile)
         if context.cleaning_notes:
             profile = dataclasses.replace(
                 profile,
@@ -723,7 +719,7 @@ class ProfileStage(Stage):
             )
         return profile, development
 
-    def record_curation(
+    def curate(
         self,
         context: scmle.core.context.Context,
         frame: pandas.DataFrame,
@@ -899,7 +895,7 @@ class ProfileStage(Stage):
             [frame.reset_index(drop=True), result.features], axis=1
         )
         if block.entity is not None:
-            merged = self.assign_entity_groups(context, block.entity, merged)
+            merged = self.regroup(context, block.entity, merged)
         context.frame = merged
         context.ingest = result
         for name, document in result.documents.items():
@@ -912,7 +908,7 @@ class ProfileStage(Stage):
         )
         return merged
 
-    def assign_entity_groups(
+    def regroup(
         self,
         context: scmle.core.context.Context,
         entity: ingest.Entity,
@@ -1008,9 +1004,7 @@ class ProfileStage(Stage):
         )
         rules = charter.rules
         stage = prefilter.StabilityStage(
-            lambda columns: self.run_robustness(
-                context, task, charter, view, columns
-            ),
+            lambda columns: self.stress(context, task, charter, view, columns),
             requested=bool(rules and rules.stability_filter),
             rows=len(view.features),
             seed=charter.seed,
@@ -1019,7 +1013,7 @@ class ProfileStage(Stage):
         baseline = self.baseline_runner(
             context, task, charter, view, structure, signed=verified.signed
         )
-        causal = self.causal_runner(context, charter, view, graph, found)
+        causal = self.hypothesise(context, charter, view, graph, found)
         explored = governed.explore_governed(
             charter=charter,
             features=view.features,
@@ -1045,7 +1039,7 @@ class ProfileStage(Stage):
             diagnostics=found.checks,
             second_stage=stage,
         )
-        pending = PendingLedger(
+        pending = Escrow(
             explored,
             task,
             charter,
@@ -1076,12 +1070,12 @@ class ProfileStage(Stage):
                 ),
             )
             return
-        self.complete_claim_ledger(context, pending)
+        self.conclude(context, pending)
 
-    def complete_claim_ledger(
+    def conclude(
         self,
         context: scmle.core.context.Context,
-        pending: "PendingLedger",
+        pending: "Escrow",
         subject: scmle.data.framing.claim.Rule | None = None,
         extra: confirm.ClaimRunner | None = None,
     ) -> None:
@@ -1133,8 +1127,8 @@ class ProfileStage(Stage):
             ),
             claim_runner=runner,
         )
-        self.write_registered_claims(context, run, runner)
-        self.check_ingest_family(context, run, pending.found)
+        self.publish(context, run, runner)
+        self.audit(context, run, pending.found)
         context.emit(
             "ledger.completed",
             run.confirmation.reason,
@@ -1149,10 +1143,8 @@ class ProfileStage(Stage):
             },
         )
         self.assess_robustness(context, pending.stage)
-        self.assess_framing(context, charter, view)
-        self.assess_identification(
-            context, charter, view, run, pending.graph, pending.found
-        )
+        self.ground(context, charter, view)
+        self.identify(context, charter, view, run, pending.graph, pending.found)
 
     def baseline_runner(
         self,
@@ -1258,7 +1250,7 @@ class ProfileStage(Stage):
             seed=charter.seed,
         )
 
-    def check_ingest_family(
+    def audit(
         self,
         context: scmle.core.context.Context,
         run: governed.GovernedRun,
@@ -1293,7 +1285,7 @@ class ProfileStage(Stage):
             set(found.quarantined) | skipped,
         )
 
-    def write_registered_claims(
+    def publish(
         self,
         context: scmle.core.context.Context,
         run: governed.GovernedRun,
@@ -1338,7 +1330,7 @@ class ProfileStage(Stage):
             {"status": status},
         )
 
-    def run_robustness(
+    def stress(
         self,
         context: scmle.core.context.Context,
         task: tasks.Task,
@@ -1455,7 +1447,7 @@ class ProfileStage(Stage):
             },
         )
 
-    def assess_framing(
+    def ground(
         self,
         context: scmle.core.context.Context,
         charter: contracts.AnalysisCharter,
@@ -1485,7 +1477,7 @@ class ProfileStage(Stage):
             {k: v["status"] for k, v in document["fields"].items()},
         )
 
-    def causal_runner(
+    def hypothesise(
         self,
         context: scmle.core.context.Context,
         charter: contracts.AnalysisCharter,
@@ -1529,7 +1521,7 @@ class ProfileStage(Stage):
             charter_hash=charter.charter_hash,
         )
 
-    def assess_identification(
+    def identify(
         self,
         context: scmle.core.context.Context,
         charter: contracts.AnalysisCharter,
@@ -1824,7 +1816,7 @@ class ProfileStage(Stage):
         locked.target = locked.target.iloc[0:0]
         return sealed
 
-    def apply_reweighing(
+    def reweigh(
         self,
         context: scmle.core.context.Context,
         task: tasks.Task,
@@ -1874,7 +1866,7 @@ class ProfileStage(Stage):
             f"(weights from {weights.min():.2f} to {weights.max():.2f})",
         )
 
-    def apply_charter_custody(
+    def impound(
         self,
         context: scmle.core.context.Context,
         task: tasks.Task,
@@ -2022,7 +2014,7 @@ class ProfileStage(Stage):
             data={"entity_column": data.group_column},
         )
 
-    def make_split(
+    def divide(
         self,
         context: scmle.core.context.Context,
         task: tasks.Task,
@@ -2058,8 +2050,8 @@ class ProfileStage(Stage):
             )
         chartered = bool(context.spec.charter_path)
         if chartered:
-            split = self.apply_charter_custody(context, task, frame, split)
-        self.apply_reweighing(context, task, split)
+            split = self.impound(context, task, frame, split)
+        self.reweigh(context, task, split)
         isolation = "in-process protocol"
         # A charter requests custody regardless of the resource-enforcement
         # mode: sealing the rows must not depend on trial supervision.
@@ -2119,7 +2111,7 @@ def chartered_rule(
     return chartered
 
 
-def attach_feature_graph(
+def graft(
     spec: tasks.Config, profile: scmle.contracts.data.DatasetProfile
 ) -> scmle.contracts.data.DatasetProfile:
     """Adds the feature graph to the profile's feature plan.
@@ -2585,19 +2577,19 @@ class SelectStage(Stage):
         data = context.spec.data
         subject = None
         if data.baseline_column and data.baseline_subject == "selected_model":
-            subject = self.selected_rule(context, pending, selected, split)
+            subject = self.codify(context, pending, selected, split)
         if pending.holds_for_coverage:
             context.pending_ledger = dataclasses.replace(
                 pending, subject=subject
             )
             return
         context.pending_ledger = None
-        ProfileStage().complete_claim_ledger(context, pending, subject)
+        ProfileStage().conclude(context, pending, subject)
 
-    def selected_rule(
+    def codify(
         self,
         context: scmle.core.context.Context,
-        pending: "PendingLedger",
+        pending: "Escrow",
         selected: experiments.Trial,
         split: Any,
     ) -> scmle.data.framing.claim.Selection:
@@ -2867,7 +2859,7 @@ def chartered_decision_model(
     return charter
 
 
-def chartered_threshold(
+def freeze(
     fitted: Any,
     probabilities: numpy.ndarray,
     actual: numpy.ndarray,
@@ -2926,7 +2918,7 @@ def chartered_threshold(
     return thresholds.Classifier.around_fitted(fitted, cut), (description)
 
 
-def chartered_net_benefit(
+def appraise(
     context: scmle.core.context.Context,
     pipeline: Any,
     features: pandas.DataFrame,
@@ -3060,7 +3052,7 @@ def choose_decision_threshold(
     positive = fitted.classes_[1]
     actual = (split.dev_target.iloc[positions] == positive).to_numpy()
     if chartered is not None:
-        return chartered_threshold(
+        return freeze(
             fitted, probabilities, actual, chartered, seed, len(positions)
         )
     kind = thresholds.OBJECTIVES[decision.threshold_objective]
@@ -3102,7 +3094,7 @@ class FinalEvaluationStage(Stage):
         return f"final one-time test evaluation of {selected.model_name}"
 
     @staticmethod
-    def diagnostic_seconds(context: scmle.core.context.Context) -> float:
+    def ration(context: scmle.core.context.Context) -> float:
         """Returns the time the post-selection diagnostics may use in total.
 
         A share (`DIAGNOSTIC_BUDGET_SHARE`) of the time budget, never less than
@@ -3119,7 +3111,7 @@ class FinalEvaluationStage(Stage):
         budget = context.spec.resources.time_budget_seconds
         return max(DIAGNOSTIC_MIN_SECONDS, DIAGNOSTIC_BUDGET_SHARE * budget)
 
-    def selected_health(
+    def diagnose(
         self,
         context: scmle.core.context.Context,
         selected: experiments.Trial,
@@ -3144,7 +3136,7 @@ class FinalEvaluationStage(Stage):
         )
         return None if health is None else health.to_dict()
 
-    def mitigate_fairness(
+    def mitigate(
         self,
         context: scmle.core.context.Context,
         selected: experiments.Trial,
@@ -3228,7 +3220,7 @@ class FinalEvaluationStage(Stage):
             pipeline, column, assigner, result.thresholds, base_cut
         )
 
-    def stream_refit(
+    def relearn(
         self,
         context: scmle.core.context.Context,
         pipeline: Any,
@@ -3276,7 +3268,7 @@ class FinalEvaluationStage(Stage):
         )
         return pipeline
 
-    def streamed_locked_metrics(
+    def tally(
         self,
         context: scmle.core.context.Context,
         pipeline: Any,
@@ -3378,7 +3370,7 @@ class FinalEvaluationStage(Stage):
             },
         }
 
-    def mitigation_on_locked_rows(
+    def corroborate(
         self,
         context: scmle.core.context.Context,
         before: Any,
@@ -3424,7 +3416,7 @@ class FinalEvaluationStage(Stage):
             "rows": len(features),
         }
 
-    def self_train(
+    def pseudolabel(
         self,
         context: scmle.core.context.Context,
         selected: experiments.Trial,
@@ -3494,9 +3486,7 @@ class FinalEvaluationStage(Stage):
         record["pseudo_rows"] = count
         return augmented
 
-    def register_coverage_claim(
-        self, context: scmle.core.context.Context
-    ) -> None:
+    def pledge(self, context: scmle.core.context.Context) -> None:
         """Fixes and hashes the coverage claim before the final rows open.
 
         Written to `coverage_claim.json`, announced by a `coverage.registered`
@@ -3691,12 +3681,12 @@ class FinalEvaluationStage(Stage):
                 selected.params,
             )
             pipeline.fit(split.dev_features, split.dev_target)
-        pipeline = self.self_train(context, selected, pipeline)
-        pipeline = self.stream_refit(context, pipeline)
+        pipeline = self.pseudolabel(context, selected, pipeline)
+        pipeline = self.relearn(context, pipeline)
         pipeline, decision = choose_decision_threshold(context, pipeline)
         unmitigated = pipeline
-        pipeline = self.mitigate_fairness(context, selected, pipeline, decision)
-        self.register_coverage_claim(context)
+        pipeline = self.mitigate(context, selected, pipeline, decision)
+        self.pledge(context)
         locked = split.locked_test
         binding = pin(selected, decision)
         locked.bind(binding)
@@ -3709,7 +3699,7 @@ class FinalEvaluationStage(Stage):
             # neutral weight so the pipeline finds the column it expects.
             test_features = test_features.assign(**{tasks.FAIRNESS_WEIGHT: 1.0})
         context.test_rows = (test_features, test_target)
-        self.mitigation_on_locked_rows(
+        self.corroborate(
             context, unmitigated, pipeline, test_features, test_target
         )
         context.emit(
@@ -3781,11 +3771,11 @@ class FinalEvaluationStage(Stage):
                 sensitive_columns=tuple(context.spec.data.sensitive_columns),
             ),
             suite.full_suite(),
-            self.diagnostic_seconds(context),
+            self.ration(context),
         )
         for name, report_body in context.diagnostics.items():
             context.write_json(f"diagnostics/{name}.json", report_body)
-        net_benefit = chartered_net_benefit(
+        net_benefit = appraise(
             context, pipeline, test_features, test_target, decision
         )
         self.write_decision_reports(
@@ -3803,7 +3793,7 @@ class FinalEvaluationStage(Stage):
             "selected_strategy": selected.strategy,
             "selected_cv_score": selected.score_mean,
             "selected_cv_std": selected.score_std,
-            "fit_health": self.selected_health(context, selected),
+            "fit_health": self.diagnose(context, selected),
             "cv_confidence": confidence.cv_interval(
                 selected.fold_scores,
                 float(
@@ -3841,7 +3831,7 @@ class FinalEvaluationStage(Stage):
                     context.catalog,
                 )
             ],
-            "streamed_locked": self.streamed_locked_metrics(context, pipeline),
+            "streamed_locked": self.tally(context, pipeline),
             "uplift": self.uplift_report(
                 context, pipeline, test_features, test_target
             ),
@@ -4140,7 +4130,7 @@ class PackageStage(Stage):
             )
         return evidence
 
-    def provenance_record(
+    def notarise(
         self,
         context: scmle.core.context.Context,
         store: Any,
@@ -4204,7 +4194,7 @@ class PackageStage(Stage):
         store.write_json("provenance.json", record)
         return record
 
-    def sbom_record(
+    def inventory(
         self,
         store: Any,
         bundle: scmle.artifacts.bundle.Bundle,
@@ -4326,7 +4316,7 @@ class PackageStage(Stage):
             data={"reason": reason},
         )
 
-    def conformal_calibration(
+    def conformalise(
         self,
         context: scmle.core.context.Context,
         selected: experiments.Trial,
@@ -4431,7 +4421,7 @@ class PackageStage(Stage):
             )
             return None
         if task is tasks.Task.REGRESSION:
-            self.keep_cv_plus(
+            self.retain(
                 context,
                 bundle,
                 fold_models,
@@ -4469,7 +4459,7 @@ class PackageStage(Stage):
             return None
         return context.spec.data.group_column
 
-    def keep_cv_plus(
+    def retain(
         self,
         context: scmle.core.context.Context,
         bundle: scmle.artifacts.bundle.Bundle,
@@ -4517,7 +4507,7 @@ class PackageStage(Stage):
             tuple(models), plan.folds, numpy.abs(observed - predicted)
         )
 
-    def complete_held_ledger(
+    def settle(
         self,
         context: scmle.core.context.Context,
         bundle: scmle.artifacts.bundle.Bundle,
@@ -4554,9 +4544,7 @@ class PackageStage(Stage):
                     "no interval or set to test on C"
                 ),
             )
-        ProfileStage().complete_claim_ledger(
-            context, pending, pending.subject, runner
-        )
+        ProfileStage().conclude(context, pending, pending.subject, runner)
 
     def cv_plus_cap(self, context: scmle.core.context.Context) -> int:
         """Returns the byte cap for kept fold models (charter's, else default).
@@ -4575,7 +4563,7 @@ class PackageStage(Stage):
                 return block.cv_plus_max_bytes
         return cv_plus.MAX_BYTES
 
-    def quantile_intervals(
+    def bracket(
         self, context: scmle.core.context.Context
     ) -> quantile.QuantileIntervals | None:
         """Fits and calibrates the low and high quantile models (regression).
@@ -4866,7 +4854,7 @@ class PackageStage(Stage):
             "seasonal_period": data.seasonal_period,
         }
 
-    def build_evidence_graph(
+    def trace(
         self,
         context: scmle.core.context.Context,
         store: Any,
@@ -5068,9 +5056,9 @@ class PackageStage(Stage):
         evaluation["nested_cv"] = self.nested_validation(context, selected)
         evaluation["bias_variance"] = self.bias_variance(context, selected)
         evaluation["sensitivity"] = self.sensitivity(context, selected)
-        bundle.conformal = self.conformal_calibration(context, selected, bundle)
-        bundle.quantile = self.quantile_intervals(context)
-        self.complete_held_ledger(context, bundle)
+        bundle.conformal = self.conformalise(context, selected, bundle)
+        bundle.quantile = self.bracket(context)
+        self.settle(context, bundle)
         if (
             scmle.core.context.require(context.task, "task")
             is tasks.Task.FORECAST
@@ -5082,7 +5070,7 @@ class PackageStage(Stage):
                 "diagnostics/forecast_backtest.json",
                 evaluation["forecast_backtest"],
             )
-        self.measure_coverage(context, bundle, evaluation)
+        self.gauge(context, bundle, evaluation)
         bundle.novelty = novelty.NoveltyDetector.fit(
             split.dev_features,
             bundle.schema.numeric,
@@ -5104,10 +5092,8 @@ class PackageStage(Stage):
         evaluation["reliability_plan"] = self.reliability_plan_record(
             context, store
         )
-        evaluation["sbom"] = self.sbom_record(store, bundle)
-        evaluation["provenance"] = self.provenance_record(
-            context, store, bundle
-        )
+        evaluation["sbom"] = self.inventory(store, bundle)
+        evaluation["provenance"] = self.notarise(context, store, bundle)
         release_attestation = attestation.ReleaseAttestation.from_records(
             evaluation["provenance"],
             evaluation["sbom"],
@@ -5150,7 +5136,7 @@ class PackageStage(Stage):
         )
         self.release_evaluation(context, store, evaluation)
         store.write_json("evaluation.json", evaluation)
-        evidence_graph = self.build_evidence_graph(context, store)
+        evidence_graph = self.trace(context, store)
         graph_record = evidence_graph.to_dict()
         graph_record["graph_digest"] = evidence_graph.digest()
         store.write_json("evidence_graph.json", graph_record)
@@ -5175,7 +5161,7 @@ class PackageStage(Stage):
         )
         context.bundle, context.result = bundle, result
 
-    def measure_coverage(
+    def gauge(
         self,
         context: scmle.core.context.Context,
         bundle: scmle.artifacts.bundle.Bundle,

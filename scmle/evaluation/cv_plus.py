@@ -65,7 +65,7 @@ FOLD_MODELS = "cv_plus"
 
 
 @dataclasses.dataclass(frozen=True)
-class ScorePlan:
+class Plan:
     """How the calibration scores of a regression bundle are served.
 
     Attributes:
@@ -88,7 +88,7 @@ def plan_scores(
     observed: int,
     models: Sequence[Any],
     max_bytes: int = MAX_BYTES,
-) -> ScorePlan:
+) -> Plan:
     """Chooses between the pooled out-of-fold scores and the CV+ models.
 
     The pooled out-of-fold margin is always available. With `MIN_ROWS_FOR_SPLIT`
@@ -123,8 +123,8 @@ def plan_scores(
     elif serialized_size(models) > max_bytes:
         reason = f"fold models exceed {max_bytes} bytes"
     if reason is not None or folds is None:
-        return ScorePlan(POOLED, None, reason)
-    return ScorePlan(FOLD_MODELS, folds, None)
+        return Plan(POOLED, None, reason)
+    return Plan(FOLD_MODELS, folds, None)
 
 
 def serialized_size(models: Sequence[Any]) -> int:

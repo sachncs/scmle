@@ -282,7 +282,7 @@ class Split:
     locked_test: LockedTestSet
 
 
-def to_ids(values: numpy.ndarray) -> tuple[int, ...]:
+def tuplify(values: numpy.ndarray) -> tuple[int, ...]:
     """Converts an index array to a tuple of Python ints.
 
     Args:
@@ -391,7 +391,7 @@ class RandomSplit(Partitioner):
         )
         return list(splitter.split(numpy.arange(len(dev_ids))))
 
-    def require_rows_per_class(self, rows: int, labels: pandas.Series) -> None:
+    def require(self, rows: int, labels: pandas.Series) -> None:
         """Stops with advice when the held-out part cannot hold every class.
 
         A stratified holdout needs at least one test row per class, and the
@@ -422,7 +422,7 @@ class RandomSplit(Partitioner):
     def partition(self, frame: pandas.DataFrame) -> Partition:
         """Random holdout followed by K-fold on the development rows.
 
-        A `DataError` from `require_rows_per_class` propagates when a
+        A `DataError` from `require` propagates when a
         stratified holdout cannot hold every class, and subclasses may raise
         a `BlockedError` when they cannot stratify or fold the rows.
 
@@ -435,7 +435,7 @@ class RandomSplit(Partitioner):
         """
         labels = self.stratify_labels(frame)
         if labels is not None:
-            self.require_rows_per_class(len(frame), labels)
+            self.require(len(frame), labels)
         dev_ids, test_ids = model_selection.train_test_split(
             numpy.arange(len(frame)),
             test_size=self.validation.test_fraction,
@@ -580,13 +580,13 @@ class EventStratifiedSplit(RandomSplit):
         return list(splitter.split(numpy.arange(len(dev_ids)), events))
 
 
-class MultilabelStratifiedSplit(RandomSplit):
+class Multilabel(RandomSplit):
     """Keeps every label's share steady across splits (multi-label)."""
 
     name = "multilabel_stratified"
     supported_tasks = frozenset({tasks.Task.MULTILABEL})
 
-    def label_matrix(self, frame: pandas.DataFrame) -> numpy.ndarray:
+    def stack(self, frame: pandas.DataFrame) -> numpy.ndarray:
         """Collects all label columns into one matrix.
 
         Args:
@@ -608,7 +608,7 @@ class MultilabelStratifiedSplit(RandomSplit):
             The development and test ids, the folds over development
             positions and any notes.
         """
-        labels = self.label_matrix(frame)
+        labels = self.stack(frame)
         share = self.validation.test_fraction
         side = iterative.assign(
             labels, [1.0 - share, share], self.validation.seed
@@ -636,7 +636,7 @@ class MultilabelStratifiedSplit(RandomSplit):
         """
         count = self.validation.folds
         assignment = iterative.assign(
-            self.label_matrix(frame)[dev_ids],
+            self.stack(frame)[dev_ids],
             [1.0 / count] * count,
             self.validation.seed,
         )
@@ -734,7 +734,7 @@ class TreatmentStratifiedSplit(RandomSplit):
         return list(splitter.split(numpy.arange(len(dev_ids)), cells))
 
 
-class PresetSplit(RandomSplit):
+class Preset(RandomSplit):
     """Uses a split that was decided while streaming the file.
 
     The `split_side` column says which rows are locked (1) and which are
@@ -1056,9 +1056,9 @@ STRATEGIES: dict[str, type[Partitioner]] = {
         RandomSplit,
         StratifiedSplit,
         EventStratifiedSplit,
-        MultilabelStratifiedSplit,
+        Multilabel,
         TreatmentStratifiedSplit,
-        PresetSplit,
+        Preset,
         GroupSplit,
         TemporalSplit,
         RollingSplit,
@@ -1147,9 +1147,7 @@ class Splitter:
         }
         return [c for c in frame.columns if c not in roles]
 
-    def keep_duplicates_together(
-        self, frame: pandas.DataFrame, part: Partition
-    ) -> Partition:
+    def gather(self, frame: pandas.DataFrame, part: Partition) -> Partition:
         """Moves copies of one record to the same side of every split.
 
         Args:
@@ -1191,20 +1189,20 @@ class Splitter:
             Manifest, development data and the sealed test set.
         """
         name = (
-            PresetSplit.name
+            Preset.name
             if streaming.SPLIT_COLUMN in frame.columns
             else self.strategy_name
         )
         strategy = STRATEGIES[name](self.spec, self.task)
         part = strategy.partition(frame)
         if name in DUPLICATE_AWARE:
-            part = self.keep_duplicates_together(frame, part)
+            part = self.gather(frame, part)
         manifest = Manifest(
             strategy=name,
             seed=self.spec.validation.seed,
-            train_ids=to_ids(part.dev_ids),
-            test_ids=to_ids(part.test_ids),
-            folds=tuple((to_ids(a), to_ids(b)) for a, b in part.folds),
+            train_ids=tuplify(part.dev_ids),
+            test_ids=tuplify(part.test_ids),
+            folds=tuple((tuplify(a), tuplify(b)) for a, b in part.folds),
             notes=tuple(part.notes),
         )
         target_name = self.spec.data.target

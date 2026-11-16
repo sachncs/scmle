@@ -102,7 +102,7 @@ class Stream:
         if self.direction not in DIRECTIONS:
             raise errors.InputError("direction must be 'greater' or 'less'")
 
-    def rescaled_null(self) -> float:
+    def orient(self) -> float:
         """Returns the null in the orientation where larger values are evidence.
 
         Returns:
@@ -214,7 +214,7 @@ def log_wealth_paths(
     """
     array = numpy.asarray(values, dtype=float)
     flat = stream.rescale(array.reshape(-1)).reshape(array.shape)
-    return log_wealth(flat, stream.rescaled_null(), size)
+    return log_wealth(flat, stream.orient(), size)
 
 
 @dataclasses.dataclass(slots=True)
@@ -249,7 +249,7 @@ class EProcess:
         to zero. A `size` below 1 is refused with a `ValueError` by
         `bet_grid`.
         """
-        grid = bet_grid(self.stream.rescaled_null(), self.size)
+        grid = bet_grid(self.stream.orient(), self.size)
         if self.totals is None:
             self.totals = numpy.zeros(len(grid))
 
@@ -276,7 +276,7 @@ class EProcess:
         self.path = numpy.zeros(0)
         if unit.size == 0:
             return self.log_e
-        null_unit = self.stream.rescaled_null()
+        null_unit = self.stream.orient()
         grid = bet_grid(null_unit, self.size)
         if self.totals is None:
             raise errors.ScmleError("bet totals are not initialised")

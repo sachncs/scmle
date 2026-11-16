@@ -19,7 +19,7 @@ ATTRIBUTION_MATRIX_RANK = 2
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CheckpointContract:
+class Checkpoint:
     """Serialization boundary for a fitted model family.
 
     Attributes:
@@ -229,7 +229,7 @@ class ModelFamilyContract:
     status: capabilities.Status
     modalities: tuple[capabilities.Modality, ...]
     required_extras: tuple[str, ...]
-    checkpoint: CheckpointContract
+    checkpoint: Checkpoint
     inference: InferenceContract
     explanation: ExplanationContract | None
     limitations: tuple[str, ...]
@@ -349,7 +349,7 @@ TABULAR_TRANSFORMER_CONTRACT = ModelFamilyContract(
     status=capabilities.Status.EXPERIMENTAL,
     modalities=(capabilities.Modality.TABULAR,),
     required_extras=("deeplearning",),
-    checkpoint=CheckpointContract(
+    checkpoint=Checkpoint(
         format="scmle.tabular-transformer.v1",
         schema_version=1,
         trusted_local_storage=True,
@@ -386,7 +386,7 @@ TABULAR_JEPA_CONTRACT = ModelFamilyContract(
     status=capabilities.Status.EXPERIMENTAL,
     modalities=(capabilities.Modality.TABULAR,),
     required_extras=("deeplearning",),
-    checkpoint=CheckpointContract(
+    checkpoint=Checkpoint(
         format="scmle.tabular-jepa.v2",
         schema_version=1,
         trusted_local_storage=True,
@@ -423,7 +423,7 @@ TABULAR_TORCH_CONTRACT = ModelFamilyContract(
     status=capabilities.Status.SUPPORTED,
     modalities=(capabilities.Modality.TABULAR,),
     required_extras=("deeplearning",),
-    checkpoint=CheckpointContract(
+    checkpoint=Checkpoint(
         format="scmle.tabular-torch.v1",
         schema_version=1,
         trusted_local_storage=True,
@@ -469,7 +469,7 @@ __all__ = [
     "TABULAR_JEPA_CONTRACT",
     "TABULAR_TORCH_CONTRACT",
     "TABULAR_TRANSFORMER_CONTRACT",
-    "CheckpointContract",
+    "Checkpoint",
     "ExplanationContract",
     "FeatureExplanation",
     "InferenceContract",

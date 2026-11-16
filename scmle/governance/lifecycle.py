@@ -403,7 +403,7 @@ class Maintainer:
             rows=len(fresh),
         )
         if report.recommendation.action != "retrain" or not retrain:
-            self.note_rows(state, fresh)
+            self.tally(state, fresh)
             return LifecycleOutcome(
                 monitoring=report,
                 retrained=False,
@@ -419,7 +419,7 @@ class Maintainer:
                 reason=skip,
                 rows=len(fresh),
             )
-            self.note_rows(state, fresh)
+            self.tally(state, fresh)
             notes.append(f"retraining skipped: {skip}")
             return LifecycleOutcome(
                 monitoring=report,
@@ -689,7 +689,7 @@ class Maintainer:
         )
         return int(target)
 
-    def note_rows(self, state: dict[str, Any], fresh: pandas.DataFrame) -> None:
+    def tally(self, state: dict[str, Any], fresh: pandas.DataFrame) -> None:
         """Counts fresh rows toward the cooldown after an attempt.
 
         Does nothing if there was no attempt or these rows are the ones last

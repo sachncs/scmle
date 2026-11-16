@@ -29,7 +29,7 @@ FLAT_TOLERANCE = 0.002
 
 
 @dataclasses.dataclass(frozen=True)
-class LearningCurve:
+class Curve:
     """Scores at growing training sizes.
 
     Attributes:
@@ -99,7 +99,7 @@ def compute(
     scorer: Callable[..., float],
     greater_is_better: bool,
     should_stop: Callable[[], bool] = lambda: False,
-) -> LearningCurve | None:
+) -> Curve | None:
     """Fits the candidate on growing slices of one fold's training rows.
 
     Args:
@@ -142,7 +142,7 @@ def compute(
         return None
     verdict, last, total = judge(scores)
     sign = 1.0 if greater_is_better else -1.0
-    return LearningCurve(
+    return Curve(
         tuple(sizes),
         tuple(sign * s for s in scores),
         verdict,

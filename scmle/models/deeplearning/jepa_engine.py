@@ -14,7 +14,7 @@ FEATURE_MATRIX_RANK = 2
 MIN_FIT_ROWS = 8
 
 
-class JepaNetwork:
+class Network:
     """Context encoder, target encoder, and predictor for tabular JEPA."""
 
     def __init__(
@@ -116,7 +116,7 @@ class Trainer:
         self.random_state = random_state
 
     @staticmethod
-    def validated_matrix(features: Any) -> numpy.ndarray:
+    def validate(features: Any) -> numpy.ndarray:
         """Converts the features to a finite float32 matrix with enough rows.
 
         Args:
@@ -149,7 +149,7 @@ class Trainer:
             )
         return matrix
 
-    def check_hyperparameters(self) -> None:
+    def vet(self) -> None:
         """Rejects hyperparameters outside their valid range.
 
         Raises:
@@ -233,10 +233,10 @@ class Trainer:
         )
         return "cpu" if device == "auto" else device
 
-    def train_batch(
+    def learn(
         self,
         torch: Any,
-        network: JepaNetwork,
+        network: Network,
         optimizer: Any,
         batch: Any,
         mask: Any,
@@ -283,7 +283,7 @@ class Trainer:
     def train_epoch(
         self,
         torch: Any,
-        network: JepaNetwork,
+        network: Network,
         optimizer: Any,
         tensor: Any,
         generator: Any,
@@ -314,7 +314,7 @@ class Trainer:
                 < self.mask_probability
             )
             epoch_losses.append(
-                self.train_batch(torch, network, optimizer, batch, mask)
+                self.learn(torch, network, optimizer, batch, mask)
             )
         return float(numpy.mean(epoch_losses))
 
@@ -338,12 +338,12 @@ class Trainer:
             ValueError: If a CUDA device is requested but unavailable. The
                 features must also be a finite numeric 2-D matrix with at
                 least 8 rows and one column, and every hyperparameter inside
-                its valid range; `validated_matrix` and
-                `check_hyperparameters` raise `ValueError` otherwise.
+                its valid range; `validate` and
+                `vet` raise `ValueError` otherwise.
         """
         del target, sample_weight
-        matrix = self.validated_matrix(features)
-        self.check_hyperparameters()
+        matrix = self.validate(features)
+        self.vet()
         torch = importlib.import_module("torch")
         if (
             str(self.device).startswith("cuda")
@@ -353,7 +353,7 @@ class Trainer:
         torch.manual_seed(self.random_state)
         device = self.resolve_device(torch)
         self.input_width_ = matrix.shape[1]
-        network = JepaNetwork(
+        network = Network(
             torch, self.input_width_, self.hidden_size, self.embedding_size
         )
         network.module.to(device)
@@ -505,7 +505,7 @@ class Trainer:
         self.__dict__.update(state)
         if weights is not None:
             torch = importlib.import_module("torch")
-            network = JepaNetwork(
+            network = Network(
                 torch,
                 self.input_width_,
                 self.hidden_size,

@@ -323,7 +323,7 @@ class Supervisor:
         finally:
             if process.is_alive():
                 if process.pid is not None:
-                    self.kill_descendants(process.pid)
+                    self.reap(process.pid)
                 process.kill()
             process.join()
             receiver.close()
@@ -337,7 +337,7 @@ class Supervisor:
         return value
 
     @staticmethod
-    def kill_descendants(root: int) -> None:
+    def reap(root: int) -> None:
         """Kills processes the trial started, so none outlive it.
 
         Args:
@@ -413,7 +413,7 @@ class Governor:
             return max(1, cap // max(self.workers, 1))
         return 1 if self.workers > 1 else None
 
-    def memory_exceeded(self) -> bool:
+    def exceeds(self) -> bool:
         """Whether peak memory is above the configured limit.
 
         Returns:
@@ -427,7 +427,7 @@ class Governor:
         """Whether trials run under process supervision."""
         return self.spec.enforcement == "hard"
 
-    def enforcement_text(self, hard_part: str) -> str:
+    def explain(self, hard_part: str) -> str:
         """Describes how a limit is applied under the current mode.
 
         Args:
@@ -468,7 +468,7 @@ class Governor:
             return None
         if time.monotonic() - self.started_at >= self.spec.time_budget_seconds:
             return "time budget exhausted before this trial started"
-        if self.memory_exceeded():
+        if self.exceeds():
             return "memory limit reached before this trial started"
         return None
 
@@ -488,7 +488,7 @@ class Governor:
             "time_budget": {
                 "limit_seconds": self.spec.time_budget_seconds,
                 "elapsed_seconds": elapsed,
-                "enforcement": self.enforcement_text(
+                "enforcement": self.explain(
                     "running trials are killed at the hard ceiling "
                     f"(remaining budget + {GRACE_SHARE:.0%} grace)"
                 ),
@@ -505,7 +505,7 @@ class Governor:
             "memory": {
                 "limit_gb": self.spec.memory_limit_gb,
                 "observed_peak_gb": peak,
-                "enforcement": self.enforcement_text(
+                "enforcement": self.explain(
                     "running trials above the limit are killed "
                     "(resident memory sampled while they run)"
                 ),

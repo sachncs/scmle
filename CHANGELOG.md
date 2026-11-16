@@ -12,6 +12,11 @@ marked `Breaking:` and listed first in their group.
 
 ### Breaking changes
 
+* **Single-word names for 564 file-local names.** Functions, methods and
+  classes used only inside their own module are renamed to single words
+  (for example `EarlyStoppingClassifier` is `Classifier`, `warm_up` is
+  `warm`). None is in the public API snapshot; every rename is listed in
+  [`docs/RENAMES.md`](docs/RENAMES.md).
 * **Single-word names (owner's naming rule).** Names are renamed to single
   words module by module; each rename is listed here. `scmle.core.retry`:
   `call_with_retries` is `call`, `Retries.delay_after` is `Retries.delay`.

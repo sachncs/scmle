@@ -132,7 +132,7 @@ FINISHED = frozenset(
 )
 
 
-class StepState(enum.StrEnum):
+class Phase(enum.StrEnum):
     """Where a step is.
 
     Attributes:
@@ -618,7 +618,7 @@ class Executor:
                 LOGGER.warning("WARNING run %s: the lease was lost", run_id)
                 return
 
-    def active_runs(self) -> list[str]:
+    def scan(self) -> list[str]:
         """Lists the runs of this workflow whose lease is valid.
 
         Returns:
@@ -708,14 +708,14 @@ class Executor:
             ConfigError: If the run was started with a different workflow
                 definition.
         """
-        others = [r for r in self.active_runs() if r != run_id]
+        others = [r for r in self.scan() if r != run_id]
         if len(others) >= self.workflow.max_concurrent_runs:
             raise ConcurrencyLimitError(
                 f"{len(others)} runs of {self.workflow.name} are in flight"
             )
         self.take_lease(run_id)
         try:
-            if len(self.active_runs()) > self.workflow.max_concurrent_runs:
+            if len(self.scan()) > self.workflow.max_concurrent_runs:
                 raise ConcurrencyLimitError(
                     f"too many runs of {self.workflow.name} in flight"
                 )
@@ -754,8 +754,8 @@ class Executor:
         Returns:
             The run record with its final state, step states, cost and end time.
         """
-        states, outputs = self.saved_progress(run_id)
-        record["cost"] = self.recorded_cost(run_id)
+        states, outputs = self.restore(run_id)
+        record["cost"] = self.tally(run_id)
         group_use: dict[str, int] = {}
         in_flight: dict[
             concurrent.futures.Future[Outcome], definition.Step
@@ -772,7 +772,7 @@ class Executor:
                 budget = self.workflow.cost_budget
                 if budget is not None and record["cost"] > budget:
                     budget_hit = True
-                changed = self.schedule_ready_steps(
+                changed = self.dispatch(
                     run_id,
                     record,
                     states,
@@ -786,12 +786,10 @@ class Executor:
                     break
                 if not in_flight:
                     continue
-                self.collect_finished_steps(
-                    record, states, outputs, group_use, in_flight
-                )
-        return self.close_run(run_id, record, states, budget_hit=budget_hit)
+                self.collect(record, states, outputs, group_use, in_flight)
+        return self.close(run_id, record, states, budget_hit=budget_hit)
 
-    def saved_progress(
+    def restore(
         self, run_id: str
     ) -> tuple[dict[str, str], dict[str, Mapping[str, Any]]]:
         """Reads which steps already succeeded in an earlier attempt.
@@ -807,14 +805,14 @@ class Executor:
         outputs: dict[str, Mapping[str, Any]] = {}
         for step in self.workflow.steps:
             saved = self.step_record(run_id, step.name)
-            if saved is not None and saved["state"] == StepState.SUCCEEDED:
-                states[step.name] = StepState.SUCCEEDED.value
+            if saved is not None and saved["state"] == Phase.SUCCEEDED:
+                states[step.name] = Phase.SUCCEEDED.value
                 outputs[step.name] = saved["outputs"]
             else:
-                states[step.name] = StepState.PENDING.value
+                states[step.name] = Phase.PENDING.value
         return states, outputs
 
-    def skip_if_upstream_failed(
+    def skip(
         self, run_id: str, step: definition.Step, states: dict[str, str]
     ) -> bool:
         """Skips a step when one of the steps it depends on did not succeed.
@@ -831,19 +829,19 @@ class Executor:
         if not any(
             p
             in (
-                StepState.FAILED,
-                StepState.SKIPPED,
-                StepState.REJECTED,
-                StepState.EXPIRED,
+                Phase.FAILED,
+                Phase.SKIPPED,
+                Phase.REJECTED,
+                Phase.EXPIRED,
             )
             for p in parents
         ):
             return False
-        states[step.name] = StepState.SKIPPED.value
-        self.save_step(run_id, step, StepState.SKIPPED, reason="upstream")
+        states[step.name] = Phase.SKIPPED.value
+        self.save_step(run_id, step, Phase.SKIPPED, reason="upstream")
         return True
 
-    def can_start(
+    def admit(
         self,
         step: definition.Step,
         states: Mapping[str, str],
@@ -860,7 +858,7 @@ class Executor:
             True when every step it depends on succeeded and its
             concurrency group (if any) is below its limit.
         """
-        if any(states[d] != StepState.SUCCEEDED for d in step.depends_on):
+        if any(states[d] != Phase.SUCCEEDED for d in step.depends_on):
             return False
         group = step.concurrency_group
         return group is None or group_use.get(
@@ -885,14 +883,14 @@ class Executor:
         Returns:
             True when the step's state changed from waiting.
         """
-        settled = self.settle_approval(run_id, step)
+        settled = self.settle(run_id, step)
         states[step.name] = settled.value
-        if settled is StepState.SUCCEEDED:
+        if settled is Phase.SUCCEEDED:
             saved = self.step_record(run_id, step.name) or {}
             outputs[step.name] = saved.get("outputs", {})
-        return settled is not StepState.WAITING
+        return settled is not Phase.WAITING
 
-    def schedule_ready_steps(
+    def dispatch(
         self,
         run_id: str,
         record: Mapping[str, Any],
@@ -923,12 +921,12 @@ class Executor:
         changed = False
         for name in self.workflow.order():
             step = self.workflow.step(name)
-            if states[name] != StepState.PENDING.value or budget_hit:
+            if states[name] != Phase.PENDING.value or budget_hit:
                 continue
-            if self.skip_if_upstream_failed(run_id, step, states):
+            if self.skip(run_id, step, states):
                 changed = True
                 continue
-            if not self.can_start(step, states, group_use):
+            if not self.admit(step, states, group_use):
                 continue
             if step.kind is definition.StepKind.APPROVAL:
                 changed = (
@@ -938,7 +936,7 @@ class Executor:
                 continue
             if len(in_flight) >= self.workflow.max_parallel:
                 continue
-            states[name] = StepState.RUNNING.value
+            states[name] = Phase.RUNNING.value
             group = step.concurrency_group
             if group is not None:
                 group_use[group] = group_use.get(group, 0) + 1
@@ -952,7 +950,7 @@ class Executor:
             in_flight[future] = step
         return changed
 
-    def collect_finished_steps(
+    def collect(
         self,
         record: dict[str, Any],
         states: dict[str, str],
@@ -978,12 +976,12 @@ class Executor:
             state, result, cost = future.result()
             states[step.name] = state
             record["cost"] = round(record["cost"] + cost, 6)
-            if state == StepState.SUCCEEDED.value:
+            if state == Phase.SUCCEEDED.value:
                 outputs[step.name] = result
             if step.concurrency_group is not None:
                 group_use[step.concurrency_group] -= 1
 
-    def close_run(
+    def close(
         self,
         run_id: str,
         record: dict[str, Any],
@@ -1007,21 +1005,21 @@ class Executor:
             and record["cost"] > self.workflow.cost_budget
         ):
             for name, state in states.items():
-                if state == StepState.PENDING.value:
+                if state == Phase.PENDING.value:
                     self.save_step(
                         run_id,
                         self.workflow.step(name),
-                        StepState.SKIPPED,
+                        Phase.SKIPPED,
                         reason="run budget",
                     )
             record["state"] = RunState.BUDGET_STOPPED.value
         else:
-            record["state"] = self.final_state(states).value
+            record["state"] = self.derive(states).value
         record["steps"] = states
         record["ended_at"] = self.clock()
         return record
 
-    def final_state(self, states: Mapping[str, str]) -> RunState:
+    def derive(self, states: Mapping[str, str]) -> RunState:
         """Derives the run's state from its steps' states.
 
         Args:
@@ -1033,17 +1031,17 @@ class Executor:
             all succeeded, otherwise `FAILED`.
         """
         values = set(states.values())
-        if StepState.WAITING.value in values:
+        if Phase.WAITING.value in values:
             return RunState.WAITING_APPROVAL
-        if StepState.REJECTED.value in values:
+        if Phase.REJECTED.value in values:
             return RunState.REJECTED
-        if StepState.EXPIRED.value in values:
+        if Phase.EXPIRED.value in values:
             return RunState.EXPIRED
-        if values == {StepState.SUCCEEDED.value}:
+        if values == {Phase.SUCCEEDED.value}:
             return RunState.SUCCEEDED
         return RunState.FAILED
 
-    def recorded_cost(self, run_id: str) -> float:
+    def tally(self, run_id: str) -> float:
         """Sums the cost of steps already recorded as succeeded for this run.
 
         Args:
@@ -1055,7 +1053,7 @@ class Executor:
         total = 0.0
         for step in self.workflow.steps:
             saved = self.step_record(run_id, step.name)
-            if saved is not None and saved["state"] == StepState.SUCCEEDED:
+            if saved is not None and saved["state"] == Phase.SUCCEEDED:
                 total += saved["cost"]
         return round(total, 6)
 
@@ -1091,7 +1089,7 @@ class Executor:
         self,
         run_id: str,
         step: definition.Step,
-        state: StepState,
+        state: Phase,
         **fields: Any,
     ) -> None:
         """Writes a step record.
@@ -1135,10 +1133,10 @@ class Executor:
         saved = self.step_record(run_id, step.name)
         if (
             saved is not None
-            and saved["state"] == StepState.SUCCEEDED
+            and saved["state"] == Phase.SUCCEEDED
             and saved["idempotency_key"] == key
         ):
-            return StepState.SUCCEEDED.value, saved["outputs"], 0.0
+            return Phase.SUCCEEDED.value, saved["outputs"], 0.0
         handler = self.handlers[step.name]
         attempts: list[dict[str, Any]] = []
         total = 0.0
@@ -1159,7 +1157,7 @@ class Executor:
             self.save_step(
                 run_id,
                 step,
-                StepState.RUNNING,
+                Phase.RUNNING,
                 idempotency_key=key,
                 attempts=attempts,
             )
@@ -1222,28 +1220,28 @@ class Executor:
                     self.save_step,
                     run_id,
                     step,
-                    StepState.SUCCEEDED,
+                    Phase.SUCCEEDED,
                     idempotency_key=key,
                     attempts=attempts,
                     outputs=result,
                     cost=round(total, 6),
                 )
                 retry.call(save, WRITES, sleep=self.sleep)
-                return StepState.SUCCEEDED.value, result, total
+                return Phase.SUCCEEDED.value, result, total
         self.save_step(
             run_id,
             step,
-            StepState.FAILED,
+            Phase.FAILED,
             idempotency_key=key,
             attempts=attempts,
             error=last_error,
             cost=round(total, 6),
         )
-        return StepState.FAILED.value, {}, total
+        return Phase.FAILED.value, {}, total
 
     # ---- approval --------------------------------------------------------
 
-    def approval_payload(
+    def compose(
         self, run_id: str, step: str, approver: str, decision: str, at: float
     ) -> dict[str, Any]:
         """Builds the content an approver signs.
@@ -1291,9 +1289,7 @@ class Executor:
             decision and time) with an added `signature` entry.
         """
         moment = self.clock() if at is None else at
-        payload = self.approval_payload(
-            run_id, step, approver, decision, moment
-        )
+        payload = self.compose(run_id, step, approver, decision, moment)
         return {**payload, "signature": signing.sign_payload(payload, key)}
 
     def submit_approval(self, decision: Mapping[str, Any]) -> None:
@@ -1324,7 +1320,7 @@ class Executor:
         if approver == record["requested_by"]:
             raise ApprovalError("the requester cannot approve their own run")
         key = self.approver_keys.get(approver)
-        payload = self.approval_payload(
+        payload = self.compose(
             run_id,
             name,
             approver,
@@ -1342,7 +1338,7 @@ class Executor:
             raise ApprovalError("a decision is already recorded")
         self.write(f"{self.base(run_id)}approvals/{name}.json", dict(decision))
 
-    def settle_approval(self, run_id: str, step: definition.Step) -> StepState:
+    def settle(self, run_id: str, step: definition.Step) -> Phase:
         """Determines the approval step's state now.
 
         A recorded decision settles the step to succeeded (approve) or rejected;
@@ -1362,24 +1358,24 @@ class Executor:
                 self.save_step(
                     run_id,
                     step,
-                    StepState.SUCCEEDED,
+                    Phase.SUCCEEDED,
                     outputs={"approver": decision["approver"]},
                     cost=0.0,
                     idempotency_key="approval",
                 )
-                return StepState.SUCCEEDED
+                return Phase.SUCCEEDED
             self.save_step(
-                run_id, step, StepState.REJECTED, approver=decision["approver"]
+                run_id, step, Phase.REJECTED, approver=decision["approver"]
             )
-            return StepState.REJECTED
+            return Phase.REJECTED
         waiting = self.step_record(run_id, step.name)
         since = (
             waiting["waiting_since"]
-            if waiting and waiting["state"] == StepState.WAITING
+            if waiting and waiting["state"] == Phase.WAITING
             else self.clock()
         )
         if self.clock() - since > step.expires_seconds:
-            self.save_step(run_id, step, StepState.EXPIRED, waiting_since=since)
-            return StepState.EXPIRED
-        self.save_step(run_id, step, StepState.WAITING, waiting_since=since)
-        return StepState.WAITING
+            self.save_step(run_id, step, Phase.EXPIRED, waiting_since=since)
+            return Phase.EXPIRED
+        self.save_step(run_id, step, Phase.WAITING, waiting_since=since)
+        return Phase.WAITING

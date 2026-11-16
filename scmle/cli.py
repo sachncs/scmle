@@ -373,7 +373,7 @@ class ProjectCommand(Command):
         )
 
 
-class PlanCommand(ProjectCommand):
+class Plan(ProjectCommand):
     """Prints the proposed plan without training."""
 
     name = "plan"
@@ -392,7 +392,7 @@ class PlanCommand(ProjectCommand):
         return EXIT_OK
 
 
-class RunCommand(ProjectCommand):
+class Run(ProjectCommand):
     """Trains, selects, tests and packages."""
 
     name = "run"
@@ -413,7 +413,7 @@ class RunCommand(ProjectCommand):
         return EXIT_OK
 
 
-class ResumeCommand(Command):
+class Resumption(Command):
     """Continues an interrupted run."""
 
     name = "resume"
@@ -449,7 +449,7 @@ class ResumeCommand(Command):
         return EXIT_OK
 
 
-class CatalogCommand(Command):
+class Cataloging(Command):
     """Produces model-agnostic dataset curation evidence."""
 
     name = "catalog"
@@ -492,7 +492,7 @@ class CatalogCommand(Command):
             help="optional path for the atomically written JSON artifact",
         )
 
-    def read_raw_bytes(self, location: str) -> bytes:
+    def read(self, location: str) -> bytes:
         """Reads raw bytes from a local path or standard input.
 
         Args:
@@ -550,9 +550,7 @@ class CatalogCommand(Command):
         if args.input == "-":
             raw_location = "-"
         if raw_location is not None:
-            catalog_input: bytes | pandas.DataFrame = self.read_raw_bytes(
-                raw_location
-            )
+            catalog_input: bytes | pandas.DataFrame = self.read(raw_location)
             source = args.source_uri or (
                 "memory://stdin" if raw_location == "-" else raw_location
             )
@@ -586,7 +584,7 @@ class CatalogCommand(Command):
         return EXIT_OK
 
 
-class PredictCommand(Command):
+class Prediction(Command):
     """Scores a dataset with a saved bundle."""
 
     name = "predict"
@@ -648,7 +646,7 @@ class PredictCommand(Command):
         return EXIT_OK
 
 
-class BatchCommand(Command):
+class Batch(Command):
     """Scores a file through the same path as the online service."""
 
     name = "batch"
@@ -745,7 +743,7 @@ class ServeCommand(Command):
         return EXIT_OK
 
 
-class ExportOnnxCommand(Command):
+class Export(Command):
     """Exports a saved bundle's pipeline as an ONNX graph."""
 
     name = "export-onnx"
@@ -780,7 +778,7 @@ class ExportOnnxCommand(Command):
         return EXIT_OK
 
 
-class PackageCommand(Command):
+class Packaging(Command):
     """Writes a deployable service folder for a saved bundle."""
 
     name = "package"
@@ -891,7 +889,7 @@ class IngestCommand(Command):
         return EXIT_OK
 
 
-class CharterCommand(Command):
+class Charter(Command):
     """Creates, checks and signs the analysis charter."""
 
     name = "charter"
@@ -1020,7 +1018,7 @@ class CharterCommand(Command):
         return EXIT_OK
 
 
-class LoopCommand(Command):
+class Loop(Command):
     """Drives the closed loop of a deployment (observe, step, ask, reply)."""
 
     name = "loop"
@@ -1256,7 +1254,7 @@ class LoopCommand(Command):
         return EXIT_OK
 
 
-class OperateCommand(Command):
+class Operation(Command):
     """Runs the unattended controller: ticks, envelopes, status and halt."""
 
     name = "operate"
@@ -1449,7 +1447,7 @@ class OperateCommand(Command):
         return EXIT_OK
 
 
-class DeployCommand(Command):
+class Deployment(Command):
     """Release evidence: live checks, the promotion gate, deployment records."""
 
     name = "deploy"
@@ -1527,7 +1525,7 @@ class DeployCommand(Command):
         return status
 
     @staticmethod
-    def read_key(path: str) -> str:
+    def read(path: str) -> str:
         """Reads a key from a file (never from the command line).
 
         Args:
@@ -1558,7 +1556,7 @@ class DeployCommand(Command):
             EXIT_OK (0) if every check passed, else EXIT_FAILED (1).
         """
         read_only = (
-            DeployCommand.read_key(args.read_only_token_file)
+            Deployment.read(args.read_only_token_file)
             if args.read_only_token_file
             else None
         )
@@ -1567,7 +1565,7 @@ class DeployCommand(Command):
             source_commit=args.commit,
             container_digest=args.container_digest,
             model_digest=args.model_digest,
-            token=DeployCommand.read_key(args.token_file),
+            token=Deployment.read(args.token_file),
             base_url=args.url,
             read_only_token=read_only,
         )
@@ -1601,7 +1599,7 @@ class DeployCommand(Command):
         Returns:
             EXIT_BLOCKED (2) if the gate refuses, else EXIT_OK (0).
         """
-        key = DeployCommand.read_key(args.key_file)
+        key = Deployment.read(args.key_file)
         candidate = release.load_candidate(args.manifest)
         if args.stage == "admit":
             decision = gate.admit(candidate, key)
@@ -1672,12 +1670,12 @@ class DeployCommand(Command):
             EXIT_OK (0) if the signature verifies, else EXIT_FAILED (1).
         """
         record = scmle.deploy.record.read_record(args.record)
-        valid = record.verify(DeployCommand.read_key(args.key_file))
+        valid = record.verify(Deployment.read(args.key_file))
         print(json.dumps({"valid": valid, "digest": record.digest()}))
         return EXIT_OK if valid else EXIT_FAILED
 
 
-class ClaimsCommand(Command):
+class Claims(Command):
     """Lists, shows and verifies the claims of a charter run."""
 
     name = "claims"
@@ -1815,7 +1813,7 @@ class ClaimsCommand(Command):
         return EXIT_OK
 
 
-class FrameCommand(Command):
+class Frame(Command):
     """Drafts a charter, cost model and questions from a plain request."""
 
     name = "frame"
@@ -1902,7 +1900,7 @@ class FrameCommand(Command):
         return EXIT_BLOCKED if result.status == draft.REFUSED else EXIT_OK
 
 
-class TrailCommand(Command):
+class Trail(Command):
     """Builds, verifies and prints the trail of one deployed model."""
 
     name = "trail"
@@ -2005,23 +2003,23 @@ class TrailCommand(Command):
 
 
 COMMANDS: tuple[Command, ...] = (
-    PlanCommand(),
-    RunCommand(),
-    ResumeCommand(),
-    CatalogCommand(),
-    PredictCommand(),
-    BatchCommand(),
+    Plan(),
+    Run(),
+    Resumption(),
+    Cataloging(),
+    Prediction(),
+    Batch(),
     ServeCommand(),
-    ExportOnnxCommand(),
-    PackageCommand(),
+    Export(),
+    Packaging(),
     IngestCommand(),
-    CharterCommand(),
-    ClaimsCommand(),
-    FrameCommand(),
-    LoopCommand(),
-    OperateCommand(),
-    DeployCommand(),
-    TrailCommand(),
+    Charter(),
+    Claims(),
+    Frame(),
+    Loop(),
+    Operation(),
+    Deployment(),
+    Trail(),
 )
 
 

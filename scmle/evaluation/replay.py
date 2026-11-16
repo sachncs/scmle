@@ -13,7 +13,7 @@ from sklearn import base
 from scmle.contracts import errors
 
 
-class PredictionReplay(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn is untyped
+class Replay(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn is untyped
     """Returns stored predictions whatever rows it is handed.
 
     Attributes:
@@ -67,9 +67,9 @@ class PredictionReplay(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
         return self.probabilities
 
 
-class ClassifierPredictions(base.ClassifierMixin, PredictionReplay):  # type: ignore[misc]  # scikit-learn is untyped
+class ClassifierPredictions(base.ClassifierMixin, Replay):  # type: ignore[misc]  # scikit-learn is untyped
     """Stored predictions that scikit-learn treats as a classifier."""
 
 
-class RegressorPredictions(base.RegressorMixin, PredictionReplay):  # type: ignore[misc]  # scikit-learn is untyped
+class RegressorPredictions(base.RegressorMixin, Replay):  # type: ignore[misc]  # scikit-learn is untyped
     """Stored predictions that scikit-learn treats as a regressor."""

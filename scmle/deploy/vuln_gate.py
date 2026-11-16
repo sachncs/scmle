@@ -158,7 +158,7 @@ def parse_report(report: Any) -> tuple[list[dict[str, Any]], set[str], str]:
     raise GateError("unrecognised scanner report (expected pip-audit or Trivy)")
 
 
-def active_entries(
+def prune(
     items: list[dict[str, Any]], key: str, today: datetime.date
 ) -> dict[str, str]:
     """Returns the unexpired entries of an exception list by `key`.
@@ -211,8 +211,8 @@ def check_policy(
     threshold = policy.get("fail_at_or_above")
     if threshold not in SEVERITIES:
         raise GateError(f"fail_at_or_above must be one of {SEVERITIES}")
-    active_entries(policy.get("unscanned_exceptions", []), "name", today)
-    return active_entries(policy.get("exceptions", []), "id", today)
+    prune(policy.get("unscanned_exceptions", []), "name", today)
+    return prune(policy.get("exceptions", []), "id", today)
 
 
 def evaluate(
@@ -269,9 +269,7 @@ def evaluate(
                 "cannot check SBOM coverage: the report lists no packages"
             )
         waived = set(
-            active_entries(
-                policy.get("unscanned_exceptions", []), "name", today
-            )
+            prune(policy.get("unscanned_exceptions", []), "name", today)
         )
         libraries = {
             f"{item['name']}=={item['version']}"

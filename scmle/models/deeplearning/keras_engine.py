@@ -18,7 +18,7 @@ MIN_ROWS_FOR_VALIDATION = 30
 MIN_EPOCHS_FOR_TREND = 3
 
 
-def load_keras() -> Any:
+def load() -> Any:
     """Imports Keras on the PyTorch backend (it reads the variable once).
 
     Returns:
@@ -105,7 +105,7 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
         """
         return numpy.asarray(target, dtype=numpy.float32)
 
-    def build_network(self, keras: Any, width: int) -> Any:
+    def build(self, keras: Any, width: int) -> Any:
         """Creates the untrained network.
 
         Args:
@@ -144,12 +144,12 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
         Returns:
             This fitted engine.
         """
-        keras = load_keras()
+        keras = load()
         keras.utils.set_random_seed(self.random_state)
         matrix = numpy.asarray(features, dtype=numpy.float32)
         encoded = self.encode_target(target)
         self.input_width_ = matrix.shape[1]
-        network = self.build_network(keras, self.input_width_)
+        network = self.build(keras, self.input_width_)
         network.compile(
             optimizer=keras.optimizers.Adam(self.learning_rate),
             loss=self.loss_name(),
@@ -233,8 +233,8 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
         weights = state.pop("weights_", None)
         super().__setstate__(state)
         if weights is not None:
-            keras = load_keras()
-            network = self.build_network(keras, self.input_width_)
+            keras = load()
+            network = self.build(keras, self.input_width_)
             network.set_weights(weights)
             self.network_ = network
 
@@ -271,7 +271,7 @@ class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit
         Returns:
             A Keras sparse categorical cross-entropy loss with `from_logits`.
         """
-        keras = load_keras()
+        keras = load()
         return keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
     def encode_target(self, target: Any) -> numpy.ndarray:

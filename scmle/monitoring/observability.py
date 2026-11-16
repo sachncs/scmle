@@ -10,7 +10,7 @@ from scmle.contracts import observability
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ObservabilityEvaluation:
+class Evaluation:
     """Fail-closed result of evaluating operational metric evidence.
 
     Attributes:
@@ -56,7 +56,7 @@ def evaluate(
     policy: observability.Requirements,
     *,
     observed_at: str,
-) -> ObservabilityEvaluation:
+) -> Evaluation:
     """Evaluates metric freshness, required signals, and upper-bound alerts.
 
     Thresholds are intentionally interpreted as upper bounds. A service can
@@ -102,7 +102,7 @@ def evaluate(
                     "unit": metric.unit,
                 }
             )
-    return ObservabilityEvaluation(
+    return Evaluation(
         passed=not missing and not expired and not future and not breaches,
         observed_at=observed_at,
         missing_signals=missing,

@@ -35,7 +35,7 @@ DEFAULT_ESS_FLOOR = 0.2
 DEFAULT_MIN_GROUP = 50
 
 
-def positive_number(value: Any, name: str) -> float:
+def check(value: Any, name: str) -> float:
     """Checks that a number is finite and strictly greater than zero.
 
     Args:
@@ -101,7 +101,7 @@ class Gates:
                 least 1, `min_propensity` or `ess_floor` is not strictly in
                 (0, 1), or `penalty` is not finite or is negative.
         """
-        if self.clip is not None and positive_number(self.clip, "clip") < 1:
+        if self.clip is not None and check(self.clip, "clip") < 1:
             raise errors.InputError("clip must be at least 1")
         open_unit(self.min_propensity, "min_propensity")
         open_unit(self.ess_floor, "ess_floor")
@@ -311,7 +311,7 @@ class Guardrail:
                 positive, or `low` is not finite and below a finite `high`.
         """
         evidence.require_text(self.name, "name")
-        positive_number(self.margin, "margin")
+        check(self.margin, "margin")
         if not qualification.finite(self.low, "low") < qualification.finite(
             self.high, "high"
         ):
@@ -397,8 +397,8 @@ class RolloutPlan:
         evidence.require_text(self.primary, "primary")
         evidence.require_text(self.salt, "salt")
         open_unit(self.assignment_prob, "assignment_prob")
-        positive_number(self.delta_min, "delta_min")
-        positive_number(self.tolerance, "tolerance")
+        check(self.delta_min, "delta_min")
+        check(self.tolerance, "tolerance")
         qualification.count(self.n_max, "n_max", minimum=2)
         for name in ("alpha_promote", "alpha_rollback"):
             if not 0 < getattr(self, name) < 1:

@@ -24,7 +24,7 @@
       ]
     },
     "G11i": {
-      "code_hash": "8b32c06718c4a31b094bccac93d20e9607ee3cde3a8c35c719dcc946a52a3b9f",
+      "code_hash": "22e8b61d375d169d2a262c4e3d02e6b023e7ecf51157448058bc6a26dc22df7a",
       "covariate_censoring_bias": -0.002747989662342687,
       "marginal_km_bias": -0.017488983865733942,
       "mean_floored_share": 0.005306666666666667,

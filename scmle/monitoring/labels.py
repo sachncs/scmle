@@ -233,7 +233,7 @@ def estimate_batch(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RandomizationCheck:
+class Uniformity:
     """Result of the audit-slice uniformity test.
 
     Attributes:
@@ -253,7 +253,7 @@ class RandomizationCheck:
 
 def check_randomization(
     audit: numpy.ndarray, rate: float, alpha: float = 0.001
-) -> RandomizationCheck:
+) -> Uniformity:
     """Tests that the audit slice's draws have the declared rate.
 
     A two-sided exact binomial test of the number of audited cases against
@@ -276,7 +276,7 @@ def check_randomization(
     if not 0.0 < rate < 1.0:
         raise errors.InputError("rate must be strictly between 0 and 1")
     result = stats.binomtest(int(flags.sum()), int(flags.size), rate)
-    return RandomizationCheck(
+    return Uniformity(
         int(flags.sum()),
         int(flags.size),
         rate,

@@ -676,7 +676,7 @@ def purity_bound(
     return float(stats.beta.ppf(1.0 - cfg.confidence, wins, trials - wins + 1))
 
 
-def bootstrap_v(
+def resample(
     missing: numpy.ndarray,
     classes: numpy.ndarray,
     n_classes: int,
@@ -1337,7 +1337,7 @@ def ceilings_of(cfg: leakage.Config) -> dict[str, float]:
     }
 
 
-def empty_report(
+def abstain(
     cfg: leakage.Config,
     gates: Mapping[str, certificates.GateStatus],
     rows: int,
@@ -1374,7 +1374,7 @@ def empty_report(
     )
 
 
-def build_problem(
+def encode(
     target: pandas.Series,
     task: str,
     cfg: leakage.Config,
@@ -1471,7 +1471,7 @@ def missingness_hypotheses(
     return found
 
 
-def limit_report(
+def halt(
     cfg: leakage.Config,
     gates: Mapping[str, certificates.GateStatus],
     rows: int,
@@ -1509,7 +1509,7 @@ def limit_report(
     )
 
 
-def finding_bound(
+def floor(
     h: Pending,
     problem: Problem,
     columns: Mapping[str, numpy.ndarray],
@@ -1542,7 +1542,7 @@ def finding_bound(
         recorded = frame[h.feature].notna().to_numpy()
         return purity_bound(recorded, class_codes, cfg, groups)
     missing = frame[h.feature].isna().to_numpy()
-    return bootstrap_v(missing, class_codes, len(totals), cfg, groups, rng)
+    return resample(missing, class_codes, len(totals), cfg, groups, rng)
 
 
 def scan_frame(
@@ -1579,12 +1579,12 @@ def scan_frame(
     """
     n = len(frame)
     try:
-        problem = build_problem(frame[target], task, cfg, groups, block_size)
+        problem = encode(frame[target], task, cfg, groups, block_size)
     except ValueError as error:
         # handled: returned as failed finding/problem/refusal with error text
-        return empty_report(cfg, gates, n, f"screen not run: {error}", names)
+        return abstain(cfg, gates, n, f"screen not run: {error}", names)
     if not leakage.enough_rows(problem.y, task, cfg):
-        return empty_report(
+        return abstain(
             cfg, gates, n, "screen not run: too few rows (low power)", names
         )
     alpha = budget.exact(cfg.alpha, "alpha")
@@ -1626,13 +1626,13 @@ def scan_frame(
     family = len(pending)
     ceilings = ceilings_of(cfg)
     if family == 0:
-        return empty_report(
+        return abstain(
             cfg, gates, n, "screen not run: no column could be tested", names
         )
     total = max(cfg.permutations, required_permutations(family, alpha))
     declined = tuple(dict.fromkeys(h.feature for h in pending))
     if total > MAX_PERMUTATIONS:
-        return limit_report(
+        return halt(
             cfg,
             gates,
             n,
@@ -1656,7 +1656,7 @@ def scan_frame(
     )
     cap = work_cap(time_budget_seconds)
     if cap is not None and work > cap:
-        return limit_report(
+        return halt(
             cfg,
             gates,
             n,
@@ -1689,7 +1689,7 @@ def scan_frame(
         bound: float | None = None
         suspect = False
         if significant:
-            bound = finding_bound(
+            bound = floor(
                 h, problem, columns, frame, class_codes, totals, cfg, groups
             )
             suspect = bound > ceilings[h.mechanism]

@@ -234,9 +234,9 @@ def c2st(
         A check whose statistic is the held-out AUC, effect the excess over
         0.5, interval the DeLong interval and p-value the permutation value.
         Differing columns or too few rows raise `ValueError` (see
-        `check_pair`).
+        `align`).
     """
-    check_pair(sample, reference)
+    align(sample, reference)
     both = pooled_codes(sample, reference)
     # The side of each pooled row: 0 for each sample row, then 1 for each
     # reference row, in the row order of `pooled_codes`.
@@ -285,7 +285,7 @@ def c2st(
     )
 
 
-def check_pair(sample: pandas.DataFrame, reference: pandas.DataFrame) -> None:
+def align(sample: pandas.DataFrame, reference: pandas.DataFrame) -> None:
     """Requires the same columns and enough rows on both sides.
 
     Args:
@@ -431,9 +431,9 @@ def mmd_test(
         A check whose statistic is the unbiased squared MMD, effect the MMD
         (square root of its positive part) and p-value the permutation value.
         Differing columns or too few rows raise `ValueError` (see
-        `check_pair`).
+        `align`).
     """
-    check_pair(sample, reference)
+    align(sample, reference)
     rng = randomness.component_rng(seed, MMD_ID, 0)
     first = numpy.sort(
         rng.choice(len(sample), min(len(sample), MAX_MMD_ROWS), replace=False)
@@ -491,7 +491,7 @@ def mmd_test(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FeatureShift:
+class Drift:
     """One column compared between the sample and the reference.
 
     Attributes:
@@ -524,7 +524,7 @@ class FeatureShift:
         return dataclasses.asdict(self)
 
 
-def categorical_test(
+def contrast(
     left: pandas.Series, right: pandas.Series
 ) -> tuple[float, float, float, bool]:
     """Tests whether two samples share one categorical distribution.
@@ -562,7 +562,7 @@ def categorical_test(
 
 def feature_tests(
     sample: pandas.DataFrame, reference: pandas.DataFrame, alpha: float = ALPHA
-) -> tuple[FeatureShift, ...]:
+) -> tuple[Drift, ...]:
     """KS or chi-square per shared column, adjusted by Benjamini-Hochberg.
 
     Args:
@@ -599,13 +599,13 @@ def feature_tests(
                 )
             )
         else:
-            statistic, p, v, low = categorical_test(left, right)
+            statistic, p, v, low = contrast(left, right)
             rows.append((str(name), "categorical", statistic, p, v, low))
     if not rows:
         return ()
     adjusted = stats.false_discovery_control([r[3] for r in rows], method="bh")
     return tuple(
-        FeatureShift(
+        Drift(
             column=name,
             kind=kind,
             statistic=statistic,
@@ -640,7 +640,7 @@ class Shift:
     reason: str
     c2st: qualification.Check | None
     mmd: qualification.Check | None
-    features: tuple[FeatureShift, ...]
+    features: tuple[Drift, ...]
     agreement: bool | None
 
     def to_dict(self) -> dict[str, Any]:
@@ -711,7 +711,7 @@ def assess(
         return unverifiable("the reference shares no feature columns")
     left, right = sample[shared], reference[shared]
     try:
-        check_pair(left, right)
+        align(left, right)
     except ValueError as error:
         # handled: returned as failed finding/problem/refusal with error text
         return unverifiable(str(error))

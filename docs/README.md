@@ -26,6 +26,7 @@ in order.
 | Run it from a shell | [`CLI.md`](CLI.md) |
 | Know what a run leaves behind | [`ARTIFACTS.md`](ARTIFACTS.md) |
 | See which parts of the API are stable | [`API_STABILITY.md`](API_STABILITY.md) |
+| Find what a renamed function or class is called now | [`RENAMES.md`](RENAMES.md) |
 | Choose extras and see dependency policy | [`DEPENDENCIES.md`](DEPENDENCIES.md) |
 
 ## Understand it

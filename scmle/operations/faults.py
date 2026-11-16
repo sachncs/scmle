@@ -78,7 +78,7 @@ def records(count: int = 3) -> list[dict[str, Any]]:
     return list(loaded["records"][:count])
 
 
-def golden_spec() -> dict[str, Any]:
+def specify() -> dict[str, Any]:
     """The hand-written reference model's specification.
 
     Returns:
@@ -87,14 +87,14 @@ def golden_spec() -> dict[str, Any]:
     return parity.load_golden(GOLDEN).spec
 
 
-def inverted_spec() -> dict[str, Any]:
+def invert() -> dict[str, Any]:
     """The same model with every coefficient negated: a wrong model.
 
     Returns:
         A copy of the golden specification with negated coefficients and
         intercept, versioned ``golden-inverted``.
     """
-    spec = copy.deepcopy(golden_spec())
+    spec = copy.deepcopy(specify())
     spec["coefficients"] = {k: -v for k, v in spec["coefficients"].items()}
     spec["intercept"] = -spec["intercept"]
     spec["model_version"] = "golden-inverted"
@@ -276,9 +276,7 @@ def predict(base: str, count: int = 3) -> tuple[int, dict[str, Any]]:
         return 0, {}
 
 
-def ready_after(
-    instance: Instance, timeout: float | None = None
-) -> float | None:
+def boot(instance: Instance, timeout: float | None = None) -> float | None:
     """Seconds until ``/readyz`` is 200, or None (time-scaled default).
 
     Args:
@@ -339,7 +337,7 @@ def await_unready(
     return seen
 
 
-def corrupt_copy(service: pathlib.Path, target: pathlib.Path) -> pathlib.Path:
+def corrupt(service: pathlib.Path, target: pathlib.Path) -> pathlib.Path:
     """A copy of a service folder whose model file had bytes appended.
 
     Args:
@@ -355,7 +353,7 @@ def corrupt_copy(service: pathlib.Path, target: pathlib.Path) -> pathlib.Path:
     return target
 
 
-def model_file_digest(service: pathlib.Path) -> str:
+def digest(service: pathlib.Path) -> str:
     """SHA-256 of the model file's bytes (what tampering changes).
 
     Args:
@@ -368,7 +366,7 @@ def model_file_digest(service: pathlib.Path) -> str:
     return provenance.sha256_digest(path.read_bytes())
 
 
-def work_folder(prefix: str) -> pathlib.Path:
+def provision(prefix: str) -> pathlib.Path:
     """A fresh scratch folder.
 
     Args:
@@ -404,7 +402,7 @@ while True:
 """
 
 
-def kill_after(
+def interrupt(
     fleet: Fleet, code: str, path: pathlib.Path, acknowledged: int
 ) -> int:
     """Kills a writer after some acknowledged units.
@@ -438,7 +436,7 @@ def kill_after(
     return last
 
 
-def state_writer_trials(fleet: Fleet, base: pathlib.Path) -> dict[str, Any]:
+def stress(fleet: Fleet, base: pathlib.Path) -> dict[str, Any]:
     """Kills an atomic state writer ten times and reads its file back.
 
     Each trial kills the writer after a number of acknowledged writes drawn
@@ -461,7 +459,7 @@ def state_writer_trials(fleet: Fleet, base: pathlib.Path) -> dict[str, Any]:
     seconds = []
     for trial in range(10):
         path = base / f"state-{trial}.json"
-        acknowledged = kill_after(
+        acknowledged = interrupt(
             fleet, STATE_WRITER, path, int(rng.integers(5, 61))
         )
         started = time.monotonic()
@@ -484,7 +482,7 @@ def state_writer_trials(fleet: Fleet, base: pathlib.Path) -> dict[str, Any]:
 def process_kill() -> recovery.Outcome:
     """Kills the service process three times, restarting it each time.
 
-    After the three kills it also runs `state_writer_trials` on atomic state
+    After the three kills it also runs `stress` on atomic state
     files.
 
     Returns:
@@ -495,17 +493,17 @@ def process_kill() -> recovery.Outcome:
         ScmleError: If the service did not become ready.
     """
     fleet = Fleet()
-    base = work_folder("kill")
+    base = provision("kill")
     result = recovery.Outcome("process_kill", environment="local subprocess")
     try:
-        service = export_service(base / "service", golden_spec())
+        service = export_service(base / "service", specify())
         times = []
         same = []
         remaining = 3
         while remaining > 0:
             remaining -= 1
             first = fleet.start(service)
-            if ready_after(first) is None:
+            if boot(first) is None:
                 raise errors.ScmleError("the service did not become ready")
             before = predict(first.base)[1].get("predictions")
             killed = time.monotonic()
@@ -523,7 +521,7 @@ def process_kill() -> recovery.Outcome:
             times.append(time.monotonic() - killed)
             same.append(bool(gone) and after is not None and after == before)
             fleet.close()
-        state = state_writer_trials(fleet, base)
+        state = stress(fleet, base)
         result.checks = {
             "killed process stopped answering and the restart answers the "
             "same predictions": all(same),
@@ -598,7 +596,7 @@ class Client(threading.Thread):
             time.sleep(0.05)
 
 
-def rolling_restart() -> recovery.Outcome:
+def restart() -> recovery.Outcome:
     """Replaces an instance under client load: a tampered copy, then a good one.
 
     The tampered replacement must stay alive but unready and never receive
@@ -613,16 +611,16 @@ def rolling_restart() -> recovery.Outcome:
         ScmleError: If the first instance did not become ready.
     """
     fleet = Fleet()
-    base = work_folder("rolling")
+    base = provision("rolling")
     result = recovery.Outcome(
         "unhealthy_container_rolling_restart", environment="local subprocess"
     )
     client = None
     try:
-        service = export_service(base / "service", golden_spec())
-        broken = corrupt_copy(service, base / "broken")
+        service = export_service(base / "service", specify())
+        broken = corrupt(service, base / "broken")
         old = fleet.start(service)
-        if ready_after(old) is None:
+        if boot(old) is None:
             raise errors.ScmleError("the first instance did not become ready")
         router = {"current": old}
         client = Client(router)
@@ -634,7 +632,7 @@ def rolling_restart() -> recovery.Outcome:
         bad.process.kill()
         started = time.monotonic()
         new = fleet.start(service)
-        became_ready = ready_after(new)
+        became_ready = boot(new)
         if became_ready is not None:
             router["current"] = new
             # An orchestrator drains the old instance before stopping it: a
@@ -699,19 +697,19 @@ def invalid_credentials() -> recovery.Outcome:
         measurements and the details observed.
     """
     fleet = Fleet()
-    base = work_folder("credentials")
+    base = provision("credentials")
     result = recovery.Outcome(
         "invalid_credentials", environment="local subprocess"
     )
     try:
-        service = export_service(base / "service", golden_spec())
+        service = export_service(base / "service", specify())
         wrong = fleet.start(service, key=WRONG_KEY)
         verdict = await_unready(wrong)
         detected = time.monotonic()
         wrong.process.kill()
         wrong.process.wait(timeout=15)
         right = fleet.start(service, key=demo.DEMO_SIGNING_KEY)
-        seconds = ready_after(right)
+        seconds = boot(right)
         elapsed = time.monotonic() - detected
         served = (
             predict(right.base)[0] == http.HTTPStatus.OK
@@ -757,26 +755,26 @@ def secret_rotation() -> recovery.Outcome:
         measurements and the details observed.
     """
     fleet = Fleet()
-    base = work_folder("rotation")
+    base = provision("rotation")
     result = recovery.Outcome(
         "secret_rotation_recovery", environment="local subprocess"
     )
     try:
         old_service = export_service(
-            base / "old", golden_spec(), demo.DEMO_SIGNING_KEY
+            base / "old", specify(), demo.DEMO_SIGNING_KEY
         )
         first = fleet.start(old_service, key=demo.DEMO_SIGNING_KEY)
-        before = ready_after(first)
+        before = boot(first)
         first.process.kill()
         first.process.wait(timeout=15)
-        new_service = export_service(base / "new", golden_spec(), ROTATED_KEY)
+        new_service = export_service(base / "new", specify(), ROTATED_KEY)
         stale = fleet.start(new_service, key=demo.DEMO_SIGNING_KEY)
         verdict = await_unready(stale)
         detected = time.monotonic()
         stale.process.kill()
         stale.process.wait(timeout=15)
         fresh = fleet.start(new_service, key=ROTATED_KEY)
-        seconds = ready_after(fresh)
+        seconds = boot(fresh)
         elapsed = time.monotonic() - detected
         log = audit.Log.open(base / "audit.jsonl")
         log.admin("operator-1", "key_rotation", from_key="old", to_key="new")
@@ -821,12 +819,12 @@ def object_store_loss() -> recovery.Outcome:
         ScmleError: If the service did not become ready.
     """
     fleet = Fleet()
-    base = work_folder("store")
+    base = provision("store")
     result = recovery.Outcome(
         "lost_object_store_access", environment="local emulator + subprocess"
     )
     try:
-        service = export_service(base / "service", golden_spec())
+        service = export_service(base / "service", specify())
         port = demo.free_port()
         store = mocks.ObjectStore(base / "objects", port=port)
         fleet.serve(store)
@@ -835,7 +833,7 @@ def object_store_loss() -> recovery.Outcome:
         fetched = base / "fetched"
         demo.download_folder(url, "models/m/v1", etags, fetched)
         running = fleet.start(fetched)
-        if ready_after(running) is None:
+        if boot(running) is None:
             raise errors.ScmleError("the service did not become ready")
         store.stop()
         fetch_failed = False
@@ -859,7 +857,7 @@ def object_store_loss() -> recovery.Outcome:
             second / "model"
         ) == provenance.bundle_digest(service / "model")
         replacement = fleet.start(second)
-        seconds = ready_after(replacement)
+        seconds = boot(replacement)
         elapsed = time.monotonic() - restored
         victim = again.root.joinpath("models", "m", "v1", "serve.py")
         victim.write_bytes(victim.read_bytes() + b"# altered")
@@ -906,12 +904,12 @@ def metrics_destination_outage() -> recovery.Outcome:
         ScmleError: If the service did not become ready.
     """
     fleet = Fleet()
-    base = work_folder("spool")
+    base = provision("spool")
     result = recovery.Outcome("dependency_outage", environment="local emulator")
     try:
-        service = export_service(base / "service", golden_spec())
+        service = export_service(base / "service", specify())
         running = fleet.start(service)
-        if ready_after(running) is None:
+        if boot(running) is None:
             raise errors.ScmleError("the service did not become ready")
         port = demo.free_port()
         url = f"http://127.0.0.1:{port}"
@@ -982,27 +980,27 @@ def corrupted_bundle() -> recovery.Outcome:
         measurements and the details observed.
     """
     fleet = Fleet()
-    base = work_folder("corrupt")
+    base = provision("corrupt")
     result = recovery.Outcome(
         "corrupted_bundle", environment="local subprocess"
     )
     try:
-        service = export_service(base / "service", golden_spec())
-        expected = model_file_digest(service)
+        service = export_service(base / "service", specify())
+        expected = digest(service)
         pristine = base / "pristine"
         shutil.copytree(service, pristine)
-        tampered = corrupt_copy(service, base / "tampered")
+        tampered = corrupt(service, base / "tampered")
         broken = fleet.start(tampered)
         verdict = await_unready(broken)
         detected = time.monotonic()
         broken.process.kill()
         broken.process.wait(timeout=15)
-        differs = model_file_digest(tampered) != expected
+        differs = digest(tampered) != expected
         shutil.rmtree(tampered)
         shutil.copytree(pristine, tampered)
-        restored = model_file_digest(tampered) == expected
+        restored = digest(tampered) == expected
         fixed = fleet.start(tampered)
-        seconds = ready_after(fixed)
+        seconds = boot(fixed)
         elapsed = time.monotonic() - detected
         result.checks = {
             "the tampered bundle was alive but never ready": (
@@ -1048,14 +1046,14 @@ def incompatible_schema() -> recovery.Outcome:
         ScmleError: If the service did not become ready.
     """
     fleet = Fleet()
-    base = work_folder("schema")
+    base = provision("schema")
     result = recovery.Outcome(
         "incompatible_schema", environment="local subprocess"
     )
     try:
-        service = export_service(base / "service", golden_spec())
+        service = export_service(base / "service", specify())
         running = fleet.start(service)
-        if ready_after(running) is None:
+        if boot(running) is None:
             raise errors.ScmleError("the service did not become ready")
         url = f"{running.base}/predict"
         wrong_digest = demo.post_json(
@@ -1155,7 +1153,7 @@ class ProcessPlane(control.ControlPlane):
         self.primary: str | None = None
         self.count = 0
 
-    def register_image(self, folder: pathlib.Path) -> str:
+    def enroll(self, folder: pathlib.Path) -> str:
         """Starts a folder's service once to learn its digest and registers it.
 
         The service is started, its ``/health`` ``artifact_digest`` is read, and
@@ -1171,7 +1169,7 @@ class ProcessPlane(control.ControlPlane):
             ScmleError: If the service does not become ready.
         """
         probe = self.fleet.start(folder)
-        if ready_after(probe) is None:
+        if boot(probe) is None:
             raise errors.ScmleError("the image does not start")
         digest = str(
             demo.get_json(f"{probe.base}/health")[1]["artifact_digest"]
@@ -1364,7 +1362,7 @@ def bad_release() -> recovery.Outcome:
         measurements and the details observed.
     """
     fleet = Fleet()
-    base = work_folder("release")
+    base = provision("release")
     result = recovery.Outcome("bad_release", environment="local processes")
     try:
         store = registry.ModelRegistryStore(base / "registry")
@@ -1376,17 +1374,15 @@ def bad_release() -> recovery.Outcome:
             ledger,
             control.Polling(attempts=40, delay=recovery.scaled(0.5)),
         )
-        good_spec = golden_spec()
+        good_spec = specify()
         third_spec = {**good_spec, "model_version": "golden-3"}
         v1 = register(store, release, good_spec, base, "v1")
-        v2 = register(store, release, inverted_spec(), base, "v2")
+        v2 = register(store, release, invert(), base, "v2")
         v3 = register(store, release, third_spec, base, "v3")
         plane = ProcessPlane(fleet)
-        d1 = plane.register_image(export_service(base / "img1", good_spec))
-        d2 = plane.register_image(
-            export_service(base / "img2", inverted_spec())
-        )
-        d3 = plane.register_image(export_service(base / "img3", third_spec))
+        d1 = plane.enroll(export_service(base / "img1", good_spec))
+        d2 = plane.enroll(export_service(base / "img2", invert()))
+        d3 = plane.enroll(export_service(base / "img3", third_spec))
         first = release.promote(
             MODEL,
             v1.version,
@@ -1422,7 +1418,7 @@ def bad_release() -> recovery.Outcome:
         consistent = release.reconcile(
             MODEL, ENVIRONMENT, plane.observe()
         ).consistent
-        plane.images[d3] = corrupt_copy(plane.images[d3], base / "img3-broken")
+        plane.images[d3] = corrupt(plane.images[d3], base / "img3-broken")
         before = json.dumps(release.read(), sort_keys=True)
         unready = release.promote(
             MODEL,
@@ -1538,7 +1534,7 @@ def job_interruption() -> recovery.Outcome:
         measurements and the details observed.
     """
     fleet = Fleet()
-    base = work_folder("job")
+    base = provision("job")
     result = recovery.Outcome(
         "job_interruption", environment="local subprocess"
     )
@@ -1602,7 +1598,7 @@ def audit_continuity() -> recovery.Outcome:
         measurements and the details observed.
     """
     fleet = Fleet()
-    base = work_folder("ledger")
+    base = provision("ledger")
     result = recovery.Outcome(
         "audit_log_continuity", environment="local subprocess"
     )
@@ -1614,7 +1610,7 @@ def audit_continuity() -> recovery.Outcome:
         contiguous = True
         for trial in range(5):
             path = base / f"audit-{trial}.jsonl"
-            acknowledged = kill_after(
+            acknowledged = interrupt(
                 fleet, LEDGER_WRITER, path, int(rng.integers(3, 61))
             )
             started = time.monotonic()
@@ -1660,7 +1656,7 @@ def audit_continuity() -> recovery.Outcome:
 
 SCENARIOS: dict[str, Callable[[], recovery.Outcome]] = {
     "process_kill": process_kill,
-    "unhealthy_container_rolling_restart": rolling_restart,
+    "unhealthy_container_rolling_restart": restart,
     "invalid_credentials": invalid_credentials,
     "lost_object_store_access": object_store_loss,
     "dependency_outage": metrics_destination_outage,

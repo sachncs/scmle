@@ -5,7 +5,7 @@ construction logic once and takes everything that merely describes a model
 (name, family, capabilities, estimator classes, fixed parameters, search
 space) as keyword arguments, so a model that only declares data is one
 configured instance, such as `RIDGE`, not a subclass. A model that really
-behaves differently stays a subclass that overrides a method (`SupportVector`
+behaves differently stays a subclass that overrides a method (`Svm`
 overrides `build`, `HistGradientBoosting` overrides `categorical_params`) and
 is configured the same way. Instances are registered like any adapter and
 must be treated as immutable. Adapters written as subclasses that declare
@@ -224,7 +224,7 @@ class HistGradientBoosting(Learner):
         return {"categorical_features": list(indices)}
 
 
-class SupportVector(Learner):
+class Svm(Learner):
     """Support vector machine with sigmoid-calibrated probabilities.
 
     scikit-learn deprecated `SVC(probability=True)` in 1.9; the supported
@@ -414,7 +414,7 @@ HIST_GRADIENT_BOOSTING = HistGradientBoosting(
     ),
 )
 
-SUPPORT_VECTOR = SupportVector(
+SUPPORT_VECTOR = Svm(
     name="svm",
     family="kernel",
     capabilities=models.Capabilities(

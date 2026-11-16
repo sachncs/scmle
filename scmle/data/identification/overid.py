@@ -150,7 +150,7 @@ def result(
     }
 
 
-def two_stage(
+def estimate(
     y: NDArray[numpy.float64],
     d: NDArray[numpy.float64],
     z: NDArray[numpy.float64],
@@ -195,7 +195,7 @@ def sargan(
     if count < MIN_INSTRUMENTS:
         return not_testable("sargan", count)
     rows = len(outcome)
-    residual = outcome - two_stage(outcome, regressor, z) * regressor
+    residual = outcome - estimate(outcome, regressor, z) * regressor
     fit = z @ numpy.linalg.lstsq(z, residual, rcond=None)[0]
     total = float(residual @ residual)
     r_squared = float(fit @ fit) / total if total > 0 else 0.0
@@ -229,7 +229,7 @@ def hansen_j(
     if count < MIN_INSTRUMENTS:
         return not_testable("hansen_j", count)
     rows = len(outcome)
-    first = outcome - two_stage(outcome, regressor, z) * regressor
+    first = outcome - estimate(outcome, regressor, z) * regressor
     moments = z * first[:, None]
     weight = numpy.linalg.pinv(moments.T @ moments / rows)
     left = z.T @ regressor / rows

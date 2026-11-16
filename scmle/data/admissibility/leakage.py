@@ -538,7 +538,7 @@ def enough_rows(y: numpy.ndarray, task: str, cfg: Config) -> bool:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SkillTest:
+class Skill:
     """Single-feature skill against a permutation null.
 
     Attributes:
@@ -565,7 +565,7 @@ class SkillTest:
     check: qualification.Check
 
 
-def decision_for(
+def decide(
     suspect: bool, low_power: bool, gate: certificates.GateStatus
 ) -> qualification.Decision:
     """Chooses the decision of a leakage test, demoted when not certified.
@@ -597,7 +597,7 @@ def skill_test(
     block_size: int | None = None,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
-) -> SkillTest:
+) -> Skill:
     """Tests whether one feature predicts the target beyond chance.
 
     Args:
@@ -676,12 +676,12 @@ def skill_test(
         interval=(bound, max(skill, bound)) if math.isfinite(bound) else None,
         effect=skill - float(numpy.mean(null)),
         n=len(y),
-        decision=decision_for(suspect, not powered, gate),
+        decision=decide(suspect, not powered, gate),
         set_id=set_id,
         seed_path=randomness.seed_path(cfg.run_seed, path, 1),
         tier=qualification.Tier.UNVERIFIED,
     )
-    return SkillTest(
+    return Skill(
         name,
         skill,
         float(numpy.mean(null)),
@@ -762,7 +762,7 @@ def within_strata(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ConditionalTest:
+class Conditional:
     """Conditional permutation test of one feature.
 
     Attributes:
@@ -794,7 +794,7 @@ def conditional_test(
     groups: pandas.Series | None = None,
     block_size: int | None = None,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
-) -> ConditionalTest:
+) -> Conditional:
     """Tests whether the feature keeps predictive value given the others.
 
     Args:
@@ -865,7 +865,7 @@ def conditional_test(
         seed_path=randomness.seed_path(cfg.run_seed, path, 1),
         tier=qualification.Tier.UNVERIFIED,
     )
-    return ConditionalTest(
+    return Conditional(
         name,
         skill,
         float(numpy.mean(null)),
@@ -911,7 +911,7 @@ def binned_target(target: pandas.Series, task: str) -> pandas.Series:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class MissingnessTest:
+class Missingness:
     """Result of testing whether a feature's missingness depends on the target.
 
     Attributes:
@@ -943,7 +943,7 @@ def missingness_test(
     cfg: Config,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
-) -> MissingnessTest | None:
+) -> Missingness | None:
     """Tests whether recording a value depends on the outcome.
 
     Args:
@@ -995,12 +995,12 @@ def missingness_test(
         interval=None,
         effect=v,
         n=len(feature),
-        decision=decision_for(suspect, not powered, gate),
+        decision=decide(suspect, not powered, gate),
         set_id=set_id,
         seed_path=randomness.seed_path(cfg.run_seed, path, 0),
         tier=qualification.Tier.UNVERIFIED,
     )
-    return MissingnessTest(
+    return Missingness(
         str(feature.name),
         method,
         p_value,
@@ -1013,7 +1013,7 @@ def missingness_test(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FeatureAssessment:
+class Assessment:
     """All leakage tests for one feature.
 
     Attributes:
@@ -1026,9 +1026,9 @@ class FeatureAssessment:
     """
 
     feature: str
-    skill: SkillTest
-    conditional: ConditionalTest | None
-    missingness: MissingnessTest | None
+    skill: Skill
+    conditional: Conditional | None
+    missingness: Missingness | None
     suspect: bool
     escalated: bool
 
@@ -1049,7 +1049,7 @@ def assess_feature(
     block_size: int | None = None,
     gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
     set_id: qualification.SetId = qualification.SetId.EXPLORATION,
-) -> FeatureAssessment:
+) -> Assessment:
     """Runs the skill, missingness and (for suspects) conditional tests.
 
     Args:
@@ -1081,7 +1081,7 @@ def assess_feature(
         else None
     )
     escalated = conditional is not None and conditional.keeps_signal and suspect
-    return FeatureAssessment(
+    return Assessment(
         str(feature.name), skill, conditional, gaps, suspect, escalated
     )
 
@@ -1095,7 +1095,7 @@ class Assessments:
         gate: Whether decisions were allowed to quarantine.
     """
 
-    assessments: tuple[FeatureAssessment, ...]
+    assessments: tuple[Assessment, ...]
     gate: certificates.GateStatus
 
     @property

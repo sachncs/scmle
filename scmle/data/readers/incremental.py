@@ -4,7 +4,7 @@ This module owns the semantics that every event source must provide: stable
 event identity, ordered checkpoints, watermarks, late-data policy, duplicate
 classification, and an atomic durable commit. It deliberately does not
 import a broker or warehouse SDK. A transport adapter supplies available
-events through ``EventSource``.
+events through ``Source``.
 """
 
 import abc
@@ -517,7 +517,7 @@ class Consumption:
         }
 
 
-class EventSource(abc.ABC):
+class Source(abc.ABC):
     """Polymorphic contract for a source that yields ordered events.
 
     Attributes:
@@ -711,7 +711,7 @@ class EventSource(abc.ABC):
         )
 
 
-class SequenceEventSource(EventSource):
+class SequenceEventSource(Source):
     """Deterministic source adapter for tests and local replay fixtures."""
 
     def __init__(
@@ -745,7 +745,7 @@ class SequenceEventSource(EventSource):
         return self.event_factory()
 
 
-class EventStreamSource(EventSource):
+class EventStreamSource(Source):
     """Bounded event-stream adapter around a caller-owned poll boundary.
 
     The callback is the only transport-specific surface. It receives the
@@ -1018,7 +1018,7 @@ class IngestionLedger:
             )
         return state
 
-    def read_batch(self, source: EventSource, limit: int = 1_000) -> EventBatch:
+    def read_batch(self, source: Source, limit: int = 1_000) -> EventBatch:
         """Reads an uncommitted batch using the durable deduplication state.
 
         Args:
@@ -1350,7 +1350,7 @@ class EventConsumer:
 
     def __init__(
         self,
-        source: EventSource,
+        source: Source,
         ledger: IngestionLedger,
         consumer_group: str,
         writer: Callable[[tuple[Event, ...]], None],

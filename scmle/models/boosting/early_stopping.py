@@ -96,7 +96,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-
                 stratify=None if stratify is None else numpy.asarray(stratify),
             ),
         )
-        arguments = self.stopping_arguments(features, target, held)
+        arguments = self.arm(features, target, held)
         self.estimator_.fit(
             features[train]
             if hasattr(features, "tocsr")
@@ -105,7 +105,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-
             **arguments,
             **fit_params,
         )
-        self.best_iteration_ = self.recorded_iteration()
+        self.best_iteration_ = self.recall()
         return self
 
     @staticmethod
@@ -124,7 +124,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-
             return features.iloc[rows]
         return numpy.asarray(features)[rows]
 
-    def stopping_arguments(
+    def arm(
         self, features: Any, target: Any, held: numpy.ndarray
     ) -> dict[str, Any]:
         """Builds the per-library `fit` arguments that enable stopping.
@@ -165,7 +165,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-
         self.estimator_.set_params(early_stopping_rounds=self.rounds)
         return {"eval_set": validation}
 
-    def recorded_iteration(self) -> int | None:
+    def recall(self) -> int | None:
         """Rounds the library kept, if it reports them.
 
         Returns:
@@ -210,7 +210,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-
         return numpy.asarray(self.estimator_.predict_proba(features))
 
 
-class EarlyStoppingClassifier(base.ClassifierMixin, HoldoutEarlyStopping):  # type: ignore[misc]  # scikit-learn ships no type information
+class Classifier(base.ClassifierMixin, HoldoutEarlyStopping):  # type: ignore[misc]  # scikit-learn ships no type information
     """Early-stopped boosting classifier."""
 
     @property
@@ -219,7 +219,7 @@ class EarlyStoppingClassifier(base.ClassifierMixin, HoldoutEarlyStopping):  # ty
         return numpy.asarray(self.encoder_.classes_)
 
 
-class EarlyStoppingRegressor(base.RegressorMixin, HoldoutEarlyStopping):  # type: ignore[misc]  # scikit-learn ships no type information
+class Regressor(base.RegressorMixin, HoldoutEarlyStopping):  # type: ignore[misc]  # scikit-learn ships no type information
     """Early-stopped boosting regressor."""
 
 
@@ -237,9 +237,5 @@ def wrap(
         A classifier or regressor wrapper, so scikit-learn scorers treat it
         as the right kind of estimator.
     """
-    kind = (
-        EarlyStoppingClassifier
-        if base.is_classifier(estimator)
-        else EarlyStoppingRegressor
-    )
+    kind = Classifier if base.is_classifier(estimator) else Regressor
     return kind(estimator, rounds, random_state=seed)

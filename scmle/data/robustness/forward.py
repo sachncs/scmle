@@ -50,7 +50,7 @@ CONFIDENCE = 0.95
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ForwardFinding:
+class Finding:
     """One finding evaluated on the forward set.
 
     Attributes:
@@ -96,7 +96,7 @@ class ForwardCheck:
     status: str
     reason: str
     opened: bool
-    findings: tuple[ForwardFinding, ...]
+    findings: tuple[Finding, ...]
 
     def to_dict(self) -> dict[str, Any]:
         """Converts the record to a JSON-ready dictionary.
@@ -146,14 +146,14 @@ def label_for(effect_x: float, low: float, high: float) -> str:
     return INCONCLUSIVE
 
 
-def evaluate_finding(
+def evaluate(
     name: str,
     effect_x: float,
     values: numpy.ndarray,
     target: numpy.ndarray,
     seed: int,
     bootstrap: int,
-) -> ForwardFinding:
+) -> Finding:
     """Re-estimates one finding on the forward rows and labels it.
 
     The interval is a percentile bootstrap of the rank correlation, widened
@@ -175,7 +175,7 @@ def evaluate_finding(
     """
     effect = stability.rank_effect(values, target)
     if not math.isfinite(effect):
-        return ForwardFinding(name, effect_x, None, INCONCLUSIVE, None)
+        return Finding(name, effect_x, None, INCONCLUSIVE, None)
     rng = randomness.component_rng(seed, f"{CHECK_ID}.{name}", 0)
     rows = len(values)
     picks = list(
@@ -215,7 +215,7 @@ def evaluate_finding(
         seed_path=randomness.seed_path(seed, f"{CHECK_ID}.{name}", 0),
         tier=qualification.Tier.UNVERIFIED,
     )
-    return ForwardFinding(name, effect_x, effect, label, check)
+    return Finding(name, effect_x, effect, label, check)
 
 
 def forward_check(
@@ -265,12 +265,10 @@ def forward_check(
     findings = []
     for name, effect_x in effects.items():
         if name not in features.columns:
-            findings.append(
-                ForwardFinding(name, effect_x, None, INCONCLUSIVE, None)
-            )
+            findings.append(Finding(name, effect_x, None, INCONCLUSIVE, None))
             continue
         findings.append(
-            evaluate_finding(
+            evaluate(
                 name,
                 effect_x,
                 features[name].to_numpy(dtype=float),

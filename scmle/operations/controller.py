@@ -168,7 +168,7 @@ class Controller:
         self.checkpoint = checkpoint
         self.loop = scmle.governance.loop.Loop.resume(
             deploy_dir,
-            hooks=scmle.governance.loop.Hooks(retrain=self.authorized_retrain),
+            hooks=scmle.governance.loop.Hooks(retrain=self.train),
             verification_keys=verification_keys,
             system_keys=system_keys,
             today=today,
@@ -180,7 +180,7 @@ class Controller:
 
     # ------------------------------------------------------------ authority
 
-    def authorized_retrain(self) -> str | None:
+    def train(self) -> str | None:
         """The loop's retrain hook: spend an envelope, then train.
 
         Returns:

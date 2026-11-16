@@ -251,7 +251,7 @@ def finish(
     )
 
 
-def check_health(fetch: Fetch, target: Target) -> Check:
+def probe(fetch: Fetch, target: Target) -> Check:
     """Checks `/livez`, `/readyz` and `/health` and the model identity.
 
     Args:
@@ -281,7 +281,7 @@ def check_health(fetch: Fetch, target: Target) -> Check:
     return finish("health", target, wire, problems)
 
 
-def check_schema(fetch: Fetch, target: Target) -> Check:
+def inspect(fetch: Fetch, target: Target) -> Check:
     """Checks that `/schema` serves the contract, digest and model identity.
 
     Args:
@@ -358,7 +358,7 @@ def check_inference(
     return finish("inference", target, wire, problems)
 
 
-def check_security(fetch: Fetch, target: Target) -> Check:
+def breach(fetch: Fetch, target: Target) -> Check:
     """Checks that anonymous and forged callers are refused, over TLS.
 
     Args:
@@ -426,10 +426,10 @@ def run_checks(
         The health, schema, inference and security results, in that order.
     """
     return [
-        check_health(fetch, target),
-        check_schema(fetch, target),
+        probe(fetch, target),
+        inspect(fetch, target),
         check_inference(fetch, target, golden, expected),
-        check_security(fetch, target),
+        breach(fetch, target),
     ]
 
 

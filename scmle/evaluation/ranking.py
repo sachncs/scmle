@@ -13,7 +13,7 @@ CUTOFF = 10
 MIN_DOCUMENTS = 2
 
 
-def query_groups(queries: Any) -> list[numpy.ndarray]:
+def group(queries: Any) -> list[numpy.ndarray]:
     """Row positions of each query.
 
     Args:
@@ -76,7 +76,7 @@ def per_query_ndcg(
     """
     values = []
     excluded = 0
-    for rows in query_groups(queries):
+    for rows in group(queries):
         truth = numpy.asarray(relevance, dtype=float)[rows]
         if len(rows) < MIN_DOCUMENTS or truth.max() <= 0:
             excluded += 1
@@ -161,7 +161,7 @@ def mean_average_precision(
         document, or NaN if there are none.
     """
     values = []
-    for rows in query_groups(queries):
+    for rows in group(queries):
         truth = numpy.asarray(relevance, dtype=float)[rows] > 0
         if len(rows) < MIN_DOCUMENTS or not truth.any():
             continue
@@ -176,7 +176,7 @@ def mean_average_precision(
     return float(numpy.mean(values)) if values else float("nan")
 
 
-def ranked_hits(
+def sort(
     relevance: numpy.ndarray, scores: numpy.ndarray, rows: numpy.ndarray
 ) -> numpy.ndarray:
     """Relevance (above zero) of one query's documents in score order.
@@ -213,8 +213,8 @@ def mean_reciprocal_rank(
         and one relevant document, or NaN if there are none.
     """
     values = []
-    for rows in query_groups(queries):
-        hits = ranked_hits(relevance, scores, rows)
+    for rows in group(queries):
+        hits = sort(relevance, scores, rows)
         if len(rows) < MIN_DOCUMENTS or not hits.any():
             continue
         values.append(1.0 / (int(numpy.argmax(hits)) + 1))
@@ -243,8 +243,8 @@ def precision_at(
         document, or NaN if there are none.
     """
     values = []
-    for rows in query_groups(queries):
-        hits = ranked_hits(relevance, scores, rows)
+    for rows in group(queries):
+        hits = sort(relevance, scores, rows)
         if len(rows) < MIN_DOCUMENTS or not hits.any():
             continue
         values.append(float(hits[:cutoff].sum() / min(cutoff, len(hits))))
@@ -270,8 +270,8 @@ def recall_at(
         document, or NaN if there are none.
     """
     values = []
-    for rows in query_groups(queries):
-        hits = ranked_hits(relevance, scores, rows)
+    for rows in group(queries):
+        hits = sort(relevance, scores, rows)
         if len(rows) < MIN_DOCUMENTS or not hits.any():
             continue
         found = int(hits[:cutoff].sum())

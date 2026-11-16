@@ -10,7 +10,7 @@ from sklearn import base
 from sklearn import pipeline
 
 
-class MultiTargetEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Multitarget(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits a pipeline whose last step predicts a matrix of targets.
 
     The framework splits off the first (primary) target; the others stay in
@@ -76,7 +76,7 @@ class MultiTargetEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-
         return predictions
 
 
-class MultiLabelEstimator(base.ClassifierMixin, MultiTargetEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class MultiLabelEstimator(base.ClassifierMixin, Multitarget):  # type: ignore[misc]  # scikit-learn ships no type information
     """Multi-label flavour: also provides per-label probabilities."""
 
     def predict_proba(self, features: Any) -> numpy.ndarray:
@@ -94,5 +94,5 @@ class MultiLabelEstimator(base.ClassifierMixin, MultiTargetEstimator):  # type: 
         return probabilities
 
 
-class MultiOutputEstimator(base.RegressorMixin, MultiTargetEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class MultiOutputEstimator(base.RegressorMixin, Multitarget):  # type: ignore[misc]  # scikit-learn ships no type information
     """Multi-output regression flavour."""

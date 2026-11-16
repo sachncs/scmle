@@ -216,7 +216,7 @@ class Calibration(Diagnostic):
         }
 
 
-class MulticlassCalibration(Diagnostic):
+class Reliability(Diagnostic):
     """Top-label reliability curve, Brier score and calibration error."""
 
     name = "calibration"
@@ -696,7 +696,7 @@ def default_suite() -> tuple[Diagnostic, ...]:
     return (
         ConfusionMatrix(),
         Calibration(),
-        MulticlassCalibration(),
+        Reliability(),
         ThresholdSweep(),
         Residuals(),
         ErrorAnalysis(),

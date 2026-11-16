@@ -505,7 +505,7 @@ class AnalysisCharter:
                 `k_max` is not an integer of at least 1; `power` is not
                 strictly in (0, 1); `seed` is not a non-negative integer; a
                 multiverse name repeats; the decision map fails
-                `check_decision_map`; a decision layer is given without a
+                `cover`; a decision layer is given without a
                 `cost_model`; or `unit_of_prediction` is set and not in
                 `UNITS_OF_PREDICTION`.
         """
@@ -525,7 +525,7 @@ class AnalysisCharter:
         names = [c.name for c in self.multiverse]
         if len(set(names)) != len(names):
             raise errors.InputError("duplicate name in multiverse")
-        self.check_decision_map()
+        self.cover()
         if self.decision is not None and self.cost_model is None:
             raise errors.InputError("a decision layer needs a cost_model")
         if (
@@ -536,7 +536,7 @@ class AnalysisCharter:
                 f"unit_of_prediction must be one of {UNITS_OF_PREDICTION}"
             )
 
-    def check_decision_map(self) -> None:
+    def cover(self) -> None:
         """Checks that every gating check has one row and a certificate id.
 
         Raises:

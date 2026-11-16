@@ -104,7 +104,7 @@ def installed_distributions() -> dict[str, str]:
     return dict(sorted(found.items()))
 
 
-def installed_versions() -> dict[str, str]:
+def detect() -> dict[str, str]:
     """Reports the versions of the tracked libraries that are installed.
 
     Returns:
@@ -160,7 +160,7 @@ def file_sha256(path: pathlib.Path) -> str:
     return digest.hexdigest()
 
 
-def minor_version(version: str) -> list[str]:
+def truncate(version: str) -> list[str]:
     """Returns the `[major, minor]` components of a version string.
 
     Args:
@@ -173,7 +173,7 @@ def minor_version(version: str) -> list[str]:
     return version.split(".")[:2]
 
 
-def sign_manifest(manifest_bytes: bytes, key: bytes) -> str:
+def sign(manifest_bytes: bytes, key: bytes) -> str:
     """Computes the HMAC-SHA256 of the manifest.
 
     The manifest carries the checksum of every stored file.
@@ -229,7 +229,7 @@ def verify_signature(
         raise errors.ArtifactError(
             f"unsupported bundle signature algorithm {algorithm!r}"
         )
-    expected = sign_manifest((root / MANIFEST_FILE).read_bytes(), key)
+    expected = sign((root / MANIFEST_FILE).read_bytes(), key)
     if not hmac.compare_digest(recorded, expected):
         raise errors.ArtifactError(
             "bundle signature is invalid: the bundle was modified or "
@@ -277,9 +277,7 @@ class Manifest:
     model_params: dict[str, Any] = dataclasses.field(default_factory=dict)
     strategy: str = "default"
     decision_threshold: float | None = None
-    libraries: dict[str, str] = dataclasses.field(
-        default_factory=installed_versions
-    )
+    libraries: dict[str, str] = dataclasses.field(default_factory=detect)
     calibration: str = ""
     environment: dict[str, str] = dataclasses.field(default_factory=dict)
     platform: str = ""
@@ -319,21 +317,21 @@ class Manifest:
             empty if all agree.
         """
         problems = []
-        if minor_version(self.sklearn) != minor_version(sklearn.__version__):
+        if truncate(self.sklearn) != truncate(sklearn.__version__):
             problems.append(
                 f"scikit-learn {self.sklearn} (installed {sklearn.__version__})"
             )
         running = platform.python_version()
-        if minor_version(self.python) != minor_version(running):
+        if truncate(self.python) != truncate(running):
             problems.append(f"python {self.python} (running {running})")
-        if minor_version(self.pandas) != minor_version(pandas.__version__):
+        if truncate(self.pandas) != truncate(pandas.__version__):
             problems.append(
                 f"pandas {self.pandas} (installed {pandas.__version__})"
             )
-        current = installed_versions()
+        current = detect()
         for library, built in sorted(self.libraries.items()):
             now = current.get(library)
-            if now is not None and minor_version(built) != minor_version(now):
+            if now is not None and truncate(built) != truncate(now):
                 problems.append(f"{library} {built} (installed {now})")
         return problems
 
@@ -375,7 +373,7 @@ def read_manifest_and_schema(
     return manifest, schema
 
 
-def verify_core_files(
+def authenticate(
     root: pathlib.Path,
     info: Manifest,
     legacy: bool,
@@ -419,7 +417,7 @@ def verify_core_files(
         )
 
 
-def verified_member_path(
+def resolve(
     root: pathlib.Path, info: Manifest, name: str, modified: str
 ) -> pathlib.Path | None:
     """Returns the path of a listed bundle member whose checksum matches.
@@ -461,37 +459,27 @@ def load_monitoring_members(
         ArtifactError: If a listed member is missing or its checksum differs.
     """
     reference = None
-    path = verified_member_path(
-        root, info, REFERENCE_FILE, "reference profile was modified"
-    )
+    path = resolve(root, info, REFERENCE_FILE, "reference profile was modified")
     if path is not None:
         reference = scmle.monitoring.reference.ReferenceProfile.from_dict(
             json.loads(path.read_text(encoding="utf-8"))
         )
     history = None
-    path = verified_member_path(
-        root, info, HISTORY_FILE, "series history was modified"
-    )
+    path = resolve(root, info, HISTORY_FILE, "series history was modified")
     if path is not None:
         history = pandas.read_parquet(path)
     calibrator = None
-    path = verified_member_path(
-        root, info, CALIBRATOR_FILE, "calibrator was modified"
-    )
+    path = resolve(root, info, CALIBRATOR_FILE, "calibrator was modified")
     if path is not None:
         calibrator = joblib.load(path)
     calibrated = None
-    path = verified_member_path(
-        root, info, CONFORMAL_FILE, "conformal scores were modified"
-    )
+    path = resolve(root, info, CONFORMAL_FILE, "conformal scores were modified")
     if path is not None:
         calibrated = scmle.evaluation.conformal.ConformalCalibrator.from_dict(
             json.loads(path.read_text(encoding="utf-8"))
         )
     detector = None
-    path = verified_member_path(
-        root, info, NOVELTY_FILE, "novelty detector was modified"
-    )
+    path = resolve(root, info, NOVELTY_FILE, "novelty detector was modified")
     if path is not None:
         detector = joblib.load(path)
     return reference, history, calibrator, calibrated, detector
@@ -514,25 +502,19 @@ def load_interval_members(
         ArtifactError: If a listed member is missing or its checksum differs.
     """
     intervals = None
-    path = verified_member_path(
-        root, info, QUANTILE_FILE, "quantile models were modified"
-    )
+    path = resolve(root, info, QUANTILE_FILE, "quantile models were modified")
     if path is not None:
         intervals = joblib.load(path)
     cv_plus_models = None
-    path = verified_member_path(
-        root, info, CV_PLUS_FILE, "CV+ fold models were modified"
-    )
+    path = resolve(root, info, CV_PLUS_FILE, "CV+ fold models were modified")
     if path is not None:
         cv_plus_models = joblib.load(path)
     stored_coverage = None
-    path = verified_member_path(
-        root, info, COVERAGE_FILE, "coverage report was modified"
-    )
+    path = resolve(root, info, COVERAGE_FILE, "coverage report was modified")
     if path is not None:
         stored_coverage = json.loads(path.read_text(encoding="utf-8"))
     stored_weights = None
-    path = verified_member_path(
+    path = resolve(
         root, info, SHIFT_WEIGHTS_FILE, "shift weights were modified"
     )
     if path is not None:
@@ -1076,7 +1058,7 @@ class Bundle:
         signature_path = root / SIGNATURE_FILE
         key = signing.resolve_key(signing_key)
         if key is not None:
-            signature = sign_manifest(manifest_text.encode(), key)
+            signature = sign(manifest_text.encode(), key)
             signature_path.write_text(
                 json.dumps(
                     {"algorithm": SIGNATURE_ALGORITHM, "signature": signature}
@@ -1147,9 +1129,7 @@ class Bundle:
                 json.dump(
                     {
                         "algorithm": SIGNATURE_ALGORITHM,
-                        "signature": sign_manifest(
-                            manifest_text.encode(), replacement
-                        ),
+                        "signature": sign(manifest_text.encode(), replacement),
                     },
                     handle,
                 )
@@ -1226,7 +1206,7 @@ class Bundle:
                 "bundle is missing a schema checksum; re-export it with "
                 f"bundle format {BUNDLE_FORMAT}"
             )
-        verify_core_files(root, info, legacy, trusted, signing_key)
+        authenticate(root, info, legacy, trusted, signing_key)
         problems = info.compatibility_problems()
         if problems and not allow_version_mismatch:
             raise errors.ArtifactError(
@@ -1541,7 +1521,7 @@ class Bundle:
             )
         calibrator = self.require_conformal("regression")
         if shift:
-            return self.shifted_interval(calibrator, data, coverage, mapping)
+            return self.reweight(calibrator, data, coverage, mapping)
         predictions = numpy.asarray(self.predict(data, mapping), dtype=float)
         lower, upper = calibrator.interval(predictions, coverage)
         return pandas.DataFrame(
@@ -1610,7 +1590,7 @@ class Bundle:
         self.shift_weights = shift_weights.StoredShiftWeights(found, chosen)
         return self.shift_weights
 
-    def shifted_interval(
+    def reweight(
         self,
         calibrator: scmle.evaluation.conformal.ConformalCalibrator,
         data: str | pathlib.Path | pandas.DataFrame,

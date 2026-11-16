@@ -66,7 +66,7 @@ def untestable(n: int, note: str) -> Outcome:
     return Outcome(p=1.0, statistic=0.0, effect=0.0, n=n, note=note)
 
 
-def complete_pairs(
+def prune(
     x: numpy.ndarray, y: numpy.ndarray
 ) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Restricts both arrays to rows where neither value is missing.
@@ -136,7 +136,7 @@ def spearman(
     """
     if direction not in DIRECTIONS:
         raise errors.InputError(f"direction must be one of {DIRECTIONS}")
-    xs, ys = complete_pairs(x, y)
+    xs, ys = prune(x, y)
     n = len(xs)
     if n < MIN_PAIRS:
         return untestable(n, "fewer than three complete pairs")
@@ -181,7 +181,7 @@ def kruskal(
         raise errors.InputError(
             "kruskal supports only the two-sided alternative"
         )
-    xs, ls = complete_pairs(x, labels)
+    xs, ls = prune(x, labels)
     n = len(xs)
     groups = [xs[ls == code] for code in numpy.unique(ls)]
     groups = [g for g in groups if len(g) > 0]

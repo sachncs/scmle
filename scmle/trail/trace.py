@@ -274,10 +274,10 @@ class Tracer:
                     "alpha_confirm"
                 ],
             }
-            self.check_charter_signature(wrapper, charter, name)
+            self.verify(wrapper, charter, name)
         self.add(name, ["run/analysis_charter.json"], facts, [])
 
-    def check_charter_signature(
+    def verify(
         self, wrapper: Mapping[str, Any], charter: Any, step: str
     ) -> None:
         """Records a finding unless the charter's HMAC verifies.
@@ -434,7 +434,7 @@ class Tracer:
             )
         return results
 
-    def report_step(
+    def recompute(
         self, name: str, relative: str, fresh: dict[str, Any], files: list[str]
     ) -> None:
         """Derives a report step: the stored copy must equal the recomputation.
@@ -493,7 +493,7 @@ class Tracer:
             self.add(name, files, {}, ["question"])
             return
         self.derived["exploratory"] = fresh
-        self.report_step(name, records.EXPLORATORY, fresh, files)
+        self.recompute(name, records.EXPLORATORY, fresh, files)
 
     def experiments(self) -> None:
         """Derives the experiment comparison."""
@@ -509,7 +509,7 @@ class Tracer:
             self.add(name, files, {}, ["question"])
             return
         self.derived["experiments"] = fresh
-        self.report_step(name, records.EXPERIMENTS, fresh, files)
+        self.recompute(name, records.EXPERIMENTS, fresh, files)
 
     def quality(self) -> None:
         """Derives the domain thresholds, which the reviewer signs."""
@@ -787,7 +787,7 @@ class Tracer:
                 scope=scope,
                 charter_hash=header["charter_hash"],
             )
-            self.reconcile_feed(summaries, name)
+            self.reconcile(summaries, name)
         self.add(
             name,
             [f"deployment/{n}" for n in records.DEPLOYMENT_FILES],
@@ -795,9 +795,7 @@ class Tracer:
             ["approval"],
         )
 
-    def reconcile_feed(
-        self, summaries: list[dict[str, Any]], step: str
-    ) -> None:
+    def reconcile(self, summaries: list[dict[str, Any]], step: str) -> None:
         """Records a mismatch unless the feed matches the ledger's cases.
 
         The feed's per-batch case counts (length of each `label` list) must
@@ -822,7 +820,7 @@ class Tracer:
                 f"recorded (feed {sizes}, ledger {seen})",
             )
 
-    def outcomes_step(self) -> None:
+    def observe(self) -> None:
         """Tracks the observed cost per case against the expectation."""
         name = "outcomes"
         feed = self.json("deployment/observed_outcomes.json", name)
@@ -851,7 +849,7 @@ class Tracer:
                 )
         tracking = reports.stamp({"kind": "outcome_tracking", **tracking})
         self.derived["outcomes"] = tracking
-        self.report_step(
+        self.recompute(
             name,
             records.OUTCOME_TRACKING,
             tracking,
@@ -919,7 +917,7 @@ def derive(
     tracer.exploration()
     tracer.experiments()
     tracer.selection()
-    tracer.outcomes_step()
+    tracer.observe()
     tracer.stakeholder()
     tracer.quality()
     tracer.approval()

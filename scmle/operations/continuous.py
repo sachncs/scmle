@@ -63,7 +63,7 @@ DATA_FAULTS = frozenset(
 )
 
 
-def canonical_csv(frame: pandas.DataFrame) -> bytes:
+def serialize(frame: pandas.DataFrame) -> bytes:
     """The bytes a dataset version is computed from.
 
     Args:
@@ -86,7 +86,7 @@ def dataset_version(frame: pandas.DataFrame) -> str:
     Returns:
         The version string.
     """
-    return "sha256:" + hashlib.sha256(canonical_csv(frame)).hexdigest()
+    return "sha256:" + hashlib.sha256(serialize(frame)).hexdigest()
 
 
 def load_dataset(
@@ -842,7 +842,7 @@ class ContinuousEvaluation:
         """Applies the policy to a window of signals.
 
         A proposal always goes through `Loop.escalate`. In ``trigger`` mode a
-        challenger is also started through `start_challenger` at once (which
+        challenger is also started through `train` at once (which
         starts none without a retrain hook or while one is already queued).
         A review that makes no proposal is written to the history as
         ``retrain_review`` and changes no state; a proposal is written as
@@ -894,10 +894,10 @@ class ContinuousEvaluation:
             evidence=("retained_outcomes.jsonl", HISTORY_FILE),
             proposed_default=DEFAULT_IF_UNANSWERED,
         )
-        identity = pending.id if pending is not None else self.pending_id()
+        identity = pending.id if pending is not None else self.find()
         challenger = None
         if self.policy.mode == TRIGGER:
-            challenger = self.start_challenger(reasons)
+            challenger = self.train(reasons)
         decision = RetrainDecision(
             self.policy.mode, reasons, None, identity, challenger, gates
         )
@@ -907,7 +907,7 @@ class ContinuousEvaluation:
         )
         return decision
 
-    def pending_id(self) -> str | None:
+    def find(self) -> str | None:
         """Id of the pending retrain question, if one is open.
 
         Returns:
@@ -918,7 +918,7 @@ class ContinuousEvaluation:
                 return item.id
         return None
 
-    def start_challenger(self, reasons: Sequence[str]) -> str | None:
+    def train(self, reasons: Sequence[str]) -> str | None:
         """Trains a challenger with the hook and registers it with the loop.
 
         Args:
@@ -970,7 +970,7 @@ class ContinuousEvaluation:
                 and deployment_ledger.ReplyDecision(body["decision"])
                 in never_list.ALLOWING
             ):
-                return self.start_challenger(("approved recommendation",))
+                return self.train(("approved recommendation",))
         raise errors.InputError(f"{escalation_id} has no approving reply")
 
     # -- history -----------------------------------------------------------
@@ -1005,7 +1005,7 @@ class ContinuousEvaluation:
                 / (version.replace(":", "-") + ".csv")
             )
             if not path.exists():
-                durability.write_atomically(path, canonical_csv(frame))
+                durability.write_atomically(path, serialize(frame))
         return self.history.record(
             "training",
             self.clock(),

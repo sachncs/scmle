@@ -11,7 +11,7 @@ from scmle.contracts import errors
 MIN_REPORTS = 2
 
 
-def validate_score(value: float, field_name: str) -> float:
+def validate(value: float, field_name: str) -> float:
     """Returns a finite score in the inclusive unit interval.
 
     Args:
@@ -53,7 +53,7 @@ class QualityThresholds:
         """Validates every declared threshold.
 
         A declared threshold that is not a number is rejected by
-        `validate_score` with a `TypeError`.
+        `validate` with a `TypeError`.
 
         Raises:
             ValueError: If neither threshold is declared, or a declared
@@ -64,9 +64,9 @@ class QualityThresholds:
                 "at least one explanation threshold is required"
             )
         if self.stability_minimum is not None:
-            validate_score(self.stability_minimum, "stability_minimum")
+            validate(self.stability_minimum, "stability_minimum")
         if self.fidelity_minimum is not None:
-            validate_score(self.fidelity_minimum, "fidelity_minimum")
+            validate(self.fidelity_minimum, "fidelity_minimum")
 
     def to_dict(self) -> dict[str, float | None]:
         """Returns JSON-compatible threshold declarations.
@@ -82,7 +82,7 @@ class QualityThresholds:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class QualityEvaluation:
+class Evaluation:
     """Reviewable result of explanation stability and fidelity checks.
 
     Attributes:
@@ -119,9 +119,9 @@ class QualityEvaluation:
         if self.sample_count < 1:
             raise errors.InputError("sample_count must be at least 1")
         if self.stability_score is not None:
-            validate_score(self.stability_score, "stability_score")
+            validate(self.stability_score, "stability_score")
         if self.fidelity_score is not None:
-            validate_score(self.fidelity_score, "fidelity_score")
+            validate(self.fidelity_score, "fidelity_score")
         if not isinstance(self.findings, tuple):
             raise errors.KindError("findings must be a tuple")
 
@@ -171,7 +171,7 @@ class ExplanationGroundTruth:
         """Validates the independent reference declaration.
 
         A `minimum_overlap` that is not a number is rejected by
-        `validate_score` with a `TypeError`.
+        `validate` with a `TypeError`.
 
         Raises:
             ValueError: If `method`, `reference`, or any expected feature or
@@ -191,7 +191,7 @@ class ExplanationGroundTruth:
             raise errors.InputError(
                 "expected_features must not contain empty values"
             )
-        validate_score(self.minimum_overlap, "minimum_overlap")
+        validate(self.minimum_overlap, "minimum_overlap")
         if any(not limitation.strip() for limitation in self.limitations):
             raise errors.InputError("limitations must not contain empty values")
 
@@ -211,7 +211,7 @@ class ExplanationGroundTruth:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GroundTruthEvaluation:
+class Comparison:
     """Reviewable comparison between an explanation and its reference.
 
     Attributes:
@@ -243,7 +243,7 @@ class GroundTruthEvaluation:
     def __post_init__(self) -> None:
         """Validates the comparison before it is persisted.
 
-        A score that is not a number is rejected by `validate_score` with
+        A score that is not a number is rejected by `validate` with
         a `TypeError`.
 
         Raises:
@@ -257,8 +257,8 @@ class GroundTruthEvaluation:
             raise errors.InputError("method must not be empty")
         if not self.reference.strip():
             raise errors.InputError("reference must not be empty")
-        validate_score(self.overlap_score, "overlap_score")
-        validate_score(self.minimum_overlap, "minimum_overlap")
+        validate(self.overlap_score, "overlap_score")
+        validate(self.minimum_overlap, "minimum_overlap")
         if not isinstance(self.findings, tuple):
             raise errors.KindError("findings must be a tuple")
 
@@ -285,7 +285,7 @@ class GroundTruthEvaluation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GroundTruthSuiteEvaluation:
+class Suite:
     """Bounded suite result for independent explanation references.
 
     Attributes:
@@ -300,7 +300,7 @@ class GroundTruthSuiteEvaluation:
 
     sample_count: int
     reference_count: int
-    evaluations: tuple[GroundTruthEvaluation, ...]
+    evaluations: tuple[Comparison, ...]
     passed: bool
     findings: tuple[str, ...]
 
@@ -364,7 +364,7 @@ class GroundTruthSuiteEvaluation:
         }
 
 
-def explanation_ranking(report: Mapping[str, Any]) -> tuple[str, ...]:
+def rank(report: Mapping[str, Any]) -> tuple[str, ...]:
     """Extracts a validated feature ranking from one explanation report.
 
     Args:
@@ -405,7 +405,7 @@ def evaluate_ground_truth(
     ground_truth: ExplanationGroundTruth,
     report: Mapping[str, Any],
     sample_id: str,
-) -> GroundTruthEvaluation:
+) -> Comparison:
     """Compares an explanation ranking with an independent reference ranking.
 
     The score is the fraction of expected features found in the observed
@@ -415,14 +415,14 @@ def evaluate_ground_truth(
     Args:
         ground_truth: The independent reference ranking.
         report: The explanation report to check, in the form read by
-            `explanation_ranking`.
+            `rank`.
         sample_id: Identity of the explained sample.
 
     Returns:
         The comparison, with the observed top features, the overlap score
         and whether it reached the reference's minimum overlap.
 
-    An invalid report is rejected by `explanation_ranking` with a
+    An invalid report is rejected by `rank` with a
     `ValueError`, and a blank `sample_id` by the result record with a
     `ValueError`.
 
@@ -431,7 +431,7 @@ def evaluate_ground_truth(
     """
     if not isinstance(ground_truth, ExplanationGroundTruth):
         raise errors.KindError("ground_truth must be ExplanationGroundTruth")
-    ranking = explanation_ranking(report)
+    ranking = rank(report)
     observed = ranking[: len(ground_truth.expected_features)]
     expected = set(ground_truth.expected_features)
     overlap = len(expected & set(observed)) / len(expected)
@@ -441,7 +441,7 @@ def evaluate_ground_truth(
         if passed
         else ("independent explanation reference overlap is below threshold",)
     )
-    return GroundTruthEvaluation(
+    return Comparison(
         sample_id=sample_id,
         method=ground_truth.method,
         reference=ground_truth.reference,
@@ -458,7 +458,7 @@ def evaluate_ground_truth(
 def evaluate_ground_truth_suite(
     sample_count: int,
     references: Sequence[tuple[ExplanationGroundTruth, Mapping[str, Any], str]],
-) -> GroundTruthSuiteEvaluation:
+) -> Suite:
     """Evaluates independent references across a bounded held-out suite.
 
     A partial reference set fails closed. This prevents a caller from
@@ -501,7 +501,7 @@ def evaluate_ground_truth_suite(
     else:
         findings = ("one or more independent explanation references failed",)
         passed = False
-    return GroundTruthSuiteEvaluation(
+    return Suite(
         sample_count=sample_count,
         reference_count=len(evaluations),
         evaluations=evaluations,
@@ -585,7 +585,7 @@ def ranking_stability(
 
     Args:
         reports: Two or more explanation reports in the form read by
-            `explanation_ranking`.
+            `rank`.
         top_k: Number of leading features compared. When None or 0, the
             smallest feature count among the reports is used.
 
@@ -600,7 +600,7 @@ def ranking_stability(
     """
     if len(reports) < MIN_REPORTS:
         raise errors.InputError("at least two explanation reports are required")
-    rankings = [explanation_ranking(report) for report in reports]
+    rankings = [rank(report) for report in reports]
     limit = top_k or min(len(ranking) for ranking in rankings)
     if limit < 1:
         raise errors.InputError("top_k must be at least 1")
@@ -674,7 +674,7 @@ def evaluate(
     *,
     stability: float | None = None,
     fidelity: float | None = None,
-) -> QualityEvaluation:
+) -> Evaluation:
     """Evaluates declared explanation thresholds without inventing measures.
 
     A declared threshold whose measure is missing fails.
@@ -690,15 +690,15 @@ def evaluate(
         The evaluation, with the findings that explain each failure or the
         statement that all thresholds passed.
 
-    A measure that is not a number is rejected by `validate_score` with a
+    A measure that is not a number is rejected by `validate` with a
     `TypeError`. A measure that is not finite or lies outside [0, 1], a
     blank `method` and a `sample_count` below 1 are rejected with a
     `ValueError`.
     """
     if stability is not None:
-        validate_score(stability, "stability")
+        validate(stability, "stability")
     if fidelity is not None:
-        validate_score(fidelity, "fidelity")
+        validate(fidelity, "fidelity")
     findings: list[str] = []
     passed = True
     if thresholds.stability_minimum is not None:
@@ -717,7 +717,7 @@ def evaluate(
             findings.append("fidelity is below its declared threshold")
     if passed:
         findings.append("all declared explanation thresholds passed")
-    return QualityEvaluation(
+    return Evaluation(
         method=method,
         sample_count=sample_count,
         stability_score=stability,

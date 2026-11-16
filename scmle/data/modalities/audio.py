@@ -323,7 +323,7 @@ def canonical_source(source: str | pathlib.Path) -> str:
     return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
 
 
-def wav_metadata(encoded_bytes: bytes) -> Metadata:
+def parse(encoded_bytes: bytes) -> Metadata:
     """Reads WAV metadata using the standard library.
 
     Args:
@@ -352,7 +352,7 @@ def wav_metadata(encoded_bytes: bytes) -> Metadata:
         ) from error
 
 
-def wav_signal_features(
+def extract(
     encoded_bytes: bytes,
     max_frames: int,
     start_frame: int = 0,
@@ -719,7 +719,7 @@ class Sample:
                 "this audio container requires an explicit codec probe"
             )
         try:
-            metadata = (probe or wav_metadata)(raw)
+            metadata = (probe or parse)(raw)
         except AudioValidationError:
             raise
         except Exception as error:
@@ -825,7 +825,7 @@ class Dataset:
 
         Returns:
             Thirteen features per sample: nine signal statistics (see
-            `wav_signal_features`), then duration in seconds, sample rate,
+            `extract`), then duration in seconds, sample rate,
             channel count and sample width (0 when unknown).
 
         Raises:
@@ -861,7 +861,7 @@ class Dataset:
                     "audio signal features require a WAV decoder for "
                     f"'{sample.source}'"
                 )
-            signal_values, observed = wav_signal_features(
+            signal_values, observed = extract(
                 sample.encoded_bytes, max_frames, start_frame
             )
             rows.append(
@@ -1111,6 +1111,6 @@ __all__ = [
     "Transcript",
     "TranscriptSegment",
     "canonical_source",
-    "wav_metadata",
-    "wav_signal_features",
+    "extract",
+    "parse",
 ]

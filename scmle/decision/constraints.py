@@ -173,7 +173,7 @@ def rate_tables(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SatisfactionTest:
+class Satisfaction:
     """Outcome of the satisfaction test on the final table.
 
     Attributes:
@@ -210,7 +210,7 @@ def satisfaction_test(
     groups: ArrayLike,
     constraint: decision.FairnessConstraint,
     alpha: float = 0.05,
-) -> SatisfactionTest:
+) -> Satisfaction:
     """Tests whether the frozen rule's group gap is at most `max_gap`.
 
     The claim is `satisfied` only if the upper bound of every compared gap is
@@ -247,7 +247,7 @@ def satisfaction_test(
         }
     )
     if small or len(names) < MIN_GROUPS:
-        return SatisfactionTest(
+        return Satisfaction(
             NOT_ASSESSABLE,
             constraint.criterion,
             constraint.max_gap,
@@ -269,7 +269,7 @@ def satisfaction_test(
             )
             upper = max(upper, abs(lo), abs(hi))
     status = SATISFIED if upper <= constraint.max_gap else NOT_SATISFIED
-    return SatisfactionTest(
+    return Satisfaction(
         status,
         constraint.criterion,
         constraint.max_gap,
@@ -303,7 +303,7 @@ def cluster_satisfaction_test(
     alpha: float = 0.05,
     draws: int = 1000,
     seed: int = 0,
-) -> SatisfactionTest:
+) -> Satisfaction:
     """Tests satisfaction by resampling whole clusters of rows.
 
     `satisfaction_test` takes rows as independent, so rows that share a
@@ -363,7 +363,7 @@ def cluster_satisfaction_test(
     )
     cluster_ids, inverse = numpy.unique(keys, return_inverse=True)
     if small or len(names) < MIN_GROUPS or len(cluster_ids) < MIN_CLUSTERS:
-        return SatisfactionTest(
+        return Satisfaction(
             NOT_ASSESSABLE,
             constraint.criterion,
             constraint.max_gap,
@@ -385,7 +385,7 @@ def cluster_satisfaction_test(
         len(cluster_ids), -1, len(names), 2
     )
 
-    def largest_gap(totals: NDArray[numpy.float64]) -> NDArray[numpy.float64]:
+    def spread(totals: NDArray[numpy.float64]) -> NDArray[numpy.float64]:
         """Computes the largest gap in any rate between groups.
 
         Args:
@@ -402,17 +402,17 @@ def cluster_satisfaction_test(
         spread = numpy.nanmax(rates, axis=-1) - numpy.nanmin(rates, axis=-1)
         return numpy.asarray(numpy.nanmax(spread, axis=-1))
 
-    point = float(largest_gap(matrix.sum(axis=0)))
+    point = float(spread(matrix.sum(axis=0)))
     rng = randomness.component_rng(seed, "decision.constraints.cluster", 0)
     weights = rng.multinomial(
         len(cluster_ids),
         numpy.full(len(cluster_ids), 1.0 / len(cluster_ids)),
         size=draws,
     ).astype(float)
-    resampled = largest_gap(numpy.einsum("dk,krgp->drgp", weights, matrix))
+    resampled = spread(numpy.einsum("dk,krgp->drgp", weights, matrix))
     upper = max(point, float(numpy.quantile(resampled, 1.0 - alpha)))
     status = SATISFIED if upper <= constraint.max_gap else NOT_SATISFIED
-    return SatisfactionTest(
+    return Satisfaction(
         status,
         constraint.criterion,
         constraint.max_gap,
@@ -513,7 +513,7 @@ def check_feasibility(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GroupThresholds:
+class Thresholds:
     """Group-specific cuts chosen on development data.
 
     Attributes:
@@ -584,7 +584,7 @@ def fit_group_thresholds(
     t: float,
     *,
     margin: float = 0.5,
-) -> GroupThresholds:
+) -> Thresholds:
     """Fits group cuts that maximise net benefit within `margin * max_gap`.
 
     The development bound is `margin * constraint.max_gap`. The common cut at
@@ -627,7 +627,7 @@ def fit_group_thresholds(
     names = sorted(str(g) for g in numpy.unique(labels))
     gap = development_gap(outcomes, common, labels, constraint.criterion)
     if gap <= bound:
-        return GroupThresholds(
+        return Thresholds(
             dict.fromkeys(names, t),
             None,
             costs.net_benefit(outcomes, common, t),
@@ -638,7 +638,7 @@ def fit_group_thresholds(
         "equal_opportunity",
         "equalized_odds",
     )
-    best: GroupThresholds | None = None
+    best: Thresholds | None = None
     for rate in numpy.linspace(0.01, 0.99, GRID):
         cuts: dict[str, float] = {}
         for name in names:
@@ -648,7 +648,7 @@ def fit_group_thresholds(
                 break
             cuts[name] = float(numpy.quantile(pool, 1.0 - rate))
         else:
-            acts = GroupThresholds(cuts, rate, 0.0, 0.0, constrained=True).act(
+            acts = Thresholds(cuts, rate, 0.0, 0.0, constrained=True).act(
                 s, labels
             )
             achieved = development_gap(
@@ -658,7 +658,7 @@ def fit_group_thresholds(
                 continue
             value = costs.net_benefit(outcomes, acts, t)
             if best is None or value > best.net_benefit:
-                best = GroupThresholds(
+                best = Thresholds(
                     cuts, float(rate), value, achieved, constrained=True
                 )
     if best is None:

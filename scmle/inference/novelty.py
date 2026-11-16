@@ -91,11 +91,11 @@ class NoveltyDetector:
         return cls(
             model,
             float(numpy.quantile(scores, TAIL)),
-            cls.far_out_fences(features, numeric),
+            cls.fence(features, numeric),
         )
 
     @staticmethod
-    def far_out_fences(
+    def fence(
         features: pandas.DataFrame, numeric: tuple[str, ...]
     ) -> dict[str, tuple[float, float]]:
         """Computes the Tukey far-out fences of each numeric feature.

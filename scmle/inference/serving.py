@@ -55,7 +55,7 @@ class Server(abc.ABC):
         """Initializes the adapter and its readiness tracker.
 
         With a bundle, the verify and load steps are marked complete at once;
-        the warm-up step is left to `warm_up`.
+        the warm-up step is left to `warm`.
 
         Args:
             bundle: Model to serve. `None` defers loading to a subclass that
@@ -112,7 +112,7 @@ class Server(abc.ABC):
         """Digest of the input schema of the bundle being served."""
         return serving.schema_digest(self.bundle.schema.to_dict())
 
-    def synthetic_record(self) -> dict[str, Any] | None:
+    def synthesise(self) -> dict[str, Any] | None:
         """Derives a record that is valid for the schema.
 
         Returns:
@@ -130,12 +130,12 @@ class Server(abc.ABC):
             record[name] = known[0]
         return record
 
-    def warm_up(self) -> None:
+    def warm(self) -> None:
         """Scores once so the first request does not pay for initialization.
 
         Marks the warm-up step complete, or skipped when no record can be
         derived, or marks the service failed if scoring raises. Warm-up
-        records come from `warmup_records` or `synthetic_record`. The warm-up
+        records come from `warmup_records` or `synthesise`. The warm-up
         call never feeds series history. A `ScmleError` from
         `Readiness.begin` (warm-up started out of order) is not caught.
         """
@@ -144,7 +144,7 @@ class Server(abc.ABC):
             records = self.warmup_records
             note = "explicit warm-up records"
             if records is None:
-                record = self.synthetic_record()
+                record = self.synthesise()
                 records = None if record is None else [record]
                 note = "synthetic record from the schema"
             if records is None:
@@ -164,7 +164,7 @@ class Server(abc.ABC):
     def respond(self, records: list[dict[str, Any]]) -> dict[str, Any]:
         """Scores records and builds the structured response.
 
-        A row that breaks a policy set to `reject` makes `enforce_policy`
+        A row that breaks a policy set to `reject` makes `enforce`
         raise `PolicyError`.
 
         Args:
@@ -229,7 +229,7 @@ class Server(abc.ABC):
             bundle = self.bundle
             rows = validation.InputValidator(bundle.schema).row_report(frame)
             response = bundle.score(frame)
-            self.enforce_policy(rows)
+            self.enforce(rows)
             if remember and not guard.abandoned():
                 bundle.remember(frame)
         response.update(
@@ -243,7 +243,7 @@ class Server(abc.ABC):
         )
         return response
 
-    def enforce_policy(self, rows: list[dict[str, Any]]) -> None:
+    def enforce(self, rows: list[dict[str, Any]]) -> None:
         """Applies the null and unseen-category policies to scored rows.
 
         Args:
@@ -546,7 +546,7 @@ class HttpServing(Server):
             "artifact_digest": self.artifact_digest,
         }
 
-    def load_in_background(self) -> None:
+    def boot(self) -> None:
         """Runs the loader, then the warm-up; failure is kept as readiness.
 
         Raises:
@@ -567,7 +567,7 @@ class HttpServing(Server):
             self.readiness.fail(reason)
             self.announce()
             return
-        self.warm_up()
+        self.warm()
         self.announce()
 
     def announce(self) -> None:
@@ -591,7 +591,7 @@ class HttpServing(Server):
                 reason=str(snapshot.get("reason", "not ready")),
             )
 
-    def observe_request(self, route: str, status: int, seconds: float) -> None:
+    def observe(self, route: str, status: int, seconds: float) -> None:
         """Passes a finished request to the monitor; never raises.
 
         Args:
@@ -606,7 +606,7 @@ class HttpServing(Server):
         except Exception:  # monitoring must not change a response
             LOGGER.exception("the signal monitor failed on a request")
 
-    def observe_rows(self, records: list[dict[str, Any]]) -> None:
+    def feed(self, records: list[dict[str, Any]]) -> None:
         """Passes the rows of a scored batch to the monitor; never raises.
 
         Args:
@@ -648,7 +648,7 @@ class HttpServing(Server):
                 },
             )
         response = self.respond(request.records)
-        self.observe_rows(request.records)
+        self.feed(request.records)
         return response
 
     def start(self) -> None:
@@ -664,18 +664,16 @@ class HttpServing(Server):
         if self.httpd is not None:
             raise errors.ScmleError("server is already running")
         handler = functools.partial(Responder, adapter=self)
-        self.httpd = ReferenceServer((self.host, self.port), handler)
+        self.httpd = Listener((self.host, self.port), handler)
         self.thread = threading.Thread(
             target=self.httpd.serve_forever, daemon=True
         )
         self.thread.start()
         if self.loader is not None:
-            self.loading = threading.Thread(
-                target=self.load_in_background, daemon=True
-            )
+            self.loading = threading.Thread(target=self.boot, daemon=True)
             self.loading.start()
         else:
-            self.warm_up()
+            self.warm()
             self.announce()
 
     def stop(self) -> None:
@@ -689,7 +687,7 @@ class HttpServing(Server):
         self.httpd = self.thread = None
 
 
-class ReferenceServer(server.ThreadingHTTPServer):
+class Listener(server.ThreadingHTTPServer):
     """The threaded HTTP server that backs `HttpServing`."""
 
     daemon_threads = True
@@ -759,9 +757,7 @@ class Responder(server.BaseHTTPRequestHandler):
             self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
-        self.adapter.observe_request(
-            self.path, status, time.monotonic() - self.started
-        )
+        self.adapter.observe(self.path, status, time.monotonic() - self.started)
 
     def fail(
         self,
@@ -909,7 +905,7 @@ class Responder(server.BaseHTTPRequestHandler):
         else:
             self.fail(404, "not found", "request")
 
-    def read_body(self) -> bytes | None:
+    def receive(self) -> bytes | None:
         """Reads the request body after checking its headers.
 
         Returns:
@@ -980,7 +976,7 @@ class Responder(server.BaseHTTPRequestHandler):
     def predict(self) -> None:
         """Scores the request and answers it, mapping failures to statuses."""
         try:
-            self.answer_prediction()
+            self.answer()
         except guard.DeadlineError as error:
             # handled: scoring deadline exceeded answered with HTTP 504
             self.fail(504, str(error), error.category)
@@ -1010,13 +1006,13 @@ class Responder(server.BaseHTTPRequestHandler):
             LOGGER.exception("internal serving failure")
             self.fail(500, "internal serving failure", "internal")
 
-    def answer_prediction(self) -> None:
+    def answer(self) -> None:
         """Reads, parses and scores the request body and sends the answer.
 
         An error response is sent, and nothing is scored, when the body is
         unreadable or is not JSON. Other failures propagate to `predict`.
         """
-        body = self.read_body()
+        body = self.receive()
         if body is None:
             return
         try:

@@ -248,7 +248,7 @@ class CurationFinding:
         )
 
 
-def check_findings(findings: tuple[Any, ...]) -> None:
+def vet(findings: tuple[Any, ...]) -> None:
     """Checks that every entry of a record's findings is a finding.
 
     Args:
@@ -527,7 +527,7 @@ class DatasetManifest:
                     f"{component_name} must be {expected.__name__}"
                 )
         object.__setattr__(self, "findings", tuple(self.findings))
-        check_findings(self.findings)
+        vet(self.findings)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON- and Arrow-compatible mapping."""
@@ -646,7 +646,7 @@ class ModalityManifest:
         if not isinstance(self.privacy, PrivacyMetadata):
             raise errors.KindError("privacy must be PrivacyMetadata")
         object.__setattr__(self, "findings", tuple(self.findings))
-        check_findings(self.findings)
+        vet(self.findings)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON- and Arrow-compatible modality manifest."""

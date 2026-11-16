@@ -63,7 +63,7 @@ def bayes_threshold(c_fp: float, c_fn: float) -> float:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CalibrationCheck:
+class Calibration:
     """Result of the binned calibration test.
 
     Attributes:
@@ -110,7 +110,7 @@ def probabilities_and_labels(
 
 def calibration_check(
     p: ArrayLike, y: ArrayLike, level: float = 0.01, bins: int = BINS
-) -> CalibrationCheck:
+) -> Calibration:
     """Binned chi-square test that `E[y | p] = p`.
 
     Args:
@@ -144,7 +144,7 @@ def calibration_check(
         observed = float(labels[part].sum())
         statistic += (observed - expected) ** 2 / max(variance, 1e-12)
     p_value = float(stats.chi2.sf(statistic, bins))
-    return CalibrationCheck(
+    return Calibration(
         statistic=statistic,
         degrees=bins,
         p_value=p_value,
@@ -317,8 +317,8 @@ class ThresholdDecision:
 
     rule: Threshold
     tier: str
-    check: CalibrationCheck
-    recheck: CalibrationCheck | None
+    check: Calibration
+    recheck: Calibration | None
     expected_cost: float
     cost_interval: tuple[float, float]
     stable_range: tuple[float, float] | None

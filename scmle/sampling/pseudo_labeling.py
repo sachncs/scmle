@@ -26,7 +26,7 @@ MIN_PSEUDO_ROWS = 20
 
 
 @dataclasses.dataclass(frozen=True)
-class SelfTrainingOutcome:
+class Outcome:
     """What cross-validation said about self-training.
 
     Attributes:
@@ -117,7 +117,7 @@ def judge(
     scorer: Callable[..., float],
     confidence: float = DEFAULT_CONFIDENCE,
     should_stop: Callable[[], bool] = lambda: False,
-) -> SelfTrainingOutcome | None:
+) -> Outcome | None:
     """Compares plain and self-trained fits on held-out labeled rows.
 
     Args:
@@ -162,6 +162,4 @@ def judge(
     if not gains:
         return None
     gain = float(numpy.mean(gains))
-    return SelfTrainingOutcome(
-        gain, len(gains), float(numpy.mean(added)), gain > 0
-    )
+    return Outcome(gain, len(gains), float(numpy.mean(added)), gain > 0)

@@ -28,7 +28,7 @@ FOLDS = 5
 
 
 @dataclasses.dataclass(frozen=True)
-class ColumnGap:
+class Gap:
     """How one column differs between the sample and the reference.
 
     Attributes:
@@ -54,7 +54,7 @@ class Representativeness:
 
     auc: float
     representative: bool
-    gaps: tuple[ColumnGap, ...]
+    gaps: tuple[Gap, ...]
 
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
@@ -133,7 +133,7 @@ class Representativeness:
         }
 
 
-def column_gap(sample: pandas.Series, reference: pandas.Series) -> ColumnGap:
+def column_gap(sample: pandas.Series, reference: pandas.Series) -> Gap:
     """Measures how one column differs between sample and reference.
 
     Args:
@@ -147,7 +147,7 @@ def column_gap(sample: pandas.Series, reference: pandas.Series) -> ColumnGap:
     """
     if pandas.api.types.is_numeric_dtype(sample):
         result = stats.ks_2samp(sample.dropna(), reference.dropna())
-        return ColumnGap(
+        return Gap(
             str(sample.name),
             float(result.statistic),  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
             float(result.pvalue),  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
@@ -155,7 +155,7 @@ def column_gap(sample: pandas.Series, reference: pandas.Series) -> ColumnGap:
     left = sample.astype(str).value_counts(normalize=True)
     right = reference.astype(str).value_counts(normalize=True)
     gap = left.sub(right, fill_value=0.0).abs().max()
-    return ColumnGap(str(sample.name), float(gap), None)
+    return Gap(str(sample.name), float(gap), None)
 
 
 def compare_to_reference(

@@ -182,7 +182,7 @@ class MeanSelector(Selector):
         def by_score(trial: experiments.Trial) -> tuple[float, ...]:
             return (-sign * round(trial.score_mean, SCORE_PRECISION),)
 
-        def tie_key(trial: experiments.Trial) -> tuple[Any, ...]:
+        def tiebreak(trial: experiments.Trial) -> tuple[Any, ...]:
             cost = registry.get(trial.model_name).capabilities.cost
             plain = trial.strategy == experiments.DEFAULT_STRATEGY
             ordering = (
@@ -199,7 +199,7 @@ class MeanSelector(Selector):
                 trial.trial_id,
             )
 
-        ordered = sorted(pool, key=lambda t: (*by_score(t), *tie_key(t)))
+        ordered = sorted(pool, key=lambda t: (*by_score(t), *tiebreak(t)))
         best = ordered[0]
         folds = max(len(best.fold_scores), 1)
         tolerance = self.rule.tie_tolerance
@@ -212,4 +212,4 @@ class MeanSelector(Selector):
             or self.probably_equivalent(best, t, sign)
         ]
         rest = [t for t in ordered if t not in tied]
-        return sorted(tied, key=tie_key) + rest
+        return sorted(tied, key=tiebreak) + rest

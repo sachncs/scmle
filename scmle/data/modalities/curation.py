@@ -147,7 +147,7 @@ def normalized_curation(curation: Mapping[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def check_governance(name: str, values: Mapping[str, str]) -> None:
+def govern(name: str, values: Mapping[str, str]) -> None:
     """Checks that a governance mapping holds only non-empty text.
 
     Args:
@@ -330,8 +330,8 @@ class DatasetCard:
             raise errors.InputError(
                 "curation report does not match sample_count"
             )
-        check_governance("provenance", self.provenance)
-        check_governance("privacy", self.privacy)
+        govern("provenance", self.provenance)
+        govern("privacy", self.privacy)
         if self.manifest is not None:
             check_manifest(
                 self.manifest,

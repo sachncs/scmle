@@ -57,7 +57,7 @@ MIN_UNAUDITED_ROWS = 2
 
 
 @dataclasses.dataclass(frozen=True)
-class NoiseRate:
+class Rate:
     """Estimate of the label-noise rate.
 
     Attributes:
@@ -103,7 +103,7 @@ class Noise:
     rows_checked: int
     input_rows: int
     sampling_bound: float
-    rate: NoiseRate
+    rate: Rate
     thresholds: tuple[float, ...]
 
     def to_dict(self) -> dict[str, Any]:
@@ -256,7 +256,7 @@ def confident_learning_flags(
     return (assigned >= 0) & (assigned != codes), thresholds
 
 
-def mean_margins(
+def integrate(
     features: pandas.DataFrame, codes: numpy.ndarray, seed: int
 ) -> numpy.ndarray:
     """Computes the area under the margin over boosting stages.
@@ -304,7 +304,7 @@ def margin_flags(
     Returns:
         A boolean per row, True where the area under the margin is negative.
     """
-    area = mean_margins(features, codes, seed)
+    area = integrate(features, codes, seed)
     return area < 0.0
 
 
@@ -354,7 +354,7 @@ def noise_rate(
     flags: numpy.ndarray,
     audit: pandas.Series | None = None,
     confidence: float = SAMPLING_CONFIDENCE,
-) -> NoiseRate:
+) -> Rate:
     """Noise-rate interval from detector flags and an optional audit.
 
     Args:
@@ -390,7 +390,7 @@ def noise_rate(
             audit.to_numpy(dtype=float),
             confidence,
         )
-        return NoiseRate(
+        return Rate(
             estimate=min(1.0, max(0.0, estimate)),
             interval=(max(0.0, low), min(1.0, high)),
             method="prediction_powered",
@@ -403,7 +403,7 @@ def noise_rate(
             audited=len(audit),
         )
     low, high = certificates.wilson_interval(int(flags.sum()), n, confidence)
-    return NoiseRate(
+    return Rate(
         estimate=float(flags.mean()),
         interval=(low, high),
         method="detector_only",

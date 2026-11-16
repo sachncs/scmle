@@ -28,7 +28,7 @@ STACK_FOLDS = 3
 MIN_MEMBERS = 2
 
 
-class GreedyBlender(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-learn ships no type information
+class Blender(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-learn ships no type information
     """Meta-learner that averages members with weights found greedily.
 
     Caruana-style ensemble selection: starting from nothing, repeatedly add
@@ -150,7 +150,7 @@ class GreedyBlender(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # sciki
         return stacked
 
 
-class ClassifierBlender(base.ClassifierMixin, GreedyBlender):  # type: ignore[misc]  # scikit-learn ships no type information
+class ClassifierBlender(base.ClassifierMixin, Blender):  # type: ignore[misc]  # scikit-learn ships no type information
     """Greedy blend of members' class probabilities."""
 
     def expand(self, stacked: numpy.ndarray) -> numpy.ndarray:
@@ -219,7 +219,7 @@ class ClassifierBlender(base.ClassifierMixin, GreedyBlender):  # type: ignore[mi
         return numpy.asarray(self.classes_[self.blend(meta).argmax(axis=1)])
 
 
-class RegressorBlender(base.RegressorMixin, GreedyBlender):  # type: ignore[misc]  # scikit-learn ships no type information
+class RegressorBlender(base.RegressorMixin, Blender):  # type: ignore[misc]  # scikit-learn ships no type information
     """Greedy blend of members' predictions."""
 
     def prepare(
@@ -290,7 +290,7 @@ class Stacking(models.Model):
         self.registry = registry
 
     @staticmethod
-    def members_of(params: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    def enlist(params: Mapping[str, Any] | None) -> list[dict[str, Any]]:
         """Returns the member specifications.
 
         Args:
@@ -332,7 +332,7 @@ class Stacking(models.Model):
             An unfitted stacking classifier or regressor over the member
             pipelines. Fewer than two members is a `ConfigError`.
         """
-        members = self.members_of(params)
+        members = self.enlist(params)
         estimators = [
             (
                 f"m{index}_{member['model']}",
@@ -403,7 +403,7 @@ class Stacking(models.Model):
             An unfitted stacking classifier or regressor. Fewer than two
             members is a `ConfigError`.
         """
-        members = self.members_of(params)
+        members = self.enlist(params)
         estimators = [
             (
                 f"m{index}_{member['model']}",

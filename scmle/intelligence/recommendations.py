@@ -59,7 +59,7 @@ class Advisor(abc.ABC):
         """
 
 
-class ImbalanceAdvice(Advisor):
+class Imbalance(Advisor):
     """Suggests decision and metric choices for rare positive classes."""
 
     def advise(
@@ -101,7 +101,7 @@ class ImbalanceAdvice(Advisor):
         return advice
 
 
-class MissingnessAdvice(Advisor):
+class Missingness(Advisor):
     """Flags columns that are mostly missing."""
 
     def advise(
@@ -139,7 +139,7 @@ class MissingnessAdvice(Advisor):
         ]
 
 
-class LeakageAdvice(Advisor):
+class Leakage(Advisor):
     """Points at leakage hypotheses raised by the profile."""
 
     def advise(
@@ -180,7 +180,7 @@ class LeakageAdvice(Advisor):
         return advice
 
 
-class DuplicateAdvice(Advisor):
+class Duplication(Advisor):
     """Flags heavily duplicated rows."""
 
     def advise(
@@ -215,7 +215,7 @@ class DuplicateAdvice(Advisor):
         ]
 
 
-class SmallDataAdvice(Advisor):
+class Scarcity(Advisor):
     """Warns that estimates from few rows are noisy."""
 
     def advise(
@@ -254,11 +254,11 @@ def default_rules() -> tuple[Advisor, ...]:
         One instance of each standard rule, in the order they are applied.
     """
     return (
-        ImbalanceAdvice(),
-        MissingnessAdvice(),
-        LeakageAdvice(),
-        DuplicateAdvice(),
-        SmallDataAdvice(),
+        Imbalance(),
+        Missingness(),
+        Leakage(),
+        Duplication(),
+        Scarcity(),
     )
 
 

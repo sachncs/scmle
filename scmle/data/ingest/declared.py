@@ -175,7 +175,7 @@ def reconcile(
     }
 
 
-def source_totals(
+def compare(
     view: str,
     frame: pandas.DataFrame,
     table: str,
@@ -303,7 +303,7 @@ def reconcile_source(
                 f"ingest plan does not read; views: {sorted(frames)}"
             )
         checks.extend(
-            source_totals(
+            compare(
                 totals.view,
                 frame,
                 tables[totals.view],

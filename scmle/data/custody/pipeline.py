@@ -113,7 +113,7 @@ def classes_complete(
     return in_x <= in_c
 
 
-def empty_carve(
+def forgo(
     dev_ids: numpy.ndarray,
     folds: list[tuple[numpy.ndarray, numpy.ndarray]],
     note: str,
@@ -242,7 +242,7 @@ def apply_custody(
         minority_rows(labels, fraction),
     )
     if estimate.verdict is feasibility.Verdict.INFEASIBLE:
-        carved = empty_carve(dev_ids, folds, estimate.reason)
+        carved = forgo(dev_ids, folds, estimate.reason)
     else:
         try:
             carved = carve.carve_confirmation(
@@ -264,13 +264,13 @@ def apply_custody(
             # set and an unconfirmed scope, as for an infeasible size.
             # handled: carve refusal becomes empty carve with reason note,
             # documented
-            carved = empty_carve(
+            carved = forgo(
                 dev_ids, folds, f"confirmation set not carved: {refusal}"
             )
         if len(carved.confirmation_ids) and not classes_complete(
             labels, carved, dev_ids
         ):
-            carved = empty_carve(
+            carved = forgo(
                 dev_ids, folds, "confirmation set misses a class: not carved"
             )
     actual = assess(
@@ -283,7 +283,7 @@ def apply_custody(
     if actual.verdict is feasibility.Verdict.INFEASIBLE and len(
         carved.confirmation_ids
     ):
-        carved = empty_carve(dev_ids, folds, actual.reason)
+        carved = forgo(dev_ids, folds, actual.reason)
         actual = assess(charter, 0, None)
     if not len(carved.confirmation_ids):
         # ERR-11: the run continues unconfirmed, so it says so loudly.

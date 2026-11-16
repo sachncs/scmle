@@ -926,7 +926,7 @@ def unregistered_coverage_finding(
     return None
 
 
-def coverage_status_problems(
+def reconcile(
     document: dict[str, Any],
     redone: dict[str, Any],
     ledger: scmle.data.ledger.ledger.Ledger,
@@ -1002,7 +1002,7 @@ def check_coverage_confirmation(
         return Finding(name, FAIL, "the document is malformed")
     if abs(redone["p_value"] - float(document["p_value"])) > TOLERANCE:
         problems.append("the p-value does not recompute from the counts")
-    problems.extend(coverage_status_problems(document, redone, ledger))
+    problems.extend(reconcile(document, redone, ledger))
     if problems:
         return Finding(name, FAIL, "; ".join(problems))
     return Finding(
@@ -1108,7 +1108,7 @@ def check_control(
     return Finding(name, FAIL, "the file differs from the ledger's control row")
 
 
-def evaluate_attestation(
+def assess(
     item: dict[str, Any],
     report: dict[str, Any],
     charter: Any,
@@ -1180,7 +1180,7 @@ def evaluate_attestations(
     problems: list[str] = []
     unchecked = False
     for item in report.get("accepted", []):
-        given, found, skipped = evaluate_attestation(
+        given, found, skipped = assess(
             item, report, charter, allowed, signing_key
         )
         problems.extend(found)

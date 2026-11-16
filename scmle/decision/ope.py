@@ -125,7 +125,7 @@ class LoggedBandit:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ValueEstimate:
+class Estimate:
     """One estimate of a policy value, or the reason there is none.
 
     Attributes:
@@ -269,7 +269,7 @@ def estimate_value(
     ess_floor: float = 0.2,
     level: float = 0.95,
     eligible_strategy: bool = False,
-) -> ValueEstimate:
+) -> Estimate:
     """Estimates `V(pi)` for a frozen target policy, or refuses.
 
     Args:
@@ -314,7 +314,7 @@ def estimate_value(
             f"effective sample size ratio {ess:.3f} is below {ess_floor}"
         )
     if reasons:
-        return ValueEstimate(
+        return Estimate(
             REFUSED,
             estimator,
             None,
@@ -338,7 +338,7 @@ def estimate_value(
     else:
         tier = qualification.Tier.UNVERIFIED.value
         notes.append("propensities estimated and no eligible F10 strategy")
-    return ValueEstimate(
+    return Estimate(
         ISSUED,
         estimator,
         centre,
@@ -361,7 +361,7 @@ def difference_value(
     ess_floor: float = 0.2,
     level: float = 0.95,
     eligible_strategy: bool = False,
-) -> ValueEstimate:
+) -> Estimate:
     """`V(pi) - V(pi0)` for a baseline policy given as a `(n, K)` matrix.
 
     The two policies are evaluated on the same rows, so the interval comes
@@ -490,7 +490,7 @@ def fit_outcome_model(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EffectThreshold:
+class Cutoff:
     """Treat iff the estimated effect exceeds `cut` (a one-parameter class).
 
     Attributes:
@@ -524,7 +524,7 @@ def fit_threshold_policy(
     *,
     penalty: float = 0.0,
     clip: float | None = None,
-) -> EffectThreshold:
+) -> Cutoff:
     """Chooses the cut on development data by penalised DR value.
 
     The class has one parameter, so the complexity penalty is the declared
@@ -559,13 +559,13 @@ def fit_threshold_policy(
     gain = (
         log.outcome_model[:, 1] - log.outcome_model[:, 0]
     ) + ratio * resid * (2.0 * (log.actions == 1) - 1.0)
-    best: EffectThreshold | None = None
+    best: Cutoff | None = None
     for cut in numpy.unique(numpy.quantile(effect, numpy.linspace(0, 1, 101))):
         treat = effect > cut
         objective = float(numpy.mean(numpy.where(treat, gain - penalty, 0.0)))
         if best is None or objective > best.objective:
-            best = EffectThreshold(float(cut), objective, penalty)
+            best = Cutoff(float(cut), objective, penalty)
     if best is None:
         raise errors.ScmleError("no candidate threshold")
-    none = EffectThreshold(float(numpy.max(effect)), 0.0, penalty)
+    none = Cutoff(float(numpy.max(effect)), 0.0, penalty)
     return best if best.objective > none.objective else none

@@ -334,9 +334,7 @@ def validate_text(value: str, field_name: str) -> str:
     return result
 
 
-def validate_evidence(
-    values: tuple[str, ...], field_name: str
-) -> tuple[str, ...]:
+def vet(values: tuple[str, ...], field_name: str) -> tuple[str, ...]:
     """Validates and returns a deterministic evidence list.
 
     Args:
@@ -360,7 +358,7 @@ def validate_evidence(
     return values
 
 
-def validate_finite(value: float, field_name: str) -> float:
+def quantify(value: float, field_name: str) -> float:
     """Validates a finite numeric threshold.
 
     Args:
@@ -405,7 +403,7 @@ class MetricDeclaration:
         validate_text(self.name, "metric.name")
         if not isinstance(self.direction, MetricDirection):
             raise errors.KindError("metric.direction must be MetricDirection")
-        validate_evidence(self.evidence, "metric.evidence")
+        vet(self.evidence, "metric.evidence")
         if self.custom and not self.evidence:
             raise errors.InputError("custom metrics require evidence")
 
@@ -442,7 +440,7 @@ class MetricGate:
             raise errors.KindError(
                 "metric_gate.direction must be MetricDirection"
             )
-        validate_finite(self.threshold, "metric_gate.threshold")
+        quantify(self.threshold, "metric_gate.threshold")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible metric gate."""
@@ -453,7 +451,7 @@ class MetricGate:
         }
 
 
-def check_open_unit_interval(value: float, field_name: str) -> None:
+def confine(value: float, field_name: str) -> None:
     """Validates a finite number strictly between zero and one.
 
     Args:
@@ -464,12 +462,12 @@ def check_open_unit_interval(value: float, field_name: str) -> None:
         ValueError: If the value is not strictly between 0 and 1 (or is not
             finite).
     """
-    checked = validate_finite(value, field_name)
+    checked = quantify(value, field_name)
     if not 0 < checked < 1:
         raise errors.InputError(f"{field_name} must be between 0 and 1")
 
 
-def check_explanation_threshold(
+def qualify(
     threshold: float, name: str, required: bool, requirement: str
 ) -> None:
     """Validates a stability or fidelity threshold of an explanation policy.
@@ -484,7 +482,7 @@ def check_explanation_threshold(
         ValueError: If the threshold is outside [0, 1] or not finite, or its
             requirement flag is not set.
     """
-    value = validate_finite(threshold, f"explanation.{name}")
+    value = quantify(threshold, f"explanation.{name}")
     if not 0.0 <= value <= 1.0:
         raise errors.InputError(f"explanation.{name} must be between 0 and 1")
     if not required:
@@ -521,13 +519,9 @@ class Uncertainty:
                 "uncertainty cannot be required when method is none"
             )
         if self.confidence_level is not None:
-            check_open_unit_interval(
-                self.confidence_level, "uncertainty.confidence_level"
-            )
+            confine(self.confidence_level, "uncertainty.confidence_level")
         if self.coverage_target is not None:
-            check_open_unit_interval(
-                self.coverage_target, "uncertainty.coverage_target"
-            )
+            confine(self.coverage_target, "uncertainty.coverage_target")
         if self.minimum_rows is not None and self.minimum_rows < 1:
             raise errors.InputError(
                 "uncertainty.minimum_rows must be at least 1"
@@ -591,8 +585,7 @@ class Calibration:
             raise errors.InputError("required calibration needs maximum_error")
         if (
             self.maximum_error is not None
-            and validate_finite(self.maximum_error, "calibration.maximum_error")
-            < 0
+            and quantify(self.maximum_error, "calibration.maximum_error") < 0
         ):
             raise errors.InputError(
                 "calibration.maximum_error must not be negative"
@@ -626,8 +619,8 @@ class Fairness:
         """
         if not isinstance(self.method, FairnessMethod):
             raise errors.KindError("fairness.method must be FairnessMethod")
-        validate_evidence(self.sensitive_columns, "fairness.sensitive_columns")
-        validate_evidence(self.metrics, "fairness.metrics")
+        vet(self.sensitive_columns, "fairness.sensitive_columns")
+        vet(self.metrics, "fairness.metrics")
         if self.method is FairnessMethod.NONE and (
             self.sensitive_columns or self.metrics
         ):
@@ -671,16 +664,14 @@ class FairnessGate:
             raise errors.InputError("fairness gate needs exactly one bound")
         if (
             self.maximum is not None
-            and validate_finite(self.maximum, "fairness_gate.maximum") < 0
+            and quantify(self.maximum, "fairness_gate.maximum") < 0
         ):
             raise errors.InputError(
                 "fairness_gate.maximum must not be negative"
             )
         if self.minimum is not None:
-            validate_finite(self.minimum, "fairness_gate.minimum")
-        validate_evidence(
-            self.required_evidence, "fairness_gate.required_evidence"
-        )
+            quantify(self.minimum, "fairness_gate.minimum")
+        vet(self.required_evidence, "fairness_gate.required_evidence")
         if not self.required_evidence:
             raise errors.InputError("fairness gates require evidence")
 
@@ -755,19 +746,17 @@ class Explanations:
             raise errors.KindError(
                 "explanation.availability must be ExplanationAvailability"
             )
-        validate_evidence(self.required_methods, "explanation.required_methods")
-        validate_evidence(
-            self.required_evidence, "explanation.required_evidence"
-        )
+        vet(self.required_methods, "explanation.required_methods")
+        vet(self.required_evidence, "explanation.required_evidence")
         if self.stability_threshold is not None:
-            check_explanation_threshold(
+            qualify(
                 self.stability_threshold,
                 "stability_threshold",
                 self.require_stability,
                 "require_stability",
             )
         if self.fidelity_threshold is not None:
-            check_explanation_threshold(
+            qualify(
                 self.fidelity_threshold,
                 "fidelity_threshold",
                 self.require_fidelity,
@@ -843,9 +832,7 @@ class DiagnosticGate:
             raise errors.KindError(
                 "diagnostic_gate.action must be DiagnosticAction"
             )
-        validate_evidence(
-            self.required_evidence, "diagnostic_gate.required_evidence"
-        )
+        vet(self.required_evidence, "diagnostic_gate.required_evidence")
         if not self.required_evidence:
             raise errors.InputError("diagnostic gates require evidence")
         if not isinstance(self.decisive, bool):
@@ -883,7 +870,7 @@ class Gates:
             raise errors.InputError("release policy requires metric_gates")
         if not self.diagnostic_gates:
             raise errors.InputError("release policy requires diagnostic_gates")
-        validate_evidence(self.required_evidence, "release.required_evidence")
+        vet(self.required_evidence, "release.required_evidence")
         if not self.required_evidence:
             raise errors.InputError("release policy requires evidence")
         if not any(

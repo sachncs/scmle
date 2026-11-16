@@ -96,7 +96,7 @@ class Multitarget(models.Model):
         return estimators.PerTarget(inner, classify=classify)
 
 
-class MultilabelLogistic(Multitarget):
+class Logistic(Multitarget):
     """Logistic regression for every label."""
 
     name = "multilabel_logistic"
@@ -182,7 +182,7 @@ MULTI_BOOSTING = Multitarget(
 )
 
 
-class MultiForest(models.Model):
+class Forest(models.Model):
     """One random forest over all targets jointly."""
 
     name = "multi_random_forest"
@@ -210,9 +210,9 @@ class MultiForest(models.Model):
 
 
 MULTITARGET_ADAPTERS: tuple[models.Model, ...] = (
-    MultilabelLogistic(),
+    Logistic(),
     MultioutputRidge(),
     MULTI_BOOSTING,
-    MultiForest(),
+    Forest(),
 )
 """Multi-target adapter instances, in registration order."""

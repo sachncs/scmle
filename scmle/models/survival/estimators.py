@@ -330,7 +330,7 @@ class DiscreteTimeBoosting(SurvivalEstimator):
         self.max_leaf_nodes = max_leaf_nodes
         self.random_state = random_state
 
-    def interval_of(self, time: numpy.ndarray) -> numpy.ndarray:
+    def locate(self, time: numpy.ndarray) -> numpy.ndarray:
         """Index of the interval each time falls in.
 
         Args:
@@ -395,7 +395,7 @@ class DiscreteTimeBoosting(SurvivalEstimator):
             )
         )
         self.edges_ = cuts
-        last = self.interval_of(time)
+        last = self.locate(time)
         average = float((last + 1).mean())
         if len(matrix) * average > MAX_EXPANDED_ROWS:
             keep = numpy.random.default_rng(self.random_state).choice(

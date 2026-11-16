@@ -950,7 +950,7 @@ def is_sequence_value(value: Any) -> bool:
     )
 
 
-def frame_shape(frame: pandas.DataFrame) -> tuple[int, ...]:
+def measure(frame: pandas.DataFrame) -> tuple[int, ...]:
     """Reads the dimensions of a frame as plain integers.
 
     Args:
@@ -975,10 +975,10 @@ def frame_for_pandas(
         frame named after the Series, or ``value`` when it has no name.
     """
     if isinstance(data, pandas.DataFrame):
-        return data, "pandas_dataframe", frame_shape(data)
+        return data, "pandas_dataframe", measure(data)
     name = str(data.name) if data.name is not None else "value"
     frame = data.to_frame(name=name)
-    return frame, "pandas_series", frame_shape(frame)
+    return frame, "pandas_series", measure(frame)
 
 
 def frame_for_array(
@@ -1029,9 +1029,9 @@ def frame_for_mapping(
         if len(lengths) != 1:
             raise errors.InputError("mapping columns must have equal lengths")
         frame = pandas.DataFrame(data)
-        return frame, "column_mapping", frame_shape(frame)
+        return frame, "column_mapping", measure(frame)
     frame = pandas.DataFrame([dict(data)])
-    return frame, "record_mapping", frame_shape(frame)
+    return frame, "record_mapping", measure(frame)
 
 
 def frame_for_data(
@@ -1061,9 +1061,9 @@ def frame_for_data(
     if isinstance(data, (list, tuple)):
         if data and all(isinstance(value, Mapping) for value in data):
             frame = pandas.DataFrame.from_records(data)
-            return frame, "record_sequence", frame_shape(frame)
+            return frame, "record_sequence", measure(frame)
         frame = pandas.DataFrame({"value": list(data)})
-        return frame, "sequence", frame_shape(frame)
+        return frame, "sequence", measure(frame)
     return frame_for_other(data)
 
 
@@ -1119,7 +1119,7 @@ def canonical_value(value: Any) -> Any:
         return value.isoformat()
     if isinstance(value, (Mapping, list, tuple, set, frozenset)):
         return canonical_collection(value)
-    return canonical_scalar(value)
+    return normalise(value)
 
 
 def canonical_collection(
@@ -1152,7 +1152,7 @@ def canonical_collection(
     return sorted(values, key=canonical_json)
 
 
-def canonical_scalar(value: Any) -> Any:
+def normalise(value: Any) -> Any:
     """Converts a value that is not a container, bytes, date or NumPy scalar.
 
     Args:

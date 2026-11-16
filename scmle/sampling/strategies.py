@@ -179,7 +179,7 @@ class Rebalancing(Strategy):
         return None
 
 
-class ClassWeighting(Rebalancing):
+class Weighting(Rebalancing):
     """Re-weights classes inversely to their frequency."""
 
     name = "class_weight"
@@ -235,7 +235,7 @@ class ClassWeighting(Rebalancing):
         return pipeline
 
 
-class FoldResampling(Rebalancing):
+class Resampling(Rebalancing):
     """Base for strategies that resample each training fold.
 
     Attributes:
@@ -270,7 +270,7 @@ class FoldResampling(Rebalancing):
         )
 
 
-class Oversampling(FoldResampling):
+class Oversampling(Resampling):
     """Random oversampling of minority classes inside each training fold."""
 
     name = "random_oversample"
@@ -278,7 +278,7 @@ class Oversampling(FoldResampling):
     resampler_class = resampling.RandomOverSampler
 
 
-class Undersampling(FoldResampling):
+class Undersampling(Resampling):
     """Random undersampling of majority classes inside each training fold."""
 
     name = "random_undersample"
@@ -350,7 +350,7 @@ class Recalibration(Strategy):
         return calibrated
 
 
-class Jitter(FoldResampling):
+class Jitter(Resampling):
     """Experimental augmentation: jittered minority copies in each fold.
 
     Not part of the default strategy list; request it explicitly with
@@ -362,7 +362,7 @@ class Jitter(FoldResampling):
     resampler_class = resampling.JitterOverSampler
 
 
-class Copula(FoldResampling):
+class Copula(Resampling):
     """Experimental augmentation: Gaussian-copula synthetic minority rows.
 
     Opt-in only; adopted only when it beats the un-augmented baseline on the
@@ -441,7 +441,7 @@ class Smote(Rebalancing):
         )
 
 
-class BorderlineSmote(Smote):
+class Borderline(Smote):
     """Borderline-SMOTE: synthesizes only near the decision boundary."""
 
     name = "borderline_smote"
@@ -518,7 +518,7 @@ class Features(Strategy):
         return pipeline
 
 
-class LogTransform(Features):
+class Logarithm(Features):
     """Log-transforms right-skewed, non-negative numeric features."""
 
     name = "log_skewed"
@@ -559,7 +559,7 @@ class LogTransform(Features):
         return None
 
 
-class RareTarget(Strategy):
+class Rarity(Strategy):
     """Regression policy for a long-tailed target: inverse-density weights.
 
     Classification resampling does not transfer to a continuous target, so
@@ -631,7 +631,7 @@ class RareTarget(Strategy):
         return resampling.DensityWeightedRegressor(inner)
 
 
-class TargetEncoding(Strategy):
+class Encoding(Strategy):
     """Regularized, cross-fitted target encoding of high-cardinality columns.
 
     Replaces one-hot encoding of categorical features with many levels by a
@@ -730,7 +730,7 @@ class Interactions(Features):
         return None
 
 
-class FeatureConstruction(Features):
+class Construction(Features):
     """Adds differences and ratios of the numeric features that matter most."""
 
     name = "construct_features"
@@ -761,7 +761,7 @@ class FeatureConstruction(Features):
         return None
 
 
-class FeatureSelection(Features):
+class Selection(Features):
     """Drops columns an L1-penalised linear model gives no weight."""
 
     name = "select_features"
@@ -830,7 +830,7 @@ class Imputation(Features):
         return None
 
 
-class MissingIndicators(Imputation):
+class Indicators(Imputation):
     """Fills with the median and flags which values were missing."""
 
     name = "missing_indicators"
@@ -905,7 +905,7 @@ class IterativeImputation(Imputation):
         return None
 
 
-class TargetTransform(Strategy):
+class Transformation(Strategy):
     """Regression on a compressed target, predicted in original units.
 
     A long-tailed target makes squared error chase the extremes; modelling a
@@ -980,24 +980,24 @@ STRATEGIES: dict[str, Strategy] = {
     strategy.name: strategy
     for strategy in (
         Default(),
-        ClassWeighting(),
+        Weighting(),
         Oversampling(),
         Undersampling(),
         PlainSmote(),
-        BorderlineSmote(),
+        Borderline(),
         Adasyn(),
         Jitter(),
         Copula(),
         Recalibration(),
-        LogTransform(),
+        Logarithm(),
         Interactions(),
-        FeatureConstruction(),
-        FeatureSelection(),
-        MissingIndicators(),
+        Construction(),
+        Selection(),
+        Indicators(),
         IterativeImputation(),
-        TargetTransform(),
-        TargetEncoding(),
-        RareTarget(),
+        Transformation(),
+        Encoding(),
+        Rarity(),
     )
 }
 EXPERIMENTAL = tuple(

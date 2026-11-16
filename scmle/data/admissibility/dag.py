@@ -312,7 +312,7 @@ class Dag:
                 `outcome`.
         """
         chosen = set(adjustment)
-        self.require_nodes([treatment, outcome, *chosen])
+        self.require([treatment, outcome, *chosen])
         if treatment == outcome:
             raise errors.InputError("treatment and outcome must differ")
         if chosen & ({treatment, outcome} | self.descendants(treatment)):
@@ -320,7 +320,7 @@ class Dag:
         cut = tuple(e for e in self.edges if e[0] != treatment)
         return separated(self.nodes, cut, [treatment], [outcome], chosen)
 
-    def require_nodes(self, names: Iterable[str]) -> None:
+    def require(self, names: Iterable[str]) -> None:
         """Checks that every name is a node of the graph.
 
         Args:
@@ -368,7 +368,7 @@ class Dag:
                 the search too large, a node is unknown, or `treatment`
                 equals `outcome`.
         """
-        self.require_nodes([treatment, outcome])
+        self.require([treatment, outcome])
         pool = self.candidates(treatment, outcome)
         if len(pool) > MAX_SEARCH_CANDIDATES:
             raise errors.InputError(

@@ -251,7 +251,7 @@ class Incident:
         )
 
 
-def event_digest(event: Mapping[str, Any]) -> str:
+def digest(event: Mapping[str, Any]) -> str:
     """Hashes a journal event without trusting its stored digest.
 
     Args:
@@ -345,7 +345,7 @@ class IncidentWorkflow:
                 )
             if record.get("previous_digest") != previous_digest:
                 raise errors.InputError("incident journal chain is invalid")
-            if record.get("event_digest") != event_digest(record):
+            if record.get("event_digest") != digest(record):
                 raise errors.InputError(
                     "incident journal event digest is invalid"
                 )
@@ -470,7 +470,7 @@ class IncidentWorkflow:
             ValueError: If the incident is resolved, or the acknowledgement
                 precedes the opening.
         """
-        incident = self.require_record(identity)
+        incident = self.require(identity)
         if incident.status is IncidentStatus.ACKNOWLEDGED:
             return incident
         if incident.status is not IncidentStatus.OPEN:
@@ -514,7 +514,7 @@ class IncidentWorkflow:
             ValueError: If the incident is not acknowledged, or the resolution
                 precedes the acknowledgement.
         """
-        incident = self.require_record(identity)
+        incident = self.require(identity)
         if incident.status is IncidentStatus.RESOLVED:
             return incident
         if incident.status is not IncidentStatus.ACKNOWLEDGED:
@@ -540,7 +540,7 @@ class IncidentWorkflow:
         self.append_event("resolved", updated)
         return updated
 
-    def require_record(self, identity: str) -> Incident:
+    def require(self, identity: str) -> Incident:
         """Returns the incident with the given identity.
 
         A blank or non-string identity raises ValueError from `require_text`.
@@ -576,7 +576,7 @@ class IncidentWorkflow:
             "incident": incident.to_dict(),
             "previous_digest": previous_digest,
         }
-        event["event_digest"] = event_digest(event)
+        event["event_digest"] = digest(event)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(
@@ -591,7 +591,7 @@ __all__ = [
     "Incident",
     "IncidentStatus",
     "IncidentWorkflow",
-    "event_digest",
+    "digest",
     "incident_id",
     "require_text",
 ]

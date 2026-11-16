@@ -345,12 +345,12 @@ class MetricsSinkResponder(server.BaseHTTPRequestHandler):
             # handled: 400 response with error
             self.reply(400, {"error": f"invalid sample: {error}"})
             return
-        with self.sink.lock, self.server_file() as handle:
+        with self.sink.lock, self.append() as handle:
             for sample in samples:
                 handle.write(json.dumps(sample) + "\n")
         self.reply(200, {"accepted": len(samples)})
 
-    def server_file(self) -> Any:
+    def append(self) -> Any:
         """Opens the sample file for appending.
 
         Returns:

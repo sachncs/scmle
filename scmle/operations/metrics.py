@@ -84,7 +84,7 @@ def escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
 
 
-def render_labels(labels: Labels, extra: Labels = ()) -> str:
+def stringify(labels: Labels, extra: Labels = ()) -> str:
     """Formats ``{a="b",...}`` (empty text for no labels).
 
     Args:
@@ -367,7 +367,7 @@ class MetricsRegistry:
         with self.lock:
             return dict(self.values.get(name, {}))
 
-    def merged_histogram(self, name: str) -> Histogram | None:
+    def merge(self, name: str) -> Histogram | None:
         """All series of a histogram added together (None if empty).
 
         Args:
@@ -410,15 +410,15 @@ class MetricsRegistry:
                     lines.append(f"# HELP {name} {text}")
                 lines.append(f"# TYPE {name} {kind}")
                 if kind == "histogram":
-                    lines.extend(self.render_histogram(name))
+                    lines.extend(self.tabulate(name))
                     continue
                 for labels, value in sorted(self.values.get(name, {}).items()):
                     lines.append(
-                        f"{name}{render_labels(labels)} {format_number(value)}"
+                        f"{name}{stringify(labels)} {format_number(value)}"
                     )
         return "\n".join(lines) + "\n"
 
-    def render_histogram(self, name: str) -> list[str]:
+    def tabulate(self, name: str) -> list[str]:
         """Renders the sample lines of one histogram metric.
 
         The caller must hold the registry lock.
@@ -433,14 +433,14 @@ class MetricsRegistry:
         lines: list[str] = []
         for labels, hist in sorted(self.histograms.get(name, {}).items()):
             for bound, count in zip(hist.buckets, hist.counts, strict=True):
-                suffix = render_labels(labels, (("le", format_number(bound)),))
+                suffix = stringify(labels, (("le", format_number(bound)),))
                 lines.append(f"{name}_bucket{suffix} {count}")
-            inf = render_labels(labels, (("le", "+Inf"),))
+            inf = stringify(labels, (("le", "+Inf"),))
             lines.append(f"{name}_bucket{inf} {hist.total}")
             lines.append(
-                f"{name}_sum{render_labels(labels)} {format_number(hist.sum)}"
+                f"{name}_sum{stringify(labels)} {format_number(hist.sum)}"
             )
-            lines.append(f"{name}_count{render_labels(labels)} {hist.total}")
+            lines.append(f"{name}_count{stringify(labels)} {hist.total}")
         return lines
 
 
@@ -590,7 +590,7 @@ class ServiceMetrics:
                 or status in UNAVAILABLE_STATUSES
             ):
                 unavailable += count
-        hist = self.registry.merged_histogram(self.DURATION)
+        hist = self.registry.merge(self.DURATION)
         return {
             "requests": total,
             "server_error_rate": server / total if total else None,

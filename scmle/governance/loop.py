@@ -296,7 +296,7 @@ class Outcome:
 
 
 @dataclasses.dataclass(frozen=True)
-class ReplyOutcome:
+class Consequence:
     """What recording a reply means for the dependent decision.
 
     Attributes:
@@ -328,7 +328,7 @@ class Hooks:
     open_incident: Callable[[str], None] | None = None
 
 
-def json_ready(value: Any) -> Any:
+def jsonify(value: Any) -> Any:
     """Converts numpy scalars and arrays inside a structure for JSON.
 
     Args:
@@ -341,13 +341,13 @@ def json_ready(value: Any) -> Any:
         is returned as the Python float, not None.
     """
     if isinstance(value, numpy.ndarray):
-        return [json_ready(item) for item in value.tolist()]
+        return [jsonify(item) for item in value.tolist()]
     if isinstance(value, numpy.generic):
         return value.item()
     if isinstance(value, dict):
-        return {str(k): json_ready(v) for k, v in value.items()}
+        return {str(k): jsonify(v) for k, v in value.items()}
     if isinstance(value, list | tuple):
-        return [json_ready(v) for v in value]
+        return [jsonify(v) for v in value]
     if isinstance(value, float) and not math.isfinite(value):
         return None
     return value
@@ -406,7 +406,7 @@ class Loop:
         self.calibrated = False
         self.feedback: dict[str, Any] | None = None
         self.guard.on_write = self.save_state
-        self.build_monitors()
+        self.arm()
 
     # ------------------------------------------------------------------ open
 
@@ -476,7 +476,7 @@ class Loop:
                 body = row["body"]
                 if row["kind"] == deployment_ledger.OBSERVE_SUMMARY:
                     effective.update(body.get("policy_amendment", {}))
-            if effective != json_ready(policy.to_dict()):
+            if effective != jsonify(policy.to_dict()):
                 raise deployment_ledger.DeploymentLedgerError(
                     "ledger was opened with a different policy"
                 )
@@ -484,7 +484,7 @@ class Loop:
             ledger = deployment_ledger.DeploymentLedger.create(
                 path,
                 charter_hash=charter.charter_hash,
-                policy=json_ready(policy.to_dict()),
+                policy=jsonify(policy.to_dict()),
                 alpha_promo=policy.alpha_promo,
                 system_keys=sorted(set(fingerprints)),
             )
@@ -494,7 +494,7 @@ class Loop:
         loop = cls(
             directory, ledger, policy, guard, hooks or Hooks(), keys, today
         )
-        loop.load_state()
+        loop.restore()
         loop.save_state()
         return loop
 
@@ -552,7 +552,7 @@ class Loop:
             single_use_attestations=single_use_attestations,
         )
 
-    def build_monitors(self) -> None:
+    def arm(self) -> None:
         """Creates fresh monitors from the policy."""
         policy = self.policy
         self.alarm = sequential_tests.RiskAlarm(
@@ -637,13 +637,13 @@ class Loop:
         }
         temporary = self.state_path.with_suffix(".tmp")
         temporary.write_text(
-            json.dumps(json_ready(state), sort_keys=True),
+            json.dumps(jsonify(state), sort_keys=True),
             encoding="utf-8",
             newline="\n",
         )
         temporary.replace(self.state_path)
 
-    def load_state(self) -> None:
+    def restore(self) -> None:
         """Reads the state file; halts if it does not match the ledger."""
         if not self.state_path.exists():
             self.halted_by_state = self.ledger.halted
@@ -765,7 +765,7 @@ class Loop:
         )
         question = {
             "action": name,
-            "detail": json_ready(dict(detail)),
+            "detail": jsonify(dict(detail)),
             "scope": self.policy.scope,
         }
         if self.guard.pending_for(question) is not None:
@@ -805,7 +805,7 @@ class Loop:
                 "phase": deployment_ledger.ENTER,
                 "reason": reason,
                 "batch": self.batch,
-                "detail": json_ready(dict(detail)),
+                "detail": jsonify(dict(detail)),
             },
         )
         self.halt_reason = reason
@@ -916,7 +916,7 @@ class Loop:
             "covered": {},
             "challenger_losses": {},
         }
-        self.pending_batches.append(json_ready(record))
+        self.pending_batches.append(jsonify(record))
         self.novelty_test.update(float(novel.mean()))
         self.ledger.commit(
             deployment_ledger.OBSERVE_SUMMARY,
@@ -1144,12 +1144,12 @@ class Loop:
         for record in self.pending_batches:
             window = self.policy.outcome_window
             if labels.is_matured(record["index"], now, window):
-                used |= self.process_batch(record)
+                used |= self.feed(record)
             else:
                 keep.append(record)
         self.pending_batches = keep
         newest = self.decide()
-        newest = self.time_out() or newest
+        newest = self.expire() or newest
         events = tuple(
             (
                 row["kind"],
@@ -1165,7 +1165,7 @@ class Loop:
         )
         return Outcome(status, events, newest, self.mechanism)
 
-    def process_batch(self, record: dict[str, Any]) -> bool:
+    def feed(self, record: dict[str, Any]) -> bool:
         """Feeds one matured batch to the monitors; False if unusable.
 
         When the label mechanism permits action, the batch feeds the loss
@@ -1218,10 +1218,10 @@ class Loop:
         if self.coverage_test is not None and record["covered"]:
             values = list(record["covered"].values())
             self.coverage_test.update(float(numpy.mean(values)))
-        self.update_challengers(record, ids, losses, observed, model_cases)
+        self.challenge(record, ids, losses, observed, model_cases)
         return True
 
-    def update_challengers(
+    def challenge(
         self,
         record: dict[str, Any],
         ids: list[str],
@@ -1498,7 +1498,7 @@ class Loop:
                 )
         return newest
 
-    def time_out(self) -> Escalation | None:
+    def expire(self) -> Escalation | None:
         """Closes escalations unanswered for ``reply_timeout`` batches.
 
         Each is closed with a timeout row that applies its own proposed
@@ -1561,7 +1561,7 @@ class Loop:
         curve = escalation.risk_coverage(score, loss, weights)
         (self.directory / RISK_COVERAGE_FILE).write_text(
             json.dumps(
-                json_ready(
+                jsonify(
                     {"curve": curve.to_dict(), "threshold": result.to_dict()}
                 )
             ),
@@ -1574,7 +1574,7 @@ class Loop:
                 deployment_ledger.HALT,
                 {
                     "phase": deployment_ledger.RELEASE,
-                    "recalibration": json_ready(result.to_dict()),
+                    "recalibration": jsonify(result.to_dict()),
                     "batch": self.batch,
                 },
             )
@@ -1590,7 +1590,7 @@ class Loop:
             self.ledger.commit(
                 deployment_ledger.OBSERVE_SUMMARY,
                 {
-                    "calibration": json_ready(result.to_dict()),
+                    "calibration": jsonify(result.to_dict()),
                     "batch": self.batch,
                 },
             )
@@ -1646,7 +1646,7 @@ class Loop:
         }
         self.ledger.commit(
             deployment_ledger.OBSERVE_SUMMARY,
-            {"feedback_test": json_ready(self.feedback)},
+            {"feedback_test": jsonify(self.feedback)},
         )
         if verdict == "loop_detected":
             self.escalate(
@@ -1693,7 +1693,7 @@ class Loop:
         escalation_id: str,
         attestation: deployment_ledger.Attestation,
         key: str | bytes | None = None,
-    ) -> ReplyOutcome:
+    ) -> Consequence:
         """Records a person's signed reply to a pending escalation.
 
         On success the attestation is committed as a ledger row, which closes
@@ -1754,7 +1754,7 @@ class Loop:
         self.ledger.commit(deployment_ledger.ATTESTATION, attestation.to_dict())
         self.save_state()
         allowed = attestation.decision in never_list.ALLOWING
-        return ReplyOutcome(
+        return Consequence(
             qualification.Tier.ATTESTED
             if allowed
             else qualification.Tier.UNVERIFIED,
@@ -2003,8 +2003,8 @@ class Loop:
                 action,
                 {
                     "field": field,
-                    "from": json_ready(old),
-                    "to": json_ready(new),
+                    "from": jsonify(old),
+                    "to": jsonify(new),
                 },
                 self.policy.scope,
             )
@@ -2012,11 +2012,11 @@ class Loop:
         self.ledger.commit(
             deployment_ledger.OBSERVE_SUMMARY,
             {
-                "policy_amendment": json_ready(changes),
+                "policy_amendment": jsonify(changes),
                 "batch": self.batch,
             },
         )
         self.policy = updated
-        self.build_monitors()
+        self.arm()
         self.save_state()
         return updated

@@ -517,7 +517,7 @@ class TorchRegressor(base.RegressorMixin, NetworkEstimator):  # type: ignore[mis
         return self.call("predict", features)
 
 
-class TabPfnEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class TabPfn(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Worker-backed TabPFN with the scikit-learn estimator interface.
 
     Attributes:
@@ -545,7 +545,7 @@ class TabPfnEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn
         self.random_state = random_state
         self.n_estimators = n_estimators
 
-    def fit(self, features: Any, target: Any) -> "TabPfnEstimator":
+    def fit(self, features: Any, target: Any) -> "TabPfn":
         """Stores the rows in the worker's TabPFN model.
 
         Args:
@@ -606,7 +606,7 @@ class TabPfnEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn
         raise worker.WorkerError("the worker could not load the model state")
 
 
-class TabPfnClassifier(base.ClassifierMixin, TabPfnEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class TabPfnClassifier(base.ClassifierMixin, TabPfn):  # type: ignore[misc]  # scikit-learn ships no type information
     """TabPFN classifier."""
 
     engine_path = "scmle.models.deeplearning.foundation.Classifier"
@@ -642,7 +642,7 @@ class TabPfnClassifier(base.ClassifierMixin, TabPfnEstimator):  # type: ignore[m
         return self.call("predict", features)
 
 
-class TabPfnRegressor(base.RegressorMixin, TabPfnEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class TabPfnRegressor(base.RegressorMixin, TabPfn):  # type: ignore[misc]  # scikit-learn ships no type information
     """TabPFN regressor."""
 
     engine_path = "scmle.models.deeplearning.foundation.Regressor"
@@ -659,7 +659,7 @@ class TabPfnRegressor(base.RegressorMixin, TabPfnEstimator):  # type: ignore[mis
         return self.call("predict", features)
 
 
-class KerasEstimator(NetworkEstimator):
+class Keras(NetworkEstimator):
     """Worker-backed Keras network with the scikit-learn estimator interface.
 
     Attributes:
@@ -712,7 +712,7 @@ class KerasEstimator(NetworkEstimator):
         self.random_state = random_state
 
 
-class KerasClassifier(base.ClassifierMixin, KerasEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class KerasClassifier(base.ClassifierMixin, Keras):  # type: ignore[misc]  # scikit-learn ships no type information
     """Keras classifier."""
 
     engine_path = "scmle.models.deeplearning.keras_engine.Classifier"
@@ -748,7 +748,7 @@ class KerasClassifier(base.ClassifierMixin, KerasEstimator):  # type: ignore[mis
         return self.call("predict", features)
 
 
-class KerasRegressor(base.RegressorMixin, KerasEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class KerasRegressor(base.RegressorMixin, Keras):  # type: ignore[misc]  # scikit-learn ships no type information
     """Keras regressor."""
 
     engine_path = "scmle.models.deeplearning.keras_engine.Regressor"

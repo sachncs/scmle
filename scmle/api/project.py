@@ -89,7 +89,7 @@ PARAMETER_ESTIMATION_DECLARATION_LOCK = "parameter_estimation_declaration.lock"
 PARAMETER_ESTIMATION_DECLARATION_SCHEMA = 1
 
 
-def build_parameter_estimation_declaration(
+def declare(
     estimand: parameter_estimation.Estimand | None,
     policy: parameter_estimation.Config | None,
 ) -> dict[str, Any]:
@@ -145,7 +145,7 @@ def parameter_estimation_declaration_digest(
     ).hexdigest()
 
 
-def read_declaration_envelope(
+def unwrap(
     artifact_path: pathlib.Path,
     expected_config_hash: str,
 ) -> dict[str, Any]:
@@ -211,7 +211,7 @@ def read_declaration_envelope(
     return envelope
 
 
-def restore_parameter_estimation_declaration(
+def restore(
     run_directory: str | pathlib.Path,
     expected_config_hash: str,
 ) -> tuple[
@@ -238,7 +238,7 @@ def restore_parameter_estimation_declaration(
             policy.
     """
     artifact_path = pathlib.Path(run_directory)
-    envelope = read_declaration_envelope(artifact_path, expected_config_hash)
+    envelope = unwrap(artifact_path, expected_config_hash)
     enabled = envelope.get("enabled")
     if enabled is False:
         if set(envelope) != {
@@ -306,7 +306,7 @@ def restore_parameter_estimation_declaration(
     return estimand, policy
 
 
-def bind_parameter_estimation_evidence(
+def bind(
     run_directory: pathlib.Path,
     artifact: pathlib.Path,
     estimation: parameter_estimation.Estimation,
@@ -374,7 +374,7 @@ def bind_parameter_estimation_evidence(
     evidence.Linker.write_atomically(graph_path, record)
 
 
-def persist_parameter_estimation_evidence(
+def persist(
     result: results.Run,
     estimation: parameter_estimation.Estimation,
 ) -> None:
@@ -434,7 +434,7 @@ def persist_parameter_estimation_evidence(
             + "\n"
         ).encode("utf-8"),
     )
-    bind_parameter_estimation_evidence(result.run_dir, artifact, verified)
+    bind(result.run_dir, artifact, verified)
     result.evaluation.clear()
     result.evaluation.update(evaluation)
     # The result must expose the exact digest-verified artifact that was
@@ -442,7 +442,7 @@ def persist_parameter_estimation_evidence(
     result.estimation = verified
 
 
-def require_treatment_column(
+def locate(
     orchestrator: scmle.core.orchestrator.Orchestrator,
     estimand: parameter_estimation.Estimand,
     policy: parameter_estimation.Config,
@@ -480,7 +480,7 @@ def require_treatment_column(
     return treatment_column
 
 
-def estimate_parameters_for_project(
+def estimate(
     orchestrator: scmle.core.orchestrator.Orchestrator,
     estimand: parameter_estimation.Estimand,
     policy: parameter_estimation.Config,
@@ -525,9 +525,7 @@ def estimate_parameters_for_project(
         "aipw_ate",
         "continuous_ipw_ate",
     }:
-        treatment_column = require_treatment_column(
-            orchestrator, estimand, policy
-        )
+        treatment_column = locate(orchestrator, estimand, policy)
         declared.append(treatment_column)
     if policy.cluster_name is not None:
         declared.append(policy.cluster_name)
@@ -961,16 +959,14 @@ class Project:
         estimation = None
         if self.estimand is not None or self.estimation_policy is not None:
             estimation = self.estimate_parameters()
-        declaration = build_parameter_estimation_declaration(
-            self.estimand, self.estimation_policy
-        )
+        declaration = declare(self.estimand, self.estimation_policy)
         result = self.orchestrator.run(
             self.output_dir,
             plan,
             parameter_estimation_declaration=declaration,
         )
         if estimation is not None:
-            persist_parameter_estimation_evidence(result, estimation)
+            persist(result, estimation)
         return result
 
     def estimate_parameters(
@@ -992,7 +988,7 @@ class Project:
         Raises:
             ConfigError: If the estimand or policy is undeclared. A modality or
                 treatment-column mismatch raises it from
-                `estimate_parameters_for_project`, and missing columns or
+                `estimate`, and missing columns or
                 values raise `DataError` from there.
         """
         if self.estimand is None or self.estimation_policy is None:
@@ -1000,7 +996,7 @@ class Project:
                 "parameter estimation is disabled: declare both estimand "
                 "and estimation_policy explicitly"
             )
-        return estimate_parameters_for_project(
+        return estimate(
             self.orchestrator,
             self.estimand,
             self.estimation_policy,
@@ -1032,18 +1028,16 @@ class Project:
         orchestrator = scmle.core.orchestrator.Orchestrator.for_run_directory(
             run_path, frame=data
         )
-        estimand, policy = restore_parameter_estimation_declaration(
+        estimand, policy = restore(
             run_path,
             orchestrator.spec.config_hash(),
         )
         estimation = None
         if estimand is not None and policy is not None:
-            estimation = estimate_parameters_for_project(
-                orchestrator, estimand, policy
-            )
+            estimation = estimate(orchestrator, estimand, policy)
         result = orchestrator.resume(run_path)
         if estimation is not None:
-            persist_parameter_estimation_evidence(result, estimation)
+            persist(result, estimation)
         return result
 
     @classmethod
@@ -1068,22 +1062,20 @@ class Project:
         orchestrator = scmle.core.orchestrator.Orchestrator.for_run_directory(
             original, frame=data
         )
-        estimand, policy = restore_parameter_estimation_declaration(
+        estimand, policy = restore(
             original,
             orchestrator.spec.config_hash(),
         )
         estimation = None
-        declaration = build_parameter_estimation_declaration(estimand, policy)
+        declaration = declare(estimand, policy)
         if estimand is not None and policy is not None:
-            estimation = estimate_parameters_for_project(
-                orchestrator, estimand, policy
-            )
+            estimation = estimate(orchestrator, estimand, policy)
         rerun = orchestrator.run(
             output_dir or original.parent,
             parameter_estimation_declaration=declaration,
         )
         if estimation is not None:
-            persist_parameter_estimation_evidence(rerun, estimation)
+            persist(rerun, estimation)
         return reproducibility.compare_runs(
             reproducibility.load_run(original),
             reproducibility.load_run(rerun.run_dir),
@@ -1283,7 +1275,7 @@ def check_manifest_matches_adapter(
         raise errors.InputError("manifest sample_count must match adapter")
 
 
-def verify_existing_curation(
+def verify(
     path: pathlib.Path,
     signing_key: str | bytes,
     candidate: modality_lifecycle.Curation,
@@ -1467,5 +1459,5 @@ class Curator:
         except FileExistsError:
             # handled: existing artifact verified and returned (idempotent
             # publish)
-            return verify_existing_curation(path, self.signing_key, candidate)
+            return verify(path, self.signing_key, candidate)
         return candidate

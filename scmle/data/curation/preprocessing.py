@@ -46,7 +46,7 @@ def build_preprocessor(
         An unfitted transformer that drops every non-feature column.
     """
     parts = []
-    special = split_high_cardinality(plan, options)
+    special = isolate(plan, options)
     if special:
         encoder = columns.CategoricalKind().high_cardinality_transformer(
             options.high_cardinality
@@ -58,7 +58,7 @@ def build_preprocessor(
             continue
         kind_options = options
         if kind.name == "numeric" and options.missing == "indicator":
-            flagged, selected = split_flagged(plan, selected)
+            flagged, selected = partition(plan, selected)
             if flagged:
                 parts.append(
                     ("numeric_flagged", kind.transformer(options), flagged)
@@ -83,7 +83,7 @@ def build_preprocessor(
     )
 
 
-def split_flagged(
+def partition(
     plan: data.FeaturePlan, selected: list[str]
 ) -> tuple[list[str], list[str]]:
     """Numeric columns whose gaps are informative, and the rest.
@@ -150,7 +150,7 @@ def monotonic_layout_problem(
     if select:
         return "feature selection drops columns the signs are indexed by"
     if missing == "indicator":
-        flagged, rest = split_flagged(plan, list(plan.numeric))
+        flagged, rest = partition(plan, list(plan.numeric))
         if flagged and rest:
             return (
                 "missing indicators move the flagged numeric columns ahead "
@@ -159,7 +159,7 @@ def monotonic_layout_problem(
     return None
 
 
-def split_high_cardinality(
+def isolate(
     plan: data.FeaturePlan,
     options: data.Preprocessing,
 ) -> tuple[str, ...]:
@@ -241,7 +241,7 @@ def default_options(
     )
 
 
-def with_weights(model: Any, plan: data.FeaturePlan, seed: int) -> Any:
+def weigh(model: Any, plan: data.FeaturePlan, seed: int) -> Any:
     """Wraps a model so that it reads the plan's weight column.
 
     Args:
@@ -376,11 +376,11 @@ def build_pipeline(
     else:
         assembled = adapter.assemble(plan, task, seed, params)
     if assembled is not None:
-        return with_weights(assembled, plan, seed)
+        return weigh(assembled, plan, seed)
     params = dict(params or {})
     if options is None:
         options = default_options(plan, adapter)
-    special = split_high_cardinality(plan, options)
+    special = isolate(plan, options)
     if options.high_cardinality == "ordinal" and special:
         params |= adapter.categorical_params(list(range(len(special))))
     steps = preprocessing_steps(plan, options, task, seed)
@@ -403,4 +403,4 @@ def build_pipeline(
         )
     steps.append(("model", estimator))
     built = wrap_estimator(pipeline.Pipeline(steps), plan, task)
-    return with_weights(built, plan, seed)
+    return weigh(built, plan, seed)

@@ -252,18 +252,16 @@ class SqliteExperimentStore(ExperimentStore):
             "artifacts",
         ):
             if column not in existing:
-                self.add_column(connection, "runs", column)
+                self.alter(connection, "runs", column)
         trial_columns = {
             row["name"]
             for row in connection.execute("PRAGMA table_info(trials)")
         }
         if "strategy" not in trial_columns:
-            self.add_column(connection, "trials", "strategy")
+            self.alter(connection, "trials", "strategy")
 
     @staticmethod
-    def add_column(
-        connection: sqlite3.Connection, table: str, column: str
-    ) -> None:
+    def alter(connection: sqlite3.Connection, table: str, column: str) -> None:
         """Adds a text column, tolerating another process adding it first.
 
         Args:

@@ -289,11 +289,9 @@ class PredictionLog:
             and removed.
         """
         with durability.path_lock(self.observability_path):
-            return self.enforce_retention_locked(observed_at)
+            return self.prune(observed_at)
 
-    def enforce_retention_locked(
-        self, observed_at: str | None
-    ) -> dict[str, Any]:
+    def prune(self, observed_at: str | None) -> dict[str, Any]:
         """Rewrites the sidecar while holding its lock.
 
         Args:

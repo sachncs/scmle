@@ -96,7 +96,7 @@ def order_drift(frame: pandas.DataFrame, numeric: tuple[str, ...]) -> float:
     return float(worst)
 
 
-def missingness_patterns(features: pandas.DataFrame) -> dict[str, Any]:
+def summarise(features: pandas.DataFrame) -> dict[str, Any]:
     """Summarizes how values go missing together.
 
     Args:
@@ -381,7 +381,7 @@ def build_fingerprint(
             "rows_with_any_missing": float(missing.any(axis=1).mean())
             if missing.size
             else 0.0,
-            "patterns": missingness_patterns(features),
+            "patterns": summarise(features),
         },
         "target": target_block,
         "features": {

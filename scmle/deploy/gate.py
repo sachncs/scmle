@@ -137,7 +137,7 @@ def model_digest_of(
     return provenance.bundle_digest(store.root / version.path)
 
 
-def model_problems(candidate: Candidate, key: str | bytes) -> list[str]:
+def veto(candidate: Candidate, key: str | bytes) -> list[str]:
     """Lists why the model may not be released, empty if it may.
 
     Args:
@@ -183,7 +183,7 @@ def admit_problems(candidate: Candidate, key: str | bytes) -> list[str]:
     Returns:
         One message per problem; empty if the build may be deployed.
     """
-    problems = model_problems(candidate, key)
+    problems = veto(candidate, key)
     if candidate.environment not in scmle.deploy.record.ENVIRONMENTS:
         problems.append(f"unknown environment {candidate.environment!r}")
     if (
@@ -203,11 +203,11 @@ def admit_problems(candidate: Candidate, key: str | bytes) -> list[str]:
     elif candidate.approver == candidate.requested_by:
         problems.append("the approver is the person who requested the release")
     if candidate.environment == PRODUCTION:
-        problems.extend(staging_problems(candidate, key))
+        problems.extend(audit(candidate, key))
     return problems
 
 
-def staging_problems(candidate: Candidate, key: str | bytes) -> list[str]:
+def audit(candidate: Candidate, key: str | bytes) -> list[str]:
     """Lists the reasons the staging record does not support production.
 
     Args:

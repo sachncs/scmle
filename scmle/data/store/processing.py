@@ -342,11 +342,11 @@ class IncrementalProcessor:
         except objectstore.AlreadyExistsError as error:
             raise ConcurrentRunError("another run holds the lock") from error
         try:
-            return self.run_locked(max_objects)
+            return self.sweep(max_objects)
         finally:
             self.retrying(lambda: self.store.delete(self.lock_key))
 
-    def run_locked(self, max_objects: int | None) -> Processing:
+    def sweep(self, max_objects: int | None) -> Processing:
         """Runs with the lock held.
 
         Lists the inputs in key order. An input already in the checkpoint

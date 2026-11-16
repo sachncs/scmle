@@ -872,8 +872,8 @@ class Monitor:
             )
             / 2
         )
-        reference_mean = self.mean_characters(self.reference)
-        current_mean = self.mean_characters(current)
+        reference_mean = self.measure(self.reference)
+        current_mean = self.measure(current)
         duplicate_rate = (
             sum(len(group) for group in current.duplicate_groups)
             / current.sample_count
@@ -888,7 +888,7 @@ class Monitor:
             threshold=self.threshold,
         )
 
-    def mean_characters(
+    def measure(
         self,
         report: document.Curation,
     ) -> float:

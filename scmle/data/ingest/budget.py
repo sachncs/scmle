@@ -58,7 +58,7 @@ class Budget:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class StopBoundary:
+class Stop:
     """Where a stage stopped because the budget could not cover the next step.
 
     Attributes:
@@ -106,7 +106,7 @@ class BudgetMeter:
         self.started = clock()
         self.queries = 0
         self.rows = 0
-        self.stops: list[StopBoundary] = []
+        self.stops: list[Stop] = []
 
     @property
     def seconds(self) -> float:
@@ -166,7 +166,7 @@ class BudgetMeter:
             return False
         reason = self.shortfall(rows, queries)
         if reason is not None:
-            self.stops.append(StopBoundary(stage, unit, reason))
+            self.stops.append(Stop(stage, unit, reason))
             return False
         self.queries += queries
         self.rows += rows

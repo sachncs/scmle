@@ -114,7 +114,7 @@ class Cancellation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FeatureBatch:
+class Batch:
     """A finite, bounded feature matrix tied to stable sample identities.
 
     Attributes:
@@ -161,7 +161,7 @@ class FeatureBatch:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DatasetPartitions:
+class Partitions:
     """Leakage-aware train, validation, and test partitions.
 
     Attributes:
@@ -264,7 +264,7 @@ class Predictor:
     lifecycle_report_digest: str | None = None
 
     @staticmethod
-    def check_report_identifies_package(
+    def identify(
         report: Record,
         adapter: Preparer,
         package_path: Path,
@@ -370,7 +370,7 @@ class Predictor:
         report_digest: str | None = None
         if lifecycle_report_path is not None:
             report = Record.read_verified(lifecycle_report_path, signing_key)
-            cls.check_report_identifies_package(
+            cls.identify(
                 report,
                 adapter,
                 Path(package_path),
@@ -391,7 +391,7 @@ class Predictor:
             lifecycle_report_digest=report_digest,
         )
 
-    def features_for(self, samples: Sequence[Any]) -> FeatureBatch:
+    def features_for(self, samples: Sequence[Any]) -> Batch:
         """Prepares and validates features for new modality samples.
 
         Args:
@@ -559,7 +559,7 @@ def parse_package(raw_package: object) -> Package:
     )
 
 
-def parse_signature(raw_signature: object) -> str | None:
+def unseal(raw_signature: object) -> str | None:
     """Restores the content signature of a persisted lifecycle report.
 
     Args:
@@ -584,7 +584,7 @@ def parse_signature(raw_signature: object) -> str | None:
     return signature_value
 
 
-def require_string_list(value: object, message: str) -> list[str]:
+def require(value: object, message: str) -> list[str]:
     """Checks that a persisted value is a list of strings.
 
     Args:
@@ -641,7 +641,7 @@ class Record:
         `monitoring`, `documentation`, `recovery`) are also normalized to
         sorted JSON-native dictionaries; a value that is not a mapping raises
         TypeError and one that is not finite JSON raises ValueError, both from
-        `normalize_json_object`.
+        `normalise`.
 
         Raises:
             ValueError: If the modality or dataset hash is blank, the stage
@@ -687,7 +687,7 @@ class Record:
             object.__setattr__(
                 self,
                 field_name,
-                normalize_json_object(getattr(self, field_name), field_name),
+                normalise(getattr(self, field_name), field_name),
             )
         if self.signature is not None and not is_sha256(self.signature):
             raise errors.InputError("signature must be a SHA-256 digest")
@@ -765,7 +765,7 @@ class Record:
         stage_evidence = parse_stage_evidence(record.get("stage_evidence"))
         package = parse_package(record.get("package"))
 
-        def mapping_field(name: str) -> dict[str, object]:
+        def pluck(name: str) -> dict[str, object]:
             value = record.get(name)
             if not isinstance(value, Mapping):
                 raise errors.InputError(
@@ -773,7 +773,7 @@ class Record:
                 )
             return dict(value)
 
-        signature = parse_signature(record.get("signature"))
+        signature = unseal(record.get("signature"))
 
         modality = record.get("modality")
         dataset_hash = record.get("dataset_hash")
@@ -783,13 +783,13 @@ class Record:
             modality=modality,
             dataset_hash=dataset_hash,
             stage_evidence=stage_evidence,
-            evaluation=mapping_field("evaluation"),
-            performance=mapping_field("performance"),
+            evaluation=pluck("evaluation"),
+            performance=pluck("performance"),
             package=package,
-            inference=mapping_field("inference"),
-            monitoring=mapping_field("monitoring"),
-            documentation=mapping_field("documentation"),
-            recovery=mapping_field("recovery"),
+            inference=pluck("inference"),
+            monitoring=pluck("monitoring"),
+            documentation=pluck("documentation"),
+            recovery=pluck("recovery"),
             signature=signature,
         )
 
@@ -935,9 +935,9 @@ class Checkpoint:
             )
         if self.signature is not None and not self.signature.strip():
             raise errors.InputError("signature must be non-empty when provided")
-        self.check_stage_progress()
+        self.sequence()
 
-    def check_stage_progress(self) -> None:
+    def sequence(self) -> None:
         """Rejects stages that are not an ordered prefix of the lifecycle.
 
         Raises:
@@ -1037,11 +1037,11 @@ class Checkpoint:
             )
         if record.get("record_type") != "modality_lifecycle_checkpoint":
             raise errors.InputError("invalid lifecycle checkpoint record type")
-        completed = require_string_list(
+        completed = require(
             record.get("completed_stages"),
             "checkpoint completed_stages must be a list",
         )
-        digests = require_string_list(
+        digests = require(
             record.get("stage_digests"),
             "checkpoint stage_digests must be a list",
         )
@@ -1192,10 +1192,8 @@ class Curation:
             )
         if not isinstance(signature, str) or not is_sha256(signature):
             raise errors.InputError("signature must be a SHA-256 digest")
-        normalized_curation = normalize_json_object(self.curation, "curation")
-        normalized_card = normalize_json_object(
-            self.dataset_card, "dataset_card"
-        )
+        normalized_curation = normalise(self.curation, "curation")
+        normalized_card = normalise(self.dataset_card, "dataset_card")
         for name, record in (
             ("curation", normalized_curation),
             ("dataset_card", normalized_card),
@@ -1320,10 +1318,10 @@ class Curation:
         )
         content_digest = record.get("content_digest")
         if content_digest is not None:
-            result.check_content_digest(content_digest)
+            result.attest(content_digest)
         return result
 
-    def check_content_digest(self, content_digest: object) -> None:
+    def attest(self, content_digest: object) -> None:
         """Checks a persisted content digest against the evidence.
 
         Args:
@@ -1530,7 +1528,7 @@ class Preparer(Curator):
     modality: ClassVar[modalities.ModalityIdentity]  # pyright: ignore[reportIncompatibleMethodOverride]  # each adapter sets a class attribute, which satisfies the abstract Curator.modality property
 
     @abc.abstractmethod
-    def split(self, seed: int) -> DatasetPartitions:
+    def split(self, seed: int) -> Partitions:
         """Splits the dataset into leakage-aware partitions.
 
         Args:
@@ -1541,7 +1539,7 @@ class Preparer(Curator):
         """
 
     @abc.abstractmethod
-    def features(self, samples: Sequence[Any]) -> FeatureBatch:
+    def features(self, samples: Sequence[Any]) -> Batch:
         """Builds bounded features for the supplied samples.
 
         Args:
@@ -1699,7 +1697,7 @@ class DocumentPreparer(Preparer):
         """
         return self.dataset.curate()
 
-    def split(self, seed: int) -> DatasetPartitions:
+    def split(self, seed: int) -> Partitions:
         """Splits by document identity to prevent chunk leakage.
 
         Args:
@@ -1710,7 +1708,7 @@ class DocumentPreparer(Preparer):
             of each under `groups`.
         """
         result = self.dataset.split(seed=seed)
-        return DatasetPartitions(
+        return Partitions(
             result.train,
             result.validation,
             result.test,
@@ -1727,7 +1725,7 @@ class DocumentPreparer(Preparer):
             },
         )
 
-    def features(self, samples: Sequence[document.Sample]) -> FeatureBatch:
+    def features(self, samples: Sequence[document.Sample]) -> Batch:
         """Prepares bounded lexical features without using labels.
 
         Args:
@@ -1745,7 +1743,7 @@ class DocumentPreparer(Preparer):
             ],
             dtype=numpy.float64,
         )
-        return FeatureBatch(
+        return Batch(
             tuple(self.sample_id(sample) for sample in samples),
             ("character_count", "token_count"),
             rows,
@@ -1797,7 +1795,7 @@ class DocumentPreparer(Preparer):
         """
         if not isinstance(sample, document.Sample):
             raise errors.KindError("sample must be a Sample")
-        raw_occlusion = self.raw_span_occlusion_scores(sample, model)
+        raw_occlusion = self.mask(sample, model)
         return {
             "status": "available",
             "method": "document_span_provenance",
@@ -1830,7 +1828,7 @@ class DocumentPreparer(Preparer):
             ],
         }
 
-    def raw_span_occlusion_scores(
+    def mask(
         self,
         sample: document.Sample,
         model: LogisticRegression,
@@ -2005,7 +2003,7 @@ class ImagePreparer(Preparer):
         """
         return self.dataset.curate()
 
-    def split(self, seed: int) -> DatasetPartitions:
+    def split(self, seed: int) -> Partitions:
         """Splits by capture group to prevent identity leakage.
 
         Args:
@@ -2016,14 +2014,14 @@ class ImagePreparer(Preparer):
             under `groups`.
         """
         result = self.dataset.split(seed=seed)
-        return DatasetPartitions(
+        return Partitions(
             result.train,
             result.validation,
             result.test,
             result.group_ids(),
         )
 
-    def features(self, samples: Sequence[image.Sample]) -> FeatureBatch:
+    def features(self, samples: Sequence[image.Sample]) -> Batch:
         """Prepares deterministic resized-pixel features.
 
         Args:
@@ -2043,7 +2041,7 @@ class ImagePreparer(Preparer):
             for column in range(width)
             for channel in range(channels)
         )
-        return FeatureBatch(
+        return Batch(
             tuple(self.sample_id(sample) for sample in samples), names, values
         )
 
@@ -2143,9 +2141,7 @@ class ImagePreparer(Preparer):
             terms,
             key=lambda item: (-abs(item[1]), item[0]),
         )[:10]
-        raw_terms = self.raw_pixel_occlusion_terms(
-            sample, model, selected_class, original_score
-        )
+        raw_terms = self.occlude(sample, model, selected_class, original_score)
         return {
             "status": "available",
             "method": "transformed_pixel_region_occlusion",
@@ -2163,7 +2159,7 @@ class ImagePreparer(Preparer):
             ],
         }
 
-    def raw_pixel_occlusion_terms(
+    def occlude(
         self,
         sample: image.Sample,
         model: LogisticRegression,
@@ -2309,7 +2305,7 @@ class AudioPreparer(Preparer):
         """
         return self.dataset.curate()
 
-    def split(self, seed: int) -> DatasetPartitions:
+    def split(self, seed: int) -> Partitions:
         """Splits by speaker/session group.
 
         Args:
@@ -2320,11 +2316,11 @@ class AudioPreparer(Preparer):
             under `groups`.
         """
         result = self.dataset.split(seed=seed)
-        return DatasetPartitions(
+        return Partitions(
             result.train, result.validation, result.test, result.group_ids()
         )
 
-    def features(self, samples: Sequence[audio.Sample]) -> FeatureBatch:
+    def features(self, samples: Sequence[audio.Sample]) -> Batch:
         """Prepares bounded WAV signal statistics.
 
         Args:
@@ -2334,7 +2330,7 @@ class AudioPreparer(Preparer):
             Batch with one row per sample, identified by its source.
         """
         prepared = audio.Dataset(tuple(samples)).prepare_features()
-        return FeatureBatch(
+        return Batch(
             tuple(prepared.sources), prepared.feature_names, prepared.to_numpy()
         )
 
@@ -2469,9 +2465,7 @@ class AudioPreparer(Preparer):
                     ),
                 }
             )
-        raw_windows = self.raw_waveform_window_scores(
-            sample, model, full_score, window_frames
-        )
+        raw_windows = self.silence(sample, model, full_score, window_frames)
         noise_robustness = self.background_noise_robustness(
             sample, model, full_score
         )
@@ -2607,7 +2601,7 @@ class AudioPreparer(Preparer):
             ],
         }
 
-    def raw_waveform_window_scores(
+    def silence(
         self,
         sample: audio.Sample,
         model: LogisticRegression,
@@ -2763,7 +2757,7 @@ class VideoPreparer(Preparer):
         """
         return self.dataset.curate()
 
-    def split(self, seed: int) -> DatasetPartitions:
+    def split(self, seed: int) -> Partitions:
         """Splits by subject/session/camera group, or by time with a cutoff.
 
         Args:
@@ -2785,7 +2779,7 @@ class VideoPreparer(Preparer):
                     )
                 )
 
-            return DatasetPartitions(
+            return Partitions(
                 temporal_result.train,
                 (),
                 temporal_result.future,
@@ -2796,14 +2790,14 @@ class VideoPreparer(Preparer):
                 },
             )
         group_result = self.dataset.split(seed=seed)
-        return DatasetPartitions(
+        return Partitions(
             group_result.train,
             group_result.validation,
             group_result.test,
             group_result.group_ids(),
         )
 
-    def features(self, samples: Sequence[video.Sample]) -> FeatureBatch:
+    def features(self, samples: Sequence[video.Sample]) -> Batch:
         """Prepares metadata or explicitly decoded temporal features.
 
         Args:
@@ -2823,7 +2817,7 @@ class VideoPreparer(Preparer):
             if self.frame_decoder is not None
             else dataset.prepare_metadata_features()
         )
-        return FeatureBatch(
+        return Batch(
             tuple(prepared.sources), prepared.feature_names, prepared.to_numpy()
         )
 
@@ -2960,7 +2954,7 @@ class VideoPreparer(Preparer):
                 int(cast("int", item["frame_index"])),
             )
         )
-        raw_windows = self.raw_frame_occlusion_scores(sample, model, full_score)
+        raw_windows = self.blank(sample, model, full_score)
         return {
             "status": "available",
             "method": "temporal_frame_statistics_occlusion",
@@ -2981,7 +2975,7 @@ class VideoPreparer(Preparer):
             ],
         }
 
-    def raw_frame_occlusion_scores(
+    def blank(
         self,
         sample: video.Sample,
         model: LogisticRegression,
@@ -3010,7 +3004,7 @@ class VideoPreparer(Preparer):
         windows: list[dict[str, object]] = []
         for target_frame in frame_indices:
 
-            def masked_decoder(
+            def blackout(
                 payload: bytes,
                 frame_index: int,
                 target_frame_index: int = target_frame,
@@ -3021,7 +3015,7 @@ class VideoPreparer(Preparer):
                 return frame
 
             prepared = video.Dataset((sample,)).prepare_frame_features(
-                masked_decoder,
+                blackout,
                 max_frames=self.max_frames,
                 max_frame_pixels=self.max_frame_pixels,
             )
@@ -3095,7 +3089,7 @@ class GraphPreparer(Preparer):
         """
         return self.dataset.curate()
 
-    def split(self, seed: int) -> DatasetPartitions:
+    def split(self, seed: int) -> Partitions:
         """Splits nodes inductively and retains partition-local edge evidence.
 
         Args:
@@ -3107,7 +3101,7 @@ class GraphPreparer(Preparer):
         """
         result = graph.inductive_node_split(self.dataset, seed=seed)
         by_id = {node.node_id: node for node in self.dataset.nodes}
-        return DatasetPartitions(
+        return Partitions(
             tuple(by_id[node_id] for node_id in result.train_nodes),
             tuple(by_id[node_id] for node_id in result.validation_nodes),
             tuple(by_id[node_id] for node_id in result.test_nodes),
@@ -3118,7 +3112,7 @@ class GraphPreparer(Preparer):
             },
         )
 
-    def features(self, samples: Sequence[graph.Node]) -> FeatureBatch:
+    def features(self, samples: Sequence[graph.Node]) -> Batch:
         """Prepares declared node features without cross-partition topology.
 
         Args:
@@ -3138,7 +3132,7 @@ class GraphPreparer(Preparer):
         rows = numpy.asarray(
             [sample.features for sample in samples], dtype=float
         )
-        return FeatureBatch(
+        return Batch(
             tuple(sample.node_id for sample in samples),
             self.dataset.feature_names,
             rows,
@@ -3476,7 +3470,7 @@ class GeospatialPreparer(Preparer):
             quality_findings=tuple(quality_findings),
         )
 
-    def split(self, seed: int) -> DatasetPartitions:
+    def split(self, seed: int) -> Partitions:
         """Splits by spatial blocks in declared CRS units.
 
         Args:
@@ -3487,16 +3481,14 @@ class GeospatialPreparer(Preparer):
             under `groups`.
         """
         result = self.dataset.split_spatial(self.block_size, seed=seed)
-        return DatasetPartitions(
+        return Partitions(
             result.train,
             result.validation,
             result.test,
             result.block_ids(),
         )
 
-    def features(
-        self, samples: Sequence[geospatial.GeoFeature]
-    ) -> FeatureBatch:
+    def features(self, samples: Sequence[geospatial.GeoFeature]) -> Batch:
         """Prepares bounded geometry envelope and centroid features.
 
         The dataset is rebuilt with the adapter's CRS and source; a missing
@@ -3513,7 +3505,7 @@ class GeospatialPreparer(Preparer):
             tuple(samples), crs=self.dataset.crs, source=self.dataset.source
         )
         prepared = dataset.prepare_features()
-        return FeatureBatch(
+        return Batch(
             tuple(prepared.feature_ids),
             prepared.feature_names,
             prepared.to_numpy(),
@@ -3924,7 +3916,7 @@ class RasterPreparer(Preparer):
             quality_findings=tuple(quality_findings),
         )
 
-    def split(self, seed: int) -> DatasetPartitions:
+    def split(self, seed: int) -> Partitions:
         """Splits by source identity because the core lacks raster decoding.
 
         Args:
@@ -3959,7 +3951,7 @@ class RasterPreparer(Preparer):
             for index, sample in enumerate(self.dataset)
             if index in test_indices
         )
-        return DatasetPartitions(
+        return Partitions(
             train,
             validation,
             test,
@@ -3970,9 +3962,7 @@ class RasterPreparer(Preparer):
             },
         )
 
-    def features(
-        self, samples: Sequence[geospatial.RasterSample]
-    ) -> FeatureBatch:
+    def features(self, samples: Sequence[geospatial.RasterSample]) -> Batch:
         """Prepares raster metadata or bounded decoded pixel features.
 
         Args:
@@ -4000,8 +3990,8 @@ class RasterPreparer(Preparer):
             rows = []
             for sample in samples:
                 pixels = sample.decode(self.decoder, max_pixels=self.max_pixels)
-                rows.append(self.pixel_feature_values(pixels, band_count))
-            return FeatureBatch(
+                rows.append(self.summarise(pixels, band_count))
+            return Batch(
                 tuple(sample.source for sample in samples),
                 names,
                 numpy.asarray(rows, dtype=numpy.float64),
@@ -4030,7 +4020,7 @@ class RasterPreparer(Preparer):
                     *transform[:6],
                 )
             )
-        return FeatureBatch(
+        return Batch(
             tuple(sample.source for sample in samples),
             names,
             numpy.asarray(rows),
@@ -4059,9 +4049,7 @@ class RasterPreparer(Preparer):
         )
 
     @staticmethod
-    def pixel_feature_values(
-        pixels: numpy.ndarray, band_count: int
-    ) -> tuple[float, ...]:
+    def summarise(pixels: numpy.ndarray, band_count: int) -> tuple[float, ...]:
         """Computes finite per-band summary values for decoded pixels.
 
         Args:
@@ -4172,7 +4160,7 @@ class RasterPreparer(Preparer):
             }
         pixels = sample.decode(self.decoder, max_pixels=self.max_pixels)
         original_values = numpy.asarray(
-            self.pixel_feature_values(pixels, sample.bands), dtype=numpy.float64
+            self.summarise(pixels, sample.bands), dtype=numpy.float64
         )
         if tuple(feature_names) != self.pixel_feature_names(sample.bands):
             raise errors.InputError(
@@ -4208,7 +4196,7 @@ class RasterPreparer(Preparer):
                 else:
                     masked_pixels[row:end_row, column:end_column, :] = 0.0
                 masked_features = numpy.asarray(
-                    self.pixel_feature_values(masked_pixels, sample.bands),
+                    self.summarise(masked_pixels, sample.bands),
                     dtype=numpy.float64,
                 ).reshape(1, -1)
                 masked_decision = numpy.asarray(
@@ -4353,10 +4341,8 @@ class Context:
         dataclasses.field(default_factory=dict)
     )
     curation_report: Any = None
-    partitions: DatasetPartitions | None = None
-    feature_batches: dict[str, FeatureBatch] = dataclasses.field(
-        default_factory=dict
-    )
+    partitions: Partitions | None = None
+    feature_batches: dict[str, Batch] = dataclasses.field(default_factory=dict)
     model: LogisticRegression | None = None
     evaluation: dict[str, object] = dataclasses.field(default_factory=dict)
     performance_observations: dict[
@@ -4388,7 +4374,7 @@ class Context:
         """
         self.stage_records[stage] = payload
 
-    def record_performance(
+    def clock(
         self,
         operation: performance.Operation,
         elapsed_seconds: float,
@@ -4440,7 +4426,7 @@ class Stage(abc.ABC):
         """
 
 
-class IngestionStage(Stage):
+class Ingestion(Stage):
     """Confirm source identity and sample cardinality."""
 
     stage = modalities.LifecycleStage.INGESTION
@@ -4466,7 +4452,7 @@ class IngestionStage(Stage):
         )
 
 
-class ValidationStage(Stage):
+class Validation(Stage):
     """Reject missing labels and malformed feature prerequisites."""
 
     stage = modalities.LifecycleStage.VALIDATION
@@ -4496,7 +4482,7 @@ class ValidationStage(Stage):
         )
 
 
-class ProfilingStage(Stage):
+class Profiling(Stage):
     """Capture modality-specific profile evidence."""
 
     stage = modalities.LifecycleStage.PROFILING
@@ -4544,7 +4530,7 @@ class CurationStage(Stage):
         context.record(self.stage, {"release_ready": True, "unresolved": []})
 
 
-class SplittingStage(Stage):
+class Splitting(Stage):
     """Create leakage-aware train, validation, and test partitions."""
 
     stage = modalities.LifecycleStage.SPLITTING
@@ -4590,7 +4576,7 @@ class SplittingStage(Stage):
         )
 
 
-class FeaturePreparationStage(Stage):
+class Preparation(Stage):
     """Prepare partition-local finite feature matrices."""
 
     stage = modalities.LifecycleStage.FEATURE_PREPARATION
@@ -4631,7 +4617,7 @@ class FeaturePreparationStage(Stage):
         )
 
 
-class ModellingStage(Stage):
+class Modelling(Stage):
     """Fit the bounded regularized linear baseline on training features."""
 
     stage = modalities.LifecycleStage.MODELLING
@@ -4659,7 +4645,7 @@ class ModellingStage(Stage):
         )
 
 
-class EvaluationStage(Stage):
+class Evaluation(Stage):
     """Evaluate once on the untouched test partition."""
 
     stage = modalities.LifecycleStage.EVALUATION
@@ -4785,7 +4771,7 @@ class DataExplainabilityStage(Stage):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RepeatedExplanation:
+class Stability:
     """Linear explanations of test rows under tiny feature perturbations.
 
     Attributes:
@@ -4807,7 +4793,7 @@ class RepeatedExplanation:
     zero_ablation_consistency: float
 
 
-def zero_ablation_consistency(
+def ablate(
     model: LogisticRegression,
     sample_row: numpy.ndarray,
     sample_coefficients: numpy.ndarray,
@@ -4850,7 +4836,7 @@ def zero_ablation_consistency(
 
 
 def perturbed_contribution_reports(
-    batch: FeatureBatch,
+    batch: Batch,
     sample_index: int,
     sample_coefficients: numpy.ndarray,
     perturbation_size: numpy.ndarray,
@@ -4896,12 +4882,12 @@ def perturbed_contribution_reports(
     return reports
 
 
-def repeated_explanations(
+def perturb(
     model: LogisticRegression,
-    batch: FeatureBatch,
+    batch: Batch,
     perturbation_size: numpy.ndarray,
     evaluated_sample_count: int,
-) -> RepeatedExplanation:
+) -> Stability:
     """Explains the first rows of a batch and tests how stable they are.
 
     Args:
@@ -4944,7 +4930,7 @@ def repeated_explanations(
                 sample_coefficients,
                 sample_reports,
                 sample_stability,
-                zero_ablation_consistency(
+                ablate(
                     model,
                     sample_row,
                     sample_coefficients,
@@ -4954,7 +4940,7 @@ def repeated_explanations(
             )
     if first is None:
         raise RuntimeError("repeated explanation evaluation produced no report")
-    return RepeatedExplanation(
+    return Stability(
         stabilities=stabilities,
         reports=explanation_reports,
         coefficients=first[0],
@@ -4964,9 +4950,7 @@ def repeated_explanations(
     )
 
 
-def linear_decision_fidelity(
-    model: LogisticRegression, batch: FeatureBatch
-) -> float:
+def replicate(model: LogisticRegression, batch: Batch) -> float:
     """Scores how closely the linear reference reproduces the decision output.
 
     Args:
@@ -5003,10 +4987,10 @@ class ModelExplainabilityStage(Stage):
     stage = modalities.LifecycleStage.MODEL_EXPLAINABILITY
 
     @staticmethod
-    def ground_truth_evidence(
+    def corroborate(
         context: Context,
-        batch: FeatureBatch,
-        partitions: DatasetPartitions,
+        batch: Batch,
+        partitions: Partitions,
         evaluated_sample_count: int,
         explanation_reports: list[dict[str, object]],
     ) -> dict[str, object]:
@@ -5087,17 +5071,17 @@ class ModelExplainabilityStage(Stage):
             ),
             key=lambda item: (-item[1], item[0]),
         )[:10]
-        fidelity = linear_decision_fidelity(model, batch)
+        fidelity = replicate(model, batch)
         train_values = context.feature_batches["train"].values
         feature_scales = numpy.maximum(numpy.std(train_values, axis=0), 1.0)
         perturbation_size = feature_scales * 1e-6
         evaluated_sample_count = min(
             len(batch.sample_ids), MAX_REPEATED_EXPLANATION_SAMPLES
         )
-        repeated = repeated_explanations(
+        repeated = perturb(
             model, batch, perturbation_size, evaluated_sample_count
         )
-        ground_truth_evidence = self.ground_truth_evidence(
+        ground_truth_evidence = self.corroborate(
             context,
             batch,
             partitions,
@@ -5175,7 +5159,7 @@ class ModelExplainabilityStage(Stage):
         context.record(self.stage, context.model_explanation.copy())
 
 
-class PackagingStage(Stage):
+class Packaging(Stage):
     """Writes and signs a digest-bound model package atomically."""
 
     stage = modalities.LifecycleStage.PACKAGING
@@ -5280,7 +5264,7 @@ class PackagingStage(Stage):
             raise
 
 
-class InferenceStage(Stage):
+class Inference(Stage):
     """Verify the package before loading and reproducing predictions."""
 
     stage = modalities.LifecycleStage.INFERENCE
@@ -5302,14 +5286,14 @@ class InferenceStage(Stage):
             )
         started = time.perf_counter()
         loaded = load_package(context.package.path, context.signing_key)
-        context.record_performance(
+        context.clock(
             performance.Operation.LOAD,
             time.perf_counter() - started,
             len(context.feature_batches["test"].sample_ids),
         )
         started = time.perf_counter()
         predictions = loaded.predict(context.feature_batches["test"].values)
-        context.record_performance(
+        context.clock(
             performance.Operation.INFERENCE,
             time.perf_counter() - started,
             len(context.feature_batches["test"].sample_ids),
@@ -5328,7 +5312,7 @@ class InferenceStage(Stage):
         context.record(self.stage, context.inference.copy())
 
 
-class MonitoringStage(Stage):
+class Monitoring(Stage):
     """Emit reference-to-observed data drift evidence."""
 
     stage = modalities.LifecycleStage.MONITORING
@@ -5343,7 +5327,7 @@ class MonitoringStage(Stage):
         context.record(self.stage, context.monitoring.copy())
 
 
-class DocumentationStage(Stage):
+class Documentation(Stage):
     """Build a truthful dataset and model card for the baseline."""
 
     stage = modalities.LifecycleStage.DOCUMENTATION
@@ -5390,7 +5374,7 @@ class DocumentationStage(Stage):
         context.record(self.stage, context.documentation.copy())
 
 
-class RecoveryAndResourceStage(Stage):
+class Recovery(Stage):
     """Prove bounded resource claims and reject a tampered package."""
 
     stage = modalities.LifecycleStage.RECOVERY_AND_RESOURCE_TESTS
@@ -5503,7 +5487,7 @@ def execute_with_performance(context: Context, stage: Stage) -> None:
             sample_count = len(context.adapter.samples)
         else:
             sample_count = len(context.feature_batches["train"].sample_ids)
-        context.record_performance(
+        context.clock(
             operation,
             time.perf_counter() - started,
             sample_count,
@@ -5511,7 +5495,7 @@ def execute_with_performance(context: Context, stage: Stage) -> None:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RunPlan:
+class Plan:
     """The fixed inputs of one lifecycle run and what they imply.
 
     Attributes:
@@ -5551,7 +5535,7 @@ class RunPlan:
             return None
         return attestation.canonical_digest(self.manifest.to_dict())
 
-    def ensure_not_cancelled(self) -> None:
+    def poll(self) -> None:
         """Stops before publication and removes this run's artifacts.
 
         Does nothing when no check was given or it reports no cancellation.
@@ -5564,19 +5548,19 @@ class RunPlan:
         """
         if self.cancellation_check is None or not self.cancellation_check():
             return
-        self.remove_package()
+        self.discard()
         if self.report_target is not None and not self.report_preexisting:
             self.report_target.unlink(missing_ok=True)
         raise LifecycleCancelledError(
             "modality lifecycle cancelled at a stage boundary"
         )
 
-    def remove_package(self) -> None:
+    def discard(self) -> None:
         """Deletes the package directory unless it existed before the run."""
         if not self.package_preexisting:
             shutil.rmtree(self.package_target, ignore_errors=True)
 
-    def check_observed_modality(self) -> None:
+    def conform(self) -> None:
         """Checks that the monitored data has the reference modality.
 
         Raises:
@@ -5604,7 +5588,7 @@ class RunPlan:
         if manifest.sample_count != len(self.adapter.samples):
             raise errors.InputError("manifest sample_count must match adapter")
 
-    def check_checkpoint_presence(self, *, resume: bool) -> None:
+    def expect(self, *, resume: bool) -> None:
         """Checks that the checkpoint file exists exactly when resuming.
 
         Args:
@@ -5641,7 +5625,7 @@ class RunPlan:
             "manifest_digest": self.manifest_digest,
         }
 
-    def load_resume_checkpoint(self, stage_names: Sequence[str]) -> Checkpoint:
+    def reload(self, stage_names: Sequence[str]) -> Checkpoint:
         """Reads the checkpoint to resume from and checks that it fits.
 
         Args:
@@ -5684,7 +5668,7 @@ class RunPlan:
             )
         return checkpoint
 
-    def verified_completed_report(self) -> Record:
+    def verify(self) -> Record:
         """Verifies the report of a run whose checkpoint is completed.
 
         Returns:
@@ -5716,7 +5700,7 @@ class RunPlan:
         )
         return completed_report
 
-    def persist_checkpoint(
+    def persist(
         self,
         completed_stages: Sequence[str],
         stage_digests: Sequence[str],
@@ -5755,7 +5739,7 @@ class RunPlan:
             ).encode("utf-8"),
         )
 
-    def evaluate_performance(
+    def benchmark(
         self,
         context: Context,
         performance_budget: performance.Budget | None,
@@ -5823,7 +5807,7 @@ class RunPlan:
             ),
         }
         if performance_result is not None and not performance_result.passed:
-            self.remove_package()
+            self.discard()
             raise errors.InputError(
                 "performance budget failed: "
                 + "; ".join(performance_result.violations)
@@ -5832,7 +5816,7 @@ class RunPlan:
             performance_comparison is not None
             and not performance_comparison.passed
         ):
-            self.remove_package()
+            self.discard()
             raise errors.InputError(
                 "performance baseline failed: "
                 + "; ".join(performance_comparison.violations)
@@ -5848,26 +5832,26 @@ class Lifecycle:
     """
 
     stages: ClassVar[tuple[Stage, ...]] = (
-        IngestionStage(),
-        ValidationStage(),
-        ProfilingStage(),
+        Ingestion(),
+        Validation(),
+        Profiling(),
         CurationStage(),
-        SplittingStage(),
-        FeaturePreparationStage(),
-        ModellingStage(),
-        EvaluationStage(),
+        Splitting(),
+        Preparation(),
+        Modelling(),
+        Evaluation(),
         DataExplainabilityStage(),
         ModelExplainabilityStage(),
-        PackagingStage(),
-        InferenceStage(),
-        MonitoringStage(),
-        DocumentationStage(),
-        RecoveryAndResourceStage(),
+        Packaging(),
+        Inference(),
+        Monitoring(),
+        Documentation(),
+        Recovery(),
     )
 
     def run_stages(
         self,
-        plan: RunPlan,
+        plan: Plan,
         context: Context,
         resumed: tuple[int, tuple[str, ...]],
         progress: tuple[list[str], list[str]],
@@ -5890,7 +5874,7 @@ class Lifecycle:
         resume_count, resume_digests = resumed
         completed_stages, stage_digests = progress
         for stage_index, stage in enumerate(self.stages):
-            plan.ensure_not_cancelled()
+            plan.poll()
             context.resume_replay = stage_index < resume_count
             execute_with_performance(context, stage)
             stage_digest = attestation.canonical_digest(
@@ -5905,11 +5889,9 @@ class Lifecycle:
             else:
                 completed_stages.append(stage.stage.value)
                 stage_digests.append(stage_digest)
-                plan.persist_checkpoint(
-                    completed_stages, stage_digests, "running"
-                )
+                plan.persist(completed_stages, stage_digests, "running")
             context.resume_replay = False
-            plan.ensure_not_cancelled()
+            plan.poll()
 
     def run(
         self,
@@ -5988,7 +5970,7 @@ class Lifecycle:
         )
         check_checkpoint_options(resume, checkpoint_target, report_target)
         package_target = Path(package_path)
-        plan = RunPlan(
+        plan = Plan(
             adapter=adapter,
             observed=observed_adapter or adapter,
             package_target=package_target,
@@ -6004,8 +5986,8 @@ class Lifecycle:
                 report_target.exists() if report_target is not None else False
             ),
         )
-        plan.ensure_not_cancelled()
-        plan.check_observed_modality()
+        plan.poll()
+        plan.conform()
         plan.check_manifest()
         stage_names = tuple(stage.stage.value for stage in self.stages)
         required_stage_names = tuple(
@@ -6018,11 +6000,11 @@ class Lifecycle:
         checkpoint: Checkpoint | None = None
 
         if checkpoint_target is not None:
-            plan.check_checkpoint_presence(resume=resume)
+            plan.expect(resume=resume)
             if resume:
-                checkpoint = plan.load_resume_checkpoint(stage_names)
+                checkpoint = plan.reload(stage_names)
                 if checkpoint.status == "completed":
-                    return plan.verified_completed_report()
+                    return plan.verify()
                 resume_count = len(checkpoint.completed_stages)
                 resume_digests = checkpoint.stage_digests
 
@@ -6032,7 +6014,7 @@ class Lifecycle:
         stage_digests = list(
             checkpoint.stage_digests if checkpoint is not None else ()
         )
-        plan.persist_checkpoint(completed_stages, stage_digests, "running")
+        plan.persist(completed_stages, stage_digests, "running")
         context = Context(
             adapter=adapter,
             package_path=package_target,
@@ -6048,7 +6030,7 @@ class Lifecycle:
             (resume_count, resume_digests),
             (completed_stages, stage_digests),
         )
-        plan.ensure_not_cancelled()
+        plan.poll()
         records = tuple(
             modalities.StageEvidence(
                 stage=stage,
@@ -6061,7 +6043,7 @@ class Lifecycle:
         package = context.package
         if package is None:
             raise RuntimeError("packaging stage did not produce a package")
-        performance_evidence = plan.evaluate_performance(
+        performance_evidence = plan.benchmark(
             context, performance_budget, performance_baseline
         )
         report = Record(
@@ -6084,11 +6066,9 @@ class Lifecycle:
                     + "\n"
                 ).encode("utf-8"),
             )
-            plan.ensure_not_cancelled()
+            plan.poll()
         if checkpoint_target is not None:
-            plan.persist_checkpoint(
-                completed_stages, stage_digests, "completed"
-            )
+            plan.persist(completed_stages, stage_digests, "completed")
         return report
 
     def declaration(self, report: Record) -> modalities.Declaration:
@@ -6314,9 +6294,7 @@ def is_sha256(value: str) -> bool:
     )
 
 
-def normalize_json_object(
-    value: Mapping[str, object], name: str
-) -> dict[str, object]:
+def normalise(value: Mapping[str, object], name: str) -> dict[str, object]:
     """Normalizes a finite JSON object or rejects the evidence boundary.
 
     Args:
@@ -6346,21 +6324,21 @@ def normalize_json_object(
 
 __all__ = [
     "AudioPreparer",
+    "Batch",
     "Cancellation",
     "Checkpoint",
     "Curation",
     "DataExplainabilityStage",
-    "DatasetPartitions",
     "DocumentPreparer",
-    "FeatureBatch",
     "GeospatialPreparer",
     "GraphPreparer",
     "ImagePreparer",
-    "InferenceStage",
+    "Inference",
     "Lifecycle",
     "LifecycleCancelledError",
-    "ModellingStage",
+    "Modelling",
     "Package",
+    "Partitions",
     "Predictor",
     "Preparer",
     "RasterPreparer",
@@ -6370,5 +6348,5 @@ __all__ = [
     "file_digest",
     "is_sha256",
     "load_package",
-    "normalize_json_object",
+    "normalise",
 ]

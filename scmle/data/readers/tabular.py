@@ -40,7 +40,7 @@ class TableReader(abc.ABC):
         """
 
 
-class CsvReader(TableReader):
+class Csv(TableReader):
     """Comma-separated values, including compressed CSV files."""
 
     suffixes = (".csv", ".csv.gz", ".csv.bz2", ".csv.xz", ".csv.zip")
@@ -74,7 +74,7 @@ class TsvReader(TableReader):
         return pandas.read_csv(path, sep="\t")
 
 
-class JsonReader(TableReader):
+class Json(TableReader):
     """JSON records or a JSON array of records."""
 
     suffixes = (".json",)
@@ -91,7 +91,7 @@ class JsonReader(TableReader):
         return pandas.read_json(path)
 
 
-class JsonLinesReader(TableReader):
+class Jsonl(TableReader):
     """Newline-delimited JSON records."""
 
     suffixes = (".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")
@@ -108,7 +108,7 @@ class JsonLinesReader(TableReader):
         return pandas.read_json(path, lines=True)
 
 
-class ExcelReader(TableReader):
+class Excel(TableReader):
     """Excel workbooks, using the first sheet by default."""
 
     suffixes = (".xlsx", ".xlsm")
@@ -134,7 +134,7 @@ class ExcelReader(TableReader):
             ) from error
 
 
-class ParquetReader(TableReader):
+class Parquet(TableReader):
     """Apache Parquet."""
 
     suffixes = (".parquet", ".pq")
@@ -151,7 +151,7 @@ class ParquetReader(TableReader):
         return pandas.read_parquet(path)
 
 
-class FeatherReader(TableReader):
+class Feather(TableReader):
     """Arrow IPC / Feather files."""
 
     suffixes = (".feather", ".arrow")
@@ -182,13 +182,13 @@ class DatasetLoader:
             readers: Readers to dispatch to; defaults to common open formats.
         """
         self.readers = readers or (
-            CsvReader(),
+            Csv(),
             TsvReader(),
-            JsonReader(),
-            JsonLinesReader(),
-            ExcelReader(),
-            ParquetReader(),
-            FeatherReader(),
+            Json(),
+            Jsonl(),
+            Excel(),
+            Parquet(),
+            Feather(),
         )
 
     def supported_suffixes(self) -> list[str]:

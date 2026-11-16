@@ -228,7 +228,7 @@ class LocalFaultExecutor:
             ).encode("utf-8"),
         )
 
-    def stop_child(self) -> tuple[bool, int | None]:
+    def halt(self) -> tuple[bool, int | None]:
         """Starts a sleeping child process, terminates it and reports how.
 
         The child is a Python interpreter that sleeps for 60 seconds. It is
@@ -279,7 +279,7 @@ class LocalFaultExecutor:
         self.write_json(
             checkpoint, {"run_id": "local-process-death", "step": 3}
         )
-        terminated, returncode = self.stop_child()
+        terminated, returncode = self.halt()
         restored = json.loads(checkpoint.read_text(encoding="utf-8"))
         digest = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
         return (
@@ -460,7 +460,7 @@ class LocalFaultExecutor:
             idempotent retry and event deduplication.
         """
         scenario = reliability.FaultScenario.WORKER_LOSS
-        terminated, returncode = self.stop_child()
+        terminated, returncode = self.halt()
         output = self.root / "worker-output.json"
         writes = {"event-1"}
         self.write_json(output, {"event_ids": sorted(writes)})
@@ -490,7 +490,7 @@ class LocalFaultExecutor:
     ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
         """Terminates a child that outlives a short wait and records it.
 
-        The wait is the 0.05 seconds of `stop_child`; the cancellation is
+        The wait is the 0.05 seconds of `halt`; the cancellation is
         written to ``timeout-terminal.json`` under the root. The resource
         error artifact is a fixed statement that nothing was published.
 
@@ -499,7 +499,7 @@ class LocalFaultExecutor:
             cancellation record and resource error.
         """
         scenario = reliability.FaultScenario.TIMEOUT
-        terminated, returncode = self.stop_child()
+        terminated, returncode = self.halt()
         terminal = self.root / "timeout-terminal.json"
         self.write_json(
             terminal, {"state": "cancelled", "returncode": returncode}
@@ -782,13 +782,13 @@ class LocalFaultExecutor:
         )
         accepted: list[str] = []
 
-        def write_events(
+        def accept(
             events: tuple[incremental.Event, ...],
         ) -> None:
             accepted.extend(item.event_id for item in events)
 
-        first = ledger.commit_with_writer((event,), write_events)
-        second = ledger.commit_with_writer((event,), write_events)
+        first = ledger.commit_with_writer((event,), accept)
+        second = ledger.commit_with_writer((event,), accept)
         return (
             self.artifact(
                 scenario,

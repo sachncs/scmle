@@ -98,9 +98,7 @@ def horizon_names(value: str, horizon: int) -> list[str]:
     return [f"{value}{HORIZON_SEPARATOR}{k}" for k in range(1, horizon + 1)]
 
 
-def series_node(
-    name: str, op: str, source: str, **params: Any
-) -> dict[str, Any]:
+def derive(name: str, op: str, source: str, **params: Any) -> dict[str, Any]:
     """Returns a feature-node record over one source column.
 
     Args:
@@ -115,7 +113,7 @@ def series_node(
     return {"name": name, "op": op, "inputs": [source], "params": params}
 
 
-def forecast_nodes(record: dict[str, Any], value: str) -> list[dict[str, Any]]:
+def featurize(record: dict[str, Any], value: str) -> list[dict[str, Any]]:
     """Returns lag, rolling and calendar nodes for a forecasting data record.
 
     Args:
@@ -135,30 +133,28 @@ def forecast_nodes(record: dict[str, Any], value: str) -> list[dict[str, Any]]:
     if period and period not in lags:
         lags.append(int(period))
     windows = list(record.get("forecast_windows") or DEFAULT_WINDOWS)
-    nodes = [series_node(f"{value}__lag{k}", "lag", value, k=k) for k in lags]
+    nodes = [derive(f"{value}__lag{k}", "lag", value, k=k) for k in lags]
     for w in windows:
         nodes.append(
-            series_node(f"{value}__mean{w}", "rolling_mean", value, window=w)
+            derive(f"{value}__mean{w}", "rolling_mean", value, window=w)
         )
-        nodes.append(
-            series_node(f"{value}__std{w}", "rolling_std", value, window=w)
-        )
+        nodes.append(derive(f"{value}__std{w}", "rolling_std", value, window=w))
     clock = record.get("time_column")
     if clock:
         nodes += [
-            series_node(f"{clock}__{part}", "datepart", clock, part=part)
+            derive(f"{clock}__{part}", "datepart", clock, part=part)
             for part in record.get("forecast_calendar") or []
         ]
     return nodes
 
 
-class FrozenModel(pydantic.BaseModel):
+class Schema(pydantic.BaseModel):
     """Immutable pydantic base that rejects unknown fields."""
 
     model_config = pydantic.ConfigDict(extra="forbid", frozen=True)
 
 
-class FeatureNode(FrozenModel):
+class FeatureNode(Schema):
     """One derived feature: `name = op(inputs; params)`.
 
     Attributes:
@@ -175,7 +171,7 @@ class FeatureNode(FrozenModel):
     params: dict[str, Any] = pydantic.Field(default_factory=dict)
 
 
-class FeatureGraph(FrozenModel):
+class FeatureGraph(Schema):
     """An ordered set of derived features.
 
     Nodes are listed in dependency order: a node may only use raw columns and
@@ -192,7 +188,7 @@ class FeatureGraph(FrozenModel):
     nodes: list[FeatureNode] = pydantic.Field(default_factory=list)
 
     @pydantic.model_validator(mode="after")
-    def check_structure(self) -> Self:
+    def verify(self) -> Self:
         """Validates unique names and dependency order.
 
         Returns:
@@ -236,7 +232,7 @@ class FeatureGraph(FrozenModel):
         ).hexdigest()[:16]
 
 
-class Dataset(FrozenModel):
+class Dataset(Schema):
     """Where the data lives and what its columns mean.
 
     Attributes:
@@ -389,7 +385,7 @@ class Dataset(FrozenModel):
     ingest_plan: str | None = None
 
 
-class Validation(FrozenModel):
+class Validation(Schema):
     """How data is partitioned for model selection and final testing.
 
     Attributes:
@@ -425,7 +421,7 @@ class Validation(FrozenModel):
     window_rows: int | None = pydantic.Field(default=None, ge=1)
 
 
-class Resources(FrozenModel):
+class Resources(Schema):
     """Compute limits for a run."""
 
     time_budget_seconds: int = pydantic.Field(default=1800, gt=0)
@@ -438,7 +434,7 @@ class Resources(FrozenModel):
     enforcement: Literal["hard", "cooperative"] = "hard"
 
 
-class Search(FrozenModel):
+class Search(Schema):
     """Hyperparameter search settings (disabled when `top_models` is 0)."""
 
     top_models: int = pydantic.Field(default=2, ge=0)
@@ -449,7 +445,7 @@ class Search(FrozenModel):
     eta: int = pydantic.Field(default=3, ge=2)
 
 
-class Strategies(FrozenModel):
+class Strategies(Schema):
     """Which data strategies to evaluate (imbalance and feature variants)."""
 
     names: list[str] = pydantic.Field(
@@ -475,13 +471,13 @@ class Strategies(FrozenModel):
     top_models: int = pydantic.Field(default=2, ge=0)
 
 
-class Stacking(FrozenModel):
+class Stacking(Schema):
     """Stacking ensemble settings (disabled when `size` < 2)."""
 
     size: int = pydantic.Field(default=3, ge=0)
 
 
-class Selection(FrozenModel):
+class Selection(Schema):
     """How the winning model is chosen and which constraints it must meet.
 
     Attributes:
@@ -545,7 +541,7 @@ class Selection(FrozenModel):
     pareto_tolerance: float = pydantic.Field(default=0.0, ge=0.0)
 
 
-class Candidates(FrozenModel):
+class Candidates(Schema):
     """Which model families may be considered.
 
     Attributes:
@@ -565,7 +561,7 @@ class Candidates(FrozenModel):
     experimental_models: list[str] = pydantic.Field(default_factory=list)
 
 
-class Threshold(FrozenModel):
+class Threshold(Schema):
     """How binary probabilities become decisions (threshold optimization)."""
 
     threshold_objective: Literal[
@@ -575,7 +571,7 @@ class Threshold(FrozenModel):
     false_negative_cost: float = pydantic.Field(default=1.0, gt=0)
 
 
-class Parity(FrozenModel):
+class Parity(Schema):
     """Optional reduction of outcome gaps between groups (binary tasks).
 
     Attributes:
@@ -606,7 +602,7 @@ class Parity(FrozenModel):
     max_accuracy_cost: float = pydantic.Field(default=0.03, ge=0.0, lt=1.0)
 
 
-class Problem(FrozenModel):
+class Problem(Schema):
     """What the model is for, so the result can be judged against it.
 
     Attributes:
@@ -622,7 +618,7 @@ class Problem(FrozenModel):
     success_criteria: dict[str, float] = pydantic.Field(default_factory=dict)
 
 
-class Config(FrozenModel):
+class Config(Schema):
     """The explicit, versioned specification of an ML project."""
 
     version: int = CONFIG_VERSION
@@ -658,7 +654,7 @@ class Config(FrozenModel):
 
     @pydantic.model_validator(mode="before")
     @classmethod
-    def expand_feature_delays(cls, values: Any) -> Any:
+    def lag(cls, values: Any) -> Any:
         """Turns `data.feature_delays` into lagged nodes and exclusions.
 
         The expansion is idempotent, so a saved configuration (which already
@@ -746,7 +742,7 @@ class Config(FrozenModel):
         present = {node["name"] for node in known}
         added = [
             node
-            for node in forecast_nodes(record, value)
+            for node in featurize(record, value)
             if node["name"] not in present
         ]
         return {
@@ -774,7 +770,7 @@ class Config(FrozenModel):
                 data columns.
         """
         data, validation = self.data, self.validation
-        check_validation_rules(self)
+        validate(self)
         check_survival_and_ordinal_rules(self)
         check_streaming_and_fairness_rules(self)
         check_multi_target_rules(self)
@@ -858,7 +854,7 @@ class Config(FrozenModel):
         return digest[:16]
 
 
-def check_validation_rules(config: Config) -> None:
+def validate(config: Config) -> None:
     """Checks the validation strategy against the columns it needs.
 
     Args:

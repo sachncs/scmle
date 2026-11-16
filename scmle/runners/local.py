@@ -27,7 +27,7 @@ class JobInterruptedError(errors.ScmleError):
     """The platform took the job away (preemption); retry from a checkpoint."""
 
 
-class JobStoppedError(errors.ScmleError):
+class StoppedError(errors.ScmleError):
     """The supervisor stopped the job (budget or timeout)."""
 
 
@@ -63,7 +63,7 @@ class JobContext:
         """Saves a checkpoint, then lets the supervisor act.
 
         The hook may then raise `JobInterruptedError` (the platform interrupts
-        after this step) or `JobStoppedError` (the budget or timeout stops the
+        after this step) or `StoppedError` (the budget or timeout stops the
         job).
 
         Args:
@@ -157,12 +157,12 @@ class Runner(base.Runner):
                 step: The step just saved.
 
             Raises:
-                JobStoppedError: If the supervisor wants the job stopped.
+                StoppedError: If the supervisor wants the job stopped.
                 JobInterruptedError: If the injected interruption strikes at
                     this attempt and step.
             """
             if self.watcher() is not None:
-                raise JobStoppedError
+                raise StoppedError
             if self.interruptions and self.interruptions(attempt, step):
                 raise JobInterruptedError
 
@@ -180,7 +180,7 @@ class Runner(base.Runner):
         except JobInterruptedError:
             # handled: interruption recorded as INTERRUPTED job status
             status = base.JobStatus(base.JobState.INTERRUPTED, "interrupted")
-        except JobStoppedError:
+        except StoppedError:
             # handled: supervisor stop recorded as CANCELLED job status
             status = base.JobStatus(base.JobState.CANCELLED, "stopped")
         except retry.TransientError as error:

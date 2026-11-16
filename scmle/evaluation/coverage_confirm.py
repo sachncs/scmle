@@ -231,7 +231,7 @@ def inside_of(
     )
 
 
-def evaluate_document(
+def assess(
     bundle: Any,
     features: pandas.DataFrame,
     target: Any,
@@ -339,9 +339,7 @@ def build_runner(
     def evaluate(
         features: pandas.DataFrame, target: pandas.Series
     ) -> confirm.ClaimRun:
-        document = evaluate_document(
-            bundle, features, target, claim_sha256, choice, task
-        )
+        document = assess(bundle, features, target, claim_sha256, choice, task)
         return confirm.ClaimRun(
             {CLAIM_ID: str(document["status"])}, {DOCUMENT: document}
         )

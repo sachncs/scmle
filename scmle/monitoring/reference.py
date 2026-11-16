@@ -42,7 +42,7 @@ def population_stability_index(
 
 
 @dataclasses.dataclass(frozen=True)
-class DistributionReference(abc.ABC):
+class Reference(abc.ABC):
     """Reference distribution of one column or score.
 
     Attributes:
@@ -81,7 +81,7 @@ class DistributionReference(abc.ABC):
         """Returns a JSON-serializable mapping.
 
         Returns:
-            A dict that `reference_from_dict` can rebuild this reference from.
+            A dict that `rebuild` can rebuild this reference from.
         """
 
     def psi(self, values: pandas.Series) -> float:
@@ -146,7 +146,7 @@ class DistributionReference(abc.ABC):
 
 
 @dataclasses.dataclass(frozen=True)
-class NumericReference(DistributionReference):
+class NumericReference(Reference):
     """Decile-binned numeric distribution.
 
     Attributes:
@@ -228,7 +228,7 @@ class NumericReference(DistributionReference):
 
 
 @dataclasses.dataclass(frozen=True)
-class CategoricalReference(DistributionReference):
+class CategoricalReference(Reference):
     """Category frequency distribution.
 
     Attributes:
@@ -322,12 +322,12 @@ class CategoricalReference(DistributionReference):
         }
 
 
-REFERENCE_KINDS: dict[str, type[DistributionReference]] = {
+REFERENCE_KINDS: dict[str, type[Reference]] = {
     cls.kind: cls for cls in (NumericReference, CategoricalReference)
 }
 
 
-def reference_from_dict(record: dict[str, Any]) -> DistributionReference:
+def rebuild(record: dict[str, Any]) -> Reference:
     """Rebuilds a reference from `to_dict` output.
 
     Args:
@@ -361,8 +361,8 @@ class ReferenceProfile:
         reference_metrics: Held-out metrics at training time.
     """
 
-    features: dict[str, DistributionReference]
-    output: DistributionReference
+    features: dict[str, Reference]
+    output: Reference
     output_name: str
     reference_metrics: dict[str, float]
 
@@ -390,7 +390,7 @@ class ReferenceProfile:
             categorical column of `plan` present in `features`, and one for
             the output.
         """
-        references: dict[str, DistributionReference] = {}
+        references: dict[str, Reference] = {}
         for column in plan.numeric:
             if column in features.columns:
                 references[column] = NumericReference.fit(features[column])
@@ -430,8 +430,8 @@ class ReferenceProfile:
             The profile.
         """
         return cls(
-            {k: reference_from_dict(v) for k, v in record["features"].items()},
-            reference_from_dict(record["output"]),
+            {k: rebuild(v) for k, v in record["features"].items()},
+            rebuild(record["output"]),
             record["output_name"],
             record["reference_metrics"],
         )

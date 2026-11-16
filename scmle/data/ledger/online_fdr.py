@@ -111,7 +111,7 @@ SAFFRON = "saffron"
 RULE_NAMES = (ELOND, LORD_PLUS_PLUS, SAFFRON)
 
 
-class RuleInvariantError(RuntimeError):
+class InvariantError(RuntimeError):
     """Raised if a rule's own bookkeeping would break (a bug, never data)."""
 
 
@@ -415,7 +415,7 @@ class Tester(abc.ABC):
             `ValueError` (see `decide`).
 
         Raises:
-            RuleInvariantError: If the wealth would turn negative.
+            InvariantError: If the wealth would turn negative.
         """
         level = self.level(state)
         rejected, candidate, e_value = self.decide(level, evidence)
@@ -432,7 +432,7 @@ class Tester(abc.ABC):
         )
         after = self.wealth(moved)
         if after < 0:
-            raise RuleInvariantError(f"wealth would be negative at test {time}")
+            raise InvariantError(f"wealth would be negative at test {time}")
         return Step(
             level=level,
             rejected=rejected,
@@ -596,7 +596,7 @@ class PValueTester(Tester):
         first = (self.alpha - self.w0) if rejected >= 1 else Fraction(0)
         return self.w0 + first + self.alpha * max(rejected - 1, 0)
 
-    def require_p(self, evidence: Evidence) -> Fraction:
+    def read(self, evidence: Evidence) -> Fraction:
         """Reads the exact p-value, which these rules need.
 
         Args:
@@ -672,13 +672,13 @@ class LordPlusPlus(PValueTester):
         Args:
             level: The level assigned to the hypothesis.
             evidence: Its evidence, which must hold a p-value (a missing one
-                is refused with a `ValueError` by `require_p`).
+                is refused with a `ValueError` by `read`).
 
         Returns:
             Whether it is rejected, False (LORD++ has no candidates) and
             None (no e-value is used).
         """
-        return self.require_p(evidence) <= level, False, None
+        return self.read(evidence) <= level, False, None
 
 
 class Saffron(PValueTester):
@@ -770,13 +770,13 @@ class Saffron(PValueTester):
         Args:
             level: The level assigned to the hypothesis.
             evidence: Its evidence, which must hold a p-value (a missing one
-                is refused with a `ValueError` by `require_p`).
+                is refused with a `ValueError` by `read`).
 
         Returns:
             Whether it is rejected, whether it is a candidate, and None (no
             e-value is used).
         """
-        p = self.require_p(evidence)
+        p = self.read(evidence)
         return p <= level, p <= self.lam, None
 
     def update_spent(

@@ -96,7 +96,7 @@ class EnvelopeGuard:
         if self.on_write is not None:
             self.on_write()
 
-    def signature_ok(self, grant: deployment_ledger.Envelope) -> bool:
+    def verifies(self, grant: deployment_ledger.Envelope) -> bool:
         """Whether the signature verifies, when keys were supplied.
 
         Args:
@@ -128,7 +128,7 @@ class EnvelopeGuard:
                 envelope's key id is not among them or its signature does not
                 verify.
         """
-        if not self.signature_ok(envelope):
+        if not self.verifies(envelope):
             raise EnvelopeRefused(
                 "grant", "the signature does not verify under a known key"
             )
@@ -190,7 +190,7 @@ class EnvelopeGuard:
         expires = deployment_ledger.parse_date(grant["expires"], "expires")
         if not issued <= today <= expires:
             return "not valid today"
-        if not self.signature_ok(deployment_ledger.Envelope.from_dict(grant)):
+        if not self.verifies(deployment_ledger.Envelope.from_dict(grant)):
             return "its signature does not verify"
         return None
 

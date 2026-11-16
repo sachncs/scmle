@@ -436,7 +436,7 @@ class TornReadError(connectors.ConnectorError):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ConsistentRead:
+class Reading:
     """Rows read under a snapshot check.
 
     Attributes:
@@ -496,7 +496,7 @@ def consistent_read(
     token: Callable[[], str] | None = None,
     attempts: int = 2,
     require_order: bool = True,
-) -> ConsistentRead:
+) -> Reading:
     """Reads a source completely, rejecting a torn read.
 
     Args:
@@ -543,5 +543,5 @@ def consistent_read(
         if before != after:
             reason = "snapshot token changed"
             continue
-        return ConsistentRead(frame, before, probe is not None, attempt)
+        return Reading(frame, before, probe is not None, attempt)
     raise TornReadError(connector.source_uri, attempts, reason)

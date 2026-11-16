@@ -25,7 +25,7 @@
         "fixed_rule_rate": 1.0,
         "true_risk": 0.15000000000000002
       },
-      "code_hash": "2c1be8e8dd08114a29587be69d0d2e7f9377dfc7034ac9916dd01c32f707d26d",
+      "code_hash": "83b6e480616b44e2121400c39535c780575ca1d443cd41525e08d603c6ccbb0c",
       "passed": true,
       "replicates": 2000,
       "seeds": [
@@ -59,7 +59,7 @@
           "within_d_max_lower": 0.9985032551048117
         }
       },
-      "code_hash": "961a648a61ec2d261c5ec9132f10536e2af87124f2cae3ff9abfbf7e02a4fefe",
+      "code_hash": "8d0774da56ab00ec97b24e4facd163d78efc9f2753007b2122c66a4deb200b34",
       "coverage_after_halt": 0.0,
       "passed": false,
       "replicates": 2000,
@@ -95,7 +95,7 @@
           "within_d_max_lower": 0.9985032551048117
         }
       },
-      "code_hash": "9b52740f8d932e4dfa35b9e4bf8cdf969ec28dbedb541963c77b5222c22e0fc7",
+      "code_hash": "3a474759d4d7e0823f4244ec3a7f3feb06e65102e6884a94745fa3ce2cfcbff3",
       "d_max": 50,
       "passed": false,
       "replicates": 2000,
@@ -105,7 +105,7 @@
       ]
     },
     "H3": {
-      "code_hash": "fa0ed0c225b5a8d04a07606b37026c3131c300a6faefa85279bcc1287066187e",
+      "code_hash": "339a3a184f8658598b69ecb677b6f1252e4a0122fc834b98abf8a547a1b39c0d",
       "passed": true,
       "psi_rule_flag_rate": 1.0,
       "replicates": 300,
@@ -124,7 +124,7 @@
       "bootstrap_fdr": 0.6136285926448561,
       "bootstrap_power": 1.0,
       "challengers": 200,
-      "code_hash": "248631b61530d75ee33ab8567533eb31ca6d32d041caa721d22492db64709f9e",
+      "code_hash": "76ca96b7746c1fed28929171788d4078beaccc9ff272385e401fa24bf1b0dba3",
       "elond_fdr": 0.0,
       "elond_power": 1.0,
       "elond_se": 0.0,
@@ -156,7 +156,7 @@
           "worse_by": 0.1
         }
       },
-      "code_hash": "7d7408fce4dc8f24f0cc62de94339742049b56eaec6245ce5b5580c421e8dbde",
+      "code_hash": "25c8f04bb85ff767913ec381a117a29aaa7134b012b8122407270882db0ea4d3",
       "passed": true,
       "replicates": 2000,
       "seeds": [
@@ -165,7 +165,7 @@
       ]
     },
     "H6": {
-      "code_hash": "315d1f07a4656c08731405d089f1413bbc084f9177318ce21ec1605d26177ca6",
+      "code_hash": "9b70fd4628786b1cf8f7a7bf75b1091afb7e6d50211560bc0fd36159bb7b90e7",
       "cs_coverage_floor": 0.9122508278236462,
       "cs_time_uniform_coverage": 1.0,
       "mnar_without_audit_slice": {

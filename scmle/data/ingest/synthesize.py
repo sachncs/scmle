@@ -159,7 +159,7 @@ def window_label(window: float | None) -> str:
     return "all" if window is None else f"{window:g}d"
 
 
-def candidate_columns(source: Source) -> tuple[list[str], list[str]]:
+def sift(source: Source) -> tuple[list[str], list[str]]:
     """Finds the value columns of a source, excluding structure.
 
     Key, time, reserved and identifier-like (`id`, `*_id`) columns are
@@ -273,7 +273,7 @@ def nested_features(
     for position, nest in enumerate(nests):
         mid_index = next(k for k, s in enumerate(sources) if s is nest.mid)
         leaf = Source(nest.leaf, nest.leaf.key)
-        numeric, others = candidate_columns(leaf)
+        numeric, others = sift(leaf)
         del others
         for window in windows:
             label = window_label(window)
@@ -319,7 +319,7 @@ def propose(
     specs: list[Feature] = []
     for index, source in enumerate(sources):
         table = source.view.name
-        numeric, other = candidate_columns(source)
+        numeric, other = sift(source)
         if source.role == PARENT:
             specs.extend(
                 Feature(
@@ -422,10 +422,10 @@ def reduce_rows(
     if primitive == NUNIQUE:
         grouped = valid.groupby(label)[value]
         return grouped.nunique().reindex(index, fill_value=0).astype(float)
-    return reduce_numeric(valid, primitive, value, index)
+    return aggregate(valid, primitive, value, index)
 
 
-def reduce_numeric(
+def aggregate(
     valid: pandas.DataFrame,
     primitive: str,
     value: str,

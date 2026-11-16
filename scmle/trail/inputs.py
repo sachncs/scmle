@@ -21,7 +21,7 @@ SECTIONS = ("stakeholder", "reviewer")
 EXPECTATION_FIELDS = ("kpi", "metric", "low", "high", "level", "basis")
 
 
-def section_payload(record: Mapping[str, Any], role: str) -> dict[str, Any]:
+def cover(record: Mapping[str, Any], role: str) -> dict[str, Any]:
     """Builds the content that a section's signature covers.
 
     Args:
@@ -64,7 +64,7 @@ def sign_inputs(
     }
     for role in SECTIONS:
         signed[role]["signature"] = signing.sign_payload(
-            section_payload(signed, role), keys[role]
+            cover(signed, role), keys[role]
         )
     return signed
 
@@ -91,13 +91,13 @@ def signature_problem(
         return f"the {role} section is unsigned"
     if key is None:
         return f"no {role} key was supplied to check the signature"
-    expected = signing.sign_payload(section_payload(record, role), key)
+    expected = signing.sign_payload(cover(record, role), key)
     if not hmac.compare_digest(str(signature), expected):
         return f"the {role} signature does not verify"
     return None
 
 
-def missing_fields(
+def lack(
     section: Mapping[str, Any], names: Sequence[str], message: str
 ) -> list[str]:
     """Lists a message for every required field a section lacks.
@@ -125,7 +125,7 @@ def structure_problems(record: Mapping[str, Any]) -> list[str]:
         (for both acceptance criteria and reviewer thresholds), criterion
         operator not in `records.OPERATORS`, or expectation field.
     """
-    found = missing_fields(
+    found = lack(
         record,
         ("model", "version", "charter_hash", "builder"),
         "missing {name}",
@@ -133,14 +133,14 @@ def structure_problems(record: Mapping[str, Any]) -> list[str]:
     stakeholder = record.get("stakeholder", {})
     reviewer = record.get("reviewer", {})
     found.extend(
-        missing_fields(
+        lack(
             stakeholder,
             ("name", "kpis", "acceptance", "expectation"),
             "stakeholder section lacks {name}",
         )
     )
     found.extend(
-        missing_fields(
+        lack(
             reviewer,
             ("name", "thresholds", "evidence"),
             "reviewer section lacks {name}",
@@ -148,7 +148,7 @@ def structure_problems(record: Mapping[str, Any]) -> list[str]:
     )
     for kpi in stakeholder.get("kpis", []):
         found.extend(
-            missing_fields(
+            lack(
                 kpi,
                 ("kpi", "owner", "metric", "direction"),
                 "a KPI lacks {name}",
@@ -159,7 +159,7 @@ def structure_problems(record: Mapping[str, Any]) -> list[str]:
         *reviewer.get("thresholds", []),
     ]:
         found.extend(
-            missing_fields(
+            lack(
                 criterion,
                 ("id", "path", "op", "value"),
                 "a criterion lacks {name}",
@@ -168,7 +168,7 @@ def structure_problems(record: Mapping[str, Any]) -> list[str]:
         if criterion.get("op") not in records.OPERATORS:
             found.append(f"criterion {criterion.get('id')} has a bad operator")
     found.extend(
-        missing_fields(
+        lack(
             stakeholder.get("expectation", {}),
             EXPECTATION_FIELDS,
             "the expectation lacks {name}",

@@ -399,7 +399,7 @@ class ModelMonitor:
         self.reference: reference.ReferenceProfile = bundle.reference
         self.thresholds = thresholds or Thresholds()
 
-    def model_output(self, frame: pandas.DataFrame) -> pandas.Series:
+    def infer(self, frame: pandas.DataFrame) -> pandas.Series:
         """Computes the output the reference describes.
 
         Args:
@@ -439,7 +439,7 @@ class ModelMonitor:
                 )
             )
         features.sort(key=lambda f: -f.psi)
-        output = self.model_output(frame)
+        output = self.infer(frame)
         output_psi = self.reference.output.adjusted_psi(output)
         return Drift(
             len(frame),

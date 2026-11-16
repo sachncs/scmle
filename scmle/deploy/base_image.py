@@ -75,7 +75,7 @@ def split_image(image: str) -> tuple[str, str, str]:
     return registry, repository, match["tag"]
 
 
-def fetch_registry_digest(image: str, timeout: float = 30.0) -> str:
+def query(image: str, timeout: float = 30.0) -> str:
     """Asks the registry for the digest of the index behind `image`.
 
     Only Docker Hub-style token authentication is implemented. This needs
@@ -137,7 +137,7 @@ def resolve(
             `repository:tag`, is refused with the same error by the helpers.
     """
     split_image(image)
-    digest = (fetch or fetch_registry_digest)(image)
+    digest = (fetch or query)(image)
     contract.require_digest(digest, "resolved digest")
     if digest == PLACEHOLDER:
         raise errors.ConfigError("the registry returned the placeholder")

@@ -123,7 +123,7 @@ class FeatureGraphReference(Contract):
 
     @pydantic.field_validator("fingerprint")
     @classmethod
-    def validate_fingerprint(cls, value: str) -> str:
+    def require(cls, value: str) -> str:
         """Rejects a missing feature-graph fingerprint.
 
         Args:
@@ -143,7 +143,7 @@ class Method(Contract):
 
     @pydantic.field_validator("name")
     @classmethod
-    def validate_name(cls, value: str) -> str:
+    def require(cls, value: str) -> str:
         """Rejects an unnamed explanation method.
 
         Args:
@@ -156,7 +156,7 @@ class Method(Contract):
 
     @pydantic.field_validator("parameters", mode="before")
     @classmethod
-    def validate_parameters(cls, value: Any) -> dict[str, object]:
+    def normalise(cls, value: Any) -> dict[str, object]:
         """Validates method parameters without lossy coercion.
 
         Args:
@@ -186,7 +186,7 @@ class PrivacyDecision(Contract):
 
     @pydantic.field_validator("reason")
     @classmethod
-    def validate_reason(cls, value: str) -> str:
+    def require(cls, value: str) -> str:
         """Requires an auditable reason for the privacy decision.
 
         Args:
@@ -199,9 +199,7 @@ class PrivacyDecision(Contract):
 
     @pydantic.field_validator("redacted_fields")
     @classmethod
-    def validate_redacted_fields(
-        cls, value: tuple[str, ...]
-    ) -> tuple[str, ...]:
+    def trim(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         """Rejects blank names in the redaction record.
 
         Args:
@@ -241,7 +239,7 @@ class EvidenceLink(Contract):
 
     @pydantic.field_validator("uri")
     @classmethod
-    def validate_uri(cls, value: str) -> str:
+    def screen(cls, value: str) -> str:
         """Rejects URI schemes that cannot be safely rendered as links.
 
         Args:
@@ -344,7 +342,7 @@ class Evidence(Contract):
         "output", "uncertainty", "stability", mode="before"
     )
     @classmethod
-    def validate_json_fields(cls, value: Any, info: Any) -> object:
+    def normalise(cls, value: Any, info: Any) -> object:
         """Rejects values that cannot be safely serialized as JSON.
 
         Args:
@@ -365,9 +363,7 @@ class Evidence(Contract):
 
     @pydantic.field_validator("uncertainty", "stability")
     @classmethod
-    def validate_measurement_object(
-        cls, value: dict[str, object], info: Any
-    ) -> dict[str, object]:
+    def require(cls, value: dict[str, object], info: Any) -> dict[str, object]:
         """Requires an explicit uncertainty and stability object.
 
         Args:

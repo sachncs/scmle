@@ -687,9 +687,7 @@ class Estimator:
                 effective-sample-size checks raise `ValueError` from the
                 helper functions and `fit_period`.
         """
-        prepared, rows_dropped = prepare_longitudinal_frame(
-            frame, self.estimand, self.policy
-        )
+        prepared, rows_dropped = prepare(frame, self.estimand, self.policy)
         fingerprint = fingerprint_frame(frame)
         try:
             period_series = prepared[
@@ -832,9 +830,7 @@ class Estimator:
         covariates = period_frame[list(self.estimand.covariates)].to_numpy(
             dtype=float
         )
-        propensity, iterations = fit_logistic_propensity(
-            covariates, treatment, policy
-        )
+        propensity, iterations = regress(covariates, treatment, policy)
         clipped = numpy.clip(
             propensity, policy.propensity_clip, 1.0 - policy.propensity_clip
         )
@@ -997,7 +993,7 @@ def convert_numeric_columns(
             )
 
 
-def prepare_longitudinal_frame(
+def prepare(
     frame: pandas.DataFrame,
     estimand: Estimand,
     policy: Config,
@@ -1129,7 +1125,7 @@ def validate_baseline_covariates(
             )
 
 
-def fit_logistic_propensity(
+def regress(
     covariates: numpy.ndarray,
     treatment: numpy.ndarray,
     policy: Config,

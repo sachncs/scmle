@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     import scmle.core.state
 
 
-class WorkflowStage(Protocol):
+class Node(Protocol):
     """Minimal structural contract for a compilable workflow stage.
 
     The compiler intentionally depends on this protocol rather than the
@@ -29,7 +29,7 @@ class WorkflowStage(Protocol):
     """
 
     state: ClassVar["scmle.core.state.RunState"]
-    requires: ClassVar[tuple[type["WorkflowStage"], ...]]
+    requires: ClassVar[tuple[type["Node"], ...]]
 
     def describe(self, context: "scmle.core.context.Context") -> str:
         """Returns the reason recorded on stage entry.
@@ -50,7 +50,7 @@ class WorkflowStage(Protocol):
         """
 
 
-StageT = TypeVar("StageT", bound=WorkflowStage)
+StageT = TypeVar("StageT", bound=Node)
 
 
 def assemble(

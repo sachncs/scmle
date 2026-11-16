@@ -75,13 +75,11 @@ class CounterfactualSearch:
         self.predict = predict
         self.actionable = list(actionable)
         self.max_changes = max_changes
-        self.values = {
-            c: self.candidate_values(background[c]) for c in actionable
-        }
-        self.scales = {c: self.scale_of(background[c]) for c in actionable}
+        self.values = {c: self.propose(background[c]) for c in actionable}
+        self.scales = {c: self.measure(background[c]) for c in actionable}
 
     @staticmethod
-    def candidate_values(column: pandas.Series) -> list[Any]:
+    def propose(column: pandas.Series) -> list[Any]:
         """Values worth trying: quantiles for numbers, common categories.
 
         Args:
@@ -102,7 +100,7 @@ class CounterfactualSearch:
         return present.value_counts().head(MAX_CATEGORIES).index.tolist()
 
     @staticmethod
-    def scale_of(column: pandas.Series) -> float:
+    def measure(column: pandas.Series) -> float:
         """Interquartile range of a numeric column (1 for categories).
 
         Args:

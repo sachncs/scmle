@@ -307,9 +307,9 @@ class Graph:
                     "evidence graph contains duplicate edges"
                 )
             seen.add(edge)
-        self.topological_order_without_validation()
+        self.linearise()
 
-    def topological_order_without_validation(self) -> tuple[str, ...]:
+    def linearise(self) -> tuple[str, ...]:
         """Computes order without recursively invoking ``validate``.
 
         The caller must already have checked that every edge joins registered
@@ -365,9 +365,7 @@ class Graph:
                     ),
                 )
             ],
-            "topological_order": list(
-                self.topological_order_without_validation()
-            ),
+            "topological_order": list(self.linearise()),
         }
 
     def canonical_json(self) -> str:

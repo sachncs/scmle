@@ -113,7 +113,7 @@ class ModelFamily(enum.StrEnum):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ModelFamilyDeclaration:
+class Declaration:
     """Evidence boundary for a model family without full task support.
 
     A family declaration is intentionally not a substitute for a complete
@@ -487,7 +487,7 @@ class Capability:
 
 
 DEFAULT_MODEL_FAMILY_DECLARATIONS = (
-    ModelFamilyDeclaration(
+    Declaration(
         model_family=ModelFamily.TRANSFORMER.value,
         status=Status.EXPERIMENTAL,
         modalities=(Modality.TABULAR,),
@@ -504,7 +504,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             "not a complete production capability declaration",
         ),
     ),
-    ModelFamilyDeclaration(
+    Declaration(
         model_family=ModelFamily.TEXT_TRANSFORMER.value,
         status=Status.EXTENSION_ONLY,
         modalities=(Modality.TEXT, Modality.DOCUMENT),
@@ -521,7 +521,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             "no production inference guarantee",
         ),
     ),
-    ModelFamilyDeclaration(
+    Declaration(
         model_family=ModelFamily.VISION_TRANSFORMER.value,
         status=Status.EXTENSION_ONLY,
         modalities=(Modality.IMAGE, Modality.VIDEO),
@@ -538,7 +538,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             "no production lifecycle evidence",
         ),
     ),
-    ModelFamilyDeclaration(
+    Declaration(
         model_family=ModelFamily.AUDIO_TRANSFORMER.value,
         status=Status.EXTENSION_ONLY,
         modalities=(Modality.AUDIO,),
@@ -555,7 +555,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             "no production lifecycle evidence",
         ),
     ),
-    ModelFamilyDeclaration(
+    Declaration(
         model_family=ModelFamily.VIDEO_TRANSFORMER.value,
         status=Status.EXTENSION_ONLY,
         modalities=(Modality.VIDEO,),
@@ -572,7 +572,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             "no production lifecycle evidence",
         ),
     ),
-    ModelFamilyDeclaration(
+    Declaration(
         model_family=ModelFamily.MULTIMODAL_TRANSFORMER.value,
         status=Status.EXTENSION_ONLY,
         modalities=(
@@ -594,7 +594,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             "must provide independent lifecycle evidence",
         ),
     ),
-    ModelFamilyDeclaration(
+    Declaration(
         model_family=ModelFamily.JEPA.value,
         status=Status.EXPERIMENTAL,
         modalities=(Modality.TABULAR,),
@@ -637,7 +637,7 @@ class Registry:
     def __init__(
         self,
         capabilities: Iterable[Capability] = (),
-        model_families: Iterable[ModelFamilyDeclaration] = (),
+        model_families: Iterable[Declaration] = (),
     ) -> None:
         """Creates a registry from complete capability declarations.
 
@@ -646,12 +646,12 @@ class Registry:
             model_families: The model-family declarations to register.
         """
         self.records: dict[Coordinate, Capability] = {}
-        self.model_families: dict[str, ModelFamilyDeclaration] = {}
+        self.model_families: dict[str, Declaration] = {}
         self.runtime_environment: Environment | None = None
         for capability in capabilities:
             self.register(capability)
         for declaration in model_families:
-            self.register_model_family(declaration)
+            self.enroll(declaration)
 
     @classmethod
     def seed(
@@ -690,9 +690,9 @@ class Registry:
             )
         self.records[capability.key] = capability
 
-    def register_model_family(
+    def enroll(
         self,
-        declaration: ModelFamilyDeclaration,
+        declaration: Declaration,
     ) -> None:
         """Registers a model-family status without replacing another one.
 
@@ -701,9 +701,9 @@ class Registry:
 
         Raises:
             ConfigError: If the family is already registered.
-            TypeError: If `declaration` is not a `ModelFamilyDeclaration`.
+            TypeError: If `declaration` is not a `Declaration`.
         """
-        if not isinstance(declaration, ModelFamilyDeclaration):
+        if not isinstance(declaration, Declaration):
             raise errors.KindError("declaration must be ModelFamilyDeclaration")
         if declaration.model_family in self.model_families:
             raise errors.ConfigError(
@@ -714,7 +714,7 @@ class Registry:
     def find(
         self,
         model_family: str,
-    ) -> ModelFamilyDeclaration | None:
+    ) -> Declaration | None:
         """Returns family metadata or ``None`` when it is not catalogued.
 
         Args:
@@ -809,13 +809,9 @@ class Registry:
                 )
             )
         if environment is not None:
-            diagnostics.extend(
-                self.resource_diagnostics(capability, environment, row_count)
-            )
+            diagnostics.extend(self.audit(capability, environment, row_count))
         elif row_count is not None or capability.resources.max_rows is not None:
-            diagnostics.extend(
-                self.resource_diagnostics(capability, None, row_count)
-            )
+            diagnostics.extend(self.audit(capability, None, row_count))
         return tuple(diagnostics)
 
     def reject(
@@ -869,7 +865,7 @@ class Registry:
             )
         return tuple(family_diagnostics)
 
-    def resource_diagnostics(
+    def audit(
         self,
         capability: Capability,
         environment: Environment | None,
@@ -1076,7 +1072,7 @@ class Registry:
             )
         )
 
-    def list_model_families(self) -> tuple[ModelFamilyDeclaration, ...]:
+    def list_model_families(self) -> tuple[Declaration, ...]:
         """Returns model-family declarations in deterministic order."""
         return tuple(
             self.model_families[name] for name in sorted(self.model_families)

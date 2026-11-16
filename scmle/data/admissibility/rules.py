@@ -108,7 +108,7 @@ class FieldDecision:
         )
 
 
-def timing_failure(
+def diagnose(
     record: provenance.FieldProvenance, declared_lag_seconds: float
 ) -> str | None:
     """Finds the reason a field fails the timing rule outright, if any.
@@ -170,7 +170,7 @@ def decide_timing(
         is admitted and one with an attested tier is admitted flagged.
     """
     tier = record.tier(today)
-    failure = timing_failure(record, declared_lag_seconds)
+    failure = diagnose(record, declared_lag_seconds)
     if failure is not None:
         return FieldDecision(
             record.name, Admission.QUARANTINE, tier, (failure,), suspect
@@ -460,7 +460,7 @@ def build_table(
         raise errors.InputError(f"kind must be one of {KINDS}")
     flags = suspects or {}
 
-    def gate_of(name: str) -> certificates.GateStatus:
+    def gate(name: str) -> certificates.GateStatus:
         if isinstance(leakage_gate, Mapping):
             return leakage_gate.get(name, certificates.GateStatus.DESCRIPTIVE)
         return leakage_gate
@@ -473,7 +473,7 @@ def build_table(
                 declared_lag_seconds,
                 today,
                 flags.get(f.name, False),
-                gate_of(f.name),
+                gate(f.name),
             )
             for f in table.fields
         )
@@ -492,7 +492,7 @@ def build_table(
             declared_lag_seconds,
             today,
             flags.get(f.name, False),
-            gate_of(f.name),
+            gate(f.name),
         )
         for f in table.fields
     )

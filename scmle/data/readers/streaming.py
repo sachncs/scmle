@@ -261,7 +261,7 @@ class ChunkSource(abc.ABC):
                     "final_snapshot_sha256": final_snapshot,
                 },
             )
-        next_watermark = watermark_value(
+        next_watermark = advance(
             selected,
             effective_watermark_column,
             current.watermark,
@@ -477,7 +477,7 @@ class Checkpoint:
         )
 
 
-def watermark_value(
+def advance(
     frame: pandas.DataFrame,
     column: str | None,
     current: str,
@@ -920,7 +920,7 @@ class CommittedState:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CommitReceipt:
+class Receipt:
     """Evidence from one idempotent streaming commit attempt.
 
     Attributes:
@@ -1340,7 +1340,7 @@ class CommitLedger:
         batch: Batch,
         sink: TransactionalSink,
         acknowledgement: Acknowledgement,
-    ) -> CommitReceipt:
+    ) -> Receipt:
         """Commits a batch and atomically persists its receipt evidence.
 
         The sink is caller-owned and must deduplicate ``batch.batch_id`` when
@@ -1397,7 +1397,7 @@ class CommitLedger:
                         self.source.source_identity(),
                         {},
                     )
-                return CommitReceipt(
+                return Receipt(
                     batch.source_identity,
                     batch.batch_id,
                     accepted=False,
@@ -1449,7 +1449,7 @@ class CommitLedger:
                 ),
             )
             self.write_atomically(state)
-            return CommitReceipt(
+            return Receipt(
                 batch.source_identity,
                 batch.batch_id,
                 accepted=True,
@@ -1464,7 +1464,7 @@ class CommitLedger:
         batch: Batch,
         writer: Callable[[pandas.DataFrame, str], None],
         acknowledgement: Acknowledgement | None = None,
-    ) -> CommitReceipt:
+    ) -> Receipt:
         """Commits a batch once and stages its external acknowledgement.
 
         The writer receives the stable batch idempotency key. If it succeeds
@@ -1525,7 +1525,7 @@ class CommitLedger:
             if batch.batch_id in current.committed_batch_ids:
                 if acknowledgement is not None:
                     self.write_pending_acknowledgement(acknowledgement)
-                return CommitReceipt(
+                return Receipt(
                     batch.source_identity,
                     batch.batch_id,
                     accepted=False,
@@ -1555,7 +1555,7 @@ class CommitLedger:
                         acknowledgement, checkpoint=batch.next_checkpoint
                     )
                 )
-            return CommitReceipt(
+            return Receipt(
                 batch.source_identity,
                 batch.batch_id,
                 accepted=True,
@@ -1646,7 +1646,7 @@ class Consumer:
         self,
         rows: int = BATCH_ROWS,
         watermark_column: str | None = None,
-    ) -> CommitReceipt:
+    ) -> Receipt:
         """Commits one batch and acknowledges it only after durable state.
 
         A previously staged acknowledgement is delivered first. Failures from
@@ -1733,7 +1733,7 @@ class CsvChunks(ChunkSource):
         return None, len(pandas.read_csv(self.path, nrows=1).columns)
 
 
-class JsonLinesChunks(ChunkSource):
+class Ndjson(ChunkSource):
     """Newline-delimited JSON read in bounded chunks."""
 
     suffixes = (".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")
@@ -1763,7 +1763,7 @@ class JsonLinesChunks(ChunkSource):
 SOURCES: tuple[type[ChunkSource], ...] = (
     ParquetChunks,
     CsvChunks,
-    JsonLinesChunks,
+    Ndjson,
 )
 
 
@@ -1848,7 +1848,7 @@ def sample_caps(
     return development, locked
 
 
-def keep_smallest(
+def retain(
     buffer: pandas.DataFrame | None, batch: pandas.DataFrame, cap: int
 ) -> pandas.DataFrame:
     """Merges a batch into a buffer, keeping the `cap` lowest-priority rows.
@@ -1902,8 +1902,8 @@ def sample_pass(
         locked_total += int(side.sum())
         priority = row_hash(positions, seed + 7919)
         tagged = batch.assign(**{SPLIT_COLUMN: side, "priority": priority})
-        dev = keep_smallest(dev, tagged[side == DEVELOPMENT], development_cap)
-        locked = keep_smallest(locked, tagged[side == LOCKED], locked_cap)
+        dev = retain(dev, tagged[side == DEVELOPMENT], development_cap)
+        locked = retain(locked, tagged[side == LOCKED], locked_cap)
     if dev is None or locked is None or dev.empty or locked.empty:
         raise errors.DataError("the file is too small to split")
     kept = pandas.concat([dev, locked]).sort_values("priority")

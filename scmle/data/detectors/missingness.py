@@ -212,7 +212,7 @@ def em_normal(
     mean = numpy.nanmean(values, axis=0)
     variance = numpy.nanvar(values, axis=0)
     covariance = numpy.diag(numpy.where(variance > 0, variance, 1.0))
-    groups = row_patterns(seen)
+    groups = group(seen)
     converged = False
     iterations = 0
     for step in range(1, max_iter + 1):
@@ -220,7 +220,7 @@ def em_normal(
         total = numpy.zeros(p)
         second = numpy.zeros((p, p))
         for observed, rows in groups:
-            filled, extra = expect_block(
+            filled, extra = expect(
                 values[numpy.ix_(rows, observed)], observed, mean, covariance, p
             )
             total += filled.sum(axis=0)
@@ -240,7 +240,7 @@ def em_normal(
     return Moments(mean, covariance, iterations, converged)
 
 
-def row_patterns(
+def group(
     seen: numpy.ndarray,
 ) -> list[tuple[numpy.ndarray, numpy.ndarray]]:
     """Groups row positions by which columns are observed.
@@ -262,7 +262,7 @@ def row_patterns(
     return groups
 
 
-def expect_block(
+def expect(
     block: numpy.ndarray,
     observed: numpy.ndarray,
     mean: numpy.ndarray,
@@ -303,7 +303,7 @@ def expect_block(
     return filled, extra
 
 
-def little_statistic(values: numpy.ndarray, fit: Moments) -> tuple[float, int]:
+def measure(values: numpy.ndarray, fit: Moments) -> tuple[float, int]:
     """Little's d2 and its degrees of freedom for given ML estimates.
 
     d2 = sum over patterns j of n_j (ybar_j - mu_j)' S_j^{-1} (ybar_j - mu_j),
@@ -321,7 +321,7 @@ def little_statistic(values: numpy.ndarray, fit: Moments) -> tuple[float, int]:
     p = values.shape[1]
     statistic = 0.0
     observed_total = 0
-    for observed, rows in row_patterns(seen):
+    for observed, rows in group(seen):
         if len(observed) == 0:
             continue
         gap = (
@@ -396,14 +396,14 @@ def little_mcar_test(
     if transform == "normal_scores":
         values = normal_scores(values)
     fit = em_normal(values)
-    statistic, df = little_statistic(values, fit)
+    statistic, df = measure(values, fit)
     if df <= 0:
         return None
     return Mcar(
         statistic=statistic,
         df=df,
         p_value=float(stats.chi2.sf(statistic, df)),
-        patterns=len(row_patterns(~numpy.isnan(values))),
+        patterns=len(group(~numpy.isnan(values))),
         rows=len(values),
         columns=tuple(str(n) for n in names),
         converged=fit.converged,
@@ -428,7 +428,7 @@ def auc_from_ranks(scores: numpy.ndarray, positive: numpy.ndarray) -> float:
     return total / (n_pos * n_neg)
 
 
-def oof_linear_scores(
+def crossfit(
     design: numpy.ndarray, target: numpy.ndarray, folds: list[numpy.ndarray]
 ) -> numpy.ndarray:
     """Computes out-of-fold least-squares scores of a 0/1 target.
@@ -498,7 +498,7 @@ def indicator_model_test(
     order = rng.permutation(len(flag))
     parts = [numpy.sort(part) for part in numpy.array_split(order, folds)]
     target = flag.astype(float)
-    observed = auc_from_ranks(oof_linear_scores(design, target, parts), flag)
+    observed = auc_from_ranks(crossfit(design, target, parts), flag)
     beaten = 0
     shuffles = list(
         map(
@@ -508,7 +508,7 @@ def indicator_model_test(
     )
     for shuffled in shuffles:
         null = auc_from_ranks(
-            oof_linear_scores(design, shuffled.astype(float), parts), shuffled
+            crossfit(design, shuffled.astype(float), parts), shuffled
         )
         beaten += int(null >= observed)
     return Predictability(
@@ -589,7 +589,7 @@ def assess_mechanism(
 
 
 @dataclasses.dataclass(frozen=True)
-class TippingPoint:
+class Sensitivity:
     """Where a conclusion flips when missing values are shifted by delta.
 
     Attributes:
@@ -617,7 +617,7 @@ def tipping_point(
     low: float,
     high: float,
     steps: int = 201,
-) -> TippingPoint:
+) -> Sensitivity:
     """Tipping-point (delta-adjustment) sensitivity analysis.
 
     Missing values are imputed at the observed mean and shifted by delta;
@@ -658,7 +658,7 @@ def tipping_point(
         if bool(conclusion(numpy.concatenate([values, filler + d]))) != baseline
     ]
     flip = min(flips, key=abs) if flips else None
-    return TippingPoint(low, high, flip, flip is not None, baseline, steps)
+    return Sensitivity(low, high, flip, flip is not None, baseline, steps)
 
 
 def make_imputer(strategy: str) -> Any:

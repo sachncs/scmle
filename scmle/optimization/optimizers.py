@@ -176,7 +176,7 @@ def suggest_int(parameter: search.IntParameter, trial: Any) -> int:
 
 
 @suggest.register
-def suggest_choice(parameter: search.ChoiceParameter, trial: Any) -> Any:
+def choose(parameter: search.ChoiceParameter, trial: Any) -> Any:
     """Suggests one of the choices.
 
     Args:
@@ -189,7 +189,7 @@ def suggest_choice(parameter: search.ChoiceParameter, trial: Any) -> Any:
     return trial.suggest_categorical(parameter.name, list(parameter.choices))
 
 
-class GridOptimizer(Optimizer):
+class Grid(Optimizer):
     """Walks a coarse grid: low, middle and high of each numeric parameter.
 
     Choices contribute every option (up to four). The grid is shuffled with
@@ -341,7 +341,7 @@ class OptunaOptimizer(Optimizer):
 
 OPTIMIZERS: dict[str, type[Optimizer]] = {
     optimizer.name: optimizer
-    for optimizer in (RandomOptimizer, GridOptimizer, OptunaOptimizer)
+    for optimizer in (RandomOptimizer, Grid, OptunaOptimizer)
 }
 
 

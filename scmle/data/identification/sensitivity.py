@@ -126,7 +126,7 @@ def smd_to_rr(d: float) -> float:
 
 
 @dataclasses.dataclass(frozen=True)
-class OlsFit:
+class Regression:
     """The coefficient of `D` in `Y ~ D + X` and what the bounds need.
 
     Attributes:
@@ -164,7 +164,7 @@ def ols_fit(
     treatment: str,
     outcome: str,
     covariates: tuple[str, ...],
-) -> OlsFit:
+) -> Regression:
     """Fits `Y ~ D + X` and the benchmark partial R-squareds.
 
     Covariates must be numeric (encode categories first). A singular
@@ -213,7 +213,9 @@ def ols_fit(
         cov_d = float(rd @ rd) / dof_d * numpy.linalg.inv(design.T @ design)
         t_d = float(cd[1 + j] / math.sqrt(cov_d[1 + j, 1 + j]))
         benchmarks[name] = (partial_r2(t_d, dof_d), r2y)
-    return OlsFit(float(coef[1]), se, dof, t, partial_r2(t, dof), benchmarks)
+    return Regression(
+        float(coef[1]), se, dof, t, partial_r2(t, dof), benchmarks
+    )
 
 
 def robustness_value(
@@ -247,7 +249,7 @@ def robustness_value(
     return 0.5 * (math.sqrt(fq**4 + 4 * fq**2) - fq**2)
 
 
-def bias_bound(fit: OlsFit, r2yz: float, r2dz: float) -> float:
+def bias_bound(fit: Regression, r2yz: float, r2dz: float) -> float:
     """Computes the largest absolute bias of a confounder.
 
     Args:
@@ -269,7 +271,7 @@ def bias_bound(fit: OlsFit, r2yz: float, r2dz: float) -> float:
 
 
 def adjusted_interval(
-    fit: OlsFit, r2yz: float, r2dz: float, level: float = 0.95
+    fit: Regression, r2yz: float, r2dz: float, level: float = 0.95
 ) -> tuple[float, float]:
     """Computes the interval over both directions of a confounder.
 

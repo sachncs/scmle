@@ -99,7 +99,7 @@ class PairwiseInteraction(diagnostics.Diagnostic):
             if truncated:
                 break
 
-        def sort_key(item: dict[str, object]) -> tuple[float, tuple[str, ...]]:
+        def rank(item: dict[str, object]) -> tuple[float, tuple[str, ...]]:
             """Orders interaction terms by strength and feature names.
 
             Args:
@@ -122,7 +122,7 @@ class PairwiseInteraction(diagnostics.Diagnostic):
                 raise TypeError("interaction term has an invalid shape")
             return (-float(score), tuple(str(value) for value in features))
 
-        terms.sort(key=sort_key)
+        terms.sort(key=rank)
         return {
             "features": terms,
             "features_considered": numeric,

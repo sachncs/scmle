@@ -68,7 +68,7 @@ MODEL_WRAPPERS = (
 CODES_KEY = "label_codes"
 
 
-def register_booster_converters() -> None:
+def enrol() -> None:
     """Registers LightGBM and XGBoost converters when onnxmltools exists.
 
     Nothing is registered when any of the needed modules cannot be imported.
@@ -146,7 +146,7 @@ def unwrap(fitted: Any) -> pipeline.Pipeline:
     return current
 
 
-def is_token_imputer(step: Any) -> bool:
+def imputes(step: Any) -> bool:
     """Checks whether `step` fills missing text with a constant token.
 
     Args:
@@ -194,7 +194,7 @@ def without_casts(model: Any) -> Any:
             for index, (name, step) in enumerate(node.steps):
                 if isinstance(
                     step, preprocessing.FunctionTransformer
-                ) or is_token_imputer(step):
+                ) or imputes(step):
                     node.steps[index] = (name, passthrough())
                 else:
                     stack.append(step)
@@ -202,7 +202,7 @@ def without_casts(model: Any) -> Any:
             for index, (name, step, cols) in enumerate(node.transformers_):
                 if isinstance(
                     step, preprocessing.FunctionTransformer
-                ) or is_token_imputer(step):
+                ) or imputes(step):
                     node.transformers_[index] = (name, passthrough(), cols)
                 elif not isinstance(step, str):
                     stack.append(step)
@@ -246,7 +246,7 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
             "ONNX export would not reproduce the attached probability "
             "calibrator; export before calibrating"
         )
-    register_booster_converters()
+    enrol()
     fitted = without_casts(unwrap(bundle.pipeline))
     model_step = fitted.steps[-1][1]
     encoded = False

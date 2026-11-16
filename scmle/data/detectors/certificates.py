@@ -280,7 +280,7 @@ class Standard:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DefectOutcome:
+class Outcome:
     """Measured result for one defect type, with its verdict.
 
     Attributes:
@@ -403,7 +403,7 @@ class Certification:
     corpus_hash: str
     seeds: tuple[int, ...]
     policy: Standard
-    outcomes: tuple[DefectOutcome, ...]
+    outcomes: tuple[Outcome, ...]
     created: str | None = None
 
     def __post_init__(self) -> None:
@@ -490,8 +490,7 @@ class Certification:
             seeds=tuple(record["seeds"]),
             policy=policy,
             outcomes=tuple(
-                DefectOutcome.from_dict(item, policy)
-                for item in record["outcomes"]
+                Outcome.from_dict(item, policy) for item in record["outcomes"]
             ),
             created=record["created"],
         )
@@ -521,7 +520,7 @@ def certify(
         The certificate, with a verdict per defect type. An empty `results`
         or a repeated defect type raises `ValueError`.
     """
-    outcomes = tuple(DefectOutcome.measure(r, policy) for r in results)
+    outcomes = tuple(Outcome.measure(r, policy) for r in results)
     return Certification(
         detector_id=detector_id,
         code_hash=code_digest,

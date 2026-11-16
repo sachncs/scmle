@@ -99,7 +99,7 @@ def load_run(directory: str | pathlib.Path) -> dict[str, Any]:
     }
 
 
-def trial_identity(trial: dict[str, Any]) -> tuple[Any, ...]:
+def identify(trial: dict[str, Any]) -> tuple[Any, ...]:
     """Names the part of a trial that must not change between runs.
 
     Args:
@@ -116,7 +116,7 @@ def trial_identity(trial: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def structural_differences(
+def compare(
     first: dict[str, Any], second: dict[str, Any]
 ) -> tuple[list[str], list[str]]:
     """Compares what two runs must share before their scores are compared.
@@ -142,8 +142,8 @@ def structural_differences(
         reasons.append("splits differ")
     if first.get("parameter_estimation") != second.get("parameter_estimation"):
         reasons.append("parameter-estimation evidence differs")
-    if [trial_identity(t) for t in first["trials"]] != [
-        trial_identity(t) for t in second["trials"]
+    if [identify(t) for t in first["trials"]] != [
+        identify(t) for t in second["trials"]
     ]:
         reasons.append("the executed trials differ")
     return reasons, notes
@@ -170,7 +170,7 @@ def compare_runs(
         tolerance, or a different candidate was selected. Otherwise `exact` if
         every fold score is identical, else `comparable`.
     """
-    reasons, notes = structural_differences(first, second)
+    reasons, notes = compare(first, second)
     a, b = first["trials"], second["trials"]
     if reasons:
         return ReplayVerdict(DIFFERENT, reasons, float("nan"), 0, notes)

@@ -19,7 +19,7 @@ from scmle import durability
 from scmle.contracts import errors
 
 
-class AlertDeliveryError(RuntimeError):
+class DeliveryError(RuntimeError):
     """A sink could not deliver an alert after its bounded retry budget."""
 
 
@@ -141,7 +141,7 @@ class Alert:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AlertDelivery:
+class Delivery:
     """Auditable outcome of one sink delivery attempt.
 
     Attributes:
@@ -183,11 +183,11 @@ class AlertDelivery:
         return dataclasses.asdict(self)
 
 
-class AlertSink(abc.ABC):
+class Sink(abc.ABC):
     """Polymorphic destination for one alert route."""
 
     @abc.abstractmethod
-    def deliver(self, alert: Alert) -> AlertDelivery:
+    def deliver(self, alert: Alert) -> Delivery:
         """Delivers an alert and returns a bounded outcome.
 
         Args:
@@ -198,7 +198,7 @@ class AlertSink(abc.ABC):
         """
 
 
-class JsonlAlertSink(AlertSink):
+class JsonlAlertSink(Sink):
     """Append-only local sink for operator pickup and test evidence.
 
     Attributes:
@@ -213,7 +213,7 @@ class JsonlAlertSink(AlertSink):
         """
         self.path = Path(path)
 
-    def deliver(self, alert: Alert) -> AlertDelivery:
+    def deliver(self, alert: Alert) -> Delivery:
         """Appends one alert record and flushes it durably.
 
         Args:
@@ -235,7 +235,7 @@ class JsonlAlertSink(AlertSink):
                 stream.flush()
                 os.fsync(stream.fileno())
             durability.sync_directory(self.path.parent)
-        return AlertDelivery(
+        return Delivery(
             alert.alert_id,
             alert.route,
             "delivered",
@@ -245,7 +245,7 @@ class JsonlAlertSink(AlertSink):
         )
 
 
-class WebhookAlertSink(AlertSink):
+class WebhookAlertSink(Sink):
     """Deliver JSON alerts to an HTTPS-compatible pager or incident gateway.
 
     Attributes:
@@ -299,7 +299,7 @@ class WebhookAlertSink(AlertSink):
         self.max_attempts = max_attempts
         self.backoff_seconds = backoff_seconds
 
-    def deliver(self, alert: Alert) -> AlertDelivery:
+    def deliver(self, alert: Alert) -> Delivery:
         """POST an alert with bounded retries and no false success.
 
         Args:
@@ -309,7 +309,7 @@ class WebhookAlertSink(AlertSink):
             A `delivered` outcome if some attempt gets an HTTP 2xx answer.
 
         Raises:
-            AlertDeliveryError: If no attempt succeeds within `max_attempts`.
+            DeliveryError: If no attempt succeeds within `max_attempts`.
         """
         body = json.dumps(alert.to_dict(), sort_keys=True).encode("utf-8")
         headers = {"Content-Type": "application/json"}
@@ -331,7 +331,7 @@ class WebhookAlertSink(AlertSink):
                         <= status
                         < http.HTTPStatus.MULTIPLE_CHOICES
                     ):
-                        return AlertDelivery(
+                        return Delivery(
                             alert.alert_id,
                             alert.route,
                             "delivered",
@@ -345,12 +345,12 @@ class WebhookAlertSink(AlertSink):
                 urllib.error.URLError,
                 TimeoutError,
             ) as error:
-                # handled: failure kept as last_reason; AlertDeliveryError after
+                # handled: failure kept as last_reason; DeliveryError after
                 # retries
                 last_reason = f"webhook delivery failed: {type(error).__name__}"
             if attempt < self.max_attempts and self.backoff_seconds:
                 time.sleep(min(self.backoff_seconds * attempt, 1.0))
-        raise AlertDeliveryError(
+        raise DeliveryError(
             f"alert {alert.alert_id} was not delivered after "
             f"{self.max_attempts} attempts: {last_reason}"
         )
@@ -365,9 +365,7 @@ class AlertDispatcher:
         lock: Serializes dispatching per journal.
     """
 
-    def __init__(
-        self, sinks: Mapping[str, AlertSink], journal: str | Path
-    ) -> None:
+    def __init__(self, sinks: Mapping[str, Sink], journal: str | Path) -> None:
         """Binds routes and an append-only delivery journal.
 
         Args:
@@ -385,7 +383,7 @@ class AlertDispatcher:
         self.journal = Path(journal)
         self.lock = durability.path_lock(self.journal)
 
-    def dispatch(self, alert: Alert) -> AlertDelivery:
+    def dispatch(self, alert: Alert) -> Delivery:
         """Delivers an alert unless a successful delivery is already journaled.
 
         The journal check, the delivery and the journal write are one step per
@@ -398,13 +396,13 @@ class AlertDispatcher:
         Returns:
             The delivery outcome: `deduplicated` if a `delivered` record for
             the alert is already in the journal, `failed` if the route has no
-            sink or the sink raised `AlertDeliveryError`, otherwise the
+            sink or the sink raised `DeliveryError`, otherwise the
             outcome the sink returned.
         """
         with self.lock:
             return self.dispatch_locked(alert)
 
-    def dispatch_locked(self, alert: Alert) -> AlertDelivery:
+    def dispatch_locked(self, alert: Alert) -> Delivery:
         """Dispatches one alert while the caller holds the journal lock.
 
         Args:
@@ -414,9 +412,9 @@ class AlertDispatcher:
             The delivery outcome, which is also appended to the journal unless
             the alert was deduplicated.
         """
-        previous = self.successful_alerts()
+        previous = self.delivered()
         if alert.alert_id in previous:
-            return AlertDelivery(
+            return Delivery(
                 alert.alert_id,
                 alert.route,
                 "deduplicated",
@@ -426,7 +424,7 @@ class AlertDispatcher:
             )
         sink = self.sinks.get(alert.route)
         if sink is None:
-            delivery = AlertDelivery(
+            delivery = Delivery(
                 alert.alert_id,
                 alert.route,
                 "failed",
@@ -437,10 +435,10 @@ class AlertDispatcher:
         else:
             try:
                 delivery = sink.deliver(alert)
-            except AlertDeliveryError as error:
+            except DeliveryError as error:
                 # handled: delivery error becomes journaled 'failed'
-                # AlertDelivery
-                delivery = AlertDelivery(
+                # Delivery
+                delivery = Delivery(
                     alert.alert_id,
                     alert.route,
                     "failed",
@@ -451,7 +449,7 @@ class AlertDispatcher:
         self.append(alert, delivery)
         return delivery
 
-    def successful_alerts(self) -> set[str]:
+    def delivered(self) -> set[str]:
         """Returns alert IDs with a durable successful delivery record.
 
         Returns:
@@ -467,7 +465,7 @@ class AlertDispatcher:
                 successful.add(str(record["alert"]["alert_id"]))
         return successful
 
-    def append(self, alert: Alert, delivery: AlertDelivery) -> None:
+    def append(self, alert: Alert, delivery: Delivery) -> None:
         """Persists one alert and its delivery outcome durably.
 
         Args:
@@ -488,10 +486,10 @@ class AlertDispatcher:
 
 __all__ = [
     "Alert",
-    "AlertDelivery",
-    "AlertDeliveryError",
     "AlertDispatcher",
-    "AlertSink",
+    "Delivery",
+    "DeliveryError",
     "JsonlAlertSink",
+    "Sink",
     "WebhookAlertSink",
 ]

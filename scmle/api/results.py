@@ -178,7 +178,7 @@ class Run:
         """Whether every stated success criterion was met (True if none)."""
         return all(c["met"] for c in self.evaluation["success_criteria"])
 
-    def unattested_suspects(self) -> list[str]:
+    def suspect(self) -> list[str]:
         """Lists flagged columns that are neither quarantined nor attested.
 
         A column the leakage screen flagged stays a suspicion until the run's
@@ -231,7 +231,7 @@ class Run:
             f"{name}={value:.4f}"
             for name, value in evaluation["test_metrics"].items()
         )
-        unattested = self.unattested_suspects()
+        unattested = self.suspect()
         warning = self.profile.screen_warning
         reasons = []
         if unattested:

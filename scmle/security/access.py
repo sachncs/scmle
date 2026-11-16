@@ -436,7 +436,7 @@ class Config:
     audit_file: str
 
     @classmethod
-    def from_environment(cls, environ: Mapping[str, str]) -> "Config":
+    def load(cls, environ: Mapping[str, str]) -> "Config":
         """Reads the authentication variables of an environment.
 
         These are `SCMLE_AUTH_KEYS_FILE`, `SCMLE_AUTH_HS256_SECRET`,
@@ -485,7 +485,7 @@ def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
             or the key file or inline secret is unusable (for example an
             HS256 secret under 32 bytes).
     """
-    settings = Config.from_environment(environ)
+    settings = Config.load(environ)
     if not settings.configured:
         return None
     if not settings.issuer or not settings.audience:
