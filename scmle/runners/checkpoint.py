@@ -7,9 +7,17 @@ that carries the digest of its own content, written atomically under
 checkpoint (a write cut short, a changed object) is skipped and reported, and
 the one before it is used, so an interrupted job loses at most the work since
 its last good checkpoint.
+
+`load` returns a typed `Reading`: absent, corrupt or loaded, never one value
+for two of them (ERR-10). A store outage raises; it is not "no checkpoint".
+Every caller handles a corrupt reading explicitly: `latest` passes over it and
+keeps it in `skipped`, `record` writes the skipped ones to durable storage
+for the attempt that resumed past them, and the run manifest lists each with
+its damage.
 """
 
 import dataclasses
+import enum
 import hashlib
 import json
 import logging
@@ -30,6 +38,17 @@ class CheckpointError(errors.ScmleError):
     category = "checkpoint"
 
 
+LEDGER = "damaged.json"
+
+
+class Condition(enum.Enum):
+    """What a checkpoint read found."""
+
+    ABSENT = "absent"
+    CORRUPT = "corrupt"
+    LOADED = "loaded"
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Checkpoint:
     """One verified checkpoint.
@@ -43,6 +62,23 @@ class Checkpoint:
     step: int
     state: Any
     sha256: str
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Reading:
+    """The result of reading one checkpoint.
+
+    Attributes:
+        key: Object key that was read.
+        condition: Absent, corrupt or loaded.
+        checkpoint: The verified checkpoint when loaded, otherwise None.
+        reason: Why a corrupt checkpoint was rejected; empty otherwise.
+    """
+
+    key: str
+    condition: Condition
+    checkpoint: Checkpoint | None = None
+    reason: str = ""
 
 
 def content_digest(step: int, state: Any) -> str:
@@ -65,7 +101,8 @@ class CheckpointStore:
     Attributes:
         store: Durable storage.
         prefix: Key prefix of this run's checkpoints.
-        skipped: Keys of damaged checkpoints passed over by the last `latest`.
+        ledger: Key of the record of damaged checkpoints a resume passed.
+        skipped: Corrupt readings passed over by the last `latest`.
     """
 
     def __init__(self, store: objectstore.Depot, run_id: str) -> None:
@@ -77,7 +114,8 @@ class CheckpointStore:
         """
         self.store = store
         self.prefix = f"runs/{run_id}/checkpoints/"
-        self.skipped: list[str] = []
+        self.ledger = self.prefix + LEDGER
+        self.skipped: list[Reading] = []
 
     def key(self, step: int) -> str:
         """Builds the object key for a step.
@@ -131,16 +169,17 @@ class CheckpointStore:
                 found.append(int(stem))
         return sorted(found)
 
-    def load(self, step: int) -> Checkpoint | None:
-        """Loads a verified checkpoint.
+    def load(self, step: int) -> Reading:
+        """Reads and verifies a checkpoint.
 
         Args:
             step: Step number.
 
         Returns:
-            The checkpoint, or None if it is absent or damaged (unreadable, not
-            JSON, a different step, or a digest that does not match); a
-            damaged one is logged as a warning.
+            The reading: `LOADED` with the checkpoint, `ABSENT` if there is no
+            object, or `CORRUPT` with the reason if it is unreadable, not
+            JSON, a different step, or a digest that does not match; a
+            corrupt one is logged as a warning.
 
         Raises:
             StoreError: If the store fails for another reason (for example
@@ -151,36 +190,82 @@ class CheckpointStore:
         try:
             data = self.store.get(key)[0]
         except objectstore.AbsentError:
-            # handled: an absent checkpoint is None, as documented
-            return None
-        except objectstore.MismatchError:
-            LOGGER.warning("checkpoint %s is corrupt; passed over", key)
-            return None
+            # handled: an absent checkpoint is an ABSENT reading
+            return Reading(key, Condition.ABSENT)
+        except objectstore.MismatchError as error:
+            # handled: a corrupt object is a DAMAGED reading; damage logs it
+            return damage(key, f"corrupt object: {error}")
         try:
             document = json.loads(data)
-            if document["step"] != step or document["sha256"] != content_digest(
-                step, document["state"]
-            ):
-                LOGGER.warning(
-                    "checkpoint %s does not verify; passed over", key
-                )
-                return None
-            return Checkpoint(step, document["state"], document["sha256"])
-        except (ValueError, KeyError, TypeError):
-            LOGGER.warning("checkpoint %s is malformed; passed over", key)
-            return None
+            state = document["state"]
+            digest = document["sha256"]
+            stored = document["step"]
+        except (ValueError, KeyError, TypeError) as error:
+            # handled: a malformed record is a DAMAGED reading; damage logs it
+            return damage(key, f"malformed: {type(error).__name__}: {error}")
+        if stored != step:
+            return damage(key, f"does not verify: holds step {stored!r}")
+        if digest != content_digest(step, state):
+            return damage(key, "does not verify: digest mismatch")
+        return Reading(key, Condition.LOADED, Checkpoint(step, state, digest))
 
     def latest(self) -> Checkpoint | None:
-        """Finds the newest checkpoint that verifies (damaged ones are skipped).
+        """Finds the newest checkpoint that verifies (corrupt ones are skipped).
 
         Returns:
-            The checkpoint, or None if there is none that verifies. The keys of
-            the damaged ones passed over are kept in `skipped`.
+            The checkpoint, or None if there is none that verifies. The
+            corrupt readings passed over are kept in `skipped`; a step whose
+            object vanished after listing is passed over silently.
         """
         self.skipped = []
         for step in reversed(self.steps()):
-            found = self.load(step)
-            if found is not None:
-                return found
-            self.skipped.append(self.key(step))
+            reading = self.load(step)
+            if reading.condition is Condition.LOADED:
+                return reading.checkpoint
+            if reading.condition is Condition.CORRUPT:
+                self.skipped.append(reading)
         return None
+
+    def record(self, attempt: int, found: Checkpoint | None) -> str | None:
+        """Writes the corrupt checkpoints the last `latest` passed over.
+
+        The record lands under the run's prefix, so the run manifest lists
+        it as evidence: a restart from an older step, or from zero, past
+        damaged checkpoints is on file, not only in a log.
+
+        Args:
+            attempt: The attempt that resumed.
+            found: The checkpoint it resumed from, or None for a fresh start.
+
+        Returns:
+            The record's key, or None if nothing was skipped.
+        """
+        if not self.skipped:
+            return None
+        body = json.dumps(
+            {
+                "attempt": attempt,
+                "resumed_from": None if found is None else found.step,
+                "damaged": [
+                    {"key": r.key, "reason": r.reason} for r in self.skipped
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        ).encode()
+        self.store.put(self.ledger, body)
+        return self.ledger
+
+
+def damage(key: str, reason: str) -> Reading:
+    """Logs a corrupt checkpoint and builds its reading.
+
+    Args:
+        key: Object key of the checkpoint.
+        reason: Why it was rejected.
+
+    Returns:
+        A `CORRUPT` reading.
+    """
+    LOGGER.warning("checkpoint %s is %s; passed over", key, reason)
+    return Reading(key, Condition.CORRUPT, reason=reason)

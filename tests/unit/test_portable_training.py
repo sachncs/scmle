@@ -342,12 +342,19 @@ def test_a_checkpoint_load_tells_absent_damaged_and_outage_apart(
     # ERR-10: absent, corrupt and backend-down all returned None, so an
     # outage looked like "no checkpoint" and the work restarted from zero.
     held = checkpoint.CheckpointStore(store, "run-x")
-    assert held.load(3) is None
+    absent = held.load(3)
+    assert absent.condition is checkpoint.Condition.ABSENT
+    assert absent.checkpoint is None
     held.save(3, {"epoch": 3})
-    assert held.load(3).state == {"epoch": 3}
+    loaded = held.load(3)
+    assert loaded.condition is checkpoint.Condition.LOADED
+    assert loaded.checkpoint.state == {"epoch": 3}
     store.put(held.key(4), b"{not json")
     with caplog.at_level("WARNING", logger=checkpoint.__name__):
-        assert held.load(4) is None
+        damaged = held.load(4)
+    assert damaged.condition is checkpoint.Condition.CORRUPT
+    assert damaged.checkpoint is None and "malformed" in damaged.reason
+    assert damaged.key == held.key(4)
     assert any("malformed" in r.getMessage() for r in caplog.records)
 
     def down(key):
@@ -356,3 +363,52 @@ def test_a_checkpoint_load_tells_absent_damaged_and_outage_apart(
     monkeypatch.setattr(store, "get", down)
     with pytest.raises(objectstore.TransientStoreError):
         held.load(3)
+
+
+def test_a_resume_past_damaged_checkpoints_leaves_a_record(store):
+    # ERR-10: a restart from zero (or an older step) past damaged
+    # checkpoints is recorded in durable storage, not only logged.
+    checkpoints = checkpoint.CheckpointStore(store, "d")
+    store.put(checkpoints.key(1), b"not json")
+    context = local.Context(
+        roles.RoleStore(store, roles.TRAINING_ROLE),
+        "d",
+        2,
+        spec_for("d"),
+        checkpoints,
+    )
+    assert context.resume() is None
+    assert [r.key for r in checkpoints.skipped] == [checkpoints.key(1)]
+    record = json.loads(store.get(checkpoints.ledger)[0])
+    assert record["attempt"] == 2 and record["resumed_from"] is None
+    assert record["damaged"][0]["key"] == checkpoints.key(1)
+    assert "malformed" in record["damaged"][0]["reason"]
+    clean = checkpoint.CheckpointStore(store, "e")
+    clean.save(1, {"w": 1})
+    local.Context(
+        roles.RoleStore(store, roles.TRAINING_ROLE),
+        "e",
+        1,
+        spec_for("e"),
+        clean,
+    ).resume()
+    assert not store.exists(clean.ledger)
+
+
+def test_the_manifest_names_damaged_checkpoints(store):
+    # ERR-10: `finish` dropped a damaged checkpoint from the manifest
+    # without a trace.
+    clock = support_runners.FakeClock()
+
+    def damaging(context):
+        context.step(1, {"w": 1})
+        context.checkpoints.store.put(context.checkpoints.key(2), b"x")
+        context.finish({"metrics": {"w": 1}})
+
+    manifest = local_runner(store, clock, damaging).run(spec_for("m"))
+    assert manifest.state == "succeeded"
+    assert manifest.checkpoints[0]["step"] == 1
+    assert manifest.checkpoints[0]["sha256"]
+    damaged = manifest.checkpoints[1]
+    assert damaged["step"] == 2 and damaged["sha256"] is None
+    assert "malformed" in damaged["damage"]

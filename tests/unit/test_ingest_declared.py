@@ -119,3 +119,19 @@ def test_the_source_is_queried_and_a_zero_total_is_compared_not_skipped():
         source_factory([0.0] * 100), 0.0,
     )  # fmt: skip
     assert [c["name"] for c in bad if not c["passed"]] == ["orders.sum.amount"]
+
+
+def test_a_non_numeric_source_total_is_reported_not_taken_as_zero(
+    monkeypatch,
+):
+    # ERR-10 / ERR-14: `except ValueError` swallowed a non-numeric total
+    # from the source and compared the extract against zero.
+    block = ingest.Expectation(
+        (ingest.TableTotals("orders", sums=(ingest.Total("amount", 0.0),)),)
+    )
+    monkeypatch.setattr(declared.profile.Sql, "scalar", lambda self, sql: "n/a")
+    with pytest.raises(errors.InputError, match="non-numeric"):
+        declared.reconcile_source(
+            {"orders": orders()}, {"orders": "orders"}, block,
+            source_factory([50.0] * 100), 0.0,
+        )  # fmt: skip

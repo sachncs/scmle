@@ -54,10 +54,16 @@ class Context:
     def resume(self) -> checkpoint.Checkpoint | None:
         """Finds where to resume.
 
+        Corrupt checkpoints passed over on the way are recorded in durable
+        storage (`CheckpointStore.record`), so a restart from an older step
+        or from zero is on file (ERR-10).
+
         Returns:
             The newest checkpoint that verifies, or None at a fresh start.
         """
-        return self.checkpoints.latest()
+        found = self.checkpoints.latest()
+        self.checkpoints.record(self.attempt, found)
+        return found
 
     def step(self, number: int, state: Any) -> None:
         """Saves a checkpoint, then lets the supervisor act.

@@ -387,7 +387,8 @@ class RunManifest:
         attempts: One record per attempt.
         total_cost: Estimated cost across attempts.
         budget: The cost ceiling, or None if there was none.
-        checkpoints: Step and SHA-256 of each verified checkpoint at the end.
+        checkpoints: Step and SHA-256 of each verified checkpoint at the end;
+            a corrupt one has `sha256` None and its `damage` reason.
         result_sha256: Digest of the result object; empty if none.
         evidence: Key, SHA-256 and size of every other object stored under the
             run at the end.
@@ -805,11 +806,17 @@ class Runner(abc.ABC):
             The saved manifest.
         """
         checkpoints = checkpoint.CheckpointStore(self.store, spec.run_id)
-        manifest.checkpoints = [
-            {"step": step, "sha256": found.sha256}
-            for step in checkpoints.steps()
-            if (found := checkpoints.load(step)) is not None
-        ]
+        manifest.checkpoints = []
+        for step in checkpoints.steps():
+            reading = checkpoints.load(step)
+            if reading.checkpoint is not None:
+                manifest.checkpoints.append(
+                    {"step": step, "sha256": reading.checkpoint.sha256}
+                )
+            elif reading.condition is checkpoint.Condition.CORRUPT:
+                manifest.checkpoints.append(
+                    {"step": step, "sha256": None, "damage": reading.reason}
+                )
         if state is Progress.SUCCEEDED:
             try:
                 meta = self.store.get(self.result_key(spec.run_id))[1]

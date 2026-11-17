@@ -188,7 +188,9 @@ def compare(
     that function forms no ratio) is compared as an absolute gap instead of
     being skipped. The checksum is computed over the source's own column.
     A quantity that `reconcile.crosscheck` does not return (including
-    when it raises `ValueError`) is compared against a source value of zero.
+    when it raises `InputError` because every source total is zero or null)
+    is compared against a source value of zero. A non-numeric source total
+    is not zero: it is raised (ERR-10, ERR-14).
     A view that lacks a declared column makes `locate` raise
     `ConfigError`, which propagates.
 
@@ -203,6 +205,9 @@ def compare(
     Returns:
         One comparison record per quantity: row count, each sum and, when
         declared, the key checksum.
+
+    Raises:
+        InputError: If the source returns a total that is not a number.
     """
     measures = [total.column for total in totals.sums]
     numeric = pandas.DataFrame(
@@ -217,14 +222,21 @@ def compare(
         outcome = scmle.data.ingest.reconcile.crosscheck(
             source, numeric, table, measures, tolerance=tolerance
         )
-    except ValueError as error:
+    except errors.InputError as error:
+        # handled: every source total was zero or null, so each check
+        # below compares against zero as an absolute gap, as documented
         LOGGER.warning(
-            "reconciliation of %s could not run (%s); its checks compare "
+            "reconciliation of %s formed no ratio (%s); its checks compare "
             "against zero",
             table,
             error,
         )
         outcome = None
+    except (TypeError, ValueError) as error:
+        raise errors.InputError(
+            f"source table {table!r} returned a non-numeric total, which "
+            f"cannot be reconciled: {error}"
+        ) from error
     prefix = f"{table}."
     if outcome is not None:
         for result in outcome.result.results:
@@ -288,6 +300,7 @@ def reconcile_source(
 
     Raises:
         ConfigError: If a declared view or column is not in the extract.
+        InputError: If the source returns a total that is not a number.
     """
     source = profile.Sql(factory)
     checks: list[dict[str, Any]] = []
