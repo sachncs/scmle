@@ -16,7 +16,6 @@ from typing import cast
 from typing import ClassVar
 
 from sklearn import base
-from sklearn import calibration
 from sklearn import compose
 from sklearn.utils import validation
 
@@ -340,7 +339,7 @@ class Recalibration(Strategy):
             The unfitted candidate estimator, preprocessing included.
         """
         inner = preprocessing.instantiate(plan, adapter, task, seed, params)
-        calibrated: models.Estimator = calibration.CalibratedClassifierCV(
+        calibrated: models.Estimator = inner_cv.Calibrated(
             inner,
             method="sigmoid",
             cv=inner_cv.for_plan(

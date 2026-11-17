@@ -19,7 +19,6 @@ import inspect
 import types
 from typing import Any
 
-from sklearn import calibration
 from sklearn import dummy
 from sklearn import ensemble
 from sklearn import linear_model
@@ -32,6 +31,7 @@ from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import search
 from scmle.contracts import tasks
+from scmle.data.splitting import inner_cv
 import scmle.models.multitarget.estimators
 import scmle.models.ordinal.estimators
 import scmle.models.ranking.estimators
@@ -229,7 +229,8 @@ class Svm(Learner):
 
     scikit-learn deprecated `SVC(probability=True)` in 1.9; the supported
     equivalent is a cross-fitted `CalibratedClassifierCV(SVC(),
-    ensemble=False)`, which is also considerably faster.
+    ensemble=False)`, which is also considerably faster. `inner_cv.Calibrated`
+    is that calibrator with its folds lowered for a rare class.
     """
 
     def build(
@@ -254,7 +255,7 @@ class Svm(Learner):
         if not task.is_classification:
             support = svm.SVR(**kwargs)
         else:
-            support = calibration.CalibratedClassifierCV(
+            support = inner_cv.Calibrated(
                 svm.SVC(random_state=seed, **kwargs),
                 method="sigmoid",
                 ensemble=False,  # pyright: ignore[reportArgumentType]  # sklearn infers str from its "auto" default; it also accepts a bool

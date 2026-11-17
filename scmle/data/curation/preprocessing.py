@@ -13,6 +13,7 @@ from typing import cast
 from sklearn import base
 from sklearn import compose
 from sklearn import pipeline
+from sklearn import preprocessing
 
 from scmle.contracts import data
 from scmle.contracts import errors
@@ -30,6 +31,12 @@ import scmle.models.survival.wrapper
 import scmle.models.uplift.wrapper
 
 SPARSE_THRESHOLD = 0.3
+# HistGradientBoosting bins a native categorical into at most `max_bins`
+# (default 255) bins, one per level, and refuses a column with more levels.
+# Integer codes are therefore capped at 255 levels: the 254 most frequent
+# keep their own code and the rest share one infrequent code, which the
+# fitted encoder records in `infrequent_categories_`.
+NATIVE_LEVELS = 255
 
 
 def build_preprocessor(
@@ -48,9 +55,7 @@ def build_preprocessor(
     parts = []
     special = isolate(plan, options)
     if special:
-        encoder = columns.Categorical().high_cardinality_transformer(
-            options.high_cardinality
-        )
+        encoder = encode(options.high_cardinality)
         parts.append(("high_cardinality", encoder, list(special)))
     for kind in columns.KINDS:
         selected = [c for c in plan.pick(kind.name) if c not in special]
@@ -80,6 +85,30 @@ def build_preprocessor(
         remainder="drop",
         verbose_feature_names_out=False,
         sparse_threshold=SPARSE_THRESHOLD if options.sparse else 0.0,
+    )
+
+
+def encode(encoding: str) -> pipeline.Pipeline | None:
+    """Encoder for the high-cardinality columns.
+
+    Integer codes for native categoricals are capped at `NATIVE_LEVELS`, so
+    a column with more levels than the estimator accepts pools its rarest
+    levels instead of failing the fit.
+
+    Args:
+        encoding: `ordinal` or `target`; anything else means one-hot.
+
+    Returns:
+        An unfitted encoder pipeline, or None for one-hot.
+    """
+    if encoding != "ordinal":
+        return columns.Categorical().high_cardinality_transformer(encoding)
+    return columns.Categorical().encode(
+        preprocessing.OrdinalEncoder(
+            handle_unknown="use_encoded_value",
+            unknown_value=-1,
+            max_categories=NATIVE_LEVELS,
+        )
     )
 
 

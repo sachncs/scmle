@@ -4,16 +4,31 @@ Calibration and stacking cross-fit models *inside* a training fold. A plain
 k-fold there would put rows of one entity on both sides of an inner split, or
 let later rows help predict earlier ones, so the splitter below follows the
 same structure the outer validation does.
+
+Cross-fitted calibration also needs every class in every inner fold, which a
+rare class on a small training slice cannot give; `Calibrated` lowers the
+fold count to what the rarest class allows instead of failing.
 """
 
 from collections.abc import Iterator
+import copy
 from typing import Any
 
 import numpy
 import pandas
+from sklearn import calibration
 from sklearn import model_selection
 
 from scmle.contracts import data
+from scmle.contracts import errors
+
+# Cross-fitting needs one fold to fit on and another to calibrate on, so two
+# folds is the fewest that still keeps every calibration row out of the fit.
+MIN_FOLDS = 2
+# scikit-learn's own default when `cv` is None.
+DEFAULT_FOLDS = 5
+# A classifier needs at least two classes to separate.
+MIN_CLASSES = 2
 
 
 class Splitter(model_selection.BaseCrossValidator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base class is Any
@@ -141,3 +156,94 @@ def for_plan(
     return Splitter(
         folds, plan.group_column, plan.time_column, classification, seed
     )
+
+
+class Calibrated(calibration.CalibratedClassifierCV):  # type: ignore[misc]  # scikit-learn ships no type information, so its base class is Any
+    """Cross-fitted calibration whose fold count follows the rarest class.
+
+    scikit-learn refuses outright when a class has fewer examples than the
+    configured folds, which happens on real tables with a rare class once a
+    learning curve or a small fold slices the training rows. This lowers the
+    fold count to the rarest class's count (at least `MIN_FOLDS`) and keeps
+    the configured splitter's structure; the count used is recorded as
+    `folds_`. A class with a single example cannot be in every fold, so then
+    each fold keeps its own calibrated model (`ensemble=True`), a fold
+    without the class giving it no probability, and the folds' average
+    gives it the rest. The configured `cv` and `ensemble` are left as they
+    were.
+
+    Attributes:
+        cv: The configured cross-validator, as scikit-learn takes it.
+        ensemble: Whether each fold keeps its own calibrated model.
+        folds_: The fold count the last fit used, None for given splits.
+    """
+
+    cv: Any
+    ensemble: Any
+    folds_: int | None
+
+    def fit(  # pyright: ignore[reportIncompatibleMethodOverride]  # the base names these parameters X and y; scikit-learn passes them positionally
+        self,
+        features: Any,
+        labels: Any,
+        sample_weight: Any = None,
+        **params: Any,
+    ) -> "Calibrated":
+        """Fits with as many folds as the rarest class allows.
+
+        Args:
+            features: Training features.
+            labels: Training labels.
+            sample_weight: Optional row weights.
+            **params: Routed to the calibrated estimator's `fit`.
+
+        Returns:
+            This fitted calibrator.
+
+        Raises:
+            InputError: If the labels hold fewer than two classes.
+        """
+        counts = numpy.unique(numpy.asarray(labels), return_counts=True)[1]
+        if len(counts) < MIN_CLASSES:
+            raise errors.InputError(
+                "calibration needs at least two classes in the training rows"
+            )
+        configured: Any = self.cv
+        requested = DEFAULT_FOLDS if configured is None else configured
+        if not isinstance(requested, int):
+            requested = getattr(requested, "n_splits", None)
+        rarest = int(numpy.min(counts))
+        if requested is None or rarest >= requested:
+            self.folds_ = requested
+            super().fit(features, labels, sample_weight, **params)
+            return self
+        self.folds_ = max(MIN_FOLDS, rarest)
+        splitter = shrink(configured, self.folds_)
+        ensembled: Any = self.ensemble
+        self.cv = list(splitter.split(features, labels))
+        if rarest < MIN_FOLDS:
+            self.ensemble = True
+        try:
+            super().fit(features, labels, sample_weight, **params)
+        finally:
+            self.cv = configured
+            self.ensemble = ensembled
+        return self
+
+
+def shrink(cv: Any, folds: int) -> Any:
+    """A copy of a cross-validator with fewer folds.
+
+    Args:
+        cv: An int, None, or a splitter with an `n_splits` attribute.
+        folds: The fold count to use.
+
+    Returns:
+        Stratified k-fold (what scikit-learn uses for an int or None on
+        labels) or a copy of `cv` with `n_splits` set to `folds`.
+    """
+    if cv is None or isinstance(cv, int):
+        return model_selection.StratifiedKFold(folds)
+    smaller = copy.copy(cv)
+    smaller.n_splits = folds
+    return smaller
