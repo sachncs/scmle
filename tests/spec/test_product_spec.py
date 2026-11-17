@@ -28,10 +28,10 @@ from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.data.validation import columns
 import scmle.data.validation.target
-from scmle.governance import lifecycle
 import scmle.inference.mapping
 from scmle.models import conformance
 import scmle.models.registry
+from scmle.operations import lifecycle
 from scmle.pipeline import stages
 import scmle.preparation.strategies
 from scmle.runtime import ray_backend

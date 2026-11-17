@@ -17,9 +17,9 @@ from scmle.assurance.ledger import budget
 from scmle.contracts import errors
 from scmle.decision import rollout
 from scmle.governance import deployment_ledger
-from scmle.governance import lifecycle
 from scmle.governance import registry
-from scmle.governance import rollout_hook
+from scmle.operations import lifecycle
+from scmle.operations import rollout_hook
 
 
 def staged(tmp_path):

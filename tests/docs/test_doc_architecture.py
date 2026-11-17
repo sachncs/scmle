@@ -17,10 +17,10 @@ from scmle.contracts import tasks
 import scmle.contracts.metrics
 from scmle.data.readers import tabular
 from scmle.evaluation import metrics
-from scmle.governance import lifecycle
 import scmle.governance.registry
 from scmle.models import custom
 from scmle.models import registry
+from scmle.operations import lifecycle
 from scmle.pipeline import planner
 from scmle.pipeline import profiler
 

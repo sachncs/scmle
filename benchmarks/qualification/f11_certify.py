@@ -177,11 +177,11 @@ from scmle.decision import ope
 from scmle.decision import rollout
 from scmle.decision import threshold
 from scmle.governance import deployment_ledger
-from scmle.governance import lifecycle
-from scmle.governance import rollout_hook
 import scmle.governance.registry
 import scmle.models.registry
 from scmle.monitoring import abtest
+from scmle.operations import lifecycle
+from scmle.operations import rollout_hook
 from scmle.preparation import preprocessing
 from scmle.runtime import randomness
 

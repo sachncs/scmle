@@ -33,7 +33,6 @@ from scmle.contracts import tasks
 from scmle.evaluation import metrics
 import scmle.evaluation.metrics
 from scmle.governance import keyring
-from scmle.governance import lifecycle
 import scmle.governance.registry
 import scmle.models.custom
 import scmle.models.registry
@@ -42,6 +41,7 @@ from scmle.monitoring import events
 from scmle.monitoring import incidents
 from scmle.monitoring import shadow
 from scmle.monitoring import slo
+from scmle.operations import lifecycle
 from scmle.runtime import limits
 from scmle.runtime import worker
 from scmle.storage import stores

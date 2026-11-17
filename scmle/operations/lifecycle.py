@@ -643,7 +643,7 @@ class Maintainer:
         """Points the champion alias back at the previous version.
 
         The decision to do so (the bootstrap interval of `revertible` or
-        the rollback e-process of `scmle.governance.rollout_hook`) is made by
+        the rollback e-process of `scmle.operations.rollout_hook`) is made by
         the caller; this is the one place the alias moves, with the same
         independent approval and the guarded registry's attestation naming
         this rollback.

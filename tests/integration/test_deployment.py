@@ -13,9 +13,9 @@ import support
 
 import scmle.api.project
 from scmle.contracts import errors
-from scmle.governance import lifecycle
 from scmle.governance import registry
 from scmle.monitoring import champion
+from scmle.operations import lifecycle
 from scmle.serving import server
 
 APPROVAL_KEY = "promotion-review-key"

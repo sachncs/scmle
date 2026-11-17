@@ -50,9 +50,9 @@ from scmle.deploy import mocks
 from scmle.deploy import packaging
 from scmle.deploy import parity
 from scmle.deploy import provenance
-from scmle.governance import lifecycle
 import scmle.governance.registry
 from scmle.monitoring import monitor
+from scmle.operations import lifecycle
 from scmle.security import tokens
 from scmle.serving import server
 

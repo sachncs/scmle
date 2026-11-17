@@ -11,11 +11,11 @@ from scmle.artifacts import bundle
 from scmle.contracts import data
 from scmle.contracts import tasks
 from scmle.governance import deployment_ledger
-from scmle.governance import lifecycle
 from scmle.governance import never_list
 import scmle.governance.loop
 import scmle.governance.registry
 import scmle.models.registry
+from scmle.operations import lifecycle
 from scmle.preparation import preprocessing
 from tests.unit import test_loop
 

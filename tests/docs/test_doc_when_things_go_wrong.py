@@ -19,9 +19,9 @@ from scmle.contracts import qualification
 from scmle.contracts import tasks
 from scmle.deploy import livetests
 from scmle.governance import deployment_ledger
-from scmle.governance import lifecycle
 from scmle.governance import loop
 from scmle.governance import never_list
+from scmle.operations import lifecycle
 from scmle.pipeline import planner
 from tests import support_release
 

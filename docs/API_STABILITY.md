@@ -114,7 +114,7 @@ on C: registered, recomputed, status matches". The snapshot is unchanged.
 `scmle.governance.uncertainty_feed.UncertaintyFeed` is an addition (an
 extension surface; the snapshot is unchanged).
 
-`scmle.governance.rollout_hook.Hook` and
+`scmle.operations.rollout_hook.Hook` and
 `Maintainer.revert` are additions (extension surfaces), as
 are `Maintainer.delegate` (called by `Hook`; it makes
 the bootstrap rules of `review` and `revertible` descriptive, and a

@@ -41,8 +41,8 @@ from scmle.contracts import errors
 from scmle.decision import design
 from scmle.decision import rollout
 from scmle.governance import deployment_ledger
-from scmle.governance import lifecycle
 from scmle.governance import registry
+from scmle.operations import lifecycle
 
 
 class Hook:

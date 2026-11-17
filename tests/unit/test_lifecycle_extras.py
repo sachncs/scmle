@@ -8,11 +8,11 @@ from scmle.artifacts import bundle
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.governance import lifecycle
 import scmle.governance.registry
 import scmle.models.registry
 from scmle.monitoring import abtest
 from scmle.monitoring import shadow
+from scmle.operations import lifecycle
 from scmle.preparation import preprocessing
 
 PLAN = data.Blueprint(("a", "b"), ())

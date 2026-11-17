@@ -112,8 +112,8 @@ scmle/governance/loop.py change_label_policy documented extension surface: docs/
 scmle/governance/loop.py delete_or_send documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
 scmle/governance/loop.py amend_policy documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
 scmle/deploy/release_state.py live documented extension surface: docs/API_STABILITY.md (release surfaces)
-scmle/governance/rollout_hook.py Hook documented extension surface: docs/API_STABILITY.md (Hook)
-scmle/governance/rollout_hook.py rewind documented extension surface: docs/API_STABILITY.md (Hook)
+scmle/operations/rollout_hook.py Hook documented extension surface: docs/API_STABILITY.md (Hook)
+scmle/operations/rollout_hook.py rewind documented extension surface: docs/API_STABILITY.md (Hook)
 scmle/governance/uncertainty_feed.py UncertaintyFeed documented extension surface: docs/API_STABILITY.md (UncertaintyFeed)
 scmle/serving/modality.py protect documented: docs/API_STABILITY.md (security surface, protect)
 scmle/deploy/parity.py expect used by scripts/make_serving_golden.py (stored golden generator)

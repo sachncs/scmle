@@ -3,7 +3,7 @@ import types
 import numpy
 import pandas
 
-from scmle.governance import lifecycle
+from scmle.operations import lifecycle
 
 
 def frame(rows=100):
