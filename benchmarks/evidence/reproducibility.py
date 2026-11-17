@@ -86,7 +86,7 @@ LIBRARIES = (
 )
 # Manifest keys that would carry each trace item (ML-10); any one suffices.
 TRACE = {
-    "data hash": ("data_hash", "dataset_hash"),
+    "data hash": ("dataset", "data_hash", "dataset_hash"),
     "configuration": ("config_hash", "configuration", "config"),
     "commit": ("commit", "git_commit"),
     "environment": ("environment",),

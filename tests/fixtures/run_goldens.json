@@ -2578,7 +2578,11 @@
     "rows_read": "str"
    },
    "model/model_manifest.json": {
+    "blas": "str",
     "calibration": "str",
+    "commit": "str",
+    "configuration": "str",
+    "dataset": "str",
     "decision_threshold": "NoneType",
     "environment": "installed",
     "files": {
@@ -2599,8 +2603,11 @@
     "platform": "str",
     "python": "str",
     "scmle_version": "str",
+    "seed": "int",
     "sklearn": "str",
-    "strategy": "str"
+    "split": "str",
+    "strategy": "str",
+    "threads": "installed"
    },
    "model/reference.json": {
     "features": {
@@ -5861,7 +5868,11 @@
     "rows_read": "str"
    },
    "model/model_manifest.json": {
+    "blas": "str",
     "calibration": "str",
+    "commit": "str",
+    "configuration": "str",
+    "dataset": "str",
     "decision_threshold": "NoneType",
     "environment": "installed",
     "files": {
@@ -5882,8 +5893,11 @@
     "platform": "str",
     "python": "str",
     "scmle_version": "str",
+    "seed": "int",
     "sklearn": "str",
-    "strategy": "str"
+    "split": "str",
+    "strategy": "str",
+    "threads": "installed"
    },
    "model/reference.json": {
     "features": {
@@ -8802,7 +8816,11 @@
     "rows_read": "str"
    },
    "model/model_manifest.json": {
+    "blas": "str",
     "calibration": "str",
+    "commit": "str",
+    "configuration": "str",
+    "dataset": "str",
     "decision_threshold": "NoneType",
     "environment": "installed",
     "files": {
@@ -8825,8 +8843,11 @@
     "platform": "str",
     "python": "str",
     "scmle_version": "str",
+    "seed": "int",
     "sklearn": "str",
-    "strategy": "str"
+    "split": "str",
+    "strategy": "str",
+    "threads": "installed"
    },
    "model/reference.json": {
     "features": {

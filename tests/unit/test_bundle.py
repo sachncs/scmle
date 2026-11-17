@@ -504,6 +504,46 @@ def test_the_environment_lock_pins_the_build_environment(trained, tmp_path):
     assert names == sorted(names)
 
 
+def test_the_manifest_traces_the_bundle_to_its_inputs(tmp_path):
+    # ML-10 / C6: every bundle names the seed, configuration, data, split,
+    # code revision and math-library threads it was built with.
+    rng = numpy.random.default_rng(0)
+    features = pandas.DataFrame(
+        {"num": rng.normal(size=200), "cat": rng.choice(["a", "b"], 200)}
+    )
+    target = pandas.Series((features.num > 0).astype(int))
+    pipe = preprocessing.instantiate(
+        PLAN,
+        scmle.models.registry.Catalog.stock().get("random_forest"),
+        tasks.Task.BINARY,
+        0,
+    ).fit(features, target)
+    bundle = scmle.artifacts.bundle.Bundle.create(
+        pipe,
+        PLAN,
+        features,
+        "y",
+        "binary_classification",
+        "roc_auc",
+        "rf",
+        seed=7,
+        configuration="c" * 64,
+        dataset="d" * 64,
+        split="s" * 64,
+    )
+    bundle.save(tmp_path / "m")
+    info = scmle.artifacts.bundle.Bundle.load(tmp_path / "m", trusted=True).info
+
+    assert (info.seed, info.configuration, info.dataset, info.split) == (
+        7,
+        "c" * 64,
+        "d" * 64,
+        "s" * 64,
+    )
+    assert len(info.commit) == 40  # this checkout is a git repository
+    assert info.threads and all(n >= 1 for n in info.threads.values())
+
+
 def test_the_lock_survives_saving_and_loading(trained, tmp_path):
     bundle = trained[0]
     bundle.save(tmp_path / "m")

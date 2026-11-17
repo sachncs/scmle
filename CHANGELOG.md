@@ -1110,6 +1110,13 @@ marked `Breaking:` and listed first in their group.
 
 ### Fixed
 
+- A bundle now traces back to what built it (ML-10). The manifest records
+  the run's `seed`, the `configuration` hash, the `dataset` hash, the
+  `split` fingerprint, the scmle `commit` (empty when scmle runs from an
+  installed wheel, whose version names the code), and the math-library
+  `threads` and `blas` in use. Older bundles load with these fields empty.
+  The C6 scorecard row no longer fails on the manifest; it is "not
+  measured" until a second platform is compared.
 - A small time budget no longer ends the run with "all trials failed". The
   first trial always runs so that a result exists, but when preparation had
   used up the budget it got the one-second minimum ceiling, too short to

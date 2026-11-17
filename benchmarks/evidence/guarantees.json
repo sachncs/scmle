@@ -130,7 +130,7 @@
     }
   },
   "claim": "C12",
-  "content_hash": "06488898e6cfc413ec526beebbd385318d93756c39710ba8a8dfd9aff84f1bfb",
+  "content_hash": "b0224eacabd7ce63ec1f8cee418b70e98725ad725b6609433a6c814f1eae314d",
   "counts": {
     "guarantees": 318,
     "linked": 14,

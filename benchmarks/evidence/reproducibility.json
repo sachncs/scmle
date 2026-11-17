@@ -1,6 +1,6 @@
 {
   "claim": "C6",
-  "code": "4bf58ad2d88ecaae03a8082e2c404e70dde79f0fddba9883ca13699afb9d2ea2",
+  "code": "bc6b7dab963e1e82aab1d003a93a0b6d698e213eb87afc7098a2d40d4bfbf22b",
   "not_measured": [
     "platforms other than those recorded here",
     "a clean-runner rebuild from the lock file",
@@ -27,7 +27,7 @@
         }
       },
       "rows": 600,
-      "seconds": 782.9,
+      "seconds": 69.6,
       "seed": 7,
       "tasks": {
         "binary": {
@@ -39,12 +39,12 @@
           "hashes": {
             "conformal.json": "c56e7abe3d6529f9c7843571238bd5aa1c1f673faa012d13e43068fa82285f58",
             "coverage_report.json": "f9bed89f1d321a3592f3d0dd6c7bf7098cbf8b4760552fd66b676194033b1e3b",
-            "model_manifest.json": "2fc21e7f76928a8458b7b15e6e34e052ae47ca4cf0c3bb7c67f711f51ba50fdb",
+            "model_manifest.json": "127ce23060cbeb9fe4acb7f7181c0511250419e603cc79491c50e3ad4f95d8f9",
             "novelty.joblib": "9064537f33db4f61ea6aec6caa8949613d712c7d86338820fc2c81e15f5d9ffc",
             "pipeline.joblib": "25c6a38f56b6b844980d4c4249a0f3087cccfba417bcb956411d1c8e9f02f8a8",
             "reference.json": "b1a7360712ac3ab9402bc5b2376d6e8f9569f22c0394ccb750de6b6a52d50a07",
             "schema.json": "6141ad7e54feef8ed46bd90746a4059cc10fa570be55c0aeb3879c838c27e2c7",
-            "signature.json": "134775f22cb799e9d347d84bad96de54d21c1c6a49a068c2110d67508f3cc9e9"
+            "signature.json": "30ff85531ee14580241eec0338e2281854ce5f4efb90dff30ccf5f6cdc8f1907"
           },
           "members": 8,
           "metrics": {
@@ -56,8 +56,8 @@
             "roc_auc": 0.9598997493734336
           },
           "seconds": [
-            185.5,
-            50.2
+            6.3,
+            6.2
           ],
           "selected": [
             "logistic_regression",
@@ -74,11 +74,7 @@
             9,
             9
           ],
-          "untraced": [
-            "data hash",
-            "configuration",
-            "commit"
-          ]
+          "untraced": []
         },
         "interaction": {
           "differing": [],
@@ -89,12 +85,12 @@
           "hashes": {
             "conformal.json": "213dde484f30526e949308cf91d3434f5e5fa4fa841952c49d378ce341e67983",
             "coverage_report.json": "55c021183fefafdc785e94307e24357426835fdde481bf6afa0d8d2cf80bf626",
-            "model_manifest.json": "6a5513952164e94597c4476863025ca740eb16a86f48ee2664b7c7754dcbb121",
+            "model_manifest.json": "fba8046f39e14f3df3b3b786760dd23638d9aeaafd18ae5a4028a27234939907",
             "novelty.joblib": "72bb57854c0eb134a0a5841141e9a9fba807580b0e004a6e011ddb93387fd8c5",
             "pipeline.joblib": "cd71db618141ea12d9303539a7690952599fa87864c4d1a7f78a4951b1eeb175",
             "reference.json": "67b755fad1a616a85599790e2c70fea990c5176274cad5d149f607dc581f1193",
             "schema.json": "6141ad7e54feef8ed46bd90746a4059cc10fa570be55c0aeb3879c838c27e2c7",
-            "signature.json": "87a148aad6c6980c5b8fc9d6654822bfeb330419d2809249597fb4b262803256"
+            "signature.json": "aa59ce0e91b4b7667261823b5389cf7e8ad6ef0dbedb486bfb39cc734df391d3"
           },
           "members": 8,
           "metrics": {
@@ -106,8 +102,8 @@
             "roc_auc": 0.8672135706340378
           },
           "seconds": [
-            46.1,
-            39.0
+            6.8,
+            6.9
           ],
           "selected": [
             "random_forest",
@@ -124,11 +120,7 @@
             9,
             9
           ],
-          "untraced": [
-            "data hash",
-            "configuration",
-            "commit"
-          ]
+          "untraced": []
         },
         "multiclass": {
           "differing": [],
@@ -139,12 +131,12 @@
           "hashes": {
             "conformal.json": "389184d09b0f79263a1f18913cd67430adf47db2cb76a0a15144f92005389651",
             "coverage_report.json": "b962ed592bbe565cdd5f0f077845291d96ee79798a9ae931849d5300a6eecdfe",
-            "model_manifest.json": "10cfe74bfa1e66d485c5448aa76c4b1b7e8053f553ae27b831cc1c562a2fa725",
+            "model_manifest.json": "88088a0f08327b31cd473a22336348deaf16b5c930337971a14ffe6b064bd063",
             "novelty.joblib": "54146f7d822f6789680d2c004377f2e6997f4ee654b926cd59694542afbf9ad5",
             "pipeline.joblib": "546d3b2c6b395a50e948d8721059e4debf844f63c3b43ed8bf74c7e780603d9b",
             "reference.json": "2603a01f1898acebe5a05cb53476a76433aeab6e45d57d2c9b56265e2f4d3f2e",
             "schema.json": "755e0ae4b9b6ed25795171859cda2db53744007478e5c2d896dc43cca0d34f73",
-            "signature.json": "6d6c6c1974d3b122c3c6deace8b52a6556e6f52fe4edc0cd3b0b1f296d4229cd"
+            "signature.json": "c745c583e4eb08ef34442ae165df34227f7abe98d76dc7404b98e963813176ae"
           },
           "members": 8,
           "metrics": {
@@ -154,8 +146,8 @@
             "log_loss": 0.6388598548604971
           },
           "seconds": [
-            137.1,
-            137.8
+            10.8,
+            10.4
           ],
           "selected": [
             "logistic_regression",
@@ -172,11 +164,7 @@
             9,
             9
           ],
-          "untraced": [
-            "data hash",
-            "configuration",
-            "commit"
-          ]
+          "untraced": []
         },
         "regression": {
           "differing": [],
@@ -188,13 +176,13 @@
             "conformal.json": "4a40f56ad7b7f75fab25b6ee64458aa1852bd1b060bef65fdd4950ca4c18623e",
             "coverage_report.json": "5746ebe9f1977517097a44780d1848a2aa38848533b6cefc4a846549344e9d5b",
             "cv_plus.joblib": "5af87ecc7e65ebd6628eb6cb433fed95d124ab70977d640e464ef13d9aec755f",
-            "model_manifest.json": "350820b3d00061a4ed7d9ed3f252f4e9777f7ff4c831f113991e8ef4a9a43461",
+            "model_manifest.json": "a6aea1c5177cff691799f0a1badfae4992849f44b0a26b91b33397f362051b76",
             "novelty.joblib": "73b4418b09c0fe119f7d1511ba86a24231b4a831d15cd245bafbb61a40214616",
             "pipeline.joblib": "317b000b380bc7a615582d023de6d24ce9412569eb1d779cd48d37c253e96174",
             "quantile.joblib": "52b9a22473f2fe6d42246930419aa001171672030a66f4ee4bc32a270c180083",
             "reference.json": "33c08be43fec9ff5a9d4bb4cb2d29f233164bdbfb7d0cd21abcda5d2f13626d7",
             "schema.json": "067f8739d06eec5aec5e2bf0c8e0944c5779ecd53a5efacbab5662fe05c2b7f2",
-            "signature.json": "fa69e1461dc274103b7097465b0e5695c9b7d4d06050e2b6c1627da3b7c3ee86"
+            "signature.json": "ceccee9b92a126e1a8232ab40996f66fee56d1b8ff2d42013ace79a0d749dfae"
           },
           "members": 10,
           "metrics": {
@@ -203,8 +191,8 @@
             "rmse": 0.929535482795817
           },
           "seconds": [
-            84.7,
-            89.3
+            5.9,
+            6.1
           ],
           "selected": [
             "ridge",
@@ -221,11 +209,7 @@
             10,
             10
           ],
-          "untraced": [
-            "data hash",
-            "configuration",
-            "commit"
-          ]
+          "untraced": []
         }
       }
     }

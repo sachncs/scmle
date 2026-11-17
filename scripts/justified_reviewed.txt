@@ -34,3 +34,4 @@ scmle/operations/faults.py run_all passthrough shown in docs/OPERATIONS.md and t
 scmle/runners/base.py Runner lone-interface local.Runner implements it; pinned in the public API
 scmle/sampling/synthesis.py Synthesizer lone-interface Copula and a test double; documented in docs/ARCHITECTURE.md
 scmle/data/admissibility/plants.py copy getter one of the five leak-type methods that plant() dispatches to by name (scmle/data/admissibility/plants.py plant); Numbers.copy overrides it, so it is polymorphic, not a getter
+scmle/artifacts/bundle.py pools single-use reads the loaded math-library thread pools and picks the BLAS implementation from threadpoolctl's records, an environment probe like detect and inventory beside it; tests/unit/test_bundle.py pins its output through the manifest, and inlined it would put a library probe inside the 120-line classmethod create

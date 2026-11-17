@@ -37,8 +37,11 @@ TOLERANCE = 1e-6
 # Models an optional extra adds; excluded so the goldens hold whichever
 # extras are installed (the CI jobs install different sets).
 OPTIONAL = ["lightgbm", "xgboost", "catboost"]
-# Keys whose mapping lists the installed packages, which vary by environment.
-INSTALLED = frozenset({"environment", "libraries", "packages", "dependencies"})
+# Keys whose mapping lists the installed packages or the loaded math
+# libraries (`threads`: OpenMP, OpenBLAS, MKL ...), which vary by environment.
+INSTALLED = frozenset(
+    {"environment", "libraries", "packages", "dependencies", "threads"}
+)
 
 
 def table(task, rows=240, seed=7):

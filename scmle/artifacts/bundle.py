@@ -16,6 +16,8 @@ import json
 import os
 import pathlib
 import platform
+import shutil
+import subprocess  # nosec B404
 import tempfile
 import threading
 from typing import Any
@@ -27,6 +29,7 @@ import pandas
 import sklearn
 from sklearn import calibration
 from sklearn import frozen
+import threadpoolctl
 
 import scmle
 from scmle import durability
@@ -76,6 +79,11 @@ MANIFEST_FILE = "model_manifest.json"
 BINARY_CLASSES = 2
 DIRICHLET_MIN_CLASSES = 3
 MAX_KNOWN_CATEGORIES = 200
+# Policy: `git rev-parse` answers in milliseconds; a hung git (a lock, a
+# network filesystem) must not stall packaging, so give up after this long.
+GIT_SECONDS = 5.0
+# A full SHA-1 commit id; anything else is not a commit.
+COMMIT_LENGTH = 40
 
 
 TRACKED_LIBRARIES = (
@@ -102,6 +110,57 @@ def inventory() -> dict[str, str]:
         if name:
             found[name.lower().replace("_", "-")] = distribution.version
     return dict(sorted(found.items()))
+
+
+def revision() -> str:
+    """The git commit of the scmle source that is running, if known.
+
+    Returns:
+        The 40-character commit of the repository holding the scmle
+        package, or an empty string when scmle runs from an installed wheel
+        (its version then names the code) or git is unavailable.
+    """
+    root = pathlib.Path(scmle.__file__).resolve().parent.parent
+    executable = shutil.which("git")
+    if executable is None or not (root / ".git").exists():
+        return ""
+    try:
+        done = subprocess.run(  # noqa: S603 -- fixed arguments  # nosec B603
+            [executable, "-C", str(root), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=GIT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        # handled: provenance is best effort; an empty commit is recorded
+        return ""
+    commit = done.stdout.strip()
+    return (
+        commit if done.returncode == 0 and len(commit) == COMMIT_LENGTH else ""
+    )
+
+
+def pools() -> tuple[dict[str, int], str]:
+    """The math-library thread pools loaded now and the BLAS in use.
+
+    Returns:
+        The thread count per loaded library (`openmp`, `openblas`, `mkl`,
+        ...) and the BLAS implementation's name, empty if none is loaded.
+    """
+    info = threadpoolctl.threadpool_info()
+    threads = {
+        str(pool["internal_api"]): int(pool["num_threads"]) for pool in info
+    }
+    blas = next(
+        (
+            str(pool["internal_api"])
+            for pool in info
+            if pool.get("user_api") == "blas"
+        ),
+        "",
+    )
+    return dict(sorted(threads.items())), blas
 
 
 def detect() -> dict[str, str]:
@@ -263,6 +322,14 @@ class Manifest:
             (filled by `Bundle.create`, empty otherwise), by name, so the
             environment can be rebuilt.
         platform: Operating system and architecture that built it.
+        seed: Random seed of the run that built it, if known.
+        configuration: Hash of the run configuration that built it.
+        dataset: Hash of the training data that built it.
+        split: Fingerprint of the train and test split it was fitted on.
+        commit: Git commit of the scmle source that built it; empty when
+            scmle ran from an installed wheel, whose version names the code.
+        threads: Thread count per math library loaded when it was built.
+        blas: BLAS implementation in use when it was built.
     """
 
     model_name: str
@@ -281,6 +348,13 @@ class Manifest:
     calibration: str = ""
     environment: dict[str, str] = dataclasses.field(default_factory=dict)
     platform: str = ""
+    seed: int | None = None
+    configuration: str = ""
+    dataset: str = ""
+    split: str = ""
+    commit: str = ""
+    threads: dict[str, int] = dataclasses.field(default_factory=dict)
+    blas: str = ""
 
     def environment_lock(self) -> str:
         """Renders the build environment as a pinned requirements listing.
@@ -610,6 +684,10 @@ class Bundle:
         time_column: str | None = None,
         history_source: pandas.DataFrame | None = None,
         class_labels: tuple[Any, ...] | None = None,
+        seed: int | None = None,
+        configuration: str = "",
+        dataset: str = "",
+        split: str = "",
     ) -> Self:
         """Builds a bundle from a fitted pipeline and its training data.
 
@@ -634,9 +712,14 @@ class Bundle:
                 model's series history.
             class_labels: Labels of the classes in probability-column order
                 when the pipeline works on codes (ordinal tasks).
+            seed: Random seed of the run.
+            configuration: Hash of the run configuration.
+            dataset: Hash of the training data.
+            split: Fingerprint of the train and test split.
 
         Returns:
-            The bundle.
+            The bundle. Its manifest also records the scmle commit and the
+            math-library threads and BLAS in use (ML-10).
         """
         computed = plan.engineered
         series_names = {n.name for n in plan.series}
@@ -684,6 +767,7 @@ class Bundle:
                 else ()
             ),
         )
+        threads, blas = pools()
         info = Manifest(
             model_name,
             model_version,
@@ -693,6 +777,13 @@ class Bundle:
             decision_threshold=decision_threshold,
             environment=inventory(),
             platform=platform.platform(),
+            seed=seed,
+            configuration=configuration,
+            dataset=dataset,
+            split=split,
+            commit=revision(),
+            threads=threads,
+            blas=blas,
         )
         bundle = cls(pipeline, schema, info, reference)
         if schema.series and history_source is not None:

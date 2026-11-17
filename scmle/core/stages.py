@@ -5016,6 +5016,10 @@ class PackageStage(Stage):
             time_column=context.spec.data.time_column,
             history_source=context.frame,
             class_labels=context.ordinal_labels,
+            seed=context.spec.validation.seed,
+            configuration=context.spec.config_hash(),
+            dataset=context.manifest.data_hash if context.manifest else "",
+            split=split.manifest.fingerprint,
             reference=scmle.monitoring.reference.Baseline.build(
                 split.dev_features,
                 profile.feature_plan,
