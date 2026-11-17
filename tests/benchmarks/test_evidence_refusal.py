@@ -51,9 +51,9 @@ def test_simulated_trials_alone_never_pass_the_real_criterion():
 
 
 def test_enough_clean_real_trials_and_justified_refusals_pass():
-    _, verdict = refusal.summary(
-        document(group(59, 0), refused=29, justified=29)
-    )
+    verdict = refusal.summary(document(group(59, 0), refused=29, justified=29))[
+        1
+    ]
 
     assert verdict == "pass"
 
@@ -68,9 +68,9 @@ def test_too_many_real_refusals_fail_once_the_minimum_is_reached():
 
 
 def test_unjustified_refusals_fail_the_precision():
-    _, verdict = refusal.summary(
-        document(group(59, 0), refused=30, justified=20)
-    )
+    verdict = refusal.summary(document(group(59, 0), refused=30, justified=20))[
+        1
+    ]
 
     assert verdict == "fail"
 

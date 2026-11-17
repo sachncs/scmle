@@ -53,9 +53,9 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.data.detectors import certificates
-from scmle.evaluation import coverage as intervals
 from scmle.evaluation import diagnostics
 from scmle.evaluation import metrics
+import scmle.evaluation.coverage
 from scmle.models import registry
 
 PATH = Path(__file__).with_suffix(".json")
@@ -215,7 +215,11 @@ def bound(hits: int, trials: int, alpha: float) -> float | None:
     """
     if trials == 0:
         return None
-    return float(intervals.clopper_pearson(hits, trials, 1 - 2 * alpha)[0])
+    return float(
+        scmle.evaluation.coverage.clopper_pearson(hits, trials, 1 - 2 * alpha)[
+            0
+        ]
+    )
 
 
 def rule() -> acceptance.Floor:
@@ -259,7 +263,7 @@ def digest() -> str:
         diagnostics.Uncertainty,
         diagnostics.redraw,
         diagnostics.Cache,
-        intervals.clopper_pearson,
+        scmle.evaluation.coverage.clopper_pearson,
         simulate,
         run,
         tally,
