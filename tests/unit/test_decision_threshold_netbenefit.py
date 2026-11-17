@@ -3,7 +3,7 @@
 import numpy
 import pytest
 
-from scmle.data.framing import costs
+from scmle.assurance.framing import costs
 from scmle.decision import netbenefit
 from scmle.decision import threshold
 

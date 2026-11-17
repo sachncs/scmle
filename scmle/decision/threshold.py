@@ -26,9 +26,9 @@ from numpy.typing import NDArray
 from scipy import optimize
 from scipy import stats
 
+from scmle.assurance.framing import costs
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.framing import costs
 from scmle.decision import netbenefit
 from scmle.models import thresholds
 from scmle.runtime import randomness

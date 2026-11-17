@@ -1,8 +1,8 @@
 import numpy
 
+from scmle.assurance.framing import provenance
+from scmle.assurance.framing import questions
 from scmle.contracts import qualification
-from scmle.data.framing import provenance
-from scmle.data.framing import questions
 
 
 def test_unsigned_llm_field_caps_the_claim_and_a_signature_lifts_it():

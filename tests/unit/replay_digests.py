@@ -10,7 +10,7 @@ import hashlib
 import pathlib
 import tempfile
 
-from scmle.data.framing import draft
+from scmle.assurance.framing import draft
 from tests.unit import test_framing_draft
 
 

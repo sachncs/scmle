@@ -26,12 +26,12 @@ import scmle.assurance.charter.decision
 import scmle.assurance.charter.ingest
 import scmle.assurance.charter.rules
 import scmle.assurance.charter.uncertainty
+from scmle.assurance.framing import costs
 from scmle.assurance.ledger import budget
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.contracts import signing
-from scmle.data.framing import costs
 
 FORMAT_VERSION = 11
 OLDEST_READABLE_FORMAT = 1

@@ -11,9 +11,9 @@ import support
 from scmle import cli
 from scmle.artifacts import claims_audit
 from scmle.assurance.charter import sealing
+from scmle.assurance.framing import costs
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
-from scmle.data.framing import costs
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "baseline-key"

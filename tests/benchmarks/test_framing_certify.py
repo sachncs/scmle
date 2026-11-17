@@ -3,7 +3,7 @@ import json
 from benchmarks.qualification import __main__
 from benchmarks.qualification import framing_certify
 from scmle.assurance.detectors import certificates
-from scmle.data.framing import baseline
+from scmle.assurance.framing import baseline
 
 
 def test_committed_framing_files_are_current():

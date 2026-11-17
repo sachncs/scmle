@@ -1,6 +1,6 @@
 """Size of the baseline claim's cluster-robust t test with uneven clusters.
 
-`scmle.data.framing.baseline` states that the claim is a one-sided
+`scmle.assurance.framing.baseline` states that the claim is a one-sided
 cluster-robust t test whose size is at most `alpha_confirm`, and that
 `MIN_CLUSTERS = 20` is the smallest cluster count at which that held. The
 test statistic is the Liang-Zeger sandwich with a `G / (G - 1)` factor and
@@ -17,7 +17,7 @@ that measured limit: the rate must stay within 3.5 binomial standard errors of
 import numpy
 import support_statistics
 
-from scmle.data.framing import baseline
+from scmle.assurance.framing import baseline
 
 ALPHA = 0.05
 KNOWN_LIMIT = 0.06

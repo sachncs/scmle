@@ -4,6 +4,7 @@ from typing import Any
 
 from scmle.assurance.admissibility import qualify
 from scmle.assurance.charter import contracts
+import scmle.assurance.framing.claim
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import explore
 from scmle.assurance.ledger import governed
@@ -12,7 +13,6 @@ from scmle.contracts import tasks
 from scmle.core import ingest_stage
 import scmle.core.context
 from scmle.core.stages import screening
-import scmle.data.framing.claim
 from scmle.data.readers import tabular
 from scmle.data.robustness import html_report
 from scmle.data.robustness import prefilter
@@ -88,10 +88,11 @@ class Qualification(screening.Screening):
             claim_id: record["status"]
             for claim_id, record in (run.confirmation.registered or {}).items()
         }
-        if scmle.data.framing.claim.DOCUMENT not in documents and any(
-            i.kind == scmle.data.framing.claim.KIND for i in runner.registered
+        if scmle.assurance.framing.claim.DOCUMENT not in documents and any(
+            i.kind == scmle.assurance.framing.claim.KIND
+            for i in runner.registered
         ):
-            documents[scmle.data.framing.claim.DOCUMENT] = {
+            documents[scmle.assurance.framing.claim.DOCUMENT] = {
                 "schema_version": 1,
                 "status": confirm.NOT_EVALUATED,
                 "issued": False,

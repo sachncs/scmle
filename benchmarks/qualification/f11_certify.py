@@ -164,11 +164,11 @@ from scmle.artifacts import bundle
 from scmle.assurance.charter import feasibility
 import scmle.assurance.charter.decision
 from scmle.assurance.detectors import certificates
+from scmle.assurance.framing import costs
 import scmle.assurance.ledger.budget
 import scmle.certificates
 from scmle.contracts import tasks
 import scmle.contracts.data
-from scmle.data.framing import costs
 from scmle.decision import anytime
 from scmle.decision import constraints
 from scmle.decision import design

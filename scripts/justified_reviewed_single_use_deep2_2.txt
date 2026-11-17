@@ -32,9 +32,9 @@ scmle/assurance/detectors/missingness.py fit_one single-use named in test_detect
 scmle/assurance/detectors/missingness.py imputers single-use named in test_detector_missingness, which asserts per-fold state depends only on the train rows
 scmle/assurance/detectors/missingness.py make_imputer single-use test_detector_missingness asserts its ValueError for an unknown strategy
 scmle/assurance/detectors/sentinels.py nullify single-use tested directly in test_detector_sentinels, which pins the integer-to-float recode and the log record
-scmle/data/framing/draft.py linkage single-use tested directly in test_framing_draft, which pins the resolved and unresolved statuses and the gating False flag
-scmle/data/framing/provenance.py claim_tier single-use named by claim.py and baseline.py docstrings and by four tests in test_framing_provenance_questions that pin the unsigned LLM and data-derived cost ceilings
-scmle/data/framing/questions.py judge single-use returns a closure over y, a and b and is tested directly in test_framing_provenance_questions
+scmle/assurance/framing/draft.py linkage single-use tested directly in test_framing_draft, which pins the resolved and unresolved statuses and the gating False flag
+scmle/assurance/framing/provenance.py claim_tier single-use named by claim.py and baseline.py docstrings and by four tests in test_framing_provenance_questions that pin the unsigned LLM and data-derived cost ceilings
+scmle/assurance/framing/questions.py judge single-use returns a closure over y, a and b and is tested directly in test_framing_provenance_questions
 scmle/data/identification/aipw.py imbalance single-use golden-test target in test_identification_golden, so the IPW formula is pinned by name
 scmle/data/identification/certified.py certificated single-use public certificate reader tested in test_f10_certify and test_identification_run_mutants
 scmle/data/identification/certified.py method_hashes single-use also called by benchmarks/qualification/f10_certify.py to write the certificate, so the benchmark and certificated must share one definition

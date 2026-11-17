@@ -8,10 +8,10 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.framing import draft
+from scmle.assurance.framing import provenance
+from scmle.assurance.framing import refusal
 from scmle.contracts import signing
-from scmle.data.framing import draft
-from scmle.data.framing import provenance
-from scmle.data.framing import refusal
 from tests.unit.test_framing_draft import MODEL
 from tests.unit.test_framing_draft import replay
 from tests.unit.test_framing_draft import request

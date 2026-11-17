@@ -36,10 +36,10 @@ from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import stats
 
+from scmle.assurance.framing import costs
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.contracts import signing
-from scmle.data.framing import costs
 
 DETECTOR_ID = "framing-selective-labels"
 DEFECT_TYPE = "selective_labels"

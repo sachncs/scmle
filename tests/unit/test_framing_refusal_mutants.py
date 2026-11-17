@@ -7,8 +7,8 @@ import json
 import pandas
 import pytest
 
+from scmle.assurance.framing import refusal
 from scmle.contracts import errors
-from scmle.data.framing import refusal
 
 
 def modal(result):

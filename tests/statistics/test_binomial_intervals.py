@@ -14,7 +14,7 @@ import support_statistics
 from scmle.assurance.charter import feasibility
 from scmle.assurance.detectors import certificates
 from scmle.assurance.detectors import duplicates
-from scmle.data.framing import refusal
+from scmle.assurance.framing import refusal
 from scmle.decision import constraints
 from scmle.evaluation import coverage
 

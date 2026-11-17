@@ -60,12 +60,12 @@ from scipy import stats
 from scmle.assurance.charter import contracts
 import scmle.assurance.charter.feasibility
 from scmle.assurance.detectors import certificates
+from scmle.assurance.framing import baseline
+from scmle.assurance.framing import costs
+from scmle.assurance.framing import draft
+from scmle.assurance.framing import feasibility
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.data.framing import baseline
-from scmle.data.framing import costs
-from scmle.data.framing import draft
-from scmle.data.framing import feasibility
 from scmle.runtime import randomness
 
 STORE_PATH = scmle.certificates.DIRECTORY / "framing_certificates.json"

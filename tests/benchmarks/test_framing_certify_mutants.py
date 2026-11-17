@@ -15,10 +15,10 @@ import pytest
 from benchmarks.qualification import framing_certify
 from scmle.assurance.charter import contracts
 from scmle.assurance.detectors import certificates
-from scmle.data.framing import baseline
-from scmle.data.framing import costs
-from scmle.data.framing import draft
-from scmle.data.framing import feasibility
+from scmle.assurance.framing import baseline
+from scmle.assurance.framing import costs
+from scmle.assurance.framing import draft
+from scmle.assurance.framing import feasibility
 from scmle.runtime import randomness
 
 

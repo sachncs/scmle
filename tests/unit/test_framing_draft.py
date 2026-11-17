@@ -7,10 +7,10 @@ import pytest
 
 from benchmarks.qualification import framing_certify
 from scmle.assurance.charter import contracts
-from scmle.data.framing import costs
-from scmle.data.framing import draft
-from scmle.data.framing import provenance
-from scmle.data.framing import refusal
+from scmle.assurance.framing import costs
+from scmle.assurance.framing import draft
+from scmle.assurance.framing import provenance
+from scmle.assurance.framing import refusal
 
 HUMAN = (costs.Basis.HUMAN,) * 4
 MODEL = costs.Tariff(0.0, 5.0, 1.0, 0.0, 0.05, 0.5, HUMAN, costs.Basis.HUMAN)

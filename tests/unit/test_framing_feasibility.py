@@ -2,8 +2,8 @@ import numpy
 import pytest
 
 from benchmarks.qualification import framing_certify
-from scmle.data.framing import baseline
-from scmle.data.framing import feasibility
+from scmle.assurance.framing import baseline
+from scmle.assurance.framing import feasibility
 
 
 def test_intraclass_recovers_known_rho():

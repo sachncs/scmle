@@ -136,7 +136,7 @@ def test_the_plan_builds_its_budget_and_rejects_unknown_fields():
 
 
 def with_cost_model():
-    from scmle.data.framing import costs
+    from scmle.assurance.framing import costs
 
     return costs.Tariff(
         0.0,

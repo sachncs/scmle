@@ -19,8 +19,8 @@ from numpy.typing import ArrayLike
 from scipy import stats
 
 from scmle.assurance.charter import feasibility
+from scmle.assurance.framing import baseline
 from scmle.contracts import errors
-from scmle.data.framing import baseline
 
 INCONCLUSIVE = "inconclusive"
 CONFIDENCE = 0.95

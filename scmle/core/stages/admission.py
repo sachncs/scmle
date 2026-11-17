@@ -8,6 +8,8 @@ import numpy
 from scmle.assurance.admissibility import attestations
 from scmle.assurance.admissibility import qualify
 from scmle.assurance.charter import contracts
+import scmle.assurance.framing.baseline
+import scmle.assurance.framing.claim
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import explore
 from scmle.contracts import errors
@@ -15,8 +17,6 @@ from scmle.contracts import tasks
 import scmle.contracts.data
 import scmle.core.context
 from scmle.core.stages import identification
-import scmle.data.framing.baseline
-import scmle.data.framing.claim
 
 
 class Admission(identification.Identification):
@@ -35,7 +35,7 @@ class Admission(identification.Identification):
         structure: tuple[str, ...],
         *,
         signed: bool,
-        subject: scmle.data.framing.claim.Rule | None = None,
+        subject: scmle.assurance.framing.claim.Rule | None = None,
     ) -> confirm.Docket | None:
         """Freezes the baseline rule on `X` and registers the claim.
 
@@ -95,7 +95,7 @@ class Admission(identification.Identification):
             for c in plan.numeric
             if c in view.features.columns and c not in structure
         ]
-        rule = scmle.data.framing.claim.solidify(
+        rule = scmle.assurance.framing.claim.solidify(
             view.features,
             list(outcome.to_numpy(float)),
             numeric,
@@ -110,14 +110,14 @@ class Admission(identification.Identification):
             seen = numpy.concatenate(
                 [seen, numpy.zeros(len(extra), dtype=bool)]
             )
-        selection = scmle.data.framing.baseline.selective_labels(
+        selection = scmle.assurance.framing.baseline.selective_labels(
             seen, decisions
         )
-        ceiling, why = scmle.data.framing.claim.source_ceiling(
+        ceiling, why = scmle.assurance.framing.claim.source_ceiling(
             data.framing_draft, charter.charter_hash, model, signed=signed
         )
-        context.write_json(scmle.data.framing.claim.PROVENANCE, why)
-        return scmle.data.framing.claim.rig(
+        context.write_json(scmle.assurance.framing.claim.PROVENANCE, why)
+        return scmle.assurance.framing.claim.rig(
             rule=rule if subject is None else subject,
             reference=None if subject is None else rule,
             model=model,

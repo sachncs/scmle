@@ -2919,3 +2919,4 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.data.admissibility` -> `scmle.assurance.admissibility`
 - `scmle.data.custody` -> `scmle.assurance.custody`
 - `scmle.governance.vault` -> `scmle.assurance.custody.vault`
+- `scmle.data.framing` -> `scmle.assurance.framing`

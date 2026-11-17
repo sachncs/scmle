@@ -6,6 +6,7 @@ from typing import Any
 from scmle.assurance.admissibility import qualify
 from scmle.assurance.charter import contracts
 from scmle.assurance.charter import sealing
+import scmle.assurance.framing.claim
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 import scmle.assurance.ledger.budget
@@ -15,7 +16,6 @@ from scmle.core import causal_claim
 import scmle.core.context
 from scmle.core.stages import admission
 from scmle.core.stages import scoring
-import scmle.data.framing.claim
 from scmle.data.robustness import prefilter
 
 
@@ -182,7 +182,7 @@ class Exploration(admission.Admission):
         self,
         context: scmle.core.context.Context,
         pending: "Escrow",
-        subject: scmle.data.framing.claim.Rule | None = None,
+        subject: scmle.assurance.framing.claim.Rule | None = None,
         extra: confirm.Docket | None = None,
     ) -> None:
         """Registers the claims, opens `C` once and writes the reports.

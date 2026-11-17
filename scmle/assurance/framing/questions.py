@@ -17,7 +17,7 @@ from typing import Any
 import numpy
 from numpy.typing import ArrayLike
 
-from scmle.data.framing import baseline
+from scmle.assurance.framing import baseline
 
 GRID_POINTS = 41
 BISECTION_WIDTH = 1e-12

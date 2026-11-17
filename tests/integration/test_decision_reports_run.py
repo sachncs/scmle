@@ -10,7 +10,7 @@ import support
 
 from scmle.assurance.charter import sealing
 import scmle.assurance.charter.decision
-from scmle.data.framing import costs
+from scmle.assurance.framing import costs
 from scmle.decision import rollout
 from tests.unit.test_charter_contracts import make_charter
 

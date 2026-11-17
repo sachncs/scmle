@@ -4,6 +4,7 @@ import dataclasses
 from typing import Any
 from typing import ClassVar
 
+import scmle.assurance.framing.claim
 from scmle.contracts import errors
 from scmle.contracts import experiments
 import scmle.core.context
@@ -12,7 +13,6 @@ from scmle.core.stages import exploration
 from scmle.core.stages import interface
 from scmle.core.stages import profiling
 from scmle.core.stages import training
-import scmle.data.framing.claim
 from scmle.evaluation import resources
 from scmle.preparation import strategies
 import scmle.runtime.state
@@ -184,7 +184,7 @@ class SelectStage(interface.Stage):
         pending: "exploration.Escrow",
         selected: experiments.Trial,
         split: Any,
-    ) -> scmle.data.framing.claim.Selection:
+    ) -> scmle.assurance.framing.claim.Selection:
         """Returns the selected model as the rule the baseline claim is about.
 
         Args:
@@ -216,7 +216,7 @@ class SelectStage(interface.Stage):
             pending.charter.cost_model, "cost_model"
         )
         classes = sorted(pending.view.target.dropna().unique(), key=str)
-        return scmle.data.framing.claim.Selection(
+        return scmle.assurance.framing.claim.Selection(
             pipeline,
             classes[-1],
             float(model.threshold),

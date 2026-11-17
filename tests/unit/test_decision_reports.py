@@ -6,8 +6,8 @@ import numpy
 import pandas
 
 import scmle.assurance.charter.decision
+from scmle.assurance.framing import costs
 from scmle.core import decision_reports
-from scmle.data.framing import costs
 from scmle.decision import rollout
 from tests.unit.test_charter_contracts import make_charter
 

@@ -27,9 +27,9 @@ import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 
+from scmle.assurance.framing import costs
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.framing import costs
 from scmle.runtime import randomness
 
 GRID_POINTS = 21

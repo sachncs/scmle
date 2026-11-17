@@ -2,9 +2,9 @@ import numpy
 import pandas
 import pytest
 
-from scmle.data.framing import baseline
-from scmle.data.framing import costs
-from scmle.data.framing import draft
+from scmle.assurance.framing import baseline
+from scmle.assurance.framing import costs
+from scmle.assurance.framing import draft
 
 HUMAN = (costs.Basis.HUMAN,) * 4
 MODEL = costs.Tariff(0.0, 5.0, 1.0, 0.0, 0.1, 0.4, HUMAN, costs.Basis.HUMAN)

@@ -3,7 +3,7 @@ from hypothesis import settings
 from hypothesis import strategies
 import numpy
 
-from scmle.data.framing import costs
+from scmle.assurance.framing import costs
 
 HUMAN = (costs.Basis.HUMAN,) * 4
 

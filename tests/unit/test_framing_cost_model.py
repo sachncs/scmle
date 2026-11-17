@@ -4,7 +4,7 @@ import numpy
 import pytest
 
 from scmle.assurance.charter import contracts
-from scmle.data.framing import costs
+from scmle.assurance.framing import costs
 
 HUMAN = (costs.Basis.HUMAN,) * 4
 

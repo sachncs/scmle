@@ -21,13 +21,13 @@ import numpy
 import pandas
 
 from scmle.assurance.charter import contracts
+from scmle.assurance.framing import baseline
+from scmle.assurance.framing import costs
+from scmle.assurance.framing import provenance
+from scmle.assurance.framing import refusal
+import scmle.assurance.framing.questions
 from scmle.contracts import errors
 from scmle.contracts import signing
-from scmle.data.framing import baseline
-from scmle.data.framing import costs
-from scmle.data.framing import provenance
-from scmle.data.framing import refusal
-import scmle.data.framing.questions
 
 ISSUED = "issued"
 WITH_QUESTIONS = "issued_with_questions"
@@ -144,7 +144,7 @@ class Draft:
     charter: contracts.AnalysisCharter | None
     fields: dict[str, provenance.Filling]
     checks: tuple[Probe, ...]
-    questions: tuple[scmle.data.framing.questions.Question, ...]
+    questions: tuple[scmle.assurance.framing.questions.Question, ...]
     robust: tuple[dict[str, Any], ...]
     open_items: tuple[str, ...]
     baseline: dict[str, Any] | None
@@ -575,7 +575,7 @@ def interview(
     open_items: list[str],
 ) -> tuple[
     dict[str, Any] | None,
-    list[scmle.data.framing.questions.Question],
+    list[scmle.assurance.framing.questions.Question],
     list[dict[str, Any]],
 ]:
     """Profiles the baseline on `X` and asks for the unknown cost threshold.
@@ -596,7 +596,7 @@ def interview(
         questions that remain for a person, and the robust verdicts.
     """
     profile = None
-    asked: list[scmle.data.framing.questions.Question] = []
+    asked: list[scmle.assurance.framing.questions.Question] = []
     robust: list[dict[str, Any]] = []
     if (
         baseline_column
@@ -617,14 +617,14 @@ def interview(
     ):
         outcome = pandas.to_numeric(data_sample[target], errors="coerce")
         seen = outcome.notna().to_numpy()
-        asked, robust = scmle.data.framing.questions.ask(
+        asked, robust = scmle.assurance.framing.questions.ask(
             [
-                scmle.data.framing.questions.Unknown(
+                scmle.assurance.framing.questions.Unknown(
                     "cost_threshold",
                     COST_RANGE[0],
                     COST_RANGE[1],
                     "a threshold t = c_FP / (c_FP + c_FN) in (0, 1)",
-                    scmle.data.framing.questions.judge(
+                    scmle.assurance.framing.questions.judge(
                         outcome.to_numpy()[seen],
                         numpy.asarray(pilot_actions)[seen],
                         data_sample[baseline_column].to_numpy()[seen],

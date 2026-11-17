@@ -23,23 +23,23 @@ them in this pass**; the numbers are what the existing tests give.
 
 | Module | Killed | Survived | Timeout | Score |
 | --- | --- | --- | --- | --- |
-| `data/framing/baseline.py` | 417 | 151 | 0 | 73.4% |
-| `data/framing/costs.py` | 237 | 70 | 0 | 77.2% |
-| `data/framing/draft.py` | 535 | 214 | 0 | 71.4% |
-| `data/framing/feasibility.py` | 159 | 62 | 0 | 71.9% |
-| `data/framing/provenance.py` | 5 | 0 | 0 | 100.0% |
-| `data/framing/questions.py` | 74 | 16 | 4 | 78.7% |
-| `data/framing/refusal.py` | 201 | 104 | 0 | 65.9% |
+| `assurance/framing/baseline.py` | 417 | 151 | 0 | 73.4% |
+| `assurance/framing/costs.py` | 237 | 70 | 0 | 77.2% |
+| `assurance/framing/draft.py` | 535 | 214 | 0 | 71.4% |
+| `assurance/framing/feasibility.py` | 159 | 62 | 0 | 71.9% |
+| `assurance/framing/provenance.py` | 5 | 0 | 0 | 100.0% |
+| `assurance/framing/questions.py` | 74 | 16 | 4 | 78.7% |
+| `assurance/framing/refusal.py` | 201 | 104 | 0 | 65.9% |
 | Total | 1628 | 617 | 4 | 72.4% |
 
 | Module | Not killed | message/string | numpy/zip keyword | replaced by None | comparison boundary | arithmetic operator | other |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `data/framing/baseline.py` | 151 | 38 | 10 | 28 | 10 | 5 | 60 |
-| `data/framing/costs.py` | 70 | 25 | 8 | 10 | 7 | 0 | 20 |
-| `data/framing/draft.py` | 214 | 66 | 0 | 40 | 6 | 0 | 102 |
-| `data/framing/feasibility.py` | 62 | 11 | 1 | 11 | 5 | 10 | 24 |
-| `data/framing/questions.py` | 20 | 2 | 0 | 3 | 2 | 3 | 10 |
-| `data/framing/refusal.py` | 104 | 26 | 12 | 10 | 7 | 3 | 46 |
+| `assurance/framing/baseline.py` | 151 | 38 | 10 | 28 | 10 | 5 | 60 |
+| `assurance/framing/costs.py` | 70 | 25 | 8 | 10 | 7 | 0 | 20 |
+| `assurance/framing/draft.py` | 214 | 66 | 0 | 40 | 6 | 0 | 102 |
+| `assurance/framing/feasibility.py` | 62 | 11 | 1 | 11 | 5 | 10 | 24 |
+| `assurance/framing/questions.py` | 20 | 2 | 0 | 3 | 2 | 3 | 10 |
+| `assurance/framing/refusal.py` | 104 | 26 | 12 | 10 | 7 | 3 | 46 |
 
 ## Ingestion
 
