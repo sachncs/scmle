@@ -384,7 +384,7 @@ def survey(source: Sql, table: str, stage: str = "profile") -> Census | None:
     return Census(table, rows, tuple(profiles))
 
 
-def profile_catalog(
+def inventory(
     source: Sql, tables: Sequence[str], stage: str = "profile"
 ) -> Catalog:
     """Profiles tables in the order given, stopping at a table boundary.

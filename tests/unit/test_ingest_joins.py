@@ -12,7 +12,7 @@ from scmle.data.ingest import profile
 
 def graph_of(db, tables, declared=(), eps_fk=0.0):
     source = db.source()
-    catalog = profile.profile_catalog(source, tables)
+    catalog = profile.inventory(source, tables)
     scans = {t.name: grain.keysearch(source, t) for t in catalog.tables}
     return (
         source,
@@ -143,7 +143,7 @@ def many_to_many_world():
 def test_many_to_many_charges_the_budget_per_pair_and_stops_at_a_boundary():
     db = many_to_many_world()
     plain = db.source()
-    catalog = profile.profile_catalog(plain, ["a", "b", "c"])
+    catalog = profile.inventory(plain, ["a", "b", "c"])
     scans = {t.name: grain.keysearch(plain, t) for t in catalog.tables}
     free = joins.many_to_many(plain, catalog, scans)
     assert len(free) == 3
@@ -162,7 +162,7 @@ def test_many_to_many_charges_the_budget_per_pair_and_stops_at_a_boundary():
 def test_many_to_many_without_a_meter_or_with_room_is_unchanged():
     db = many_to_many_world()
     plain = db.source()
-    catalog = profile.profile_catalog(plain, ["a", "b", "c"])
+    catalog = profile.inventory(plain, ["a", "b", "c"])
     scans = {t.name: grain.keysearch(plain, t) for t in catalog.tables}
     meter = budget.Meter(budget.Budget())
     roomy = profile.Sql(db.factory, meter)
@@ -173,7 +173,7 @@ def test_many_to_many_without_a_meter_or_with_room_is_unchanged():
 def test_paths_go_up_and_down_to_depth_two_without_revisiting():
     jw = ingest_worlds.surrogate_world(4)
     source = jw.db.source()
-    catalog = profile.profile_catalog(source, jw.tables)
+    catalog = profile.inventory(source, jw.tables)
     scans = {t.name: grain.keysearch(source, t) for t in catalog.tables}
     declared = tuple(
         joins.Reference(c, (col,), p, ("id",)) for c, col, p in jw.truth

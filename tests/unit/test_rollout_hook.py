@@ -188,7 +188,7 @@ def test_a_rollback_decision_restores_the_previous_champion(tmp_path):
     assert status == rollout.ROLLBACK
     assert "rollback_proposal" in [r["kind"] for r in ledger.rows]
     assert store.resolve("m").version == challenger.version
-    restored = hook.roll_back(
+    restored = hook.rewind(
         sanction(store.resolve("m", 1)), signing_key=APPROVAL_KEY
     )
     assert restored == 1
@@ -207,7 +207,7 @@ def test_no_rollback_without_a_rollback_decision(tmp_path):
     hook.promote(sanction(challenger), signing_key=APPROVAL_KEY)
 
     with pytest.raises(errors.ScmleError, match="rollback"):
-        hook.roll_back(sanction(store.resolve("m", 1)), APPROVAL_KEY)
+        hook.rewind(sanction(store.resolve("m", 1)), APPROVAL_KEY)
 
 
 def test_the_budget_survives_in_the_ledger_rows(tmp_path):
@@ -303,12 +303,12 @@ def test_the_hook_is_the_only_decider_of_promotion_and_rollback(tmp_path):
     assert bootstrap.rolled_back is False
     assert store.resolve("m").version == challenger.version
     with pytest.raises(errors.ScmleError, match="rollback"):
-        hook.roll_back(sanction(store.resolve("m", 1)), APPROVAL_KEY)
+        hook.rewind(sanction(store.resolve("m", 1)), APPROVAL_KEY)
 
     rng = numpy.random.default_rng(6)
     watch_arm = (rng.random(20000) < 0.5).astype(float)
     outcome = (rng.random(20000) < 0.30 - 0.15 * watch_arm).astype(float)
     assert hook.watch(watch_arm, outcome) == rollout.ROLLBACK
     assert store.resolve("m").version == challenger.version
-    hook.roll_back(sanction(store.resolve("m", 1)), signing_key=APPROVAL_KEY)
+    hook.rewind(sanction(store.resolve("m", 1)), signing_key=APPROVAL_KEY)
     assert store.resolve("m").version == 1

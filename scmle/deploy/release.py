@@ -77,7 +77,7 @@ def revive(record: Mapping[str, Any]) -> registry.Sanction:
         raise errors.ArtifactError(f"bad approval record: {error}") from error
 
 
-def observation_from_dict(record: Mapping[str, Any]) -> observation.Observation:
+def rebuild(record: Mapping[str, Any]) -> observation.Observation:
     """Rebuilds an observation from `Observation.to_dict`.
 
     Args:
@@ -208,9 +208,7 @@ def gather(manifest_path: str | pathlib.Path) -> gate.Candidate:
             )
         ),
         observation=(
-            None
-            if seen_path is None
-            else observation_from_dict(read_json(seen_path))
+            None if seen_path is None else rebuild(read_json(seen_path))
         ),
         staging_record=(
             None

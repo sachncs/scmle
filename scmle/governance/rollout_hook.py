@@ -116,7 +116,7 @@ class Hook:
         target: str,
         retrain: bool = True,
         configure: dict[str, Any] | None = None,
-    ) -> lifecycle.LifecycleOutcome:
+    ) -> lifecycle.Verdict:
         """Runs `Maintainer.review` and logs its comparison.
 
         When a retrain runs, the challenger is staged for the rollout whatever
@@ -147,7 +147,7 @@ class Hook:
     ) -> lifecycle.Outcome:
         """Runs `Maintainer.revertible` as a logged diagnostic.
 
-        Nothing moves, whatever the approval: only `watch` and `roll_back`
+        Nothing moves, whatever the approval: only `watch` and `rewind`
         take the previous champion back.
 
         Args:
@@ -399,7 +399,7 @@ class Hook:
             )
         return status
 
-    def roll_back(
+    def rewind(
         self,
         approval: registry.Sanction,
         signing_key: str | bytes | None = None,

@@ -3238,7 +3238,7 @@ class FinalEvaluationStage(Stage):
         for batch in source.batches():
             positions = numpy.arange(offset, offset + len(batch))
             offset += len(batch)
-            side = streaming.side_of(positions, fraction, seed)
+            side = streaming.allot(positions, fraction, seed)
             part = batch[side == streaming.DEVELOPMENT]
             if part.empty:
                 continue
@@ -3282,7 +3282,7 @@ class FinalEvaluationStage(Stage):
         for batch in source.batches():
             positions = numpy.arange(offset, offset + len(batch))
             offset += len(batch)
-            side = streaming.side_of(positions, fraction, seed)
+            side = streaming.allot(positions, fraction, seed)
             part = batch[side == streaming.LOCKED]
             if part.empty:
                 continue

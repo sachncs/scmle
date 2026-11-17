@@ -203,7 +203,7 @@ class Executor:
         return scmle.governance.reliability.Emission(
             evidence_type=evidence_type,
             content=content,
-            observed_outcome=reliability.EvidenceOutcome.SAFE_OUTCOME_OBSERVED,
+            observed_outcome=reliability.Outcome.SAFE_OUTCOME_OBSERVED,
             observation=observation,
         )
 

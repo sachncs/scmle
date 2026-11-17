@@ -554,7 +554,7 @@ def test_rejecting_or_undecided_replies_apply_the_safe_default(tmp_path):
 )
 def test_replies_that_do_not_fit_are_refused(tmp_path, changes, message):
     loop, esc = pending_one(tmp_path)
-    with pytest.raises(scmle.governance.loop.ReplyRefused, match=message):
+    with pytest.raises(scmle.governance.loop.RefusalError, match=message):
         loop.reply(esc.id, reply_to(esc, **changes))
     assert len(loop.pending_escalations()) == 1
 
@@ -562,19 +562,19 @@ def test_replies_that_do_not_fit_are_refused(tmp_path, changes, message):
 def test_signature_key_and_system_key_checks(tmp_path):
     loop, esc = pending_one(tmp_path)
     with pytest.raises(
-        scmle.governance.loop.ReplyRefused, match="system holds"
+        scmle.governance.loop.RefusalError, match="system holds"
     ):
         loop.reply(esc.id, reply_to(esc, key=SYSTEM_KEY))
     with pytest.raises(
-        scmle.governance.loop.ReplyRefused, match="no verification key"
+        scmle.governance.loop.RefusalError, match="no verification key"
     ):
         loop.reply(esc.id, reply_to(esc, key="unknown-person-key"))
     forged = reply_to(esc).to_dict()
     forged["statement"] = "changed after signing"
-    with pytest.raises(scmle.governance.loop.ReplyRefused, match="signature"):
+    with pytest.raises(scmle.governance.loop.RefusalError, match="signature"):
         loop.reply(esc.id, deployment_ledger.Attestation.from_dict(forged))
     with pytest.raises(
-        scmle.governance.loop.ReplyRefused, match="not a pending"
+        scmle.governance.loop.RefusalError, match="not a pending"
     ):
         loop.reply("esc-0", reply_to(esc))
 
@@ -687,7 +687,7 @@ def test_high_impact_answer_is_blocked_in_routing_and_guarded_as_an_action(
 def test_the_system_cannot_attest_for_itself(tmp_path):
     loop, esc = pending_one(tmp_path)
     assert not hasattr(loop, "sign") and not hasattr(loop, "attest")
-    with pytest.raises(scmle.governance.loop.ReplyRefused):
+    with pytest.raises(scmle.governance.loop.RefusalError):
         loop.reply(esc.id, reply_to(esc, key=SYSTEM_KEY))
     environment_key = "env-key"
     os.environ["SCMLE_SIGNING_KEY"] = environment_key
@@ -698,7 +698,7 @@ def test_the_system_cannot_attest_for_itself(tmp_path):
                 types.SimpleNamespace(promote=lambda *a, **k: 1), "m", 3, None
             )
         esc2 = other.pending_escalations()[0]
-        with pytest.raises(scmle.governance.loop.ReplyRefused):
+        with pytest.raises(scmle.governance.loop.RefusalError):
             other.reply(
                 esc2.id,
                 reply_to(esc2, key=environment_key),

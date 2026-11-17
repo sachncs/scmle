@@ -133,7 +133,7 @@ def fingerprint(frame: pandas.DataFrame) -> str:
 
 
 @dataclasses.dataclass(frozen=True)
-class LifecycleOutcome:
+class Verdict:
     """What one lifecycle review concluded and did.
 
     Attributes:
@@ -250,7 +250,7 @@ class Maintainer:
             return "cooldown"
         return None
 
-    def register_run(
+    def enlist(
         self,
         result: results.Run,
         promote: bool = False,
@@ -344,7 +344,7 @@ class Maintainer:
         target: str,
         retrain: bool = True,
         configure: dict[str, Any] | None = None,
-    ) -> LifecycleOutcome:
+    ) -> Verdict:
         """Monitors the champion on fresh labeled data and acts on advice.
 
         If monitoring recommends retraining, a challenger is trained on part
@@ -377,7 +377,7 @@ class Maintainer:
         target: str,
         retrain: bool,
         configure: dict[str, Any] | None,
-    ) -> LifecycleOutcome:
+    ) -> Verdict:
         """Does the work of `review`; the caller holds the state lock.
 
         Args:
@@ -404,7 +404,7 @@ class Maintainer:
         )
         if report.recommendation.action != "retrain" or not retrain:
             self.tally(state, fresh)
-            return LifecycleOutcome(
+            return Verdict(
                 monitoring=report,
                 retrained=False,
                 comparison=None,
@@ -421,7 +421,7 @@ class Maintainer:
             )
             self.tally(state, fresh)
             notes.append(f"retraining skipped: {skip}")
-            return LifecycleOutcome(
+            return Verdict(
                 monitoring=report,
                 retrained=False,
                 comparison=None,
@@ -466,14 +466,14 @@ class Maintainer:
                 **evidence,
             )
             notes.append("challenger was not clearly better; champion kept")
-            return LifecycleOutcome(
+            return Verdict(
                 monitoring=report,
                 retrained=True,
                 comparison=comparison,
                 promoted_version=None,
                 notes=notes,
             )
-        record = self.register_run(challenger_run)
+        record = self.enlist(challenger_run)
         self.registry.promote(
             self.model, record.version, scmle.governance.registry.CHALLENGER
         )
@@ -492,7 +492,7 @@ class Maintainer:
             f"staged challenger as v{record.version}; independent approval "
             "required before champion promotion"
         )
-        return LifecycleOutcome(
+        return Verdict(
             monitoring=report,
             retrained=True,
             comparison=comparison,

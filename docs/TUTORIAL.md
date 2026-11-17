@@ -150,7 +150,7 @@ logging.info(report.recommendation)  # none / investigate / retrain
 
 store = registry.ModelRegistryStore("registry")
 manager = lifecycle.Maintainer(store, "churn", "work")
-record = manager.register_run(result)  # registers a staged version
+record = manager.enlist(result)  # registers a staged version
 approval_key = "loaded-from-your-release-secret"
 approval = registry.Sanction(
     model="churn",

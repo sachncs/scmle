@@ -160,7 +160,7 @@ def parse(path: pathlib.Path) -> dict[str, Any]:
     return document
 
 
-def write_document(path: pathlib.Path, document: Mapping[str, Any]) -> None:
+def persist(path: pathlib.Path, document: Mapping[str, Any]) -> None:
     """Writes an attestation file deterministically.
 
     Keys are sorted and the file ends with a newline.
@@ -220,7 +220,7 @@ def stamp(
         },
     )
     document = envelope(body, signing_key)
-    write_document(folder / PROVENANCE_FILE, document)
+    persist(folder / PROVENANCE_FILE, document)
     return document
 
 
@@ -275,7 +275,7 @@ def bind(
         },
     )
     document = envelope(body, signing_key)
-    write_document(folder / IMAGE_ATTESTATION_FILE, document)
+    persist(folder / IMAGE_ATTESTATION_FILE, document)
     return document
 
 

@@ -29,12 +29,12 @@ def test_catalog_fingerprint_changes_with_the_data():
     db = ingest_worlds.new_database("fp")
     db.execute("CREATE TABLE t (a INTEGER)")
     db.execute("INSERT INTO t VALUES (?)", [(1,), (2,)])
-    first = profile.profile_catalog(db.source(), ["t"])
-    assert profile.profile_catalog(db.source(), ["t"]).fingerprint == (
+    first = profile.inventory(db.source(), ["t"])
+    assert profile.inventory(db.source(), ["t"]).fingerprint == (
         first.fingerprint
     )
     db.execute("INSERT INTO t VALUES (?)", [(3,)])
-    assert profile.profile_catalog(db.source(), ["t"]).fingerprint != (
+    assert profile.inventory(db.source(), ["t"]).fingerprint != (
         first.fingerprint
     )
 
@@ -62,7 +62,7 @@ def test_budget_stops_profile_at_a_table_boundary():
         db.execute(f"INSERT INTO {name} VALUES (?, ?)", [(1, 2), (3, 4)])
     meter = budget.Meter(budget.Budget(max_queries=5))
     source = profile.Sql(db.factory, meter)
-    catalog = profile.profile_catalog(source, ["t1", "t2"])
+    catalog = profile.inventory(source, ["t1", "t2"])
     assert catalog.partial
     assert [t.name for t in catalog.tables] == ["t1"]
     assert meter.partial

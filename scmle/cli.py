@@ -1213,7 +1213,7 @@ class Loop(Command):
         key = pathlib.Path(args.key_file).read_text(encoding="utf-8").strip()
         try:
             outcome = loop.reply(args.escalation_id, reply, key)
-        except scmle.governance.loop.ReplyRefused as error:
+        except scmle.governance.loop.RefusalError as error:
             raise errors.ConfigError(f"reply refused: {error}") from error
         print(
             json.dumps(
@@ -1630,7 +1630,7 @@ class Deployment(Command):
             if args.ledger
             else None
         )
-        seen = release.observation_from_dict(
+        seen = release.rebuild(
             release.read_json(pathlib.Path(args.observation))
         )
         report = release_state.ReleaseRegistry(store, ledger).reconcile(

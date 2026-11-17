@@ -146,10 +146,10 @@ def test_logs_refuse_reserved_fields_and_unknown_levels(tmp_path):
 def test_traceparent_round_trips_and_bad_headers_get_a_new_id():
     trace = logs.traceid()
     header = logs.traceheader(trace)
-    assert logs.parse_traceparent(header) == trace
+    assert logs.extract(header) == trace
     assert logs.propagate(header) == trace
     for bad in (None, "", "00-xyz", f"00-{'0' * 32}-{'1' * 16}-01"):
-        assert logs.parse_traceparent(bad) is None
+        assert logs.extract(bad) is None
         assert len(logs.propagate(bad)) == 32
     with pytest.raises(ValueError):
         logs.traceheader("short")

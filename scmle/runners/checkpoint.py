@@ -153,7 +153,7 @@ class CheckpointStore:
         except objectstore.AbsentError:
             # handled: an absent checkpoint is None, as documented
             return None
-        except objectstore.CorruptObjectError:
+        except objectstore.MismatchError:
             LOGGER.warning("checkpoint %s is corrupt; passed over", key)
             return None
         try:

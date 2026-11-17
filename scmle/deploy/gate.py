@@ -241,7 +241,7 @@ def audit(candidate: Candidate, key: str | bytes) -> list[str]:
     return problems
 
 
-def check_problems(candidate: Candidate) -> list[str]:
+def vet(candidate: Candidate) -> list[str]:
     """Lists the reasons the live checks do not support the release.
 
     Args:
@@ -328,7 +328,7 @@ def certify(
         The decision; when allowed, it carries the signed record.
     """
     problems = objections(candidate, key)
-    problems.extend(check_problems(candidate))
+    problems.extend(vet(candidate))
     problems.extend(absences(candidate))
     seen = candidate.observation
     if problems or seen is None:

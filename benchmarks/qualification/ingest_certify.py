@@ -507,7 +507,7 @@ def join_world(seed: int) -> tuple[int, int, int, int]:
     """
     world = ingest_worlds.surrogate_world(seed)
     source = world.db.source()
-    catalog = profile.profile_catalog(source, world.tables)
+    catalog = profile.inventory(source, world.tables)
     scans = {t.name: grain.keysearch(source, t) for t in catalog.tables}
     graph = joins.discover(source, catalog, scans)
     accepted = {

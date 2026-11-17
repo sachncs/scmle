@@ -284,7 +284,7 @@ def test_cached_predictions_match_the_model():
     numpy.testing.assert_allclose(
         replay.predict_proba(subset), inputs.estimator.predict_proba(subset)
     )
-    bare = diagnostics.CachedPredictions(
+    bare = diagnostics.Cache(
         make_inputs(tasks.Task.REGRESSION).estimator,
         make_inputs(tasks.Task.REGRESSION).features,
     )

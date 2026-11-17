@@ -131,9 +131,7 @@ class Plan:
         Returns:
             The catalog of the profiled tables.
         """
-        self.catalog = profile.profile_catalog(
-            self.source, self.settings.tables
-        )
+        self.catalog = profile.inventory(self.source, self.settings.tables)
         persist(self.run_dir, CATALOG, self.catalog.to_dict())
         return self.catalog
 

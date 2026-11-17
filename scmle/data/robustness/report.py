@@ -164,9 +164,7 @@ def shift_report(found: qualify.Robustness) -> dict[str, Any]:
     }
 
 
-def require_keys(
-    document: dict[str, Any], keys: tuple[str, ...], name: str
-) -> None:
+def require(document: dict[str, Any], keys: tuple[str, ...], name: str) -> None:
     """Checks that a document has the expected keys and schema version.
 
     Args:
@@ -195,11 +193,11 @@ def conform(document: dict[str, Any]) -> None:
         ValueError: On a missing key, an unknown status or a finding that
             lacks its curve data.
     """
-    require_keys(document, STABILITY_KEYS, "stability report")
+    require(document, STABILITY_KEYS, "stability report")
     if document["status"] not in STABILITY_STATUSES:
         raise errors.InputError("stability report has an unknown status")
     for finding in document["findings"]:
-        require_keys(
+        require(
             {"schema_version": SCHEMA_VERSION, **finding},
             ("schema_version", *FINDING_KEYS),
             "finding",
@@ -218,7 +216,7 @@ def validate_shift(document: dict[str, Any]) -> None:
         ValueError: On a missing key, an unknown status, or a `pass` without
             a classifier test (a pass needs a reference).
     """
-    require_keys(document, SHIFT_KEYS, "shift report")
+    require(document, SHIFT_KEYS, "shift report")
     status = document["status"]
     if status not in {s.value for s in shift.Status}:
         raise errors.InputError("shift report has an unknown status")

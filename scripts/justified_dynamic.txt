@@ -4,7 +4,7 @@
 scmle/cli.py run_* subcommand dispatch getattr(self, f"run_{...}") at cli.py:906,1047,1285,1491,1686
 scmle/data/splitting/inner_cv.py get_n_splits scikit-learn calls a cross-validator's get_n_splits by name
 scmle/deploy/demo.py http_request urllib finds a handler's http_request method by name
-scmle/data/store/objectstore.py CorruptObjectError named by the Depot.get contract for backends that record a hash; the shipped local backend cannot raise it
+scmle/data/store/objectstore.py MismatchError named by the Depot.get contract for backends that record a hash; the shipped local backend cannot raise it
 scmle/deploy/mocks.py do_PUT http.server calls do_<METHOD> on a request handler by name
 scmle/deploy/mocks.py do_HEAD http.server calls do_<METHOD> on a request handler by name
 scmle/inference/serving.py version_string http.server reads version_string on a request handler by name
@@ -113,7 +113,7 @@ scmle/governance/loop.py delete_or_send documented extension surface: docs/API_S
 scmle/governance/loop.py amend_policy documented extension surface: docs/API_STABILITY.md (closed loop, F13); a never-list gate action
 scmle/governance/release_state.py live documented extension surface: docs/API_STABILITY.md (release surfaces)
 scmle/governance/rollout_hook.py Hook documented extension surface: docs/API_STABILITY.md (Hook)
-scmle/governance/rollout_hook.py roll_back documented extension surface: docs/API_STABILITY.md (Hook)
+scmle/governance/rollout_hook.py rewind documented extension surface: docs/API_STABILITY.md (Hook)
 scmle/governance/uncertainty_feed.py UncertaintyFeed documented extension surface: docs/API_STABILITY.md (UncertaintyFeed)
 scmle/inference/modality_serving.py protect documented: docs/API_STABILITY.md (security surface, protect)
 scmle/inference/parity.py expect used by scripts/make_serving_golden.py (stored golden generator)

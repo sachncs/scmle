@@ -583,7 +583,7 @@ def streaming_case(root: pathlib.Path) -> Row:
     from scmle.data.readers import streaming
 
     frame = pandas.read_parquet(path)
-    side = streaming.side_of(numpy.arange(len(frame)), 0.2, 42)
+    side = streaming.allot(numpy.arange(len(frame)), 0.2, 42)
     features = frame.drop(columns=["Cover_Type"])
     model = ensemble.HistGradientBoostingClassifier(random_state=0).fit(
         features[side == 0], frame["Cover_Type"][side == 0]

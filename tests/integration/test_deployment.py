@@ -69,7 +69,7 @@ def sanction(record):
 
 
 def register_champion(manager, store, result):
-    record = manager.register_run(result)
+    record = manager.enlist(result)
     store.promote(
         manager.model,
         record.version,

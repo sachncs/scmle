@@ -25,7 +25,7 @@ adds the deployment ledger's attestation in front of them.
 
 Reach. `Loop`'s wrappers, a `ModelRegistryStore` with an attached guard (so
 `Maintainer.elevate`, `revertible` and
-`register_run(promote=True)` too) and nothing else. The custody API
+`enlist(promote=True)` too) and nothing else. The custody API
 (`scmle.data.custody`) is not routed through the guard: its own one-time open
 of a sealed set stays the only check there, and `Loop.reopen_sealed` is the
 wrapper for callers who want the attestation in front of it.

@@ -97,7 +97,7 @@ NUMERIC_ORIENTATION = {
 }
 
 
-class ReplyRefused(errors.ArtifactError):
+class RefusalError(errors.ArtifactError):
     """A reply was not recorded, and why."""
 
 
@@ -1705,7 +1705,7 @@ class Loop:
             decision itself.
 
         Raises:
-            ReplyRefused: If the escalation is not pending, the reply is
+            RefusalError: If the escalation is not pending, the reply is
                 bound to another escalation, question or scope, was signed
                 with a key the system holds (or is verified by one), no
                 verification key is known for its key id, it does not verify,
@@ -1715,15 +1715,15 @@ class Loop:
         pending = {e.id: e for e in self.pending_escalations()}
         target = pending.get(escalation_id)
         if target is None:
-            raise ReplyRefused(f"{escalation_id!r} is not a pending escalation")
+            raise RefusalError(f"{escalation_id!r} is not a pending escalation")
         if attestation.escalation_id != escalation_id:
-            raise ReplyRefused("the reply answers a different escalation")
+            raise RefusalError("the reply answers a different escalation")
         if attestation.question_hash != target.question_hash:
-            raise ReplyRefused("the reply is bound to a different question")
+            raise RefusalError("the reply is bound to a different question")
         if attestation.scope != target.question["scope"]:
-            raise ReplyRefused("the reply names a different scope")
+            raise RefusalError("the reply names a different scope")
         if attestation.key_id in self.ledger.system_keys:
-            raise ReplyRefused(
+            raise RefusalError(
                 "the reply is signed with a key the system holds"
             )
         verifier = (
@@ -1732,16 +1732,16 @@ class Loop:
             else self.verification_keys.get(attestation.key_id)
         )
         if verifier is None:
-            raise ReplyRefused("no verification key for the reply's key id")
+            raise RefusalError("no verification key for the reply's key id")
         if deployment_ledger.thumbprint(verifier) in self.ledger.system_keys:
-            raise ReplyRefused("the verification key is one the system holds")
+            raise RefusalError("the verification key is one the system holds")
         if not attestation.verify(verifier):
-            raise ReplyRefused("the reply's signature does not verify")
+            raise RefusalError("the reply's signature does not verify")
         today = self.today()
         issued = deployment_ledger.parse_date(attestation.date, "date")
         expires = deployment_ledger.parse_date(attestation.expires, "expires")
         if not issued <= today <= expires:
-            raise ReplyRefused("the reply is expired or dated in the future")
+            raise RefusalError("the reply is expired or dated in the future")
         self.ledger.commit(deployment_ledger.ATTESTATION, attestation.to_dict())
         self.save_state()
         allowed = attestation.decision in never_list.ALLOWING
@@ -1788,7 +1788,7 @@ class Loop:
     def intercept(self, registry: Any) -> None:
         """Routes every champion move of `registry` through this guard.
 
-        `elevate`, `revertible` and `register_run(promote=True)`
+        `elevate`, `revertible` and `enlist(promote=True)`
         of a `Maintainer` over this registry then need an attestation,
         as `move_champion` does. Moving the alias by editing the registry's
         files is not stopped.

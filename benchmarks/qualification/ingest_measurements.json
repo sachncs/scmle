@@ -11,7 +11,7 @@
     "within_budget": 100
   },
   "code_hashes": {
-    "budget": "cd4dc67abf0ff4682b9d0e91ce160a67e1f9b4539f543cbaa77c2c8e54792f98",
+    "budget": "cc3597ddad115e9dd74cf8c9c91c095b872816e3a2867765f33d60ac389eb9ae",
     "entities": "6b92452f1da8cfac127c91f09d6ea9428037ced043f04d663ce130cc735fe15a",
     "grain": "b10850507efe9eb26041421dca08c92500f1dbb62117d0af471d53cf1439f743",
     "joins": "24f8749b53de51170f7355c3b970c4e2cb71f7be7ce676bf738950904f67b251",
@@ -105,7 +105,7 @@
     "seed_offset": 0,
     "tolerance": 0.0
   },
-  "seconds": 19.8,
+  "seconds": 20.0,
   "torn_read": {
     "batch_rows": 5,
     "detected": 500,

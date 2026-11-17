@@ -139,7 +139,7 @@ def parse(
     return findings, scanned, "trivy"
 
 
-def parse_report(report: Any) -> tuple[list[dict[str, Any]], set[str], str]:
+def interpret(report: Any) -> tuple[list[dict[str, Any]], set[str], str]:
     """Detects the scanner format and parses it.
 
     Args:
@@ -243,7 +243,7 @@ def evaluate(
     """
     today = today or datetime.datetime.now(datetime.UTC).date()
     active = enforce(policy, today)
-    findings, scanned, scanner = parse_report(report)
+    findings, scanned, scanner = interpret(report)
     if not scanned and not findings:
         raise GateError(
             "the scan looked at no packages: an empty scan is not a pass"

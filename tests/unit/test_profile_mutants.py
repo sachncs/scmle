@@ -309,12 +309,12 @@ def test_table_and_catalog_lookups_and_dicts():
 
 def test_a_complete_catalog_is_not_partial_and_a_stopped_one_is():
     source = recorded_source()[0]
-    complete = profile.profile_catalog(source, ["t"])
+    complete = profile.inventory(source, ["t"])
     assert complete.partial is False
     assert [t.name for t in complete.tables] == ["t"]
     meter = budget.Meter(budget.Budget(max_queries=0))
     stopped_source = recorded_source(meter=meter)[0]
-    stopped = profile.profile_catalog(stopped_source, ["t"], "custom")
+    stopped = profile.inventory(stopped_source, ["t"], "custom")
     assert stopped.partial is True
     assert stopped.tables == ()
     assert meter.stops[0].stage == "custom"

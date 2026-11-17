@@ -67,7 +67,7 @@ class Verification(enum.StrEnum):
     INCONCLUSIVE = "inconclusive"
 
 
-class EvidenceOutcome(enum.StrEnum):
+class Outcome(enum.StrEnum):
     """Observed result recorded by a fault-injection execution."""
 
     SAFE_OUTCOME_OBSERVED = "safe_outcome_observed"
@@ -101,7 +101,7 @@ class Evidence:
     execution_id: str
     artifact_uri: str
     artifact_digest: str
-    observed_outcome: EvidenceOutcome
+    observed_outcome: Outcome
     recorded_at: str
     reviewer: str
     observation: str
@@ -110,7 +110,7 @@ class Evidence:
         """Rejects evidence records that cannot be independently reviewed.
 
         Raises:
-            TypeError: If `observed_outcome` is not an `EvidenceOutcome`.
+            TypeError: If `observed_outcome` is not an `Outcome`.
             ValueError: If a required text field is blank.
         """
         for name in (
@@ -125,8 +125,8 @@ class Evidence:
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise errors.InputError(f"{name} must not be empty")
-        if not isinstance(self.observed_outcome, EvidenceOutcome):
-            raise errors.KindError("observed_outcome must be EvidenceOutcome")
+        if not isinstance(self.observed_outcome, Outcome):
+            raise errors.KindError("observed_outcome must be Outcome")
 
     def to_dict(self) -> dict[str, str]:
         """Returns a deterministic JSON-compatible evidence record."""
@@ -156,7 +156,7 @@ class Evidence:
             execution_id=str(record["execution_id"]),
             artifact_uri=str(record["artifact_uri"]),
             artifact_digest=str(record["artifact_digest"]),
-            observed_outcome=EvidenceOutcome(record["observed_outcome"]),
+            observed_outcome=Outcome(record["observed_outcome"]),
             recorded_at=str(record["recorded_at"]),
             reviewer=str(record["reviewer"]),
             observation=str(record["observation"]),
@@ -260,8 +260,7 @@ class Plan:
                     f"{missing_text}"
                 )
             if any(
-                item.observed_outcome
-                is not EvidenceOutcome.SAFE_OUTCOME_OBSERVED
+                item.observed_outcome is not Outcome.SAFE_OUTCOME_OBSERVED
                 for item in self.evidence
             ):
                 raise errors.InputError(
@@ -414,7 +413,7 @@ class Registry:
             )
         missing = set(plan.evidence_requirements) - evidence_types
         has_unsafe = any(
-            item.observed_outcome is EvidenceOutcome.UNSAFE_OUTCOME_OBSERVED
+            item.observed_outcome is Outcome.UNSAFE_OUTCOME_OBSERVED
             for item in evidence
         )
         if has_unsafe:

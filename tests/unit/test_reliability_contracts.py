@@ -10,9 +10,7 @@ from scmle.contracts import reliability
 
 def make_evidence(
     evidence_type: str,
-    outcome: reliability.EvidenceOutcome = (
-        reliability.EvidenceOutcome.SAFE_OUTCOME_OBSERVED
-    ),
+    outcome: reliability.Outcome = (reliability.Outcome.SAFE_OUTCOME_OBSERVED),
 ) -> reliability.Evidence:
     """Build one concrete evidence record for contract tests."""
     return reliability.Evidence(
@@ -103,7 +101,7 @@ def test_passed_scenario_rejects_unsafe_evidence():
         make_evidence("process_termination"),
         make_evidence(
             "checkpoint_resume",
-            reliability.EvidenceOutcome.UNSAFE_OUTCOME_OBSERVED,
+            reliability.Outcome.UNSAFE_OUTCOME_OBSERVED,
         ),
     )
 
@@ -121,7 +119,7 @@ def test_evidence_rejects_empty_review_fields():
             execution_id="run-1",
             artifact_uri="artifact://run/evidence.json",
             artifact_digest=" ",
-            observed_outcome=reliability.EvidenceOutcome.SAFE_OUTCOME_OBSERVED,
+            observed_outcome=reliability.Outcome.SAFE_OUTCOME_OBSERVED,
             recorded_at="2026-10-20T10:00:00+00:00",
             reviewer="reviewer",
             observation="observed",
@@ -210,7 +208,7 @@ def test_registry_marks_unsafe_evidence_failed_and_incomplete_safe_evidence_inco
             make_evidence("process_termination"),
             make_evidence(
                 "checkpoint_resume",
-                reliability.EvidenceOutcome.UNSAFE_OUTCOME_OBSERVED,
+                reliability.Outcome.UNSAFE_OUTCOME_OBSERVED,
             ),
         ),
     )

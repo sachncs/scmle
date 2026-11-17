@@ -166,7 +166,7 @@ def test_a_transform_that_keeps_failing_stops_at_that_object(store, after_two):
 
 PERMANENT = {
     "store_error": lambda: objectstore.StoreError("denied"),
-    "corrupt_object": lambda: objectstore.CorruptObjectError("torn read"),
+    "corrupt_object": lambda: objectstore.MismatchError("torn read"),
     "not_found": lambda: objectstore.AbsentError("vanished"),
     "framework_error": lambda: errors.DataError("bad bytes"),
 }

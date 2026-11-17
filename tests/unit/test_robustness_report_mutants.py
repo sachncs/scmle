@@ -263,14 +263,12 @@ def test_the_key_tuples_are_exact():
 
 def test_require_keys_names_the_document_and_the_missing_keys():
     with pytest.raises(ValueError, match=r"^thing is missing \['b', 'c'\]$"):
-        report.require_keys(
-            {"schema_version": 1, "a": 1}, ("a", "b", "c"), "thing"
-        )
+        report.require({"schema_version": 1, "a": 1}, ("a", "b", "c"), "thing")
     with pytest.raises(
         ValueError, match=r"^thing has an unsupported schema_version$"
     ):
-        report.require_keys({"schema_version": 2, "a": 1}, ("a",), "thing")
-    report.require_keys({"schema_version": 1, "a": 1}, ("a",), "thing")
+        report.require({"schema_version": 2, "a": 1}, ("a",), "thing")
+    report.require({"schema_version": 1, "a": 1}, ("a",), "thing")
 
 
 def valid_stability():

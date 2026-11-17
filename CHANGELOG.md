@@ -12,6 +12,16 @@ marked `Breaking:` and listed first in their group.
 
 ### Breaking changes
 
+* **Single-word names for 19 more uniquely defined names.** Among them
+  public classes `CorruptObjectError` -> `MismatchError`, `EvidenceOutcome`
+  -> `Outcome`, `LifecycleOutcome` -> `Verdict`, `ReleaseReadinessSummary`
+  -> `Scorecard` and `ReplyRefused` -> `RefusalError`; each is listed in
+  [`docs/RENAMES.md`](docs/RENAMES.md). The remaining multi-word names are
+  kept for a stated reason: members of a parallel family in one module
+  (`RandomSplit`, `GroupSplit`, `IngestStage`, `TrainStage` ...) that one
+  word cannot tell apart until the family gets its own module, record keys
+  and fields, classes pickled into bundles, and names other libraries also
+  define.
 * **Single-word names for 97 names defined in several places.** Methods
   shared by several classes and helpers defined in several modules are
   renamed to one word each, every definition to the same word, so the

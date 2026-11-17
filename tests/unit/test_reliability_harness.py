@@ -14,7 +14,7 @@ def artifact(evidence_type: str) -> scmle.governance.reliability.Emission:
     return scmle.governance.reliability.Emission(
         evidence_type=evidence_type,
         content=f"observed:{evidence_type}".encode(),
-        observed_outcome=reliability.EvidenceOutcome.SAFE_OUTCOME_OBSERVED,
+        observed_outcome=reliability.Outcome.SAFE_OUTCOME_OBSERVED,
         observation="safe outcome observed in the injected execution",
     )
 
@@ -114,6 +114,6 @@ def test_harness_rejects_path_injection_in_evidence_name(tmp_path):
         scmle.governance.reliability.Emission(
             evidence_type="../escape",
             content=b"evidence",
-            observed_outcome=reliability.EvidenceOutcome.INCONCLUSIVE,
+            observed_outcome=reliability.Outcome.INCONCLUSIVE,
             observation="not enough evidence",
         )

@@ -1115,7 +1115,7 @@ def admit(
         )
 
 
-def check_prepared_rows(
+def screen(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     clusters: Sequence[Any] | None,
@@ -1791,7 +1791,7 @@ def estimate_parameters(
     matrix, values, kept, dropped = prepare(
         matrix, values, policy.missing, input_clusters
     )
-    check_prepared_rows(matrix, values, clusters, policy)
+    screen(matrix, values, clusters, policy)
     cluster_values = kept if input_clusters is not None else None
     design = numpy.column_stack((numpy.ones(matrix.shape[0]), matrix))
     fit = compute(matrix, design, values, estimand, policy, cluster_values)

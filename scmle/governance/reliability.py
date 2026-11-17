@@ -25,14 +25,14 @@ class Emission:
 
     evidence_type: str
     content: bytes
-    observed_outcome: reliability.EvidenceOutcome
+    observed_outcome: reliability.Outcome
     observation: str
 
     def __post_init__(self) -> None:
         """Checks that the evidence can be persisted and reviewed.
 
         Raises:
-            TypeError: If `observed_outcome` is not an `EvidenceOutcome`.
+            TypeError: If `observed_outcome` is not an `Outcome`.
             ValueError: If the evidence type is blank or not a path-safe name,
                 the content is not non-empty bytes, or the observation is blank.
         """
@@ -43,8 +43,8 @@ class Emission:
         content: object = self.content  # may be any value from a caller
         if not isinstance(content, bytes) or not content:
             raise errors.InputError("content must be non-empty bytes")
-        if not isinstance(self.observed_outcome, reliability.EvidenceOutcome):
-            raise errors.KindError("observed_outcome must be EvidenceOutcome")
+        if not isinstance(self.observed_outcome, reliability.Outcome):
+            raise errors.KindError("observed_outcome must be Outcome")
         if not self.observation.strip():
             raise errors.InputError("observation must not be empty")
 

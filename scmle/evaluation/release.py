@@ -283,7 +283,7 @@ def exhaustive(counts_by_kind: Any) -> None:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ReleaseReadinessSummary:
+class Scorecard:
     """Machine-readable readiness summary derived from release findings.
 
     The summary intentionally contains counts rather than duplicating the
@@ -528,7 +528,7 @@ class Verdict:
             sort_keys=True,
         )
 
-    def tally(self) -> ReleaseReadinessSummary:
+    def tally(self) -> Scorecard:
         """Returns deterministic readiness counts derived from findings.
 
         Returns:
@@ -555,7 +555,7 @@ class Verdict:
         blocking_failures = sum(
             not item.passed and item.blocking for item in self.findings
         )
-        return ReleaseReadinessSummary(
+        return Scorecard(
             task=self.task,
             policy_schema_version=self.policy_schema_version,
             status=(

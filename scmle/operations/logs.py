@@ -60,7 +60,7 @@ def traceid() -> str:
             return found
 
 
-def parse_traceparent(header: str | None) -> str | None:
+def extract(header: str | None) -> str | None:
     """The trace id of a valid W3C ``traceparent`` header, else None.
 
     Args:
@@ -105,7 +105,7 @@ def propagate(header: str | None) -> str:
     Returns:
         The header's trace id if valid, else a new trace id.
     """
-    return parse_traceparent(header) or traceid()
+    return extract(header) or traceid()
 
 
 def scrub(value: Any) -> Any:

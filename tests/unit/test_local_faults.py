@@ -30,7 +30,7 @@ def test_local_executor_passes_every_declared_scenario(tmp_path):
         assert plan.verification_status is reliability.Verification.PASSED
         assert all(
             evidence.observed_outcome
-            is reliability.EvidenceOutcome.SAFE_OUTCOME_OBSERVED
+            is reliability.Outcome.SAFE_OUTCOME_OBSERVED
             for evidence in plan.evidence
         )
         assert all(

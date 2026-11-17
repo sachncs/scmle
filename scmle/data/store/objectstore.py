@@ -71,7 +71,7 @@ class ConflictError(StoreError):
     category = "conflict"
 
 
-class CorruptObjectError(StoreError):
+class MismatchError(StoreError):
     """The bytes read do not match the recorded SHA-256."""
 
     category = "store_corrupt"
@@ -253,7 +253,7 @@ class Depot(abc.ABC):
 
         Raises:
             AbsentError: If there is no such object.
-            CorruptObjectError: If the bytes do not match the recorded hash.
+            MismatchError: If the bytes do not match the recorded hash.
         """
 
     @abc.abstractmethod

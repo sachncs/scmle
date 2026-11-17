@@ -969,7 +969,7 @@ class Receipt:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CommitLedger:
+class Journal:
     """Atomic local ledger for replay-safe streaming evidence.
 
     This ledger provides a durable idempotency boundary for a caller-owned
@@ -1295,7 +1295,7 @@ class CommitLedger:
                 {},
             )
 
-    def validate_sink_receipt(self, batch: Batch, receipt: Voucher) -> None:
+    def attest(self, batch: Batch, receipt: Voucher) -> None:
         """Validates a sink receipt before it enters durable state.
 
         Args:
@@ -1425,7 +1425,7 @@ class CommitLedger:
                     self.source.source_identity(),
                     {"type": type(sink_receipt).__name__},
                 )
-            self.validate_sink_receipt(batch, sink_receipt)
+            self.attest(batch, sink_receipt)
             evidence = Commitment(
                 batch.source_identity,
                 batch.batch_id,
@@ -1571,7 +1571,7 @@ class Consumer:
 
     def __init__(
         self,
-        ledger: CommitLedger,
+        ledger: Journal,
         consumer_group: str,
         writer: Callable[[pandas.DataFrame, str], None],
         acknowledge: Callable[[Acknowledgement], None],
@@ -1784,7 +1784,7 @@ def locate(uri: str | pathlib.Path) -> Feed:
     )
 
 
-def side_of(
+def allot(
     positions: numpy.ndarray, fraction: float, seed: int
 ) -> numpy.ndarray:
     """Assigns each row position to development (0) or locked (1).
@@ -1890,7 +1890,7 @@ def sweep(
     for batch in source.batches():
         positions = numpy.arange(offset, offset + len(batch))
         offset += len(batch)
-        side = side_of(positions, test_fraction, seed)
+        side = allot(positions, test_fraction, seed)
         locked_total += int(side.sum())
         priority = row_hash(positions, seed + 7919)
         tagged = batch.assign(**{SPLIT_COLUMN: side, "priority": priority})

@@ -478,7 +478,7 @@ def test_readiness_summary_rejects_inconsistent_values(
     values[field] = value
 
     with pytest.raises((TypeError, ValueError), match=message):
-        release.ReleaseReadinessSummary(**values)  # type: ignore[arg-type]
+        release.Scorecard(**values)  # type: ignore[arg-type]
 
 
 def test_attestation_gate_requires_a_signed_release_record():

@@ -31,7 +31,7 @@ scmle/operations/faults.py object_store_loss single-use one of 11 SCENARIOS tabl
 scmle/operations/faults.py blackout single-use one of 11 SCENARIOS table entries ("dependency_outage") that Runner dispatches by fault id; 70 lines of spool and sink steps
 scmle/operations/faults.py degradation single-use 25-line polling loop with a continue for short or failed responses and a return of (labelled count, monotonic time); inlined into the 110-line bad_release it would need break flags to replace the returns
 scmle/operations/faults.py resilience single-use one of 11 SCENARIOS table entries ("audit_log_continuity") that Runner dispatches by fault id; 60 lines of kill and reopen trials
-scmle/operations/logs.py parse_traceparent single-use tests/unit/test_operations_telemetry.py asserts it directly for valid and malformed W3C headers
+scmle/operations/logs.py extract single-use tests/unit/test_operations_telemetry.py asserts it directly for valid and malformed W3C headers
 scmle/operations/metrics.py cpu single-use falls back to time.process_time when the resource module is missing (Windows) and otherwise sums ru_utime and ru_stime; called as an argument beside the residency sibling in poll
 scmle/operations/notify.py courier single-use tests/unit/test_operations_telemetry.py builds it directly; it is the default transport whose HTTPS-only check and status-code mapping are part of the docstring contract
 scmle/operations/signals.py misses single-use tests/unit/test_operations_telemetry.py asserts its 0/1 output and the misaligned-length ValueError

@@ -180,7 +180,7 @@ def test_plan_error_messages_name_the_gap():
                 make_evidence("process_termination"),
                 make_evidence(
                     "checkpoint_resume",
-                    reliability.EvidenceOutcome.INCONCLUSIVE,
+                    reliability.Outcome.INCONCLUSIVE,
                 ),
             ),
         )
