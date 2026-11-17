@@ -42,6 +42,7 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import log_loss
 
 from scmle import durability
+from scmle import envelope
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import events
@@ -6262,9 +6263,8 @@ def load_package(
         raise errors.InputError("modality package is incomplete")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     feature_names, model_digest = verify_package_manifest(manifest, signing_key)
-    if file_digest(model_path) != model_digest:
-        raise errors.InputError("modality package model digest does not verify")
-    loaded = joblib.load(model_path)
+    payload = envelope.fetch(model_path, model_digest)
+    loaded = joblib.load(io.BytesIO(payload))
     vet(loaded, len(feature_names))
     return loaded
 

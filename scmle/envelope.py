@@ -8,13 +8,18 @@ and an HMAC over both, made with the signing key (`signing.keying`).
 the HMAC, and returns the payload bytes for the caller to unpickle. An
 envelope without an HMAC, or one read with no key, is refused unless the
 caller vouches for its source with `trusted=True`, the same rule bundles
-follow.
+follow. Vouching is refused outright in production (`vouch`), and every
+envelope and package read goes through `read` or `check`, so that rule lives
+here once. A package payload is read once (`fetch`): the bytes whose digest
+is checked are the bytes the caller unpickles, so a file swapped between the
+check and the load is never run (SEC-13).
 """
 
 from collections.abc import Mapping
 import hashlib
 import hmac
 import json
+import os
 import pathlib
 from typing import Any
 
@@ -24,6 +29,53 @@ from scmle.contracts import signing
 
 MAGIC = b"SCMLE-ENVELOPE 1\n"
 LIMIT = 1 << 20
+ENVIRONMENT = "SCMLE_ENV"
+PRODUCTION = "production"
+
+
+def vouch(trusted: bool) -> None:
+    """Refuses `trusted=True` in production, as `Bundle.load` does (SEC-1).
+
+    Vouching skips authentication, and unpickling executes code, so
+    production accepts only signed checkpoints and packages.
+
+    Args:
+        trusted: Whether the caller vouches for an unauthenticated file.
+
+    Raises:
+        ArtifactError: If `trusted` is true and `$SCMLE_ENV` is `production`.
+    """
+    if trusted and os.environ.get(ENVIRONMENT, "").strip().lower() == (
+        PRODUCTION
+    ):
+        raise errors.ArtifactError(
+            f"trusted loading is refused when {ENVIRONMENT}={PRODUCTION}: "
+            "sign the file and verify it with the signing key"
+        )
+
+
+def fetch(path: str | pathlib.Path, digest: object) -> bytes:
+    """Reads a package payload once and checks it against its digest.
+
+    The caller unpickles the returned bytes (`io.BytesIO`), never the file,
+    so what is checked is what is loaded.
+
+    Args:
+        path: The payload file.
+        digest: The SHA-256 hex digest the (authenticated) manifest records.
+
+    Returns:
+        The payload bytes.
+
+    Raises:
+        InputError: If the bytes do not match `digest`.
+    """
+    data = pathlib.Path(path).read_bytes()
+    if not isinstance(digest, str) or not hmac.compare_digest(
+        hashlib.sha256(data).hexdigest(), digest
+    ):
+        raise errors.InputError(f"{path} does not match its digest")
+    return data
 
 
 def mac(header: Mapping[str, Any], key: bytes) -> str:
@@ -80,11 +132,13 @@ def read(
         The metadata and the payload bytes, safe for the caller to unpickle.
 
     Raises:
-        ValueError: If the file is not an envelope, its header is malformed
+        InputError: If the file is not an envelope, its header is malformed
             or the payload does not match its digest.
         ArtifactError: If the envelope is unsigned, or no key is available,
-            and `trusted` is false, or its HMAC does not verify.
+            and `trusted` is false, or its HMAC does not verify, or
+            `trusted` is true in production.
     """
+    vouch(trusted)
     data = pathlib.Path(path).read_bytes()
     if not data.startswith(MAGIC):
         raise errors.InputError(f"{path} is not an scmle envelope")
@@ -148,8 +202,8 @@ def check(
 ) -> None:
     """Refuses to go on to unpickle unless the manifest is authentic.
 
-    Call before loading the payload, after checking that the payload
-    matches the digest the manifest records.
+    Call before loading the payload, then read the payload with `fetch`
+    against the digest the authenticated manifest records.
 
     Args:
         manifest: The package manifest, as read.
@@ -159,8 +213,10 @@ def check(
 
     Raises:
         ArtifactError: If the manifest's signature does not verify, or it is
-            unsigned (or no key is set) and `trusted` is false.
+            unsigned (or no key is set) and `trusted` is false, or `trusted`
+            is true in production.
     """
+    vouch(trusted)
     key = signing.keying(signing_key)
     signature = manifest.get("signature")
     signed = isinstance(signature, str)

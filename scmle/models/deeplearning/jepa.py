@@ -224,7 +224,6 @@ class Embedder(base.TransformerMixin, estimators.NetworkEstimator):  # type: ign
                 and `trusted` is false, its signature does not verify, or
                 `trusted` is true and `$SCMLE_ENV` is `production`.
         """
-        estimators.vouch(trusted)
         try:
             meta, payload = envelope.read(path, signing_key, trusted)
         except OSError as error:

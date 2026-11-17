@@ -8,6 +8,7 @@ and drift boundaries explicit.
 
 import dataclasses
 import hashlib
+import io
 import json
 import os
 import pathlib
@@ -699,13 +700,6 @@ class Classifier:
                 is unsupported, or a digest does not match.
             TypeError: If the payload is not an `Classifier`.
         """
-        if trusted and os.environ.get("SCMLE_ENV", "").strip().lower() == (
-            "production"
-        ):
-            raise errors.ArtifactError(
-                "trusted loading is refused when SCMLE_ENV=production: sign "
-                "the package and verify it with the signing key"
-            )
         target = pathlib.Path(path).expanduser()
         if not target.is_dir():
             raise FileNotFoundError(target)
@@ -719,10 +713,9 @@ class Classifier:
         model_path = target / str(manifest.get("model_path", ""))
         if not model_path.is_file():
             raise errors.InputError("image model package has no model payload")
-        if file_digest(model_path) != manifest.get("artifact_digest"):
-            raise errors.InputError("image model payload digest does not match")
         envelope.check(manifest, target, signing_key, trusted)
-        loaded = joblib.load(model_path)
+        payload = envelope.fetch(model_path, manifest.get("artifact_digest"))
+        loaded = joblib.load(io.BytesIO(payload))
         if not isinstance(loaded, cls):
             raise errors.KindError("package does not contain an Classifier")
         loaded.preflight()

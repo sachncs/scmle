@@ -63,3 +63,15 @@ def test_production_refuses_a_trusted_package(tmp_path, load):
     (tmp_path / "manifest.json").write_text(json.dumps(manifest))
     with pytest.raises(errors.ArtifactError, match="SCMLE_ENV=production"):
         load(tmp_path, trusted=True)
+
+
+def test_every_envelope_read_and_check_refuses_trust_in_production(tmp_path):
+    path = envelope.seal(tmp_path / "unsigned.bin", {}, pickled())
+    with pytest.raises(errors.ArtifactError, match="SCMLE_ENV=production"):
+        envelope.read(path, trusted=True)
+    with pytest.raises(errors.ArtifactError, match="SCMLE_ENV=production"):
+        envelope.check(envelope.sign({}), tmp_path, trusted=True)
+
+
+def test_the_production_check_lives_only_in_the_envelope():
+    assert not hasattr(estimators, "vouch")
