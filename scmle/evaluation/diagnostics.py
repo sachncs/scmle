@@ -32,8 +32,17 @@ CLASSIFICATION = frozenset({tasks.Task.BINARY, tasks.Task.MULTICLASS})
 BINARY_ONLY = frozenset({tasks.Task.BINARY})
 REGRESSION_ONLY = frozenset({tasks.Task.REGRESSION})
 EVERYTHING = frozenset(tasks.Task)
-# The clock every deadline is read from (tests replace it).
-clock = time.monotonic
+
+
+def clock() -> float:
+    """Reads the clock every deadline is read from (tests replace it).
+
+    Returns:
+        The monotonic time in seconds.
+    """
+    return time.monotonic()
+
+
 # Upper-envelope multiplier on the fitted cost models below. Derivation: the
 # models were fitted by non-negative least squares on 31 runs (the 15
 # TabArena tasks of benchmarks/evidence/quality.py, each with a gradient

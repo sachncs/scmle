@@ -439,7 +439,7 @@ def test_uncertainty_stops_at_the_deadline_mid_loop(monkeypatch):
     score = base.metric.score
 
     class Ticking:
-        name = base.metric.name
+        name = "ticking"  # not studentized: every resample calls `score`
 
         def score(self, *args):
             calls.append(1)

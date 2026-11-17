@@ -2,8 +2,10 @@
 
 `Uncertainty` resamples the evaluation rows (whole groups, time blocks or
 rows) and re-scores cached predictions (`Cache`), so a bootstrap of
-thousands of resamples predicts once. Its cost model sizes the resamples to
-the time left (`Uncertainty.cost`).
+thousands of resamples predicts once. ROC AUC and RMSE get a studentized
+(bootstrap-t) interval with a standard error clustered by unit
+(`studentize`); other metrics get the percentile interval. Its cost model
+sizes the resamples to the time left (`Uncertainty.cost`).
 """
 
 from typing import Any
@@ -110,12 +112,12 @@ class RegressorReplay(base.RegressorMixin, Cache):  # type: ignore[misc]  # scik
     """Cached predictions that scikit-learn treats as a regressor."""
 
 
-def redraw(
+def draw(
     rows: int,
     groups: pandas.Series | None,
     temporal: bool,
     rng: numpy.random.Generator,
-) -> numpy.ndarray:
+) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Draws one bootstrap resample that respects the data's dependence.
 
     Args:
@@ -129,7 +131,9 @@ def redraw(
         Row positions of the resample: whole groups drawn with replacement
         (its length varies with the group sizes), or blocks of
         `max(5, int(sqrt(rows)))` positions truncated to `rows`, or `rows`
-        positions drawn with replacement.
+        positions drawn with replacement. Beside them, the independent unit
+        of each position: each drawn copy of a group or block is its own
+        unit, and each drawn row is its own unit.
     """
     if groups is not None:
         members = (
@@ -137,15 +141,178 @@ def redraw(
         )
         labels = list(members)
         drawn = rng.integers(0, len(labels), len(labels))
-        return numpy.concatenate([members[labels[i]] for i in drawn])
-    if temporal:
+        parts = [members[labels[i]] for i in drawn]
+    elif temporal:
         length = max(5, int(numpy.sqrt(rows)))
         starts = rng.integers(0, max(rows - length + 1, 1), -(-rows // length))
-        blocks = numpy.concatenate(
-            [numpy.arange(s, min(s + length, rows)) for s in starts]
-        )
-        return blocks[:rows]
-    return rng.integers(0, rows, rows)
+        parts = [numpy.arange(s, min(s + length, rows)) for s in starts]
+    else:
+        return rng.integers(0, rows, rows), numpy.arange(rows)
+    positions = numpy.concatenate(parts)
+    units = numpy.repeat(numpy.arange(len(parts)), [len(p) for p in parts])
+    kept = len(positions) if groups is not None else rows
+    return positions[:kept], units[:kept]
+
+
+def redraw(
+    rows: int,
+    groups: pandas.Series | None,
+    temporal: bool,
+    rng: numpy.random.Generator,
+) -> numpy.ndarray:
+    """Draws the row positions of one resample (`draw` without the units).
+
+    Args:
+        rows: Number of evaluation rows.
+        groups: Entity labels, if rows are clustered by entity.
+        temporal: Whether to draw contiguous blocks.
+        rng: Source of randomness.
+
+    Returns:
+        The positions `draw` returns.
+    """
+    return draw(rows, groups, temporal, rng)[0]
+
+
+def rank(
+    values: numpy.ndarray, truth: numpy.ndarray
+) -> tuple[float, numpy.ndarray] | None:
+    """ROC AUC and each row's share of its sampling error (DeLong).
+
+    Args:
+        values: Scores of the positive class.
+        truth: Whether each row is positive.
+
+    Returns:
+        The area (ties count one half) and each row's influence: for a
+        positive row, its placement among the negatives minus the area,
+        over the number of positives; likewise for a negative row. None
+        when a class is absent.
+    """
+    positives, negatives = values[truth], values[~truth]
+    if not len(positives) or not len(negatives):
+        return None
+    ordered = numpy.sort(negatives)
+    wins = (
+        numpy.searchsorted(ordered, positives, "left")
+        + numpy.searchsorted(ordered, positives, "right")
+    ) / (2 * len(negatives))
+    ordered = numpy.sort(positives)
+    losses = 1 - (
+        numpy.searchsorted(ordered, negatives, "left")
+        + numpy.searchsorted(ordered, negatives, "right")
+    ) / (2 * len(positives))
+    area = float(wins.mean())
+    effects = numpy.empty(len(values))
+    effects[truth] = (wins - area) / len(positives)
+    effects[~truth] = (losses - area) / len(negatives)
+    return area, effects
+
+
+def square(
+    values: numpy.ndarray, truth: numpy.ndarray
+) -> tuple[float, numpy.ndarray] | None:
+    """RMSE and each row's share of its sampling error (delta method).
+
+    Args:
+        values: Predictions.
+        truth: Observed values.
+
+    Returns:
+        The RMSE and each row's influence, `(e^2 - MSE) / (2 n RMSE)`; None
+        when the RMSE is zero (no spread to studentize by).
+    """
+    squares = (truth - values) ** 2
+    mean = float(squares.mean())
+    if mean <= 0:
+        return None
+    error = numpy.sqrt(mean)
+    return float(error), (squares - mean) / (2 * len(values) * error)
+
+
+# Metrics with a closed-form influence, so the interval is studentized.
+# Measured with benchmarks/evidence/coverage.py (trials 0..299 per family,
+# percentile -> studentized): ROC AUC on 60 groups 265 -> 279 of 300, RMSE
+# on 300 rows 281 -> 286, ROC AUC on 300 rows 284 -> 281; over 882 trials
+# 816 -> 836, 818 -> 827 and 848 -> 845. The percentile interval missed
+# because its spread moves with the estimate; dividing each resample by its
+# own standard error removes that.
+LINEAR = {"roc_auc": rank, "rmse": square}
+# The values each studentized metric can take; the interval is clipped to it.
+RANGES = {"roc_auc": (0.0, 1.0), "rmse": (0.0, numpy.inf)}
+
+
+def studentize(
+    name: str,
+    values: numpy.ndarray,
+    truth: numpy.ndarray,
+    units: numpy.ndarray,
+) -> tuple[float, float] | None:
+    """A metric and its standard error clustered by independent unit.
+
+    Args:
+        name: Metric name; only those in `LINEAR` are supported.
+        values: Positive-class scores (ROC AUC) or predictions (RMSE).
+        truth: Positive flags (ROC AUC) or observed values (RMSE).
+        units: Independent unit of each row.
+
+    Returns:
+        The metric and `sqrt(K / (K - 1) * sum_k (sum of influences in unit
+        k)^2)` over K units; None for an unsupported metric, a metric the
+        rows cannot score, or fewer than two units.
+    """
+    found = LINEAR[name](values, truth) if name in LINEAR else None
+    labels, codes = numpy.unique(units, return_inverse=True)
+    if found is None or len(labels) < 2:  # noqa: PLR2004 -- K - 1 divides
+        return None
+    count = len(labels)
+    sums = numpy.bincount(codes, weights=found[1])
+    return found[0], float(numpy.sqrt(count / (count - 1) * (sums**2).sum()))
+
+
+def divide(difference: float, error: float) -> float:
+    """A resample's studentized difference.
+
+    Args:
+        difference: Resample metric minus the full-sample metric.
+        error: The resample's standard error.
+
+    Returns:
+        `difference / error`; with a zero error, 0.0 for no difference and
+        a signed infinity otherwise (which leaves the percentile interval).
+    """
+    if error > 0:
+        return difference / error
+    return (
+        0.0 if difference == 0 else float(numpy.copysign(numpy.inf, difference))
+    )
+
+
+def expose(
+    replay: Cache, target: pandas.Series, name: str
+) -> tuple[numpy.ndarray, numpy.ndarray] | None:
+    """The cached responses and truth a studentized metric reads.
+
+    Args:
+        replay: Cached predictions of the evaluation rows.
+        target: Their labels, in the same order.
+        name: Metric name.
+
+    Returns:
+        Predictions and values for `rmse`; positive-class probabilities and
+        positive flags for binary `roc_auc`; None otherwise.
+    """
+    if name == "rmse":
+        return replay.predictions.to_numpy(float), target.to_numpy(float)
+    classes = replay.classes_
+    if name != "roc_auc" or replay.probabilities is None or classes is None:
+        return None
+    if len(classes) != 2:  # noqa: PLR2004 -- binary only
+        return None
+    return (
+        replay.probabilities.to_numpy()[:, 1],
+        (target == classes[1]).to_numpy(),
+    )
 
 
 class Uncertainty(diagnostics.Diagnostic):
@@ -235,6 +402,12 @@ class Uncertainty(diagnostics.Diagnostic):
     def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
         """Bootstraps the primary metric on the evaluation rows.
 
+        ROC AUC (binary) and RMSE, resampled by rows or groups, get the
+        studentized (bootstrap-t) interval: each resample is scored in
+        closed form (`studentize`) together with its standard error, which
+        is also cheaper than the scorer. Other metrics, and temporal
+        blocks, get the percentile interval of the scorer's values.
+
         The number of resamples is `replicates`, cut to what `cost` says
         fits before the deadline; below `minimum_resamples` (too few for an
         interval that is not too narrow) the bootstrap is skipped, and the
@@ -244,7 +417,7 @@ class Uncertainty(diagnostics.Diagnostic):
             inputs: The fitted candidate and evaluation data.
 
         Returns:
-            The metric name, its point estimate, the percentile interval
+            The metric name, its point estimate, the interval of `bound`
             (key `ci_` plus the confidence; None when every resample
             failed or too few ran), the resampling unit, the number of
             resamples `planned`, the number of successful resamples
@@ -260,10 +433,9 @@ class Uncertainty(diagnostics.Diagnostic):
         replay_class = (
             RegressorReplay if inputs.task is tasks.Task.REGRESSION else Replay
         )
+        cache = replay_class(inputs.estimator, features)
         # Scorers only call predict and predict_proba on the replay.
-        replay = cast(
-            "models.Estimator", replay_class(inputs.estimator, features)
-        )
+        replay = cast("models.Estimator", cache)
         metric, positive = inputs.metric, inputs.positive_label
         estimate = metric.score(replay, features, target, positive)
         groups = (
@@ -273,6 +445,7 @@ class Uncertainty(diagnostics.Diagnostic):
         )
         rng = numpy.random.default_rng(inputs.seed)
         scores: list[float] = []
+        ratios: list[float] = []
         unit = (
             "groups"
             if groups is not None
@@ -280,17 +453,41 @@ class Uncertainty(diagnostics.Diagnostic):
             if inputs.temporal
             else "rows"
         )
+        # Blocks overlap and the full sample has no blocks to cluster by, so
+        # a temporal bootstrap keeps the percentile interval.
+        exposed = (
+            None if inputs.temporal else expose(cache, target, metric.name)
+        )
+        centre = (
+            None
+            if exposed is None
+            else studentize(
+                metric.name,
+                *exposed,
+                numpy.arange(len(target))
+                if groups is None
+                else groups.to_numpy(),
+            )
+        )
         each = self.cost(inputs)
         planned = self.replicates(len(target))
         if inputs.deadline is not None:
             planned = min(planned, max(int(inputs.left() // each), 0))
         attempted = 0
         if planned >= self.minimum_resamples:
-            for _ in range(planned):
+            for replicate in range(planned):  # noqa: B007
                 if inputs.expired():
                     break
-                rows = redraw(len(target), groups, inputs.temporal, rng)
+                rows, units = draw(len(target), groups, inputs.temporal, rng)
                 attempted += 1
+                if exposed is not None and centre is not None:
+                    found = studentize(
+                        metric.name, exposed[0][rows], exposed[1][rows], units
+                    )
+                    if found is not None:
+                        scores.append(found[0])
+                        ratios.append(divide(found[0] - centre[0], found[1]))
+                    continue
                 try:
                     scores.append(
                         metric.score(
@@ -308,14 +505,7 @@ class Uncertainty(diagnostics.Diagnostic):
         if attempted >= self.minimum_resamples and len(scores) >= (
             attempted * KEPT
         ):
-            low, high = numpy.percentile(
-                scores,
-                [
-                    (100 - self.confidence) / 2,
-                    100 - (100 - self.confidence) / 2,
-                ],
-            )
-            interval = [float(low), float(high)]
+            interval = self.bound(scores, ratios, centre, metric.name)
         report = {
             "metric": metric.name,
             "estimate": float(estimate),
@@ -339,3 +529,38 @@ class Uncertainty(diagnostics.Diagnostic):
                 ),
             }
         return report
+
+    def bound(
+        self,
+        scores: list[float],
+        ratios: list[float],
+        centre: tuple[float, float] | None,
+        name: str,
+    ) -> list[float]:
+        """The interval of `confidence` percent from the resamples.
+
+        Args:
+            scores: The metric on each kept resample.
+            ratios: For a studentized metric, each resample's
+                `(score - estimate) / its standard error`; else empty.
+            centre: The full-sample metric and its standard error, or None.
+            name: Metric name.
+
+        Returns:
+            The bootstrap-t interval `estimate - q_high * error, estimate -
+            q_low * error` clipped to `RANGES`, when `centre` has a positive
+            error and every ratio is finite; otherwise the percentile
+            interval of `scores`.
+        """
+        tail = (100 - self.confidence) / 2
+        low, high = numpy.percentile(scores, [tail, 100 - tail])
+        if (
+            centre is not None
+            and centre[1] > 0
+            and numpy.isfinite(ratios).all()
+        ):
+            top, bottom = numpy.percentile(ratios, [100 - tail, tail])
+            floor, ceiling = RANGES[name]
+            low = max(centre[0] - top * centre[1], floor)
+            high = min(centre[0] - bottom * centre[1], ceiling)
+        return [float(low), float(high)]
