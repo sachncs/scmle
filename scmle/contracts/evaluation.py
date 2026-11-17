@@ -304,7 +304,7 @@ FAIRNESS_METRICS: Mapping[tasks.Task, frozenset[str]] = {
 }
 
 
-def validate_text(value: str, field_name: str) -> str:
+def sanitize(value: str, field_name: str) -> str:
     """Returns non-empty canonical text for a contract field.
 
     Args:
@@ -348,7 +348,7 @@ def vet(values: tuple[str, ...], field_name: str) -> tuple[str, ...]:
     if not isinstance(values, tuple):
         raise errors.KindError(f"{field_name} must be a tuple of strings")
     for value in values:
-        validate_text(value, field_name)
+        sanitize(value, field_name)
     if len(values) != len(set(values)):
         raise errors.InputError(f"{field_name} must not contain duplicates")
     return values
@@ -396,7 +396,7 @@ class Declaration:
                 evidence is invalid or repeats, or a custom metric has no
                 evidence.
         """
-        validate_text(self.name, "metric.name")
+        sanitize(self.name, "metric.name")
         if not isinstance(self.direction, Orientation):
             raise errors.KindError("metric.direction must be Orientation")
         vet(self.evidence, "metric.evidence")
@@ -431,7 +431,7 @@ class Hurdle:
             ValueError: If the metric name is blank or padded with
                 whitespace, or the threshold is not finite.
         """
-        validate_text(self.metric, "metric_gate.metric")
+        sanitize(self.metric, "metric_gate.metric")
         if not isinstance(self.direction, Orientation):
             raise errors.KindError("metric_gate.direction must be Orientation")
         quantify(self.threshold, "metric_gate.threshold")
@@ -651,7 +651,7 @@ class Equity:
                 given, the maximum is negative, a bound is not finite, or
                 there is no required evidence.
         """
-        validate_text(self.metric, "fairness_gate.metric")
+        sanitize(self.metric, "fairness_gate.metric")
         if (self.maximum is None) == (self.minimum is None):
             raise errors.InputError("fairness gate needs exactly one bound")
         if (
@@ -819,7 +819,7 @@ class Requirement:
             ValueError: If the name is blank, the evidence is invalid or
                 repeats, or there is no required evidence.
         """
-        validate_text(self.name, "diagnostic_gate.name")
+        sanitize(self.name, "diagnostic_gate.name")
         if not isinstance(self.action, Remedy):
             raise errors.KindError("diagnostic_gate.action must be Remedy")
         vet(self.required_evidence, "diagnostic_gate.required_evidence")
@@ -928,7 +928,7 @@ class Criteria:
             raise errors.KindError("policy.task must be Task")
         if self.schema_version < 1:
             raise errors.InputError("policy.schema_version must be at least 1")
-        validate_text(self.primary_metric, "policy.primary_metric")
+        sanitize(self.primary_metric, "policy.primary_metric")
         if not self.metrics:
             raise errors.InputError("evaluation policy requires metrics")
         metric_names = [metric.name for metric in self.metrics]
@@ -960,7 +960,7 @@ class Criteria:
                     f"{metric.direction.value}"
                 )
         self.enforce()
-        self.validate_calibration()
+        self.temper()
         self.scope()
         self.validate_explanations()
         self.audit()
@@ -978,7 +978,7 @@ class Criteria:
                 f"'{self.task.value}'"
             )
 
-    def validate_calibration(self) -> None:
+    def temper(self) -> None:
         """Rejects calibration methods not implemented for this task.
 
         Raises:
@@ -1110,7 +1110,7 @@ class Criteria:
             "release": self.release.to_dict(),
         }
 
-    def canonical_json(self) -> str:
+    def canonize(self) -> str:
         """Returns stable JSON suitable for hashing and evidence storage."""
         return json.dumps(
             self.to_dict(),
@@ -1189,7 +1189,7 @@ class Registry:
             "policies": [policy.to_dict() for policy in self.list_policies()],
         }
 
-    def canonical_json(self) -> str:
+    def canonize(self) -> str:
         """Returns stable JSON for the complete policy registry."""
         return json.dumps(
             self.to_dict(),

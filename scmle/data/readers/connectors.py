@@ -175,7 +175,7 @@ class SchemeError(ConnectorError):
         self.supported_schemes = supported
 
 
-class RetryExhaustedError(ConnectorError):
+class RetryError(ConnectorError):
     """All attempts for a connector operation failed.
 
     Attributes:
@@ -641,7 +641,7 @@ def persevere(
         The operation result.
 
     Raises:
-        RetryExhaustedError: If every attempt fails.
+        RetryError: If every attempt fails.
         ConnectorError: If the operation raises one; it is not retried.
         AssertionError: If the retry loop ends without returning or
             raising, which cannot happen because the budget allows at least
@@ -654,7 +654,7 @@ def persevere(
             raise
         except Exception as error:
             if attempt == retry_budget.max_attempts:
-                raise RetryExhaustedError(
+                raise RetryError(
                     source_uri, operation_name, attempt, error
                 ) from error
             if retry_budget.delay_seconds:
@@ -807,7 +807,7 @@ class Adapter(abc.ABC):
             source_identity=self.source_identity,
         )
 
-    def validate_checkpoint(self, checkpoint: Bookmark | None) -> Bookmark:
+    def rebind(self, checkpoint: Bookmark | None) -> Bookmark:
         """Binds and validates a checkpoint before reading rows.
 
         Args:
@@ -916,7 +916,7 @@ class Filesystem(Adapter):
     def schema(self) -> Columns:
         """Reads the local file and describes its schema.
 
-        Read failures are retried and then surface as `RetryExhaustedError`.
+        Read failures are retried and then surface as `RetryError`.
 
         Returns:
             The schema of the parsed file.
@@ -961,7 +961,7 @@ class Filesystem(Adapter):
             file's content digest.
         """
         self.validate_limit(limit)
-        value = self.validate_checkpoint(checkpoint)
+        value = self.rebind(checkpoint)
 
         def read() -> Page:
             initial_content_sha256 = self.content_sha256()
@@ -1196,7 +1196,7 @@ class DbApiConnector(Adapter):
             rows up to it, and whether more rows remain.
         """
         self.validate_limit(limit)
-        value = self.validate_checkpoint(checkpoint)
+        value = self.rebind(checkpoint)
         return persevere(
             lambda: self.fetch(value, limit),
             "read_rows",
@@ -1424,7 +1424,7 @@ class Lakehouse(Adapter):
             returned.
         """
         self.validate_limit(limit)
-        value = self.validate_checkpoint(checkpoint)
+        value = self.rebind(checkpoint)
         return persevere(
             lambda: self.read_batch(value, limit),
             "read_rows",
@@ -1773,7 +1773,7 @@ class Bucket(Adapter):
                 differs from the one the checkpoint was bound to.
         """
         self.validate_limit(limit)
-        value = self.validate_checkpoint(checkpoint)
+        value = self.rebind(checkpoint)
         object_payload = self.read_object()
         try:
             value = value.seal(object_payload.content_sha256)
@@ -1980,7 +1980,7 @@ class StreamingObjectStoreConnector(Adapter):
                 checkpoint offset exceeds the current object size.
         """
         self.validate_limit(limit)
-        value = self.validate_checkpoint(checkpoint)
+        value = self.rebind(checkpoint)
         total = self.measure()
         if value.offset > total:
             raise CheckpointError(

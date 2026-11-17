@@ -76,7 +76,7 @@ def test_a_plane_that_has_not_settled_is_not_ready():
     plane.deploy(support_runtime.NEW)
     seen = plane.observe()
     assert not seen.ready
-    assert seen.digest_of("serve-2") == support_runtime.NEW
+    assert seen.distill("serve-2") == support_runtime.NEW
 
 
 def test_an_observation_refuses_a_tag_and_a_broken_split():
@@ -133,7 +133,7 @@ def test_approval_needs_a_signed_bundle_and_a_valid_independent_review(
         ),
         "unsigned approval": support_runtime.sanction(1).__class__(
             **{
-                **support_runtime.sanction(1).unsigned_dict(),
+                **support_runtime.sanction(1).preimage(),
                 "decision": "approved",
                 "evidence": ("t",),
             }

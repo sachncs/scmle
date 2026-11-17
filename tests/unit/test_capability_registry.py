@@ -163,8 +163,8 @@ def test_registry_serialization_is_canonical_across_registration_order():
         tuple(reversed(capabilities.DEFAULT_MODEL_FAMILY_DECLARATIONS)),
     )
 
-    assert first.canonical_json() == second.to_json()
-    assert json.loads(first.canonical_json()) == first.to_dict()
+    assert first.canonize() == second.to_json()
+    assert json.loads(first.canonize()) == first.to_dict()
     assert first.to_dict()["schema_version"] == 1
 
 
@@ -199,12 +199,12 @@ def test_transformer_and_jepa_family_statuses_are_explicit():
     assert families[capabilities.ModelFamily.TRANSFORMER.value].modalities == (
         capabilities.Modality.TABULAR,
     )
-    assert families[
-        capabilities.ModelFamily.TRANSFORMER.value
-    ].supports_modality(capabilities.Modality.TABULAR)
+    assert families[capabilities.ModelFamily.TRANSFORMER.value].accommodates(
+        capabilities.Modality.TABULAR
+    )
     assert not families[
         capabilities.ModelFamily.TRANSFORMER.value
-    ].supports_modality(capabilities.Modality.IMAGE)
+    ].accommodates(capabilities.Modality.IMAGE)
     for family_name in (
         capabilities.ModelFamily.TEXT_TRANSFORMER.value,
         capabilities.ModelFamily.VISION_TRANSFORMER.value,

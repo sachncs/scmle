@@ -35,7 +35,7 @@ def reference():
 
 def make_gateway(clock, **options):
     check = tokens.Verifier(
-        tokens.KeySet(
+        tokens.Keystore(
             [
                 tokens.Key.jwk(support_identity.hs_jwk("hs-1")),
                 tokens.Key.jwk(support_identity.rsa_jwk("k1", "rs-1")),
@@ -204,7 +204,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
     path = tmp_path / "audit.jsonl"
     log = audit.Log.open(path, clock=clock)
     check = tokens.Verifier(
-        tokens.KeySet([tokens.Key.jwk(support_identity.hs_jwk("hs-1"))]),
+        tokens.Keystore([tokens.Key.jwk(support_identity.hs_jwk("hs-1"))]),
         support_identity.ISSUER,
         support_identity.AUDIENCE,
         clock=clock,
@@ -218,7 +218,9 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
     finally:
         adapter.stop()
     gateway.rotate(
-        tokens.KeySet([tokens.Key.jwk(support_identity.rsa_jwk("k1", "rs-2"))]),
+        tokens.Keystore(
+            [tokens.Key.jwk(support_identity.rsa_jwk("k1", "rs-2"))]
+        ),
         actor="ops",
         reason="scheduled",
     )

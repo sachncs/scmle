@@ -390,7 +390,7 @@ class Gateway:
             raise DeniedError(429, "too_many_failures", wait)
         raise DeniedError(status, reason)
 
-    def rotate(self, keys: tokens.KeySet, actor: str, reason: str) -> None:
+    def rotate(self, keys: tokens.Keystore, actor: str, reason: str) -> None:
         """Replaces the verifier's trusted keys and audits the change.
 
         The audit row, written only when there is an audit log, lists the
@@ -494,9 +494,9 @@ def gateway_from_environment(environ: Mapping[str, str]) -> Gateway | None:
             "authentication keys"
         )
     if settings.keys_file:
-        keys = tokens.KeySet.from_file(settings.keys_file)
+        keys = tokens.Keystore.from_file(settings.keys_file)
     else:
-        keys = tokens.KeySet(
+        keys = tokens.Keystore(
             [
                 tokens.Key(
                     "env", tokens.HS256, secret=settings.hs256_secret.encode()

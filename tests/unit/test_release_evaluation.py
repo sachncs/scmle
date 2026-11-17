@@ -134,7 +134,7 @@ def test_release_evaluation_passes_and_serializes_deterministically():
     assert not first.blocked
     assert first.blocking_reasons == ()
     assert first == second
-    assert json.loads(first.canonical_json())["passed"] is True
+    assert json.loads(first.canonize())["passed"] is True
 
 
 def test_release_evidence_gate_requires_a_verified_signature():
@@ -412,8 +412,8 @@ def test_readiness_summary_counts_findings_and_serializes_deterministically():
         total=2, passed=1, failed=1, blocking=1, blocking_failures=0
     )
     assert set(summary.counts_by_kind) == {kind.value for kind in release.Kind}
-    assert json.loads(summary.canonical_json()) == summary.to_dict()
-    assert summary.canonical_json() == result.tally().canonical_json()
+    assert json.loads(summary.canonize()) == summary.to_dict()
+    assert summary.canonize() == result.tally().canonize()
     assert result.to_dict()["readiness"] == summary.to_dict()
 
 

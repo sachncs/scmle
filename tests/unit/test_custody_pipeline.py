@@ -76,9 +76,7 @@ def test_three_sets_partition_every_row_and_c_is_sealed():
     held = vault.sets["C"]
     assert held.ids == manifest.confirmation_ids
     held.commit("c", "l")
-    rows = held.open(
-        held.issue_token(), "test", claims_hash="c", ledger_hash="l"
-    )
+    rows = held.open(held.mint(), "test", claims_hash="c", ledger_hash="l")
     assert numpy.allclose(
         rows[0]["x"].to_numpy(), frame["x"].iloc[list(held.ids)].to_numpy()
     )

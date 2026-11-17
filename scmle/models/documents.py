@@ -264,7 +264,7 @@ class Classifier:
         Raises:
             RuntimeError: If the classifier has not been fitted.
         """
-        self.require_fitted()
+        self.preflight()
         vectorizer = self.vectorizer
         estimator = self.estimator
         if vectorizer is None or estimator is None:
@@ -364,7 +364,7 @@ class Classifier:
         Raises:
             RuntimeError: If the classifier has not been fitted.
         """
-        self.require_fitted()
+        self.preflight()
         if not samples:
             return ()
         matrix = self.transform(samples)
@@ -389,7 +389,7 @@ class Classifier:
         Raises:
             RuntimeError: If the classifier has not been fitted.
         """
-        self.require_fitted()
+        self.preflight()
         if not samples:
             return ()
         matrix = self.transform(samples)
@@ -437,7 +437,7 @@ class Classifier:
             labels=labels,
         )
 
-    def global_explanation(self, top_k: int = 10) -> Explanation:
+    def overview(self, top_k: int = 10) -> Explanation:
         """Ranks terms by their mean absolute linear coefficient.
 
         Args:
@@ -453,7 +453,7 @@ class Classifier:
         """
         if top_k < 1:
             raise errors.InputError("top_k must be positive")
-        self.require_fitted()
+        self.preflight()
         vectorizer = self.vectorizer
         estimator = self.estimator
         if vectorizer is None or estimator is None:
@@ -478,7 +478,7 @@ class Classifier:
             ),
         )
 
-    def local_explanation(
+    def spotlight(
         self,
         sample: document.Sample,
         top_k: int = 10,
@@ -501,7 +501,7 @@ class Classifier:
         """
         if top_k < 1:
             raise errors.InputError("top_k must be positive")
-        self.require_fitted()
+        self.preflight()
         vectorizer = self.vectorizer
         estimator = self.estimator
         if vectorizer is None or estimator is None:
@@ -573,7 +573,7 @@ class Classifier:
             raise errors.InputError("top_k must be positive")
         if max_terms < 1:
             raise errors.InputError("max_terms must be positive")
-        self.require_fitted()
+        self.preflight()
         vectorizer = self.vectorizer
         estimator = self.estimator
         if vectorizer is None or estimator is None:
@@ -595,14 +595,14 @@ class Classifier:
             ),
             key=lambda item: (-abs(item[1]), item[0]),
         )[:max_terms]
-        original_score = self.predicted_class_score(matrix)
+        original_score = self.confidence(matrix)
         ablations: list[tuple[str, float]] = []
         for candidate in candidates:
             term = candidate[0]
             pattern = rf"(?iu)\b{re.escape(term)}\b"
             ablated_content = re.sub(pattern, " ", sample.content)
             ablated_matrix = vectorizer.transform([ablated_content or " "])
-            delta = original_score - self.predicted_class_score(ablated_matrix)
+            delta = original_score - self.confidence(ablated_matrix)
             ablations.append((term, float(delta)))
         selected = sorted(
             ablations,
@@ -621,7 +621,7 @@ class Classifier:
             citations=sample.citations(),
         )
 
-    def predicted_class_score(self, matrix: Any) -> float:
+    def confidence(self, matrix: Any) -> float:
         """Computes the decision score of the predicted class.
 
         Args:
@@ -634,7 +634,7 @@ class Classifier:
         Raises:
             RuntimeError: If the classifier has not been fitted.
         """
-        self.require_fitted()
+        self.preflight()
         estimator = self.estimator
         if estimator is None:
             raise errors.OrderError("classifier is not fitted")
@@ -653,7 +653,7 @@ class Classifier:
         Raises:
             RuntimeError: If the classifier has not been fitted.
         """
-        self.require_fitted()
+        self.preflight()
         estimator = self.estimator
         if estimator is None:
             raise errors.OrderError("classifier is not fitted")
@@ -678,7 +678,7 @@ class Classifier:
         Raises:
             FileExistsError: If `path` already exists.
         """
-        self.require_fitted()
+        self.preflight()
         target = pathlib.Path(path).expanduser()
         if target.exists():
             raise FileExistsError(f"model package already exists: {target}")
@@ -776,7 +776,7 @@ class Classifier:
         loaded = joblib.load(model_path)
         if not isinstance(loaded, cls):
             raise errors.KindError("package does not contain a Classifier")
-        loaded.require_fitted()
+        loaded.preflight()
         if loaded.model_digest != manifest.get("model_digest"):
             raise errors.InputError(
                 "document model digest does not match manifest"
@@ -795,13 +795,13 @@ class Classifier:
         Raises:
             RuntimeError: If the classifier has not been fitted.
         """
-        self.require_fitted()
+        self.preflight()
         vectorizer = self.vectorizer
         if vectorizer is None:
             raise errors.OrderError("classifier is not fitted")
         return vectorizer.transform([sample.content for sample in samples])
 
-    def require_fitted(self) -> None:
+    def preflight(self) -> None:
         """Checks that the classifier has been fitted.
 
         Raises:

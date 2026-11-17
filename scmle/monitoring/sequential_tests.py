@@ -188,7 +188,7 @@ class Betting:
         return self.log_capital >= self.threshold
 
     @property
-    def ever_crossed(self) -> Any:
+    def surpassed(self) -> Any:
         """Whether the capital ever reached ``1 / alpha``."""
         return self.peak >= self.threshold
 
@@ -360,7 +360,7 @@ class Mixture:
         return self.log_capital >= self.threshold
 
     @property
-    def ever_crossed(self) -> Any:
+    def surpassed(self) -> Any:
         """Whether the mixture ever reached ``1 / alpha``."""
         return self.peak >= self.threshold
 

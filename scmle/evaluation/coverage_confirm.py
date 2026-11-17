@@ -309,7 +309,7 @@ def not_evaluated(reason: str) -> dict[str, Any]:
     }
 
 
-def build_runner(
+def rig(
     bundle: Any,
     task: str,
     claim_sha256: str,

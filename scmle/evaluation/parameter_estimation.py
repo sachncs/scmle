@@ -782,8 +782,8 @@ class Estimation:
         names = tuple(item.name for item in self.parameters)
         if len(set(names)) != len(names):
             raise errors.InputError("parameter names must be unique")
-        self.check_covariance()
-        self.check_row_accounting()
+        self.invertible()
+        self.conserve()
         for mapping_name, mapping_value in (
             ("diagnostics", self.diagnostics),
             ("sensitivity", self.sensitivity),
@@ -803,7 +803,7 @@ class Estimation:
                 "raw_input_fingerprint must be a lowercase SHA-256 digest"
             )
 
-    def check_row_accounting(self) -> None:
+    def conserve(self) -> None:
         """Checks the row counts and that used plus dropped rows add up.
 
         Raises:
@@ -825,7 +825,7 @@ class Estimation:
                 "row accounting must reconcile to rows_input"
             )
 
-    def check_covariance(self) -> None:
+    def invertible(self) -> None:
         """Checks that the covariance is square, finite and symmetric.
 
         Raises:

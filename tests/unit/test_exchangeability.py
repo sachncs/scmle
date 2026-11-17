@@ -88,9 +88,7 @@ def test_the_confirmation_document_describes_exchangeability_without_a_status():
     x = pandas.DataFrame({"x": rng.normal(size=400)})
     y = x["x"] + rng.uniform(-1.0, 1.0, 400)
     calibration = numpy.abs(rng.uniform(-1.0, 1.0, 400))
-    runner = coverage_confirm.build_runner(
-        Band(calibration), "regression", "c" * 64
-    )
+    runner = coverage_confirm.rig(Band(calibration), "regression", "c" * 64)
     document = runner.run(x, y).documents[coverage_confirm.DOCUMENT]
     described = document["described_on_the_same_rows"]["exchangeability"]
     assert described["status"] == "described"

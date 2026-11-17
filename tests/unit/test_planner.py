@@ -70,8 +70,7 @@ def test_small_budget_prefers_fast_models(planner, frame):
     assert "random_forest" not in plan.candidate_models
     assert "hist_gradient_boosting" in plan.candidate_models
     assert any(
-        d.technique == "random_forest"
-        and d.action is experiments.DecisionAction.REJECT
+        d.technique == "random_forest" and d.action is experiments.Edict.REJECT
         for d in plan.decisions
     )
 
@@ -82,7 +81,7 @@ def test_imbalance_strategies_are_planned_not_deferred(planner, frame):
     included = {
         d.technique: d.reason
         for d in plan.decisions
-        if d.action is experiments.DecisionAction.INCLUDE
+        if d.action is experiments.Edict.INCLUDE
     }
     assert {"class_weight", "random_oversample", "random_undersample"} <= set(
         included
@@ -97,7 +96,7 @@ def test_balanced_data_rejects_imbalance_strategies_with_a_reason(
     rejected = {
         d.technique: d.reason
         for d in plan.decisions
-        if d.action is experiments.DecisionAction.REJECT
+        if d.action is experiments.Edict.REJECT
     }
     assert "balanced enough" in rejected["random_oversample"]
 
@@ -116,7 +115,7 @@ def test_strategy_search_can_be_disabled_in_the_plan(planner, frame):
     )
     assert not any(
         d.technique == "random_oversample"
-        and d.action is experiments.DecisionAction.INCLUDE
+        and d.action is experiments.Edict.INCLUDE
         for d in plan.decisions
     )
 

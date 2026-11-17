@@ -234,9 +234,7 @@ def linkage(
     return found
 
 
-def check_manifest(
-    folder: Path, document: Mapping[str, Any]
-) -> list[trace.Finding]:
+def audit(folder: Path, document: Mapping[str, Any]) -> list[trace.Finding]:
     """Checks that every listed record exists and has the recorded digest.
 
     Args:
@@ -317,7 +315,7 @@ def verify(
         keys: Verification keys by role.
 
     Returns:
-        The report, with the findings of `linkage`, `check_manifest`,
+        The report, with the findings of `linkage`, `audit`,
         `rederive` and the derivation itself, without duplicates. An absent
         ``trail.json`` gives a single missing-link finding and a file that is
         not JSON a single broken-chain finding, each with an empty head and
@@ -338,7 +336,7 @@ def verify(
             trace.Finding(trace.BROKEN_CHAIN, "trail", "trail.json is bad"),
         )
         return Verification(str(folder), "", 0, found)
-    problems = linkage(document, keys) + check_manifest(folder, document)
+    problems = linkage(document, keys) + audit(folder, document)
     derived = trace.derive(folder, keys)
     problems += list(derived.findings) + rederive(document, derived)
     unique: list[trace.Finding] = []

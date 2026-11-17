@@ -24,7 +24,7 @@ class Budget:
         max_queries: Source queries allowed.
         max_rows_scanned: Rows the source is estimated to scan. Bytes are not
             observable through DB-API, so the unit is rows.
-        max_seconds: Wall time allowed (see `BudgetMeter` for repeatability).
+        max_seconds: Wall time allowed (see `Meter` for repeatability).
         max_features: Cap on synthesized features.
     """
 
@@ -80,7 +80,7 @@ class Stop:
         return dataclasses.asdict(self)
 
 
-class BudgetMeter:
+class Meter:
     """Charges estimated cost against an `Budget`.
 
     Queries and rows are counted from the estimates the stages give before

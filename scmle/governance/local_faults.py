@@ -783,8 +783,8 @@ class Executor:
         ) -> None:
             accepted.extend(item.event_id for item in events)
 
-        first = ledger.commit_with_writer((event,), accept)
-        second = ledger.commit_with_writer((event,), accept)
+        first = ledger.finalize((event,), accept)
+        second = ledger.finalize((event,), accept)
         return (
             self.artifact(
                 scenario,

@@ -216,7 +216,7 @@ class Trainer:
         ).startswith("cuda"):
             raise errors.InputError("device must be auto, cpu, or cuda")
 
-    def resolve_device(self, torch: Any) -> str:
+    def place(self, torch: Any) -> str:
         """Chooses the device the training runs on.
 
         Args:
@@ -351,7 +351,7 @@ class Trainer:
         ):
             raise errors.InputError("requested CUDA device is not available")
         torch.manual_seed(self.random_state)
-        device = self.resolve_device(torch)
+        device = self.place(torch)
         self.input_width_ = matrix.shape[1]
         network = Network(
             torch, self.input_width_, self.hidden_size, self.embedding_size

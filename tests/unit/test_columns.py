@@ -21,7 +21,7 @@ def test_kind_detection():
             "t": pandas.to_datetime(["2024-01-01", "2024-01-02"]),
         }
     )
-    kinds = {c: columns.kind_of(frame[c]).name for c in frame}
+    kinds = {c: columns.categorize(frame[c]).name for c in frame}
     assert kinds == {
         "n": "numeric",
         "b": "numeric",
@@ -46,14 +46,13 @@ def test_statistics_per_kind():
 
 def test_exclusion_rules():
     ids = pandas.Series([f"u{i}" for i in range(50)])
-    assert "id-like" in columns.Categorical().exclusion_reason(ids)
+    assert "id-like" in columns.Categorical().rationale(ids)
     assert (
-        columns.Categorical().exclusion_reason(pandas.Series(list("ab" * 25)))
-        is None
+        columns.Categorical().rationale(pandas.Series(list("ab" * 25))) is None
     )
     # Datetimes are kept: the profiler expands them into features.
-    assert columns.DatetimeKind().exclusion_reason(pandas.Series([1])) is None
-    assert columns.Quantitative().exclusion_reason(pandas.Series([1])) is None
+    assert columns.DatetimeKind().rationale(pandas.Series([1])) is None
+    assert columns.Quantitative().rationale(pandas.Series([1])) is None
 
 
 def test_transformers_exist_only_for_feature_kinds():
@@ -232,13 +231,13 @@ def sentences(count):
 
 
 def test_free_text_is_its_own_kind_and_short_labels_are_not():
-    assert columns.kind_of(sentences(60)).name == "text"
+    assert columns.categorize(sentences(60)).name == "text"
     labels = pandas.Series(["red", "green", "blue"] * 30)
-    assert columns.kind_of(labels).name == "categorical"
+    assert columns.categorize(labels).name == "categorical"
     cities = pandas.Series(["New York City", "Los Angeles CA"] * 40)
-    assert columns.kind_of(cities).name == "categorical"
+    assert columns.categorize(cities).name == "categorical"
     ids = pandas.Series([f"u{i}" for i in range(60)])
-    assert columns.kind_of(ids).name == "categorical"
+    assert columns.categorize(ids).name == "categorical"
 
 
 def test_the_text_transformer_learns_its_vocabulary_per_fit():

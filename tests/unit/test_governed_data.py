@@ -405,7 +405,7 @@ def test_exhausted_or_permanent_failures_stop_at_the_object_and_keep_progress(
         policy=retry.Retries(2, 0.0),
         sleep=lambda s: None,
     ).run()
-    assert run.failed == "input/a.csv" and "RetryExhaustedError" in run.error
+    assert run.failed == "input/a.csv" and "RetryError" in run.error
 
 
 def test_the_gate_runs_before_processing_and_quarantine_is_respected(

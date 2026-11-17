@@ -273,7 +273,7 @@ class Attestation:
         if parse_date(self.expires, "expires") < issued:
             raise MisuseError("expires is before the date")
 
-    def unsigned_dict(self) -> dict[str, Any]:
+    def preimage(self) -> dict[str, Any]:
         """The signed content.
 
         Returns:
@@ -291,7 +291,7 @@ class Attestation:
         Returns:
             The signed content plus the signature.
         """
-        return {**self.unsigned_dict(), "signature": self.signature}
+        return {**self.preimage(), "signature": self.signature}
 
     @classmethod
     def create(cls, key: str | bytes, **fields: Any) -> Self:
@@ -309,7 +309,7 @@ class Attestation:
         """
         fields["decision"] = Reply(fields["decision"])
         unsigned = cls(key_id=thumbprint(key), **fields)
-        signature = signing.mac(unsigned.unsigned_dict(), key)
+        signature = signing.mac(unsigned.preimage(), key)
         return dataclasses.replace(unsigned, signature=signature)
 
     @classmethod
@@ -346,7 +346,7 @@ class Attestation:
         """
         if not self.signature or self.key_id != thumbprint(key):
             return False
-        expected = signing.mac(self.unsigned_dict(), key)
+        expected = signing.mac(self.preimage(), key)
         return hmac.compare_digest(self.signature, expected)
 
 
@@ -426,7 +426,7 @@ class Envelope:
         if parse_date(self.expires, "expires") < issued:
             raise MisuseError("expires is before the date")
 
-    def unsigned_dict(self) -> dict[str, Any]:
+    def preimage(self) -> dict[str, Any]:
         """The signed content.
 
         Returns:
@@ -443,7 +443,7 @@ class Envelope:
         Returns:
             The signed content plus the signature.
         """
-        return {**self.unsigned_dict(), "signature": self.signature}
+        return {**self.preimage(), "signature": self.signature}
 
     @classmethod
     def create(cls, key: str | bytes, **fields: Any) -> Self:
@@ -458,7 +458,7 @@ class Envelope:
             The signed envelope.
         """
         unsigned = cls(key_id=thumbprint(key), **fields)
-        signature = signing.mac(unsigned.unsigned_dict(), key)
+        signature = signing.mac(unsigned.preimage(), key)
         return dataclasses.replace(unsigned, signature=signature)
 
     @classmethod
@@ -492,7 +492,7 @@ class Envelope:
         """
         if not self.signature or self.key_id != thumbprint(key):
             return False
-        expected = signing.mac(self.unsigned_dict(), key)
+        expected = signing.mac(self.preimage(), key)
         return hmac.compare_digest(self.signature, expected)
 
 

@@ -271,7 +271,7 @@ class Boundary:
             self, "limitations", tuple(sorted(set(self.limitations)))
         )
 
-    def supports_modality(self, modality: capabilities.Modality | str) -> bool:
+    def accommodates(self, modality: capabilities.Modality | str) -> bool:
         """Returns whether this family accepts the declared modality.
 
         Args:
@@ -300,7 +300,7 @@ class Boundary:
                 cannot be converted to a numeric array, its rank or width is
                 wrong, or it contains non-finite values.
         """
-        if not self.supports_modality(capabilities.Modality.TABULAR):
+        if not self.accommodates(capabilities.Modality.TABULAR):
             raise errors.InputError(
                 f"{self.model_family} has no numeric tabular input contract"
             )

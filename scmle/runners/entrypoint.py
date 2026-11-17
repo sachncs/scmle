@@ -29,7 +29,7 @@ from scmle.runners import roles
 DEFAULT_WORKLOAD = "scmle.runners.project:run_project"
 
 
-def mount(uri: str) -> objectstore.ObjectStore:
+def mount(uri: str) -> objectstore.Depot:
     """Opens a `file://` store.
 
     Args:
@@ -74,7 +74,7 @@ def resolve(name: str) -> Callable[[local.Context], None]:
     return workload
 
 
-def respec(store: objectstore.ObjectStore, run_id: str) -> base.Job:
+def respec(store: objectstore.Depot, run_id: str) -> base.Job:
     """Rebuilds the stored spec.
 
     Args:

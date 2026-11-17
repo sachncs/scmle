@@ -44,7 +44,7 @@ KNOWN_ENTITY_FUTURE = "known_entity_future"
 UNITS_OF_PREDICTION = (NEW_ENTITY, KNOWN_ENTITY_FUTURE)
 
 
-class DecisionAction(enum.StrEnum):
+class Edict(enum.StrEnum):
     """Closed set of actions a check may trigger."""
 
     DROP_COLUMN = "drop_column"
@@ -235,7 +235,7 @@ class Trigger:
 
     check_id: str
     trigger: str
-    action: DecisionAction
+    action: Edict
     certificate_id: str = ""
 
     def __post_init__(self) -> None:
@@ -243,12 +243,12 @@ class Trigger:
 
         Raises:
             ValueError: If `check_id` or `trigger` is blank, or `action` is
-                not a `DecisionAction`.
+                not an `Edict`.
         """
         evidence.require_text(self.check_id, "check_id")
         evidence.require_text(self.trigger, "trigger")
-        if not isinstance(self.action, DecisionAction):
-            raise errors.InputError("action must be a DecisionAction")
+        if not isinstance(self.action, Edict):
+            raise errors.InputError("action must be an Edict")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the row.
@@ -270,7 +270,7 @@ class Trigger:
 
         Keys other than the fields, and missing fields, are rejected with
         the `ValueError` of `qualification.require`; an `action`
-        that is not a `DecisionAction` value also raises `ValueError`.
+        that is not an `Edict` value also raises `ValueError`.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -282,7 +282,7 @@ class Trigger:
         return cls(
             check_id=record["check_id"],
             trigger=record["trigger"],
-            action=DecisionAction(record["action"]),
+            action=Edict(record["action"]),
             certificate_id=record["certificate_id"],
         )
 
@@ -789,7 +789,7 @@ def parse(record: Mapping[str, Any]) -> AnalysisCharter:
         ) from error
 
 
-def load_json(path: str | Path) -> dict[str, Any]:
+def deserialize(path: str | Path) -> dict[str, Any]:
     """Reads a JSON object from a file.
 
     Args:
@@ -818,7 +818,7 @@ def peek(path: str | Path) -> AnalysisCharter:
 
     A file with a `charter` key is read as the signed wrapper and that
     entry is used; any other object is read as a bare charter. Problems
-    raise `ConfigError` (from `load_json` and `parse`).
+    raise `ConfigError` (from `deserialize` and `parse`).
 
     Args:
         path: The charter file.
@@ -826,6 +826,6 @@ def peek(path: str | Path) -> AnalysisCharter:
     Returns:
         The validated charter.
     """
-    record = load_json(path)
+    record = deserialize(path)
     inner = record.get("charter", record)
     return parse(inner)

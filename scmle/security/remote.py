@@ -1,11 +1,11 @@
 """Keys and revocations fetched over the network.
 
-`tokens.KeySet.from_file` and `RevocationList.from_file` read files. This
+`tokens.Keystore.from_file` and `RevocationList.from_file` read files. This
 module adds the pull side, with the standard library only:
 
 * `discover` reads an OpenID Connect discovery document and checks that its
   `issuer` is exactly the issuer asked for;
-* `KeySet` is a key set backed by a JWKS URL: cached for `ttl`
+* `Keystore` is a key set backed by a JWKS URL: cached for `ttl`
   seconds, refetched once for an unknown `kid` (at most every `min_refresh`
   seconds, so a stream of forged `kid` values cannot drive fetches), served
   stale for at most `max_stale` seconds when the source is down, and after
@@ -124,7 +124,7 @@ def discover(
     return document
 
 
-class KeySet(tokens.KeySet):
+class Keystore(tokens.Keystore):
     """A key set that refreshes itself from a JWKS URL.
 
     Attributes:
@@ -179,7 +179,7 @@ class KeySet(tokens.KeySet):
         super().__init__(list(loaded.keys.values()))
         self.fetched_at = self.clock()
 
-    def load(self) -> tokens.KeySet:
+    def load(self) -> tokens.Keystore:
         """Fetches and parses the JWKS document.
 
         Returns:
@@ -189,7 +189,7 @@ class KeySet(tokens.KeySet):
             ConfigError: If the fetch fails or the document is not a valid
                 JWKS.
         """
-        return tokens.KeySet.jwks(
+        return tokens.Keystore.jwks(
             self.fetcher(self.uri, allow_http=self.allow_http)
         )
 

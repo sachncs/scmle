@@ -53,7 +53,7 @@ class TransientError(errors.ScmleError):
     category = "transient"
 
 
-class RetryExhaustedError(errors.ScmleError):
+class RetryError(errors.ScmleError):
     """Every attempt failed.
 
     Attributes:
@@ -185,7 +185,7 @@ def call(
         The operation's result.
 
     Raises:
-        RetryExhaustedError: If every attempt failed with a transient error.
+        RetryError: If every attempt failed with a transient error.
     """
     last: Exception | None = None
     judge = is_transient or transient
@@ -198,7 +198,7 @@ def call(
             last = error
             if attempt < policy.max_attempts:
                 sleep(policy.delay(attempt))
-    raise RetryExhaustedError(
+    raise RetryError(
         policy.max_attempts,
         f"{policy.max_attempts} attempts failed; last: {last!r}",
     ) from last

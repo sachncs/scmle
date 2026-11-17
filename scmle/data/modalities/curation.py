@@ -169,7 +169,7 @@ def govern(name: str, values: Mapping[str, str]) -> None:
         raise errors.InputError(f"{name} must contain non-empty values")
 
 
-def check_manifest(
+def audit(
     manifest: data.Passport,
     dataset_hash: str,
     sample_count: int,
@@ -220,7 +220,7 @@ def proportions(validation_fraction: float, test_fraction: float) -> None:
 
 
 def allocate(
-    group_ids: Iterable[str],
+    cohorts: Iterable[str],
     validation_fraction: float,
     test_fraction: float,
     seed: int,
@@ -231,7 +231,7 @@ def allocate(
     at least one group is always left for training when any exists.
 
     Args:
-        group_ids: The unique group ids; sorted before the shuffle.
+        cohorts: The unique group ids; sorted before the shuffle.
         validation_fraction: Share of groups for validation, in [0, 1).
         test_fraction: Share of groups for testing, in [0, 1).
         seed: Seed of the shuffle.
@@ -239,7 +239,7 @@ def allocate(
     Returns:
         The validation group ids and the test group ids.
     """
-    groups = sorted(group_ids)
+    groups = sorted(cohorts)
     randomizer = random.Random(seed)  # nosec B311  # noqa: S311 -- a seeded, reproducible data split, not a security use
     randomizer.shuffle(groups)
     test_count = int(len(groups) * test_fraction)
@@ -266,7 +266,7 @@ def allocate(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DatasetCard:
+class Datasheet:
     """Human-reviewable card generated from modality curation evidence.
 
     The card keeps data understanding separate from model quality. Privacy
@@ -331,7 +331,7 @@ class DatasetCard:
         govern("provenance", self.provenance)
         govern("privacy", self.privacy)
         if self.manifest is not None:
-            check_manifest(
+            audit(
                 self.manifest,
                 self.dataset_hash,
                 self.sample_count,
@@ -580,7 +580,7 @@ def flaw(
 
 __all__ = [
     "Curation",
-    "DatasetCard",
+    "Datasheet",
     "conflicting_label_groups",
     "dataset_hash",
     "flaw",

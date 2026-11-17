@@ -30,8 +30,8 @@ def store(tmp_path):
 
 
 def test_run_lifecycle_and_lineage(store):
-    store.start_run("run_1", "abc", "/tmp/run_1", "2026-10-15T00:00:00+00:00")
-    store.update_run(
+    store.commence("run_1", "abc", "/tmp/run_1", "2026-10-15T00:00:00+00:00")
+    store.revise(
         "run_1",
         dataset_id="ds_1",
         data_hash="h",
@@ -46,23 +46,23 @@ def test_run_lifecycle_and_lineage(store):
 
 
 def test_event_listener_mirrors_state(store):
-    store.start_run("run_1", "abc", "d", "2026-10-15T00:00:00+00:00")
+    store.commence("run_1", "abc", "d", "2026-10-15T00:00:00+00:00")
     store.listen("run_1", events.Event("run_1", "state.TRAINING"))
     store.listen("run_1", events.Event("run_1", "trial.ok"))
     assert store.runs()[0]["state"] == "TRAINING"
 
 
 def test_trials_roundtrip_and_upsert(store):
-    store.start_run("run_1", "abc", "d", "2026-10-15T00:00:00+00:00")
-    store.record_trial("run_1", make_trial())
-    store.record_trial(
+    store.commence("run_1", "abc", "d", "2026-10-15T00:00:00+00:00")
+    store.transcribe("run_1", make_trial())
+    store.transcribe(
         "run_1",
         make_trial(
             "trial_002",
             experiments.Termination.FAILED,
         ),
     )
-    store.record_trial("run_1", make_trial())  # replaces trial_001
+    store.transcribe("run_1", make_trial())  # replaces trial_001
     rows = store.trials("run_1")
     assert [r["trial_id"] for r in rows] == ["trial_001", "trial_002"]
     assert (
@@ -71,23 +71,23 @@ def test_trials_roundtrip_and_upsert(store):
 
 
 def test_resume_reregisters_run_without_duplicates(store):
-    store.start_run("run_1", "abc", "d", "2026-10-15T00:00:00+00:00")
-    store.update_run("run_1", state="TRAINING")
-    store.start_run("run_1", "abc", "d", "2026-10-15T01:00:00+00:00")
+    store.commence("run_1", "abc", "d", "2026-10-15T00:00:00+00:00")
+    store.revise("run_1", state="TRAINING")
+    store.commence("run_1", "abc", "d", "2026-10-15T01:00:00+00:00")
     assert len(store.runs()) == 1 and store.runs()[0]["state"] == "CREATED"
 
 
 def test_unknown_columns_are_rejected(store):
-    store.start_run("run_1", "abc", "d", "2026-10-15T00:00:00+00:00")
+    store.commence("run_1", "abc", "d", "2026-10-15T00:00:00+00:00")
     with pytest.raises(ValueError, match="unknown run columns"):
-        store.update_run("run_1", bogus=1)
+        store.revise("run_1", bogus=1)
 
 
 def test_null_store_is_a_safe_noop():
     null = stores.Null()
-    null.start_run("r", "h", "d", "t")
-    null.update_run("r", state="X")
-    null.record_trial("r", make_trial())
+    null.commence("r", "h", "d", "t")
+    null.revise("r", state="X")
+    null.transcribe("r", make_trial())
     null.listen("r", events.Event("r", "state.X"))
     assert null.runs() == [] and null.trials("r") == []
     assert isinstance(null, stores.Store)
@@ -100,9 +100,9 @@ def test_every_operation_closes_its_connection(tmp_path):
     with warnings.catch_warnings():
         warnings.simplefilter("error", ResourceWarning)
         store = stores.SqliteExperimentStore(tmp_path / "leak.sqlite")
-        store.start_run("r", "h", "d", "2026-10-15T00:00:00+00:00")
-        store.update_run("r", state="TRAINING", fingerprint={"a": 1.0})
-        store.record_trial("r", make_trial())
+        store.commence("r", "h", "d", "2026-10-15T00:00:00+00:00")
+        store.revise("r", state="TRAINING", fingerprint={"a": 1.0})
+        store.transcribe("r", make_trial())
         store.runs()
         store.trials("r")
         store.history()
@@ -111,9 +111,9 @@ def test_every_operation_closes_its_connection(tmp_path):
 
 def test_a_failed_update_rolls_back_and_still_closes(tmp_path):
     store = stores.SqliteExperimentStore(tmp_path / "rollback.sqlite")
-    store.start_run("r", "h", "d", "2026-10-15T00:00:00+00:00")
+    store.commence("r", "h", "d", "2026-10-15T00:00:00+00:00")
     with pytest.raises(ValueError):
-        store.update_run("r", bogus=1)
+        store.revise("r", bogus=1)
     assert store.runs()[0]["state"] == "CREATED"
 
 

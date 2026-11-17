@@ -38,10 +38,10 @@ def test_record_round_trips_and_index_is_deterministic():
     assert evidence.Record.from_dict(make_record().to_dict()) == make_record()
     assert index.ready()
     assert (
-        index.canonical_json()
+        index.canonize()
         == evidence.Index(
             [make_record("a.first"), make_record("z.last")]
-        ).canonical_json()
+        ).canonize()
     )
 
 

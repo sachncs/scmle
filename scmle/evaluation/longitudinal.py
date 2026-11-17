@@ -397,8 +397,8 @@ class Estimation:
         labels = tuple(item.period for item in self.periods)
         if len(set(labels)) != len(labels):
             raise errors.InputError("period labels must be unique")
-        self.check_covariance()
-        self.check_row_accounting()
+        self.invertible()
+        self.conserve()
         for name, item_value in (
             ("diagnostics", self.diagnostics),
             ("limitations", self.limitations),
@@ -418,7 +418,7 @@ class Estimation:
                 "raw_input_fingerprint must be a lowercase SHA-256 digest"
             )
 
-    def check_covariance(self) -> None:
+    def invertible(self) -> None:
         """Checks that the covariance is square, finite and symmetric.
 
         Raises:
@@ -436,7 +436,7 @@ class Estimation:
         if not numpy.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-12):
             raise errors.InputError("covariance must be symmetric")
 
-    def check_row_accounting(self) -> None:
+    def conserve(self) -> None:
         """Checks the row counts and that used plus dropped rows add up.
 
         Raises:
@@ -688,7 +688,7 @@ class Estimator:
                 helper functions and `wave`.
         """
         prepared, rows_dropped = prepare(frame, self.estimand, self.policy)
-        fingerprint = fingerprint_frame(frame)
+        fingerprint = imprint(frame)
         try:
             period_series = prepared[
                 self.estimand.time_column
@@ -712,9 +712,7 @@ class Estimator:
             periodise(item, covariance[index, index], critical_value)
             for index, item in enumerate(fitted)
         )
-        reference = independent_reference(
-            fitted, self.policy.reference_tolerance
-        )
+        reference = referee(fitted, self.policy.reference_tolerance)
         return Estimation(
             estimand=self.estimand,
             policy=self.policy,
@@ -879,7 +877,7 @@ class Estimator:
         subject_name = self.estimand.subject_identity
         subject_values = period_frame[subject_name].tolist()
         return {
-            "period": period_label(period_value),
+            "period": periodize(period_value),
             "estimate": estimate,
             "rows": len(period_frame),
             "treated_rows": treated_rows,
@@ -903,9 +901,7 @@ class Estimator:
         }
 
 
-def check_declared_columns(
-    frame: pandas.DataFrame, estimand: Estimand
-) -> list[str]:
+def conform(frame: pandas.DataFrame, estimand: Estimand) -> list[str]:
     """Lists the declared columns and requires all of them in the frame.
 
     Args:
@@ -934,7 +930,7 @@ def check_declared_columns(
     return required
 
 
-def check_subject_and_time(frame: pandas.DataFrame, estimand: Estimand) -> None:
+def situate(frame: pandas.DataFrame, estimand: Estimand) -> None:
     """Checks the subject identities and time values of the panel.
 
     Args:
@@ -964,12 +960,10 @@ def check_subject_and_time(frame: pandas.DataFrame, estimand: Estimand) -> None:
         [estimand.subject_identity, estimand.time_column]
     ).any():
         raise errors.InputError("duplicate subject-time rows are not allowed")
-    validate_time_order(frame, estimand)
+    chronologize(frame, estimand)
 
 
-def convert_numeric_columns(
-    prepared: pandas.DataFrame, value_columns: list[str]
-) -> None:
+def numericize(prepared: pandas.DataFrame, value_columns: list[str]) -> None:
     """Converts the value columns to numbers in place and checks them.
 
     Args:
@@ -1024,8 +1018,8 @@ def prepare(
         raise errors.KindError("frame must be a pandas DataFrame")
     if frame.empty:
         raise errors.InputError("longitudinal frame must not be empty")
-    required = check_declared_columns(frame, estimand)
-    check_subject_and_time(frame, estimand)
+    required = conform(frame, estimand)
+    situate(frame, estimand)
     prepared = frame[required].copy()
     value_columns = [
         estimand.treatment_column,
@@ -1040,7 +1034,7 @@ def prepare(
     rows_dropped = int(missing_mask.sum())
     if rows_dropped:
         prepared = prepared.loc[~missing_mask].copy()
-    convert_numeric_columns(prepared, value_columns)
+    numericize(prepared, value_columns)
     treatment_values = set(
         prepared[estimand.treatment_column].unique().tolist()
     )
@@ -1050,7 +1044,7 @@ def prepare(
         raise errors.InputError("missingness policy left no rows")
     if len(prepared) < policy.minimum_rows_per_period:
         raise errors.InputError("longitudinal frame has insufficient rows")
-    validate_baseline_covariates(prepared, estimand)
+    pretreat(prepared, estimand)
     return prepared, rows_dropped
 
 
@@ -1074,7 +1068,7 @@ def monotone(times: pandas.Series) -> None:
         )
 
 
-def validate_time_order(frame: pandas.DataFrame, estimand: Estimand) -> None:
+def chronologize(frame: pandas.DataFrame, estimand: Estimand) -> None:
     """Requires strictly increasing time values within each subject.
 
     Args:
@@ -1101,9 +1095,7 @@ def validate_time_order(frame: pandas.DataFrame, estimand: Estimand) -> None:
         raise errors.InputError("time values have invalid ordering") from error
 
 
-def validate_baseline_covariates(
-    frame: pandas.DataFrame, estimand: Estimand
-) -> None:
+def pretreat(frame: pandas.DataFrame, estimand: Estimand) -> None:
     """Checks the declared no-time-varying-covariates condition in the data.
 
     Args:
@@ -1288,7 +1280,7 @@ def periodise(
     )
 
 
-def independent_reference(
+def referee(
     fitted: Sequence[Mapping[str, Any]], tolerance: float
 ) -> dict[str, Any]:
     """Recalculates normalized weighted means through an independent path.
@@ -1351,7 +1343,7 @@ def independent_reference(
     }
 
 
-def period_label(value: Any) -> str:
+def periodize(value: Any) -> str:
     """Converts a pandas/numpy time value to a stable JSON label.
 
     Args:
@@ -1370,7 +1362,7 @@ def period_label(value: Any) -> str:
     return str(value)
 
 
-def fingerprint_frame(frame: pandas.DataFrame) -> str:
+def imprint(frame: pandas.DataFrame) -> str:
     """Returns a deterministic digest of the supplied frame.
 
     Args:

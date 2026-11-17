@@ -56,10 +56,8 @@ def test_class_style_subclass_keeps_class_level_data():
 
 
 def test_only_lightgbm_overrides_categorical_params():
-    assert boosters.LIGHTGBM.categorical_params([2]) == {
-        "categorical_feature": [2]
-    }
-    assert boosters.XGBOOST.categorical_params([2]) == {}
+    assert boosters.LIGHTGBM.nominals([2]) == {"categorical_feature": [2]}
+    assert boosters.XGBOOST.nominals([2]) == {}
 
 
 def test_params_override_fixed_params_and_seed_is_applied():

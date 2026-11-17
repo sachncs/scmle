@@ -260,7 +260,7 @@ class Split:
     validation: tuple["Sample", ...]
     test: tuple["Sample", ...]
 
-    def group_ids(self) -> dict[str, tuple[str, ...]]:
+    def cohorts(self) -> dict[str, tuple[str, ...]]:
         """Returns the stable groups assigned to each partition.
 
         Returns:
@@ -281,7 +281,7 @@ class Split:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class TemporalSplit:
+class Chronology:
     """Time-ordered video clips separated at a UTC cutoff.
 
     Attributes:
@@ -314,7 +314,7 @@ class TemporalSplit:
             )
 
     @property
-    def has_future_leakage(self) -> bool:
+    def lookahead(self) -> bool:
         """Whether a training clip was observed after the cutoff."""
         return any(
             isinstance(sample.observation_time, datetime)
@@ -831,7 +831,7 @@ class Dataset:
             grouped, validation_fraction, test_fraction, seed
         )
 
-        def samples_for(excluded: set[str]) -> tuple[Sample, ...]:
+        def sieve(excluded: set[str]) -> tuple[Sample, ...]:
             return tuple(
                 sample
                 for sample in self.samples
@@ -849,12 +849,12 @@ class Dataset:
             if (sample.group_id or sample.source) in test_groups
         )
         return Split(
-            train=samples_for(test_groups | validation_groups),
+            train=sieve(test_groups | validation_groups),
             validation=validation,
             test=test,
         )
 
-    def split_temporal(self, cutoff: datetime | str) -> TemporalSplit:
+    def cutover(self, cutoff: datetime | str) -> Chronology:
         """Splits fully timestamped videos into past and future partitions.
 
         Videos at the cutoff belong to training. Videos after the cutoff
@@ -890,7 +890,7 @@ class Dataset:
             if isinstance(sample.observation_time, datetime)
             and sample.observation_time > cutoff_time
         )
-        return TemporalSplit(
+        return Chronology(
             cutoff=cutoff_time,
             train=train,
             future=future,
@@ -1062,13 +1062,13 @@ class Dataset:
 
 
 __all__ = [
+    "Chronology",
     "Dataset",
     "Features",
     "Metadata",
     "Profile",
     "Sample",
     "Split",
-    "TemporalSplit",
     "VideoError",
     "VideoFrameDecoder",
     "VideoProbe",

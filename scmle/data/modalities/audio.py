@@ -280,7 +280,7 @@ class Split:
     validation: tuple["Sample", ...]
     test: tuple["Sample", ...]
 
-    def group_ids(self) -> dict[str, tuple[str, ...]]:
+    def cohorts(self) -> dict[str, tuple[str, ...]]:
         """Returns the stable groups assigned to each partition.
 
         Returns:
@@ -917,7 +917,7 @@ class Dataset:
             grouped, validation_fraction, test_fraction, seed
         )
 
-        def samples_for(excluded: set[str]) -> tuple[Sample, ...]:
+        def sieve(excluded: set[str]) -> tuple[Sample, ...]:
             return tuple(
                 sample
                 for sample in self.samples
@@ -935,7 +935,7 @@ class Dataset:
             if (sample.group_id or sample.source) in test_groups
         )
         return Split(
-            train=samples_for(test_groups | validation_groups),
+            train=sieve(test_groups | validation_groups),
             validation=validation,
             test=test,
         )

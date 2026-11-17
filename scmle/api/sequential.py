@@ -112,7 +112,7 @@ class Estimation:
         self.result = verified
         return verified
 
-    def load_result(self) -> sequential.Estimation:
+    def recall(self) -> sequential.Estimation:
         """Loads and verifies the durable report associated with this project.
 
         A missing report, or one whose envelope or digest fails verification,
@@ -139,11 +139,11 @@ class Estimation:
             An exact verdict when the persisted and replayed evidence agree;
             otherwise a different verdict with explicit reasons.
         """
-        persisted = self.load_result()
+        persisted = self.recall()
         replay_input = self.data if data is None else data
         frame = tabulate(replay_input)
         reasons: list[str] = []
-        observed_fingerprint = sequential.fingerprint_frame(frame)
+        observed_fingerprint = sequential.imprint(frame)
         if observed_fingerprint != persisted.raw_input_fingerprint:
             reasons.append("input fingerprint differs from persisted evidence")
         if persisted.estimand.to_dict() != self.estimand.to_dict():

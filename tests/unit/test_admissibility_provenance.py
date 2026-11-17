@@ -44,7 +44,7 @@ def make_field(
         )
     if source is provenance.Provenance.LOG and log is None:
         log = provenance.Reconstruction(100, 0, 0.0)
-    return provenance.FieldProvenance(
+    return provenance.Pedigree(
         name=name,
         origin=provenance.Origin.INSTRUMENT,
         writer="sensor",
@@ -130,7 +130,7 @@ def test_as_of_rule_consistency():
 
 def test_source_and_rule_must_agree():
     with pytest.raises(ValueError, match="needs a source"):
-        provenance.FieldProvenance(
+        provenance.Pedigree(
             "f",
             provenance.Origin.MANUAL,
             "w",
@@ -142,7 +142,7 @@ def test_source_and_rule_must_agree():
             provenance.Availability.YES,
         )
     with pytest.raises(ValueError, match="cannot have a source"):
-        provenance.FieldProvenance(
+        provenance.Pedigree(
             "f",
             provenance.Origin.MANUAL,
             "w",
@@ -156,7 +156,7 @@ def test_source_and_rule_must_agree():
     with pytest.raises(ValueError, match="needs an attestation"):
         make_field(att=None)
     with pytest.raises(ValueError, match="needs a log_check"):
-        provenance.FieldProvenance(
+        provenance.Pedigree(
             "f",
             provenance.Origin.MANUAL,
             "w",
@@ -216,7 +216,7 @@ def test_from_dict_rejects_unknown_versions_and_fields():
     record = dict(table["fields"][0])
     record["surprise"] = 1
     with pytest.raises(ValueError, match="unexpected"):
-        provenance.FieldProvenance.from_dict(record)
+        provenance.Pedigree.from_dict(record)
 
 
 def test_covering_adds_unverified_records_for_undeclared_columns():

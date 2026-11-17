@@ -3,7 +3,7 @@
 `Network` holds the construction logic once; a network that only differs in
 its data (architecture, search space, capabilities) is a configured instance,
 such as `MLP`, not a subclass. `Jepa` and `KerasMlp` stay classes because
-they override `build` (and `Jepa` also `rejection_reason` and `assemble`),
+they override `build` (and `Jepa` also `objection` and `assemble`),
 and `TabPfn` builds different estimators.
 """
 
@@ -98,7 +98,7 @@ class Network(models.Model):
             if value is not None:
                 setattr(self, attribute, value)
 
-    def gpu_usable(self) -> bool:
+    def accelerated(self) -> bool:
         """Whether PyTorch can see a CUDA device (asked of the worker).
 
         Returns:
@@ -258,7 +258,7 @@ class Jepa(Network):
         )
     )
 
-    def rejection_reason(
+    def objection(
         self, task: tasks.Task, row_count: int | None = None
     ) -> str | None:
         """Rejects datasets too small for representation cross-validation.
@@ -271,7 +271,7 @@ class Jepa(Network):
             The base adapter's reason if it has one; otherwise a reason when
             `row_count` is below 16; otherwise None.
         """
-        reason = super().rejection_reason(task, row_count)
+        reason = super().objection(task, row_count)
         if reason is not None:
             return reason
         if row_count is not None and row_count < MIN_JEPA_ROWS:
@@ -447,7 +447,7 @@ class TabPfn(models.Model):
         memory_factor=6.0,
     )
 
-    def rejection_reason(
+    def objection(
         self, task: tasks.Task, row_count: int | None = None
     ) -> str | None:
         """Keeps TabPFN outside the automatic beta candidate set.
@@ -466,7 +466,7 @@ class TabPfn(models.Model):
             The base adapter's reason if it has one; otherwise always the
             extension-only reason, so it is never an automatic candidate.
         """
-        missing = super().rejection_reason(task, row_count)
+        missing = super().objection(task, row_count)
         if missing is not None:
             return missing
         return (
@@ -474,7 +474,7 @@ class TabPfn(models.Model):
             "license, token custody, and complete release evidence exist"
         )
 
-    def gpu_usable(self) -> bool:
+    def accelerated(self) -> bool:
         """Whether PyTorch can see a CUDA device (asked of the worker).
 
         Returns:

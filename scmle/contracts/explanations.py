@@ -101,7 +101,7 @@ class Snapshot(Contract):
 
     @pydantic.field_validator("identifier", "version", "digest")
     @classmethod
-    def validate_identity(cls, value: str, info: Any) -> str:
+    def identify(cls, value: str, info: Any) -> str:
         """Rejects blank snapshot identity components.
 
         Args:
@@ -223,7 +223,7 @@ class Link(Contract):
 
     @pydantic.field_validator("relation", "uri")
     @classmethod
-    def validate_text(cls, value: str, info: Any) -> str:
+    def sanitize(cls, value: str, info: Any) -> str:
         """Requires a non-empty relation and URI.
 
         A blank value is rejected with a `ValueError`.
@@ -260,7 +260,7 @@ class Link(Contract):
 
     @pydantic.field_validator("digest")
     @classmethod
-    def validate_digest(cls, value: str | None) -> str | None:
+    def assay(cls, value: str | None) -> str | None:
         """Normalizes an optional evidence digest.
 
         Args:
@@ -278,7 +278,7 @@ class Evidence(Contract):
     The record deliberately stores references and JSON-native outputs rather
     than Python objects. This makes the evidence portable across processes,
     safe to persist, and suitable for rendering by a trusted HTML viewer.
-    ``canonical_json`` escapes HTML-sensitive characters while preserving a
+    ``canonize`` escapes HTML-sensitive characters while preserving a
     deterministic key and separator order.
 
     Attributes:
@@ -326,7 +326,7 @@ class Evidence(Contract):
         "software_version",
     )
     @classmethod
-    def validate_identity(cls, value: str, info: Any) -> str:
+    def identify(cls, value: str, info: Any) -> str:
         """Rejects blank top-level identity fields.
 
         Args:
@@ -472,7 +472,7 @@ class Evidence(Contract):
             )
         return normalized
 
-    def canonical_json(self) -> str:
+    def canonize(self) -> str:
         """Returns deterministic JSON safe to embed in an HTML document."""
         payload = json.dumps(
             self.to_dict(),

@@ -40,8 +40,8 @@ def test_checkpoint_round_trip_preserves_embeddings(tmp_path):
     rows = features()
     original = estimator().fit(rows)
     before = original.transform(rows[:7])
-    checkpoint = original.save_checkpoint(tmp_path / "jepa.bin", KEY)
-    restored = Embedder.load_checkpoint(checkpoint, KEY)
+    checkpoint = original.stash(tmp_path / "jepa.bin", KEY)
+    restored = Embedder.restore(checkpoint, KEY)
     numpy.testing.assert_allclose(restored.transform(rows[:7]), before)
     assert restored.training_report_ == original.training_report_
 
@@ -49,10 +49,10 @@ def test_checkpoint_round_trip_preserves_embeddings(tmp_path):
 def test_an_unsigned_checkpoint_needs_trust(tmp_path, monkeypatch):
     """SEC-1: nothing is unpickled from a checkpoint nobody signed."""
     monkeypatch.delenv("SCMLE_SIGNING_KEY", raising=False)
-    checkpoint = estimator().fit(features()).save_checkpoint(tmp_path / "j.bin")
+    checkpoint = estimator().fit(features()).stash(tmp_path / "j.bin")
     with pytest.raises(errors.ArtifactError, match="not signed"):
-        Embedder.load_checkpoint(checkpoint, KEY)
-    assert Embedder.load_checkpoint(checkpoint, trusted=True)
+        Embedder.restore(checkpoint, KEY)
+    assert Embedder.restore(checkpoint, trusted=True)
 
 
 def test_same_seed_reproduces_training_and_transform_output():
@@ -71,26 +71,22 @@ def test_invalid_checkpoint_format_is_rejected(tmp_path):
     path = tmp_path / "invalid.joblib"
     joblib.dump({"format": "unknown"}, path)
     with pytest.raises(ValueError, match="not an scmle envelope"):
-        Embedder.load_checkpoint(path, KEY, trusted=True)
+        Embedder.restore(path, KEY, trusted=True)
 
 
 def test_checkpoint_payload_tampering_is_rejected(tmp_path):
     """A modified serialized payload fails the integrity check."""
-    checkpoint = (
-        estimator().fit(features()).save_checkpoint(tmp_path / "j.bin", KEY)
-    )
+    checkpoint = estimator().fit(features()).stash(tmp_path / "j.bin", KEY)
     raw = bytearray(checkpoint.read_bytes())
     raw[-1] ^= 1
     checkpoint.write_bytes(bytes(raw))
     with pytest.raises(ValueError, match="digest"):
-        Embedder.load_checkpoint(checkpoint, KEY)
+        Embedder.restore(checkpoint, KEY)
 
 
 def test_checkpoint_metadata_mismatch_is_rejected(tmp_path):
     """Envelope metadata cannot silently describe another representation."""
-    checkpoint = (
-        estimator().fit(features()).save_checkpoint(tmp_path / "j.bin", KEY)
-    )
+    checkpoint = estimator().fit(features()).stash(tmp_path / "j.bin", KEY)
     meta, payload = envelope.read(checkpoint, KEY)
     edited = {**meta, "input_width": meta["input_width"] + 1}
     magic, header, body = checkpoint.read_bytes().split(b"\n", 2)
@@ -100,7 +96,7 @@ def test_checkpoint_metadata_mismatch_is_rejected(tmp_path):
         magic + b"\n" + json.dumps(record).encode() + b"\n" + body
     )
     with pytest.raises(errors.ArtifactError, match="not authentic"):
-        Embedder.load_checkpoint(checkpoint, KEY)
+        Embedder.restore(checkpoint, KEY)
     envelope.seal(checkpoint, edited, payload, KEY)
     with pytest.raises(ValueError, match="metadata does not match"):
-        Embedder.load_checkpoint(checkpoint, KEY)
+        Embedder.restore(checkpoint, KEY)

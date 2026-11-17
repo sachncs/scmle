@@ -373,7 +373,7 @@ def test_decoded_raster_lifecycle_emits_pixel_occlusion_evidence(
 def test_metadata_only_raster_explanation_is_explicitly_unavailable():
     """Metadata-only raster packages never imply pixel evidence."""
     adapter = raster_adapter()
-    result = adapter.modality_specific_explanation(
+    result = adapter.elucidate(
         adapter.samples[0],
         object(),
         (),

@@ -99,9 +99,7 @@ def test_valid_policy_contains_task_aware_contracts():
 
     assert policy.task is tasks.Task.BINARY
     assert policy.to_dict()["release"]["metric_gates"][0]["threshold"] == 0.75
-    assert (
-        json.loads(policy.canonical_json())["task"] == "binary_classification"
-    )
+    assert json.loads(policy.canonize())["task"] == "binary_classification"
 
 
 def test_explanation_quality_thresholds_are_explicit_and_serialized():
@@ -332,7 +330,7 @@ def test_registry_fails_closed_for_undeclared_tasks_and_sorts_records():
     with pytest.raises(evaluation.UndeclaredError, match="survival"):
         registry.require(tasks.Task.SURVIVAL)
     assert registry.list_policies() == (binary,)
-    assert json.loads(registry.canonical_json())["policies"][0]["task"] == (
+    assert json.loads(registry.canonize())["policies"][0]["task"] == (
         "binary_classification"
     )
 
@@ -372,8 +370,8 @@ def test_custom_metric_requires_evidence_and_json_is_deterministic():
             required_evidence=("run.json",),
         ),
     )
-    assert policy.canonical_json() == policy.canonical_json()
-    assert "business_cost" in policy.canonical_json()
+    assert policy.canonize() == policy.canonize()
+    assert "business_cost" in policy.canonize()
     with pytest.raises(ValueError, match="custom metrics require evidence"):
         evaluation.Declaration(
             "business_cost", evaluation.Orientation.MINIMIZE, custom=True

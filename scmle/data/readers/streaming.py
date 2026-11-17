@@ -196,7 +196,7 @@ class Feed(abc.ABC):
             raise errors.InputError("rows must be positive")
         identity = self.source_identity()
         observed_snapshot = self.snapshot_sha256()
-        current = self.validate_checkpoint(checkpoint, observed_snapshot)
+        current = self.rebind(checkpoint, observed_snapshot)
         if (
             checkpoint is not None
             and current.offset > 0
@@ -283,7 +283,7 @@ class Feed(abc.ABC):
             has_more,
         )
 
-    def validate_checkpoint(
+    def rebind(
         self, checkpoint: "Checkpoint | None", snapshot: str
     ) -> "Checkpoint":
         """Binds a checkpoint to this source and current raw snapshot.
@@ -359,7 +359,7 @@ class StreamingError(errors.DataError):
         super().__init__(message, self.details)
 
 
-def validate_digest(value: str, field_name: str) -> None:
+def assay(value: str, field_name: str) -> None:
     """Validates a SHA-256 digest used as durable source evidence.
 
     Args:
@@ -430,7 +430,7 @@ class Checkpoint:
         """
         if not self.source_identity.strip():
             raise errors.InputError("source_identity must not be empty")
-        validate_digest(self.snapshot_sha256, "snapshot_sha256")
+        assay(self.snapshot_sha256, "snapshot_sha256")
         if isinstance(self.offset, bool) or not isinstance(self.offset, int):
             raise errors.KindError("offset must be an integer")
         if self.offset < 0:
@@ -834,7 +834,7 @@ class Commitment:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CommittedState:
+class Settlement:
     """Durable idempotency and checkpoint state for one source snapshot.
 
     Attributes:
@@ -987,7 +987,7 @@ class CommitLedger:
     source: Feed
 
     @property
-    def lock_path(self) -> pathlib.Path:
+    def lockfile(self) -> pathlib.Path:
         """The sidecar file used to serialize local ledger writers."""
         return self.path.with_name(f"{self.path.name}.lock")
 
@@ -1003,9 +1003,9 @@ class CommitLedger:
         Yields:
             None, while the exclusive lock on the sidecar file is held.
         """
-        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        self.lockfile.parent.mkdir(parents=True, exist_ok=True)
         windows_lock: Any = None
-        with self.lock_path.open("a+b") as handle:
+        with self.lockfile.open("a+b") as handle:
             if os.name == "nt":
                 import msvcrt  # noqa: PLC0415 -- Windows-only module, imported only on Windows
 
@@ -1029,7 +1029,7 @@ class CommitLedger:
 
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
-    def load(self) -> CommittedState:
+    def load(self) -> Settlement:
         """Loads state, failing closed if the source snapshot changed.
 
         Returns:
@@ -1044,9 +1044,9 @@ class CommitLedger:
         snapshot = self.source.snapshot_sha256()
         identity = self.source.source_identity()
         if not self.path.exists():
-            return CommittedState(Checkpoint(identity, snapshot))
+            return Settlement(Checkpoint(identity, snapshot))
         try:
-            state = CommittedState.from_dict(
+            state = Settlement.from_dict(
                 json.loads(self.path.read_text(encoding="utf-8"))
             )
         except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
@@ -1112,7 +1112,7 @@ class CommitLedger:
             state.checkpoint, rows=rows, watermark_column=watermark_column
         )
 
-    def write_atomically(self, state: CommittedState) -> None:
+    def write_atomically(self, state: Settlement) -> None:
         """Publishes state with durable temporary-file replacement.
 
         Args:
@@ -1144,9 +1144,7 @@ class CommitLedger:
             ),
         )
 
-    def write_pending_acknowledgement(
-        self, acknowledgement: Acknowledgement
-    ) -> None:
+    def earmark(self, acknowledgement: Acknowledgement) -> None:
         """Persists an acknowledgement while the ledger lock is held.
 
         Args:
@@ -1180,7 +1178,7 @@ class CommitLedger:
             ).encode("utf-8"),
         )
 
-    def load_pending_acknowledgement(self) -> Acknowledgement | None:
+    def reclaim(self) -> Acknowledgement | None:
         """Loads the pending acknowledgement, if one exists.
 
         Returns:
@@ -1225,7 +1223,7 @@ class CommitLedger:
             )
         return acknowledgement
 
-    def clear_pending_acknowledgement(self) -> None:
+    def retract(self) -> None:
         """Removes a delivered acknowledgement and flushes the directory.
 
         Nothing happens if no acknowledgement is staged.
@@ -1434,7 +1432,7 @@ class CommitLedger:
                 sink_receipt,
                 acknowledgement,
             )
-            state = CommittedState(
+            state = Settlement(
                 batch.next_checkpoint,
                 tuple(sorted((*current.committed_batch_ids, batch.batch_id))),
                 tuple(
@@ -1455,7 +1453,7 @@ class CommitLedger:
                 acknowledgement=acknowledgement,
             )
 
-    def commit_with_writer(
+    def finalize(
         self,
         batch: Batch,
         writer: Callable[[pandas.DataFrame, str], None],
@@ -1520,7 +1518,7 @@ class CommitLedger:
             current = self.load()
             if batch.batch_id in current.committed_batch_ids:
                 if acknowledgement is not None:
-                    self.write_pending_acknowledgement(acknowledgement)
+                    self.earmark(acknowledgement)
                 return Receipt(
                     batch.source_identity,
                     batch.batch_id,
@@ -1539,14 +1537,14 @@ class CommitLedger:
                     },
                 )
             writer(batch.frame, batch.batch_id)
-            state = CommittedState(
+            state = Settlement(
                 batch.next_checkpoint,
                 tuple(sorted((*current.committed_batch_ids, batch.batch_id))),
                 current.transaction_evidence,
             )
             self.write_atomically(state)
             if acknowledgement is not None:
-                self.write_pending_acknowledgement(
+                self.earmark(
                     dataclasses.replace(
                         acknowledgement, checkpoint=batch.next_checkpoint
                     )
@@ -1604,7 +1602,7 @@ class Consumer:
         self.writer = writer
         self.acknowledge = acknowledge
 
-    def deliver_pending_acknowledgement(self) -> str | None:
+    def handoff(self) -> str | None:
         """Delivers and clears one staged acknowledgement after restart.
 
         Returns:
@@ -1616,7 +1614,7 @@ class Consumer:
                 consumer group, or the acknowledge callback raises (the
                 staged record is kept for retry).
         """
-        pending = self.ledger.load_pending_acknowledgement()
+        pending = self.ledger.reclaim()
         if pending is None:
             return None
         if pending.consumer_group != self.consumer_group:
@@ -1635,7 +1633,7 @@ class Consumer:
                 self.ledger.source.source_identity(),
                 {"batch_id": pending.batch_id},
             ) from error
-        self.ledger.clear_pending_acknowledgement()
+        self.ledger.retract()
         return pending.batch_id
 
     def consume(
@@ -1656,7 +1654,7 @@ class Consumer:
         Returns:
             The receipt of the ledger commit.
         """
-        self.deliver_pending_acknowledgement()
+        self.handoff()
         batch = self.ledger.read_batch(rows, watermark_column)
         acknowledgement = Acknowledgement(
             batch.source_identity,
@@ -1664,10 +1662,8 @@ class Consumer:
             batch.batch_id,
             batch.next_checkpoint,
         )
-        receipt = self.ledger.commit_with_writer(
-            batch, self.writer, acknowledgement
-        )
-        self.deliver_pending_acknowledgement()
+        receipt = self.ledger.finalize(batch, self.writer, acknowledgement)
+        self.handoff()
         return receipt
 
 

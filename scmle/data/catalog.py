@@ -30,7 +30,7 @@ DIGEST_LENGTH = 64
 MATRIX_DIMENSIONS = 2
 
 
-def canonical_json(value: Any) -> str:
+def canonize(value: Any) -> str:
     """Returns deterministic JSON for an already JSON-compatible value.
 
     Args:
@@ -54,14 +54,12 @@ def digest_value(value: Any) -> str:
     """Returns a SHA-256 identity for deterministic JSON content.
 
     Args:
-        value: A JSON-compatible value, serialized with ``canonical_json``.
+        value: A JSON-compatible value, serialized with ``canonize``.
 
     Returns:
         The string ``"sha256:"`` followed by 64 lowercase hex digits.
     """
-    return (
-        f"sha256:{hashlib.sha256(canonical_json(value).encode()).hexdigest()}"
-    )
+    return f"sha256:{hashlib.sha256(canonize(value).encode()).hexdigest()}"
 
 
 def normalize(uri: str) -> str:
@@ -92,7 +90,7 @@ def normalize(uri: str) -> str:
     return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
 
 
-def validate_digest(value: str, field_name: str) -> str:
+def assay(value: str, field_name: str) -> str:
     """Validates and normalizes a SHA-256 identity.
 
     Args:
@@ -544,7 +542,7 @@ class Labeling:
         )
 
 
-def check_counts(sample_count: Any, schema_version: Any) -> None:
+def census(sample_count: Any, schema_version: Any) -> None:
     """Checks the two integer fields of a catalog.
 
     Args:
@@ -572,7 +570,7 @@ class Catalog:
 
     The contract accepts arbitrary caller-owned observations, but it never
     silently invents a content hash for an opaque object.  Use ``from_data``
-    for supported Python data structures or ``from_observation`` when a
+    for supported Python data structures or ``glean`` when a
     caller-owned adapter can provide trustworthy evidence for another format.
     """
 
@@ -608,7 +606,7 @@ class Catalog:
         data_kind: object = self.data_kind
         if not isinstance(data_kind, str) or not data_kind.strip():
             raise errors.InputError("data_kind must not be empty")
-        check_counts(self.sample_count, self.schema_version)
+        census(self.sample_count, self.schema_version)
         dimensions: Iterable[object] = self.shape
         if any(
             isinstance(dimension, bool)
@@ -646,7 +644,7 @@ class Catalog:
         object.__setattr__(
             self,
             "content_identity",
-            validate_digest(self.content_identity, "content_identity"),
+            assay(self.content_identity, "content_identity"),
         )
         object.__setattr__(self, "data_kind", self.data_kind.strip())
         object.__setattr__(self, "limitations", tuple(self.limitations))
@@ -657,7 +655,7 @@ class Catalog:
         )
 
     @classmethod
-    def from_observation(
+    def glean(
         cls,
         source: Source | str | pathlib.Path,
         data_kind: str,
@@ -759,7 +757,7 @@ class Catalog:
             blocker_values.append("privacy_and_retention_not_assessed")
         blocker_values.extend(observation.release_blockers)
         blocker_values.extend(release_blockers)
-        return cls.from_observation(
+        return cls.glean(
             source=source_value,
             data_kind=observation.data_kind,
             shape=observation.shape,
@@ -813,13 +811,13 @@ class Catalog:
         record["catalog_digest"] = self.catalog_digest
         return record
 
-    def canonical_json(self) -> str:
+    def canonize(self) -> str:
         """Returns canonical catalog content suitable for verification.
 
         Returns:
             Canonical JSON text of ``contents()``.
         """
-        return canonical_json(self.contents())
+        return canonize(self.contents())
 
     def write(self, path: str | pathlib.Path) -> None:
         """Persists the catalog atomically as verified JSON evidence.
@@ -876,9 +874,7 @@ class Catalog:
             raise errors.InputError(
                 "catalog evidence schema is invalid"
             ) from error
-        if validate_digest(expected_digest, "catalog_digest") != (
-            catalog.catalog_digest
-        ):
+        if assay(expected_digest, "catalog_digest") != (catalog.catalog_digest):
             raise errors.InputError(
                 "catalog digest does not match catalog content"
             )
@@ -1149,7 +1145,7 @@ def canonical_collection(
     if isinstance(value, (list, tuple)):
         return [canonicalize(item) for item in value]
     values = [canonicalize(item) for item in value]
-    return sorted(values, key=canonical_json)
+    return sorted(values, key=canonize)
 
 
 def normalise(value: Any) -> Any:
@@ -1301,7 +1297,7 @@ def summarize(
     observed = series[~series.isna()]
     distribution: dict[str, int] = {}
     for value in observed.tolist():
-        bucket = canonical_json(canonicalize(value))
+        bucket = canonize(canonicalize(value))
         distribution[bucket] = distribution.get(bucket, 0) + 1
     observed_count = len(observed)
     distinct_count = len(distribution)
@@ -1397,9 +1393,7 @@ def examine(
                 frame_content(frame, data_kind, shape)
             )
         else:
-            content_identity = validate_digest(
-                supplied_identity, "content_identity"
-            )
+            content_identity = assay(supplied_identity, "content_identity")
             limitations.append("content_identity_was_supplied_by_caller")
         return Observation(
             data_kind=data_kind,
@@ -1418,7 +1412,7 @@ def examine(
         content_identity = (
             f"sha256:{hashlib.sha256(bytes(data)).hexdigest()}"
             if supplied_identity is None
-            else validate_digest(supplied_identity, "content_identity")
+            else assay(supplied_identity, "content_identity")
         )
         if supplied_identity is not None:
             limitations.append("content_identity_was_supplied_by_caller")
@@ -1445,7 +1439,7 @@ def examine(
         raise errors.KindError(
             "opaque data needs a caller-supplied SHA-256 content_identity"
         )
-    content_identity = validate_digest(supplied_identity, "content_identity")
+    content_identity = assay(supplied_identity, "content_identity")
     label, label_limitations, label_blockers = summarize(None, label_column)
     limitations.extend(
         (

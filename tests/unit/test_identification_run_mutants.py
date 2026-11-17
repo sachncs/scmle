@@ -159,7 +159,7 @@ def test_the_gate_tables_and_documents_are_pinned():
 def test_an_interval_excludes_zero_only_when_strictly_one_sided(
     low, high, excludes
 ):
-    assert run.Est(0.0, 1.0, low, high, 10).excludes_zero() is excludes
+    assert run.Est(0.0, 1.0, low, high, 10).conclusive() is excludes
 
 
 def test_an_estimate_has_its_own_empty_detail():
@@ -229,7 +229,7 @@ def test_the_base_adapter_stores_its_settings_and_does_nothing_by_default():
     with pytest.raises(NotImplementedError):
         adapter.estimate(frame, 0.95)
     with pytest.raises(NotImplementedError):
-        adapter.estimate_for(frame, 0.95)
+        adapter.reckon(frame, 0.95)
 
 
 # alphas, assemble, refuse
@@ -699,7 +699,7 @@ def test_the_closing_notes_name_unsupported_exposures_then_the_unchecked_set():
 
 
 def test_the_verdict_states_the_hypothesis_in_words():
-    assert run.verdict_of(block()) == {
+    assert run.arbitrate(block()) == {
         "hypothesis": "ATE of t on y = 0",
         "labelled": "causal, under the attested assumptions",
     }
@@ -855,7 +855,7 @@ def test_the_backdoor_estimate_for_another_outcome_refits_on_x():
     adapter, x = prepared()
     c = confirm_rows()
     spec = adapter.spec
-    same = adapter.estimate_for(c, 0.95)
+    same = adapter.reckon(c, 0.95)
     main = adapter.estimate(c, 0.95)
     assert (same.estimate, same.se, same.low, same.high, same.n) == (
         main.estimate,
@@ -865,7 +865,7 @@ def test_the_backdoor_estimate_for_another_outcome_refits_on_x():
         main.n,
     )
     assert same.detail == {}
-    other = adapter.estimate_for(c, 0.9, "nco")
+    other = adapter.reckon(c, 0.9, "nco")
     fitted = aipw.prefit(x, ("a", "b"), "t", "nco", 3, "linear")
     direct = aipw.estimate(
         fitted, c, "t", "nco", "ATE", 0.9, spec.trim, spec.min_share
@@ -896,7 +896,7 @@ def test_the_backdoor_controls_test_each_negative_outcome_and_exposure():
     assert tests[1] == battery.wald(
         "negative_exposure:z", "negative_exposure", found.estimate, found.se
     )
-    outcome = adapter.estimate_for(c, 0.95, "nco")
+    outcome = adapter.reckon(c, 0.95, "nco")
     assert tests[0] == battery.wald(
         "negative_outcome:nco", "negative_outcome", outcome.estimate, outcome.se
     )
@@ -980,8 +980,8 @@ def test_the_randomized_adapter_is_the_difference_in_means():
     )
     assert out.detail == {}
     other = aipw.difference_in_means(c, "t", "nco", 0.9)
-    assert adapter.estimate_for(c, 0.9, "nco").estimate == other.estimate
-    assert adapter.estimate_for(c, 0.9).estimate == direct.estimate
+    assert adapter.reckon(c, 0.9, "nco").estimate == other.estimate
+    assert adapter.reckon(c, 0.9).estimate == direct.estimate
     tests = adapter.controls(c, 0.9)
     assert tests == [
         battery.wald(
@@ -1074,7 +1074,7 @@ def test_the_did_estimate_is_the_overall_att_with_its_event_study():
         "pretrend_p": fit.pretrend_p,
         "event_study": dict(zip(fit.events, fit.coefficients, strict=True)),
     }
-    other = adapter.estimate_for(c, 0.9, "nco")
+    other = adapter.reckon(c, 0.9, "nco")
     direct = did.estimate(c, "id", "t", "g", "nco", 0.9)
     assert (other.estimate, other.se, other.low, other.high, other.n) == (
         direct.estimate,
@@ -1084,7 +1084,7 @@ def test_the_did_estimate_is_the_overall_att_with_its_event_study():
         len(c),
     )
     assert other.detail == {}
-    assert adapter.estimate_for(c, 0.9).estimate == fit.estimate
+    assert adapter.reckon(c, 0.9).estimate == fit.estimate
 
 
 def test_the_did_controls_start_with_the_pretrend_wald_test():
@@ -1268,7 +1268,7 @@ def test_the_iv_estimate_marks_a_weak_confirmation_set_and_keeps_weakness():
 def test_the_iv_estimate_for_another_outcome_gives_the_two_stage_interval():
     frame = iv_world(1500, 1)
     adapter = run.Instrument(iv_spec(), frame, 0, "linear", 0.01)
-    out = adapter.estimate_for(frame, 0.9, "nco")
+    out = adapter.reckon(frame, 0.9, "nco")
     fit = iv.estimate(frame, "d", "nco", "z", (), 0.9)
     assert (out.estimate, out.se, out.low, out.high, out.n) == (
         fit.estimate,
@@ -1279,7 +1279,7 @@ def test_the_iv_estimate_for_another_outcome_gives_the_two_stage_interval():
     )
     assert out.detail == {}
     assert (
-        adapter.estimate_for(frame, 0.9).estimate
+        adapter.reckon(frame, 0.9).estimate
         == iv.estimate(frame, "d", "y", "z", (), 0.9).estimate
     )
     tests = adapter.controls(frame, 0.9)
@@ -1405,7 +1405,7 @@ def test_the_rd_estimate_is_bias_corrected_at_the_frozen_bandwidth():
         "conventional": fit.estimate,
         "bandwidth": adapter.bandwidth,
     }
-    other = adapter.estimate_for(c, 0.9, "cov")
+    other = adapter.reckon(c, 0.9, "cov")
     direct = rd.estimate(c, "x", "cov", 0.0, 0.9, adapter.bandwidth, ())
     assert (other.estimate, other.se, other.low, other.high, other.n) == (
         direct.bias_corrected,
@@ -1415,7 +1415,7 @@ def test_the_rd_estimate_is_bias_corrected_at_the_frozen_bandwidth():
         direct.n_left + direct.n_right,
     )
     assert other.detail == {}
-    assert adapter.estimate_for(c, 0.9).estimate == fit.bias_corrected
+    assert adapter.reckon(c, 0.9).estimate == fit.bias_corrected
 
 
 def test_the_rd_controls_are_the_placebo_cutoffs_and_covariate_balance():
@@ -1546,7 +1546,7 @@ def test_the_synthetic_adapter_refuses_a_panel_it_cannot_use():
     with pytest.raises(ValueError, match="exactly one treated unit"):
         adapter.estimate(none, 0.95)
     with pytest.raises(NotImplementedError):
-        adapter.estimate_for(panel, 0.95, "y")
+        adapter.reckon(panel, 0.95, "y")
 
 
 # identify and design_only, with scripted adapters
@@ -2048,7 +2048,7 @@ def test_the_declared_minimum_share_reaches_every_backdoor_estimate():
     with pytest.raises(ValueError, match=r"declared minimum share 0\.99"):
         adapter.estimate(c, 0.95)
     with pytest.raises(ValueError, match=r"declared minimum share 0\.99"):
-        adapter.estimate_for(c, 0.95)
+        adapter.reckon(c, 0.95)
     with pytest.raises(ValueError, match=r"declared minimum share 0\.99"):
         adapter.controls(c, 0.95)
     lenient = block(
@@ -2059,7 +2059,7 @@ def test_the_declared_minimum_share_reaches_every_backdoor_estimate():
     ok = run.Backdoor(lenient, x, 0, "linear", 0.01)
     ok.prepare()
     assert ok.estimate(c, 0.95).n < len(c)
-    assert ok.estimate_for(c, 0.95).n < len(c)
+    assert ok.reckon(c, 0.95).n < len(c)
     assert len(ok.controls(c, 0.95)) == 1
 
 
@@ -2084,7 +2084,7 @@ def test_the_boosted_learner_and_seed_reach_every_nuisance_fit():
     )
     other = aipw.prefit(x, ("a", "b"), "t", "nco", 5, "boosted")
     found = aipw.estimate(other, c, "t", "nco", "ATE", 0.9, 0.0, 0.5)
-    got = adapter.estimate_for(c, 0.9, "nco")
+    got = adapter.reckon(c, 0.9, "nco")
     assert (got.estimate, got.se) == (found.estimate, found.se)
     exposure = aipw.prefit(x, ("a", "b"), "z", "y", 5, "boosted")
     expected = aipw.estimate(exposure, c, "z", "y", "ATE", 0.9, 0.0, 0.5)
@@ -2103,7 +2103,7 @@ def test_the_randomized_estimate_for_another_outcome_keeps_level_and_counts():
         spec, observational(300, 1), 0, "linear", 0.01
     )
     c = observational(600, 2)
-    out = adapter.estimate_for(c, 0.8, "nco")
+    out = adapter.reckon(c, 0.8, "nco")
     direct = aipw.difference_in_means(c, "t", "nco", 0.8)
     assert (out.estimate, out.se, out.low, out.high, out.n) == (
         direct.estimate,

@@ -715,7 +715,7 @@ def drill(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
     report = monitor.Watcher(
         registry.load(MODEL, signing_key=DEMO_SIGNING_KEY)
     ).assess(features, fresh[TARGET])
-    outcome = manager.check_rollback(
+    outcome = manager.revertible(
         fresh,
         TARGET,
         approval=sanction(good_record, "rollback to v1 (drill)", "drill"),
@@ -1052,7 +1052,7 @@ def run(
     processes: list[subprocess.Popen[bytes]] = []
     try:
         if store_url is None:
-            own_store = mocks.ObjectStore(workdir / "object-store")
+            own_store = mocks.Depot(workdir / "object-store")
             own_store.start()
             store_url = own_store.address
         if metrics_url is None:

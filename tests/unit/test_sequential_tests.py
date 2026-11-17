@@ -63,7 +63,7 @@ def test_false_alarm_rate_is_below_the_level_at_every_look():
     )
     for ignored in range(1500):
         test.update(rng.binomial(50, 0.15, 1000) / 50)
-    assert test.ever_crossed.mean() <= 0.05
+    assert test.surpassed.mean() <= 0.05
 
 
 def test_a_rise_is_detected():
@@ -179,7 +179,7 @@ def test_mixture_false_alarm_rate_is_below_the_level():
     )
     for ignored in range(800):
         test.update(rng.binomial(50, 0.15, 600) / 50)
-    assert test.ever_crossed.mean() <= 0.05
+    assert test.surpassed.mean() <= 0.05
 
 
 def test_mixture_detects_a_change_after_a_long_quiet_stretch():
@@ -195,8 +195,8 @@ def test_mixture_detects_a_change_after_a_long_quiet_stretch():
         values = rng.binomial(50, risk, 100) / 50
         plain.update(values)
         mixed.update(values)
-    assert mixed.ever_crossed.mean() == 1.0
-    assert plain.ever_crossed.mean() < 0.5
+    assert mixed.surpassed.mean() == 1.0
+    assert plain.surpassed.mean() < 0.5
 
 
 def test_mixture_weights_add_to_at_most_one_and_old_terms_are_dropped():
@@ -242,7 +242,7 @@ def enumerate_paths(p, horizon, direction, alpha):
         for step, bit in enumerate(bits):
             test.update(float(bit))
             means[step] += probability * float(test.e_value)
-        if test.ever_crossed:
+        if test.surpassed:
             crossing += probability
     return means, crossing
 

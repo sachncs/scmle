@@ -223,7 +223,7 @@ class Index:
         """
         return bool(self.records) and not self.pending()
 
-    def unsigned_dict(self) -> dict[str, Any]:
+    def preimage(self) -> dict[str, Any]:
         """Returns the versioned content covered by the index signature."""
         return {
             "schema_version": 1,
@@ -239,7 +239,7 @@ class Index:
         Returns:
             The signature, which is also stored on the index.
         """
-        self.signature = signing.mac(self.unsigned_dict(), signing_key)
+        self.signature = signing.mac(self.preimage(), signing_key)
         return self.signature
 
     def verify(self, signing_key: str | bytes) -> bool:
@@ -253,12 +253,12 @@ class Index:
         """
         if self.signature is None:
             return False
-        expected = signing.mac(self.unsigned_dict(), signing_key)
+        expected = signing.mac(self.preimage(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a deterministic, JSON-compatible evidence index."""
-        record = self.unsigned_dict()
+        record = self.preimage()
         if self.signature is not None:
             record["signature"] = {
                 "algorithm": signing.SIGNATURE_ALGORITHM,
@@ -306,10 +306,10 @@ class Index:
         index.signature = signature
         return index
 
-    def canonical_json(self) -> str:
+    def canonize(self) -> str:
         """Returns stable JSON suitable for hashing and signing."""
         return json.dumps(
-            self.unsigned_dict(),
+            self.preimage(),
             ensure_ascii=False,
             separators=(",", ":"),
             sort_keys=True,

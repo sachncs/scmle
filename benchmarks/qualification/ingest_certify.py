@@ -743,13 +743,11 @@ def multiplicity(offset: int) -> dict[str, Any]:
         )
         synthesize.enlist(ledger, found)
         equal += (
-            synthesize.check_multiplicity(found.declared_family_size, ledger)
+            synthesize.plurality(found.declared_family_size, ledger)
             == found.declared_family_size
         )
         try:
-            synthesize.check_multiplicity(
-                found.declared_family_size + 1, ledger
-            )
+            synthesize.plurality(found.declared_family_size + 1, ledger)
         except synthesize.MultiplicityError:
             mismatch_caught += 1
     return judged(

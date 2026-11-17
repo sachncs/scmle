@@ -187,14 +187,14 @@ class Maintainer:
         this on construction), the e-processes of `scmle.decision.rollout`
         are the only deciders. `review` then stages the retrained challenger
         whatever its bootstrap comparison says, so the e-process can test
-        it, and `check_rollback` never moves the alias; both audit the
+        it, and `revertible` never moves the alias; both audit the
         bootstrap result as a descriptive diagnostic (`descriptive: true`,
         `decides: false`). Without a bound rollout nothing changes.
         """
         self.rollout_decides = True
 
     @property
-    def state_path(self) -> pathlib.Path:
+    def statefile(self) -> pathlib.Path:
         """Where the manager remembers its last attempt."""
         return self.registry.root / f"{self.model}{STATE_SUFFIX}"
 
@@ -206,11 +206,11 @@ class Maintainer:
             retraining attempt (None if none), and `rows_since_attempt`;
             the saved content as it is when the state file exists.
         """
-        with durability.latch(self.state_path):
-            if not self.state_path.exists():
+        with durability.latch(self.statefile):
+            if not self.statefile.exists():
                 return {"last_digest": None, "rows_since_attempt": 0}
             state: dict[str, Any] = json.loads(
-                self.state_path.read_text(encoding="utf-8")
+                self.statefile.read_text(encoding="utf-8")
             )
             return state
 
@@ -221,7 +221,7 @@ class Maintainer:
             state: The state to save, as returned by `recall`.
         """
         durability.write_atomically(
-            self.state_path, json.dumps(state).encode("utf-8")
+            self.statefile, json.dumps(state).encode("utf-8")
         )
 
     def skip_reason(
@@ -368,7 +368,7 @@ class Maintainer:
         Returns:
             The outcome.
         """
-        with durability.latch(self.state_path):  # One attempt at a time.
+        with durability.latch(self.statefile):  # One attempt at a time.
             return self.locked(fresh, target, retrain, configure)
 
     def locked(
@@ -500,7 +500,7 @@ class Maintainer:
             notes=notes,
         )
 
-    def check_rollback(
+    def revertible(
         self,
         fresh: pandas.DataFrame,
         target: str,
@@ -642,7 +642,7 @@ class Maintainer:
     ) -> int:
         """Points the champion alias back at the previous version.
 
-        The decision to do so (the bootstrap interval of `check_rollback` or
+        The decision to do so (the bootstrap interval of `revertible` or
         the rollback e-process of `scmle.governance.rollout_hook`) is made by
         the caller; this is the one place the alias moves, with the same
         independent approval and the guarded registry's attestation naming

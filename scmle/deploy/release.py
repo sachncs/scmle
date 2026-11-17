@@ -120,8 +120,10 @@ def triage(
     digest = provenance.file_digest(report)
     try:
         verdict = vuln_gate.evaluate(
-            vuln_gate.load_json(report),
-            vuln_gate.load_json(policy) if policy else vuln_gate.DEFAULT_POLICY,
+            vuln_gate.deserialize(report),
+            vuln_gate.deserialize(policy)
+            if policy
+            else vuln_gate.DEFAULT_POLICY,
         )
     except vuln_gate.GateError:
         # handled: unparseable report becomes failed ImageScan, documented

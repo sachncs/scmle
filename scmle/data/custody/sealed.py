@@ -228,13 +228,13 @@ class Locker:
         """Whether the rows were released."""
         return bool(self.locked.opened)
 
-    def issue_token(self) -> str:
+    def mint(self) -> str:
         """Issues the release token; call only once selection is frozen.
 
         Returns:
             The token that `open` requires.
         """
-        token = self.locked.issue_token()
+        token = self.locked.mint()
         self.log.append(self.set_id, "token_issued", ORCHESTRATOR)
         return token
 
@@ -281,7 +281,7 @@ class Locker:
         """Releases the rows a single time.
 
         Args:
-            token: The token from `issue_token`.
+            token: The token from `mint`.
             actor: Who is opening (recorded).
             claims_hash: Digest of the claims being tested; required, with
                 `ledger_hash`, once the set is committed.

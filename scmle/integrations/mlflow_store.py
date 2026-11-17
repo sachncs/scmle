@@ -106,7 +106,7 @@ class MlflowExperimentStore(stores.Store):
             return self.parents[run_id]
         return None
 
-    def start_run(
+    def commence(
         self, run_id: str, config_hash: str, run_dir: str, started_at: str
     ) -> None:
         """Creates the parent run, or reuses it when resuming.
@@ -136,7 +136,7 @@ class MlflowExperimentStore(stores.Store):
             self.parents[run_id] = parent
         self.client.set_tag(parent, "scmle.state", "CREATED")
 
-    def update_run(self, run_id: str, **fields: Any) -> None:
+    def revise(self, run_id: str, **fields: Any) -> None:
         """Maps fields to tags, metrics and run status.
 
         `cv_score` and each `test_metrics` entry (non-NaN) become metrics; the
@@ -181,7 +181,7 @@ class MlflowExperimentStore(stores.Store):
         if state in TERMINAL:
             self.client.set_terminated(parent, TERMINAL[state])
 
-    def record_trial(self, run_id: str, trial: experiments.Trial) -> None:
+    def transcribe(self, run_id: str, trial: experiments.Trial) -> None:
         """Logs a trial as a child run of the parent run.
 
         Does nothing if the parent run is unknown. The child run is ended as

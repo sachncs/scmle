@@ -109,7 +109,7 @@ class Decision:
 
 
 def diagnose(
-    record: provenance.FieldProvenance, declared_lag_seconds: float
+    record: provenance.Pedigree, declared_lag_seconds: float
 ) -> str | None:
     """Finds the reason a field fails the timing rule outright, if any.
 
@@ -141,7 +141,7 @@ def diagnose(
 
 
 def clock(
-    record: provenance.FieldProvenance,
+    record: provenance.Pedigree,
     mode: Mode,
     declared_lag_seconds: float,
     today: datetime.date | None,
@@ -209,7 +209,7 @@ def clock(
 
 
 def forecastable(
-    record: provenance.FieldProvenance,
+    record: provenance.Pedigree,
     mode: Mode = Mode.STRICT,
     declared_lag_seconds: float = 0.0,
     today: datetime.date | None = None,
@@ -304,7 +304,7 @@ def decide_graph_rule(
 
 
 def adjudicate(
-    record: provenance.FieldProvenance,
+    record: provenance.Pedigree,
     graph: dag.Dag,
     treatment: str,
     outcome: str,

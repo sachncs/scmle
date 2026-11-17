@@ -503,8 +503,8 @@ class Estimation:
             raise errors.InputError(
                 "sequential result needs target and comparator regimes"
             )
-        self.check_covariance()
-        self.check_counts()
+        self.invertible()
+        self.census()
         self.scrutinise()
         for mapping_name, mapping_value in (
             ("diagnostics", self.diagnostics),
@@ -525,7 +525,7 @@ class Estimation:
                 "raw_input_fingerprint must be a lowercase SHA-256 digest"
             )
 
-    def check_covariance(self) -> None:
+    def invertible(self) -> None:
         """Checks that the covariance is a finite symmetric 2 by 2 matrix.
 
         Raises:
@@ -542,7 +542,7 @@ class Estimation:
         ):
             raise errors.InputError("covariance must be finite and symmetric")
 
-    def check_counts(self) -> None:
+    def census(self) -> None:
         """Checks the row and subject counts and their accounting.
 
         Raises:
@@ -849,7 +849,7 @@ class Estimator:
         prepared, rows_dropped, subjects_input, subjects_dropped = prepare(
             frame, self.estimand, self.policy
         )
-        fingerprint = fingerprint_frame(frame)
+        fingerprint = imprint(frame)
         period_values = order(prepared, self.estimand.time_column)
         # Subjects of mixed types sort by type name, then by `repr`.
         subject_values = sorted(
@@ -902,7 +902,7 @@ class Estimator:
             cumulative *= increment
             truncated = numpy.minimum(cumulative, self.policy.maximum_weight)
             period_diagnostic = PeriodDiagnostics(
-                period=period_label(value),
+                period=periodize(value),
                 rows=len(subject_values),
                 treated_rows=treated_rows,
                 control_rows=control_rows,
@@ -970,7 +970,7 @@ class Estimator:
         )
         contrast = target.estimate - comparator.estimate
         contrast_standard_error = math.sqrt(max(float(covariance.sum()), 0.0))
-        reference = independent_reference(
+        reference = referee(
             target_mask,
             comparator_mask,
             final_weights,
@@ -1055,9 +1055,7 @@ class Estimator:
         )
 
 
-def check_declared_columns(
-    frame: pandas.DataFrame, estimand: Estimand
-) -> list[str]:
+def conform(frame: pandas.DataFrame, estimand: Estimand) -> list[str]:
     """Lists the declared columns and requires all of them in the frame.
 
     Args:
@@ -1087,7 +1085,7 @@ def check_declared_columns(
     return required
 
 
-def check_subject_and_time(frame: pandas.DataFrame, estimand: Estimand) -> None:
+def situate(frame: pandas.DataFrame, estimand: Estimand) -> None:
     """Checks the subject identities and time values of the panel.
 
     Args:
@@ -1114,12 +1112,10 @@ def check_subject_and_time(frame: pandas.DataFrame, estimand: Estimand) -> None:
                 )
     if frame.duplicated([subject_name, time_name]).any():
         raise errors.InputError("duplicate subject-time rows are not allowed")
-    validate_time_order(frame, estimand)
+    chronologize(frame, estimand)
 
 
-def convert_numeric_columns(
-    prepared: pandas.DataFrame, value_columns: list[str]
-) -> None:
+def numericize(prepared: pandas.DataFrame, value_columns: list[str]) -> None:
     """Converts the value columns to numbers in place and checks them.
 
     Args:
@@ -1191,10 +1187,10 @@ def prepare(
         raise errors.KindError("frame must be a pandas DataFrame")
     if frame.empty:
         raise errors.InputError("sequential frame must not be empty")
-    required = check_declared_columns(frame, estimand)
+    required = conform(frame, estimand)
     subject_name = estimand.subject_identity
     time_name = estimand.time_column
-    check_subject_and_time(frame, estimand)
+    situate(frame, estimand)
     subjects_input = int(frame[subject_name].nunique())
     value_columns = [
         estimand.treatment_column,
@@ -1216,7 +1212,7 @@ def prepare(
         subjects_dropped = len(dropped_subjects)
         rows_dropped = int((~keep_mask).sum())
         prepared = prepared.loc[keep_mask].copy()
-    convert_numeric_columns(prepared, value_columns)
+    numericize(prepared, value_columns)
     if prepared.empty:
         raise errors.InputError("missingness policy left no subjects")
     treatment_values = set(
@@ -1236,11 +1232,11 @@ def prepare(
         )
     if len(prepared[subject_name].unique()) < policy.minimum_subjects:
         raise errors.InputError("sequential frame has insufficient subjects")
-    validate_baseline_covariates(prepared, estimand)
+    pretreat(prepared, estimand)
     return prepared, rows_dropped, subjects_input, subjects_dropped
 
 
-def validate_time_order(frame: pandas.DataFrame, estimand: Estimand) -> None:
+def chronologize(frame: pandas.DataFrame, estimand: Estimand) -> None:
     """Rejects repeated consecutive time values within a subject.
 
     Only equal neighbouring values (in row order) are rejected; descending
@@ -1287,9 +1283,7 @@ def order(frame: pandas.DataFrame, time_column: str) -> list[Any]:
         raise errors.InputError("time values have invalid ordering") from error
 
 
-def validate_baseline_covariates(
-    frame: pandas.DataFrame, estimand: Estimand
-) -> None:
+def pretreat(frame: pandas.DataFrame, estimand: Estimand) -> None:
     """Ensures declared baseline covariates are stable within subjects.
 
     Args:
@@ -1583,7 +1577,7 @@ def covary(
     )
 
 
-def independent_reference(
+def referee(
     target_mask: numpy.ndarray,
     comparator_mask: numpy.ndarray,
     weights: numpy.ndarray,
@@ -1649,7 +1643,7 @@ def independent_reference(
     }
 
 
-def period_label(value: Any) -> str:
+def periodize(value: Any) -> str:
     """Converts a period value into a stable report label.
 
     Args:
@@ -1666,7 +1660,7 @@ def period_label(value: Any) -> str:
     return str(value)
 
 
-def fingerprint_frame(frame: pandas.DataFrame) -> str:
+def imprint(frame: pandas.DataFrame) -> str:
     """Returns a deterministic SHA-256 digest of the supplied frame.
 
     Args:

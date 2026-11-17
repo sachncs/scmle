@@ -278,7 +278,7 @@ def coerce(value: Any) -> float | None:
     return None if value is None else float(value)
 
 
-class KeySet:
+class Keystore:
     """The keys currently trusted, by `kid`; replaced as a whole on rotation.
 
     Attributes:
@@ -467,7 +467,7 @@ class Verifier:
 
     def __init__(
         self,
-        keys: KeySet,
+        keys: Keystore,
         issuer: str,
         audience: str,
         *,

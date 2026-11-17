@@ -192,7 +192,7 @@ class Trigger:
             self.action()
 
 
-class FailpointStore(objectstore.ObjectStore):
+class FailpointStore(objectstore.Depot):
     """A store that tells a hook about the writes the processor makes.
 
     Once the hook has raised `Crash` the store is dead: every later call

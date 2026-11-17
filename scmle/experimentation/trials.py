@@ -361,7 +361,7 @@ class Runner:
             weighted=bool(
                 context.spec.selection.weighted
                 and self.feature_plan.weight_column
-                and self.metric.accepts_weights()
+                and self.metric.weightable()
             ),
         )
 

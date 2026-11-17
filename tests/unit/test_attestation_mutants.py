@@ -80,9 +80,7 @@ def test_from_records_message_and_signature_cover_the_unsigned_record():
     record = attestation.Attestation.from_records(
         provenance, sbom, signing_key="k"
     )
-    assert record.attestation_signature == signing.mac(
-        record.unsigned_dict(), b"k"
-    )
+    assert record.attestation_signature == signing.mac(record.preimage(), b"k")
 
 
 def test_a_missing_signature_present_reads_as_false_and_true_is_kept():
@@ -118,7 +116,7 @@ def test_from_dict_rejects_blank_or_missing_signature_values():
 
 
 def test_unsigned_dict_is_exactly_the_schema_one_record():
-    assert build_record().unsigned_dict() == {
+    assert build_record().preimage() == {
         "schema_version": 1,
         "run_id": "r",
         "subjects": {

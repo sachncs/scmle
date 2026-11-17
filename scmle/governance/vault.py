@@ -114,7 +114,7 @@ class SealedTestSet(splitters.Lockbox):
         self.channel = parent
         parent.send((self.token, (features, target)))
 
-    def issue_token(self) -> str:
+    def mint(self) -> str:
         """Returns the release token; call only once selection is frozen."""
         return self.token
 
@@ -144,7 +144,7 @@ class SealedTestSet(splitters.Lockbox):
         """Asks the vault for the rows, once.
 
         Args:
-            token: The token from `issue_token`.
+            token: The token from `mint`.
             binding: The digest given to `bind`, which must come first.
 
         On success the vault process is ended after the rows are received.

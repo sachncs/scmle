@@ -600,9 +600,9 @@ class Modeler:
             checkpoint_path=self.checkpoint_path,
             resume=self.resume,
         )
-        return self.load_result()
+        return self.recall()
 
-    def load_result(self) -> Predictor:
+    def recall(self) -> Predictor:
         """Loads and verifies the signed report and package for this project.
 
         Returns:

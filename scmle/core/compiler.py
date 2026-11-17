@@ -28,7 +28,7 @@ class Node(Protocol):
     without introducing an inheritance requirement into the extension point.
     """
 
-    state: ClassVar["scmle.core.state.RunState"]
+    state: ClassVar["scmle.core.state.Progress"]
     requires: ClassVar[tuple[type["Node"], ...]]
 
     def describe(self, context: "scmle.core.context.Context") -> str:

@@ -170,7 +170,7 @@ def test_the_measured_verdicts_are_the_ones_the_gates_rely_on():
     }
     # So the skill test stays descriptive: gating needs every leak type.
     assert (
-        leakage.gate_status(store, leakage.CERTIFIED)
+        leakage.adjudication(store, leakage.CERTIFIED)
         is certificates.Authority.DESCRIPTIVE
     )
     for detector in (asof.DETECTOR_ID, reconciliation.DETECTOR_ID):

@@ -137,7 +137,7 @@ def noise_floor(
     return float(numpy.mean(gap**2) / 2.0)
 
 
-def verdict_of(variance: float, bias: float) -> str:
+def arbitrate(variance: float, bias: float) -> str:
     """Names the dominant source of error.
 
     Args:
@@ -263,7 +263,7 @@ def decompose(
     )
     noise = noise_floor(features, target, classification)
     mean_bias = raw_bias if noise is None else max(raw_bias - noise, 0.0)
-    verdict = verdict_of(mean_variance, mean_bias)
+    verdict = arbitrate(mean_variance, mean_bias)
     return Decomposition(
         "zero_one" if classification else "squared_error",
         replicates,

@@ -257,7 +257,7 @@ class Catalog:
                     "models.experimental_models for explicit opt-in"
                 )
                 continue
-            reason = adapter.rejection_reason(task, row_count)
+            reason = adapter.objection(task, row_count)
             if reason is None:
                 compatible.append(adapter)
             else:

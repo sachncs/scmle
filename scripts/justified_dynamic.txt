@@ -4,7 +4,7 @@
 scmle/cli.py run_* subcommand dispatch getattr(self, f"run_{...}") at cli.py:906,1047,1285,1491,1686
 scmle/data/splitting/inner_cv.py get_n_splits scikit-learn calls a cross-validator's get_n_splits by name
 scmle/deploy/demo.py http_request urllib finds a handler's http_request method by name
-scmle/data/store/objectstore.py CorruptObjectError named by the ObjectStore.get contract for backends that record a hash; the shipped local backend cannot raise it
+scmle/data/store/objectstore.py CorruptObjectError named by the Depot.get contract for backends that record a hash; the shipped local backend cannot raise it
 scmle/deploy/mocks.py do_PUT http.server calls do_<METHOD> on a request handler by name
 scmle/deploy/mocks.py do_HEAD http.server calls do_<METHOD> on a request handler by name
 scmle/inference/serving.py version_string http.server reads version_string on a request handler by name
@@ -120,11 +120,11 @@ scmle/inference/parity.py expect used by scripts/make_serving_golden.py (stored 
 scmle/integrations/mlflow_store.py MlflowExperimentStore documented: docs/DEPENDENCIES.md (tracking extra)
 scmle/models/custom.py register_estimator public API: pinned in tests/fixtures/public_api.json, docs/API_STABILITY.md
 scmle/models/custom.py unregister_estimator public API: pinned in tests/fixtures/public_api.json, docs/API_STABILITY.md
-scmle/models/documents.py global_explanation kept in doubt: sibling of the documented local_explanation (website/src/pages/docs/api.astro)
-scmle/models/documents.py local_explanation documented: website/src/pages/docs/api.astro (document model explanations)
+scmle/models/documents.py overview kept in doubt: sibling of the documented spotlight (website/src/pages/docs/api.astro)
+scmle/models/documents.py spotlight documented: website/src/pages/docs/api.astro (document model explanations)
 scmle/models/documents.py ablate documented: website/src/pages/docs/api.astro (document model explanations)
-scmle/models/images.py global_explanation kept in doubt: sibling of the documented local_explanation (website/src/pages/docs/api.astro)
-scmle/models/images.py local_explanation documented: website/src/pages/docs/api.astro (image model explanations)
+scmle/models/images.py overview kept in doubt: sibling of the documented spotlight (website/src/pages/docs/api.astro)
+scmle/models/images.py spotlight documented: website/src/pages/docs/api.astro (image model explanations)
 scmle/models/images.py occlude documented: website/src/pages/docs/api.astro (image model explanations)
 scmle/monitoring/abtest.py compare_arms called by benchmarks/qualification/f11_certify.py
 scmle/monitoring/alerts.py from_evidence documented: website/src/pages/docs/operations.astro (Alert example)

@@ -550,7 +550,7 @@ class Join:
             raise errors.InputError("crs must not be empty")
         if not self.predicate_name.strip():
             raise errors.InputError("predicate_name must not be empty")
-        self.check_counts()
+        self.census()
         if self.comparison_limit < 1 or self.match_limit < 1:
             raise errors.InputError("join limits must be positive")
         identities = tuple(
@@ -560,7 +560,7 @@ class Join:
         if len(identities) != len(set(identities)):
             raise errors.InputError("join matches must be unique")
 
-    def check_counts(self) -> None:
+    def census(self) -> None:
         """Checks that the join counts are positive and consistent.
 
         Raises:
@@ -817,7 +817,7 @@ class Partition:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class TemporalSplit:
+class Chronology:
     """Time-ordered geospatial features separated at a UTC cutoff.
 
     Attributes:
@@ -850,7 +850,7 @@ class TemporalSplit:
             )
 
     @property
-    def has_future_leakage(self) -> bool:
+    def lookahead(self) -> bool:
         """Whether any training feature was observed after the cutoff."""
         return any(
             isinstance(feature.observation_time, datetime)
@@ -1917,7 +1917,7 @@ class Dataset:
             },
         )
 
-    def split_temporal(self, cutoff: datetime | str) -> TemporalSplit:
+    def cutover(self, cutoff: datetime | str) -> Chronology:
         """Splits fully timestamped features into past and future partitions.
 
         Features at the cutoff belong to training. Features after the cutoff
@@ -1954,7 +1954,7 @@ class Dataset:
             if isinstance(feature.observation_time, datetime)
             and feature.observation_time > cutoff_time
         )
-        return TemporalSplit(
+        return Chronology(
             cutoff=cutoff_time,
             train=train,
             future=future,
@@ -2301,6 +2301,7 @@ class Tile:
 __all__ = [
     "GEOMETRY_TYPES",
     "Autocorrelation",
+    "Chronology",
     "Dataset",
     "Features",
     "GeometryError",
@@ -2309,7 +2310,6 @@ __all__ = [
     "Profile",
     "RasterDecoder",
     "TemporalError",
-    "TemporalSplit",
     "Tile",
     "autocorrelate",
     "canonical_observation_time",

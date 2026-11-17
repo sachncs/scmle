@@ -72,9 +72,9 @@ def test_canonical_json_is_deterministic_and_html_safe():
     first = substantiate(output={"text": "<script>&"})
     second = substantiate(output={"text": "<script>&"})
 
-    serialized = first.canonical_json()
+    serialized = first.canonize()
 
-    assert serialized == second.canonical_json()
+    assert serialized == second.canonize()
     assert "<script>" not in serialized
     assert "&" not in serialized
     assert "\\u003cscript\\u003e\\u0026" in serialized

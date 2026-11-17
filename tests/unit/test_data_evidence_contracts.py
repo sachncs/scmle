@@ -75,12 +75,8 @@ def test_curation_finding_rejects_invalid_confidence(confidence):
 
 
 def test_observation_conversion_has_deterministic_identity_and_evidence():
-    first = data.Finding.from_observation(
-        "column 'income' has missing values", "quality"
-    )
-    second = data.Finding.from_observation(
-        "column 'income' has missing values", "quality"
-    )
+    first = data.Finding.glean("column 'income' has missing values", "quality")
+    second = data.Finding.glean("column 'income' has missing values", "quality")
 
     assert first.finding_id == second.finding_id
     assert first.finding_id.startswith("quality.")
@@ -340,7 +336,7 @@ def test_dataset_card_makes_intended_use_and_limits_explicit():
         dropped_columns={"email": "sensitive"},
     )
 
-    card = data.DatasetCard.distill(report)
+    card = data.Datasheet.distill(report)
     record = card.to_dict()
 
     assert card.owner == "ml-platform"

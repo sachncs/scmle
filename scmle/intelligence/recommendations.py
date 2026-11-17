@@ -247,7 +247,7 @@ class Scarcity(Advisor):
         ]
 
 
-def default_rules() -> tuple[Advisor, ...]:
+def ruleset() -> tuple[Advisor, ...]:
     """Returns the standard recommendation rules.
 
     Returns:
@@ -278,6 +278,6 @@ def recommend(
         All applicable recommendations, in rule order.
     """
     found: list[Recommendation] = []
-    for rule in rules if rules is not None else default_rules():
+    for rule in rules if rules is not None else ruleset():
         found.extend(rule.advise(profile, spec))
     return tuple(found)

@@ -38,7 +38,7 @@ def test_every_lifecycle_event_is_logged_with_its_exact_fields():
     log = sealed.Journal()
     held = sealed.Locker("C", resident(), log)
     held.commit("claims-1", "ledger-1")
-    token = held.issue_token()
+    token = held.mint()
     refusal(lambda: held.open("guess", "attacker"))
     held.open(token, "confirmation", "claims-1", "ledger-1")
     rows = [
@@ -68,7 +68,7 @@ def test_a_denied_open_records_the_reason_of_the_refusal():
     log = sealed.Journal()
     held = sealed.Locker("F", resident(), log)
     held.commit("c", "l")
-    token = held.issue_token()
+    token = held.mint()
     refusal(lambda: held.open(token, "x"))
     assert log.entries[-1]["detail"] == {
         "reason": "test set is locked: binding mismatch"
@@ -157,9 +157,7 @@ def test_the_vault_seals_in_process_only_when_asked_not_to_use_one():
     assert isinstance(held.locked, splitters.ResidentTestSet)
     assert protocol.level == sealed.PROTOCOL_LEVEL
     held.commit("c", "l")
-    features, labels = held.open(
-        held.issue_token(), claims_hash="c", ledger_hash="l"
-    )
+    features, labels = held.open(held.mint(), claims_hash="c", ledger_hash="l")
     assert features.equals(frame) and labels.equals(target)
     assert held.ids == (4, 5, 6)
     process = sealed.Vault(sealed.Journal(), process=True)
@@ -169,7 +167,7 @@ def test_the_vault_seals_in_process_only_when_asked_not_to_use_one():
         assert process.level == sealed.VAULT_LEVEL
         real.commit("c", "l")
         features, labels = real.open(
-            real.issue_token(), claims_hash="c", ledger_hash="l"
+            real.mint(), claims_hash="c", ledger_hash="l"
         )
         assert features.equals(frame) and labels.equals(target)
     finally:
@@ -189,7 +187,7 @@ def test_adopting_a_set_names_it_in_the_log_and_refuses_a_repeat():
 def test_a_partial_binding_is_not_enough_for_a_committed_set():
     held = sealed.Locker("C", resident(), sealed.Journal())
     held.commit("c", "l")
-    token = held.issue_token()
+    token = held.mint()
     for claims, ledger in (("c", None), (None, "l")):
         text = refusal(partial(held.open, token, "x", claims, ledger))
         assert text == "test set is locked: binding mismatch"
@@ -213,11 +211,11 @@ def test_vault_refusals_are_whole_messages():
         assert refusal(lambda: locked.open("guess")) == (
             "test set is locked: invalid token"
         )
-        assert refusal(lambda: locked.open(locked.issue_token())) == (
+        assert refusal(lambda: locked.open(locked.mint())) == (
             "test set is locked: not bound to a frozen selection"
         )
         locked.bind("b")
-        locked.open(locked.issue_token(), "b")
+        locked.open(locked.mint(), "b")
         assert refusal(lambda: locked.open(locked.token, "b")) == (
             "test set was already used for final evaluation"
         )

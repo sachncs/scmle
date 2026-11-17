@@ -149,7 +149,7 @@ def test_modality_dataset_card_keeps_curation_and_governance_gaps_explicit():
         "risk_findings": [],
     }
 
-    card = curation.DatasetCard.from_report(
+    card = curation.Datasheet.from_report(
         "image", report, ("bounded representation",)
     )
 
@@ -161,7 +161,7 @@ def test_modality_dataset_card_keeps_curation_and_governance_gaps_explicit():
     )
 
     with pytest.raises(ValueError, match="does not match dataset_hash"):
-        curation.DatasetCard(
+        curation.Datasheet(
             modality="image",
             dataset_hash="different",
             sample_count=3,
@@ -183,7 +183,7 @@ def test_modality_curation_card_can_describe_an_empty_snapshot():
         "risk_findings": [],
     }
 
-    card = curation.DatasetCard.from_report(
+    card = curation.Datasheet.from_report(
         "extension:acme/empty-source", report, ("empty snapshot",)
     )
 

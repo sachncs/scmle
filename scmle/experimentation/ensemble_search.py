@@ -84,7 +84,7 @@ class Stacker:
             for combiner in COMBINERS:
                 self.context.enter(
                     combiner,
-                    experiments.DecisionAction.REJECT,
+                    experiments.Edict.REJECT,
                     "fewer than two eligible distinct models",
                 )
             return
@@ -100,7 +100,7 @@ class Stacker:
             self.context.check_cancelled()
             trial_id = self.context.allocate(1)[0]
             outcome = self.runner.run(trial_id, combiner, params)
-            self.context.record_trial(outcome)
+            self.context.transcribe(outcome)
             self.judge(
                 combiner,
                 members[0],
@@ -129,7 +129,7 @@ class Stacker:
         if outcome.status is not experiments.Termination.OK:
             self.context.enter(
                 combiner,
-                experiments.DecisionAction.REJECT,
+                experiments.Edict.REJECT,
                 f"trial {outcome.status}: {outcome.error}",
             )
             return
@@ -137,9 +137,7 @@ class Stacker:
         gain = sign * (outcome.score_mean - leader.score_mean)
         self.context.enter(
             combiner,
-            experiments.DecisionAction.INCLUDE
-            if gain > 0
-            else experiments.DecisionAction.REJECT,
+            experiments.Edict.INCLUDE if gain > 0 else experiments.Edict.REJECT,
             f"{combiner} of {', '.join(names)}: cv {self.metric.name} "
             f"{outcome.score_mean:.4f} vs best member {leader.score_mean:.4f} "
             f"({gain:+.4f} in the metric's favour)",

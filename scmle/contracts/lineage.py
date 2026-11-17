@@ -368,7 +368,7 @@ class Graph:
             "topological_order": list(self.linearise()),
         }
 
-    def canonical_json(self) -> str:
+    def canonize(self) -> str:
         """Returns canonical graph content suitable for hashing and signing."""
         return json.dumps(
             self.to_dict(),
@@ -379,7 +379,7 @@ class Graph:
 
     def digest(self) -> str:
         """Returns the hex SHA-256 digest of the canonical graph content."""
-        return hashlib.sha256(self.canonical_json().encode("utf-8")).hexdigest()
+        return hashlib.sha256(self.canonize().encode("utf-8")).hexdigest()
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:

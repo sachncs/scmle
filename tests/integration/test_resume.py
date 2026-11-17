@@ -196,7 +196,7 @@ def test_custom_tracker_is_honoured(binary_frame, tmp_path):
         def __init__(self):
             self.seen = []
 
-        def record_trial(self, run_id, trial):
+        def transcribe(self, run_id, trial):
             self.seen.append(trial.trial_id)
 
     recorder = Recording()

@@ -91,7 +91,7 @@ class Strategist:
             else:
                 self.context.enter(
                     f"{name}@{leader.model_name}",
-                    experiments.DecisionAction.REJECT,
+                    experiments.Edict.REJECT,
                     f"not applicable: {reason}",
                 )
         ids = self.context.allocate(len(chosen))
@@ -100,7 +100,7 @@ class Strategist:
             for trial_id, name in zip(ids, chosen, strict=True)
         ]
         for outcome in self.runner.run_many(jobs):
-            self.context.record_trial(outcome)
+            self.context.transcribe(outcome)
             self.judge(leader, outcome)
 
     def judge(
@@ -119,16 +119,14 @@ class Strategist:
         if outcome.status is not experiments.Termination.OK:
             self.context.enter(
                 technique,
-                experiments.DecisionAction.REJECT,
+                experiments.Edict.REJECT,
                 f"trial {outcome.status}: {outcome.error}",
             )
             return
         sign = 1 if self.metric.greater_is_better else -1
         gain = sign * (outcome.score_mean - leader.score_mean)
         verdict = (
-            experiments.DecisionAction.INCLUDE
-            if gain > 0
-            else experiments.DecisionAction.REJECT
+            experiments.Edict.INCLUDE if gain > 0 else experiments.Edict.REJECT
         )
         self.context.enter(
             technique,

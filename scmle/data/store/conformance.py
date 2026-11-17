@@ -1,6 +1,6 @@
 """One conformance suite for every object-store backend.
 
-`run_conformance(store)` exercises the behaviour the `ObjectStore` interface
+`run_conformance(store)` exercises the behaviour the `Depot` interface
 promises and returns a report; the same function runs against the local
 backend in the unit tests and against any other backend a user supplies.
 Each check works under a unique prefix and removes what it wrote. A check
@@ -119,7 +119,7 @@ def raises(
     raise ConformanceError(f"{message}: nothing was raised")
 
 
-def check_round_trip(store: objectstore.ObjectStore, base: str) -> None:
+def check_round_trip(store: objectstore.Depot, base: str) -> None:
     """Bytes come back unchanged with a correct hash and size.
 
     The check fails with `ConformanceError` (through `require`) if the
@@ -141,7 +141,7 @@ def check_round_trip(store: objectstore.ObjectStore, base: str) -> None:
     require(bool(meta.modified), "modification time is missing")
 
 
-def check_binary_and_empty(store: objectstore.ObjectStore, base: str) -> None:
+def check_binary_and_empty(store: objectstore.Depot, base: str) -> None:
     """Every byte value and the empty object survive.
 
     The check fails with `ConformanceError` (through `require`) if the
@@ -158,7 +158,7 @@ def check_binary_and_empty(store: objectstore.ObjectStore, base: str) -> None:
     require(store.head(f"{base}/empty").size == 0, "empty size is wrong")
 
 
-def check_large(store: objectstore.ObjectStore, base: str) -> None:
+def check_large(store: objectstore.Depot, base: str) -> None:
     """A one-mebibyte object round-trips.
 
     The check fails with `ConformanceError` (through `require`) if the
@@ -173,7 +173,7 @@ def check_large(store: objectstore.ObjectStore, base: str) -> None:
     require(store.get(f"{base}/large")[0] == data, "large object changed")
 
 
-def check_overwrite(store: objectstore.ObjectStore, base: str) -> None:
+def check_overwrite(store: objectstore.Depot, base: str) -> None:
     """An unconditional put replaces the object.
 
     The check fails with `ConformanceError` (through `require`) if the
@@ -192,7 +192,7 @@ def check_overwrite(store: objectstore.ObjectStore, base: str) -> None:
     )
 
 
-def check_missing(store: objectstore.ObjectStore, base: str) -> None:
+def check_missing(store: objectstore.Depot, base: str) -> None:
     """Reading a missing object is `AbsentError`; `exists` says no.
 
     The check fails with `ConformanceError` (through `require`) if if
@@ -218,7 +218,7 @@ def check_missing(store: objectstore.ObjectStore, base: str) -> None:
     require(store.exists(f"{base}/there"), "a written key does not exist")
 
 
-def headcheck(store: objectstore.ObjectStore, base: str) -> None:
+def headcheck(store: objectstore.Depot, base: str) -> None:
     """`head` reports what `get` reports.
 
     The check fails with `ConformanceError` (through `require`) if the
@@ -235,7 +235,7 @@ def headcheck(store: objectstore.ObjectStore, base: str) -> None:
     )
 
 
-def check_if_absent(store: objectstore.ObjectStore, base: str) -> None:
+def check_if_absent(store: objectstore.Depot, base: str) -> None:
     """A conditional put creates once and then refuses without changes.
 
     The check fails with `ConformanceError` (through `require`) if the
@@ -256,7 +256,7 @@ def check_if_absent(store: objectstore.ObjectStore, base: str) -> None:
     require(store.get(key)[0] == b"first", "a refused put changed the object")
 
 
-def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
+def check_if_absent_race(store: objectstore.Depot, base: str) -> None:
     """Of several simultaneous conditional puts exactly one wins.
 
     The check fails with `ConformanceError` (through `require`) if a
@@ -306,7 +306,7 @@ def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
     require(outcomes.count("lost") == RACERS - 1, "losers were not refused")
 
 
-def check_if_version(store: objectstore.ObjectStore, base: str) -> None:
+def check_if_version(store: objectstore.Depot, base: str) -> None:
     """A versioned put or delete acts only on the version it names.
 
     The check fails with `ConformanceError` (through `require`) if a put
@@ -344,7 +344,7 @@ def check_if_version(store: objectstore.ObjectStore, base: str) -> None:
     )
 
 
-def check_if_version_race(store: objectstore.ObjectStore, base: str) -> None:
+def check_if_version_race(store: objectstore.Depot, base: str) -> None:
     """Of several swaps from the same version exactly one wins.
 
     The check fails with `ConformanceError` (through `require`) if a racer
@@ -391,7 +391,7 @@ def check_if_version_race(store: objectstore.ObjectStore, base: str) -> None:
     require(outcomes.count("lost") == RACERS - 1, "losers were not refused")
 
 
-def check_listing(store: objectstore.ObjectStore, base: str) -> None:
+def check_listing(store: objectstore.Depot, base: str) -> None:
     """Listing is by prefix, sorted by key, and sees nested keys.
 
     The check fails with `ConformanceError` (through `require`) if a
@@ -414,7 +414,7 @@ def check_listing(store: objectstore.ObjectStore, base: str) -> None:
     require(store.list_objects(f"{base}/zzz") == [], "empty prefix not empty")
 
 
-def paginate(store: objectstore.ObjectStore, base: str) -> None:
+def paginate(store: objectstore.Depot, base: str) -> None:
     """More objects than one page are all listed once.
 
     The check fails with `ConformanceError` (through `require`) if the
@@ -433,7 +433,7 @@ def paginate(store: objectstore.ObjectStore, base: str) -> None:
     )
 
 
-def check_delete(store: objectstore.ObjectStore, base: str) -> None:
+def check_delete(store: objectstore.Depot, base: str) -> None:
     """Delete removes the object and is idempotent.
 
     The check fails with `ConformanceError` (through `require`) if the
@@ -452,7 +452,7 @@ def check_delete(store: objectstore.ObjectStore, base: str) -> None:
     store.delete(f"{base}/never-existed")
 
 
-def check_key_rules(store: objectstore.ObjectStore, base: str) -> None:  # noqa: ARG001 -- every check in CHECKS is called with the store and a key prefix
+def check_key_rules(store: objectstore.Depot, base: str) -> None:  # noqa: ARG001 -- every check in CHECKS is called with the store and a key prefix
     """Unsafe keys are refused before reaching the backend.
 
     The check fails with `ConformanceError` (through `require`) if if
@@ -475,7 +475,7 @@ def check_key_rules(store: objectstore.ObjectStore, base: str) -> None:  # noqa:
         )
 
 
-def check_isolation(store: objectstore.ObjectStore, base: str) -> None:
+def check_isolation(store: objectstore.Depot, base: str) -> None:
     """Objects written under one prefix are not listed under a sibling.
 
     The check fails with `ConformanceError` (through `require`) if a
@@ -494,7 +494,7 @@ def check_isolation(store: objectstore.ObjectStore, base: str) -> None:
     )
 
 
-CHECKS: tuple[Callable[[objectstore.ObjectStore, str], None], ...] = (
+CHECKS: tuple[Callable[[objectstore.Depot, str], None], ...] = (
     check_round_trip,
     check_binary_and_empty,
     check_large,
@@ -514,7 +514,7 @@ CHECKS: tuple[Callable[[objectstore.ObjectStore, str], None], ...] = (
 
 
 def run_conformance(
-    store: objectstore.ObjectStore, run_id: str | None = None
+    store: objectstore.Depot, run_id: str | None = None
 ) -> Conformance:
     """Runs every check against `store`.
 

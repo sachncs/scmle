@@ -115,9 +115,9 @@ extension surface; the snapshot is unchanged).
 `scmle.governance.rollout_hook.Hook` and
 `Maintainer.revert` are additions (extension surfaces), as
 are `Maintainer.delegate` (called by `Hook`; it makes
-the bootstrap rules of `review` and `check_rollback` descriptive, and a
+the bootstrap rules of `review` and `revertible` descriptive, and a
 manager without a bound hook behaves as before) and
-`Hook.review` and `Hook.check_rollback`; the
+`Hook.review` and `Hook.revertible`; the
 deployment ledger gained the row kinds `rollout_experiment`,
 `rollout_assignment` and `rollout_decision`, and a ledger without them loads unchanged.
 
@@ -170,7 +170,7 @@ Causal identification (F10). No entry of the pinned surface changed.
 `causal` (`scmle.data.charter.causal.Question`, with `Control` and
 `Confounding`); it is omitted from the record when unset, so charters of
 format 1 to 3 keep their hash and signature, and a charter that carries it is
-format 4 (an older wrapper carrying it is refused). `DecisionAction` gained the
+format 4 (an older wrapper carrying it is refused). `Edict` gained the
 member `refuse_claim`. `scmle.data.identification` (`select`, `aipw`, `did`,
 `iv`, `rd`, `synth`, `sensitivity`, `battery`, `tier`, `run`, `certified`) is
 an extension surface like the other qualification modules.
@@ -202,7 +202,7 @@ versioned (`SPEC_FORMAT`); `from_dict` refuses any other format.
 
 `scmle.security.tokens`, `scmle.security.access` and `scmle.security.audit`
 are extension surfaces like `scmle.deploy.contract`: token verification
-(`Verifier`, `KeySet`, `Key`, `RevocationList`, `Principal`),
+(`Verifier`, `Keystore`, `Key`, `RevocationList`, `Principal`),
 the request gateway (`Gateway`, `RateLimiter`, `DeniedError`) and the audit
 log (`Log`) are pinned in the snapshot's `surfaces` block. Behaviour changes to existing classes:
 `HttpServing` gained the keyword-only `gateway` and refuses a non-loopback

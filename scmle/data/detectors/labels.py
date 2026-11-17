@@ -152,7 +152,7 @@ def model(
     )
 
 
-def out_of_fold_probabilities(
+def heldout(
     features: pandas.DataFrame, codes: numpy.ndarray, seed: int
 ) -> numpy.ndarray:
     """Computes class probabilities from models that never saw the row.
@@ -440,7 +440,7 @@ def detect(
     """Runs both detectors and reports where they agree.
 
     Too few rows or classes raise `ValueError` (see
-    `out_of_fold_probabilities`).
+    `heldout`).
 
     Args:
         features: Numeric feature frame (exploration rows only).
@@ -481,7 +481,7 @@ def detect(
                 index=[remap[int(p)] for p in audit.index],
             )
     codes = encode(labels)[1]
-    probabilities = out_of_fold_probabilities(features, codes, seed)
+    probabilities = heldout(features, codes, seed)
     cl_flags, thresholds = mislabeled(probabilities, codes)
     aum_flags = margins(features, codes, seed)
     both = cl_flags & aum_flags

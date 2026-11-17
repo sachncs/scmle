@@ -84,7 +84,7 @@ def test_decision_row_fields_are_named(field):
     values = {
         "check_id": "leakage.skill",
         "trigger": "t",
-        "action": contracts.DecisionAction.QUARANTINE_COLUMN,
+        "action": contracts.Edict.QUARANTINE_COLUMN,
         field: " ",
     }
     assert message(partial(contracts.Trigger, **values)) == (

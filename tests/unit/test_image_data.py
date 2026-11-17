@@ -299,7 +299,7 @@ def test_split_keeps_explicit_capture_groups_together():
     first = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
     second = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
 
-    assignments = first.group_ids()
+    assignments = first.cohorts()
     groups = [set(values) for values in assignments.values()]
     assert sum("session-0" in values for values in groups) == 1
     assert set().union(*groups) == {

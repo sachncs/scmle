@@ -67,7 +67,7 @@ class Store(abc.ABC):
     """Persists runs, trials and lineage."""
 
     @abc.abstractmethod
-    def start_run(
+    def commence(
         self, run_id: str, config_hash: str, run_dir: str, started_at: str
     ) -> None:
         """Registers (or re-registers, on resume) a run.
@@ -80,7 +80,7 @@ class Store(abc.ABC):
         """
 
     @abc.abstractmethod
-    def update_run(self, run_id: str, **fields: Any) -> None:
+    def revise(self, run_id: str, **fields: Any) -> None:
         """Updates run columns (state, dataset_id, selected_model, ...).
 
         Args:
@@ -89,7 +89,7 @@ class Store(abc.ABC):
         """
 
     @abc.abstractmethod
-    def record_trial(self, run_id: str, trial: experiments.Trial) -> None:
+    def transcribe(self, run_id: str, trial: experiments.Trial) -> None:
         """Inserts or replaces a trial.
 
         Args:
@@ -132,13 +132,13 @@ class Store(abc.ABC):
             event: An emitted event; non-state events are ignored.
         """
         if event.kind.startswith("state."):
-            self.update_run(run_id, state=event.kind.removeprefix("state."))
+            self.revise(run_id, state=event.kind.removeprefix("state."))
 
 
 class Null(Store):
     """Tracking disabled: every operation is a no-op."""
 
-    def start_run(
+    def commence(
         self, run_id: str, config_hash: str, run_dir: str, started_at: str
     ) -> None:
         """Ignores the run.
@@ -150,7 +150,7 @@ class Null(Store):
             started_at: Start timestamp. Unused.
         """
 
-    def update_run(self, run_id: str, **fields: Any) -> None:
+    def revise(self, run_id: str, **fields: Any) -> None:
         """Ignores the update.
 
         Args:
@@ -158,7 +158,7 @@ class Null(Store):
             **fields: Columns to update. Unused.
         """
 
-    def record_trial(self, run_id: str, trial: experiments.Trial) -> None:
+    def transcribe(self, run_id: str, trial: experiments.Trial) -> None:
         """Ignores the trial.
 
         Args:
@@ -198,7 +198,7 @@ class SqliteExperimentStore(Store):
     """Local SQLite tracking database (one file, no services).
 
     Attributes:
-        COLUMNS: Run columns that `update_run` may set.
+        COLUMNS: Run columns that `revise` may set.
         path: Path of the database file.
     """
 
@@ -327,7 +327,7 @@ class SqliteExperimentStore(Store):
         connection.row_factory = sqlite3.Row
         return connection
 
-    def start_run(
+    def commence(
         self, run_id: str, config_hash: str, run_dir: str, started_at: str
     ) -> None:
         """Inserts the run, or refreshes it when resuming.
@@ -349,7 +349,7 @@ class SqliteExperimentStore(Store):
                 (run_id, config_hash, started_at, started_at, run_dir),
             )
 
-    def update_run(self, run_id: str, **fields: Any) -> None:
+    def revise(self, run_id: str, **fields: Any) -> None:
         """Updates whitelisted columns; dict values are stored as JSON.
 
         Args:
@@ -376,7 +376,7 @@ class SqliteExperimentStore(Store):
                 (*values.values(), run_id),
             )
 
-    def record_trial(self, run_id: str, trial: experiments.Trial) -> None:
+    def transcribe(self, run_id: str, trial: experiments.Trial) -> None:
         """Upserts a trial.
 
         Args:

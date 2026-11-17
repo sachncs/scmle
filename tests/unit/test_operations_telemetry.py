@@ -37,7 +37,7 @@ def make_service():
 def test_counts_error_rates_availability_and_latency_are_kept_apart():
     registry, service = make_service()
     for status in [200] * 90 + [422] * 4 + [429] * 2 + [500] * 3 + [503]:
-        service.record_request("/predict", status, 0.05)
+        service.tally("/predict", status, 0.05)
     summary = service.summary()
     assert summary["requests"] == 100
     assert summary["server_error_rate"] == pytest.approx(0.04)
@@ -65,8 +65,8 @@ def test_the_quantile_estimate_follows_the_buckets():
 
 def test_the_text_exposition_is_valid_prometheus():
     registry, service = make_service()
-    service.record_request("/predict", 200, 0.02)
-    service.record_request("/predict", 500, 0.3)
+    service.tally("/predict", 200, 0.02)
+    service.tally("/predict", 500, 0.3)
     service.poll()
     text = registry.render()
     assert text.endswith("\n")
@@ -161,7 +161,7 @@ def test_traceparent_round_trips_and_bad_headers_get_a_new_id():
 def test_healthy_traffic_and_data_breach_nothing():
     watch = support_ops.monitor()
     support_ops.healthy_traffic(watch)
-    watch.observe_features(support_ops.START, support_ops.frame(300, seed=1))
+    watch.sense(support_ops.START, support_ops.frame(300, seed=1))
     watch.observe_outcomes(support_ops.START, [0.0] * 90 + [1.0] * 10)
     rows = watch.evaluate(support_ops.START + 20)
     assert not [r for r in rows if r.breached], [r.to_dict() for r in rows]
@@ -192,9 +192,7 @@ def named(rows, name):
 
 def test_feature_quality_and_drift_are_each_detected():
     watch = support_ops.monitor()
-    watch.observe_features(
-        support_ops.START, support_ops.frame(400, seed=2, shift=25.0)
-    )
+    watch.sense(support_ops.START, support_ops.frame(400, seed=2, shift=25.0))
     rows = watch.evaluate(support_ops.START + 1)
     assert named(rows, "feature_psi_max").breached
     assert named(rows, "feature_psi_max").detail["worst"][0][0] in {
@@ -202,16 +200,12 @@ def test_feature_quality_and_drift_are_each_detected():
         "balance",
     }
     watch = support_ops.monitor()
-    watch.observe_features(
-        support_ops.START, support_ops.frame(400, seed=3, missing=0.4)
-    )
+    watch.sense(support_ops.START, support_ops.frame(400, seed=3, missing=0.4))
     rows = watch.evaluate(support_ops.START + 1)
     assert named(rows, "feature_missing_increase").breached
     assert named(rows, "feature_missing_increase").detail["features"] == ["age"]
     watch = support_ops.monitor()
-    watch.observe_features(
-        support_ops.START, support_ops.frame(400, seed=4, unseen=0.5)
-    )
+    watch.sense(support_ops.START, support_ops.frame(400, seed=4, unseen=0.5))
     assert named(
         watch.evaluate(support_ops.START + 1), "unseen_category_rate"
     ).breached
@@ -219,7 +213,7 @@ def test_feature_quality_and_drift_are_each_detected():
 
 def test_a_feature_missing_from_the_batch_counts_as_missing():
     watch = support_ops.monitor()
-    watch.observe_features(
+    watch.sense(
         support_ops.START,
         support_ops.frame(300, seed=5).drop(columns=["balance"]),
     )
@@ -250,9 +244,7 @@ def test_sampling_keeps_a_share_and_is_deterministic():
             profile=support_ops.profile(),
         )
         kept.append(
-            watch.observe_features(
-                support_ops.START, support_ops.frame(4000, seed=1)
-            )
+            watch.sense(support_ops.START, support_ops.frame(4000, seed=1))
         )
     assert kept[0] == kept[1] and 800 < kept[0] < 1200
     with pytest.raises(ValueError):

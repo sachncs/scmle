@@ -258,7 +258,7 @@ class Classifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc
         return labels
 
 
-def out_of_fold_probabilities(
+def heldout(
     build: Callable[[], Any],
     features: pandas.DataFrame,
     target: pandas.Series,

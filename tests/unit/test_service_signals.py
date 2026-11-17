@@ -79,10 +79,10 @@ def test_a_failing_monitor_never_breaks_serving(reference):
     bundle, golden = reference
 
     class Broken:
-        def record_request(self, *args):
+        def tally(self, *args):
             raise RuntimeError("monitor down")
 
-        def observe_features(self, *args):
+        def sense(self, *args):
             raise RuntimeError("monitor down")
 
     adapter = serving.HttpServing(bundle, monitor=Broken())
@@ -97,7 +97,7 @@ def test_a_failing_monitor_never_breaks_serving(reference):
 def test_the_runtime_writes_evaluated_signals_as_json_lines(tmp_path):
     monitor = signals.SignalMonitor()
     for second in range(50):
-        monitor.record_request(1000.0 + second, "/predict", 200, 0.01)
+        monitor.tally(1000.0 + second, "/predict", 200, 0.01)
     target = tmp_path / "signals.jsonl"
     written = runtime.emit(monitor, 1060.0, target)
     line = json.loads(target.read_text().splitlines()[0])

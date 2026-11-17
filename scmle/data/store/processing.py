@@ -207,7 +207,7 @@ class IncrementalProcessor:
 
     def __init__(
         self,
-        store: objectstore.ObjectStore,
+        store: objectstore.Depot,
         contract: snapshot.DataContract,
         transform: Callable[[pandas.DataFrame], pandas.DataFrame],
         *,
@@ -260,7 +260,7 @@ class IncrementalProcessor:
         self.before_commit = before_commit
         self.waits: list[float] = []
 
-    def load_checkpoint(self) -> Checkpoint:
+    def restore(self) -> Checkpoint:
         """Loads the stored checkpoint.
 
         A damaged checkpoint is not replaced: `CorruptError`
@@ -277,7 +277,7 @@ class IncrementalProcessor:
             return Checkpoint()
         return Checkpoint.from_bytes(data)
 
-    def save_checkpoint(self, checkpoint: Checkpoint) -> None:
+    def stash(self, checkpoint: Checkpoint) -> None:
         """Writes the checkpoint atomically.
 
         Args:
@@ -293,7 +293,7 @@ class IncrementalProcessor:
         """Runs an operation, retrying transient errors and noting waits.
 
         Each wait between attempts is appended to `waits`. Errors that are
-        not transient propagate at once, and `RetryExhaustedError`
+        not transient propagate at once, and `RetryError`
         propagates when every attempt failed with a transient error.
 
         Args:
@@ -365,7 +365,7 @@ class IncrementalProcessor:
             ChangedError: If a processed input now has different bytes.
         """
         self.waits.clear()
-        checkpoint = self.load_checkpoint()
+        checkpoint = self.restore()
         done: list[str] = []
         skipped: list[str] = []
         duplicate_objects: list[str] = []
@@ -391,8 +391,8 @@ class IncrementalProcessor:
             if meta.sha256 in checkpoint.processed.values():
                 checkpoint.processed[meta.key] = meta.sha256
                 try:
-                    self.retrying(lambda: self.save_checkpoint(checkpoint))
-                except retry.RetryExhaustedError as error:
+                    self.retrying(lambda: self.stash(checkpoint))
+                except retry.RetryError as error:
                     LOGGER.exception("checkpoint save failed at %s", meta.key)
                     failed, problem = meta.key, errors.Failure.of(error).text
                     break
@@ -400,7 +400,7 @@ class IncrementalProcessor:
                 continue
             try:
                 dropped, written, output_key = self.process(meta, checkpoint)
-            except (errors.ScmleError, retry.RetryExhaustedError) as error:
+            except (errors.ScmleError, retry.RetryError) as error:
                 LOGGER.exception("processing failed at %s", meta.key)
                 failed, problem = meta.key, errors.Failure.of(error).text
                 break
@@ -463,5 +463,5 @@ class IncrementalProcessor:
             self.before_commit(meta.key)
         checkpoint.processed[meta.key] = meta.sha256
         checkpoint.seen.update(keys[fresh].tolist())
-        self.retrying(lambda: self.save_checkpoint(checkpoint))
+        self.retrying(lambda: self.stash(checkpoint))
         return dropped, len(result), output_key

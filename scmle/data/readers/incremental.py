@@ -546,14 +546,14 @@ class Source(abc.ABC):
         self.late_data_policy = late_data_policy
 
     @abc.abstractmethod
-    def available_events(self) -> Iterable[Event]:
+    def unconsumed(self) -> Iterable[Event]:
         """Returns available events without changing committed state.
 
         Returns:
             The events the transport currently offers.
         """
 
-    def validate_checkpoint(self, checkpoint: Checkpoint | None) -> Checkpoint:
+    def rebind(self, checkpoint: Checkpoint | None) -> Checkpoint:
         """Binds a checkpoint to this source, failing before any polling.
 
         Args:
@@ -615,11 +615,11 @@ class Source(abc.ABC):
                 values.
             IncrementalError: With code "late_event" if a late event is found
                 and the policy is REJECT. An invalid checkpoint also raises
-                IncrementalError, from `validate_checkpoint`.
+                IncrementalError, from `rebind`.
         """
         if limit <= 0:
             raise errors.InputError("limit must be positive")
-        current = self.validate_checkpoint(checkpoint)
+        current = self.rebind(checkpoint)
         committed = frozenset(seen_event_ids)
         values = tuple(records)
         if any(not isinstance(event, Event) for event in values):
@@ -692,7 +692,7 @@ class Source(abc.ABC):
     ) -> Batch:
         """Selects a bounded batch without committing its side effects.
 
-        Failures from `available_events` and from `select_events` (such as an
+        Failures from `unconsumed` and from `select_events` (such as an
         IncrementalError for a late event under the REJECT policy) propagate
         unchanged.
 
@@ -705,7 +705,7 @@ class Source(abc.ABC):
             The selected batch, as described for `select_events`.
         """
         return self.select_events(
-            self.available_events(), checkpoint, seen_event_ids, limit
+            self.unconsumed(), checkpoint, seen_event_ids, limit
         )
 
 
@@ -734,7 +734,7 @@ class SequenceEventSource(Source):
             values = tuple(events)
             self.event_factory = lambda: values
 
-    def available_events(self) -> Iterable[Event]:
+    def unconsumed(self) -> Iterable[Event]:
         """Returns the current event view supplied by the transport seam.
 
         Returns:
@@ -798,7 +798,7 @@ class Stream(Source):
         self.event_reader = event_reader
         self.retry_budget = retry_budget or connectors.Retries()
 
-    def available_events(self) -> Iterable[Event]:
+    def unconsumed(self) -> Iterable[Event]:
         """Rejects unbounded polling without a checkpoint and limit.
 
         Raises:
@@ -867,14 +867,14 @@ class Stream(Source):
         Returns:
             The selected batch, as described for `select_events`.
         """
-        current = self.validate_checkpoint(checkpoint)
+        current = self.rebind(checkpoint)
         return self.select_events(
             self.poll_events(current, limit), current, seen_event_ids, limit
         )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CommittedState:
+class Settlement:
     """Durable event IDs and checkpoint after an atomic ingestion commit.
 
     Attributes:
@@ -945,7 +945,7 @@ class Ledger:
     source_identity: str
 
     @property
-    def lock_path(self) -> pathlib.Path:
+    def lockfile(self) -> pathlib.Path:
         """The sidecar file used to serialize ledger writers."""
         return self.path.with_name(f"{self.path.name}.lock")
 
@@ -961,9 +961,9 @@ class Ledger:
         Yields:
             None, while the exclusive lock on the sidecar file is held.
         """
-        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        self.lockfile.parent.mkdir(parents=True, exist_ok=True)
         windows_lock: Any = None
-        with self.lock_path.open("a+b") as handle:
+        with self.lockfile.open("a+b") as handle:
             if os.name == "nt":
                 import msvcrt  # noqa: PLC0415 -- Windows-only module, imported only on Windows
 
@@ -987,7 +987,7 @@ class Ledger:
 
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
-    def load(self) -> CommittedState:
+    def load(self) -> Settlement:
         """Loads committed state or initialize an empty source state.
 
         An unreadable or malformed state file raises the parsing error
@@ -1002,9 +1002,9 @@ class Ledger:
                 state belongs to another source.
         """
         if not self.path.exists():
-            return CommittedState(Checkpoint(self.source_identity))
+            return Settlement(Checkpoint(self.source_identity))
         record = json.loads(self.path.read_text(encoding="utf-8"))
-        state = CommittedState.from_dict(record)
+        state = Settlement.from_dict(record)
         if state.checkpoint.source_identity != self.source_identity:
             raise IncrementalError(
                 "state_source_mismatch",
@@ -1039,7 +1039,7 @@ class Ledger:
         state = self.load()
         return source.read_events(state.checkpoint, state.seen_event_ids, limit)
 
-    def write_atomically(self, state: CommittedState) -> None:
+    def write_atomically(self, state: Settlement) -> None:
         """Publishes state with a durable temporary-file replacement.
 
         Callers that combine a read and write must hold ``lock``. This method
@@ -1079,9 +1079,7 @@ class Ledger:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
             raise
 
-    def write_pending_acknowledgement(
-        self, acknowledgement: EventAcknowledgement
-    ) -> None:
+    def earmark(self, acknowledgement: EventAcknowledgement) -> None:
         """Stage an acknowledgement with durable atomic replacement.
 
         If writing fails, the temporary file is removed and the error
@@ -1124,7 +1122,7 @@ class Ledger:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
             raise
 
-    def load_pending_acknowledgement(self) -> EventAcknowledgement | None:
+    def reclaim(self) -> EventAcknowledgement | None:
         """Loads the acknowledgement that still needs transport delivery.
 
         Returns:
@@ -1158,7 +1156,7 @@ class Ledger:
             )
         return acknowledgement
 
-    def clear_pending_acknowledgement(self) -> None:
+    def retract(self) -> None:
         """Removes a delivered acknowledgement and flushes the directory entry.
 
         Nothing is removed if no acknowledgement is staged.
@@ -1166,7 +1164,7 @@ class Ledger:
         self.pending_acknowledgement_path.unlink(missing_ok=True)
         durability.sync_directory(self.pending_acknowledgement_path.parent)
 
-    def commit(self, batch: Batch) -> CommittedState:
+    def commit(self, batch: Batch) -> Settlement:
         """Atomically publishes a processed batch's IDs and checkpoint.
 
         Args:
@@ -1210,7 +1208,7 @@ class Ledger:
                         "candidate": batch.next_checkpoint.to_dict(),
                     },
                 )
-            state = CommittedState(
+            state = Settlement(
                 batch.next_checkpoint,
                 tuple(
                     sorted(set(current.seen_event_ids) | set(batch.event_ids))
@@ -1219,7 +1217,7 @@ class Ledger:
             self.write_atomically(state)
             return state
 
-    def commit_with_writer(
+    def finalize(
         self,
         events: Iterable[Event],
         writer: Callable[[tuple[Event, ...]], None],
@@ -1308,12 +1306,12 @@ class Ledger:
                     max(timestamps).isoformat(),
                 )
                 self.write_atomically(
-                    CommittedState(checkpoint, tuple(sorted(seen)))
+                    Settlement(checkpoint, tuple(sorted(seen)))
                 )
             else:
                 checkpoint = current.checkpoint
             if acknowledgement is not None and acknowledgement.event_ids:
-                self.write_pending_acknowledgement(
+                self.earmark(
                     dataclasses.replace(acknowledgement, checkpoint=checkpoint)
                 )
             return Ack(
@@ -1389,7 +1387,7 @@ class Ingestor:
         self.writer = writer
         self.acknowledge = acknowledge
 
-    def deliver_pending_acknowledgement(self) -> tuple[str, ...]:
+    def handoff(self) -> tuple[str, ...]:
         """Delivers and clears a previously staged acknowledgement.
 
         Returns:
@@ -1401,7 +1399,7 @@ class Ingestor:
                 consumer group, or the acknowledge callback raises (the
                 staged record is kept for retry).
         """
-        pending = self.ledger.load_pending_acknowledgement()
+        pending = self.ledger.reclaim()
         if pending is None:
             return ()
         if pending.consumer_group != self.consumer_group:
@@ -1423,7 +1421,7 @@ class Ingestor:
                     "event_ids": list(pending.event_ids),
                 },
             ) from error
-        self.ledger.clear_pending_acknowledgement()
+        self.ledger.retract()
         return pending.event_ids
 
     def consume(self, limit: int = 1_000) -> Consumption:
@@ -1439,7 +1437,7 @@ class Ingestor:
             The commit receipt and the identities whose acknowledgement was
             delivered in this cycle.
         """
-        self.deliver_pending_acknowledgement()
+        self.handoff()
         batch = self.ledger.read_batch(self.source, limit)
         event_ids = tuple(
             sorted(
@@ -1454,10 +1452,10 @@ class Ingestor:
             event_ids=event_ids,
             checkpoint=batch.next_checkpoint,
         )
-        receipt = self.ledger.commit_with_writer(
+        receipt = self.ledger.finalize(
             batch.events, self.writer, acknowledgement
         )
-        acknowledged = self.deliver_pending_acknowledgement()
+        acknowledged = self.handoff()
         return Consumption(
             source_identity=self.source.source_identity,
             consumer_group=self.consumer_group,

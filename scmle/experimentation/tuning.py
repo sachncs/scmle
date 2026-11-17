@@ -232,7 +232,7 @@ class Tuner:
             if trial.status is experiments.Termination.OK:
                 self.complete(trial, optimizer)
             else:
-                self.context.record_trial(trial)
+                self.context.transcribe(trial)
 
     def run_batch(
         self,
@@ -281,7 +281,7 @@ class Tuner:
             }
         for trial in first_rung:
             if trial.status is not experiments.Termination.OK:
-                self.context.record_trial(trial)
+                self.context.transcribe(trial)
             elif survivors is None:
                 self.complete(trial, optimizer)
             elif trial.trial_id in finished:
@@ -323,4 +323,4 @@ class Tuner:
             experiments.Termination.PRUNED,
         ):
             optimizer.tell(trial.params, trial.score_mean)
-        self.context.record_trial(trial)
+        self.context.transcribe(trial)

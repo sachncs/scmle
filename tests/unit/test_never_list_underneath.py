@@ -20,7 +20,7 @@ def test_a_sealed_set_opens_once_even_with_the_right_token():
     )
     try:
         locked.bind("b")
-        locked.open(locked.issue_token(), "b")
+        locked.open(locked.mint(), "b")
         with pytest.raises(errors.LeakageError, match="already used"):
             locked.open(locked.token, "b")
     finally:

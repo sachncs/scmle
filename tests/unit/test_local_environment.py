@@ -164,7 +164,7 @@ def test_the_make_targets_and_the_guide_agree():
 
 
 def test_the_object_store_round_trips_and_checks_digests(tmp_path):
-    store = mocks.ObjectStore(tmp_path / "store")
+    store = mocks.Depot(tmp_path / "store")
     store.start()
     try:
         data = b"model bytes"
@@ -292,7 +292,7 @@ def test_a_folder_survives_the_object_store_round_trip(tmp_path):
     (source / "model").mkdir(parents=True)
     (source / "model" / "a.bin").write_bytes(b"abc")
     (source / "serve.py").write_text("print()")
-    store = mocks.ObjectStore(tmp_path / "store")
+    store = mocks.Depot(tmp_path / "store")
     store.start()
     try:
         etags = demo.sync(store.address, source, "svc/v1")

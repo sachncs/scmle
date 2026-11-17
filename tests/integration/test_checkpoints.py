@@ -46,10 +46,10 @@ def test_reviewers_see_the_plan_and_the_selection(binary_frame, tmp_path):
 
     project(binary_frame, tmp_path, policies.Callback(decide)).run()
     plan_review, selection_review = seen
-    assert plan_review.gate is state.RunState.PLANNING
+    assert plan_review.gate is state.Progress.PLANNING
     assert "Candidates:" in plan_review.summary
     assert plan_review.details["candidate_models"]
-    assert selection_review.gate is state.RunState.SELECTING
+    assert selection_review.gate is state.Progress.SELECTING
     assert "test set is still locked" in selection_review.summary
     assert selection_review.details["status"] == "ok"
 
@@ -57,7 +57,7 @@ def test_reviewers_see_the_plan_and_the_selection(binary_frame, tmp_path):
 def test_rejecting_the_plan_stops_before_any_training(binary_frame, tmp_path):
     reject = policies.Callback(
         lambda review: policies.Approval(False, "alice", "too many models"),
-        gates=frozenset({scmle.core.state.RunState.PLANNING}),
+        gates=frozenset({scmle.core.state.Progress.PLANNING}),
     )
     with pytest.raises(
         errors.BlockedError, match="alice: too many models"
@@ -77,7 +77,7 @@ def test_rejecting_the_selection_keeps_the_test_set_locked(
     binary_frame, tmp_path
 ):
     reject = policies.Callback(
-        lambda review: review.gate is not scmle.core.state.RunState.SELECTING
+        lambda review: review.gate is not scmle.core.state.Progress.SELECTING
     )
     with pytest.raises(
         errors.BlockedError, match="SELECTING not approved"
@@ -94,7 +94,7 @@ def test_every_checkpoint_must_approve(binary_frame, tmp_path):
     yes = policies.Callback(lambda review: True)
     no = policies.Callback(
         lambda review: policies.Approval(False, "bob", "veto"),
-        gates=frozenset({scmle.core.state.RunState.SELECTING}),
+        gates=frozenset({scmle.core.state.Progress.SELECTING}),
     )
     with pytest.raises(errors.BlockedError, match="bob"):
         project(binary_frame, tmp_path, yes, no).run()

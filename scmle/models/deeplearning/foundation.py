@@ -108,10 +108,10 @@ class Learner:
             "train_target_": self.train_target_,
             "n_iter_": 1,
             "training_report_": {"verdict": "ok", "steps": 0},
-            **self.extra_state(),
+            **self.surplus(),
         }
 
-    def extra_state(self) -> dict[str, Any]:
+    def surplus(self) -> dict[str, Any]:
         """Task-specific entries of the state.
 
         Returns:
@@ -151,7 +151,7 @@ class Classifier(Learner):
 
     class_name = "TabPFNClassifier"
 
-    def extra_state(self) -> dict[str, Any]:
+    def surplus(self) -> dict[str, Any]:
         """The class labels.
 
         Returns:

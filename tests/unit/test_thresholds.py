@@ -93,7 +93,7 @@ def test_out_of_fold_probabilities_cover_validation_rows_only_once():
         (list(range(60)), list(range(60, 90))),
         (list(range(90)), list(range(90, 120))),
     ]
-    probability, positions = thresholds.out_of_fold_probabilities(
+    probability, positions = thresholds.heldout(
         linear_model.LogisticRegression, features, target, folds
     )
     assert sorted(positions) == list(range(60, 120)) and len(probability) == 60

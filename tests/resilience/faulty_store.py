@@ -7,7 +7,7 @@ def throttled():
     return objectstore.TransientStoreError("throttled")
 
 
-class FaultyStore(objectstore.ObjectStore):
+class FaultyStore(objectstore.Depot):
     """Raises an error for a window of the calls that match a filter.
 
     A call matches when its operation is in `operations` and its key (the

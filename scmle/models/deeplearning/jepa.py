@@ -152,7 +152,7 @@ class Embedder(base.TransformerMixin, estimators.NetworkEstimator):  # type: ign
             feature_count=self.state_["input_width_"],
         )
 
-    def checkpoint_manifest(self) -> dict[str, object]:
+    def inventory(self) -> dict[str, object]:
         """Returns the explicit fitted-checkpoint contract metadata."""
         validation.check_is_fitted(self, attributes=["state_"])
         family = self.model_contract()
@@ -169,7 +169,7 @@ class Embedder(base.TransformerMixin, estimators.NetworkEstimator):  # type: ign
             else None,
         }
 
-    def save_checkpoint(
+    def stash(
         self,
         path: str | pathlib.Path,
         signing_key: str | bytes | None = None,
@@ -177,7 +177,7 @@ class Embedder(base.TransformerMixin, estimators.NetworkEstimator):  # type: ign
         """Saves the fitted representation as an authenticated envelope.
 
         The payload holds the estimator configuration, training report and
-        NumPy-only worker state; the header holds `checkpoint_manifest`, the
+        NumPy-only worker state; the header holds `inventory`, the
         payload digest and an HMAC (`scmle.envelope`), so nothing is
         unpickled before it is authenticated (SEC-1). An unfitted estimator
         raises scikit-learn's `NotFittedError`.
@@ -196,11 +196,11 @@ class Embedder(base.TransformerMixin, estimators.NetworkEstimator):  # type: ign
             {"format": self.CHECKPOINT_FORMAT, "estimator": self}, serialized
         )
         return envelope.seal(
-            path, self.checkpoint_manifest(), serialized.getvalue(), signing_key
+            path, self.inventory(), serialized.getvalue(), signing_key
         )
 
     @classmethod
-    def load_checkpoint(
+    def restore(
         cls,
         path: str | pathlib.Path,
         signing_key: str | bytes | None = None,
@@ -209,7 +209,7 @@ class Embedder(base.TransformerMixin, estimators.NetworkEstimator):  # type: ign
         """Loads a checkpoint, authenticating it before anything is unpickled.
 
         Args:
-            path: Checkpoint produced by `save_checkpoint`.
+            path: Checkpoint produced by `stash`.
             signing_key: HMAC key; the configured key is used when None.
             trusted: Whether the caller vouches for an unsigned checkpoint.
 
@@ -253,7 +253,7 @@ class Embedder(base.TransformerMixin, estimators.NetworkEstimator):  # type: ign
         if not isinstance(estimator, cls):
             raise errors.InputError("checkpoint does not contain a Embedder")
         validation.check_is_fitted(estimator, attributes=["state_"])
-        expected = json.loads(json.dumps(estimator.checkpoint_manifest()))
+        expected = json.loads(json.dumps(estimator.inventory()))
         if meta != expected:
             raise errors.InputError(
                 "tabular JEPA checkpoint metadata does not match"

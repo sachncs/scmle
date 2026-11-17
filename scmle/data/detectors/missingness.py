@@ -6,7 +6,7 @@ Mechanism is argued from evidence, never asserted:
   project has no statsmodels dependency).
 * MAR is probed with an indicator model: can the other columns predict that a
   value is missing? Out-of-fold AUC is compared with a permutation null.
-* MNAR cannot be tested from the data. `tipping_point` reports the shift of
+* MNAR cannot be tested from the data. `tipover` reports the shift of
   the missing values at which a conclusion flips, over a declared range.
 * The per-column screen against the target stays in
   `scmle.data.profiling.missingness`.
@@ -610,7 +610,7 @@ class Sensitivity:
     steps: int
 
 
-def tipping_point(
+def tipover(
     observed: numpy.ndarray,
     n_missing: int,
     conclusion: Callable[[numpy.ndarray], bool],

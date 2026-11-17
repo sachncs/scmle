@@ -41,7 +41,7 @@ def test_zero_weight_rows_do_not_influence_a_model_that_takes_weights():
         features, target
     )
 
-    assert model.accepts_weights(model.estimator_)
+    assert model.weightable(model.estimator_)
     slope = model.estimator_.named_steps["model"].coef_[0]
     assert slope > 0
 
@@ -58,7 +58,7 @@ def test_models_without_weight_support_are_fitted_on_a_weighted_draw():
     plain = pipeline.Pipeline([("scale", scaler()), ("model", NoWeights())])
     model = weighting.weighted(plain, "w", 0).fit(features, target)
 
-    assert not model.accepts_weights(model.estimator_)
+    assert not model.weightable(model.estimator_)
     assert model.estimator_.named_steps["model"].coef_[0] > 0
 
 

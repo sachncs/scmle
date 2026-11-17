@@ -105,10 +105,10 @@ def test_read_optional_returns_only_json_objects(tmp_path):
 def test_column_of_names_the_feature_or_none(run):
     ledger = claims_audit.rehydrate(run)
     claim_id = next(iter(ledger.hypotheses))
-    assert claims_audit.column_of(ledger, claim_id) == (
+    assert claims_audit.locate(ledger, claim_id) == (
         ledger.hypotheses[claim_id].spec.column
     )
-    assert claims_audit.column_of(ledger, "h-unknown") is None
+    assert claims_audit.locate(ledger, "h-unknown") is None
 
 
 def test_list_and_show_work_when_the_claims_file_has_no_withdrawals(run):

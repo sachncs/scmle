@@ -49,7 +49,7 @@ at most `alpha`, and in practice far lower because the lower bound must also
 clear the ceiling. Nothing is claimed about power against leaks weaker than
 the ceiling. The measured operating characteristics are in the certificate
 (`benchmarks.qualification.f4_certify`); until a current certificate passes,
-`gate_status` is descriptive and decisions are demoted to warnings.
+`adjudication` is descriptive and decisions are demoted to warnings.
 """
 
 from collections.abc import Hashable
@@ -191,7 +191,7 @@ def design(series: pandas.Series) -> numpy.ndarray:
     return pandas.get_dummies(pooled).to_numpy(dtype="float64")
 
 
-def encode_target(y: pandas.Series, task: str) -> numpy.ndarray:
+def vectorize(y: pandas.Series, task: str) -> numpy.ndarray:
     """Encodes the target as class codes or floats.
 
     Args:
@@ -621,14 +621,14 @@ def probe(
     Raises:
         ValueError: If both `groups` and `block_size` are given, `feature`
             and `target` differ in length, or the target is invalid (see
-            `encode_target`).
+            `vectorize`).
     """
     if groups is not None and block_size is not None:
         raise errors.InputError("use groups or block_size, not both")
     if len(feature) != len(target):
         raise errors.InputError("feature and target must have the same length")
     name = str(feature.name)
-    y = encode_target(target, task)
+    y = vectorize(target, task)
     group_values = None if groups is None else groups.to_numpy()
     x = design(feature)
     path = f"{SKILL}.{name}"
@@ -810,12 +810,12 @@ def condition(
 
     Raises:
         ValueError: If both `groups` and `block_size` are given, or the
-            target is invalid (see `encode_target`).
+            target is invalid (see `vectorize`).
     """
     if groups is not None and block_size is not None:
         raise errors.InputError("use groups or block_size, not both")
     name = str(feature.name)
-    y = encode_target(target, task)
+    y = vectorize(target, task)
     group_values = None if groups is None else groups.to_numpy()
     x = design(feature)
     path = f"{CONDITIONAL}.{name}"
@@ -1173,7 +1173,7 @@ def scan(
 
     Returns:
         The report, with one assessment per tested feature in the order
-        given, recording `gate` as passed (see `gate_status` for deriving
+        given, recording `gate` as passed (see `adjudication` for deriving
         it from the certificates).
 
     Raises:
@@ -1206,7 +1206,7 @@ def scan(
 CERTIFIED = Config(skill_ceiling=0.95, association_ceiling=0.9)
 
 
-def gate_status(
+def adjudication(
     store: certificates.Store,
     cfg: Config,
     task: str = "classification",

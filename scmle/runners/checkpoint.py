@@ -68,7 +68,7 @@ class CheckpointStore:
         skipped: Keys of damaged checkpoints passed over by the last `latest`.
     """
 
-    def __init__(self, store: objectstore.ObjectStore, run_id: str) -> None:
+    def __init__(self, store: objectstore.Depot, run_id: str) -> None:
         """Initializes the store view.
 
         Args:

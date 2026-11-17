@@ -91,7 +91,7 @@ def test_f_is_opened_once_and_logged_under_the_forward_actor():
     check = by_name["f"].check
     assert check.set_id.value == "F" and check.tier.value == "unverified"
     with pytest.raises(errors.LeakageError):
-        held.open(held.issue_token())
+        held.open(held.mint())
     vault.log.verify()
 
 

@@ -21,7 +21,7 @@ an approval in parallel, then batch prediction (approved).
 
 ## The local executor
 
-State lives in an `ObjectStore` under `workflows/<name>/runs/<run id>/`.
+State lives in a `Depot` under `workflows/<name>/runs/<run id>/`.
 
 | Concern | Behaviour |
 | --- | --- |

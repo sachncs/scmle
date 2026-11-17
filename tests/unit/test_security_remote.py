@@ -107,7 +107,9 @@ def test_a_verifier_accepts_a_token_signed_by_a_fetched_key():
     documents = Documents()
     with serve(documents) as base:
         provider(base, documents)
-        keys = remote.KeySet(f"{base}/jwks.json", clock=clock, allow_http=True)
+        keys = remote.Keystore(
+            f"{base}/jwks.json", clock=clock, allow_http=True
+        )
         check = tokens.Verifier(
             keys,
             support_identity.ISSUER,
@@ -125,7 +127,7 @@ def test_the_key_set_is_cached_until_the_ttl_and_then_refreshed():
     documents = Documents()
     with serve(documents) as base:
         provider(base, documents)
-        keys = remote.KeySet(
+        keys = remote.Keystore(
             f"{base}/jwks.json", ttl=60, clock=clock, allow_http=True
         )
         keys.get("rs-k1")
@@ -141,7 +143,7 @@ def test_rotation_is_picked_up_for_an_unknown_kid_but_not_every_call():
     documents = Documents()
     with serve(documents) as base:
         provider(base, documents, keys=("k1",))
-        keys = remote.KeySet(
+        keys = remote.Keystore(
             f"{base}/jwks.json",
             ttl=3600,
             min_refresh=10,
@@ -162,7 +164,7 @@ def test_a_key_set_that_cannot_be_fetched_fails_closed_after_max_stale(caplog):
     documents = Documents()
     with serve(documents) as base:
         provider(base, documents)
-        keys = remote.KeySet(
+        keys = remote.Keystore(
             f"{base}/jwks.json",
             ttl=60,
             max_stale=300,
@@ -184,7 +186,7 @@ def test_a_key_set_that_cannot_be_fetched_fails_closed_after_max_stale(caplog):
 def test_the_first_fetch_must_succeed():
     documents = Documents()
     with serve(documents) as base, pytest.raises(errors.ConfigError):
-        remote.KeySet(f"{base}/jwks.json", allow_http=True)
+        remote.Keystore(f"{base}/jwks.json", allow_http=True)
 
 
 def revoke(documents, **fields):
@@ -204,7 +206,7 @@ def test_two_replicas_see_a_revocation_within_the_ttl():
         revoke(documents)
         replicas = []
         for ignored in range(2):
-            keys = remote.KeySet(
+            keys = remote.Keystore(
                 f"{base}/jwks.json", clock=clock, allow_http=True
             )
             lists = remote.Revocations(
@@ -238,7 +240,9 @@ def test_a_revocation_source_that_stays_down_stops_accepting_tokens():
     with serve(documents) as base:
         provider(base, documents)
         revoke(documents)
-        keys = remote.KeySet(f"{base}/jwks.json", clock=clock, allow_http=True)
+        keys = remote.Keystore(
+            f"{base}/jwks.json", clock=clock, allow_http=True
+        )
         lists = remote.Revocations(
             f"{base}/revoked.json",
             ttl=30,

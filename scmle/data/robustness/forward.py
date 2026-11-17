@@ -255,7 +255,7 @@ def forward_check(
     ).hexdigest()
     if not source.committed:
         source.commit(claims, LEDGER)
-    token = source.issue_token()
+    token = source.mint()
     features, target = source.open(
         token, ACTOR, claims_hash=claims, ledger_hash=LEDGER
     )

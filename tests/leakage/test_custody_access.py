@@ -89,7 +89,7 @@ def reachable(root, limit=200_000):
 def test_the_view_reaches_no_sealed_object_or_token():
     built = build()
     outcome, vault = built.outcome, built.vault
-    tokens = {s.issue_token() for s in vault.sets.values()}
+    tokens = {s.mint() for s in vault.sets.values()}
     objects = reachable(outcome.view)
     assert not any(
         isinstance(
@@ -120,7 +120,7 @@ def test_pickling_the_view_leaks_neither_rows_nor_tokens():
     built = build()
     frame, outcome, vault = built.frame, built.outcome, built.vault
     blob = pickle.dumps(outcome.view)
-    for token in (s.issue_token() for s in vault.sets.values()):
+    for token in (s.mint() for s in vault.sets.values()):
         assert token.encode() not in blob
     restored = pickle.loads(blob)  # nosec B301 - our own bytes
     held = set(frame[SENTINEL].iloc[list(vault.sets["C"].ids)].tolist())
@@ -132,7 +132,7 @@ def test_the_open_log_and_manifest_hold_ids_but_never_values():
     frame, outcome, vault, log = build()
     held = vault.sets["C"]
     held.commit("claims-1", "ledger-1")
-    held.open(held.issue_token(), "confirmation", "claims-1", "ledger-1")
+    held.open(held.mint(), "confirmation", "claims-1", "ledger-1")
     text = json.dumps(log.entries) + json.dumps(outcome.manifest.to_dict())
     for value in frame[SENTINEL].iloc[list(held.ids)].head(50):
         assert repr(float(value)) not in text
@@ -155,7 +155,7 @@ def test_a_second_open_is_refused_and_both_attempts_are_logged():
     vault, log = built.vault, built.log
     held = vault.sets["C"]
     held.commit("claims-1", "ledger-1")
-    token = held.issue_token()
+    token = held.mint()
     held.open(token, "confirmation", "claims-1", "ledger-1")
     try:
         held.open(token, "exploration", "claims-1", "ledger-1")
@@ -174,7 +174,7 @@ def test_a_release_for_a_different_selection_is_refused_by_the_vault():
     built = build()
     held, log = built.vault.sets["C"], built.log
     held.commit("claims-1", "ledger-1")
-    token = held.issue_token()
+    token = held.mint()
     try:
         held.open(token, "exploration", "claims-1", "ledger-OTHER")
     except errors.LeakageError:

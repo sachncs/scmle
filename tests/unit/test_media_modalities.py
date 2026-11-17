@@ -235,7 +235,7 @@ def test_audio_split_keeps_explicit_speaker_groups_together():
     first = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
     second = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
 
-    assignments = first.group_ids()
+    assignments = first.cohorts()
     groups = [set(values) for values in assignments.values()]
     assert sum("speaker-0" in values for values in groups) == 1
     assert set().union(*groups) == {"speaker-0", "speaker-1", "speaker-2"}
@@ -323,7 +323,7 @@ def test_video_temporal_split_normalizes_time_and_records_coverage():
     )
     dataset = video.Dataset(samples)
 
-    split = dataset.split_temporal("2026-01-02T00:00:00+00:00")
+    split = dataset.cutover("2026-01-02T00:00:00+00:00")
     report = dataset.curate()
 
     assert dataset.samples[0].observation_time == datetime(
@@ -331,7 +331,7 @@ def test_video_temporal_split_normalizes_time_and_records_coverage():
     )
     assert len(split.train) == 2
     assert len(split.future) == 1
-    assert not split.has_future_leakage
+    assert not split.lookahead
     assert split.cutoff.tzinfo == UTC
     assert report.profile["temporal"]["status"] == "complete"
 
@@ -364,7 +364,7 @@ def test_video_temporal_state_fails_closed_when_incomplete():
         finding.finding_id for finding in report.quality_findings
     }
     with pytest.raises(video.VideoTemporalError, match="every video"):
-        dataset.split_temporal("2026-01-02T00:00:00Z")
+        dataset.cutover("2026-01-02T00:00:00Z")
     with pytest.raises(video.VideoTemporalError, match="timezone"):
         video.canonical_observation_time("2026-01-01T00:00:00")
 
@@ -553,7 +553,7 @@ def test_video_split_keeps_explicit_subject_groups_together():
     first = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
     second = dataset.split(validation_fraction=0.25, test_fraction=0.25, seed=3)
 
-    assignments = first.group_ids()
+    assignments = first.cohorts()
     groups = [set(values) for values in assignments.values()]
     assert sum("subject-0" in values for values in groups) == 1
     assert set().union(*groups) == {
@@ -987,7 +987,7 @@ def test_geospatial_temporal_split_normalizes_time_and_curates_coverage():
     )
     dataset = geospatial.Dataset(features, crs="EPSG:3857")
 
-    split = dataset.split_temporal("2026-01-02T00:00:00+00:00")
+    split = dataset.cutover("2026-01-02T00:00:00+00:00")
     report = dataset.curate()
 
     assert dataset.features[0].observation_time == datetime(
@@ -995,7 +995,7 @@ def test_geospatial_temporal_split_normalizes_time_and_curates_coverage():
     )
     assert len(split.train) == 2
     assert len(split.future) == 1
-    assert not split.has_future_leakage
+    assert not split.lookahead
     assert split.cutoff.tzinfo == UTC
     assert report.profile["temporal"]["status"] == "complete"
 
@@ -1026,7 +1026,7 @@ def test_geospatial_temporal_state_fails_closed_when_incomplete():
     }
     assert "quality.geospatial-mixed-temporal-state" in quality_ids
     with pytest.raises(geospatial.TemporalError, match="every feature"):
-        mixed.split_temporal("2026-01-02T00:00:00Z")
+        mixed.cutover("2026-01-02T00:00:00Z")
     with pytest.raises(geospatial.TemporalError, match="timezone"):
         geospatial.canonical_observation_time("2026-01-01T00:00:00")
 

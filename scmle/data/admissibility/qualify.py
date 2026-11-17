@@ -383,7 +383,7 @@ def run(
     today: datetime.date | None = None,
     causal: scmle.data.charter.causal.Question | None = None,
     dag: scmle.data.admissibility.dag.Dag | None = None,
-    declared: Sequence[provenance.FieldProvenance] = (),
+    declared: Sequence[provenance.Pedigree] = (),
 ) -> Qualification:
     """Runs leakage, admissibility and the detector pipeline on `X`.
 

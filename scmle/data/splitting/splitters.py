@@ -125,7 +125,7 @@ class Lockbox(abc.ABC):
     opened: bool
 
     @abc.abstractmethod
-    def issue_token(self) -> str:
+    def mint(self) -> str:
         """Returns the release token; call only once selection is frozen.
 
         Returns:
@@ -154,7 +154,7 @@ class Lockbox(abc.ABC):
         """Releases the test data a single time.
 
         Args:
-            token: The token from `issue_token`.
+            token: The token from `mint`.
             binding: The binding fixed by `bind`; required once one is set.
 
         Returns:
@@ -191,7 +191,7 @@ class ResidentTestSet(Lockbox):
         features: Test features.
         target: Test labels.
         ids: Row ids of the test rows.
-        token: Secret issued by `issue_token` (excluded from repr).
+        token: Secret issued by `mint` (excluded from repr).
         opened: Whether the set has been released.
         binding: Digest the release is bound to, or None.
     """
@@ -205,7 +205,7 @@ class ResidentTestSet(Lockbox):
     opened: bool = False
     binding: str | None = None
 
-    def issue_token(self) -> str:
+    def mint(self) -> str:
         """Returns the release token; call only once selection is frozen.
 
         Returns:
@@ -233,7 +233,7 @@ class ResidentTestSet(Lockbox):
         """Releases the test data a single time.
 
         Args:
-            token: The token from `issue_token`.
+            token: The token from `mint`.
             binding: The binding fixed by `bind`, which must come first.
 
         Returns:
@@ -354,7 +354,7 @@ class RandomSplit(Partitioner):
 
     name = "random"
 
-    def stratify_labels(self, frame: pandas.DataFrame) -> pandas.Series | None:  # noqa: ARG002 -- hook that subclasses override and read the frame in
+    def stratifier(self, frame: pandas.DataFrame) -> pandas.Series | None:  # noqa: ARG002 -- hook that subclasses override and read the frame in
         """Labels to stratify the holdout on; none for plain random.
 
         Args:
@@ -433,7 +433,7 @@ class RandomSplit(Partitioner):
             The sorted development and test ids, the folds over development
             positions and any notes.
         """
-        labels = self.stratify_labels(frame)
+        labels = self.stratifier(frame)
         if labels is not None:
             self.require(len(frame), labels)
         dev_ids, test_ids = model_selection.train_test_split(
@@ -454,7 +454,7 @@ class StratifiedSplit(RandomSplit):
     name = "stratified"
     supported_tasks = frozenset({tasks.Task.BINARY, tasks.Task.MULTICLASS})
 
-    def stratify_labels(self, frame: pandas.DataFrame) -> pandas.Series:
+    def stratifier(self, frame: pandas.DataFrame) -> pandas.Series:
         """Stratifies on the target; every class needs two examples.
 
         Args:
@@ -526,7 +526,7 @@ class EventStratifiedSplit(RandomSplit):
         """
         return frame[self.data.event_column]
 
-    def stratify_labels(self, frame: pandas.DataFrame) -> pandas.Series:
+    def stratifier(self, frame: pandas.DataFrame) -> pandas.Series:
         """Stratifies the holdout on the event indicator.
 
         Args:
@@ -682,7 +682,7 @@ class TreatmentStratifiedSplit(RandomSplit):
             return arm * 2 + outcome.astype(int)
         return arm
 
-    def stratify_labels(self, frame: pandas.DataFrame) -> pandas.Series:
+    def stratifier(self, frame: pandas.DataFrame) -> pandas.Series:
         """Stratifies the holdout on the arm / outcome cell.
 
         Args:
@@ -887,7 +887,7 @@ class GroupSplit(Partitioner):
         )
 
 
-class TemporalSplit(Partitioner):
+class Chronology(Partitioner):
     """Trains on the past and evaluates on the future."""
 
     name = "temporal"
@@ -982,7 +982,7 @@ class TemporalSplit(Partitioner):
         return Partition(dev_ids, test_ids, windows[::-1], notes)
 
 
-class RollingSplit(TemporalSplit):
+class RollingSplit(Chronology):
     """Rolling-origin evaluation: slide forward, validate on what follows.
 
     Each fold trains on the rows before a cut-off (at most `window_rows` of
@@ -1060,7 +1060,7 @@ STRATEGIES: dict[str, type[Partitioner]] = {
         TreatmentStratifiedSplit,
         Preset,
         GroupSplit,
-        TemporalSplit,
+        Chronology,
         RollingSplit,
     )
 }

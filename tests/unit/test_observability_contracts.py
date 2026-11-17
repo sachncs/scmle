@@ -38,7 +38,7 @@ def test_metrics_events_and_policy_have_deterministic_json():
         redacted_fields=("email",),
     )
 
-    payload = observability.canonical_json((metric,), (event,), policy())
+    payload = observability.canonize((metric,), (event,), policy())
 
     assert '"error_category":"schema"' in payload
     assert '"email"' in payload

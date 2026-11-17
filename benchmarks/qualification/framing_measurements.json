@@ -37,7 +37,7 @@
     "accepted": 0,
     "malformed": 1000
   },
-  "seconds": 7.3,
+  "seconds": 7.4,
   "selective_labels": {
     "alpha": 0.01,
     "clean": 500,

@@ -128,7 +128,7 @@ class Joint(scmle.contracts.metrics.Metric):
 
     kind: str = "f1_macro_labels"
 
-    def accepts_weights(self) -> bool:
+    def weightable(self) -> bool:
         """These scores are unweighted.
 
         Returns:

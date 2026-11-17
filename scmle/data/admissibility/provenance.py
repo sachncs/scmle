@@ -1,6 +1,6 @@
 """Field-level provenance and evidence tiers.
 
-A `FieldProvenance` record says how one field's values come to exist: where
+A `Pedigree` record says how one field's values come to exist: where
 they originate, who writes them, when, whether they are overwritten, and the
 as-of rule that says how long before the prediction moment each value is
 known. The tier of the as-of rule is:
@@ -314,7 +314,7 @@ class Reconstruction:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FieldProvenance:
+class Pedigree:
     """How one field's values come to exist.
 
     Attributes:
@@ -474,7 +474,7 @@ class FieldProvenance:
         )
 
 
-def undeclared(name: str) -> FieldProvenance:
+def undeclared(name: str) -> Pedigree:
     """Returns the record of a field nobody described: everything unknown.
 
     Args:
@@ -483,7 +483,7 @@ def undeclared(name: str) -> FieldProvenance:
     Returns:
         A record whose tier is `unverified`.
     """
-    return FieldProvenance(
+    return Pedigree(
         name=name,
         origin=Origin.DERIVED,
         writer="undeclared",
@@ -504,7 +504,7 @@ class Dictionary:
         fields: One record per field, in a fixed order, names unique.
     """
 
-    fields: tuple[FieldProvenance, ...]
+    fields: tuple[Pedigree, ...]
 
     def __post_init__(self) -> None:
         """Validates the table.
@@ -521,7 +521,7 @@ class Dictionary:
     def covering(
         cls,
         columns: Sequence[str],
-        declared: Sequence[FieldProvenance] = (),
+        declared: Sequence[Pedigree] = (),
     ) -> Self:
         """Builds a table with a record for every column.
 
@@ -547,7 +547,7 @@ class Dictionary:
             )
         return cls(tuple(by_name.get(c) or undeclared(c) for c in columns))
 
-    def get(self, name: str) -> FieldProvenance:
+    def get(self, name: str) -> Pedigree:
         """Looks up the record of a field.
 
         Args:
@@ -613,9 +613,7 @@ class Dictionary:
             raise errors.InputError(f"unexpected field(s): {extra}")
         if "fields" not in document:
             raise errors.InputError("missing field(s): ['fields']")
-        return cls(
-            tuple(FieldProvenance.from_dict(f) for f in document["fields"])
-        )
+        return cls(tuple(Pedigree.from_dict(f) for f in document["fields"]))
 
     def digest(self) -> str:
         """Hashes the table.

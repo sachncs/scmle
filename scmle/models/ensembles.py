@@ -349,7 +349,7 @@ class Stacking(models.Model):
         inner = inner_cv.for_plan(
             plan, task.is_classification, STACK_FOLDS, seed
         )
-        meta = self.meta_learner(task, len(estimators))
+        meta = self.stacker(task, len(estimators))
         stack: models.Estimator
         if task.is_classification:
             stack = cast(
@@ -370,7 +370,7 @@ class Stacking(models.Model):
             )
         return stack
 
-    def meta_learner(self, task: tasks.Task, members: int) -> Any:  # noqa: ARG002 -- override point of the stacking template
+    def stacker(self, task: tasks.Task, members: int) -> Any:  # noqa: ARG002 -- override point of the stacking template
         """Creates the model that combines the members' out-of-fold predictions.
 
         Args:
@@ -413,7 +413,7 @@ class Stacking(models.Model):
             )
             for index, member in enumerate(members)
         ]
-        meta = self.meta_learner(task, len(estimators))
+        meta = self.stacker(task, len(estimators))
         stack: models.Estimator
         if task.is_classification:
             stack = cast(
@@ -440,7 +440,7 @@ class Blending(Stacking):
 
     name = "blending"
 
-    def meta_learner(self, task: tasks.Task, members: int) -> Any:
+    def stacker(self, task: tasks.Task, members: int) -> Any:
         """Creates a greedy blender instead of a fitted linear model.
 
         Args:

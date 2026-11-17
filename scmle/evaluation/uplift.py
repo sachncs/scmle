@@ -242,7 +242,7 @@ class Incrementality(scmle.contracts.metrics.Metric):
 
     kind: str = "qini"
 
-    def accepts_weights(self) -> bool:
+    def weightable(self) -> bool:
         """Returns whether row weights are accepted; these scores are not.
 
         Returns:

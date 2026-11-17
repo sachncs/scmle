@@ -441,7 +441,7 @@ def test_dbapi_connector_reports_structured_retry_exhaustion():
         connectors.Retries(max_retries=1),
     )
 
-    with pytest.raises(connectors.RetryExhaustedError) as raised:
+    with pytest.raises(connectors.RetryError) as raised:
         connector.schema()
 
     assert attempts == 2

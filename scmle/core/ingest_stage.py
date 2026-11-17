@@ -92,7 +92,7 @@ class Output:
 
     features: pandas.DataFrame
     declared: int
-    records: tuple[provenance.FieldProvenance, ...]
+    records: tuple[provenance.Pedigree, ...]
     documents: dict[str, dict[str, Any]]
     summary: dict[str, Any]
 
@@ -404,7 +404,7 @@ def resolve_entities(
     return groups, {**found.to_dict(), "group_column": spec.column}
 
 
-def check_multiplicity(
+def plurality(
     declared: int,
     synthesized: tuple[str, ...],
     registered_columns: set[str],

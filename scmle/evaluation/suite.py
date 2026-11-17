@@ -20,10 +20,10 @@ def lineup() -> tuple[diagnostics.Diagnostic, ...]:
         diagnostics.
     """
     return (
-        *diagnostics.default_suite(),
+        *diagnostics.panoply(),
         slices.Slices(),
         fairness.Fairness(),
         robustness.Robustness(),
         shift.Adversary(),
-        *suite.default_suite(),
+        *suite.panoply(),
     )

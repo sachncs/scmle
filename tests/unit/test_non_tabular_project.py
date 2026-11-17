@@ -155,7 +155,7 @@ def test_project_runs_and_reloads_verified_bounded_result(tmp_path: Path):
     assert result.predict(list(adapter.samples[:2])).shape == (2,)
     assert result.predict_proba(list(adapter.samples[:2])).shape == (2, 2)
 
-    loaded = project.load_result()
+    loaded = project.recall()
     assert loaded.report == result.report
     assert loaded.predictor.health()["lifecycle_report_verified"] is True
 

@@ -77,7 +77,7 @@ class Reweighter(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ship
         column: str = self.estimator.query_column
         return column
 
-    def accepts_weights(self, candidate: base.BaseEstimator) -> bool:
+    def weightable(self, candidate: base.BaseEstimator) -> bool:
         """Checks whether a pipeline's model step takes `sample_weight`.
 
         Args:
@@ -114,7 +114,7 @@ class Reweighter(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ship
         labels = pandas.Series(numpy.asarray(target))
         weights = frame[self.column].to_numpy(dtype=float)
         candidate = cast("Any", base.clone(self.estimator))
-        if self.accepts_weights(candidate):
+        if self.weightable(candidate):
             candidate.fit(frame, labels, model__sample_weight=weights)
         else:
             generator = numpy.random.default_rng(self.random_state)

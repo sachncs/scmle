@@ -300,7 +300,7 @@ class RankingMetric(scmle.contracts.metrics.Metric):
 
     kind: str = "ndcg"
 
-    def accepts_weights(self) -> bool:
+    def weightable(self) -> bool:
         """Returns whether the metric can use row weights.
 
         Queries are the unit of scoring, not weighted rows.

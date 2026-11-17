@@ -26,7 +26,7 @@ const executor = [
   <div class="callout"><p><strong>Automatic versus approved.</strong> A step with <code>effect="approved"</code> may only exist behind an <code>approval</code> step it depends on; the definition refuses otherwise. The standard workflow is: ingest, train, evaluate, then monitor and an approval in parallel, then batch prediction (approved).</p></div>
 
   <h2>The local executor</h2>
-  <p>State lives in an <code>ObjectStore</code> (see <a href={`${base}/docs/governed-data/`}>Governed data</a>) under <code>workflows/&lt;name&gt;/runs/&lt;run id&gt;/</code>.</p>
+  <p>State lives in an <code>Depot</code> (see <a href={`${base}/docs/governed-data/`}>Governed data</a>) under <code>workflows/&lt;name&gt;/runs/&lt;run id&gt;/</code>.</p>
   <DocTable label="Executor behaviour" head={["Concern", "Behaviour"]} rows={executor} />
   <p>A <code>Scheduler</code> turns the schedule into slots and applies the declared catch-up policy to missed ones: <code>run_all</code> (bounded by <code>max_catch_up</code>), <code>latest_only</code>, or <code>skip</code> (only a slot still within a tenth of an interval). Run ids come from the slot, so a scheduler that lost its state cannot repeat a finished slot. The first tick does not backfill. A slot that cannot start because the workflow is busy is <code>deferred</code> and stays due.</p>
 

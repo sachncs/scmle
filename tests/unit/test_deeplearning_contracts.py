@@ -37,8 +37,8 @@ def test_transformer_contract_is_tabular_and_fails_closed_for_images():
     family = contracts.TABULAR_TRANSFORMER_CONTRACT
 
     assert family.status is capabilities.Status.EXPERIMENTAL
-    assert family.supports_modality(capabilities.Modality.TABULAR)
-    assert not family.supports_modality(capabilities.Modality.IMAGE)
+    assert family.accommodates(capabilities.Modality.TABULAR)
+    assert not family.accommodates(capabilities.Modality.IMAGE)
 
 
 def test_transformer_runs_real_torch_inference_explanation_and_checkpoint(
@@ -67,13 +67,13 @@ def test_transformer_runs_real_torch_inference_explanation_and_checkpoint(
     assert explanation.method == "gradient_x_input"
     assert explanation.target == "predicted_output"
 
-    checkpoint = model.save_checkpoint(tmp_path / "transformer.bin", KEY)
-    restored = estimators.TorchClassifier.load_checkpoint(checkpoint, KEY)
+    checkpoint = model.stash(tmp_path / "transformer.bin", KEY)
+    restored = estimators.TorchClassifier.restore(checkpoint, KEY)
 
     numpy.testing.assert_allclose(
         restored.predict_proba(matrix[:6]), probabilities, rtol=0.0, atol=0.0
     )
-    assert restored.checkpoint_manifest()["model_family"] == "transformer"
+    assert restored.inventory()["model_family"] == "transformer"
 
 
 def test_transformer_rejects_non_tabular_shape_before_worker_start():
@@ -109,13 +109,13 @@ def test_jepa_runs_real_torch_embedding_explanation_and_checkpoint(tmp_path):
     assert explanation.method == "embedding_gradient_x_input"
     assert explanation.target == "embedding_energy"
 
-    checkpoint = model.save_checkpoint(tmp_path / "jepa.bin", KEY)
-    restored = jepa.Embedder.load_checkpoint(checkpoint, KEY)
+    checkpoint = model.stash(tmp_path / "jepa.bin", KEY)
+    restored = jepa.Embedder.restore(checkpoint, KEY)
 
     numpy.testing.assert_allclose(
         restored.transform(matrix[:5]), embedding, rtol=0.0, atol=0.0
     )
-    assert restored.checkpoint_manifest()["model_family"] == "jepa"
+    assert restored.inventory()["model_family"] == "jepa"
 
 
 def test_transformer_checkpoint_metadata_tampering_is_rejected(tmp_path):
@@ -128,14 +128,14 @@ def test_transformer_checkpoint_metadata_tampering_is_rejected(tmp_path):
         validation_fraction=0.0,
         random_state=7,
     ).fit(matrix, labels(len(matrix)))
-    checkpoint = model.save_checkpoint(tmp_path / "transformer.bin", KEY)
+    checkpoint = model.stash(tmp_path / "transformer.bin", KEY)
     meta, payload = scmle.envelope.read(checkpoint, KEY)
     scmle.envelope.seal(
         checkpoint, {**meta, "model_family": "jepa"}, payload, KEY
     )
 
     with pytest.raises(ValueError, match="metadata does not match"):
-        estimators.TorchClassifier.load_checkpoint(checkpoint, KEY)
+        estimators.TorchClassifier.restore(checkpoint, KEY)
 
 
 def test_torch_adapters_expose_the_same_fail_closed_modality_contract():
@@ -143,14 +143,14 @@ def test_torch_adapters_expose_the_same_fail_closed_modality_contract():
     transformer = networks.FT_TRANSFORMER
     jepa_adapter = networks.Jepa()
 
-    assert transformer.family_contract.supports_modality("tabular")
-    assert not transformer.family_contract.supports_modality("image")
+    assert transformer.family_contract.accommodates("tabular")
+    assert not transformer.family_contract.accommodates("image")
     assert jepa_adapter.family_contract is contracts.TABULAR_JEPA_CONTRACT
 
 
 def test_jepa_rejection_reason_includes_both_training_boundaries():
     """Small JEPA datasets report the complete actionable boundary."""
-    reason = networks.Jepa().rejection_reason(tasks.Task.BINARY, row_count=15)
+    reason = networks.Jepa().objection(tasks.Task.BINARY, row_count=15)
 
     assert reason == (
         "tabular JEPA requires at least 16 rows for its training and "

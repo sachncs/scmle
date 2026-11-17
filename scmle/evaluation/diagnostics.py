@@ -683,7 +683,7 @@ class Uncertainty(Diagnostic):
         }
 
 
-def default_suite() -> tuple[Diagnostic, ...]:
+def panoply() -> tuple[Diagnostic, ...]:
     """Returns the standard diagnostics.
 
     Returns:
@@ -709,7 +709,7 @@ def run_suite(
 
     Args:
         inputs: Fitted candidate and evaluation data.
-        suite: Diagnostics to run; defaults to `default_suite()`.
+        suite: Diagnostics to run; defaults to `panoply()`.
         total_seconds: Time allowance for the whole suite, shared evenly by
             the diagnostics still to run (None = unlimited). It sets
             `DiagnosticInput.deadline`; only diagnostics that check
@@ -722,7 +722,7 @@ def run_suite(
     reports: dict[str, dict[str, Any]] = {}
     chosen = [
         d
-        for d in (suite if suite is not None else default_suite())
+        for d in (suite if suite is not None else panoply())
         if inputs.task in d.applies_to
     ]
     finish = None if total_seconds is None else time.monotonic() + total_seconds

@@ -165,7 +165,7 @@ def test_a_clearly_worse_new_champion_is_rolled_back(good, tmp_path):
     store, manager = registry_with(tmp_path, good, broken)
     fresh = traffic(1200, seed=20)
 
-    outcome = manager.check_rollback(
+    outcome = manager.revertible(
         fresh,
         "y",
         approval=sanction(store.resolve("m", 1)),
@@ -188,7 +188,7 @@ def test_a_clearly_worse_new_champion_waits_for_approval(good, tmp_path):
     broken = bundle_of("logistic_regression", traffic(seed=0, flip=True))
     store, manager = registry_with(tmp_path, good, broken)
 
-    outcome = manager.check_rollback(traffic(1200, seed=20), "y")
+    outcome = manager.revertible(traffic(1200, seed=20), "y")
 
     assert not outcome.rolled_back
     assert outcome.restored_version is None
@@ -200,7 +200,7 @@ def test_a_new_champion_that_holds_up_stays(good, tmp_path):
     same = bundle_of("logistic_regression", traffic(seed=1))
     store, manager = registry_with(tmp_path, good, same)
 
-    outcome = manager.check_rollback(
+    outcome = manager.revertible(
         traffic(1200, seed=21),
         "y",
         lifecycle.Trigger(tolerance=0.02),
@@ -220,7 +220,7 @@ def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
         signing_key=APPROVAL_KEY,
     )
 
-    assert "no previous" in manager.check_rollback(traffic(300), "y").reason
+    assert "no previous" in manager.revertible(traffic(300), "y").reason
     second = store.register(
         "m",
         bundle_of("decision_tree", traffic(100, seed=9)).save(tmp_path / "f"),
@@ -232,7 +232,7 @@ def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
         approval=sanction(second),
         signing_key=APPROVAL_KEY,
     )
-    assert "fewer than" in manager.check_rollback(traffic(20), "y").reason
+    assert "fewer than" in manager.revertible(traffic(20), "y").reason
 
 
 def test_a_rollback_that_is_refused_is_not_audited_as_rolled_back(
@@ -241,7 +241,7 @@ def test_a_rollback_that_is_refused_is_not_audited_as_rolled_back(
     broken = bundle_of("logistic_regression", traffic(seed=0, flip=True))
     store, manager = registry_with(tmp_path, good, broken)
     with pytest.raises(errors.ArtifactError):
-        manager.check_rollback(
+        manager.revertible(
             traffic(1200, seed=20),
             "y",
             approval=sanction(store.resolve("m", 1)),

@@ -261,7 +261,7 @@ def test_the_bootstrap_rollback_check_never_moves_the_alias_once_a_hook_is_bound
     ledger = ledger_for()
     hook = rollout_hook.Hook(manager, make_plan(), ledger)
 
-    outcome = hook.check_rollback(
+    outcome = hook.revertible(
         test_lifecycle_extras.traffic(1200, seed=20),
         "y",
         approval=sanction(store.resolve("m", 1)),
@@ -294,7 +294,7 @@ def test_the_hook_is_the_only_decider_of_promotion_and_rollback(tmp_path):
     hook.promote(sanction(challenger), signing_key=APPROVAL_KEY)
     fresh = test_lifecycle_extras.traffic(1200, seed=20)
 
-    bootstrap = manager.check_rollback(
+    bootstrap = manager.revertible(
         fresh,
         "y",
         approval=sanction(store.resolve("m", 1)),

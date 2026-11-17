@@ -55,7 +55,7 @@ def test_gain_sign_verdict_flips_with_the_threshold():
     y = (rng.random(2000) < 0.3).astype(float)
     a = (rng.random(2000) < numpy.where(y == 1, 0.8, 0.45)).astype(float)
     b = (rng.random(2000) < numpy.where(y == 1, 0.55, 0.15)).astype(float)
-    found = questions.tipping_point(
+    found = questions.tipover(
         questions.Unknown("t", 0.05, 0.5, "x", questions.judge(y, a, b))
     )
     assert found is not None and 0.05 < found.tipping_value < 0.5

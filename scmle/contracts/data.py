@@ -172,7 +172,7 @@ class Finding:
         }
 
     @classmethod
-    def from_observation(
+    def glean(
         cls,
         message: str,
         category: str,
@@ -939,7 +939,7 @@ class Curation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DatasetCard:
+class Datasheet:
     """Human-reviewable summary of a dataset snapshot before modelling.
 
     A card is generated from the curation report, but it is not a release

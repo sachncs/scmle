@@ -303,14 +303,14 @@ def test_tipping_point_matches_closed_form_and_grid():
         len(observed) + k
     )
     assert full == pytest.approx(null)
-    result = missingness.tipping_point(
+    result = missingness.tipover(
         observed, k, lambda v: v.mean() > null, -10.0, 10.0, steps=2001
     )
     assert result.baseline is True and result.inside_range
     assert result.flip_delta is not None
     assert result.flip_delta == pytest.approx(delta, abs=0.02)
     assert result.flip_delta <= delta + 1e-9
-    narrow = missingness.tipping_point(
+    narrow = missingness.tipover(
         observed, k, lambda v: v.mean() > null, -1.0, 1.0, steps=101
     )
     assert narrow.flip_delta is None and not narrow.inside_range
@@ -320,13 +320,13 @@ def test_tipping_point_matches_closed_form_and_grid():
 def test_tipping_point_validates():
     f = lambda v: True  # noqa: E731
     with pytest.raises(ValueError, match="observed"):
-        missingness.tipping_point(numpy.array([]), 1, f, -1, 1)
+        missingness.tipover(numpy.array([]), 1, f, -1, 1)
     with pytest.raises(ValueError, match="observed"):
-        missingness.tipping_point(numpy.ones(3), 0, f, -1, 1)
+        missingness.tipover(numpy.ones(3), 0, f, -1, 1)
     with pytest.raises(ValueError, match="low < high"):
-        missingness.tipping_point(numpy.ones(3), 1, f, 1, 1)
+        missingness.tipover(numpy.ones(3), 1, f, 1, 1)
     with pytest.raises(ValueError, match="steps"):
-        missingness.tipping_point(numpy.ones(3), 1, f, -1, 1, steps=1)
+        missingness.tipover(numpy.ones(3), 1, f, -1, 1, steps=1)
 
 
 @pytest.mark.parametrize("strategy", missingness.STRATEGIES)

@@ -202,7 +202,7 @@ def gate_h1(replicates: int, base: int = 0) -> dict[str, Any]:
         out[name] = {
             "true_risk": risk,
             "betting": rate_floor(
-                float(monitor.ever_crossed.mean()), ALPHA_ALARM, replicates
+                float(monitor.surpassed.mean()), ALPHA_ALARM, replicates
             ),
             "fixed_rule_rate": float(fixed.mean()),
         }
@@ -243,7 +243,7 @@ def detection(
         values = batch_means(rng, level, replicates)
         monitor.update(values)
         late = step >= pre
-        hit = monitor.ever_crossed & (first < 0) & late
+        hit = monitor.surpassed & (first < 0) & late
         first[hit] = step - pre
         fixed_hit = fixed_rule(values) & (fixed_first < 0) & late
         fixed_first[fixed_hit] = step - pre
@@ -318,7 +318,7 @@ def gate_h3(replicates: int, base: int = 0) -> dict[str, Any]:
         )
         for step in range(stream.spec.batches):
             monitor.update(float(stream.loss[step].mean()))
-        trigger += int(monitor.ever_crossed)
+        trigger += int(monitor.surpassed)
         edges = numpy.quantile(stream.z[:100].ravel(), numpy.linspace(0, 1, 11))
         edges[0], edges[-1] = -numpy.inf, numpy.inf
         expected = numpy.histogram(stream.z[:100].ravel(), edges)[0]
@@ -542,7 +542,7 @@ def gate_h5(replicates: int, base: int = 0) -> dict[str, Any]:
             worse = factor * DELTA_RB
             gap = rng.binomial(BATCH, worse, replicates) / BATCH
             process.update((gap + 1.0) / 2.0)
-            hit = process.ever_crossed & (first < 0)
+            hit = process.surpassed & (first < 0)
             first[hit] = step
         found = first >= 0
         rows[name] = {
@@ -883,7 +883,7 @@ def gate_h10(replicates: int, base: int = 0) -> dict[str, Any]:
         for step in range(pre + 300):
             risk = 0.5 * R_STAR if step < pre else level
             monitor.update(batch_means(rng, risk, replicates))
-            hit = monitor.ever_crossed & (first < 0) & (step >= pre)
+            hit = monitor.surpassed & (first < 0) & (step >= pre)
             first[hit] = step - pre
         within = int(((first >= 0) & (first < D_MAX)).sum())
         found = first >= 0

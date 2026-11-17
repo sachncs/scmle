@@ -112,7 +112,7 @@ def test_failures_past_the_budget_stop_at_that_object_and_resume_cleanly(
     faulty, run = flaky_processor(store, POLICY.max_attempts, target)
     result = run.run()
     assert result.failed == "input/o2.csv"
-    assert result.error.startswith("RetryExhaustedError")
+    assert result.error.startswith("RetryError")
     assert result.processed == ("input/o0.csv", "input/o1.csv")
     assert result.retries == tuple(POLICY.delays())
     assert faulty.matching == TARGETS[target]["skip"] + POLICY.max_attempts
@@ -136,7 +136,7 @@ def test_a_listing_that_keeps_failing_raises_and_changes_nothing(
     failpoints.processor(store).run(max_objects=2)
     before = failpoints.files_of(store)
     faulty, run = flaky_processor(store, POLICY.max_attempts, "listing")
-    with pytest.raises(retry.RetryExhaustedError) as raised:
+    with pytest.raises(retry.RetryError) as raised:
         run.run()
     assert raised.value.attempts == POLICY.max_attempts
     assert faulty.matching == POLICY.max_attempts
@@ -159,7 +159,7 @@ def test_a_transform_that_keeps_failing_stops_at_that_object(store, after_two):
         sleep=lambda seconds: None,
     ).run()
     assert result.failed == "input/o2.csv"
-    assert result.error.startswith("RetryExhaustedError")
+    assert result.error.startswith("RetryError")
     assert store.get(failpoints.STATE_KEY)[0] == after_two
     assert not store.exists("output/o2.csv")
 
@@ -244,7 +244,7 @@ def test_a_lock_that_cannot_be_taken_within_budget_stops_before_any_work(
         store, POLICY.max_attempts, **GUARDED["lock_acquire"]
     )
     guarded = objectstore.RetryingStore(faulty, POLICY, sleep=waits.append)
-    with pytest.raises(retry.RetryExhaustedError) as raised:
+    with pytest.raises(retry.RetryError) as raised:
         failpoints.processor(guarded).run()
     assert raised.value.attempts == POLICY.max_attempts
     assert waits == POLICY.delays()
@@ -263,7 +263,7 @@ def test_a_lock_release_that_fails_past_budget_leaves_finished_work_intact(
     guarded = objectstore.RetryingStore(
         faulty, POLICY, sleep=lambda seconds: None
     )
-    with pytest.raises(retry.RetryExhaustedError):
+    with pytest.raises(retry.RetryError):
         failpoints.processor(guarded).run()
     assert failpoints.files_of(store) == reference.files
     assert store.get(failpoints.STATE_KEY)[0] == reference.checkpoint
@@ -287,7 +287,7 @@ def test_the_retrying_store_makes_exactly_the_budgeted_attempts(
         assert faulty.matching == failures + 1
         assert waits == POLICY.delays()[:failures]
     else:
-        with pytest.raises(retry.RetryExhaustedError) as raised:
+        with pytest.raises(retry.RetryError) as raised:
             guarded.get("input/o0.csv")
         assert raised.value.attempts == faulty.matching == POLICY.max_attempts
         assert waits == POLICY.delays()

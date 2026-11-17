@@ -74,7 +74,7 @@ class Question:
         return record
 
 
-def tipping_point(unknown: Unknown) -> Question | None:
+def tipover(unknown: Unknown) -> Question | None:
     """Finds where the verdict changes as `unknown` varies over its range.
 
     The range is scanned on a grid of `GRID_POINTS` values and the first
@@ -127,7 +127,7 @@ def ask(
     for unknown in unknowns:
         if unknown.name in derivable:
             continue
-        found = tipping_point(unknown)
+        found = tipover(unknown)
         if found is None:
             robust.append(
                 {

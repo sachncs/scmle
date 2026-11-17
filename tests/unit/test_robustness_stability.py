@@ -296,8 +296,8 @@ def test_attribution_names_the_choice_that_moves_the_estimate():
 
 
 def test_gate_status_needs_every_defect_type_current_and_passing():
-    assert stability.gate_status(None) is certificates.Authority.DESCRIPTIVE
+    assert stability.adjudication(None) is certificates.Authority.DESCRIPTIVE
     assert (
-        stability.gate_status(certificates.Store())
+        stability.adjudication(certificates.Store())
         is certificates.Authority.DESCRIPTIVE
     )

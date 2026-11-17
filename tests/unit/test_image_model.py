@@ -75,8 +75,8 @@ def test_image_classifier_fits_evaluates_and_explains(
     classifier = make_classifier().fit(training_data)
 
     evaluation = classifier.evaluate(evaluation_data)
-    global_explanation = classifier.global_explanation(top_k=5)
-    local_explanation = classifier.local_explanation(evaluation_data.samples[0])
+    overview = classifier.overview(top_k=5)
+    spotlight = classifier.spotlight(evaluation_data.samples[0])
 
     assert classifier.fitted
     assert set(classifier.predict(evaluation_data)) == {"red", "blue"}
@@ -84,12 +84,10 @@ def test_image_classifier_fits_evaluates_and_explains(
     assert evaluation.accuracy == 1.0
     assert evaluation.macro_f1 == 1.0
     assert math.isfinite(evaluation.log_loss)
-    assert global_explanation.input_hash is None
-    assert global_explanation.terms
-    assert (
-        local_explanation.input_hash == evaluation_data.samples[0].content_hash
-    )
-    assert local_explanation.terms
+    assert overview.input_hash is None
+    assert overview.terms
+    assert spotlight.input_hash == evaluation_data.samples[0].content_hash
+    assert spotlight.terms
 
     occlusion = classifier.occlude(
         evaluation_data.samples[0], top_k=3, patch_size=(1, 1)

@@ -67,7 +67,7 @@ class Mirror:
 
     def __init__(
         self,
-        store: objectstore.ObjectStore,
+        store: objectstore.Depot,
         prefix: str,
         directory: pathlib.Path,
     ) -> None:

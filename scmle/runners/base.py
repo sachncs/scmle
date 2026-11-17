@@ -77,7 +77,7 @@ TERMINAL = frozenset(
 )
 
 
-class RunState(enum.StrEnum):
+class Progress(enum.StrEnum):
     """How a whole run ended (or that it has not).
 
     Attributes:
@@ -98,7 +98,7 @@ class RunState(enum.StrEnum):
     RETRIES_EXHAUSTED = "retries_exhausted"
 
 
-FINAL = frozenset(set(RunState) - {RunState.STARTED})
+FINAL = frozenset(set(Progress) - {Progress.STARTED})
 
 
 class ConflictError(errors.ScmleError):
@@ -383,7 +383,7 @@ class RunManifest:
         spec_digest: Digest of the job spec.
         project_digest: Digest of the project specification.
         identity: The training identity.
-        state: `RunState` value.
+        state: `Progress` value.
         attempts: One record per attempt.
         total_cost: Estimated cost across attempts.
         budget: The cost ceiling, or None if there was none.
@@ -400,7 +400,7 @@ class RunManifest:
     spec_digest: str
     project_digest: str
     identity: str
-    state: str = RunState.STARTED.value
+    state: str = Progress.STARTED.value
     attempts: list[Attempt] = dataclasses.field(default_factory=list)
     total_cost: float = 0.0
     budget: float | None = None
@@ -435,7 +435,7 @@ class RunManifest:
         return cls(**fields)
 
 
-class BudgetMeter:
+class Meter:
     """Accumulates the estimated cost of a run across attempts.
 
     Attributes:
@@ -511,7 +511,7 @@ class Runner(abc.ABC):
 
     def __init__(
         self,
-        store: objectstore.ObjectStore,
+        store: objectstore.Depot,
         *,
         serving_identity: str,
         clock: Clock | None = None,
@@ -531,8 +531,8 @@ class Runner(abc.ABC):
         self.serving_identity = serving_identity
         self.clock = clock or Clock()
         self.poll_seconds = poll_seconds
-        self.stop_reason: RunState | None = None
-        self.watcher: Callable[[], RunState | None] = lambda: None
+        self.stop_reason: Progress | None = None
+        self.watcher: Callable[[], Progress | None] = lambda: None
 
     @abc.abstractmethod
     def submit(self, spec: Job, attempt: int) -> Ticket:
@@ -683,7 +683,7 @@ class Runner(abc.ABC):
         manifest = self.register(spec)
         if manifest.state in {s.value for s in FINAL}:
             return manifest
-        meter = BudgetMeter(spec, manifest.total_cost)
+        meter = Meter(spec, manifest.total_cost)
         policy = spec.retries
         while len(manifest.attempts) < policy.max_attempts:
             number = len(manifest.attempts) + 1
@@ -692,15 +692,15 @@ class Runner(abc.ABC):
                 return self.finish(spec, manifest, ended)
             if len(manifest.attempts) < policy.max_attempts:
                 self.clock.sleep(policy.delay(number))
-        return self.finish(spec, manifest, RunState.RETRIES_EXHAUSTED)
+        return self.finish(spec, manifest, Progress.RETRIES_EXHAUSTED)
 
     def attempt(
         self,
         spec: Job,
         manifest: RunManifest,
-        meter: BudgetMeter,
+        meter: Meter,
         number: int,
-    ) -> RunState | None:
+    ) -> Progress | None:
         """Runs one attempt.
 
         Args:
@@ -717,7 +717,7 @@ class Runner(abc.ABC):
         started = self.clock.now()
         self.stop_reason = None
 
-        def watch() -> RunState | None:
+        def watch() -> Progress | None:
             """Checks the budget and the timeout of the running attempt.
 
             Returns:
@@ -727,9 +727,9 @@ class Runner(abc.ABC):
             """
             elapsed = self.clock.now() - started
             if meter.exceeded(elapsed):
-                self.stop_reason = RunState.BUDGET_STOPPED
+                self.stop_reason = Progress.BUDGET_STOPPED
             elif elapsed > spec.timeout_seconds:
-                self.stop_reason = RunState.TIMED_OUT
+                self.stop_reason = Progress.TIMED_OUT
             return self.stop_reason
 
         self.watcher = watch
@@ -738,7 +738,7 @@ class Runner(abc.ABC):
         manifest.attempts.append(record)
         self.save(manifest)
         status = Status(State.PENDING)
-        stopped: RunState | None = None
+        stopped: Progress | None = None
         while True:
             status = self.poll(handle)
             if status.state in TERMINAL:
@@ -762,12 +762,12 @@ class Runner(abc.ABC):
         if stopped is not None:
             return stopped
         if status.state is State.SUCCEEDED:
-            return RunState.SUCCEEDED
+            return Progress.SUCCEEDED
         if status.state is State.INTERRUPTED or (
             status.state is State.FAILED and status.retryable
         ):
             return None
-        return RunState.FAILED
+        return Progress.FAILED
 
     def confirm(self, handle: Ticket) -> Status:
         """Polls a cancelled attempt a few times for its terminal state.
@@ -790,7 +790,7 @@ class Runner(abc.ABC):
         return Status(State.CANCELLED, "cancel requested")
 
     def finish(
-        self, spec: Job, manifest: RunManifest, state: RunState
+        self, spec: Job, manifest: RunManifest, state: Progress
     ) -> RunManifest:
         """Seals the manifest with checkpoints, the result and the state.
 
@@ -810,12 +810,12 @@ class Runner(abc.ABC):
             for step in checkpoints.steps()
             if (found := checkpoints.load(step)) is not None
         ]
-        if state is RunState.SUCCEEDED:
+        if state is Progress.SUCCEEDED:
             try:
                 meta = self.store.get(self.result_key(spec.run_id))[1]
             except objectstore.AbsentError:
                 # handled: run marked FAILED with reason
-                state = RunState.FAILED
+                state = Progress.FAILED
                 manifest.attempts[-1].reason = "job ended without a result"
             else:
                 manifest.result_sha256 = meta.sha256

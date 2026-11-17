@@ -94,8 +94,8 @@ def test_old_databases_are_migrated(tmp_path):
     connection.commit()
     connection.close()
     store = stores.SqliteExperimentStore(path)
-    store.start_run("r", "h", "d", "2026-10-15T00:00:00+00:00")
-    store.update_run(
+    store.commence("r", "h", "d", "2026-10-15T00:00:00+00:00")
+    store.revise(
         "r", fingerprint={"a": 1.0}, task="regression", selected_strategy="x"
     )
     assert store.runs()[0]["selected_strategy"] == "x"

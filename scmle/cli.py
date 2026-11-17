@@ -1859,19 +1859,19 @@ class Frame(Command):
         Returns:
             EXIT_BLOCKED (2) if the framing was refused, else EXIT_OK (0).
         """
-        source = draft.Offer.from_dict(contracts.load_json(args.source))
+        source = draft.Offer.from_dict(contracts.deserialize(args.source))
         dates = [c for c in args.parse_dates.split(",") if c]
         frame = pandas.read_csv(args.data, parse_dates=dates)
         text = pathlib.Path(args.request).read_text(encoding="utf-8")
         model = (
-            costs.Tariff.from_dict(contracts.load_json(args.cost_model))
+            costs.Tariff.from_dict(contracts.deserialize(args.cost_model))
             if args.cost_model
             else None
         )
         sampler = None
         tau = None
         if args.replay:
-            recorded = contracts.load_json(args.replay)
+            recorded = contracts.deserialize(args.replay)
             sampler = refusal.Replayer(
                 str(recorded["model_id"]), recorded["samples"]
             )

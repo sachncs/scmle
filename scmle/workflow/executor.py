@@ -1,6 +1,6 @@
 """The local executor: the same definition, run with durable state.
 
-Layout under ``workflows/<name>/runs/<run id>/`` in an `ObjectStore`:
+Layout under ``workflows/<name>/runs/<run id>/`` in a `Depot`:
 ``run.json`` (state, trigger, requester, cost), ``steps/<step>.json`` (state,
 attempts, outputs, idempotency key, cost), ``approvals/<step>.json`` and
 ``lock`` (a lease). Everything is written atomically, so a crashed executor
@@ -99,7 +99,7 @@ def parse(key: str, data: bytes) -> dict[str, Any]:
     return record
 
 
-class RunState(enum.StrEnum):
+class Progress(enum.StrEnum):
     """Where a run is.
 
     Attributes:
@@ -123,11 +123,11 @@ class RunState(enum.StrEnum):
 
 FINISHED = frozenset(
     {
-        RunState.SUCCEEDED,
-        RunState.FAILED,
-        RunState.BUDGET_STOPPED,
-        RunState.REJECTED,
-        RunState.EXPIRED,
+        Progress.SUCCEEDED,
+        Progress.FAILED,
+        Progress.BUDGET_STOPPED,
+        Progress.REJECTED,
+        Progress.EXPIRED,
     }
 )
 
@@ -222,7 +222,7 @@ class StepContext:
     attempt: int
     idempotency_key: str
     upstream: Mapping[str, Mapping[str, Any]]
-    store: objectstore.ObjectStore
+    store: objectstore.Depot
     started: float
     clock: Callable[[], float]
     spent: float = 0.0
@@ -265,7 +265,7 @@ Handler = Callable[[StepContext], Mapping[str, Any] | None]
 Outcome = tuple[str, Mapping[str, Any], float]
 
 
-def digest_of(value: Any) -> str:
+def distill(value: Any) -> str:
     """Digests a value as canonical JSON.
 
     Args:
@@ -289,7 +289,7 @@ def run_id_for(workflow: definition.Workflow, trigger_key: str) -> str:
         The workflow name and a 16-character digest of its name, version and the
         trigger key, truncated to 64 characters.
     """
-    short = digest_of([workflow.name, workflow.version, trigger_key])[:16]
+    short = distill([workflow.name, workflow.version, trigger_key])[:16]
     return f"{workflow.name}-{short}"[:64]
 
 
@@ -312,7 +312,7 @@ class Executor:
     def __init__(
         self,
         workflow: definition.Workflow,
-        store: objectstore.ObjectStore,
+        store: objectstore.Depot,
         handlers: Mapping[str, Handler],
         *,
         approver_keys: Mapping[str, str] | None = None,
@@ -679,7 +679,7 @@ class Executor:
         record = self.run_record(run_id)
         if record is None:
             raise errors.ConfigError(f"no run {run_id}")
-        settled = {s.value for s in FINISHED} - {RunState.FAILED.value}
+        settled = {s.value for s in FINISHED} - {Progress.FAILED.value}
         if record["state"] in settled:
             return record
         return self.drive(run_id, record["trigger_key"], record["requested_by"])
@@ -722,7 +722,7 @@ class Executor:
                 "workflow_digest": self.workflow.digest(),
                 "trigger_key": trigger_key,
                 "requested_by": requested_by,
-                "state": RunState.RUNNING.value,
+                "state": Progress.RUNNING.value,
                 "cost": 0.0,
                 "started_at": self.clock(),
             }
@@ -730,7 +730,7 @@ class Executor:
                 raise errors.ConfigError(
                     "the run was started with a different workflow definition"
                 )
-            record["state"] = RunState.RUNNING.value
+            record["state"] = Progress.RUNNING.value
             self.write(self.base(run_id) + "run.json", record)
             record = self.execute(run_id, record)
             self.write(self.base(run_id) + "run.json", record)
@@ -1007,14 +1007,14 @@ class Executor:
                         Phase.SKIPPED,
                         reason="run budget",
                     )
-            record["state"] = RunState.BUDGET_STOPPED.value
+            record["state"] = Progress.BUDGET_STOPPED.value
         else:
             record["state"] = self.derive(states).value
         record["steps"] = states
         record["ended_at"] = self.clock()
         return record
 
-    def derive(self, states: Mapping[str, str]) -> RunState:
+    def derive(self, states: Mapping[str, str]) -> Progress:
         """Derives the run's state from its steps' states.
 
         Args:
@@ -1027,14 +1027,14 @@ class Executor:
         """
         values = set(states.values())
         if Phase.WAITING.value in values:
-            return RunState.WAITING_APPROVAL
+            return Progress.WAITING_APPROVAL
         if Phase.REJECTED.value in values:
-            return RunState.REJECTED
+            return Progress.REJECTED
         if Phase.EXPIRED.value in values:
-            return RunState.EXPIRED
+            return Progress.EXPIRED
         if values == {Phase.SUCCEEDED.value}:
-            return RunState.SUCCEEDED
-        return RunState.FAILED
+            return Progress.SUCCEEDED
+        return Progress.FAILED
 
     def tally(self, run_id: str) -> float:
         """Sums the cost of steps already recorded as succeeded for this run.
@@ -1071,12 +1071,12 @@ class Executor:
             The hex digest of the run id, step name, parameters and the digests
             of the upstream outputs.
         """
-        return digest_of(
+        return distill(
             [
                 run_id,
                 step.name,
                 dict(step.parameters),
-                {k: digest_of(v) for k, v in sorted(upstream.items())},
+                {k: distill(v) for k, v in sorted(upstream.items())},
             ]
         )
 

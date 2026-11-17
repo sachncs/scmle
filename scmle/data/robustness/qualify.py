@@ -141,7 +141,7 @@ def run(
     """
     loaded = qualify.load_store(F6_STORE, directory)
     store = loaded.store
-    stability_gate = stability.gate_status(store)
+    stability_gate = stability.adjudication(store)
     rule_note = ""
     if rule != stability.DEFAULT_RULE:
         stability_gate = certificates.Authority.DESCRIPTIVE

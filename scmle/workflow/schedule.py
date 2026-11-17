@@ -74,7 +74,7 @@ class Scheduler:
     def __init__(
         self,
         workflow: definition.Workflow,
-        store: objectstore.ObjectStore,
+        store: objectstore.Depot,
     ) -> None:
         """Initializes the scheduler.
 

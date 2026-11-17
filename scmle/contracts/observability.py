@@ -256,7 +256,7 @@ class Requirements:
         }
 
 
-def canonical_json(
+def canonize(
     metrics: Sequence[Sample],
     events: Sequence[Inference],
     policy: Requirements,

@@ -596,7 +596,7 @@ class QualityGate:
     def __init__(
         self,
         rules: Sequence[Check],
-        store: objectstore.ObjectStore | None = None,
+        store: objectstore.Depot | None = None,
     ) -> None:
         """Initializes the gate.
 

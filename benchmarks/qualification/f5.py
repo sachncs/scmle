@@ -84,7 +84,7 @@ def label_detector(frame: pandas.DataFrame) -> pandas.Series:
 
 def provenance_for(
     frame: pandas.DataFrame,
-) -> dict[str, outliers.FieldProvenance]:
+) -> dict[str, outliers.Pedigree]:
     """Instrument ranges from the clean table, padded by `OUTLIER_PAD`.
 
     Args:
@@ -99,9 +99,7 @@ def provenance_for(
     for name in OUTLIER_COLUMNS:
         low, high = float(frame[name].min()), float(frame[name].max())
         pad = OUTLIER_PAD * (high - low)
-        out[name] = outliers.FieldProvenance(
-            instrument_range=(low - pad, high + pad)
-        )
+        out[name] = outliers.Pedigree(instrument_range=(low - pad, high + pad))
     return out
 
 

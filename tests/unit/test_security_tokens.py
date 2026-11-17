@@ -11,7 +11,7 @@ from tests import support_identity
 
 def verifier(clock, *keys, revocations=None, **options):
     return tokens.Verifier(
-        tokens.KeySet([tokens.Key.jwk(k) for k in keys]),
+        tokens.Keystore([tokens.Key.jwk(k) for k in keys]),
         support_identity.ISSUER,
         support_identity.AUDIENCE,
         revocations=revocations,
@@ -207,7 +207,7 @@ def test_rotation_keeps_old_tokens_until_the_old_key_expires():
         "k1", "rs-old", support_identity.claims_at(clock.now)
     )
     assert check.verify(old)
-    both = tokens.KeySet(
+    both = tokens.Keystore(
         [
             tokens.Key.jwk(support_identity.rsa_jwk("k1", "rs-old")),
             tokens.Key.jwk(support_identity.rsa_jwk("k2", "rs-new")),
@@ -218,7 +218,7 @@ def test_rotation_keeps_old_tokens_until_the_old_key_expires():
         "k2", "rs-new", support_identity.claims_at(clock.now)
     )
     assert check.verify(old) and check.verify(new)
-    check.keys = tokens.KeySet(
+    check.keys = tokens.Keystore(
         [tokens.Key.jwk(support_identity.rsa_jwk("k2", "rs-new"))]
     )
     assert refused(check, old) == tokens.UNKNOWN_KEY
@@ -235,10 +235,10 @@ def test_weak_or_malformed_keys_are_refused():
     with pytest.raises(errors.ConfigError):
         tokens.Key.jwk({"kty": "EC", "kid": "k"})
     with pytest.raises(errors.ConfigError):
-        tokens.KeySet([])
+        tokens.Keystore([])
     twin = tokens.Key("k", tokens.HS256, secret=support_identity.HS_SECRET)
     with pytest.raises(errors.ConfigError, match="unique"):
-        tokens.KeySet([twin, twin])
+        tokens.Keystore([twin, twin])
 
 
 def test_a_key_set_loads_from_a_jwks_file(tmp_path):
@@ -253,9 +253,9 @@ def test_a_key_set_loads_from_a_jwks_file(tmp_path):
             }
         )
     )
-    assert set(tokens.KeySet.from_file(path).keys) == {"rs-1", "hs-1"}
+    assert set(tokens.Keystore.from_file(path).keys) == {"rs-1", "hs-1"}
     with pytest.raises(errors.ConfigError):
-        tokens.KeySet.from_file(tmp_path / "missing.json")
+        tokens.Keystore.from_file(tmp_path / "missing.json")
 
 
 def test_a_short_hs256_secret_cannot_mint():
@@ -275,4 +275,4 @@ def test_a_key_set_file_that_is_not_an_object_is_a_config_error(
     path = tmp_path / "jwks.json"
     path.write_text(document)
     with pytest.raises(errors.ConfigError):
-        tokens.KeySet.from_file(path)
+        tokens.Keystore.from_file(path)

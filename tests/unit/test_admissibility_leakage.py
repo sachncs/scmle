@@ -123,19 +123,17 @@ def test_design_handles_numeric_categorical_and_missing():
 
 
 def test_target_encoding_rules():
-    assert leakage.encode_target(
-        pandas.Series(["b", "a", "b"]), CLS
-    ).tolist() == [
+    assert leakage.vectorize(pandas.Series(["b", "a", "b"]), CLS).tolist() == [
         1,
         0,
         1,
     ]
     with pytest.raises(ValueError, match="two classes"):
-        leakage.encode_target(pandas.Series([1, 1, 1]), CLS)
+        leakage.vectorize(pandas.Series([1, 1, 1]), CLS)
     with pytest.raises(ValueError, match="missing"):
-        leakage.encode_target(pandas.Series([0, numpy.nan, 1]), CLS)
+        leakage.vectorize(pandas.Series([0, numpy.nan, 1]), CLS)
     with pytest.raises(ValueError, match="task"):
-        leakage.encode_target(pandas.Series([0, 1]), "ranking")
+        leakage.vectorize(pandas.Series([0, 1]), "ranking")
 
 
 def test_config_boundaries():
@@ -500,31 +498,31 @@ def test_gate_requires_current_passing_certificates_for_every_leak_type():
     digest = leakage.code_digest()
     good = store_for(digest)
     assert (
-        leakage.gate_status(good, leakage.CERTIFIED)
+        leakage.adjudication(good, leakage.CERTIFIED)
         is certificates.Authority.GATING
     )
     descriptive = certificates.Authority.DESCRIPTIVE
     assert (
-        leakage.gate_status(certificates.Store(), leakage.CERTIFIED)
+        leakage.adjudication(certificates.Store(), leakage.CERTIFIED)
         is descriptive
     )
     assert (
-        leakage.gate_status(store_for("c" * 64), leakage.CERTIFIED)
+        leakage.adjudication(store_for("c" * 64), leakage.CERTIFIED)
         is descriptive
     )  # stale
     assert (
-        leakage.gate_status(store_for(digest, passed=False), leakage.CERTIFIED)
+        leakage.adjudication(store_for(digest, passed=False), leakage.CERTIFIED)
         is descriptive
     )
     missing_type = store_for(digest, leakage.LEAK_DEFECTS[:-1])
-    assert leakage.gate_status(missing_type, leakage.CERTIFIED) is descriptive
+    assert leakage.adjudication(missing_type, leakage.CERTIFIED) is descriptive
 
 
 def test_gate_requires_the_certified_settings_and_a_binary_target():
     good = store_for(leakage.code_digest())
     descriptive = certificates.Authority.DESCRIPTIVE
     assert (
-        leakage.gate_status(
+        leakage.adjudication(
             good, dataclasses.replace(leakage.CERTIFIED, run_seed=9)
         )
         is certificates.Authority.GATING
@@ -536,13 +534,13 @@ def test_gate_requires_the_certified_settings_and_a_binary_target():
         {"max_leaf_nodes": 4},
     ):
         cfg = dataclasses.replace(leakage.CERTIFIED, **change)
-        assert leakage.gate_status(good, cfg) is descriptive
+        assert leakage.adjudication(good, cfg) is descriptive
     assert (
-        leakage.gate_status(good, leakage.CERTIFIED, "regression")
+        leakage.adjudication(good, leakage.CERTIFIED, "regression")
         is descriptive
     )
     assert (
-        leakage.gate_status(good, leakage.CERTIFIED, CLS, n_classes=3)
+        leakage.adjudication(good, leakage.CERTIFIED, CLS, n_classes=3)
         is descriptive
     )
 

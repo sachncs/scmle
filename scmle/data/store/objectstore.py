@@ -183,7 +183,7 @@ def iso(moment: float | datetime.datetime) -> str:
     return moment.astimezone(datetime.UTC).isoformat(timespec="seconds")
 
 
-class ObjectStore(abc.ABC):
+class Depot(abc.ABC):
     """Bytes under keys, with the same behaviour on every backend.
 
     Attributes:
@@ -394,7 +394,7 @@ def locked(path: pathlib.Path) -> Generator[None, None, None]:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-class LocalObjectStore(ObjectStore):
+class LocalObjectStore(Depot):
     """Objects as files under a root directory.
 
     Attributes:
@@ -625,7 +625,7 @@ class LocalObjectStore(ObjectStore):
             path.unlink()
 
 
-class RetryingStore(ObjectStore):
+class RetryingStore(Depot):
     """Wraps a store so transient failures are retried under a policy.
 
     Attributes:
@@ -636,7 +636,7 @@ class RetryingStore(ObjectStore):
 
     def __init__(
         self,
-        inner: ObjectStore,
+        inner: Depot,
         policy: retry.Retries,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
@@ -658,7 +658,7 @@ class RetryingStore(ObjectStore):
 
         Only transient errors are retried; any other error propagates at
         once, and when every attempt fails with a transient error
-        `RetryExhaustedError` propagates.
+        `RetryError` propagates.
 
         Args:
             operation: Zero-argument callable that does the store call.
@@ -676,7 +676,7 @@ class RetryingStore(ObjectStore):
         if_absent: bool = False,
         if_version: str | None = None,
     ) -> ObjectMeta:
-        """See `ObjectStore.put`.
+        """See `Depot.put`.
 
         A conditional put whose first try landed but was reported as a
         timeout fails on the retry with `ExistsError` or
@@ -704,7 +704,7 @@ class RetryingStore(ObjectStore):
             key: The object key.
 
         Returns:
-            The content and metadata, as from `ObjectStore.get`.
+            The content and metadata, as from `Depot.get`.
         """
         return self.run(lambda: self.inner.get(key))
 
@@ -715,7 +715,7 @@ class RetryingStore(ObjectStore):
             key: The object key.
 
         Returns:
-            The metadata, as from `ObjectStore.head`.
+            The metadata, as from `Depot.head`.
         """
         return self.run(lambda: self.inner.head(key))
 
@@ -726,7 +726,7 @@ class RetryingStore(ObjectStore):
             prefix: Key prefix; empty for every object.
 
         Returns:
-            The metadata, as from `ObjectStore.list_objects`.
+            The metadata, as from `Depot.list_objects`.
         """
         return self.run(lambda: self.inner.list_objects(prefix))
 

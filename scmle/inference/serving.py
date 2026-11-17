@@ -365,9 +365,7 @@ class Batcher(Server):
 class Observer(Protocol):
     """What `HttpServing` tells an operations monitor (duck-typed)."""
 
-    def record_request(
-        self, at: float, route: str, status: int, seconds: float
-    ) -> None:
+    def tally(self, at: float, route: str, status: int, seconds: float) -> None:
         """Records one finished request.
 
         Args:
@@ -377,7 +375,7 @@ class Observer(Protocol):
             seconds: Time the request took.
         """
 
-    def observe_features(self, at: float, frame: pandas.DataFrame) -> int:
+    def sense(self, at: float, frame: pandas.DataFrame) -> int:
         """Observes the rows of a scored batch.
 
         Args:
@@ -602,7 +600,7 @@ class HttpServing(Server):
         if self.monitor is None:
             return
         try:
-            self.monitor.record_request(time.time(), route, status, seconds)
+            self.monitor.tally(time.time(), route, status, seconds)
         except Exception:  # monitoring must not change a response
             LOGGER.exception("the signal monitor failed on a request")
 
@@ -615,9 +613,7 @@ class HttpServing(Server):
         if self.monitor is None:
             return
         try:
-            self.monitor.observe_features(
-                time.time(), pandas.DataFrame(records)
-            )
+            self.monitor.sense(time.time(), pandas.DataFrame(records))
         except Exception:  # monitoring must not change a response
             LOGGER.exception("the signal monitor failed on features")
 
@@ -732,7 +728,7 @@ class Responder(server.BaseHTTPRequestHandler):
         """
         return "scmle-reference"
 
-    def send_json(
+    def transmit(
         self,
         status: int,
         payload: dict[str, Any],
@@ -783,7 +779,7 @@ class Responder(server.BaseHTTPRequestHandler):
         }
         if details is not None:
             payload["details"] = details
-        self.send_json(status, payload, headers)
+        self.transmit(status, payload, headers)
 
     def identify(self) -> bool:
         """Resolves the request ID and rejects an invalid caller ID.
@@ -797,9 +793,7 @@ class Responder(server.BaseHTTPRequestHandler):
         if caller is None:
             self.request_id = guard.mint()
             return True
-        self.request_id = (
-            caller if guard.is_valid_request_id(caller) else guard.mint()
-        )
+        self.request_id = caller if guard.wellformed(caller) else guard.mint()
         if self.request_id != caller:
             self.fail(
                 400,
@@ -852,7 +846,7 @@ class Responder(server.BaseHTTPRequestHandler):
         readiness = adapter.health()
         if self.path == "/livez":
             alive = adapter.admission.alive
-            self.send_json(
+            self.transmit(
                 200 if alive else 503,
                 {
                     "status": "alive" if alive else "wedged",
@@ -860,7 +854,7 @@ class Responder(server.BaseHTTPRequestHandler):
                 },
             )
         elif self.path == "/readyz":
-            self.send_json(
+            self.transmit(
                 200 if readiness["ready"] else 503,
                 {**readiness, **adapter.identity()},
                 None if readiness["ready"] else {"Retry-After": "1"},
@@ -875,7 +869,7 @@ class Responder(server.BaseHTTPRequestHandler):
             )
         elif self.path == "/health":
             info = adapter.bundle.info
-            self.send_json(
+            self.transmit(
                 200,
                 {
                     "status": "ok",
@@ -888,7 +882,7 @@ class Responder(server.BaseHTTPRequestHandler):
                 },
             )
         elif self.path == "/schema":
-            self.send_json(
+            self.transmit(
                 200,
                 {
                     "schema_version": serving.SCHEMA_VERSION,
@@ -1023,7 +1017,7 @@ class Responder(server.BaseHTTPRequestHandler):
         request = serving.parse(payload, adapter.max_records)
         response = adapter.admission.run(lambda: adapter.score(request))
         response["request_id"] = self.request_id
-        self.send_json(200, response)
+        self.transmit(200, response)
 
     def log_message(
         self,

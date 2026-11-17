@@ -181,7 +181,7 @@ def credit(
     )
 
 
-def build_runner(
+def rig(
     spec: causal.Question,
     x: pandas.DataFrame,
     target_name: str,

@@ -158,7 +158,7 @@ def goldens(directory: str | pathlib.Path) -> Goldens:
     )
 
 
-def to_float(frame: Any) -> Any:
+def floating(frame: Any) -> Any:
     """Casts a frame to float; a named function so the pipeline can pickle.
 
     Args:
@@ -170,7 +170,7 @@ def to_float(frame: Any) -> Any:
     return pandas.DataFrame(frame).apply(pandas.to_numeric, errors="coerce")
 
 
-def to_object(frame: Any) -> Any:
+def objectify(frame: Any) -> Any:
     """Casts a frame to object; a named function so the pipeline can pickle.
 
     Args:
@@ -219,7 +219,7 @@ def handwrite(spec: dict[str, Any]) -> bundle.Bundle:
                 "numeric",
                 Pipeline(
                     [
-                        ("cast", FunctionTransformer(to_float)),
+                        ("cast", FunctionTransformer(floating)),
                         ("impute", SimpleImputer(strategy="median")),
                         ("scale", StandardScaler()),
                     ]
@@ -230,7 +230,7 @@ def handwrite(spec: dict[str, Any]) -> bundle.Bundle:
                 "categorical",
                 Pipeline(
                     [
-                        ("cast", FunctionTransformer(to_object)),
+                        ("cast", FunctionTransformer(objectify)),
                         (
                             "impute",
                             SimpleImputer(

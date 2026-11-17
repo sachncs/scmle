@@ -64,7 +64,7 @@ def target_kind(target: pandas.Series, classification: bool) -> str:
     )
 
 
-def encode_target(
+def vectorize(
     target: pandas.Series,
     classification: bool,
     classes: Sequence[Any] | None = None,

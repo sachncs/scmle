@@ -102,9 +102,7 @@ def test_a_refused_write_names_the_source_uri():
 
 
 def test_fetch_charges_the_stage_unit_and_rows_and_counts_queries():
-    meter = budget.BudgetMeter(
-        budget.Budget(max_queries=2, max_rows_scanned=50)
-    )
+    meter = budget.Meter(budget.Budget(max_queries=2, max_rows_scanned=50))
     source = recorded_source(meter=meter)[0]
     first = source.fetch("SELECT a FROM t ORDER BY a", "stg", "unit-1", 20)
     assert first == [(1,), (2,), (2,)]
@@ -119,7 +117,7 @@ def test_fetch_charges_the_stage_unit_and_rows_and_counts_queries():
 
 
 def test_fetch_without_a_stage_is_not_charged():
-    meter = budget.BudgetMeter(budget.Budget(max_queries=0))
+    meter = budget.Meter(budget.Budget(max_queries=0))
     source = recorded_source(meter=meter)[0]
     assert source.fetch("SELECT a FROM t ORDER BY a") == [(1,), (2,), (2,)]
     assert meter.queries == 0
@@ -128,7 +126,7 @@ def test_fetch_without_a_stage_is_not_charged():
 
 
 def test_scalar_defaults_to_no_stage_and_an_empty_unit():
-    meter = budget.BudgetMeter(budget.Budget(max_queries=0))
+    meter = budget.Meter(budget.Budget(max_queries=0))
     source = recorded_source(meter=meter)[0]
     assert source.scalar("SELECT COUNT(*) FROM t") == 3
     assert meter.queries == 0
@@ -154,7 +152,7 @@ def test_columns_reads_names_with_a_zero_row_query():
 
 
 def test_columns_charges_the_table_with_no_rows_and_stops_cleanly():
-    meter = budget.BudgetMeter(budget.Budget(max_queries=1, max_rows_scanned=0))
+    meter = budget.Meter(budget.Budget(max_queries=1, max_rows_scanned=0))
     source = recorded_source(meter=meter)[0]
     assert source.columns("t") == ("a", "b")
     assert meter.queries == 0
@@ -162,7 +160,7 @@ def test_columns_charges_the_table_with_no_rows_and_stops_cleanly():
     assert meter.queries == 1
     assert source.columns("t", "stg") == ()
     assert (meter.stops[0].stage, meter.stops[0].unit) == ("stg", "t")
-    refusing = budget.BudgetMeter(budget.Budget(max_queries=0))
+    refusing = budget.Meter(budget.Budget(max_queries=0))
     other = recorded_source(meter=refusing)[0]
     assert other.columns("t", "stg") == ()
     assert other.queries == 0
@@ -170,7 +168,7 @@ def test_columns_charges_the_table_with_no_rows_and_stops_cleanly():
 
 
 def test_columns_cost_no_rows_even_when_rows_are_limited():
-    meter = budget.BudgetMeter(budget.Budget(max_rows_scanned=0))
+    meter = budget.Meter(budget.Budget(max_rows_scanned=0))
     source = recorded_source(meter=meter)[0]
     assert source.columns("t", "stg") == ("a", "b")
     assert meter.stops == []
@@ -193,7 +191,7 @@ def test_value_kind_classifies_each_type():
 
 
 def test_the_profile_issues_these_exact_statements_and_charges():
-    meter = budget.BudgetMeter(budget.Budget())
+    meter = budget.Meter(budget.Budget())
     source, log = recorded_source(meter=meter)[:2]
     table = profile.survey(source, "t", "prof")
     assert log == [
@@ -228,18 +226,18 @@ def test_the_profile_issues_these_exact_statements_and_charges():
 
 
 def test_the_profile_names_the_table_and_the_column_when_it_stops():
-    meter = budget.BudgetMeter(budget.Budget(max_queries=0))
+    meter = budget.Meter(budget.Budget(max_queries=0))
     source = recorded_source(meter=meter)[0]
     assert profile.survey(source, "t", "prof") is None
     assert (meter.stops[0].stage, meter.stops[0].unit) == ("prof", "t")
-    columns = budget.BudgetMeter(budget.Budget(max_queries=2))
+    columns = budget.Meter(budget.Budget(max_queries=2))
     other = recorded_source(meter=columns)[0]
     assert profile.survey(other, "t", "prof") is None
     assert (columns.stops[0].stage, columns.stops[0].unit) == ("prof", "t.a")
 
 
 def test_the_default_profile_stage_is_profile():
-    meter = budget.BudgetMeter(budget.Budget(max_queries=0))
+    meter = budget.Meter(budget.Budget(max_queries=0))
     source = recorded_source(meter=meter)[0]
     assert profile.survey(source, "t") is None
     assert meter.stops[0].stage == "profile"
@@ -314,7 +312,7 @@ def test_a_complete_catalog_is_not_partial_and_a_stopped_one_is():
     complete = profile.profile_catalog(source, ["t"])
     assert complete.partial is False
     assert [t.name for t in complete.tables] == ["t"]
-    meter = budget.BudgetMeter(budget.Budget(max_queries=0))
+    meter = budget.Meter(budget.Budget(max_queries=0))
     stopped_source = recorded_source(meter=meter)[0]
     stopped = profile.profile_catalog(stopped_source, ["t"], "custom")
     assert stopped.partial is True

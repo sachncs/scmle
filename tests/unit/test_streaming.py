@@ -342,7 +342,7 @@ def test_writer_commit_preserves_previous_transaction_evidence(tmp_path):
     )
 
     second_batch = ledger.read_batch(rows=2)
-    ledger.commit_with_writer(second_batch, lambda frame, batch_id: None)
+    ledger.finalize(second_batch, lambda frame, batch_id: None)
 
     reopened = streaming.CommitLedger(ledger.path, source)
     retry_sink = RecordingSink(sink_receipt)
@@ -364,10 +364,10 @@ def test_stream_ledger_commits_idempotently_and_persists_checkpoint(tmp_path):
     batch = ledger.read_batch(rows=2, watermark_column="event_time")
     written = []
 
-    first = ledger.commit_with_writer(
+    first = ledger.finalize(
         batch, lambda frame, key: written.append((frame.copy(), key))
     )
-    second = ledger.commit_with_writer(
+    second = ledger.finalize(
         batch, lambda frame, key: written.append((frame.copy(), key))
     )
     reopened = streaming.CommitLedger(ledger.path, source)
@@ -434,7 +434,7 @@ def test_stream_ledger_refuses_a_changed_source_snapshot(tmp_path):
     source = streaming.Csv(path)
     ledger = streaming.CommitLedger(tmp_path / "state.json", source)
     batch = ledger.read_batch(rows=2)
-    ledger.commit_with_writer(batch, lambda frame, key: None)
+    ledger.finalize(batch, lambda frame, key: None)
 
     changed = pandas.read_csv(path)
     changed.loc[0, "value"] = 99

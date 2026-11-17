@@ -148,7 +148,7 @@ class Source(Protocol):
         """Whether the release is already bound to a claim set."""
         ...
 
-    def issue_token(self) -> str:
+    def mint(self) -> str:
         """Returns the release token."""
         ...
 
@@ -174,7 +174,7 @@ class Source(Protocol):
         """Releases the rows a single time.
 
         Args:
-            token: The release token from `issue_token`.
+            token: The release token from `mint`.
             actor: Who opens the set.
             claims_hash: The claim-set hash the release was bound to.
             ledger_hash: The ledger head the release was bound to.
@@ -617,7 +617,7 @@ def finish(
     )
 
 
-def check_policy(policy: str) -> None:
+def enforce(policy: str) -> None:
     """Refuses a failure policy that is not available.
 
     Args:
@@ -839,7 +839,7 @@ def confirm(
 ) -> Confirmation:
     """Freezes the survivors and tests them once on the confirmation set.
 
-    An unavailable failure policy is refused first, by `check_policy`, with a
+    An unavailable failure policy is refused first, by `enforce`, with a
     `ConfigError`.
 
     Args:
@@ -876,7 +876,7 @@ def confirm(
             freezing the survivors or building the withdrawal accounting
             (a withdrawn id that is not a survivor) is not caught either.
     """
-    check_policy(policy)
+    enforce(policy)
     if ledger.confirmation is not None:
         denied_log = custody_log or (source.log if source is not None else None)
         if denied_log is not None:
@@ -1058,7 +1058,7 @@ def unseal(
         if not source.committed:
             source.commit(claims_hash, ledger_hash)
         rows = source.open(
-            source.issue_token(),
+            source.mint(),
             actor=ACTOR,
             claims_hash=claims_hash,
             ledger_hash=ledger_hash,

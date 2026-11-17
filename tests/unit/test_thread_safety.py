@@ -394,9 +394,9 @@ def test_concurrent_store_writes_are_all_recorded(tmp_path):
 
     def work(index):
         run_id = f"run_{index}"
-        store.start_run(run_id, "hash", str(tmp_path), "2026-01-01T00:00:00Z")
+        store.commence(run_id, "hash", str(tmp_path), "2026-01-01T00:00:00Z")
         for number in range(per_thread):
-            store.record_trial(
+            store.transcribe(
                 run_id,
                 experiments.Trial(
                     trial_id=f"t{number}",
@@ -406,7 +406,7 @@ def test_concurrent_store_writes_are_all_recorded(tmp_path):
                     score_mean=0.5,
                 ),
             )
-            store.update_run(run_id, state="RUNNING")
+            store.revise(run_id, state="RUNNING")
         return run_id
 
     ids, failures = run_together(THREADS, work)

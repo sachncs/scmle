@@ -172,7 +172,7 @@ class Booster(models.Model):
 class LightGbm(Booster):
     """LightGBM, which takes native categoricals at fit time."""
 
-    def categorical_params(self, indices: list[int]) -> dict[str, Any]:
+    def nominals(self, indices: list[int]) -> dict[str, Any]:
         """Marks the integer-coded columns as categorical.
 
         Args:

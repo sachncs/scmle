@@ -175,7 +175,7 @@ def old_rule(
     task = TABLES[kind][2]
     flagged = {}
     for name in names:
-        column = columns.kind_of(frame[name])
+        column = columns.categorize(frame[name])
         flagged[name] = (
             column.association(frame[name], target, task) >= OLD_ASSOCIATION
             or column.missingness_association(frame[name], target, task)

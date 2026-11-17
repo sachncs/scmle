@@ -139,7 +139,7 @@ class Attestation:
             return record
         return dataclasses.replace(
             record,
-            attestation_signature=mac(record.unsigned_dict(), key),
+            attestation_signature=mac(record.preimage(), key),
         )
 
     @classmethod
@@ -190,7 +190,7 @@ class Attestation:
             attestation_signature=signature_value,
         )
 
-    def unsigned_dict(self) -> dict[str, Any]:
+    def preimage(self) -> dict[str, Any]:
         """Returns the canonical content the attestation signature covers."""
         return {
             "schema_version": 1,
@@ -205,7 +205,7 @@ class Attestation:
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible attestation record."""
-        record = self.unsigned_dict()
+        record = self.preimage()
         if self.attestation_signature is not None:
             record["signature"] = {
                 "algorithm": SIGNATURE_ALGORITHM,
@@ -237,7 +237,7 @@ class Attestation:
         except (TypeError, ValueError):
             # handled: malformed records give False, documented
             return False
-        if self.unsigned_dict() != expected.unsigned_dict():
+        if self.preimage() != expected.preimage():
             return False
         if self.attestation_signature is None:
             return expected.attestation_signature is None

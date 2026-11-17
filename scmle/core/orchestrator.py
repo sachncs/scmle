@@ -254,7 +254,7 @@ class Orchestrator:
             {**declaration, "digest": digest},
         )
         store.write_text("parameter_estimation_declaration.lock", f"{digest}\n")
-        store.write_json("config.json", json.loads(self.spec.canonical_json()))
+        store.write_json("config.json", json.loads(self.spec.canonize()))
         store.write_text("environment.lock", environment_lock())
         return self.execute(store, approved, {}, "run created")
 
@@ -353,7 +353,7 @@ class Orchestrator:
         return sorted(path.stem for path in trials_dir.glob("trial_*.json"))
 
     def consult_checkpoints(
-        self, gate: state.RunState, context: scmle.core.context.Context
+        self, gate: state.Progress, context: scmle.core.context.Context
     ) -> None:
         """Asks every checkpoint registered for `gate` and audits the verdicts.
 
@@ -412,13 +412,13 @@ class Orchestrator:
         tracker = self.tracker or stores.SqliteExperimentStore(
             store.directory.parent / "experiments.sqlite"
         )
-        tracker.start_run(
+        tracker.commence(
             store.run_id,
             self.spec.config_hash(),
             str(store.directory),
             events.stamp(),
         )
-        tracker.update_run(store.run_id, config_json=self.spec.canonical_json())
+        tracker.revise(store.run_id, config_json=self.spec.canonize())
         log.listeners.append(functools.partial(tracker.listen, store.run_id))
         machine = state.Tracker(
             store.run_id, log, self.spec.config_hash(), reason
@@ -433,12 +433,12 @@ class Orchestrator:
             for stage in self.stages:
                 context.check_cancelled()
                 machine.transition(stage.state, stage.describe(context))
-                if stage.state is state.RunState.PLANNING:
+                if stage.state is state.Progress.PLANNING:
                     context.observe()
                 stage.execute(context)
                 self.consult_checkpoints(stage.state, context)
             machine.transition(
-                state.RunState.COMPLETED,
+                state.Progress.COMPLETED,
                 "run complete",
                 ("model/", "evaluation.json"),
             )
@@ -446,27 +446,27 @@ class Orchestrator:
         except errors.CancelledError as error:
             error.details.setdefault("run_dir", str(store.directory))
             error.details["recoverable_trials"] = self.recoverable(store)
-            machine.transition(state.RunState.CANCELLED, str(error))
+            machine.transition(state.Progress.CANCELLED, str(error))
             raise
         except KeyboardInterrupt as error:
-            machine.transition(state.RunState.CANCELLED, "interrupted")
+            machine.transition(state.Progress.CANCELLED, "interrupted")
             raise errors.CancelledError(
                 "interrupted", {"run_dir": str(store.directory)}
             ) from error
         except errors.BlockedError as error:
             error.details["run_dir"] = str(store.directory)
             error.details["recoverable_trials"] = self.recoverable(store)
-            machine.transition(state.RunState.BLOCKED, str(error))
+            machine.transition(state.Progress.BLOCKED, str(error))
             raise
         except errors.ScmleError as error:
             error.details["run_dir"] = str(store.directory)
             error.details["recoverable_trials"] = self.recoverable(store)
             machine.transition(
-                state.RunState.FAILED, f"{error.category}: {error}"
+                state.Progress.FAILED, f"{error.category}: {error}"
             )
             raise
         except Exception as error:
-            machine.transition(state.RunState.FAILED, f"internal: {error!r}")
+            machine.transition(state.Progress.FAILED, f"internal: {error!r}")
             raise errors.ScmleError(
                 str(error),
                 {

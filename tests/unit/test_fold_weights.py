@@ -67,5 +67,5 @@ def test_metrics_report_whether_their_function_takes_weights():
         "b", "", False, every, weighted_error
     )
 
-    assert not plain.accepts_weights()
-    assert weighted.accepts_weights()
+    assert not plain.weightable()
+    assert weighted.weightable()

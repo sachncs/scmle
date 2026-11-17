@@ -440,7 +440,7 @@ class Registry:
         return lines
 
 
-def resident_bytes() -> int:
+def residency() -> int:
     """Peak resident memory of this process in bytes (0 if unknown).
 
     ``ru_maxrss`` is a peak, not the current size; it is bytes on macOS and
@@ -504,7 +504,7 @@ class Instrumentation:
             "The model and artifact this process serves.",
         )
 
-    def record_request(self, route: str, status: int, seconds: float) -> None:
+    def tally(self, route: str, status: int, seconds: float) -> None:
         """Counts a request and observes its latency.
 
         The request counter is labelled by route, status and model version;
@@ -539,7 +539,7 @@ class Instrumentation:
         labels = {"model_version": self.model_version}
         self.registry.set(
             self.MEMORY,
-            float(resident_bytes()),
+            float(residency()),
             labels,
             "Peak resident memory in bytes.",
         )

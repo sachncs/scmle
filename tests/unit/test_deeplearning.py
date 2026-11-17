@@ -144,7 +144,7 @@ def test_adapters_pass_conformance_and_support_every_task(name):
     conformance.comply(adapter)
 
     assert adapter.capabilities.tasks == tasks.STANDARD_TASKS
-    assert adapter.rejection_reason(tasks.Task.BINARY) is None
+    assert adapter.objection(tasks.Task.BINARY) is None
 
 
 def test_a_pytorch_model_family_trains_packages_and_predicts(

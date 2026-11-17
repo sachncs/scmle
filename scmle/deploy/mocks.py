@@ -126,11 +126,11 @@ class Handler(server.BaseHTTPRequestHandler):
     """Serves the object store's requests.
 
     Attributes:
-        store: The object store served; `ObjectStore.handler` sets it on a
+        store: The object store served; `Depot.handler` sets it on a
             subclass.
     """
 
-    store: ClassVar["ObjectStore"]
+    store: ClassVar["Depot"]
 
     def reply(self, status: int, body: bytes, headers: dict[str, str]) -> None:
         """Sends a response.
@@ -250,7 +250,7 @@ class Handler(server.BaseHTTPRequestHandler):
         """
 
 
-class ObjectStore(Stub):
+class Depot(Stub):
     """PUT, GET, HEAD and list over `/<bucket>/<key>`, with SHA-256 etags.
 
     Attributes:
@@ -526,7 +526,7 @@ def main(arguments: list[str] | None = None) -> int:
         action.add_argument("--port", type=int, required=True)
     options = parser.parse_args(arguments)
     service: Stub = (
-        ObjectStore(options.root, options.host, options.port)
+        Depot(options.root, options.host, options.port)
         if options.service == "object-store"
         else MetricsSink(options.file, options.host, options.port)
     )

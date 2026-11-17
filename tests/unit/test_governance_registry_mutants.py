@@ -98,7 +98,7 @@ def test_independence_must_be_a_bool_and_the_signature_text():
 
 def test_the_signed_fields_are_exactly_the_documented_ones():
     approval = review()
-    assert approval.unsigned_dict() == {
+    assert approval.preimage() == {
         "model": "m",
         "version": 1,
         "content_id": "c" * 64,
@@ -112,7 +112,7 @@ def test_the_signed_fields_are_exactly_the_documented_ones():
     assert "signature" not in approval.to_dict()
     signed = approval.sign(KEY)
     assert signed.to_dict() == {
-        **approval.unsigned_dict(),
+        **approval.preimage(),
         "signature": (signed.signature),
     }
     assert signed.signature and approval.signature is None

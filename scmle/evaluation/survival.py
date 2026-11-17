@@ -193,7 +193,7 @@ class Survival(metrics.Metric):
 
     kind: str = "ibs"
 
-    def accepts_weights(self) -> bool:
+    def weightable(self) -> bool:
         """Returns whether row weights are accepted.
 
         These scores weight by censoring, not by row weights.

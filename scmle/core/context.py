@@ -641,7 +641,7 @@ class Context:
     def enter(
         self,
         technique: str,
-        action: experiments.DecisionAction,
+        action: experiments.Edict,
         reason: str,
     ) -> None:
         """Records an evidence-based decision for the decision log.
@@ -653,7 +653,7 @@ class Context:
         """
         self.outcomes.append(experiments.Decision(technique, action, reason))
 
-    def record_trial(self, outcome: experiments.Trial) -> None:
+    def transcribe(self, outcome: experiments.Trial) -> None:
         """Appends a trial and persists, announces and tracks it.
 
         Args:
@@ -673,7 +673,7 @@ class Context:
         self.write_json(path, outcome.to_dict())
         self.emit(f"trial.{outcome.status}", outcome.model_name, (path,))
         if self.store is not None:
-            self.tracker.record_trial(self.store.run_id, outcome)
+            self.tracker.transcribe(self.store.run_id, outcome)
 
     def track(self, **fields: Any) -> None:
         """Updates the tracked run row if the run is persisted.
@@ -682,7 +682,7 @@ class Context:
             **fields: Run-row fields to update.
         """
         if self.store is not None:
-            self.tracker.update_run(self.store.run_id, **fields)
+            self.tracker.revise(self.store.run_id, **fields)
 
     def check_cancelled(self) -> None:
         """Raises if cancellation was requested.

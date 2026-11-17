@@ -206,13 +206,13 @@ def test_read_charter_unwraps_a_signed_file_and_reads_a_bare_one(tmp_path):
 def test_unreadable_and_invalid_charters_say_what_went_wrong(tmp_path):
     missing = tmp_path / "none.json"
     with pytest.raises(Exception) as caught:
-        contracts.load_json(missing)
+        contracts.deserialize(missing)
     assert str(caught.value).startswith(f"cannot read charter {missing}: ")
     assert "No such file" in str(caught.value)
     listing = tmp_path / "list.json"
     listing.write_text("[]")
     with pytest.raises(Exception) as caught:
-        contracts.load_json(listing)
+        contracts.deserialize(listing)
     assert str(caught.value) == f"charter {listing} is not a JSON object"
     with pytest.raises(Exception) as caught:
         contracts.parse({"question": "x"})

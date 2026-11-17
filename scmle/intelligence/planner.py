@@ -116,7 +116,7 @@ class Memory(Refiner):
                 decisions.append(
                     experiments.Decision(
                         adapter.name,
-                        experiments.DecisionAction.REJECT,
+                        experiments.Edict.REJECT,
                         f"estimated training memory {estimate:.2f} GB exceeds "
                         f"the {limit:g} GB limit",
                     )
@@ -152,7 +152,7 @@ class GpuFilter(Refiner):
         """
         if context.spec.resources.gpu != "required":
             return candidates
-        capable = [a for a in candidates if a.gpu_usable()]
+        capable = [a for a in candidates if a.accelerated()]
         if not capable:
             raise errors.BlockedError(
                 "resources.gpu='required' but no compatible model can use a "
@@ -161,7 +161,7 @@ class GpuFilter(Refiner):
         decisions.extend(
             experiments.Decision(
                 adapter.name,
-                experiments.DecisionAction.REJECT,
+                experiments.Edict.REJECT,
                 "gpu required",
             )
             for adapter in candidates
@@ -197,7 +197,7 @@ class Budget(Refiner):
         decisions.append(
             experiments.Decision(
                 "reduce_search_complexity",
-                experiments.DecisionAction.INCLUDE,
+                experiments.Edict.INCLUDE,
                 f"time budget < {tasks.FAST_BUDGET_SECONDS}s: tune at most "
                 f"{search.top_models} model(s) with "
                 f"{search.configs_per_model} config(s) each and try strategies "
@@ -212,7 +212,7 @@ class Budget(Refiner):
                 decisions.append(
                     experiments.Decision(
                         adapter.name,
-                        experiments.DecisionAction.REJECT,
+                        experiments.Edict.REJECT,
                         f"time budget < {tasks.FAST_BUDGET_SECONDS}s: "
                         "fast models only",
                     )
@@ -252,7 +252,7 @@ class Streaming(Refiner):
                     decisions.append(
                         experiments.Decision(
                             adapter.name,
-                            experiments.DecisionAction.REJECT,
+                            experiments.Edict.REJECT,
                             "built for data larger than memory; set "
                             "memory_budget_gb with training='stream'",
                         )
@@ -268,7 +268,7 @@ class Streaming(Refiner):
                 decisions.append(
                     experiments.Decision(
                         adapter.name,
-                        experiments.DecisionAction.REJECT,
+                        experiments.Edict.REJECT,
                         "cannot learn incrementally, so it cannot train on "
                         "a stream larger than memory",
                     )
@@ -304,7 +304,7 @@ class Persistence(Refiner):
                 decisions.append(
                     experiments.Decision(
                         adapter.name,
-                        experiments.DecisionAction.REJECT,
+                        experiments.Edict.REJECT,
                         "model cannot be serialized into a bundle",
                     )
                 )
@@ -344,14 +344,14 @@ class Cardinality(Refiner):
             a
             for a in candidates
             if a.capabilities.native_categorical
-            and a.categorical_params([0])
+            and a.nominals([0])
             and a.family != "baseline"
         ]
         if native:
             decisions.append(
                 experiments.Decision(
                     "native_categorical_boosting",
-                    experiments.DecisionAction.INCLUDE,
+                    experiments.Edict.INCLUDE,
                     f"{len(wide)} high-cardinality categorical feature(s) "
                     f"({', '.join(wide)}); searched first: "
                     + ", ".join(a.name for a in native),
@@ -361,7 +361,7 @@ class Cardinality(Refiner):
             decisions.append(
                 experiments.Decision(
                     "native_categorical_boosting",
-                    experiments.DecisionAction.DEFER,
+                    experiments.Edict.DEFER,
                     "no compatible model handles categoricals natively",
                 )
             )
@@ -373,9 +373,9 @@ class Cardinality(Refiner):
         decisions.append(
             experiments.Decision(
                 "regularized_target_encoding",
-                experiments.DecisionAction.INCLUDE
+                experiments.Edict.INCLUDE
                 if enabled
-                else experiments.DecisionAction.DEFER,
+                else experiments.Edict.DEFER,
                 "evaluated as the 'target_encoding' strategy on the original "
                 "validation folds"
                 if enabled
@@ -419,7 +419,7 @@ class Exclusion(Refiner):
                 continue
             decisions.append(
                 experiments.Decision(
-                    adapter.name, experiments.DecisionAction.REJECT, reason
+                    adapter.name, experiments.Edict.REJECT, reason
                 )
             )
         return kept
@@ -465,7 +465,7 @@ class MonotonicFilter(Refiner):
                 decisions.append(
                     experiments.Decision(
                         adapter.name,
-                        experiments.DecisionAction.REJECT,
+                        experiments.Edict.REJECT,
                         "cannot enforce monotonic constraints",
                     )
                 )
@@ -513,7 +513,7 @@ class Approval(Refiner):
         decisions.extend(
             experiments.Decision(
                 adapter.name,
-                experiments.DecisionAction.REJECT,
+                experiments.Edict.REJECT,
                 "not in approved plan",
             )
             for adapter in candidates
@@ -565,7 +565,7 @@ class History(Refiner):
             decisions.append(
                 experiments.Decision(
                     "meta_learning",
-                    experiments.DecisionAction.DEFER,
+                    experiments.Edict.DEFER,
                     "no comparable history on other datasets",
                 )
             )
@@ -574,7 +574,7 @@ class History(Refiner):
         decisions.append(
             experiments.Decision(
                 "meta_learning",
-                experiments.DecisionAction.INCLUDE,
+                experiments.Edict.INCLUDE,
                 "searched first, from similar past datasets: "
                 + ", ".join(
                     f"{a.name} ({weights[a.name]:.2f})" for a in preferred
@@ -615,7 +615,7 @@ class Strategy(Refiner):
                 decisions.append(
                     experiments.Decision(
                         name,
-                        experiments.DecisionAction.INCLUDE,
+                        experiments.Edict.INCLUDE,
                         f"{strategy.description}; evaluated on the top "
                         f"{spec.top_models} screened models where applicable "
                         f"(applies to: {', '.join(applicable)})",
@@ -639,7 +639,7 @@ class Strategy(Refiner):
                 decisions.append(
                     experiments.Decision(
                         name,
-                        experiments.DecisionAction.REJECT,
+                        experiments.Edict.REJECT,
                         f"not applicable: {why}",
                     )
                 )
@@ -671,7 +671,7 @@ class Tuning(Refiner):
             decisions.append(
                 experiments.Decision(
                     "hyperparameter_tuning",
-                    experiments.DecisionAction.DEFER,
+                    experiments.Edict.DEFER,
                     "disabled (search.top_models=0) or no tunable candidate",
                 )
             )
@@ -679,7 +679,7 @@ class Tuning(Refiner):
             decisions.append(
                 experiments.Decision(
                     "hyperparameter_tuning",
-                    experiments.DecisionAction.INCLUDE,
+                    experiments.Edict.INCLUDE,
                     f"{search.optimizer} search on the top "
                     f"{search.top_models} of {len(tunable)} tunable models, "
                     f"{search.configs_per_model} configs each, "
@@ -718,20 +718,20 @@ class Ensemble(Refiner):
                 if size < MIN_ENSEMBLE_SIZE
                 else "fewer than two eligible distinct models"
             )
-            action = experiments.DecisionAction.DEFER
+            action = experiments.Edict.DEFER
         else:
             reason = (
                 f"stack the best of up to {size} distinct models; adopted "
                 "only if it beats its best member in cross-validation"
             )
-            action = experiments.DecisionAction.INCLUDE
+            action = experiments.Edict.INCLUDE
         reason_blend = reason.replace("stack the best", "blend the best")
         decisions.append(experiments.Decision("stacking", action, reason))
         decisions.append(experiments.Decision("blending", action, reason_blend))
         return candidates
 
 
-def default_rules() -> tuple[Refiner, ...]:
+def ruleset() -> tuple[Refiner, ...]:
     """Returns the standard rule chain.
 
     Returns:
@@ -774,11 +774,11 @@ class Planner:
         Args:
             registry: Source of candidate adapters.
             catalog: Metric catalog used to resolve the primary metric.
-            rules: Rule chain; defaults to `default_rules()`.
+            rules: Rule chain; defaults to `ruleset()`.
         """
         self.registry = registry
         self.catalog = catalog
-        self.rules = rules if rules is not None else default_rules()
+        self.rules = rules if rules is not None else ruleset()
 
     def plan(self, context: Situation) -> experiments.Plan:
         """Builds the experiment plan.
@@ -804,9 +804,7 @@ class Planner:
             tuple(spec.models.experimental_models),
         )
         decisions = [
-            experiments.Decision(
-                name, experiments.DecisionAction.REJECT, reason
-            )
+            experiments.Decision(name, experiments.Edict.REJECT, reason)
             for name, reason in sorted(rejected.items())
         ]
         candidates = compatible
@@ -817,7 +815,7 @@ class Planner:
         decisions += [
             experiments.Decision(
                 a.name,
-                experiments.DecisionAction.INCLUDE,
+                experiments.Edict.INCLUDE,
                 (
                     f"{'experimental-only ' if not a.auto_candidate else ''}"
                     f"{a.family} candidate (cost {a.capabilities.cost})"
@@ -829,7 +827,7 @@ class Planner:
             decisions.append(
                 experiments.Decision(
                     "leakage_screen",
-                    experiments.DecisionAction.DEFER,
+                    experiments.Edict.DEFER,
                     profile.admonition,
                 )
             )

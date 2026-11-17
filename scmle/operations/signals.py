@@ -250,9 +250,7 @@ class SignalMonitor:
         self.sampler = numpy.random.default_rng(policy.seed)
         self.lock = threading.Lock()
 
-    def record_request(
-        self, at: float, route: str, status: int, seconds: float
-    ) -> None:
+    def tally(self, at: float, route: str, status: int, seconds: float) -> None:
         """Records one finished request (epoch seconds ``at``).
 
         Args:
@@ -264,7 +262,7 @@ class SignalMonitor:
         with self.lock:
             self.requests.append((at, route, status, seconds))
 
-    def observe_features(self, at: float, frame: pandas.DataFrame) -> int:
+    def sense(self, at: float, frame: pandas.DataFrame) -> int:
         """Keeps a sample of the rows of a scored batch; returns the count.
 
         Args:

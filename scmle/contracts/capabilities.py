@@ -196,7 +196,7 @@ class Declaration:
             "limitations": list(self.limitations),
         }
 
-    def supports_modality(self, modality: Modality) -> bool:
+    def accommodates(self, modality: Modality) -> bool:
         """Returns whether this family declares the requested modality.
 
         Args:
@@ -838,7 +838,7 @@ class Registry:
                 observed={"model_family_status": family_status},
             )
         ]
-        if family is not None and not family.supports_modality(key.modality):
+        if family is not None and not family.accommodates(key.modality):
             family_diagnostics.append(
                 Reason(
                     code="model_family_modality_unsupported",
@@ -1028,7 +1028,7 @@ class Registry:
         Experimental or extension-only declarations may be used only when the
         caller explicitly includes their status in ``allowed_statuses``. A
         request with any diagnostic is refused with
-        `UnsupportedError` (raised by `raise_unsupported`) whose
+        `UnsupportedError` (raised by `refuse`) whose
         message is the first diagnostic. `TypeError` from `diagnose` for
         arguments of the wrong type propagates unchanged.
 
@@ -1053,7 +1053,7 @@ class Registry:
             row_count=row_count,
         )
         if diagnostics:
-            self.raise_unsupported(
+            self.refuse(
                 key,
                 diagnostics[0].message,
                 diagnostics,
@@ -1091,7 +1091,7 @@ class Registry:
             ],
         }
 
-    def canonical_json(self) -> str:
+    def canonize(self) -> str:
         """Returns stable JSON suitable for hashing and release evidence."""
         return json.dumps(
             self.to_dict(),
@@ -1103,9 +1103,9 @@ class Registry:
 
     def to_json(self) -> str:
         """Returns the canonical serialized registry."""
-        return self.canonical_json()
+        return self.canonize()
 
-    def raise_unsupported(
+    def refuse(
         self,
         key: Coordinate,
         reason: str,

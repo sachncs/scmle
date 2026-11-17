@@ -226,7 +226,7 @@ def footprint(root: int) -> dict[int, int]:
     return {pid: table[pid][1] for pid in members if pid in table}
 
 
-def resident_bytes(pid: int) -> int:
+def residency(pid: int) -> int:
     """Resident memory of a process and its descendants, 0 if it is gone.
 
     Args:
@@ -378,7 +378,7 @@ class Supervisor:
                 "ceiling and was killed"
             )
         if self.memory_gb is not None and process.pid is not None:
-            used = resident_bytes(process.pid) / BYTES_PER_GB
+            used = residency(process.pid) / BYTES_PER_GB
             if used > self.memory_gb:
                 return (
                     f"trial used {used:.2f} GB, above the "

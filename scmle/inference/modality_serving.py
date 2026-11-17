@@ -207,7 +207,7 @@ class ModalityHttpServing:
         }
 
     @staticmethod
-    def is_valid_request_id(request_id: str) -> bool:
+    def wellformed(request_id: str) -> bool:
         """Checks whether a caller request ID is safe to echo in headers.
 
         Args:
@@ -313,7 +313,7 @@ class Responder(server.BaseHTTPRequestHandler):
         caller_request_id = self.headers.get("X-Request-ID")
         if caller_request_id is None:
             return self.adapter.mint(), None
-        if self.adapter.is_valid_request_id(caller_request_id):
+        if self.adapter.wellformed(caller_request_id):
             return caller_request_id, None
         return (
             self.adapter.mint(),
@@ -323,7 +323,7 @@ class Responder(server.BaseHTTPRequestHandler):
             ),
         )
 
-    def send_json(
+    def transmit(
         self,
         status: int,
         payload: dict[str, object],
@@ -377,7 +377,7 @@ class Responder(server.BaseHTTPRequestHandler):
             )
         except access.DeniedError as denied:
             # handled: denied response sent to client
-            self.send_json(
+            self.transmit(
                 denied.status, denied.body, request_id, denied.headers
             )
             return False
@@ -395,7 +395,7 @@ class Responder(server.BaseHTTPRequestHandler):
         """
         request_id, identity_error = self.identify()
         if identity_error is not None:
-            self.send_json(
+            self.transmit(
                 400,
                 {"error": identity_error, "category": "request"},
                 request_id,
@@ -417,16 +417,16 @@ class Responder(server.BaseHTTPRequestHandler):
             return
         adapter = self.adapter
         if self.path == "/livez":
-            self.send_json(200, {"status": "alive"}, request_id)
+            self.transmit(200, {"status": "alive"}, request_id)
         elif self.path == "/readyz":
             state = adapter.readiness.snapshot()
-            self.send_json(
+            self.transmit(
                 200 if state["ready"] else 503,
                 {**state, "artifact_digest": adapter.artifact_digest},
                 request_id,
             )
         elif self.path == "/health":
-            self.send_json(
+            self.transmit(
                 200,
                 {
                     **adapter.predictor.health(),
@@ -435,7 +435,7 @@ class Responder(server.BaseHTTPRequestHandler):
                 request_id,
             )
         elif self.path == "/schema":
-            self.send_json(
+            self.transmit(
                 200,
                 {
                     "schema_version": serving.SCHEMA_VERSION,
@@ -448,7 +448,7 @@ class Responder(server.BaseHTTPRequestHandler):
                 request_id,
             )
         else:
-            self.send_json(404, {"error": "not found"}, request_id)
+            self.transmit(404, {"error": "not found"}, request_id)
 
     def receive(self) -> object:
         """Reads and parses the JSON body after checking its headers.
@@ -503,7 +503,7 @@ class Responder(server.BaseHTTPRequestHandler):
         if request_id is None:
             return
         if self.path != "/predict":
-            self.send_json(404, {"error": "not found"}, request_id)
+            self.transmit(404, {"error": "not found"}, request_id)
             return
         adapter = self.adapter
         try:
@@ -512,38 +512,38 @@ class Responder(server.BaseHTTPRequestHandler):
                 response = adapter.admission.run(
                     lambda: adapter.response(payload)
                 )
-            self.send_json(200, response, request_id)
+            self.transmit(200, response, request_id)
         except RejectedError as rejected:
             # handled: error response sent to client
-            self.send_json(
+            self.transmit(
                 rejected.status,
                 {"error": str(rejected), "category": "request"},
                 request_id,
             )
         except guard.OverloadedError as error:
             # handled: 429 response sent
-            self.send_json(
+            self.transmit(
                 429,
                 {"error": str(error), "category": error.category},
                 request_id,
             )
         except guard.DeadlineError as error:
             # handled: 504 response sent
-            self.send_json(
+            self.transmit(
                 504,
                 {"error": str(error), "category": error.category},
                 request_id,
             )
         except OverflowError as error:
             # handled: 413 response sent
-            self.send_json(
+            self.transmit(
                 413,
                 {"error": str(error), "category": "request"},
                 request_id,
             )
         except (TypeError, ValueError) as error:
             # handled: 422 response sent
-            self.send_json(
+            self.transmit(
                 422,
                 {
                     "error": f"invalid modality samples: {error}",
@@ -553,7 +553,7 @@ class Responder(server.BaseHTTPRequestHandler):
             )
         except Exception:  # noqa: BLE001 -- last boundary: answer with a 500
             # handled: 500 response sent
-            self.send_json(
+            self.transmit(
                 500,
                 {
                     "error": "internal modality serving failure",

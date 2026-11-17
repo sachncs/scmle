@@ -102,7 +102,7 @@ def substantiate(
     )
 
 
-def default_suite() -> tuple[diagnostics.Diagnostic, ...]:
+def panoply() -> tuple[diagnostics.Diagnostic, ...]:
     """Returns the standard explanation diagnostics.
 
     Returns:

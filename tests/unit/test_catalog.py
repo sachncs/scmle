@@ -175,7 +175,7 @@ def test_catalog_persists_atomically_and_verifies_read_back(tmp_path):
 
 def test_adapter_owned_observation_supports_unknown_shapes():
     """Adapters can publish evidence without routing through a model API."""
-    result = catalog.Catalog.from_observation(
+    result = catalog.Catalog.glean(
         source="warehouse://events",
         data_kind="custom_event_stream",
         shape=(12, 4),
@@ -321,7 +321,7 @@ def test_raw_and_opaque_identity_overrides_are_validated():
     with pytest.raises(ValueError, match="SHA-256"):
         catalog.Catalog.from_data(object(), content_identity="bad")
     with pytest.raises(ValueError, match="SHA-256"):
-        catalog.Catalog.from_observation(
+        catalog.Catalog.glean(
             source="memory://bad",
             data_kind="custom",
             shape=(),

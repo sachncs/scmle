@@ -117,7 +117,7 @@ def test_project_result_can_be_loaded_from_a_verified_artifact(
     result = project.run()
     restored = Estimation(
         make_frame(), make_estimand(), make_policy(), output_dir=tmp_path
-    ).load_result()
+    ).recall()
 
     assert result.digest() == restored.digest()
     assert project.artifact_path.name == "sequential_estimation.json"

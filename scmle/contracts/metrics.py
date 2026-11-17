@@ -41,7 +41,7 @@ class Metric:
         """
         return scorer_value if self.greater_is_better else -scorer_value
 
-    def accepts_weights(self) -> bool:
+    def weightable(self) -> bool:
         """Returns whether the metric can be scored with `sample_weight`.
 
         Returns:
@@ -146,7 +146,7 @@ class Formula(Metric):
     score_function: Callable[..., float] = metrics.accuracy_score
     response_method: str = "predict"
 
-    def accepts_weights(self) -> bool:
+    def weightable(self) -> bool:
         """Returns whether the user function takes `sample_weight`.
 
         Returns:

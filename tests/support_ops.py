@@ -49,7 +49,7 @@ def monitor(window=300.0, minimum=30, **thresholds):
 
 def healthy_traffic(watch, count=200, at=START, status=200, seconds=0.05):
     for step in range(count):
-        watch.record_request(at + step * 0.1, "/predict", status, seconds)
+        watch.tally(at + step * 0.1, "/predict", status, seconds)
 
 
 def named(rows, name):

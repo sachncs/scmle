@@ -73,7 +73,7 @@ class Capabilities:
         probabilities: Provides `predict_proba` for classification.
         native_categorical: The pipeline can hand it high-cardinality
             columns as integer codes marked categorical (the adapter
-            implements `categorical_params`).
+            implements `nominals`).
         handles_missing: Handles missing values natively.
         early_stopping: Supports early stopping.
         needs_scaling: Benefits from standardized inputs.
@@ -189,7 +189,7 @@ class Model(abc.ABC):
         """
         return None
 
-    def categorical_params(
+    def nominals(
         self,
         indices: list[int],  # noqa: ARG002 -- overridden by adapters
     ) -> Mapping[str, Any]:
@@ -207,7 +207,7 @@ class Model(abc.ABC):
         """
         return {}
 
-    def gpu_usable(self) -> bool:
+    def accelerated(self) -> bool:
         """Returns whether this adapter can use a GPU on this machine right now.
 
         The default trusts the declared capability; adapters whose GPU
@@ -230,7 +230,7 @@ class Model(abc.ABC):
             for module in self.requires
         )
 
-    def rejection_reason(
+    def objection(
         self, task: tasks.Task, row_count: int | None = None
     ) -> str | None:
         """Returns why the adapter cannot be used, if it cannot.

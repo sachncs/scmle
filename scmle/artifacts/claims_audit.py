@@ -174,7 +174,7 @@ def rehydrate(run_dir: str | Path) -> scmle.data.ledger.ledger.Ledger:
         raise errors.ArtifactError(str(error)) from error
 
 
-def column_of(
+def locate(
     ledger: scmle.data.ledger.ledger.Ledger, claim_id: str
 ) -> str | None:
     """Finds the feature a claim's hypothesis tests.
@@ -207,7 +207,7 @@ def inventory(run_dir: str | Path) -> list[dict[str, Any]]:
     listed = [
         {
             "claim_id": claim["claim_id"],
-            "feature": column_of(ledger, claim["claim_id"]),
+            "feature": locate(ledger, claim["claim_id"]),
             "tier": claim["tier"],
             "adjusted_p_value": claim["adjusted_p_value"],
             "effect": claim["effect"],

@@ -177,7 +177,7 @@ class Threshold:
         }
 
 
-def validate_calibration(
+def temper(
     score: Any, loss: Any, weights: Any = None
 ) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray | None]:
     """Checks a calibration set and returns it as arrays.
@@ -263,14 +263,14 @@ def select(
 
     Raises:
         ValueError: If `r_star` or `delta` is not strictly between 0 and 1,
-            the calibration inputs are invalid (see `validate_calibration`),
+            the calibration inputs are invalid (see `temper`),
             or the grid is empty or not strictly decreasing.
     """
     if not 0.0 < r_star < 1.0 or not 0.0 < delta < 1.0:
         raise scmle.contracts.errors.InputError(
             "r_star and delta must be strictly between 0 and 1"
         )
-    g, losses, w = validate_calibration(score, loss, weights)
+    g, losses, w = temper(score, loss, weights)
     points = (
         numpy.linspace(1.0, 0.0, DEFAULT_GRID)
         if grid is None
@@ -376,7 +376,7 @@ def risk_coverage(
 ) -> Curve:
     """Risk-coverage curve on a fixed grid, optionally weighted.
 
-    Inputs are validated as in `validate_calibration`, which raises
+    Inputs are validated as in `temper`, which raises
     `ValueError` for invalid ones; an empty set also raises `ValueError`.
 
     Args:
@@ -389,7 +389,7 @@ def risk_coverage(
         The weighted coverage and risk at each threshold and the area under
         the curve; risk is NaN where nothing is answered.
     """
-    g, losses, w = validate_calibration(score, loss, weights)
+    g, losses, w = temper(score, loss, weights)
     if g.size == 0:
         raise scmle.contracts.errors.InputError("calibration set is empty")
     grid = numpy.linspace(1.0, 0.0, points)

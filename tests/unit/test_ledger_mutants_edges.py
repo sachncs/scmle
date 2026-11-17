@@ -29,5 +29,5 @@ def test_missing_labels_do_not_make_a_binary_target_multiclass():
 
 def test_a_text_regression_target_is_refused_in_full():
     with pytest.raises(ValueError) as caught:
-        explore.encode_target(pandas.Series(["a", "b"]), False)
+        explore.vectorize(pandas.Series(["a", "b"]), False)
     assert str(caught.value) == "a regression target must be numeric"

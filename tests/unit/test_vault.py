@@ -21,12 +21,12 @@ def sealed():
 
 def test_the_rows_are_released_once_to_the_token_holder(sealed):
     sealed.bind("b")
-    features, target = sealed.open(sealed.issue_token(), "b")
+    features, target = sealed.open(sealed.mint(), "b")
 
     assert list(features["a"]) == [1.0, 2.0, 3.0] and list(target) == [0, 1, 0]
     assert sealed.opened is True
     with pytest.raises(errors.LeakageError, match="already used"):
-        sealed.open(sealed.issue_token(), "b")
+        sealed.open(sealed.mint(), "b")
 
 
 def test_a_wrong_token_is_refused_by_the_vault_process(sealed):
@@ -35,7 +35,7 @@ def test_a_wrong_token_is_refused_by_the_vault_process(sealed):
 
     assert sealed.opened is False
     sealed.bind("b")
-    released = sealed.open(sealed.issue_token(), "b")
+    released = sealed.open(sealed.mint(), "b")
     assert len(released[0]) == 3
 
 
@@ -71,12 +71,12 @@ def test_a_vault_that_is_gone_is_reported_not_hung():
     locked.process.wait()
 
     with pytest.raises(errors.LeakageError, match=r"gone|locked"):
-        locked.open(locked.issue_token())
+        locked.open(locked.mint())
 
 
 def test_a_bound_vault_refuses_a_release_for_another_selection(sealed):
     sealed.bind("selection-a")
-    token = sealed.issue_token()
+    token = sealed.mint()
 
     with pytest.raises(errors.LeakageError, match="binding mismatch"):
         sealed.open(token)
@@ -97,9 +97,9 @@ def test_a_vault_binds_once(sealed):
 def test_an_unbound_vault_refuses(sealed):
     # GATE-3: an unbound vault used to release with the token alone.
     with pytest.raises(errors.LeakageError, match="not bound"):
-        sealed.open(sealed.issue_token())
+        sealed.open(sealed.mint())
     sealed.bind("b")
-    assert len(sealed.open(sealed.issue_token(), "b")[0]) == 3
+    assert len(sealed.open(sealed.mint(), "b")[0]) == 3
 
 
 def test_a_bound_vault_checks_the_token_before_the_binding(sealed):

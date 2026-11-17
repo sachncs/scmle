@@ -288,12 +288,12 @@ def scout(
 
     Raises:
         LedgerError: If the ledger holds no online rule configuration. An
-            unavailable `policy` is refused by `confirm.check_policy` with a
+            unavailable `policy` is refused by `confirm.enforce` with a
             `ConfigError`.
     """
-    confirm.check_policy(policy)
+    confirm.enforce(policy)
     kind = explore.target_kind(target, classification)
-    codes = explore.encode_target(target, classification)
+    codes = explore.vectorize(target, classification)
     classes = (
         tuple(sorted(target.dropna().unique(), key=str))
         if classification
@@ -392,7 +392,7 @@ def finalise(
         alpha_confirm=alpha,
         rule=confirmation_rule,
         policy=policy,
-        encode=lambda series: explore.encode_target(
+        encode=lambda series: explore.vectorize(
             series, classification, classes
         ).to_numpy(dtype=float),
         withdrawal=withdrawal if withdrawal and withdrawal.accounted else None,

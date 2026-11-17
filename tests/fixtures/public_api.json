@@ -67,7 +67,7 @@
         "kind": "class",
         "signature_sha256": "7a1c16243ad853ab4421d4f0e9e3b99d5c2af4bc74e8b02fc8bbb1598bb1de9d"
       },
-      "RetryExhaustedError": {
+      "RetryError": {
         "kind": "class",
         "signature_sha256": "ed5a4edc433b5b6cce3ab807221835302e40783fe8f961dfc0124dc5c3b79e5c"
       },
@@ -87,6 +87,10 @@
       }
     },
     "scmle.data.store.objectstore": {
+      "Depot": {
+        "kind": "class",
+        "signature_sha256": "5bd8bcbedd1160de89a0a507583d6e95e8b000cb0b9ea49dface5f1761bae1ea"
+      },
       "LocalObjectStore": {
         "kind": "class",
         "signature_sha256": "c75bccf3cd28e6237ca1713ba812b199bf64f30b23149c0710b80f6584494c36"
@@ -95,13 +99,9 @@
         "kind": "class",
         "signature_sha256": "43590b0fa2c37d37e2ad952ca6d26d4634ccf5c514489ca72fcec4f24982b2ce"
       },
-      "ObjectStore": {
-        "kind": "class",
-        "signature_sha256": "5bd8bcbedd1160de89a0a507583d6e95e8b000cb0b9ea49dface5f1761bae1ea"
-      },
       "RetryingStore": {
         "kind": "class",
-        "signature_sha256": "0e8f56df6483b409e9f0016f8065c5e2455b6aab261c7721e53f7c3dba000206"
+        "signature_sha256": "cce72f1058e67f1e36feba26c58c302bcca55e10204007ab82489b9515f2539c"
       },
       "StoreError": {
         "kind": "class",
@@ -115,7 +115,7 @@
       },
       "IncrementalProcessor": {
         "kind": "class",
-        "signature_sha256": "aa88a3a408445ade1699baae73a2014db0457866bbbb13810a182d9943cb9279"
+        "signature_sha256": "bf06b72a6e737e890338db19de8cfcc3e1f40bcb119d0e12e7b3e28fbfa6c3ac"
       },
       "Processing": {
         "kind": "class",
@@ -133,7 +133,7 @@
       },
       "QualityGate": {
         "kind": "class",
-        "signature_sha256": "f150eded37c613655561d5f9758d796cf42dbaa7e94be146a55fc8c15a94999a"
+        "signature_sha256": "760c25b855525e6da4e79cab21c9039cb2794dd0741fd1642fe3efc4cfa378ed"
       },
       "QualityGateError": {
         "kind": "class",
@@ -159,7 +159,7 @@
       },
       "SnapshotReader": {
         "kind": "class",
-        "signature_sha256": "dfecd9645e368359784339f5c1b756a45211bc714dd4d3f913de6588738566af"
+        "signature_sha256": "820195575a8d7f0bd37d5f1ef5c6ff608196841083e94a7e7ae62cede819692a"
       },
       "SnapshotRecord": {
         "kind": "class",
@@ -611,6 +611,10 @@
         "kind": "class",
         "signature_sha256": "dc68318309426b24fa18084feec9aa46a909ac73862ac19daf9b9a390911b947"
       },
+      "Progress": {
+        "kind": "class",
+        "signature_sha256": "63d2e21144e7c3bbffa70a6c28582ac413d734490805e327a0272f83195d662a"
+      },
       "Resources": {
         "kind": "class",
         "signature_sha256": "59102e10d5ef8f969bc15fc46da57222e8f24eb769ada3a7755e01caaca2d2f5"
@@ -619,19 +623,15 @@
         "kind": "class",
         "signature_sha256": "a79d29c712a1beedd4821e04a17deeec4361f6f41608a1e29227e291a22b40f3"
       },
-      "RunState": {
-        "kind": "class",
-        "signature_sha256": "63d2e21144e7c3bbffa70a6c28582ac413d734490805e327a0272f83195d662a"
-      },
       "Runner": {
         "kind": "class",
-        "signature_sha256": "1622fc7de9b4f9debc69e58eacf6271eed1fae031026f661be7c205556d4b36b"
+        "signature_sha256": "1cc9f7a6941124241528748f59e21340459ee679b2bd15450a69afaac154f84f"
       }
     },
     "scmle.runners.checkpoint": {
       "CheckpointStore": {
         "kind": "class",
-        "signature_sha256": "8de07e40ef1e2f1e0ccdb5ff1fc2deb4e016b21a376509c956e6c09aba3864a7"
+        "signature_sha256": "bd1da8a6bc625323d45fa5717ededd370a98cf6a704999b544ef7caa21d0402a"
       }
     },
     "scmle.runners.local": {
@@ -657,7 +657,7 @@
       },
       "RoleStore": {
         "kind": "class",
-        "signature_sha256": "f91ba1ecd175aebe4e2430e524668695f129227c35feff6391608acabfab5dfa"
+        "signature_sha256": "4e34b929be705619f53424d9506b3755c82f2c48d27eb27abef27bc3c7c037cb"
       },
       "check_distinct": {
         "kind": "callable",
@@ -701,7 +701,7 @@
         "kind": "class",
         "signature_sha256": "7fbecf12f06ba1307ba0688f1fc68a13831f1d13458bb00d00c93fd6c0aed943"
       },
-      "KeySet": {
+      "Keystore": {
         "kind": "class",
         "signature_sha256": "0ad1d79377ab4a628aa258b2d3feed4fb075f45da16a0fb0c0096f78b1693782"
       },
@@ -719,7 +719,7 @@
       },
       "Verifier": {
         "kind": "class",
-        "signature_sha256": "8f207b18b5f3fed6a9ac8b15b58bd353ec54ea63bb2d657041777b307b514266"
+        "signature_sha256": "057e86420597970575b279d4da9888a27b94d6377fa182c36b7b9aea6d7590e4"
       },
       "sign_hs256": {
         "kind": "callable",
@@ -791,21 +791,21 @@
       },
       "Executor": {
         "kind": "class",
-        "signature_sha256": "12606ea666a53435bbf211c95014377a64b30cb6b18246af7e7e9c0927bc83df"
+        "signature_sha256": "cd4d42d6b64bb6eb41e541af9888ebe242d3525d29a3877e55e9c8172e49ad77"
       },
-      "RunState": {
+      "Progress": {
         "kind": "class",
         "signature_sha256": "a82e13e02a2d785b71f22220b0fd4a45a0cb365960e5b7ed200152fd6791f3a2"
       },
       "StepContext": {
         "kind": "class",
-        "signature_sha256": "b13b6ac7859f8adb74cb633b6e87c2a530872ef9d43a75fca5e1a1c795b533ae"
+        "signature_sha256": "54b68f514b4d58a4c67ff6e54e7faec41b18a96ec168a5290a9314782afadddd"
       }
     },
     "scmle.workflow.schedule": {
       "Scheduler": {
         "kind": "class",
-        "signature_sha256": "c2982ecbf87dcf389bb20305fd6f31a09d111dbd4d3e2eaa803edbeabc13d655"
+        "signature_sha256": "228fd9d49a1387a2f35832d3079baffac485deb32e8b382e4d1d3b2f4ba24c18"
       },
       "Tick": {
         "kind": "class",

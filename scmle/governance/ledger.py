@@ -12,7 +12,7 @@ from scmle.contracts import experiments
 from scmle.data.splitting import splitters
 
 
-def digest_of(row_ids: list[Any]) -> dict[str, Any]:
+def distill(row_ids: list[Any]) -> dict[str, Any]:
     """Row count and digest in the format trials record.
 
     Args:
@@ -49,7 +49,7 @@ def observed_access(
     """
     manifest = split.manifest
     expected = [
-        (digest_of(list(fit)), digest_of(list(validate)))
+        (distill(list(fit)), distill(list(validate)))
         for fit, validate in manifest.folds
     ]
     development = {str(i) for i in manifest.train_ids}

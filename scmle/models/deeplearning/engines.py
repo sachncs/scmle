@@ -159,7 +159,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         self.random_state = random_state
 
     @abc.abstractmethod
-    def encode_target(self, target: Any) -> numpy.ndarray:
+    def vectorize(self, target: Any) -> numpy.ndarray:
         """Converts the target to the array the loss consumes.
 
         Args:
@@ -170,7 +170,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         """
 
     @abc.abstractmethod
-    def output_units(self) -> int:
+    def dimensionality(self) -> int:
         """Number of network outputs.
 
         Returns:
@@ -178,7 +178,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         """
 
     @abc.abstractmethod
-    def row_losses(self, torch: Any, outputs: Any, targets: Any) -> Any:
+    def penalize(self, torch: Any, outputs: Any, targets: Any) -> Any:
         """Per-row loss (no reduction).
 
         Args:
@@ -191,7 +191,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         """
 
     @abc.abstractmethod
-    def row_weights(self, targets: numpy.ndarray) -> numpy.ndarray:
+    def weighting(self, targets: numpy.ndarray) -> numpy.ndarray:
         """Per-row weight implied by the estimator's own settings.
 
         Args:
@@ -201,7 +201,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
             Float32 array with one weight per row.
         """
 
-    def resolve_device(self, torch: Any) -> str:
+    def place(self, torch: Any) -> str:
         """Chooses where to train.
 
         Args:
@@ -274,8 +274,8 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
             combine the estimator's own weights with `sample_weight`.
         """
         matrix = self.dense(features)
-        encoded = self.encode_target(target)
-        weights = self.row_weights(encoded)
+        encoded = self.vectorize(target)
+        weights = self.weighting(encoded)
         if sample_weight is not None:
             weights = weights * numpy.asarray(
                 sample_weight, dtype=numpy.float32
@@ -421,7 +421,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         )
         validation, training = order[:held], order[held:]
         torch.manual_seed(self.random_state)
-        device = self.resolve_device(torch)
+        device = self.place(torch)
         self.input_width_ = matrix.shape[1]
         network = self.construct(torch).to(device)
         tensors = {
@@ -568,12 +568,13 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
             torch: The imported torch module.
 
         Returns:
-            The untrained module, sized by `input_width_` and `output_units()`.
+            The untrained module, sized by `input_width_` and
+            `dimensionality()`.
         """
         return architectures.ARCHITECTURES[self.architecture].build(
             torch,
             self.input_width_,
-            self.output_units(),
+            self.dimensionality(),
             tuple(self.hidden_sizes),
             self.dropout,
         )
@@ -629,7 +630,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         if outputs.dim() == SINGLE_MEMBER_OUTPUT_DIMS:
             outputs = outputs.unsqueeze(1)
         batch, members = outputs.shape[0], outputs.shape[1]
-        losses = self.row_losses(
+        losses = self.penalize(
             torch,
             outputs.reshape(batch * members, -1),
             tensors["y"][rows].repeat_interleave(members),
@@ -778,7 +779,7 @@ class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit
         )
         self.class_weight = class_weight
 
-    def encode_target(self, target: Any) -> numpy.ndarray:
+    def vectorize(self, target: Any) -> numpy.ndarray:
         """Maps labels to 0..K-1 and remembers the classes.
 
         Args:
@@ -792,15 +793,15 @@ class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit
         )
         return codes.astype(numpy.int64)
 
-    def output_units(self) -> int:
+    def dimensionality(self) -> int:
         """One unit per class.
 
         Returns:
-            The number of classes seen by `encode_target`.
+            The number of classes seen by `vectorize`.
         """
         return len(self.classes_)
 
-    def row_losses(self, torch: Any, outputs: Any, targets: Any) -> Any:
+    def penalize(self, torch: Any, outputs: Any, targets: Any) -> Any:
         """Cross entropy per row, optionally smoothed or focal.
 
         Args:
@@ -822,7 +823,7 @@ class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit
             return (1.0 - confidence) ** self.focal_gamma * entropy
         return entropy
 
-    def row_weights(self, targets: numpy.ndarray) -> numpy.ndarray:
+    def weighting(self, targets: numpy.ndarray) -> numpy.ndarray:
         """Inverse class frequency when `class_weight` is `balanced`.
 
         Args:
@@ -874,7 +875,7 @@ class Regressor(base.RegressorMixin, Trainer):  # type: ignore[misc]  # scikit-l
 
     losses = ("default", "huber")
 
-    def encode_target(self, target: Any) -> numpy.ndarray:
+    def vectorize(self, target: Any) -> numpy.ndarray:
         """Standardizes the target and remembers its scale.
 
         Args:
@@ -891,7 +892,7 @@ class Regressor(base.RegressorMixin, Trainer):  # type: ignore[misc]  # scikit-l
             numpy.float32
         )
 
-    def output_units(self) -> int:
+    def dimensionality(self) -> int:
         """A single value.
 
         Returns:
@@ -899,7 +900,7 @@ class Regressor(base.RegressorMixin, Trainer):  # type: ignore[misc]  # scikit-l
         """
         return 1
 
-    def row_losses(self, torch: Any, outputs: Any, targets: Any) -> Any:
+    def penalize(self, torch: Any, outputs: Any, targets: Any) -> Any:
         """Squared error per row, or Huber when configured.
 
         Args:
@@ -919,7 +920,7 @@ class Regressor(base.RegressorMixin, Trainer):  # type: ignore[misc]  # scikit-l
             )
         return (outputs.squeeze(-1) - targets) ** 2
 
-    def row_weights(self, targets: numpy.ndarray) -> numpy.ndarray:
+    def weighting(self, targets: numpy.ndarray) -> numpy.ndarray:
         """Unit weights.
 
         Args:

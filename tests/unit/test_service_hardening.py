@@ -546,7 +546,7 @@ def test_the_gate_script_exit_codes(tmp_path):
 
 def test_the_shipped_policy_is_valid():
     policy = json.loads((ROOT / "deploy" / "vuln-policy.json").read_text())
-    vuln_gate.check_policy(policy, TODAY)
+    vuln_gate.enforce(policy, TODAY)
     assert policy["fail_at_or_above"] == "HIGH"
 
 

@@ -146,7 +146,7 @@ def test_the_adapter_is_rejected_without_the_package_and_explains_why():
 
     if adapter.is_available():
         pytest.skip("tabpfn is installed here")
-    reason = adapter.rejection_reason(tasks.Task.BINARY)
+    reason = adapter.objection(tasks.Task.BINARY)
 
     assert reason is not None and "missing dependency: tabpfn" in reason
     assert adapter.family == "foundation"
@@ -160,7 +160,7 @@ def test_the_adapter_stays_extension_only_when_its_package_is_available(
     adapter = registry.Catalog.stock().get("tabpfn")
     monkeypatch.setattr(adapter, "is_available", lambda: True)
 
-    reason = adapter.rejection_reason(tasks.Task.BINARY)
+    reason = adapter.objection(tasks.Task.BINARY)
 
     assert reason is not None and "extension-only" in reason
 

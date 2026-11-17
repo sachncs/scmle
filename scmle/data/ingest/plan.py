@@ -115,9 +115,9 @@ class Plan:
         self.settings = settings
         limits = budget or scmle.data.ingest.budget.Budget()
         self.meter = (
-            scmle.data.ingest.budget.BudgetMeter(limits)
+            scmle.data.ingest.budget.Meter(limits)
             if clock is None
-            else scmle.data.ingest.budget.BudgetMeter(limits, clock)
+            else scmle.data.ingest.budget.Meter(limits, clock)
         )
         self.source = profile.Sql(connection_factory, self.meter)
         self.catalog: profile.Catalog | None = None

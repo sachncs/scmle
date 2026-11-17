@@ -301,7 +301,7 @@ class Martingale:
         """
         return self.log_e >= -math.log(fractional(level))
 
-    def ever_crossed(self, level: float) -> bool:
+    def surpassed(self, level: float) -> bool:
         """Checks whether the e-value was at least `1 / level` at any point.
 
         Args:

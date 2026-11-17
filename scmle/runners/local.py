@@ -121,7 +121,7 @@ class Runner(base.Runner):
         """Initializes the runner.
 
         Args:
-            store: Durable storage (any `ObjectStore`).
+            store: Durable storage (any `Depot`).
             workload: The training function.
             serving_identity: The serving identity (see `Runner`).
             interruptions: `(attempt, step) -> bool`; true makes the job

@@ -5,7 +5,7 @@ How data is read, checked and processed before training and inference
 
 ## Object stores
 
-`ObjectStore` is bytes under keys: `put` (atomic replace; `if_absent=True`
+`Depot` is bytes under keys: `put` (atomic replace; `if_absent=True`
 creates only), `get`, `head`, `list_objects`, `delete`, `exists`. Metadata
 always carries a SHA-256 computed by this code, so a changed object raises
 `CorruptObjectError`. The package ships the interface and one backend:
@@ -14,7 +14,7 @@ always carries a SHA-256 computed by this code, so a changed object raises
 | --- | --- | --- |
 | Directory | `LocalObjectStore(root)` | none |
 
-Any other backend is written by the user against the same `ObjectStore`
+Any other backend is written by the user against the same `Depot`
 interface; no object-store SDK is a dependency. Keys are validated before
 they reach a backend (no `..`, empty segment or leading slash).
 `RetryingStore` retries `TransientStoreError` (throttling, timeouts, 5xx)

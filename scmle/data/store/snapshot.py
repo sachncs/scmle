@@ -45,7 +45,7 @@ class SnapshotError(errors.DataError):
     category = "snapshot"
 
 
-def kind_of(series: pandas.Series) -> str:
+def categorize(series: pandas.Series) -> str:
     """The storage-independent kind of a column.
 
     `int`, `float`, `bool`, `datetime` or `string`, so a contract does not
@@ -78,7 +78,7 @@ def dtypes(frame: pandas.DataFrame) -> dict[str, str]:
     Returns:
         Column name (as a string) to kind, in column order.
     """
-    return {str(name): kind_of(frame[name]) for name in frame.columns}
+    return {str(name): categorize(frame[name]) for name in frame.columns}
 
 
 def schema_digest(schema: Mapping[str, str]) -> str:
@@ -299,7 +299,7 @@ class SnapshotReader:
 
     def __init__(
         self,
-        store: objectstore.ObjectStore,
+        store: objectstore.Depot,
         log: ReadLog | None = None,
         clock: Callable[[], datetime.datetime] | None = None,
     ) -> None:
@@ -380,7 +380,7 @@ class SnapshotReader:
         return frame, record
 
 
-def connector_reader(store: objectstore.ObjectStore) -> Callable[[str], bytes]:
+def connector_reader(store: objectstore.Depot) -> Callable[[str], bytes]:
     """Adapts a store to the `read_bytes` callable of `Bucket`.
 
     The URI's path (after the store's own prefix) is the object key, so a

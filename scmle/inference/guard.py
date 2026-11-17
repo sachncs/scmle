@@ -329,7 +329,7 @@ class Admission:
         self.pool.shutdown(wait=False, cancel_futures=True)
 
 
-def is_valid_request_id(request_id: str) -> bool:
+def wellformed(request_id: str) -> bool:
     """Checks whether a caller request id is safe to echo in a header.
 
     Args:

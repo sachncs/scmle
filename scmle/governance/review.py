@@ -249,7 +249,7 @@ class Signoff:
                 "observed_at must include timezone information"
             )
 
-    def unsigned_dict(self) -> dict[str, Any]:
+    def preimage(self) -> dict[str, Any]:
         """Returns the content covered by the review signature."""
         return {
             "schema_version": 1,
@@ -268,7 +268,7 @@ class Signoff:
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a persisted review record."""
-        record = self.unsigned_dict()
+        record = self.preimage()
         if self.signature is not None:
             record["signature"] = self.signature
         return record
@@ -306,10 +306,10 @@ class Signoff:
             else None,
         )
 
-    def canonical_json(self) -> str:
+    def canonize(self) -> str:
         """Returns canonical unsigned review content."""
         return json.dumps(
-            self.unsigned_dict(),
+            self.preimage(),
             ensure_ascii=True,
             separators=(",", ":"),
             sort_keys=True,
@@ -326,7 +326,7 @@ class Signoff:
         """
         return dataclasses.replace(
             self,
-            signature=signing.mac(self.unsigned_dict(), signing_key),
+            signature=signing.mac(self.preimage(), signing_key),
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
@@ -343,7 +343,7 @@ class Signoff:
         """
         if self.signature is None:
             return False
-        expected = signing.mac(self.unsigned_dict(), signing_key)
+        expected = signing.mac(self.preimage(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     def write(self, path: str | Path) -> None:

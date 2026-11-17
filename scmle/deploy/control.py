@@ -173,7 +173,7 @@ def expecting(
             it matches.
         """
         reasons = []
-        digest = seen.digest_of(revision)
+        digest = seen.distill(revision)
         if digest is None:
             reasons.append(f"revision {revision} is not reported")
         elif digest != image_digest:

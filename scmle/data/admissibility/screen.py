@@ -1391,10 +1391,10 @@ def encode(
 
     Raises:
         ValueError: If a regression target is constant, or the outcome is
-            rejected by `leakage.encode_target` (missing values, fewer
+            rejected by `leakage.vectorize` (missing values, fewer
             than two classes, or an unknown task).
     """
-    y = leakage.encode_target(target, task)
+    y = leakage.vectorize(target, task)
     folds = crossfit(len(y), cfg.folds, groups, block_size, cfg.run_seed)
     total = float(((y - y.mean()) ** 2).sum()) if task == "regression" else 0.0
     if task == "regression" and total == 0.0:

@@ -92,7 +92,7 @@ class Sanction:
         ):
             raise errors.InputError("signature must be non-empty text")
 
-    def unsigned_dict(self) -> dict[str, Any]:
+    def preimage(self) -> dict[str, Any]:
         """Returns the approval fields covered by its signature."""
         return {
             "model": self.model,
@@ -109,7 +109,7 @@ class Sanction:
     def sign(self, signing_key: str | bytes) -> Self:
         """Returns this approval with a content-bound HMAC signature.
 
-        The signature covers `unsigned_dict`. An empty key is refused by the
+        The signature covers `preimage`. An empty key is refused by the
         signing helper with a `ValueError`.
 
         Args:
@@ -120,7 +120,7 @@ class Sanction:
         """
         return dataclasses.replace(
             self,
-            signature=signing.mac(self.unsigned_dict(), signing_key),
+            signature=signing.mac(self.preimage(), signing_key),
         )
 
     def verify(self, signing_key: str | bytes | None = None) -> bool:
@@ -139,7 +139,7 @@ class Sanction:
         key = signing.keying(signing_key)
         if key is None:
             return False
-        expected = signing.mac(self.unsigned_dict(), key)
+        expected = signing.mac(self.preimage(), key)
         return hmac.compare_digest(self.signature, expected)
 
     def validate(
@@ -184,7 +184,7 @@ class Sanction:
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the complete approval record for durable audit evidence."""
-        record = self.unsigned_dict()
+        record = self.preimage()
         if self.signature is not None:
             record["signature"] = self.signature
         return record

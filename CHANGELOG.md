@@ -12,6 +12,22 @@ marked `Breaking:` and listed first in their group.
 
 ### Breaking changes
 
+* **Single-word names for 97 names defined in several places.** Methods
+  shared by several classes and helpers defined in several modules are
+  renamed to one word each, every definition to the same word, so the
+  method stays polymorphic; each rename and its modules is listed in
+  [`docs/RENAMES.md`](docs/RENAMES.md). Five public classes are renamed:
+  `ObjectStore` -> `Depot`, `KeySet` -> `Keystore`, `RunState` ->
+  `Progress` (in `scmle.runners.base` and `scmle.workflow.executor`),
+  `RetryExhaustedError` -> `RetryError`, and 15 more public classes
+  changed contract because a method they expose was renamed; the API
+  snapshot is regenerated. Kept on purpose: names that are also defined by
+  pandas, NumPy, scikit-learn or the standard library (`to_dict`,
+  `predict_proba`, `do_GET` ...), the `run_<action>` methods the command
+  line finds by name, and names that are dataclass fields,
+  properties stored in records, or keys of a serialized record
+  (`artifact_digest`, `dataset_hash`, `source_identity` ...), whose rename
+  would change a stored format and belongs with versioned records.
 * **Single-word names for 1,209 cross-module names.** Functions, methods
   and classes used across modules are renamed to single words; every rename
   is listed in [`docs/RENAMES.md`](docs/RENAMES.md). Names pinned in the

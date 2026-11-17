@@ -253,12 +253,12 @@ def test_checkpoint_mismatch_reports_the_checkpoint():
     source = make_source()
     foreign = incremental.Checkpoint("other", 3)
     with pytest.raises(incremental.IncrementalError) as caught:
-        source.validate_checkpoint(foreign)
+        source.rebind(foreign)
     assert caught.value.code == "checkpoint_mismatch"
     assert caught.value.details["checkpoint"] == foreign.to_dict()
     assert caught.value.source_uri == source.source_uri
     assert str(caught.value) == "checkpoint belongs to a different source"
-    fresh = source.validate_checkpoint(None)
+    fresh = source.rebind(None)
     assert fresh == incremental.Checkpoint(source.source_identity)
 
 
@@ -362,7 +362,7 @@ def test_stream_source_validation_and_polling():
     )
 
     with pytest.raises(incremental.IncrementalError) as caught:
-        stream.available_events()
+        stream.unconsumed()
     assert caught.value.code == "bounded_poll_required"
     assert caught.value.source_uri == stream.source_uri
 
@@ -383,20 +383,20 @@ def test_stream_source_validation_and_polling():
 
 def test_committed_state_round_trip_and_validation():
     point = incremental.Checkpoint("s", 2)
-    state = incremental.CommittedState(point, ("a", "b"))
+    state = incremental.Settlement(point, ("a", "b"))
     assert state.to_dict() == {
         "schema_version": 1,
         "checkpoint": point.to_dict(),
         "seen_event_ids": ["a", "b"],
     }
-    assert incremental.CommittedState.from_dict(state.to_dict()) == state
+    assert incremental.Settlement.from_dict(state.to_dict()) == state
     for version in (2, None):
         record = state.to_dict()
         record["schema_version"] = version
         with pytest.raises(ValueError, match=r"^unsupported incremental state"):
-            incremental.CommittedState.from_dict(record)
+            incremental.Settlement.from_dict(record)
     with pytest.raises(ValueError, match=r"^seen_event_ids must be sorted"):
-        incremental.CommittedState(point, ("b", "a"))
+        incremental.Settlement(point, ("b", "a"))
 
 
 def make_ledger(tmp_path, source=None):
@@ -407,16 +407,14 @@ def make_ledger(tmp_path, source=None):
 
 def test_ledger_paths_and_load_defaults(tmp_path):
     source, ledger = make_ledger(tmp_path)
-    assert ledger.lock_path.name == "state.json.lock"
+    assert ledger.lockfile.name == "state.json.lock"
     assert ledger.pending_acknowledgement_path.name == "state.json.ack"
-    assert ledger.load() == incremental.CommittedState(
+    assert ledger.load() == incremental.Settlement(
         incremental.Checkpoint(source.source_identity)
     )
     ledger.path.write_text(
         json.dumps(
-            incremental.CommittedState(
-                incremental.Checkpoint("other")
-            ).to_dict()
+            incremental.Settlement(incremental.Checkpoint("other")).to_dict()
         ),
         encoding="utf-8",
     )
@@ -441,7 +439,7 @@ def test_ledger_source_and_batch_mismatches(tmp_path):
     assert batch_error.value.details["batch_source_identity"] == "other"
     with pytest.raises(incremental.IncrementalError) as state_error:
         ledger.write_atomically(
-            incremental.CommittedState(incremental.Checkpoint("other"))
+            incremental.Settlement(incremental.Checkpoint("other"))
         )
     assert state_error.value.code == "state_source_mismatch"
     assert not ledger.path.exists()
@@ -449,17 +447,17 @@ def test_ledger_source_and_batch_mismatches(tmp_path):
         "other", "g", (), incremental.Checkpoint("other")
     )
     with pytest.raises(incremental.IncrementalError) as ack_error:
-        ledger.write_pending_acknowledgement(ack)
+        ledger.earmark(ack)
     assert ack_error.value.code == "acknowledgement_source_mismatch"
     assert ack_error.value.details["ack_source_identity"] == "other"
     with pytest.raises(incremental.IncrementalError) as writer_error:
-        ledger.commit_with_writer([], lambda events: None, ack)
+        ledger.finalize([], lambda events: None, ack)
     assert writer_error.value.code == "acknowledgement_source_mismatch"
 
 
 def test_write_atomically_persists_sorted_json_and_cleans_up(tmp_path):
     source, ledger = make_ledger(tmp_path / "nested")
-    state = incremental.CommittedState(
+    state = incremental.Settlement(
         incremental.Checkpoint(source.source_identity, 1), ("a",)
     )
     ledger.write_atomically(state)
@@ -509,7 +507,7 @@ def test_commit_with_writer_receipt_and_checkpoint(tmp_path):
         make_event("b", 2, "2026-01-02T00:00:00Z"),
         make_event("a", 1, "2026-01-05T00:00:00Z"),
     ]
-    receipt = ledger.commit_with_writer(events, written.append)
+    receipt = ledger.finalize(events, written.append)
 
     assert [tuple(e.event_id for e in call) for call in written] == [("a", "b")]
     assert receipt.accepted_event_ids == ("a", "b")
@@ -518,7 +516,7 @@ def test_commit_with_writer_receipt_and_checkpoint(tmp_path):
     assert receipt.checkpoint.watermark == "2026-01-05T00:00:00+00:00"
     assert ledger.load().seen_event_ids == ("a", "b")
 
-    again = ledger.commit_with_writer(
+    again = ledger.finalize(
         [make_event("a", 1), make_event("c", 9, "2026-01-03T00:00:00Z")],
         written.append,
     )
@@ -527,7 +525,7 @@ def test_commit_with_writer_receipt_and_checkpoint(tmp_path):
     assert again.checkpoint.sequence == 9
     assert again.checkpoint.watermark == "2026-01-05T00:00:00+00:00"
 
-    noop = ledger.commit_with_writer([make_event("a", 1)], written.append)
+    noop = ledger.finalize([make_event("a", 1)], written.append)
     assert noop.accepted_event_ids == ()
     assert noop.checkpoint == again.checkpoint
     assert len(written) == 2
@@ -536,15 +534,15 @@ def test_commit_with_writer_receipt_and_checkpoint(tmp_path):
 def test_commit_with_writer_type_checks_and_failed_writer(tmp_path):
     ledger = make_ledger(tmp_path)[1]
     with pytest.raises(TypeError, match=r"^events must contain Event values$"):
-        ledger.commit_with_writer(["x"], lambda events: None)
+        ledger.finalize(["x"], lambda events: None)
     with pytest.raises(TypeError, match=r"^writer must be callable$"):
-        ledger.commit_with_writer([], "nope")
+        ledger.finalize([], "nope")
 
     def failing(events):
         raise RuntimeError("sink down")
 
     with pytest.raises(RuntimeError, match=r"sink down"):
-        ledger.commit_with_writer([make_event("a", 1)], failing)
+        ledger.finalize([make_event("a", 1)], failing)
     assert not ledger.path.exists()
 
 
@@ -555,20 +553,20 @@ def test_commit_with_writer_stages_the_acknowledgement_at_the_checkpoint(
     ident = source.source_identity
     stale = incremental.Checkpoint(ident, 0)
     ack = incremental.EventAcknowledgement(ident, "g", ("a",), stale)
-    ledger.commit_with_writer([make_event("a", 3)], lambda events: None, ack)
+    ledger.finalize([make_event("a", 3)], lambda events: None, ack)
 
-    staged = ledger.load_pending_acknowledgement()
+    staged = ledger.reclaim()
     assert staged.checkpoint.sequence == 3
     assert staged.consumer_group == "g"
     text = ledger.pending_acknowledgement_path.read_text(encoding="utf-8")
     assert text == json.dumps(staged.to_dict(), sort_keys=True) + "\n"
-    ledger.clear_pending_acknowledgement()
-    assert ledger.load_pending_acknowledgement() is None
-    ledger.clear_pending_acknowledgement()
+    ledger.retract()
+    assert ledger.reclaim() is None
+    ledger.retract()
 
     empty = incremental.EventAcknowledgement(ident, "g", (), stale)
-    ledger.commit_with_writer([make_event("b", 4)], lambda events: None, empty)
-    assert ledger.load_pending_acknowledgement() is None
+    ledger.finalize([make_event("b", 4)], lambda events: None, empty)
+    assert ledger.reclaim() is None
 
 
 def test_pending_acknowledgement_loading_errors(tmp_path):
@@ -577,7 +575,7 @@ def test_pending_acknowledgement_loading_errors(tmp_path):
         "{not json", encoding="utf-8"
     )
     with pytest.raises(incremental.IncrementalError) as bad:
-        ledger.load_pending_acknowledgement()
+        ledger.reclaim()
     assert bad.value.code == "invalid_pending_acknowledgement"
     assert bad.value.details["path"] == str(ledger.pending_acknowledgement_path)
     assert bad.value.source_uri == source.source_identity
@@ -589,7 +587,7 @@ def test_pending_acknowledgement_loading_errors(tmp_path):
         json.dumps(foreign.to_dict()), encoding="utf-8"
     )
     with pytest.raises(incremental.IncrementalError) as mismatch:
-        ledger.load_pending_acknowledgement()
+        ledger.reclaim()
     assert mismatch.value.code == "acknowledgement_source_mismatch"
     assert mismatch.value.details["ack_source_identity"] == "other"
 
@@ -638,7 +636,7 @@ def test_consume_commits_and_acknowledges_everything_seen(tmp_path):
     assert len(sink) == 1
     assert delivered[0].event_ids == ("a", "b")
     assert delivered[0].checkpoint.sequence == 2
-    assert ledger.load_pending_acknowledgement() is None
+    assert ledger.reclaim() is None
 
     replay = consumer.consume()
     assert replay.receipt.accepted_event_ids == ()
@@ -665,11 +663,11 @@ def test_a_failed_acknowledgement_is_kept_and_retried(tmp_path):
     assert error.details["consumer_group"] == "g"
     assert error.details["event_ids"] == ["a"]
     assert isinstance(error.__cause__, RuntimeError)
-    assert ledger.load_pending_acknowledgement() is not None
+    assert ledger.reclaim() is not None
 
-    assert consumer.deliver_pending_acknowledgement() == ("a",)
-    assert ledger.load_pending_acknowledgement() is None
-    assert consumer.deliver_pending_acknowledgement() == ()
+    assert consumer.handoff() == ("a",)
+    assert ledger.reclaim() is None
+    assert consumer.handoff() == ()
 
 
 def test_a_pending_acknowledgement_of_another_group_is_refused(tmp_path):
@@ -680,9 +678,9 @@ def test_a_pending_acknowledgement_of_another_group_is_refused(tmp_path):
         ("a",),
         incremental.Checkpoint(consumer.source.source_identity, 1),
     )
-    ledger.write_pending_acknowledgement(ack)
+    ledger.earmark(ack)
     with pytest.raises(incremental.IncrementalError) as caught:
-        consumer.deliver_pending_acknowledgement()
+        consumer.handoff()
     assert caught.value.code == "consumer_group_mismatch"
     assert caught.value.source_uri == consumer.source.source_uri
     assert caught.value.details["pending_group"] == "elsewhere"

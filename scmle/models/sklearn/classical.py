@@ -6,7 +6,7 @@ construction logic once and takes everything that merely describes a model
 space) as keyword arguments, so a model that only declares data is one
 configured instance, such as `RIDGE`, not a subclass. A model that really
 behaves differently stays a subclass that overrides a method (`Svm`
-overrides `build`, `HistGradientBoosting` overrides `categorical_params`) and
+overrides `build`, `HistGradientBoosting` overrides `nominals`) and
 is configured the same way. Instances are registered like any adapter and
 must be treated as immutable. Adapters written as subclasses that declare
 class attributes, including user adapters registered through
@@ -211,7 +211,7 @@ class Dummy(models.Model):
 class HistGradientBoosting(Learner):
     """Histogram-based gradient boosting, which takes native categoricals."""
 
-    def categorical_params(self, indices: list[int]) -> dict[str, Any]:
+    def nominals(self, indices: list[int]) -> dict[str, Any]:
         """Marks the integer-coded columns as categorical.
 
         Args:

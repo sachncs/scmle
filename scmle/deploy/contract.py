@@ -484,7 +484,7 @@ class Probes:
         return cls(**record)
 
 
-def canonical_json(payload: Mapping[str, Any]) -> bytes:
+def canonize(payload: Mapping[str, Any]) -> bytes:
     """Serializes a payload deterministically.
 
     Args:
@@ -661,10 +661,7 @@ class Deployment:
             `sha256:` followed by the hex SHA-256 of the canonical JSON of
             `to_dict()`.
         """
-        return (
-            "sha256:"
-            + hashlib.sha256(canonical_json(self.to_dict())).hexdigest()
-        )
+        return "sha256:" + hashlib.sha256(canonize(self.to_dict())).hexdigest()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

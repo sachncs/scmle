@@ -141,14 +141,14 @@ def test_locked_test_set_opens_once(frame):
     with pytest.raises(errors.LeakageError, match="invalid token"):
         locked.open("guess")
     with pytest.raises(errors.LeakageError, match="bind it"):
-        locked.open(locked.issue_token())
+        locked.open(locked.mint())
     locked.bind("b")
     with pytest.raises(errors.LeakageError, match="binding mismatch"):
-        locked.open(locked.issue_token(), "other")
-    features, target = locked.open(locked.issue_token(), "b")
+        locked.open(locked.mint(), "other")
+    features, target = locked.open(locked.mint(), "b")
     assert len(features) == len(locked) == len(target)
     with pytest.raises(errors.LeakageError, match="already used"):
-        locked.open(locked.issue_token(), "b")
+        locked.open(locked.mint(), "b")
 
 
 def temporal_spec(embargo):
@@ -341,7 +341,7 @@ def test_feature_delays_become_lagged_nodes_and_exclusions_idempotently():
         {"k": 3},
     )
     assert "report" in spec.data.excluded_columns
-    again = tasks.Config.model_validate_json(spec.canonical_json())
+    again = tasks.Config.model_validate_json(spec.canonize())
     assert again == spec and len(again.feature_graph.nodes) == 1
 
 

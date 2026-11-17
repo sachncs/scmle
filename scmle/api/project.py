@@ -166,10 +166,10 @@ def unwrap(
             unsupported schema or has another configuration hash.
     """
     report_path = artifact_path / PARAMETER_ESTIMATION_DECLARATION_ARTIFACT
-    lock_path = artifact_path / PARAMETER_ESTIMATION_DECLARATION_LOCK
+    lockfile = artifact_path / PARAMETER_ESTIMATION_DECLARATION_LOCK
     try:
         envelope = json.loads(report_path.read_text(encoding="utf-8"))
-        lock_digest = lock_path.read_text(encoding="utf-8").strip()
+        lock_digest = lockfile.read_text(encoding="utf-8").strip()
     except (OSError, TypeError, ValueError) as error:
         raise errors.ArtifactError(
             "parameter estimation declaration is missing or unreadable",
@@ -1415,10 +1415,10 @@ class Curator:
             raise errors.InputError("curation dataset_hash must match adapter")
         if reported_sample_count != sample_count:
             raise errors.InputError("curation sample_count must match adapter")
-        card = curation.DatasetCard.from_report(
+        card = curation.Datasheet.from_report(
             modality,
             curation_payload,
-            self.adapter.modality_notes(),
+            self.adapter.remarks(),
             manifest=self.manifest,
             task="not_declared",
         )

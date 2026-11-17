@@ -19,7 +19,7 @@ class Termination(enum.StrEnum):
     PRUNED = "pruned"
 
 
-class DecisionAction(enum.StrEnum):
+class Edict(enum.StrEnum):
     """What the planner did with a technique."""
 
     INCLUDE = "include"
@@ -38,7 +38,7 @@ class Decision:
     """
 
     technique: str
-    action: DecisionAction
+    action: Edict
     reason: str
 
     def to_dict(self) -> dict[str, str]:
@@ -111,9 +111,7 @@ class Plan:
             candidate_models=tuple(record["candidate_models"]),
             optimization_budget_seconds=record["optimization_budget_seconds"],
             decisions=tuple(
-                Decision(
-                    d["technique"], DecisionAction(d["action"]), d["reason"]
-                )
+                Decision(d["technique"], Edict(d["action"]), d["reason"])
                 for d in record["decisions"]
             ),
             warnings=tuple(record["warnings"]),

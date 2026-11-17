@@ -376,7 +376,7 @@ class Predictor:
                 Path(package_path),
                 (dataset_hash, model_digest, signature["value"]),
             )
-            report_digest = attestation.checksum(report.unsigned_dict())
+            report_digest = attestation.checksum(report.preimage())
         package = Package(
             path=str(package_path),
             model_sha256=model_digest,
@@ -689,7 +689,7 @@ class Record:
         if self.signature is not None and not hashlike(self.signature):
             raise errors.InputError("signature must be a SHA-256 digest")
 
-    def unsigned_dict(self) -> dict[str, object]:
+    def preimage(self) -> dict[str, object]:
         """Builds the exact report content covered by the signature.
 
         Returns:
@@ -722,7 +722,7 @@ class Record:
         """
         return dataclasses.replace(
             self,
-            signature=signing.mac(self.unsigned_dict(), signing_key),
+            signature=signing.mac(self.preimage(), signing_key),
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
@@ -737,7 +737,7 @@ class Record:
         """
         if self.signature is None:
             return False
-        expected = signing.mac(self.unsigned_dict(), signing_key)
+        expected = signing.mac(self.preimage(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     @classmethod
@@ -836,7 +836,7 @@ class Record:
             The unsigned content plus a `signature` entry that is None if
             unsigned, otherwise the algorithm and value.
         """
-        record = self.unsigned_dict()
+        record = self.preimage()
         record["signature"] = (
             None
             if self.signature is None
@@ -960,7 +960,7 @@ class Checkpoint:
                 "completed checkpoint must contain every lifecycle stage"
             )
 
-    def unsigned_dict(self) -> dict[str, object]:
+    def preimage(self) -> dict[str, object]:
         """Builds the exact checkpoint content covered by its signature.
 
         Returns:
@@ -996,7 +996,7 @@ class Checkpoint:
         """
         return dataclasses.replace(
             self,
-            signature=signing.mac(self.unsigned_dict(), signing_key),
+            signature=signing.mac(self.preimage(), signing_key),
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
@@ -1011,7 +1011,7 @@ class Checkpoint:
         """
         if self.signature is None:
             return False
-        expected = signing.mac(self.unsigned_dict(), signing_key)
+        expected = signing.mac(self.preimage(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     @classmethod
@@ -1089,7 +1089,7 @@ class Checkpoint:
             The unsigned content plus a `signature` entry holding the algorithm
             and value.
         """
-        record = self.unsigned_dict()
+        record = self.preimage()
         record["signature"] = {
             "algorithm": signing.SIGNATURE_ALGORITHM,
             "value": self.signature,
@@ -1204,7 +1204,7 @@ class Curation:
         object.__setattr__(self, "curation", roundtrip)
         object.__setattr__(self, "dataset_card", normalized_card)
 
-    def unsigned_dict(self) -> dict[str, object]:
+    def preimage(self) -> dict[str, object]:
         """Builds the exact curation content covered by the signature.
 
         Returns:
@@ -1224,7 +1224,7 @@ class Curation:
     @property
     def content_digest(self) -> str:
         """The deterministic digest of the unsigned evidence."""
-        return attestation.checksum(self.unsigned_dict())
+        return attestation.checksum(self.preimage())
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
         """Checks the persisted curation signature.
@@ -1237,7 +1237,7 @@ class Curation:
         Returns:
             True if the signature matches the unsigned evidence, else False.
         """
-        expected = signing.mac(self.unsigned_dict(), signing_key)
+        expected = signing.mac(self.preimage(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     def to_dict(self) -> dict[str, object]:
@@ -1247,7 +1247,7 @@ class Curation:
             The unsigned content plus the content digest, path and a `signature`
             entry holding the algorithm and value.
         """
-        record = self.unsigned_dict()
+        record = self.preimage()
         record["content_digest"] = self.content_digest
         record["path"] = self.path
         record["signature"] = {
@@ -1408,7 +1408,7 @@ class Curator(abc.ABC):
         """
 
     @abc.abstractmethod
-    def modality_notes(self) -> tuple[str, ...]:
+    def remarks(self) -> tuple[str, ...]:
         """Lists representation and curation limits.
 
         Returns:
@@ -1510,7 +1510,7 @@ class ExtensionCurator(Curator):
             )
         return report
 
-    def modality_notes(self) -> tuple[str, ...]:
+    def remarks(self) -> tuple[str, ...]:
         """Lists the explicit caller-owned boundaries for the dataset card.
 
         Returns:
@@ -1579,7 +1579,7 @@ class Preparer(Curator):
             Drift evidence as a JSON-native mapping.
         """
 
-    def modality_specific_explanation(
+    def elucidate(
         self,
         sample: Any,  # noqa: ARG002 -- hook signature that subclasses override
         model: LogisticRegression,  # noqa: ARG002 -- hook signature that subclasses override
@@ -1647,7 +1647,7 @@ class Preparer(Curator):
         """
         return tuple(self.label(sample) for sample in samples)
 
-    def group_ids(self, samples: Sequence[Any]) -> tuple[str, ...]:
+    def cohorts(self, samples: Sequence[Any]) -> tuple[str, ...]:
         """Gives the stable grouping identities used for split evidence.
 
         Args:
@@ -1768,12 +1768,12 @@ class DocumentPreparer(Preparer):
         """
         return sample.label
 
-    def modality_specific_explanation(
+    def elucidate(
         self,
         sample: Any,
         model: LogisticRegression,
-        feature_names: Sequence[str],  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
-        coefficients: numpy.ndarray,  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
+        feature_names: Sequence[str],  # noqa: ARG002 -- overrides Preparer.elucidate
+        coefficients: numpy.ndarray,  # noqa: ARG002 -- overrides Preparer.elucidate
     ) -> dict[str, object]:
         """Builds page and section provenance for a document explanation.
 
@@ -1941,7 +1941,7 @@ class DocumentPreparer(Preparer):
         report = documents.Monitor(current).observe(observed.dataset)
         return report.to_dict()
 
-    def modality_notes(self) -> tuple[str, ...]:
+    def remarks(self) -> tuple[str, ...]:
         """Describes the bounded document representation.
 
         Returns:
@@ -2015,7 +2015,7 @@ class ImagePreparer(Preparer):
             result.train,
             result.validation,
             result.test,
-            result.group_ids(),
+            result.cohorts(),
         )
 
     def features(self, samples: Sequence[image.Sample]) -> Batch:
@@ -2064,12 +2064,12 @@ class ImagePreparer(Preparer):
         """
         return sample.label
 
-    def modality_specific_explanation(
+    def elucidate(
         self,
         sample: Any,
         model: LogisticRegression,
-        feature_names: Sequence[str],  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
-        coefficients: numpy.ndarray,  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
+        feature_names: Sequence[str],  # noqa: ARG002 -- overrides Preparer.elucidate
+        coefficients: numpy.ndarray,  # noqa: ARG002 -- overrides Preparer.elucidate
     ) -> dict[str, object]:
         """Builds bounded occlusion evidence on transformed RGB pixels.
 
@@ -2253,7 +2253,7 @@ class ImagePreparer(Preparer):
         report = images.Monitor(self.dataset.curate()).observe(observed.dataset)
         return report.to_dict()
 
-    def modality_notes(self) -> tuple[str, ...]:
+    def remarks(self) -> tuple[str, ...]:
         """Describes image lifecycle limits.
 
         Returns:
@@ -2314,7 +2314,7 @@ class AudioPreparer(Preparer):
         """
         result = self.dataset.split(seed=seed)
         return Partitions(
-            result.train, result.validation, result.test, result.group_ids()
+            result.train, result.validation, result.test, result.cohorts()
         )
 
     def features(self, samples: Sequence[audio.Sample]) -> Batch:
@@ -2380,7 +2380,7 @@ class AudioPreparer(Preparer):
             },
         }
 
-    def modality_notes(self) -> tuple[str, ...]:
+    def remarks(self) -> tuple[str, ...]:
         """Describes audio lifecycle limits.
 
         Returns:
@@ -2397,12 +2397,12 @@ class AudioPreparer(Preparer):
             ),
         )
 
-    def modality_specific_explanation(
+    def elucidate(
         self,
         sample: Any,
         model: LogisticRegression,
-        feature_names: Sequence[str],  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
-        coefficients: numpy.ndarray,  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
+        feature_names: Sequence[str],  # noqa: ARG002 -- overrides Preparer.elucidate
+        coefficients: numpy.ndarray,  # noqa: ARG002 -- overrides Preparer.elucidate
     ) -> dict[str, object]:
         """Builds bounded time-local score evidence for WAV samples.
 
@@ -2765,9 +2765,9 @@ class Footage(Preparer):
             temporal cutoff, validation is empty and test holds the later data.
         """
         if self.temporal_cutoff is not None:
-            temporal_result = self.dataset.split_temporal(self.temporal_cutoff)
+            temporal_result = self.dataset.cutover(self.temporal_cutoff)
 
-            def group_ids(
+            def cohorts(
                 samples: Sequence[video.Sample],
             ) -> tuple[str, ...]:
                 return tuple(
@@ -2781,9 +2781,9 @@ class Footage(Preparer):
                 (),
                 temporal_result.future,
                 {
-                    "train": group_ids(temporal_result.train),
+                    "train": cohorts(temporal_result.train),
                     "validation": (),
-                    "test": group_ids(temporal_result.future),
+                    "test": cohorts(temporal_result.future),
                 },
             )
         group_result = self.dataset.split(seed=seed)
@@ -2791,7 +2791,7 @@ class Footage(Preparer):
             group_result.train,
             group_result.validation,
             group_result.test,
-            group_result.group_ids(),
+            group_result.cohorts(),
         )
 
     def features(self, samples: Sequence[video.Sample]) -> Batch:
@@ -2867,7 +2867,7 @@ class Footage(Preparer):
             },
         }
 
-    def modality_notes(self) -> tuple[str, ...]:
+    def remarks(self) -> tuple[str, ...]:
         """Describes video lifecycle limits.
 
         Returns:
@@ -2889,12 +2889,12 @@ class Footage(Preparer):
             ),
         )
 
-    def modality_specific_explanation(
+    def elucidate(
         self,
         sample: Any,
         model: LogisticRegression,
-        feature_names: Sequence[str],  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
-        coefficients: numpy.ndarray,  # noqa: ARG002 -- overrides Preparer.modality_specific_explanation
+        feature_names: Sequence[str],  # noqa: ARG002 -- overrides Preparer.elucidate
+        coefficients: numpy.ndarray,  # noqa: ARG002 -- overrides Preparer.elucidate
     ) -> dict[str, object]:
         """Builds bounded temporal frame-statistics occlusion evidence.
 
@@ -3238,7 +3238,7 @@ class GraphPreparer(Preparer):
             },
         }
 
-    def modality_specific_explanation(
+    def elucidate(
         self,
         sample: Any,
         model: LogisticRegression,
@@ -3373,7 +3373,7 @@ class GraphPreparer(Preparer):
             },
         }
 
-    def modality_notes(self) -> tuple[str, ...]:
+    def remarks(self) -> tuple[str, ...]:
         """Describes graph lifecycle limits.
 
         Returns:
@@ -3530,7 +3530,7 @@ class GeospatialPreparer(Preparer):
         """
         return sample.label
 
-    def modality_specific_explanation(
+    def elucidate(
         self,
         sample: Any,
         model: LogisticRegression,
@@ -3677,7 +3677,7 @@ class GeospatialPreparer(Preparer):
             "bounds_changed": current["bounds"] != reference["bounds"],
         }
 
-    def modality_notes(self) -> tuple[str, ...]:
+    def remarks(self) -> tuple[str, ...]:
         """Describes geospatial lifecycle limits.
 
         Returns:
@@ -4113,7 +4113,7 @@ class Imagery(Preparer):
         """
         return self.labels_by_source[sample.source]
 
-    def modality_specific_explanation(
+    def elucidate(
         self,
         sample: Any,
         model: LogisticRegression,
@@ -4270,7 +4270,7 @@ class Imagery(Preparer):
             "profile_changed": current.profile != reference.profile,
         }
 
-    def modality_notes(self) -> tuple[str, ...]:
+    def remarks(self) -> tuple[str, ...]:
         """Describes raster lifecycle limits.
 
         Returns:
@@ -4759,7 +4759,7 @@ class Composition(Stage):
                     "Feature summaries describe association and coverage, not "
                     "causation."
                 ),
-                *context.adapter.modality_notes(),
+                *context.adapter.remarks(),
             ],
         }
         context.record(self.stage, context.data_explanation.copy())
@@ -5130,7 +5130,7 @@ class ModelExplainabilityStage(Stage):
                 ],
             },
             "independent_ground_truth": ground_truth_evidence,
-            "modality_specific": context.adapter.modality_specific_explanation(
+            "modality_specific": context.adapter.elucidate(
                 partitions.test[0],
                 model,
                 batch.feature_names,
@@ -5336,10 +5336,10 @@ class Documentation(Stage):
         """
         if context.curation_report is None:
             raise errors.OrderError("profiling must precede documentation")
-        dataset_card = curation.DatasetCard.from_report(
+        dataset_card = curation.Datasheet.from_report(
             modalities.serialise(context.adapter.modality),
             context.curation_report.to_dict(),
-            context.adapter.modality_notes(),
+            context.adapter.remarks(),
             manifest=context.manifest,
         )
         context.documentation = {
@@ -5355,7 +5355,7 @@ class Documentation(Stage):
             "dataset_hash": context.adapter.dataset_hash,
             "model_family": "regularized_linear_classifier",
             "dataset_card": dataset_card.to_dict(),
-            "limitations": list(context.adapter.modality_notes()),
+            "limitations": list(context.adapter.remarks()),
             "promotion_requirements": [
                 "independent metric recomputation",
                 "modality-specific explanation validation",
@@ -5562,7 +5562,7 @@ class Plan:
                 "observed adapter modality must match reference modality"
             )
 
-    def check_manifest(self) -> None:
+    def audit(self) -> None:
         """Checks the manifest, if any, against the adapter.
 
         Raises:
@@ -5977,7 +5977,7 @@ class Lifecycle:
         )
         plan.poll()
         plan.conform()
-        plan.check_manifest()
+        plan.audit()
         stage_names = tuple(stage.stage.value for stage in self.stages)
         required_stage_names = tuple(
             stage.value for stage in modalities.REQUIRED_LIFECYCLE_STAGES

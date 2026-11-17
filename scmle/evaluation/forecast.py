@@ -125,7 +125,7 @@ class ForecastMetric(metrics.Metric):
     kind: str = "mase"
     scale: float | None = None
 
-    def accepts_weights(self) -> bool:
+    def weightable(self) -> bool:
         """These scores are unweighted.
 
         Returns:

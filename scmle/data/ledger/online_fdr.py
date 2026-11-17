@@ -382,7 +382,7 @@ class Tester(abc.ABC):
             e-value used (None for the p-value rules).
         """
 
-    def update_spent(
+    def expend(
         self,
         state: State,
         level: Fraction,
@@ -428,7 +428,7 @@ class Tester(abc.ABC):
             candidates=(*state.candidates, time)
             if candidate
             else state.candidates,
-            spent=self.update_spent(state, level, candidate),
+            spent=self.expend(state, level, candidate),
         )
         after = self.wealth(moved)
         if after < 0:
@@ -779,7 +779,7 @@ class Saffron(PValueTester):
         p = self.read(evidence)
         return p <= level, p <= self.lam, None
 
-    def update_spent(
+    def expend(
         self, state: State, level: Fraction, candidate: bool
     ) -> Fraction:
         """Computes the level spent; candidates cost nothing.

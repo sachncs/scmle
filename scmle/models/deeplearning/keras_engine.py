@@ -78,7 +78,7 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
         self.validation_fraction = validation_fraction
         self.random_state = random_state
 
-    def output_units(self) -> int:
+    def dimensionality(self) -> int:
         """Network outputs (overridden by the classifier).
 
         Returns:
@@ -86,7 +86,7 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
         """
         return 1
 
-    def loss_name(self) -> Any:
+    def objective(self) -> Any:
         """Keras loss identifier.
 
         Returns:
@@ -94,7 +94,7 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
         """
         return "mse"
 
-    def encode_target(self, target: Any) -> numpy.ndarray:
+    def vectorize(self, target: Any) -> numpy.ndarray:
         """Converts the target to what the loss consumes.
 
         Args:
@@ -114,7 +114,7 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
 
         Returns:
             A sequential model of ReLU dense layers with dropout and a final
-            dense layer of `output_units()` units.
+            dense layer of `dimensionality()` units.
         """
         regularizer = keras.regularizers.l2(self.l2)
         layers = [keras.layers.Input((width,))]
@@ -125,7 +125,7 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
                 )
             )
             layers.append(keras.layers.Dropout(self.dropout))
-        layers.append(keras.layers.Dense(self.output_units()))
+        layers.append(keras.layers.Dense(self.dimensionality()))
         return keras.Sequential(layers)
 
     def fit(
@@ -147,12 +147,12 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
         keras = load()
         keras.utils.set_random_seed(self.random_state)
         matrix = numpy.asarray(features, dtype=numpy.float32)
-        encoded = self.encode_target(target)
+        encoded = self.vectorize(target)
         self.input_width_ = matrix.shape[1]
         network = self.build(keras, self.input_width_)
         network.compile(
             optimizer=keras.optimizers.Adam(self.learning_rate),
-            loss=self.loss_name(),
+            loss=self.objective(),
         )
         held = len(matrix) >= MIN_ROWS_FOR_VALIDATION
         callbacks = [keras.callbacks.TerminateOnNaN()]
@@ -245,7 +245,7 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
             features: Numeric matrix with the width seen at fit.
 
         Returns:
-            Array of shape `(n_rows, output_units)`.
+            Array of shape `(n_rows, dimensionality)`.
         """
         return numpy.asarray(
             self.network_.predict(
@@ -257,15 +257,15 @@ class Trainer(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships n
 class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit-learn ships no type information
     """Classifier: softmax over class scores."""
 
-    def output_units(self) -> int:
+    def dimensionality(self) -> int:
         """One unit per class.
 
         Returns:
-            The number of classes seen by `encode_target`.
+            The number of classes seen by `vectorize`.
         """
         return len(self.classes_)
 
-    def loss_name(self) -> Any:
+    def objective(self) -> Any:
         """Cross entropy over integer class codes, from logits.
 
         Returns:
@@ -274,7 +274,7 @@ class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit
         keras = load()
         return keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
-    def encode_target(self, target: Any) -> numpy.ndarray:
+    def vectorize(self, target: Any) -> numpy.ndarray:
         """Maps labels to 0..K-1 and remembers the classes.
 
         Args:
@@ -320,7 +320,7 @@ class Classifier(base.ClassifierMixin, Trainer):  # type: ignore[misc]  # scikit
 class Regressor(base.RegressorMixin, Trainer):  # type: ignore[misc]  # scikit-learn ships no type information
     """Regressor trained on the standardized target."""
 
-    def encode_target(self, target: Any) -> numpy.ndarray:
+    def vectorize(self, target: Any) -> numpy.ndarray:
         """Standardizes the target and remembers its scale.
 
         Args:

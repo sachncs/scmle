@@ -94,7 +94,7 @@ def scrub(series: pandas.Series) -> pandas.Series:
     return numeric.replace([numpy.inf, -numpy.inf], numpy.nan)
 
 
-def to_float(values: Any) -> numpy.ndarray:
+def floating(values: Any) -> numpy.ndarray:
     """Coerces a 2-D block to float; unparseable and infinite become NaN.
 
     Args:
@@ -120,7 +120,7 @@ def stringify(values: Any) -> numpy.ndarray:
     return frame.iloc[:, 0].fillna("").astype(str).to_numpy()
 
 
-def to_object(values: Any) -> numpy.ndarray:
+def objectify(values: Any) -> numpy.ndarray:
     """Casts a 2-D block to object dtype with NaN for missing entries.
 
     Args:
@@ -218,7 +218,7 @@ class Family(abc.ABC):
             "n_unique": int(series.nunique(dropna=True)),
         }
 
-    def exclusion_reason(self, series: pandas.Series) -> str | None:  # noqa: ARG002 -- Family hook; every kind shares this signature
+    def rationale(self, series: pandas.Series) -> str | None:  # noqa: ARG002 -- Family hook; every kind shares this signature
         """Returns why the column cannot be a feature, if it cannot.
 
         Args:
@@ -417,7 +417,7 @@ class Quantitative(Family):
             (
                 "cast",
                 preprocessing.FunctionTransformer(
-                    to_float, feature_names_out="one-to-one"
+                    floating, feature_names_out="one-to-one"
                 ),
             ),
         ]
@@ -485,7 +485,7 @@ class DatetimeKind(Family):
         """
         return pandas.api.types.is_datetime64_any_dtype(series)
 
-    def exclusion_reason(self, series: pandas.Series) -> str | None:  # noqa: ARG002 -- Family hook; every kind shares this signature
+    def rationale(self, series: pandas.Series) -> str | None:  # noqa: ARG002 -- Family hook; every kind shares this signature
         """Datetimes are kept: the profiler expands them into features.
 
         Args:
@@ -605,7 +605,7 @@ class Categorical(Family):
         stats["entropy_bits"] = entropy(series)
         return stats
 
-    def exclusion_reason(self, series: pandas.Series) -> str | None:
+    def rationale(self, series: pandas.Series) -> str | None:
         """Near-unique text columns are treated as identifiers.
 
         Args:
@@ -653,7 +653,7 @@ class Categorical(Family):
                 (
                     "cast",
                     preprocessing.FunctionTransformer(
-                        to_object, feature_names_out="one-to-one"
+                        objectify, feature_names_out="one-to-one"
                     ),
                 ),
                 (
@@ -730,7 +730,7 @@ KINDS: tuple[Family, ...] = (
 )
 
 
-def kind_of(series: pandas.Series) -> Family:
+def categorize(series: pandas.Series) -> Family:
     """Returns the first kind that matches `series`.
 
     Args:

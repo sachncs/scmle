@@ -369,7 +369,7 @@ def jsonable(document: Mapping[str, Any]) -> dict[str, Any]:
     return dict(json.loads(json.dumps(document, default=str, sort_keys=True)))
 
 
-def build_runner(
+def rig(
     *,
     rule: Rule,
     reference: Regression | None = None,
@@ -432,7 +432,7 @@ def build_runner(
         if selection["flagged"]:
             document = refused(registration, selection)
         else:
-            y = explore.encode_target(
+            y = explore.vectorize(
                 target, classification=True, classes=classes
             ).to_numpy(float)
             clusters = (

@@ -586,7 +586,7 @@ class Loop:
     # ----------------------------------------------------------------- state
 
     @property
-    def state_path(self) -> Path:
+    def statefile(self) -> Path:
         """The state file."""
         return self.directory / STATE_FILE
 
@@ -633,20 +633,20 @@ class Loop:
             ),
             "pending_batches": self.pending_batches,
         }
-        temporary = self.state_path.with_suffix(".tmp")
+        temporary = self.statefile.with_suffix(".tmp")
         temporary.write_text(
             json.dumps(jsonify(state), sort_keys=True),
             encoding="utf-8",
             newline="\n",
         )
-        temporary.replace(self.state_path)
+        temporary.replace(self.statefile)
 
     def restore(self) -> None:
         """Reads the state file; halts if it does not match the ledger."""
-        if not self.state_path.exists():
+        if not self.statefile.exists():
             self.halted_by_state = self.ledger.halted
             return
-        state = json.loads(self.state_path.read_text(encoding="utf-8"))
+        state = json.loads(self.statefile.read_text(encoding="utf-8"))
         if state["ledger_head"] != self.ledger.head:
             self.halted_by_state = True
             self.halt_reason = HALT_STATE
@@ -1788,7 +1788,7 @@ class Loop:
     def intercept(self, registry: Any) -> None:
         """Routes every champion move of `registry` through this guard.
 
-        `elevate`, `check_rollback` and `register_run(promote=True)`
+        `elevate`, `revertible` and `register_run(promote=True)`
         of a `Maintainer` over this registry then need an attestation,
         as `move_champion` does. Moving the alias by editing the registry's
         files is not stopped.

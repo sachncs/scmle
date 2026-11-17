@@ -91,7 +91,7 @@ class Affidavit:
             raise errors.InputError("column must be a non-empty string")
         qualification.finite(self.lead_seconds, "lead_seconds")
 
-    def field(self) -> provenance.FieldProvenance:
+    def field(self) -> provenance.Pedigree:
         """Builds the provenance record the admissibility rules consume.
 
         Returns:
@@ -100,7 +100,7 @@ class Affidavit:
             `attested`, serving availability `yes`, no definition history, an
             unknown write time and overwrite status, and this attestation.
         """
-        return provenance.FieldProvenance(
+        return provenance.Pedigree(
             name=self.column,
             origin=provenance.Origin.DERIVED,
             writer=WRITER,

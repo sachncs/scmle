@@ -189,7 +189,7 @@ def read_verified(
 
     A file that cannot be read, is not a JSON object, is not a valid
     charter, or fails `check_format` raises `ConfigError` (from
-    `contracts.load_json`, `contracts.parse` and
+    `contracts.deserialize`, `contracts.parse` and
     `check_format`). A bare charter has no wrapper and so no hash or
     signature to check.
 
@@ -205,7 +205,7 @@ def read_verified(
             `require_signature` is set and the charter is bare, unsigned, or
             signed with no key available.
     """
-    record = contracts.load_json(path)
+    record = contracts.deserialize(path)
     if "charter" not in record:
         charter = contracts.parse(record)
         if require_signature:

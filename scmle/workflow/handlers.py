@@ -47,14 +47,14 @@ def delegate(
         """
         manifest = runner.run(make_spec(context))
         context.spend(manifest.total_cost)
-        if manifest.state == base.RunState.SUCCEEDED:
+        if manifest.state == base.Progress.SUCCEEDED:
             return {
                 "run_id": manifest.run_id,
                 "result_sha256": manifest.result_sha256,
                 "attempts": len(manifest.attempts),
                 "cost": manifest.total_cost,
             }
-        if manifest.state == base.RunState.RETRIES_EXHAUSTED:
+        if manifest.state == base.Progress.RETRIES_EXHAUSTED:
             raise executor.PreemptedError(
                 f"job {manifest.run_id} was interrupted on every attempt"
             )

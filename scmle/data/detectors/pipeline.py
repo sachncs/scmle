@@ -45,7 +45,7 @@ class Findings:
     skipped: Mapping[str, str]
 
 
-def gate_status(
+def adjudication(
     store: certificates.Store | None, detector_id: str
 ) -> dict[str, certificates.Authority]:
     """Looks up the gating status of each defect type of a detector.
@@ -75,7 +75,7 @@ def run(
     target: str | None = None,
     store: certificates.Store | None = None,
     seed: int = 0,
-    provenance: Mapping[str, outliers.FieldProvenance] | None = None,
+    provenance: Mapping[str, outliers.Pedigree] | None = None,
 ) -> Findings:
     """Runs all detectors on exploration rows.
 
@@ -124,5 +124,5 @@ def run(
                 skipped[detector_id] = str(error)
             continue
         results[detector_id] = steps[detector_id](working)
-    status = {d: gate_status(store, d) for d in registry.SPECS}
+    status = {d: adjudication(store, d) for d in registry.SPECS}
     return Findings(tuple(order), results, status, tuple(log), skipped)

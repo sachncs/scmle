@@ -111,7 +111,7 @@ def test_retries_stop_at_the_budget_and_never_retry_a_permanent_error(
         retry.Retries(max_attempts=3, base_delay_seconds=0.1),
         sleep=waits.append,
     )
-    with pytest.raises(retry.RetryExhaustedError) as raised:
+    with pytest.raises(retry.RetryError) as raised:
         store.put("k", b"x")
     assert raised.value.attempts == 3 and len(waits) == 2
     inner.puts = 0

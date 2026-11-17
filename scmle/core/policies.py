@@ -25,7 +25,7 @@ class Review:
         details: Structured facts (plan, selected trial, ...).
     """
 
-    gate: state.RunState
+    gate: state.Progress
     summary: str
     details: dict[str, Any]
 
@@ -52,8 +52,8 @@ class Reviewer(abc.ABC):
         gates: Stages after which the checkpoint is consulted.
     """
 
-    gates: frozenset[state.RunState] = frozenset(
-        {state.RunState.PLANNING, state.RunState.SELECTING}
+    gates: frozenset[state.Progress] = frozenset(
+        {state.Progress.PLANNING, state.Progress.SELECTING}
     )
 
     @abc.abstractmethod
@@ -74,7 +74,7 @@ class Callback(Reviewer):
     def __init__(
         self,
         decide: Callable[[Review], Approval | bool],
-        gates: frozenset[state.RunState] | None = None,
+        gates: frozenset[state.Progress] | None = None,
     ) -> None:
         """Initializes the checkpoint.
 
@@ -104,7 +104,7 @@ class Callback(Reviewer):
 
 
 def describe(
-    gate: state.RunState, context: scmle.core.context.Context
+    gate: state.Progress, context: scmle.core.context.Context
 ) -> Review:
     """Builds the review shown at `gate`.
 
@@ -119,7 +119,7 @@ def describe(
         selected trial in the context) fails with the context's
         unavailable-product error.
     """
-    if gate is state.RunState.PLANNING:
+    if gate is state.Progress.PLANNING:
         plan = scmle.core.context.require(context.plan, "plan")
         return Review(gate, plan.summary(), plan.to_dict())
     selected = scmle.core.context.require(context.selected, "selected")

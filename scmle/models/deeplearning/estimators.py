@@ -170,7 +170,7 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
             )
         return explanation
 
-    def checkpoint_manifest(self) -> dict[str, object]:
+    def inventory(self) -> dict[str, object]:
         """Returns the fitted checkpoint metadata, without the weights."""
         validation.check_is_fitted(self, attributes=["state_"])
         family = self.model_contract()
@@ -290,7 +290,7 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
             feature_count=self.state_["input_width_"],
         )
 
-    def save_checkpoint(
+    def stash(
         self,
         path: str | pathlib.Path,
         signing_key: str | bytes | None = None,
@@ -316,11 +316,11 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
             serialized,
         )
         return envelope.seal(
-            path, self.checkpoint_manifest(), serialized.getvalue(), signing_key
+            path, self.inventory(), serialized.getvalue(), signing_key
         )
 
     @classmethod
-    def load_checkpoint(
+    def restore(
         cls,
         path: str | pathlib.Path,
         signing_key: str | bytes | None = None,
@@ -329,7 +329,7 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
         """Loads a checkpoint, authenticating it before anything is unpickled.
 
         Args:
-            path: Checkpoint produced by `save_checkpoint`.
+            path: Checkpoint produced by `stash`.
             signing_key: HMAC key; the configured key is used when None.
             trusted: Whether the caller vouches for an unsigned checkpoint.
 
@@ -369,7 +369,7 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
                 f"checkpoint does not contain a {cls.__name__}"
             )
         validation.check_is_fitted(estimator, attributes=["state_"])
-        expected = json.loads(json.dumps(estimator.checkpoint_manifest()))
+        expected = json.loads(json.dumps(estimator.inventory()))
         if (
             serialized.get("format")
             != estimator.model_contract().checkpoint.format

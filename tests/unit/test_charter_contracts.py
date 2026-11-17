@@ -30,7 +30,7 @@ def make_charter(**overrides):
             contracts.Trigger(
                 check_id="leakage.skill",
                 trigger="lower bound above floor at the budgeted level",
-                action=contracts.DecisionAction.QUARANTINE_COLUMN,
+                action=contracts.Edict.QUARANTINE_COLUMN,
                 certificate_id="cert.leakage.skill",
             ),
         ),
@@ -101,7 +101,7 @@ def test_gating_row_needs_a_certificate_id():
     row = contracts.Trigger(
         check_id="leakage.skill",
         trigger="t",
-        action=contracts.DecisionAction.BLOCK_RUN,
+        action=contracts.Edict.BLOCK_RUN,
         certificate_id="",
     )
     with pytest.raises(ValueError, match="certificate_id"):
@@ -122,7 +122,7 @@ def test_decision_row_for_unknown_check_is_rejected_by_the_registry_lint():
 
 
 def test_decision_action_is_a_closed_set():
-    assert {a.value for a in contracts.DecisionAction} == {
+    assert {a.value for a in contracts.Edict} == {
         "drop_column",
         "quarantine_column",
         "reweight",

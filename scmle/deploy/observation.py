@@ -84,7 +84,7 @@ class Observation:
         if sum(item.percent for item in self.traffic) != FULL_TRAFFIC:
             raise errors.ConfigError("traffic shares must sum to 100")
 
-    def digest_of(self, revision: str) -> str | None:
+    def distill(self, revision: str) -> str | None:
         """Looks up the image digest of a revision.
 
         Args:

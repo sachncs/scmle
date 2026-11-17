@@ -36,7 +36,7 @@ CLASSES = ("error", "population", "real_extreme", "unclassified", "none")
 
 
 @dataclasses.dataclass(frozen=True)
-class FieldProvenance:
+class Pedigree:
     """What is known about one numeric field.
 
     Attributes:
@@ -120,7 +120,7 @@ def outside(
 
 def triage(
     frame: pandas.DataFrame,
-    provenance: Mapping[str, FieldProvenance] | None = None,
+    provenance: Mapping[str, Pedigree] | None = None,
     contracts: Mapping[str, Contract] | None = None,
     cutoff: float = CANDIDATE_Z,
 ) -> Triage:
@@ -186,7 +186,7 @@ def triage(
 
 def misrecorded(
     frame: pandas.DataFrame,
-    provenance: Mapping[str, FieldProvenance],
+    provenance: Mapping[str, Pedigree],
     contracts: Mapping[str, Contract] | None = None,
 ) -> pandas.Series:
     """Flags the rows classed `error` by provenance.

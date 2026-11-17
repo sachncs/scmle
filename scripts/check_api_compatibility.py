@@ -113,7 +113,7 @@ EXTENSION_SURFACES = {
     "scmle.security.tokens": (
         tokens,
         (
-            "KeySet",
+            "Keystore",
             "Principal",
             "RevocationList",
             "TokenError",
@@ -137,7 +137,7 @@ EXTENSION_SURFACES = {
         retry,
         (
             "Retries",
-            "RetryExhaustedError",
+            "RetryError",
             "TransientError",
             "call",
         ),
@@ -147,7 +147,7 @@ EXTENSION_SURFACES = {
         (
             "LocalObjectStore",
             "ObjectMeta",
-            "ObjectStore",
+            "Depot",
             "RetryingStore",
             "StoreError",
         ),
@@ -175,7 +175,7 @@ EXTENSION_SURFACES = {
             "Job",
             "Resources",
             "RunManifest",
-            "RunState",
+            "Progress",
             "Runner",
         ),
     ),
@@ -202,7 +202,7 @@ EXTENSION_SURFACES = {
     ),
     "scmle.workflow.executor": (
         executor,
-        ("ApprovalError", "Executor", "RunState", "StepContext"),
+        ("ApprovalError", "Executor", "Progress", "StepContext"),
     ),
     "scmle.workflow.schedule": (schedule, ("Scheduler", "Tick")),
     "scmle.data.store.processing": (

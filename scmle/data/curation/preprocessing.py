@@ -229,7 +229,7 @@ def default_options(
     native = bool(
         plan.high_cardinality
         and caps.native_categorical
-        and adapter.categorical_params([0])
+        and adapter.nominals([0])
     )
     return data.Preprocessing(
         scale=caps.needs_scaling,
@@ -376,7 +376,7 @@ def instantiate(
         options = default_options(plan, adapter)
     special = isolate(plan, options)
     if options.high_cardinality == "ordinal" and special:
-        params |= adapter.categorical_params(list(range(len(special))))
+        params |= adapter.nominals(list(range(len(special))))
     steps = preprocess(plan, options, task, seed)
     estimator = adapter.build(task, seed, params)
     problem = misalignment(plan, options.select, options.missing)

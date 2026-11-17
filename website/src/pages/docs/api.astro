@@ -142,7 +142,7 @@ restored = Classifier.load(artifact.path, trusted=True)</code></pre>
   <pre><code>reader = Reader()
 sample = reader.load("policy.txt", document_id="policy-2026")
 curation = Dataset((sample,)).curate()
-explanation = model.local_explanation(sample)
+explanation = model.spotlight(sample)
 
 assert curation.source_traceability_coverage == 1.0
 assert explanation.to_dict()["citations"][0]["source_digest"] == sample.source_digest</code></pre>
@@ -167,7 +167,7 @@ train = Dataset((
 ))
 model = Classifier(Config(target_size=(16, 16))).fit(train)
 prediction = model.predict(train)
-explanation = model.local_explanation(train.samples[0])
+explanation = model.spotlight(train.samples[0])
 occlusion = model.occlude(
     train.samples[0], patch_size=(4, 4), top_k=5
 )
@@ -232,7 +232,7 @@ temporal = Dataset((clip,)).summarize(
 print(temporal.sampled_frame_indices)</code></pre>
   <p><code>summarize</code> selects evenly spaced frames, records their indices, computes bounded pixel statistics, and rejects oversized, malformed, or non-finite decoder output. The lifecycle can use the same explicit decoder to emit frame-statistics occlusion evidence. This is not raw saliency, motion attribution, synchronization proof, or a production video model; those require a versioned decoder policy, temporal leakage review, independent evaluation, serving, and recovery evidence. Use <code>group_id</code> for subject, session, camera, or other identity-aware splits; without it, the source is the only safe grouping unit.</p>
   <h2>Video temporal boundaries</h2>
-  <p>A video clip may have an observation time independent of its encoded container timestamp. Pass a timezone-aware ISO-8601 value or <code>datetime</code> to <code>Sample.from_bytes</code>. The sample stores the canonical UTC value and binds it into the dataset identity. <code>Dataset.curate()</code> reports absent, mixed, or complete temporal coverage; <code>split_temporal</code> fails closed unless every clip is timed. To make the experimental lifecycle use this policy, pass the same cutoff as <code>Footage(temporal_cutoff=...)</code>; otherwise the adapter retains its explicit group-aware split.</p>
+  <p>A video clip may have an observation time independent of its encoded container timestamp. Pass a timezone-aware ISO-8601 value or <code>datetime</code> to <code>Sample.from_bytes</code>. The sample stores the canonical UTC value and binds it into the dataset identity. <code>Dataset.curate()</code> reports absent, mixed, or complete temporal coverage; <code>cutover</code> fails closed unless every clip is timed. To make the experimental lifecycle use this policy, pass the same cutoff as <code>Footage(temporal_cutoff=...)</code>; otherwise the adapter retains its explicit group-aware split.</p>
   <pre><code>{`from scmle.data.modalities import Dataset, Sample
 
 clip = Sample.from_bytes(
@@ -242,7 +242,7 @@ clip = Sample.from_bytes(
     observation_time="2026-01-03T00:00:00+00:00",
 )
 dataset = Dataset((clip,))
-future_boundary = dataset.split_temporal("2026-01-02T00:00:00Z")
+future_boundary = dataset.cutover("2026-01-02T00:00:00Z")
 print(future_boundary.cutoff)
 print(future_boundary.future)`}</code></pre>
   <p>This boundary prevents a random split from silently mixing past and future observations. It does not infer event time from a filename, prove causal ordering, or replace domain-specific watermark and late-arrival policy.</p>

@@ -6,7 +6,7 @@ from scmle.contracts import errors
 from scmle.contracts import events
 
 
-class RunState(enum.StrEnum):
+class Progress(enum.StrEnum):
     """Lifecycle states of a run."""
 
     CREATED = "CREATED"
@@ -24,20 +24,20 @@ class RunState(enum.StrEnum):
 
 
 FORWARD_ORDER = (
-    RunState.CREATED,
-    RunState.VALIDATING,
-    RunState.PROFILING,
-    RunState.PLANNING,
-    RunState.TRAINING,
-    RunState.SELECTING,
-    RunState.TESTING,
-    RunState.PACKAGING,
-    RunState.COMPLETED,
+    Progress.CREATED,
+    Progress.VALIDATING,
+    Progress.PROFILING,
+    Progress.PLANNING,
+    Progress.TRAINING,
+    Progress.SELECTING,
+    Progress.TESTING,
+    Progress.PACKAGING,
+    Progress.COMPLETED,
 )
 ABORT_STATES = frozenset(
-    {RunState.FAILED, RunState.CANCELLED, RunState.BLOCKED}
+    {Progress.FAILED, Progress.CANCELLED, Progress.BLOCKED}
 )
-TERMINAL_STATES = ABORT_STATES | {RunState.COMPLETED}
+TERMINAL_STATES = ABORT_STATES | {Progress.COMPLETED}
 
 
 class TransitionError(errors.ScmleError):
@@ -67,12 +67,12 @@ class Tracker:
         self.run_id = run_id
         self.log = log
         self.config_hash = config_hash
-        self.state = RunState.CREATED
+        self.state = Progress.CREATED
         self.emit(self.state, reason)
 
     def emit(
         self,
-        state: RunState,
+        state: Progress,
         reason: str,
         artifacts: tuple[str, ...] = (),
     ) -> None:
@@ -95,7 +95,7 @@ class Tracker:
 
     def transition(
         self,
-        target: RunState,
+        target: Progress,
         reason: str = "",
         artifacts: tuple[str, ...] = (),
     ) -> None:

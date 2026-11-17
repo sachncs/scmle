@@ -430,7 +430,7 @@ class Registry:
         prevents an explicit experimental opt-in from bypassing the lifecycle
         evidence boundary. An absent, incomplete or status-ineligible modality
         is refused with `UnsupportedError` (raised by
-        `raise_unsupported`); a non-modality argument raises `TypeError`.
+        `refuse`); a non-modality argument raises `TypeError`.
 
         Args:
             modality: Modality to resolve.
@@ -447,16 +447,16 @@ class Registry:
             else frozenset(allowed_statuses)
         )
         if declaration is None:
-            self.raise_unsupported(modality, "no declaration exists")
+            self.refuse(modality, "no declaration exists")
         if not declaration.complete:
             missing = [stage.value for stage in declaration.missing_stages]
-            self.raise_unsupported(
+            self.refuse(
                 modality,
                 "declaration is incomplete",
                 {"missing_stages": missing},
             )
         if declaration.status not in statuses:
-            self.raise_unsupported(
+            self.refuse(
                 modality,
                 f"registered as {declaration.status.value}; accepted statuses "
                 f"are {sorted(status.value for status in statuses)}",
@@ -487,7 +487,7 @@ class Registry:
             sort_keys=True,
         )
 
-    def raise_unsupported(
+    def refuse(
         self,
         modality: ModalityIdentity,
         reason: str,

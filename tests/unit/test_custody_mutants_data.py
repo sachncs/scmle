@@ -369,7 +369,7 @@ def test_sealed_rows_have_a_fresh_index_and_their_own_labels():
     held = ran.vault.sets["C"]
     held.commit("c", "l")
     features, target = held.open(
-        held.issue_token(), "test", claims_hash="c", ledger_hash="l"
+        held.mint(), "test", claims_hash="c", ledger_hash="l"
     )
     assert isinstance(features.index, pandas.RangeIndex)
     assert isinstance(target.index, pandas.RangeIndex)

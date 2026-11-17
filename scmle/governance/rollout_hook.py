@@ -14,9 +14,9 @@ registries. This hook is the one place that joins the two:
   `Maintainer.elevate`, which still needs the registry's
   independent signed approval (and the attestation of a guarded registry);
 * binding the hook makes the manager's bootstrap rules descriptive
-  (`Maintainer.delegate`): `review` and `check_rollback` no
+  (`Maintainer.delegate`): `review` and `revertible` no
   longer decide promotion or rollback, and the hook's `review` and
-  `check_rollback` write their results to the decision log as
+  `revertible` write their results to the decision log as
   `bootstrap_diagnostic` rows with `descriptive: true` and `decides: false`;
 * a promoted champion gets its rollback monitor at the rollout plan's
   rollback level (once per champion); a rollback decision is a proposal
@@ -137,7 +137,7 @@ class Hook:
             self.diagnose("review", outcome.comparison)
         return outcome
 
-    def check_rollback(
+    def revertible(
         self,
         fresh: pandas.DataFrame,
         target: str,
@@ -145,7 +145,7 @@ class Hook:
         approval: registry.Sanction | None = None,
         signing_key: str | bytes | None = None,
     ) -> lifecycle.Outcome:
-        """Runs `Maintainer.check_rollback` as a logged diagnostic.
+        """Runs `Maintainer.revertible` as a logged diagnostic.
 
         Nothing moves, whatever the approval: only `watch` and `roll_back`
         take the previous champion back.
@@ -160,7 +160,7 @@ class Hook:
         Returns:
             The lifecycle manager's rollback outcome.
         """
-        outcome = self.manager.check_rollback(
+        outcome = self.manager.revertible(
             fresh, target, policy, approval, signing_key
         )
         if outcome.comparison is not None:

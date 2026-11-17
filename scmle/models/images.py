@@ -243,7 +243,7 @@ class Classifier:
         Raises:
             RuntimeError: If the classifier has not been fitted.
         """
-        self.require_fitted()
+        self.preflight()
         estimator = self.estimator
         if estimator is None:
             raise errors.OrderError("classifier is not fitted")
@@ -256,7 +256,7 @@ class Classifier:
         Raises:
             RuntimeError: If the classifier has not been fitted.
         """
-        self.require_fitted()
+        self.preflight()
         estimator = self.estimator
         if estimator is None:
             raise errors.OrderError("classifier is not fitted")
@@ -344,7 +344,7 @@ class Classifier:
         Raises:
             RuntimeError: If the classifier has not been fitted.
         """
-        self.require_fitted()
+        self.preflight()
         if not dataset.samples:
             return ()
         estimator = self.estimator
@@ -372,7 +372,7 @@ class Classifier:
         Raises:
             RuntimeError: If the classifier has not been fitted.
         """
-        self.require_fitted()
+        self.preflight()
         if not dataset.samples:
             return ()
         estimator = self.estimator
@@ -414,7 +414,7 @@ class Classifier:
             labels=tuple(str(value) for value in self.classes),
         )
 
-    def global_explanation(self, top_k: int = 10) -> Explanation:
+    def overview(self, top_k: int = 10) -> Explanation:
         """Ranks pixels by their mean absolute linear coefficient.
 
         Args:
@@ -430,7 +430,7 @@ class Classifier:
         """
         if top_k < 1:
             raise errors.InputError("top_k must be positive")
-        self.require_fitted()
+        self.preflight()
         estimator = self.estimator
         if estimator is None:
             raise errors.OrderError("classifier is not fitted")
@@ -453,7 +453,7 @@ class Classifier:
             ),
         )
 
-    def local_explanation(
+    def spotlight(
         self,
         sample: image.Sample,
         top_k: int = 10,
@@ -475,7 +475,7 @@ class Classifier:
         """
         if top_k < 1:
             raise errors.InputError("top_k must be positive")
-        self.require_fitted()
+        self.preflight()
         estimator = self.estimator
         if estimator is None:
             raise errors.OrderError("classifier is not fitted")
@@ -542,9 +542,9 @@ class Classifier:
             raise errors.InputError(
                 "patch_size must contain positive dimensions"
             )
-        self.require_fitted()
+        self.preflight()
         features = self.transform(image.Dataset((sample,)))
-        original_score = self.predicted_class_score(features)
+        original_score = self.confidence(features)
         width, height = self.config.target_size
         channels = 1 if self.config.mode == "L" else len(self.config.mode)
         patch_width, patch_height = patch_size
@@ -561,7 +561,7 @@ class Classifier:
                 ]
                 occluded = features.copy()
                 occluded[0, indexes] = 0.0
-                delta = original_score - self.predicted_class_score(occluded)
+                delta = original_score - self.confidence(occluded)
                 terms.append(
                     (
                         f"region[{row}:{end_row},{column}:{end_column}]",
@@ -584,7 +584,7 @@ class Classifier:
             ),
         )
 
-    def predicted_class_score(self, features: numpy.ndarray) -> float:
+    def confidence(self, features: numpy.ndarray) -> float:
         """Computes the decision score of the predicted class.
 
         Args:
@@ -597,7 +597,7 @@ class Classifier:
         Raises:
             RuntimeError: If the classifier has not been fitted.
         """
-        self.require_fitted()
+        self.preflight()
         estimator = self.estimator
         if estimator is None:
             raise errors.OrderError("classifier is not fitted")
@@ -628,7 +628,7 @@ class Classifier:
         Raises:
             FileExistsError: If `path` already exists.
         """
-        self.require_fitted()
+        self.preflight()
         target = pathlib.Path(path).expanduser()
         if target.exists():
             raise FileExistsError(f"model package already exists: {target}")
@@ -717,7 +717,7 @@ class Classifier:
         loaded = joblib.load(model_path)
         if not isinstance(loaded, cls):
             raise errors.KindError("package does not contain an Classifier")
-        loaded.require_fitted()
+        loaded.preflight()
         if loaded.model_digest != manifest.get("model_digest"):
             raise errors.InputError(
                 "image model digest does not match manifest"
@@ -733,7 +733,7 @@ class Classifier:
         Returns:
             Array with one row of flattened pixels per image.
         """
-        self.require_fitted()
+        self.preflight()
         return dataset.flatten(
             self.config.target_size,
             self.config.mode,
@@ -758,7 +758,7 @@ class Classifier:
                 )
         return tuple(names)
 
-    def require_fitted(self) -> None:
+    def preflight(self) -> None:
         """Checks that the classifier has been fitted.
 
         Raises:

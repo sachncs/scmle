@@ -14,7 +14,7 @@ override = "none; the verdict is only computed when --unit is given, so omitting
 variables = ["--unit", "--target-table", "--eps-key", "--eps-null", "--max-key-size", "--max-queries", "--max-rows-scanned", "--max-seconds"]
 
 [ingest.multiplicity]
-site = "scmle.core.ingest_stage:check_multiplicity"
+site = "scmle.core.ingest_stage:plurality"
 error = "BlockedError"
 claim = "C3"
 passes = "The declared family size equals the number of synthesized columns and the ledger registered exactly the non-excluded synthesized columns."
@@ -142,7 +142,7 @@ override = "none"
 variables = ["MIN_STRATUM_ROWS", "validation.folds", "data.event_column"]
 
 [split.event.stratify]
-site = "scmle.data.splitting.splitters:EventStratifiedSplit.stratify_labels"
+site = "scmle.data.splitting.splitters:EventStratifiedSplit.stratifier"
 error = "BlockedError"
 claim = "C5"
 passes = "Events and censored rows each number at least MIN_STRATUM_ROWS in the full data."
@@ -214,7 +214,7 @@ override = "none"
 variables = ["MIN_STRATUM_ROWS", "validation.folds"]
 
 [split.stratified.stratify]
-site = "scmle.data.splitting.splitters:StratifiedSplit.stratify_labels"
+site = "scmle.data.splitting.splitters:StratifiedSplit.stratifier"
 error = "BlockedError"
 claim = "C5"
 passes = "Every class has at least MIN_STRATUM_ROWS rows in the full data."
@@ -223,7 +223,7 @@ override = "none"
 variables = ["MIN_STRATUM_ROWS", "data.target"]
 
 [split.temporal.holdout]
-site = "scmle.data.splitting.splitters:TemporalSplit.chronological_holdout"
+site = "scmle.data.splitting.splitters:Chronology.chronological_holdout"
 error = "BlockedError"
 claim = "C5"
 passes = "Every value of the time column parses as a datetime."
@@ -232,7 +232,7 @@ override = "none"
 variables = ["data.time_column", "validation.test_fraction", "validation.embargo_rows", "data.horizon"]
 
 [split.temporal.partition]
-site = "scmle.data.splitting.splitters:TemporalSplit.partition"
+site = "scmle.data.splitting.splitters:Chronology.partition"
 error = "BlockedError"
 claim = "C5"
 passes = "The time column orders the rows and there are at least folds + 1 + embargo development rows."
@@ -250,7 +250,7 @@ override = "none"
 variables = ["MIN_FOLDS", "validation.folds", "data.treatment_column"]
 
 [split.treatment.stratify]
-site = "scmle.data.splitting.splitters:TreatmentStratifiedSplit.stratify_labels"
+site = "scmle.data.splitting.splitters:TreatmentStratifiedSplit.stratifier"
 error = "BlockedError"
 claim = "C5"
 passes = "Every treatment / outcome cell has at least MIN_STRATUM_ROWS rows."

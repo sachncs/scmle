@@ -235,7 +235,7 @@ def test_a_rollback_needs_an_attestation_naming_the_rollback(
     loop.intercept(store)
     manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     with pytest.raises(never_list.AttestationRequired):
-        manager.check_rollback(
+        manager.revertible(
             traffic(1200, seed=20),
             "y",
             approval=sanction(first),
@@ -243,7 +243,7 @@ def test_a_rollback_needs_an_attestation_naming_the_rollback(
         )
     assert store.resolve("m").version == 2
     approve_pending(loop)
-    outcome = manager.check_rollback(
+    outcome = manager.revertible(
         traffic(1200, seed=20),
         "y",
         approval=sanction(first),

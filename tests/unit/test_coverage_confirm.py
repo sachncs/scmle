@@ -77,7 +77,7 @@ class Band:
 
 
 def test_the_runner_tests_the_released_rows_once():
-    runner = coverage_confirm.build_runner(Band(), "regression", "c" * 64)
+    runner = coverage_confirm.rig(Band(), "regression", "c" * 64)
     assert runner is not None and len(runner.registered) == 1
     rng = numpy.random.default_rng(0)
     x = pandas.DataFrame({"x": rng.normal(size=400)})
@@ -92,8 +92,8 @@ def test_no_calibration_or_no_interval_task_gives_no_runner():
     class Bare:
         conformal = None
 
-    assert coverage_confirm.build_runner(Bare(), "regression", "c" * 64) is None
-    assert coverage_confirm.build_runner(Band(), "ranking", "c" * 64) is None
+    assert coverage_confirm.rig(Bare(), "regression", "c" * 64) is None
+    assert coverage_confirm.rig(Band(), "ranking", "c" * 64) is None
     assert (
         coverage_confirm.not_evaluated("x")["status"] == confirm.NOT_EVALUATED
     )
@@ -103,7 +103,7 @@ def run_band_rows():
     rng = numpy.random.default_rng(0)
     x = pandas.DataFrame({"x": rng.normal(size=400)})
     y = x["x"] + rng.uniform(-1.0, 1.0, 400)
-    runner = coverage_confirm.build_runner(Band(), "regression", "c" * 64)
+    runner = coverage_confirm.rig(Band(), "regression", "c" * 64)
     return runner.run(x, y)
 
 

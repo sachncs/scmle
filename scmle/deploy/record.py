@@ -104,7 +104,7 @@ class Record:
         for check, digest in self.evidence:
             contract.require_digest(digest, f"evidence[{check}]")
 
-    def unsigned_dict(self) -> dict[str, Any]:
+    def preimage(self) -> dict[str, Any]:
         """Builds the signed content.
 
         Returns:
@@ -123,7 +123,7 @@ class Record:
         Returns:
             The signed content plus the signature.
         """
-        return {**self.unsigned_dict(), "signature": self.signature}
+        return {**self.preimage(), "signature": self.signature}
 
     def digest(self) -> str:
         """Digests the signed record, for the ledger and the next release.
@@ -145,7 +145,7 @@ class Record:
             A copy of the record with `signature` set.
         """
         return dataclasses.replace(
-            self, signature=signing.mac(self.unsigned_dict(), key)
+            self, signature=signing.mac(self.preimage(), key)
         )
 
     def verify(self, key: str | bytes) -> bool:
@@ -160,7 +160,7 @@ class Record:
         """
         if not self.signature:
             return False
-        expected = signing.mac(self.unsigned_dict(), key)
+        expected = signing.mac(self.preimage(), key)
         return hmac.compare_digest(self.signature, expected)
 
     @classmethod

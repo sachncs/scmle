@@ -159,7 +159,7 @@ def test_c_itself_refuses_a_second_open_after_the_stage():
     source = source_with(*c_rows())
     confirm.confirm(ledger, source, alpha_confirm=ALPHA)
     with pytest.raises(errors.LeakageError):
-        source.open(source.issue_token(), actor="exploration")
+        source.open(source.mint(), actor="exploration")
 
 
 def test_unrejected_survivors_stay_unverified_with_their_adjusted_p():
@@ -255,7 +255,7 @@ def test_a_crash_while_opening_is_a_failure_not_an_exception():
         log = sealed.Journal()
         committed = True
 
-        def issue_token(self):
+        def mint(self):
             return "t"
 
         def open(self, token, actor="x", claims_hash=None, ledger_hash=None):
@@ -337,11 +337,11 @@ def test_claims_file_round_trips_and_carries_the_hashes(tmp_path):
 def test_confirmation_with_class_labels_uses_the_exploration_coding():
     y = world(400, 1)[1]
     labels = pandas.Series(numpy.where(y > y.median(), "yes", "no"))
-    codes = explore.encode_target(labels, True)
+    codes = explore.vectorize(labels, True)
     assert set(codes.unique()) == {0.0, 1.0}
     assert float(codes[labels == "yes"].iloc[0]) == 1.0  # sorted: no < yes
-    flipped = explore.encode_target(labels, True, classes=("yes", "no"))
+    flipped = explore.vectorize(labels, True, classes=("yes", "no"))
     assert float(flipped[labels == "yes"].iloc[0]) == 0.0
     with pytest.raises(ValueError, match="numeric"):
-        explore.encode_target(pandas.Series(["a", "b"]), False)
+        explore.vectorize(pandas.Series(["a", "b"]), False)
     assert confirm.default_encoding(labels).tolist() == codes.tolist()

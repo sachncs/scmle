@@ -824,7 +824,7 @@ def object_store_loss() -> recovery.Outcome:
     try:
         service = export_service(base / "service", specify())
         port = demo.unused()
-        store = mocks.ObjectStore(base / "objects", port=port)
+        store = mocks.Depot(base / "objects", port=port)
         fleet.serve(store)
         url = store.address
         etags = demo.sync(url, service, "models/m/v1")
@@ -842,7 +842,7 @@ def object_store_loss() -> recovery.Outcome:
             fetch_failed = True
         served_during = predict(running.base)[0] == http.HTTPStatus.OK
         restored = time.monotonic()
-        again = mocks.ObjectStore(base / "objects", port=port)
+        again = mocks.Depot(base / "objects", port=port)
         fleet.serve(again)
         intact = {
             name: again.root.joinpath("models", "m", "v1", name).exists()
@@ -1073,7 +1073,7 @@ def incompatible_schema() -> recovery.Outcome:
         for step in range(40):
             code = demo.post_json(url, {"records": missing})[0]
             statuses.append(code)
-            watch.record_request(100.0 + step, "/predict", code, 0.01)
+            watch.tally(100.0 + step, "/predict", code, 0.01)
         verdict = classify.classify(watch.evaluate(140.0))
         digest = demo.retrieve(f"{running.base}/schema")[1]["schema_digest"]
         adapted = demo.post_json(

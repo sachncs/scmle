@@ -150,7 +150,7 @@ def test_l23_to_l39_decision_table(run):
     )  # declarative API
     assert (
         next(s.state for s in stages.default_stages())
-        is state.RunState.VALIDATING
+        is state.Progress.VALIDATING
     )
     assert {"sequential", "process", "ray"} <= {
         scheduler.Serial.name,
@@ -499,7 +499,7 @@ def test_l234_to_l264_flow_with_locked_test_and_single_final_evaluation(run):
 def test_l268_l276_states_blocked_and_transition_events(run):
     """Explicit states incl. BLOCKED/FAILED/CANCELLED; events carry required fields."""
     project, result = run
-    assert {s.value for s in state.RunState} >= {
+    assert {s.value for s in state.Progress} >= {
         "CREATED",
         "VALIDATING",
         "PROFILING",

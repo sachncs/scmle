@@ -39,7 +39,7 @@ def test_feature_plan_helpers():
 
 def test_plan_summary_and_dict():
     decision = experiments.Decision(
-        "dummy", experiments.DecisionAction.INCLUDE, "baseline"
+        "dummy", experiments.Edict.INCLUDE, "baseline"
     )
     plan = experiments.Plan(
         "p1", "regression", "rmse", "random", ("dummy",), 60, (decision,)
@@ -68,8 +68,8 @@ def test_adapter_rejection_reasons():
             raise NotImplementedError
 
     adapter = Probe()
-    assert "does not support" in adapter.rejection_reason(tasks.Task.REGRESSION)
-    assert "missing dependency" in adapter.rejection_reason(tasks.Task.BINARY)
+    assert "does not support" in adapter.objection(tasks.Task.REGRESSION)
+    assert "missing dependency" in adapter.objection(tasks.Task.BINARY)
     assert not adapter.is_available()
 
 

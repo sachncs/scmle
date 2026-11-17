@@ -309,7 +309,7 @@ def test_multiplicity_matches_registered_hypotheses_and_mismatch_fails():
         out.frame, out.manifest, out.declared_family_size + 1
     )
     with pytest.raises(synthesize.MultiplicityError):
-        synthesize.check_multiplicity(short.declared_family_size, ledger)
+        synthesize.plurality(short.declared_family_size, ledger)
 
 
 def imported_modules(path):

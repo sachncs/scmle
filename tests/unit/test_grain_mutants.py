@@ -299,7 +299,7 @@ def test_invalid_tolerance_messages_name_the_argument():
 
 
 def build_budgeted(frame):
-    meter = budget.BudgetMeter(budget.Budget(max_queries=1000))
+    meter = budget.Meter(budget.Budget(max_queries=1000))
     db = ingest_worlds.new_database("gm")
     ingest_worlds.load(db, "t", frame)
     source = profile.Sql(db.factory, meter)
@@ -329,7 +329,7 @@ def test_a_stopped_level_names_the_stage_and_the_level():
         | {"d": numpy.repeat(numpy.arange(40), 5)}
     )
     source, table = build_budgeted(frame)[:2]
-    source.meter = budget.BudgetMeter(budget.Budget(max_queries=0))
+    source.meter = budget.Meter(budget.Budget(max_queries=0))
     scan = grain.keysearch(source, table)
     stop = source.meter.stops[0]
     assert (stop.stage, stop.unit, stop.reason) == (
@@ -339,7 +339,7 @@ def test_a_stopped_level_names_the_stage_and_the_level():
     )
     assert scan.partial is True
     other = build_budgeted(frame)
-    other[0].meter = budget.BudgetMeter(budget.Budget(max_queries=0))
+    other[0].meter = budget.Meter(budget.Budget(max_queries=0))
     grain.keysearch(other[0], other[1], stage="custom")
     assert other[0].meter.stops[0].stage == "custom"
 
@@ -350,7 +350,7 @@ def test_the_level_charge_is_two_queries_for_each_runnable_set():
         | {"d": numpy.repeat(numpy.arange(40), 5)}
     )
     source, table = build_budgeted(frame)[:2]
-    spend = budget.BudgetMeter(budget.Budget(max_queries=1000))
+    spend = budget.Meter(budget.Budget(max_queries=1000))
     source.meter = spend
     scan = grain.keysearch(source, table, max_size=2)
     runnable = [
@@ -520,7 +520,7 @@ def test_the_unit_check_charges_the_unit_stage_and_stops_on_budget():
     source = profile.Sql(db.factory)
     table = profile.survey(source, "t")
     scan = grain.keysearch(source, table, max_size=1)
-    source.meter = budget.BudgetMeter(budget.Budget(max_queries=0))
+    source.meter = budget.Meter(budget.Budget(max_queries=0))
     verdict = grain.unit_verdict(source, table, "customer month", scan)
     assert verdict.verdict == grain.UNKNOWN
     assert verdict.reason == "budget stopped the unit check"
@@ -544,7 +544,7 @@ def test_the_unit_check_measures_unseen_sets_once_and_charges_for_them():
     source = profile.Sql(db.factory)
     table = profile.survey(source, "t")
     scan = grain.keysearch(source, table, max_size=1)
-    spend = budget.BudgetMeter(budget.Budget(max_queries=100))
+    spend = budget.Meter(budget.Budget(max_queries=100))
     source.meter = spend
     before = source.queries
     verdict = grain.unit_verdict(source, table, "customer month", scan)

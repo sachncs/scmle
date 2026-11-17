@@ -57,7 +57,7 @@ def test_ingestion_ledger_commits_atomically_and_retries_idempotently(tmp_path):
     assert committed == retried == reopened
     assert committed.checkpoint.sequence == 1
     assert next_batch.event_ids == ("b",)
-    assert ledger.lock_path.exists()
+    assert ledger.lockfile.exists()
     assert json.loads(ledger.path.read_text())["schema_version"] == 1
 
 
@@ -150,7 +150,7 @@ def test_event_stream_source_fails_closed_for_unbounded_or_oversized_reads():
     with pytest.raises(
         incremental.IncrementalError, match="require read_events"
     ):
-        source.available_events()
+        source.unconsumed()
     with pytest.raises(incremental.IncrementalError, match="more events"):
         source.read_events(limit=1)
 
@@ -206,11 +206,11 @@ def test_idempotent_sink_commit_filters_duplicates_and_persists_receipt(
     ledger = incremental.Ledger(tmp_path / "sink.json", source.source_identity)
     written = []
 
-    first = ledger.commit_with_writer(
+    first = ledger.finalize(
         (event("b", 2, 1), event("a", 1, 0)),
         written.extend,
     )
-    second = ledger.commit_with_writer(
+    second = ledger.finalize(
         (event("a", 1, 0), event("b", 2, 1)),
         written.extend,
     )
@@ -233,7 +233,7 @@ def test_idempotent_sink_keeps_state_unchanged_when_writer_fails(tmp_path):
         raise OSError("sink unavailable")
 
     with pytest.raises(OSError, match="sink unavailable"):
-        ledger.commit_with_writer((event("a", 1, 0),), fail)
+        ledger.finalize((event("a", 1, 0),), fail)
 
     assert not ledger.path.exists()
     assert ledger.load().seen_event_ids == ()

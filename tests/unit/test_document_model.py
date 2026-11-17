@@ -55,8 +55,8 @@ def test_document_classifier_fits_evaluates_and_explains(
     classifier = make_classifier().fit(training_samples)
 
     evaluation = classifier.evaluate(evaluation_samples)
-    global_explanation = classifier.global_explanation(top_k=5)
-    local_explanation = classifier.local_explanation(evaluation_samples[0])
+    overview = classifier.overview(top_k=5)
+    spotlight = classifier.spotlight(evaluation_samples[0])
     ablation = classifier.ablate(evaluation_samples[0], top_k=3, max_terms=5)
 
     assert classifier.fitted
@@ -66,10 +66,10 @@ def test_document_classifier_fits_evaluates_and_explains(
     assert evaluation.accuracy >= 0.75
     assert evaluation.macro_f1 >= 0.75
     assert math.isfinite(evaluation.log_loss)
-    assert global_explanation.input_hash is None
-    assert global_explanation.terms
-    assert local_explanation.input_hash == evaluation_samples[0].content_hash
-    assert local_explanation.terms
+    assert overview.input_hash is None
+    assert overview.terms
+    assert spotlight.input_hash == evaluation_samples[0].content_hash
+    assert spotlight.terms
     assert ablation.method == "term_ablation"
     assert ablation.input_hash == evaluation_samples[0].content_hash
     assert len(ablation.terms) == 3
@@ -86,7 +86,7 @@ def test_document_explanations_preserve_source_citations():
     )
     classifier = make_classifier().fit(training)
 
-    explanation = classifier.local_explanation(training[0])
+    explanation = classifier.spotlight(training[0])
     payload = explanation.to_dict()
 
     assert explanation.citations

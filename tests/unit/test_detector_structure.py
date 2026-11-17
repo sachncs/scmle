@@ -123,7 +123,7 @@ def triage_frame():
 def test_triage_assigns_class_only_from_provenance():
     frame = triage_frame()
     info = {
-        "v": outliers.FieldProvenance(
+        "v": outliers.Pedigree(
             instrument_range=(-100.0, 100.0),
             population_range=(0.0, 60.0),
             extremes_possible=True,
@@ -153,11 +153,11 @@ def test_range_violation_is_an_error_even_when_not_a_ranked_candidate():
     frame = pandas.DataFrame({"v": numpy.linspace(0, 100, 101)})
     frame.loc[5, "v"] = 100.5
     result = outliers.triage(
-        frame, {"v": outliers.FieldProvenance(instrument_range=(0, 100))}
+        frame, {"v": outliers.Pedigree(instrument_range=(0, 100))}
     )
     assert result.classes[5] == "error" and not result.candidates[5]
     flags = outliers.misrecorded(
-        frame, {"v": outliers.FieldProvenance(instrument_range=(0, 100))}
+        frame, {"v": outliers.Pedigree(instrument_range=(0, 100))}
     )
     assert list(numpy.flatnonzero(flags)) == [5]
 
@@ -171,7 +171,7 @@ def test_range_bounds_are_inclusive_and_missing_is_ignored():
 def test_extremes_possible_false_keeps_candidates_unclassified():
     frame = triage_frame()
     info = {
-        "v": outliers.FieldProvenance(
+        "v": outliers.Pedigree(
             instrument_range=(-100.0, 100.0), extremes_possible=False
         )
     }
@@ -181,7 +181,7 @@ def test_extremes_possible_false_keeps_candidates_unclassified():
 def test_triage_rejects_bad_provenance_and_contracts():
     frame = triage_frame()
     with pytest.raises(ValueError, match="unknown column"):
-        outliers.triage(frame, {"zz": outliers.FieldProvenance()})
+        outliers.triage(frame, {"zz": outliers.Pedigree()})
     with pytest.raises(ValueError, match="boolean"):
         outliers.triage(frame, None, {"bad": lambda f: f["v"]})
 
@@ -257,15 +257,15 @@ def passing_store(detector_id, defect):
 
 
 def test_gate_status_is_descriptive_without_a_current_passing_certificate():
-    none = pipeline.gate_status(None, "f5-sentinel")
+    none = pipeline.adjudication(None, "f5-sentinel")
     assert set(none.values()) == {certificates.Authority.DESCRIPTIVE}
     store = passing_store("f5-sentinel", "sentinel")
-    status = pipeline.gate_status(store, "f5-sentinel")
+    status = pipeline.adjudication(store, "f5-sentinel")
     assert status["sentinel"] is certificates.Authority.GATING
-    empty = pipeline.gate_status(certificates.Store(), "f5-sentinel")
+    empty = pipeline.adjudication(certificates.Store(), "f5-sentinel")
     assert empty["sentinel"] is certificates.Authority.DESCRIPTIVE
     other = passing_store("f5-duplicates", "duplicate_exact")
-    assert pipeline.gate_status(other, "f5-sentinel")["sentinel"] is (
+    assert pipeline.adjudication(other, "f5-sentinel")["sentinel"] is (
         certificates.Authority.DESCRIPTIVE
     )
     result = pipeline.run(sentinel_table(), store=store)

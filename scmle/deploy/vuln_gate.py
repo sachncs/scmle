@@ -41,7 +41,7 @@ class GateError(Exception):
     """The report or the policy cannot be trusted."""
 
 
-def load_json(path: Path) -> Any:
+def deserialize(path: Path) -> Any:
     """Reads JSON or raises a `GateError`.
 
     Args:
@@ -191,9 +191,7 @@ def prune(
     return active
 
 
-def check_policy(
-    policy: dict[str, Any], today: datetime.date
-) -> dict[str, str]:
+def enforce(policy: dict[str, Any], today: datetime.date) -> dict[str, str]:
     """Validates the policy.
 
     Args:
@@ -244,7 +242,7 @@ def evaluate(
             refused with the same error.
     """
     today = today or datetime.datetime.now(datetime.UTC).date()
-    active = check_policy(policy, today)
+    active = enforce(policy, today)
     findings, scanned, scanner = parse_report(report)
     if not scanned and not findings:
         raise GateError(
@@ -311,9 +309,11 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--sbom", type=Path)
     options = parser.parse_args(arguments)
     try:
-        policy = load_json(options.policy) if options.policy else DEFAULT_POLICY
-        sbom = load_json(options.sbom) if options.sbom else None
-        verdict = evaluate(load_json(options.report), policy, sbom)
+        policy = (
+            deserialize(options.policy) if options.policy else DEFAULT_POLICY
+        )
+        sbom = deserialize(options.sbom) if options.sbom else None
+        verdict = evaluate(deserialize(options.report), policy, sbom)
     except GateError as error:
         # handled: printed failed verdict, exit code 2
         print(json.dumps({"passed": False, "error": str(error)}, indent=2))  # noqa: T201 -- command-line output

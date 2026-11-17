@@ -678,7 +678,7 @@ class ReleaseRegistry:
         """
 
         def check(seen: observation.Observation) -> list[str]:
-            digest = seen.digest_of(revision)
+            digest = seen.distill(revision)
             if digest is None:
                 return [f"revision {revision} is not reported"]
             if digest != image_digest:

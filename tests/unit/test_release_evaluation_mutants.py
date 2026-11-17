@@ -286,7 +286,7 @@ def test_summary_serializes_exactly():
         "counts_by_kind": expected_kinds,
     }
     assert list(summary.to_dict()["counts_by_kind"]) == sorted(expected_kinds)
-    text = summary.canonical_json()
+    text = summary.canonize()
     assert text.startswith('{"blocking_failures":1,"blocking_findings":2,')
     assert text.endswith('"task":"binary","total_findings":3}')
     assert ", " not in text
@@ -309,7 +309,7 @@ def test_evaluation_validation_and_exact_serialization():
         "findings": [item.to_dict() for item in outcome.findings],
         "readiness": outcome.tally().to_dict(),
     }
-    text = outcome.canonical_json()
+    text = outcome.canonize()
     assert text.startswith('{"blocked":true,"blocking_reasons":["bad\\u00e9"]')
     assert "\\u00ef" in text
     assert ", " not in text
@@ -915,7 +915,7 @@ def test_finding_validation_messages_are_exact():
 def test_summary_canonical_json_escapes_non_ascii_text():
     summary = make_outcome((make_finding(),)).tally()
     named = dataclasses.replace(summary, task="naïve")
-    assert '"task":"na\\u00efve"' in named.canonical_json()
+    assert '"task":"na\\u00efve"' in named.canonize()
 
 
 def test_gate_findings_for_unusable_metrics_are_failed_and_blocking():

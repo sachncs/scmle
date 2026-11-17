@@ -153,7 +153,7 @@ class Edge:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class TemporalSplit:
+class Chronology:
     """Time-ordered graph edges separated at an explicit UTC cutoff.
 
     Attributes:
@@ -186,7 +186,7 @@ class TemporalSplit:
             raise errors.InputError("future_edges must contain event times")
 
     @property
-    def has_future_leakage(self) -> bool:
+    def lookahead(self) -> bool:
         """Whether a training edge occurs after the cutoff."""
         cutoff = self.cutoff.astimezone(UTC)
         return any(
@@ -1387,6 +1387,7 @@ def prepare_features(
 
 
 __all__ = [
+    "Chronology",
     "Connectivity",
     "Dataset",
     "Degrees",
@@ -1398,7 +1399,6 @@ __all__ = [
     "Partition",
     "Profile",
     "TemporalError",
-    "TemporalSplit",
     "Validation",
     "ValidationError",
     "edgelist",

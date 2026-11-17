@@ -862,7 +862,7 @@ version 1 is champion again.
 What you should know that this demo skips: a real approval is written by a
 second person, with real evidence files, using a key you keep secret. The demo
 signs its own approval, which proves the mechanism, not the independence.
-The registry also has `Maintainer.check_rollback`, which compares the two
+The registry also has `Maintainer.revertible`, which compares the two
 versions on fresh labeled rows and rolls back only if the new one is clearly
 worse. See [`TUTORIAL.md`](TUTORIAL.md) section 7.
 

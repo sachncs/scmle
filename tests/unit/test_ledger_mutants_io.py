@@ -287,13 +287,13 @@ def test_policy_messages_are_exact():
         "the Thresholdout reusable holdout is not implemented; use the "
         "'unconfirmed' failure policy",
     ):
-        confirm.check_policy(confirm.THRESHOLDOUT)
+        confirm.enforce(confirm.THRESHOLDOUT)
     with raises(
         errors.ConfigError,
         "failure policy must be one of ('unconfirmed', 'thresholdout')",
     ):
-        confirm.check_policy("retry")
-    confirm.check_policy(confirm.UNCONFIRMED)
+        confirm.enforce("retry")
+    confirm.enforce(confirm.UNCONFIRMED)
 
 
 def test_unconfirmed_claims_keep_the_exploration_effect_and_say_why():
@@ -383,7 +383,7 @@ def test_no_survivors_reason_and_crash_reasons():
         log = sealed.Journal()
         committed = True
 
-        def issue_token(self):
+        def mint(self):
             return "t"
 
         def open(self, token, actor="x", claims_hash=None, ledger_hash=None):
@@ -442,8 +442,8 @@ def test_class_codes_sort_by_text_like_in_exploration():
     labels = pandas.Series([2, 10] * 5, dtype=object)
     codes = confirm.default_encoding(labels)
     assert list(codes[:2]) == [1.0, 0.0]  # "10" sorts before "2"
-    assert list(explore.encode_target(labels, True)[:2]) == [1.0, 0.0]
-    assert list(explore.encode_target(labels, True, classes=(2, 10))[:2]) == [
+    assert list(explore.vectorize(labels, True)[:2]) == [1.0, 0.0]
+    assert list(explore.vectorize(labels, True, classes=(2, 10))[:2]) == [
         0.0,
         1.0,
     ]
@@ -616,7 +616,7 @@ def test_a_crash_records_the_custody_head_and_the_level():
         log = sealed.Journal()
         committed = True
 
-        def issue_token(self):
+        def mint(self):
             return "t"
 
         def open(self, token, actor="x", claims_hash=None, ledger_hash=None):

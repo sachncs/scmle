@@ -48,11 +48,11 @@ def test_mlflow_store_reuses_the_parent_run_on_resume(binary_frame, tmp_path):
     store = mlflow_store.MlflowExperimentStore(
         f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}", "scmle-resume"
     )
-    store.start_run("run_x", "hash", "/tmp/x", "2026-10-15T00:00:00+00:00")
+    store.commence("run_x", "hash", "/tmp/x", "2026-10-15T00:00:00+00:00")
     again = mlflow_store.MlflowExperimentStore(
         f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}", "scmle-resume"
     )
-    again.start_run("run_x", "hash", "/tmp/x", "2026-10-15T01:00:00+00:00")
+    again.commence("run_x", "hash", "/tmp/x", "2026-10-15T01:00:00+00:00")
     assert len(again.runs()) == 1
 
 

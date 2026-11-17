@@ -75,7 +75,7 @@ def test_batches_and_single_updates_agree_and_track_the_running_maximum():
     path = anytime.log_wealth_paths(data, stream)
     assert whole.max_log_e == pytest.approx(max(0.0, path.max()))
     assert whole.crossed(0.5) == (whole.log_e >= math.log(2))
-    assert whole.ever_crossed(0.5)
+    assert whole.surpassed(0.5)
     assert len(whole.path) == 200
 
 

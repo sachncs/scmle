@@ -419,7 +419,7 @@ class ReleaseReadinessSummary:
             },
         }
 
-    def canonical_json(self) -> str:
+    def canonize(self) -> str:
         """Returns stable JSON suitable for release automation.
 
         Returns:
@@ -513,7 +513,7 @@ class Verdict:
             "readiness": self.tally().to_dict(),
         }
 
-    def canonical_json(self) -> str:
+    def canonize(self) -> str:
         """Returns stable JSON suitable for release evidence storage.
 
         Returns:

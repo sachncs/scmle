@@ -136,7 +136,7 @@ def test_builder_output_has_deterministic_canonical_json():
         stability={"a": 1, "z": 2},
     )
 
-    assert first.canonical_json() == second.canonical_json()
+    assert first.canonize() == second.canonize()
 
 
 def test_builder_rejects_missing_top_level_identity():
@@ -170,7 +170,7 @@ def test_builder_rejects_unnamed_diagnostics():
 
 
 def test_default_suite_includes_bounded_interaction_evidence():
-    diagnostics_in_suite = suite.default_suite()
+    diagnostics_in_suite = suite.panoply()
 
     assert tuple(diagnostic.name for diagnostic in diagnostics_in_suite) == (
         "permutation_importance",

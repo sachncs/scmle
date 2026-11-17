@@ -87,7 +87,7 @@ class Sql:
     def __init__(
         self,
         connection_factory: Callable[[], Any],
-        meter: budget.BudgetMeter | None = None,
+        meter: budget.Meter | None = None,
         uri: str = "sqlite://ingest",
         read_only_statement: str | None = None,
     ) -> None:

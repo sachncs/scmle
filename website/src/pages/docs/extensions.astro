@@ -71,7 +71,7 @@ class PointCloudAdapter(modality_lifecycle.Preparer):
     def monitor(self, observed):
         ...  # compare the reference and observed source populations
 
-    def modality_notes(self) -> tuple[str, ...]:
+    def remarks(self) -> tuple[str, ...]:
         ...  # representation and interpretation limits`}</code></pre>
   <p>The ellipses above are a contract outline, not a compatibility shim. A real adapter must implement every abstract method and test its boundaries against raw fixtures. Keep domain code in the adapter; do not add a generic wrapper that hides missing semantics.</p>
 

@@ -66,14 +66,14 @@ def disqualify(
     Returns:
         `missing >95%` when the missing rate exceeds `HIGH_MISSING_DROP`,
         `constant` for a column with at most one distinct value, otherwise
-        the reason given by `kind.exclusion_reason`; None when the column
+        the reason given by `kind.rationale`; None when the column
         can be a feature.
     """
     if stats["missing_rate"] > HIGH_MISSING_DROP:
         return "missing >95%"
     if stats["n_unique"] <= 1:
         return "constant"
-    return kind.exclusion_reason(series)
+    return kind.rationale(series)
 
 
 def summarize(
@@ -218,7 +218,7 @@ class Profiler:
             if name == self.spec.data.target:
                 continue
             series = frame[name]
-            kind = columns.kind_of(series)
+            kind = columns.categorize(series)
             stats = kind.statistics(series)
             statistics[name] = stats
             if name in dropped:
@@ -397,7 +397,7 @@ class Profiler:
         target = frame[self.spec.data.target]
         for name in feature_columns:
             series = frame[name]
-            kind = columns.kind_of(series)
+            kind = columns.categorize(series)
             statistics[name]["target_association"] = round(
                 kind.association(series, target, task), 4
             )

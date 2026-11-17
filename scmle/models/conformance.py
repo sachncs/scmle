@@ -108,10 +108,10 @@ def smoke(
         if len(numpy.asarray(fitted.predict(matrix))) != len(features):
             raise errors.ConfigError(f"{name}: failed on sparse input")
     if caps.native_categorical:
-        extra = adapter.categorical_params([0])
+        extra = adapter.nominals([0])
         if not extra:
             raise errors.ConfigError(
-                f"{name}: declares native_categorical but categorical_params "
+                f"{name}: declares native_categorical but nominals "
                 "returns nothing"
             )
         codes = features.copy()

@@ -105,7 +105,7 @@ def test_a_betting_test_reproduces_its_recorded_state():
         0.31820956068636064, rel=1e-12
     )
     assert record["peak"] == pytest.approx(0.3519764231571782, rel=1e-12)
-    assert not test.crossed and not test.ever_crossed
+    assert not test.crossed and not test.surpassed
     assert test.e_value == pytest.approx(numpy.exp(record["log_capital"]))
 
 
@@ -138,7 +138,7 @@ def test_the_threshold_and_crossing_use_the_level():
     assert test.threshold == pytest.approx(numpy.log(20.0))
     for ignored in range(60):
         test.update(1.0)
-    assert test.crossed and test.ever_crossed
+    assert test.crossed and test.surpassed
 
 
 def test_a_serialized_array_test_is_refused():

@@ -107,7 +107,7 @@ class Est:
     n: int
     detail: Mapping[str, Any] = dataclasses.field(default_factory=dict)
 
-    def excludes_zero(self) -> bool:
+    def conclusive(self) -> bool:
         """Tests whether the interval excludes zero.
 
         Returns:
@@ -238,7 +238,7 @@ class Estimator:
         """
         raise NotImplementedError
 
-    def estimate_for(
+    def reckon(
         self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Computes the same estimate on `C` with another outcome column.
@@ -380,7 +380,7 @@ class Backdoor(Estimator):
             {"population": result.population},
         )
 
-    def estimate_for(
+    def reckon(
         self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Computes the AIPW estimate on `C` with another outcome column.
@@ -433,7 +433,7 @@ class Backdoor(Estimator):
         tests = []
         for control in spec.negative_controls:
             if control.kind == "outcome":
-                est = self.estimate_for(c, level, control.variable)
+                est = self.reckon(c, level, control.variable)
                 name = f"negative_outcome:{control.variable}"
             else:
                 nuisances = aipw.prefit(
@@ -533,7 +533,7 @@ class RandomizedEstimator(Estimator):
         r = aipw.difference_in_means(c, spec.treatment, spec.outcome, level)
         return Est(r.estimate, r.se, r.low, r.high, r.n)
 
-    def estimate_for(
+    def reckon(
         self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Computes the difference in means on `C` with another outcome column.
@@ -566,7 +566,7 @@ class RandomizedEstimator(Estimator):
         for control in self.spec.negative_controls:
             if control.kind != "outcome":
                 continue
-            est = self.estimate_for(c, level, control.variable)
+            est = self.reckon(c, level, control.variable)
             test = waldify(
                 est, f"negative_outcome:{control.variable}", "negative_outcome"
             )
@@ -669,7 +669,7 @@ class DiD(Estimator):
             },
         )
 
-    def estimate_for(
+    def reckon(
         self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Computes the overall ATT on `C` with another outcome column.
@@ -705,7 +705,7 @@ class DiD(Estimator):
             )
         for control in self.spec.negative_controls:
             if control.kind == "outcome":
-                est = self.estimate_for(c, level, control.variable)
+                est = self.reckon(c, level, control.variable)
                 test = waldify(
                     est,
                     f"negative_outcome:{control.variable}",
@@ -837,7 +837,7 @@ class Instrument(Estimator):
             },
         )
 
-    def estimate_for(
+    def reckon(
         self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Computes the IV estimate on `C` with another outcome column.
@@ -867,7 +867,7 @@ class Instrument(Estimator):
         tests = []
         for control in self.spec.negative_controls:
             if control.kind == "outcome":
-                est = self.estimate_for(c, level, control.variable)
+                est = self.reckon(c, level, control.variable)
                 test = waldify(
                     est,
                     f"negative_outcome:{control.variable}",
@@ -991,7 +991,7 @@ class RdEstimator(Estimator):
             {"conventional": fit.estimate, "bandwidth": fit.bandwidth},
         )
 
-    def estimate_for(
+    def reckon(
         self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Computes the bias-corrected discontinuity for another outcome.
@@ -1144,7 +1144,7 @@ class Synth(Estimator):
             {"p_value": result.p_value, "ratio": result.ratio},
         )
 
-    def estimate_for(
+    def reckon(
         self, c: pandas.DataFrame, level: float, outcome: str | None = None
     ) -> Est:
         """Always refuses: synthetic control has no other-outcome estimate.
@@ -1709,9 +1709,9 @@ def identify(
     )
     decision = tier.decide(facts)
     notes.extend(caveats(spec, strategy, checked=checked))
-    verdict = verdict_of(spec)
+    verdict = arbitrate(spec)
     verdict["interval_excludes_zero"] = (
-        primary.excludes_zero() if numpy.isfinite(primary.low) else None
+        primary.conclusive() if numpy.isfinite(primary.low) else None
     )
     report = {
         "status": select.IDENTIFIED,
@@ -1840,7 +1840,7 @@ def design_only(
     )
 
 
-def verdict_of(spec: causal.Question) -> dict[str, Any]:
+def arbitrate(spec: causal.Question) -> dict[str, Any]:
     """States the primary hypothesis `theta = 0` in words.
 
     Args:

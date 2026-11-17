@@ -117,7 +117,7 @@ def check_distinct(training_identity: str, serving_identity: str) -> None:
         )
 
 
-class RoleStore(objectstore.ObjectStore):
+class RoleStore(objectstore.Depot):
     """A store that refuses what its role does not allow.
 
     Attributes:
@@ -125,7 +125,7 @@ class RoleStore(objectstore.ObjectStore):
         role: The role enforced.
     """
 
-    def __init__(self, inner: objectstore.ObjectStore, role: Role) -> None:
+    def __init__(self, inner: objectstore.Depot, role: Role) -> None:
         """Initializes the wrapper.
 
         Args:
@@ -169,7 +169,7 @@ class RoleStore(objectstore.ObjectStore):
         if_absent: bool = False,
         if_version: str | None = None,
     ) -> objectstore.ObjectMeta:
-        """Stores `data` if the role may write `key` (see `ObjectStore.put`).
+        """Stores `data` if the role may write `key` (see `Depot.put`).
 
         Args:
             key: The object key.
@@ -186,7 +186,7 @@ class RoleStore(objectstore.ObjectStore):
         )
 
     def get(self, key: str) -> tuple[bytes, objectstore.ObjectMeta]:
-        """Reads an object if the role may read it (see `ObjectStore.get`).
+        """Reads an object if the role may read it (see `Depot.get`).
 
         Args:
             key: The object key.
@@ -198,7 +198,7 @@ class RoleStore(objectstore.ObjectStore):
         return self.inner.get(key)
 
     def head(self, key: str) -> objectstore.ObjectMeta:
-        """Reads metadata if the role may read the key (see `ObjectStore.head`).
+        """Reads metadata if the role may read the key (see `Depot.head`).
 
         Args:
             key: The object key.
@@ -210,7 +210,7 @@ class RoleStore(objectstore.ObjectStore):
         return self.inner.head(key)
 
     def list_objects(self, prefix: str = "") -> list[objectstore.ObjectMeta]:
-        """Lists objects if the role may read the prefix (see `ObjectStore`).
+        """Lists objects if the role may read the prefix (see `Depot`).
 
         A prefix the role may not read raises RoleDeniedError from
         `need_read`.
@@ -225,7 +225,7 @@ class RoleStore(objectstore.ObjectStore):
         return self.inner.list_objects(prefix)
 
     def delete(self, key: str, *, if_version: str | None = None) -> None:
-        """Deletes an object if the role may write the key (see `ObjectStore`).
+        """Deletes an object if the role may write the key (see `Depot`).
 
         Args:
             key: The object key.

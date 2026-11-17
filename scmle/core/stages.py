@@ -142,7 +142,7 @@ class Stage(abc.ABC):
             ordered by `compiler.assemble`).
     """
 
-    state: ClassVar[scmle.core.state.RunState]
+    state: ClassVar[scmle.core.state.Progress]
     requires: ClassVar[tuple[type, ...]] = ()
 
     @abc.abstractmethod
@@ -173,8 +173,8 @@ MATRIX_DIMENSIONS = 2
 class IngestStage(Stage):
     """Reads the dataset and fingerprints it."""
 
-    state: ClassVar[scmle.core.state.RunState] = (
-        scmle.core.state.RunState.VALIDATING
+    state: ClassVar[scmle.core.state.Progress] = (
+        scmle.core.state.Progress.VALIDATING
     )
 
     def describe(
@@ -457,8 +457,8 @@ class ProfileStage(Stage):
     """
 
     requires: ClassVar[tuple[type, ...]] = (IngestStage,)
-    state: ClassVar[scmle.core.state.RunState] = (
-        scmle.core.state.RunState.PROFILING
+    state: ClassVar[scmle.core.state.Progress] = (
+        scmle.core.state.Progress.PROFILING
     )
 
     def describe(
@@ -751,13 +751,11 @@ class ProfileStage(Stage):
             streamed=context.stream is not None,
             cleaning_notes=tuple(context.cleaning_notes),
             quality_findings=tuple(
-                scmle.contracts.data.Finding.from_observation(
-                    finding, "quality"
-                )
+                scmle.contracts.data.Finding.glean(finding, "quality")
                 for finding in profile.quality_findings
             ),
             risk_findings=tuple(
-                scmle.contracts.data.Finding.from_observation(finding, "risk")
+                scmle.contracts.data.Finding.glean(finding, "risk")
                 for finding in profile.risk_findings
             ),
             feature_columns={
@@ -767,7 +765,7 @@ class ProfileStage(Stage):
             },
             dropped_columns=profile.feature_plan.dropped,
         )
-        card = scmle.contracts.data.DatasetCard.distill(curation)
+        card = scmle.contracts.data.Datasheet.distill(curation)
         context.profile = profile
         context.curation = curation
         context.write_json("dataset_profile.json", profile.to_dict())
@@ -1202,7 +1200,7 @@ class ProfileStage(Stage):
                 f"baseline column '{column}' is not in the exploration rows"
             )
         classes = sorted(view.target.dropna().unique(), key=str)
-        outcome = explore.encode_target(
+        outcome = explore.vectorize(
             view.target, classification=True, classes=classes
         )
         plan = scmle.core.context.require(
@@ -1235,7 +1233,7 @@ class ProfileStage(Stage):
             data.framing_draft, charter.charter_hash, model, signed=signed
         )
         context.write_json(scmle.data.framing.claim.PROVENANCE, why)
-        return scmle.data.framing.claim.build_runner(
+        return scmle.data.framing.claim.rig(
             rule=rule if subject is None else subject,
             reference=None if subject is None else rule,
             model=model,
@@ -1276,7 +1274,7 @@ class ProfileStage(Stage):
             if h.spec.column
         }
         skipped = {pair[0] for pair in run.plan.skipped}
-        ingest_stage.check_multiplicity(
+        ingest_stage.plurality(
             result.declared,
             columns,
             registered,
@@ -1357,7 +1355,7 @@ class ProfileStage(Stage):
         profile = scmle.core.context.require(context.profile, "profile")
         plan = profile.feature_plan
         candidates = [*plan.numeric, *plan.categorical]
-        codes = explore.encode_target(view.target, task.is_classification)
+        codes = explore.vectorize(view.target, task.is_classification)
         kind = explore.target_kind(view.target, task.is_classification)
         reference = (
             tabular.read_table(data.reference_uri)
@@ -1508,7 +1506,7 @@ class ProfileStage(Stage):
             return None
         frame = view.features.copy()
         frame[context.spec.data.target] = view.target
-        return causal_claim.build_runner(
+        return causal_claim.rig(
             block,
             frame,
             context.spec.data.target,
@@ -1714,7 +1712,7 @@ class ProfileStage(Stage):
                 context.write_json("curation_report.json", amended.to_dict())
                 context.write_json(
                     "dataset_card.json",
-                    scmle.contracts.data.DatasetCard.distill(amended).to_dict(),
+                    scmle.contracts.data.Datasheet.distill(amended).to_dict(),
                 )
                 written.extend(["curation_report.json", "dataset_card.json"])
         context.emit(
@@ -1840,7 +1838,7 @@ class ProfileStage(Stage):
         if task not in (tasks.Task.BINARY, tasks.Task.MULTICLASS):
             context.enter(
                 label,
-                experiments.DecisionAction.REJECT,
+                experiments.Edict.REJECT,
                 "reweighing applies to binary and multiclass tasks only",
             )
             return
@@ -1857,7 +1855,7 @@ class ProfileStage(Stage):
         )
         context.enter(
             label,
-            experiments.DecisionAction.INCLUDE,
+            experiments.Edict.INCLUDE,
             "development rows reweighted so group and label are independent "
             f"(weights from {weights.min():.2f} to {weights.max():.2f})",
         )
@@ -1932,7 +1930,7 @@ class ProfileStage(Stage):
         )
         context.custody = outcome
         context.custody_vault = vault_set
-        context.write_json("analysis_charter.json", contracts.load_json(path))
+        context.write_json("analysis_charter.json", contracts.deserialize(path))
         context.write_json("error_budget.json", charter.error_budget.to_dict())
         context.write_json("feasibility.json", outcome.feasibility.to_dict())
         context.write_json("split_manifest.json", outcome.manifest.to_dict())
@@ -2287,7 +2285,7 @@ def requisition(
         context.spec.fairness.mitigation == "group_thresholds"
         and task is not tasks.Task.BINARY
     ):
-        context.capability_registry.raise_unsupported(
+        context.capability_registry.refuse(
             key,
             "group-threshold mitigation is implemented for binary tasks only",
         )
@@ -2314,8 +2312,8 @@ class Planning(Stage):
     """Builds the experiment plan from the development-set profile."""
 
     requires: ClassVar[tuple[type, ...]] = (ProfileStage,)
-    state: ClassVar[scmle.core.state.RunState] = (
-        scmle.core.state.RunState.PLANNING
+    state: ClassVar[scmle.core.state.Progress] = (
+        scmle.core.state.Progress.PLANNING
     )
 
     def describe(
@@ -2370,8 +2368,8 @@ class TrainStage(Stage):
     """Cross-validates every candidate within the time budget."""
 
     requires: ClassVar[tuple[type, ...]] = (Planning,)
-    state: ClassVar[scmle.core.state.RunState] = (
-        scmle.core.state.RunState.TRAINING
+    state: ClassVar[scmle.core.state.Progress] = (
+        scmle.core.state.Progress.TRAINING
     )
 
     def describe(self, context: scmle.core.context.Context) -> str:
@@ -2418,7 +2416,7 @@ class TrainStage(Stage):
                 ]
                 outcomes = runner.run_many(jobs)
             for outcome in outcomes:
-                context.record_trial(outcome)
+                context.transcribe(outcome)
         strategy_search.Strategist(context, runner).search(list(context.trials))
         tuning.Tuner(context, runner).tune(list(context.trials))
         ensemble_search.Stacker(context, runner).search(list(context.trials))
@@ -2428,8 +2426,8 @@ class SelectStage(Stage):
     """Applies the selection policy and the serving constraints."""
 
     requires: ClassVar[tuple[type, ...]] = (TrainStage,)
-    state: ClassVar[scmle.core.state.RunState] = (
-        scmle.core.state.RunState.SELECTING
+    state: ClassVar[scmle.core.state.Progress] = (
+        scmle.core.state.Progress.SELECTING
     )
 
     def describe(self, context: scmle.core.context.Context) -> str:
@@ -2541,7 +2539,7 @@ class SelectStage(Stage):
         trial = chosen.trial
         context.enter(
             f"{trial.model_name}/{trial.strategy}",
-            experiments.DecisionAction.INCLUDE,
+            experiments.Edict.INCLUDE,
             f"fastest within {context.spec.selection.pareto_tolerance} of the "
             f"best score ({chosen.usage.p95_latency_ms:.1f} ms p95)",
         )
@@ -2679,12 +2677,12 @@ class SelectStage(Stage):
             label = f"{trial.model_name}/{trial.strategy}"
             if broken:
                 context.enter(
-                    label, experiments.DecisionAction.REJECT, "; ".join(broken)
+                    label, experiments.Edict.REJECT, "; ".join(broken)
                 )
                 continue
             context.enter(
                 label,
-                experiments.DecisionAction.INCLUDE,
+                experiments.Edict.INCLUDE,
                 f"within serving limits ({usage.model_mb:.2f} MB, p95 "
                 f"{usage.p95_latency_ms:.1f} ms on {usage.machine})",
             )
@@ -3035,7 +3033,7 @@ def choose_decision_threshold(
     adapter = context.registry.get(selected.model_name)
     plan = scmle.core.context.require(context.profile, "profile").feature_plan
     seed = context.spec.validation.seed
-    probabilities, positions = thresholds.out_of_fold_probabilities(
+    probabilities, positions = thresholds.heldout(
         lambda: strategy.build(plan, adapter, task, seed, selected.params),
         split.dev_features,
         split.dev_target,
@@ -3067,8 +3065,8 @@ class FinalEvaluationStage(Stage):
     """Refits the frozen candidate and opens the locked test set once."""
 
     requires: ClassVar[tuple[type, ...]] = (SelectStage,)
-    state: ClassVar[scmle.core.state.RunState] = (
-        scmle.core.state.RunState.TESTING
+    state: ClassVar[scmle.core.state.Progress] = (
+        scmle.core.state.Progress.TESTING
     )
 
     def describe(self, context: scmle.core.context.Context) -> str:
@@ -3160,7 +3158,7 @@ class FinalEvaluationStage(Stage):
         if task is not tasks.Task.BINARY:
             context.enter(
                 label,
-                experiments.DecisionAction.REJECT,
+                experiments.Edict.REJECT,
                 "group thresholds apply to binary classification only",
             )
             return pipeline
@@ -3171,7 +3169,7 @@ class FinalEvaluationStage(Stage):
             context.profile, "profile"
         ).feature_plan
         seed = context.spec.validation.seed
-        probabilities, positions = thresholds.out_of_fold_probabilities(
+        probabilities, positions = thresholds.heldout(
             lambda: strategy.build(plan, adapter, task, seed, selected.params),
             split.dev_features,
             split.dev_target,
@@ -3198,9 +3196,9 @@ class FinalEvaluationStage(Stage):
         )
         context.enter(
             label,
-            experiments.DecisionAction.INCLUDE
+            experiments.Edict.INCLUDE
             if result.applied
-            else experiments.DecisionAction.REJECT,
+            else experiments.Edict.REJECT,
             result.reason,
         )
         context.fairness_mitigation = result.to_dict()
@@ -3678,7 +3676,7 @@ class FinalEvaluationStage(Stage):
         locked = split.locked_test
         binding = pin(selected, decision)
         locked.bind(binding)
-        test_features, test_target = locked.open(locked.issue_token(), binding)
+        test_features, test_target = locked.open(locked.mint(), binding)
         if (
             context.spec.data.weight_column == tasks.FAIRNESS_WEIGHT
             and tasks.FAIRNESS_WEIGHT not in test_features
@@ -3845,8 +3843,8 @@ class PackageStage(Stage):
     """Writes the model bundle, leaderboard and report."""
 
     requires: ClassVar[tuple[type, ...]] = (FinalEvaluationStage,)
-    state: ClassVar[scmle.core.state.RunState] = (
-        scmle.core.state.RunState.PACKAGING
+    state: ClassVar[scmle.core.state.Progress] = (
+        scmle.core.state.Progress.PACKAGING
     )
 
     def evidence_index(
@@ -4051,7 +4049,7 @@ class PackageStage(Stage):
         )
         diagnostics_by_name = {
             diagnostic.name: diagnostic
-            for diagnostic in scmle.explainability.suite.default_suite()
+            for diagnostic in scmle.explainability.suite.panoply()
         }
         evidence: dict[str, dict[str, Any]] = {}
         for name, diagnostic in diagnostics_by_name.items():
@@ -4515,7 +4513,7 @@ class PackageStage(Stage):
         task = scmle.core.context.require(context.task, "task")
         runner = None
         if context.coverage_claim_sha256 is not None:
-            runner = coverage_confirm.build_runner(
+            runner = coverage_confirm.rig(
                 bundle, task.value, context.coverage_claim_sha256
             )
         if runner is None:
@@ -5121,7 +5119,7 @@ class PackageStage(Stage):
         result = results.Run(
             run_id=store.run_id,
             run_dir=store.directory,
-            state=scmle.core.state.RunState.COMPLETED.value,
+            state=scmle.core.state.Progress.COMPLETED.value,
             plan=scmle.core.context.require(context.plan, "plan"),
             profile=profile,
             trials=context.trials,

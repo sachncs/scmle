@@ -733,7 +733,7 @@ def lineage(
             source = provenance.Provenance.NONE
             attestation = None
         records.append(
-            provenance.FieldProvenance(
+            provenance.Pedigree(
                 name=entry["name"],
                 origin=provenance.Origin.DERIVED,
                 writer="scmle.data.ingest.synthesize",
@@ -758,7 +758,7 @@ def enlist(
     """Registers every kept feature as a `synthesized` hypothesis.
 
     If the number registered then differs from the declared size,
-    `check_multiplicity` raises `MultiplicityError`, which propagates.
+    `plurality` raises `MultiplicityError`, which propagates.
 
     Args:
         ledger: The hypothesis ledger.
@@ -782,13 +782,11 @@ def enlist(
         )
         for entry in features.kept()
     ]
-    check_multiplicity(features.declared_family_size, ledger)
+    plurality(features.declared_family_size, ledger)
     return registered
 
 
-def check_multiplicity(
-    declared: int, ledger: scmle.data.ledger.ledger.Ledger
-) -> int:
+def plurality(declared: int, ledger: scmle.data.ledger.ledger.Ledger) -> int:
     """Requires the registered `synthesized` count to equal the declared one.
 
     Args:

@@ -59,7 +59,7 @@ class Cindex(metrics.Metric):
     given (`estimator.event_column`), so it needs no extra plumbing.
     """
 
-    def accepts_weights(self) -> bool:
+    def weightable(self) -> bool:
         """Reports whether the metric uses sample weights.
 
         Returns:

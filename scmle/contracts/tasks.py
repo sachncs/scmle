@@ -842,7 +842,7 @@ class Config(Schema):
             }
         )
 
-    def canonical_json(self) -> str:
+    def canonize(self) -> str:
         """Returns a key-sorted, whitespace-free JSON rendering."""
         return json.dumps(
             self.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
@@ -850,7 +850,7 @@ class Config(Schema):
 
     def config_hash(self) -> str:
         """Returns a short deterministic hash of the canonical configuration."""
-        digest = hashlib.sha256(self.canonical_json().encode()).hexdigest()
+        digest = hashlib.sha256(self.canonize().encode()).hexdigest()
         return digest[:16]
 
 

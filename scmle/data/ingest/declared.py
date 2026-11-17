@@ -80,7 +80,7 @@ def check(
     }
 
 
-def column_of(frame: pandas.DataFrame, view: str, column: str) -> pandas.Series:
+def locate(frame: pandas.DataFrame, view: str, column: str) -> pandas.Series:
     """Takes a column of a view.
 
     Args:
@@ -141,7 +141,7 @@ def reconcile(
         for total in table.sums:
             found = float(
                 pandas.to_numeric(
-                    column_of(frame, table.view, total.column), errors="coerce"
+                    locate(frame, table.view, total.column), errors="coerce"
                 ).sum()
             )
             denominator = abs(total.total) or 1.0
@@ -155,7 +155,7 @@ def reconcile(
                 )
             )
         if table.checksum is not None and table.checksum_column is not None:
-            found_sum = sha(column_of(frame, table.view, table.checksum_column))
+            found_sum = sha(locate(frame, table.view, table.checksum_column))
             checks.append(
                 check(
                     f"{table.view}.checksum.{table.checksum_column}",
@@ -189,7 +189,7 @@ def compare(
     being skipped. The checksum is computed over the source's own column.
     A quantity that `reconcile.crosscheck` does not return (including
     when it raises `ValueError`) is compared against a source value of zero.
-    A view that lacks a declared column makes `column_of` raise
+    A view that lacks a declared column makes `locate` raise
     `ConfigError`, which propagates.
 
     Args:
@@ -207,7 +207,7 @@ def compare(
     measures = [total.column for total in totals.sums]
     numeric = pandas.DataFrame(
         {
-            m: pandas.to_numeric(column_of(frame, view, m), errors="coerce")
+            m: pandas.to_numeric(locate(frame, view, m), errors="coerce")
             for m in measures
         },
         index=frame.index,
@@ -244,7 +244,7 @@ def compare(
             check(f"{view}.{name}", extract, theirs, gap / denominator, limit)
         )
     if totals.checksum_column is not None:
-        column = column_of(frame, view, totals.checksum_column)
+        column = locate(frame, view, totals.checksum_column)
         values = source.fetch(
             profile.statement(
                 "SELECT {c} FROM {t}",

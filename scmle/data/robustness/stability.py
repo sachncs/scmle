@@ -294,7 +294,7 @@ class Variant:
     high: float | None
 
     @property
-    def excludes_zero(self) -> bool:
+    def conclusive(self) -> bool:
         """Whether the perturbation interval is defined and excludes zero."""
         return (
             self.low is not None
@@ -415,7 +415,7 @@ def verdict(
         math.inf if headline == 0.0 else abs(median - headline) / abs(headline)
     )
     interval_share = float(
-        numpy.mean([e.excludes_zero for e in effects if e.effect is not None])
+        numpy.mean([e.conclusive for e in effects if e.effect is not None])
     )
     numbers = {
         "median": median,
@@ -797,7 +797,7 @@ def code_digest() -> str:
     return certificates.code_hash(multiverse, sys.modules[__name__])
 
 
-def gate_status(
+def adjudication(
     store: certificates.Store | None,
 ) -> certificates.Authority:
     """Decides whether stability verdicts may act.
