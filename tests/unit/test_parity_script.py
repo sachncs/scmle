@@ -3,10 +3,10 @@
 import importlib.util
 import pathlib
 
+from scmle.assurance import coverage_slices
 from scmle.assurance.admissibility import screen
 import scmle.certificates
 from scmle.data.identification import certified
-from scmle.evaluation import coverage_slices
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "parity.py"

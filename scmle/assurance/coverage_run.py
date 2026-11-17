@@ -28,9 +28,9 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance import coverage_slices
 from scmle.contracts import errors
 from scmle.evaluation import coverage
-from scmle.evaluation import coverage_slices
 
 LOGGER = logging.getLogger(__name__)
 

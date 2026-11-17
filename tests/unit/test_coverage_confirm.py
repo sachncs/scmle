@@ -4,8 +4,8 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.assurance import coverage_confirm
 from scmle.assurance.ledger import confirm
-from scmle.evaluation import coverage_confirm
 from scmle.evaluation import task_gate
 
 CHOICE = coverage_confirm.principal("regression")

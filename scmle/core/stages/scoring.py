@@ -8,6 +8,7 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance import coverage_confirm
 from scmle.assurance.charter import contracts
 from scmle.assurance.charter import sealing
 from scmle.contracts import errors
@@ -16,7 +17,6 @@ import scmle.core.context
 from scmle.core.stages import cost
 from scmle.decision import netbenefit
 import scmle.decision.threshold
-from scmle.evaluation import coverage_confirm
 from scmle.models import thresholds
 from scmle.preparation import strategies
 

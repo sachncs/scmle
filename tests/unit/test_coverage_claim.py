@@ -6,9 +6,9 @@ import numpy
 import pytest
 
 from scmle.artifacts import claims_audit
+from scmle.assurance import coverage_run
 from scmle.assurance.custody import sealed
 from scmle.assurance.ledger import ledger
-from scmle.evaluation import coverage_run
 
 
 def make_claim(**overrides):

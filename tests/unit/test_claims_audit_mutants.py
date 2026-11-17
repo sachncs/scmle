@@ -7,6 +7,8 @@ import types
 import pytest
 
 from scmle.artifacts import claims_audit
+from scmle.assurance import coverage_confirm
+from scmle.assurance import coverage_run
 from scmle.assurance.charter import sealing
 from scmle.assurance.custody import sealed
 from scmle.assurance.ledger import confirm
@@ -15,8 +17,6 @@ import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.core import decision_reports
 from scmle.data.splitting import splitters
-from scmle.evaluation import coverage_confirm
-from scmle.evaluation import coverage_run
 from tests.unit.test_charter_causal import causal_charter
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_claims_audit import edit_claims

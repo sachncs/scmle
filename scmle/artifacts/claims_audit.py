@@ -46,6 +46,8 @@ from pathlib import Path
 from typing import Any
 from typing import cast
 
+from scmle.assurance import coverage_confirm
+from scmle.assurance import coverage_run
 from scmle.assurance.charter import contracts
 from scmle.assurance.charter import sealing
 from scmle.assurance.custody import sealed
@@ -57,8 +59,6 @@ from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.core import decision_reports
 from scmle.data.identification import attest
-from scmle.evaluation import coverage_confirm
-from scmle.evaluation import coverage_run
 
 CHARTER_FILE = "analysis_charter.json"
 CUSTODY_FILE = "custody_log.jsonl"

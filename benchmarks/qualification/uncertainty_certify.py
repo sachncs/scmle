@@ -94,11 +94,11 @@ from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import neighbors
 
+from scmle.assurance import coverage_slices
 from scmle.assurance.detectors import certificates
 import scmle.certificates
 from scmle.evaluation import conformal
 from scmle.evaluation import coverage
-from scmle.evaluation import coverage_slices
 from scmle.evaluation import ipcw
 from scmle.evaluation import quantile
 from scmle.evaluation import reconcile

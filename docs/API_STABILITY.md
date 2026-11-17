@@ -104,7 +104,7 @@ signature.
 Charter format 11 adds the optional `coverage_on_confirmation` field of the
 `uncertainty` block (`scmle.assurance.charter.uncertainty.Uncertainty`, an
 extension surface; a format 10 charter keeps its hash and signature, both
-pinned). `scmle.evaluation.coverage_confirm`, `coverage.undercovered`,
+pinned). `scmle.assurance.coverage_confirm`, `coverage.undercovered`,
 `coverage_slices.flag_gate` and `FlagGate` are additions (extension
 surfaces); the per-slice records of `coverage_report.json` gained `flag`,
 `flag_p_value` and `flag_certified`, and the slice summary `flagged`,

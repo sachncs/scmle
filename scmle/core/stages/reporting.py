@@ -5,6 +5,7 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance import coverage_run
 from scmle.assurance.charter import sealing
 import scmle.assurance.ledger.ledger
 from scmle.contracts import tasks
@@ -13,7 +14,6 @@ import scmle.core.context
 from scmle.core.stages import relabelling
 from scmle.core.stages import scoring
 from scmle.evaluation import coverage
-from scmle.evaluation import coverage_run
 
 
 class Reporting(relabelling.Relabelling):

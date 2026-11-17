@@ -3,7 +3,7 @@
 import numpy
 import pandas
 
-from scmle.evaluation import coverage_confirm
+from scmle.assurance import coverage_confirm
 from scmle.evaluation import exchangeability
 
 

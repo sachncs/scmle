@@ -5,7 +5,7 @@ import json
 import numpy
 import pandas
 
-from scmle.evaluation import coverage_slices
+from scmle.assurance import coverage_slices
 
 
 def test_categorical_levels_are_the_labels_and_a_new_level_is_kept():

@@ -32,12 +32,12 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.assurance import coverage_run
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import ledger
 from scmle.contracts import tasks
 from scmle.evaluation import conformal
 from scmle.evaluation import coverage
-from scmle.evaluation import coverage_run
 from scmle.evaluation import exchangeability
 from scmle.evaluation import task_gate
 

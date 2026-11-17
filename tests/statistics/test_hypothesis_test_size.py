@@ -14,6 +14,7 @@ import pandas
 from scipy import stats
 import support_statistics
 
+from scmle.assurance import coverage_confirm
 from scmle.assurance.admissibility import leakage
 from scmle.assurance.framing import baseline
 from scmle.assurance.ledger import bivariate
@@ -21,7 +22,6 @@ from scmle.assurance.robustness import shift
 from scmle.decision import design
 from scmle.evaluation import balance
 from scmle.evaluation import coverage
-from scmle.evaluation import coverage_confirm
 from scmle.evaluation import exchangeability
 from scmle.governance import escalation
 

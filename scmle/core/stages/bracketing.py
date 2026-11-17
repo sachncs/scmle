@@ -5,6 +5,9 @@ from typing import Any
 import numpy
 
 import scmle.artifacts.bundle
+from scmle.assurance import coverage_confirm
+from scmle.assurance import coverage_run
+from scmle.assurance import coverage_slices
 from scmle.contracts import tasks
 import scmle.core.context
 from scmle.core.stages import cost
@@ -12,9 +15,6 @@ from scmle.core.stages import diagnosis
 from scmle.core.stages import profiling
 from scmle.core.stages import scoring
 from scmle.evaluation import conformal
-from scmle.evaluation import coverage_confirm
-from scmle.evaluation import coverage_run
-from scmle.evaluation import coverage_slices
 from scmle.evaluation import quantile
 from scmle.preparation import preprocessing
 

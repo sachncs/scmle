@@ -41,12 +41,12 @@ scmle/evaluation/backtest.py seasonal_naive single-use 8-line forecasting baseli
 scmle/evaluation/conformal.py representatives single-use tests/statistics/test_prediction_intervals.py, tests/unit/test_evaluation_golden.py and tests/unit/test_conformal_entity.py (5 calls) pin its determinism and the empty case
 scmle/evaluation/coverage.py classwise single-use tests/unit/test_evaluation_golden.py calls coverage.classwise(covered, labels, 0.9) to pin the by-class report
 scmle/evaluation/coverage.py grade single-use tests/unit/test_uncertainty_methods.py asserts confirmed, attested and unverified outcomes for five argument combinations
-scmle/evaluation/coverage_confirm.py shortfall single-use tests/statistics/test_hypothesis_test_size.py calls it twice to measure the size of the test
-scmle/evaluation/coverage_confirm.py held single-use 35-line two-branch computation (residual interval from predict_interval versus pooled set membership from predict_set); the caller confirm builds the document right after and is already about 45 lines
-scmle/evaluation/coverage_run.py claim_document single-use tests/unit/test_coverage_claim.py builds the claim through it, and it fixes the stored claim document (schema_version, methods, rule text) whose hash is registered
-scmle/evaluation/coverage_run.py run_report single-use tests/unit/test_coverage_claim.py calls it, and its name is cited from artifacts/bundle.py as the producer of the stored coverage_report
-scmle/evaluation/coverage_slices.py fingerprint single-use tests/unit/test_coverage_slices.py and benchmarks/qualification/uncertainty_certify.py both call it to write and compare the certificate method hash
-scmle/evaluation/coverage_slices.py bucket single-use tests/unit/test_coverage_slices.py calls it three times (banding, text values, too many levels)
+scmle/assurance/coverage_confirm.py shortfall single-use tests/statistics/test_hypothesis_test_size.py calls it twice to measure the size of the test
+scmle/assurance/coverage_confirm.py held single-use 35-line two-branch computation (residual interval from predict_interval versus pooled set membership from predict_set); the caller confirm builds the document right after and is already about 45 lines
+scmle/assurance/coverage_run.py claim_document single-use tests/unit/test_coverage_claim.py builds the claim through it, and it fixes the stored claim document (schema_version, methods, rule text) whose hash is registered
+scmle/assurance/coverage_run.py run_report single-use tests/unit/test_coverage_claim.py calls it, and its name is cited from artifacts/bundle.py as the producer of the stored coverage_report
+scmle/assurance/coverage_slices.py fingerprint single-use tests/unit/test_coverage_slices.py and benchmarks/qualification/uncertainty_certify.py both call it to write and compare the certificate method hash
+scmle/assurance/coverage_slices.py bucket single-use tests/unit/test_coverage_slices.py calls it three times (banding, text values, too many levels)
 scmle/evaluation/cv_plus.py holdouts single-use tests/unit/test_cv_plus.py calls it for the valid partition and the overlapping case, and the module docstring names it
 scmle/evaluation/cv_plus.py strategize single-use tests/unit/test_cv_plus.py calls it five times for the pooled, fold-model, overlap and byte-cap cases, and the module docstring names it
 scmle/data/store/processing.py matches single-use its raise sits next to the try in Checkpoint.from_bytes that converts ValueError into CorruptError; inlined, ruff TRY301 (raise-within-try) fails on the `raise ValueError("digest or format mismatch")` inside that try

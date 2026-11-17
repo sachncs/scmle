@@ -2922,3 +2922,6 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.data.framing` -> `scmle.assurance.framing`
 - `scmle.data.ingest` -> `scmle.assurance.ingest`
 - `scmle.data.robustness` -> `scmle.assurance.robustness`
+- `scmle.evaluation.coverage_run` -> `scmle.assurance.coverage_run`
+- `scmle.evaluation.coverage_slices` -> `scmle.assurance.coverage_slices`
+- `scmle.evaluation.coverage_confirm` -> `scmle.assurance.coverage_confirm`
