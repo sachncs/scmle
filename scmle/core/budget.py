@@ -8,6 +8,7 @@ one cheapest trial and the reserve) cannot fit is refused before any work
 (`Reserve.admit`).
 """
 
+from collections.abc import Callable
 import dataclasses
 
 from scmle.contracts import errors
@@ -21,7 +22,8 @@ START_SECONDS = 1.0
 # tasks at a 60 s budget, OMP_NUM_THREADS=1, two runs at a time). n is the
 # row count, p the feature columns, C' the classes when more than two, else
 # 1. Each constant is the fitted coefficient of its model. Preparation has
-# its own estimate (`scmle.data.profiling.profiler.estimate`).
+# its own estimate (`scmle.data.profiling.profiler.estimate`), which the
+# caller passes to `Reserve.provision`.
 # The first trial of the run on the cheapest model: 1.86 s on 52,035 rows,
 # 0.6-1.4 s on 702-2,949 rows; START_SECONDS plus 2e-5 s per row covers
 # all seven.
@@ -65,23 +67,6 @@ def factor(classes: int) -> int:
         The class count when above two, else 1.
     """
     return classes if classes > BINARY_CLASSES else 1
-
-
-def preparation(rows: int, columns: int, classes: int, budget: float) -> float:
-    """Estimates the seconds ingestion and profiling take.
-
-    Args:
-        rows: Training rows.
-        columns: Feature columns.
-        classes: Target classes (0 for regression).
-        budget: The time budget, which caps the capped profiling steps.
-
-    Returns:
-        The profiler's upper-bound estimate.
-    """
-    from scmle.data.profiling import profiler  # noqa: PLC0415 -- cycle
-
-    return profiler.estimate(rows, columns, classes, budget)
 
 
 def cheapest(rows: int) -> float:
@@ -144,6 +129,16 @@ def reservation(
     }
 
 
+def refuse(rows: int, columns: int, classes: int, budget: float) -> float:
+    """The preparation estimate of a reserve not yet provisioned.
+
+    Raises:
+        InputError: Always; `Reserve.provision` sets the real estimate.
+    """
+    del rows, columns, classes, budget
+    raise errors.InputError("provision the reserve before using it")
+
+
 @dataclasses.dataclass
 class Reserve:
     """Seconds of a time budget held back for post-training work.
@@ -154,11 +149,15 @@ class Reserve:
             `package`); empty until `provision`.
         shape: Rows, feature columns and classes the reserve was estimated
             for, or None before `provision`.
+        estimate: The preparation cost model, seconds from rows, columns,
+            classes and budget (`profiler.estimate`); it refuses until
+            `provision`.
     """
 
     budget: float
     parts: dict[str, float] = dataclasses.field(default_factory=dict)
     shape: tuple[int, int, int] | None = None
+    estimate: Callable[[int, int, int, float], float] = refuse
 
     @property
     def total(self) -> float:
@@ -166,7 +165,11 @@ class Reserve:
         return sum(self.parts.values())
 
     def provision(
-        self, rows: int, columns: int, classes: int
+        self,
+        rows: int,
+        columns: int,
+        classes: int,
+        estimate: Callable[[int, int, int, float], float],
     ) -> dict[str, float]:
         """Estimates and holds the post-training reserve for a table.
 
@@ -174,11 +177,14 @@ class Reserve:
             rows: Training rows.
             columns: Feature columns.
             classes: Target classes (0 for regression).
+            estimate: The preparation cost model (`profiler.estimate`),
+                used by `minimum` and `smallest`.
 
         Returns:
             The reserve by part (see `reservation`).
         """
         self.shape = (rows, columns, classes)
+        self.estimate = estimate
         self.parts = reservation(rows, columns, classes, self.budget)
         return dict(self.parts)
 
@@ -197,7 +203,7 @@ class Reserve:
         """
         rows, columns, classes = self.measured()
         if prepared is None:
-            prepared = preparation(rows, columns, classes, self.budget)
+            prepared = self.estimate(rows, columns, classes, self.budget)
         return prepared + cheapest(rows) + self.total
 
     def smallest(self, prepared: float | None = None) -> int:
@@ -218,7 +224,7 @@ class Reserve:
 
         def fits(budget: int) -> bool:
             done = (
-                preparation(rows, columns, classes, budget)
+                self.estimate(rows, columns, classes, budget)
                 if prepared is None
                 else prepared
             )

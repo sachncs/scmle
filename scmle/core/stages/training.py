@@ -10,6 +10,7 @@ from scmle.core.stages import cost
 from scmle.core.stages import interface
 from scmle.core.stages import planning
 import scmle.core.state
+from scmle.data.profiling import profiler
 from scmle.experimentation import ensemble_search
 from scmle.experimentation import strategy_search
 from scmle.experimentation import trials
@@ -54,7 +55,9 @@ class TrainStage(interface.Stage):
         """
         governor = context.regulator
         if governor.reserve.shape is None:
-            governor.reserve.provision(*cost.dimensions(context))
+            governor.reserve.provision(
+                *cost.dimensions(context), profiler.estimate
+            )
         runner = trials.Runner(context)
         plan = scmle.core.context.require(context.plan, "plan")
         names = plan.candidate_models

@@ -34,6 +34,7 @@ from scmle.core import state
 import scmle.core.context
 import scmle.core.stages
 from scmle.data.custody import journal
+from scmle.data.profiling import profiler
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
 from scmle.experimentation import stores
@@ -421,7 +422,9 @@ class Orchestrator:
                 cannot fit in the time budget (`budget.Reserve.admit`).
         """
         reserve = context.regulator.reserve
-        parts = reserve.provision(*scmle.core.stages.dimensions(context))
+        parts = reserve.provision(
+            *scmle.core.stages.dimensions(context), profiler.estimate
+        )
         context.emit(
             "budget.reserved",
             f"{reserve.total:.1f} s of the "

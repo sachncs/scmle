@@ -8,6 +8,7 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.core import budget
 from scmle.core import limits
+from scmle.data.profiling import profiler
 
 
 def governor(**kwargs):
@@ -104,8 +105,8 @@ def test_the_reserve_follows_the_measured_cost_models():
 
 
 def test_the_preparation_estimate_grows_with_the_table():
-    small = budget.preparation(500, 5, 2, 60)
-    wide = budget.preparation(1132, 111, 8, 60)
+    small = profiler.estimate(500, 5, 2, 60)
+    wide = profiler.estimate(1132, 111, 8, 60)
     assert 0 < small < wide
     assert (
         budget.cheapest(52035) > budget.cheapest(1000) >= (budget.START_SECONDS)
@@ -114,13 +115,13 @@ def test_the_preparation_estimate_grows_with_the_table():
 
 def test_a_run_that_cannot_fit_is_refused_with_the_smallest_budget():
     tight = budget.Reserve(5)
-    tight.provision(50_000, 100, 10)
+    tight.provision(50_000, 100, 10, profiler.estimate)
     with pytest.raises(errors.BlockedError, match="smallest budget") as caught:
         tight.admit()
     smallest = caught.value.details["smallest_budget_seconds"]
     assert smallest > 5 and caught.value.details["estimate_seconds"] > 5
     roomy = budget.Reserve(smallest)
-    roomy.provision(50_000, 100, 10)
+    roomy.provision(50_000, 100, 10, profiler.estimate)
     roomy.admit()
 
 
