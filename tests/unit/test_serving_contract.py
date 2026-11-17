@@ -766,3 +766,37 @@ def test_a_timeout_raised_by_the_work_itself_is_not_a_deadline_error():
         assert not isinstance(caught.value, guard.DeadlineError)
     finally:
         control.close()
+
+
+def test_a_read_only_model_scores_beside_a_hung_call(
+    golden, bundle, monkeypatch
+):
+    # SRV-1: one global lock serialized every scoring call, so a hung call
+    # blocked every worker although a model without series is read-only.
+    assert not bundle.schema.series
+    adapter = serving.HttpServing(bundle)
+    gate = SlowGate()
+    original = bundle.score
+
+    def score(frame, *args, **kwargs):
+        if threading.current_thread().name == "hung":
+            gate.entered.set()
+            gate.release.wait(20)
+        return original(frame, *args, **kwargs)
+
+    monkeypatch.setattr(bundle, "score", score)
+    frame = pandas.DataFrame(golden.records[:1])
+    hung = threading.Thread(target=adapter.infer, args=(frame,), name="hung")
+    hung.start()
+    try:
+        assert gate.entered.wait(10)
+        done = []
+        other = threading.Thread(
+            target=lambda: done.append(adapter.infer(frame))
+        )
+        other.start()
+        other.join(10)
+        assert done and done[0]["record_count"] == 1
+    finally:
+        gate.release.set()
+        hung.join(10)

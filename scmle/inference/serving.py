@@ -10,6 +10,7 @@ validation, the same preprocessing, the same model call, the same response.
 import abc
 from collections.abc import Callable
 from collections.abc import Mapping
+import contextlib
 import functools
 from http import server
 import json
@@ -153,8 +154,7 @@ class Server(abc.ABC):
                     "skipped: no synthetic record for series or extra inputs",
                 )
                 return
-            with self.lock:
-                self.bundle.score(pandas.DataFrame(records))
+            self.bundle.score(pandas.DataFrame(records))
         except Exception as error:
             LOGGER.exception("warm-up failed")
             self.readiness.fail(f"warm-up failed: {type(error).__name__}")
@@ -215,6 +215,9 @@ class Server(abc.ABC):
             remember: Whether to add the rows to the bundle's remembered
                 series history after scoring.
 
+        Calls run concurrently unless the model has series features, whose
+        history makes scoring and remembering one serialized step.
+
         The policies are enforced after scoring and before the rows are
         remembered, so a rejected batch leaves the history unchanged and
         `PolicyError` propagates. Rows of a request whose caller already got
@@ -225,8 +228,12 @@ class Server(abc.ABC):
             artifact digest, schema digest, `record_count` and the per-row
             `rows` report.
         """
-        with self.lock:
-            bundle = self.bundle
+        bundle = self.bundle
+        # A model without series features is read-only, so its calls run in
+        # parallel (SRV-1); with series, scoring reads the history the
+        # previous request remembered, so score and remember stay one step.
+        held = self.lock if bundle.schema.series else contextlib.nullcontext()
+        with held:
             rows = validation.Validator(bundle.schema).describe(frame)
             response = bundle.score(frame)
             self.enforce(rows)
@@ -489,18 +496,9 @@ class HttpServing(Server):
         """Readiness, which a timed-out call still running takes away.
 
         Returns:
-            The readiness snapshot, with `ready` false and the reason set
-            while any timed-out call holds a worker (SRV-1), and the
-            admission counts under `workers`.
+            See `guard.assess`.
         """
-        snapshot = self.readiness.snapshot()
-        workers = self.admission.state()
-        if snapshot["ready"] and workers["stuck"]:
-            snapshot["ready"] = False
-            snapshot["reason"] = (
-                f"{workers['stuck']} timed-out call(s) still running"
-            )
-        return {**snapshot, "workers": workers}
+        return guard.assess(self.readiness, self.admission)
 
     @property
     def address(self) -> str:

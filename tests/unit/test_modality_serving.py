@@ -3,6 +3,7 @@
 import json
 import re
 import threading
+import time
 from typing import cast
 import urllib.error
 import urllib.request
@@ -453,4 +454,83 @@ def test_modality_service_limits_concurrency_and_time(tmp_path, monkeypatch):
         assert holder[0][0] == 504 and holder[0][1]["category"] == "timeout"
     finally:
         gate.set()
+        service.stop()
+
+
+def get(url: str) -> tuple[int, dict[str, object]]:
+    """Get a probe and return status plus decoded body."""
+    try:
+        with urllib.request.urlopen(url) as response:
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read())
+
+
+def test_a_hung_modality_call_takes_the_replica_out_of_traffic(
+    tmp_path, monkeypatch
+):
+    # SRV-1: a timed-out call kept its worker while /readyz stayed 200 and
+    # /livez was unconditional, so traffic kept arriving behind it.
+    service = started_modality_service(tmp_path, (2, 0.2, 1))[0]
+    release = threading.Event()
+    original = modality_lifecycle.Predictor.predict
+
+    def hung(self, samples):
+        if not release.is_set():
+            release.wait(20)
+        return original(self, samples)
+
+    monkeypatch.setattr(modality_lifecycle.Predictor, "predict", hung)
+    url = f"{service.address}/predict"
+    try:
+        assert post(url, SAMPLE_PAYLOAD)[0] == 504
+        status, body = get(f"{service.address}/readyz")
+        assert status == 503 and "still running" in str(body["reason"])
+        status, body = post(url, SAMPLE_PAYLOAD)
+        assert status == 503 and body["category"] == "not_ready"
+        status, body = get(f"{service.address}/livez")
+        assert status == 503 and body["status"] == "wedged"
+        release.set()
+        deadline = time.monotonic() + 10
+        while service.admission.state()["busy"] and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert get(f"{service.address}/readyz")[0] == 200
+        assert post(url, SAMPLE_PAYLOAD)[0] == 200
+        assert get(f"{service.address}/livez")[0] == 200
+    finally:
+        release.set()
+        service.stop()
+
+
+def test_a_modality_predictor_scores_beside_a_hung_call(tmp_path, monkeypatch):
+    # SRV-1: one lock serialized every call although the predictor is
+    # read-only, so one hung call blocked every worker.
+    service = started_modality_service(tmp_path)[0]
+    entered = threading.Event()
+    release = threading.Event()
+    original = modality_lifecycle.Predictor.predict
+
+    def predict(self, samples):
+        if threading.current_thread().name == "hung":
+            entered.set()
+            release.wait(20)
+        return original(self, samples)
+
+    monkeypatch.setattr(modality_lifecycle.Predictor, "predict", predict)
+    hung = threading.Thread(
+        target=service.response, args=(SAMPLE_PAYLOAD,), name="hung"
+    )
+    hung.start()
+    try:
+        assert entered.wait(10)
+        done = []
+        other = threading.Thread(
+            target=lambda: done.append(service.response(SAMPLE_PAYLOAD))
+        )
+        other.start()
+        other.join(10)
+        assert done and done[0]["sample_count"] == 1
+    finally:
+        release.set()
+        hung.join(10)
         service.stop()

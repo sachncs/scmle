@@ -27,6 +27,8 @@ from scmle.inference import guard
 from scmle.security import access
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from scmle.models import modality_lifecycle
 
 MAX_MODALITY_REQUEST_BYTES = 16 * 1024 * 1024
@@ -66,7 +68,9 @@ class ModalityHttpServing:
     predictor is verified when it is loaded, so the service is ready once
     constructed; the warm-up step is recorded as skipped because a caller-owned
     decoder has no synthetic sample. At most 8 requests run at once (429
-    beyond) and a scoring call past 30 seconds answers 504. Every response
+    beyond) and a scoring call past 30 seconds answers 504; while it still
+    runs ``/readyz`` and ``/predict`` answer 503, and `guard.STRIKES`
+    timeouts in a row make ``/livez`` answer 503. Every response
     carries the schema version and the package digest, which doubles as the
     model version because modality packages carry no separate label.
     Authentication, TLS, transport-specific decoding, and operational paging
@@ -123,7 +127,6 @@ class ModalityHttpServing:
         self.max_request_bytes = max_request_bytes
         self.max_samples = max_samples
         self.require_lifecycle_report = require_lifecycle_report
-        self.lock = threading.Lock()
         self.admission = guard.Admission(8, 30.0)
         self.readiness = guard.Readiness()
         for step in guard.STEPS[:2]:
@@ -165,7 +168,7 @@ class ModalityHttpServing:
     def response(self, payload: object) -> dict[str, object]:
         """Decodes samples and returns predictions with their probabilities.
 
-        Scoring runs under a lock, so concurrent calls are serialized.
+        The predictor is read-only, so concurrent calls run in parallel.
 
         Args:
             payload: The parsed JSON request body.
@@ -188,9 +191,8 @@ class ModalityHttpServing:
             raise OverflowError(
                 f"request contains more than {self.max_samples} samples"
             )
-        with self.lock:
-            predictions = self.predictor.predict(samples)
-            probabilities = self.predictor.predict_proba(samples)
+        predictions = self.predictor.predict(samples)
+        probabilities = self.predictor.predict_proba(samples)
         return {
             "schema_version": serving.SCHEMA_VERSION,
             "model_version": self.artifact_digest,
@@ -204,6 +206,37 @@ class ModalityHttpServing:
                 self.predictor.lifecycle_report_digest is not None
             ),
             "lifecycle_report_digest": self.predictor.lifecycle_report_digest,
+        }
+
+    def probe(self, path: str) -> tuple[int, Mapping[str, object]]:
+        """Answers a probe, or the readiness gate in front of `/predict`.
+
+        Args:
+            path: `/livez`, `/readyz` or `/predict`.
+
+        Returns:
+            The status and body. `/livez` is 503 once `guard.STRIKES` calls
+            in a row timed out; `/readyz` and `/predict` are 503 while not
+            ready, including while a timed-out call still runs (SRV-1). A
+            ready `/predict` gets 200 and an empty body: go on and score.
+        """
+        if path == "/livez":
+            alive = self.admission.alive
+            status = 200 if alive else 503
+            return status, {
+                "status": "alive" if alive else "wedged",
+                **self.admission.state(),
+            }
+        state = guard.assess(self.readiness, self.admission)
+        status = 200 if state["ready"] else 503
+        if path == "/readyz":
+            return status, {**state, "artifact_digest": self.artifact_digest}
+        if state["ready"]:
+            return status, {}
+        return status, {
+            "error": "service is not ready",
+            "category": "not_ready",
+            "details": dict(state),
         }
 
     @staticmethod
@@ -416,15 +449,9 @@ class Responder(server.BaseHTTPRequestHandler):
         if request_id is None:
             return
         adapter = self.adapter
-        if self.path == "/livez":
-            self.transmit(200, {"status": "alive"}, request_id)
-        elif self.path == "/readyz":
-            state = adapter.readiness.snapshot()
-            self.transmit(
-                200 if state["ready"] else 503,
-                {**state, "artifact_digest": adapter.artifact_digest},
-                request_id,
-            )
+        if self.path in ("/livez", "/readyz"):
+            status, body = adapter.probe(self.path)
+            self.transmit(status, dict(body), request_id)
         elif self.path == "/health":
             self.transmit(
                 200,
@@ -497,7 +524,8 @@ class Responder(server.BaseHTTPRequestHandler):
         Only `POST /predict` is served; another path gets 404 and a
         refused gateway check gets its own status. Failures are
         answered with an error response (415, 411, 400, 413, 422,
-        429, 504 or 500 as appropriate) and not propagated.
+        429, 504 or 500 as appropriate) and not propagated; while a
+        timed-out call still runs the replica is not ready and answers 503.
         """
         request_id = self.screen("POST")
         if request_id is None:
@@ -506,6 +534,10 @@ class Responder(server.BaseHTTPRequestHandler):
             self.transmit(404, {"error": "not found"}, request_id)
             return
         adapter = self.adapter
+        status, refusal = adapter.probe(self.path)
+        if refusal:
+            self.transmit(status, dict(refusal), request_id)
+            return
         try:
             payload = self.receive()
             with adapter.admission.admit():

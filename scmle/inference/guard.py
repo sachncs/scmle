@@ -11,6 +11,7 @@ in a row make it not alive, so the platform restarts it.
 
 from collections.abc import Callable
 from collections.abc import Generator
+from collections.abc import Mapping
 import concurrent.futures
 import contextlib
 import enum
@@ -327,6 +328,28 @@ class Admission:
         Calls that have not started are cancelled.
         """
         self.pool.shutdown(wait=False, cancel_futures=True)
+
+
+def assess(readiness: Readiness, admission: Admission) -> Mapping[str, Any]:
+    """Readiness, which a timed-out call still running takes away.
+
+    Args:
+        readiness: The verify, load and warm-up tracker.
+        admission: The admission control whose workers are counted.
+
+    Returns:
+        The readiness snapshot, with `ready` false and the reason set while
+        any timed-out call holds a worker (SRV-1), and the admission counts
+        under `workers`.
+    """
+    snapshot = readiness.snapshot()
+    workers = admission.state()
+    if snapshot["ready"] and workers["stuck"]:
+        snapshot["ready"] = False
+        snapshot["reason"] = (
+            f"{workers['stuck']} timed-out call(s) still running"
+        )
+    return {**snapshot, "workers": workers}
 
 
 def wellformed(request_id: str) -> bool:
