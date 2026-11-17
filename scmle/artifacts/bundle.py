@@ -33,6 +33,7 @@ import threadpoolctl
 
 import scmle
 from scmle import durability
+from scmle import envelope
 from scmle.contracts import artifacts
 from scmle.contracts import errors
 from scmle.contracts import signing
@@ -456,7 +457,9 @@ def authenticate(
 ) -> None:
     """Authenticates a bundle and checks its model and schema checksums.
 
-    Nothing is unpickled here.
+    Nothing is unpickled here. `trusted` vouches for a missing signature
+    only: a signature that cannot be checked, because no key is set, may be
+    an invalid one, so it is refused like one.
 
     Args:
         root: The bundle directory.
@@ -466,8 +469,8 @@ def authenticate(
         signing_key: HMAC key; defaults to `$SCMLE_SIGNING_KEY`.
 
     Raises:
-        ArtifactError: If the bundle is unauthenticated, lacks its model file,
-            or a checksum differs.
+        ArtifactError: If the bundle is unauthenticated, signed but no key is
+            set to check it, lacks its model file, or a checksum differs.
     """
     authentic = verify_signature(root, signing_key)
     if not authentic and not trusted:
@@ -476,6 +479,13 @@ def authenticate(
             "based and loading executes code. Sign bundles with "
             f"${signing.SIGNING_KEY_ENV}, or pass trusted=True if you trust "
             "its source."
+        )
+    if not authentic and (root / SIGNATURE_FILE).exists():
+        raise errors.ArtifactError(
+            "refusing a signed bundle with no signing key set to verify it: "
+            "trusted=True vouches for a missing signature, never for one "
+            f"that may be invalid. Set ${signing.SIGNING_KEY_ENV} or pass "
+            "signing_key."
         )
     model_path = root / MODEL_FILE
     if not model_path.exists():
@@ -1263,13 +1273,7 @@ class Bundle:
             ArtifactError: If the bundle is unauthenticated, tampered with,
                 incomplete, or incompatible.
         """
-        if trusted and os.environ.get("SCMLE_ENV", "").strip().lower() == (
-            "production"
-        ):
-            raise errors.ArtifactError(
-                "trusted loading is refused when SCMLE_ENV=production: sign "
-                "the bundle and verify it with the signing key"
-            )
+        envelope.vouch(trusted)
         root = pathlib.Path(directory)
         manifest, schema = unpack(root)
         legacy = manifest.get("format") == 1
