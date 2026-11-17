@@ -17,6 +17,7 @@ import pandas
 
 from scmle.contracts import data
 from scmle.contracts import errors
+from scmle.data.readers import delimited
 
 
 class TableReader(abc.ABC):
@@ -41,37 +42,72 @@ class TableReader(abc.ABC):
 
 
 class Csv(TableReader):
-    """Comma-separated values, including compressed CSV files."""
+    """Delimited text, including compressed files.
 
-    suffixes = (".csv", ".csv.gz", ".csv.bz2", ".csv.xz", ".csv.zip")
+    The bytes are decoded by byte-order mark, as UTF-8 or as plausible
+    cp1252, and the delimiter is found from the header unless stated. A
+    file with no single right reading is refused (see `delimited`).
 
-    def load(self, path: pathlib.Path) -> pandas.DataFrame:
-        """Reads a CSV file.
+    Attributes:
+        delimiter: Field separator, or None to detect it.
+        encoding: Codec name, or None to detect it.
+    """
+
+    suffixes: ClassVar[tuple[str, ...]] = (
+        ".csv",
+        ".csv.gz",
+        ".csv.bz2",
+        ".csv.xz",
+        ".csv.zip",
+    )
+
+    def __init__(
+        self, delimiter: str | None = None, encoding: str | None = None
+    ) -> None:
+        """Initializes the reader.
 
         Args:
-            path: Existing CSV file, optionally compressed.
+            delimiter: Field separator; detected from the header when None.
+            encoding: Codec name; detected from the bytes when None.
+        """
+        self.delimiter = delimiter
+        self.encoding = encoding
+
+    def load(self, path: pathlib.Path) -> pandas.DataFrame:
+        """Reads a delimited file.
+
+        Args:
+            path: Existing delimited file, optionally compressed.
 
         Returns:
             The parsed table.
+
+        Raises:
+            InputError: If the file cannot be decoded, its delimiter is
+                ambiguous, it has duplicate headers or ragged records, or
+                a column has no exact reading.
         """
-        return pandas.read_csv(path)
+        try:
+            text = delimited.decode(delimited.inflate(path), self.encoding)
+            delimiter = self.delimiter or delimited.sniff(text)
+            delimited.check(text, delimiter)
+            return delimited.parse(text, delimiter)
+        except errors.InputError as error:
+            raise errors.InputError(f"{path.name}: {error}") from error
 
 
-class Tsv(TableReader):
+class Tsv(Csv):
     """Tab-separated values."""
 
     suffixes = (".tsv", ".tab", ".tsv.gz", ".tab.gz")
 
-    def load(self, path: pathlib.Path) -> pandas.DataFrame:
-        """Reads a tab-separated table.
+    def __init__(self, encoding: str | None = None) -> None:
+        """Initializes the reader.
 
         Args:
-            path: Existing tab-separated file.
-
-        Returns:
-            The parsed table.
+            encoding: Codec name; detected from the bytes when None.
         """
-        return pandas.read_csv(path, sep="\t")
+        super().__init__("\t", encoding)
 
 
 class Json(TableReader):
@@ -240,6 +276,8 @@ class Loader:
         reader = self.pick(path)
         try:
             frame = reader.load(path)
+        except errors.DataError:
+            raise
         except Exception as error:  # Parser errors vary by engine.
             raise errors.DataError(
                 f"failed to read {path.name}: {error}"
