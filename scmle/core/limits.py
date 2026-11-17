@@ -27,6 +27,7 @@ from collections.abc import Mapping
 import contextlib
 import dataclasses
 import importlib
+import logging
 import multiprocessing
 from multiprocessing import connection
 import multiprocessing.process
@@ -45,6 +46,9 @@ import threadpoolctl
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.core import budget
+from scmle.core import logs
+
+LOGGER = logging.getLogger(__name__)
 
 resource: Any  # the `resource` module, or None where it is missing
 try:
@@ -52,6 +56,11 @@ try:
 except ImportError:  # Windows has no `resource` module.
     # handled: optional module absent; None checked by callers (Windows)
     resource = None
+    logs.degrade(
+        LOGGER,
+        "no `resource` module: peak memory is read through psutil and "
+        "excludes finished child processes",
+    )
 
 WINDOWS = sys.platform == "win32"
 KILL_SIGNAL = signal.SIGTERM if WINDOWS else signal.SIGKILL  # type: ignore[attr-defined,unused-ignore]

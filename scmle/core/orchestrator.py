@@ -26,6 +26,7 @@ from scmle.contracts import experiments
 from scmle.contracts import tasks
 from scmle.core import compiler
 from scmle.core import limits
+from scmle.core import logs
 from scmle.core import policies
 from scmle.core import resource_observation
 from scmle.core import scheduler
@@ -256,7 +257,8 @@ class Orchestrator:
         store.write_text("parameter_estimation_declaration.lock", f"{digest}\n")
         store.write_json("config.json", json.loads(self.spec.canonize()))
         store.write_text("environment.lock", environment_lock())
-        return self.execute(store, approved, {}, "run created")
+        with logs.bind(run=store.run_id):
+            return self.execute(store, approved, {}, "run created")
 
     def resume(self, run_directory: str | pathlib.Path) -> results.Run:
         """Continues an interrupted run, reusing its completed trials.
@@ -299,7 +301,8 @@ class Orchestrator:
             else None
         )
         checkpoints = self.restore(store)
-        return self.execute(store, approved, checkpoints, "run resumed")
+        with logs.bind(run=store.run_id):
+            return self.execute(store, approved, checkpoints, "run resumed")
 
     @classmethod
     def reload(cls, run_directory: str | pathlib.Path, **kwargs: Any) -> Self:

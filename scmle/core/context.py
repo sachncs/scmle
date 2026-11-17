@@ -1,6 +1,7 @@
 """Mutable state shared by the stages of one run."""
 
 import dataclasses
+import logging
 import threading
 import time
 from typing import Any
@@ -32,6 +33,7 @@ from scmle.experimentation import stores
 import scmle.intelligence.recommendations
 import scmle.models.registry
 
+LOGGER = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
@@ -636,6 +638,7 @@ class Context:
             reason: Why, with the estimate and the time left.
         """
         self.skipped.append({"work": work, "reason": reason})
+        LOGGER.warning("%s skipped or reduced: %s", work, reason)
         self.emit(
             "budget.skipped",
             f"{work} skipped or reduced: {reason}",

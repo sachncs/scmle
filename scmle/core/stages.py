@@ -2389,9 +2389,15 @@ def devise(
                 allowed_statuses=allowed_statuses,
                 row_count=manifest.row_count,
             )
-        except capabilities.UnsupportedError:
+        except capabilities.UnsupportedError as error:
             if model_family not in {"custom", "test"}:
                 raise
+            LOGGER.warning(
+                "%s family %s accepted as extension-only: %s",
+                key,
+                model_family,
+                error,
+            )
             if context.capability_registry.records.get(key) is None:
                 context.capability_registry.register(
                     scmle.core.context.extension_capability(key)

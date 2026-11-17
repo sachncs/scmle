@@ -9,6 +9,7 @@ transient are injected.
 from collections.abc import Callable
 import dataclasses
 import errno
+import logging
 import math
 import time
 from typing import TypeVar
@@ -16,6 +17,7 @@ import urllib.error
 
 from scmle.contracts import errors
 
+LOGGER = logging.getLogger(__name__)
 T = TypeVar("T")
 # Error numbers of failures that pass: the resource is busy, the call was
 # interrupted, or the network dropped or timed out. Missing files, denied
@@ -196,6 +198,12 @@ def call(
             if not judge(error):
                 raise
             last = error
+            LOGGER.warning(
+                "attempt %d of %d failed transiently: %r",
+                attempt,
+                policy.max_attempts,
+                error,
+            )
             if attempt < policy.max_attempts:
                 sleep(policy.delay(attempt))
     raise RetryError(

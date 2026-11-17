@@ -2,6 +2,7 @@
 
 import datetime
 import importlib.metadata
+import logging
 import os
 import pathlib
 import re
@@ -16,6 +17,7 @@ from scmle.contracts import errors
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+LOGGER = logging.getLogger(__name__)
 OBSERVATION_SCHEMA_VERSION = 1
 BYTES_PER_GB = 1024**3
 WINDOWS = sys.platform == "win32"
@@ -153,9 +155,10 @@ def processors() -> tuple[int | None, str]:
     affinity_probe = getattr(os, "sched_getaffinity", None)
     try:
         affinity = affinity_probe(0) if affinity_probe is not None else None
-    except OSError:
+    except OSError as error:
         # handled: affinity probe failure falls back; source label names
         # os.cpu_count
+        LOGGER.warning("CPU affinity unreadable, using cpu_count: %s", error)
         affinity = None
     if affinity:
         return len(affinity), "os.sched_getaffinity"
@@ -163,6 +166,7 @@ def processors() -> tuple[int | None, str]:
         count = os.cpu_count()
     except NotImplementedError:
         # handled: cpu_count unsupported yields (None, 'unknown') source
+        LOGGER.warning("CPU count unsupported on this platform")
         count = None
     return (count, "os.cpu_count") if count else (None, "unknown")
 
@@ -192,8 +196,9 @@ def observe_windows_memory_gb() -> tuple[float | None, str]:
         import psutil  # noqa: PLC0415 -- Windows-only dependency  # pyright: ignore[reportMissingModuleSource]  # psutil is a Windows-only dependency and ships no stub source here
 
         total = psutil.virtual_memory().total
-    except (ImportError, OSError, AttributeError):
+    except (ImportError, OSError, AttributeError) as error:
         # handled: psutil unavailable or failing reported as (None, 'unknown')
+        LOGGER.warning("memory capacity unreadable through psutil: %s", error)
         return None, "unknown"
     if not isinstance(total, int) or total <= 0:
         return None, "unknown"
@@ -212,8 +217,9 @@ def freespace(path: pathlib.Path) -> tuple[float | None, str]:
     """
     try:
         free = shutil.disk_usage(path).free
-    except OSError:
+    except OSError as error:
         # handled: disk query failure returned as None/'unknown', documented
+        LOGGER.warning("free space of %s unreadable: %s", path, error)
         return None, "unknown"
     return free / BYTES_PER_GB, f"shutil.disk_usage({path})"
 
@@ -258,9 +264,15 @@ def project_extra_requirements() -> dict[str, tuple[str, ...]]:
         )
     except importlib.metadata.PackageNotFoundError:
         # handled: project not installed gives empty mapping, documented
+        LOGGER.warning(
+            "%s is not installed; no extras observed", PROJECT_DISTRIBUTION
+        )
         return {}
-    except (ValueError, OSError):
+    except (ValueError, OSError) as error:
         # handled: unreadable project metadata gives empty mapping, documented
+        LOGGER.warning(
+            "project metadata unreadable; no extras observed: %s", error
+        )
         return {}
     grouped: dict[str, list[str]] = {}
     for requirement in requirements:
@@ -289,8 +301,9 @@ def present(package: str) -> bool:
     except importlib.metadata.PackageNotFoundError:
         # handled: missing distribution reported as not installed (False)
         return False
-    except (ValueError, OSError):
+    except (ValueError, OSError) as error:
         # handled: unreadable metadata returns False; docstring ties True to
         # readability
+        LOGGER.warning("metadata of %s unreadable: %s", package, error)
         return False
     return True
