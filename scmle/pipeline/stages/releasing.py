@@ -190,9 +190,11 @@ class Releasing(interface.Stage):
         outcome = release.countersign(
             outcome, evidence_index, evidence_verified
         )
-        evaluation["release_policy"] = policy.to_dict()
+        evaluation["release_policy"] = policy.model_dump(mode="json")
         evaluation["release_evaluation"] = outcome.to_dict()
         evaluation["release_evidence"] = evidence_index.to_dict()
-        store.write_json("evaluation_policy.json", policy.to_dict())
+        store.write_json(
+            "evaluation_policy.json", policy.model_dump(mode="json")
+        )
         store.write_json("release_evidence.json", evidence_index.to_dict())
         store.write_json("release_evaluation.json", outcome.to_dict())

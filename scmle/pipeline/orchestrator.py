@@ -28,9 +28,9 @@ from scmle.contracts import tasks
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
 import scmle.models.registry
-from scmle.pipeline import compiler
+from scmle.pipeline import engine
 from scmle.pipeline import policies
-from scmle.pipeline import profiler
+from scmle.pipeline import roster
 import scmle.pipeline.context
 import scmle.pipeline.stages
 from scmle.runtime import limits
@@ -93,9 +93,10 @@ class Orchestrator:
             registry.load_plugins()
         self.registry = registry
         self.policy = policy or selection.Averager(spec.selection)
-        self.stages = compiler.assemble(
+        self.stages = engine.order(
             stages or scmle.pipeline.stages.default_stages()
         )
+        self.pipeline = engine.Pipeline(self.stages)
         self.tracker = tracker
         self.checkpoints = checkpoints
         self.capability_registry = capability_registry
@@ -130,7 +131,7 @@ class Orchestrator:
             capability_registry=(
                 self.capability_registry
                 if self.capability_registry is not None
-                else scmle.pipeline.context.enrol()
+                else roster.enrol()
             ),
             capability_observation=resource_observation.observe_runtime_resources(
                 store.directory if store is not None else None
@@ -195,6 +196,9 @@ class Orchestrator:
     ) -> scmle.pipeline.context.Context:
         """Ingests, profiles and plans without training or writing files.
 
+        Runs the planning stage and the stages it needs, with no state
+        machine, reviewers, run store or log.
+
         Args:
             approved: Plan restricting which models may be considered.
 
@@ -207,10 +211,8 @@ class Orchestrator:
         self.adopt(approved)
         context = self.new_context(approved_plan=approved)
         context.history = self.recall(self.tracker)
-        scmle.pipeline.stages.IngestStage().execute(context)
-        scmle.pipeline.stages.ProfileStage().execute(context)
-        context.plan = scmle.pipeline.stages.devise(context)
-        scmle.pipeline.stages.advise(context)
+        self.pipeline = engine.Pipeline(self.stages)
+        self.pipeline.advance(context, until=scmle.pipeline.stages.Planning)
         return context
 
     def run(
@@ -405,60 +407,6 @@ class Orchestrator:
                     f"{verdict.reason or 'no reason given'}"
                 )
 
-    @staticmethod
-    def admit(context: scmle.pipeline.context.Context) -> None:
-        """Holds the post-training reserve and refuses a run that cannot fit.
-
-        Runs right after ingestion, before any profiling or training: the
-        reserve for the final refit, diagnostics and packaging is estimated
-        from the table's shape and held back from the trial window
-        (`Governor.until`).
-
-        Args:
-            context: The run context, holding the ingested frame.
-
-        Raises:
-            BlockedError: If preparation, one cheapest trial and the reserve
-                cannot fit in the time budget (`budget.Reserve.admit`).
-        """
-        reserve = context.regulator.reserve
-        parts = reserve.provision(
-            *scmle.pipeline.stages.dimensions(context), profiler.estimate
-        )
-        context.emit(
-            "budget.reserved",
-            f"{reserve.total:.1f} s of the "
-            f"{context.spec.resources.time_budget_seconds} s budget held for "
-            "the final refit, diagnostics and packaging",
-            data={"reserve_seconds": parts},
-        )
-        reserve.admit()
-
-    @staticmethod
-    def ready(
-        gate: state.Progress, context: scmle.pipeline.context.Context
-    ) -> None:
-        """Prepares the context for the stage about to run.
-
-        Before planning, observes the runtime resources. Before testing,
-        wraps the locked test set so that opening it is first recorded in
-        the run's custody journal (`journal.Custodian`).
-
-        Args:
-            gate: The state of the stage about to run.
-            context: The run context.
-        """
-        if gate is state.Progress.PLANNING:
-            context.observe()
-        if gate is not state.Progress.TESTING:
-            return
-        split = scmle.pipeline.context.require(context.split, "split")
-        if not isinstance(split.locked_test, journal.Custodian):
-            split.locked_test = journal.Custodian(
-                split.locked_test,
-                journal.Journal.locate(context.run_store.directory),
-            )
-
     def execute(
         self,
         store: scmle.artifacts.store.Workspace,
@@ -508,59 +456,18 @@ class Orchestrator:
         context.checkpoints = checkpoints
         for name, failure in self.registry.plugin_failures.items():
             context.emit("plugin.rejected", f"{name}: {failure}")
+        self.pipeline = engine.Pipeline(self.stages)
         try:
-            for stage in self.stages:
-                context.check_cancelled()
-                machine.transition(stage.state, stage.describe(context))
-                self.ready(stage.state, context)
-                with context.regulator.cap():
-                    stage.execute(context)
-                if isinstance(stage, scmle.pipeline.stages.IngestStage):
-                    self.admit(context)
-                self.consult_checkpoints(stage.state, context)
-            machine.transition(
-                state.Progress.COMPLETED,
-                "run complete",
-                ("model/", "evaluation.json"),
-            )
-            return scmle.pipeline.context.require(context.result, "result")
-        except errors.CancelledError as error:
-            error.details.setdefault("run_dir", str(store.directory))
-            error.details["recoverable_trials"] = self.recoverable(store)
-            machine.transition(state.Progress.CANCELLED, str(error))
-            raise
-        except KeyboardInterrupt as error:
-            machine.transition(state.Progress.CANCELLED, "interrupted")
-            raise errors.CancelledError(
-                "interrupted", {"run_dir": str(store.directory)}
-            ) from error
-        except errors.BlockedError as error:
-            error.details["run_dir"] = str(store.directory)
-            error.details["recoverable_trials"] = self.recoverable(store)
-            machine.transition(state.Progress.BLOCKED, str(error))
-            raise
-        except errors.ScmleError as error:
-            # This also takes an `InputError` (and `KindError`,
-            # `OrderError`): before ERR-20 those were bare ValueError,
-            # TypeError or RuntimeError raises that fell to the catch-all
-            # below, failing as `internal:` and escaping wrapped. Kept on
-            # purpose: an InputError is by contract a user or data problem,
-            # not a defect, so the run fails as `input:` and the error
-            # escapes as itself; a bare ValueError still fails as internal.
-            error.details["run_dir"] = str(store.directory)
-            error.details["recoverable_trials"] = self.recoverable(store)
-            machine.transition(
-                state.Progress.FAILED, f"{error.category}: {error}"
-            )
-            raise
-        except Exception as error:
-            machine.transition(state.Progress.FAILED, f"internal: {error!r}")
-            raise errors.ScmleError(
-                str(error),
-                {
+            self.pipeline.run(
+                context,
+                machine,
+                self.consult_checkpoints,
+                lambda: {
                     "run_dir": str(store.directory),
                     "recoverable_trials": self.recoverable(store),
                 },
-            ) from error
+                ("model/", "evaluation.json"),
+            )
+            return scmle.pipeline.context.require(context.result, "result")
         finally:
             context.close()

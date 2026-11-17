@@ -9,6 +9,7 @@ from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import tasks
 from scmle.pipeline import recommendations
+from scmle.pipeline import roster
 import scmle.pipeline.context
 import scmle.pipeline.planner
 from scmle.pipeline.stages import interface
@@ -84,7 +85,7 @@ def devise(
             )
             if context.capability_registry.records.get(key) is None:
                 context.capability_registry.register(
-                    scmle.pipeline.context.extension_capability(key)
+                    roster.extension_capability(key)
                 )
             context.capability_registry.require(
                 key,
@@ -145,7 +146,7 @@ def requisition(
         modality=modality,
         task=task,
         model_family=model_family,
-        evaluation=scmle.pipeline.context.TABULAR_BETA_EVALUATIONS[task],
+        evaluation=roster.TABULAR_BETA_EVALUATIONS[task],
         uncertainty=capabilities.Uncertainty.NONE,
         fairness=fairness,
         explainability=capabilities.Explainability.NONE,
@@ -203,14 +204,17 @@ class Planning(interface.Stage):
     def execute(self, context: scmle.pipeline.context.Context) -> None:
         """Builds the execution plan and the recommendations.
 
-        Writes the execution plan, the capability registry, the decision log and
-        the recommendations, and emits a `plan.recommendations` event. A
-        candidate without an accepted capability declaration stops the run
-        (`devise` raises `UnsupportedError`).
+        First records the runtime resources the capability gate plans
+        against. Writes the execution plan, the capability registry, the
+        decision log and the recommendations, and emits a
+        `plan.recommendations` event. A candidate without an accepted
+        capability declaration stops the run (`devise` raises
+        `UnsupportedError`).
 
         Args:
             context: The run context; receives the execution plan.
         """
+        context.observe()
         plan = devise(context)
         context.plan = plan
         context.write_json("execution_plan.json", plan.to_dict())

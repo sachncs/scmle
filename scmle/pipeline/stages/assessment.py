@@ -5,6 +5,7 @@ from typing import ClassVar
 
 import numpy
 
+from scmle.assurance.custody import journal
 from scmle.contracts import experiments
 from scmle.contracts import tasks
 from scmle.evaluation import confidence
@@ -50,6 +51,8 @@ class FinalEvaluationStage(reporting.Reporting):
         fairness mitigation, registers the coverage claim, then opens the
         locked rows once, after the selection is frozen. Records the test
         metrics, diagnostics and the evaluation document in the context.
+        The locked rows are first wrapped so that opening them is recorded in
+        the run's custody journal (`journal.Custodian`).
 
         Args:
             context: The run context; receives the final model, the test rows
@@ -57,6 +60,11 @@ class FinalEvaluationStage(reporting.Reporting):
         """
         context.check_cancelled()
         split = scmle.pipeline.context.require(context.split, "split")
+        if not isinstance(split.locked_test, journal.Custodian):
+            split.locked_test = journal.Custodian(
+                split.locked_test,
+                journal.Journal.locate(context.run_store.directory),
+            )
         selected = scmle.pipeline.context.require(context.selected, "selected")
         task = scmle.pipeline.context.require(context.task, "task")
         metric = scmle.pipeline.context.require(context.metric, "metric")

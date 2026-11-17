@@ -13,7 +13,7 @@ class Stage(abc.ABC):
     Attributes:
         state: Lifecycle state the run is in while the stage executes.
         requires: Stages that must run before this one (the workflow is
-            ordered by `compiler.assemble`).
+            ordered by `engine.order`).
     """
 
     state: ClassVar[scmle.runtime.state.Progress]

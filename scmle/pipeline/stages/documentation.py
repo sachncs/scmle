@@ -116,8 +116,8 @@ class Documentation(releasing.Releasing):
                     ),
                 ),
             )
-            evidence[name] = record.to_dict()
-            store.write_json(f"explanations/{name}.json", record.to_dict())
+            evidence[name] = record.model_dump(mode="json")
+            store.write_json(f"explanations/{name}.json", evidence[name])
             store.write_text(
                 f"explanations/{name}.html",
                 explanation_report.Renderer().render(

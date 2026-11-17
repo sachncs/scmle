@@ -14,13 +14,17 @@ import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import interface
 from scmle.pipeline.stages import planning
+from scmle.pipeline.stages import reservation
 import scmle.runtime.state
 
 
 class TrainStage(interface.Stage):
     """Cross-validates every candidate within the time budget."""
 
-    requires: ClassVar[tuple[type, ...]] = (planning.Planning,)
+    requires: ClassVar[tuple[type, ...]] = (
+        planning.Planning,
+        reservation.Reservation,
+    )
     state: ClassVar[scmle.runtime.state.Progress] = (
         scmle.runtime.state.Progress.TRAINING
     )
