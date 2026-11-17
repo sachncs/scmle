@@ -11,12 +11,12 @@ from scipy import stats
 from sklearn.metrics import r2_score
 from sklearn.metrics import roc_auc_score
 
+from scmle.assurance.ledger import multiplicity
+import scmle.assurance.ledger.budget
 from scmle.data.admissibility import leakage
 from scmle.data.admissibility import plants
 from scmle.data.admissibility import screen
 from scmle.data.detectors import certificates
-from scmle.data.ledger import multiplicity
-import scmle.data.ledger.budget
 
 CLS = "classification"
 FAST = leakage.Config(
@@ -246,7 +246,7 @@ def test_by_decisions_equal_the_exact_adjustment_of_the_reported_p_values():
     report = run(frame)
     ps = [f.p_value if f.complete else 1.0 for f in report.findings]
     adjustment = multiplicity.adjust(
-        ps, scmle.data.ledger.budget.Correction.BY, Fraction(1, 20)
+        ps, scmle.assurance.ledger.budget.Correction.BY, Fraction(1, 20)
     )
     assert [f.significant for f in report.findings] == list(adjustment.rejected)
 

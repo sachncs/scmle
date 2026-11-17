@@ -448,7 +448,7 @@
       "override": "",
       "registered": true,
       "seconds": 9.6,
-      "site": "scmle.data.ledger.confirm:confirm",
+      "site": "scmle.assurance.ledger.confirm:confirm",
       "stopped": "confirm.single_use",
       "surface": "api",
       "vector": "run the same signed charter on the same data again"

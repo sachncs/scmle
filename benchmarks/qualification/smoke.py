@@ -21,9 +21,9 @@ from benchmarks.qualification import ledger_checks
 from benchmarks.qualification import oracles
 from benchmarks.qualification import simulate
 from benchmarks.qualification import standins
+from scmle.assurance.ledger import budget
 from scmle.contracts import qualification
 from scmle.data.detectors import certificates
-from scmle.data.ledger import budget
 from scmle.data.robustness import shift
 
 ALPHA = 0.05

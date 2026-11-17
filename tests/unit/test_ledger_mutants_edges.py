@@ -4,8 +4,8 @@ import numpy
 import pandas
 import pytest
 
-from scmle.data.ledger import controls
-from scmle.data.ledger import explore
+from scmle.assurance.ledger import controls
+from scmle.assurance.ledger import explore
 
 
 def test_the_quantile_index_never_goes_below_the_smallest_count():

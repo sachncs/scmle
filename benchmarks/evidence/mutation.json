@@ -74,7 +74,7 @@
       "scmle/data/framing/__init__.py",
       "scmle/data/identification/__init__.py",
       "scmle/data/ingest/__init__.py",
-      "scmle/data/ledger/__init__.py",
+      "scmle/assurance/ledger/__init__.py",
       "scmle/data/modalities/__init__.py",
       "scmle/data/modalities/audio/__init__.py",
       "scmle/data/modalities/document/__init__.py",
@@ -463,7 +463,7 @@
         "scmle.data.identification.sensitivity.x_rvalue__mutmut_15",
         "scmle.data.identification.sensitivity.x_rvalue__mutmut_3"
       ],
-      "files": "dc8d5bde2a9393ab5ea6a3b56485ee1f183cbaecc081c83c481398cea53409f1",
+      "files": "435370292ad3a52715bf535458fa3fc0a79b3c702fb1abc1acfc3a7bb3678980",
       "module": "scmle/data/identification/sensitivity.py",
       "mutants": 448,
       "not_run": 0,
@@ -940,7 +940,7 @@
         "scmle.governance.lifecycle.x\u01c1Maintainer\u01c1revertible__mutmut_96",
         "scmle.governance.lifecycle.x\u01c1Maintainer\u01c1tally__mutmut_10"
       ],
-      "files": "155da155931d6fbcfcb00ff06385884e3b350ee83777579b7fea43a7b8246423",
+      "files": "48cb112339bd2bbf28157677f25b02bb512234c7780c03760f86c336dca14bad",
       "module": "scmle/governance/lifecycle.py",
       "mutants": 651,
       "not_run": 0,

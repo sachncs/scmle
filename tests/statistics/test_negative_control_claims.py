@@ -1,6 +1,6 @@
 """The negative-control gate and its Monte Carlo interval.
 
-`scmle.data.ledger.controls` promises three things about re-run counts
+`scmle.assurance.ledger.controls` promises three things about re-run counts
 (`B` permuted-target discovery counts) and an observed count:
 
 * if the observed count is exchangeable with the re-run counts, the gate
@@ -19,7 +19,7 @@ import numpy
 from scipy import stats
 import support_statistics
 
-from scmle.data.ledger import controls
+from scmle.assurance.ledger import controls
 
 RUNS = 4000
 

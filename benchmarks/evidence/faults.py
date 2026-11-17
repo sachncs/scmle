@@ -539,12 +539,12 @@ def confirmation(times: int) -> None:
     Args:
         times: 1 passes; 2 injects a second use of the confirmation set.
     """
+    from scmle.assurance.ledger import confirm
+    from scmle.assurance.ledger import controls
+    from scmle.assurance.ledger import explore
+    from scmle.assurance.ledger import online_fdr
+    import scmle.assurance.ledger.ledger
     from scmle.data.custody import sealed
-    from scmle.data.ledger import confirm
-    from scmle.data.ledger import controls
-    from scmle.data.ledger import explore
-    from scmle.data.ledger import online_fdr
-    import scmle.data.ledger.ledger
     from scmle.data.splitting import splitters
 
     def world(rows: int, seed: int) -> tuple[pandas.DataFrame, pandas.Series]:
@@ -556,7 +556,7 @@ def confirmation(times: int) -> None:
         return features, pandas.Series(target, name="y")
 
     alpha = Fraction(1, 20)
-    ledger = scmle.data.ledger.ledger.Ledger.create(
+    ledger = scmle.assurance.ledger.ledger.Ledger.create(
         None,
         charter_hash="c" * 64,
         config=online_fdr.Settings(online_fdr.ELOND, Fraction(1, 10)),

@@ -32,9 +32,9 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.assurance.ledger import confirm
+from scmle.assurance.ledger import ledger
 from scmle.contracts import tasks
-from scmle.data.ledger import confirm
-from scmle.data.ledger import ledger
 from scmle.evaluation import conformal
 from scmle.evaluation import coverage
 from scmle.evaluation import coverage_run

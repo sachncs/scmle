@@ -7,7 +7,7 @@ charter's `Procedure.stability_filter` is true and the verdicts are allowed to
 gate, withdraws the `fragile` survivors from the family tested on `C`.
 
 Error control (see `confirm.STAGE_TWO_STATEMENT` and the "Second stage"
-section of `scmle.data.ledger.confirm`). The stage reads the exploration
+section of `scmle.assurance.ledger.confirm`). The stage reads the exploration
 features and target and the charter, and nothing else; it is handed no `C`
 and no `F`. Its verdict is therefore a function of `X`, the charter and the
 seed. Under the assumption already made for confirmation, that the rows of `C`
@@ -36,10 +36,10 @@ from collections.abc import Callable
 from collections.abc import Sequence
 import dataclasses
 
+from scmle.assurance.ledger import confirm
+from scmle.assurance.ledger import ledger
 from scmle.contracts import qualification
 from scmle.data.detectors import certificates
-from scmle.data.ledger import confirm
-from scmle.data.ledger import ledger
 from scmle.data.robustness import qualify
 from scmle.data.robustness import shift
 from scmle.data.robustness import stability

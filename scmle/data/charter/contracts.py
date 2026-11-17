@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 from typing import Self
 
+from scmle.assurance.ledger import budget
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
@@ -31,7 +32,6 @@ import scmle.data.charter.ingest
 import scmle.data.charter.rules
 import scmle.data.charter.uncertainty
 from scmle.data.framing import costs
-from scmle.data.ledger import budget
 
 FORMAT_VERSION = 11
 OLDEST_READABLE_FORMAT = 1

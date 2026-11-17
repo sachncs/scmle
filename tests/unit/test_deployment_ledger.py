@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-import scmle.data.ledger.ledger
+import scmle.assurance.ledger.ledger
 from scmle.governance import deployment_ledger
 
 KEY = "human-key-not-held-by-the-system"
@@ -28,12 +28,12 @@ def escalate(ledger, action="promote"):
             "phase": deployment_ledger.PHASE_OPEN,
             "id": f"esc-{number}",
             "question": question,
-            "question_hash": scmle.data.ledger.ledger.digest(question),
+            "question_hash": scmle.assurance.ledger.ledger.digest(question),
             "evidence": ["alarm-1"],
             "proposed_default": "keep_champion",
         },
     )
-    return f"esc-{number}", scmle.data.ledger.ledger.digest(question)
+    return f"esc-{number}", scmle.assurance.ledger.ledger.digest(question)
 
 
 def reply(identity, digest, key=KEY, **changes):
@@ -244,7 +244,7 @@ def test_escalation_needs_a_matching_hash_id_and_evidence():
         "phase": deployment_ledger.PHASE_OPEN,
         "id": "esc-1",
         "question": question,
-        "question_hash": scmle.data.ledger.ledger.digest(question),
+        "question_hash": scmle.assurance.ledger.ledger.digest(question),
         "evidence": [],
         "proposed_default": "d",
     }

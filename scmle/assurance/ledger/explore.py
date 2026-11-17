@@ -18,10 +18,10 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.ledger import bivariate
+from scmle.assurance.ledger import online_fdr
+import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
-from scmle.data.ledger import bivariate
-from scmle.data.ledger import online_fdr
-import scmle.data.ledger.ledger
 
 NUMERIC = "numeric"
 BINARY = "binary"
@@ -40,7 +40,7 @@ class Plan:
         target_kind: `numeric`, `binary` or `multiclass`.
     """
 
-    specs: tuple[scmle.data.ledger.ledger.Test, ...]
+    specs: tuple[scmle.assurance.ledger.ledger.Test, ...]
     skipped: tuple[tuple[str, str], ...]
     target_kind: str
 
@@ -137,7 +137,7 @@ def hypothesize(
             skipped.append((str(name), "constant or entirely missing"))
             continue
         specs.append(
-            scmle.data.ledger.ledger.Test.create(
+            scmle.assurance.ledger.ledger.Test.create(
                 name=f"{name}~target",
                 family=FAMILY,
                 statistic=statistic,
@@ -153,11 +153,11 @@ def hypothesize(
 
 
 def run_exploration(
-    ledger: scmle.data.ledger.ledger.Ledger,
+    ledger: scmle.assurance.ledger.ledger.Ledger,
     features: pandas.DataFrame,
     codes: pandas.Series,
     plan: Plan,
-) -> tuple[scmle.data.ledger.ledger.Outcome, ...]:
+) -> tuple[scmle.assurance.ledger.ledger.Outcome, ...]:
     """Registers every planned hypothesis, then tests them in order.
 
     Args:

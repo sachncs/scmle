@@ -16,12 +16,12 @@ import dataclasses
 from typing import Any
 from typing import Self
 
+from scmle.assurance.ledger import budget
+from scmle.assurance.ledger import confirm
+from scmle.assurance.ledger import online_fdr
+import scmle.assurance.ledger.online_fdr
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.ledger import budget
-from scmle.data.ledger import confirm
-from scmle.data.ledger import online_fdr
-import scmle.data.ledger.online_fdr
 
 DEFAULT_S_MIN = 0.8
 DEFAULT_BAND = 0.5
@@ -48,7 +48,7 @@ class Procedure:
         q_min: Stability rule, smallest share of intervals excluding zero.
     """
 
-    ledger_rule: str = scmle.data.ledger.online_fdr.ELOND
+    ledger_rule: str = scmle.assurance.ledger.online_fdr.ELOND
     confirmation_rule: str = budget.Correction.BY.value
     failure_policy: str = confirm.UNCONFIRMED
     stability_filter: bool = False

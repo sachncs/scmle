@@ -213,7 +213,7 @@ def stratum(path: str) -> str:
     """The stratum of a module.
 
     Args:
-        path: Module path such as `scmle/data/ledger/budget.py`.
+        path: Module path such as `scmle/assurance/ledger/budget.py`.
 
     Returns:
         The top-level package, or `root` for a file directly in `scmle/`.

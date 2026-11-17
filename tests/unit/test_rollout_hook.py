@@ -13,8 +13,8 @@ from test_lifecycle_extras import APPROVAL_KEY
 from test_lifecycle_extras import bundle_of
 from test_lifecycle_extras import sanction
 
+from scmle.assurance.ledger import budget
 from scmle.contracts import errors
-from scmle.data.ledger import budget
 from scmle.decision import rollout
 from scmle.governance import deployment_ledger
 from scmle.governance import lifecycle

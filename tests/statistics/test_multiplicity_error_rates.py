@@ -1,8 +1,8 @@
 """Family-wise error and false discovery rate of the repository's rules.
 
-`scmle.data.ledger.multiplicity` (Holm, Bonferroni, Benjamini-Hochberg,
+`scmle.assurance.ledger.multiplicity` (Holm, Bonferroni, Benjamini-Hochberg,
 Benjamini-Yekutieli), `scmle.evaluation.coverage.stepdown` and the
-online rules in `scmle.data.ledger.online_fdr` (e-LOND, LORD++, SAFFRON) are
+online rules in `scmle.assurance.ledger.online_fdr` (e-LOND, LORD++, SAFFRON) are
 run on p-values simulated from a known truth. Under the global null the
 family-wise error and the false discovery rate both equal the probability of
 any rejection, which must not exceed alpha = 0.05 by more than 3.5 binomial
@@ -17,9 +17,9 @@ import numpy
 from scipy import stats
 import support_statistics
 
-from scmle.data.ledger import budget
-from scmle.data.ledger import multiplicity
-from scmle.data.ledger import online_fdr
+from scmle.assurance.ledger import budget
+from scmle.assurance.ledger import multiplicity
+from scmle.assurance.ledger import online_fdr
 from scmle.evaluation import coverage
 
 ALPHA = 0.05

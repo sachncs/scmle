@@ -8,7 +8,7 @@ from hypothesis import settings
 from hypothesis import strategies
 import pytest
 
-import scmle.data.ledger.budget
+import scmle.assurance.ledger.budget
 
 SETTINGS = settings(
     max_examples=60,
@@ -28,13 +28,15 @@ horizons = strategies.one_of(
 def test_assigned_levels_never_exceed_the_promotion_level(
     alpha, horizon, count
 ):
-    budget = scmle.data.ledger.budget.DecisionBudget(
+    budget = scmle.assurance.ledger.budget.DecisionBudget(
         alpha, Fraction(1, 100), horizon
     )
     for index in range(count):
         try:
-            budget, level = scmle.data.ledger.budget.enroll(budget, f"e{index}")
-        except scmle.data.ledger.budget.ExhaustedError:
+            budget, level = scmle.assurance.ledger.budget.enroll(
+                budget, f"e{index}"
+            )
+        except scmle.assurance.ledger.budget.ExhaustedError:
             break
         assert level > 0
         assert budget.spent <= alpha
@@ -44,35 +46,43 @@ def test_assigned_levels_never_exceed_the_promotion_level(
 @SETTINGS
 @given(alphas, strategies.integers(min_value=1, max_value=50))
 def test_the_open_ended_discount_sums_to_a_closed_form(alpha, count):
-    budget = scmle.data.ledger.budget.DecisionBudget(alpha, Fraction(1, 100))
+    budget = scmle.assurance.ledger.budget.DecisionBudget(
+        alpha, Fraction(1, 100)
+    )
     for index in range(count):
-        budget, ignored = scmle.data.ledger.budget.enroll(budget, f"e{index}")
+        budget, ignored = scmle.assurance.ledger.budget.enroll(
+            budget, f"e{index}"
+        )
     assert budget.spent == alpha * Fraction(count, count + 1)
 
 
 @SETTINGS
 @given(alphas, strategies.integers(min_value=1, max_value=30))
 def test_a_round_trip_keeps_every_level_bit_for_bit(alpha, count):
-    budget = scmle.data.ledger.budget.DecisionBudget(
+    budget = scmle.assurance.ledger.budget.DecisionBudget(
         alpha, Fraction(1, 100), horizon=30
     )
     for index in range(count):
-        budget, ignored = scmle.data.ledger.budget.enroll(budget, f"e{index}")
-    budget, ignored = scmle.data.ledger.budget.start_rollback_monitor(
+        budget, ignored = scmle.assurance.ledger.budget.enroll(
+            budget, f"e{index}"
+        )
+    budget, ignored = scmle.assurance.ledger.budget.start_rollback_monitor(
         budget, "champion"
     )
     assert (
-        scmle.data.ledger.budget.DecisionBudget.from_dict(budget.to_dict())
+        scmle.assurance.ledger.budget.DecisionBudget.from_dict(budget.to_dict())
         == budget
     )
 
 
 def test_a_horizon_budget_is_exhausted_after_horizon_experiments():
-    budget = scmle.data.ledger.budget.DecisionBudget(
+    budget = scmle.assurance.ledger.budget.DecisionBudget(
         Fraction(1, 50), Fraction(1, 100), horizon=3
     )
     for index in range(3):
-        budget, ignored = scmle.data.ledger.budget.enroll(budget, f"e{index}")
+        budget, ignored = scmle.assurance.ledger.budget.enroll(
+            budget, f"e{index}"
+        )
     assert budget.spent == Fraction(1, 50)
-    with pytest.raises(scmle.data.ledger.budget.ExhaustedError):
-        scmle.data.ledger.budget.enroll(budget, "e3")
+    with pytest.raises(scmle.assurance.ledger.budget.ExhaustedError):
+        scmle.assurance.ledger.budget.enroll(budget, "e3")

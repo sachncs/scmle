@@ -68,6 +68,7 @@ import numpy
 import pandas
 
 from benchmarks.qualification import f10_generators
+from scmle.assurance.ledger import budget
 import scmle.certificates
 import scmle.data.admissibility.dag
 from scmle.data.charter import causal
@@ -82,7 +83,6 @@ from scmle.data.identification import run
 from scmle.data.identification import select
 from scmle.data.identification import sensitivity
 from scmle.data.identification import synth
-from scmle.data.ledger import budget
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f10_certificates.json"
 DEV_SEED_BASE = 10_000

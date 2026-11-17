@@ -4,10 +4,10 @@ import json
 
 import pytest
 
+from scmle.assurance.ledger import confirm
+from scmle.assurance.ledger import governed
+from scmle.assurance.ledger import usage
 from scmle.contracts import errors
-from scmle.data.ledger import confirm
-from scmle.data.ledger import governed
-from scmle.data.ledger import usage
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_ledger_governed import build
 from tests.unit.test_ledger_governed import locate

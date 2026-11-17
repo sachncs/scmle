@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from scmle.assurance.ledger import multiplicity
 import scmle.certificates
 from scmle.data.detectors import certificates
 from scmle.data.identification import aipw
@@ -25,7 +26,6 @@ from scmle.data.identification import select
 from scmle.data.identification import sensitivity
 from scmle.data.identification import synth
 from scmle.data.identification import tier
-from scmle.data.ledger import multiplicity
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f10_certificates.json"
 METHOD_SOURCES: dict[str, list[Any]] = {

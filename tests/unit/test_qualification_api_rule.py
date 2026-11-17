@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 
 import scmle
+from scmle.assurance.ledger import budget
 from scmle.contracts import qualification
-from scmle.data.ledger import budget
 from scmle.runtime import randomness
 from scripts import check_api_compatibility
 

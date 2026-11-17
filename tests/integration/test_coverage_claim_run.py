@@ -7,7 +7,7 @@ import support
 from test_decision_reports_run import run
 
 from scmle.artifacts import claims_audit
-from scmle.data.ledger import ledger
+from scmle.assurance.ledger import ledger
 
 
 def read(folder, name):

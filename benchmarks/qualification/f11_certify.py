@@ -161,6 +161,7 @@ import scipy.stats
 
 from benchmarks.qualification import f11_generators
 from scmle.artifacts import bundle
+import scmle.assurance.ledger.budget
 import scmle.certificates
 from scmle.contracts import tasks
 import scmle.contracts.data
@@ -168,7 +169,6 @@ from scmle.data.charter import feasibility
 import scmle.data.charter.decision
 from scmle.data.detectors import certificates
 from scmle.data.framing import costs
-import scmle.data.ledger.budget
 from scmle.decision import anytime
 from scmle.decision import constraints
 from scmle.decision import design
@@ -1256,8 +1256,8 @@ def plan_for(
         delta_min=delta_min,
         tolerance=tolerance,
         n_max=n_max,
-        alpha_promote=scmle.data.ledger.budget.exact(ALPHA_PROMOTE, "a"),
-        alpha_rollback=scmle.data.ledger.budget.exact(ALPHA_ROLLBACK, "a"),
+        alpha_promote=scmle.assurance.ledger.budget.exact(ALPHA_PROMOTE, "a"),
+        alpha_rollback=scmle.assurance.ledger.budget.exact(ALPHA_ROLLBACK, "a"),
         guardrails=guardrails,
     )
 
@@ -1610,7 +1610,7 @@ def gate_b5(runs: int, base: int = 0) -> dict[str, Any]:
     rng = rng_for(base, "b5", 0)
     violations = 0
     for _ in range(runs):
-        alpha = scmle.data.ledger.budget.exact(
+        alpha = scmle.assurance.ledger.budget.exact(
             float(rng.integers(1, 100)) / 1000, "a"
         )
         horizon = (
@@ -1618,28 +1618,28 @@ def gate_b5(runs: int, base: int = 0) -> dict[str, Any]:
             if rng.random() < OPEN_HORIZON_SHARE
             else int(rng.integers(1, 30))
         )
-        budget = scmle.data.ledger.budget.DecisionBudget(
-            alpha, scmle.data.ledger.budget.exact(0.01, "b"), horizon
+        budget = scmle.assurance.ledger.budget.DecisionBudget(
+            alpha, scmle.assurance.ledger.budget.exact(0.01, "b"), horizon
         )
         total = Fraction(0)
         for index in range(int(rng.integers(0, 40))):
             try:
-                budget, level = scmle.data.ledger.budget.enroll(
+                budget, level = scmle.assurance.ledger.budget.enroll(
                     budget, f"e{index}"
                 )
-            except scmle.data.ledger.budget.ExhaustedError:
+            except scmle.assurance.ledger.budget.ExhaustedError:
                 break
             total += level
         if budget.spent != total or total > alpha:
             violations += 1
         try:
-            scmle.data.ledger.budget.enroll(
+            scmle.assurance.ledger.budget.enroll(
                 budget, "overspend", alpha - budget.spent + 1
             )
             violations += 1
-        except scmle.data.ledger.budget.ExhaustedError:
+        except scmle.assurance.ledger.budget.ExhaustedError:
             pass
-        rebuilt = scmle.data.ledger.budget.DecisionBudget.from_dict(
+        rebuilt = scmle.assurance.ledger.budget.DecisionBudget.from_dict(
             json.loads(json.dumps(budget.to_dict()))
         )
         if rebuilt != budget:
@@ -2235,8 +2235,8 @@ def sources() -> dict[str, list[Any]]:
             gate_b4,
         ],
         "B5": [
-            scmle.data.ledger.budget.enroll,
-            scmle.data.ledger.budget.DecisionBudget,
+            scmle.assurance.ledger.budget.enroll,
+            scmle.assurance.ledger.budget.DecisionBudget,
             gate_b5,
         ],
         "B6": [design.srm_log_bayes_factor, design.mismatch, gate_b6],

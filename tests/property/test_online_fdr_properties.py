@@ -8,7 +8,7 @@ from hypothesis import settings
 from hypothesis import strategies
 import pytest
 
-from scmle.data.ledger import online_fdr
+from scmle.assurance.ledger import online_fdr
 
 SETTINGS = settings(
     max_examples=80,

@@ -1,6 +1,6 @@
-# Mutation survivors in `scmle/data/ledger/budget.py`
+# Mutation survivors in `scmle/assurance/ledger/budget.py`
 
-mutmut 3.x, scope `scmle.data.ledger.budget*`, tests
+mutmut 3.x, scope `scmle.assurance.ledger.budget*`, tests
 `tests/unit/test_error_budget.py` and
 `tests/unit/test_error_budget_boundaries.py`: 310 mutants, 309 killed, 1
 surviving. The survivor is equivalent and is deliberately left unkilled.

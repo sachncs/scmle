@@ -7,8 +7,8 @@ import pytest
 from scipy import stats
 
 from benchmarks.qualification import oracles
-from scmle.data.ledger import budget
-from scmle.data.ledger import multiplicity
+from scmle.assurance.ledger import budget
+from scmle.assurance.ledger import multiplicity
 
 
 def test_bh_and_by_adjusted_values_match_the_frozen_scipy_oracle():

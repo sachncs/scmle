@@ -55,8 +55,8 @@ from typing import Any
 
 import numpy
 
+from scmle.assurance.ledger import online_fdr
 from scmle.contracts import errors
-from scmle.data.ledger import online_fdr
 
 GREATER = "greater"
 LESS = "less"

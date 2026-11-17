@@ -14,9 +14,9 @@ import pandas
 from scipy import stats
 import support_statistics
 
+from scmle.assurance.ledger import bivariate
 from scmle.data.admissibility import leakage
 from scmle.data.framing import baseline
-from scmle.data.ledger import bivariate
 from scmle.data.robustness import shift
 from scmle.decision import design
 from scmle.evaluation import balance

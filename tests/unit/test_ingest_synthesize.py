@@ -10,12 +10,12 @@ import pandas
 import pytest
 
 from benchmarks.qualification import ingest_checks
+from scmle.assurance.ledger import online_fdr
+import scmle.assurance.ledger.ledger
 from scmle.contracts import qualification
 from scmle.data.admissibility import provenance
 from scmle.data.ingest import asof_view
 from scmle.data.ingest import synthesize
-from scmle.data.ledger import online_fdr
-import scmle.data.ledger.ledger
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -298,7 +298,7 @@ def test_multiplicity_matches_registered_hypotheses_and_mismatch_fails():
     out = synthesize.synthesize(
         targets, "moment", [synthesize.Source(view, "cid")]
     )
-    ledger = scmle.data.ledger.ledger.Ledger.create(
+    ledger = scmle.assurance.ledger.ledger.Ledger.create(
         None,
         charter_hash="0" * 64,
         config=online_fdr.Settings("lord++", fractions.Fraction(1, 20)),

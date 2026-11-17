@@ -7,9 +7,9 @@ import scmle.data.identification
 
 FORBIDDEN = (
     "scmle.data.custody",
-    "scmle.data.ledger.confirm",
-    "scmle.data.ledger.governed",
-    "scmle.data.ledger.ledger",
+    "scmle.assurance.ledger.confirm",
+    "scmle.assurance.ledger.governed",
+    "scmle.assurance.ledger.ledger",
 )
 
 

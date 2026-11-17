@@ -98,9 +98,9 @@ from typing import Any
 from typing import ClassVar
 from typing import Self
 
+from scmle.assurance.ledger import budget
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.ledger import budget
 
 P_FLOOR = 1e-300
 DEFAULT_KAPPA = 0.5

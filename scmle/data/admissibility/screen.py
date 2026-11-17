@@ -38,7 +38,7 @@ Procedure, for every candidate column `j` (the family has `m` members):
    number plus noise) whose skill stays under the skill ceiling.
 3. Multiplicity. All `m` p-values (skill, echo and missingness tests) form one
    family adjusted by Benjamini and Yekutieli (2001, Ann. Statist. 29:1165)
-   at level `alpha`, in exact arithmetic (`scmle.data.ledger.multiplicity`).
+   at level `alpha`, exactly (`scmle.assurance.ledger.multiplicity`).
    The number of permutations is raised until the smallest reachable p-value
    `1 / (B + 1)` can pass the rank-1 threshold `alpha / (m * H_m)`; if that
    needs more than `MAX_PERMUTATIONS` the screen says so and flags nothing.
@@ -114,15 +114,15 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.assurance.ledger import budget
+from scmle.assurance.ledger import multiplicity
+import scmle.assurance.ledger.budget
 import scmle.certificates
 from scmle.contracts import errors
 from scmle.data.admissibility import leakage
 from scmle.data.admissibility import plants
 from scmle.data.detectors import certificates
 from scmle.data.detectors import trace
-from scmle.data.ledger import budget
-from scmle.data.ledger import multiplicity
-import scmle.data.ledger.budget
 from scmle.runtime import randomness
 
 DETECTOR_ID = "f4-leakage-screen"
@@ -2296,7 +2296,7 @@ def scan(
     complete = [h.statistic is None or h.drawn == total for h in pending]
     used = [p if done else 1.0 for p, done in zip(ps, complete, strict=True)]
     adjustment = multiplicity.adjust(
-        used, scmle.data.ledger.budget.Correction.BY, alpha
+        used, scmle.assurance.ledger.budget.Correction.BY, alpha
     )
     findings = []
     for k, h in enumerate(pending):

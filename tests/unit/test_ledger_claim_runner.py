@@ -2,10 +2,10 @@
 
 import pytest
 
-from scmle.data.ledger import confirm
-from scmle.data.ledger import governed
-from scmle.data.ledger import online_fdr
-import scmle.data.ledger.ledger
+from scmle.assurance.ledger import confirm
+from scmle.assurance.ledger import governed
+from scmle.assurance.ledger import online_fdr
+import scmle.assurance.ledger.ledger
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_ledger_governed import build
 from tests.unit.test_ledger_governed import locate
@@ -115,7 +115,7 @@ def test_a_crashing_runner_is_failed_and_the_family_is_still_confirmed():
 
 def new_ledger():
     charter = make_charter()
-    return scmle.data.ledger.ledger.Ledger.create(
+    return scmle.assurance.ledger.ledger.Ledger.create(
         None,
         charter_hash=charter.charter_hash,
         config=online_fdr.Settings("e-lond", 0.1),
@@ -126,7 +126,7 @@ def new_ledger():
 
 def test_a_sealed_ledger_takes_no_new_claim():
     result = go(runner([]))
-    with pytest.raises(scmle.data.ledger.ledger.LedgerError):
+    with pytest.raises(scmle.assurance.ledger.ledger.LedgerError):
         result.ledger.enroll("late", "baseline", "x", SHA)
 
 
@@ -135,7 +135,7 @@ def test_the_seal_must_state_every_registered_claim():
     ledger.enroll("c1", "baseline", "s", SHA)
     ledger.freeze()
     with pytest.raises(
-        scmle.data.ledger.ledger.LedgerError, match="registered claim"
+        scmle.assurance.ledger.ledger.LedgerError, match="registered claim"
     ):
         ledger.seal({"outcome": "x"})
 
@@ -144,7 +144,7 @@ def test_registering_twice_with_the_same_hash_is_idempotent():
     ledger = new_ledger()
     first = ledger.enroll("c1", "baseline", "s", SHA)
     assert ledger.enroll("c1", "baseline", "s", SHA) is first
-    with pytest.raises(scmle.data.ledger.ledger.LedgerError):
+    with pytest.raises(scmle.assurance.ledger.ledger.LedgerError):
         ledger.enroll("c1", "baseline", "s", "b" * 64)
 
 

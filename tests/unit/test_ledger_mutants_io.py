@@ -12,17 +12,17 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.ledger import bivariate
+from scmle.assurance.ledger import budget
+from scmle.assurance.ledger import confirm
+from scmle.assurance.ledger import controls
+from scmle.assurance.ledger import explore
+from scmle.assurance.ledger import governed
+from scmle.assurance.ledger import online_fdr
+import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.custody import sealed
-from scmle.data.ledger import bivariate
-from scmle.data.ledger import budget
-from scmle.data.ledger import confirm
-from scmle.data.ledger import controls
-from scmle.data.ledger import explore
-from scmle.data.ledger import governed
-from scmle.data.ledger import online_fdr
-import scmle.data.ledger.ledger
 from scmle.data.splitting import splitters
 from scmle.runtime import randomness
 from tests.unit.test_charter_contracts import make_charter
@@ -35,7 +35,7 @@ def raises(error, message):
 
 
 def fresh(path=None, alpha=TEN_PERCENT, rule=online_fdr.ELOND):
-    return scmle.data.ledger.ledger.Ledger.create(
+    return scmle.assurance.ledger.ledger.Ledger.create(
         path,
         charter_hash="c" * 64,
         config=online_fdr.Settings(rule, alpha),
@@ -53,7 +53,7 @@ def signal_data(rows=300, seed=0):
 
 
 def spec(column, name=None, direction=bivariate.TWO_SIDED):
-    return scmle.data.ledger.ledger.Test.create(
+    return scmle.assurance.ledger.ledger.Test.create(
         name=name or f"{column}~y",
         family="f",
         statistic="spearman",
@@ -67,7 +67,7 @@ def spec(column, name=None, direction=bivariate.TWO_SIDED):
 
 
 def test_files_are_written_with_sorted_keys_and_nested_folders(tmp_path):
-    path = tmp_path / "deep" / "er" / scmle.data.ledger.ledger.FILE_NAME
+    path = tmp_path / "deep" / "er" / scmle.assurance.ledger.ledger.FILE_NAME
     ledger = fresh(path)
     features, target = signal_data()
     ledger.test(ledger.register(spec("s")), features, target)
@@ -79,45 +79,45 @@ def test_files_are_written_with_sorted_keys_and_nested_folders(tmp_path):
 
 def test_open_creates_missing_folders_and_passes_the_horizon(tmp_path):
     charter = make_charter()
-    ledger = scmle.data.ledger.ledger.Ledger.open(
+    ledger = scmle.assurance.ledger.ledger.Ledger.open(
         tmp_path / "a" / "b", charter, horizon=4
     )
     assert ledger.config.horizon == 4
-    again = scmle.data.ledger.ledger.Ledger.open(
+    again = scmle.assurance.ledger.ledger.Ledger.open(
         tmp_path / "a" / "b", charter, horizon=4
     )
     assert again.head == ledger.head
     with raises(
-        scmle.data.ledger.ledger.LedgerError,
+        scmle.assurance.ledger.ledger.LedgerError,
         "ledger was created with a different rule",
     ):
-        scmle.data.ledger.ledger.Ledger.open(
+        scmle.assurance.ledger.ledger.Ledger.open(
             tmp_path / "a" / "b", charter, horizon=5
         )
 
 
 def test_load_checks_the_recorded_head(tmp_path):
-    path = tmp_path / scmle.data.ledger.ledger.FILE_NAME
+    path = tmp_path / scmle.assurance.ledger.ledger.FILE_NAME
     ledger = fresh(path)
     assert (
-        scmle.data.ledger.ledger.Ledger.load(path, ledger.head).head
+        scmle.assurance.ledger.ledger.Ledger.load(path, ledger.head).head
         == ledger.head
     )
     with raises(
-        scmle.data.ledger.ledger.LedgerError,
+        scmle.assurance.ledger.ledger.LedgerError,
         "ledger head does not match the recorded head: rows were removed "
         "from the end or the file was replaced",
     ):
-        scmle.data.ledger.ledger.Ledger.load(path, "0" * 64)
+        scmle.assurance.ledger.ledger.Ledger.load(path, "0" * 64)
 
 
 def rechained(rows):
-    previous = scmle.data.ledger.ledger.GENESIS
+    previous = scmle.assurance.ledger.ledger.GENESIS
     out = []
     for index, row in enumerate(rows):
         row["seq"] = index
         row["prev"] = previous
-        row["hash"] = scmle.data.ledger.ledger.digest(
+        row["hash"] = scmle.assurance.ledger.ledger.digest(
             {k: row[k] for k in ("seq", "kind", "body", "prev")}
         )
         previous = row["hash"]
@@ -133,7 +133,7 @@ def write_rows(path, rows):
 
 
 def explored_file(tmp_path, p_value=1e-6):
-    path = tmp_path / scmle.data.ledger.ledger.FILE_NAME
+    path = tmp_path / scmle.assurance.ledger.ledger.FILE_NAME
     ledger = fresh(path)
     handle = ledger.register(spec("n"))
     ledger.record(handle, bivariate.Outcome(p_value, 0.1, 0.1, 100))
@@ -144,14 +144,15 @@ def test_a_wrong_sequence_number_alone_breaks_the_chain(tmp_path):
     path = explored_file(tmp_path)
     rows = [json.loads(line) for line in path.read_text().splitlines()]
     rows[1]["seq"] = 5
-    rows[1]["hash"] = scmle.data.ledger.ledger.digest(
+    rows[1]["hash"] = scmle.assurance.ledger.ledger.digest(
         {k: rows[1][k] for k in ("seq", "kind", "body", "prev")}
     )
     write_rows(path, rows)
     with raises(
-        scmle.data.ledger.ledger.LedgerError, "ledger chain broken at row 1"
+        scmle.assurance.ledger.ledger.LedgerError,
+        "ledger chain broken at row 1",
     ):
-        scmle.data.ledger.ledger.Ledger.load(path)
+        scmle.assurance.ledger.ledger.Ledger.load(path)
 
 
 def stored_e_with_error(tmp_path, p_value, relative_error):
@@ -169,13 +170,13 @@ def stored_e_with_error(tmp_path, p_value, relative_error):
 @pytest.mark.parametrize("p_value", [1e-6, 0.5])
 def test_the_calibration_tolerance_is_one_part_in_a_trillion(tmp_path, p_value):
     inside = stored_e_with_error(tmp_path / "in", p_value, 0.5e-12)
-    scmle.data.ledger.ledger.Ledger.load(inside)
+    scmle.assurance.ledger.ledger.Ledger.load(inside)
     outside = stored_e_with_error(tmp_path / "out", p_value, 1.5e-12)
     with raises(
-        scmle.data.ledger.ledger.LedgerError,
+        scmle.assurance.ledger.ledger.LedgerError,
         "stored e-value is not the calibrated p",
     ):
-        scmle.data.ledger.ledger.Ledger.load(outside)
+        scmle.assurance.ledger.ledger.Ledger.load(outside)
 
 
 def test_a_result_row_without_a_reason_loads_with_an_empty_one(tmp_path):
@@ -183,14 +184,14 @@ def test_a_result_row_without_a_reason_loads_with_an_empty_one(tmp_path):
     rows = [json.loads(line) for line in path.read_text().splitlines()]
     del next(r for r in rows if r["kind"] == "result")["body"]["reason"]
     write_rows(path, rechained(rows))
-    loaded = scmle.data.ledger.ledger.Ledger.load(path)
+    loaded = scmle.assurance.ledger.ledger.Ledger.load(path)
     assert next(iter(loaded.results.values())).reason == ""
 
 
 def test_a_hypothesis_without_a_column_reads_the_first_one():
     features, target = signal_data()
     ledger = fresh()
-    plain = scmle.data.ledger.ledger.Test.create(
+    plain = scmle.assurance.ledger.ledger.Test.create(
         name="first", family="f", statistic="spearman", null="x"
     )
     result = ledger.test(ledger.register(plain), features, target)
@@ -417,7 +418,7 @@ def test_a_custody_log_without_entries_gives_no_head():
 def test_hypotheses_without_a_column_or_with_a_direction_run_on_c():
     features, target = signal_data(600, 1)
     ledger = fresh(None, Fraction(1, 10))
-    plain = scmle.data.ledger.ledger.Test.create(
+    plain = scmle.assurance.ledger.ledger.Test.create(
         name="first", family="f", statistic="spearman", null="x"
     )
     up = spec("s", "up", bivariate.GREATER)
@@ -651,11 +652,11 @@ def test_every_check_on_c_has_its_own_seed_index():
 def test_a_known_id_with_another_specification_is_not_registered():
     ledger = fresh()
     ledger.register(spec("s"))
-    impostor = scmle.data.ledger.ledger.Hypothesis(
+    impostor = scmle.assurance.ledger.ledger.Hypothesis(
         "h000001", spec("n", "other")
     )
     with raises(
-        scmle.data.ledger.ledger.LedgerError,
+        scmle.assurance.ledger.ledger.LedgerError,
         "hypothesis h000001 is not registered: registration must precede "
         "evaluation",
     ):
@@ -663,14 +664,14 @@ def test_a_known_id_with_another_specification_is_not_registered():
 
 
 def test_notes_reach_the_stored_reason_and_survive_a_reload(tmp_path):
-    path = tmp_path / scmle.data.ledger.ledger.FILE_NAME
+    path = tmp_path / scmle.assurance.ledger.ledger.FILE_NAME
     ledger = fresh(path)
     features, target = signal_data()
     features["flat"] = 1.0
     result = ledger.test(ledger.register(spec("flat")), features, target)
     assert result.reason == "a variable is constant"
     assert result.check.p_value == 1.0
-    again = scmle.data.ledger.ledger.Ledger.load(path)
+    again = scmle.assurance.ledger.ledger.Ledger.load(path)
     assert next(iter(again.results.values())).reason == "a variable is constant"
 
 

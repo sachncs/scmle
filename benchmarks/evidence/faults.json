@@ -1,6 +1,6 @@
 {
   "claim": "C1",
-  "code": "ad15904646c0a8308ca2826647d9f64f431a698995f8d700eb91a9ac02abed0c",
+  "code": "364f249c6c5b7f4ca6de38e94390b69479f0b2be97c9f6ccaeb31bbe5f0fc385",
   "data": "simulated tables and synthetic inputs only",
   "floor": 1.0,
   "gates": [
@@ -284,7 +284,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.01,
-      "site": "scmle.data.ledger.confirm:confirm"
+      "site": "scmle.assurance.ledger.confirm:confirm"
     },
     {
       "cause": "a second confirmation on the same ledger and sealed set",

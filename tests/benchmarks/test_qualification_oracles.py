@@ -8,9 +8,9 @@ from scipy import stats
 
 from benchmarks.qualification import make_oracles
 from benchmarks.qualification import oracles
+from scmle.assurance.ledger import budget
 from scmle.contracts import qualification
 from scmle.data.detectors import certificates
-from scmle.data.ledger import budget
 
 REL = 1e-8
 

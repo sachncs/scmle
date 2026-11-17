@@ -719,8 +719,8 @@ def multiplicity(offset: int) -> dict[str, Any]:
     """
     import fractions
 
-    from scmle.data.ledger import online_fdr
-    import scmle.data.ledger.ledger
+    from scmle.assurance.ledger import online_fdr
+    import scmle.assurance.ledger.ledger
 
     equal = 0
     mismatch_caught = 0
@@ -734,7 +734,7 @@ def multiplicity(offset: int) -> dict[str, Any]:
             [synthesize.Nest(source, items, "oid")],
             schema.lag,
         )
-        ledger = scmle.data.ledger.ledger.Ledger.create(
+        ledger = scmle.assurance.ledger.ledger.Ledger.create(
             None,
             charter_hash="0" * 64,
             config=online_fdr.Settings("lord++", fractions.Fraction(1, 20)),

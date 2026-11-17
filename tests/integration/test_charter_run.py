@@ -169,9 +169,9 @@ def test_a_charter_run_writes_the_ledger_control_and_claims(
     done = event(result.run_dir, "ledger.completed")["data"]
     claims = json.loads((folder / "confirmed_claims.json").read_text())
     assert done["ledger_head"] == claims["ledger_head"]
-    import scmle.data.ledger.ledger
+    import scmle.assurance.ledger.ledger
 
-    ledger = scmle.data.ledger.ledger.Ledger.load(
+    ledger = scmle.assurance.ledger.ledger.Ledger.load(
         folder / "hypothesis_ledger.jsonl", expected_head=done["ledger_head"]
     )
     # Only numeric features are candidates; the categorical one is skipped.
@@ -394,7 +394,7 @@ def test_a_charter_run_writes_valid_stability_and_shift_reports(
 def test_survivors_are_rerun_over_the_declared_multiverse(
     binary_frame, tmp_path
 ):
-    import scmle.data.ledger.ledger
+    import scmle.assurance.ledger.ledger
 
     path = inscribe(tmp_path, multiverse=RICH_MULTIVERSE)
     result = run(binary_frame, tmp_path, path)
@@ -402,7 +402,7 @@ def test_survivors_are_rerun_over_the_declared_multiverse(
 
     report = json.loads((folder / "stability_report.json").read_text())
     done = event(result.run_dir, "ledger.completed")["data"]
-    ledger = scmle.data.ledger.ledger.Ledger.load(
+    ledger = scmle.assurance.ledger.ledger.Ledger.load(
         folder / "hypothesis_ledger.jsonl", expected_head=done["ledger_head"]
     )
     survivors = {h.spec.column for h in ledger.survivors()}
@@ -455,8 +455,8 @@ def test_a_run_without_a_charter_has_no_robustness_reports(
 def test_chartered_rules_drive_the_ledger_and_the_second_stage(
     binary_frame, tmp_path
 ):
+    import scmle.assurance.ledger.ledger
     import scmle.data.charter.rules
-    import scmle.data.ledger.ledger
 
     rules = scmle.data.charter.rules.Procedure(
         ledger_rule="lord++", confirmation_rule="bh", stability_filter=True
@@ -468,7 +468,7 @@ def test_chartered_rules_drive_the_ledger_and_the_second_stage(
     done = event(result.run_dir, "ledger.completed")["data"]
     assert done["rules"] == "chartered"
     assert done["rule"] == "lord++" and done["withdrawn"] is not None
-    ledger = scmle.data.ledger.ledger.Ledger.load(
+    ledger = scmle.assurance.ledger.ledger.Ledger.load(
         folder / "hypothesis_ledger.jsonl", expected_head=done["ledger_head"]
     )
     assert ledger.confirmation["rule"] == "bh"

@@ -9,11 +9,11 @@ import pandas
 import pytest
 import support
 
+import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.data.charter import ingest
 from scmle.data.charter import sealing
 from scmle.data.ingest import declared
-import scmle.data.ledger.ledger
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "ingest-key"
@@ -158,8 +158,8 @@ def test_features_come_from_the_database_and_reach_the_ledger(tmp_path):
         assert (folder / name).exists()
     profile = read(result, "dataset_profile.json")["feature_plan"]
     assert set(kept) & set(profile["numeric"])
-    ledger = scmle.data.ledger.ledger.Ledger.load(
-        folder / scmle.data.ledger.ledger.FILE_NAME
+    ledger = scmle.assurance.ledger.ledger.Ledger.load(
+        folder / scmle.assurance.ledger.ledger.FILE_NAME
     )
     registered = {h.spec.column for h in ledger.hypotheses.values()}
     assert set(kept) <= registered

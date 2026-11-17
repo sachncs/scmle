@@ -7,13 +7,13 @@ import types
 import pytest
 
 from scmle.artifacts import claims_audit
+from scmle.assurance.ledger import confirm
+from scmle.assurance.ledger import governed
+import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.core import decision_reports
 from scmle.data.charter import sealing
 from scmle.data.custody import sealed
-from scmle.data.ledger import confirm
-from scmle.data.ledger import governed
-import scmle.data.ledger.ledger
 from scmle.data.splitting import splitters
 from scmle.evaluation import coverage_confirm
 from scmle.evaluation import coverage_run
@@ -576,7 +576,7 @@ def stage_two_ledger():
 
 def stage_two_document(**changes):
     family = ["h1", "h2"]
-    digest = scmle.data.ledger.ledger.digest(
+    digest = scmle.assurance.ledger.ledger.digest(
         {"survivors_sha256": "s", "family": family}
     )
     document = {
@@ -835,7 +835,7 @@ def claim_registration(folder, claim, registrations=1):
     (folder / coverage_run.CLAIM_FILE).write_text(
         json.dumps(claim), encoding="utf-8"
     )
-    digest = scmle.data.ledger.ledger.digest(claim)
+    digest = scmle.assurance.ledger.ledger.digest(claim)
     events = [
         ("final_test", coverage_run.REGISTRATION_EVENT, {"sha256": digest})
     ] * registrations
@@ -957,9 +957,9 @@ def test_verify_reports_the_chain_step_exactly(run, tmp_path):
     )
     empty = tmp_path / "empty"
     empty.mkdir()
-    with pytest.raises(scmle.data.ledger.ledger.LedgerError) as caught:
-        scmle.data.ledger.ledger.Ledger.load(
-            empty / scmle.data.ledger.ledger.FILE_NAME
+    with pytest.raises(scmle.assurance.ledger.ledger.LedgerError) as caught:
+        scmle.assurance.ledger.ledger.Ledger.load(
+            empty / scmle.assurance.ledger.ledger.FILE_NAME
         )
     assert claims_audit.verify(empty, KEY) == claims_audit.Verification(
         str(empty), (finding(CHAIN, "fail", str(caught.value)),)

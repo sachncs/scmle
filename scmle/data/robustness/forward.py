@@ -32,8 +32,8 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.ledger import confirm
 from scmle.contracts import qualification
-from scmle.data.ledger import confirm
 from scmle.data.robustness import stability
 from scmle.runtime import randomness
 

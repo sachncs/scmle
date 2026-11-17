@@ -29,6 +29,8 @@ jobs:
             patterns: "benchmarks.*"
           - name: data
             patterns: "scmle.data.*"
+          - name: assurance
+            patterns: "scmle.assurance.*"
           - name: evaluation
             patterns: "scmle.evaluation.*"
           - name: rest

@@ -401,7 +401,7 @@ def test_a_deployment_row_of_the_wrong_kind_is_a_broken_chain(tmp_path):
     # ERR-20: the body check now raises KindError, an InputError; the
     # ledger turns it into its own MisuseError as it did the TypeError, so
     # the handler's behaviour is unchanged and the row stays a finding.
-    from scmle.data.ledger import ledger
+    from scmle.assurance.ledger import ledger
 
     content = {"seq": 0, "kind": "open", "body": [1], "prev": ledger.GENESIS}
     row = dict(content, hash=ledger.digest(content))

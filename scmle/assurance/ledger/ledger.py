@@ -59,13 +59,13 @@ from typing import Any
 
 import pandas
 
+from scmle.assurance.ledger import bivariate
+from scmle.assurance.ledger import online_fdr
+import scmle.assurance.ledger.online_fdr
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.contracts import signing
 import scmle.contracts.evidence
-from scmle.data.ledger import bivariate
-from scmle.data.ledger import online_fdr
-import scmle.data.ledger.online_fdr
 from scmle.runtime import randomness
 
 GENESIS = "0" * 64
@@ -432,7 +432,7 @@ class Ledger:
         cls,
         run_dir: str | Path,
         charter: Any,
-        rule: str = scmle.data.ledger.online_fdr.ELOND,
+        rule: str = scmle.assurance.ledger.online_fdr.ELOND,
         horizon: int | None = None,
     ) -> "Ledger":
         """Opens the run's ledger, creating it on first use.

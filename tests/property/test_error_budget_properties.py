@@ -9,7 +9,7 @@ from hypothesis import settings
 from hypothesis import strategies
 import pytest
 
-import scmle.data.ledger.budget
+import scmle.assurance.ledger.budget
 
 SETTINGS = settings(
     max_examples=60,
@@ -22,16 +22,16 @@ alphas = strategies.fractions(
 )
 wealths = strategies.fractions(min_value=0, max_value=1, max_denominator=1000)
 amounts = strategies.fractions(min_value=0, max_value=1, max_denominator=1000)
-rules = strategies.sampled_from(list(scmle.data.ledger.budget.Correction))
+rules = strategies.sampled_from(list(scmle.assurance.ledger.budget.Correction))
 
 
 def budget_from(alpha, wealth):
-    return scmle.data.ledger.budget.ErrorBudget(
-        confirmation=scmle.data.ledger.budget.ConfirmationBudget(alpha),
-        exploration=scmle.data.ledger.budget.ExplorationBudget(
+    return scmle.assurance.ledger.budget.ErrorBudget(
+        confirmation=scmle.assurance.ledger.budget.ConfirmationBudget(alpha),
+        exploration=scmle.assurance.ledger.budget.ExplorationBudget(
             initial=wealth, wealth=wealth
         ),
-        permutations_b=scmle.data.ledger.budget.MIN_PERMUTATIONS,
+        permutations_b=scmle.assurance.ledger.budget.MIN_PERMUTATIONS,
         detector_tolerances=(),
     )
 
@@ -45,8 +45,8 @@ def test_wealth_never_goes_negative_and_spending_is_conserved(
     accepted = Fraction(0)
     for amount in attempts:
         try:
-            budget = scmle.data.ledger.budget.spend(budget, amount)
-        except scmle.data.ledger.budget.ExhaustedError:
+            budget = scmle.assurance.ledger.budget.spend(budget, amount)
+        except scmle.assurance.ledger.budget.ExhaustedError:
             assert amount > budget.exploration.wealth
             continue
         accepted += amount
@@ -65,7 +65,7 @@ def test_spend_is_order_independent(alpha, parts):
     for order in itertools.permutations(parts):
         budget = budget_from(alpha, Fraction(1))
         for amount in order:
-            budget = scmle.data.ledger.budget.spend(budget, amount)
+            budget = scmle.assurance.ledger.budget.spend(budget, amount)
         results.add(budget)
     assert len(results) == 1
 
@@ -77,16 +77,16 @@ def test_exploration_spending_never_touches_the_confirmation_budget(
 ):
     budget = budget_from(alpha, wealth)
     before = [
-        scmle.data.ledger.budget.confirmation_alpha(budget, n, r)
+        scmle.assurance.ledger.budget.confirmation_alpha(budget, n, r)
         for n in (1, 5)
-        for r in scmle.data.ledger.budget.Correction
+        for r in scmle.assurance.ledger.budget.Correction
     ]
     if amount <= wealth:
-        budget = scmle.data.ledger.budget.spend(budget, amount)
+        budget = scmle.assurance.ledger.budget.spend(budget, amount)
     after = [
-        scmle.data.ledger.budget.confirmation_alpha(budget, n, r)
+        scmle.assurance.ledger.budget.confirmation_alpha(budget, n, r)
         for n in (1, 5)
-        for r in scmle.data.ledger.budget.Correction
+        for r in scmle.assurance.ledger.budget.Correction
     ]
     assert before == after
     assert budget.confirmation.alpha_confirm == alpha
@@ -107,7 +107,7 @@ def test_exploration_spending_never_touches_the_confirmation_budget(
 )
 def test_split_shares_sum_exactly_and_stay_valid(alpha, wealth, weights):
     budget = budget_from(alpha, wealth)
-    parts = scmle.data.ledger.budget.apportion(budget, weights)
+    parts = scmle.assurance.ledger.budget.apportion(budget, weights)
     assert sum(p.confirmation.alpha_confirm for p in parts.values()) == alpha
     assert sum(p.exploration.initial for p in parts.values()) == wealth
     assert all(
@@ -119,8 +119,8 @@ def test_split_shares_sum_exactly_and_stay_valid(alpha, wealth, weights):
 @given(alphas, strategies.integers(min_value=1, max_value=500), rules)
 def test_confirmation_alpha_is_bounded_and_decreasing_in_n(alpha, n, rule):
     budget = budget_from(alpha, Fraction(1, 10))
-    here = scmle.data.ledger.budget.confirmation_alpha(budget, n, rule)
-    more = scmle.data.ledger.budget.confirmation_alpha(budget, n + 1, rule)
+    here = scmle.assurance.ledger.budget.confirmation_alpha(budget, n, rule)
+    more = scmle.assurance.ledger.budget.confirmation_alpha(budget, n + 1, rule)
     assert 0 < more <= here <= float(alpha)
 
 
@@ -128,8 +128,8 @@ def test_confirmation_alpha_is_bounded_and_decreasing_in_n(alpha, n, rule):
 @given(alphas, strategies.integers(min_value=1, max_value=500))
 def test_bonferroni_levels_add_back_to_alpha(alpha, n):
     budget = budget_from(alpha, Fraction(1, 10))
-    level = scmle.data.ledger.budget.confirmation_alpha(
-        budget, n, scmle.data.ledger.budget.Correction.BONFERRONI
+    level = scmle.assurance.ledger.budget.confirmation_alpha(
+        budget, n, scmle.assurance.ledger.budget.Correction.BONFERRONI
     )
     assert level * n == pytest.approx(float(alpha), rel=1e-12)
 
@@ -138,11 +138,11 @@ def test_bonferroni_levels_add_back_to_alpha(alpha, n):
 @given(alphas, strategies.integers(min_value=1, max_value=500))
 def test_benjamini_yekutieli_is_never_looser_than_benjamini_hochberg(alpha, n):
     budget = budget_from(alpha, Fraction(1, 10))
-    bh = scmle.data.ledger.budget.confirmation_alpha(
-        budget, n, scmle.data.ledger.budget.Correction.BH
+    bh = scmle.assurance.ledger.budget.confirmation_alpha(
+        budget, n, scmle.assurance.ledger.budget.Correction.BH
     )
-    by = scmle.data.ledger.budget.confirmation_alpha(
-        budget, n, scmle.data.ledger.budget.Correction.BY
+    by = scmle.assurance.ledger.budget.confirmation_alpha(
+        budget, n, scmle.assurance.ledger.budget.Correction.BY
     )
     assert by <= bh
 
@@ -153,8 +153,8 @@ def test_serialization_round_trips_exactly(alpha, wealth, attempts):
     budget = budget_from(alpha, wealth)
     for amount in attempts:
         if amount <= budget.exploration.wealth:
-            budget = scmle.data.ledger.budget.spend(budget, amount)
+            budget = scmle.assurance.ledger.budget.spend(budget, amount)
     assert (
-        scmle.data.ledger.budget.ErrorBudget.from_dict(budget.to_dict())
+        scmle.assurance.ledger.budget.ErrorBudget.from_dict(budget.to_dict())
         == budget
     )

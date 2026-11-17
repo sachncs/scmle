@@ -6,9 +6,9 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.ledger import budget
 from scmle.data.charter import causal
 from scmle.data.identification import run
-from scmle.data.ledger import budget
 
 BUDGET = budget.ErrorBudget.create(0.05, 0.1)
 COVARIATES = "unconfoundedness_given:a,b"

@@ -106,11 +106,11 @@ override = "none"
 variables = ["reconcile", "delta_rec"]
 
 [confirm.single_use]
-site = "scmle.data.ledger.confirm:confirm"
+site = "scmle.assurance.ledger.confirm:confirm"
 error = "LeakageError"
 claim = "C2, C3"
 passes = "The ledger has no confirmation recorded yet, and no other run in the registry spent this charter's confirmation set on this data."
-blocks = "ledger.confirmation is not None, so the confirmation was already performed; or the usage register (scmle/data/ledger/usage.py) records that another run of the same charter already spent the confirmation set on the same data; the attempt is logged as denied; a LeakageError from opening the set also propagates."
+blocks = "ledger.confirmation is not None, so the confirmation was already performed; or the usage register (scmle/assurance/ledger/usage.py) records that another run of the same charter already spent the confirmation set on the same data; the attempt is logged as denied; a LeakageError from opening the set also propagates."
 override = "none"
 variables = []
 

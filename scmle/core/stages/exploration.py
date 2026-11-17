@@ -3,6 +3,9 @@
 import dataclasses
 from typing import Any
 
+from scmle.assurance.ledger import confirm
+from scmle.assurance.ledger import governed
+import scmle.assurance.ledger.budget
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.core import causal_claim
@@ -13,9 +16,6 @@ from scmle.data.admissibility import qualify
 from scmle.data.charter import contracts
 from scmle.data.charter import sealing
 import scmle.data.framing.claim
-from scmle.data.ledger import confirm
-from scmle.data.ledger import governed
-import scmle.data.ledger.budget
 from scmle.data.robustness import prefilter
 
 
@@ -217,7 +217,7 @@ class Exploration(admission.Admission):
         run = governed.finalise(
             pending.explored,
             source=vault.sets.get("C"),
-            confirmation_rule=scmle.data.ledger.budget.Correction(
+            confirmation_rule=scmle.assurance.ledger.budget.Correction(
                 governing(
                     "confirmation_rule",
                     context.spec.confirmation_rule,

@@ -45,11 +45,11 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.ledger import ledger
 from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.data.charter import contracts
 import scmle.data.charter.decision
-from scmle.data.ledger import ledger
 from scmle.decision import constraints
 from scmle.decision import design
 from scmle.decision import ope

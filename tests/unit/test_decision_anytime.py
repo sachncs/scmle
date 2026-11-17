@@ -6,7 +6,7 @@ import math
 import numpy
 import pytest
 
-from scmle.data.ledger import online_fdr
+from scmle.assurance.ledger import online_fdr
 from scmle.decision import anytime
 
 

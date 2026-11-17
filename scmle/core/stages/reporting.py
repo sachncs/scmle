@@ -5,13 +5,13 @@ from typing import Any
 import numpy
 import pandas
 
+import scmle.assurance.ledger.ledger
 from scmle.contracts import tasks
 from scmle.core import decision_reports
 import scmle.core.context
 from scmle.core.stages import relabelling
 from scmle.core.stages import scoring
 from scmle.data.charter import sealing
-import scmle.data.ledger.ledger
 from scmle.evaluation import coverage
 from scmle.evaluation import coverage_run
 
@@ -49,7 +49,7 @@ class Reporting(relabelling.Relabelling):
         )
         if claim is None:
             return
-        sha = scmle.data.ledger.ledger.digest(claim)
+        sha = scmle.assurance.ledger.ledger.digest(claim)
         context.write_json(coverage_run.CLAIM_FILE, claim)
         context.coverage_claim_sha256 = sha
         vault = context.custody_vault

@@ -10,10 +10,10 @@ import support
 
 from scmle import cli
 from scmle.artifacts import claims_audit
+import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.data.charter import sealing
 from scmle.data.framing import costs
-import scmle.data.ledger.ledger
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "baseline-key"
@@ -81,8 +81,8 @@ def test_the_claim_is_registered_by_hash_and_tested_once_on_c(tmp_path):
     entry = claims["registered_claims"]["baseline_vs_current_process"]
     assert entry["kind"] == "baseline"
     assert entry["sha256"] == report["registration_hash"]
-    ledger = scmle.data.ledger.ledger.Ledger.load(
-        pathlib.Path(result.run_dir) / scmle.data.ledger.ledger.FILE_NAME
+    ledger = scmle.assurance.ledger.ledger.Ledger.load(
+        pathlib.Path(result.run_dir) / scmle.assurance.ledger.ledger.FILE_NAME
     )
     assert (
         ledger.claims["baseline_vs_current_process"]["sha256"]

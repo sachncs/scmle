@@ -8,12 +8,12 @@ import pytest
 
 ROOT = Path(__file__).parents[2]
 PACKAGES = (
-    "charter",
-    "custody",
-    "ledger",
-    "admissibility",
-    "detectors",
-    "robustness",
+    "scmle.data.charter",
+    "scmle.data.custody",
+    "scmle.assurance.ledger",
+    "scmle.data.admissibility",
+    "scmle.data.detectors",
+    "scmle.data.robustness",
 )
 ALLOWED_NUMPY_RANDOM = {"Generator", "SeedSequence", "BitGenerator", "PCG64"}
 
@@ -94,9 +94,8 @@ def test_scanner_accepts_keyed_generators(source):
 def test_qualification_packages_use_no_unseeded_randomness():
     problems = []
     for package in PACKAGES:
-        directory = ROOT / "scmle" / "data" / package
-        if not directory.is_dir():
-            continue
+        directory = ROOT.joinpath(*package.split("."))
+        assert directory.is_dir(), package
         for path in sorted(directory.rglob("*.py")):
             problems += [
                 f"{path.relative_to(ROOT)}: {item}"

@@ -4,6 +4,8 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.ledger import online_fdr
+import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.admissibility import qualify
@@ -11,8 +13,6 @@ from scmle.data.admissibility import screen
 import scmle.data.admissibility.dag
 import scmle.data.charter.causal
 from scmle.data.detectors import certificates
-from scmle.data.ledger import online_fdr
-import scmle.data.ledger.ledger
 from tests.unit.test_charter_contracts import make_charter
 
 
@@ -291,7 +291,7 @@ def test_structure_columns_are_not_candidates():
 
 def make_ledger(path=None):
     charter = make_charter()
-    return scmle.data.ledger.ledger.Ledger.create(
+    return scmle.assurance.ledger.ledger.Ledger.create(
         path,
         charter_hash=charter.charter_hash,
         config=online_fdr.Settings(
@@ -328,7 +328,7 @@ def test_a_diagnostic_spends_no_wealth_and_survives_reload(tmp_path):
 
     assert ledger.wealth == before
     assert not ledger.hypotheses
-    reloaded = scmle.data.ledger.ledger.Ledger.load(path)
+    reloaded = scmle.assurance.ledger.ledger.Ledger.load(path)
     assert reloaded.diagnostics == [sample_check()]
     assert reloaded.head == ledger.head
 
@@ -337,7 +337,9 @@ def test_a_diagnostic_cannot_follow_the_freeze():
     ledger = make_ledger()
     ledger.freeze()
 
-    with pytest.raises(scmle.data.ledger.ledger.LedgerError, match="frozen"):
+    with pytest.raises(
+        scmle.assurance.ledger.ledger.LedgerError, match="frozen"
+    ):
         ledger.record_diagnostic(sample_check(), "f4-leakage-skill")
 
 
@@ -346,7 +348,7 @@ def test_a_diagnostic_that_read_c_is_refused():
     check = sample_check(qualification.Subset.CONFIRMATION)
 
     with pytest.raises(
-        scmle.data.ledger.ledger.LedgerError, match="exploration"
+        scmle.assurance.ledger.ledger.LedgerError, match="exploration"
     ):
         ledger.record_diagnostic(check, "f4-leakage-skill")
 

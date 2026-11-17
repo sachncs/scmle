@@ -5,9 +5,9 @@ import json
 
 import pytest
 
+from scmle.assurance.ledger import budget
 from scmle.contracts import errors
 from scmle.data.charter import contracts
-from scmle.data.ledger import budget
 
 
 def make_charter(**overrides):

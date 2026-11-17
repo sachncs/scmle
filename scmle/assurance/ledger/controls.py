@@ -49,9 +49,9 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.assurance.ledger import budget
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.ledger import budget
 from scmle.runtime import randomness
 
 QUANTILE = 0.95

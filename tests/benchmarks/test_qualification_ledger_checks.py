@@ -8,8 +8,8 @@ from scipy import stats
 
 from benchmarks.qualification import __main__
 from benchmarks.qualification import ledger_checks
-from scmle.data.ledger import bivariate
-from scmle.data.ledger import online_fdr
+from scmle.assurance.ledger import bivariate
+from scmle.assurance.ledger import online_fdr
 
 
 def test_the_vectorized_tester_matches_the_library_test():

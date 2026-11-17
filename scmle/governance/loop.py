@@ -58,11 +58,11 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.ledger import online_fdr
+import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.contracts import signing
-from scmle.data.ledger import online_fdr
-import scmle.data.ledger.ledger
 from scmle.governance import deployment_ledger
 from scmle.governance import escalation
 from scmle.governance import never_list
@@ -793,7 +793,7 @@ class Loop:
                 "phase": deployment_ledger.PHASE_OPEN,
                 "id": identity,
                 "question": question,
-                "question_hash": scmle.data.ledger.ledger.digest(question),
+                "question_hash": scmle.assurance.ledger.ledger.digest(question),
                 "evidence": list(evidence),
                 "proposed_default": proposed_default
                 or self.policy.safe_default,

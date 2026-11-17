@@ -17,10 +17,10 @@ from fractions import Fraction
 from typing import Any
 from typing import Self
 
+import scmle.assurance.ledger.budget
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
-import scmle.data.ledger.budget
 
 BASELINES = ("treat_none", "treat_all", "incumbent")
 CRITERIA = (
@@ -421,14 +421,14 @@ class Experiment:
                 "guardrail names must be distinct from each other"
             )
 
-    def budget(self) -> scmle.data.ledger.budget.DecisionBudget:
+    def budget(self) -> scmle.assurance.ledger.budget.DecisionBudget:
         """Builds a decision budget from the rollout's levels.
 
         Returns:
             A new `DecisionBudget` with this rollout's `alpha_promote`,
             `alpha_rollback` and `horizon`.
         """
-        return scmle.data.ledger.budget.DecisionBudget(
+        return scmle.assurance.ledger.budget.DecisionBudget(
             alpha_promote=self.alpha_promote,
             alpha_rollback=self.alpha_rollback,
             horizon=self.horizon,
@@ -482,10 +482,10 @@ class Experiment:
             delta_min=record["delta_min"],
             tolerance=record["tolerance"],
             n_max=record["n_max"],
-            alpha_promote=scmle.data.ledger.budget.parse_fraction(
+            alpha_promote=scmle.assurance.ledger.budget.parse_fraction(
                 record["alpha_promote"], "alpha_promote"
             ),
-            alpha_rollback=scmle.data.ledger.budget.parse_fraction(
+            alpha_rollback=scmle.assurance.ledger.budget.parse_fraction(
                 record["alpha_rollback"], "alpha_rollback"
             ),
             low=record["low"],

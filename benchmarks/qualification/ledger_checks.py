@@ -17,7 +17,7 @@ What is measured, on worlds with known truth:
   groups or blocks is not.
 
 The p-values here come from a vectorized Spearman test (`RankTester`) that is
-checked against `scmle.data.ledger.bivariate.spearman` before use, so the
+checked against `scmle.assurance.ledger.bivariate.spearman` before use, so the
 speed does not change what is measured.
 """
 
@@ -31,9 +31,9 @@ import pandas
 from scipy import stats
 from sklearn.datasets import load_diabetes
 
-from scmle.data.ledger import bivariate
-from scmle.data.ledger import controls
-from scmle.data.ledger import online_fdr
+from scmle.assurance.ledger import bivariate
+from scmle.assurance.ledger import controls
+from scmle.assurance.ledger import online_fdr
 from scmle.runtime import randomness
 
 ALPHA = 0.05

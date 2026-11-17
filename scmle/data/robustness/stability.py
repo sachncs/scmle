@@ -51,12 +51,12 @@ from typing import Any
 import numpy
 from scipy import stats
 
+from scmle.assurance.ledger import bivariate
+from scmle.assurance.ledger import controls
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
-from scmle.data.ledger import bivariate
-from scmle.data.ledger import controls
 from scmle.data.robustness import multiverse
 from scmle.runtime import randomness
 

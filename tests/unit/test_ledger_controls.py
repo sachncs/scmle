@@ -4,7 +4,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.data.ledger import controls
+from scmle.assurance.ledger import controls
 
 
 def rng(seed=0):

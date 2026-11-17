@@ -1,6 +1,6 @@
 """The deployment ledger: a hash-chained record of the closed loop.
 
-The hypothesis ledger (`scmle.data.ledger.ledger`) closes at its
+The hypothesis ledger (`scmle.assurance.ledger.ledger`) closes at its
 confirmation, so a production loop cannot append to it. This ledger has its
 own chain, with the same row layout and hash (`ledger.digest`), and the same
 limits: it shows that nothing was edited, removed from the middle or
@@ -81,9 +81,9 @@ from pathlib import Path
 from typing import Any
 from typing import Self
 
+from scmle.assurance.ledger import ledger
 from scmle.contracts import errors
 from scmle.contracts import signing
-from scmle.data.ledger import ledger
 from scmle.monitoring import sequential_tests
 
 FILE_NAME = "deployment_ledger.jsonl"

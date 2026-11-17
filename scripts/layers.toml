@@ -34,9 +34,9 @@ layers = [
 runtime = "Process runtime: randomness, retries, limits, budgets, logs, workers."
 storage = "Object stores, store conformance and experiment stores."
 preparation = "Fold-local preprocessing, selection, sampling and task wrappers."
-assurance = "Evidence that a run is sound: ledger, charter, detectors, admissibility, custody, framing, ingest, robustness and coverage."
+assurance = "Run soundness evidence: ledger, charter, detectors, custody, coverage."
 causal = "Causal identification and causal claims."
-pipeline = "The run pipeline: context, stages, orchestrator, search, planning and profiling."
+pipeline = "The run pipeline: context, stages, orchestrator, search, planning."
 serving = "The prediction servers and the service runtime."
 rehearsal = "Operations rehearsals: the demo and the fault harnesses."
 

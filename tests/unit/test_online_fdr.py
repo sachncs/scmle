@@ -10,7 +10,7 @@ import math
 
 import pytest
 
-from scmle.data.ledger import online_fdr
+from scmle.assurance.ledger import online_fdr
 
 ALPHA = Fraction(1, 10)
 

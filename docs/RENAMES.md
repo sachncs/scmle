@@ -2913,3 +2913,4 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.models.ranking.wrapper` -> `scmle.preparation.ranking`
 - `scmle.models.survival.wrapper` -> `scmle.preparation.survival`
 - `scmle.models.uplift.wrapper` -> `scmle.preparation.uplift`
+- `scmle.data.ledger` -> `scmle.assurance.ledger`

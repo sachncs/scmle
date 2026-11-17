@@ -294,7 +294,8 @@ name = "Foundation packages import nothing else from scmle"
 type = "forbidden"
 source_modules = ["scmle.contracts", "scmle.durability", "scmle.unsupervised"]
 forbidden_modules = [
-    "scmle.api", "scmle.artifacts", "scmle.cli", "scmle.core", "scmle.data",
+    "scmle.api", "scmle.artifacts", "scmle.assurance", "scmle.cli",
+    "scmle.core", "scmle.data",
     "scmle.decision", "scmle.deploy", "scmle.evaluation", "scmle.experimentation",
     "scmle.explainability", "scmle.governance", "scmle.inference",
     "scmle.intelligence", "scmle.models", "scmle.monitoring",
@@ -326,7 +327,7 @@ layers = ["scmle.cli", "scmle.workflow", "scmle.runners | scmle.trail"]
 name = "The mutually dependent packages do not import the top of the stack"
 type = "forbidden"
 source_modules = [
-    "scmle.api", "scmle.artifacts", "scmle.core", "scmle.data",
+    "scmle.api", "scmle.artifacts", "scmle.assurance", "scmle.core", "scmle.data",
     "scmle.decision", "scmle.deploy", "scmle.evaluation",
     "scmle.experimentation", "scmle.explainability",
     "scmle.governance", "scmle.inference", "scmle.intelligence",
@@ -343,7 +344,7 @@ name = "Optimization depends only on the contracts package"
 type = "forbidden"
 source_modules = ["scmle.optimization"]
 forbidden_modules = [
-    "scmle.api", "scmle.artifacts", "scmle.core", "scmle.data",
+    "scmle.api", "scmle.artifacts", "scmle.assurance", "scmle.core", "scmle.data",
     "scmle.decision", "scmle.deploy", "scmle.evaluation",
     "scmle.experimentation", "scmle.explainability",
     "scmle.governance", "scmle.inference", "scmle.intelligence",

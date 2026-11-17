@@ -37,9 +37,9 @@ from collections.abc import Sequence
 import dataclasses
 from fractions import Fraction
 
+from scmle.assurance.ledger import budget
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.ledger import budget
 
 STATEMENTS = {
     budget.Correction.BH: (

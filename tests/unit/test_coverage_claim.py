@@ -6,8 +6,8 @@ import numpy
 import pytest
 
 from scmle.artifacts import claims_audit
+from scmle.assurance.ledger import ledger
 from scmle.data.custody import sealed
-from scmle.data.ledger import ledger
 from scmle.evaluation import coverage_run
 
 

@@ -35,9 +35,9 @@ from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 import pandas
 
+import scmle.assurance.ledger.budget
 from scmle.contracts import errors
 import scmle.data.charter.decision
-import scmle.data.ledger.budget
 from scmle.decision import design
 from scmle.decision import rollout
 from scmle.governance import deployment_ledger
@@ -54,7 +54,7 @@ class Hook:
         plan: scmle.data.charter.decision.Experiment,
         ledger: deployment_ledger.DeploymentLedger,
         *,
-        budget: scmle.data.ledger.budget.DecisionBudget | None = None,
+        budget: scmle.assurance.ledger.budget.DecisionBudget | None = None,
         log: rollout.Journal | None = None,
     ) -> None:
         """Binds the hook to a manager, a plan and a deployment ledger.
@@ -199,7 +199,7 @@ class Hook:
         challenger = self.manager.registry.resolve(
             self.manager.model, registry.CHALLENGER
         )
-        budget, level = scmle.data.ledger.budget.enroll(
+        budget, level = scmle.assurance.ledger.budget.enroll(
             self.budget, experiment_id
         )
         self.budget = budget
@@ -336,7 +336,7 @@ class Hook:
             )
         record = self.manager.elevate(approval, signing_key)
         self.champion_id = f"{self.manager.model}:v{record.version}"
-        budget, level = scmle.data.ledger.budget.start_rollback_monitor(
+        budget, level = scmle.assurance.ledger.budget.start_rollback_monitor(
             self.budget, self.champion_id
         )
         self.budget = budget

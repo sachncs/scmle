@@ -28,16 +28,16 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.ledger import budget
+from scmle.assurance.ledger import confirm
+from scmle.assurance.ledger import controls
+from scmle.assurance.ledger import explore
+from scmle.assurance.ledger import online_fdr
+from scmle.assurance.ledger import usage
+import scmle.assurance.ledger.budget
+import scmle.assurance.ledger.ledger
+import scmle.assurance.ledger.online_fdr
 from scmle.contracts import qualification
-from scmle.data.ledger import budget
-from scmle.data.ledger import confirm
-from scmle.data.ledger import controls
-from scmle.data.ledger import explore
-from scmle.data.ledger import online_fdr
-from scmle.data.ledger import usage
-import scmle.data.ledger.budget
-import scmle.data.ledger.ledger
-import scmle.data.ledger.online_fdr
 
 CONTROL_FILE = "negative_control.json"
 DEFAULT_BLOCKS = 20
@@ -55,7 +55,7 @@ class Governance:
         scope: `strata` or `global`, how the control permuted the target.
     """
 
-    ledger: scmle.data.ledger.ledger.Ledger
+    ledger: scmle.assurance.ledger.ledger.Ledger
     plan: explore.Plan
     control: controls.Control
     confirmation: confirm.Confirmation
@@ -155,7 +155,7 @@ class Explored:
             (`usage.fingerprint`), or None when nothing is recorded.
     """
 
-    ledger: scmle.data.ledger.ledger.Ledger
+    ledger: scmle.assurance.ledger.ledger.Ledger
     plan: explore.Plan
     control: controls.Control
     withdrawal: confirm.Withdrawal | None
@@ -177,14 +177,14 @@ def run_governed(
     run_dir: str | Path | None,
     exclude: tuple[str, ...] = (),
     strata: numpy.ndarray | None = None,
-    rule: str = scmle.data.ledger.online_fdr.ELOND,
+    rule: str = scmle.assurance.ledger.online_fdr.ELOND,
     confirmation_rule: budget.Correction = (
-        scmle.data.ledger.budget.Correction.BY
+        scmle.assurance.ledger.budget.Correction.BY
     ),
     policy: str = confirm.UNCONFIRMED,
     diagnostics: Sequence[tuple[str, qualification.Check]] = (),
     second_stage: Callable[
-        [Sequence[scmle.data.ledger.ledger.Hypothesis]], confirm.Withdrawal
+        [Sequence[scmle.assurance.ledger.ledger.Hypothesis]], confirm.Withdrawal
     ]
     | None = None,
     claim_runner: confirm.Docket | None = None,
@@ -252,11 +252,11 @@ def scout(
     run_dir: str | Path | None,
     exclude: tuple[str, ...] = (),
     strata: numpy.ndarray | None = None,
-    rule: str = scmle.data.ledger.online_fdr.ELOND,
+    rule: str = scmle.assurance.ledger.online_fdr.ELOND,
     policy: str = confirm.UNCONFIRMED,
     diagnostics: Sequence[tuple[str, qualification.Check]] = (),
     second_stage: Callable[
-        [Sequence[scmle.data.ledger.ledger.Hypothesis]], confirm.Withdrawal
+        [Sequence[scmle.assurance.ledger.ledger.Hypothesis]], confirm.Withdrawal
     ]
     | None = None,
 ) -> Explored:
@@ -305,7 +305,7 @@ def scout(
     )
     plan = explore.hypothesize(features, kind, exclude)
     if run_dir is None:
-        ledger = scmle.data.ledger.ledger.Ledger.create(
+        ledger = scmle.assurance.ledger.ledger.Ledger.create(
             None,
             charter_hash=charter.charter_hash,
             config=online_fdr.Settings(
@@ -315,12 +315,12 @@ def scout(
             seed=charter.seed,
         )
     else:
-        ledger = scmle.data.ledger.ledger.Ledger.open(
+        ledger = scmle.assurance.ledger.ledger.Ledger.open(
             run_dir, charter, rule=rule
         )
     config = ledger.config
     if config is None:  # pragma: no cover - open() always sets it
-        raise scmle.data.ledger.ledger.LedgerError("ledger has no rule")
+        raise scmle.assurance.ledger.ledger.LedgerError("ledger has no rule")
     if diagnostics and not ledger.diagnostics:
         for source_name, found in diagnostics:
             ledger.record_diagnostic(found, source_name)
@@ -364,7 +364,7 @@ def finalise(
     *,
     source: confirm.Source | None,
     confirmation_rule: budget.Correction = (
-        scmle.data.ledger.budget.Correction.BY
+        scmle.assurance.ledger.budget.Correction.BY
     ),
     policy: str = confirm.UNCONFIRMED,
     claim_runner: confirm.Docket | None = None,

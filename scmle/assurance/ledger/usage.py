@@ -30,7 +30,7 @@ from typing import Any
 
 import pandas
 
-import scmle.data.ledger.ledger
+import scmle.assurance.ledger.ledger
 
 FOLDER = ".confirmations"
 
@@ -65,7 +65,7 @@ def key(charter: str, data: str, rows: Any) -> str:
         The hex digest the use is recorded under.
     """
     return str(
-        scmle.data.ledger.ledger.digest(
+        scmle.assurance.ledger.ledger.digest(
             {
                 "charter_hash": charter,
                 "data": data,

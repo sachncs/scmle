@@ -55,9 +55,9 @@ from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import special
 
+from scmle.assurance.ledger import online_fdr
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.ledger import online_fdr
 
 GRID_SIZE = 14
 GRID_TOP = 0.9

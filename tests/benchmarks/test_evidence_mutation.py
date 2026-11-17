@@ -85,7 +85,7 @@ def test_allocation_is_proportional_by_largest_remainder():
 
 
 def test_strata_are_top_level_packages():
-    assert mutation.stratum("scmle/data/ledger/budget.py") == "data"
+    assert mutation.stratum("scmle/assurance/ledger/budget.py") == "data"
     assert mutation.stratum("scmle/cli.py") == "root"
 
 

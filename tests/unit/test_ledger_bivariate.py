@@ -7,7 +7,7 @@ import pytest
 from scipy import stats
 
 from benchmarks.qualification import oracles
-from scmle.data.ledger import bivariate
+from scmle.assurance.ledger import bivariate
 
 REL = 1e-8
 

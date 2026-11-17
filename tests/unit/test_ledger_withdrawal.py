@@ -7,9 +7,9 @@ import pandas
 import pytest
 from scipy import stats
 
-from scmle.data.ledger import confirm
-from scmle.data.ledger import governed
-from scmle.data.ledger import ledger
+from scmle.assurance.ledger import confirm
+from scmle.assurance.ledger import governed
+from scmle.assurance.ledger import ledger
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_ledger_governed import build
 from tests.unit.test_ledger_governed import locate

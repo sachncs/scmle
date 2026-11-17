@@ -16,7 +16,7 @@ import numpy
 from scipy import stats
 import support_statistics
 
-from scmle.data.ledger import controls
+from scmle.assurance.ledger import controls
 
 RUNS = 4000
 

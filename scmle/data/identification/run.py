@@ -28,6 +28,9 @@ from typing import cast
 import numpy
 import pandas
 
+from scmle.assurance.ledger import budget
+from scmle.assurance.ledger import multiplicity
+import scmle.assurance.ledger.budget
 from scmle.contracts import errors
 from scmle.contracts import qualification
 import scmle.data.admissibility.dag
@@ -42,9 +45,6 @@ from scmle.data.identification import sensitivity
 from scmle.data.identification import synth
 from scmle.data.identification import tier
 import scmle.data.identification.certified
-from scmle.data.ledger import budget
-from scmle.data.ledger import multiplicity
-import scmle.data.ledger.budget
 
 DOCUMENTS = (
     "identification_plan.json",
@@ -1444,7 +1444,7 @@ def stratify(
     alpha = Fraction(1.0 - level).limit_denominator(10**9)
     adjusted = multiplicity.adjust(
         [r["p_value"] for r in rows],
-        scmle.data.ledger.budget.Correction.HOLM,
+        scmle.assurance.ledger.budget.Correction.HOLM,
         alpha,
     )
     for row, p_adj, flag in zip(
@@ -1453,11 +1453,11 @@ def stratify(
         row["adjusted_p"] = p_adj
         row["rejected"] = bool(flag)
     return {
-        "rule": scmle.data.ledger.budget.Correction.HOLM.value,
+        "rule": scmle.assurance.ledger.budget.Correction.HOLM.value,
         "alpha": float(alpha),
         "family_size": len(rows),
         "statement": multiplicity.STATEMENTS[
-            scmle.data.ledger.budget.Correction.HOLM
+            scmle.assurance.ledger.budget.Correction.HOLM
         ],
         "hypotheses": rows,
         "rejected": [

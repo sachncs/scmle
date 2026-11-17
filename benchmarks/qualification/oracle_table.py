@@ -31,10 +31,10 @@ from typing import Any
 import numpy
 
 from benchmarks.qualification import oracles
+from scmle.assurance.ledger import bivariate
+from scmle.assurance.ledger import budget
+from scmle.assurance.ledger import multiplicity
 from scmle.data.detectors import certificates
-from scmle.data.ledger import bivariate
-from scmle.data.ledger import budget
-from scmle.data.ledger import multiplicity
 from scmle.evaluation import coverage
 
 FLOOR = 1e-14
@@ -150,10 +150,12 @@ WIRED: Mapping[str, Wired] = {
     "clopper_pearson": Wired(
         "scmle.evaluation.coverage.clopper_pearson", clopper
     ),
-    "spearmanr": Wired("scmle.data.ledger.bivariate.spearman", spearman),
-    "kruskal": Wired("scmle.data.ledger.bivariate.kruskal", kruskal),
-    "fdr_control": Wired("scmle.data.ledger.multiplicity.adjust", fdr),
-    "harmonic_number": Wired("scmle.data.ledger.budget.harmonic", harmonic),
+    "spearmanr": Wired("scmle.assurance.ledger.bivariate.spearman", spearman),
+    "kruskal": Wired("scmle.assurance.ledger.bivariate.kruskal", kruskal),
+    "fdr_control": Wired("scmle.assurance.ledger.multiplicity.adjust", fdr),
+    "harmonic_number": Wired(
+        "scmle.assurance.ledger.budget.harmonic", harmonic
+    ),
 }
 
 

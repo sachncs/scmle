@@ -6,10 +6,10 @@ import numpy
 import pytest
 from scipy import stats
 
+from scmle.assurance.ledger import bivariate
 from scmle.contracts import qualification
 from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
-from scmle.data.ledger import bivariate
 from scmle.data.robustness import multiverse
 from scmle.data.robustness import stability
 

@@ -4,7 +4,7 @@ import numpy
 import pandas
 from scipy import stats
 
-from scmle.data.ledger import confirm
+from scmle.assurance.ledger import confirm
 from scmle.evaluation import coverage_confirm
 from scmle.evaluation import task_gate
 

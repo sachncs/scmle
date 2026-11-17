@@ -7,6 +7,7 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.ledger import budget
 from scmle.contracts import qualification
 import scmle.data.admissibility.dag
 from scmle.data.charter import causal
@@ -21,7 +22,6 @@ from scmle.data.identification import select
 from scmle.data.identification import sensitivity
 from scmle.data.identification import synth
 from scmle.data.identification import tier
-from scmle.data.ledger import budget
 from tests.unit.test_identification_run import did_frame
 from tests.unit.test_identification_run import observational
 

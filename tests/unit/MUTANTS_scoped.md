@@ -17,7 +17,7 @@ tests give. They are a record, not a claim that the survivors are
 equivalent. The release target in the phase exit gate is 80; modules below it
 are listed.
 
-## Ledger (`scmle/data/ledger/`)
+## Ledger (`scmle/assurance/ledger/`)
 
 Tests: `test_online_fdr.py`, `test_online_fdr_properties.py`,
 `test_multiplicity.py`, `test_ledger_controls.py`, `test_ledger_bivariate.py`,

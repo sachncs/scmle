@@ -11,13 +11,13 @@ import support
 
 from scmle import cli
 from scmle.artifacts import claims_audit
+import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 import scmle.data.admissibility.dag
 from scmle.data.charter import causal
 from scmle.data.charter import sealing
 from scmle.data.identification import attest
 import scmle.data.identification.run
-import scmle.data.ledger.ledger
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "identification-key"
@@ -109,15 +109,17 @@ def test_an_identified_charter_estimates_on_the_single_opening_of_c(tmp_path):
     folder = pathlib.Path(result.run_dir)
     log = (folder / "custody_log.jsonl").read_text()
     assert log.count('"event":"open"') + log.count('"event": "open"') == 1
-    ledger = scmle.data.ledger.ledger.Ledger.load(
-        folder / scmle.data.ledger.ledger.FILE_NAME
+    ledger = scmle.assurance.ledger.ledger.Ledger.load(
+        folder / scmle.assurance.ledger.ledger.FILE_NAME
     )
     registered = ledger.claims["causal_primary_theta_zero"]
     assert registered["kind"] == "causal_primary"
     sealed = ledger.confirmation["attachments"]
     assert set(sealed) == set(scmle.data.identification.run.DOCUMENTS)
     for name, expected in sealed.items():
-        assert scmle.data.ledger.ledger.digest(read(result, name)) == expected
+        assert (
+            scmle.assurance.ledger.ledger.digest(read(result, name)) == expected
+        )
     assert ledger.confirmation["claims"] == {
         "causal_primary_theta_zero": {
             "kind": "causal_primary",
@@ -239,8 +241,8 @@ def test_subgroup_hypotheses_are_registered_and_reported_in_the_causal_files(
     registered = {}
     for name, result in (("plain", plain), ("split", split)):
         folder = pathlib.Path(result.run_dir)
-        ledger = scmle.data.ledger.ledger.Ledger.load(
-            folder / scmle.data.ledger.ledger.FILE_NAME
+        ledger = scmle.assurance.ledger.ledger.Ledger.load(
+            folder / scmle.assurance.ledger.ledger.FILE_NAME
         )
         registered[name] = ledger.claims["causal_primary_theta_zero"]["sha256"]
     assert registered["plain"] != registered["split"]

@@ -24,11 +24,11 @@ from typing import Any
 import numpy
 import pandas
 
+import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.data.admissibility import provenance
 from scmle.data.ingest import asof_view
-import scmle.data.ledger.ledger
 
 COUNT = "count"
 SUM = "sum"
@@ -753,8 +753,8 @@ def lineage(
 
 
 def enlist(
-    ledger: scmle.data.ledger.ledger.Ledger, features: Selection
-) -> list[scmle.data.ledger.ledger.Hypothesis]:
+    ledger: scmle.assurance.ledger.ledger.Ledger, features: Selection
+) -> list[scmle.assurance.ledger.ledger.Hypothesis]:
     """Registers every kept feature as a `synthesized` hypothesis.
 
     If the number registered then differs from the declared size,
@@ -769,7 +769,7 @@ def enlist(
     """
     registered = [
         ledger.register(
-            scmle.data.ledger.ledger.Test.create(
+            scmle.assurance.ledger.ledger.Test.create(
                 name=f"{entry['name']}~target",
                 family=FAMILY,
                 statistic=STATISTIC,
@@ -786,7 +786,9 @@ def enlist(
     return registered
 
 
-def plurality(declared: int, ledger: scmle.data.ledger.ledger.Ledger) -> int:
+def plurality(
+    declared: int, ledger: scmle.assurance.ledger.ledger.Ledger
+) -> int:
     """Requires the registered `synthesized` count to equal the declared one.
 
     Args:

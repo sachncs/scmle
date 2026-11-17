@@ -27,7 +27,7 @@ pinned or documented as a contract.
 The data-qualification records and helpers live below the pinned top-level API
 and are extension surfaces until promoted: `scmle.contracts.qualification`
 (`Check`, `Claim`, `Certificate`, `Tier`, `Decision`, `Subset`),
-`scmle.data.ledger.budget` (`ErrorBudget` and the budget functions) and
+`scmle.assurance.ledger.budget` (`ErrorBudget` and the budget functions) and
 `scmle.runtime.randomness` (keyed random streams). Rule: new qualification names
 are added without touching any entry in `tests/fixtures/public_api.json`, and
 a name is pinned only deliberately, with a changelog
@@ -185,7 +185,7 @@ its hash. `choose_decision_threshold` takes the threshold from the charter's
 cost model when the charter has a decision block and the task is binary, even
 if `decision.threshold_objective` is `none`; without a block it behaves as
 before. `evaluation.json` gained the keys `net_benefit` (null without a block)
-and, inside `decision`, `f11`. `scmle.data.ledger.budget` gained
+and, inside `decision`, `f11`. `scmle.assurance.ledger.budget` gained
 `DecisionBudget`, `enroll` and `start_rollback_monitor`.
 
 ## Deployment contract
