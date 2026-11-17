@@ -23,10 +23,10 @@ from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.deploy import verify
 from scmle.inference import guard
-from scmle.inference import serving
 from scmle.operations import signals
 from scmle.runtime import logs
 from scmle.security import access
+from scmle.serving import server
 
 LOGGER = logging.getLogger(__name__)
 # Set (to any non-empty value) for JSON-lines logs, as `scmle --log-json`.
@@ -76,22 +76,20 @@ def settings(environ: Mapping[str, str]) -> dict[str, Any]:
         "host": environ.get("HOST", DEFAULT_HOST),
         "port": int(number(environ, "PORT", 8000)),
         "max_request_bytes": int(
-            number(
-                environ, "SCMLE_MAX_REQUEST_BYTES", serving.MAX_REQUEST_BYTES
-            )
+            number(environ, "SCMLE_MAX_REQUEST_BYTES", server.MAX_REQUEST_BYTES)
         ),
         "max_records": int(
-            number(environ, "SCMLE_MAX_RECORDS", serving.MAX_REQUEST_RECORDS)
+            number(environ, "SCMLE_MAX_RECORDS", server.MAX_REQUEST_RECORDS)
         ),
         "max_concurrent": int(
             number(
                 environ,
                 "SCMLE_MAX_CONCURRENT",
-                serving.MAX_CONCURRENT_REQUESTS,
+                server.MAX_CONCURRENT_REQUESTS,
             )
         ),
         "scoring_timeout_seconds": number(
-            environ, "SCMLE_SCORING_TIMEOUT", serving.SCORING_TIMEOUT_SECONDS
+            environ, "SCMLE_SCORING_TIMEOUT", server.SCORING_TIMEOUT_SECONDS
         ),
         "on_null": environ.get("SCMLE_ON_NULL", "impute"),
         "on_unseen": environ.get("SCMLE_ON_UNSEEN", "report"),
@@ -169,7 +167,7 @@ def pulse(
             LOGGER.exception("could not write the signals")
 
 
-def prime(folder: pathlib.Path, environ: Mapping[str, str]) -> serving.Loader:
+def prime(folder: pathlib.Path, environ: Mapping[str, str]) -> server.Loader:
     """Builds the loader that drives the verify and load readiness steps.
 
     Args:
@@ -223,7 +221,7 @@ def run(folder: pathlib.Path, environ: Mapping[str, str]) -> None:
     """
     logs.configure(logging.INFO, structured=bool(environ.get(LOG_JSON)))
     monitor = signals.SignalMonitor()
-    adapter = serving.HttpServing(
+    adapter = server.HttpServing(
         loader=prime(folder, environ),
         monitor=monitor,
         **settings(environ),
@@ -270,4 +268,4 @@ def healthcheck(environ: Mapping[str, str]) -> int:
 if __name__ == "__main__":
     if sys.argv[1:] == ["healthcheck"]:
         sys.exit(healthcheck(os.environ))
-    sys.exit("usage: python -m scmle.deploy.runtime healthcheck")
+    sys.exit("usage: python -m scmle.serving.runtime healthcheck")

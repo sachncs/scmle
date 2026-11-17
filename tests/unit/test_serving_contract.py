@@ -17,7 +17,7 @@ import scmle.contracts.serving
 from scmle.deploy import provenance
 from scmle.inference import guard
 from scmle.inference import parity
-from scmle.inference import serving
+import scmle.serving.server
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 GOLDEN = ROOT / "deploy" / "local" / "golden"
@@ -71,7 +71,7 @@ def wait_until_settled(adapter, timeout):
 
 @pytest.fixture
 def running(bundle):
-    adapter = serving.HttpServing(bundle)
+    adapter = scmle.serving.server.HttpServing(bundle)
     adapter.start()
     yield adapter
     adapter.stop()
@@ -120,7 +120,7 @@ def test_batch_serving_shares_the_online_path(
     source = tmp_path / "records.csv"
     pandas.DataFrame(golden.records).to_csv(source, index=False)
     destination = tmp_path / "scored.csv"
-    batch = serving.Batcher(bundle)
+    batch = scmle.serving.server.Batcher(bundle)
     assert batch.score_file(source, destination, chunk_rows=3) == len(
         golden.records
     )
@@ -176,7 +176,7 @@ def test_the_artifact_digest_names_the_saved_manifest(bundle, tmp_path):
     assert provenance.bundle_digest(folder) == provenance.manifest_digest(
         loaded.info.to_dict()
     )
-    assert serving.HttpServing(loaded).artifact_digest == (
+    assert scmle.serving.server.HttpServing(loaded).artifact_digest == (
         provenance.bundle_digest(folder)
     )
 
@@ -222,7 +222,9 @@ def test_nulls_unseen_categories_and_extra_columns_are_reported_per_row(
 
 def test_policies_can_reject_nulls_and_unseen_categories(golden, bundle):
     # Enforces docs/SERVICE_SLO.md:56.
-    strict = serving.HttpServing(bundle, on_null="reject", on_unseen="reject")
+    strict = scmle.serving.server.HttpServing(
+        bundle, on_null="reject", on_unseen="reject"
+    )
     strict.start()
     try:
         clean = golden.records[:3]
@@ -239,7 +241,7 @@ def test_policies_can_reject_nulls_and_unseen_categories(golden, bundle):
     finally:
         strict.stop()
     with pytest.raises(errors.ConfigError, match="on_null"):
-        serving.HttpServing(bundle, on_null="guess")
+        scmle.serving.server.HttpServing(bundle, on_null="guess")
 
 
 def test_schema_changes_are_explicit(golden, running):
@@ -289,7 +291,9 @@ def test_the_schema_endpoint_publishes_schemas_and_limits(running):
 
 
 def test_size_and_record_limits(golden, bundle):
-    adapter = serving.HttpServing(bundle, max_request_bytes=200, max_records=2)
+    adapter = scmle.serving.server.HttpServing(
+        bundle, max_request_bytes=200, max_records=2
+    )
     adapter.start()
     try:
         url = f"{adapter.address}/predict"
@@ -323,7 +327,7 @@ class SlowGate:
 def test_concurrency_limit_answers_429_while_slots_are_busy(
     golden, bundle, monkeypatch
 ):
-    adapter = serving.HttpServing(bundle, max_concurrent=1)
+    adapter = scmle.serving.server.HttpServing(bundle, max_concurrent=1)
     gate = SlowGate()
     original = adapter.respond
 
@@ -361,7 +365,9 @@ def test_a_scoring_call_past_its_deadline_answers_504(
     golden, bundle, monkeypatch
 ):
     # Enforces docs/SERVICE_SLO.md:71.
-    adapter = serving.HttpServing(bundle, scoring_timeout_seconds=0.2)
+    adapter = scmle.serving.server.HttpServing(
+        bundle, scoring_timeout_seconds=0.2
+    )
     gate = SlowGate()
     monkeypatch.setattr(
         adapter, "respond", lambda records: gate.release.wait(5) and {}
@@ -393,7 +399,7 @@ def test_a_hung_call_makes_the_replica_unready_until_it_returns(
     # Enforces docs/SERVICE_SLO.md:71.
     # SRV-1: a timed-out call kept its worker and the lock while readiness
     # stayed true, so traffic kept arriving and queued behind it.
-    adapter = serving.HttpServing(
+    adapter = scmle.serving.server.HttpServing(
         bundle, max_concurrent=2, scoring_timeout_seconds=0.2
     )
     gate = SlowGate()
@@ -489,7 +495,7 @@ def test_readiness_follows_verify_then_load_then_warm_up(golden, bundle):
         readiness.complete(guard.Phase.LOADING)
         return bundle
 
-    adapter = serving.HttpServing(loader=loader)
+    adapter = scmle.serving.server.HttpServing(loader=loader)
     adapter.start()
     try:
         assert wait_until_settled(adapter, 20)
@@ -520,7 +526,7 @@ def test_a_failed_verification_keeps_the_service_alive_but_never_ready(
         readiness.begin(guard.Phase.VERIFYING)
         raise errors.ArtifactError("bundle signature is invalid")
 
-    adapter = serving.HttpServing(loader=loader)
+    adapter = scmle.serving.server.HttpServing(loader=loader)
     adapter.start()
     try:
         assert not wait_until_settled(adapter, 20)
@@ -553,7 +559,7 @@ def test_not_ready_while_the_loader_is_still_running(bundle):
         readiness.complete(guard.Phase.LOADING)
         return bundle
 
-    adapter = serving.HttpServing(loader=loader)
+    adapter = scmle.serving.server.HttpServing(loader=loader)
     adapter.start()
     try:
         status, body = call(f"{adapter.address}/readyz")
@@ -567,7 +573,7 @@ def test_not_ready_while_the_loader_is_still_running(bundle):
 
 
 def test_a_failing_warm_up_is_not_ready(bundle):
-    adapter = serving.HttpServing(
+    adapter = scmle.serving.server.HttpServing(
         bundle, warmup_records=[{"age": "not a number"}]
     )
     adapter.start()
@@ -603,7 +609,7 @@ def test_a_loader_input_error_shows_its_type_not_its_message():
         readiness.begin(guard.Phase.VERIFYING)
         raise errors.InputError("key file /secret/path is empty")
 
-    adapter = serving.HttpServing(loader=loader)
+    adapter = scmle.serving.server.HttpServing(loader=loader)
     adapter.start()
     try:
         assert not wait_until_settled(adapter, 20)
@@ -617,9 +623,11 @@ def test_a_loader_input_error_shows_its_type_not_its_message():
 
 def test_the_loader_and_bundle_arguments_are_exclusive(bundle):
     with pytest.raises(errors.ConfigError, match="exactly one"):
-        serving.HttpServing()
+        scmle.serving.server.HttpServing()
     with pytest.raises(errors.ConfigError, match="exactly one"):
-        serving.HttpServing(bundle, loader=lambda readiness: bundle)
+        scmle.serving.server.HttpServing(
+            bundle, loader=lambda readiness: bundle
+        )
     with pytest.raises(errors.ConfigError, match="positive"):
         guard.Admission(0, 1.0)
 
@@ -774,7 +782,7 @@ def test_a_read_only_model_scores_beside_a_hung_call(
     # SRV-1: one global lock serialized every scoring call, so a hung call
     # blocked every worker although a model without series is read-only.
     assert not bundle.schema.series
-    adapter = serving.HttpServing(bundle)
+    adapter = scmle.serving.server.HttpServing(bundle)
     gate = SlowGate()
     original = bundle.score
 

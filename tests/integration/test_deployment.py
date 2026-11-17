@@ -15,8 +15,8 @@ import scmle.api.project
 from scmle.contracts import errors
 from scmle.governance import lifecycle
 from scmle.governance import registry
-from scmle.inference import serving
 from scmle.monitoring import champion
+from scmle.serving import server
 
 APPROVAL_KEY = "promotion-review-key"
 
@@ -198,7 +198,7 @@ def test_registry_refuses_tampered_bundles(trained, tmp_path):
 
 
 def test_http_serving_predict_health_schema_and_errors(trained):
-    adapter = serving.HttpServing(trained.bundle)
+    adapter = server.HttpServing(trained.bundle)
     adapter.start()
     try:
         base = adapter.address
@@ -237,7 +237,7 @@ def test_http_serving_predict_health_schema_and_errors(trained):
 
 
 def test_http_serving_reports_diagnostics_for_messy_input(trained):
-    adapter = serving.HttpServing(trained.bundle)
+    adapter = server.HttpServing(trained.bundle)
     adapter.start()
     try:
         records = [{"a": 0.1, "b": None, "c": "never_seen", "extra": 1}]
@@ -254,15 +254,15 @@ def test_http_serving_reports_diagnostics_for_messy_input(trained):
 def test_batch_serving_scores_files(trained, tmp_path, monkeypatch):
     source = tmp_path / "in.csv"
     make_frame(40, 3).drop(columns="y").to_csv(source, index=False)
-    adapter = serving.Batcher(trained.bundle)
+    adapter = server.Batcher(trained.bundle)
     writes = []
-    real_write = serving.durability.write_atomically
+    real_write = server.durability.write_atomically
 
     def record_write(path, content):
         writes.append((path, content))
         return real_write(path, content)
 
-    monkeypatch.setattr(serving.durability, "write_atomically", record_write)
+    monkeypatch.setattr(server.durability, "write_atomically", record_write)
     destination = tmp_path / "out.csv"
     assert adapter.score_file(source, destination) == 40
     assert writes and writes[0][0] == destination

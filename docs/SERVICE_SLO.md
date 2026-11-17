@@ -1,8 +1,8 @@
 # Service contract and objectives
 
 What the generated prediction service promises, and what it does not. The
-service is the reference HTTP adapter in `scmle/inference/serving.py` (tabular)
-and `scmle/inference/modality_serving.py` (signed modality packages). It uses
+service is the reference HTTP adapter in `scmle/serving/server.py` (tabular)
+and `scmle/serving/modality.py` (signed modality packages). It uses
 only the standard library. Authentication, scopes, per-caller rate limits and
 audit are in `scmle.security` ([`TENANT_ISOLATION.md`](TENANT_ISOLATION.md));
 TLS belongs to the ingress.

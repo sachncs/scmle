@@ -13,12 +13,12 @@ import pytest
 from scmle.contracts import errors
 from scmle.data.modalities import document
 from scmle.inference import guard
-from scmle.inference import modality_serving
-import scmle.inference.modality_serving
 from scmle.pipeline import modality_lifecycle
+from scmle.serving import modality
+import scmle.serving.modality
 
 
-class DocumentDecoder(modality_serving.ModalitySampleDecoder):
+class DocumentDecoder(modality.ModalitySampleDecoder):
     """Decode the deliberately small JSON document test contract."""
 
     def decode(self, payload: object) -> tuple[document.Sample, ...]:
@@ -106,12 +106,12 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
 ):
     """A caller decoder can expose a signed modality package safely."""
     assert (
-        scmle.inference.modality_serving.ModalityHttpServing
-        is modality_serving.ModalityHttpServing
+        scmle.serving.modality.ModalityHttpServing
+        is modality.ModalityHttpServing
     )
     assert (
-        scmle.inference.modality_serving.ModalitySampleDecoder
-        is modality_serving.ModalitySampleDecoder
+        scmle.serving.modality.ModalitySampleDecoder
+        is modality.ModalitySampleDecoder
     )
     reference = adapter()
     report = modality_lifecycle.Lifecycle().run(
@@ -124,7 +124,7 @@ def test_modality_http_serving_verifies_health_schema_and_predictions(
         report.package.path,
         "serving-key",
     )
-    serving = modality_serving.ModalityHttpServing(
+    serving = modality.ModalityHttpServing(
         predictor,
         DocumentDecoder(),
         max_samples=2,
@@ -223,7 +223,7 @@ def test_release_bound_serving_publishes_verified_lifecycle_identity(tmp_path):
         "serving-key",
         lifecycle_report_path=report_path,
     )
-    serving = modality_serving.ModalityHttpServing(
+    serving = modality.ModalityHttpServing(
         predictor,
         DocumentDecoder(),
         require_lifecycle_report=True,
@@ -249,7 +249,7 @@ def test_release_bound_serving_rejects_unbound_predictor(tmp_path):
     )
 
     with pytest.raises(ValueError, match="verified lifecycle report"):
-        modality_serving.ModalityHttpServing(
+        modality.ModalityHttpServing(
             predictor,
             DocumentDecoder(),
             require_lifecycle_report=True,
@@ -282,7 +282,7 @@ def test_report_binding_rejects_tampered_lifecycle_evidence(tmp_path):
 def test_modality_http_serving_rejects_invalid_request_bounds():
     """The reference server refuses unsafe zero-sized request limits."""
     with pytest.raises(ValueError, match="request bounds"):
-        modality_serving.ModalityHttpServing(
+        modality.ModalityHttpServing(
             predictor=cast("modality_lifecycle.Predictor", None),
             decoder=DocumentDecoder(),
             max_request_bytes=0,
@@ -302,7 +302,7 @@ def test_modality_http_serving_classifies_unexpected_decoder_errors(tmp_path):
         report.package.path,
         "serving-key",
     )
-    serving = modality_serving.ModalityHttpServing(
+    serving = modality.ModalityHttpServing(
         predictor,
         ExplodingDecoder(),
     )
@@ -335,7 +335,7 @@ def test_modality_http_serving_echoes_valid_request_identity(tmp_path):
         report.package.path,
         "serving-key",
     )
-    serving = modality_serving.ModalityHttpServing(predictor, DocumentDecoder())
+    serving = modality.ModalityHttpServing(predictor, DocumentDecoder())
     serving.start()
     try:
         request = urllib.request.Request(
@@ -366,7 +366,7 @@ def test_modality_http_serving_rejects_unsafe_request_identity(
         report.package.path,
         "serving-key",
     )
-    serving = modality_serving.ModalityHttpServing(predictor, DocumentDecoder())
+    serving = modality.ModalityHttpServing(predictor, DocumentDecoder())
     serving.start()
     try:
         status, body = post(
@@ -394,7 +394,7 @@ def started_modality_service(tmp_path, limits=None):
     predictor = modality_lifecycle.Predictor.from_package(
         reference, report.package.path, "serving-key"
     )
-    service = modality_serving.ModalityHttpServing(predictor, DocumentDecoder())
+    service = modality.ModalityHttpServing(predictor, DocumentDecoder())
     if limits:
         service.admission.close()
         service.admission = guard.Admission(*limits)

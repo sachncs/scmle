@@ -380,16 +380,6 @@
         "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
       }
     },
-    "scmle.inference.modality_serving": {
-      "ModalityHttpServing": {
-        "kind": "class",
-        "signature_sha256": "530aa2774a91bf8a965f7ec0fe3c2247d2f30f6ee53256cbae3289cbb72c5d45"
-      },
-      "ModalitySampleDecoder": {
-        "kind": "class",
-        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
-      }
-    },
     "scmle.models.custom": {
       "register_estimator": {
         "kind": "callable",
@@ -702,6 +692,16 @@
       "sign_hs256": {
         "kind": "callable",
         "signature_sha256": "a2595b470c83be98251c6957c3531977742fb0bf4d0d4247b3fed996757cdb54"
+      }
+    },
+    "scmle.serving.modality": {
+      "ModalityHttpServing": {
+        "kind": "class",
+        "signature_sha256": "530aa2774a91bf8a965f7ec0fe3c2247d2f30f6ee53256cbae3289cbb72c5d45"
+      },
+      "ModalitySampleDecoder": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
       }
     },
     "scmle.storage.objectstore": {

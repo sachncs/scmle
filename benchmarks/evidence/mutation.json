@@ -589,7 +589,7 @@
         "scmle.data.readers.tabular.x\u01c1Loader\u01c1pick__mutmut_5",
         "scmle.data.readers.tabular.x\u01c1Tsv\u01c1__init____mutmut_4"
       ],
-      "files": "7c16af1ff13cbffeb4090380294056d11e73e0d17349c2fc9a824cff0a17d62e",
+      "files": "c7d98d10f11cd8cd814d5f4ba1830b596fed1f53314e20c677fafe8c79cbb535",
       "module": "scmle/data/readers/tabular.py",
       "mutants": 284,
       "not_run": 0,
@@ -1002,7 +1002,7 @@
         "scmle.inference.parity.x\u01c1Parity\u01c1to_dict__mutmut_5",
         "scmle.inference.parity.x\u01c1Tolerance\u01c1__post_init____mutmut_14"
       ],
-      "files": "014daabfdda15af89192c6a84966b1d72a417cd99abcfc983f3501a48f560689",
+      "files": "29de3b115f76de5e0863651adbeb8b1f44c08fd13107eb2d8c32b9613fa6e612",
       "module": "scmle/inference/parity.py",
       "mutants": 452,
       "not_run": 0,
@@ -1181,7 +1181,7 @@
         "scmle.monitoring.monitor.x\u01c1Watcher\u01c1performance__mutmut_90",
         "scmle.monitoring.monitor.x\u01c1Watcher\u01c1performance__mutmut_97"
       ],
-      "files": "34274e1d8b699e40a58ad5bffb56e51b8be4c63bb7096cf27421172d919d1d13",
+      "files": "df694bc99fe7563d4ef16e17d6974a643d65c272625c5cb4e6bea3930764b427",
       "module": "scmle/monitoring/monitor.py",
       "mutants": 308,
       "not_run": 0,

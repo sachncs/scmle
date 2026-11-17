@@ -13,7 +13,7 @@ import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.deploy import verify
 from scmle.inference import parity
-from scmle.inference import serving
+from scmle.serving import server
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 GOLDEN = ROOT / "deploy" / "local" / "golden"
@@ -74,7 +74,7 @@ def test_three_timeouts_in_a_row_wedge_livez_and_leave_history_alone(
     golden, bundle, monkeypatch
 ):
     """Enforces docs/SERVICE_SLO.md:71."""
-    adapter = serving.HttpServing(bundle, scoring_timeout_seconds=0.1)
+    adapter = server.HttpServing(bundle, scoring_timeout_seconds=0.1)
     adapter.start()
     remembered = []
     gates = []

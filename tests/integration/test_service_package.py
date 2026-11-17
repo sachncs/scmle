@@ -1,8 +1,10 @@
 """Any model, including ones ONNX cannot express, ships as a service."""
 
+import importlib.util
 import json
 import os
 import pathlib
+import re
 import socket
 import subprocess
 import sys
@@ -100,7 +102,11 @@ def test_the_folder_holds_everything_needed_to_run_and_rebuild(boosted):
     pins = (folder / "requirements.txt").read_text()
     assert f"scmle=={bundle.info.scmle_version}" in pins
     assert f"scikit-learn=={bundle.info.sklearn}" in pins
-    assert "python:" in (folder / "Dockerfile").read_text()
+    dockerfile = (folder / "Dockerfile").read_text()
+    assert "python:" in dockerfile
+    command = re.search(r'CMD \["python", "-m", "([\w.]+)"', dockerfile)
+    assert command
+    assert importlib.util.find_spec(command[1])
     with pytest.raises(errors.ArtifactError, match="already holds"):
         packaging.scaffold(bundle, folder)
 

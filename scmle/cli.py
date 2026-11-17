@@ -51,13 +51,13 @@ import scmle.governance.envelope
 import scmle.governance.loop
 from scmle.inference import packaging
 from scmle.inference import parity
-from scmle.inference import serving
 import scmle.inference.mapping
 import scmle.operations.controller
 from scmle.optimization import optimizers
 from scmle.runtime import config
 from scmle.runtime import logs
 from scmle.security import access
+from scmle.serving import server
 from scmle.trail import builder
 from scmle.trail import chain
 import scmle.trail.show
@@ -689,7 +689,7 @@ class Batch(Command):
             The exit status, EXIT_OK (0).
         """
         model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
-        adapter = serving.Batcher(
+        adapter = server.Batcher(
             model, on_null=args.on_null, on_unseen=args.on_unseen
         )
         rows = adapter.score_file(args.data, args.output, args.chunk_rows)
@@ -728,7 +728,7 @@ class Serve(Command):
             The exit status, EXIT_OK (0), once serving has stopped.
         """
         model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
-        adapter = serving.HttpServing(
+        adapter = server.HttpServing(
             model,
             args.host,
             args.port,

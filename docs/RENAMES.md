@@ -2941,3 +2941,6 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.data.profiling.profiler` -> `scmle.pipeline.profiler`
 - `scmle.evaluation.suite` -> `scmle.pipeline.suite`
 - `scmle.models.modality_lifecycle` -> `scmle.pipeline.modality_lifecycle`
+- `scmle.inference.serving` -> `scmle.serving.server`
+- `scmle.inference.modality_serving` -> `scmle.serving.modality`
+- `scmle.deploy.runtime` -> `scmle.serving.runtime`

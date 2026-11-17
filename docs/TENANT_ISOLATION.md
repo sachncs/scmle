@@ -1,7 +1,7 @@
 # Tenant isolation policy
 
 What "tenant" means here, what isolates tenants, and what does not. It covers
-the prediction service (`scmle.inference.serving`, `modality_serving`) behind
+the prediction service (`scmle.serving.server`, `modality_serving`) behind
 `scmle.security`. Infrastructure-level isolation (accounts, networks, storage
 permissions) belongs to wherever you host it and is not claimed here.
 

@@ -16,7 +16,6 @@ from scmle.data.splitting import splitters
 from scmle.data.validation import columns
 from scmle.evaluation import diagnostics
 from scmle.evaluation import selection
-from scmle.inference import serving
 from scmle.models import registry
 from scmle.models import thresholds
 from scmle.monitoring import monitor
@@ -28,6 +27,7 @@ from scmle.preparation import resampling
 from scmle.preparation import strategies
 from scmle.preparation import synthesis
 from scmle.runtime import scheduler
+from scmle.serving import server
 from scmle.storage import stores
 
 
@@ -70,7 +70,7 @@ def concrete_subclasses(base, *modules):
         (scheduler.Executor, [scheduler]),
         (optimizers.Optimizer, [optimizers]),
         (stores.Store, [stores]),
-        (serving.Server, [serving]),
+        (server.Server, [server]),
     ],
     ids=lambda value: getattr(value, "__name__", ""),
 )

@@ -311,7 +311,7 @@ ROOT_SURFACES = {
         "PeriodDiagnostics",
         "RegimeEstimate",
     ),
-    "scmle.inference.modality_serving": (
+    "scmle.serving.modality": (
         "ModalityHttpServing",
         "ModalitySampleDecoder",
     ),

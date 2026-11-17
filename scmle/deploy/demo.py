@@ -52,9 +52,9 @@ from scmle.governance import lifecycle
 import scmle.governance.registry
 from scmle.inference import packaging
 from scmle.inference import parity
-from scmle.inference import serving
 from scmle.monitoring import monitor
 from scmle.security import tokens
+from scmle.serving import server
 
 DEMO_SIGNING_KEY = "scmle-local-demo-signing-key-published-fixture"
 MODEL = "churn"
@@ -581,7 +581,7 @@ def compare(
                 expected - pandas.DataFrame(body["probabilities"]).to_numpy()
             ).max()
         )
-    batch = serving.Batcher(direct)
+    batch = server.Batcher(direct)
     batch_path = workdir / "batch-predictions.csv"
     batch.score_file(data / "fresh.csv", batch_path)
     scored = pandas.read_csv(batch_path)
@@ -728,7 +728,7 @@ def drill(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
     original = bundle.Bundle.load(
         workdir / "export-v1", signing_key=DEMO_SIGNING_KEY
     )
-    adapter = serving.HttpServing(restored)
+    adapter = server.HttpServing(restored)
     adapter.start()
     try:
         status, body = post_json(

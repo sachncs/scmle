@@ -10,15 +10,15 @@ import urllib.request
 import pytest
 
 from scmle.contracts import errors
-from scmle.deploy import runtime
 from scmle.deploy import verify
 from scmle.governance import deployment_ledger
 from scmle.inference import packaging
 from scmle.inference import parity
-from scmle.inference import serving
 from scmle.security import access
 from scmle.security import audit
 from scmle.security import tokens
+from scmle.serving import runtime
+from scmle.serving import server
 from tests import support_identity
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -75,7 +75,7 @@ def call(base, path, token=None, payload=None):
 def service(reference):
     clock = support_identity.Clock()
     gateway = make_gateway(clock, tenant="acme")
-    adapter = serving.HttpServing(reference, gateway=gateway)
+    adapter = server.HttpServing(reference, gateway=gateway)
     adapter.start()
     try:
         yield adapter, gateway, clock
@@ -155,7 +155,7 @@ def test_the_rate_limit_answers_429_with_retry_after(reference):
     gateway = make_gateway(
         clock, limiter=access.RateLimiter(1.0, 2, clock=ticks)
     )
-    adapter = serving.HttpServing(reference, gateway=gateway)
+    adapter = server.HttpServing(reference, gateway=gateway)
     adapter.start()
     try:
         token = bearer(clock)
@@ -177,7 +177,7 @@ def test_guessing_credentials_is_slowed(reference):
     gateway = make_gateway(
         clock, failure_limiter=access.RateLimiter(1.0, 3, clock=ticks)
     )
-    adapter = serving.HttpServing(reference, gateway=gateway)
+    adapter = server.HttpServing(reference, gateway=gateway)
     adapter.start()
     try:
         codes = [
@@ -192,7 +192,7 @@ def test_the_request_size_limit_still_applies_behind_the_gateway(
     reference,
 ):
     clock = support_identity.Clock()
-    adapter = serving.HttpServing(
+    adapter = server.HttpServing(
         reference, gateway=make_gateway(clock), max_request_bytes=64
     )
     adapter.start()
@@ -217,7 +217,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
         clock=clock,
     )
     gateway = access.Gateway(check, audit=log)
-    adapter = serving.HttpServing(reference, gateway=gateway)
+    adapter = server.HttpServing(reference, gateway=gateway)
     adapter.start()
     try:
         call(adapter.address, "/health", bearer(clock))
@@ -270,7 +270,7 @@ def test_a_failed_activation_is_audited(tmp_path):
     def failing(readiness):
         raise errors.ArtifactError("bundle is tampered with")
 
-    adapter = serving.HttpServing(loader=failing, gateway=gateway)
+    adapter = server.HttpServing(loader=failing, gateway=gateway)
     adapter.start()
     try:
         adapter.loading.join(10)
@@ -286,11 +286,11 @@ def test_no_unauthenticated_server_can_listen_beyond_loopback(reference):
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:184.
     # Enforces README.md:259.
     with pytest.raises(errors.ConfigError, match="without authentication"):
-        serving.HttpServing(reference, host="0.0.0.0")  # nosec B104
+        server.HttpServing(reference, host="0.0.0.0")  # nosec B104
     for host in ("127.0.0.1", "::1", "localhost"):
-        serving.HttpServing(reference, host=host)
+        server.HttpServing(reference, host=host)
     clock = support_identity.Clock()
-    serving.HttpServing(
+    server.HttpServing(
         reference,
         host="0.0.0.0",
         gateway=make_gateway(clock),  # nosec B104
@@ -376,8 +376,8 @@ def test_a_tampered_artifact_never_loads_in_production(reference, tmp_path):
 
 def test_the_modality_service_is_gated_the_same_way(tmp_path):
     # Enforces docs/API_STABILITY.md:209.
-    from scmle.inference import modality_serving
     from scmle.pipeline import modality_lifecycle
+    from scmle.serving import modality
     from tests.unit import test_modality_serving
 
     reference = test_modality_serving.adapter()
@@ -387,7 +387,7 @@ def test_the_modality_service_is_gated_the_same_way(tmp_path):
     predictor = modality_lifecycle.Predictor.from_package(
         reference, report.package.path, "serving-key"
     )
-    open_host = modality_serving.ModalityHttpServing(
+    open_host = modality.ModalityHttpServing(
         predictor,
         test_modality_serving.DocumentDecoder(),
         host="0.0.0.0",  # nosec B104
@@ -395,7 +395,7 @@ def test_the_modality_service_is_gated_the_same_way(tmp_path):
     with pytest.raises(errors.ConfigError, match="without authentication"):
         open_host.start()
     clock = support_identity.Clock()
-    service = modality_serving.ModalityHttpServing(
+    service = modality.ModalityHttpServing(
         predictor, test_modality_serving.DocumentDecoder()
     )
     service.protect(make_gateway(clock))

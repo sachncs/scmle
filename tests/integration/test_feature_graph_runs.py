@@ -324,10 +324,10 @@ def test_serving_remembers_records_so_the_next_single_record_sees_them(
     tmp_path,
 ):
     # Enforces docs/TUTORIAL.md:91.
-    from scmle.inference import serving
+    from scmle.serving import server
 
     result = run_series(series_frame(), tmp_path)
-    adapter = serving.Batcher(result.bundle)
+    adapter = server.Batcher(result.bundle)
     raw = series_frame().drop(columns=["y"])
     last_day = raw.day.max()
     first = raw[raw.unit == "u1"].iloc[[0]].copy()

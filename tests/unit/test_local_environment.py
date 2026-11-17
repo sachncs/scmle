@@ -17,7 +17,7 @@ from scmle.contracts import observability
 from scmle.deploy import demo
 from scmle.deploy import mocks
 from scmle.deploy import provenance
-from scmle.deploy import runtime
+from scmle.serving import runtime
 from scripts import make_demo_data
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -262,12 +262,12 @@ def test_runtime_settings_read_the_environment_and_reject_garbage():
 def test_the_container_healthcheck_follows_readiness(tmp_path):
     from scmle.artifacts import bundle
     from scmle.inference import parity
-    from scmle.inference import serving
+    from scmle.serving import server
 
     golden = parity.goldens(ROOT / "deploy" / "local" / "golden")
     folder = parity.handwrite(golden.spec).save(tmp_path / "bundle")
     model = bundle.Bundle.load(folder, trusted=True)
-    adapter = serving.HttpServing(model, port=0)
+    adapter = server.HttpServing(model, port=0)
     adapter.start()
     try:
         port = str(adapter.httpd.server_address[1])

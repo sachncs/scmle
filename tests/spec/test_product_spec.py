@@ -973,9 +973,9 @@ def test_l480_l496_inference_contract(run, frame, tmp_path):
     assert caught.value.details["missing"] == ["b"]  # structured errors
     path = tmp_path / "batch.csv"
     features.to_csv(path, index=False)
-    from scmle.inference import serving
+    from scmle.serving import server
 
-    assert serving.Batcher(result.bundle).score_file(
+    assert server.Batcher(result.bundle).score_file(
         path, tmp_path / "out.csv"
     ) == len(features)  # batch
     assert result.bundle.pipeline.predict(
@@ -1049,17 +1049,17 @@ def test_l610_l629_backlog_priorities(run):
     from scmle.evaluation import diagnostics
     from scmle.explainability import importance
     from scmle.governance import registry
-    from scmle.inference import serving
     from scmle.models import ensembles
     from scmle.monitoring import monitor
     from scmle.pipeline import knowledge
     from scmle.preparation import synthesis
+    from scmle.serving import server
 
     result = run[1]
     assert len(result.predict(make_frame().drop(columns="y"))) == len(
         make_frame()
     )  # project API and inference-ready artifact
-    assert issubclass(serving.HttpServing, serving.Server)  # serving
+    assert issubclass(server.HttpServing, server.Server)  # serving
     assert callable(registry.ModelRegistryStore.promote)  # deployment
     report = monitor.Watcher(result.bundle).assess(
         make_frame(seed=3).drop(columns="y"), make_frame(seed=3)["y"]

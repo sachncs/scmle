@@ -7,10 +7,10 @@ import urllib.request
 
 import pytest
 
-from scmle.deploy import runtime
 from scmle.inference import parity
-from scmle.inference import serving
 from scmle.operations import signals
+from scmle.serving import runtime
+from scmle.serving import server
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -42,7 +42,7 @@ def test_every_finished_request_is_recorded_with_route_status_and_time(
 ):
     bundle, golden = reference
     monitor = signals.SignalMonitor()
-    adapter = serving.HttpServing(bundle, monitor=monitor)
+    adapter = server.HttpServing(bundle, monitor=monitor)
     adapter.start()
     try:
         base = adapter.address
@@ -65,7 +65,7 @@ def test_every_finished_request_is_recorded_with_route_status_and_time(
 def test_scored_features_are_sampled_into_the_monitor(reference):
     bundle, golden = reference
     monitor = signals.SignalMonitor(signals.Window(sample_rate=1.0, seed=1))
-    adapter = serving.HttpServing(bundle, monitor=monitor)
+    adapter = server.HttpServing(bundle, monitor=monitor)
     adapter.start()
     try:
         base = adapter.address
@@ -85,7 +85,7 @@ def test_a_failing_monitor_never_breaks_serving(reference):
         def sense(self, *args):
             raise RuntimeError("monitor down")
 
-    adapter = serving.HttpServing(bundle, monitor=Broken())
+    adapter = server.HttpServing(bundle, monitor=Broken())
     adapter.start()
     try:
         base = adapter.address

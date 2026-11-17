@@ -19,9 +19,11 @@ marked `Breaking:` and listed first in their group.
   modules moved so far: `scmle.core.retry` -> `scmle.runtime.retry`,
   `scmle.data.store.objectstore` -> `scmle.storage.objectstore`,
   `scmle.api.results` -> `scmle.artifacts.results`,
-  `scmle.models.modality_lifecycle` -> `scmle.pipeline.modality_lifecycle`.
-  Logger names follow the module path, so a log filter on an old path must
-  change.
+  `scmle.models.modality_lifecycle` -> `scmle.pipeline.modality_lifecycle`,
+  `scmle.inference.modality_serving` -> `scmle.serving.modality`. A service
+  folder generated from now on runs `python -m scmle.serving.runtime`;
+  folders generated earlier pin the scmle version that built them. Logger
+  names follow the module path, so a log filter on an old path must change.
 * **Bundle format 4.** The package layering (register phase 3) moves
   modules whose classes are pickled inside a bundle, so `BUNDLE_FORMAT` goes
   from 3 to 4 and `Bundle.load` refuses a format 3 bundle with the existing

@@ -2,8 +2,8 @@
 
 import logging
 
-from scmle.inference import serving
 from scmle.runtime import logs
+from scmle.serving import server
 from tests.unit.test_serving_contract import bundle  # noqa: F401
 from tests.unit.test_serving_contract import call
 from tests.unit.test_serving_contract import golden  # noqa: F401
@@ -28,7 +28,7 @@ def test_a_failing_request_logs_its_request_id(running, golden, monkeypatch):  #
 
     monkeypatch.setattr(running, "score", broken)
     collect = Collect()
-    serving.LOGGER.addHandler(collect)
+    server.LOGGER.addHandler(collect)
     try:
         status = call(
             f"{running.address}/predict",
@@ -36,7 +36,7 @@ def test_a_failing_request_logs_its_request_id(running, golden, monkeypatch):  #
             headers={"X-Request-ID": "trace-42"},
         )[0]
     finally:
-        serving.LOGGER.removeHandler(collect)
+        server.LOGGER.removeHandler(collect)
     assert status == 500
     assert collect.records
     assert all(record.request == "trace-42" for record in collect.records)

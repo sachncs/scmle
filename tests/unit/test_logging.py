@@ -73,7 +73,7 @@ def test_the_cli_installs_the_convention_handler(package):
 
 
 def test_the_service_runtime_uses_the_convention():
-    text = (ROOT / "scmle/deploy/runtime.py").read_text(encoding="utf-8")
+    text = (ROOT / "scmle/serving/runtime.py").read_text(encoding="utf-8")
     assert "logs.configure(" in text
     assert "basicConfig" not in text
 

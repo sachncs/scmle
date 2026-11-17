@@ -33,7 +33,7 @@ SERVER = '''\
 import os
 import pathlib
 
-from scmle.deploy import runtime
+from scmle.serving import runtime
 
 if __name__ == "__main__":
     runtime.run(pathlib.Path(__file__).parent, os.environ)
@@ -67,7 +67,7 @@ USER 10001:10001
 EXPOSE 8000
 STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=10s --timeout=3s --start-period=60s --retries=3 \\
-  CMD ["python", "-m", "scmle.deploy.runtime", "healthcheck"]
+  CMD ["python", "-m", "scmle.serving.runtime", "healthcheck"]
 CMD ["python", "serve.py"]
 """
 

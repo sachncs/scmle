@@ -27,8 +27,8 @@ scmle/deploy/control.py ControlPlane lone-interface Processes and MemoryPlane im
 scmle/evaluation/replay.py predict getter public API: Run and Predictor methods pinned in tests/fixtures/public_api.json and shown in the README; scikit-learn estimator interface elsewhere
 scmle/evaluation/selection.py Selector lone-interface documented extension point (README, docs/ARCHITECTURE.md, website)
 scmle/assurance/custody/vault.py mint getter member of the Source protocol, satisfied by splitters and the vault
-scmle/inference/modality_serving.py ModalitySampleDecoder lone-interface test double, in __all__ and pinned in the public API
-scmle/inference/serving.py Observer lone-interface test doubles in test_service_signals
+scmle/serving/modality.py ModalitySampleDecoder lone-interface test double, in __all__ and pinned in the public API
+scmle/serving/server.py Observer lone-interface test doubles in test_service_signals
 scmle/models/deeplearning/jepa_engine.py load_state_dict passthrough mirrors the torch module interface the engines call
 scmle/models/ensembles.py predict_proba passthrough public API or scikit-learn estimator interface
 scmle/pipeline/modality_lifecycle/curators.py remarks getter adapter hook documented on the website extensions page
