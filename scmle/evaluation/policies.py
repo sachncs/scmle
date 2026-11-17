@@ -61,24 +61,32 @@ def derive(
             name=name,
             direction=direction,
         )
-        gates.append(evaluation.Hurdle(name, direction, float(threshold)))
+        gates.append(
+            evaluation.Hurdle(
+                metric=name, direction=direction, threshold=float(threshold)
+            )
+        )
     evidence_ref = "diagnostics/metric_uncertainty.json"
     return evaluation.Criteria(
         task=task,
         primary_metric=primary_metric,
         metrics=tuple(declarations.values()),
-        uncertainty=evaluation.Uncertainty(evaluation.UncertaintyMethod.NONE),
-        calibration=evaluation.Calibration(evaluation.Procedure.NONE),
-        fairness=evaluation.Fairness(evaluation.Technique.NONE),
+        uncertainty=evaluation.Uncertainty(
+            method=evaluation.UncertaintyMethod.NONE
+        ),
+        calibration=evaluation.Calibration(method=evaluation.Procedure.NONE),
+        fairness=evaluation.Fairness(method=evaluation.Technique.NONE),
         small_groups=evaluation.Subgroups(warning_threshold=30),
-        explanations=evaluation.Explanations(evaluation.Explicability.NONE),
+        explanations=evaluation.Explanations(
+            availability=evaluation.Explicability.NONE
+        ),
         release=evaluation.Gates(
             metric_gates=tuple(gates),
             diagnostic_gates=(
                 evaluation.Requirement(
-                    "metric_uncertainty",
-                    evaluation.Remedy.BLOCK,
-                    (evidence_ref,),
+                    name="metric_uncertainty",
+                    action=evaluation.Remedy.BLOCK,
+                    required_evidence=(evidence_ref,),
                 ),
             ),
             required_evidence=(
