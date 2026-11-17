@@ -808,7 +808,7 @@ def custody(fault: str) -> None:
     folder = Path(tempfile.mkdtemp(prefix="faults-"))
     record = journal.Journal(folder / "custody" / "run_x.jsonl", "run_x")
     record.start("hash")
-    record.decide("PLANNING", False, "alice", "no")
+    record.decide("PLANNING", approved=False, reviewer="alice", reason="no")
     if fault == "opened":
         record.witness()
     if fault == "edited":
