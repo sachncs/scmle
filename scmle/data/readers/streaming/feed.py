@@ -44,19 +44,19 @@ def align(
     if (
         checkpoint is not None
         and current.offset > 0
-        and current.watermark_column != watermark_column
+        and current.column != watermark_column
     ):
         raise failure.StreamingError(
             "watermark_mismatch",
             "watermark column does not match the checkpoint",
             identity,
             {
-                "checkpoint_watermark_column": current.watermark_column,
+                "checkpoint_watermark_column": current.column,
                 "requested_watermark_column": watermark_column,
             },
         )
     return (
-        current.watermark_column
+        current.column
         if checkpoint is not None and current.offset > 0
         else watermark_column
     )
@@ -272,7 +272,7 @@ class Feed(abc.ABC):
         )
         next_checkpoint = progress.Checkpoint(
             identity,
-            observed_snapshot,
+            {"snapshot": observed_snapshot},
             current.offset + len(selected),
             next_watermark,
             effective_watermark_column,
@@ -305,21 +305,23 @@ class Feed(abc.ABC):
         """
         identity = self.source_identity()
         if checkpoint is None:
-            return progress.Checkpoint(identity, snapshot)
-        if checkpoint.source_identity != identity:
+            return progress.Checkpoint(identity, {"snapshot": snapshot})
+        if checkpoint.source != identity:
             raise failure.StreamingError(
                 "checkpoint_source_mismatch",
                 "checkpoint belongs to another streaming source",
                 identity,
-                {"checkpoint_source_identity": checkpoint.source_identity},
+                {"checkpoint_source_identity": checkpoint.source},
             )
-        if checkpoint.snapshot_sha256 != snapshot:
+        if checkpoint.digests["snapshot"] != snapshot:
             raise failure.StreamingError(
                 "source_snapshot_changed",
                 "source snapshot does not match the checkpoint",
                 identity,
                 {
-                    "checkpoint_snapshot_sha256": checkpoint.snapshot_sha256,
+                    "checkpoint_snapshot_sha256": checkpoint.digests[
+                        "snapshot"
+                    ],
                     "observed_snapshot_sha256": snapshot,
                 },
             )

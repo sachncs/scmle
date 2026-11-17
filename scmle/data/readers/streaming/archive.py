@@ -75,7 +75,7 @@ class Archive(sidecar.Sidecar):
         identity = self.source.source_identity()
         if not self.path.exists():
             return transaction.Settlement(
-                progress.Checkpoint(identity, snapshot)
+                progress.Checkpoint(identity, {"snapshot": snapshot})
             )
         try:
             state = transaction.Settlement.from_dict(
@@ -88,36 +88,36 @@ class Archive(sidecar.Sidecar):
                 identity,
                 {"path": str(self.path)},
             ) from error
-        if state.checkpoint.source_identity != identity:
+        if state.checkpoint.source != identity:
             raise failure.StreamingError(
                 "checkpoint_source_mismatch",
                 "durable streaming state belongs to another source",
                 identity,
-                {"state_source_identity": state.checkpoint.source_identity},
+                {"state_source_identity": state.checkpoint.source},
             )
-        if state.checkpoint.snapshot_sha256 != snapshot:
+        if state.checkpoint.digests["snapshot"] != snapshot:
             raise failure.StreamingError(
                 "source_snapshot_changed",
                 "durable streaming state belongs to another source snapshot",
                 identity,
                 {
                     "checkpoint_snapshot_sha256": (
-                        state.checkpoint.snapshot_sha256
+                        state.checkpoint.digests["snapshot"]
                     ),
                     "observed_snapshot_sha256": snapshot,
                 },
             )
-        for evidence in state.transaction_evidence:
+        for evidence in state.commitments:
             if (
-                evidence.sink_receipt.checkpoint.snapshot_sha256 != snapshot
-                or evidence.acknowledgement.checkpoint.snapshot_sha256
+                evidence.receipt.checkpoint.digests["snapshot"] != snapshot
+                or evidence.acknowledgement.checkpoint.digests["snapshot"]
                 != snapshot
             ):
                 raise failure.StreamingError(
                     "source_snapshot_changed",
                     "transaction evidence belongs to another source snapshot",
                     identity,
-                    {"batch_id": evidence.batch_id},
+                    {"batch_id": evidence.batch},
                 )
         return state
 
@@ -156,8 +156,8 @@ class Archive(sidecar.Sidecar):
         """
         confine(
             self.source,
-            state.checkpoint.source_identity,
-            state.checkpoint.snapshot_sha256,
+            state.checkpoint.source,
+            state.checkpoint.digests["snapshot"],
             "checkpoint_source_mismatch",
             (
                 "state does not belong to this source",
@@ -183,8 +183,8 @@ class Archive(sidecar.Sidecar):
         """
         confine(
             self.source,
-            acknowledgement.source_identity,
-            acknowledgement.checkpoint.snapshot_sha256,
+            acknowledgement.source,
+            acknowledgement.checkpoint.digests["snapshot"],
             "acknowledgement_source_mismatch",
             (
                 "acknowledgement belongs to another source",
@@ -227,8 +227,8 @@ class Archive(sidecar.Sidecar):
             ) from error
         confine(
             self.source,
-            acknowledgement.source_identity,
-            acknowledgement.checkpoint.snapshot_sha256,
+            acknowledgement.source,
+            acknowledgement.checkpoint.digests["snapshot"],
             "acknowledgement_source_mismatch",
             (
                 "pending acknowledgement belongs to another source",
@@ -286,14 +286,14 @@ class Archive(sidecar.Sidecar):
                 checkpoint differs from the batch's.
         """
         identity = self.source.source_identity()
-        if acknowledgement.source_identity != batch.source_identity:
+        if acknowledgement.source != batch.source_identity:
             raise failure.StreamingError(
                 "acknowledgement_source_mismatch",
                 "acknowledgement does not match the batch source",
                 identity,
                 {},
             )
-        if acknowledgement.batch_id != batch.batch_id:
+        if acknowledgement.batch != batch.batch_id:
             raise failure.StreamingError(
                 "acknowledgement_batch_mismatch",
                 "acknowledgement does not match the batch",
@@ -322,19 +322,19 @@ class Archive(sidecar.Sidecar):
                 checkpoint differs from the batch's.
         """
         identity = self.source.source_identity()
-        if receipt.source_identity != batch.source_identity:
+        if receipt.source != batch.source_identity:
             raise failure.StreamingError(
                 "sink_receipt_source_mismatch",
                 "sink receipt belongs to another source",
                 identity,
-                {"receipt_source_identity": receipt.source_identity},
+                {"receipt_source_identity": receipt.source},
             )
-        if receipt.batch_id != batch.batch_id:
+        if receipt.batch != batch.batch_id:
             raise failure.StreamingError(
                 "sink_receipt_batch_mismatch",
                 "sink receipt belongs to another batch",
                 identity,
-                {"receipt_batch_id": receipt.batch_id},
+                {"receipt_batch_id": receipt.batch},
             )
         if receipt.checkpoint != batch.next_checkpoint:
             raise failure.StreamingError(

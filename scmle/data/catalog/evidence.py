@@ -1,72 +1,107 @@
-"""The schema, missingness, duplicate and label evidence of a catalog."""
+"""The schema, missingness, duplicate and label evidence of a catalog.
+
+These parts carry no version of their own: the catalog that holds them is
+versioned, and each part lists the renames of its stored keys in
+`migrations`, which the catalog's own migration applies to it.
+"""
 
 from collections.abc import Iterable
 from collections.abc import Mapping
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Field:
-    """One ordered field in an observed dataset schema."""
+    """One ordered field in an observed dataset schema.
+
+    Attributes:
+        name: The field's name.
+        kind: The field's data type name.
+    """
 
     __module__ = "scmle.data.catalog"
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"data_type": "kind"}),
+    )
+
     name: str
-    data_type: str
+    kind: str
 
     def __post_init__(self) -> None:
         """Validates schema field names and types, and strips their spaces.
 
         Raises:
-            ValueError: If ``name`` or ``data_type`` is not a string or is
-                empty after stripping whitespace.
+            ValueError: If ``name`` or ``kind`` is not a string or is empty
+                after stripping whitespace.
         """
         name: object = self.name
-        data_type: object = self.data_type
+        kind: object = self.kind
         if not isinstance(name, str) or not name.strip():
             raise errors.InputError("field name must not be empty")
-        if not isinstance(data_type, str) or not data_type.strip():
-            raise errors.InputError("field data_type must not be empty")
+        if not isinstance(kind, str) or not kind.strip():
+            raise errors.InputError("field kind must not be empty")
         object.__setattr__(self, "name", self.name.strip())
-        object.__setattr__(self, "data_type", self.data_type.strip())
+        object.__setattr__(self, "kind", self.kind.strip())
 
     def to_dict(self) -> dict[str, str]:
         """Returns JSON-native field evidence.
 
         Returns:
-            A dictionary with ``name`` and ``data_type``.
+            A dictionary with ``name`` and ``kind``.
         """
-        return {"name": self.name, "data_type": self.data_type}
+        return {"name": self.name, "kind": self.kind}
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds a schema field from JSON evidence.
 
         Args:
-            record: A mapping with ``name`` and ``data_type`` entries.
+            record: A mapping with ``name`` and ``kind`` entries.
 
         Returns:
             The reconstructed field.
         """
-        return cls(str(record["name"]), str(record["data_type"]))
+        return cls(str(record["name"]), str(record["kind"]))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Missingness:
-    """Observed missing-value state, including fields with missingness."""
+    """Observed missing-value state, including fields with missingness.
+
+    Attributes:
+        status: Whether missingness was observed.
+        total: Number of values observed.
+        missing: Number of those values that are missing.
+        incomplete: Number of rows with at least one missing value.
+        fields: Field name to its number of missing values.
+    """
 
     __module__ = "scmle.data.catalog"
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "total_values": "total",
+                "missing_values": "missing",
+                "rows_with_missing": "incomplete",
+                "by_field": "fields",
+            }
+        ),
+    )
+
     status: str
-    total_values: int
-    missing_values: int
-    rows_with_missing: int
-    by_field: Mapping[str, int]
+    total: int
+    missing: int
+    incomplete: int
+    fields: Mapping[str, int]
 
     def __post_init__(self) -> None:
         """Validates missingness accounting.
@@ -74,15 +109,15 @@ class Missingness:
         Raises:
             TypeError: If a count is not an integer (booleans are rejected).
             ValueError: If ``status`` is empty, a count is negative,
-                ``missing_values`` exceeds ``total_values``, or ``by_field``
-                has a blank name or a negative or non-integer count.
+                ``missing`` exceeds ``total``, or ``fields`` has a blank name
+                or a negative or non-integer count.
         """
         if not self.status.strip():
             raise errors.InputError("missingness status must not be empty")
         for field_name, field_value in (
-            ("total_values", self.total_values),
-            ("missing_values", self.missing_values),
-            ("rows_with_missing", self.rows_with_missing),
+            ("total", self.total),
+            ("missing", self.missing),
+            ("incomplete", self.incomplete),
         ):
             if isinstance(field_value, bool) or not isinstance(
                 field_value, int
@@ -90,34 +125,31 @@ class Missingness:
                 raise errors.KindError(f"{field_name} must be an integer")
             if field_value < 0:
                 raise errors.InputError(f"{field_name} must not be negative")
-        if self.missing_values > self.total_values:
-            raise errors.InputError("missing_values cannot exceed total_values")
-        by_field_items: Iterable[tuple[object, object]] = self.by_field.items()
+        if self.missing > self.total:
+            raise errors.InputError("missing cannot exceed total")
+        field_items: Iterable[tuple[object, object]] = self.fields.items()
         if any(
             not isinstance(name, str)
             or not name.strip()
             or isinstance(count, bool)
             or not isinstance(count, int)
             or count < 0
-            for name, count in by_field_items
+            for name, count in field_items
         ):
             raise errors.InputError(
-                "by_field must contain non-negative named counts"
+                "fields must contain non-negative named counts"
             )
-        object.__setattr__(
-            self, "by_field", dict(sorted(self.by_field.items()))
-        )
+        object.__setattr__(self, "fields", dict(sorted(self.fields.items())))
 
     @property
     def fraction(self) -> float:
         """The fraction of observed values that are missing.
 
-        This is ``missing_values / total_values``, or 0.0 when there are no
-        values.
+        This is ``missing / total``, or 0.0 when there are no values.
         """
-        if self.total_values == 0:
+        if self.total == 0:
             return 0.0
-        return self.missing_values / self.total_values
+        return self.missing / self.total
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native missingness evidence.
@@ -128,11 +160,11 @@ class Missingness:
         """
         return {
             "status": self.status,
-            "total_values": self.total_values,
-            "missing_values": self.missing_values,
+            "total": self.total,
+            "missing": self.missing,
             "missing_fraction": self.fraction,
-            "rows_with_missing": self.rows_with_missing,
-            "by_field": dict(self.by_field),
+            "incomplete": self.incomplete,
+            "fields": dict(self.fields),
         }
 
     @classmethod
@@ -152,12 +184,12 @@ class Missingness:
         """
         result = cls(
             status=str(record["status"]),
-            total_values=int(record["total_values"]),
-            missing_values=int(record["missing_values"]),
-            rows_with_missing=int(record["rows_with_missing"]),
-            by_field={
+            total=int(record["total"]),
+            missing=int(record["missing"]),
+            incomplete=int(record["incomplete"]),
+            fields={
                 str(name): int(count)
-                for name, count in dict(record.get("by_field", {})).items()
+                for name, count in dict(record.get("fields", {})).items()
             },
         )
         observed_fraction = record.get("missing_fraction")
@@ -172,42 +204,46 @@ class Missingness:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Duplication:
-    """Observed duplicate-row state and the method used to measure it."""
+    """Observed duplicate-row state and the method used to measure it.
+
+    Attributes:
+        status: Whether duplicates were observed.
+        rows: Number of duplicate rows.
+        fraction: Fraction of rows that are duplicates, in [0, 1].
+        method: How duplicates were measured.
+    """
 
     __module__ = "scmle.data.catalog"
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"duplicate_rows": "rows", "duplicate_fraction": "fraction"}
+        ),
+    )
+
     status: str
-    duplicate_rows: int
-    duplicate_fraction: float
+    rows: int
+    fraction: float
     method: str
 
     def __post_init__(self) -> None:
         """Validates duplicate accounting.
 
         Raises:
-            ValueError: If ``status`` or ``method`` is empty, ``duplicate_rows``
-                is negative, or ``duplicate_fraction`` is not a finite number
-                in [0, 1].
-            TypeError: If ``duplicate_rows`` is not an integer (booleans are
-                rejected).
+            ValueError: If ``status`` or ``method`` is empty, ``rows`` is
+                negative, or ``fraction`` is not a finite number in [0, 1].
+            TypeError: If ``rows`` is not an integer (booleans are rejected).
         """
         if not self.status.strip() or not self.method.strip():
             raise errors.InputError(
                 "duplicate status and method must not be empty"
             )
-        if isinstance(self.duplicate_rows, bool) or not isinstance(
-            self.duplicate_rows, int
-        ):
-            raise errors.KindError("duplicate_rows must be an integer")
-        if self.duplicate_rows < 0:
-            raise errors.InputError("duplicate_rows must not be negative")
-        if (
-            not math.isfinite(self.duplicate_fraction)
-            or not 0 <= (self.duplicate_fraction) <= 1
-        ):
-            raise errors.InputError(
-                "duplicate_fraction must be between zero and one"
-            )
+        if isinstance(self.rows, bool) or not isinstance(self.rows, int):
+            raise errors.KindError("rows must be an integer")
+        if self.rows < 0:
+            raise errors.InputError("rows must not be negative")
+        if not math.isfinite(self.fraction) or not 0 <= self.fraction <= 1:
+            raise errors.InputError("fraction must be between zero and one")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native duplicate evidence.
@@ -218,8 +254,8 @@ class Duplication:
         """
         return {
             "status": self.status,
-            "duplicate_rows": self.duplicate_rows,
-            "duplicate_fraction": self.duplicate_fraction,
+            "rows": self.rows,
+            "fraction": self.fraction,
             "method": self.method,
         }
 
@@ -235,23 +271,42 @@ class Duplication:
         """
         return cls(
             status=str(record["status"]),
-            duplicate_rows=int(record["duplicate_rows"]),
-            duplicate_fraction=float(record["duplicate_fraction"]),
+            rows=int(record["rows"]),
+            fraction=float(record["fraction"]),
             method=str(record["method"]),
         )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Labeling:
-    """Explicit label state without inferring a learning task."""
+    """Explicit label state without inferring a learning task.
+
+    Attributes:
+        status: Whether a label was declared and observed.
+        field: The label column, or None when none was declared.
+        observed: Number of observed (non-missing) labels.
+        missing: Number of missing labels.
+        distinct: Number of distinct observed labels.
+        distribution: Label to its count; the counts sum to ``observed``.
+    """
 
     __module__ = "scmle.data.catalog"
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "observed_count": "observed",
+                "missing_count": "missing",
+                "distinct_count": "distinct",
+            }
+        ),
+    )
+
     status: str
     field: str | None
-    observed_count: int
-    missing_count: int
-    distinct_count: int
+    observed: int
+    missing: int
+    distinct: int
     distribution: Mapping[str, int]
 
     def __post_init__(self) -> None:
@@ -259,9 +314,9 @@ class Labeling:
 
         Raises:
             ValueError: If ``status`` is empty, ``field`` is blank, a count is
-                negative, ``distinct_count`` exceeds ``observed_count``,
-                ``distribution`` has an empty key or a negative or non-integer
-                count, or its counts do not sum to ``observed_count``.
+                negative, ``distinct`` exceeds ``observed``, ``distribution``
+                has an empty key or a negative or non-integer count, or its
+                counts do not sum to ``observed``.
             TypeError: If a count is not an integer (booleans are rejected).
         """
         if not self.status.strip():
@@ -269,9 +324,9 @@ class Labeling:
         if self.field is not None and not self.field.strip():
             raise errors.InputError("label field must not be empty")
         for field_name, field_value in (
-            ("observed_count", self.observed_count),
-            ("missing_count", self.missing_count),
-            ("distinct_count", self.distinct_count),
+            ("observed", self.observed),
+            ("missing", self.missing),
+            ("distinct", self.distinct),
         ):
             if isinstance(field_value, bool) or not isinstance(
                 field_value, int
@@ -279,10 +334,8 @@ class Labeling:
                 raise errors.KindError(f"{field_name} must be an integer")
             if field_value < 0:
                 raise errors.InputError(f"{field_name} must not be negative")
-        if self.distinct_count > self.observed_count:
-            raise errors.InputError(
-                "distinct_count cannot exceed observed_count"
-            )
+        if self.distinct > self.observed:
+            raise errors.InputError("distinct cannot exceed observed")
         distribution_items: Iterable[tuple[object, object]] = (
             self.distribution.items()
         )
@@ -297,10 +350,8 @@ class Labeling:
             raise errors.InputError(
                 "distribution must contain non-negative counts"
             )
-        if sum(self.distribution.values()) != self.observed_count:
-            raise errors.InputError(
-                "distribution does not match observed_count"
-            )
+        if sum(self.distribution.values()) != self.observed:
+            raise errors.InputError("distribution does not match observed")
         object.__setattr__(
             self, "distribution", dict(sorted(self.distribution.items()))
         )
@@ -314,9 +365,9 @@ class Labeling:
         return {
             "status": self.status,
             "field": self.field,
-            "observed_count": self.observed_count,
-            "missing_count": self.missing_count,
-            "distinct_count": self.distinct_count,
+            "observed": self.observed,
+            "missing": self.missing,
+            "distinct": self.distinct,
             "distribution": dict(self.distribution),
         }
 
@@ -334,9 +385,9 @@ class Labeling:
         return cls(
             status=str(record["status"]),
             field=record.get("field"),
-            observed_count=int(record["observed_count"]),
-            missing_count=int(record["missing_count"]),
-            distinct_count=int(record["distinct_count"]),
+            observed=int(record["observed"]),
+            missing=int(record["missing"]),
+            distinct=int(record["distinct"]),
             distribution={
                 str(label): int(count)
                 for label, count in dict(record.get("distribution", {})).items()

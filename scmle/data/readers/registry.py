@@ -1,5 +1,6 @@
 """Source snapshot registry and schema-evolution decisions."""
 
+from collections.abc import Callable
 from collections.abc import Mapping
 import dataclasses
 import json
@@ -7,41 +8,101 @@ import os
 import pathlib
 import tempfile
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle import durability
 from scmle.contracts import data
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.readers import connectors
+
+DIGESTS = {
+    "schema_hash": "schema",
+    "data_hash": "data",
+    "raw_source_hash": "raw",
+}
+
+
+def nest(layout: records.Layout) -> records.Layout:
+    """Moves a renamed version-1 snapshot's hashes under ``digests``.
+
+    Args:
+        layout: The snapshot after its other keys were renamed.
+
+    Returns:
+        The snapshot with ``schema_hash``, ``data_hash`` and
+        ``raw_source_hash`` nested as ``digests.schema``, ``digests.data``
+        and ``digests.raw``.
+    """
+    rest = {key: value for key, value in layout.items() if key not in DIGESTS}
+    rest["digests"] = {
+        new: layout[old] for old, new in DIGESTS.items() if old in layout
+    }
+    return rest
+
+
+def flatten(layout: records.Layout) -> records.Layout:
+    """Undoes `nest`.
+
+    Args:
+        layout: A version-2 snapshot.
+
+    Returns:
+        The snapshot with its digests as top-level version-1 keys.
+    """
+    rest = {key: value for key, value in layout.items() if key != "digests"}
+    digests = layout.get("digests", {})
+    rest.update(
+        {old: digests[new] for old, new in DIGESTS.items() if new in digests}
+    )
+    return rest
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Observation:
     """Immutable identity and source schema for one observed snapshot.
 
+    A snapshot carries no version of its own: the `Sources` registry that
+    holds it is versioned and applies `migrations` to it.
+
     Attributes:
-        source_id: Identity of the logical source.
-        source_uri: Canonical URI of the source.
-        snapshot_id: Identity of this snapshot of the source.
-        schema_hash: Hash of the snapshot's column names and dtypes.
-        data_hash: Hash of the snapshot's row contents.
-        raw_source_hash: Hash of the raw source bytes, or an empty string
-            when they were not available.
-        row_count: Number of rows in the snapshot.
-        schema: Mapping from column name to source type name.
-        captured_at: Capture time as supplied by the caller.
+        source: Identity of the logical source.
+        uri: Canonical URI of the source.
+        snapshot: Identity of this snapshot of the source.
+        digests: Hashes keyed by the hashed thing: ``schema`` (the
+            snapshot's column names and dtypes), ``data`` (its row
+            contents) and ``raw`` (the raw source bytes, or an empty string
+            when they were not available).
+        rows: Number of rows in the snapshot.
+        layout: Mapping from column name to source type name.
+        captured: Capture time as supplied by the caller.
         watermark: Source watermark, or an empty string if none.
+        migrations: The snapshot's layout steps, applied by `Sources`.
     """
 
-    source_id: str
-    source_uri: str
-    snapshot_id: str
-    schema_hash: str
-    data_hash: str
-    raw_source_hash: str
-    row_count: int
-    schema: Mapping[str, str]
-    captured_at: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "source_id": "source",
+                "source_uri": "uri",
+                "snapshot_id": "snapshot",
+                "row_count": "rows",
+                "schema": "layout",
+                "captured_at": "captured",
+            },
+            change=nest,
+            revert=flatten,
+        ),
+    )
+
+    source: str
+    uri: str
+    snapshot: str
+    digests: Mapping[str, str]
+    rows: int
+    layout: Mapping[str, str]
+    captured: str
     watermark: str = ""
 
     def __post_init__(self) -> None:
@@ -49,81 +110,80 @@ class Observation:
 
         Raises:
             ValueError: If a required identity or time field is blank, the
-                row count is negative, the schema is empty, or a schema
-                column name or type name is blank.
+                digests are not exactly ``schema``, ``data`` and ``raw`` or
+                the schema or data digest is blank, the row count is
+                negative, the layout is empty, or a column name or type name
+                is blank.
         """
-        for name in (
-            "source_id",
-            "source_uri",
-            "snapshot_id",
-            "schema_hash",
-            "data_hash",
-            "captured_at",
-        ):
+        for name in ("source", "uri", "snapshot", "captured"):
             if not getattr(self, name).strip():
                 raise errors.InputError(f"{name} must not be empty")
-        if self.row_count < 0:
-            raise errors.InputError("row_count must not be negative")
-        if not self.schema:
-            raise errors.InputError("schema must not be empty")
+        if set(self.digests) != {"schema", "data", "raw"}:
+            raise errors.InputError("digests must hold schema, data and raw")
+        for name in ("schema", "data"):
+            if not self.digests[name].strip():
+                raise errors.InputError(f"{name} digest must not be empty")
+        object.__setattr__(self, "digests", dict(self.digests))
+        if self.rows < 0:
+            raise errors.InputError("rows must not be negative")
+        if not self.layout:
+            raise errors.InputError("layout must not be empty")
         if any(
             not name.strip() or not type_name.strip()
-            for name, type_name in self.schema.items()
+            for name, type_name in self.layout.items()
         ):
-            raise errors.InputError("schema names and types must not be empty")
+            raise errors.InputError("layout names and types must not be empty")
 
     @classmethod
     def restore(
         cls,
         manifest: data.DatasetManifest,
-        schema: Mapping[str, str],
-        captured_at: str,
+        layout: Mapping[str, str],
+        captured: str,
     ) -> Self:
         """Builds a source snapshot from the immutable dataset manifest.
 
         Args:
             manifest: Manifest of the ingested dataset. An empty URI is
                 treated as ``memory://``.
-            schema: Mapping from column name to source type name.
-            captured_at: Capture time to record.
+            layout: Mapping from column name to source type name.
+            captured: Capture time to record.
 
         Returns:
             A snapshot whose identity, hashes and row count come from the
             manifest; the raw source hash is taken from the manifest's
             ``raw-source`` lineage hash, or is empty when absent.
         """
-        source_uri = connectors.canonicalize(manifest.uri or "memory://")
+        uri = connectors.canonicalize(manifest.uri or "memory://")
         return cls(
-            source_id=connectors.source_identity(source_uri),
-            source_uri=source_uri,
-            snapshot_id=manifest.snapshot_id,
-            schema_hash=manifest.schema_hash,
-            data_hash=manifest.data_hash,
-            raw_source_hash=manifest.lineage.object_hashes.get(
-                "raw-source", ""
-            ),
-            row_count=manifest.row_count,
-            schema=dict(schema),
-            captured_at=captured_at,
+            source=connectors.source_identity(uri),
+            uri=uri,
+            snapshot=manifest.snapshot,
+            digests={
+                "schema": manifest.digests["schema"],
+                "data": manifest.digests["data"],
+                "raw": manifest.lineage.digests.get("raw-source", ""),
+            },
+            rows=manifest.rows,
+            layout=dict(layout),
+            captured=captured,
         )
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the snapshot.
 
         Returns:
-            A JSON-compatible mapping of every field, with the schema
+            A JSON-compatible mapping of every field, with the layout
             sorted by column name.
         """
         return {
-            "source_id": self.source_id,
-            "source_uri": self.source_uri,
-            "snapshot_id": self.snapshot_id,
-            "schema_hash": self.schema_hash,
-            "data_hash": self.data_hash,
-            "raw_source_hash": self.raw_source_hash,
-            "row_count": self.row_count,
-            "schema": dict(sorted(self.schema.items())),
-            "captured_at": self.captured_at,
+            "source": self.source,
+            "uri": self.uri,
+            "snapshot": self.snapshot,
+            "digests": dict(self.digests),
+            "rows": self.rows,
+            "layout": dict(sorted(self.layout.items())),
+            "captured": self.captured,
             "watermark": self.watermark,
         }
 
@@ -133,25 +193,28 @@ class Observation:
 
         Args:
             record: Mapping as produced by `to_dict`. The keys other than
-                ``raw_source_hash`` and ``watermark`` are required; those
-                two default to an empty string.
+                ``digests.raw`` and ``watermark`` are required; those two
+                default to an empty string.
 
         Returns:
             The reconstructed snapshot.
         """
+        digests = dict(record["digests"])
         return cls(
-            source_id=str(record["source_id"]),
-            source_uri=str(record["source_uri"]),
-            snapshot_id=str(record["snapshot_id"]),
-            schema_hash=str(record["schema_hash"]),
-            data_hash=str(record["data_hash"]),
-            raw_source_hash=str(record.get("raw_source_hash", "")),
-            row_count=int(record["row_count"]),
-            schema={
-                str(name): str(type_name)
-                for name, type_name in dict(record["schema"]).items()
+            source=str(record["source"]),
+            uri=str(record["uri"]),
+            snapshot=str(record["snapshot"]),
+            digests={
+                "schema": str(digests["schema"]),
+                "data": str(digests["data"]),
+                "raw": str(digests.get("raw", "")),
             },
-            captured_at=str(record["captured_at"]),
+            rows=int(record["rows"]),
+            layout={
+                str(name): str(type_name)
+                for name, type_name in dict(record["layout"]).items()
+            },
+            captured=str(record["captured"]),
             watermark=str(record.get("watermark", "")),
         )
 
@@ -229,25 +292,85 @@ def diff(previous: Observation | None, current: Observation) -> Compatibility:
         names of added, removed and type-changed columns.
     """
     if previous is None:
-        return Compatibility(None, current.snapshot_id, (), (), ())
-    previous_names = set(previous.schema)
-    current_names = set(current.schema)
+        return Compatibility(None, current.snapshot, (), (), ())
+    previous_names = set(previous.layout)
+    current_names = set(current.layout)
     added = tuple(sorted(current_names - previous_names))
     removed = tuple(sorted(previous_names - current_names))
     changed = tuple(
         sorted(
             name
             for name in previous_names & current_names
-            if previous.schema[name] != current.schema[name]
+            if previous.layout[name] != current.layout[name]
         )
     )
     return Compatibility(
-        previous.snapshot_id,
-        current.snapshot_id,
+        previous.snapshot,
+        current.snapshot,
         added,
         removed,
         changed,
     )
+
+
+def lift(layout: records.Layout) -> records.Layout:
+    """Moves every snapshot of a version-1 registry to version 2.
+
+    Args:
+        layout: A version-1 registry without its version key.
+
+    Returns:
+        The registry with each snapshot's keys renamed and its hashes
+        nested.
+    """
+    return shift(layout, Observation.migrations[0].upgrade)
+
+
+def lower(layout: records.Layout) -> records.Layout:
+    """Undoes `lift`.
+
+    Args:
+        layout: A version-2 registry without its version key.
+
+    Returns:
+        The registry with every snapshot in version-1 form.
+    """
+    return shift(layout, Observation.migrations[0].downgrade)
+
+
+def shift(
+    layout: records.Layout,
+    step: Callable[[records.Layout], records.Layout],
+) -> records.Layout:
+    """Applies a step to every snapshot of a stored registry.
+
+    Args:
+        layout: The stored registry.
+        step: Moves one stored snapshot.
+
+    Returns:
+        The registry with every snapshot moved; entries that are not the
+        expected lists or mappings are left for loading to reject.
+    """
+    sources = layout.get("sources")
+    if not isinstance(sources, list):
+        return layout
+    return {
+        **layout,
+        "sources": [
+            {
+                **source,
+                "snapshots": [
+                    step(dict(item)) if isinstance(item, Mapping) else item
+                    for item in source["snapshots"]
+                ],
+            }
+            if isinstance(source, Mapping)
+            and isinstance(source.get("snapshots"), list)
+            else source
+            for source in sources
+        ],
+    }
 
 
 @dataclasses.dataclass
@@ -257,7 +380,13 @@ class Sources:
     Attributes:
         snapshots: Mapping from source id to that source's snapshots, in
             registration order.
+        migrations: The registry's version steps, oldest first; version 2
+            renamed the keys of every snapshot.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(change=lift, revert=lower),
+    )
 
     snapshots: dict[str, tuple[Observation, ...]] = dataclasses.field(
         default_factory=dict
@@ -276,17 +405,15 @@ class Sources:
             ValueError: If the snapshot id is already registered for the
                 source with different evidence.
         """
-        history = self.snapshots.get(snapshot.source_id, ())
+        history = self.snapshots.get(snapshot.source, ())
         for existing in history:
-            if existing.snapshot_id == snapshot.snapshot_id:
+            if existing.snapshot == snapshot.snapshot:
                 same_content = (
-                    existing.source_id == snapshot.source_id
-                    and existing.source_uri == snapshot.source_uri
-                    and existing.schema_hash == snapshot.schema_hash
-                    and existing.data_hash == snapshot.data_hash
-                    and existing.raw_source_hash == snapshot.raw_source_hash
-                    and existing.row_count == snapshot.row_count
-                    and dict(existing.schema) == dict(snapshot.schema)
+                    existing.source == snapshot.source
+                    and existing.uri == snapshot.uri
+                    and dict(existing.digests) == dict(snapshot.digests)
+                    and existing.rows == snapshot.rows
+                    and dict(existing.layout) == dict(snapshot.layout)
                     and existing.watermark == snapshot.watermark
                 )
                 if not same_content:
@@ -295,7 +422,7 @@ class Sources:
                         "evidence"
                     )
                 return
-        self.snapshots[snapshot.source_id] = (*history, snapshot)
+        self.snapshots[snapshot.source] = (*history, snapshot)
 
     def latest(self, source_id: str) -> Observation | None:
         """Finds the most recently registered snapshot for a source.
@@ -319,18 +446,18 @@ class Sources:
             The schema decision against the latest registered snapshot of
             the same source; ``initial`` if there is none.
         """
-        return diff(self.latest(snapshot.source_id), snapshot)
+        return diff(self.latest(snapshot.source), snapshot)
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the registry.
 
         Returns:
-            A JSON-compatible mapping with ``schema_version`` 1 and the
-            sources sorted by id, each with its snapshots in registration
-            order.
+            A JSON-compatible mapping with the current ``schema_version``
+            and the sources sorted by id, each with its snapshots in
+            registration order.
         """
         return {
-            "schema_version": 1,
+            "schema_version": records.ORIGIN + len(self.migrations),
             "sources": [
                 {
                     "source_id": source_id,
@@ -358,7 +485,8 @@ class Sources:
         """Rebuilds a source registry from serialized evidence.
 
         Snapshots are re-registered, so conflicting duplicate snapshot ids
-        are rejected as by `register`.
+        are rejected as by `register`. A registry stored at an older schema
+        version is migrated first.
 
         Args:
             record: Mapping as produced by `to_dict`.
@@ -367,16 +495,18 @@ class Sources:
             The reconstructed registry.
 
         Raises:
-            ValueError: If the schema version is not 1, ``sources`` or a
-                source's ``snapshots`` is not a list, or a snapshot's source
-                id differs from the source it is listed under.
+            ValueError: If the schema version is missing or newer than this
+                build, ``sources`` or a source's ``snapshots`` is not a list,
+                or a snapshot's source id differs from the source it is
+                listed under.
             TypeError: If an entry of ``sources`` is not a mapping.
         """
-        if record.get("schema_version") != 1:
+        if not isinstance(record.get("schema_version"), int):
             raise errors.InputError(
                 "unsupported source registry schema version"
             )
-        sources = record.get("sources")
+        layout = records.load("Sources", cls.migrations, record)
+        sources = layout.get("sources")
         if not isinstance(sources, list):
             raise errors.InputError("sources must be a list")
         registry = cls()
@@ -389,7 +519,7 @@ class Sources:
                 raise errors.InputError("source snapshots must be a list")
             for item in snapshots:
                 snapshot = Observation.from_dict(item)
-                if snapshot.source_id != source_id:
+                if snapshot.source != source_id:
                     raise errors.InputError(
                         "snapshot source id does not match registry"
                     )

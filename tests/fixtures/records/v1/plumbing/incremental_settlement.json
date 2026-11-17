@@ -1,0 +1,12 @@
+{
+  "checkpoint": {
+    "sequence": 4,
+    "source_identity": "source_x",
+    "watermark": "2026-01-01T00:00:00+00:00"
+  },
+  "schema_version": 1,
+  "seen_event_ids": [
+    "e1",
+    "e2"
+  ]
+}

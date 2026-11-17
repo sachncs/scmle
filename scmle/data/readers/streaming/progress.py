@@ -1,15 +1,18 @@
 """Durable row positions, watermarks and the batches that advance them."""
 
+from collections.abc import Callable
 from collections.abc import Mapping
 import dataclasses
 import datetime
 import hashlib
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 import pandas
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.readers.streaming import failure
 
 SHA256_HEX_LENGTH = 64
@@ -53,46 +56,113 @@ def validate_timestamp(value: str, field_name: str) -> datetime.datetime:
     return parsed.astimezone(datetime.UTC)
 
 
+def nest(layout: records.Layout) -> records.Layout:
+    """Moves a renamed version-1 checkpoint's snapshot digest under digests.
+
+    Args:
+        layout: The checkpoint after its other keys were renamed.
+
+    Returns:
+        The checkpoint with ``snapshot_sha256`` as ``digests.snapshot``.
+    """
+    if "snapshot_sha256" not in layout:
+        return layout
+    rest = {k: v for k, v in layout.items() if k != "snapshot_sha256"}
+    return {**rest, "digests": {"snapshot": layout["snapshot_sha256"]}}
+
+
+def flatten(layout: records.Layout) -> records.Layout:
+    """Undoes `nest`.
+
+    Args:
+        layout: A version-2 checkpoint.
+
+    Returns:
+        The checkpoint with its snapshot digest as ``snapshot_sha256``.
+    """
+    if "digests" not in layout:
+        return layout
+    rest = {k: v for k, v in layout.items() if k != "digests"}
+    return {**rest, "snapshot_sha256": layout["digests"]["snapshot"]}
+
+
+def shift(
+    layout: records.Layout,
+    key: str,
+    step: Callable[[records.Layout], records.Layout],
+) -> records.Layout:
+    """Applies a step to one nested part of a stored record.
+
+    Args:
+        layout: The stored record.
+        key: The key of the nested part.
+        step: Moves the stored part.
+
+    Returns:
+        The record with the part moved, or unchanged when the part is not a
+        mapping (loading then rejects it).
+    """
+    part = layout.get(key)
+    if not isinstance(part, Mapping):
+        return layout
+    return {**layout, key: step(dict(part))}
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Checkpoint:
     """A durable row position bound to a source and exact raw snapshot.
 
+    A checkpoint carries no version of its own: the record that holds it is
+    versioned and applies `migrations` to it.
+
     Attributes:
-        source_identity: Identity of the source the position belongs to.
-        snapshot_sha256: SHA-256 hex digest of the file the position was
-            taken on.
+        source: Identity of the source the position belongs to.
+        digests: Digests keyed by the hashed thing; ``snapshot`` is the
+            SHA-256 hex digest of the file the position was taken on.
         offset: Number of rows already consumed, so the next row to read
             is the one at this zero-based position.
         watermark: Greatest timestamp seen so far as an ISO-8601 UTC
             string; empty when none has been seen.
-        watermark_column: Column the watermark is taken from, or None.
+        column: Column the watermark is taken from, or None.
+        migrations: The checkpoint's layout steps, applied by its holder.
     """
 
-    source_identity: str
-    snapshot_sha256: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"source_identity": "source", "watermark_column": "column"},
+            change=nest,
+            revert=flatten,
+        ),
+    )
+
+    source: str
+    digests: Mapping[str, str]
     offset: int = 0
     watermark: str = ""
-    watermark_column: str | None = None
+    column: str | None = None
 
     def __post_init__(self) -> None:
         """Validates source, snapshot, offset, and optional watermark.
 
         Raises:
-            ValueError: If the source identity is blank, the snapshot is not a
-                SHA-256 hex digest, the offset is negative, the watermark
-                column is an empty string, or the watermark is not a
-                timezone-aware ISO-8601 timestamp.
+            ValueError: If the source identity is blank, the digests are not
+                exactly a SHA-256 hex ``snapshot`` digest, the offset is
+                negative, the watermark column is an empty string, or the
+                watermark is not a timezone-aware ISO-8601 timestamp.
             TypeError: If the offset is not an integer.
         """
-        if not self.source_identity.strip():
-            raise errors.InputError("source_identity must not be empty")
-        assay(self.snapshot_sha256, "snapshot_sha256")
+        if not self.source.strip():
+            raise errors.InputError("source must not be empty")
+        if set(self.digests) != {"snapshot"}:
+            raise errors.InputError("digests must hold the snapshot digest")
+        assay(self.digests["snapshot"], "snapshot digest")
+        object.__setattr__(self, "digests", dict(self.digests))
         if isinstance(self.offset, bool) or not isinstance(self.offset, int):
             raise errors.KindError("offset must be an integer")
         if self.offset < 0:
             raise errors.InputError("offset must be non-negative")
-        if self.watermark_column is not None and not self.watermark_column:
-            raise errors.InputError("watermark_column must not be empty")
+        if self.column is not None and not self.column:
+            raise errors.InputError("column must not be empty")
         if self.watermark:
             validate_timestamp(self.watermark, "watermark")
 
@@ -103,11 +173,11 @@ class Checkpoint:
             A dictionary with the five checkpoint fields.
         """
         return {
-            "source_identity": self.source_identity,
-            "snapshot_sha256": self.snapshot_sha256,
+            "source": self.source,
+            "digests": dict(self.digests),
             "offset": self.offset,
             "watermark": self.watermark,
-            "watermark_column": self.watermark_column,
+            "column": self.column,
         }
 
     @classmethod
@@ -121,13 +191,13 @@ class Checkpoint:
             The checkpoint described by `record`.
         """
         return cls(
-            source_identity=str(record["source_identity"]),
-            snapshot_sha256=str(record["snapshot_sha256"]),
+            source=str(record["source"]),
+            digests={"snapshot": str(record["digests"]["snapshot"])},
             offset=int(record["offset"]),
             watermark=str(record.get("watermark", "")),
-            watermark_column=(
-                str(record["watermark_column"])
-                if record.get("watermark_column") is not None
+            column=(
+                str(record["column"])
+                if record.get("column") is not None
                 else None
             ),
         )
@@ -220,9 +290,9 @@ class Batch:
                 not a DataFrame, or the checkpoint does not advance past the
                 start offset.
         """
-        if self.next_checkpoint.source_identity != self.source_identity:
+        if self.next_checkpoint.source != self.source_identity:
             raise errors.InputError("batch and checkpoint sources differ")
-        if self.next_checkpoint.snapshot_sha256 != self.snapshot_sha256:
+        if self.next_checkpoint.digests["snapshot"] != self.snapshot_sha256:
             raise errors.InputError("batch and checkpoint snapshots differ")
         if self.start_offset < 0:
             raise errors.InputError("start_offset must be non-negative")

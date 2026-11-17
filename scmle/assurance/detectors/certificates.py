@@ -12,40 +12,59 @@ lower bound states how well the count supports the floor, and results are
 kept per defect type, never pooled into one number.
 """
 
-import ast
 from collections.abc import Iterable
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
 import enum
-import hashlib
-import inspect
-import io
 import json
 import math
 from pathlib import Path
-import re
-import textwrap
-import tokenize
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scipy import stats
 
+from scmle.assurance.detectors.hashing import code_hash
+from scmle.assurance.detectors.hashing import corpus_hash
+from scmle.assurance.detectors.hashing import hash_source
+from scmle.assurance.detectors.hashing import require_digest
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
+from scmle.contracts import records
+
+# The hashing names live in `hashing` and stay importable from here.
+__all__ = [
+    "DIGESTS",
+    "INTERVAL_TOLERANCE",
+    "PAIR_LENGTH",
+    "SCHEMA_VERSION",
+    "Audit",
+    "Authority",
+    "CertificateError",
+    "Certification",
+    "Freshness",
+    "Outcome",
+    "StaleError",
+    "Standard",
+    "Store",
+    "audit",
+    "certify",
+    "code_hash",
+    "corpus_hash",
+    "demote",
+    "flatten",
+    "hash_source",
+    "nest",
+    "require_digest",
+    "wilson_interval",
+]
 
 SCHEMA_VERSION = 1
-SHA256_HEX = re.compile(r"[0-9a-f]{64}")
+DIGESTS = {"code_hash": "code", "corpus_hash": "corpus"}
 INTERVAL_TOLERANCE = 1e-9
-DOCSTRING_OWNERS = (
-    ast.Module,
-    ast.FunctionDef,
-    ast.AsyncFunctionDef,
-    ast.ClassDef,
-)
-
 PAIR_LENGTH = 2
 
 
@@ -104,141 +123,30 @@ def wilson_interval(
     return max(0.0, min(centre - half, p)), min(1.0, max(centre + half, p))
 
 
-def documentation(tree: ast.Module) -> set[int]:
-    """Finds the lines occupied only by a docstring statement.
-
-    Args:
-        tree: Parsed module.
-
-    Returns:
-        The 1-based line numbers of every docstring that shares its lines
-        with no other statement.
-    """
-    statements = [n for n in ast.walk(tree) if isinstance(n, ast.stmt)]
-    lines: set[int] = set()
-    for owner in ast.walk(tree):
-        if not isinstance(owner, DOCSTRING_OWNERS) or not owner.body:
-            continue
-        first = owner.body[0]
-        if not (
-            isinstance(first, ast.Expr)
-            and isinstance(first.value, ast.Constant)
-            and isinstance(first.value.value, str)
-        ):
-            continue
-        span = range(first.lineno, (first.end_lineno or first.lineno) + 1)
-        shared = any(
-            other is not first and other.lineno in span for other in statements
-        )
-        if not shared:
-            lines.update(span)
-    return lines
-
-
-def hash_source(source: str) -> str:
-    """SHA-256 of source text with comments, docstrings and blanks removed.
-
-    The text itself is hashed, not a syntax tree, so the value does not
-    depend on the Python version that computes it. Reformatting the code
-    changes the hash, which is deliberate: any edit needs re-certification.
-    Source that is not valid Python raises `SyntaxError`.
-
-    Args:
-        source: Python source for a function, class or module.
-
-    Returns:
-        64 lowercase hexadecimal characters.
-    """
-    text = textwrap.dedent(source)
-    tree = ast.parse(text)
-    lines = text.splitlines()
-    for token in tokenize.generate_tokens(io.StringIO(text).readline):
-        if token.type == tokenize.COMMENT:
-            row, column = token.start
-            lines[row - 1] = lines[row - 1][:column]
-    dropped = documentation(tree)
-    kept = [
-        line.rstrip()
-        for number, line in enumerate(lines, start=1)
-        if line.strip() and number not in dropped
-    ]
-    return hashlib.sha256("\n".join(kept).encode("utf-8")).hexdigest()
-
-
-def code_hash(*objects: Any) -> str:
-    """Combined hash of the source of functions, classes or modules.
-
-    Only the given objects' own source is hashed, not what they call, so a
-    detector's certificate must list every callable that affects its result.
-
-    Args:
-        *objects: Objects whose source `inspect` can read.
-
-    Returns:
-        64 lowercase hexadecimal characters; order matters.
-
-    Raises:
-        ValueError: If no object is given.
-    """
-    if not objects:
-        raise errors.InputError("code_hash needs at least one object")
-    parts = [hash_source(inspect.getsource(item)) for item in objects]
-    return hashlib.sha256("\n".join(parts).encode("ascii")).hexdigest()
-
-
-def corpus_hash(parts: Iterable[str]) -> str:
-    """Hashes the corpus file hashes a run used, ignoring their order.
-
-    Args:
-        parts: SHA-256 hex digests of the corpus files.
-
-    Returns:
-        64 lowercase hexadecimal characters.
-
-    Raises:
-        ValueError: If no part is given or a part is not a SHA-256 digest.
-    """
-    members = sorted(parts)
-    if not members:
-        raise errors.InputError("corpus_hash needs at least one part")
-    for part in members:
-        require_digest(part, "corpus part")
-    return hashlib.sha256("\n".join(members).encode("ascii")).hexdigest()
-
-
-def require_digest(value: Any, name: str) -> str:
-    """Returns `value` if it is a lowercase SHA-256 hex digest.
-
-    Args:
-        value: The value to check.
-        name: Name of the value, used in the error message.
-
-    Returns:
-        `value`, unchanged.
-
-    Raises:
-        ValueError: If `value` is not a 64-character lowercase hex string.
-    """
-    if not isinstance(value, str) or not SHA256_HEX.fullmatch(value):
-        raise errors.InputError(
-            f"{name} must be a 64-character lowercase SHA-256"
-        )
-    return value
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
 class Standard:
     """Pre-registered floors a detector must clear to be certified.
 
+    A policy carries its own schema version, like the `Certificate` counts
+    it judges; a stored policy without one is version 1.
+
     Attributes:
-        recall_floor: Minimum allowed lower Wilson bound of recall.
-        false_alarm_ceiling: Maximum allowed upper Wilson bound of the
-            false-alarm rate on a clean copy.
+        recall: Minimum allowed lower Wilson bound of recall (the recall
+            floor).
+        alarms: Maximum allowed upper Wilson bound of the false-alarm rate
+            on a clean copy (the false-alarm ceiling).
         confidence: Level of both intervals, in (0, 1).
+        migrations: The policy's version steps, oldest first.
     """
 
-    recall_floor: float
-    false_alarm_ceiling: float
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"recall_floor": "recall", "false_alarm_ceiling": "alarms"}
+        ),
+    )
+
+    recall: float
+    alarms: float
     confidence: float = qualification.DEFAULT_CONFIDENCE
 
     def __post_init__(self) -> None:
@@ -248,10 +156,8 @@ class Standard:
             ValueError: If a floor or ceiling is not a probability, or
                 `confidence` is not strictly between 0 and 1.
         """
-        qualification.probability(self.recall_floor, "recall_floor")
-        qualification.probability(
-            self.false_alarm_ceiling, "false_alarm_ceiling"
-        )
+        qualification.probability(self.recall, "recall")
+        qualification.probability(self.alarms, "alarms")
         confidence = qualification.finite(self.confidence, "confidence")
         if not 0.0 < confidence < 1.0:
             raise errors.InputError("confidence must be within (0, 1)")
@@ -260,39 +166,55 @@ class Standard:
         """Returns the policy as a JSON-ready record.
 
         Returns:
-            A mapping of every field to its value.
+            A mapping of the schema version and every field to its value.
         """
-        return dataclasses.asdict(self)
+        return {
+            "schema_version": records.ORIGIN + len(self.migrations),
+            **dataclasses.asdict(self),
+        }
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds a policy, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping holding exactly the fields of the policy.
+            record: A mapping holding exactly the fields of the policy, at
+                any supported schema version.
 
         Returns:
             The policy. A record with unexpected or missing fields, or
             invalid values, raises `ValueError`.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        return cls(**qualification.require(cls, record))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Outcome:
     """Measured result for one defect type, with its verdict.
 
+    An outcome carries its own schema version; a stored outcome without
+    one is version 1.
+
     Attributes:
         certificate: Counts of planted defects found and clean rows flagged.
-        recall_interval: Wilson interval for recall.
-        false_alarm_interval: Wilson interval for the false-alarm rate.
+        recall: Wilson interval for recall.
+        alarms: Wilson interval for the false-alarm rate.
         passed: Whether both bounds meet the policy.
+        migrations: The outcome's version steps, oldest first.
     """
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "recall_interval": "recall",
+                "false_alarm_interval": "alarms",
+            }
+        ),
+    )
+
     certificate: qualification.Certificate
-    recall_interval: tuple[float, float]
-    false_alarm_interval: tuple[float, float]
+    recall: tuple[float, float]
+    alarms: tuple[float, float]
     passed: bool
 
     @classmethod
@@ -317,12 +239,9 @@ class Outcome:
             certificate.detected, certificate.planted, policy.confidence
         )
         alarms = wilson_interval(
-            certificate.false_alarms, certificate.clean_rows, policy.confidence
+            certificate.alarms, certificate.clean, policy.confidence
         )
-        passed = (
-            recall[0] >= policy.recall_floor
-            and alarms[1] <= policy.false_alarm_ceiling
-        )
+        passed = recall[0] >= policy.recall and alarms[1] <= policy.alarms
         return cls(certificate, recall, alarms, passed)
 
     def to_dict(self) -> dict[str, Any]:
@@ -333,9 +252,10 @@ class Outcome:
             the verdict.
         """
         return {
+            "schema_version": records.ORIGIN + len(self.migrations),
             "certificate": self.certificate.to_dict(),
-            "recall_interval": list(self.recall_interval),
-            "false_alarm_interval": list(self.false_alarm_interval),
+            "recall": list(self.recall),
+            "alarms": list(self.alarms),
             "passed": self.passed,
         }
 
@@ -344,7 +264,8 @@ class Outcome:
         """Rebuilds an outcome and checks it against its own counts.
 
         Args:
-            record: A mapping holding exactly the fields of the outcome.
+            record: A mapping holding exactly the fields of the outcome, at
+                any supported schema version.
             policy: The policy the verdict is recomputed under.
 
         Returns:
@@ -354,10 +275,10 @@ class Outcome:
             CertificateError: If a stored interval or verdict disagrees with
                 the value recomputed from the counts.
         """
-        qualification.require(cls, record)
+        record = qualification.require(cls, record)
         certificate = qualification.Certificate.from_dict(record["certificate"])
         expected = cls.measure(certificate, policy)
-        for name in ("recall_interval", "false_alarm_interval"):
+        for name in ("recall", "alarms"):
             limits = record[name]
             if (
                 not isinstance(limits, list | tuple)
@@ -374,7 +295,7 @@ class Outcome:
                 for a, b in zip(stored, recomputed, strict=True)
             ):
                 raise CertificateError(
-                    f"{name} does not match the recorded counts"
+                    f"{name} interval does not match the recorded counts"
                 )
         if record["passed"] is not expected.passed:
             raise CertificateError(
@@ -383,24 +304,71 @@ class Outcome:
         return expected
 
 
+def nest(layout: records.Layout) -> records.Layout:
+    """Moves a renamed version-1 certificate's hashes under ``digests``.
+
+    Args:
+        layout: The certificate after its other keys were renamed.
+
+    Returns:
+        The certificate with ``code_hash`` and ``corpus_hash`` nested as
+        ``digests.code`` and ``digests.corpus``. The policy and outcomes
+        carry their own versions and are not touched.
+    """
+    rest = {k: v for k, v in layout.items() if k not in DIGESTS}
+    rest["digests"] = {
+        new: layout[old] for old, new in DIGESTS.items() if old in layout
+    }
+    return rest
+
+
+def flatten(layout: records.Layout) -> records.Layout:
+    """Undoes `nest`.
+
+    Args:
+        layout: A version-2 certificate.
+
+    Returns:
+        The certificate with its digests as version-1 keys.
+    """
+    rest = {k: v for k, v in layout.items() if k != "digests"}
+    digests = layout.get("digests", {})
+    rest.update(
+        {old: digests[new] for old, new in DIGESTS.items() if new in digests}
+    )
+    return rest
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Certification:
     """Certificate for one detector version on one corpus and seed set.
 
+    A certificate carries its own schema version, as do its policy and
+    outcomes; a stored certificate without one is version 1. Nothing is
+    re-hashed on loading, so a migrated certificate keeps the code hash it
+    was issued for.
+
     Attributes:
-        detector_id: Detector that was measured.
-        code_hash: Hash of the code that was measured.
-        corpus_hash: Hash of the data the plants were injected into.
+        detector: Detector that was measured.
+        digests: Hashes keyed by the hashed thing: ``code``, the code that
+            was measured (the staleness key), and ``corpus``, the data the
+            plants were injected into.
         seeds: Run seeds the injections used.
         policy: Floors the outcomes were judged against.
         outcomes: One outcome per defect type.
         created: Caller-supplied ISO timestamp, or None. Never read from
             the clock, so the file is reproducible.
+        migrations: The certificate's version steps, oldest first.
     """
 
-    detector_id: str
-    code_hash: str
-    corpus_hash: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"detector_id": "detector"}, change=nest, revert=flatten
+        ),
+    )
+
+    detector: str
+    digests: Mapping[str, str]
     seeds: tuple[int, ...]
     policy: Standard
     outcomes: tuple[Outcome, ...]
@@ -410,14 +378,18 @@ class Certification:
         """Validates the record.
 
         Raises:
-            ValueError: If an id or hash is invalid, `seeds` or `outcomes`
-                is not a non-empty tuple, a seed is not a non-negative
-                integer, defect types repeat, or an outcome belongs to a
-                different detector.
+            ValueError: If an id or hash is invalid, `digests` is not exactly
+                ``code`` and ``corpus``, `seeds` or `outcomes` is not a
+                non-empty tuple, a seed is not a non-negative integer,
+                defect types repeat, or an outcome belongs to a different
+                detector.
         """
-        evidence.require_text(self.detector_id, "detector_id")
-        require_digest(self.code_hash, "code_hash")
-        require_digest(self.corpus_hash, "corpus_hash")
+        evidence.require_text(self.detector, "detector")
+        if set(self.digests) != {"code", "corpus"}:
+            raise errors.InputError("digests must hold code and corpus")
+        require_digest(self.digests["code"], "code digest")
+        require_digest(self.digests["corpus"], "corpus digest")
+        object.__setattr__(self, "digests", dict(self.digests))
         qualification.tupled(self.seeds, "seeds")
         if not self.seeds:
             raise errors.InputError("seeds must not be empty")
@@ -426,11 +398,11 @@ class Certification:
         qualification.tupled(self.outcomes, "outcomes")
         if not self.outcomes:
             raise errors.InputError("outcomes must not be empty")
-        kinds = [o.certificate.defect_type for o in self.outcomes]
+        kinds = [o.certificate.defect for o in self.outcomes]
         if len(set(kinds)) != len(kinds):
             raise errors.InputError("defect types must be unique")
         for outcome in self.outcomes:
-            if outcome.certificate.detector_id != self.detector_id:
+            if outcome.certificate.detector != self.detector:
                 raise errors.InputError(
                     "outcome belongs to a different detector"
                 )
@@ -439,18 +411,16 @@ class Certification:
     def key(self) -> tuple[str, str, str, tuple[int, ...]]:
         """The detector id, code hash, corpus hash and sorted seeds."""
         return (
-            self.detector_id,
-            self.code_hash,
-            self.corpus_hash,
+            self.detector,
+            self.digests["code"],
+            self.digests["corpus"],
             tuple(sorted(self.seeds)),
         )
 
     @property
     def certified_defect_types(self) -> tuple[str, ...]:
         """The defect types whose outcome passed the policy."""
-        return tuple(
-            o.certificate.defect_type for o in self.outcomes if o.passed
-        )
+        return tuple(o.certificate.defect for o in self.outcomes if o.passed)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the certificate as a JSON-ready record.
@@ -460,9 +430,9 @@ class Certification:
             outcomes as records and the seeds as a list.
         """
         return {
-            "detector_id": self.detector_id,
-            "code_hash": self.code_hash,
-            "corpus_hash": self.corpus_hash,
+            "schema_version": records.ORIGIN + len(self.migrations),
+            "detector": self.detector,
+            "digests": dict(self.digests),
             "seeds": list(self.seeds),
             "policy": self.policy.to_dict(),
             "outcomes": [o.to_dict() for o in self.outcomes],
@@ -474,19 +444,22 @@ class Certification:
         """Rebuilds a certificate, verifying every stored verdict.
 
         Args:
-            record: A mapping holding exactly the fields of the certificate.
+            record: A mapping holding exactly the fields of the certificate,
+                at any supported schema version.
 
         Returns:
             The certificate. A record that is invalid, or whose stored
             verdict disagrees with its counts, raises `ValueError` or
             `CertificateError`.
         """
-        qualification.require(cls, record)
+        record = qualification.require(cls, record)
         policy = Standard.from_dict(record["policy"])
+        digests = record["digests"]
+        if not isinstance(digests, Mapping):
+            raise errors.InputError("digests must be a mapping")
         return cls(
-            detector_id=record["detector_id"],
-            code_hash=record["code_hash"],
-            corpus_hash=record["corpus_hash"],
+            detector=record["detector"],
+            digests=digests,
             seeds=tuple(record["seeds"]),
             policy=policy,
             outcomes=tuple(
@@ -522,9 +495,8 @@ def certify(
     """
     outcomes = tuple(Outcome.measure(r, policy) for r in results)
     return Certification(
-        detector_id=detector_id,
-        code_hash=code_digest,
-        corpus_hash=corpus_digest,
+        detector=detector_id,
+        digests={"code": code_digest, "corpus": corpus_digest},
         seeds=tuple(seeds),
         policy=policy,
         outcomes=outcomes,
@@ -577,7 +549,11 @@ class Audit:
 
 
 class Store:
-    """The set of certificates written as `detector_certificates.json`."""
+    """The set of certificates written as `detector_certificates.json`.
+
+    The document's own layout is unchanged since version 1; each
+    certificate in it carries its own schema version.
+    """
 
     def __init__(self, items: Iterable[Certification] = ()) -> None:
         """Creates a store, keeping the last certificate for each key.
@@ -617,7 +593,7 @@ class Store:
         return tuple(
             c
             for c in self.certificates
-            if c.detector_id == detector_id and c.code_hash == code_digest
+            if c.detector == detector_id and c.digests["code"] == code_digest
         )
 
     def state(self, detector_id: str, code_digest: str) -> Freshness:
@@ -634,7 +610,7 @@ class Store:
         """
         if self.current(detector_id, code_digest):
             return Freshness.CURRENT
-        if any(c.detector_id == detector_id for c in self.certificates):
+        if any(c.detector == detector_id for c in self.certificates):
             return Freshness.STALE
         return Freshness.MISSING
 
@@ -707,6 +683,8 @@ class Store:
     @classmethod
     def from_dict(cls, document: Mapping[str, Any]) -> Self:
         """Rebuilds a store, verifying every stored verdict.
+
+        Each certificate migrates itself from the version it was stored at.
 
         Args:
             document: A mapping with `schema_version` and `certificates`.

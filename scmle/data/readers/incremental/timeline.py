@@ -6,9 +6,11 @@ import dataclasses
 import datetime
 import enum
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 
 class IncrementalError(errors.DataError):
@@ -92,30 +94,40 @@ class Event:
     """One immutable event from an incremental source.
 
     Attributes:
-        event_id: Non-empty, stable identity of the event.
+        identifier: Non-empty, stable identity of the event.
         sequence: Positive integer giving the event's position in the
             source's order.
-        event_time: Time the event occurred, as a timezone-aware ISO-8601
+        occurred: Time the event occurred, as a timezone-aware ISO-8601
             string.
         payload: The event's content; copied into a plain dict on
             construction.
-        ingest_time: Time the system recorded the event, as a
-            timezone-aware ISO-8601 string; empty when the source does not
-            report it.
+        ingested: Time the system recorded the event, as a timezone-aware
+            ISO-8601 string; empty when the source does not report it.
+        migrations: The event record's version steps, oldest first.
     """
 
-    event_id: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "event_id": "identifier",
+                "event_time": "occurred",
+                "ingest_time": "ingested",
+            }
+        ),
+    )
+
+    identifier: str
     sequence: int
-    event_time: str
+    occurred: str
     payload: Mapping[str, Any]
-    ingest_time: str = ""
+    ingested: str = ""
 
     def __post_init__(self) -> None:
         """Validates event identity, ordering, time, and payload shape.
 
-        ``ingest_time`` is when the system recorded the event (transaction
+        ``ingested`` is when the system recorded the event (transaction
         time). It is empty when the source does not report it; a point-in-
-        time reader must then fall back to ``event_time`` plus a declared
+        time reader must then fall back to ``occurred`` plus a declared
         delay and say so.
 
         Raises:
@@ -124,18 +136,18 @@ class Event:
             TypeError: If the sequence is not an integer or the payload is not
                 a mapping.
         """
-        event_id: object = self.event_id
-        if not isinstance(event_id, str) or not event_id.strip():
-            raise errors.InputError("event_id must not be empty")
+        identifier: object = self.identifier
+        if not isinstance(identifier, str) or not identifier.strip():
+            raise errors.InputError("identifier must not be empty")
         if isinstance(self.sequence, bool) or not isinstance(
             self.sequence, int
         ):
             raise errors.KindError("sequence must be an integer")
         if self.sequence < 1:
             raise errors.InputError("sequence must be a positive integer")
-        parse_timestamp(self.event_time, "event_time")
-        if self.ingest_time:
-            parse_timestamp(self.ingest_time, "ingest_time")
+        parse_timestamp(self.occurred, "occurred")
+        if self.ingested:
+            parse_timestamp(self.ingested, "ingested")
         if not isinstance(self.payload, Mapping):
             raise errors.KindError("payload must be a mapping")
         object.__setattr__(self, "payload", dict(self.payload))
@@ -144,22 +156,26 @@ class Event:
         """Returns a JSON-compatible event record.
 
         Returns:
-            A dictionary of the event's fields; `ingest_time` is included only
-            when it is non-empty.
+            A dictionary of the schema version and the event's fields;
+            `ingested` is included only when it is non-empty.
         """
         record: dict[str, Any] = {
-            "event_id": self.event_id,
+            "schema_version": records.ORIGIN + len(self.migrations),
+            "identifier": self.identifier,
             "sequence": self.sequence,
-            "event_time": self.event_time,
+            "occurred": self.occurred,
             "payload": dict(self.payload),
         }
-        if self.ingest_time:
-            record["ingest_time"] = self.ingest_time
+        if self.ingested:
+            record["ingested"] = self.ingested
         return record
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds an event from a persisted record.
+
+        A record without a schema version is a version-1 record and is
+        migrated first.
 
         Args:
             record: Mapping in the form produced by `to_dict`.
@@ -167,12 +183,13 @@ class Event:
         Returns:
             The event described by `record`.
         """
+        layout = records.load("Event", cls.migrations, record)
         return cls(
-            event_id=str(record["event_id"]),
-            sequence=int(record["sequence"]),
-            event_time=str(record["event_time"]),
-            payload=dict(record["payload"]),
-            ingest_time=str(record.get("ingest_time", "")),
+            identifier=str(layout["identifier"]),
+            sequence=int(layout["sequence"]),
+            occurred=str(layout["occurred"]),
+            payload=dict(layout["payload"]),
+            ingested=str(layout.get("ingested", "")),
         )
 
 
@@ -180,15 +197,23 @@ class Event:
 class Checkpoint:
     """Committed position and watermark for one incremental source.
 
+    A checkpoint carries no version of its own: the record that holds it is
+    versioned and applies `migrations` to it.
+
     Attributes:
-        source_identity: Identity of the source.
+        source: Identity of the source.
         sequence: Highest committed event sequence; 0 when nothing has been
             committed.
         watermark: Greatest committed event time as an ISO-8601 string;
             empty when none.
+        migrations: The checkpoint's layout steps, applied by its holder.
     """
 
-    source_identity: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"source_identity": "source"}),
+    )
+
+    source: str
     sequence: int = 0
     watermark: str = ""
 
@@ -200,8 +225,8 @@ class Checkpoint:
                 negative, or the watermark is not timezone-aware ISO-8601.
             TypeError: If the sequence is not an integer.
         """
-        if not self.source_identity.strip():
-            raise errors.InputError("source_identity must not be empty")
+        if not self.source.strip():
+            raise errors.InputError("source must not be empty")
         if isinstance(self.sequence, bool) or not isinstance(
             self.sequence, int
         ):
@@ -224,7 +249,7 @@ class Checkpoint:
         Raises:
             ValueError: If the checkpoint belongs to a different source.
         """
-        if self.source_identity != source_identity:
+        if self.source != source_identity:
             raise errors.InputError("checkpoint belongs to a different source")
         return self
 
@@ -235,7 +260,7 @@ class Checkpoint:
             A dictionary with the three checkpoint fields.
         """
         return {
-            "source_identity": self.source_identity,
+            "source": self.source,
             "sequence": self.sequence,
             "watermark": self.watermark,
         }
@@ -251,7 +276,7 @@ class Checkpoint:
             The checkpoint described by `record`.
         """
         return cls(
-            source_identity=str(record["source_identity"]),
+            source=str(record["source"]),
             sequence=int(record["sequence"]),
             watermark=str(record.get("watermark", "")),
         )
@@ -289,7 +314,7 @@ class Batch:
             TypeError: If `events` holds something other than Event
                 values.
         """
-        if self.next_checkpoint.source_identity != self.source_identity:
+        if self.next_checkpoint.source != self.source_identity:
             raise errors.InputError(
                 "batch and checkpoint source identities differ"
             )
@@ -307,7 +332,7 @@ class Batch:
     @property
     def event_ids(self) -> tuple[str, ...]:
         """The identities of the selected events, in the order of `events`."""
-        return tuple(event.event_id for event in self.events)
+        return tuple(event.identifier for event in self.events)
 
 
 def horizon(events: Sequence[Event], watermark: str) -> str:
@@ -324,7 +349,7 @@ def horizon(events: Sequence[Event], watermark: str) -> str:
         no events and no watermark.
     """
     timestamps = [
-        parse_timestamp(event.event_time, "event_time") for event in events
+        parse_timestamp(event.occurred, "occurred") for event in events
     ]
     if watermark:
         timestamps.append(parse_timestamp(watermark, "watermark"))
@@ -345,7 +370,7 @@ def forward(checkpoint: Checkpoint, events: Sequence[Event]) -> Checkpoint:
         events' times.
     """
     return Checkpoint(
-        checkpoint.source_identity,
+        checkpoint.source,
         max(checkpoint.sequence, *(event.sequence for event in events)),
         horizon(events, checkpoint.watermark),
     )

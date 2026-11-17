@@ -1,0 +1,13 @@
+{
+  "batch_id": "batch_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "checkpoint": {
+    "offset": 3,
+    "snapshot_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "source_identity": "source_y",
+    "watermark": "2026-01-01T00:00:00+00:00",
+    "watermark_column": "time"
+  },
+  "consumer_group": "group",
+  "schema_version": 1,
+  "source_identity": "source_y"
+}

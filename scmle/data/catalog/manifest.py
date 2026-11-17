@@ -7,34 +7,117 @@ import dataclasses
 import json
 import pathlib
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle import durability
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.catalog import canon
 from scmle.data.catalog import evidence
 from scmle.data.catalog import identity
 from scmle.data.catalog import inspection
 
-CATALOG_SCHEMA_VERSION = 1
+PARTS = {
+    "source": identity.Source.migrations,
+    "missingness": evidence.Missingness.migrations,
+    "duplicates": evidence.Duplication.migrations,
+    "label": evidence.Labeling.migrations,
+}
 
 
-def census(sample_count: Any, schema_version: Any) -> None:
+def lift(layout: records.Layout) -> records.Layout:
+    """Moves a renamed version-1 catalog's nested parts to version 2.
+
+    Args:
+        layout: The catalog after its top-level keys were renamed.
+
+    Returns:
+        The catalog with ``content_identity`` nested as
+        ``digests.content`` and every part's keys renamed.
+    """
+    moved = {key: value for key, value in layout.items() if key in PARTS}
+    lifted = {
+        key: records.upgrade(PARTS[key], dict(value), records.ORIGIN)
+        for key, value in moved.items()
+    }
+    rest = {
+        key: value
+        for key, value in layout.items()
+        if key not in PARTS and key != "content_identity"
+    }
+    if "columns" in rest:
+        rest["columns"] = [
+            records.upgrade(
+                evidence.Field.migrations, dict(field), records.ORIGIN
+            )
+            for field in rest["columns"]
+        ]
+    if "content_identity" in layout:
+        rest["digests"] = {"content": layout["content_identity"]}
+    return {**rest, **lifted}
+
+
+def lower(layout: records.Layout) -> records.Layout:
+    """Undoes `lift`.
+
+    Args:
+        layout: A version-2 catalog.
+
+    Returns:
+        The catalog with its parts and content digest in version-1 form.
+    """
+    moved = {key: value for key, value in layout.items() if key in PARTS}
+    lowered = {
+        key: records.downgrade(PARTS[key], dict(value))
+        for key, value in moved.items()
+    }
+    rest = {
+        key: value
+        for key, value in layout.items()
+        if key not in PARTS and key != "digests"
+    }
+    if "columns" in rest:
+        rest["columns"] = [
+            records.downgrade(evidence.Field.migrations, dict(field))
+            for field in rest["columns"]
+        ]
+    if "digests" in layout:
+        rest["content_identity"] = layout["digests"]["content"]
+    return {**rest, **lowered}
+
+
+MIGRATIONS = (
+    records.Migration(
+        renames={
+            "data_kind": "kind",
+            "schema": "columns",
+            "sample_count": "samples",
+            "release_blockers": "blockers",
+        },
+        change=lift,
+        revert=lower,
+    ),
+)
+CATALOG_SCHEMA_VERSION = records.ORIGIN + len(MIGRATIONS)
+
+
+def census(samples: Any, schema_version: Any) -> None:
     """Checks the two integer fields of a catalog.
 
     Args:
-        sample_count: The sample count to check.
+        samples: The sample count to check.
         schema_version: The schema version to check.
 
     Raises:
         TypeError: If either is not an integer (booleans are rejected).
-        ValueError: If `sample_count` is negative or `schema_version` is
-            not the supported version.
+        ValueError: If `samples` is negative or `schema_version` is not the
+            supported version.
     """
-    if isinstance(sample_count, bool) or not isinstance(sample_count, int):
-        raise errors.KindError("sample_count must be an integer")
-    if sample_count < 0:
-        raise errors.InputError("sample_count must not be negative")
+    if isinstance(samples, bool) or not isinstance(samples, int):
+        raise errors.KindError("samples must be an integer")
+    if samples < 0:
+        raise errors.InputError("samples must not be negative")
     if isinstance(schema_version, bool) or not isinstance(schema_version, int):
         raise errors.KindError("schema_version must be an integer")
     if schema_version != CATALOG_SCHEMA_VERSION:
@@ -70,9 +153,9 @@ def withhold(source: identity.Source) -> list[str]:
     blockers: list[str] = []
     if not source.owner:
         blockers.append("source_owner_not_declared")
-    if not source.acquisition_method:
+    if not source.acquisition:
         blockers.append("source_acquisition_method_not_declared")
-    if not source.privacy_classification:
+    if not source.privacy:
         blockers.append("privacy_and_retention_not_assessed")
     return blockers
 
@@ -84,23 +167,23 @@ def vet(catalog: "Catalog") -> tuple[evidence.Field, ...]:
         catalog: The catalog being constructed.
 
     Returns:
-        The schema as a tuple, read from the catalog once.
+        The columns as a tuple, read from the catalog once.
 
     Raises:
         TypeError: If ``source``, ``missingness``, ``duplicates``, ``label``,
-            or a schema entry has the wrong class, or if ``sample_count`` or
+            or a column has the wrong class, or if ``samples`` or
             ``schema_version`` is not an integer (booleans are rejected).
-        ValueError: If ``data_kind`` is empty, ``sample_count`` is negative,
+        ValueError: If ``kind`` is empty, ``samples`` is negative,
             ``schema_version`` is unsupported, ``shape`` has a negative or
-            non-integer entry, or ``limitations`` is empty or has a blank
-            entry, or ``release_blockers`` has a blank entry.
+            non-integer entry, ``limitations`` is empty or has a blank
+            entry, or ``blockers`` has a blank entry.
     """
     if not isinstance(catalog.source, identity.Source):
         raise errors.KindError("source must be Source")
-    data_kind: object = catalog.data_kind
-    if not isinstance(data_kind, str) or not data_kind.strip():
-        raise errors.InputError("data_kind must not be empty")
-    census(catalog.sample_count, catalog.schema_version)
+    kind: object = catalog.kind
+    if not isinstance(kind, str) or not kind.strip():
+        raise errors.InputError("kind must not be empty")
+    census(catalog.samples, catalog.schema_version)
     dimensions: Iterable[object] = catalog.shape
     if any(
         isinstance(dimension, bool)
@@ -109,9 +192,9 @@ def vet(catalog: "Catalog") -> tuple[evidence.Field, ...]:
         for dimension in dimensions
     ):
         raise errors.InputError("shape must contain non-negative integers")
-    fields = tuple(catalog.schema)
+    fields = tuple(catalog.columns)
     if any(not isinstance(field, evidence.Field) for field in fields):
-        raise errors.KindError("schema must contain Field records")
+        raise errors.KindError("columns must contain Field records")
     if not isinstance(catalog.missingness, evidence.Missingness):
         raise errors.KindError("missingness must be Missingness")
     if not isinstance(catalog.duplicates, evidence.Duplication):
@@ -119,7 +202,7 @@ def vet(catalog: "Catalog") -> tuple[evidence.Field, ...]:
     if not isinstance(catalog.label, evidence.Labeling):
         raise errors.KindError("label must be Labeling")
     limitation_notes: Iterable[object] = catalog.limitations
-    blocker_notes: Iterable[object] = catalog.release_blockers
+    blocker_notes: Iterable[object] = catalog.blockers
     if not catalog.limitations or any(
         not isinstance(item, str) or not item.strip()
         for item in limitation_notes
@@ -128,10 +211,26 @@ def vet(catalog: "Catalog") -> tuple[evidence.Field, ...]:
     if any(
         not isinstance(item, str) or not item.strip() for item in blocker_notes
     ):
-        raise errors.InputError(
-            "release_blockers must contain non-empty strings"
-        )
+        raise errors.InputError("blockers must contain non-empty strings")
     return fields
+
+
+def fingerprint(digests: Mapping[str, str]) -> dict[str, str]:
+    """Checks and normalizes a catalog's digests.
+
+    Args:
+        digests: The digests, keyed by the hashed thing.
+
+    Returns:
+        The ``content`` digest, normalized to ``sha256:`` and lowercase hex.
+
+    Raises:
+        ValueError: If `digests` holds anything but a SHA-256 ``content``
+            digest.
+    """
+    if set(digests) != {"content"}:
+        raise errors.InputError("digests must hold the content digest")
+    return {"content": identity.assay(digests["content"], "content")}
 
 
 def load(path: str | pathlib.Path) -> tuple[Mapping[str, Any], str]:
@@ -171,21 +270,24 @@ class Catalog:
     silently invents a content hash for an opaque object.  Use ``from_data``
     for supported Python data structures or ``glean`` when a
     caller-owned adapter can provide trustworthy evidence for another format.
+    ``digests`` holds ``content``, the SHA-256 digest of the data content.
     """
 
     __module__ = "scmle.data.catalog"
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = MIGRATIONS
+
     source: identity.Source
-    data_kind: str
+    kind: str
     shape: tuple[int, ...]
-    schema: tuple[evidence.Field, ...]
-    sample_count: int
+    columns: tuple[evidence.Field, ...]
+    samples: int
     missingness: evidence.Missingness
     duplicates: evidence.Duplication
     label: evidence.Labeling
-    content_identity: str
+    digests: Mapping[str, str]
     limitations: tuple[str, ...]
-    release_blockers: tuple[str, ...]
+    blockers: tuple[str, ...]
     schema_version: int = CATALOG_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -193,61 +295,55 @@ class Catalog:
 
         Raises:
             TypeError: If ``source``, ``missingness``, ``duplicates``,
-                ``label``, or a schema entry has the wrong class, or if
-                ``sample_count`` or ``schema_version`` is not an integer
+                ``label``, or a column has the wrong class, or if
+                ``samples`` or ``schema_version`` is not an integer
                 (booleans are rejected).
-            ValueError: If ``data_kind`` is empty, ``sample_count`` is
-                negative, ``schema_version`` is unsupported, ``shape`` has a
+            ValueError: If ``kind`` is empty, ``samples`` is negative,
+                ``schema_version`` is unsupported, ``shape`` has a
                 negative or non-integer entry, ``limitations`` is empty or has
-                a blank entry, ``release_blockers`` has a blank entry, or
-                ``content_identity`` is not a SHA-256 digest.
+                a blank entry, ``blockers`` has a blank entry, or
+                ``digests`` does not hold exactly a SHA-256 ``content``
+                digest.
         """
-        fields = vet(self)
-        object.__setattr__(self, "schema", fields)
-        object.__setattr__(
-            self,
-            "content_identity",
-            identity.assay(self.content_identity, "content_identity"),
-        )
-        object.__setattr__(self, "data_kind", self.data_kind.strip())
+        object.__setattr__(self, "columns", vet(self))
+        object.__setattr__(self, "digests", fingerprint(self.digests))
+        object.__setattr__(self, "kind", self.kind.strip())
         object.__setattr__(self, "limitations", tuple(self.limitations))
         object.__setattr__(
-            self,
-            "release_blockers",
-            tuple(dict.fromkeys(self.release_blockers)),
+            self, "blockers", tuple(dict.fromkeys(self.blockers))
         )
 
     @classmethod
     def glean(
         cls,
         source: identity.Source | str | pathlib.Path,
-        data_kind: str,
+        kind: str,
         shape: Sequence[int],
-        schema: Sequence[evidence.Field],
-        sample_count: int,
+        columns: Sequence[evidence.Field],
+        samples: int,
         missingness: evidence.Missingness,
         duplicates: evidence.Duplication,
         label: evidence.Labeling,
-        content_identity: str,
+        content: str,
         limitations: Sequence[str],
-        release_blockers: Sequence[str] = (),
+        blockers: Sequence[str] = (),
     ) -> Self:
         """Builds a catalog from adapter-owned evidence for any data format.
 
         Args:
             source: The data source, or a URI or path that is wrapped in a
                 ``Source`` with default governance fields.
-            data_kind: Name of the kind of data observed.
+            kind: Name of the kind of data observed.
             shape: Dimensions of the data.
-            schema: Ordered fields of the observed schema.
-            sample_count: Number of samples (rows) observed.
+            columns: Ordered fields of the observed schema.
+            samples: Number of samples (rows) observed.
             missingness: Observed missing-value summary.
             duplicates: Observed duplicate-row summary.
             label: Label summary.
-            content_identity: SHA-256 digest of the data content.
+            content: SHA-256 digest of the data content.
             limitations: Non-empty statements of what the evidence does not
                 establish.
-            release_blockers: Conditions that block release; duplicates are
+            blockers: Conditions that block release; duplicates are
                 removed, keeping first-seen order.
 
         Returns:
@@ -256,16 +352,16 @@ class Catalog:
         source_value = adopt(source)
         return cls(
             source=source_value,
-            data_kind=data_kind,
+            kind=kind,
             shape=tuple(shape),
-            schema=tuple(schema),
-            sample_count=sample_count,
+            columns=tuple(columns),
+            samples=samples,
             missingness=missingness,
             duplicates=duplicates,
             label=label,
-            content_identity=content_identity,
+            digests={"content": content},
             limitations=tuple(limitations),
-            release_blockers=tuple(release_blockers),
+            blockers=tuple(blockers),
         )
 
     @classmethod
@@ -316,16 +412,16 @@ class Catalog:
         blocker_values.extend(release_blockers)
         return cls.glean(
             source=source_value,
-            data_kind=observation.data_kind,
+            kind=observation.data_kind,
             shape=observation.shape,
-            schema=observation.schema,
-            sample_count=observation.sample_count,
+            columns=observation.schema,
+            samples=observation.sample_count,
             missingness=observation.missingness,
             duplicates=observation.duplicates,
             label=observation.label,
-            content_identity=observation.content_identity,
+            content=observation.content_identity,
             limitations=tuple(dict.fromkeys(limitation_values)),
-            release_blockers=tuple(dict.fromkeys(blocker_values)),
+            blockers=tuple(dict.fromkeys(blocker_values)),
         )
 
     @property
@@ -346,16 +442,16 @@ class Catalog:
         return {
             "schema_version": self.schema_version,
             "source": self.source.to_dict(),
-            "data_kind": self.data_kind,
+            "kind": self.kind,
             "shape": list(self.shape),
-            "schema": [field.to_dict() for field in self.schema],
-            "sample_count": self.sample_count,
+            "columns": [field.to_dict() for field in self.columns],
+            "samples": self.samples,
             "missingness": self.missingness.to_dict(),
             "duplicates": self.duplicates.to_dict(),
             "label": self.label.to_dict(),
-            "content_identity": self.content_identity,
+            "digests": dict(self.digests),
             "limitations": list(self.limitations),
-            "release_blockers": list(self.release_blockers),
+            "blockers": list(self.blockers),
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -398,65 +494,71 @@ class Catalog:
     def read_verified(cls, path: str | pathlib.Path) -> Self:
         """Reads a catalog and fail closed if its digest or schema is invalid.
 
+        The digest is checked on the content as stored, before an older
+        layout is migrated, so an older catalog verifies as it was written.
+
         Args:
             path: A file written by ``write``.
 
         Returns:
             The catalog rebuilt from the file, whose recorded digest matches
-            its recomputed digest.
+            the digest of its stored content.
 
         Raises:
             ValueError: If the file cannot be read or parsed, is not a JSON
-                object, lacks a string ``catalog_digest``, does not rebuild
-                into a valid catalog, or its digest does not match the content.
+                object, lacks a string ``catalog_digest``, its digest does
+                not match the stored content, or the content does not
+                rebuild into a valid catalog.
         """
         payload, expected_digest = load(path)
-        try:
-            catalog = cls.from_dict(payload)
-        except (KeyError, TypeError, ValueError) as error:
-            raise errors.InputError(
-                "catalog evidence schema is invalid"
-            ) from error
+        if not isinstance(payload.get("schema_version"), int):
+            raise errors.InputError("catalog evidence schema is invalid")
         if identity.assay(expected_digest, "catalog_digest") != (
-            catalog.catalog_digest
+            canon.digest_value(payload)
         ):
             raise errors.InputError(
                 "catalog digest does not match catalog content"
             )
-        return catalog
+        try:
+            return cls.from_dict(payload)
+        except (KeyError, TypeError, ValueError) as error:
+            raise errors.InputError(
+                "catalog evidence schema is invalid"
+            ) from error
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds a catalog from content without trusting its digest.
 
+        A record stored at an older schema version (none means 1) is
+        migrated first.
+
         Args:
             record: A mapping of catalog content as produced by ``to_dict``.
                 Any ``catalog_digest`` is not checked here. A missing
-                required entry other than ``schema_version`` raises
-                ``KeyError``; ``release_blockers`` may be absent.
+                required entry raises ``KeyError``; ``blockers`` may be
+                absent.
 
         Returns:
             The reconstructed catalog.
 
         Raises:
-            ValueError: If ``schema_version`` is missing or unsupported.
+            ValueError: If ``schema_version`` is not an integer or is newer
+                than this build.
         """
-        if int(record.get("schema_version", 0)) != CATALOG_SCHEMA_VERSION:
-            raise errors.InputError("unsupported catalog schema version")
+        layout = records.load("Catalog", cls.migrations, record)
         return cls(
-            source=identity.Source.from_dict(record["source"]),
-            data_kind=str(record["data_kind"]),
-            shape=tuple(int(value) for value in record["shape"]),
-            schema=tuple(
-                evidence.Field.from_dict(field) for field in record["schema"]
+            source=identity.Source.from_dict(layout["source"]),
+            kind=str(layout["kind"]),
+            shape=tuple(int(value) for value in layout["shape"]),
+            columns=tuple(
+                evidence.Field.from_dict(field) for field in layout["columns"]
             ),
-            sample_count=int(record["sample_count"]),
-            missingness=evidence.Missingness.from_dict(record["missingness"]),
-            duplicates=evidence.Duplication.from_dict(record["duplicates"]),
-            label=evidence.Labeling.from_dict(record["label"]),
-            content_identity=str(record["content_identity"]),
-            limitations=tuple(str(item) for item in record["limitations"]),
-            release_blockers=tuple(
-                str(item) for item in record.get("release_blockers", ())
-            ),
+            samples=int(layout["samples"]),
+            missingness=evidence.Missingness.from_dict(layout["missingness"]),
+            duplicates=evidence.Duplication.from_dict(layout["duplicates"]),
+            label=evidence.Labeling.from_dict(layout["label"]),
+            digests={"content": str(layout["digests"]["content"])},
+            limitations=tuple(str(item) for item in layout["limitations"]),
+            blockers=tuple(str(item) for item in layout.get("blockers", ())),
         )

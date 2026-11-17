@@ -89,12 +89,12 @@ class Ingestor:
         pending = self.ledger.reclaim()
         if pending is None:
             return ()
-        if pending.consumer_group != self.consumer_group:
+        if pending.consumer != self.consumer_group:
             raise timeline.IncrementalError(
                 "consumer_group_mismatch",
                 "pending acknowledgement belongs to another consumer group",
                 self.source.source_uri,
-                {"pending_group": pending.consumer_group},
+                {"pending_group": pending.consumer},
             )
         try:
             self.acknowledge(pending)
@@ -105,11 +105,11 @@ class Ingestor:
                 self.source.source_uri,
                 {
                     "consumer_group": self.consumer_group,
-                    "event_ids": list(pending.event_ids),
+                    "event_ids": list(pending.events),
                 },
             ) from error
         self.ledger.retract()
-        return pending.event_ids
+        return pending.events
 
     def consume(self, limit: int = 1_000) -> evidence.Consumption:
         """Consume, durably commit, acknowledge, and return evidence.
@@ -134,9 +134,9 @@ class Ingestor:
             )
         )
         acknowledgement = evidence.EventAcknowledgement(
-            source_identity=self.source.source_identity,
-            consumer_group=self.consumer_group,
-            event_ids=event_ids,
+            source=self.source.source_identity,
+            consumer=self.consumer_group,
+            events=event_ids,
             checkpoint=batch.next_checkpoint,
         )
         receipt = self.ledger.finalize(

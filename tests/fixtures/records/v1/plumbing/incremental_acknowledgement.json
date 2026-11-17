@@ -1,0 +1,14 @@
+{
+  "checkpoint": {
+    "sequence": 4,
+    "source_identity": "source_x",
+    "watermark": "2026-01-01T00:00:00+00:00"
+  },
+  "consumer_group": "group",
+  "event_ids": [
+    "e1",
+    "e2"
+  ],
+  "schema_version": 1,
+  "source_identity": "source_x"
+}

@@ -1,0 +1,45 @@
+{
+  "checkpoint": {
+    "offset": 3,
+    "snapshot_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "source_identity": "source_y",
+    "watermark": "2026-01-01T00:00:00+00:00",
+    "watermark_column": "time"
+  },
+  "committed_batch_ids": [
+    "batch_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  ],
+  "schema_version": 2,
+  "transaction_evidence": [
+    {
+      "acknowledgement": {
+        "batch_id": "batch_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "checkpoint": {
+          "offset": 3,
+          "snapshot_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "source_identity": "source_y",
+          "watermark": "2026-01-01T00:00:00+00:00",
+          "watermark_column": "time"
+        },
+        "consumer_group": "group",
+        "schema_version": 1,
+        "source_identity": "source_y"
+      },
+      "batch_id": "batch_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "schema_version": 1,
+      "sink_receipt": {
+        "batch_id": "batch_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "checkpoint": {
+          "offset": 3,
+          "snapshot_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "source_identity": "source_y",
+          "watermark": "2026-01-01T00:00:00+00:00",
+          "watermark_column": "time"
+        },
+        "receipt": "receipt-1",
+        "source_identity": "source_y"
+      },
+      "source_identity": "source_y"
+    }
+  ]
+}

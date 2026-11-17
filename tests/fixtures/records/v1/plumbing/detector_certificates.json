@@ -1,0 +1,73 @@
+{
+  "certificates": [
+    {
+      "code_hash": "a99bb9f7e74d32bb6503427f32045c7730564505c871c1a71706ec0b75bcb09b",
+      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
+      "created": null,
+      "detector_id": "f5-duplicates",
+      "outcomes": [
+        {
+          "certificate": {
+            "clean_rows": 569,
+            "defect_type": "duplicate_exact",
+            "detected": 285,
+            "detector_id": "f5-duplicates",
+            "false_alarms": 0,
+            "planted": 285,
+            "seed_path": [
+              0,
+              "certify.f5-duplicates",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.006705972065294502
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.986700459011742,
+            1.0
+          ]
+        },
+        {
+          "certificate": {
+            "clean_rows": 569,
+            "defect_type": "duplicate_near",
+            "detected": 285,
+            "detector_id": "f5-duplicates",
+            "false_alarms": 0,
+            "planted": 285,
+            "seed_path": [
+              0,
+              "certify.f5-duplicates",
+              0
+            ]
+          },
+          "false_alarm_interval": [
+            0.0,
+            0.006705972065294502
+          ],
+          "passed": true,
+          "recall_interval": [
+            0.986700459011742,
+            1.0
+          ]
+        }
+      ],
+      "policy": {
+        "confidence": 0.95,
+        "false_alarm_ceiling": 0.05,
+        "recall_floor": 0.8
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    }
+  ],
+  "schema_version": 1
+}

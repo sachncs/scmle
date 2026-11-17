@@ -134,7 +134,7 @@ class Curation:
             "citation_count": self.citation_count,
             "release_ready": self.release_ready,
             "unresolved_blocking_findings": [
-                finding.finding_id
+                finding.identifier
                 for finding in self.unresolved_blocking_findings
             ],
         }

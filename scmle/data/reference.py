@@ -15,6 +15,7 @@ import numpy
 import pandas
 
 from scmle.contracts import data
+from scmle.contracts import records
 from scmle.data.validation import columns
 
 DECILES = tuple(numpy.linspace(0.1, 0.9, 9))
@@ -353,14 +354,21 @@ class Baseline:
     Attributes:
         features: Reference per feature column.
         output: Reference of the model's score / predicted class.
-        output_name: What `output` describes.
-        reference_metrics: Held-out metrics at training time.
+        name: What `output` describes.
+        metrics: Held-out metrics at training time.
+        migrations: The profile's version steps, oldest first.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"output_name": "name", "reference_metrics": "metrics"}
+        ),
+    )
 
     features: dict[str, Reference]
     output: Reference
-    output_name: str
-    reference_metrics: dict[str, float]
+    name: str
+    metrics: dict[str, float]
 
     @classmethod
     def build(
@@ -368,8 +376,8 @@ class Baseline:
         features: pandas.DataFrame,
         plan: data.Blueprint,
         output: pandas.Series,
-        output_name: str,
-        reference_metrics: dict[str, float],
+        name: str,
+        metrics: dict[str, float],
     ) -> Self:
         """Builds the profile from reference data.
 
@@ -378,8 +386,8 @@ class Baseline:
             plan: Feature columns by kind.
             output: The model's score (numeric) or predicted class (categorical)
                 on held-out rows.
-            output_name: Description of `output`.
-            reference_metrics: Held-out metrics at training time.
+            name: Description of `output`.
+            metrics: Held-out metrics at training time.
 
         Returns:
             The profile, with a reference for each numeric and
@@ -399,35 +407,44 @@ class Baseline:
             if numeric_output
             else CategoricalReference.fit(output)
         )
-        return cls(references, output_reference, output_name, reference_metrics)
+        return cls(references, output_reference, name, metrics)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping.
 
         Returns:
             A dict with the feature references, the output reference, its name
-            and the reference metrics.
+            and the reference metrics, at the current `schema_version`.
         """
         return {
+            records.KEY: records.ORIGIN + len(self.migrations),
             "features": {k: v.to_dict() for k, v in self.features.items()},
             "output": self.output.to_dict(),
-            "output_name": self.output_name,
-            "reference_metrics": self.reference_metrics,
+            "name": self.name,
+            "metrics": self.metrics,
         }
 
     @classmethod
     def from_dict(cls, record: dict[str, Any]) -> Self:
         """Rebuilds a profile from `to_dict` output.
 
+        The bundle checks the stored file's checksum before this reads it.
+
         Args:
-            record: A dict produced by `to_dict`.
+            record: A dict produced by `to_dict`; one without a
+                `schema_version` is version 1 and is migrated.
 
         Returns:
             The profile.
+
+        Raises:
+            InputError: If the version is not a positive integer or is newer
+                than this build.
         """
+        values = records.load("baseline", cls.migrations, record)
         return cls(
-            {k: rebuild(v) for k, v in record["features"].items()},
-            rebuild(record["output"]),
-            record["output_name"],
-            record["reference_metrics"],
+            {k: rebuild(v) for k, v in values["features"].items()},
+            rebuild(values["output"]),
+            values["name"],
+            values["metrics"],
         )

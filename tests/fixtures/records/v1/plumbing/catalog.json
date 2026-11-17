@@ -1,0 +1,71 @@
+{
+  "catalog_digest": "sha256:2749e3411249f7a10a72e886d49c07c9799974437869931533135c6538c1234a",
+  "content_identity": "sha256:889b4bec8809e002728a93f8e70334e17d76e675932fc793e109deda450cc447",
+  "data_kind": "pandas_dataframe",
+  "duplicates": {
+    "duplicate_fraction": 0.6666666666666666,
+    "duplicate_rows": 2,
+    "method": "pandas.DataFrame.duplicated(keep=False)",
+    "status": "observed"
+  },
+  "label": {
+    "distinct_count": 1,
+    "distribution": {
+      "\"a\"": 2
+    },
+    "field": "label",
+    "missing_count": 1,
+    "observed_count": 2,
+    "status": "constant"
+  },
+  "limitations": [
+    "curation_only_no_model_fit_or_performance_claim",
+    "missing_values_are_reported_not_repaired",
+    "duplicate_rows_are_reported_not_removed"
+  ],
+  "missingness": {
+    "by_field": {
+      "id": 0,
+      "label": 1,
+      "value": 1
+    },
+    "missing_fraction": 0.2222222222222222,
+    "missing_values": 2,
+    "rows_with_missing": 1,
+    "status": "observed",
+    "total_values": 9
+  },
+  "release_blockers": [
+    "label_is_constant",
+    "missingness_policy_not_declared",
+    "duplicate_policy_not_declared"
+  ],
+  "sample_count": 3,
+  "schema": [
+    {
+      "data_type": "int64",
+      "name": "id"
+    },
+    {
+      "data_type": "float64",
+      "name": "value"
+    },
+    {
+      "data_type": "str",
+      "name": "label"
+    }
+  ],
+  "schema_version": 1,
+  "shape": [
+    3,
+    3
+  ],
+  "source": {
+    "acquisition_method": "warehouse-export",
+    "owner": "analytics",
+    "privacy_classification": "internal",
+    "source_identity": "sha256:5de966a12accac2d40c1606b53440b92edb5dfa8f8a31531ff0ba578fb699b71",
+    "uri": "s3://bucket/events",
+    "version": "7"
+  }
+}

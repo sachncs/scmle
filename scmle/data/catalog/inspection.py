@@ -225,10 +225,10 @@ def tally(frame: pandas.DataFrame) -> evidence.Missingness:
     }
     return evidence.Missingness(
         status="observed",
-        total_values=int(frame.shape[0] * frame.shape[1]),
-        missing_values=missing_values,
-        rows_with_missing=int(missing.any(axis=1).sum()),
-        by_field=field_counts,
+        total=int(frame.shape[0] * frame.shape[1]),
+        missing=missing_values,
+        incomplete=int(missing.any(axis=1).sum()),
+        fields=field_counts,
     )
 
 
@@ -250,16 +250,16 @@ def dedupe(frame: pandas.DataFrame) -> evidence.Duplication:
         # handled: returned as not_observed summary; documented
         return evidence.Duplication(
             status="not_observed",
-            duplicate_rows=0,
-            duplicate_fraction=0.0,
+            rows=0,
+            fraction=0.0,
             method="row equality was not supported for one or more fields",
         )
     duplicate_rows = int(duplicate_mask.sum())
     fraction = duplicate_rows / len(frame) if len(frame) else 0.0
     return evidence.Duplication(
         status="observed",
-        duplicate_rows=duplicate_rows,
-        duplicate_fraction=fraction,
+        rows=duplicate_rows,
+        fraction=fraction,
         method="pandas.DataFrame.duplicated(keep=False)",
     )
 
@@ -382,10 +382,10 @@ def scrutinize(
     label, label_limitations, label_blockers = summarize(frame, label_column)
     limitations.extend(label_limitations)
     blockers.extend(label_blockers)
-    if missingness.missing_values:
+    if missingness.missing:
         limitations.append("missing_values_are_reported_not_repaired")
         blockers.append("missingness_policy_not_declared")
-    if duplicates.duplicate_rows:
+    if duplicates.rows:
         limitations.append("duplicate_rows_are_reported_not_removed")
         blockers.append("duplicate_policy_not_declared")
     if supplied_identity is None:

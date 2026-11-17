@@ -84,7 +84,7 @@ class Curation:
             ],
             "release_ready": self.release_ready,
             "unresolved_blocking_findings": [
-                finding.finding_id
+                finding.identifier
                 for finding in self.unresolved_blocking_findings
             ],
         }
@@ -190,9 +190,9 @@ def audit(
     """
     if not isinstance(manifest, data.Passport):
         raise errors.KindError("manifest must be Passport")
-    if manifest.content_hash != dataset_hash:
+    if manifest.digests["content"] != dataset_hash:
         raise errors.InputError("manifest does not match dataset_hash")
-    if manifest.sample_count != sample_count:
+    if manifest.samples != sample_count:
         raise errors.InputError("manifest does not match sample_count")
     if manifest.modality != modality:
         raise errors.InputError("manifest does not match modality")
@@ -383,12 +383,12 @@ class Datasheet:
             raise errors.InputError("curation report must contain sample_count")
         if manifest is None:
             manifest = data.Passport(
-                dataset_id=f"{modality}-{dataset_hash_value[:16]}",
-                snapshot_id=dataset_hash_value,
+                identifier=f"{modality}-{dataset_hash_value[:16]}",
+                snapshot=dataset_hash_value,
                 modality=modality,
                 task=task,
-                sample_count=sample_count_value,
-                content_hash=dataset_hash_value,
+                samples=sample_count_value,
+                digests={"content": dataset_hash_value},
                 findings=tuple(
                     data.Finding.from_dict(finding)
                     for finding in (
@@ -397,9 +397,9 @@ class Datasheet:
                     )
                 ),
             )
-        if manifest.content_hash != dataset_hash_value:
+        if manifest.digests["content"] != dataset_hash_value:
             raise errors.InputError("manifest does not match dataset_hash")
-        if manifest.sample_count != sample_count_value:
+        if manifest.samples != sample_count_value:
             raise errors.InputError("manifest does not match sample_count")
         if manifest.modality != modality:
             raise errors.InputError("manifest does not match modality")
@@ -413,7 +413,7 @@ class Datasheet:
         }
         if (
             not manifest.source.owner
-            and not manifest.source.acquisition_method
+            and not manifest.source.acquisition
             and manifest.privacy.classification == "unclassified"
         ):
             declared_provenance = {
@@ -564,11 +564,11 @@ def flaw(
         The new finding.
     """
     return data.Finding(
-        finding_id=finding_id,
-        rule_version="multimodal-curation.v1",
+        identifier=finding_id,
+        rule="multimodal-curation.v1",
         severity=severity,
         confidence=1.0,
-        affected_scope=scope,
+        scope=scope,
         evidence=evidence,
         remediation=remediation,
         owner="data-curation",

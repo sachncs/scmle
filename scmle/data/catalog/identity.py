@@ -4,11 +4,13 @@ from collections.abc import Mapping
 import dataclasses
 import pathlib
 from typing import Any
+from typing import ClassVar
 from typing import Self
 from urllib.parse import urlsplit
 from urllib.parse import urlunsplit
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.catalog import canon
 
 DIGEST_LENGTH = 64
@@ -72,34 +74,46 @@ def assay(value: str, field_name: str) -> str:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Source:
-    """Identity and governance context for a caller-owned data source."""
+    """Identity and governance context for a caller-owned data source.
+
+    Attributes:
+        uri: The source URI or path; normalized on construction.
+        version: The source's own version label.
+        owner: Who owns the source.
+        acquisition: How the data was acquired.
+        privacy: The privacy classification of the data.
+    """
 
     __module__ = "scmle.data.catalog"
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "acquisition_method": "acquisition",
+                "privacy_classification": "privacy",
+            }
+        ),
+    )
 
     uri: str | pathlib.Path = "memory://"
     version: str = ""
     owner: str = ""
-    acquisition_method: str = ""
-    privacy_classification: str = ""
+    acquisition: str = ""
+    privacy: str = ""
 
     def __post_init__(self) -> None:
         """Validates and normalizes source identity fields.
 
         Raises:
             ValueError: If ``uri`` is empty or whitespace.
-            TypeError: If ``version``, ``owner``, ``acquisition_method``, or
-                ``privacy_classification`` is not a string.
+            TypeError: If ``version``, ``owner``, ``acquisition``, or
+                ``privacy`` is not a string.
         """
         uri_value = str(self.uri)
         if not uri_value.strip():
             raise errors.InputError("uri must not be empty")
         object.__setattr__(self, "uri", normalize(uri_value))
-        for field_name in (
-            "version",
-            "owner",
-            "acquisition_method",
-            "privacy_classification",
-        ):
+        for field_name in ("version", "owner", "acquisition", "privacy"):
             field_value = getattr(self, field_name)
             if not isinstance(field_value, str):
                 raise errors.KindError(f"{field_name} must be a string")
@@ -110,15 +124,18 @@ class Source:
         """The deterministic identity of the declared source.
 
         This is the ``sha256:`` digest of the URI, version, owner,
-        acquisition method, and privacy classification.
+        acquisition method, and privacy classification. The digest names
+        the source across runs, so it hashes the version-1 keys
+        (``acquisition_method``, ``privacy_classification``): renaming the
+        fields never changes the identity of a registered source.
         """
         return canon.digest_value(
             {
                 "uri": self.uri,
                 "version": self.version,
                 "owner": self.owner,
-                "acquisition_method": self.acquisition_method,
-                "privacy_classification": self.privacy_classification,
+                "acquisition_method": self.acquisition,
+                "privacy_classification": self.privacy,
             }
         )
 
@@ -132,8 +149,8 @@ class Source:
             "uri": self.uri,
             "version": self.version,
             "owner": self.owner,
-            "acquisition_method": self.acquisition_method,
-            "privacy_classification": self.privacy_classification,
+            "acquisition": self.acquisition,
+            "privacy": self.privacy,
             "source_identity": self.source_identity,
         }
 
@@ -157,10 +174,8 @@ class Source:
             uri=str(record["uri"]),
             version=str(record.get("version", "")),
             owner=str(record.get("owner", "")),
-            acquisition_method=str(record.get("acquisition_method", "")),
-            privacy_classification=str(
-                record.get("privacy_classification", "")
-            ),
+            acquisition=str(record.get("acquisition", "")),
+            privacy=str(record.get("privacy", "")),
         )
         expected = record.get("source_identity")
         if expected != source.source_identity:

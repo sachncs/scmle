@@ -489,21 +489,20 @@ def manifested(
     if raw_hash:
         object_hashes["raw-source"] = raw_hash
     return data.DatasetManifest(
-        dataset_id=f"ds_{content_hash[:8]}",
-        schema_hash=schema_hash(frame),
-        data_hash=content_hash,
-        row_count=len(frame),
-        column_count=frame.shape[1],
+        identifier=f"ds_{content_hash[:8]}",
+        digests={"schema": schema_hash(frame), "data": content_hash},
+        rows=len(frame),
+        columns=frame.shape[1],
         target=target,
         uri=str(uri),
-        snapshot_id=identity,
+        snapshot=identity,
         modality=modality,
         source=data.Origin(
-            acquisition_method=semantic(uri),
+            acquisition=semantic(uri),
         ),
         lineage=data.Ancestry(
-            source_snapshot=identity,
-            object_hashes=object_hashes,
+            snapshot=identity,
+            digests=object_hashes,
         ),
     )
 

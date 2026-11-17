@@ -36,11 +36,11 @@ def flaw(
         An open finding with confidence 1.0 and owner ``data-curation``.
     """
     return data.Finding(
-        finding_id=finding_id,
-        rule_version="document-curation.v1",
+        identifier=finding_id,
+        rule="document-curation.v1",
         severity=severity,
         confidence=1.0,
-        affected_scope=scope,
+        scope=scope,
         evidence=evidence,
         remediation=remediation,
         owner="data-curation",

@@ -70,12 +70,12 @@ class Consumer:
         pending = self.ledger.reclaim()
         if pending is None:
             return None
-        if pending.consumer_group != self.consumer_group:
+        if pending.consumer != self.consumer_group:
             raise failure.StreamingError(
                 "consumer_group_mismatch",
                 "pending acknowledgement belongs to another consumer group",
                 self.ledger.source.source_identity(),
-                {"pending_consumer_group": pending.consumer_group},
+                {"pending_consumer_group": pending.consumer},
             )
         try:
             self.acknowledge(pending)
@@ -84,10 +84,10 @@ class Consumer:
                 "acknowledgement_failed",
                 "external acknowledgement failed; retry is required",
                 self.ledger.source.source_identity(),
-                {"batch_id": pending.batch_id},
+                {"batch_id": pending.batch},
             ) from error
         self.ledger.retract()
-        return pending.batch_id
+        return pending.batch
 
     def consume(
         self,

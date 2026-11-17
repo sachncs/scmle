@@ -63,11 +63,7 @@ def replay(
             it is recorded as committed without transaction evidence.
     """
     evidence = next(
-        (
-            item
-            for item in current.transaction_evidence
-            if item.batch_id == batch.batch_id
-        ),
+        (item for item in current.commitments if item.batch == batch.batch_id),
         None,
     )
     if evidence is not None:
@@ -84,10 +80,10 @@ def replay(
             accepted=False,
             duplicate=True,
             checkpoint=evidence.acknowledgement.checkpoint,
-            sink_receipt=evidence.sink_receipt,
+            sink_receipt=evidence.receipt,
             acknowledgement=evidence.acknowledgement,
         )
-    if batch.batch_id in current.committed_batch_ids:
+    if batch.batch_id in current.committed:
         raise failure.StreamingError(
             "transaction_evidence_missing",
             "batch was committed without transactional evidence",
@@ -114,14 +110,14 @@ def settle(
         The state at the batch's next checkpoint with the batch identity
         added, and the evidence added in batch identity order.
     """
-    recorded = current.transaction_evidence
+    recorded = current.commitments
     if evidence is not None:
         recorded = tuple(
-            sorted((*recorded, evidence), key=lambda item: item.batch_id)
+            sorted((*recorded, evidence), key=lambda item: item.batch)
         )
     return transaction.Settlement(
         batch.next_checkpoint,
-        tuple(sorted((*current.committed_batch_ids, batch.batch_id))),
+        tuple(sorted((*current.committed, batch.batch_id))),
         recorded,
     )
 
@@ -285,8 +281,8 @@ class Journal(archive.Archive):
             raise errors.KindError("writer must be callable")
         self.validate(batch)
         if acknowledgement is not None and (
-            acknowledgement.source_identity != batch.source_identity
-            or acknowledgement.batch_id != batch.batch_id
+            acknowledgement.source != batch.source_identity
+            or acknowledgement.batch != batch.batch_id
         ):
             raise failure.StreamingError(
                 "acknowledgement_batch_mismatch",
@@ -296,7 +292,7 @@ class Journal(archive.Archive):
             )
         with self.lock():
             current = self.load()
-            if batch.batch_id in current.committed_batch_ids:
+            if batch.batch_id in current.committed:
                 if acknowledgement is not None:
                     self.earmark(acknowledgement)
                 return transaction.Receipt(

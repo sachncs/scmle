@@ -120,7 +120,7 @@ class Source(abc.ABC):
         if any(not isinstance(event, timeline.Event) for event in values):
             raise errors.KindError("transport records must yield Event values")
         ordered = tuple(
-            sorted(values, key=lambda event: (event.sequence, event.event_id))
+            sorted(values, key=lambda event: (event.sequence, event.identifier))
         )
         eligible, duplicates, late = self.sift(ordered, committed, current)
         selected = tuple(eligible[:limit])
@@ -168,26 +168,29 @@ class Source(abc.ABC):
         eligible: list[timeline.Event] = []
         selected_ids: set[str] = set()
         for event in ordered:
-            if event.event_id in committed or event.event_id in selected_ids:
-                duplicates.add(event.event_id)
+            if (
+                event.identifier in committed
+                or event.identifier in selected_ids
+            ):
+                duplicates.add(event.identifier)
                 continue
             if event.sequence <= current.sequence:
-                late.add(event.event_id)
+                late.add(event.identifier)
                 if self.late_data_policy is timeline.Lateness.DROP:
                     continue
                 if self.late_data_policy is timeline.Lateness.REJECT:
                     raise timeline.IncrementalError(
                         "late_event",
-                        f"event '{event.event_id}' is older than checkpoint",
+                        f"event '{event.identifier}' is older than checkpoint",
                         self.source_uri,
                         {
-                            "event_id": event.event_id,
+                            "event_id": event.identifier,
                             "event_sequence": event.sequence,
                             "checkpoint_sequence": current.sequence,
                         },
                     )
             eligible.append(event)
-            selected_ids.add(event.event_id)
+            selected_ids.add(event.identifier)
         return eligible, duplicates, late
 
     def read_events(
