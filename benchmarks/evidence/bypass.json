@@ -420,7 +420,7 @@
       "override": "",
       "registered": true,
       "seconds": 2.0,
-      "site": "scmle.data.custody.journal:Journal.admit",
+      "site": "scmle.assurance.custody.journal:Journal.admit",
       "stopped": "split.resident.reopen",
       "surface": "api",
       "vector": "delete evaluation.json of a completed run and resume"
@@ -434,7 +434,7 @@
       "override": "",
       "registered": true,
       "seconds": 2.0,
-      "site": "scmle.data.custody.journal:Journal.admit",
+      "site": "scmle.assurance.custody.journal:Journal.admit",
       "stopped": "split.resident.reopen",
       "surface": "api",
       "vector": "exclude the winner in config.json, rehash the declaration, delete execution_plan.json and evaluation.json, resume"
@@ -462,7 +462,7 @@
       "override": "",
       "registered": true,
       "seconds": 6.2,
-      "site": "scmle.data.custody.journal:Journal.admit",
+      "site": "scmle.assurance.custody.journal:Journal.admit",
       "stopped": "split.resident.reopen",
       "surface": "api",
       "vector": "delete evaluation.json of a confirmed charter run and resume"

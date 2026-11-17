@@ -8,9 +8,9 @@ import support
 
 from scmle.assurance.charter import sealing
 import scmle.assurance.charter.contracts
+from scmle.assurance.custody import sealed
+import scmle.assurance.custody.manifest
 from scmle.contracts import errors
-from scmle.data.custody import sealed
-import scmle.data.custody.manifest
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "integration-key"
@@ -72,7 +72,7 @@ def test_the_charter_artifacts_are_written_and_verifiable(
         "custody_log.jsonl",
     ):
         assert (folder / name).exists(), name
-    loaded = scmle.data.custody.manifest.restore(
+    loaded = scmle.assurance.custody.manifest.restore(
         json.loads((folder / "split_manifest.json").read_text())
     )
     assert len(loaded.sha256) == 64

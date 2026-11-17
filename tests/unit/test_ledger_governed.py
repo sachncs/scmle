@@ -6,12 +6,12 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.custody import sealed
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import explore
 from scmle.assurance.ledger import governed
 from scmle.assurance.ledger import online_fdr
 import scmle.assurance.ledger.ledger
-from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
 from tests.unit.test_charter_contracts import make_charter
 

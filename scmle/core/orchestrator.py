@@ -19,6 +19,7 @@ import pandas
 
 from scmle.api import results
 import scmle.artifacts.store
+from scmle.assurance.custody import journal
 from scmle.contracts import capabilities
 from scmle.contracts import errors
 from scmle.contracts import events
@@ -28,7 +29,6 @@ from scmle.core import compiler
 from scmle.core import policies
 import scmle.core.context
 import scmle.core.stages
-from scmle.data.custody import journal
 from scmle.data.profiling import profiler
 from scmle.evaluation import metrics
 from scmle.evaluation import selection

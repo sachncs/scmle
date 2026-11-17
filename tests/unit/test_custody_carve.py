@@ -4,8 +4,8 @@ import numpy
 import pytest
 from sklearn import model_selection
 
+from scmle.assurance.custody import carve
 from scmle.contracts import errors
-from scmle.data.custody import carve
 
 CH, DH = "c" * 64, "d" * 64
 

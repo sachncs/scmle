@@ -5,8 +5,8 @@ import pandas
 import pytest
 from scipy import stats
 
+from scmle.assurance.custody import sealed
 from scmle.contracts import errors
-from scmle.data.custody import sealed
 from scmle.data.robustness import coverage
 from scmle.data.robustness import forward
 from scmle.data.robustness import shift

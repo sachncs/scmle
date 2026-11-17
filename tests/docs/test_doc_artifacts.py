@@ -9,8 +9,8 @@ import pytest
 
 from benchmarks import reliability
 from scmle.artifacts import bundle
+from scmle.assurance.custody import sealed
 from scmle.contracts import errors
-from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
 from scmle.deploy import vuln_gate
 from scmle.inference import packaging

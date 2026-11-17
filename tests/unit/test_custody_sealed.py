@@ -5,8 +5,8 @@ import json
 import pandas
 import pytest
 
+from scmle.assurance.custody import sealed
 from scmle.contracts import errors
-from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
 
 

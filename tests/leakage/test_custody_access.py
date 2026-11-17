@@ -12,12 +12,12 @@ import typing
 import numpy
 import pandas
 
+from scmle.assurance.custody import pipeline
+from scmle.assurance.custody import sealed
+import scmle.assurance.custody.vault
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.custody import pipeline
-from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
-import scmle.governance.vault
 from tests.unit.test_charter_contracts import make_charter
 
 SENTINEL = "sentinel"
@@ -98,7 +98,7 @@ def test_the_view_reaches_no_sealed_object_or_token():
             sealed.Locker
             | sealed.Vault
             | sealed.Journal
-            | scmle.governance.vault.SealedTestSet
+            | scmle.assurance.custody.vault.SealedTestSet
             | splitters.Lockbox,
         )
         for o in objects
@@ -146,7 +146,7 @@ def test_the_orchestrator_process_keeps_only_the_ids():
     built = build()
     outcome, vault = built.outcome, built.vault
     held = vault.sets["C"]
-    assert isinstance(held.locked, scmle.governance.vault.SealedTestSet)
+    assert isinstance(held.locked, scmle.assurance.custody.vault.SealedTestSet)
     assert not hasattr(held.locked, "features")
     assert not hasattr(held.locked, "target")
     assert held.ids == outcome.manifest.confirmation_ids

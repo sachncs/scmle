@@ -13,10 +13,10 @@ import pytest
 import support
 
 import scmle.api.project
+from scmle.assurance.custody import journal
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.core import policies
-from scmle.data.custody import journal
 from scmle.runtime import state
 
 

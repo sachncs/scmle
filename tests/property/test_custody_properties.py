@@ -7,8 +7,8 @@ from hypothesis import strategies
 import numpy
 from sklearn import model_selection
 
+from scmle.assurance.custody import carve
 from scmle.contracts import errors
-from scmle.data.custody import carve
 
 
 @strategies.composite

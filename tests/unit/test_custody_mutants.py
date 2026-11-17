@@ -13,11 +13,11 @@ import json
 import pandas
 import pytest
 
+from scmle.assurance.custody import merkle
+from scmle.assurance.custody import sealed
+from scmle.assurance.custody import vault
 from scmle.contracts import errors
-from scmle.data.custody import merkle
-from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
-from scmle.governance import vault
 
 
 def resident(values=(1.0, 2.0, 3.0)):

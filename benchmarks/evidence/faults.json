@@ -1,6 +1,6 @@
 {
   "claim": "C1",
-  "code": "b91507e0ccb692b3192403b40135d24136b84154f505fcfa38f9fcb01f916a16",
+  "code": "fcea203c7fb59b137dc3bbec60e0aef27a5f57d85320c8c4ed496d33f38f0df8",
   "data": "simulated tables and synthetic inputs only",
   "floor": 1.0,
   "gates": [
@@ -468,7 +468,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.0,
-      "site": "scmle.data.custody.journal:Journal.admit"
+      "site": "scmle.assurance.custody.journal:Journal.admit"
     },
     {
       "cause": "run resumed after its journal recorded the test set opened",
@@ -488,7 +488,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.0,
-      "site": "scmle.data.custody.journal:Journal.read"
+      "site": "scmle.assurance.custody.journal:Journal.read"
     },
     {
       "cause": "custody journal with a verdict's reviewer rewritten",
@@ -822,7 +822,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 1.08,
-      "site": "scmle.governance.vault:SealedTestSet.bind"
+      "site": "scmle.assurance.custody.vault:SealedTestSet.bind"
     },
     {
       "cause": "sealed test set bound twice",
@@ -842,7 +842,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 1.1,
-      "site": "scmle.governance.vault:SealedTestSet.open"
+      "site": "scmle.assurance.custody.vault:SealedTestSet.open"
     },
     {
       "cause": "sealed test set opened with a wrong token",

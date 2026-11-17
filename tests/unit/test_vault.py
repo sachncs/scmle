@@ -6,8 +6,8 @@ import sys
 import pandas
 import pytest
 
+from scmle.assurance.custody import vault
 from scmle.contracts import errors
-from scmle.governance import vault
 
 
 @pytest.fixture

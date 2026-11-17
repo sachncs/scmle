@@ -16,11 +16,11 @@ from typing import Self
 
 import pandas
 
+from scmle.assurance.custody import merkle
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.contracts import signing
-from scmle.data.custody import merkle
 from scmle.data.splitting import splitters
 
 MANIFEST_VERSION = 2

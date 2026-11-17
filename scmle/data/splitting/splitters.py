@@ -185,7 +185,7 @@ class ResidentTestSet(Lockbox):
     Python cannot hide attributes, so the lock is a protocol: trial code only
     receives development data, and `open` enforces a one-time, token-gated
     release that is recorded. The sealed variant moves the rows to a separate
-    process (see `scmle.governance.vault`).
+    process (see `scmle.assurance.custody.vault`).
 
     Attributes:
         features: Test features.

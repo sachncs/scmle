@@ -16,9 +16,9 @@ import gc
 import numpy
 import pandas
 
+from scmle.assurance.custody import pipeline
+from scmle.assurance.custody import sealed
 from scmle.contracts import tasks
-from scmle.data.custody import pipeline
-from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
 from tests.unit.test_charter_contracts import make_charter
 

@@ -8,11 +8,11 @@ from scmle import cli
 from scmle.artifacts import claims_audit
 from scmle.assurance.charter import sealing
 import scmle.assurance.charter.rules
+from scmle.assurance.custody import sealed
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 from scmle.assurance.ledger import ledger
 from scmle.contracts import errors
-from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_ledger_governed import build

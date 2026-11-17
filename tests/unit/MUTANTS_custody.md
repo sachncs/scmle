@@ -16,8 +16,8 @@ timeout)`.
 
 ## Custody modules and the vault
 
-Modules: `scmle/data/custody/{carve,manifest,merkle,pipeline,sealed}.py`,
-`scmle/governance/vault.py`. Tests: `tests/unit/test_custody_*.py`,
+Modules: `scmle/assurance/custody/{carve,manifest,merkle,pipeline,sealed}.py`,
+`scmle/assurance/custody/vault.py`. Tests: `tests/unit/test_custody_*.py`,
 `tests/property/test_custody_properties.py`, `tests/unit/test_vault.py`,
 `tests/leakage/test_custody_access.py`.
 

@@ -7,7 +7,7 @@ import pandas
 
 import scmle
 import scmle.api.project
-from scmle.governance import vault
+from scmle.assurance.custody import vault
 
 
 def test_the_package_root_re_exports_nothing():

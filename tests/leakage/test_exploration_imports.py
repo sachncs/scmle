@@ -17,8 +17,8 @@ import pytest
 import scmle
 
 FORBIDDEN = (
-    "scmle.data.custody",
-    "scmle.governance.vault",
+    "scmle.assurance.custody",
+    "scmle.assurance.custody.vault",
     "scmle.data.splitting.splitters",
     "scmle.core.stages",
 )
@@ -106,14 +106,14 @@ def test_no_module_reaches_custody_through_its_imports(package):
 
 def test_the_checker_sees_an_import_and_matches_whole_names(tmp_path):
     sample = tmp_path / "bad.py"
-    sample.write_text("from scmle.governance import vault\n")
-    assert "scmle.governance.vault" in imported_modules(sample)
-    assert forbidden("scmle.data.custody.sealed")
+    sample.write_text("from scmle.assurance.custody import vault\n")
+    assert "scmle.assurance.custody.vault" in imported_modules(sample)
+    assert forbidden("scmle.assurance.custody.sealed")
     assert not forbidden("scmle.data.custody_like")
 
 
 def test_the_closure_follows_imports_to_the_vault():
-    reached = closure("scmle.data.custody.pipeline")
-    assert "scmle.governance.vault" in reached
-    trail = reached["scmle.governance.vault"]
-    assert trail[0] == "scmle.data.custody.pipeline" and len(trail) >= 3
+    reached = closure("scmle.assurance.custody.pipeline")
+    assert "scmle.assurance.custody.vault" in reached
+    trail = reached["scmle.assurance.custody.vault"]
+    assert trail[0] == "scmle.assurance.custody.pipeline" and len(trail) >= 3

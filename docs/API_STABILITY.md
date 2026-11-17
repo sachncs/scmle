@@ -37,7 +37,7 @@ entry and a regenerated snapshot (`scripts/check_api_compatibility.py
 One deliberate change to the pinned surface: `Project` gained the optional
 keyword `charter` (default `None`, so every existing call is unchanged) and the
 snapshot was regenerated for that single entry. The charter and custody
-modules (`scmle.assurance.charter`, `scmle.data.custody`) are extension surfaces
+modules (`scmle.assurance.charter`, `scmle.assurance.custody`) are extension surfaces
 like the other qualification modules.
 
 ## Leakage screen

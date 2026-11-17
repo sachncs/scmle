@@ -6,16 +6,16 @@ import pandas
 
 from scmle.assurance.charter import contracts
 from scmle.assurance.charter import sealing
+from scmle.assurance.custody import vault
+import scmle.assurance.custody.pipeline
+import scmle.assurance.custody.sealed
 from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import tasks
 import scmle.core.context
 from scmle.core.stages import exploration
-import scmle.data.custody.pipeline
-import scmle.data.custody.sealed
 from scmle.data.splitting import splitters
 from scmle.evaluation import reweighing
-from scmle.governance import vault
 
 
 class Impounding(exploration.Exploration):
@@ -138,12 +138,12 @@ class Impounding(exploration.Exploration):
                 "as units"
             )
         self.check_known_entity(context, charter, split)
-        log = scmle.data.custody.sealed.Journal(
+        log = scmle.assurance.custody.sealed.Journal(
             context.store.directory / "custody_log.jsonl"
             if context.store is not None
             else None
         )
-        vault_set = scmle.data.custody.sealed.Vault(log)
+        vault_set = scmle.assurance.custody.sealed.Vault(log)
         data_hash = (
             context.manifest.data_hash
             if context.manifest is not None
@@ -151,7 +151,7 @@ class Impounding(exploration.Exploration):
                 pandas.util.hash_pandas_object(frame).to_numpy().tobytes()
             ).hexdigest()
         )
-        outcome = scmle.data.custody.pipeline.sequester(
+        outcome = scmle.assurance.custody.pipeline.sequester(
             charter=charter,
             split=split,
             frame=frame,
@@ -224,7 +224,10 @@ class Impounding(exploration.Exploration):
                     "the charter's unit_of_prediction is known_entity_future, "
                     f"which needs data.{role} (the entity and the time order)"
                 )
-        if split.manifest.strategy not in scmle.data.custody.pipeline.TEMPORAL:
+        if (
+            split.manifest.strategy
+            not in scmle.assurance.custody.pipeline.TEMPORAL
+        ):
             raise errors.ConfigError(
                 "known_entity_future needs time-ordered validation "
                 "(temporal or rolling), not "

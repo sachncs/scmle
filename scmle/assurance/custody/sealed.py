@@ -1,15 +1,15 @@
 """Sealed sets, the hash-chained open log and the exploration view.
 
-Protection model. A sealed set lives in a separate operating-system
-process (`scmle.governance.vault`): after sealing, the orchestrator keeps only
+Protection model. A sealed set lives in a separate operating-system process
+(`scmle.assurance.custody.vault`): after sealing, the orchestrator keeps only
 row ids and a release token, and the rows travel to the token holder once, over
 a channel keyed by a secret that only the parent and the vault hold. Code that
-is given only an `View` has no reference to a sealed set, a vault
-or a token, so it cannot open one by accident or by attribute access. This is
-tamper-evident custody on one machine, not adversary-proof: a process with the
-same operating-system privileges could still attach to the vault or read the
-original file. Every sealing, token issue, open and refused attempt is written
-to a hash-chained log that holds ids and counts but never row values.
+is given only an `View` has no reference to a sealed set, a vault or a token, so
+it cannot open one by accident or by attribute access. This is tamper-evident
+custody on one machine, not adversary-proof: a process with the same
+operating-system privileges could still attach to the vault or read the original
+file. Every sealing, token issue, open and refused attempt is written to a
+hash-chained log that holds ids and counts but never row values.
 """
 
 from collections.abc import Mapping
@@ -23,10 +23,10 @@ from typing import Any
 
 import pandas
 
+from scmle.assurance.custody import vault
 from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.data.splitting import splitters
-from scmle.governance import vault
 
 LOGGER = logging.getLogger(__name__)
 

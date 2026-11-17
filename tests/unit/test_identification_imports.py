@@ -6,7 +6,7 @@ import pathlib
 import scmle.data.identification
 
 FORBIDDEN = (
-    "scmle.data.custody",
+    "scmle.assurance.custody",
     "scmle.assurance.ledger.confirm",
     "scmle.assurance.ledger.governed",
     "scmle.assurance.ledger.ledger",

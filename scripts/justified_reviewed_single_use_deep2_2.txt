@@ -13,15 +13,15 @@ scmle/assurance/charter/feasibility.py n_required_mean single-use public closed 
 scmle/assurance/charter/feasibility.py detectability single-use public closed form named by tests/statistics/test_power_formulas and eight unit assertions in the feasibility tests
 scmle/assurance/charter/sealing.py inscribe single-use public writer called by cli and by sixty tests that seal charters
 scmle/preparation/preprocessing.py wrap single-use instantiate already has ten decision points, the C901 limit, so the five wrapper conditions here would break complexity; the survival, forecast, multi-target, uplift, query wrapping order is also fixed in one place
-scmle/data/custody/carve.py autocorrelation single-use named by tests/unit/test_custody_carve, test_custody_pipeline and MUTANTS_custody.md, which pin its zero result for a constant series
-scmle/data/custody/carve.py enclose single-use mutates in_c in place and returns it, a contract test_custody_mutants_data checks, and carve's time-block branch would grow a loop
-scmle/data/custody/carve.py link single-use inlined into unitize it raises complexity to 11 against a limit of 10 (checked with ruff), because of the negative-code skip and first-seen branch
-scmle/data/custody/carve.py pick single-use named by test_custody_mutants_data, which pins that one unit is always left unmarked and the target rounding
-scmle/data/custody/carve.py restrict single-use raises the ConfigError that the carve docstring names, and test_custody_carve, test_custody_mutants_data and MUTANTS_custody.md call it directly
-scmle/data/custody/carve.py unitize single-use union-find with two nested closures (find, union) that MUTANTS_custody.md names; inlined into carve it would add to a function whose decision points are time-block versus stratified draw and the too-few-units note
-scmle/data/custody/merkle.py combine single-use tagged parent hash tested directly by ten assertions in test_custody_merkle, test_custody_mutants and test_reliability_contracts
-scmle/data/custody/merkle.py merkle_root single-use named by test_custody_merkle, test_custody_mutants and MUTANTS_custody.md, which pin the odd-level carry and EMPTY_ROOT
-scmle/data/custody/merkle.py fingerprints single-use named by test_custody_mutants and MUTANTS_custody.md, which pin the ascending-id ordering before hashing
+scmle/assurance/custody/carve.py autocorrelation single-use named by tests/unit/test_custody_carve, test_custody_pipeline and MUTANTS_custody.md, which pin its zero result for a constant series
+scmle/assurance/custody/carve.py enclose single-use mutates in_c in place and returns it, a contract test_custody_mutants_data checks, and carve's time-block branch would grow a loop
+scmle/assurance/custody/carve.py link single-use inlined into unitize it raises complexity to 11 against a limit of 10 (checked with ruff), because of the negative-code skip and first-seen branch
+scmle/assurance/custody/carve.py pick single-use named by test_custody_mutants_data, which pins that one unit is always left unmarked and the target rounding
+scmle/assurance/custody/carve.py restrict single-use raises the ConfigError that the carve docstring names, and test_custody_carve, test_custody_mutants_data and MUTANTS_custody.md call it directly
+scmle/assurance/custody/carve.py unitize single-use union-find with two nested closures (find, union) that MUTANTS_custody.md names; inlined into carve it would add to a function whose decision points are time-block versus stratified draw and the too-few-units note
+scmle/assurance/custody/merkle.py combine single-use tagged parent hash tested directly by ten assertions in test_custody_merkle, test_custody_mutants and test_reliability_contracts
+scmle/assurance/custody/merkle.py merkle_root single-use named by test_custody_merkle, test_custody_mutants and MUTANTS_custody.md, which pin the odd-level carry and EMPTY_ROOT
+scmle/assurance/custody/merkle.py fingerprints single-use named by test_custody_mutants and MUTANTS_custody.md, which pin the ascending-id ordering before hashing
 scmle/assurance/detectors/certificates.py documentation single-use AST scan that keeps a docstring sharing a line with another statement; test_qualification_certificates pins the resulting hash_source behaviour, and the scan is non-obvious next to hash_source's tokenizer loop
 scmle/assurance/detectors/labels.py assign single-use tested directly in test_detector_labels, which pins the -1 result where no class reaches its threshold
 scmle/assurance/detectors/labels.py mislabeled single-use tested directly in test_detector_labels and its caller detect is a long assembly of the Noise record

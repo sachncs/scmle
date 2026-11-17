@@ -14,12 +14,12 @@ import pandas
 
 from scmle.assurance.charter import contracts
 from scmle.assurance.charter import feasibility
+from scmle.assurance.custody import carve
+from scmle.assurance.custody import merkle
+from scmle.assurance.custody import sealed
+import scmle.assurance.custody.manifest
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.custody import carve
-from scmle.data.custody import merkle
-from scmle.data.custody import sealed
-import scmle.data.custody.manifest
 from scmle.data.splitting import duplicates
 from scmle.data.splitting import splitters
 
@@ -42,7 +42,7 @@ class Outcome:
 
     split: splitters.Split
     view: sealed.View
-    manifest: scmle.data.custody.manifest.Manifest
+    manifest: scmle.assurance.custody.manifest.Manifest
     feasibility: feasibility.Feasibility
 
 
@@ -366,7 +366,7 @@ def finish(
         folds=folds,
         notes=notes,
     )
-    manifest = scmle.data.custody.manifest.Manifest(
+    manifest = scmle.assurance.custody.manifest.Manifest(
         strategy=old.strategy,
         seed=charter.seed,
         embargo_rows=embargo_rows,

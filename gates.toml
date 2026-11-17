@@ -196,7 +196,7 @@ override = "none"
 variables = []
 
 [split.resident.reopen]
-site = "scmle.data.custody.journal:Journal.admit"
+site = "scmle.assurance.custody.journal:Journal.admit"
 error = "BlockedError"
 claim = "C2, C8"
 passes = "The run has a custody journal, its chain is intact, and it records no opening of the test set."
@@ -205,7 +205,7 @@ override = "none"
 variables = []
 
 [split.resident.journal]
-site = "scmle.data.custody.journal:Journal.read"
+site = "scmle.assurance.custody.journal:Journal.read"
 error = "BlockedError"
 claim = "C2, C8"
 passes = "There is no journal, or every entry's previous digest and own digest match the hash chain."
@@ -376,7 +376,7 @@ override = "none"
 variables = ["data.treatment_column", "MIN_ARM_ROWS"]
 
 [vault.bind]
-site = "scmle.governance.vault:SealedTestSet.bind"
+site = "scmle.assurance.custody.vault:SealedTestSet.bind"
 error = "LeakageError"
 claim = "C2, C8"
 passes = "The rows were not released and the vault process answers ok to the bind message."
@@ -385,7 +385,7 @@ override = "none"
 variables = []
 
 [vault.open]
-site = "scmle.governance.vault:SealedTestSet.open"
+site = "scmle.assurance.custody.vault:SealedTestSet.open"
 error = "LeakageError"
 claim = "C2, C8"
 passes = "The rows were not released and the vault process answers ok, after which the vault is closed."

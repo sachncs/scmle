@@ -7,11 +7,11 @@ import pandas
 import pytest
 
 from scmle.assurance.charter import feasibility
+from scmle.assurance.custody import carve
+from scmle.assurance.custody import pipeline
+from scmle.assurance.custody import sealed
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.custody import carve
-from scmle.data.custody import pipeline
-from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
 from tests.unit.test_charter_contracts import make_charter
 

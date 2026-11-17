@@ -10,13 +10,13 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.custody import carve
+from scmle.assurance.custody import pipeline
+from scmle.assurance.custody import sealed
+import scmle.assurance.custody.manifest
 from scmle.contracts import errors
 from scmle.contracts import tasks
 import scmle.contracts.tasks
-from scmle.data.custody import carve
-from scmle.data.custody import pipeline
-from scmle.data.custody import sealed
-import scmle.data.custody.manifest
 from scmle.data.splitting import splitters
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_custody_manifest import make
@@ -102,7 +102,7 @@ def test_an_overlap_is_named_by_the_later_set():
 
 def test_scope_error_lists_the_allowed_scopes():
     assert message(lambda: make(scope="x")) == (
-        f"scope must be one of {scmle.data.custody.manifest.SCOPES}"
+        f"scope must be one of {scmle.assurance.custody.manifest.SCOPES}"
     )
 
 
@@ -117,23 +117,25 @@ def test_hash_and_version_errors_are_exact_and_a_missing_hash_is_an_error():
     record = make().to_dict()
     record["strategy"] = "other"
     assert message(
-        lambda: scmle.data.custody.manifest.Manifest.from_dict(record)
+        lambda: scmle.assurance.custody.manifest.Manifest.from_dict(record)
     ) == ("split manifest hash mismatch: the manifest was edited")
     del record["sha256"]
     assert message(
-        lambda: scmle.data.custody.manifest.Manifest.from_dict(record)
+        lambda: scmle.assurance.custody.manifest.Manifest.from_dict(record)
     ) == ("split manifest hash mismatch: the manifest was edited")
     assert message(
-        lambda: scmle.data.custody.manifest.Manifest.from_dict({})
+        lambda: scmle.assurance.custody.manifest.Manifest.from_dict({})
     ) == ("unsupported split manifest version")
 
 
 def test_a_record_without_a_version_or_ids_is_unsupported_not_a_key_error():
-    assert message(lambda: scmle.data.custody.manifest.restore({})) == (
+    assert message(lambda: scmle.assurance.custody.manifest.restore({})) == (
         "unsupported split manifest version: None"
     )
     assert message(
-        lambda: scmle.data.custody.manifest.restore({"manifest_version": 9})
+        lambda: scmle.assurance.custody.manifest.restore(
+            {"manifest_version": 9}
+        )
     ) == ("unsupported split manifest version: 9")
 
 
@@ -141,24 +143,27 @@ def test_a_v1_record_without_notes_loads_and_a_bad_fingerprint_is_exact():
     v1 = splitters.Manifest("random", 3, (0, 1), (2,), (((0,), (1,)),))
     record = v1.to_dict()
     record.pop("notes", None)
-    assert scmle.data.custody.manifest.restore(record).notes == ()
+    assert scmle.assurance.custody.manifest.restore(record).notes == ()
     record["fingerprint"] = "0" * 16
-    assert message(lambda: scmle.data.custody.manifest.restore(record)) == (
-        "split manifest fingerprint mismatch: the manifest was edited"
-    )
+    assert message(
+        lambda: scmle.assurance.custody.manifest.restore(record)
+    ) == ("split manifest fingerprint mismatch: the manifest was edited")
 
 
 def test_a_manifest_without_roots_loads_with_empty_roots():
     record = make().to_dict()
     assert "row_roots" not in record
     assert (
-        scmle.data.custody.manifest.Manifest.from_dict(record).row_roots == ()
+        scmle.assurance.custody.manifest.Manifest.from_dict(record).row_roots
+        == ()
     )
 
 
 def test_pairs_of_a_root_are_stored_as_tuples_after_a_round_trip():
     manifest = make(row_roots=(("exploration", "a" * 64),))
-    loaded = scmle.data.custody.manifest.Manifest.from_dict(manifest.to_dict())
+    loaded = scmle.assurance.custody.manifest.Manifest.from_dict(
+        manifest.to_dict()
+    )
     assert loaded.row_roots == (("exploration", "a" * 64),)
     assert loaded == manifest
 

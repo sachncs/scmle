@@ -3,9 +3,9 @@
 import pandas
 import pytest
 
+from scmle.assurance.custody import vault
 from scmle.contracts import errors
 from scmle.governance import registry
-from scmle.governance import vault
 
 
 def test_the_champion_alias_does_not_move_without_a_signed_approval(tmp_path):

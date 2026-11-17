@@ -24,11 +24,11 @@ log's one-time open of a sealed set stay in force underneath; the guard only
 adds the deployment ledger's attestation in front of them.
 
 Reach. `Loop`'s wrappers, a `ModelRegistryStore` with an attached guard (so
-`Maintainer.elevate`, `revertible` and
-`enlist(promote=True)` too) and nothing else. The custody API
-(`scmle.data.custody`) is not routed through the guard: its own one-time open
-of a sealed set stays the only check there, and `Loop.reopen_sealed` is the
-wrapper for callers who want the attestation in front of it.
+`Maintainer.elevate`, `revertible` and `enlist(promote=True)` too) and nothing
+else. The custody API (`scmle.assurance.custody`) is not routed through the
+guard: its own one-time open of a sealed set stays the only check there, and
+`Loop.reopen_sealed` is the wrapper for callers who want the attestation in
+front of it.
 
 Limits. The guard is code around the entry points of this package. It cannot
 stop a person or a process with file or interpreter access from calling the

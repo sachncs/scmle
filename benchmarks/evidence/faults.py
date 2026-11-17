@@ -539,12 +539,12 @@ def confirmation(times: int) -> None:
     Args:
         times: 1 passes; 2 injects a second use of the confirmation set.
     """
+    from scmle.assurance.custody import sealed
     from scmle.assurance.ledger import confirm
     from scmle.assurance.ledger import controls
     from scmle.assurance.ledger import explore
     from scmle.assurance.ledger import online_fdr
     import scmle.assurance.ledger.ledger
-    from scmle.data.custody import sealed
     from scmle.data.splitting import splitters
 
     def world(rows: int, seed: int) -> tuple[pandas.DataFrame, pandas.Series]:
@@ -779,9 +779,9 @@ def vault(fault: str) -> None:
     Args:
         fault: `bind` (bind twice), `open` (a wrong token) or `none`.
     """
-    import scmle.governance.vault
+    import scmle.assurance.custody.vault
 
-    locked = scmle.governance.vault.SealedTestSet(
+    locked = scmle.assurance.custody.vault.SealedTestSet(
         pandas.DataFrame({"a": [1.0, 2.0, 3.0]}),
         pandas.Series([0, 1, 0]),
         (10, 11, 12),
@@ -803,7 +803,7 @@ def custody(fault: str) -> None:
         fault: `opened` (the test set was opened, then resumed), `edited`
             (a verdict's reviewer was rewritten, then read) or `none`.
     """
-    from scmle.data.custody import journal
+    from scmle.assurance.custody import journal
 
     folder = Path(tempfile.mkdtemp(prefix="faults-"))
     record = journal.Journal(folder / "custody" / "run_x.jsonl", "run_x")

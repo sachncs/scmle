@@ -5,7 +5,7 @@ import hashlib
 import numpy
 import pandas
 
-from scmle.data.custody import merkle
+from scmle.assurance.custody import merkle
 
 
 def table():

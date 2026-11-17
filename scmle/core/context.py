@@ -12,6 +12,8 @@ import pandas
 from scmle.api import results
 import scmle.artifacts.bundle
 import scmle.artifacts.store
+from scmle.assurance.custody import pipeline
+from scmle.assurance.custody import sealed
 from scmle.contracts import capabilities
 from scmle.contracts import errors
 from scmle.contracts import events
@@ -20,8 +22,6 @@ from scmle.contracts import lineage
 from scmle.contracts import tasks
 import scmle.contracts.data
 import scmle.contracts.metrics
-from scmle.data.custody import pipeline
-from scmle.data.custody import sealed
 from scmle.data.readers import streaming
 from scmle.data.splitting import splitters
 from scmle.evaluation import metrics

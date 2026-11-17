@@ -7,6 +7,7 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.custody import sealed
 from scmle.assurance.ledger import bivariate
 from scmle.assurance.ledger import budget
 from scmle.assurance.ledger import confirm
@@ -16,7 +17,6 @@ from scmle.assurance.ledger import online_fdr
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
 
 ALPHA = Fraction(1, 20)

@@ -3,7 +3,7 @@
 import pandas
 import pytest
 
-from scmle.governance import vault
+from scmle.assurance.custody import vault
 from scmle.runtime import ipc
 
 

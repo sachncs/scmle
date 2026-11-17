@@ -2917,3 +2917,5 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.data.charter` -> `scmle.assurance.charter`
 - `scmle.data.detectors` -> `scmle.assurance.detectors`
 - `scmle.data.admissibility` -> `scmle.assurance.admissibility`
+- `scmle.data.custody` -> `scmle.assurance.custody`
+- `scmle.governance.vault` -> `scmle.assurance.custody.vault`

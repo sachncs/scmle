@@ -23,10 +23,14 @@ from scmle.runtime import logs
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PACKAGES = (
     "scmle/cli.py",
-    "scmle/sampling",
+    "scmle/preparation/pseudo_labeling.py",
+    "scmle/preparation/resampling.py",
+    "scmle/preparation/strategies.py",
+    "scmle/preparation/synthesis.py",
     "scmle/operations",
     "scmle/monitoring",
     "scmle/governance",
+    "scmle/assurance/custody/vault.py",
     "scmle/deploy",
 )
 NAMED = re.compile(r"getLogger\(([^)]*)\)")
@@ -36,6 +40,7 @@ def sources():
     """The Python files of the rolled-out packages."""
     for name in PACKAGES:
         path = ROOT / name
+        assert path.exists(), name
         yield from [path] if path.is_file() else sorted(path.rglob("*.py"))
 
 

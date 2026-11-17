@@ -13,8 +13,8 @@ import pathlib
 import scmle.assurance.ledger
 
 FORBIDDEN = (
-    "scmle.data.custody",
-    "scmle.governance.vault",
+    "scmle.assurance.custody",
+    "scmle.assurance.custody.vault",
     "scmle.data.splitting",
     "scmle.core.stages",
 )
@@ -47,5 +47,5 @@ def test_no_ledger_module_imports_custody_or_the_vault():
 
 def test_the_checker_sees_an_import_when_there_is_one(tmp_path):
     sample = tmp_path / "bad.py"
-    sample.write_text("from scmle.data.custody import sealed\n")
-    assert "scmle.data.custody.sealed" in imported_modules(sample)
+    sample.write_text("from scmle.assurance.custody import sealed\n")
+    assert "scmle.assurance.custody.sealed" in imported_modules(sample)

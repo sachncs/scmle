@@ -2,8 +2,8 @@
 
 import logging
 
+from scmle.assurance.custody import sealed
 from scmle.contracts import signing
-from scmle.data.custody import sealed
 
 
 def test_an_unsigned_in_memory_log_warns_by_name(monkeypatch, caplog) -> None:

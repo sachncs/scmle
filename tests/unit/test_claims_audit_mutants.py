@@ -8,12 +8,12 @@ import pytest
 
 from scmle.artifacts import claims_audit
 from scmle.assurance.charter import sealing
+from scmle.assurance.custody import sealed
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.core import decision_reports
-from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
 from scmle.evaluation import coverage_confirm
 from scmle.evaluation import coverage_run
