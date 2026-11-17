@@ -6,11 +6,13 @@ import enum
 import hashlib
 import math
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.contracts import explanations
+from scmle.contracts import records
 
 
 def normalise(
@@ -93,11 +95,12 @@ class Finding:
     """One reviewable, reproducible observation about a dataset.
 
     Attributes:
-        finding_id: Stable identifier for the rule finding.
-        rule_version: Version of the rule that produced the finding.
+        identifier: Stable identifier for the rule finding.
+        rule: Versioned name of the rule that produced the finding, such as
+            ``pipeline-observation.v1``.
         severity: Operational impact if the finding is not addressed.
         confidence: Confidence in the finding, from zero through one.
-        affected_scope: Columns, rows, partitions, or objects affected.
+        scope: Columns, rows, partitions, or objects affected.
         evidence: Reproducible measurements or references supporting it.
         remediation: Action required to resolve or assess the finding.
         owner: Person or team responsible for the finding.
@@ -105,13 +108,25 @@ class Finding:
         disposition: Current review decision.
         blocking: Whether the finding blocks training or release.
         timestamp: UTC timestamp when the finding was observed.
+        migrations: Version steps of the stored finding, which is versioned
+            by the manifest that holds it.
     """
 
-    finding_id: str
-    rule_version: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "id": "identifier",
+                "rule_version": "rule",
+                "affected_scope": "scope",
+            }
+        ),
+    )
+
+    identifier: str
+    rule: str
     severity: FindingSeverity
     confidence: float
-    affected_scope: Mapping[str, Any]
+    scope: Mapping[str, Any]
     evidence: Mapping[str, Any]
     remediation: str
     owner: str
@@ -130,10 +145,10 @@ class Finding:
                 is blank, the confidence is not a finite number in [0, 1], or
                 the severity or disposition is not a valid value.
         """
-        if not self.finding_id.strip():
-            raise errors.InputError("finding_id must not be empty")
-        if not self.rule_version.strip():
-            raise errors.InputError("rule_version must not be empty")
+        if not self.identifier.strip():
+            raise errors.InputError("identifier must not be empty")
+        if not self.rule.strip():
+            raise errors.InputError("rule must not be empty")
         if not math.isfinite(self.confidence) or not 0 <= self.confidence <= 1:
             raise errors.InputError(
                 "confidence must be finite and between zero and one"
@@ -154,11 +169,11 @@ class Finding:
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON- and Arrow-compatible mapping."""
         return {
-            "id": self.finding_id,
-            "rule_version": self.rule_version,
+            "identifier": self.identifier,
+            "rule": self.rule,
             "severity": self.severity.value,
             "confidence": self.confidence,
-            "affected_scope": dict(self.affected_scope),
+            "scope": dict(self.scope),
             "evidence": dict(self.evidence),
             "remediation": self.remediation,
             "owner": self.owner,
@@ -201,11 +216,11 @@ class Finding:
             raise errors.InputError("category must not be empty")
         digest = hashlib.sha256(observation.encode("utf-8")).hexdigest()
         return cls(
-            finding_id=f"{finding_category}.{digest[:16]}",
-            rule_version="pipeline-observation.v1",
+            identifier=f"{finding_category}.{digest[:16]}",
+            rule="pipeline-observation.v1",
             severity=severity,
             confidence=1.0,
-            affected_scope={"category": finding_category},
+            scope={"category": finding_category},
             evidence={"message": observation},
             remediation="Review the observation and record a disposition.",
             owner="pipeline",
@@ -228,11 +243,11 @@ class Finding:
             The finding.
         """
         return cls(
-            finding_id=str(record["id"]),
-            rule_version=str(record["rule_version"]),
+            identifier=str(record["identifier"]),
+            rule=str(record["rule"]),
             severity=FindingSeverity(record["severity"]),
             confidence=float(record["confidence"]),
-            affected_scope=dict(record["affected_scope"]),
+            scope=dict(record["scope"]),
             evidence=dict(record["evidence"]),
             remediation=str(record["remediation"]),
             owner=str(record["owner"]),

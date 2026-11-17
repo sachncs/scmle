@@ -3,9 +3,11 @@
 from collections.abc import Mapping
 import dataclasses
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts.data import findings
 
 SHA256_HEX_LENGTH = 64
@@ -17,46 +19,60 @@ class Origin:
 
     Attributes:
         owner: Team or organization accountable for the source.
-        acquisition_method: How the source was acquired.
-        captured_at: Source capture timestamp, when known.
+        acquisition: How the source was acquired.
+        captured: Source capture timestamp, when known.
         timezone: Timezone used by source timestamps.
-        sampling_frame: Population or sampling frame represented by the data.
+        sampling: Population or sampling frame represented by the data.
         units: Units by semantic field name.
-        semantic_definitions: Human-readable definitions by field name.
-        extraction_query: Query or predicate used to extract the source.
-        object_prefix: Object-store prefix or partition selector.
+        definitions: Human-readable semantic definitions by field name.
+        query: Extraction query or predicate used to extract the source.
+        prefix: Object-store prefix or partition selector.
         license: License or usage grant covering the source.
-        access_policy: Policy governing access to the source.
+        access: Policy governing access to the source.
+        migrations: Version steps of the stored part, which is versioned by
+            the manifest that holds it.
     """
 
-    owner: str = ""
-    acquisition_method: str = ""
-    captured_at: str = ""
-    timezone: str = ""
-    sampling_frame: str = ""
-    units: Mapping[str, str] = dataclasses.field(default_factory=dict)
-    semantic_definitions: Mapping[str, str] = dataclasses.field(
-        default_factory=dict
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "acquisition_method": "acquisition",
+                "captured_at": "captured",
+                "sampling_frame": "sampling",
+                "semantic_definitions": "definitions",
+                "extraction_query": "query",
+                "object_prefix": "prefix",
+                "access_policy": "access",
+            }
+        ),
     )
-    extraction_query: str = ""
-    object_prefix: str = ""
+
+    owner: str = ""
+    acquisition: str = ""
+    captured: str = ""
+    timezone: str = ""
+    sampling: str = ""
+    units: Mapping[str, str] = dataclasses.field(default_factory=dict)
+    definitions: Mapping[str, str] = dataclasses.field(default_factory=dict)
+    query: str = ""
+    prefix: str = ""
     license: str = ""
-    access_policy: str = ""
+    access: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON- and Arrow-compatible mapping."""
         return {
             "owner": self.owner,
-            "acquisition_method": self.acquisition_method,
-            "captured_at": self.captured_at,
+            "acquisition": self.acquisition,
+            "captured": self.captured,
             "timezone": self.timezone,
-            "sampling_frame": self.sampling_frame,
+            "sampling": self.sampling,
             "units": dict(self.units),
-            "semantic_definitions": dict(self.semantic_definitions),
-            "extraction_query": self.extraction_query,
-            "object_prefix": self.object_prefix,
+            "definitions": dict(self.definitions),
+            "query": self.query,
+            "prefix": self.prefix,
             "license": self.license,
-            "access_policy": self.access_policy,
+            "access": self.access,
         }
 
     @classmethod
@@ -71,47 +87,78 @@ class Origin:
         """
         return cls(
             owner=str(record.get("owner", "")),
-            acquisition_method=str(record.get("acquisition_method", "")),
-            captured_at=str(record.get("captured_at", "")),
+            acquisition=str(record.get("acquisition", "")),
+            captured=str(record.get("captured", "")),
             timezone=str(record.get("timezone", "")),
-            sampling_frame=str(record.get("sampling_frame", "")),
+            sampling=str(record.get("sampling", "")),
             units=dict(record.get("units", {})),
-            semantic_definitions=dict(record.get("semantic_definitions", {})),
-            extraction_query=str(record.get("extraction_query", "")),
-            object_prefix=str(record.get("object_prefix", "")),
+            definitions=dict(record.get("definitions", {})),
+            query=str(record.get("query", "")),
+            prefix=str(record.get("prefix", "")),
             license=str(record.get("license", "")),
-            access_policy=str(record.get("access_policy", "")),
+            access=str(record.get("access", "")),
         )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Ancestry:
-    """Transform and label provenance for an immutable dataset snapshot."""
+    """Transform and label provenance for an immutable dataset snapshot.
 
-    source_snapshot: str = ""
-    parent_datasets: tuple[str, ...] = ()
+    Attributes:
+        snapshot: Id of the source snapshot.
+        parents: Ids of the parent datasets.
+        transformations: Transformations applied, in order.
+        labelling: Where the labels came from.
+        generator: Version of the label generator.
+        annotator: Version of the annotator.
+        adjudication: Adjudication status of the labels.
+        partitions: Ids of the partitions.
+        digests: Hash of each object, by object.
+        evolution: Schema evolution of the snapshot.
+        migrations: Version steps of the stored part, which is versioned by
+            the manifest that holds it.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "source_snapshot": "snapshot",
+                "parent_datasets": "parents",
+                "label_source": "labelling",
+                "label_generator_version": "generator",
+                "annotator_version": "annotator",
+                "adjudication_status": "adjudication",
+                "partition_ids": "partitions",
+                "object_hashes": "digests",
+                "schema_evolution": "evolution",
+            }
+        ),
+    )
+
+    snapshot: str = ""
+    parents: tuple[str, ...] = ()
     transformations: tuple[str, ...] = ()
-    label_source: str = ""
-    label_generator_version: str = ""
-    annotator_version: str = ""
-    adjudication_status: str = ""
-    partition_ids: tuple[str, ...] = ()
-    object_hashes: Mapping[str, str] = dataclasses.field(default_factory=dict)
-    schema_evolution: str = ""
+    labelling: str = ""
+    generator: str = ""
+    annotator: str = ""
+    adjudication: str = ""
+    partitions: tuple[str, ...] = ()
+    digests: Mapping[str, str] = dataclasses.field(default_factory=dict)
+    evolution: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON- and Arrow-compatible mapping."""
         return {
-            "source_snapshot": self.source_snapshot,
-            "parent_datasets": list(self.parent_datasets),
+            "snapshot": self.snapshot,
+            "parents": list(self.parents),
             "transformations": list(self.transformations),
-            "label_source": self.label_source,
-            "label_generator_version": self.label_generator_version,
-            "annotator_version": self.annotator_version,
-            "adjudication_status": self.adjudication_status,
-            "partition_ids": list(self.partition_ids),
-            "object_hashes": dict(self.object_hashes),
-            "schema_evolution": self.schema_evolution,
+            "labelling": self.labelling,
+            "generator": self.generator,
+            "annotator": self.annotator,
+            "adjudication": self.adjudication,
+            "partitions": list(self.partitions),
+            "digests": dict(self.digests),
+            "evolution": self.evolution,
         }
 
     @classmethod
@@ -125,45 +172,71 @@ class Ancestry:
             The lineage metadata.
         """
         return cls(
-            source_snapshot=str(record.get("source_snapshot", "")),
-            parent_datasets=tuple(record.get("parent_datasets", ())),
+            snapshot=str(record.get("snapshot", "")),
+            parents=tuple(record.get("parents", ())),
             transformations=tuple(record.get("transformations", ())),
-            label_source=str(record.get("label_source", "")),
-            label_generator_version=str(
-                record.get("label_generator_version", "")
-            ),
-            annotator_version=str(record.get("annotator_version", "")),
-            adjudication_status=str(record.get("adjudication_status", "")),
-            partition_ids=tuple(record.get("partition_ids", ())),
-            object_hashes=dict(record.get("object_hashes", {})),
-            schema_evolution=str(record.get("schema_evolution", "")),
+            labelling=str(record.get("labelling", "")),
+            generator=str(record.get("generator", "")),
+            annotator=str(record.get("annotator", "")),
+            adjudication=str(record.get("adjudication", "")),
+            partitions=tuple(record.get("partitions", ())),
+            digests=dict(record.get("digests", {})),
+            evolution=str(record.get("evolution", "")),
         )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Confidentiality:
-    """Privacy, consent, and retention controls for a dataset snapshot."""
+    """Privacy, consent, and retention controls for a dataset snapshot.
+
+    Attributes:
+        classification: Data classification level.
+        identifying: Whether the data contains personally identifying
+            information.
+        sensitive: Names of the sensitive fields.
+        consent: Consent basis for processing.
+        retention: Retention period.
+        deletion: Deletion policy.
+        access: Access policy.
+        redaction: Whether redaction is required.
+        migrations: Version steps of the stored part, which is versioned by
+            the manifest that holds it.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "contains_pii": "identifying",
+                "sensitive_fields": "sensitive",
+                "consent_basis": "consent",
+                "retention_period": "retention",
+                "deletion_policy": "deletion",
+                "access_policy": "access",
+                "redaction_required": "redaction",
+            }
+        ),
+    )
 
     classification: str = "unclassified"
-    contains_pii: bool = False
-    sensitive_fields: tuple[str, ...] = ()
-    consent_basis: str = ""
-    retention_period: str = ""
-    deletion_policy: str = ""
-    access_policy: str = ""
-    redaction_required: bool = False
+    identifying: bool = False
+    sensitive: tuple[str, ...] = ()
+    consent: str = ""
+    retention: str = ""
+    deletion: str = ""
+    access: str = ""
+    redaction: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON- and Arrow-compatible mapping."""
         return {
             "classification": self.classification,
-            "contains_pii": self.contains_pii,
-            "sensitive_fields": list(self.sensitive_fields),
-            "consent_basis": self.consent_basis,
-            "retention_period": self.retention_period,
-            "deletion_policy": self.deletion_policy,
-            "access_policy": self.access_policy,
-            "redaction_required": self.redaction_required,
+            "identifying": self.identifying,
+            "sensitive": list(self.sensitive),
+            "consent": self.consent,
+            "retention": self.retention,
+            "deletion": self.deletion,
+            "access": self.access,
+            "redaction": self.redaction,
         }
 
     @classmethod
@@ -179,14 +252,23 @@ class Confidentiality:
         """
         return cls(
             classification=str(record.get("classification", "unclassified")),
-            contains_pii=bool(record.get("contains_pii", False)),
-            sensitive_fields=tuple(record.get("sensitive_fields", ())),
-            consent_basis=str(record.get("consent_basis", "")),
-            retention_period=str(record.get("retention_period", "")),
-            deletion_policy=str(record.get("deletion_policy", "")),
-            access_policy=str(record.get("access_policy", "")),
-            redaction_required=bool(record.get("redaction_required", False)),
+            identifying=bool(record.get("identifying", False)),
+            sensitive=tuple(record.get("sensitive", ())),
+            consent=str(record.get("consent", "")),
+            retention=str(record.get("retention", "")),
+            deletion=str(record.get("deletion", "")),
+            access=str(record.get("access", "")),
+            redaction=bool(record.get("redaction", False)),
         )
+
+
+PARTS = {
+    "source": Origin.migrations[0],
+    "lineage": Ancestry.migrations[0],
+    "privacy": Confidentiality.migrations[0],
+    "findings": findings.Finding.migrations[0],
+}
+VERSION = records.ORIGIN + 1
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -194,14 +276,14 @@ class DatasetManifest:
     """Immutable identity of an ingested dataset.
 
     Attributes:
-        dataset_id: Short identifier derived from the content hash.
-        schema_hash: Hash of column names and dtypes.
-        data_hash: Hash of the row contents.
-        row_count: Number of rows.
-        column_count: Number of columns.
+        identifier: Short identifier derived from the content hash.
+        digests: Hashes by the hashed thing: ``schema`` (column names and
+            dtypes) and ``data`` (the row contents).
+        rows: Number of rows.
+        columns: Number of columns.
         target: Name of the target column.
         uri: Where the data was read from.
-        snapshot_id: Immutable identity of the source snapshot.
+        snapshot: Immutable identity of the source snapshot.
         modality: Dataset modality, such as `tabular` or `image`.
         task: Intended learning task, when known.
         schema_version: Version of this manifest contract.
@@ -209,19 +291,32 @@ class DatasetManifest:
         lineage: Source, transformation, and label lineage metadata.
         privacy: Privacy, consent, retention, and access metadata.
         findings: Structured findings attached to this snapshot.
+        migrations: Version steps of the stored manifest and its parts.
     """
 
-    dataset_id: str
-    schema_hash: str
-    data_hash: str
-    row_count: int
-    column_count: int
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "dataset_id": "identifier",
+                "row_count": "rows",
+                "column_count": "columns",
+                "snapshot_id": "snapshot",
+            },
+            parts=PARTS,
+            groups={"digests": {"schema_hash": "schema", "data_hash": "data"}},
+        ),
+    )
+
+    identifier: str
+    digests: Mapping[str, str]
+    rows: int
+    columns: int
     target: str
     uri: str = ""
-    snapshot_id: str = ""
+    snapshot: str = ""
     modality: str = "tabular"
     task: str = ""
-    schema_version: int = 1
+    schema_version: int = VERSION
     source: Origin = dataclasses.field(default_factory=Origin)
     lineage: Ancestry = dataclasses.field(default_factory=Ancestry)
     privacy: Confidentiality = dataclasses.field(
@@ -236,14 +331,15 @@ class DatasetManifest:
             TypeError: If a count or the schema version is not an integer,
                 a metadata component has the wrong type, or a finding is not
                 a `Finding`.
-            ValueError: If an identity field (dataset id, hashes, target or
-                modality) is blank or not a string, a count is negative, or
-                the schema version is below one.
+            ValueError: If an identity field (dataset id, schema and data
+                digests, target or modality) is blank or not a string, a
+                count is negative, or the schema version is below one.
         """
+        object.__setattr__(self, "digests", dict(self.digests))
         text_fields: tuple[tuple[str, object], ...] = (
-            ("dataset_id", self.dataset_id),
-            ("schema_hash", self.schema_hash),
-            ("data_hash", self.data_hash),
+            ("identifier", self.identifier),
+            ("digests.schema", self.digests.get("schema")),
+            ("digests.data", self.digests.get("data")),
             ("target", self.target),
             ("modality", self.modality),
         )
@@ -251,18 +347,18 @@ class DatasetManifest:
             if not isinstance(field_value, str) or not field_value.strip():
                 raise errors.InputError(f"{field_name} must not be empty")
         for count_name, count_value in (
-            ("row_count", self.row_count),
-            ("column_count", self.column_count),
+            ("rows", self.rows),
+            ("columns", self.columns),
             ("schema_version", self.schema_version),
         ):
             if isinstance(count_value, bool) or not isinstance(
                 count_value, int
             ):
                 raise errors.KindError(f"{count_name} must be an integer")
-        if self.row_count < 0:
-            raise errors.InputError("row_count must not be negative")
-        if self.column_count < 0:
-            raise errors.InputError("column_count must not be negative")
+        if self.rows < 0:
+            raise errors.InputError("rows must not be negative")
+        if self.columns < 0:
+            raise errors.InputError("columns must not be negative")
         if self.schema_version < 1:
             raise errors.InputError("schema_version must be positive")
         for component_name, component, expected in (
@@ -280,14 +376,13 @@ class DatasetManifest:
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON- and Arrow-compatible mapping."""
         return {
-            "dataset_id": self.dataset_id,
-            "schema_hash": self.schema_hash,
-            "data_hash": self.data_hash,
-            "row_count": self.row_count,
-            "column_count": self.column_count,
+            "identifier": self.identifier,
+            "digests": dict(sorted(self.digests.items())),
+            "rows": self.rows,
+            "columns": self.columns,
             "target": self.target,
             "uri": self.uri,
-            "snapshot_id": self.snapshot_id,
+            "snapshot": self.snapshot,
             "modality": self.modality,
             "task": self.task,
             "schema_version": self.schema_version,
@@ -297,28 +392,46 @@ class DatasetManifest:
             "findings": [finding.to_dict() for finding in self.findings],
         }
 
+    def anchor(self) -> records.Layout:
+        """Returns the manifest in its version-1 layout, for identity digests.
+
+        A digest that names the manifest across runs is computed on this
+        layout, so renaming a stored key never changes it.
+        """
+        record = self.to_dict()
+        del record[records.KEY]
+        record = records.downgrade(self.migrations, record)
+        return {**record, records.KEY: records.ORIGIN}
+
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds a manifest from its serialized representation.
 
+        A manifest stored at an older schema version is migrated first,
+        parts included.
+
         Args:
-            record: A mapping as produced by `to_dict`.
+            record: A mapping as produced by `to_dict`, at any supported
+                schema version.
 
         Returns:
             The manifest.
         """
+        record = records.load(cls.__name__, cls.migrations, record)
         return cls(
-            dataset_id=str(record["dataset_id"]),
-            schema_hash=str(record["schema_hash"]),
-            data_hash=str(record["data_hash"]),
-            row_count=int(record["row_count"]),
-            column_count=int(record["column_count"]),
+            identifier=str(record["identifier"]),
+            digests={
+                str(key): str(value)
+                for key, value in dict(record["digests"]).items()
+            },
+            rows=int(record["rows"]),
+            columns=int(record["columns"]),
             target=str(record["target"]),
             uri=str(record.get("uri", "")),
-            snapshot_id=str(record.get("snapshot_id", "")),
+            snapshot=str(record.get("snapshot", "")),
             modality=str(record.get("modality", "tabular")),
             task=str(record.get("task", "")),
-            schema_version=int(record.get("schema_version", 1)),
+            schema_version=int(record[records.KEY]),
             source=Origin.from_dict(record.get("source", {})),
             lineage=Ancestry.from_dict(record.get("lineage", {})),
             privacy=Confidentiality.from_dict(record.get("privacy", {})),
@@ -336,15 +449,42 @@ class Passport:
     Unlike ``DatasetManifest``, this contract does not assume rows, columns,
     or a tabular schema. It binds a modality sample collection to its source,
     transformation, label, privacy, and curation evidence instead.
+
+    Attributes:
+        identifier: Id of the dataset.
+        snapshot: Immutable identity of the source snapshot.
+        modality: Dataset modality.
+        task: Intended learning task.
+        samples: Number of samples.
+        digests: Hashes by the hashed thing; ``content`` is the SHA-256 of
+            the sample collection.
+        schema_version: Version of this manifest contract.
+        source: Source ownership, acquisition, and semantic metadata.
+        lineage: Source, transformation, and label lineage metadata.
+        privacy: Privacy, consent, retention, and access metadata.
+        findings: Structured findings attached to this snapshot.
+        migrations: Version steps of the stored passport and its parts.
     """
 
-    dataset_id: str
-    snapshot_id: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "dataset_id": "identifier",
+                "snapshot_id": "snapshot",
+                "sample_count": "samples",
+            },
+            parts=PARTS,
+            groups={"digests": {"content_hash": "content"}},
+        ),
+    )
+
+    identifier: str
+    snapshot: str
     modality: str
     task: str
-    sample_count: int
-    content_hash: str
-    schema_version: int = 1
+    samples: int
+    digests: Mapping[str, str]
+    schema_version: int = VERSION
     source: Origin = dataclasses.field(default_factory=Origin)
     lineage: Ancestry = dataclasses.field(default_factory=Ancestry)
     privacy: Confidentiality = dataclasses.field(
@@ -363,28 +503,29 @@ class Passport:
                 negative, the schema version is below one, or the content
                 hash is not 64 lowercase hexadecimal characters.
         """
+        object.__setattr__(self, "digests", dict(self.digests))
+        content = self.digests.get("content", "")
         for name, value in (
-            ("dataset_id", self.dataset_id),
-            ("snapshot_id", self.snapshot_id),
+            ("identifier", self.identifier),
+            ("snapshot", self.snapshot),
             ("modality", self.modality),
             ("task", self.task),
-            ("content_hash", self.content_hash),
+            ("digests.content", content),
         ):
             if not value.strip():
                 raise errors.InputError(f"{name} must not be empty")
-        if isinstance(self.sample_count, bool) or not isinstance(
-            self.sample_count, int
-        ):
-            raise errors.KindError("sample_count must be an integer")
-        if self.sample_count < 0:
-            raise errors.InputError("sample_count must not be negative")
+        if isinstance(self.samples, bool) or not isinstance(self.samples, int):
+            raise errors.KindError("samples must be an integer")
+        if self.samples < 0:
+            raise errors.InputError("samples must not be negative")
         if self.schema_version < 1:
             raise errors.InputError("schema_version must be positive")
-        if len(self.content_hash) != SHA256_HEX_LENGTH or any(
-            character not in "0123456789abcdef"
-            for character in self.content_hash
+        if len(content) != SHA256_HEX_LENGTH or any(
+            character not in "0123456789abcdef" for character in content
         ):
-            raise errors.InputError("content_hash must be a SHA-256 hex digest")
+            raise errors.InputError(
+                "digests.content must be a SHA-256 hex digest"
+            )
         if not isinstance(self.source, Origin):
             raise errors.KindError("source must be Origin")
         if not isinstance(self.lineage, Ancestry):
@@ -397,12 +538,12 @@ class Passport:
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON- and Arrow-compatible modality manifest."""
         return {
-            "dataset_id": self.dataset_id,
-            "snapshot_id": self.snapshot_id,
+            "identifier": self.identifier,
+            "snapshot": self.snapshot,
             "modality": self.modality,
             "task": self.task,
-            "sample_count": self.sample_count,
-            "content_hash": self.content_hash,
+            "samples": self.samples,
+            "digests": dict(sorted(self.digests.items())),
             "schema_version": self.schema_version,
             "source": self.source.to_dict(),
             "lineage": self.lineage.to_dict(),
@@ -410,24 +551,43 @@ class Passport:
             "findings": [finding.to_dict() for finding in self.findings],
         }
 
+    def anchor(self) -> records.Layout:
+        """Returns the manifest in its version-1 layout, for identity digests.
+
+        A digest that names the manifest across runs is computed on this
+        layout, so renaming a stored key never changes it.
+        """
+        record = self.to_dict()
+        del record[records.KEY]
+        record = records.downgrade(self.migrations, record)
+        return {**record, records.KEY: records.ORIGIN}
+
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds a modality manifest from serialized evidence.
 
+        A passport stored at an older schema version is migrated first,
+        parts included.
+
         Args:
-            record: A mapping as produced by `to_dict`.
+            record: A mapping as produced by `to_dict`, at any supported
+                schema version.
 
         Returns:
             The manifest.
         """
+        record = records.load(cls.__name__, cls.migrations, record)
         return cls(
-            dataset_id=str(record["dataset_id"]),
-            snapshot_id=str(record["snapshot_id"]),
+            identifier=str(record["identifier"]),
+            snapshot=str(record["snapshot"]),
             modality=str(record["modality"]),
             task=str(record["task"]),
-            sample_count=int(record["sample_count"]),
-            content_hash=str(record["content_hash"]),
-            schema_version=int(record.get("schema_version", 1)),
+            samples=int(record["samples"]),
+            digests={
+                str(key): str(value)
+                for key, value in dict(record["digests"]).items()
+            },
+            schema_version=int(record[records.KEY]),
             source=Origin.from_dict(record.get("source", {})),
             lineage=Ancestry.from_dict(record.get("lineage", {})),
             privacy=Confidentiality.from_dict(record.get("privacy", {})),

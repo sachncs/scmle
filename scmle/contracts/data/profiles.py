@@ -259,7 +259,7 @@ class Curation:
             "dropped_columns": dict(self.dropped_columns),
             "release_ready": self.release_ready,
             "unresolved_blocking_findings": [
-                finding.finding_id
+                finding.identifier
                 for finding in self.unresolved_blocking_findings
             ],
         }
@@ -344,8 +344,8 @@ class Datasheet:
         if not report.risk_findings:
             limitations.append("No risk finding was emitted by the profiler.")
         return cls(
-            dataset_id=manifest.dataset_id,
-            snapshot_id=manifest.snapshot_id,
+            dataset_id=manifest.identifier,
+            snapshot_id=manifest.snapshot,
             modality=manifest.modality,
             task=manifest.task,
             target=manifest.target,

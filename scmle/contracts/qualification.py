@@ -12,12 +12,14 @@ import dataclasses
 import enum
 import math
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scipy import stats
 
 from scmle.contracts import errors
 from scmle.contracts import evidence
+from scmle.contracts import records
 
 SeedPath = tuple[str | int, ...]
 DEFAULT_CONFIDENCE = 0.95
@@ -114,16 +116,28 @@ def count(value: Any, name: str, minimum: int = 0) -> int:
     return value
 
 
-def require(cls: type, record: Mapping[str, Any]) -> None:
-    """Requires `record` to hold exactly the dataclass fields of `cls`.
+def require(cls: Any, record: Mapping[str, Any]) -> records.Layout:
+    """Migrates `record` and requires it to hold the dataclass fields of `cls`.
 
     Args:
-        cls: The dataclass whose fields are expected.
-        record: The mapping to check.
+        cls: The dataclass whose fields are expected; its `migrations`, if
+            it has any, lift a record stored at an older schema version.
+        record: The mapping to check, at any supported schema version.
+
+    Returns:
+        The record (at the current version, without its version key, when
+        `cls` has migrations).
 
     Raises:
-        ValueError: If the record has a field `cls` lacks or lacks one it has.
+        ValueError: If the record has a field `cls` lacks or lacks one it
+            has, or its schema version is unsupported.
     """
+    steps = getattr(cls, "migrations", None)
+    if steps is None:
+        record = dict(record)
+    else:
+        record = records.load(cls.__name__, steps, record)
+        del record[records.KEY]
     names = {field.name for field in dataclasses.fields(cls)}
     unexpected = sorted(set(record) - names)
     missing = sorted(names - set(record))
@@ -131,6 +145,7 @@ def require(cls: type, record: Mapping[str, Any]) -> None:
         raise errors.InputError(f"unexpected field(s): {unexpected}")
     if missing:
         raise errors.InputError(f"missing field(s): {missing}")
+    return record
 
 
 def tupled(value: Any, name: str) -> None:
@@ -152,29 +167,41 @@ class Check:
     """One statistical test or estimator and its decision.
 
     Attributes:
-        check_id: Stable identifier of the check.
-        null_hypothesis: The null being tested, in words.
+        identifier: Stable identifier of the check.
+        null: The null hypothesis being tested, in words.
         statistic: Test statistic or estimate.
         p_value: Probability under the null, when the check is a test.
         interval: Confidence interval, when the check is an estimator.
         effect: Effect size on a scale stated by the check.
         n: Rows the check used.
         decision: Action the result triggers.
-        set_id: Data set the check read.
-        seed_path: (run seed, component name, index) of its random stream.
+        subset: Data set the check read.
+        seeds: (run seed, component name, index) of its random stream.
         tier: Evidence tier. `confirmed` requires the confirmation set.
+        migrations: Version steps of the stored check.
     """
 
-    check_id: str
-    null_hypothesis: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "check_id": "identifier",
+                "null_hypothesis": "null",
+                "set_id": "subset",
+                "seed_path": "seeds",
+            }
+        ),
+    )
+
+    identifier: str
+    null: str
     statistic: float
     p_value: float | None
     interval: tuple[float, float] | None
     effect: float
     n: int
     decision: Decision
-    set_id: Subset
-    seed_path: SeedPath
+    subset: Subset
+    seeds: SeedPath
     tier: Tier
 
     def __post_init__(self) -> None:
@@ -189,8 +216,8 @@ class Check:
                 decision, set or tier has the wrong type, or the confirmed
                 tier is not on the confirmation set.
         """
-        evidence.require_text(self.check_id, "check_id")
-        evidence.require_text(self.null_hypothesis, "null_hypothesis")
+        evidence.require_text(self.identifier, "identifier")
+        evidence.require_text(self.null, "null")
         finite(self.statistic, "statistic")
         finite(self.effect, "effect")
         count(self.n, "n")
@@ -206,15 +233,15 @@ class Check:
                 raise errors.InputError("interval must satisfy low <= high")
         if self.p_value is None and self.interval is None:
             raise errors.InputError("a check needs a p_value or interval")
-        tupled(self.seed_path, "seed_path")
+        tupled(self.seeds, "seeds")
         for decision, kind in (
             (self.decision, Decision),
-            (self.set_id, Subset),
+            (self.subset, Subset),
             (self.tier, Tier),
         ):
             if not isinstance(decision, kind):
                 raise errors.InputError(f"expected a {kind.__name__}")
-        on_confirmation = self.set_id is Subset.CONFIRMATION
+        on_confirmation = self.subset is Subset.CONFIRMATION
         if self.tier is Tier.CONFIRMED and not on_confirmation:
             raise errors.InputError(
                 "confirmed tier requires the confirmation set 'C'"
@@ -228,16 +255,17 @@ class Check:
             sequences as lists.
         """
         return {
-            "check_id": self.check_id,
-            "null_hypothesis": self.null_hypothesis,
+            "schema_version": records.ORIGIN + len(self.migrations),
+            "identifier": self.identifier,
+            "null": self.null,
             "statistic": self.statistic,
             "p_value": self.p_value,
             "interval": None if self.interval is None else list(self.interval),
             "effect": self.effect,
             "n": self.n,
             "decision": self.decision.value,
-            "set_id": self.set_id.value,
-            "seed_path": list(self.seed_path),
+            "subset": self.subset.value,
+            "seeds": list(self.seeds),
             "tier": self.tier.value,
         }
 
@@ -246,24 +274,25 @@ class Check:
         """Rebuilds a check, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping as produced by `to_dict`.
+            record: A mapping as produced by `to_dict`, at any supported
+                schema version.
 
         Returns:
             The check.
         """
-        require(cls, record)
+        record = require(cls, record)
         interval = record["interval"]
         return cls(
-            check_id=record["check_id"],
-            null_hypothesis=record["null_hypothesis"],
+            identifier=record["identifier"],
+            null=record["null"],
             statistic=record["statistic"],
             p_value=record["p_value"],
             interval=None if interval is None else tuple(interval),
             effect=record["effect"],
             n=record["n"],
             decision=Decision(record["decision"]),
-            set_id=Subset(record["set_id"]),
-            seed_path=tuple(record["seed_path"]),
+            subset=Subset(record["subset"]),
+            seeds=tuple(record["seeds"]),
             tier=Tier(record["tier"]),
         )
 
@@ -273,18 +302,25 @@ class Claim:
     """A finding that survived exploration and was tested on `C`.
 
     Attributes:
-        claim_id: Stable identifier of the claim.
+        identifier: Stable identifier of the claim.
         statement: The finding, in words.
-        check_ids: Checks that support it.
+        checks: Ids of the checks that support it.
         adjusted_p_value: Multiplicity-adjusted p-value from confirmation.
         effect: Confirmed effect size.
         tier: Evidence tier. `confirmed` needs an adjusted p-value.
         assumptions: Assumptions the guarantee depends on.
+        migrations: Version steps of the stored claim.
     """
 
-    claim_id: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"claim_id": "identifier", "check_ids": "checks"}
+        ),
+    )
+
+    identifier: str
     statement: str
-    check_ids: tuple[str, ...]
+    checks: tuple[str, ...]
     adjusted_p_value: float | None
     effect: float
     tier: Tier
@@ -294,20 +330,20 @@ class Claim:
         """Validates the record.
 
         Raises:
-            ValueError: If the id or statement is blank, `check_ids` or
+            ValueError: If the id or statement is blank, `checks` or
                 `assumptions` is not a tuple, there are no check ids or one is
                 blank, the adjusted p-value is not within [0, 1], the effect
                 is not a finite number, the tier has the wrong type, or a
                 confirmed claim has no adjusted p-value.
         """
-        evidence.require_text(self.claim_id, "claim_id")
+        evidence.require_text(self.identifier, "identifier")
         evidence.require_text(self.statement, "statement")
-        tupled(self.check_ids, "check_ids")
+        tupled(self.checks, "checks")
         tupled(self.assumptions, "assumptions")
-        if not self.check_ids:
-            raise errors.InputError("check_ids must not be empty")
-        for check_id in self.check_ids:
-            evidence.require_text(check_id, "check_ids")
+        if not self.checks:
+            raise errors.InputError("checks must not be empty")
+        for check in self.checks:
+            evidence.require_text(check, "checks")
         if self.adjusted_p_value is not None:
             probability(self.adjusted_p_value, "adjusted_p_value")
         finite(self.effect, "effect")
@@ -324,9 +360,10 @@ class Claim:
             as its value.
         """
         return {
-            "claim_id": self.claim_id,
+            "schema_version": records.ORIGIN + len(self.migrations),
+            "identifier": self.identifier,
             "statement": self.statement,
-            "check_ids": list(self.check_ids),
+            "checks": list(self.checks),
             "adjusted_p_value": self.adjusted_p_value,
             "effect": self.effect,
             "tier": self.tier.value,
@@ -338,16 +375,17 @@ class Claim:
         """Rebuilds a claim, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping as produced by `to_dict`.
+            record: A mapping as produced by `to_dict`, at any supported
+                schema version.
 
         Returns:
             The claim.
         """
-        require(cls, record)
+        record = require(cls, record)
         return cls(
-            claim_id=record["claim_id"],
+            identifier=record["identifier"],
             statement=record["statement"],
-            check_ids=tuple(record["check_ids"]),
+            checks=tuple(record["checks"]),
             adjusted_p_value=record["adjusted_p_value"],
             effect=record["effect"],
             tier=Tier(record["tier"]),
@@ -359,27 +397,40 @@ class Claim:
 class Certificate:
     """Measured operating characteristics of a detector.
 
-    The detector ran on `planted` known defects and on `clean_rows` rows
+    The detector ran on `planted` known defects and on `clean` rows
     without defects. Plants are synthetic, so recall is optimistic; the
     Wilson lower bound states how well the count supports it.
 
     Attributes:
-        detector_id: Detector that was measured.
-        defect_type: Kind of defect planted.
+        detector: Id of the detector that was measured.
+        defect: Kind of defect planted.
         planted: Number of planted defects.
         detected: Planted defects the detector found.
-        clean_rows: Rows in the clean copy.
-        false_alarms: Clean rows the detector flagged.
-        seed_path: (run seed, component name, index) of the injection.
+        clean: Rows in the clean copy.
+        alarms: Clean rows the detector flagged (false alarms).
+        seeds: (run seed, component name, index) of the injection.
+        migrations: Version steps of the stored certificate.
     """
 
-    detector_id: str
-    defect_type: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "detector_id": "detector",
+                "defect_type": "defect",
+                "clean_rows": "clean",
+                "false_alarms": "alarms",
+                "seed_path": "seeds",
+            }
+        ),
+    )
+
+    detector: str
+    defect: str
     planted: int
     detected: int
-    clean_rows: int
-    false_alarms: int
-    seed_path: SeedPath
+    clean: int
+    alarms: int
+    seeds: SeedPath
 
     def __post_init__(self) -> None:
         """Validates the record.
@@ -388,22 +439,20 @@ class Certificate:
             ValueError: If an identity is blank, a count is not an integer,
                 the planted or clean-row count is below one, the detected or
                 false-alarm count is negative, the detected count exceeds the
-                planted count, the false alarms exceed the clean rows, or the
+                planted count, the alarms exceed the clean rows, or the
                 seed path is not a tuple.
         """
-        evidence.require_text(self.detector_id, "detector_id")
-        evidence.require_text(self.defect_type, "defect_type")
+        evidence.require_text(self.detector, "detector")
+        evidence.require_text(self.defect, "defect")
         count(self.planted, "planted", minimum=1)
         count(self.detected, "detected")
         if self.detected > self.planted:
             raise errors.InputError("detected must be between 0 and planted")
-        count(self.clean_rows, "clean_rows", minimum=1)
-        count(self.false_alarms, "false_alarms")
-        if self.false_alarms > self.clean_rows:
-            raise errors.InputError(
-                "false_alarms must be between 0 and clean_rows"
-            )
-        tupled(self.seed_path, "seed_path")
+        count(self.clean, "clean", minimum=1)
+        count(self.alarms, "alarms")
+        if self.alarms > self.clean:
+            raise errors.InputError("alarms must be between 0 and clean")
+        tupled(self.seeds, "seeds")
 
     @property
     def recall(self) -> float:
@@ -413,7 +462,7 @@ class Certificate:
     @property
     def false_alarm_rate(self) -> float:
         """Share of clean rows that were flagged."""
-        return self.false_alarms / self.clean_rows
+        return self.alarms / self.clean
 
     def recall_lower_bound(
         self, confidence: float = DEFAULT_CONFIDENCE
@@ -446,13 +495,14 @@ class Certificate:
             The certificate's fields as a dict, with the seed path as a list.
         """
         return {
-            "detector_id": self.detector_id,
-            "defect_type": self.defect_type,
+            "schema_version": records.ORIGIN + len(self.migrations),
+            "detector": self.detector,
+            "defect": self.defect,
             "planted": self.planted,
             "detected": self.detected,
-            "clean_rows": self.clean_rows,
-            "false_alarms": self.false_alarms,
-            "seed_path": list(self.seed_path),
+            "clean": self.clean,
+            "alarms": self.alarms,
+            "seeds": list(self.seeds),
         }
 
     @classmethod
@@ -460,18 +510,19 @@ class Certificate:
         """Rebuilds a certificate, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping as produced by `to_dict`.
+            record: A mapping as produced by `to_dict`, at any supported
+                schema version.
 
         Returns:
             The certificate.
         """
-        require(cls, record)
+        record = require(cls, record)
         return cls(
-            detector_id=record["detector_id"],
-            defect_type=record["defect_type"],
+            detector=record["detector"],
+            defect=record["defect"],
             planted=record["planted"],
             detected=record["detected"],
-            clean_rows=record["clean_rows"],
-            false_alarms=record["false_alarms"],
-            seed_path=tuple(record["seed_path"]),
+            clean=record["clean"],
+            alarms=record["alarms"],
+            seeds=tuple(record["seeds"]),
         )

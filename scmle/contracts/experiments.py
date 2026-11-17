@@ -5,7 +5,10 @@ import dataclasses
 import enum
 import json
 from typing import Any
+from typing import ClassVar
 from typing import Self
+
+from scmle.contracts import records
 
 DEFAULT_STRATEGY = "default"
 
@@ -55,22 +58,34 @@ class Plan:
     """Declarative, auditable description of the proposed workflow.
 
     Attributes:
-        plan_id: Deterministic identifier.
+        identifier: Deterministic identifier.
         task: Resolved task type value.
         metric: Primary metric name.
-        validation_strategy: Resolved split strategy name.
-        candidate_models: Models that will be trained, in execution order.
-        optimization_budget_seconds: Wall-clock budget.
+        validation: Resolved split strategy name.
+        candidates: Models that will be trained, in execution order.
+        budget: Wall-clock optimization budget, in seconds.
         decisions: Included / rejected / deferred techniques with reasons.
         warnings: Risks surfaced during planning.
+        migrations: Version steps of the stored plan.
     """
 
-    plan_id: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "plan_id": "identifier",
+                "validation_strategy": "validation",
+                "candidate_models": "candidates",
+                "optimization_budget_seconds": "budget",
+            }
+        ),
+    )
+
+    identifier: str
     task: str
     metric: str
-    validation_strategy: str
-    candidate_models: tuple[str, ...]
-    optimization_budget_seconds: int
+    validation: str
+    candidates: tuple[str, ...]
+    budget: int
     decisions: tuple[Decision, ...] = ()
     warnings: tuple[str, ...] = ()
 
@@ -78,11 +93,11 @@ class Plan:
         """Returns a human-readable multi-line summary."""
         lines = [
             (
-                f"Plan {self.plan_id}: {self.task}, metric={self.metric}, "
-                f"validation={self.validation_strategy}, "
-                f"budget={self.optimization_budget_seconds}s"
+                f"Plan {self.identifier}: {self.task}, "
+                f"metric={self.metric}, validation={self.validation}, "
+                f"budget={self.budget}s"
             ),
-            "Candidates: " + ", ".join(self.candidate_models),
+            "Candidates: " + ", ".join(self.candidates),
         ]
         lines += [
             f"  [{d.action}] {d.technique}: {d.reason}" for d in self.decisions
@@ -94,22 +109,25 @@ class Plan:
     def from_dict(cls, record: dict[str, Any]) -> Self:
         """Rebuilds a plan from `to_dict` output.
 
-        Every key written by `to_dict` is required; a missing key raises
+        A stored plan of an older schema version is migrated first. Every
+        key written by `to_dict` is required; a missing key raises
         `KeyError`.
 
         Args:
-            record: A mapping as produced by `to_dict`.
+            record: A mapping as produced by `to_dict`, at any supported
+                schema version.
 
         Returns:
             The plan.
         """
+        record = records.load(cls.__name__, cls.migrations, record)
         return cls(
-            plan_id=record["plan_id"],
+            identifier=record["identifier"],
             task=record["task"],
             metric=record["metric"],
-            validation_strategy=record["validation_strategy"],
-            candidate_models=tuple(record["candidate_models"]),
-            optimization_budget_seconds=record["optimization_budget_seconds"],
+            validation=record["validation"],
+            candidates=tuple(record["candidates"]),
+            budget=record["budget"],
             decisions=tuple(
                 Decision(d["technique"], Edict(d["action"]), d["reason"])
                 for d in record["decisions"]
@@ -120,12 +138,13 @@ class Plan:
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
         return {
-            "plan_id": self.plan_id,
+            "schema_version": records.ORIGIN + len(self.migrations),
+            "identifier": self.identifier,
             "task": self.task,
             "metric": self.metric,
-            "validation_strategy": self.validation_strategy,
-            "candidate_models": list(self.candidate_models),
-            "optimization_budget_seconds": self.optimization_budget_seconds,
+            "validation": self.validation,
+            "candidates": list(self.candidates),
+            "budget": self.budget,
             "decisions": [d.to_dict() for d in self.decisions],
             "warnings": list(self.warnings),
         }

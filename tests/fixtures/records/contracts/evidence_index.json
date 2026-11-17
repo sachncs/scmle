@@ -1,0 +1,31 @@
+{
+  "records": [
+    {
+      "artifact": {
+        "digest": "sha256:a",
+        "path": "a.json"
+      },
+      "claim": "accuracy above floor",
+      "command_or_test": "uv run pytest tests",
+      "criterion_id": "accuracy",
+      "decision": "accepted",
+      "limitations": [
+        "synthetic data"
+      ],
+      "observed_at": "2026-10-20T12:00:00+00:00",
+      "raw_inputs": {
+        "run": "sha256:run"
+      },
+      "result": "pass",
+      "reviewer": "ci",
+      "scope": {
+        "modality": "tabular"
+      }
+    }
+  ],
+  "schema_version": 1,
+  "signature": {
+    "algorithm": "hmac-sha256",
+    "value": "6de11302ce923605fb43a0010855f003e7a01350daa3d0dead09e0bebfd3712c"
+  }
+}

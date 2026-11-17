@@ -6,9 +6,11 @@ import dataclasses
 import enum
 import json
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 
 class Contingency(enum.StrEnum):
@@ -86,23 +88,39 @@ class Evidence:
     this evidence envelope.
 
     Attributes:
-        evidence_type: Stable name of the evidence item, such as
+        kind: Stable name of the evidence item, such as
             ``checkpoint_resume`` or ``artifact_digest``.
-        execution_id: Identity of the run that performed the injection.
-        artifact_uri: URI of the durable evidence artifact.
-        artifact_digest: Digest of the evidence artifact contents.
-        observed_outcome: Result observed by the execution.
-        recorded_at: Timestamp supplied by the execution recorder.
+        execution: Identity of the run that performed the injection.
+        uri: URI of the durable evidence artifact.
+        digests: Digests by the hashed thing; ``artifact`` is the digest of
+            the evidence artifact contents.
+        outcome: Result observed by the execution.
+        recorded: Timestamp supplied by the execution recorder.
         reviewer: Human or automated reviewer that verified the evidence.
         observation: Concrete observation captured in the evidence record.
+        migrations: Version steps of the stored evidence, which is versioned
+            by the registry that holds it.
     """
 
-    evidence_type: str
-    execution_id: str
-    artifact_uri: str
-    artifact_digest: str
-    observed_outcome: Outcome
-    recorded_at: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "evidence_type": "kind",
+                "execution_id": "execution",
+                "artifact_uri": "uri",
+                "observed_outcome": "outcome",
+                "recorded_at": "recorded",
+            },
+            groups={"digests": {"artifact_digest": "artifact"}},
+        ),
+    )
+
+    kind: str
+    execution: str
+    uri: str
+    digests: Mapping[str, str]
+    outcome: Outcome
+    recorded: str
     reviewer: str
     observation: str
 
@@ -110,33 +128,34 @@ class Evidence:
         """Rejects evidence records that cannot be independently reviewed.
 
         Raises:
-            TypeError: If `observed_outcome` is not an `Outcome`.
-            ValueError: If a required text field is blank.
+            TypeError: If `outcome` is not an `Outcome`.
+            ValueError: If a required text field, or the artifact digest, is
+                blank.
         """
-        for name in (
-            "evidence_type",
-            "execution_id",
-            "artifact_uri",
-            "artifact_digest",
-            "recorded_at",
-            "reviewer",
-            "observation",
+        for name, value in (
+            ("kind", self.kind),
+            ("execution", self.execution),
+            ("uri", self.uri),
+            ("digests.artifact", self.digests.get("artifact")),
+            ("recorded", self.recorded),
+            ("reviewer", self.reviewer),
+            ("observation", self.observation),
         ):
-            value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise errors.InputError(f"{name} must not be empty")
-        if not isinstance(self.observed_outcome, Outcome):
-            raise errors.KindError("observed_outcome must be Outcome")
+        object.__setattr__(self, "digests", dict(self.digests))
+        if not isinstance(self.outcome, Outcome):
+            raise errors.KindError("outcome must be Outcome")
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> records.Layout:
         """Returns a deterministic JSON-compatible evidence record."""
         return {
-            "evidence_type": self.evidence_type,
-            "execution_id": self.execution_id,
-            "artifact_uri": self.artifact_uri,
-            "artifact_digest": self.artifact_digest,
-            "observed_outcome": self.observed_outcome.value,
-            "recorded_at": self.recorded_at,
+            "kind": self.kind,
+            "execution": self.execution,
+            "uri": self.uri,
+            "digests": dict(sorted(self.digests.items())),
+            "outcome": self.outcome.value,
+            "recorded": self.recorded,
             "reviewer": self.reviewer,
             "observation": self.observation,
         }
@@ -152,12 +171,15 @@ class Evidence:
             The evidence.
         """
         return cls(
-            evidence_type=str(record["evidence_type"]),
-            execution_id=str(record["execution_id"]),
-            artifact_uri=str(record["artifact_uri"]),
-            artifact_digest=str(record["artifact_digest"]),
-            observed_outcome=Outcome(record["observed_outcome"]),
-            recorded_at=str(record["recorded_at"]),
+            kind=str(record["kind"]),
+            execution=str(record["execution"]),
+            uri=str(record["uri"]),
+            digests={
+                str(key): str(value)
+                for key, value in dict(record["digests"]).items()
+            },
+            outcome=Outcome(record["outcome"]),
+            recorded=str(record["recorded"]),
             reviewer=str(record["reviewer"]),
             observation=str(record["observation"]),
         )
@@ -174,15 +196,15 @@ def require(requirements: tuple[str, ...]) -> None:
             repeated.
     """
     if not requirements:
-        raise errors.InputError("evidence_requirements must not be empty")
+        raise errors.InputError("requirements must not be empty")
     supplied: Iterable[object] = requirements  # may hold non-strings
     if any(
         not isinstance(requirement, str) or not requirement.strip()
         for requirement in supplied
     ):
-        raise errors.InputError("evidence_requirements must contain text")
+        raise errors.InputError("requirements must contain text")
     if len(set(requirements)) != len(requirements):
-        raise errors.InputError("evidence_requirements must be unique")
+        raise errors.InputError("requirements must be unique")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -195,20 +217,34 @@ class Plan:
 
     Attributes:
         scenario: Fault condition being tested.
-        expected_safe_outcome: Safe behavior required by the release policy.
+        outcome: Expected safe behavior required by the release policy.
         recoverability: Recovery promise made to operators and users.
-        evidence_requirements: Evidence types required for a passing result.
-        release_blocking: Whether an unsafe or unverified result blocks release.
-        verification_status: Current evidence state.
+        requirements: Evidence types required for a passing result.
+        blocking: Whether an unsafe or unverified result blocks release.
+        verification: Current evidence state.
         evidence: Evidence records from actual executions.
+        migrations: Version steps of the stored plan and its evidence, which
+            the registry that holds them versions.
     """
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "expected_safe_outcome": "outcome",
+                "evidence_requirements": "requirements",
+                "release_blocking": "blocking",
+                "verification_status": "verification",
+            },
+            parts={"evidence": Evidence.migrations[0]},
+        ),
+    )
+
     scenario: Contingency
-    expected_safe_outcome: SafeOutcome
+    outcome: SafeOutcome
     recoverability: Recoverability
-    evidence_requirements: tuple[str, ...]
-    release_blocking: bool
-    verification_status: Verification = Verification.PLANNED
+    requirements: tuple[str, ...]
+    blocking: bool
+    verification: Verification = Verification.PLANNED
     evidence: tuple[Evidence, ...] = ()
 
     def __post_init__(self) -> None:
@@ -216,7 +252,7 @@ class Plan:
 
         Raises:
             TypeError: If an enumerated field has the wrong type or
-                `release_blocking` is not a bool.
+                `blocking` is not a bool.
             ValueError: If the evidence requirements are empty, blank or
                 repeated, evidence types repeat, a status other than planned has
                 no evidence, or a passed scenario lacks a required evidence type
@@ -225,34 +261,27 @@ class Plan:
         """
         enum_fields = (
             ("scenario", self.scenario, Contingency),
-            ("expected_safe_outcome", self.expected_safe_outcome, SafeOutcome),
+            ("outcome", self.outcome, SafeOutcome),
             ("recoverability", self.recoverability, Recoverability),
-            (
-                "verification_status",
-                self.verification_status,
-                Verification,
-            ),
+            ("verification", self.verification, Verification),
         )
         for name, value, expected in enum_fields:
             if not isinstance(value, expected):
                 raise errors.KindError(f"{name} must be {expected.__name__}")
-        require(self.evidence_requirements)
-        if not isinstance(self.release_blocking, bool):
-            raise errors.KindError("release_blocking must be bool")
-        evidence_types = [item.evidence_type for item in self.evidence]
+        require(self.requirements)
+        if not isinstance(self.blocking, bool):
+            raise errors.KindError("blocking must be bool")
+        evidence_types = [item.kind for item in self.evidence]
         if len(set(evidence_types)) != len(evidence_types):
             raise errors.InputError(
                 "evidence types must be unique per scenario"
             )
-        if (
-            self.verification_status is not Verification.PLANNED
-            and not self.evidence
-        ):
+        if self.verification is not Verification.PLANNED and not self.evidence:
             raise errors.InputError(
                 "verification status requires execution evidence"
             )
-        if self.verification_status is Verification.PASSED:
-            missing = set(self.evidence_requirements) - set(evidence_types)
+        if self.verification is Verification.PASSED:
+            missing = set(self.requirements) - set(evidence_types)
             if missing:
                 missing_text = ", ".join(sorted(missing))
                 raise errors.InputError(
@@ -260,7 +289,7 @@ class Plan:
                     f"{missing_text}"
                 )
             if any(
-                item.observed_outcome is not Outcome.SAFE_OUTCOME_OBSERVED
+                item.outcome is not Outcome.SAFE_OUTCOME_OBSERVED
                 for item in self.evidence
             ):
                 raise errors.InputError(
@@ -271,11 +300,11 @@ class Plan:
         """Returns a deterministic JSON-compatible scenario record."""
         return {
             "scenario": self.scenario.value,
-            "expected_safe_outcome": self.expected_safe_outcome.value,
+            "outcome": self.outcome.value,
             "recoverability": self.recoverability.value,
-            "evidence_requirements": list(self.evidence_requirements),
-            "release_blocking": self.release_blocking,
-            "verification_status": self.verification_status.value,
+            "requirements": list(self.requirements),
+            "blocking": self.blocking,
+            "verification": self.verification.value,
             "evidence": [item.to_dict() for item in self.evidence],
         }
 
@@ -291,15 +320,18 @@ class Plan:
         """
         return cls(
             scenario=Contingency(record["scenario"]),
-            expected_safe_outcome=SafeOutcome(record["expected_safe_outcome"]),
+            outcome=SafeOutcome(record["outcome"]),
             recoverability=Recoverability(record["recoverability"]),
-            evidence_requirements=tuple(record["evidence_requirements"]),
-            release_blocking=bool(record["release_blocking"]),
-            verification_status=Verification(record["verification_status"]),
+            requirements=tuple(record["requirements"]),
+            blocking=bool(record["blocking"]),
+            verification=Verification(record["verification"]),
             evidence=tuple(
                 Evidence.from_dict(item) for item in record["evidence"]
             ),
         )
+
+
+VERSION = records.ORIGIN + len(Plan.migrations)
 
 
 @dataclasses.dataclass
@@ -398,23 +430,22 @@ class Registry:
             raise errors.InputError("evidence must be a non-empty tuple")
         if not all(isinstance(item, Evidence) for item in evidence):
             raise errors.KindError("evidence must contain Evidence values")
-        execution_ids = {item.execution_id for item in evidence}
-        if len(execution_ids) != 1:
+        executions = {item.execution for item in evidence}
+        if len(executions) != 1:
             raise errors.InputError(
-                "evidence for one scenario must share an execution_id"
+                "evidence for one scenario must share an execution"
             )
         plan = self.plans[scenario]
-        evidence_types = {item.evidence_type for item in evidence}
-        unexpected = evidence_types - set(plan.evidence_requirements)
+        evidence_types = {item.kind for item in evidence}
+        unexpected = evidence_types - set(plan.requirements)
         if unexpected:
             names = ", ".join(sorted(unexpected))
             raise errors.InputError(
                 f"evidence has unexpected requirements: {names}"
             )
-        missing = set(plan.evidence_requirements) - evidence_types
+        missing = set(plan.requirements) - evidence_types
         has_unsafe = any(
-            item.observed_outcome is Outcome.UNSAFE_OUTCOME_OBSERVED
-            for item in evidence
+            item.outcome is Outcome.UNSAFE_OUTCOME_OBSERVED for item in evidence
         )
         if has_unsafe:
             status = Verification.FAILED
@@ -424,7 +455,7 @@ class Registry:
             status = Verification.PASSED
         updated = dataclasses.replace(
             plan,
-            verification_status=status,
+            verification=status,
             evidence=evidence,
         )
         self.plans[scenario] = updated
@@ -450,7 +481,8 @@ class Registry:
         """Returns the complete plan in deterministic dictionary form.
 
         Returns:
-            A dict with ``schema_version`` 1 and ``scenarios``, the scenario
+            A dict with the current ``schema_version`` and ``scenarios``, the
+            scenario
             records ordered by scenario value. Raises `ValueError` if a
             required scenario has no plan.
         """
@@ -459,7 +491,7 @@ class Registry:
             self.plans.values(), key=lambda plan: plan.scenario.value
         )
         return {
-            "schema_version": 1,
+            "schema_version": VERSION,
             "scenarios": [plan.to_dict() for plan in ordered_plans],
         }
 
@@ -481,9 +513,12 @@ class Registry:
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds and validates a complete registry from a mapping.
 
+        A registry stored at an older schema version has its scenarios
+        migrated to the current layout first.
+
         Args:
-            record: A mapping with ``schema_version`` 1 and a ``scenarios``
-                list of scenario mappings.
+            record: A mapping with a supported ``schema_version`` and a
+                ``scenarios`` list of scenario mappings.
 
         Returns:
             The registry.
@@ -494,7 +529,12 @@ class Registry:
                 are not a list, a scenario repeats, a scenario record is
                 invalid, or a required scenario is missing.
         """
-        if record.get("schema_version") != 1:
+        version = record.get("schema_version")
+        if (
+            isinstance(version, bool)
+            or not isinstance(version, int)
+            or not records.ORIGIN <= version <= VERSION
+        ):
             raise errors.InputError(
                 "unsupported fault-injection plan schema version"
             )
@@ -505,7 +545,11 @@ class Registry:
         for item in scenarios:
             if not isinstance(item, Mapping):
                 raise errors.KindError("each scenario must be a mapping")
-            registry.register(Plan.from_dict(item))
+            registry.register(
+                Plan.from_dict(
+                    records.upgrade(Plan.migrations, dict(item), version)
+                )
+            )
         registry.insist()
         return registry
 
@@ -639,15 +683,15 @@ def drills() -> tuple[Plan, ...]:
     return tuple(
         Plan(
             scenario=scenario,
-            expected_safe_outcome=expected_safe_outcome,
+            outcome=outcome,
             recoverability=recoverability,
-            evidence_requirements=evidence_requirements,
-            release_blocking=True,
+            requirements=requirements,
+            blocking=True,
         )
         for (
             scenario,
-            expected_safe_outcome,
+            outcome,
             recoverability,
-            evidence_requirements,
+            requirements,
         ) in scenarios
     )

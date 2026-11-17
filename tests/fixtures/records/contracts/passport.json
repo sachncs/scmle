@@ -1,0 +1,80 @@
+{
+  "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "dataset_id": "img-1",
+  "findings": [
+    {
+      "affected_scope": {
+        "columns": [
+          "income"
+        ]
+      },
+      "blocking": false,
+      "confidence": 0.9,
+      "disposition": "open",
+      "evidence": {
+        "rate": 0.1
+      },
+      "id": "quality.missingness",
+      "owner": "data-team",
+      "remediation": "impute",
+      "reviewer": null,
+      "rule_version": "missingness.v2",
+      "severity": "warning",
+      "timestamp": "2026-10-20T09:00:00+00:00"
+    }
+  ],
+  "lineage": {
+    "adjudication_status": "complete",
+    "annotator_version": "2.0",
+    "label_generator_version": "4.1",
+    "label_source": "labels.py",
+    "object_hashes": {
+      "part": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "parent_datasets": [
+      "raw"
+    ],
+    "partition_ids": [
+      "p=1"
+    ],
+    "schema_evolution": "additive",
+    "source_snapshot": "raw-1",
+    "transformations": [
+      "clean"
+    ]
+  },
+  "modality": "image",
+  "privacy": {
+    "access_policy": "approved",
+    "classification": "confidential",
+    "consent_basis": "contract",
+    "contains_pii": true,
+    "deletion_policy": "on-request",
+    "redaction_required": true,
+    "retention_period": "90d",
+    "sensitive_fields": [
+      "email"
+    ]
+  },
+  "sample_count": 3,
+  "schema_version": 1,
+  "snapshot_id": "snap-1",
+  "source": {
+    "access_policy": "restricted",
+    "acquisition_method": "export",
+    "captured_at": "2026-10-20T09:00:00+00:00",
+    "extraction_query": "select *",
+    "license": "internal",
+    "object_prefix": "s3://b/p",
+    "owner": "ml",
+    "sampling_frame": "customers",
+    "semantic_definitions": {
+      "y": "churn"
+    },
+    "timezone": "UTC",
+    "units": {
+      "amount": "EUR"
+    }
+  },
+  "task": "binary_classification"
+}

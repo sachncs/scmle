@@ -1,0 +1,17 @@
+{
+  "check_id": "assoc.age",
+  "decision": "warn",
+  "effect": 0.3,
+  "interval": null,
+  "n": 100,
+  "null_hypothesis": "no association",
+  "p_value": 0.01,
+  "seed_path": [
+    7,
+    "assoc.age",
+    0
+  ],
+  "set_id": "X",
+  "statistic": 2.0,
+  "tier": "unverified"
+}

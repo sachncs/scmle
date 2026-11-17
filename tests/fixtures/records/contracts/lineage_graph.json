@@ -1,0 +1,30 @@
+{
+  "edges": [
+    {
+      "relationship": "trained_on",
+      "source_id": "source",
+      "target_id": "model"
+    }
+  ],
+  "nodes": [
+    {
+      "attributes": {},
+      "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "kind": "model",
+      "node_id": "model"
+    },
+    {
+      "attributes": {
+        "uri": "file:///d"
+      },
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "raw_source",
+      "node_id": "source"
+    }
+  ],
+  "schema_version": 1,
+  "topological_order": [
+    "source",
+    "model"
+  ]
+}

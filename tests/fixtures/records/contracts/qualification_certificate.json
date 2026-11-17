@@ -1,0 +1,13 @@
+{
+  "clean_rows": 1000,
+  "defect_type": "label_flip",
+  "detected": 45,
+  "detector_id": "label_noise",
+  "false_alarms": 20,
+  "planted": 50,
+  "seed_path": [
+    7,
+    "certificate.label_noise",
+    0
+  ]
+}

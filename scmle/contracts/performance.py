@@ -7,9 +7,11 @@ import enum
 import math
 import statistics
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 MIN_REFERENCE_RUNS = 2
 
@@ -47,14 +49,39 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Observation:
-    """One measured operation with the machine context for its result."""
+    """One measured operation with the machine context for its result.
+
+    Attributes:
+        operation: The lifecycle operation measured.
+        elapsed: Wall-clock time of the operation, in seconds.
+        memory: Peak resident memory during the operation, in gigabytes, or
+            None when it was not measured.
+        samples: Number of samples the operation processed.
+        machine: Machine the measurement ran on.
+        observed: Time of the measurement, as an offset-aware ISO-8601
+            timestamp.
+        software: Software environment of the measurement.
+        migrations: Version steps of the stored observation, which is
+            versioned by the run that holds it.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "elapsed_seconds": "elapsed",
+                "peak_memory_gb": "memory",
+                "sample_count": "samples",
+                "observed_at": "observed",
+            }
+        ),
+    )
 
     operation: Operation
-    elapsed_seconds: float
-    peak_memory_gb: float | None
-    sample_count: int
+    elapsed: float
+    memory: float | None
+    samples: int
     machine: str
-    observed_at: str
+    observed: str
     software: str
 
     def __post_init__(self) -> None:
@@ -69,35 +96,33 @@ class Observation:
         operation: Any = self.operation  # may be a raw value at runtime
         if not isinstance(operation, Operation):
             object.__setattr__(self, "operation", Operation(operation))
-        if not math.isfinite(self.elapsed_seconds) or self.elapsed_seconds < 0:
-            raise errors.InputError(
-                "elapsed_seconds must be finite and non-negative"
-            )
-        if self.peak_memory_gb is not None and (
-            not math.isfinite(self.peak_memory_gb) or self.peak_memory_gb < 0
+        if not math.isfinite(self.elapsed) or self.elapsed < 0:
+            raise errors.InputError("elapsed must be finite and non-negative")
+        if self.memory is not None and (
+            not math.isfinite(self.memory) or self.memory < 0
         ):
             raise errors.InputError(
-                "peak_memory_gb must be finite and non-negative when present"
+                "memory must be finite and non-negative when present"
             )
-        if isinstance(self.sample_count, bool) or self.sample_count < 0:
-            raise errors.InputError("sample_count must be non-negative")
+        if isinstance(self.samples, bool) or self.samples < 0:
+            raise errors.InputError("samples must be non-negative")
         machine: object = self.machine  # may be a non-string at runtime
         if not isinstance(machine, str) or not machine.strip():
             raise errors.InputError("machine must not be empty")
         software: object = self.software  # may be a non-string at runtime
         if not isinstance(software, str) or not software.strip():
             raise errors.InputError("software must not be empty")
-        parse_timestamp(self.observed_at, "observed_at")
+        parse_timestamp(self.observed, "observed")
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native performance evidence."""
         return {
             "operation": self.operation.value,
-            "elapsed_seconds": self.elapsed_seconds,
-            "peak_memory_gb": self.peak_memory_gb,
-            "sample_count": self.sample_count,
+            "elapsed": self.elapsed,
+            "memory": self.memory,
+            "samples": self.samples,
             "machine": self.machine,
-            "observed_at": self.observed_at,
+            "observed": self.observed,
             "software": self.software,
         }
 
@@ -113,24 +138,37 @@ class Observation:
         """
         return cls(
             operation=Operation(record["operation"]),
-            elapsed_seconds=float(record["elapsed_seconds"]),
-            peak_memory_gb=(
-                float(record["peak_memory_gb"])
-                if record.get("peak_memory_gb") is not None
+            elapsed=float(record["elapsed"]),
+            memory=(
+                float(record["memory"])
+                if record.get("memory") is not None
                 else None
             ),
-            sample_count=int(record["sample_count"]),
+            samples=int(record["samples"]),
             machine=str(record["machine"]),
-            observed_at=str(record["observed_at"]),
+            observed=str(record["observed"]),
             software=str(record["software"]),
         )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Run:
-    """One complete performance measurement run."""
+    """One complete performance measurement run.
 
-    run_id: str
+    Attributes:
+        identifier: The run's own id.
+        observations: One observation per measured operation.
+        migrations: Version steps of the stored run and its observations.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={"run_id": "identifier"},
+            parts={"observations": Observation.migrations[0]},
+        ),
+    )
+
+    identifier: str
     observations: tuple[Observation, ...]
 
     def __post_init__(self) -> None:
@@ -141,9 +179,9 @@ class Run:
                 operation repeats, or the observations come from more than one
                 environment.
         """
-        run_id: object = self.run_id  # may be a non-string at runtime
-        if not isinstance(run_id, str) or not run_id.strip():
-            raise errors.InputError("run_id must not be empty")
+        identifier: object = self.identifier  # may be a non-string at runtime
+        if not isinstance(identifier, str) or not identifier.strip():
+            raise errors.InputError("identifier must not be empty")
         normalized = tuple(self.observations)
         operations = [observation.operation for observation in normalized]
         if not normalized:
@@ -183,7 +221,8 @@ class Run:
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native run evidence."""
         return {
-            "run_id": self.run_id,
+            "schema_version": records.ORIGIN + len(self.migrations),
+            "identifier": self.identifier,
             "observations": [
                 observation.to_dict() for observation in self.observations
             ],
@@ -193,14 +232,18 @@ class Run:
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds a measured run from JSON-native evidence.
 
+        A run stored at an older schema version is migrated first.
+
         Args:
-            record: A mapping as produced by `to_dict`.
+            record: A mapping as produced by `to_dict`, at any supported
+                schema version.
 
         Returns:
             The run.
         """
+        record = records.load(cls.__name__, cls.migrations, record)
         return cls(
-            run_id=str(record["run_id"]),
+            identifier=str(record["identifier"]),
             observations=tuple(
                 Observation.from_dict(observation)
                 for observation in record["observations"]
@@ -261,7 +304,7 @@ class Baseline:
             observation.operation for observation in runs[0].observations
         }
         expected_sample_counts = {
-            observation.operation: observation.sample_count
+            observation.operation: observation.samples
             for observation in runs[0].observations
         }
         if not expected:
@@ -284,10 +327,7 @@ class Baseline:
                         "performance baseline runs must share the same "
                         "operations"
                     )
-                if (
-                    observation.sample_count
-                    != expected_sample_counts[operation]
-                ):
+                if observation.samples != expected_sample_counts[operation]:
                     raise errors.InputError(
                         "performance baseline runs must share sample counts"
                     )
@@ -361,7 +401,7 @@ class Baseline:
             return Comparison(
                 passed=False,
                 baseline_run_count=len(self.reference_runs),
-                current_run_id=current.run_id,
+                current_run_id=current.identifier,
                 relative_regressions={},
                 violations=(
                     "performance comparison environment differs from baseline",
@@ -373,7 +413,7 @@ class Baseline:
             return Comparison(
                 passed=False,
                 baseline_run_count=len(self.reference_runs),
-                current_run_id=current.run_id,
+                current_run_id=current.identifier,
                 relative_regressions={},
                 violations=tally,
             )
@@ -388,7 +428,7 @@ class Baseline:
         return Comparison(
             passed=not violations,
             baseline_run_count=len(self.reference_runs),
-            current_run_id=current.run_id,
+            current_run_id=current.identifier,
             relative_regressions=regressions,
             violations=tuple(violations),
         )
@@ -417,14 +457,11 @@ class Baseline:
                     "validated sample-count observation disappeared: "
                     f"{operation.value}"
                 )
-            if (
-                current_observation.sample_count
-                != baseline_observation.sample_count
-            ):
+            if current_observation.samples != baseline_observation.samples:
                 violations.append(
                     f"{operation.value} sample count differs from baseline: "
-                    f"expected {baseline_observation.sample_count}, "
-                    f"observed {current_observation.sample_count}"
+                    f"expected {baseline_observation.samples}, "
+                    f"observed {current_observation.samples}"
                 )
         return tuple(violations)
 
@@ -460,22 +497,22 @@ class Baseline:
                 f"validated baseline observation disappeared: {operation.value}"
             )
         reference_times = [
-            observation.elapsed_seconds
+            observation.elapsed
             for observation in reference_observations
             if observation is not None
         ]
         time_regression = rise(
             statistics.median(reference_times),
-            current_observation.elapsed_seconds,
+            current_observation.elapsed,
         )
         memory_regression: float | None = None
         reference_memory = [
-            observation.peak_memory_gb
+            observation.memory
             for observation in reference_observations
             if observation is not None
         ]
         if all(value is not None for value in reference_memory):
-            if current_observation.peak_memory_gb is None:
+            if current_observation.memory is None:
                 violations.append(
                     f"missing peak memory observation: {operation.value}"
                 )
@@ -488,7 +525,7 @@ class Baseline:
                             if value is not None
                         ]
                     ),
-                    current_observation.peak_memory_gb,
+                    current_observation.memory,
                 )
         regression = {
             "elapsed_seconds": time_regression,
@@ -606,13 +643,13 @@ class Budget:
                     f"missing performance observation: {operation.value}"
                 )
                 continue
-            if measurement.elapsed_seconds > limit:
+            if measurement.elapsed > limit:
                 violations.append(
                     f"{operation.value} took "
-                    f"{measurement.elapsed_seconds:.6g}s "
+                    f"{measurement.elapsed:.6g}s "
                     f"> {limit:.6g}s budget"
                 )
-            memory = measurement.peak_memory_gb
+            memory = measurement.memory
             if self.max_peak_memory_gb is not None and memory is None:
                 violations.append(
                     f"missing peak memory observation: {operation.value}"

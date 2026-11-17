@@ -1,0 +1,43 @@
+{
+  "categorical": [
+    "region"
+  ],
+  "classes": [
+    0,
+    1
+  ],
+  "dtypes": {
+    "amount": "float64",
+    "region": "object"
+  },
+  "extra_inputs": [
+    "when"
+  ],
+  "graph_fingerprint": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "group_column": "customer",
+  "known_categories": {
+    "region": [
+      "east",
+      "west"
+    ]
+  },
+  "numeric": [
+    "amount"
+  ],
+  "optional_inputs": [
+    "segment"
+  ],
+  "series": [
+    {
+      "column": "amount",
+      "name": "lag"
+    }
+  ],
+  "series_columns": [
+    "amount__lag"
+  ],
+  "target": "y",
+  "targets": [],
+  "task": "binary_classification",
+  "time_column": "when"
+}

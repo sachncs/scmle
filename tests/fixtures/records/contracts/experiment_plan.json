@@ -1,0 +1,21 @@
+{
+  "candidate_models": [
+    "dummy",
+    "logistic_regression"
+  ],
+  "decisions": [
+    {
+      "action": "include",
+      "reason": "baseline",
+      "technique": "dummy"
+    }
+  ],
+  "metric": "roc_auc",
+  "optimization_budget_seconds": 60,
+  "plan_id": "plan-1",
+  "task": "binary_classification",
+  "validation_strategy": "stratified",
+  "warnings": [
+    "small data"
+  ]
+}

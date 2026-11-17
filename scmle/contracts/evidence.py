@@ -8,9 +8,11 @@ import enum
 import hmac
 import json
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts import signing
 
 
@@ -54,28 +56,41 @@ class Record:
     """One independently reviewable release claim.
 
     Attributes:
-        criterion_id: Stable identifier for the acceptance criterion.
+        criterion: Stable identifier for the acceptance criterion.
         claim: Exact claim supported by this record.
         scope: Modality, task, platform, and release scope of the claim.
-        raw_inputs: Immutable source identities used to produce the result.
-        command_or_test: Reproducible command or test selector.
+        inputs: Immutable source identities used to produce the result.
+        command: Reproducible command or test selector.
         artifact: Evidence artifact metadata, including a digest when present.
         result: Observed pass, fail, or explicitly waived result.
         reviewer: Person or automation that reviewed the evidence.
-        observed_at: Time the result was observed, in UTC ISO-8601 form.
+        observed: Time the result was observed, in UTC ISO-8601 form.
         limitations: Known uncertainty or excluded scope.
         decision: Whether the criterion is accepted, required, or blocked.
+        migrations: Version steps of the stored record, which is versioned
+            by the index that holds it.
     """
 
-    criterion_id: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "criterion_id": "criterion",
+                "raw_inputs": "inputs",
+                "command_or_test": "command",
+                "observed_at": "observed",
+            }
+        ),
+    )
+
+    criterion: str
     claim: str
     scope: Mapping[str, str]
-    raw_inputs: Mapping[str, str]
-    command_or_test: str
+    inputs: Mapping[str, str]
+    command: str
     artifact: Mapping[str, str]
     result: Outcome
     reviewer: str
-    observed_at: str
+    observed: str
     limitations: tuple[str, ...]
     decision: Disposition
 
@@ -89,17 +104,17 @@ class Record:
                 is not an ISO-8601 timestamp, or it has no timezone.
         """
         for field_name, value in (
-            ("criterion_id", self.criterion_id),
+            ("criterion", self.criterion),
             ("claim", self.claim),
-            ("command_or_test", self.command_or_test),
+            ("command", self.command),
             ("reviewer", self.reviewer),
-            ("observed_at", self.observed_at),
+            ("observed", self.observed),
         ):
             require_text(value, field_name)
         if not self.scope:
             raise errors.InputError("scope must not be empty")
-        if not self.raw_inputs:
-            raise errors.InputError("raw_inputs must not be empty")
+        if not self.inputs:
+            raise errors.InputError("inputs must not be empty")
         if not self.artifact:
             raise errors.InputError("artifact must not be empty")
         if not self.limitations:
@@ -112,24 +127,24 @@ class Record:
         decision: Any = self.decision  # may be a raw value at runtime
         if not isinstance(decision, Disposition):
             object.__setattr__(self, "decision", Disposition(decision))
-        timestamp = datetime.datetime.fromisoformat(self.observed_at)
+        timestamp = datetime.datetime.fromisoformat(self.observed)
         if timestamp.tzinfo is None or timestamp.utcoffset() is None:
             raise errors.InputError(
-                "observed_at must include timezone information"
+                "observed must include timezone information"
             )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible release evidence record."""
         return {
-            "criterion_id": self.criterion_id,
+            "criterion": self.criterion,
             "claim": self.claim,
             "scope": dict(sorted(self.scope.items())),
-            "raw_inputs": dict(sorted(self.raw_inputs.items())),
-            "command_or_test": self.command_or_test,
+            "inputs": dict(sorted(self.inputs.items())),
+            "command": self.command,
             "artifact": dict(sorted(self.artifact.items())),
             "result": self.result.value,
             "reviewer": self.reviewer,
-            "observed_at": self.observed_at,
+            "observed": self.observed,
             "limitations": list(self.limitations),
             "decision": self.decision.value,
         }
@@ -145,22 +160,33 @@ class Record:
             The evidence record.
         """
         return cls(
-            criterion_id=str(record["criterion_id"]),
+            criterion=str(record["criterion"]),
             claim=str(record["claim"]),
             scope=dict(record["scope"]),
-            raw_inputs=dict(record["raw_inputs"]),
-            command_or_test=str(record["command_or_test"]),
+            inputs=dict(record["inputs"]),
+            command=str(record["command"]),
             artifact=dict(record["artifact"]),
             result=Outcome(record["result"]),
             reviewer=str(record["reviewer"]),
-            observed_at=str(record["observed_at"]),
+            observed=str(record["observed"]),
             limitations=tuple(record["limitations"]),
             decision=Disposition(record["decision"]),
         )
 
 
+VERSION = records.ORIGIN + len(Record.migrations)
+
+
 class Index:
-    """Deterministic collection of unique release evidence records."""
+    """Deterministic collection of unique release evidence records.
+
+    Attributes:
+        records: The evidence records by criterion.
+        signature: The index signature, or None while unsigned.
+        version: The layout the signature covers: the current one for a new
+            index, the stored one for a loaded index, so an index signed in
+            an older layout still verifies after its records migrate.
+    """
 
     def __init__(
         self,
@@ -179,6 +205,7 @@ class Index:
         """
         self.records: dict[str, Record] = {}
         self.signature = signature
+        self.version = VERSION
         if signature is not None:
             require_text(signature, "signature")
         for record in records:
@@ -196,11 +223,11 @@ class Index:
         """
         if self.signature is not None:
             raise errors.InputError("a signed evidence index cannot be changed")
-        if record.criterion_id in self.records:
+        if record.criterion in self.records:
             raise errors.InputError(
-                f"duplicate evidence criterion: {record.criterion_id}"
+                f"duplicate evidence criterion: {record.criterion}"
             )
-        self.records[record.criterion_id] = record
+        self.records[record.criterion] = record
 
     def pending(self) -> tuple[Record, ...]:
         """Returns records that cannot yet support an accepted release."""
@@ -224,10 +251,19 @@ class Index:
         return bool(self.records) and not self.pending()
 
     def preimage(self) -> dict[str, Any]:
-        """Returns the versioned content covered by the index signature."""
+        """Returns the versioned content covered by the index signature.
+
+        The records are laid out at the index's `version`, so the signature
+        of a stored index is checked against the bytes it was made over.
+        """
         return {
-            "schema_version": 1,
-            "records": [record.to_dict() for record in self.ordered()],
+            "schema_version": self.version,
+            "records": [
+                records.downgrade(
+                    Record.migrations, record.to_dict(), self.version
+                )
+                for record in self.ordered()
+            ],
         }
 
     def sign(self, signing_key: str | bytes) -> str:
@@ -270,9 +306,13 @@ class Index:
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds and validates a versioned evidence index.
 
+        An index stored at an older schema version keeps that version, so
+        its signature verifies against the layout it was made over, while
+        its records are migrated to the current layout.
+
         Args:
-            record: A mapping with schema version 1, a list of records and an
-                optional signature object.
+            record: A mapping with a supported schema version, a list of
+                records and an optional signature object.
 
         Returns:
             The index, signed if the record carried a signature.
@@ -282,7 +322,12 @@ class Index:
                 not a list, or the signature is malformed or uses an
                 unsupported algorithm.
         """
-        if record.get("schema_version") != 1:
+        version = record.get("schema_version")
+        if (
+            isinstance(version, bool)
+            or not isinstance(version, int)
+            or not records.ORIGIN <= version <= VERSION
+        ):
             raise errors.InputError("unsupported evidence index schema version")
         raw_records = record.get("records")
         if not isinstance(raw_records, list):
@@ -302,8 +347,14 @@ class Index:
                 str(signature_record.get("value", "")),
                 "signature",
             )
-        index = cls(Record.from_dict(item) for item in raw_records)
+        index = cls(
+            Record.from_dict(
+                records.upgrade(Record.migrations, dict(item), version)
+            )
+            for item in raw_records
+        )
         index.signature = signature
+        index.version = version
         return index
 
     def canonize(self) -> str:

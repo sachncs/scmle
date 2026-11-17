@@ -2,7 +2,10 @@
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 from typing import Self
+
+from scmle.contracts import records
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -15,49 +18,65 @@ class Interface:
         numeric: Numeric feature columns.
         categorical: Categorical feature columns.
         dtypes: Training dtype name per numeric and categorical feature.
-        known_categories: Sorted categories seen in training per categorical
+        categories: Sorted categories seen in training per categorical
             column (when built from training data, capped in number).
         classes: Class labels for classification, else None.
-        extra_inputs: Raw columns the caller must supply because the feature
+        extras: Raw columns the caller must supply because the feature
             graph reads them, although the model does not use them directly.
         series: Ordered (time-series) feature nodes recomputed on the input
             batch at inference, as plain dictionaries.
-        series_columns: Columns those nodes produce that the pipeline reads.
-        graph_fingerprint: Hash of the feature graph, empty without one.
-        group_column: Entity column the series nodes group by, if any.
-        time_column: Column ordering the rows for series nodes, if any.
+        derived: Columns those nodes produce that the pipeline reads.
+        digests: Digests by the hashed thing; ``graph`` is the hash of the
+            feature graph, absent without one.
+        group: Entity column the series nodes group by, if any.
+        time: Column ordering the rows for series nodes, if any.
         targets: Output columns of a multi-target model, in order.
-        optional_inputs: Columns used when supplied but not required (the
+        optional: Columns used when supplied but not required (the
             sensitive column behind group-specific thresholds).
+        migrations: Version steps of the stored schema.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "known_categories": "categories",
+                "extra_inputs": "extras",
+                "series_columns": "derived",
+                "group_column": "group",
+                "time_column": "time",
+                "optional_inputs": "optional",
+            },
+            groups={"digests": {"graph_fingerprint": "graph"}},
+        ),
+    )
 
     target: str
     task: str
     numeric: tuple[str, ...]
     categorical: tuple[str, ...]
     dtypes: dict[str, str]
-    known_categories: dict[str, list[str]]
+    categories: dict[str, list[str]]
     classes: tuple[Any, ...] | None
-    extra_inputs: tuple[str, ...] = ()
+    extras: tuple[str, ...] = ()
     series: tuple[dict[str, Any], ...] = ()
-    series_columns: tuple[str, ...] = ()
-    graph_fingerprint: str = ""
-    group_column: str | None = None
-    time_column: str | None = None
-    optional_inputs: tuple[str, ...] = ()
+    derived: tuple[str, ...] = ()
+    digests: dict[str, str] = dataclasses.field(default_factory=dict)
+    group: str | None = None
+    time: str | None = None
+    optional: tuple[str, ...] = ()
     targets: tuple[str, ...] = ()
 
     @property
     def features(self) -> list[str]:
         """Columns the caller must supply: model features, then graph inputs."""
         return list(
-            dict.fromkeys(self.numeric + self.categorical + self.extra_inputs)
+            dict.fromkeys(self.numeric + self.categorical + self.extras)
         )
 
     @property
     def consumed(self) -> list[str]:
         """Columns the fitted pipeline reads (supplied plus computed series)."""
-        return list(dict.fromkeys([*self.features, *self.series_columns]))
+        return list(dict.fromkeys([*self.features, *self.derived]))
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-serializable mapping."""
@@ -65,38 +84,61 @@ class Interface:
         record["numeric"] = list(self.numeric)
         record["categorical"] = list(self.categorical)
         record["classes"] = None if self.classes is None else list(self.classes)
-        record["extra_inputs"] = list(self.extra_inputs)
+        record["extras"] = list(self.extras)
         record["series"] = list(self.series)
-        record["series_columns"] = list(self.series_columns)
+        record["derived"] = list(self.derived)
+        record[records.KEY] = records.ORIGIN + len(self.migrations)
         return record
+
+    def anchor(self) -> records.Layout:
+        """Returns the schema in its version-1 layout, for identity digests.
+
+        A digest that names the schema across runs (the serving schema
+        digest) is computed on this layout, so renaming a stored key never
+        changes it.
+        """
+        record = self.to_dict()
+        del record[records.KEY]
+        layout = records.downgrade(self.migrations, record)
+        # Version 1 always wrote the fingerprint, empty without a graph.
+        layout.setdefault("graph_fingerprint", "")
+        return layout
 
     @classmethod
     def from_dict(cls, record: dict[str, Any]) -> Self:
         """Rebuilds a schema from `to_dict` output.
 
+        A schema stored at an older schema version is migrated first.
+
         Args:
-            record: A mapping as produced by `to_dict`; the later fields default
-                to empty when absent.
+            record: A mapping as produced by `to_dict`, at any supported
+                schema version; the later fields default to empty when
+                absent.
 
         Returns:
             The schema.
         """
+        record = records.load(cls.__name__, cls.migrations, record)
         classes = record["classes"]
+        digests = {
+            str(key): str(value)
+            for key, value in record.get("digests", {}).items()
+        }
         return cls(
             target=record["target"],
             task=record["task"],
             numeric=tuple(record["numeric"]),
             categorical=tuple(record["categorical"]),
             dtypes=record["dtypes"],
-            known_categories=record["known_categories"],
+            categories=record["categories"],
             classes=None if classes is None else tuple(classes),
-            extra_inputs=tuple(record.get("extra_inputs", ())),
+            extras=tuple(record.get("extras", ())),
             series=tuple(record.get("series", ())),
-            series_columns=tuple(record.get("series_columns", ())),
-            graph_fingerprint=record.get("graph_fingerprint", ""),
-            group_column=record.get("group_column"),
-            time_column=record.get("time_column"),
-            optional_inputs=tuple(record.get("optional_inputs", ())),
+            derived=tuple(record.get("derived", ())),
+            digests=digests,
+            group=record.get("group"),
+            time=record.get("time"),
+            optional=tuple(record.get("optional", ())),
             targets=tuple(record.get("targets", ())),
         )
 

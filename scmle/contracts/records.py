@@ -188,18 +188,7 @@ class Record(Schema):
         """
         if not isinstance(raw, Mapping):
             return raw
-        layout = dict(raw)
-        stored = cls.detect(layout)
-        current = cls.latest()
-        if stored > current:
-            raise errors.InputError(
-                f"{cls.__name__} record has schema version {stored}, newer "
-                f"than this build's {current}"
-            )
-        for step in cls.migrations[stored - ORIGIN :]:
-            layout = step.upgrade(layout)
-        layout[KEY] = current
-        return layout
+        return load(cls.__name__, cls.migrations, raw, cls.legacy)
 
     @classmethod
     def detect(cls, layout: Layout) -> int:
@@ -214,18 +203,218 @@ class Record(Schema):
         Raises:
             InputError: If the version is not an integer of at least 1.
         """
-        if KEY in layout:
-            value = layout.pop(KEY)
-        elif cls.legacy is not None and cls.legacy in layout:
-            value = layout.pop(cls.legacy)
-        else:
-            return ORIGIN
-        if isinstance(value, bool) or not isinstance(value, int):
+        return detect(cls.__name__, layout, cls.legacy)
+
+
+def detect(name: str, layout: Layout, legacy: str | None = None) -> int:
+    """Removes and returns the stored version of a record.
+
+    Args:
+        name: The record kind, for the error message.
+        layout: The stored record; its version key is removed.
+        legacy: The kind's old spelling of the version key, or None.
+
+    Returns:
+        The stored version; 1 when the record carries none.
+
+    Raises:
+        InputError: If the version is not an integer of at least 1.
+    """
+    if KEY in layout:
+        value = layout.pop(KEY)
+    elif legacy is not None and legacy in layout:
+        value = layout.pop(legacy)
+    else:
+        return ORIGIN
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise errors.InputError(f"{name} schema version must be an integer")
+    if value < ORIGIN:
+        raise errors.InputError(
+            f"{name} schema version must be at least {ORIGIN}"
+        )
+    return value
+
+
+def load(
+    name: str,
+    migrations: tuple[Migration, ...],
+    raw: Mapping[str, Any],
+    legacy: str | None = None,
+) -> Layout:
+    """Moves a stored record of any kind to its current version.
+
+    This is the loading path of `Record`, also used by the record kinds that
+    are still dataclasses with their own `from_dict`.
+
+    Args:
+        name: The record kind, for error messages.
+        migrations: The kind's version steps, oldest first.
+        raw: The stored record.
+        legacy: The kind's old spelling of the version key, or None.
+
+    Returns:
+        The record at the current version, with `schema_version` set to it.
+
+    Raises:
+        InputError: If the stored version is not a positive integer or is
+            newer than this build.
+    """
+    layout = dict(raw)
+    stored = detect(name, layout, legacy)
+    current = ORIGIN + len(migrations)
+    if stored > current:
+        raise errors.InputError(
+            f"{name} record has schema version {stored}, newer than this "
+            f"build's {current}"
+        )
+    layout = upgrade(migrations, layout, stored)
+    layout[KEY] = current
+    return layout
+
+
+def upgrade(
+    migrations: tuple[Migration, ...], layout: Layout, version: int
+) -> Layout:
+    """Moves a layout without a version key from `version` to the current one.
+
+    Args:
+        migrations: The kind's version steps, oldest first.
+        layout: The record (or a part of one) at `version`.
+        version: The version `layout` is in.
+
+    Returns:
+        The layout at the kind's current version.
+    """
+    for step in migrations[version - ORIGIN :]:
+        layout = step.upgrade(layout)
+    return layout
+
+
+def downgrade(
+    migrations: tuple[Migration, ...], layout: Layout, version: int = ORIGIN
+) -> Layout:
+    """Moves a layout without a version key from the current version down.
+
+    Identity digests are computed on the layout at the kind's anchor version
+    (1), so renaming a key never changes the identity of stored content.
+
+    Args:
+        migrations: The kind's version steps, oldest first.
+        layout: The record (or a part of one) at the current version.
+        version: The version to move to.
+
+    Returns:
+        The layout at `version`.
+    """
+    for step in reversed(migrations[version - ORIGIN :]):
+        layout = step.downgrade(layout)
+    return layout
+
+
+def nest(
+    renames: Mapping[str, str],
+    parts: Mapping[str, Migration] | None = None,
+    groups: Mapping[str, Mapping[str, str]] | None = None,
+) -> Migration:
+    """Builds a step that also moves nested parts and gathers keys.
+
+    A part (a mapping, or a list of mappings) is moved by its own step, and
+    a group collects top-level keys into one object: `{"digests":
+    {"data_hash": "data"}}` moves `data_hash` to `digests.data`. Both are
+    undone by the step's revert.
+
+    Args:
+        renames: Old key to new key at the top level.
+        parts: New key of a nested part to the part's step.
+        groups: Name of a new object to its old keys and their new names.
+
+    Returns:
+        The step.
+    """
+    moves = dict(parts or {})
+    folds = {name: dict(keys) for name, keys in (groups or {}).items()}
+
+    def change(layout: Layout) -> Layout:
+        for key, step in moves.items():
+            if key in layout:
+                layout[key] = shift(layout[key], step.upgrade)
+        return gather(layout, folds)
+
+    def revert(layout: Layout) -> Layout:
+        layout = scatter(layout, folds)
+        for key, step in moves.items():
+            if key in layout:
+                layout[key] = shift(layout[key], step.downgrade)
+        return layout
+
+    return Migration(renames=renames, change=change, revert=revert)
+
+
+def shift(value: Any, move: Callable[[Layout], Layout]) -> Any:
+    """Moves a nested part, or each part of a list, one version.
+
+    Args:
+        value: A mapping, a list of mappings, or anything else (unchanged).
+        move: The part's step in one direction.
+
+    Returns:
+        The moved value.
+    """
+    if isinstance(value, Mapping):
+        return move(dict(value))
+    if isinstance(value, list | tuple):
+        return [
+            move(dict(item)) if isinstance(item, Mapping) else item
+            for item in value
+        ]
+    return value
+
+
+def gather(layout: Layout, folds: Mapping[str, Mapping[str, str]]) -> Layout:
+    """Collects top-level keys into named objects.
+
+    Args:
+        layout: The record; changed in place.
+        folds: Name of each object to its old keys and their new names.
+
+    Returns:
+        The record.
+
+    Raises:
+        InputError: If an object's name is already a stored key.
+    """
+    for name, keys in folds.items():
+        if name in layout:
             raise errors.InputError(
-                f"{cls.__name__} schema version must be an integer"
+                f"gathering would overwrite the stored key {name!r}"
             )
-        if value < ORIGIN:
+        layout[name] = {
+            new: layout.pop(old) for old, new in keys.items() if old in layout
+        }
+    return layout
+
+
+def scatter(layout: Layout, folds: Mapping[str, Mapping[str, str]]) -> Layout:
+    """Undoes `gather`: spreads named objects back to top-level keys.
+
+    Args:
+        layout: The record; changed in place.
+        folds: Name of each object to its old keys and their new names.
+
+    Returns:
+        The record.
+
+    Raises:
+        InputError: If an object holds a key the older layout has no
+            place for.
+    """
+    for name, keys in folds.items():
+        group = dict(layout.pop(name, {}))
+        for old, new in keys.items():
+            if new in group:
+                layout[old] = group.pop(new)
+        if group:
             raise errors.InputError(
-                f"{cls.__name__} schema version must be at least {ORIGIN}"
+                f"{name} holds keys an older layout lacks: {sorted(group)}"
             )
-        return value
+    return layout

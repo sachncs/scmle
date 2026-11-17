@@ -13,9 +13,11 @@ import enum
 import hashlib
 import json
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 
 class Kind(enum.StrEnum):
@@ -55,9 +57,22 @@ def require_text(value: str, name: str) -> str:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Node:
-    """One immutable content identity in an evidence graph."""
+    """One immutable content identity in an evidence graph.
 
-    node_id: str
+    Attributes:
+        identifier: The node's id, unique within its graph.
+        kind: Evidence object category.
+        digest: Content digest of the object.
+        attributes: Extra string metadata.
+        migrations: Version steps of the stored node, which is versioned by
+            the graph that holds it.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"node_id": "identifier"}),
+    )
+
+    identifier: str
     kind: Kind
     digest: str
     attributes: Mapping[str, str] = dataclasses.field(default_factory=dict)
@@ -70,7 +85,7 @@ class Node:
             ValueError: If the id or digest is blank, the kind is not a valid
                 node kind, or an attribute name is empty.
         """
-        require_text(self.node_id, "node_id")
+        require_text(self.identifier, "identifier")
         require_text(self.digest, "digest")
         kind: Any = self.kind  # may be a raw value at runtime
         if not isinstance(kind, Kind):
@@ -85,7 +100,7 @@ class Node:
     def to_dict(self) -> dict[str, Any]:
         """Returns a deterministic JSON-compatible node record."""
         return {
-            "node_id": self.node_id,
+            "identifier": self.identifier,
             "kind": self.kind.value,
             "digest": self.digest,
             "attributes": dict(sorted(self.attributes.items())),
@@ -102,7 +117,7 @@ class Node:
             The node.
         """
         return cls(
-            node_id=str(record["node_id"]),
+            identifier=str(record["identifier"]),
             kind=Kind(record["kind"]),
             digest=str(record["digest"]),
             attributes=dict(record.get("attributes", {})),
@@ -111,10 +126,24 @@ class Node:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Edge:
-    """A directed lifecycle relationship between two evidence nodes."""
+    """A directed lifecycle relationship between two evidence nodes.
 
-    source_id: str
-    target_id: str
+    Attributes:
+        source: Id of the node the edge leaves.
+        target: Id of the node the edge enters.
+        relationship: What the edge means.
+        migrations: Version steps of the stored edge, which is versioned by
+            the graph that holds it.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"source_id": "source", "target_id": "target"}
+        ),
+    )
+
+    source: str
+    target: str
     relationship: str
 
     def __post_init__(self) -> None:
@@ -124,17 +153,17 @@ class Edge:
             ValueError: If an endpoint or the relationship is blank, or the edge
                 connects a node to itself.
         """
-        require_text(self.source_id, "source_id")
-        require_text(self.target_id, "target_id")
+        require_text(self.source, "source")
+        require_text(self.target, "target")
         require_text(self.relationship, "relationship")
-        if self.source_id == self.target_id:
+        if self.source == self.target:
             raise errors.InputError("evidence edges must not be self-loops")
 
     def to_dict(self) -> dict[str, str]:
         """Returns a JSON-compatible edge record."""
         return {
-            "source_id": self.source_id,
-            "target_id": self.target_id,
+            "source": self.source,
+            "target": self.target,
             "relationship": self.relationship,
         }
 
@@ -149,8 +178,8 @@ class Edge:
             The edge.
         """
         return cls(
-            source_id=str(record["source_id"]),
-            target_id=str(record["target_id"]),
+            source=str(record["source"]),
+            target=str(record["target"]),
             relationship=str(record["relationship"]),
         )
 
@@ -163,7 +192,7 @@ class Graph:
     immediately, so a partial graph cannot be mistaken for valid lineage.
     """
 
-    schema_version = 1
+    schema_version = 1 + len(Node.migrations)
 
     def __init__(self, nodes: Iterable[Node] = ()) -> None:
         """Creates a graph and registers initial nodes.
@@ -188,12 +217,12 @@ class Graph:
         """
         if not isinstance(node, Node):
             raise errors.KindError("node must be Node")
-        existing = self.nodes.get(node.node_id)
+        existing = self.nodes.get(node.identifier)
         if existing is not None and existing != node:
             raise errors.InputError(
-                f"conflicting evidence node: {node.node_id}"
+                f"conflicting evidence node: {node.identifier}"
             )
-        self.nodes[node.node_id] = node
+        self.nodes[node.identifier] = node
 
     def connect(self, edge: Edge) -> None:
         """Registers one edge and rejects dangling or cyclic lineage.
@@ -210,11 +239,11 @@ class Graph:
         """
         if not isinstance(edge, Edge):
             raise errors.KindError("edge must be Edge")
-        if edge.source_id not in self.nodes or edge.target_id not in self.nodes:
+        if edge.source not in self.nodes or edge.target not in self.nodes:
             raise errors.InputError("evidence edge refers to an unknown node")
         if edge in self.edges:
             return
-        if self.reachable(edge.target_id, edge.source_id):
+        if self.reachable(edge.target, edge.source):
             raise errors.InputError("evidence graph must remain acyclic")
         self.edges.append(edge)
 
@@ -248,7 +277,7 @@ class Graph:
         """Returns deterministic outgoing adjacency lists."""
         result: dict[str, list[str]] = {node_id: [] for node_id in self.nodes}
         for edge in self.edges:
-            result[edge.source_id].append(edge.target_id)
+            result[edge.source].append(edge.target)
         return {
             node_id: tuple(sorted(targets))
             for node_id, targets in sorted(result.items())
@@ -269,7 +298,7 @@ class Graph:
         incoming = dict.fromkeys(self.nodes, 0)
         outgoing = self.outgoing()
         for edge in self.edges:
-            incoming[edge.target_id] += 1
+            incoming[edge.target] += 1
         ready = sorted(
             node_id for node_id, count in incoming.items() if count == 0
         )
@@ -295,10 +324,7 @@ class Graph:
         """
         seen: set[Edge] = set()
         for edge in self.edges:
-            if (
-                edge.source_id not in self.nodes
-                or edge.target_id not in self.nodes
-            ):
+            if edge.source not in self.nodes or edge.target not in self.nodes:
                 raise errors.InputError(
                     "evidence graph contains a dangling edge"
                 )
@@ -325,7 +351,7 @@ class Graph:
         incoming = dict.fromkeys(self.nodes, 0)
         outgoing = self.outgoing()
         for edge in self.edges:
-            incoming[edge.target_id] += 1
+            incoming[edge.target] += 1
         ready = sorted(
             node_id for node_id, count in incoming.items() if count == 0
         )
@@ -359,8 +385,8 @@ class Graph:
                 for edge in sorted(
                     self.edges,
                     key=lambda item: (
-                        item.source_id,
-                        item.target_id,
+                        item.source,
+                        item.target,
                         item.relationship,
                     ),
                 )
@@ -368,10 +394,30 @@ class Graph:
             "topological_order": list(self.linearise()),
         }
 
+    def anchor(self) -> records.Layout:
+        """Returns the graph content in its version-1 layout.
+
+        The graph digest names content across runs, so it is computed on
+        this layout: renaming a stored key never changes it.
+        """
+        record = self.to_dict()
+        return {
+            **record,
+            "schema_version": records.ORIGIN,
+            "nodes": [
+                records.downgrade(Node.migrations, node)
+                for node in record["nodes"]
+            ],
+            "edges": [
+                records.downgrade(Edge.migrations, edge)
+                for edge in record["edges"]
+            ],
+        }
+
     def canonize(self) -> str:
-        """Returns canonical graph content suitable for hashing and signing."""
+        """Returns the canonical version-1 content, for hashing and signing."""
         return json.dumps(
-            self.to_dict(),
+            self.anchor(),
             ensure_ascii=False,
             separators=(",", ":"),
             sort_keys=True,
@@ -389,6 +435,9 @@ class Graph:
         edge with an unknown endpoint or that closes a cycle also raises
         `ValueError`.
 
+        A version-1 graph (`node_id`, `source_id`, `target_id`) is migrated
+        to the current layout first.
+
         Args:
             record: A mapping with the schema version, nodes, edges and, if
                 present, the topological order.
@@ -397,14 +446,28 @@ class Graph:
             The graph.
 
         Raises:
-            ValueError: If the schema version is unsupported or a recorded
-                topological order differs from the graph's.
+            ValueError: If the schema version is missing or unsupported or a
+                recorded topological order differs from the graph's.
         """
-        if int(record.get("schema_version", 0)) != cls.schema_version:
+        version = record.get("schema_version")
+        if (
+            isinstance(version, bool)
+            or not isinstance(version, int)
+            or not records.ORIGIN <= version <= cls.schema_version
+        ):
             raise errors.InputError("unsupported evidence graph schema version")
-        graph = cls(Node.from_dict(item) for item in record.get("nodes", ()))
+        graph = cls(
+            Node.from_dict(
+                records.upgrade(Node.migrations, dict(item), version)
+            )
+            for item in record.get("nodes", ())
+        )
         for item in record.get("edges", ()):
-            graph.connect(Edge.from_dict(item))
+            graph.connect(
+                Edge.from_dict(
+                    records.upgrade(Edge.migrations, dict(item), version)
+                )
+            )
         graph.validate()
         expected_order = tuple(record.get("topological_order", ()))
         if expected_order and expected_order != graph.topological_order():

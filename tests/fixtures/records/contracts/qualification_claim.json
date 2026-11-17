@@ -1,0 +1,14 @@
+{
+  "adjusted_p_value": 0.02,
+  "assumptions": [
+    "iid"
+  ],
+  "check_ids": [
+    "assoc.age:X",
+    "assoc.age:C"
+  ],
+  "claim_id": "claim.age",
+  "effect": 0.3,
+  "statement": "age matters",
+  "tier": "confirmed"
+}

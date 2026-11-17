@@ -1,0 +1,231 @@
+{
+  "scenarios": [
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "snapshot_digest_change",
+        "run_invalidation",
+        "lineage_record"
+      ],
+      "expected_safe_outcome": "invalidate_changed_snapshot",
+      "recoverability": "operator_assisted",
+      "release_blocking": true,
+      "scenario": "changed_snapshot",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "corruption_injection",
+        "digest_mismatch",
+        "quarantine_record"
+      ],
+      "expected_safe_outcome": "quarantine_corrupt_artifact",
+      "recoverability": "operator_assisted",
+      "release_blocking": true,
+      "scenario": "corrupt_artifact",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "environment_identity",
+        "dependency_rejection",
+        "run_state"
+      ],
+      "expected_safe_outcome": "reject_incompatible_dependency",
+      "recoverability": "operator_assisted",
+      "release_blocking": true,
+      "scenario": "dependency_mismatch",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "disk_capacity_exhaustion",
+        "artifact_integrity",
+        "resource_error"
+      ],
+      "expected_safe_outcome": "preserve_durable_artifact",
+      "recoverability": "operator_assisted",
+      "release_blocking": true,
+      "scenario": "disk_full",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "duplicate_event",
+        "idempotency_key",
+        "state_transition"
+      ],
+      "expected_safe_outcome": "ignore_duplicate_event",
+      "recoverability": "automatic",
+      "release_blocking": true,
+      "scenario": "duplicate_event",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "lineage_gap",
+        "release_block",
+        "audit_record"
+      ],
+      "expected_safe_outcome": "block_release_for_missing_lineage",
+      "recoverability": "terminal_safe_failure",
+      "release_blocking": true,
+      "scenario": "incomplete_lineage",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "signature_tampering",
+        "verification_failure",
+        "quarantine_record"
+      ],
+      "expected_safe_outcome": "reject_untrusted_artifact",
+      "recoverability": "operator_assisted",
+      "release_blocking": true,
+      "scenario": "invalid_signature",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "memory_pressure",
+        "publication_absence",
+        "resource_error"
+      ],
+      "expected_safe_outcome": "abort_before_publication",
+      "recoverability": "operator_assisted",
+      "release_blocking": true,
+      "scenario": "memory_exhaustion",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "write_interruption",
+        "atomicity_check",
+        "artifact_integrity"
+      ],
+      "expected_safe_outcome": "preserve_durable_artifact",
+      "recoverability": "automatic",
+      "release_blocking": true,
+      "scenario": "partial_write",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [
+        {
+          "artifact_digest": "sha256:process_termination",
+          "artifact_uri": "artifact://faults/process_termination.json",
+          "evidence_type": "process_termination",
+          "execution_id": "fault-run-1",
+          "observation": "observed process_termination",
+          "observed_outcome": "safe_outcome_observed",
+          "recorded_at": "2026-10-20T10:00:00+00:00",
+          "reviewer": "reviewer"
+        },
+        {
+          "artifact_digest": "sha256:checkpoint_resume",
+          "artifact_uri": "artifact://faults/checkpoint_resume.json",
+          "evidence_type": "checkpoint_resume",
+          "execution_id": "fault-run-1",
+          "observation": "observed checkpoint_resume",
+          "observed_outcome": "safe_outcome_observed",
+          "recorded_at": "2026-10-20T10:00:00+00:00",
+          "reviewer": "reviewer"
+        },
+        {
+          "artifact_digest": "sha256:artifact_integrity",
+          "artifact_uri": "artifact://faults/artifact_integrity.json",
+          "evidence_type": "artifact_integrity",
+          "execution_id": "fault-run-1",
+          "observation": "observed artifact_integrity",
+          "observed_outcome": "safe_outcome_observed",
+          "recorded_at": "2026-10-20T10:00:00+00:00",
+          "reviewer": "reviewer"
+        }
+      ],
+      "evidence_requirements": [
+        "process_termination",
+        "checkpoint_resume",
+        "artifact_integrity"
+      ],
+      "expected_safe_outcome": "resume_durable_checkpoint",
+      "recoverability": "automatic",
+      "release_blocking": true,
+      "scenario": "process_death",
+      "verification_status": "passed"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "approval_rejection",
+        "release_block",
+        "audit_record"
+      ],
+      "expected_safe_outcome": "block_release_for_rejected_approval",
+      "recoverability": "terminal_safe_failure",
+      "release_blocking": true,
+      "scenario": "rejected_approval",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "retry_history",
+        "terminal_event",
+        "partial_publication_check"
+      ],
+      "expected_safe_outcome": "terminate_after_retry_exhaustion",
+      "recoverability": "terminal_safe_failure",
+      "release_blocking": true,
+      "scenario": "retry_exhaustion",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "checkpoint_identity",
+        "stale_checkpoint_rejection",
+        "run_state"
+      ],
+      "expected_safe_outcome": "reject_stale_checkpoint",
+      "recoverability": "operator_assisted",
+      "release_blocking": true,
+      "scenario": "stale_checkpoint",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "timeout_injection",
+        "cancellation_record",
+        "resource_error"
+      ],
+      "expected_safe_outcome": "cancel_and_record_terminal_failure",
+      "recoverability": "operator_assisted",
+      "release_blocking": true,
+      "scenario": "timeout",
+      "verification_status": "planned"
+    },
+    {
+      "evidence": [],
+      "evidence_requirements": [
+        "worker_termination",
+        "idempotent_retry",
+        "event_deduplication"
+      ],
+      "expected_safe_outcome": "retry_idempotent_work",
+      "recoverability": "automatic",
+      "release_blocking": true,
+      "scenario": "worker_loss",
+      "verification_status": "planned"
+    }
+  ],
+  "schema_version": 1
+}
