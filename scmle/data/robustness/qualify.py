@@ -24,8 +24,8 @@ from pathlib import Path
 import numpy
 import pandas
 
+from scmle.assurance.charter import contracts
 from scmle.data.admissibility import qualify
-from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.robustness import coverage
 from scmle.data.robustness import forward

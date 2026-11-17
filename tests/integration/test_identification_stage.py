@@ -11,11 +11,11 @@ import support
 
 from scmle import cli
 from scmle.artifacts import claims_audit
+from scmle.assurance.charter import causal
+from scmle.assurance.charter import sealing
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 import scmle.data.admissibility.dag
-from scmle.data.charter import causal
-from scmle.data.charter import sealing
 from scmle.data.identification import attest
 import scmle.data.identification.run
 from tests.unit.test_charter_contracts import make_charter

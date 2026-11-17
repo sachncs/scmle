@@ -37,7 +37,7 @@ entry and a regenerated snapshot (`scripts/check_api_compatibility.py
 One deliberate change to the pinned surface: `Project` gained the optional
 keyword `charter` (default `None`, so every existing call is unchanged) and the
 snapshot was regenerated for that single entry. The charter and custody
-modules (`scmle.data.charter`, `scmle.data.custody`) are extension surfaces
+modules (`scmle.assurance.charter`, `scmle.data.custody`) are extension surfaces
 like the other qualification modules.
 
 ## Leakage screen
@@ -84,12 +84,12 @@ the charter gained the optional field `ingest` (format 7) and a charter
 without it keeps its hash. `tests/fixtures/public_api.json` was regenerated
 for the `Project` entry alone. Charter format 8 adds the optional
 `entity` and `reconcile` sub-blocks of `ingest`
-(`scmle.data.charter.ingest.Entity`, `Expectation`, extension
+(`scmle.assurance.charter.ingest.Entity`, `Expectation`, extension
 surfaces); a format 7 ingest charter keeps its hash and signature.
 Charter format 9 adds the optional `subgroups` field of the causal block
-(`scmle.data.charter.causal.Subgroup`, an extension surface) and the
+(`scmle.assurance.charter.causal.Subgroup`, an extension surface) and the
 optional `attestors` and `attestations` fields
-(`scmle.data.charter.causal.Attestor`, `scmle.data.identification.attest`);
+(`scmle.assurance.charter.causal.Attestor`, `scmle.data.identification.attest`);
 a format 4 causal charter keeps its hash and signature. The `subgroups` key
 of `identification_report.json` gained `gate`, `statement_gate` and a per
 hypothesis `certified_size`, and the summary in `causal_claims.json` a `gate`;
@@ -97,12 +97,12 @@ hypothesis `certified_size`, and the summary in `causal_claims.json` a `gate`;
 additions (extension surfaces).
 
 Charter format 10 adds the optional `uncertainty` block
-(`scmle.data.charter.uncertainty.Uncertainty`, an extension surface; the
+(`scmle.assurance.charter.uncertainty.Uncertainty`, an extension surface; the
 snapshot is unchanged); a charter of format 9 or older keeps its hash and
 signature.
 
 Charter format 11 adds the optional `coverage_on_confirmation` field of the
-`uncertainty` block (`scmle.data.charter.uncertainty.Uncertainty`, an
+`uncertainty` block (`scmle.assurance.charter.uncertainty.Uncertainty`, an
 extension surface; a format 10 charter keeps its hash and signature, both
 pinned). `scmle.evaluation.coverage_confirm`, `coverage.undercovered`,
 `coverage_slices.flag_gate` and `FlagGate` are additions (extension
@@ -168,8 +168,8 @@ method `attach` and the optional `guard_detail` of `promote`; without a
 guard behaviour is unchanged.
 
 Causal identification (F10). No entry of the pinned surface changed.
-`scmle.data.charter.contracts.AnalysisEstimand` gained the optional field
-`causal` (`scmle.data.charter.causal.Question`, with `Control` and
+`scmle.assurance.charter.contracts.AnalysisEstimand` gained the optional field
+`causal` (`scmle.assurance.charter.causal.Question`, with `Control` and
 `Confounding`); it is omitted from the record when unset, so charters of
 format 1 to 3 keep their hash and signature, and a charter that carries it is
 format 4 (an older wrapper carrying it is refused). `Edict` gained the
@@ -177,7 +177,7 @@ member `refuse_claim`. `scmle.data.identification` (`select`, `aipw`, `did`,
 `iv`, `rd`, `synth`, `sensitivity`, `battery`, `tier`, `run`, `certified`) is
 an extension surface like the other qualification modules.
 
-Decision layer (F11). `scmle.decision` and `scmle.data.charter.decision` are
+Decision layer (F11). `scmle.decision` and `scmle.assurance.charter.decision` are
 extension surfaces like the other qualification modules; none of their
 names is pinned in `tests/fixtures/public_api.json`. The charter
 gained the optional field `decision` (format 5); a charter without it keeps

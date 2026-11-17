@@ -45,11 +45,11 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.charter import contracts
+import scmle.assurance.charter.decision
 from scmle.assurance.ledger import ledger
 from scmle.contracts import errors
 from scmle.contracts import signing
-from scmle.data.charter import contracts
-import scmle.data.charter.decision
 from scmle.decision import constraints
 from scmle.decision import design
 from scmle.decision import ope
@@ -101,7 +101,7 @@ def hashsums(folder: str | Path) -> dict[str, str | None]:
 
 
 def policy_value(
-    layer: scmle.data.charter.decision.Layer,
+    layer: scmle.assurance.charter.decision.Layer,
     actions: numpy.ndarray,
     outcome: numpy.ndarray,
     logged: numpy.ndarray | None,
@@ -172,7 +172,7 @@ def policy_value(
 
 
 def fairness(
-    layer: scmle.data.charter.decision.Layer,
+    layer: scmle.assurance.charter.decision.Layer,
     features: pandas.DataFrame,
     outcome: numpy.ndarray,
     actions: numpy.ndarray,

@@ -305,8 +305,8 @@ def stage(unit: str) -> Any:
     Returns:
         The stage output.
     """
+    from scmle.assurance.charter import ingest
     from scmle.core import ingest_stage
-    from scmle.data.charter import ingest
 
     with tempfile.TemporaryDirectory() as folder:
         document = {
@@ -512,7 +512,7 @@ def reconcile(drop: int) -> None:
     Args:
         drop: Rows dropped from the extract; 0 passes.
     """
-    from scmle.data.charter import ingest
+    from scmle.assurance.charter import ingest
     from scmle.data.ingest import declared
 
     orders = pandas.DataFrame(

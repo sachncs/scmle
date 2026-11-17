@@ -5,13 +5,13 @@ from typing import Any
 
 import pandas
 
+from scmle.assurance.charter import ingest
+from scmle.assurance.charter import sealing
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.core import ingest_stage
 import scmle.core.context
 from scmle.core.stages import surveying
-from scmle.data.charter import ingest
-from scmle.data.charter import sealing
 
 LOGGER = logging.getLogger(__name__)
 

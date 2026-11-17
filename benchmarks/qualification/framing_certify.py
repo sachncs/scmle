@@ -57,10 +57,10 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.assurance.charter import contracts
+import scmle.assurance.charter.feasibility
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.data.charter import contracts
-import scmle.data.charter.feasibility
 from scmle.data.detectors import certificates
 from scmle.data.framing import baseline
 from scmle.data.framing import costs
@@ -434,7 +434,7 @@ def feasibility_run(seed: int, ratio: float) -> tuple[str, str]:
     deff = 1 + (m - 1) * rho
     s_true = float(d_big.std(ddof=1))
     delta_min = 0.04
-    required = scmle.data.charter.feasibility.n_required_mean(
+    required = scmle.assurance.charter.feasibility.n_required_mean(
         delta_min / s_true, alpha=ALPHA, k_max=1, power=0.8
     )
     n_conf = round(ratio * required * deff)

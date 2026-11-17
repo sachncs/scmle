@@ -12,9 +12,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from scmle.assurance.charter import contracts
 from scmle.contracts import errors
 from scmle.contracts import signing
-from scmle.data.charter import contracts
 
 SIGNATURE_FIELD = "signature"
 RULES_FORMAT = 3

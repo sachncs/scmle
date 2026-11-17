@@ -12,10 +12,10 @@ import logging
 import numpy
 import pandas
 
+from scmle.assurance.charter import contracts
+from scmle.assurance.charter import feasibility
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.charter import contracts
-from scmle.data.charter import feasibility
 from scmle.data.custody import carve
 from scmle.data.custody import merkle
 from scmle.data.custody import sealed

@@ -21,16 +21,16 @@ from pathlib import Path
 from typing import Any
 from typing import Self
 
+import scmle.assurance.charter.causal
+import scmle.assurance.charter.decision
+import scmle.assurance.charter.ingest
+import scmle.assurance.charter.rules
+import scmle.assurance.charter.uncertainty
 from scmle.assurance.ledger import budget
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.contracts import signing
-import scmle.data.charter.causal
-import scmle.data.charter.decision
-import scmle.data.charter.ingest
-import scmle.data.charter.rules
-import scmle.data.charter.uncertainty
 from scmle.data.framing import costs
 
 FORMAT_VERSION = 11
@@ -140,7 +140,7 @@ class AnalysisEstimand:
     prediction_moment: str
     intercurrent_events: tuple[Event, ...]
     summary_measure: str
-    causal: scmle.data.charter.causal.Question | None = None
+    causal: scmle.assurance.charter.causal.Question | None = None
 
     def __post_init__(self) -> None:
         """Validates the estimand.
@@ -216,7 +216,7 @@ class AnalysisEstimand:
             causal=(
                 None
                 if block is None
-                else scmle.data.charter.causal.Question.from_dict(block)
+                else scmle.assurance.charter.causal.Question.from_dict(block)
             ),
         )
 
@@ -486,11 +486,11 @@ class AnalysisCharter:
     multiverse: tuple[Choice, ...]
     seed: int
     cost_model: costs.Tariff | None = None
-    rules: scmle.data.charter.rules.Procedure | None = None
-    decision: scmle.data.charter.decision.Layer | None = None
+    rules: scmle.assurance.charter.rules.Procedure | None = None
+    decision: scmle.assurance.charter.decision.Layer | None = None
     unit_of_prediction: str | None = None
-    ingest: scmle.data.charter.ingest.Ingestion | None = None
-    uncertainty: scmle.data.charter.uncertainty.Uncertainty | None = None
+    ingest: scmle.assurance.charter.ingest.Ingestion | None = None
+    uncertainty: scmle.assurance.charter.uncertainty.Uncertainty | None = None
 
     def __post_init__(self) -> None:
         """Validates the charter, including the decision-map lint.
@@ -709,23 +709,23 @@ class AnalysisCharter:
             rules=(
                 None
                 if chosen is None
-                else scmle.data.charter.rules.Procedure.from_dict(chosen)
+                else scmle.assurance.charter.rules.Procedure.from_dict(chosen)
             ),
             decision=(
                 None
                 if layer is None
-                else scmle.data.charter.decision.Layer.from_dict(layer)
+                else scmle.assurance.charter.decision.Layer.from_dict(layer)
             ),
             unit_of_prediction=record["unit_of_prediction"],
             ingest=(
                 None
                 if block is None
-                else scmle.data.charter.ingest.Ingestion.from_dict(block)
+                else scmle.assurance.charter.ingest.Ingestion.from_dict(block)
             ),
             uncertainty=(
                 None
                 if bounds is None
-                else scmle.data.charter.uncertainty.Uncertainty.from_dict(
+                else scmle.assurance.charter.uncertainty.Uncertainty.from_dict(
                     bounds
                 )
             ),

@@ -5,11 +5,11 @@ import json
 
 import pytest
 
+from scmle.assurance.charter import contracts
+from scmle.assurance.charter import rules
+from scmle.assurance.charter import sealing
 from scmle.assurance.ledger import budget
 from scmle.assurance.ledger import online_fdr
-from scmle.data.charter import contracts
-from scmle.data.charter import rules
-from scmle.data.charter import sealing
 from tests.unit.test_charter_contracts import make_charter
 
 

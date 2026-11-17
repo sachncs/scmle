@@ -7,7 +7,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.data.charter import contracts
+from scmle.assurance.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.robustness import qualify
 from scmle.data.robustness import report

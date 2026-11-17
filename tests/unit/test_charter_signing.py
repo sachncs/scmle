@@ -5,9 +5,9 @@ import json
 import pytest
 
 from scmle import cli
+from scmle.assurance.charter import contracts
+from scmle.assurance.charter import sealing
 from scmle.contracts import errors
-from scmle.data.charter import contracts
-from scmle.data.charter import sealing
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "unit-test-key"

@@ -21,7 +21,7 @@ import numpy
 import pandas
 import support
 
-from scmle.data.charter import sealing
+from scmle.assurance.charter import sealing
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "canary-key"

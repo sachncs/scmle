@@ -1,6 +1,6 @@
 """The closed-form power and sample-size formulas against simulated power.
 
-`scmle.data.charter.feasibility` states how many confirmation rows promise a
+`scmle.assurance.charter.feasibility` states how many confirmation rows promise a
 given power at the Bonferroni level `alpha / K`. Each formula is applied at
 its own required size, data are simulated with exactly that effect, and the
 share of rejections at the Bonferroni level must be within 3.5 binomial
@@ -13,7 +13,7 @@ import numpy
 from scipy import stats
 import support_statistics
 
-from scmle.data.charter import feasibility
+from scmle.assurance.charter import feasibility
 
 ALPHA = 0.05
 POWER = 0.8

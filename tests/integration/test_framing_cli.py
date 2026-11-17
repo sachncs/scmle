@@ -6,7 +6,7 @@ import numpy
 import pandas
 
 from scmle import cli
-from scmle.data.charter import sealing
+from scmle.assurance.charter import sealing
 
 MODEL = {
     "c_00": 0.0,

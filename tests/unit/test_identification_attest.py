@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from scmle.data.charter import causal
+from scmle.assurance.charter import causal
 from scmle.data.identification import attest
 from scmle.data.identification import run
 from tests.unit.test_identification_run import ASSUMPTIONS

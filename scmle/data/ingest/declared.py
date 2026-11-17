@@ -28,8 +28,8 @@ from typing import Any
 
 import pandas
 
+from scmle.assurance.charter import ingest
 from scmle.contracts import errors
-from scmle.data.charter import ingest
 from scmle.data.ingest import profile
 import scmle.data.ingest.reconcile
 

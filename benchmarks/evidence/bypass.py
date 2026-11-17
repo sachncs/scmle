@@ -83,7 +83,7 @@ SCOPE = (
 # ArtifactError, not BlockedError or LeakageError).
 UNREGISTERED = {
     "bundle.authenticate": "scmle.artifacts.bundle:Bundle.load",
-    "charter.verify": "scmle.data.charter.sealing:read_verified",
+    "charter.verify": "scmle.assurance.charter.sealing:read_verified",
 }
 OUTCOMES = ("blocked", "override", "bypass", "error")
 # Policy: training budget of a run that should train, in seconds.

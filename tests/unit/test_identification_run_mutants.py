@@ -7,10 +7,10 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.charter import causal
 from scmle.assurance.ledger import budget
 from scmle.contracts import qualification
 import scmle.data.admissibility.dag
-from scmle.data.charter import causal
 from scmle.data.identification import aipw
 from scmle.data.identification import battery
 from scmle.data.identification import certified

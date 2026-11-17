@@ -3,9 +3,9 @@
 import pandas
 import pytest
 
+from scmle.assurance.charter import ingest
 from scmle.contracts import errors
 from scmle.core import ingest_stage
-from scmle.data.charter import ingest
 
 
 def spec():

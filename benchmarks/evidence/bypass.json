@@ -1,7 +1,7 @@
 {
   "allowed": 0,
   "claim": "C8",
-  "code": "488a0eae8f224882b365baa414e110baa6a2ca1f950ba8abaf495967617186f0",
+  "code": "3763d4a7ae862d70f70f63758d1c8e98256692813f5450cefe7c80b44fb99377",
   "counts": {
     "attempts": 47,
     "blocked": 43,
@@ -730,7 +730,7 @@
   ],
   "unregistered": {
     "bundle.authenticate": "scmle.artifacts.bundle:Bundle.load",
-    "charter.verify": "scmle.data.charter.sealing:read_verified"
+    "charter.verify": "scmle.assurance.charter.sealing:read_verified"
   },
   "untargeted": [
     "admissibility.quarantine_all",

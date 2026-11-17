@@ -26,9 +26,9 @@ import json
 from pathlib import Path
 import time
 
+from scmle.assurance.charter import contracts
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.charter import contracts
 
 DEFAULT_MAX_SPECS = 12
 

@@ -3,8 +3,8 @@
 import pandas
 import pytest
 
+from scmle.assurance.charter import ingest
 from scmle.contracts import errors
-from scmle.data.charter import ingest
 from scmle.data.ingest import declared
 
 

@@ -6,8 +6,8 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.charter import causal
 from scmle.assurance.ledger import budget
-from scmle.data.charter import causal
 from scmle.data.identification import run
 
 BUDGET = budget.ErrorBudget.create(0.05, 0.1)

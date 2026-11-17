@@ -4,8 +4,8 @@ import json
 
 import pytest
 
+from scmle.assurance.charter import contracts
 from scmle.contracts import qualification
-from scmle.data.charter import contracts
 from scmle.data.robustness import multiverse
 from tests.unit.test_charter_contracts import make_charter
 

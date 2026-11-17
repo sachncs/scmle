@@ -2,7 +2,7 @@
 
 import pytest
 
-from scmle.data.charter import rules
+from scmle.assurance.charter import rules
 
 
 def test_each_rule_error_names_the_offending_field():

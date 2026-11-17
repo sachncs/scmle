@@ -61,7 +61,7 @@ import numpy
 import pandas
 
 from benchmarks.qualification import subgroup_certify
-from scmle.data.charter import causal
+from scmle.assurance.charter import causal
 from scmle.data.detectors import certificates
 from scmle.data.identification import run
 

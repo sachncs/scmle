@@ -13,7 +13,7 @@ import numpy
 import pytest
 
 from benchmarks.qualification import framing_certify
-from scmle.data.charter import contracts
+from scmle.assurance.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.framing import baseline
 from scmle.data.framing import costs

@@ -73,9 +73,9 @@ from scipy import stats
 from sklearn.datasets import load_breast_cancer
 
 from benchmarks.qualification import certify
+from scmle.assurance.charter import contracts
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.robustness import multiverse
 from scmle.data.robustness import shift

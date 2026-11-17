@@ -68,10 +68,10 @@ import numpy
 import pandas
 
 from benchmarks.qualification import f10_generators
+from scmle.assurance.charter import causal
 from scmle.assurance.ledger import budget
 import scmle.certificates
 import scmle.data.admissibility.dag
-from scmle.data.charter import causal
 from scmle.data.detectors import certificates
 from scmle.data.identification import aipw
 from scmle.data.identification import battery

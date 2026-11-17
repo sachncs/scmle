@@ -64,7 +64,7 @@ distinguish on the machine used, except where the reason says otherwise.
 
 ## Charter modules and attestations
 
-Modules: `scmle/data/charter/{contracts,feasibility,rules,sealing}.py`,
+Modules: `scmle/assurance/charter/{contracts,feasibility,rules,sealing}.py`,
 `scmle/data/admissibility/attestations.py`. Tests:
 `tests/unit/test_charter_*.py` (including `test_charter_mutants.py`,
 `test_charter_feasibility_mutants.py`,

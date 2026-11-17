@@ -3,7 +3,7 @@
 import numpy
 import pandas
 
-from scmle.data.charter import causal
+from scmle.assurance.charter import causal
 from scmle.data.identification import run
 from tests.unit.test_identification_run import block
 from tests.unit.test_identification_run import BUDGET

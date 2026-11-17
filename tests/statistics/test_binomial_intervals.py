@@ -11,7 +11,7 @@ import pytest
 from scipy import stats
 import support_statistics
 
-from scmle.data.charter import feasibility
+from scmle.assurance.charter import feasibility
 from scmle.data.detectors import certificates
 from scmle.data.detectors import duplicates
 from scmle.data.framing import refusal

@@ -31,6 +31,7 @@ from pathlib import Path
 
 import pandas
 
+import scmle.assurance.charter.causal
 import scmle.certificates
 from scmle.contracts import errors
 from scmle.contracts import qualification
@@ -40,7 +41,6 @@ from scmle.data.admissibility import rules
 from scmle.data.admissibility import screen
 import scmle.data.admissibility.attestations
 import scmle.data.admissibility.dag
-import scmle.data.charter.causal
 from scmle.data.detectors import certificates
 from scmle.data.detectors import pipeline
 
@@ -254,7 +254,7 @@ def waiver(
 def admit(
     frame: pandas.DataFrame,
     candidates: Sequence[str],
-    spec: scmle.data.charter.causal.Question,
+    spec: scmle.assurance.charter.causal.Question,
     graph: scmle.data.admissibility.dag.Dag,
     seed: int,
     day: datetime.date,
@@ -293,7 +293,7 @@ def admit(
         falsification, if it ran.
     """
     records = provenance.Dictionary.covering([str(c) for c in candidates])
-    members = scmle.data.charter.causal.adjusters(spec.assumptions) or ()
+    members = scmle.assurance.charter.causal.adjusters(spec.assumptions) or ()
     try:
         table: rules.Admissibility | None = rules.build_table(
             records,
@@ -381,7 +381,7 @@ def run(
     ] = (),
     scope: str = "",
     today: datetime.date | None = None,
-    causal: scmle.data.charter.causal.Question | None = None,
+    causal: scmle.assurance.charter.causal.Question | None = None,
     dag: scmle.data.admissibility.dag.Dag | None = None,
     declared: Sequence[provenance.Pedigree] = (),
 ) -> Qualification:

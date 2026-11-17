@@ -6,9 +6,9 @@ import pathlib
 import pytest
 import support
 
+from scmle.assurance.charter import sealing
+import scmle.assurance.charter.contracts
 from scmle.contracts import errors
-from scmle.data.charter import sealing
-import scmle.data.charter.contracts
 from scmle.data.custody import sealed
 import scmle.data.custody.manifest
 from tests.unit.test_charter_contracts import make_charter
@@ -355,13 +355,13 @@ def test_a_run_without_a_charter_writes_no_admissibility_artifacts(
 
 
 RICH_MULTIVERSE = (
-    scmle.data.charter.contracts.Choice(
+    scmle.assurance.charter.contracts.Choice(
         "imputation", ("median", "complete_case"), "median"
     ),
-    scmle.data.charter.contracts.Choice(
+    scmle.assurance.charter.contracts.Choice(
         "outlier_rule", ("none", "winsorize", "iqr_drop"), "none"
     ),
-    scmle.data.charter.contracts.Choice(
+    scmle.assurance.charter.contracts.Choice(
         "inclusion", ("all", "first_half", "second_half"), "all"
     ),
 )
@@ -455,10 +455,10 @@ def test_a_run_without_a_charter_has_no_robustness_reports(
 def test_chartered_rules_drive_the_ledger_and_the_second_stage(
     binary_frame, tmp_path
 ):
+    import scmle.assurance.charter.rules
     import scmle.assurance.ledger.ledger
-    import scmle.data.charter.rules
 
-    rules = scmle.data.charter.rules.Procedure(
+    rules = scmle.assurance.charter.rules.Procedure(
         ledger_rule="lord++", confirmation_rule="bh", stability_filter=True
     )
     path = inscribe(tmp_path, multiverse=RICH_MULTIVERSE, rules=rules)

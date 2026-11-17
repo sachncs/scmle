@@ -6,12 +6,12 @@ import pytest
 
 from scmle import cli
 from scmle.artifacts import claims_audit
+from scmle.assurance.charter import sealing
+import scmle.assurance.charter.rules
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 from scmle.assurance.ledger import ledger
 from scmle.contracts import errors
-from scmle.data.charter import sealing
-import scmle.data.charter.rules
 from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
 from tests.unit.test_charter_contracts import make_charter
@@ -95,7 +95,7 @@ def test_a_signed_run_cannot_pass_the_audit_without_its_key(tmp_path):
 
 
 def test_chartered_rules_are_checked_against_the_ledger(tmp_path):
-    rules = scmle.data.charter.rules.Procedure(
+    rules = scmle.assurance.charter.rules.Procedure(
         ledger_rule="lord++", confirmation_rule="bh"
     )
     make_run(tmp_path, rules=rules)
@@ -107,7 +107,7 @@ def test_chartered_rules_are_checked_against_the_ledger(tmp_path):
     other.mkdir()
     make_run(other)
     changed = json.loads((other / "analysis_charter.json").read_text())
-    changed["charter"]["rules"] = scmle.data.charter.rules.Procedure(
+    changed["charter"]["rules"] = scmle.assurance.charter.rules.Procedure(
         confirmation_rule="holm"
     ).to_dict()
     changed["format"] = 3

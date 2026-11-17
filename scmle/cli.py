@@ -25,13 +25,13 @@ from scmle import durability
 from scmle.api import project
 from scmle.artifacts import bundle
 from scmle.artifacts import claims_audit
+from scmle.assurance.charter import contracts
+from scmle.assurance.charter import feasibility
+from scmle.assurance.charter import sealing
 from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.contracts import tasks
 from scmle.data.catalog import Catalog
-from scmle.data.charter import contracts
-from scmle.data.charter import feasibility
-from scmle.data.charter import sealing
 from scmle.data.framing import costs
 from scmle.data.framing import draft
 from scmle.data.framing import refusal

@@ -63,8 +63,8 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.charter import causal
 import scmle.certificates
-from scmle.data.charter import causal
 from scmle.data.detectors import certificates
 from scmle.data.identification import certified
 from scmle.data.identification import run

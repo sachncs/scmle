@@ -2,13 +2,13 @@
 
 from typing import Any
 
+from scmle.assurance.charter import contracts
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 from scmle.core import causal_claim
 import scmle.core.context
 from scmle.core.stages import qualification
 from scmle.data.admissibility import qualify
-from scmle.data.charter import contracts
 from scmle.data.framing import draft
 import scmle.data.identification.run
 

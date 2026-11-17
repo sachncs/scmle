@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy
 import pytest
 
-from scmle.data.charter import decision
+from scmle.assurance.charter import decision
 from scmle.data.framing import costs
 from scmle.decision import anytime
 from scmle.decision import constraints

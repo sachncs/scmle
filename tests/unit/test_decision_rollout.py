@@ -6,7 +6,7 @@ import math
 import numpy
 import pytest
 
-import scmle.data.charter.decision
+import scmle.assurance.charter.decision
 from scmle.decision import design
 from scmle.decision import rollout
 
@@ -22,11 +22,11 @@ def make_plan(**overrides):
         "alpha_promote": Fraction(1, 50),
         "alpha_rollback": Fraction(1, 100),
         "guardrails": (
-            scmle.data.charter.decision.Guardrail("bounce", margin=0.05),
+            scmle.assurance.charter.decision.Guardrail("bounce", margin=0.05),
         ),
     }
     values.update(overrides)
-    return scmle.data.charter.decision.Experiment(**values)
+    return scmle.assurance.charter.decision.Experiment(**values)
 
 
 def traffic(n, seed, lift=0.04, bounce_lift=0.0, base=0.10):
@@ -130,7 +130,7 @@ def test_a_harmful_guardrail_blocks_promotion():
 
 
 def test_a_lower_is_worse_guardrail_is_read_in_the_other_direction():
-    guard = scmle.data.charter.decision.Guardrail(
+    guard = scmle.assurance.charter.decision.Guardrail(
         "rating", 0.05, higher_is_worse=False
     )
     plan = make_plan(guardrails=(guard,), n_max=30000)

@@ -122,7 +122,7 @@
     }
   },
   "claim": "C12",
-  "content_hash": "bcc14e55822eb83fa28abddd8995214fa6cec187f19255d6ca1724a9688ceb22",
+  "content_hash": "39e5f12738312310cd4ee0d7af413c998c7a40109e0ee9904f10fdc032038745",
   "counts": {
     "guarantees": 245,
     "linked": 245,
@@ -462,7 +462,7 @@
         "tests/unit/test_charter_ingest.py::test_the_entity_block_needs_format_eight_and_round_trips",
         "tests/unit/test_charter_ingest.py::test_the_reconcile_block_needs_format_eight_and_round_trips"
       ],
-      "text": "Charter format 8 adds the optional `entity` and `reconcile` sub-blocks of `ingest` (`scmle.data.charter.ingest.Entity`, `Expectation`, extension surfaces); a format 7 ingest charter keeps its hash and signature.",
+      "text": "Charter format 8 adds the optional `entity` and `reconcile` sub-blocks of `ingest` (`scmle.assurance.charter.ingest.Entity`, `Expectation`, extension surfaces); a format 7 ingest charter keeps its hash and signature.",
       "words": [
         "blocks"
       ]
@@ -479,7 +479,7 @@
         "tests/unit/test_charter_causal.py::test_attestors_need_format_nine_and_round_trip",
         "tests/unit/test_charter_causal.py::test_subgroups_need_format_nine_and_round_trip"
       ],
-      "text": "Charter format 9 adds the optional `subgroups` field of the causal block (`scmle.data.charter.causal.Subgroup`, an extension surface) and the optional `attestors` and `attestations` fields (`scmle.data.charter.causal.Attestor`, `scmle.data.identification.attest`); a format 4 causal charter keeps its hash and signature.",
+      "text": "Charter format 9 adds the optional `subgroups` field of the causal block (`scmle.assurance.charter.causal.Subgroup`, an extension surface) and the optional `attestors` and `attestations` fields (`scmle.assurance.charter.causal.Attestor`, `scmle.data.identification.attest`); a format 4 causal charter keeps its hash and signature.",
       "words": [
         "block"
       ]
@@ -497,7 +497,7 @@
         "tests/unit/test_charter_uncertainty.py::test_a_charter_without_the_block_keeps_its_hash_and_format",
         "tests/unit/test_charter_uncertainty.py::test_the_block_changes_the_hash_round_trips_and_needs_format_ten"
       ],
-      "text": "Charter format 10 adds the optional `uncertainty` block (`scmle.data.charter.uncertainty.Uncertainty`, an extension surface; the snapshot is unchanged); a charter of format 9 or older keeps its hash and signature.",
+      "text": "Charter format 10 adds the optional `uncertainty` block (`scmle.assurance.charter.uncertainty.Uncertainty`, an extension surface; the snapshot is unchanged); a charter of format 9 or older keeps its hash and signature.",
       "words": [
         "block"
       ]
@@ -514,7 +514,7 @@
         "tests/unit/test_charter_uncertainty.py::test_the_confirmation_coverage_flag_needs_format_eleven_and_round_trips",
         "tests/unit/test_charter_uncertainty.py::test_without_the_flag_a_format_ten_charter_keeps_its_hash"
       ],
-      "text": "Charter format 11 adds the optional `coverage_on_confirmation` field of the `uncertainty` block (`scmle.data.charter.uncertainty.Uncertainty`, an extension surface; a format 10 charter keeps its hash and signature, both pinned).",
+      "text": "Charter format 11 adds the optional `coverage_on_confirmation` field of the `uncertainty` block (`scmle.assurance.charter.uncertainty.Uncertainty`, an extension surface; a format 10 charter keeps its hash and signature, both pinned).",
       "words": [
         "block"
       ]
@@ -548,7 +548,7 @@
         "tests/unit/test_charter_rules.py::test_a_charter_without_rules_keeps_its_hash_and_signature",
         "tests/unit/test_charter_rules.py::test_an_old_signed_file_still_loads_and_verifies"
       ],
-      "text": "`scmle.data.charter.contracts.AnalysisEstimand` gained the optional field `causal` (`scmle.data.charter.causal.Question`, with `Control` and `Confounding`); it is omitted from the record when unset, so charters of format 1 to 3 keep their hash and signature, and a charter that carries it is format 4 (an older wrapper carrying it is refused).",
+      "text": "`scmle.assurance.charter.contracts.AnalysisEstimand` gained the optional field `causal` (`scmle.assurance.charter.causal.Question`, with `Control` and `Confounding`); it is omitted from the record when unset, so charters of format 1 to 3 keep their hash and signature, and a charter that carries it is format 4 (an older wrapper carrying it is refused).",
       "words": [
         "refused"
       ]

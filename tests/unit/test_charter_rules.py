@@ -5,10 +5,10 @@ import json
 
 import pytest
 
+from scmle.assurance.charter import contracts
+from scmle.assurance.charter import sealing
+import scmle.assurance.charter.rules
 from scmle.contracts import errors
-from scmle.data.charter import contracts
-from scmle.data.charter import sealing
-import scmle.data.charter.rules
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "rules-key"
@@ -21,7 +21,9 @@ FROZEN_SIGNATURE = (
 
 
 def chartered(**changes):
-    return make_charter(rules=scmle.data.charter.rules.Procedure(**changes))
+    return make_charter(
+        rules=scmle.assurance.charter.rules.Procedure(**changes)
+    )
 
 
 def test_a_charter_without_rules_keeps_its_hash_and_signature():
@@ -118,22 +120,24 @@ def test_rules_in_an_older_format_are_refused(tmp_path):
 )
 def test_invalid_rules_are_rejected(changes):
     with pytest.raises(ValueError):
-        scmle.data.charter.rules.Procedure(**changes)
+        scmle.assurance.charter.rules.Procedure(**changes)
 
 
 def test_rules_reject_unknown_and_missing_fields():
-    record = scmle.data.charter.rules.Procedure().to_dict()
+    record = scmle.assurance.charter.rules.Procedure().to_dict()
     with pytest.raises(ValueError, match="unexpected"):
-        scmle.data.charter.rules.Procedure.from_dict({**record, "extra": 1})
+        scmle.assurance.charter.rules.Procedure.from_dict(
+            {**record, "extra": 1}
+        )
     del record["band"]
     with pytest.raises(ValueError, match="missing"):
-        scmle.data.charter.rules.Procedure.from_dict(record)
+        scmle.assurance.charter.rules.Procedure.from_dict(record)
 
 
 def test_defaults_match_the_shipped_stability_rule():
     from scmle.data.robustness import stability
 
-    defaults = scmle.data.charter.rules.Procedure()
+    defaults = scmle.assurance.charter.rules.Procedure()
     assert dataclasses.asdict(stability.DEFAULT_RULE) == {
         "s_min": defaults.s_min,
         "band": defaults.band,

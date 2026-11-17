@@ -28,8 +28,8 @@ from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 from scipy import stats
 
+from scmle.assurance.charter import decision
 from scmle.contracts import errors
-from scmle.data.charter import decision
 from scmle.data.framing import costs
 from scmle.decision import netbenefit
 from scmle.runtime import randomness

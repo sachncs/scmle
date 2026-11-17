@@ -2,8 +2,8 @@
 
 import pytest
 
+from scmle.assurance.charter import causal
 import scmle.data.admissibility.dag
-from scmle.data.charter import causal
 from scmle.data.identification import select
 
 COVARIATES = "unconfoundedness_given:age"

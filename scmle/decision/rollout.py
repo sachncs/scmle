@@ -51,8 +51,8 @@ import numpy
 from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 
+import scmle.assurance.charter.decision
 from scmle.contracts import errors
-import scmle.data.charter.decision
 from scmle.decision import anytime
 from scmle.decision import design
 
@@ -106,8 +106,8 @@ class Decision:
 
 
 def metric_stream(
-    plan: scmle.data.charter.decision.Experiment,
-    guard: scmle.data.charter.decision.Guardrail | None,
+    plan: scmle.assurance.charter.decision.Experiment,
+    guard: scmle.assurance.charter.decision.Guardrail | None,
 ) -> anytime.Stream:
     """The centred pseudo-outcome stream and null of the primary or a guardrail.
 
@@ -131,8 +131,8 @@ def metric_stream(
 
 
 def metric_values(
-    plan: scmle.data.charter.decision.Experiment,
-    guard: scmle.data.charter.decision.Guardrail | None,
+    plan: scmle.assurance.charter.decision.Experiment,
+    guard: scmle.assurance.charter.decision.Guardrail | None,
     arm: NDArray[numpy.float64],
     outcome: ArrayLike,
     carry: tuple[float, int] = (0.0, 0),
@@ -186,7 +186,7 @@ class Rollout:
 
     def __init__(
         self,
-        plan: scmle.data.charter.decision.Experiment,
+        plan: scmle.assurance.charter.decision.Experiment,
         experiment_id: str,
         level: float,
     ) -> None:
@@ -209,7 +209,7 @@ class Rollout:
         self.target = -math.log(level)
         names = [plan.primary, *(g.name for g in plan.guardrails)]
         self.names = names
-        self.guards: list[scmle.data.charter.decision.Guardrail | None] = [
+        self.guards: list[scmle.assurance.charter.decision.Guardrail | None] = [
             None,
             *plan.guardrails,
         ]

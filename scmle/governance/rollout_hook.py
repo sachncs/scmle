@@ -35,9 +35,9 @@ from numpy.typing import ArrayLike
 from numpy.typing import NDArray
 import pandas
 
+import scmle.assurance.charter.decision
 import scmle.assurance.ledger.budget
 from scmle.contracts import errors
-import scmle.data.charter.decision
 from scmle.decision import design
 from scmle.decision import rollout
 from scmle.governance import deployment_ledger
@@ -51,7 +51,7 @@ class Hook:
     def __init__(
         self,
         manager: lifecycle.Maintainer,
-        plan: scmle.data.charter.decision.Experiment,
+        plan: scmle.assurance.charter.decision.Experiment,
         ledger: deployment_ledger.DeploymentLedger,
         *,
         budget: scmle.assurance.ledger.budget.DecisionBudget | None = None,

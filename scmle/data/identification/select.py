@@ -12,8 +12,8 @@ from collections.abc import Mapping
 import dataclasses
 from typing import Any
 
+from scmle.assurance.charter import causal
 import scmle.data.admissibility.dag
-from scmle.data.charter import causal
 
 IDENTIFIED = "identified"
 NOT_IDENTIFIED = "not_identified"

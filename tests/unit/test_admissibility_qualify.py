@@ -4,6 +4,7 @@ import numpy
 import pandas
 import pytest
 
+import scmle.assurance.charter.causal
 from scmle.assurance.ledger import online_fdr
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
@@ -11,7 +12,6 @@ from scmle.contracts import qualification
 from scmle.data.admissibility import qualify
 from scmle.data.admissibility import screen
 import scmle.data.admissibility.dag
-import scmle.data.charter.causal
 from scmle.data.detectors import certificates
 from tests.unit.test_charter_contracts import make_charter
 
@@ -167,7 +167,7 @@ def causal_world(rows=500, seed=0):
 
 
 def spec(assumptions):
-    return scmle.data.charter.causal.Question(
+    return scmle.assurance.charter.causal.Question(
         treatment="t",
         outcome="y",
         estimand="ATE",

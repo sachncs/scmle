@@ -7,11 +7,11 @@ scmle/data/catalog.py tabulate single-use coerce already has six returns, so the
 scmle/data/catalog.py coerce single-use dispatcher whose return contract and ValueError are documented and which examine calls once; inlined it would bury examine's frame-less branches under an isinstance chain
 scmle/data/catalog.py frame_for_mapping single-use coerce already has six returns, and the columns-versus-record rule with its equal-length ValueError is a separate documented step
 scmle/data/catalog.py normalize single-use body carries the documented rule that a one-letter scheme before a colon is a Windows drive and so a path, which the Source validator should not repeat inside its field loop
-scmle/data/charter/contracts.py peek single-use public reader called by cli and by tests/unit/test_charter_contracts and test_charter_rules_sealing_mutants, which assert the wrapped and bare charter forms
-scmle/data/charter/feasibility.py mde_mean single-use public closed form named by six tests in test_charter_feasibility and test_charter_feasibility_mutants, including the n below 1 NaN case
-scmle/data/charter/feasibility.py n_required_mean single-use public closed form named by fourteen tests including tests/statistics/test_power_formulas and by benchmarks/qualification/framing_certify.py
-scmle/data/charter/feasibility.py detectability single-use public closed form named by tests/statistics/test_power_formulas and eight unit assertions in the feasibility tests
-scmle/data/charter/sealing.py inscribe single-use public writer called by cli and by sixty tests that seal charters
+scmle/assurance/charter/contracts.py peek single-use public reader called by cli and by tests/unit/test_charter_contracts and test_charter_rules_sealing_mutants, which assert the wrapped and bare charter forms
+scmle/assurance/charter/feasibility.py mde_mean single-use public closed form named by six tests in test_charter_feasibility and test_charter_feasibility_mutants, including the n below 1 NaN case
+scmle/assurance/charter/feasibility.py n_required_mean single-use public closed form named by fourteen tests including tests/statistics/test_power_formulas and by benchmarks/qualification/framing_certify.py
+scmle/assurance/charter/feasibility.py detectability single-use public closed form named by tests/statistics/test_power_formulas and eight unit assertions in the feasibility tests
+scmle/assurance/charter/sealing.py inscribe single-use public writer called by cli and by sixty tests that seal charters
 scmle/preparation/preprocessing.py wrap single-use instantiate already has ten decision points, the C901 limit, so the five wrapper conditions here would break complexity; the survival, forecast, multi-target, uplift, query wrapping order is also fixed in one place
 scmle/data/custody/carve.py autocorrelation single-use named by tests/unit/test_custody_carve, test_custody_pipeline and MUTANTS_custody.md, which pin its zero result for a constant series
 scmle/data/custody/carve.py enclose single-use mutates in_c in place and returns it, a contract test_custody_mutants_data checks, and carve's time-block branch would grow a loop

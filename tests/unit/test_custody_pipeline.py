@@ -6,9 +6,9 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.charter import feasibility
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.charter import feasibility
 from scmle.data.custody import carve
 from scmle.data.custody import pipeline
 from scmle.data.custody import sealed

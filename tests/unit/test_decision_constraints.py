@@ -3,7 +3,7 @@
 import numpy
 import pytest
 
-from scmle.data.charter import decision
+from scmle.assurance.charter import decision
 from scmle.decision import constraints
 
 

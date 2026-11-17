@@ -5,7 +5,7 @@ import math
 import pytest
 from scipy import stats
 
-from scmle.data.charter import feasibility
+from scmle.assurance.charter import feasibility
 from scmle.data.detectors import certificates
 
 

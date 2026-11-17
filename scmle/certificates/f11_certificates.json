@@ -397,7 +397,7 @@
       ]
     },
     "A8": {
-      "code_hash": "5cc7d27e580cff2c69d73929a31a5c61edc66f42094200b6ed3989afcdaaefb7",
+      "code_hash": "31ef87bb1f71237ad1f67e89fd3bcfd9dde7a7a6e9a1af6f8bf188537c6a2eff",
       "false_refusal_bound": 0.07516611478423584,
       "false_refusal_rate": 0.04666666666666667,
       "false_refusals_equal": 14,
@@ -420,7 +420,7 @@
         "agree": 100,
         "runs": 100
       },
-      "code_hash": "bd6af7af628db5dda40885c21dc744a0ec6eb75f4ba0ee8618bac808693213eb",
+      "code_hash": "69339a28bfece570891f5491bafc018ed9a60a4577cfe7e7067bec0da1c54fd5",
       "compare_arms": {
         "false_adopt": 10,
         "interval": [
@@ -464,7 +464,7 @@
     },
     "B2": {
       "bound": 0.02395979797464467,
-      "code_hash": "b626f61551ccd6545b2031e6d5801cbfe7dc7379d008ca1fcc90bca8bea06259",
+      "code_hash": "43a6e1b3863a996b3a5af308737d9646fb955af1b30653a42d8fc82b09b4770e",
       "interval": [
         0.0005500831677591556,
         0.002615776292629832
@@ -615,7 +615,7 @@
         ],
         "rate": 0.001
       },
-      "code_hash": "24bc6030776dbdeec40d30003cee91b7de580c61531ede1f7f10efd80e72348e",
+      "code_hash": "6a4c57d2b710a59319bd4ad41ae4f0b5265dc8b30a55000020c8cd0777857c3f",
       "false_rollback": {
         "interval": [
           8.826773070546787e-05,

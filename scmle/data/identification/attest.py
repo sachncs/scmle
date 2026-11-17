@@ -46,12 +46,12 @@ from pathlib import Path
 from typing import Any
 from typing import Self
 
+from scmle.assurance.charter import causal
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.contracts import signing
 from scmle.data.admissibility import provenance
-from scmle.data.charter import causal
 
 FORMAT_VERSION = 1
 

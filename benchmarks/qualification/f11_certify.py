@@ -161,12 +161,12 @@ import scipy.stats
 
 from benchmarks.qualification import f11_generators
 from scmle.artifacts import bundle
+from scmle.assurance.charter import feasibility
+import scmle.assurance.charter.decision
 import scmle.assurance.ledger.budget
 import scmle.certificates
 from scmle.contracts import tasks
 import scmle.contracts.data
-from scmle.data.charter import feasibility
-import scmle.data.charter.decision
 from scmle.data.detectors import certificates
 from scmle.data.framing import costs
 from scmle.decision import anytime
@@ -1058,7 +1058,7 @@ def gate_b8(runs: int, base: int = 0) -> dict[str, Any]:
 
 def fair_constraint(
     gap: float = 0.05,
-) -> scmle.data.charter.decision.Constraint:
+) -> scmle.assurance.charter.decision.Constraint:
     """The constraint of the fairness worlds.
 
     Args:
@@ -1067,7 +1067,7 @@ def fair_constraint(
     Returns:
         An equal-opportunity constraint on `group` with that gap.
     """
-    return scmle.data.charter.decision.Constraint(
+    return scmle.assurance.charter.decision.Constraint(
         "group", "equal_opportunity", gap, "group_thresholds", "certify"
     )
 
@@ -1183,7 +1183,7 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
     refused = {}
     for pair in pairs:
         declared = tuple(
-            scmle.data.charter.decision.Constraint(
+            scmle.assurance.charter.decision.Constraint(
                 "group", c, 0.05, "reweighing"
             )
             for c in pair
@@ -1201,7 +1201,9 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
                 count += 1
         refused["/".join(pair)] = count
     declared = tuple(
-        scmle.data.charter.decision.Constraint("group", c, 0.05, "reweighing")
+        scmle.assurance.charter.decision.Constraint(
+            "group", c, 0.05, "reweighing"
+        )
         for c in pairs[0]
     )
     false_refusals = 0
@@ -1234,9 +1236,9 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
 def plan_for(
     delta_min: float = 0.02,
     n_max: int = 3000,
-    guardrails: tuple[scmle.data.charter.decision.Guardrail, ...] = (),
+    guardrails: tuple[scmle.assurance.charter.decision.Guardrail, ...] = (),
     tolerance: float = 0.02,
-) -> scmle.data.charter.decision.Experiment:
+) -> scmle.assurance.charter.decision.Experiment:
     """The rollout plan the online worlds use.
 
     Args:
@@ -1249,7 +1251,7 @@ def plan_for(
         A plan for a conversion experiment with assignment probability 0.5
         and the module's promotion and rollback levels.
     """
-    return scmle.data.charter.decision.Experiment(
+    return scmle.assurance.charter.decision.Experiment(
         unit="user",
         primary="conversion",
         assignment_prob=0.5,
@@ -1388,7 +1390,7 @@ def gate_b2(runs: int, base: int = 0) -> dict[str, Any]:
         The promotions (primary and guardrail both crossing), rate,
         interval, bound and `passed`.
     """
-    guard = scmle.data.charter.decision.Guardrail("bounce", margin=0.05)
+    guard = scmle.assurance.charter.decision.Guardrail("bounce", margin=0.05)
     plan = plan_for(n_max=6000, guardrails=(guard,))
     hits = 0
     chunk = 250

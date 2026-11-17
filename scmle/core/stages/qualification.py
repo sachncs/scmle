@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from scmle.assurance.charter import contracts
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import explore
 from scmle.assurance.ledger import governed
@@ -11,7 +12,6 @@ from scmle.core import ingest_stage
 import scmle.core.context
 from scmle.core.stages import screening
 from scmle.data.admissibility import qualify
-from scmle.data.charter import contracts
 import scmle.data.framing.claim
 from scmle.data.readers import tabular
 from scmle.data.robustness import html_report

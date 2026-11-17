@@ -10,9 +10,9 @@ import support
 
 from scmle import cli
 from scmle.artifacts import claims_audit
+from scmle.assurance.charter import sealing
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
-from scmle.data.charter import sealing
 from scmle.data.framing import costs
 from tests.unit.test_charter_contracts import make_charter
 

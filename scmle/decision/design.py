@@ -1,7 +1,7 @@
 """Rollout design: sample size, expected sample number, assignment, SRM.
 
 Written before any traffic. The fixed-horizon size comes from
-the closed forms in `scmle.data.charter.feasibility`; the expected sample
+the closed forms in `scmle.assurance.charter.feasibility`; the expected sample
 number of the anytime-valid design is simulated with the engine in
 `scmle.decision.anytime`, and the ratio between the two is reported rather
 than hidden. Assignment is a salted hash of the unit id, so it is
@@ -21,10 +21,10 @@ from numpy.typing import NDArray
 from scipy import special
 from scipy import stats
 
+from scmle.assurance.charter import decision
+from scmle.assurance.charter import feasibility
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.charter import decision
-from scmle.data.charter import feasibility
 from scmle.decision import anytime
 from scmle.runtime import randomness
 

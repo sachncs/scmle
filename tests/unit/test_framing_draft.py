@@ -6,7 +6,7 @@ import pandas
 import pytest
 
 from benchmarks.qualification import framing_certify
-from scmle.data.charter import contracts
+from scmle.assurance.charter import contracts
 from scmle.data.framing import costs
 from scmle.data.framing import draft
 from scmle.data.framing import provenance

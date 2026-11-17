@@ -20,9 +20,9 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.charter import contracts
 from scmle.contracts import errors
 from scmle.contracts import signing
-from scmle.data.charter import contracts
 from scmle.data.framing import baseline
 from scmle.data.framing import costs
 from scmle.data.framing import provenance

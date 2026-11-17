@@ -5,10 +5,10 @@ import json
 
 import pytest
 
+from scmle.assurance.charter import causal
+from scmle.assurance.charter import contracts
+from scmle.assurance.charter import sealing
 from scmle.contracts import errors
-from scmle.data.charter import causal
-from scmle.data.charter import contracts
-from scmle.data.charter import sealing
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_charter_rules import FROZEN_HASH
 

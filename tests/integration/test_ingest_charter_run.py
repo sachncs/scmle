@@ -9,10 +9,10 @@ import pandas
 import pytest
 import support
 
+from scmle.assurance.charter import ingest
+from scmle.assurance.charter import sealing
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
-from scmle.data.charter import ingest
-from scmle.data.charter import sealing
 from scmle.data.ingest import declared
 from tests.unit.test_charter_contracts import make_charter
 

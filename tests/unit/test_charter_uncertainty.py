@@ -4,10 +4,10 @@ import json
 
 import pytest
 
+from scmle.assurance.charter import contracts
+from scmle.assurance.charter import sealing
+from scmle.assurance.charter import uncertainty
 from scmle.contracts import errors
-from scmle.data.charter import contracts
-from scmle.data.charter import sealing
-from scmle.data.charter import uncertainty
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_charter_ingest import PINNED_HASH
 

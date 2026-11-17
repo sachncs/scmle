@@ -28,13 +28,13 @@ from typing import cast
 import numpy
 import pandas
 
+from scmle.assurance.charter import causal
 from scmle.assurance.ledger import budget
 from scmle.assurance.ledger import multiplicity
 import scmle.assurance.ledger.budget
 from scmle.contracts import errors
 from scmle.contracts import qualification
 import scmle.data.admissibility.dag
-from scmle.data.charter import causal
 from scmle.data.identification import aipw
 from scmle.data.identification import battery
 from scmle.data.identification import did

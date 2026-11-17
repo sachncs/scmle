@@ -2,8 +2,8 @@
 
 import numpy
 
+from scmle.assurance.charter import contracts
 from scmle.contracts import qualification
-from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.robustness import coverage
 from scmle.data.robustness import multiverse

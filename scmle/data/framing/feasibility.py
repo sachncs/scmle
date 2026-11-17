@@ -18,8 +18,8 @@ import numpy
 from numpy.typing import ArrayLike
 from scipy import stats
 
+from scmle.assurance.charter import feasibility
 from scmle.contracts import errors
-from scmle.data.charter import feasibility
 from scmle.data.framing import baseline
 
 INCONCLUSIVE = "inconclusive"

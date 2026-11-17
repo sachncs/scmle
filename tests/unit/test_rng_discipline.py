@@ -8,7 +8,7 @@ import pytest
 
 ROOT = Path(__file__).parents[2]
 PACKAGES = (
-    "scmle.data.charter",
+    "scmle.assurance.charter",
     "scmle.data.custody",
     "scmle.assurance.ledger",
     "scmle.data.admissibility",

@@ -69,7 +69,7 @@ def test_a_run_without_a_charter_writes_the_claim_too(tmp_path):
 
 def test_declared_slices_are_in_the_claim_and_flagged_by_the_margin(tmp_path):
     # Enforces docs/ARTIFACTS.md:70.
-    from scmle.data.charter import uncertainty
+    from scmle.assurance.charter import uncertainty
 
     result = run(
         tmp_path,
@@ -97,7 +97,7 @@ def test_declared_slices_are_in_the_claim_and_flagged_by_the_margin(tmp_path):
 
 
 def confirmation_run(tmp_path):
-    from scmle.data.charter import uncertainty
+    from scmle.assurance.charter import uncertainty
 
     return run(
         tmp_path,

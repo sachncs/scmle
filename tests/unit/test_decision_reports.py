@@ -5,21 +5,21 @@ from fractions import Fraction
 import numpy
 import pandas
 
+import scmle.assurance.charter.decision
 from scmle.core import decision_reports
-import scmle.data.charter.decision
 from scmle.data.framing import costs
 from scmle.decision import rollout
 from tests.unit.test_charter_contracts import make_charter
 
 
 def layer(fairness=(), plan=None):
-    return scmle.data.charter.decision.Layer(
-        scmle.data.charter.decision.Policy("EUR"), fairness, plan
+    return scmle.assurance.charter.decision.Layer(
+        scmle.assurance.charter.decision.Policy("EUR"), fairness, plan
     )
 
 
 def plan():
-    return scmle.data.charter.decision.Experiment(
+    return scmle.assurance.charter.decision.Experiment(
         unit="user",
         primary="conv",
         assignment_prob=0.5,
@@ -77,10 +77,10 @@ def test_fairness_reports_each_constraint_and_missing_columns():
     outcome = (rng.random(n) < 0.5).astype(float)
     acts = (rng.random(n) < 0.5).astype(float)
     items = (
-        scmle.data.charter.decision.Constraint(
+        scmle.assurance.charter.decision.Constraint(
             "g", "demographic_parity", 0.3, "reweighing"
         ),
-        scmle.data.charter.decision.Constraint(
+        scmle.assurance.charter.decision.Constraint(
             "absent", "demographic_parity", 0.3, "reweighing"
         ),
     )

@@ -5,13 +5,13 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.charter import sealing
 import scmle.assurance.ledger.ledger
 from scmle.contracts import tasks
 from scmle.core import decision_reports
 import scmle.core.context
 from scmle.core.stages import relabelling
 from scmle.core.stages import scoring
-from scmle.data.charter import sealing
 from scmle.evaluation import coverage
 from scmle.evaluation import coverage_run
 
