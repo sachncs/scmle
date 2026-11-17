@@ -21,8 +21,8 @@ import itertools
 import re
 from typing import Any
 
+from scmle.assurance.ingest import profile
 from scmle.contracts import errors
-from scmle.data.ingest import profile
 
 LEVELS = 3
 SMALL_N = 1000

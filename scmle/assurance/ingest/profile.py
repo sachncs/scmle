@@ -23,8 +23,8 @@ from typing import Any
 
 import pandas
 
+from scmle.assurance.ingest import budget
 from scmle.contracts import errors
-from scmle.data.ingest import budget
 from scmle.data.readers import connectors
 
 ORDER_BY = re.compile(r"\border\s+by\b", re.IGNORECASE)

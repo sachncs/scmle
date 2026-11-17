@@ -2,17 +2,17 @@
 
 Two detectors have certificates in `ingest_certificates.json`:
 
-* `ingest-torn-read` (`scmle.data.ingest.profile.untorn` with the
+* `ingest-torn-read` (`scmle.assurance.ingest.profile.untorn` with the
   `DbApiConnector` batch check): `NOISY` worlds mutate a table between
   batches (an update behind the read position, one ahead of it, an insert, a
   delete; each kind equally often); `QUIET` worlds are static. Policy:
   recall Wilson lower bound at least 0.99, false-alarm upper bound at most
   0.02, 95 percent intervals.
-* `ingest-reconcile` (`scmle.data.ingest.reconcile`): `RECONCILE_RUNS` worlds
-  per planted defect (`fanout`, `dropped_rows`, `torn_read`) and the same
+* `ingest-reconcile` (`scmle.assurance.ingest.reconcile`): `RECONCILE_RUNS`
+  worlds per planted defect (`fanout`, `dropped_rows`, `torn_read`) and the same
   number of clean worlds. A detection is a reconciliation with an unexplained
-  gap. Policy: recall lower bound at least 0.95, false-alarm upper bound at
-  most 0.05. The plants are large relative to the tolerance (zero), and the
+  gap. Policy: recall lower bound at least 0.95, false-alarm upper bound at most
+  0.05. The plants are large relative to the tolerance (zero), and the
   reconciliation compares aggregates, so offsetting row errors would pass; no
   such plant is in the world.
 
@@ -63,17 +63,17 @@ import pandas
 from benchmarks.qualification import ingest_checks
 from benchmarks.qualification import ingest_worlds
 from scmle.assurance.detectors import certificates
+from scmle.assurance.ingest import asof_view
+from scmle.assurance.ingest import budget
+from scmle.assurance.ingest import entities
+from scmle.assurance.ingest import grain
+from scmle.assurance.ingest import joins
+from scmle.assurance.ingest import profile
+from scmle.assurance.ingest import reconcile
+from scmle.assurance.ingest import synthesize
+import scmle.assurance.ingest.plan
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.data.ingest import asof_view
-from scmle.data.ingest import budget
-from scmle.data.ingest import entities
-from scmle.data.ingest import grain
-from scmle.data.ingest import joins
-from scmle.data.ingest import profile
-from scmle.data.ingest import reconcile
-from scmle.data.ingest import synthesize
-import scmle.data.ingest.plan
 from scmle.data.readers import connectors
 from scmle.runtime import randomness
 
@@ -663,10 +663,10 @@ def budget_run(seed: int, directory: Path) -> tuple[bool, list[dict[str, str]]]:
         max_rows_scanned=int(rng.integers(0, 150_000)),
     )
     world = ingest_worlds.surrogate_world(0)
-    plan = scmle.data.ingest.plan.Plan(
+    plan = scmle.assurance.ingest.plan.Plan(
         directory / f"b{seed}",
         world.db.factory,
-        scmle.data.ingest.plan.Config(tables=tuple(world.tables)),
+        scmle.assurance.ingest.plan.Config(tables=tuple(world.tables)),
         limit,
     )
     plan.run_all()
@@ -772,7 +772,7 @@ def code_hashes() -> dict[str, str]:
         "grain": certificates.code_hash(grain),
         "joins": certificates.code_hash(joins),
         "entities": certificates.code_hash(entities),
-        "budget": certificates.code_hash(budget, scmle.data.ingest.plan),
+        "budget": certificates.code_hash(budget, scmle.assurance.ingest.plan),
     }
 
 

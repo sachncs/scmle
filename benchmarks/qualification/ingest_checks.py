@@ -21,8 +21,8 @@ import pandas
 
 from benchmarks.qualification import ingest_naive
 from benchmarks.qualification import ingest_worlds
-from scmle.data.ingest import asof_view
-from scmle.data.ingest import synthesize
+from scmle.assurance.ingest import asof_view
+from scmle.assurance.ingest import synthesize
 from scmle.runtime import randomness
 
 RTOL = 1e-9

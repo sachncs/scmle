@@ -5,9 +5,9 @@ import pandas
 import pytest
 
 from benchmarks.qualification import ingest_worlds
-from scmle.data.ingest import budget
-from scmle.data.ingest import grain
-from scmle.data.ingest import profile
+from scmle.assurance.ingest import budget
+from scmle.assurance.ingest import grain
+from scmle.assurance.ingest import profile
 
 
 def scan_of(frame, eps_key=0.0, eps_null=0.0, size=3, meter=None):

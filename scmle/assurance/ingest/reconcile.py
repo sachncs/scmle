@@ -25,9 +25,9 @@ import pandas
 
 from scmle.assurance.admissibility import reconciliation
 from scmle.assurance.detectors import certificates
+from scmle.assurance.ingest import profile
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.ingest import profile
 
 DETECTOR_ID = "ingest-reconcile"
 DEFECT_FANOUT = "fanout"

@@ -25,10 +25,10 @@ import numpy
 import pandas
 
 from scmle.assurance.admissibility import provenance
+from scmle.assurance.ingest import asof_view
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.ingest import asof_view
 
 COUNT = "count"
 SUM = "sum"
@@ -736,7 +736,7 @@ def lineage(
             provenance.Pedigree(
                 name=entry["name"],
                 origin=provenance.Origin.DERIVED,
-                writer="scmle.data.ingest.synthesize",
+                writer="scmle.assurance.ingest.synthesize",
                 written_at=provenance.Stamp.UNKNOWN,
                 overwritten=provenance.Overwritten.NEVER,
                 definition_history=history,

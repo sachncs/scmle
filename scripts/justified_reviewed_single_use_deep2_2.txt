@@ -46,12 +46,12 @@ scmle/data/identification/run.py caveats single-use tested directly in test_iden
 scmle/data/identification/run.py subgroup_results single-use tested directly in test_identification_run_mutants (five references), which pin that adapter.weak is restored
 scmle/data/identification/tier.py evidence_shortfalls single-use inlined into decide it gives complexity 14 and 13 branches against limits of 10 and 12 (checked with ruff)
 scmle/data/identification/tier.py assess single-use its five keys are the CONDITIONS tuple that decide and Assignment report, so the name documents the tier rule; inlined it fits ruff but puts a twenty line boolean table into decide
-scmle/data/ingest/declared.py reconcile_source single-use named in the ingest stage and declared.py module docstrings and tested directly in test_ingest_declared; its caller is core/ingest_stage
-scmle/data/ingest/entities.py pairing single-use tested by five references in test_ingest_entities and used by benchmarks/qualification/ingest_certify.py, which read the skipped-block count
-scmle/data/ingest/entities.py jarowinkler single-use tested against the standard value in test_ingest_entities
-scmle/data/ingest/entities.py cutoffs single-use the cumulative-precision scan for t_match and the half-rate scan for t_group is non-obvious, and resolve calls it in the labelled branch opposite the weakest calculation of the unlabelled branch
-scmle/data/ingest/grain.py layer single-use builds the apriori-style candidate sets with three comprehensions; inlined into keysearch, which already has six decision points, it would exceed the complexity limit of 10, which levels alone already breaks by one
-scmle/data/ingest/grain.py levels single-use inlined into keysearch it gives complexity 11 against a limit of 10 (checked with ruff)
-scmle/data/ingest/grain.py sweep single-use level 1 from profile counts with no query is a distinct documented step; inlined it passes ruff but leaves keysearch at the complexity limit and repeats the Candidate construction of levels
-scmle/data/ingest/grain.py shrink single-use unit_verdict already has six returns, the PLR0911 limit, so the two returns here would break it
-scmle/data/ingest/grain.py grains single-use tested directly in test_ingest_grain, which pins stop word, joiner and number dropping
+scmle/assurance/ingest/declared.py reconcile_source single-use named in the ingest stage and declared.py module docstrings and tested directly in test_ingest_declared; its caller is core/ingest_stage
+scmle/assurance/ingest/entities.py pairing single-use tested by five references in test_ingest_entities and used by benchmarks/qualification/ingest_certify.py, which read the skipped-block count
+scmle/assurance/ingest/entities.py jarowinkler single-use tested against the standard value in test_ingest_entities
+scmle/assurance/ingest/entities.py cutoffs single-use the cumulative-precision scan for t_match and the half-rate scan for t_group is non-obvious, and resolve calls it in the labelled branch opposite the weakest calculation of the unlabelled branch
+scmle/assurance/ingest/grain.py layer single-use builds the apriori-style candidate sets with three comprehensions; inlined into keysearch, which already has six decision points, it would exceed the complexity limit of 10, which levels alone already breaks by one
+scmle/assurance/ingest/grain.py levels single-use inlined into keysearch it gives complexity 11 against a limit of 10 (checked with ruff)
+scmle/assurance/ingest/grain.py sweep single-use level 1 from profile counts with no query is a distinct documented step; inlined it passes ruff but leaves keysearch at the complexity limit and repeats the Candidate construction of levels
+scmle/assurance/ingest/grain.py shrink single-use unit_verdict already has six returns, the PLR0911 limit, so the two returns here would break it
+scmle/assurance/ingest/grain.py grains single-use tested directly in test_ingest_grain, which pins stop word, joiner and number dropping

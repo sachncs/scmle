@@ -8,8 +8,8 @@ import pandas
 import pytest
 
 from benchmarks.qualification import ingest_worlds
-from scmle.data.ingest import budget
-from scmle.data.ingest import profile
+from scmle.assurance.ingest import budget
+from scmle.assurance.ingest import profile
 from scmle.data.readers import connectors
 
 

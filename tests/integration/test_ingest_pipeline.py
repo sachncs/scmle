@@ -9,13 +9,13 @@ import pandas
 from benchmarks.qualification import ingest_worlds
 from scmle import cli
 from scmle.assurance.admissibility import provenance
+from scmle.assurance.ingest import asof_view
+from scmle.assurance.ingest import profile
+from scmle.assurance.ingest import reconcile
+from scmle.assurance.ingest import synthesize
+import scmle.assurance.ingest.budget
+import scmle.assurance.ingest.plan
 from scmle.contracts import qualification
-from scmle.data.ingest import asof_view
-from scmle.data.ingest import profile
-from scmle.data.ingest import reconcile
-from scmle.data.ingest import synthesize
-import scmle.data.ingest.budget
-import scmle.data.ingest.plan
 from scmle.data.readers import connectors
 
 SEED = 20240601
@@ -78,15 +78,15 @@ def frame_of(db, table, order):
 
 
 def run_pipeline(db, tmp_path):
-    plan = scmle.data.ingest.plan.Plan(
+    plan = scmle.assurance.ingest.plan.Plan(
         tmp_path / "ingest",
         db.factory,
-        scmle.data.ingest.plan.Config(
+        scmle.assurance.ingest.plan.Config(
             tables=("customers", "orders", "events"),
             unit="customer",
             target_table="customers",
         ),
-        scmle.data.ingest.budget.Budget(),
+        scmle.assurance.ingest.budget.Budget(),
     )
     summary = plan.run_all()
     note = provenance.Attestation(
@@ -257,7 +257,7 @@ def test_cli_source_is_read_only(tmp_path):
     keeper.execute("INSERT INTO t VALUES (1)")
     keeper.commit()
     keeper.close()
-    connection = scmle.data.ingest.plan.opener(path)()
+    connection = scmle.assurance.ingest.plan.opener(path)()
     try:
         connection.execute("INSERT INTO t VALUES (2)")
     except sqlite3.OperationalError:

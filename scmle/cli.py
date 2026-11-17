@@ -31,14 +31,14 @@ from scmle.assurance.charter import sealing
 from scmle.assurance.framing import costs
 from scmle.assurance.framing import draft
 from scmle.assurance.framing import refusal
+from scmle.assurance.ingest import budget
+from scmle.assurance.ingest import grain
+from scmle.assurance.ingest import joins
+import scmle.assurance.ingest.plan
 from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.contracts import tasks
 from scmle.data.catalog import Catalog
-from scmle.data.ingest import budget
-from scmle.data.ingest import grain
-from scmle.data.ingest import joins
-import scmle.data.ingest.plan
 from scmle.data.readers import tabular
 from scmle.deploy import gate
 from scmle.deploy import livetests
@@ -859,12 +859,12 @@ class IngestCommand(Command):
         """
         declared: tuple[joins.Reference, ...] = ()
         if args.foreign_keys:
-            declared = scmle.data.ingest.plan.declarations(
+            declared = scmle.assurance.ingest.plan.declarations(
                 json.loads(
                     pathlib.Path(args.foreign_keys).read_text(encoding="utf-8")
                 )
             )
-        settings = scmle.data.ingest.plan.Config(
+        settings = scmle.assurance.ingest.plan.Config(
             tables=tuple(t for t in args.tables.split(",") if t),
             unit=args.unit,
             target_table=args.target_table,
@@ -874,9 +874,9 @@ class IngestCommand(Command):
             max_key_size=args.max_key_size,
             declared=declared,
         )
-        plan = scmle.data.ingest.plan.Plan(
+        plan = scmle.assurance.ingest.plan.Plan(
             pathlib.Path(args.output),
-            scmle.data.ingest.plan.opener(args.sqlite),
+            scmle.assurance.ingest.plan.opener(args.sqlite),
             settings,
             budget.Budget(
                 args.max_queries, args.max_rows_scanned, args.max_seconds

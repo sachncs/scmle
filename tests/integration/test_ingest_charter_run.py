@@ -11,9 +11,9 @@ import support
 
 from scmle.assurance.charter import ingest
 from scmle.assurance.charter import sealing
+from scmle.assurance.ingest import declared
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
-from scmle.data.ingest import declared
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "ingest-key"

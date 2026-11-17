@@ -24,7 +24,7 @@ Point in time. On `WORLDS` random parent/child/leaf schemas (ties, gaps,
 late and backfilled rows, missing recorded times, windows, lags, nested
 aggregates; `benchmarks.qualification.ingest_checks.random_schema` under
 its own component name), the product's vectorised synthesis
-(`scmle.data.ingest.synthesize.evaluate` over `asof_view.View`) is compared
+(`scmle.assurance.ingest.synthesize.evaluate` over `asof_view.View`) is compared
 with the row-by-row reference `benchmarks.qualification.ingest_naive`,
 within `reference_rel_tol` relative and absolute (`acceptance.toml`).
 
@@ -61,9 +61,9 @@ from benchmarks import acceptance
 from benchmarks.qualification import ingest_checks
 from benchmarks.qualification import ingest_naive
 from scmle.assurance.detectors import certificates
+from scmle.assurance.ingest import asof_view
+from scmle.assurance.ingest import synthesize
 from scmle.contracts import errors
-from scmle.data.ingest import asof_view
-from scmle.data.ingest import synthesize
 from scmle.data.readers import tabular
 
 PATH = Path(__file__).with_suffix(".json")

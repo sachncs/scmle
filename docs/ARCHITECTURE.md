@@ -66,7 +66,7 @@ tracking database.
 
 ## Raw-data ingestion
 
-`scmle.data.ingest` sits before the single table that the run starts from.
+`scmle.assurance.ingest` sits before the single table that the run starts from.
 Statistics about tables (counts, distinct counts, keys, inclusion) are
 aggregate queries run in the source, because a sample cannot confirm a
 universal statement. Rows are pulled only by `profile.untorn`, which

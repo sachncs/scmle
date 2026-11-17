@@ -45,26 +45,26 @@ them in this pass**; the numbers are what the existing tests give.
 
 | Module | Killed | Survived | Timeout | Score |
 | --- | --- | --- | --- | --- |
-| `data/ingest/asof_view.py` | 134 | 41 | 0 | 76.6% |
-| `data/ingest/budget.py` | 58 | 13 | 0 | 81.7% |
-| `data/ingest/entities.py` | 634 | 253 | 1 | 71.4% |
-| `data/ingest/grain.py` | 309 | 118 | 0 | 72.4% |
-| `data/ingest/joins.py` | 352 | 98 | 3 | 77.7% |
-| `data/ingest/profile.py` | 239 | 81 | 5 | 73.5% |
-| `data/ingest/reconcile.py` | 84 | 4 | 0 | 95.5% |
-| `data/ingest/synthesize.py` | 499 | 95 | 1 | 83.9% |
+| `assurance/ingest/asof_view.py` | 134 | 41 | 0 | 76.6% |
+| `assurance/ingest/budget.py` | 58 | 13 | 0 | 81.7% |
+| `assurance/ingest/entities.py` | 634 | 253 | 1 | 71.4% |
+| `assurance/ingest/grain.py` | 309 | 118 | 0 | 72.4% |
+| `assurance/ingest/joins.py` | 352 | 98 | 3 | 77.7% |
+| `assurance/ingest/profile.py` | 239 | 81 | 5 | 73.5% |
+| `assurance/ingest/reconcile.py` | 84 | 4 | 0 | 95.5% |
+| `assurance/ingest/synthesize.py` | 499 | 95 | 1 | 83.9% |
 | Total | 2309 | 703 | 10 | 76.4% |
 
 | Module | Not killed | message/string | numpy/zip keyword | replaced by None | comparison boundary | arithmetic operator | other |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `data/ingest/asof_view.py` | 41 | 17 | 2 | 11 | 0 | 1 | 10 |
-| `data/ingest/budget.py` | 13 | 2 | 0 | 0 | 5 | 0 | 6 |
-| `data/ingest/entities.py` | 254 | 13 | 21 | 53 | 13 | 35 | 119 |
-| `data/ingest/grain.py` | 118 | 14 | 0 | 37 | 11 | 9 | 47 |
-| `data/ingest/joins.py` | 101 | 11 | 6 | 27 | 2 | 8 | 47 |
-| `data/ingest/profile.py` | 86 | 16 | 0 | 27 | 0 | 4 | 39 |
-| `data/ingest/reconcile.py` | 4 | 1 | 0 | 0 | 0 | 0 | 3 |
-| `data/ingest/synthesize.py` | 96 | 33 | 0 | 19 | 2 | 5 | 37 |
+| `assurance/ingest/asof_view.py` | 41 | 17 | 2 | 11 | 0 | 1 | 10 |
+| `assurance/ingest/budget.py` | 13 | 2 | 0 | 0 | 5 | 0 | 6 |
+| `assurance/ingest/entities.py` | 254 | 13 | 21 | 53 | 13 | 35 | 119 |
+| `assurance/ingest/grain.py` | 118 | 14 | 0 | 37 | 11 | 9 | 47 |
+| `assurance/ingest/joins.py` | 101 | 11 | 6 | 27 | 2 | 8 | 47 |
+| `assurance/ingest/profile.py` | 86 | 16 | 0 | 27 | 0 | 4 | 39 |
+| `assurance/ingest/reconcile.py` | 4 | 1 | 0 | 0 | 0 | 0 | 3 |
+| `assurance/ingest/synthesize.py` | 96 | 33 | 0 | 19 | 2 | 5 | 37 |
 
 The category columns are a mechanical classification of the mutant's diff
 (`message/string`: text of an error message; `numpy/zip keyword`: a `dtype=`,

@@ -29,9 +29,9 @@ from typing import Any
 import pandas
 
 from scmle.assurance.charter import ingest
+from scmle.assurance.ingest import profile
+import scmle.assurance.ingest.reconcile
 from scmle.contracts import errors
-from scmle.data.ingest import profile
-import scmle.data.ingest.reconcile
 
 LOGGER = logging.getLogger(__name__)
 
@@ -219,7 +219,7 @@ def compare(
     )
     found: dict[str, tuple[float, float]] = {}
     try:
-        outcome = scmle.data.ingest.reconcile.crosscheck(
+        outcome = scmle.assurance.ingest.reconcile.crosscheck(
             source, numeric, table, measures, tolerance=tolerance
         )
     except errors.InputError as error:

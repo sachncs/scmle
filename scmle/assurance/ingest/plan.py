@@ -18,11 +18,11 @@ import sqlite3
 from typing import Any
 
 from scmle import durability
+from scmle.assurance.ingest import grain
+from scmle.assurance.ingest import joins
+from scmle.assurance.ingest import profile
+import scmle.assurance.ingest.budget
 from scmle.contracts import errors
-from scmle.data.ingest import grain
-from scmle.data.ingest import joins
-from scmle.data.ingest import profile
-import scmle.data.ingest.budget
 
 CATALOG = "ingest_catalog.json"
 GRAIN = "grain_report.json"
@@ -97,7 +97,7 @@ class Plan:
         run_dir: pathlib.Path,
         connection_factory: Callable[[], Any],
         settings: Config,
-        budget: scmle.data.ingest.budget.Budget | None = None,
+        budget: scmle.assurance.ingest.budget.Budget | None = None,
         clock: Callable[[], float] | None = None,
     ) -> None:
         """Opens the ingestion; nothing is read yet.
@@ -113,11 +113,11 @@ class Plan:
         """
         self.run_dir = pathlib.Path(run_dir)
         self.settings = settings
-        limits = budget or scmle.data.ingest.budget.Budget()
+        limits = budget or scmle.assurance.ingest.budget.Budget()
         self.meter = (
-            scmle.data.ingest.budget.Meter(limits)
+            scmle.assurance.ingest.budget.Meter(limits)
             if clock is None
-            else scmle.data.ingest.budget.Meter(limits, clock)
+            else scmle.assurance.ingest.budget.Meter(limits, clock)
         )
         self.source = profile.Sql(connection_factory, self.meter)
         self.catalog: profile.Catalog | None = None

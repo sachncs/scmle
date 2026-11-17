@@ -513,7 +513,7 @@ def reconcile(drop: int) -> None:
         drop: Rows dropped from the extract; 0 passes.
     """
     from scmle.assurance.charter import ingest
-    from scmle.data.ingest import declared
+    from scmle.assurance.ingest import declared
 
     orders = pandas.DataFrame(
         {"order_id": range(1, 101), "amount": [50.0] * 100}

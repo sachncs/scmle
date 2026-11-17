@@ -4,7 +4,7 @@ import pytest
 
 from benchmarks.qualification import ingest_worlds
 from scmle.assurance.detectors import certificates
-from scmle.data.ingest import reconcile
+from scmle.assurance.ingest import reconcile
 
 
 def run(kind, seed=5, gate=certificates.Authority.DESCRIPTIVE):

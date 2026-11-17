@@ -4,8 +4,8 @@ import pandas
 import pytest
 
 from scmle.assurance.charter import ingest
+from scmle.assurance.ingest import declared
 from scmle.contracts import errors
-from scmle.data.ingest import declared
 
 
 def orders():

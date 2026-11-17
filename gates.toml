@@ -97,7 +97,7 @@ override = "Relax selection.max_model_mb or selection.max_p95_latency_ms, or rai
 variables = ["selection.max_model_mb", "selection.max_p95_latency_ms", "selection.latency_safety_factor", "selection.max_candidates_checked", "selection.pareto_tolerance"]
 
 [ingest.reconcile]
-site = "scmle.data.ingest.declared:require"
+site = "scmle.assurance.ingest.declared:require"
 error = "BlockedError"
 claim = "C5, C7"
 passes = "Every check in the reconciliation report and every source check passed."

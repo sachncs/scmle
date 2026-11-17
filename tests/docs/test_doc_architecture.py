@@ -8,13 +8,13 @@ from sklearn import naive_bayes
 
 from benchmarks.qualification import ingest_worlds
 from scmle import durability
+from scmle.assurance.ingest import grain
+from scmle.assurance.ingest import joins
+from scmle.assurance.ingest import profile
 from scmle.contracts import experiments
 from scmle.contracts import models
 from scmle.contracts import tasks
 import scmle.contracts.metrics
-from scmle.data.ingest import grain
-from scmle.data.ingest import joins
-from scmle.data.ingest import profile
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 from scmle.evaluation import metrics

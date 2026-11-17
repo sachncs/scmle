@@ -11,11 +11,11 @@ import pytest
 
 from benchmarks.qualification import ingest_checks
 from scmle.assurance.admissibility import provenance
+from scmle.assurance.ingest import asof_view
+from scmle.assurance.ingest import synthesize
 from scmle.assurance.ledger import online_fdr
 import scmle.assurance.ledger.ledger
 from scmle.contracts import qualification
-from scmle.data.ingest import asof_view
-from scmle.data.ingest import synthesize
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -329,17 +329,17 @@ def imported_modules(path):
 
 def test_synthesize_has_no_raw_read_path():
     # Enforces docs/ARCHITECTURE.md:74.
-    names = imported_modules(ROOT / "scmle/data/ingest/synthesize.py")
+    names = imported_modules(ROOT / "scmle/assurance/ingest/synthesize.py")
     forbidden = (
         "scmle.data.readers",
-        "scmle.data.ingest.profile",
+        "scmle.assurance.ingest.profile",
         "sqlite3",
     )
     assert not [n for n in names if n.startswith(forbidden)]
-    source = (ROOT / "scmle/data/ingest/synthesize.py").read_text()
+    source = (ROOT / "scmle/assurance/ingest/synthesize.py").read_text()
     assert "read_csv" not in source and "read_sql" not in source
     assert "scmle.data.readers" in "\n".join(
-        imported_modules(ROOT / "scmle/data/ingest/profile.py")
+        imported_modules(ROOT / "scmle/assurance/ingest/profile.py")
     )
 
 

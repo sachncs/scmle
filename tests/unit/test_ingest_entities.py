@@ -4,8 +4,8 @@ import numpy
 import pytest
 
 from benchmarks.qualification import ingest_worlds
+from scmle.assurance.ingest import entities
 from scmle.contracts import qualification
-from scmle.data.ingest import entities
 
 FIELDS = [
     entities.Field("first"),

@@ -17,9 +17,9 @@ from collections.abc import Sequence
 import dataclasses
 from typing import Any
 
+from scmle.assurance.ingest import grain
+from scmle.assurance.ingest import profile
 from scmle.contracts import errors
-from scmle.data.ingest import grain
-from scmle.data.ingest import profile
 
 ACCEPTED = "accepted"
 CANDIDATE = "candidate"

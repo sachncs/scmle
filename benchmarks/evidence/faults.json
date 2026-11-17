@@ -1,6 +1,6 @@
 {
   "claim": "C1",
-  "code": "fcea203c7fb59b137dc3bbec60e0aef27a5f57d85320c8c4ed496d33f38f0df8",
+  "code": "117b709b9439439f64974a1ac3f93163e096114a8585c6717a5f44cd4a26e1bd",
   "data": "simulated tables and synthetic inputs only",
   "floor": 1.0,
   "gates": [
@@ -127,7 +127,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.0,
-      "site": "scmle.data.ingest.declared:require"
+      "site": "scmle.assurance.ingest.declared:require"
     },
     {
       "cause": "extract one row short of the declared totals",

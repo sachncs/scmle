@@ -56,14 +56,14 @@ import pandas
 
 from scmle.assurance.admissibility import provenance
 from scmle.assurance.charter import ingest
+from scmle.assurance.ingest import asof_view
+from scmle.assurance.ingest import budget
+from scmle.assurance.ingest import declared
+from scmle.assurance.ingest import entities
+from scmle.assurance.ingest import profile
+from scmle.assurance.ingest import synthesize
+import scmle.assurance.ingest.plan
 from scmle.contracts import errors
-from scmle.data.ingest import asof_view
-from scmle.data.ingest import budget
-from scmle.data.ingest import declared
-from scmle.data.ingest import entities
-from scmle.data.ingest import profile
-from scmle.data.ingest import synthesize
-import scmle.data.ingest.plan
 from scmle.data.readers import connectors
 
 MANIFEST = "feature_manifest.json"
@@ -252,15 +252,15 @@ def run(
     missing = [c for c in (key, moment) if c not in frame.columns]
     if missing:
         raise errors.ConfigError(f"ingest plan names columns {missing} absent")
-    factory = scmle.data.ingest.plan.opener(plan_document["database"])
-    settings = scmle.data.ingest.plan.Config(
+    factory = scmle.assurance.ingest.plan.opener(plan_document["database"])
+    settings = scmle.assurance.ingest.plan.Config(
         tables=tuple(plan_document["tables"]),
         unit=plan_document.get("unit"),
         target_table=plan_document.get("target_table"),
         eps_key=spec.eps_key,
         eps_null=spec.eps_null,
         eps_fk=spec.eps_fk,
-        declared=scmle.data.ingest.plan.declarations(
+        declared=scmle.assurance.ingest.plan.declarations(
             plan_document.get("declared", [])
         ),
     )
@@ -272,7 +272,9 @@ def run(
     )
     with tempfile.TemporaryDirectory() as scratch:
         folder = run_dir if run_dir is not None else Path(scratch)
-        plan = scmle.data.ingest.plan.Plan(folder, factory, settings, limits)
+        plan = scmle.assurance.ingest.plan.Plan(
+            folder, factory, settings, limits
+        )
         summary = plan.run_all()
     verdict = plan.verdict
     if verdict is not None and verdict.blocks:

@@ -20,7 +20,7 @@ from typing import Any
 import numpy
 import pandas
 
-from scmle.data.ingest import profile
+from scmle.assurance.ingest import profile
 from scmle.data.readers import connectors
 from scmle.runtime import randomness
 

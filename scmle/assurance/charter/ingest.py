@@ -264,7 +264,7 @@ class TableTotals:
         sums: Column totals in the source.
         checksum_column: Column whose values are checksummed.
         checksum: SHA-256 of the sorted values of that column as text, joined
-            by newlines (`scmle.data.ingest.declared.sha`).
+            by newlines (`scmle.assurance.ingest.declared.sha`).
     """
 
     view: str
