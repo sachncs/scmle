@@ -113,7 +113,7 @@ def test_an_uncertified_check_is_descriptive_not_an_error():
         status = store.status(
             detector, f6_certify.current_digests()[detector], defect
         )
-        assert status is certificates.GateStatus.DESCRIPTIVE
+        assert status is certificates.Authority.DESCRIPTIVE
 
 
 def test_the_planted_shift_has_the_stated_bayes_auc():

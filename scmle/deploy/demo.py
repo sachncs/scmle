@@ -174,9 +174,9 @@ def train(name: str, data: pathlib.Path) -> scmle.api.results.Run:
     ).run()
 
 
-def approval_for(
-    record: scmle.governance.registry.VersionRecord, reason: str, evidence: str
-) -> scmle.governance.registry.PromotionApproval:
+def sanction(
+    record: scmle.governance.registry.Release, reason: str, evidence: str
+) -> scmle.governance.registry.Sanction:
     """Builds an approval bound to one registered version.
 
     Args:
@@ -187,12 +187,12 @@ def approval_for(
     Returns:
         An approved promotion by the demo reviewer, signed with the demo key.
     """
-    return scmle.governance.registry.PromotionApproval(
+    return scmle.governance.registry.Sanction(
         model=record.model,
         version=record.version,
         content_id=record.content_id,
         reviewer=REVIEWER,
-        decision=scmle.governance.registry.PromotionDecision.APPROVED,
+        decision=scmle.governance.registry.Verdict.APPROVED,
         reason=reason,
         evidence=(evidence,),
         approved_at=now(),
@@ -308,7 +308,7 @@ def authenticate(environ: Mapping[str, str], prefixes: tuple[str, ...]) -> bool:
     return True
 
 
-def get_json(url: str, timeout: float = 10.0) -> tuple[int, dict[str, Any]]:
+def retrieve(url: str, timeout: float = 10.0) -> tuple[int, dict[str, Any]]:
     """GETs JSON; HTTP errors return their status and body.
 
     Args:
@@ -352,7 +352,7 @@ def post_json(
         return error.code, json.loads(error.read())
 
 
-def wait_ready(
+def settle(
     base: str,
     process: subprocess.Popen[bytes] | None = None,
     timeout: float = READY_TIMEOUT_SECONDS,
@@ -373,7 +373,7 @@ def wait_ready(
         if process is not None and process.poll() is not None:
             return None
         try:
-            status = get_json(f"{base}/readyz", timeout=2.0)[0]
+            status = retrieve(f"{base}/readyz", timeout=2.0)[0]
         except OSError:
             # handled: not-yet-ready poll retried; timeout returns None
             status = 0
@@ -405,7 +405,7 @@ def halt(process: subprocess.Popen[bytes] | None) -> None:
         process.stderr.close()
 
 
-def free_port() -> int:
+def unused() -> int:
     """Finds a free local TCP port.
 
     Returns:
@@ -416,9 +416,7 @@ def free_port() -> int:
         return int(probe.getsockname()[1])
 
 
-def upload_folder(
-    base: str, folder: pathlib.Path, prefix: str
-) -> dict[str, str]:
+def sync(base: str, folder: pathlib.Path, prefix: str) -> dict[str, str]:
     """Uploads every file of `folder`.
 
     Args:
@@ -431,7 +429,7 @@ def upload_folder(
         the store returned.
     """
     return {
-        path.relative_to(folder).as_posix(): mocks.put_object(
+        path.relative_to(folder).as_posix(): mocks.deposit(
             base,
             f"{prefix}/{path.relative_to(folder).as_posix()}",
             path.read_bytes(),
@@ -441,7 +439,7 @@ def upload_folder(
     }
 
 
-def download_folder(
+def download(
     base: str, prefix: str, expected: dict[str, str], destination: pathlib.Path
 ) -> None:
     """Fetches the folder back, refusing any file whose digest differs.
@@ -523,14 +521,14 @@ def prepare(
     registry.promote(
         MODEL,
         records[0].version,
-        approval=approval_for(records[0], "initial release", "evaluation.json"),
+        approval=sanction(records[0], "initial release", "evaluation.json"),
         signing_key=DEMO_SIGNING_KEY,
     )
     service = good.bundle.export_service(
         workdir / "service", signing_key=DEMO_SIGNING_KEY
     )
-    golden = parity.load_golden(GOLDEN_DIRECTORY)
-    golden_service = parity.reference_bundle(golden.spec).export_service(
+    golden = parity.goldens(GOLDEN_DIRECTORY)
+    golden_service = parity.handwrite(golden.spec).export_service(
         workdir / "golden-service", signing_key=DEMO_SIGNING_KEY
     )
     log.record(
@@ -580,7 +578,7 @@ def compare(
                 expected - pandas.DataFrame(body["probabilities"]).to_numpy()
             ).max()
         )
-    batch = serving.BatchServing(direct)
+    batch = serving.Batcher(direct)
     batch_path = workdir / "batch-predictions.csv"
     batch.score_file(data / "fresh.csv", batch_path)
     scored = pandas.read_csv(batch_path)
@@ -625,7 +623,7 @@ def tamper(service: pathlib.Path, workdir: pathlib.Path) -> dict[str, Any]:
         handle.write(b"tampered")
     (unsigned / "model" / bundle.SIGNATURE_FILE).unlink()
     for label, folder in (("corrupted", corrupt), ("unsigned", unsigned)):
-        port = free_port()
+        port = unused()
         process = launch(folder, port)
         base = f"http://127.0.0.1:{port}"
         try:
@@ -634,7 +632,7 @@ def tamper(service: pathlib.Path, workdir: pathlib.Path) -> dict[str, Any]:
             ready: dict[str, Any] = {}
             while time.monotonic() < deadline:
                 try:
-                    ready_status, ready = get_json(
+                    ready_status, ready = retrieve(
                         f"{base}/readyz", timeout=2.0
                     )
                 except OSError:
@@ -644,7 +642,7 @@ def tamper(service: pathlib.Path, workdir: pathlib.Path) -> dict[str, Any]:
                 if ready.get("phase") == "failed":
                     break
                 time.sleep(0.2)
-            live_status = get_json(f"{base}/livez")[0]
+            live_status = retrieve(f"{base}/livez")[0]
             predict_status = post_json(
                 f"{base}/predict", {"records": [{"age": 1.0}]}
             )[0]
@@ -709,18 +707,18 @@ def drill(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
     registry.promote(
         MODEL,
         bad_record.version,
-        approval=approval_for(bad_record, "bad release (drill)", "drill"),
+        approval=sanction(bad_record, "bad release (drill)", "drill"),
         signing_key=DEMO_SIGNING_KEY,
     )
     champion_before = registry.resolve(MODEL).version
     features = fresh.drop(columns=[TARGET])
-    report = monitor.ModelMonitor(
+    report = monitor.Watcher(
         registry.load(MODEL, signing_key=DEMO_SIGNING_KEY)
     ).assess(features, fresh[TARGET])
     outcome = manager.check_rollback(
         fresh,
         TARGET,
-        approval=approval_for(good_record, "rollback to v1 (drill)", "drill"),
+        approval=sanction(good_record, "rollback to v1 (drill)", "drill"),
         signing_key=DEMO_SIGNING_KEY,
     )
     restored = registry.load(MODEL, signing_key=DEMO_SIGNING_KEY)
@@ -758,7 +756,7 @@ def drill(workdir: pathlib.Path, data: pathlib.Path) -> dict[str, Any]:
     }
 
 
-def records_of(frame: pandas.DataFrame) -> list[dict[str, Any]]:
+def serialize(frame: pandas.DataFrame) -> list[dict[str, Any]]:
     """Converts rows to JSON-ready dictionaries with string keys.
 
     Args:
@@ -773,7 +771,7 @@ def records_of(frame: pandas.DataFrame) -> list[dict[str, Any]]:
     ]
 
 
-def process_memory_mb(process: subprocess.Popen[bytes] | None) -> float | None:
+def footprint(process: subprocess.Popen[bytes] | None) -> float | None:
     """Reads the resident memory of a child process.
 
     Args:
@@ -876,13 +874,13 @@ def push(
         How many samples the sink accepted.
     """
     kinds = {
-        "latency": observability.SignalKind.LATENCY,
-        "memory": observability.SignalKind.MEMORY,
+        "latency": observability.Indicator.LATENCY,
+        "memory": observability.Indicator.MEMORY,
     }
     samples = [
-        observability.MetricSample(
+        observability.Sample(
             name=name,
-            kind=kinds.get(name.split("_")[0], observability.SignalKind.DRIFT),
+            kind=kinds.get(name.split("_")[0], observability.Indicator.DRIFT),
             value=value,
             unit=unit,
             timestamp=now(),
@@ -890,7 +888,7 @@ def push(
         )
         for name, (value, unit) in values.items()
     ]
-    return mocks.post_metrics(sink, samples)
+    return mocks.transmit(sink, samples)
 
 
 def mirror(
@@ -912,11 +910,11 @@ def mirror(
         The folder the service was fetched into.
     """
     started = time.monotonic()
-    etags = upload_folder(store_url, service, "models/churn/v1")
+    etags = sync(store_url, service, "models/churn/v1")
     fetched = workdir / "fetched-service"
     if fetched.exists():
         shutil.rmtree(fetched)
-    download_folder(store_url, "models/churn/v1", etags, fetched)
+    download(store_url, "models/churn/v1", etags, fetched)
     same = provenance.bundle_digest(
         fetched / "model"
     ) == provenance.bundle_digest(service / "model")
@@ -943,14 +941,14 @@ def corroborate(
             caller stops it.
     """
     started = time.monotonic()
-    golden_port = free_port()
+    golden_port = unused()
     golden_base = f"http://127.0.0.1:{golden_port}"
     golden_process = launch(golden_service, golden_port)
     processes.append(golden_process)
-    golden_ready = wait_ready(golden_base, golden_process)
+    golden_ready = settle(golden_base, golden_process)
     report: dict[str, Any] = {"passed": False}
     if golden_ready is not None:
-        report = parity.check_remote(
+        report = parity.crosscheck(
             golden_base, GOLDEN_DIRECTORY, "cross_environment", 30.0
         )
     transcript.record(
@@ -962,7 +960,7 @@ def corroborate(
     )
 
 
-def fail_not_ready(process: subprocess.Popen[bytes]) -> NoReturn:
+def unready(process: subprocess.Popen[bytes]) -> NoReturn:
     """Raises the error for a service that did not become ready.
 
     Args:
@@ -976,7 +974,7 @@ def fail_not_ready(process: subprocess.Popen[bytes]) -> NoReturn:
     )
 
 
-def measure_and_ship_metrics(
+def instrument(
     transcript: Transcript,
     *,
     base: str,
@@ -999,9 +997,9 @@ def measure_and_ship_metrics(
     """
     started = time.monotonic()
     frame = pandas.read_csv(data / "fresh.csv").drop(columns=[TARGET])
-    single = measure(base, records_of(frame.head(1)))
-    hundred = measure(base, records_of(frame.head(100)), 40)
-    memory = process_memory_mb(process)
+    single = measure(base, serialize(frame.head(1)))
+    hundred = measure(base, serialize(frame.head(100)), 40)
+    memory = footprint(process)
     accepted = push(
         metrics_url,
         {
@@ -1012,7 +1010,7 @@ def measure_and_ship_metrics(
         },
         "v1",
     )
-    count = get_json(f"{metrics_url}/metrics")[1]["count"]
+    count = retrieve(f"{metrics_url}/metrics")[1]["count"]
     transcript.record(
         "measure and ship metrics",
         started,
@@ -1067,12 +1065,12 @@ def run(
         fetched = mirror(transcript, store_url, service, workdir)
 
         started = time.monotonic()
-        port = free_port()
+        port = unused()
         base = f"http://127.0.0.1:{port}"
         process = launch(fetched, port)
         processes.append(process)
-        startup = wait_ready(base, process)
-        status, ready = get_json(f"{base}/readyz") if startup else (0, {})
+        startup = settle(base, process)
+        status, ready = retrieve(f"{base}/readyz") if startup else (0, {})
         transcript.record(
             "serve under production rules",
             started,
@@ -1082,7 +1080,7 @@ def run(
             verify_note=ready.get("notes", {}).get("verifying"),
         )
         if startup is None:
-            fail_not_ready(process)
+            unready(process)
 
         started = time.monotonic()
         checks = compare(base, fetched / "model", data, workdir)
@@ -1125,7 +1123,7 @@ def run(
             **drill,
         )
 
-        measure_and_ship_metrics(
+        instrument(
             transcript,
             base=base,
             process=process,
@@ -1171,7 +1169,7 @@ def verify(
     transcript = Transcript()
     authenticate(os.environ, (api, golden_api))
     started = time.monotonic()
-    ready = wait_ready(api) is not None and wait_ready(golden_api) is not None
+    ready = settle(api) is not None and settle(golden_api) is not None
     transcript.record("services ready", started, ok=ready)
     if not ready:
         return transcript
@@ -1186,7 +1184,7 @@ def verify(
         **checks,
     )
     started = time.monotonic()
-    report = parity.check_remote(
+    report = parity.crosscheck(
         golden_api, GOLDEN_DIRECTORY, "cross_environment", 30.0
     )
     transcript.record(

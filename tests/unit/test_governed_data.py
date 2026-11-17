@@ -28,7 +28,7 @@ def store(tmp_path):
     return objectstore.LocalObjectStore(tmp_path / "root")
 
 
-def reader_for(store, key="o.csv", hours=0.0):
+def pick(store, key="o.csv", hours=0.0):
     """A reader whose clock is `hours` after the object was modified."""
     modified = snapshot.parse_time(store.head(key).modified)
     now = modified + datetime.timedelta(hours=hours)
@@ -37,18 +37,16 @@ def reader_for(store, key="o.csv", hours=0.0):
 
 def test_every_read_records_identity_schema_freshness_and_lineage(store):
     store.put("in/orders.csv", CSV.encode())
-    frame, record = reader_for(store, "in/orders.csv").read(
-        "in/orders.csv", CONTRACT
-    )
+    frame, record = pick(store, "in/orders.csv").read("in/orders.csv", CONTRACT)
     assert len(frame) == 3
     assert record.uri == store.uri("in/orders.csv")
-    assert record.sha256 == objectstore.sha256_of(CSV.encode())
+    assert record.sha256 == objectstore.checksum(CSV.encode())
     assert record.size == len(CSV) and record.rows == 3
     assert record.schema_version == "2" and record.schema_matches
     assert record.schema_digest == CONTRACT.digest
     assert record.freshness == snapshot.FRESH
     assert record.snapshot_id.startswith("snap-")
-    ignored, child = reader_for(store, "in/orders.csv").read(
+    ignored, child = pick(store, "in/orders.csv").read(
         "in/orders.csv", CONTRACT, parents=[record]
     )
     assert child.lineage == (record.snapshot_id,)
@@ -56,7 +54,7 @@ def test_every_read_records_identity_schema_freshness_and_lineage(store):
 
 def test_snapshot_ids_follow_the_content(store):
     store.put("o.csv", CSV.encode())
-    reader = reader_for(store)
+    reader = pick(store)
     ignored, first = reader.read("o.csv", CONTRACT)
     ignored, again = reader.read("o.csv", CONTRACT)
     store.put("o.csv", (CSV + "4,1.0,south\n").encode())
@@ -68,14 +66,14 @@ def test_snapshot_ids_follow_the_content(store):
 
 def test_staleness_and_schema_drift_are_recorded_not_hidden(store):
     store.put("o.csv", CSV.encode())
-    ignored, stale = reader_for(store, hours=5).read("o.csv", CONTRACT)
+    ignored, stale = pick(store, hours=5).read("o.csv", CONTRACT)
     assert stale.freshness == snapshot.STALE and stale.age_seconds > 7200
     store.put("d.csv", b"id,amount\n1,2.0\n")
-    ignored, drifted = reader_for(store, "d.csv").read("d.csv", CONTRACT)
+    ignored, drifted = pick(store, "d.csv").read("d.csv", CONTRACT)
     assert not drifted.schema_matches
     assert drifted.schema_digest != CONTRACT.digest
     open_ended = snapshot.DataContract("x", "1", {"id": "int"})
-    ignored, free = reader_for(store, "d.csv").read("d.csv", open_ended)
+    ignored, free = pick(store, "d.csv").read("d.csv", open_ended)
     assert free.freshness == snapshot.UNKNOWN
 
 
@@ -103,8 +101,8 @@ def test_the_read_log_persists_and_traces_lineage(store, tmp_path):
 def test_unreadable_objects_fail_clearly(store):
     store.put("x.bin", b"\x00\x01")
     with pytest.raises(snapshot.SnapshotError):
-        reader_for(store, "x.bin").read("x.bin", CONTRACT)
-    with pytest.raises(objectstore.NotFoundError):
+        pick(store, "x.bin").read("x.bin", CONTRACT)
+    with pytest.raises(objectstore.AbsentError):
         snapshot.SnapshotReader(store).read("missing.csv", CONTRACT)
 
 
@@ -134,7 +132,7 @@ def test_a_contract_is_validated():
 
 def prepared(store, text=CSV, hours=0.0):
     store.put("o.csv", text.encode())
-    return reader_for(store, hours=hours).read("o.csv", CONTRACT)
+    return pick(store, hours=hours).read("o.csv", CONTRACT)
 
 
 def gate_for(store, *rules):
@@ -146,7 +144,7 @@ def test_a_clean_dataset_passes_both_stages(store):
     gate = gate_for(
         store,
         quality.SchemaCheck(),
-        quality.FreshnessCheck(),
+        quality.Freshness(),
         quality.MinRowsCheck(3),
         quality.UniqueKeyCheck(),
     )
@@ -158,7 +156,7 @@ def test_a_clean_dataset_passes_both_stages(store):
 
 def test_fail_policy_stops_the_run_with_the_report(store):
     frame, record = prepared(store, hours=9)
-    gate = gate_for(store, quality.FreshnessCheck(policy=quality.Severity.FAIL))
+    gate = gate_for(store, quality.Freshness(policy=quality.Severity.FAIL))
     with pytest.raises(quality.QualityGateError) as raised:
         gate.run(frame, record, CONTRACT, quality.Stage.TRAIN)
     assert not raised.value.quarantined
@@ -206,7 +204,7 @@ def test_warn_policy_records_and_continues(store):
     gate = gate_for(
         store,
         quality.NullFractionCheck("amount", 0.1, policy=quality.Severity.WARN),
-        quality.NoNullsCheck("amount", policy=quality.Severity.WARN),
+        quality.Complete("amount", policy=quality.Severity.WARN),
     )
     result = gate.run(frame, record, CONTRACT, quality.Stage.TRAIN)
     assert result.report.decision == "passed_with_warnings"
@@ -227,7 +225,7 @@ def test_rules_apply_only_to_their_stages(store):
 
 def test_schema_drift_and_allowed_values_are_caught(store):
     store.put("d.csv", b"id,amount\n1,2.0\n")
-    frame, record = reader_for(store, "d.csv").read("d.csv", CONTRACT)
+    frame, record = pick(store, "d.csv").read("d.csv", CONTRACT)
     with pytest.raises(quality.QualityGateError, match="missing column region"):
         gate_for(store, quality.SchemaCheck()).run(
             frame, record, CONTRACT, quality.Stage.INFERENCE
@@ -235,7 +233,7 @@ def test_schema_drift_and_allowed_values_are_caught(store):
     frame, record = prepared(store, CSV + "6,1.0,mars\n")
     gate = gate_for(
         store,
-        quality.AllowedValuesCheck(
+        quality.Membership(
             "region", ["north", "south"], policy=quality.Severity.QUARANTINE
         ),
     )
@@ -298,7 +296,7 @@ def test_a_repeated_upload_is_skipped_and_a_changed_input_is_refused(store):
     assert result.duplicate_objects == ("input/a-copy.csv",)
     assert result.processed == ()
     store.put("input/a.csv", (CSV + "7,1.0,south\n").encode())
-    with pytest.raises(processing.ChangedInputError):
+    with pytest.raises(processing.ChangedError):
         processor(store).run()
 
 
@@ -334,7 +332,7 @@ def test_a_crash_between_output_and_checkpoint_recovers_without_duplicates(
         store.get("state/checkpoint.json")[0]
     )
     assert list(state.processed) == ["input/a.csv"]
-    with pytest.raises(processing.ConcurrentRunError):
+    with pytest.raises(processing.LockError):
         processor(store).run()
     processor(store).break_lock()
     resumed = processor(store).run()
@@ -445,24 +443,24 @@ def test_a_damaged_checkpoint_is_never_silently_reset(store):
     store.put(
         "state/checkpoint.json", data.replace(b"input/a.csv", b"input/z.csv")
     )
-    with pytest.raises(processing.CheckpointCorruptError):
+    with pytest.raises(processing.CorruptError):
         processor(store).run()
     store.put("state/checkpoint.json", b"not json")
-    with pytest.raises(processing.CheckpointCorruptError):
+    with pytest.raises(processing.CorruptError):
         processor(store).run()
     assert not store.exists("state/lock")
 
 
 @pytest.mark.parametrize("stored", [b"1", b"[]", b'"text"', b"null"])
 def test_a_checkpoint_that_is_not_an_object_is_reported_as_corrupt(stored):
-    with pytest.raises(processing.CheckpointCorruptError):
+    with pytest.raises(processing.CorruptError):
         processing.Checkpoint.from_bytes(stored)
 
 
 def test_a_second_run_cannot_share_the_checkpoint(store):
     seed(store)
     store.put("state/lock", b"someone")
-    with pytest.raises(processing.ConcurrentRunError):
+    with pytest.raises(processing.LockError):
         processor(store).run()
     assert store.exists("state/lock")
 
@@ -487,7 +485,7 @@ def test_processing_needs_key_columns():
 
 def test_the_frame_dtype_kinds_are_reader_independent():
     frame = pandas.DataFrame({"a": [1], "b": [1.5], "c": ["x"], "d": [True]})
-    assert snapshot.observed_schema(frame) == {
+    assert snapshot.dtypes(frame) == {
         "a": "int",
         "b": "float",
         "c": "string",
@@ -500,5 +498,5 @@ def test_a_connector_reader_reads_the_object_a_store_uri_names(store):
     read = snapshot.connector_reader(store)
 
     assert read(store.uri("data/a.csv")) == b"x,y\n1,2\n"
-    with pytest.raises(objectstore.NotFoundError):
+    with pytest.raises(objectstore.AbsentError):
         read(store.uri("data/missing.csv"))

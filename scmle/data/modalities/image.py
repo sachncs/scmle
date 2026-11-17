@@ -2,7 +2,7 @@
 
 Pillow is intentionally optional. Importing this module remains safe without
 it, while every operation that needs image decoding raises
-``ImageDependencyError`` with an actionable, structured error envelope.
+``DependencyError`` with an actionable, structured error envelope.
 """
 
 from collections.abc import Iterable
@@ -20,13 +20,13 @@ import numpy
 
 from scmle.contracts import data
 from scmle.contracts import errors
-from scmle.data.modalities.curation import build_finding
-from scmle.data.modalities.curation import check_split_fractions
+from scmle.data.modalities.curation import allocate
 from scmle.data.modalities.curation import conflicting_label_groups
 from scmle.data.modalities.curation import Curation
 from scmle.data.modalities.curation import dataset_hash
+from scmle.data.modalities.curation import flaw
 from scmle.data.modalities.curation import label_counts
-from scmle.data.modalities.curation import partition_group_ids
+from scmle.data.modalities.curation import proportions
 
 IMAGE_SIZE_DIMENSIONS = 2
 SHA256_HEX_LENGTH = 64
@@ -96,7 +96,7 @@ class ImageError(errors.DataError):
         self.source = source
 
 
-class ImageDependencyError(ImageError):
+class DependencyError(ImageError):
     """Raised when Pillow is required but is not installed."""
 
     category = "dependency"
@@ -123,7 +123,7 @@ class ImageValidationError(ImageError):
     """Raised when an image violates a safety or validity constraint."""
 
 
-def require_pillow(operation: str = "image data") -> Any:
+def pillow(operation: str = "image data") -> Any:
     """Returns the optional Pillow module or raises a structured error.
 
     Args:
@@ -133,14 +133,14 @@ def require_pillow(operation: str = "image data") -> Any:
         The imported Pillow image module.
 
     Raises:
-        ImageDependencyError: If Pillow is not installed.
+        DependencyError: If Pillow is not installed.
     """
     if not PILLOW_AVAILABLE or PillowModule is None:
-        raise ImageDependencyError(operation)
+        raise DependencyError(operation)
     return PillowModule
 
 
-def check_dimensions(
+def bounds(
     width: int, height: int, max_pixels: int | None, source: str
 ) -> None:
     """Checks that decoded image dimensions are positive and within limits.
@@ -171,7 +171,7 @@ def check_dimensions(
         )
 
 
-def neighbor_components(neighbors: Mapping[int, set[int]]) -> list[set[int]]:
+def islands(neighbors: Mapping[int, set[int]]) -> list[set[int]]:
     """Finds the connected groups of a neighbour graph.
 
     Args:
@@ -217,9 +217,7 @@ def canonical_source(source: str | pathlib.Path) -> str:
     return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
 
 
-def validate_feature_options(
-    target_size: tuple[int, int], mode: str
-) -> tuple[int, int]:
+def configure(target_size: tuple[int, int], mode: str) -> tuple[int, int]:
     """Validates the deterministic baseline feature configuration.
 
     Args:
@@ -248,7 +246,7 @@ def validate_feature_options(
     return target_size
 
 
-def image_content_hash(
+def imprint(
     image: Any,
     width: int,
     height: int,
@@ -450,11 +448,11 @@ class Sample:
 
         Raises:
             ImageValidationError: If the payload is empty, corrupt, or too
-                large. An ImageDependencyError (Pillow missing) or a
+                large. An DependencyError (Pillow missing) or a
                 ValueError (invalid limit) from the helpers it calls
                 propagates unchanged.
         """
-        require_pillow("image ingestion")
+        pillow("image ingestion")
         raw = bytes(encoded_bytes)
         stable_source = canonical_source(source)
         cls.validate(max_bytes, max_pixels)
@@ -476,12 +474,12 @@ class Sample:
                 opened.verify()
             with PillowModule.open(io.BytesIO(raw)) as opened:
                 width, height = opened.size
-                check_dimensions(width, height, max_pixels, stable_source)
+                bounds(width, height, max_pixels, stable_source)
                 mode = opened.mode
                 channels = len(opened.getbands())
                 format_name = opened.format or "unknown"
                 opened.load()
-                content_hash = image_content_hash(opened, width, height)
+                content_hash = imprint(opened, width, height)
                 exif_tags = tuple(sorted(str(tag) for tag in opened.getexif()))
                 sensitive_metadata = tuple(
                     sorted(
@@ -544,7 +542,7 @@ class Sample:
         Raises:
             ImageValidationError: If the file is missing, not a regular
                 file, larger than ``max_bytes``, or unreadable. Failures of
-                `from_bytes`, including ImageDependencyError, propagate.
+                `from_bytes`, including DependencyError, propagate.
         """
         file_path = pathlib.Path(path).expanduser()
         source = canonical_source(file_path)
@@ -661,7 +659,7 @@ class Sample:
                 two positive integers.
             ImageValidationError: If the stored bytes cannot be decoded.
         """
-        image_library = require_pillow("image decoding")
+        image_library = pillow("image decoding")
         selected_mode = mode or self.mode
         if selected_mode not in SUPPORTED_FEATURE_MODES:
             raise errors.InputError(
@@ -669,7 +667,7 @@ class Sample:
                 f"{selected_mode!r}"
             )
         if target_size is not None:
-            validate_feature_options(target_size, selected_mode)
+            configure(target_size, selected_mode)
         try:
             with image_library.open(io.BytesIO(self.encoded_bytes)) as opened:
                 converted = opened.convert(selected_mode)
@@ -934,7 +932,7 @@ class Dataset:
                     neighbors[right].add(left)
         groups = [
             tuple(sorted(candidates[index].source for index in component))
-            for component in neighbor_components(neighbors)
+            for component in islands(neighbors)
             if len({candidates[index].content_hash for index in component}) > 1
         ]
         return tuple(sorted(groups))
@@ -957,7 +955,7 @@ class Dataset:
         Raises:
             ValueError: If ``max_samples`` is not a positive integer.
                 ``profile_size`` that is not two positive integers also
-                raises ValueError, from `validate_feature_options`.
+                raises ValueError, from `configure`.
         """
         samples_limit: object = max_samples
         if not isinstance(samples_limit, int) or isinstance(
@@ -966,7 +964,7 @@ class Dataset:
             raise errors.InputError("max_samples must be a positive integer")
         if max_samples <= 0:
             raise errors.InputError("max_samples must be a positive integer")
-        validate_feature_options(profile_size, "RGB")
+        configure(profile_size, "RGB")
         profiled = self.samples[:max_samples]
         if not profiled:
             return Profile(
@@ -1100,7 +1098,7 @@ class Dataset:
         risk_findings = []
         if not self.samples:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.image-empty-dataset",
                     data.FindingSeverity.CRITICAL,
                     {"dataset": "empty"},
@@ -1111,7 +1109,7 @@ class Dataset:
             )
         if profile.duplicate_count:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.image-duplicate-content",
                     data.FindingSeverity.WARNING,
                     {"dataset": "profiled_samples"},
@@ -1122,7 +1120,7 @@ class Dataset:
             )
         if near_duplicate_groups:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.image-near-duplicate-content",
                     data.FindingSeverity.WARNING,
                     {"dataset": "profiled_samples"},
@@ -1139,7 +1137,7 @@ class Dataset:
             )
         if conflicts:
             risk_findings.append(
-                build_finding(
+                flaw(
                     "risk.image-conflicting-duplicate-labels",
                     data.FindingSeverity.ERROR,
                     {"dataset": "all_samples"},
@@ -1151,7 +1149,7 @@ class Dataset:
             )
         if sensitive_metadata:
             risk_findings.append(
-                build_finding(
+                flaw(
                     "risk.image-sensitive-metadata",
                     data.FindingSeverity.ERROR,
                     {"dataset": "all_samples"},
@@ -1163,7 +1161,7 @@ class Dataset:
             )
         if profile.truncated:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.image-profile-truncated",
                     data.FindingSeverity.INFO,
                     {"dataset": "profiled_samples"},
@@ -1178,7 +1176,7 @@ class Dataset:
             )
         if "unlabeled" in labels and len(labels) > 1:
             risk_findings.append(
-                build_finding(
+                flaw(
                     "risk.image-mixed-label-state",
                     data.FindingSeverity.WARNING,
                     {"dataset": "all_samples"},
@@ -1197,7 +1195,7 @@ class Dataset:
             risk_findings=tuple(risk_findings),
         )
 
-    def prepare_tabular_features(
+    def flatten(
         self,
         target_size: tuple[int, int] = (16, 16),
         mode: str = "RGB",
@@ -1218,9 +1216,9 @@ class Dataset:
             Array of shape ``(sample_count, width * height * channels)``;
             with no samples, shape ``(0, width * height * channels)``. An
             invalid ``target_size`` or ``mode`` raises ValueError from
-            `validate_feature_options`.
+            `configure`.
         """
-        validate_feature_options(target_size, mode)
+        configure(target_size, mode)
         channels = 1 if mode == "L" else len(mode)
         feature_count = target_size[0] * target_size[1] * channels
         if not self.samples:
@@ -1262,13 +1260,13 @@ class Dataset:
         """
         if not self.samples:
             raise errors.InputError("cannot split an empty image dataset")
-        check_split_fractions(validation_fraction, test_fraction)
+        proportions(validation_fraction, test_fraction)
         grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:
             grouped.setdefault(sample.group_id or sample.source, []).append(
                 sample
             )
-        validation_groups, test_groups = partition_group_ids(
+        validation_groups, test_groups = allocate(
             grouped, validation_fraction, test_fraction, seed
         )
 

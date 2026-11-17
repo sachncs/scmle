@@ -43,7 +43,7 @@ def vet(run_seed: int, component: str, index: int) -> str:
     return name
 
 
-def name_words(component: str) -> tuple[int, ...]:
+def derive(component: str) -> tuple[int, ...]:
     """Returns stable 32-bit words derived from a component name.
 
     Args:
@@ -75,7 +75,7 @@ def component_seed_sequence(
     """
     name = vet(run_seed, component, index)
     return numpy.random.SeedSequence(
-        entropy=run_seed, spawn_key=(*name_words(name), index)
+        entropy=run_seed, spawn_key=(*derive(name), index)
     )
 
 

@@ -13,7 +13,7 @@ MIN_CLASSES = 2
 BINARY_CLASSES = 2
 
 
-def is_numeric_target(target: pandas.Series) -> bool:
+def quantitative(target: pandas.Series) -> bool:
     """Reports whether the target is numeric and not boolean.
 
     Args:
@@ -111,7 +111,7 @@ def check_targets(
                 raise errors.BlockedError(
                     f"label column '{column}' must hold 0 or 1"
                 )
-        elif not is_numeric_target(values):
+        elif not quantitative(values):
             raise errors.BlockedError(
                 f"target column '{column}' must be numeric"
             )
@@ -181,7 +181,7 @@ class TaskResolver:
             BlockedError: If the target is not numeric or has a value that
                 is not greater than zero.
         """
-        if not is_numeric_target(target) or (target <= 0).any():
+        if not quantitative(target) or (target <= 0).any():
             raise errors.BlockedError(
                 "survival needs a numeric duration target greater than zero"
             )
@@ -199,7 +199,7 @@ class TaskResolver:
         Raises:
             BlockedError: If the outcome is not numeric.
         """
-        if not is_numeric_target(target):
+        if not quantitative(target):
             raise errors.BlockedError("uplift needs a numeric outcome")
         return tasks.Task.UPLIFT
 
@@ -263,7 +263,7 @@ class TaskResolver:
         Raises:
             BlockedError: If the target is not numeric.
         """
-        if not is_numeric_target(target):
+        if not quantitative(target):
             raise errors.BlockedError(
                 "regression requested but the target is not numeric"
             )
@@ -325,7 +325,7 @@ class TaskResolver:
                 "there is nothing to learn"
             )
         if (
-            not is_numeric_target(target)
+            not quantitative(target)
             and classes > TEXT_TARGET_MIN_CLASSES
             and classes / max(len(target), 1) > TEXT_TARGET_MAX_RATIO
         ):
@@ -334,7 +334,7 @@ class TaskResolver:
                 "distinct values: it looks like an identifier or free text, "
                 "not a class label; choose another target"
             )
-        if not is_numeric_target(target):
+        if not quantitative(target):
             return (
                 tasks.Task.BINARY
                 if classes == BINARY_CLASSES

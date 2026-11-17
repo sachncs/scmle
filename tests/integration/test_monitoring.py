@@ -40,7 +40,7 @@ def trained(tmp_path_factory):
 
 
 def test_stable_data_is_stable(trained):
-    monitor = scmle.monitoring.monitor.ModelMonitor(trained.bundle)
+    monitor = scmle.monitoring.monitor.Watcher(trained.bundle)
     report = monitor.assess(make_frame(600, 1).drop(columns="y"))
     assert report.drift.output_status == "stable"
     assert all(f.status == "stable" for f in report.drift.features)
@@ -49,9 +49,7 @@ def test_stable_data_is_stable(trained):
 
 def test_a_shifted_feature_is_found_and_ranked_first(trained):
     shifted = make_frame(600, 2, shift=2.5).drop(columns="y")
-    report = scmle.monitoring.monitor.ModelMonitor(trained.bundle).assess(
-        shifted
-    )
+    report = scmle.monitoring.monitor.Watcher(trained.bundle).assess(shifted)
     worst = report.drift.features[0]
     assert worst.feature == "a" and worst.status == "high" and worst.psi > 0.25
     assert report.recommendation.action in {"investigate", "retrain"}
@@ -61,7 +59,7 @@ def test_a_shifted_feature_is_found_and_ranked_first(trained):
 def test_unseen_categories_trigger_investigation(trained):
     data = make_frame(500, 3).drop(columns="y")
     data["c"] = numpy.where(numpy.arange(500) % 3 == 0, "brand_new", data["c"])
-    report = scmle.monitoring.monitor.ModelMonitor(trained.bundle).assess(data)
+    report = scmle.monitoring.monitor.Watcher(trained.bundle).assess(data)
     category = next(f for f in report.drift.features if f.feature == "c")
     assert category.unseen_rate > 0.2
     assert any("unseen" in r for r in report.recommendation.reasons)
@@ -71,7 +69,7 @@ def test_delayed_labels_are_handled_explicitly(trained):
     data = make_frame(600, 4)
     outcomes = data["y"].astype(float).copy()
     outcomes.iloc[100:] = numpy.nan  # labels still pending
-    monitor = scmle.monitoring.monitor.ModelMonitor(trained.bundle)
+    monitor = scmle.monitoring.monitor.Watcher(trained.bundle)
     report = monitor.assess(data.drop(columns="y"), outcomes)
     performance = report.performance
     assert (
@@ -87,7 +85,7 @@ def test_delayed_labels_are_handled_explicitly(trained):
 
 def test_concept_drift_is_caught_by_performance_not_features(trained):
     flipped = make_frame(800, 5, relabel=True)
-    monitor = scmle.monitoring.monitor.ModelMonitor(trained.bundle)
+    monitor = scmle.monitoring.monitor.Watcher(trained.bundle)
     report = monitor.assess(flipped.drop(columns="y"), flipped["y"])
     assert all(f.status == "stable" for f in report.drift.features)
     assert report.performance.status == "degraded"
@@ -98,7 +96,7 @@ def test_concept_drift_is_caught_by_performance_not_features(trained):
 def test_prediction_log_joins_late_outcomes(trained, tmp_path):
     log = events.PredictionLog(tmp_path / "log" / "events.jsonl")
     frame = make_frame(60, 6)
-    logged = log.log_predictions(trained.bundle, frame.drop(columns="y"))
+    logged = log.chronicle(trained.bundle, frame.drop(columns="y"))
     assert (
         len(logged) == 60
         and logged[0].model_version == trained.bundle.info.model_version
@@ -112,7 +110,7 @@ def test_prediction_log_joins_late_outcomes(trained, tmp_path):
     features, predictions, outcomes = log.load()
     assert len(features) == len(predictions) == len(outcomes) == 60
     assert outcomes.notna().sum() == 40 and outcomes.isna().sum() == 20
-    report = scmle.monitoring.monitor.ModelMonitor(trained.bundle).assess(
+    report = scmle.monitoring.monitor.Watcher(trained.bundle).assess(
         features, outcomes
     )
     assert report.performance.labeled_rows == 40
@@ -124,8 +122,8 @@ def test_prediction_log_can_emit_redacted_observability_sidecar(
     policy = observability.Requirements(
         retention_days=30,
         required_signals=(
-            observability.SignalKind.LATENCY,
-            observability.SignalKind.ERROR,
+            observability.Indicator.LATENCY,
+            observability.Indicator.ERROR,
         ),
         redacted_fields=("features",),
         alert_thresholds={},
@@ -136,7 +134,7 @@ def test_prediction_log_can_emit_redacted_observability_sidecar(
         run_id="serve-1",
     )
     frame = make_frame(3, 7).drop(columns="y")
-    log.log_predictions(trained.bundle, frame, event_ids=["a", "b", "c"])
+    log.chronicle(trained.bundle, frame, event_ids=["a", "b", "c"])
 
     records = [
         json.loads(line)
@@ -162,7 +160,7 @@ def test_bundles_without_reference_cannot_be_monitored(trained):
     bare = copy.copy(trained.bundle)
     bare.reference = None
     with pytest.raises(errors.ArtifactError, match="reference"):
-        scmle.monitoring.monitor.ModelMonitor(bare)
+        scmle.monitoring.monitor.Watcher(bare)
 
 
 def test_advisor_combines_rules_and_keeps_all_reasons():
@@ -195,7 +193,7 @@ def test_champion_challenger_promotes_only_a_clearly_better_model(tmp_path):
     ).run()
     holdout = make_frame(1500, 8)
     features = holdout.drop(columns="y")
-    promote = champion.ChampionChallenger(
+    promote = champion.Referee(
         weak.bundle, strong.bundle, bootstraps=80
     ).compare(features, holdout["y"])
     assert (
@@ -203,11 +201,11 @@ def test_champion_challenger_promotes_only_a_clearly_better_model(tmp_path):
         and promote.advantage > 0
         and promote.interval[0] > 0
     )
-    keep = champion.ChampionChallenger(
-        strong.bundle, weak.bundle, bootstraps=80
-    ).compare(features, holdout["y"])
+    keep = champion.Referee(strong.bundle, weak.bundle, bootstraps=80).compare(
+        features, holdout["y"]
+    )
     assert keep.decision == "keep" and keep.advantage < 0
-    same = champion.ChampionChallenger(
+    same = champion.Referee(
         strong.bundle, strong.bundle, bootstraps=80
     ).compare(features, holdout["y"])
     assert same.decision == "keep" and same.advantage == pytest.approx(0.0)
@@ -221,8 +219,8 @@ def test_comparison_validates_inputs(trained, tmp_path):
         output_dir=tmp_path,
     ).run()
     with pytest.raises(errors.ConfigError, match="different tasks"):
-        champion.ChampionChallenger(trained.bundle, regression.bundle)
-    pair = champion.ChampionChallenger(trained.bundle, trained.bundle)
+        champion.Referee(trained.bundle, regression.bundle)
+    pair = champion.Referee(trained.bundle, trained.bundle)
     few = make_frame(10, 10)
     with pytest.raises(errors.ConfigError, match="at least"):
         pair.compare(few.drop(columns="y"), few["y"])
@@ -237,13 +235,13 @@ def test_comparison_resamples_whole_groups_and_time_blocks(
     from scmle.evaluation import diagnostics
 
     seen = []
-    real = diagnostics.resample_rows
+    real = diagnostics.redraw
 
     def spy(rows, groups, temporal, rng):
         seen.append((groups is not None, temporal))
         return real(rows, groups, temporal, rng)
 
-    monkeypatch.setattr(diagnostics, "resample_rows", spy)
+    monkeypatch.setattr(diagnostics, "redraw", spy)
     holdout = make_frame(300, 12)
     holdout["entity"] = numpy.arange(300) % 20
     holdout["when"] = pandas.date_range("2024-01-01", periods=300, freq="D")
@@ -253,7 +251,7 @@ def test_comparison_resamples_whole_groups_and_time_blocks(
     clustered.schema = dataclasses.replace(
         trained.bundle.schema, group_column="entity"
     )
-    champion.ChampionChallenger(clustered, clustered, bootstraps=5).compare(
+    champion.Referee(clustered, clustered, bootstraps=5).compare(
         features, holdout["y"]
     )
     assert seen and all(group and not block for group, block in seen)
@@ -263,7 +261,5 @@ def test_comparison_resamples_whole_groups_and_time_blocks(
     timed.schema = dataclasses.replace(
         trained.bundle.schema, time_column="when"
     )
-    champion.ChampionChallenger(timed, timed, bootstraps=5).compare(
-        features, holdout["y"]
-    )
+    champion.Referee(timed, timed, bootstraps=5).compare(features, holdout["y"])
     assert seen and all(block and not group for group, block in seen)

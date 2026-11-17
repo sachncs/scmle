@@ -2,13 +2,13 @@
 
 import pytest
 
-from scmle.models.deeplearning.jepa import JepaEstimator
+from scmle.models.deeplearning.jepa import Embedder
 from scmle.models.deeplearning.jepa_engine import Trainer
 
 
 def test_jepa_is_a_self_supervised_representation_contract():
     """The estimator exposes only explicit tabular representation settings."""
-    estimator = JepaEstimator(
+    estimator = Embedder(
         hidden_size=32,
         embedding_size=16,
         mask_probability=0.25,
@@ -35,7 +35,7 @@ def test_tabular_jepa_trains_and_encodes():
 
     rng = numpy.random.default_rng(5)
     features = rng.normal(size=(48, 4)).astype(numpy.float32)
-    estimator = JepaEstimator(
+    estimator = Embedder(
         hidden_size=16,
         embedding_size=8,
         epochs=2,

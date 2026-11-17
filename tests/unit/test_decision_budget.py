@@ -18,8 +18,8 @@ def fresh(**overrides):
 
 def test_the_default_levels_follow_the_discount_exactly():
     budget = fresh()
-    budget, first = scmle.data.ledger.budget.assign_experiment(budget, "a")
-    budget, second = scmle.data.ledger.budget.assign_experiment(budget, "b")
+    budget, first = scmle.data.ledger.budget.enroll(budget, "a")
+    budget, second = scmle.data.ledger.budget.enroll(budget, "b")
     assert first == Fraction(1, 100)
     assert second == Fraction(1, 300)
     assert budget.spent == Fraction(4, 300)
@@ -28,31 +28,31 @@ def test_the_default_levels_follow_the_discount_exactly():
 
 def test_an_explicit_level_may_not_overspend():
     budget = fresh()
-    budget, level = scmle.data.ledger.budget.assign_experiment(
+    budget, level = scmle.data.ledger.budget.enroll(
         budget, "a", Fraction(1, 100)
     )
     assert level == Fraction(1, 100)
-    with pytest.raises(scmle.data.ledger.budget.BudgetExhaustedError):
-        scmle.data.ledger.budget.assign_experiment(budget, "b", Fraction(1, 99))
-    budget, ignored = scmle.data.ledger.budget.assign_experiment(
+    with pytest.raises(scmle.data.ledger.budget.ExhaustedError):
+        scmle.data.ledger.budget.enroll(budget, "b", Fraction(1, 99))
+    budget, ignored = scmle.data.ledger.budget.enroll(
         budget, "b", Fraction(1, 100)
     )
     assert budget.remaining == 0
 
 
 def test_an_experiment_id_is_used_once_and_a_level_is_positive():
-    budget, ignored = scmle.data.ledger.budget.assign_experiment(fresh(), "a")
+    budget, ignored = scmle.data.ledger.budget.enroll(fresh(), "a")
     with pytest.raises(ValueError, match="already has a level"):
-        scmle.data.ledger.budget.assign_experiment(budget, "a")
+        scmle.data.ledger.budget.enroll(budget, "a")
     with pytest.raises(ValueError, match="positive"):
-        scmle.data.ledger.budget.assign_experiment(budget, "b", 0)
+        scmle.data.ledger.budget.enroll(budget, "b", 0)
     with pytest.raises(ValueError):
-        scmle.data.ledger.budget.assign_experiment(budget, " ")
+        scmle.data.ledger.budget.enroll(budget, " ")
 
 
 def test_the_original_budget_is_not_modified():
     budget = fresh()
-    scmle.data.ledger.budget.assign_experiment(budget, "a")
+    scmle.data.ledger.budget.enroll(budget, "a")
     assert budget.assigned == ()
 
 
@@ -100,8 +100,8 @@ def test_floats_are_read_as_written_and_records_reject_extras():
 
 
 def test_discount_weights():
-    assert scmle.data.ledger.budget.discount_weight(1, None) == Fraction(1, 2)
-    assert scmle.data.ledger.budget.discount_weight(3, 4) == Fraction(1, 4)
-    assert scmle.data.ledger.budget.discount_weight(5, 4) == 0
+    assert scmle.data.ledger.budget.gammas(1, None) == Fraction(1, 2)
+    assert scmle.data.ledger.budget.gammas(3, 4) == Fraction(1, 4)
+    assert scmle.data.ledger.budget.gammas(5, 4) == 0
     with pytest.raises(ValueError):
-        scmle.data.ledger.budget.discount_weight(0, None)
+        scmle.data.ledger.budget.gammas(0, None)

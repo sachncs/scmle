@@ -18,7 +18,7 @@ def choices():
 
 
 def test_the_full_grid_is_the_product_with_the_default_first():
-    grid = multiverse.enumerate_grid(choices(), seed=0, max_specs=100)
+    grid = multiverse.universe(choices(), seed=0, max_specs=100)
     assert grid.total == 6 and len(grid.specs) == 6 and not grid.subset
     assert grid.default.to_dict() == {
         "imputation": "median",
@@ -28,11 +28,10 @@ def test_the_full_grid_is_the_product_with_the_default_first():
 
 
 def test_a_large_grid_becomes_a_seeded_subset_of_fixed_size():
-    first = multiverse.enumerate_grid(choices(), seed=1, max_specs=3)
-    again = multiverse.enumerate_grid(choices(), seed=1, max_specs=3)
+    first = multiverse.universe(choices(), seed=1, max_specs=3)
+    again = multiverse.universe(choices(), seed=1, max_specs=3)
     others = [
-        multiverse.enumerate_grid(choices(), seed=k, max_specs=3)
-        for k in range(2, 8)
+        multiverse.universe(choices(), seed=k, max_specs=3) for k in range(2, 8)
     ]
     assert first == again
     assert first.subset and len(first.specs) == 3 and first.total == 6
@@ -42,20 +41,20 @@ def test_a_large_grid_becomes_a_seeded_subset_of_fixed_size():
 
 
 def test_enumeration_is_independent_of_the_order_of_the_declaration():
-    forward = multiverse.enumerate_grid(choices(), 0)
-    backward = multiverse.enumerate_grid(tuple(reversed(choices())), 0)
+    forward = multiverse.universe(choices(), 0)
+    backward = multiverse.universe(tuple(reversed(choices())), 0)
     assert forward == backward
 
 
 def test_repeated_names_and_an_empty_budget_are_refused():
     with pytest.raises(ValueError, match="distinct"):
-        multiverse.enumerate_grid(choices() + choices()[:1], 0)
+        multiverse.universe(choices() + choices()[:1], 0)
     with pytest.raises(ValueError, match="max_specs"):
-        multiverse.enumerate_grid(choices(), 0, max_specs=0)
+        multiverse.universe(choices(), 0, max_specs=0)
 
 
 def test_no_choices_give_a_single_default_specification():
-    grid = multiverse.enumerate_grid((), 0)
+    grid = multiverse.universe((), 0)
     assert grid.total == 1 and grid.default.values == ()
 
 
@@ -73,9 +72,9 @@ def test_a_specification_added_later_changes_both_hashes_and_the_tier():
     used = multiverse.declaration_sha256(amended.multiverse)
     assert declared != used
     keep = qualification.Tier.ATTESTED
-    assert multiverse.tier_after_declaration(declared, declared, keep) is keep
+    assert multiverse.downgrade(declared, declared, keep) is keep
     assert (
-        multiverse.tier_after_declaration(declared, used, keep)
+        multiverse.downgrade(declared, used, keep)
         is qualification.Tier.UNVERIFIED
     )
 
@@ -87,8 +86,8 @@ def test_the_declaration_hash_ignores_the_order_of_choices():
 
 
 def test_results_are_cached_by_finding_specification_and_seed(tmp_path):
-    grid = multiverse.enumerate_grid(choices(), 0)
-    cache = multiverse.ResultCache()
+    grid = multiverse.universe(choices(), 0)
+    cache = multiverse.Memo()
     calls = []
 
     def evaluate(spec):
@@ -109,13 +108,13 @@ def test_results_are_cached_by_finding_specification_and_seed(tmp_path):
     path = tmp_path / "cache.json"
     cache.save(path)
     assert json.loads(path.read_text())
-    resumed = multiverse.ResultCache.load(path)
+    resumed = multiverse.Memo.load(path)
     assert resumed.items == cache.items
-    assert multiverse.ResultCache.load(tmp_path / "missing.json").items == {}
+    assert multiverse.Memo.load(tmp_path / "missing.json").items == {}
 
 
 def test_the_time_budget_skips_and_records_the_rest():
-    grid = multiverse.enumerate_grid(choices(), 0)
+    grid = multiverse.universe(choices(), 0)
     ticks = iter(range(100))
     run = multiverse.run_grid(
         grid,
@@ -131,7 +130,7 @@ def test_the_time_budget_skips_and_records_the_rest():
 
 
 def test_the_run_is_deterministic_under_a_fixed_seed():
-    grid = multiverse.enumerate_grid(choices(), 3)
+    grid = multiverse.universe(choices(), 3)
     a = multiverse.run_grid(grid, lambda s: {"v": 1.0}, finding="x", seed=3)
     b = multiverse.run_grid(grid, lambda s: {"v": 1.0}, finding="x", seed=3)
     assert a.results == b.results and a.skipped == ()

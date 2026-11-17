@@ -1,6 +1,6 @@
 """Trial execution: cross-validate complete candidate pipelines.
 
-A trial is described by a picklable `TrialPayload` and evaluated by the
+A trial is described by a picklable `Payload` and evaluated by the
 module-level `evaluate_payload`, so the same code runs in-process or in a
 worker process depending on the execution backend.
 """
@@ -33,7 +33,7 @@ from scmle.sampling import strategies
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class TrialJob:
+class Job:
     """What to evaluate.
 
     Attributes:
@@ -53,7 +53,7 @@ class TrialJob:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class TrialPayload:
+class Payload:
     """Everything a worker needs to evaluate one job, with no shared state.
 
     Attributes:
@@ -68,16 +68,16 @@ class TrialPayload:
         features: Development features.
         target: Development labels.
         folds: Cross-validation folds (positions in the development data).
-        thread_limit: Threads each worker may use (None = library default).
+        threadcap: Threads each worker may use (None = library default).
         ceiling_seconds: Hard time ceiling for the trial (None = none).
         memory_gb: Hard memory cap for the trial (None = none).
         weighted: Score folds with the feature plan's weight column.
     """
 
-    job: TrialJob
+    job: Job
     adapter: models.Model
     strategy: strategies.Strategy
-    feature_plan: data.FeaturePlan
+    feature_plan: data.Blueprint
     task: tasks.Task
     seed: int
     metric: scmle.contracts.metrics.Metric
@@ -85,7 +85,7 @@ class TrialPayload:
     features: pandas.DataFrame
     target: pandas.Series
     folds: Sequence[tuple[list[int], list[int]]]
-    thread_limit: int | None
+    threadcap: int | None
     ceiling_seconds: float | None = None
     memory_gb: float | None = None
     weighted: bool = False
@@ -109,7 +109,7 @@ def summarise(row_ids: pandas.Index) -> dict[str, Any]:
     return {"rows": len(ordered), "digest": digest[:16]}
 
 
-def runtime_requirements(adapter: models.Model) -> dict[str, Any]:
+def requirements(adapter: models.Model) -> dict[str, Any]:
     """Lists the Python version and the library versions a model needs.
 
     Args:
@@ -129,8 +129,8 @@ def runtime_requirements(adapter: models.Model) -> dict[str, Any]:
     return {"python": platform.python_version(), "libraries": needed}
 
 
-def fold_weights(
-    payload: TrialPayload, positions: numpy.ndarray
+def weigh(
+    payload: Payload, positions: numpy.ndarray
 ) -> dict[str, numpy.ndarray]:
     """Builds scorer keyword arguments carrying the rows' weights.
 
@@ -149,7 +149,7 @@ def fold_weights(
     return {"sample_weight": values}
 
 
-def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
+def evaluate_payload(payload: Payload) -> experiments.Trial:
     """Cross-validates one job; never raises for model failures.
 
     Args:
@@ -165,7 +165,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
     result = experiments.Trial(
         job.trial_id,
         job.model_name,
-        experiments.TrialStatus.FAILED,
+        experiments.Termination.FAILED,
         metric.name,
         params=dict(job.params),
         strategy=job.strategy,
@@ -175,7 +175,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
             "seed": payload.seed,
             "weighted": payload.weighted,
         },
-        runtime=runtime_requirements(payload.adapter),
+        runtime=requirements(payload.adapter),
     )
     try:
         pipeline = payload.strategy.build(
@@ -188,7 +188,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
         scorer = metric.scorer(payload.positive_label)
         raw_scores = []
         raw_train_scores = []
-        with threadpoolctl.threadpool_limits(limits=payload.thread_limit):
+        with threadpoolctl.threadpool_limits(limits=payload.threadcap):
             for fit_list, evaluate_list in folds:
                 fit = numpy.asarray(fit_list)
                 evaluate = numpy.asarray(evaluate_list)
@@ -202,7 +202,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
                         candidate,
                         payload.features.iloc[evaluate],
                         payload.target.iloc[evaluate],
-                        **fold_weights(payload, evaluate),
+                        **weigh(payload, evaluate),
                     )
                 )
                 raw_train_scores.append(
@@ -210,7 +210,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
                         candidate,
                         payload.features.iloc[sample],
                         payload.target.iloc[sample],
-                        **fold_weights(payload, sample),
+                        **weigh(payload, sample),
                     )
                 )
                 result.observed_access.append(
@@ -228,7 +228,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
         ]
         result.score_mean = float(numpy.mean(scores))
         result.score_std = float(numpy.std(scores))
-        result.status = experiments.TrialStatus.OK
+        result.status = experiments.Termination.OK
     except Exception as error:  # noqa: BLE001 -- isolation: any model failure is data
         # handled: model failure stored in the FAILED trial, with its trace
         failure = errors.Failure.of(error)
@@ -238,7 +238,7 @@ def evaluate_payload(payload: TrialPayload) -> experiments.Trial:
     return result
 
 
-def lost_trial(payload: TrialPayload, error: Exception) -> experiments.Trial:
+def lose(payload: Payload, error: Exception) -> experiments.Trial:
     """Builds a failed result for a trial whose worker was lost.
 
     Args:
@@ -253,7 +253,7 @@ def lost_trial(payload: TrialPayload, error: Exception) -> experiments.Trial:
     return experiments.Trial(
         job.trial_id,
         job.model_name,
-        experiments.TrialStatus.FAILED,
+        experiments.Termination.FAILED,
         payload.metric.name,
         params=dict(job.params),
         strategy=job.strategy,
@@ -262,7 +262,7 @@ def lost_trial(payload: TrialPayload, error: Exception) -> experiments.Trial:
     )
 
 
-def guarded_evaluate(payload: TrialPayload) -> experiments.Trial:
+def supervise(payload: Payload) -> experiments.Trial:
     """Evaluates a job in a supervised process under hard limits.
 
     A trial killed for exceeding a limit, or lost with its process, becomes a
@@ -272,30 +272,30 @@ def guarded_evaluate(payload: TrialPayload) -> experiments.Trial:
         payload: Self-contained description of the work.
 
     Returns:
-        The trial result, `FAILED` with a `TrialLimitError` message if a limit
+        The trial result, `FAILED` with a `TrialError` message if a limit
         was exceeded.
     """
     supervisor = limits.Supervisor(payload.ceiling_seconds, payload.memory_gb)
     try:
         trial: experiments.Trial = supervisor.run(evaluate_payload, payload)
-    except limits.TrialLimitError as error:
-        # handled: limit breach returned as FAILED trial with TrialLimitError
+    except limits.TrialError as error:
+        # handled: limit breach returned as FAILED trial with TrialError
         # text
         job = payload.job
         return experiments.Trial(
             job.trial_id,
             job.model_name,
-            experiments.TrialStatus.FAILED,
+            experiments.Termination.FAILED,
             payload.metric.name,
             params=dict(job.params),
             strategy=job.strategy,
-            error=f"TrialLimitError: {error}",
+            error=f"TrialError: {error}",
             failure=errors.Failure.of(error).dump(),
         )
     return trial
 
 
-class TrialRunner:
+class Runner:
     """Evaluates candidate pipelines with failure isolation.
 
     Attributes:
@@ -329,7 +329,7 @@ class TrialRunner:
         """The concurrency of the execution backend."""
         return self.context.backend.workers
 
-    def payload(self, job: TrialJob) -> TrialPayload:
+    def payload(self, job: Job) -> Payload:
         """Builds the self-contained payload for a job.
 
         Args:
@@ -340,8 +340,8 @@ class TrialRunner:
             for it, a weight column exists and the metric accepts weights.
         """
         context = self.context
-        governor = context.resource_governor
-        return TrialPayload(
+        governor = context.regulator
+        return Payload(
             job=job,
             adapter=context.registry.get(job.model_name),
             strategy=strategies.lookup(job.strategy),
@@ -355,8 +355,8 @@ class TrialRunner:
             features=self.split.dev_features,
             target=self.split.dev_target,
             folds=self.folds,
-            thread_limit=governor.thread_limit,
-            ceiling_seconds=governor.trial_ceiling_seconds(),
+            threadcap=governor.threadcap,
+            ceiling_seconds=governor.deadline(),
             memory_gb=context.spec.resources.memory_limit_gb,
             weighted=bool(
                 context.spec.selection.weighted
@@ -383,10 +383,10 @@ class TrialRunner:
         Returns:
             The trial result.
         """
-        job = TrialJob(trial_id, model_name, dict(params or {}), fold_count)
+        job = Job(trial_id, model_name, dict(params or {}), fold_count)
         return self.run_many([job])[0]
 
-    def run_many(self, jobs: Sequence[TrialJob]) -> list[experiments.Trial]:
+    def run_many(self, jobs: Sequence[Job]) -> list[experiments.Trial]:
         """Evaluates independent jobs, concurrently if the backend allows.
 
         Checkpointed results from an interrupted run are reused; only the
@@ -400,7 +400,7 @@ class TrialRunner:
         """
         results: list[experiments.Trial | None] = [None] * len(jobs)
         slots: list[int] = []
-        payloads: list[TrialPayload] = []
+        payloads: list[Payload] = []
         for index, job in enumerate(jobs):
             cached = self.reuse(job)
             if cached is not None:
@@ -408,14 +408,14 @@ class TrialRunner:
             else:
                 slots.append(index)
                 payloads.append(self.payload(job))
-        governor = self.context.resource_governor
-        function = guarded_evaluate if governor.hard else evaluate_payload
-        outputs = self.context.backend.map(function, payloads, lost_trial)
+        governor = self.context.regulator
+        function = supervise if governor.hard else evaluate_payload
+        outputs = self.context.backend.map(function, payloads, lose)
         for index, output in zip(slots, outputs, strict=True):
             results[index] = output
         return [r for r in results if r is not None]
 
-    def reuse(self, job: TrialJob) -> experiments.Trial | None:
+    def reuse(self, job: Job) -> experiments.Trial | None:
         """Returns a checkpointed result from an interrupted run, if valid.
 
         A checkpoint is reused only if the trial id, model and parameters
@@ -430,7 +430,7 @@ class TrialRunner:
             A result view with exactly the requested folds, or None.
         """
         checkpoint = self.context.checkpoints.get(job.trial_id)
-        usable = (experiments.TrialStatus.OK, experiments.TrialStatus.PRUNED)
+        usable = (experiments.Termination.OK, experiments.Termination.PRUNED)
         if (
             checkpoint is None
             or checkpoint.status not in usable
@@ -446,7 +446,7 @@ class TrialRunner:
         return experiments.Trial(
             job.trial_id,
             job.model_name,
-            experiments.TrialStatus.OK,
+            experiments.Termination.OK,
             checkpoint.metric,
             float(numpy.mean(scores)),
             float(numpy.std(scores)),
@@ -479,7 +479,7 @@ class TrialRunner:
         return experiments.Trial(
             trial_id,
             model_name,
-            experiments.TrialStatus.SKIPPED,
+            experiments.Termination.SKIPPED,
             self.metric.name,
             error=reason,
         )

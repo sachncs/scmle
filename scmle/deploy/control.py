@@ -178,9 +178,9 @@ def expecting(
             reasons.append(f"revision {revision} is not reported")
         elif digest != image_digest:
             reasons.append(f"revision {revision} runs {digest}")
-        if seen.share_of(revision) != percent:
+        if seen.portion(revision) != percent:
             reasons.append(
-                f"revision {revision} holds {seen.share_of(revision)}% "
+                f"revision {revision} holds {seen.portion(revision)}% "
                 f"of traffic, not {percent}%"
             )
         if not seen.ready:

@@ -1,7 +1,7 @@
 """Family-wise error and false discovery rate of the repository's rules.
 
 `scmle.data.ledger.multiplicity` (Holm, Bonferroni, Benjamini-Hochberg,
-Benjamini-Yekutieli), `scmle.evaluation.coverage.holm_rejections` and the
+Benjamini-Yekutieli), `scmle.evaluation.coverage.stepdown` and the
 online rules in `scmle.data.ledger.online_fdr` (e-LOND, LORD++, SAFFRON) are
 run on p-values simulated from a known truth. Under the global null the
 family-wise error and the false discovery rate both equal the probability of
@@ -112,17 +112,17 @@ def test_holm_in_the_coverage_module_agrees_with_the_ledger_holm():
         expected = multiplicity.adjust(
             p_values, budget.Correction.HOLM, LEVEL
         ).rejected
-        assert tuple(coverage.holm_rejections(p_values, ALPHA)) == expected
+        assert tuple(coverage.stepdown(p_values, ALPHA)) == expected
 
 
 def test_the_coverage_module_holm_controls_the_family_wise_error():
     rng = numpy.random.default_rng(4)
     any_rejected = sum(
-        any(coverage.holm_rejections(row.tolist(), ALPHA))
+        any(coverage.stepdown(row.tolist(), ALPHA))
         for row in rng.uniform(size=(RUNS, FAMILY))
     )
     support_statistics.assert_rate_at_most(
-        any_rejected / RUNS, ALPHA, RUNS, "coverage.holm_rejections"
+        any_rejected / RUNS, ALPHA, RUNS, "coverage.stepdown"
     )
 
 
@@ -133,7 +133,7 @@ def online_run(rule, rng, signals):
     p_values = numpy.where(
         alternative, rng.beta(0.05, 1.0, length), rng.random(length)
     )
-    config = online_fdr.RuleConfig(rule, LEVEL)
+    config = online_fdr.Settings(rule, LEVEL)
     steps = online_fdr.replay(
         config, [online_fdr.Evidence(p=float(p)) for p in p_values]
     )
@@ -177,7 +177,7 @@ def test_e_lond_controls_the_error_rate_under_dependent_p_values():
         common = rng.normal()
         z = numpy.sqrt(0.7) * common + numpy.sqrt(0.3) * rng.normal(size=length)
         steps = online_fdr.replay(
-            online_fdr.RuleConfig(online_fdr.ELOND, LEVEL),
+            online_fdr.Settings(online_fdr.ELOND, LEVEL),
             [online_fdr.Evidence(p=float(p)) for p in stats.norm.sf(z)],
         )
         any_false += any(step.rejected for step in steps)

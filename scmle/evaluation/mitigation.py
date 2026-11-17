@@ -113,7 +113,7 @@ def gap(
     return float(max(found) - min(found)) if len(found) > 1 else 0.0
 
 
-def group_cuts(
+def cutoffs(
     probabilities: numpy.ndarray,
     groups: pandas.Series,
     actual: numpy.ndarray,
@@ -197,7 +197,7 @@ def judge(
         `max_accuracy_cost`; the reason names the first check that failed.
         Rows of groups without a threshold use `base`.
     """
-    cuts = group_cuts(probabilities, groups, actual, criterion, base)
+    cuts = cutoffs(probabilities, groups, actual, criterion, base)
     assigned = groups.map(cuts).fillna(base).to_numpy(float)
     before_flags = probabilities >= base
     after_flags = probabilities >= assigned

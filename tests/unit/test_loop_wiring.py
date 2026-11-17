@@ -20,8 +20,8 @@ import scmle.models.registry
 from tests.unit import test_loop
 
 APPROVAL_KEY = "promotion-review-key"
-PLAN = data.FeaturePlan(("a", "b"), ())
-MODELS = scmle.models.registry.Catalog.with_builtins()
+PLAN = data.Blueprint(("a", "b"), ())
+MODELS = scmle.models.registry.Catalog.stock()
 
 
 def halted_loop(tmp_path, hooks=None):
@@ -78,7 +78,7 @@ def test_feedback_cannot_be_tested_without_a_declared_bypass_slice(tmp_path):
     loop = test_loop.open_loop(tmp_path)
     bypass, model = feedback_groups(0.8)
     with pytest.raises(ValueError) as caught:
-        loop.check_feedback(bypass, model)
+        loop.performativity(bypass, model)
     assert str(caught.value) == (
         "no bypass slice is declared (policy.bypass_rate is 0): "
         "feedback cannot be tested"
@@ -90,7 +90,7 @@ def test_a_feedback_loop_is_recorded_escalated_and_survives_reopening(
 ):
     loop = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass_rate=0.3))
     bypass, model = feedback_groups(0.8)
-    check = loop.check_feedback(bypass, model)
+    check = loop.performativity(bypass, model)
     assert check.p_value is not None and check.p_value <= 0.05
     record = read_mechanism(loop)
     assert record["feedback"] == "loop_detected"
@@ -109,7 +109,7 @@ def test_a_feedback_loop_is_recorded_escalated_and_survives_reopening(
 def test_no_feedback_loop_is_reported_without_an_escalation(tmp_path):
     loop = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass_rate=0.3))
     bypass, model = feedback_groups(0.0)
-    loop.check_feedback(bypass, model)
+    loop.performativity(bypass, model)
     assert read_mechanism(loop)["feedback"] == "no_loop_detected"
     assert not loop.pending_escalations()
 
@@ -129,7 +129,7 @@ def traffic(rows=400, seed=0, flip=False):
 
 def bundle_of(frame):
     features = frame.drop(columns="y")
-    fitted = preprocessing.build_pipeline(
+    fitted = preprocessing.instantiate(
         PLAN, MODELS.get("logistic_regression"), tasks.Task.BINARY, 0
     ).fit(features, frame.y)
     return bundle.Bundle.create(
@@ -143,13 +143,13 @@ def bundle_of(frame):
     )
 
 
-def approval_for(record):
-    return scmle.governance.registry.PromotionApproval(
+def sanction(record):
+    return scmle.governance.registry.Sanction(
         model=record.model,
         version=record.version,
         content_id=record.content_id,
         reviewer="unit-reviewer",
-        decision=scmle.governance.registry.PromotionDecision.APPROVED,
+        decision=scmle.governance.registry.Verdict.APPROVED,
         reason="verified unit fixture",
         evidence=("unit-evidence.json",),
         approved_at="2026-10-20T00:00:00+00:00",
@@ -168,7 +168,7 @@ def exported(tmp_path_factory):
 def guarded(tmp_path, exported):
     loop = test_loop.open_loop(tmp_path)
     store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
-    loop.guard_registry(store)
+    loop.intercept(store)
     first = store.register("m", exported[0], trusted=True)
     second = store.register("m", exported[1], trusted=True)
     return loop, store, first, second
@@ -187,7 +187,7 @@ def test_an_unattested_champion_move_is_refused_and_escalated(
     first = records[0]
     with pytest.raises(never_list.AttestationRequired):
         store.promote(
-            "m", 1, approval=approval_for(first), signing_key=APPROVAL_KEY
+            "m", 1, approval=sanction(first), signing_key=APPROVAL_KEY
         )
     assert "champion" not in store.aliases("m")
     assert loop.pending_escalations()[0].question["detail"] == {
@@ -211,11 +211,11 @@ def test_promote_challenger_needs_the_attestation_and_the_approval(
     second = records[1]
     store.promote("m", 2, alias=scmle.governance.registry.CHALLENGER)
     manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
-    approval = approval_for(second)
+    approval = sanction(second)
     with pytest.raises(never_list.AttestationRequired):
-        manager.promote_challenger(approval, signing_key=APPROVAL_KEY)
+        manager.elevate(approval, signing_key=APPROVAL_KEY)
     approve_pending(loop)
-    record = manager.promote_challenger(approval, signing_key=APPROVAL_KEY)
+    record = manager.elevate(approval, signing_key=APPROVAL_KEY)
     assert record.version == 2 and store.resolve("m").version == 2
 
 
@@ -224,21 +224,21 @@ def test_a_rollback_needs_an_attestation_naming_the_rollback(
 ):
     loop, store, first, second = guarded(tmp_path, exported)
     # Put both versions in place without the guard, as an older deployment did.
-    store.attach_guard(None, "stream")
+    store.attach(None, "stream")
     for record in (first, second):
         store.promote(
             "m",
             record.version,
-            approval=approval_for(record),
+            approval=sanction(record),
             signing_key=APPROVAL_KEY,
         )
-    loop.guard_registry(store)
+    loop.intercept(store)
     manager = lifecycle.Maintainer(store, "m", str(tmp_path / "work"))
     with pytest.raises(never_list.AttestationRequired):
         manager.check_rollback(
             traffic(1200, seed=20),
             "y",
-            approval=approval_for(first),
+            approval=sanction(first),
             signing_key=APPROVAL_KEY,
         )
     assert store.resolve("m").version == 2
@@ -246,7 +246,7 @@ def test_a_rollback_needs_an_attestation_naming_the_rollback(
     outcome = manager.check_rollback(
         traffic(1200, seed=20),
         "y",
-        approval=approval_for(first),
+        approval=sanction(first),
         signing_key=APPROVAL_KEY,
     )
     assert outcome.rolled_back and store.resolve("m").version == 1
@@ -257,9 +257,9 @@ def test_a_guarded_loop_move_spends_a_single_use_attestation_once(
 ):
     loop = test_loop.open_loop(tmp_path, single_use_attestations=True)
     store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
-    loop.guard_registry(store)
+    loop.intercept(store)
     record = store.register("m", exported[0], trusted=True)
-    approval = approval_for(record)
+    approval = sanction(record)
     with pytest.raises(never_list.AttestationRequired):
         loop.move_champion(store, "m", 1, approval, APPROVAL_KEY)
     approve_pending(loop)
@@ -273,9 +273,9 @@ def test_a_refused_approval_does_not_spend_a_single_use_attestation(
 ):
     loop = test_loop.open_loop(tmp_path, single_use_attestations=True)
     store = scmle.governance.registry.ModelRegistryStore(tmp_path / "registry")
-    loop.guard_registry(store)
+    loop.intercept(store)
     record = store.register("m", exported[0], trusted=True)
-    approval = approval_for(record)
+    approval = sanction(record)
     with pytest.raises(never_list.AttestationRequired):
         store.promote("m", 1, approval=approval, signing_key=APPROVAL_KEY)
     approve_pending(loop)

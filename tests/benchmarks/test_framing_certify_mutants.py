@@ -415,7 +415,7 @@ def test_the_omission_request_is_the_stated_one(monkeypatch):
     assert framing_certify.omission_asks(4, True, False) is False
     request = seen["request"]
     assert request.text == "Predict churn for each customer."
-    assert request.source == draft.SourceDescription(
+    assert request.source == draft.Offer(
         "warehouse://crm/accounts",
         ("customer_id", "as_of", "churn", "current_rule"),
         primary_key=("customer_id",),
@@ -439,15 +439,15 @@ def test_a_given_cost_model_is_the_one_in_the_design(monkeypatch):
 
     monkeypatch.setattr(draft, "frame", fake)
     framing_certify.omission_asks(4, False, True)
-    assert seen["cost_model"] == costs.DecisionCostModel(
+    assert seen["cost_model"] == costs.Tariff(
         0.0,
         5.0,
         1.0,
         0.0,
         0.05,
         0.5,
-        (costs.CostSource.HUMAN,) * 4,
-        costs.CostSource.HUMAN,
+        (costs.Basis.HUMAN,) * 4,
+        costs.Basis.HUMAN,
     )
 
 

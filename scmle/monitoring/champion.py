@@ -51,7 +51,7 @@ class Comparison:
     dropped: int = 0
 
 
-class ChampionChallenger:
+class Referee:
     """Decides whether a challenger should replace the champion.
 
     Attributes:
@@ -141,8 +141,8 @@ class ChampionChallenger:
             )
             frame = frame.iloc[order].reset_index(drop=True)
             target = target.iloc[order].reset_index(drop=True)
-        champion_view = self.champion.prepare_frame(frame)
-        challenger_view = self.challenger.prepare_frame(frame)
+        champion_view = self.champion.prepare(frame)
+        challenger_view = self.challenger.prepare(frame)
         positive = metrics.positive_label(target, task)
         sign = 1.0 if metric.greater_is_better else -1.0
 
@@ -177,7 +177,7 @@ class ChampionChallenger:
             map(
                 operator.call,
                 itertools.repeat(
-                    lambda: diagnostics.resample_rows(
+                    lambda: diagnostics.redraw(
                         len(target), groups, temporal, rng
                     ),
                     self.bootstraps,

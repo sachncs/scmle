@@ -55,13 +55,13 @@ def post(url, payload):
         return error.code, json.loads(error.read())
 
 
-def approval_for(record):
-    return registry.PromotionApproval(
+def sanction(record):
+    return registry.Sanction(
         model=record.model,
         version=record.version,
         content_id=record.content_id,
         reviewer="integration-reviewer",
-        decision=registry.PromotionDecision.APPROVED,
+        decision=registry.Verdict.APPROVED,
         reason="verified integration fixture",
         evidence=("integration-evidence.json",),
         approved_at="2026-10-20T00:00:00+00:00",
@@ -73,7 +73,7 @@ def register_champion(manager, store, result):
     store.promote(
         manager.model,
         record.version,
-        approval=approval_for(record),
+        approval=sanction(record),
         signing_key=APPROVAL_KEY,
     )
     return record
@@ -94,14 +94,14 @@ def test_registry_versions_aliases_and_audit(trained, tmp_path):
     assert (first.version, second.version) == (1, 2)
     assert first.content_id != second.content_id
     store.promote(
-        "churn", 1, approval=approval_for(first), signing_key=APPROVAL_KEY
+        "churn", 1, approval=sanction(first), signing_key=APPROVAL_KEY
     )
     store.promote("churn", 2, "challenger")
     assert store.aliases("churn") == {"champion": 1, "challenger": 2}
     assert store.resolve("churn", "challenger").run_id == "r2"
     assert store.resolve("churn", 2).metrics == {"roc_auc": 0.91}
     store.promote(
-        "churn", 2, approval=approval_for(second), signing_key=APPROVAL_KEY
+        "churn", 2, approval=sanction(second), signing_key=APPROVAL_KEY
     )
     assert store.resolve("churn").version == 2
     audit = [
@@ -116,7 +116,7 @@ def test_registry_versions_aliases_and_audit(trained, tmp_path):
         "promote",
     ]
     assert audit[-1]["previous"] == 1
-    assert audit[-1]["approval_record"] == approval_for(second).to_dict()
+    assert audit[-1]["approval_record"] == sanction(second).to_dict()
     features = make_frame(20, 1).drop(columns="y")
     numpy.testing.assert_array_equal(
         store.load("churn").predict(features), trained.predict(features)
@@ -154,7 +154,7 @@ def test_champion_promotion_requires_matching_independent_approval(
             "m",
             record.version,
             approval=dataclasses.replace(
-                approval_for(record), content_id="wrong-content"
+                sanction(record), content_id="wrong-content"
             ),
             signing_key=APPROVAL_KEY,
         )
@@ -163,8 +163,8 @@ def test_champion_promotion_requires_matching_independent_approval(
             "m",
             record.version,
             approval=dataclasses.replace(
-                approval_for(record),
-                decision=registry.PromotionDecision.REJECTED,
+                sanction(record),
+                decision=registry.Verdict.REJECTED,
             ),
             signing_key=APPROVAL_KEY,
         )
@@ -172,7 +172,7 @@ def test_champion_promotion_requires_matching_independent_approval(
         store.promote(
             "m",
             record.version,
-            approval=dataclasses.replace(approval_for(record), signature=None),
+            approval=dataclasses.replace(sanction(record), signature=None),
             signing_key=APPROVAL_KEY,
         )
     with pytest.raises(errors.ArtifactError, match="valid signature"):
@@ -180,7 +180,7 @@ def test_champion_promotion_requires_matching_independent_approval(
             "m",
             record.version,
             approval=dataclasses.replace(
-                approval_for(record), reason="tampered review"
+                sanction(record), reason="tampered review"
             ),
             signing_key=APPROVAL_KEY,
         )
@@ -254,7 +254,7 @@ def test_http_serving_reports_diagnostics_for_messy_input(trained):
 def test_batch_serving_scores_files(trained, tmp_path, monkeypatch):
     source = tmp_path / "in.csv"
     make_frame(40, 3).drop(columns="y").to_csv(source, index=False)
-    adapter = serving.BatchServing(trained.bundle)
+    adapter = serving.Batcher(trained.bundle)
     writes = []
     real_write = serving.durability.write_atomically
 
@@ -288,7 +288,7 @@ def test_lifecycle_retrains_and_promotes_after_concept_drift(trained, tmp_path):
     outcome = manager.review(
         drifted,
         "y",
-        project_options={
+        configure={
             "time_budget": 300,
             "search": support.NO_TUNING,
             "strategies": support.NO_STRATEGIES,
@@ -299,9 +299,7 @@ def test_lifecycle_retrains_and_promotes_after_concept_drift(trained, tmp_path):
     assert outcome.retrained and outcome.comparison.decision == "promote"
     assert outcome.promoted_version is None
     candidate = store.resolve("churn", registry.CHALLENGER)
-    manager.promote_challenger(
-        approval_for(candidate), signing_key=APPROVAL_KEY
-    )
+    manager.elevate(sanction(candidate), signing_key=APPROVAL_KEY)
     assert store.resolve("churn").version == 2
     assert [v.version for v in store.versions("churn")] == [1, 2]
     assert any("independent approval" in note for note in outcome.notes)
@@ -331,7 +329,7 @@ def test_registering_identical_content_is_idempotent(trained, tmp_path):
     third = store.register("churn", copy, run_id="r3", trusted=True)
     assert again.version == third.version == first.version == 1
     assert len(store.versions("churn")) == 1
-    assert first.content_id == registry.content_id_of(bundle_dir)
+    assert first.content_id == registry.identify(bundle_dir)
     audit = (store.root / "audit.jsonl").read_text().splitlines()
     assert len(audit) == 1  # duplicates leave no extra audit noise
 
@@ -359,7 +357,7 @@ def test_registry_accepts_signed_bundles_and_reauthenticates_on_load(
     store.promote(
         "m",
         record.version,
-        approval=approval_for(record),
+        approval=sanction(record),
         signing_key=APPROVAL_KEY,
     )
     features = make_frame(10, 3).drop(columns="y")
@@ -404,9 +402,9 @@ def test_repeated_checks_of_the_same_drift_retrain_exactly_once(
     runs.clear()
     drifted = make_frame(2400, 5, relabel=True)
 
-    first = manager.review(drifted, "y", project_options=FAST_OPTIONS)
-    second = manager.review(drifted, "y", project_options=FAST_OPTIONS)
-    third = manager.review(drifted, "y", project_options=FAST_OPTIONS)
+    first = manager.review(drifted, "y", configure=FAST_OPTIONS)
+    second = manager.review(drifted, "y", configure=FAST_OPTIONS)
+    third = manager.review(drifted, "y", configure=FAST_OPTIONS)
 
     assert len(runs) == 1
     assert first.promoted_version is None
@@ -429,7 +427,7 @@ def test_a_rejected_challenger_is_recorded_and_not_retried_at_once(
     register_champion(manager, store, trained)
     runs.clear()
     monkeypatch.setattr(
-        champion.ChampionChallenger,
+        champion.Referee,
         "compare",
         lambda self, data, outcomes, metric_name=None: champion.Comparison(
             "roc_auc", len(data), 0.9, 0.9, 0.0, (-0.01, 0.01), 0.5, "keep"
@@ -437,13 +435,13 @@ def test_a_rejected_challenger_is_recorded_and_not_retried_at_once(
     )
 
     first = manager.review(
-        make_frame(1200, 5, relabel=True), "y", project_options=FAST_OPTIONS
+        make_frame(1200, 5, relabel=True), "y", configure=FAST_OPTIONS
     )
     soon = manager.review(
-        make_frame(400, 8, relabel=True), "y", project_options=FAST_OPTIONS
+        make_frame(400, 8, relabel=True), "y", configure=FAST_OPTIONS
     )
     later = manager.review(
-        make_frame(1400, 9, relabel=True), "y", project_options=FAST_OPTIONS
+        make_frame(1400, 9, relabel=True), "y", configure=FAST_OPTIONS
     )
 
     assert first.retrained and first.promoted_version is None
@@ -475,7 +473,7 @@ def test_too_few_labeled_rows_do_not_trigger_training(
     runs.clear()
 
     outcome = manager.review(
-        make_frame(2400, 5, relabel=True), "y", project_options=FAST_OPTIONS
+        make_frame(2400, 5, relabel=True), "y", configure=FAST_OPTIONS
     )
 
     assert outcome.skipped == "too_few_rows" and not runs
@@ -485,7 +483,7 @@ def test_a_bound_rollout_stages_the_challenger_whatever_the_bootstrap_says(
     trained, tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        champion.ChampionChallenger,
+        champion.Referee,
         "compare",
         lambda self, data, outcomes, metric_name=None: champion.Comparison(
             "roc_auc", len(data), 0.9, 0.9, 0.0, (-0.01, 0.01), 0.5, "keep"
@@ -494,10 +492,10 @@ def test_a_bound_rollout_stages_the_challenger_whatever_the_bootstrap_says(
     store = registry.ModelRegistryStore(tmp_path / "registry")
     manager = lifecycle.Maintainer(store, "churn", str(tmp_path / "work"))
     register_champion(manager, store, trained)
-    manager.defer_to_rollout()
+    manager.delegate()
 
     outcome = manager.review(
-        make_frame(1200, 5, relabel=True), "y", project_options=FAST_OPTIONS
+        make_frame(1200, 5, relabel=True), "y", configure=FAST_OPTIONS
     )
 
     assert outcome.retrained and outcome.promoted_version is None

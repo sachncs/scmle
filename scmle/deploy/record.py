@@ -145,7 +145,7 @@ class Record:
             A copy of the record with `signature` set.
         """
         return dataclasses.replace(
-            self, signature=signing.sign_payload(self.unsigned_dict(), key)
+            self, signature=signing.mac(self.unsigned_dict(), key)
         )
 
     def verify(self, key: str | bytes) -> bool:
@@ -160,7 +160,7 @@ class Record:
         """
         if not self.signature:
             return False
-        expected = signing.sign_payload(self.unsigned_dict(), key)
+        expected = signing.mac(self.unsigned_dict(), key)
         return hmac.compare_digest(self.signature, expected)
 
     @classmethod

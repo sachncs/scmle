@@ -41,7 +41,7 @@ class Decision(enum.StrEnum):
     BLOCK = "block"
 
 
-class SetId(enum.StrEnum):
+class Subset(enum.StrEnum):
     """Which data set a check read."""
 
     EXPLORATION = "X"
@@ -133,7 +133,7 @@ def require(cls: type, record: Mapping[str, Any]) -> None:
         raise errors.InputError(f"missing field(s): {missing}")
 
 
-def require_tuple(value: Any, name: str) -> None:
+def tupled(value: Any, name: str) -> None:
     """Requires a tuple so that records compare equal after a round trip.
 
     Args:
@@ -173,7 +173,7 @@ class Check:
     effect: float
     n: int
     decision: Decision
-    set_id: SetId
+    set_id: Subset
     seed_path: SeedPath
     tier: Tier
 
@@ -197,7 +197,7 @@ class Check:
         if self.p_value is not None:
             probability(self.p_value, "p_value")
         if self.interval is not None:
-            require_tuple(self.interval, "interval")
+            tupled(self.interval, "interval")
             if len(self.interval) != INTERVAL_LENGTH:
                 raise errors.InputError("interval must hold (low, high)")
             low = finite(self.interval[0], "interval")
@@ -206,15 +206,15 @@ class Check:
                 raise errors.InputError("interval must satisfy low <= high")
         if self.p_value is None and self.interval is None:
             raise errors.InputError("a check needs a p_value or interval")
-        require_tuple(self.seed_path, "seed_path")
+        tupled(self.seed_path, "seed_path")
         for decision, kind in (
             (self.decision, Decision),
-            (self.set_id, SetId),
+            (self.set_id, Subset),
             (self.tier, Tier),
         ):
             if not isinstance(decision, kind):
                 raise errors.InputError(f"expected a {kind.__name__}")
-        on_confirmation = self.set_id is SetId.CONFIRMATION
+        on_confirmation = self.set_id is Subset.CONFIRMATION
         if self.tier is Tier.CONFIRMED and not on_confirmation:
             raise errors.InputError(
                 "confirmed tier requires the confirmation set 'C'"
@@ -262,7 +262,7 @@ class Check:
             effect=record["effect"],
             n=record["n"],
             decision=Decision(record["decision"]),
-            set_id=SetId(record["set_id"]),
+            set_id=Subset(record["set_id"]),
             seed_path=tuple(record["seed_path"]),
             tier=Tier(record["tier"]),
         )
@@ -302,8 +302,8 @@ class Claim:
         """
         evidence.require_text(self.claim_id, "claim_id")
         evidence.require_text(self.statement, "statement")
-        require_tuple(self.check_ids, "check_ids")
-        require_tuple(self.assumptions, "assumptions")
+        tupled(self.check_ids, "check_ids")
+        tupled(self.assumptions, "assumptions")
         if not self.check_ids:
             raise errors.InputError("check_ids must not be empty")
         for check_id in self.check_ids:
@@ -403,7 +403,7 @@ class Certificate:
             raise errors.InputError(
                 "false_alarms must be between 0 and clean_rows"
             )
-        require_tuple(self.seed_path, "seed_path")
+        tupled(self.seed_path, "seed_path")
 
     @property
     def recall(self) -> float:

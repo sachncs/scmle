@@ -108,10 +108,10 @@ def executor_for(store, workflow, recorder, clock, **options):
 
 
 def approve(executor, record, who="ml-owner", decision="approve"):
-    signed = executor.sign_approval(
+    signed = executor.decide(
         record["run_id"], "approve", who, decision, KEYS[who]
     )
-    executor.submit_approval(signed)
+    executor.ratify(signed)
     return signed
 
 
@@ -135,7 +135,7 @@ def test_the_standard_pipeline_is_valid_and_ordered():
         ("approve", "monitor"),
         ("batch_predict",),
     )
-    assert flow.has_approval_upstream("batch_predict")
+    assert flow.gated("batch_predict")
     assert flow.digest() == definition.standard_workflow().digest()
     assert flow.digest() != definition.standard_workflow(version="2").digest()
 
@@ -234,7 +234,7 @@ def test_a_second_executor_cannot_work_on_a_run_in_flight(store):
         run_id = scmle.workflow.executor.run_id_for(flow, "req-1")
         try:
             second.start("req-1", "alice")
-        except scmle.workflow.executor.RunInFlightError as error:
+        except scmle.workflow.executor.BusyError as error:
             seen.append(str(error))
         return {"run": run_id}
 
@@ -300,7 +300,7 @@ def test_interrupted_steps_retry_with_backoff_and_the_same_key(store):
     def flaky(context):
         keys.append(context.idempotency_key)
         if context.attempt < 3:
-            raise scmle.workflow.executor.StepInterruptedError("preempted")
+            raise scmle.workflow.executor.PreemptedError("preempted")
         return {"ok": True}
 
     recorder.behaviour["train"] = flaky
@@ -322,7 +322,7 @@ def test_retries_are_bounded(store):
     recorder = Recorder(clock)
 
     def always(context):
-        raise scmle.workflow.executor.StepInterruptedError("preempted")
+        raise scmle.workflow.executor.PreemptedError("preempted")
 
     recorder.behaviour["train"] = always
     record = executor_for(store, pipeline(), recorder, clock).start("r", "a")
@@ -350,7 +350,7 @@ def test_a_crashed_executor_is_taken_over_after_its_lease(store):
     )
     successor = executor_for(store, flow, recorder, clock, owner="b")
     recorder.behaviour.pop("train")
-    with pytest.raises(scmle.workflow.executor.RunInFlightError):
+    with pytest.raises(scmle.workflow.executor.BusyError):
         successor.resume(run_id)
     clock.now += 301
     record = successor.resume(run_id)
@@ -404,17 +404,17 @@ def test_a_lease_is_renewed_and_released_only_by_its_holder(store):
     second = executor_for(store, flow, Recorder(clock), clock, owner="second")
     run_id = "run-a"
     lock = f"workflows/{flow.name}/runs/{run_id}/lock"
-    first.take_lease(run_id)
+    first.acquire(run_id)
     assert json.loads(store.get(lock)[0])["fence"] == 1
-    with pytest.raises(scmle.workflow.executor.RunInFlightError):
-        second.take_lease(run_id)
+    with pytest.raises(scmle.workflow.executor.BusyError):
+        second.acquire(run_id)
     second.fences[run_id] = 1
     with pytest.raises(scmle.workflow.executor.EvictionError):
         second.renew_lease(run_id)
-    second.release_lease(run_id)
+    second.relinquish(run_id)
     assert store.exists(lock)
     clock.now += 301
-    second.take_lease(run_id)
+    second.acquire(run_id)
     assert json.loads(store.get(lock)[0]) == {
         "owner": "second",
         "expires": clock.now + 300.0,
@@ -422,9 +422,9 @@ def test_a_lease_is_renewed_and_released_only_by_its_holder(store):
     }
     with pytest.raises(scmle.workflow.executor.EvictionError):
         first.renew_lease(run_id)
-    first.release_lease(run_id)
+    first.relinquish(run_id)
     assert json.loads(store.get(lock)[0])["owner"] == "second"
-    second.release_lease(run_id)
+    second.relinquish(run_id)
     assert not store.exists(lock)
 
 
@@ -444,9 +444,9 @@ def test_of_two_executors_racing_for_an_expired_lease_one_wins(store):
     def race(executor):
         start.wait()
         try:
-            executor.take_lease(run_id)
+            executor.acquire(run_id)
             outcomes.append("won")
-        except scmle.workflow.executor.RunInFlightError:
+        except scmle.workflow.executor.BusyError:
             outcomes.append("lost")
 
     threads = [threading.Thread(target=race, args=(e,)) for e in racers]
@@ -564,39 +564,39 @@ def test_approval_rules_are_enforced(store):
     recorder = Recorder(clock)
     executor = executor_for(store, pipeline(), recorder, clock)
     record = executor.start("req-1", requested_by="ml-owner")
-    good = executor.sign_approval(
+    good = executor.decide(
         record["run_id"], "approve", "second", "approve", KEYS["second"]
     )
     forged = {**good, "signature": "0" * 64}
     with pytest.raises(
         scmle.workflow.executor.ApprovalError, match="signature"
     ):
-        executor.submit_approval(forged)
+        executor.ratify(forged)
     tampered = {**good, "decision": "reject"}
     with pytest.raises(
         scmle.workflow.executor.ApprovalError, match="signature"
     ):
-        executor.submit_approval(tampered)
-    own = executor.sign_approval(
+        executor.ratify(tampered)
+    own = executor.decide(
         record["run_id"], "approve", "ml-owner", "approve", KEYS["ml-owner"]
     )
     with pytest.raises(
         scmle.workflow.executor.ApprovalError, match="requester"
     ):
-        executor.submit_approval(own)
-    stranger = executor.sign_approval(
+        executor.ratify(own)
+    stranger = executor.decide(
         record["run_id"], "approve", "mallory", "approve", "any-key-at-all"
     )
     with pytest.raises(
         scmle.workflow.executor.ApprovalError, match="not listed"
     ):
-        executor.submit_approval(stranger)
+        executor.ratify(stranger)
     wrong_step = {**good, "step": "monitor"}
     with pytest.raises(scmle.workflow.executor.ApprovalError):
-        executor.submit_approval(wrong_step)
-    executor.submit_approval(good)
+        executor.ratify(wrong_step)
+    executor.ratify(good)
     with pytest.raises(scmle.workflow.executor.ApprovalError, match="already"):
-        executor.submit_approval(good)
+        executor.ratify(good)
     assert executor.resume(record["run_id"])["state"] == "succeeded"
 
 
@@ -759,7 +759,7 @@ def test_a_training_step_runs_through_a_runner_and_resumes_inside_it(tmp_path):
     recorder = Recorder(clock)
     flow = pipeline()
     handlers_ = recorder.handlers(flow)
-    handlers_["train"] = handlers.runner_handler(runner, spec_for)
+    handlers_["train"] = handlers.delegate(runner, spec_for)
     executor = scmle.workflow.executor.Executor(
         flow,
         objectstore.LocalObjectStore(tmp_path / "state"),
@@ -792,4 +792,4 @@ def test_a_corrupt_record_names_its_key(store):
     lock = f"workflows/{flow.name}/runs/run-c/lock"
     store.put(lock, b"{torn")
     with pytest.raises(errors.ArtifactError, match="corrupt"):
-        executor.take_lease("run-c")
+        executor.acquire("run-c")

@@ -116,7 +116,7 @@ class Performance:
         labeled_fraction: Outcome coverage.
         metrics: Metrics on labeled rows (empty if too few labels).
         reference_metrics: The same metrics at training time.
-        relative_change: Oriented relative change per metric (negative is
+        rise: Oriented relative change per metric (negative is
             worse).
         status: `insufficient_labels`, `ok` or `degraded`.
     """
@@ -126,7 +126,7 @@ class Performance:
     labeled_fraction: float
     metrics: dict[str, float]
     reference_metrics: dict[str, float]
-    relative_change: dict[str, float]
+    rise: dict[str, float]
     status: str
 
 
@@ -189,7 +189,7 @@ class Advisor(abc.ABC):
         """
 
 
-class PerformanceAdvisor(Advisor):
+class Degradation(Advisor):
     """Retrain when labeled performance degraded beyond tolerance."""
 
     def evaluate(
@@ -210,9 +210,7 @@ class PerformanceAdvisor(Advisor):
             is `degraded`, otherwise None.
         """
         if performance is not None and performance.status == "degraded":
-            worst = min(
-                performance.relative_change.items(), key=lambda kv: kv[1]
-            )
+            worst = min(performance.rise.items(), key=lambda kv: kv[1])
             return (
                 "retrain",
                 (
@@ -298,7 +296,7 @@ class OutputDriftAdvisor(Advisor):
         return None
 
 
-class UnseenCategoryAdvisor(Advisor):
+class Novelty(Advisor):
     """Investigate when many categories were never seen in training."""
 
     def evaluate(
@@ -331,10 +329,10 @@ class UnseenCategoryAdvisor(Advisor):
 
 
 DEFAULT_RULES: tuple[Advisor, ...] = (
-    PerformanceAdvisor(),
+    Degradation(),
     FeatureDriftAdvisor(),
     OutputDriftAdvisor(),
-    UnseenCategoryAdvisor(),
+    Novelty(),
 )
 
 
@@ -368,7 +366,7 @@ def advise(
     return Recommendation(action, [pair[1] for pair in fired])
 
 
-class ModelMonitor:
+class Watcher:
     """Compares production data and outcomes with a bundle's training state.
 
     Attributes:
@@ -396,7 +394,7 @@ class ModelMonitor:
                 "this bundle has no monitoring reference profile"
             )
         self.bundle = bundle
-        self.reference: reference.ReferenceProfile = bundle.reference
+        self.reference: reference.Baseline = bundle.reference
         self.thresholds = thresholds or Thresholds()
 
     def infer(self, frame: pandas.DataFrame) -> pandas.Series:
@@ -422,11 +420,11 @@ class ModelMonitor:
         Returns:
             The drift report, with features ordered by decreasing adjusted PSI.
         """
-        frame = self.bundle.prepare_frame(data)
+        frame = self.bundle.prepare(data)
         features = []
         for name, ref in self.reference.features.items():
             values = frame[name]
-            psi = ref.adjusted_psi(values)
+            psi = ref.adjust(values)
             features.append(
                 FeatureDrift(
                     name,
@@ -440,7 +438,7 @@ class ModelMonitor:
             )
         features.sort(key=lambda f: -f.psi)
         output = self.infer(frame)
-        output_psi = self.reference.output.adjusted_psi(output)
+        output_psi = self.reference.output.adjust(output)
         return Drift(
             len(frame),
             features,
@@ -484,7 +482,7 @@ class ModelMonitor:
         Raises:
             ValueError: If a labelled row has a propensity outside ``(0, 1]``.
         """
-        frame = self.bundle.prepare_frame(data)
+        frame = self.bundle.prepare(data)
         known = outcomes.reset_index(drop=True).notna().to_numpy()
         if maturity is not None:
             known = known & maturity.reset_index(drop=True).to_numpy(bool)

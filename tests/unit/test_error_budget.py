@@ -60,7 +60,7 @@ def test_spending_returns_a_new_budget_and_never_mutates():
 def test_overspending_is_refused_and_leaves_the_budget_intact():
     budget = make_budget()
     with pytest.raises(
-        scmle.data.ledger.budget.BudgetExhaustedError, match="exceeds"
+        scmle.data.ledger.budget.ExhaustedError, match="exceeds"
     ):
         scmle.data.ledger.budget.spend(budget, 0.11)
     assert scmle.data.ledger.budget.remaining(budget) == pytest.approx(0.1)
@@ -99,7 +99,7 @@ def test_exploration_budget_rejects_inconsistent_state():
 
 def test_split_budget_shares_sum_exactly_to_the_totals():
     budget = scmle.data.ledger.budget.spend(make_budget(), 0.03)
-    parts = scmle.data.ledger.budget.split_budget(
+    parts = scmle.data.ledger.budget.apportion(
         budget, {"x": 1, "y": 2, "z": 0.5}
     )
     assert set(parts) == {"x", "y", "z"}
@@ -122,7 +122,7 @@ def test_split_budget_shares_sum_exactly_to_the_totals():
 )
 def test_split_budget_rejects_bad_weights(weights):
     with pytest.raises(ValueError):
-        scmle.data.ledger.budget.split_budget(make_budget(), weights)
+        scmle.data.ledger.budget.apportion(make_budget(), weights)
 
 
 def test_confirmation_alpha_for_each_rule():
@@ -156,13 +156,11 @@ def test_confirmation_alpha_rejects_negative_counts():
 
 
 def test_detector_tolerances_validate_and_round_trip():
-    tolerance = scmle.data.ledger.budget.DetectorTolerance(
-        "label_noise", 0.05, 0.8
-    )
+    tolerance = scmle.data.ledger.budget.Tolerance("label_noise", 0.05, 0.8)
     budget = make_budget(detector_tolerances=(tolerance,))
     assert budget.detector_tolerances == (tolerance,)
     with pytest.raises(ValueError, match="max_false_alarm_rate"):
-        scmle.data.ledger.budget.DetectorTolerance("x", 1.5, 0.8)
+        scmle.data.ledger.budget.Tolerance("x", 1.5, 0.8)
     with pytest.raises(ValueError, match="duplicate"):
         make_budget(detector_tolerances=(tolerance, tolerance))
 
@@ -171,7 +169,7 @@ def test_json_round_trip_is_exact():
     budget = scmle.data.ledger.budget.spend(
         make_budget(
             detector_tolerances=(
-                scmle.data.ledger.budget.DetectorTolerance("d", 0.05, 0.8),
+                scmle.data.ledger.budget.Tolerance("d", 0.05, 0.8),
             ),
             permutations_b=50,
         ),

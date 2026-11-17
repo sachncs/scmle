@@ -55,7 +55,7 @@ FORMAT = 1
 SEPARATOR = "\x1f"
 
 
-def require_match(digest: str, expected: str, document: dict[str, Any]) -> None:
+def matches(digest: str, expected: str, document: dict[str, Any]) -> None:
     """Checks a checkpoint's digest and format.
 
     Args:
@@ -71,19 +71,19 @@ def require_match(digest: str, expected: str, document: dict[str, Any]) -> None:
         raise errors.InputError("digest or format mismatch")
 
 
-class CheckpointCorruptError(errors.DataError):
+class CorruptError(errors.DataError):
     """The checkpoint does not match its digest or format."""
 
     category = "checkpoint_corrupt"
 
 
-class ChangedInputError(errors.DataError):
+class ChangedError(errors.DataError):
     """An already processed input object now has different bytes."""
 
     category = "input_changed"
 
 
-class ConcurrentRunError(errors.ScmleError):
+class LockError(errors.ScmleError):
     """Another run holds the lock."""
 
     category = "concurrent_run"
@@ -132,7 +132,7 @@ class Checkpoint:
         Raises:
             ValueError: Raised internally on a digest or format mismatch and
                 converted to the error below.
-            CheckpointCorruptError: If the bytes are not valid JSON, lack a
+            CorruptError: If the bytes are not valid JSON, lack a
                 field, or have a wrong digest or format.
         """
         try:
@@ -141,12 +141,10 @@ class Checkpoint:
             expected = hashlib.sha256(
                 json.dumps(document, sort_keys=True).encode()
             ).hexdigest()
-            require_match(digest, expected, document)
+            matches(digest, expected, document)
             return cls(dict(document["processed"]), set(document["seen"]))
         except (ValueError, KeyError, TypeError, AttributeError) as error:
-            raise CheckpointCorruptError(
-                f"checkpoint is corrupt: {error}"
-            ) from error
+            raise CorruptError(f"checkpoint is corrupt: {error}") from error
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -265,7 +263,7 @@ class IncrementalProcessor:
     def load_checkpoint(self) -> Checkpoint:
         """Loads the stored checkpoint.
 
-        A damaged checkpoint is not replaced: `CheckpointCorruptError`
+        A damaged checkpoint is not replaced: `CorruptError`
         from `Checkpoint.from_bytes` propagates, as do errors from the
         store.
 
@@ -274,7 +272,7 @@ class IncrementalProcessor:
         """
         try:
             data = self.retrying(lambda: self.store.get(self.state_key))[0]
-        except objectstore.NotFoundError:
+        except objectstore.AbsentError:
             # handled: absent checkpoint returns documented empty checkpoint
             return Checkpoint()
         return Checkpoint.from_bytes(data)
@@ -327,20 +325,20 @@ class IncrementalProcessor:
             the earlier objects recorded.
 
         Raises:
-            ConcurrentRunError: If another run holds the lock.
+            LockError: If another run holds the lock.
 
         The lock is released when the run ends, whatever the outcome. Every
         store call is retried on a transient error except taking the lock:
         retrying a conditional put could turn a timeout whose first try
-        landed into `AlreadyExistsError`, so that call is tried once.
-        `CheckpointCorruptError` propagates if the checkpoint is damaged,
-        and `ChangedInputError` if an input that was already processed now
+        landed into `ExistsError`, so that call is tried once.
+        `CorruptError` propagates if the checkpoint is damaged,
+        and `ChangedError` if an input that was already processed now
         has different bytes; both leave the stored checkpoint as it was.
         """
         try:
             self.store.put(self.lock_key, b"locked", if_absent=True)
-        except objectstore.AlreadyExistsError as error:
-            raise ConcurrentRunError("another run holds the lock") from error
+        except objectstore.ExistsError as error:
+            raise LockError("another run holds the lock") from error
         try:
             return self.sweep(max_objects)
         finally:
@@ -364,7 +362,7 @@ class IncrementalProcessor:
             What happened in this run.
 
         Raises:
-            ChangedInputError: If a processed input now has different bytes.
+            ChangedError: If a processed input now has different bytes.
         """
         self.waits.clear()
         checkpoint = self.load_checkpoint()
@@ -383,7 +381,7 @@ class IncrementalProcessor:
             known = checkpoint.processed.get(meta.key)
             if known is not None:
                 if known != meta.sha256:
-                    raise ChangedInputError(
+                    raise ChangedError(
                         f"{meta.key} changed after it was processed"
                     )
                 skipped.append(meta.key)

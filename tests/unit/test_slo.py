@@ -6,12 +6,12 @@ from scmle.contracts import observability
 from scmle.monitoring import slo
 
 
-def target() -> slo.SLOTarget:
+def target() -> slo.Slo:
     """Build a target with an explicit operational response path."""
-    return slo.SLOTarget(
+    return slo.Slo(
         name="prediction-latency",
         metric_name="p95_latency_ms",
-        kind=observability.SignalKind.LATENCY,
+        kind=observability.Indicator.LATENCY,
         maximum=250.0,
         window_days=7,
         minimum_samples=2,
@@ -21,11 +21,11 @@ def target() -> slo.SLOTarget:
     )
 
 
-def metric(value: float, timestamp: str) -> observability.MetricSample:
+def metric(value: float, timestamp: str) -> observability.Sample:
     """Build a timestamped latency observation."""
-    return observability.MetricSample(
+    return observability.Sample(
         name="p95_latency_ms",
-        kind=observability.SignalKind.LATENCY,
+        kind=observability.Indicator.LATENCY,
         value=value,
         unit="ms",
         timestamp=timestamp,
@@ -43,7 +43,7 @@ def test_slo_passes_and_records_owner_runbook_and_budget():
         observed_at="2026-10-20T12:00:00+00:00",
     )
 
-    assert result.status is slo.SLOStatus.PASS
+    assert result.status is slo.Status.PASS
     assert result.incident_required is False
     assert result.error_budget_remaining == pytest.approx(0.2)
     assert result.to_dict()["owner"] == "ml-on-call"
@@ -60,7 +60,7 @@ def test_slo_breach_preserves_incident_path_and_uses_worst_sample():
         observed_at="2026-10-20T12:00:00+00:00",
     )
 
-    assert result.status is slo.SLOStatus.BREACHED
+    assert result.status is slo.Status.BREACHED
     assert result.incident_required
     assert result.target.runbook.endswith("prediction-latency")
     assert result.observed_maximum == 400.0
@@ -82,19 +82,19 @@ def test_slo_is_not_green_when_data_is_missing_or_future():
         observed_at="2026-10-20T12:00:00+00:00",
     )
 
-    assert missing.status is slo.SLOStatus.INSUFFICIENT_DATA
+    assert missing.status is slo.Status.INSUFFICIENT_DATA
     assert missing.incident_required
-    assert future.status is slo.SLOStatus.INVALID
+    assert future.status is slo.Status.INVALID
     assert future.incident_required
 
 
 def test_slo_rejects_missing_operational_metadata_and_invalid_limits():
     """An SLO without an owner or runbook is not an operating contract."""
     with pytest.raises(ValueError, match="owner"):
-        slo.SLOTarget(
+        slo.Slo(
             name="latency",
             metric_name="p95_latency_ms",
-            kind=observability.SignalKind.LATENCY,
+            kind=observability.Indicator.LATENCY,
             maximum=250.0,
             window_days=7,
             minimum_samples=1,
@@ -103,10 +103,10 @@ def test_slo_rejects_missing_operational_metadata_and_invalid_limits():
             alert_route="on-call",
         )
     with pytest.raises(ValueError, match="maximum"):
-        slo.SLOTarget(
+        slo.Slo(
             name="latency",
             metric_name="p95_latency_ms",
-            kind=observability.SignalKind.LATENCY,
+            kind=observability.Indicator.LATENCY,
             maximum=-1.0,
             window_days=7,
             minimum_samples=1,

@@ -12,10 +12,8 @@ from scmle.data.framing import draft
 from scmle.data.framing import provenance
 from scmle.data.framing import refusal
 
-HUMAN = (costs.CostSource.HUMAN,) * 4
-MODEL = costs.DecisionCostModel(
-    0.0, 5.0, 1.0, 0.0, 0.05, 0.5, HUMAN, costs.CostSource.HUMAN
-)
+HUMAN = (costs.Basis.HUMAN,) * 4
+MODEL = costs.Tariff(0.0, 5.0, 1.0, 0.0, 0.05, 0.5, HUMAN, costs.Basis.HUMAN)
 
 
 def table(n=400, seed=0):
@@ -36,7 +34,7 @@ def table(n=400, seed=0):
 def request(frame, text="Predict churn for each customer.", **kw):
     if "resolved_at" in frame.columns:
         kw.setdefault("target_time_column", "resolved_at")
-    source = draft.SourceDescription(
+    source = draft.Offer(
         "warehouse://crm/accounts",
         tuple(frame.columns),
         primary_key=("customer_id",),
@@ -55,7 +53,7 @@ def test_deterministic_draft_assembles_an_unsigned_charter():
     assert result.charter.unit == "customer_id"
     assert result.charter.cost_model == MODEL
     assert "deployment_population" in result.open_items
-    assert provenance.FieldSource.LLM not in result.fields.values()
+    assert provenance.Filling.LLM not in result.fields.values()
     again = draft.frame(request(frame), frame, cost_model=MODEL)
     assert again.charter.charter_hash == result.charter.charter_hash
 
@@ -92,17 +90,14 @@ def test_data_checks_flag_population_and_duplicates():
         "unit": ["region"],
         "population": "region == 'n'",
     }
-    checks = {
-        c.name: c
-        for c in draft.check_draft(frame, slots, request(frame).source)
-    }
+    checks = {c.name: c for c in draft.vet(frame, slots, request(frame).source)}
     assert checks["unit_unique"].ok is False
     assert checks["population_coverage"].ok is True
-    everything = draft.check_draft(
+    everything = draft.vet(
         frame, {"population": "customer_id >= 0"}, request(frame).source
     )
     assert everything[0].ok is False
-    odd = draft.check_draft(
+    odd = draft.vet(
         frame, {"population": "__import__('os')"}, request(frame).source
     )
     assert odd[0].blocking and not odd[0].ok
@@ -127,7 +122,7 @@ def test_artifacts_are_written(tmp_path):
     result = draft.frame(
         request(frame), frame, cost_model=MODEL, baseline_column="current_rule"
     )
-    names = draft.write_artifacts(result, tmp_path)
+    names = draft.emit(result, tmp_path)
     assert {
         "framing_draft.json",
         "decision_cost_model.json",
@@ -137,18 +132,16 @@ def test_artifacts_are_written(tmp_path):
     stored = json.loads((tmp_path / "framing_draft.json").read_text())
     assert stored["charter_hash"] == result.charter.charter_hash
     refused = draft.frame(request(frame, "Predict `nope`."), frame)
-    assert "framing_refusal.json" in draft.write_artifacts(
-        refused, tmp_path / "r"
-    )
+    assert "framing_refusal.json" in draft.emit(refused, tmp_path / "r")
 
 
 def test_link_report_is_descriptive():
     frame = table()
     result = draft.frame(request(frame), frame)
-    link = draft.link_report(result.charter, list(frame.columns))
+    link = draft.linkage(result.charter, list(frame.columns))
     assert link["fields"]["target"]["status"] == "resolved"
     assert link["gating"] is False
-    other = draft.link_report(result.charter, ["x"])
+    other = draft.linkage(result.charter, ["x"])
     assert other["fields"]["target"]["status"] == "unresolved"
 
 
@@ -164,7 +157,7 @@ SAMPLE = {
 
 
 def replay(samples, model_id="recorded-model"):
-    return refusal.ReplaySampler(model_id, samples)
+    return refusal.Replayer(model_id, samples)
 
 
 def test_llm_path_fills_slots_as_llm_and_replay_is_hash_identical(monkeypatch):
@@ -189,9 +182,9 @@ def test_llm_path_fills_slots_as_llm_and_replay_is_hash_identical(monkeypatch):
         human={"question": "Who leaves?"},
     )
     assert first.status != draft.REFUSED
-    assert first.fields["target"] is provenance.FieldSource.LLM
+    assert first.fields["target"] is provenance.Filling.LLM
     assert first.charter.charter_hash == second.charter.charter_hash
-    assert first.draft_hash == second.draft_hash
+    assert first.sha == second.sha
     assert first.llm["samples_hash"] == second.llm["samples_hash"]
 
 
@@ -213,7 +206,7 @@ def test_llm_proposal_naming_a_missing_column_is_discarded():
     )
     assert result.status != draft.REFUSED
     assert result.discarded
-    assert provenance.FieldSource.LLM not in result.fields.values()
+    assert provenance.Filling.LLM not in result.fields.values()
 
 
 def test_consensus_scores_population_by_jaccard():
@@ -228,7 +221,7 @@ def test_consensus_scores_population_by_jaccard():
 
 def test_refusal_follows_the_calibrated_tau_and_the_cp_bound():
     assert refusal.refuse(0.0, None) and not refusal.refuse(0.0, 0.0)
-    assert refusal.clopper_pearson_upper(0, 59) == pytest.approx(
+    assert refusal.ceiling(0, 59) == pytest.approx(
         1 - 0.05 ** (1 / 59), rel=1e-6
     )
 

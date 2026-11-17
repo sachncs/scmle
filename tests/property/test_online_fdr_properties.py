@@ -34,7 +34,7 @@ RULES = strategies.sampled_from(list(online_fdr.RULE_NAMES))
 
 
 def config(rule, alpha, horizon):
-    return online_fdr.RuleConfig(rule, alpha, horizon=horizon)
+    return online_fdr.Settings(rule, alpha, horizon=horizon)
 
 
 def evidence(values):
@@ -59,7 +59,7 @@ def test_replay_is_deterministic_and_matches_the_dict_round_trip(
     rule, alpha, horizon, values
 ):
     first = config(rule, alpha, horizon)
-    second = online_fdr.RuleConfig.from_dict(first.to_dict())
+    second = online_fdr.Settings.from_dict(first.to_dict())
     assert online_fdr.replay(first, evidence(values)) == online_fdr.replay(
         second, evidence(values)
     )

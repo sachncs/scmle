@@ -396,7 +396,7 @@ def started_modality_service(tmp_path, limits=None):
     service = modality_serving.ModalityHttpServing(predictor, DocumentDecoder())
     if limits:
         service.admission.close()
-        service.admission = guard.AdmissionControl(*limits)
+        service.admission = guard.Admission(*limits)
     service.start()
     return service, predictor
 

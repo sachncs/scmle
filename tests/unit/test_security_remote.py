@@ -85,21 +85,21 @@ def test_discovery_refuses_a_document_for_another_issuer():
 def test_plain_http_and_other_schemes_are_refused_by_default():
     for url in ("http://127.0.0.1:1/x", "file:///etc/passwd", "ftp://x/y"):
         with pytest.raises(errors.ConfigError):
-            remote.fetch_json(url)
+            remote.retrieve(url)
 
 
 def test_a_fetch_failure_or_a_non_json_body_is_a_config_error():
     documents = Documents()
     with serve(documents) as base:
         with pytest.raises(errors.ConfigError):
-            remote.fetch_json(f"{base}/missing", allow_http=True)
+            remote.retrieve(f"{base}/missing", allow_http=True)
         documents.routes["/text"] = "not an object"
-        assert remote.fetch_json(f"{base}/text", allow_http=True) == (
+        assert remote.retrieve(f"{base}/text", allow_http=True) == (
             "not an object"
         )
         documents.broken = True
         with pytest.raises(errors.ConfigError):
-            remote.fetch_json(f"{base}/jwks.json", allow_http=True)
+            remote.retrieve(f"{base}/jwks.json", allow_http=True)
 
 
 def test_a_verifier_accepts_a_token_signed_by_a_fetched_key():

@@ -53,33 +53,33 @@ def test_validation_messages_are_exact():
     with raises(ValueError, "kappa must be strictly between 0 and 1"):
         online_fdr.calibrate(0.5, kappa=1.0)
     with raises(ValueError, "alpha must be within [0, 1]"):
-        online_fdr.ELond(2)
+        online_fdr.Lond(2)
     with raises(ValueError, "kappa must be a finite number"):
-        online_fdr.ELond(ALPHA, kappa=float("nan"))
+        online_fdr.Lond(ALPHA, kappa=float("nan"))
     with raises(ValueError, "kappa must be strictly between 0 and 1"):
-        online_fdr.ELond(ALPHA, kappa=0.0)
+        online_fdr.Lond(ALPHA, kappa=0.0)
     with raises(ValueError, "w0 must be within [0, 1]"):
-        online_fdr.LordPlusPlus(ALPHA, w0=2)
+        online_fdr.Lord(ALPHA, w0=2)
     with raises(ValueError, "w0 must be within [0, alpha]"):
-        online_fdr.LordPlusPlus(ALPHA, w0=Fraction(1, 5))
+        online_fdr.Lord(ALPHA, w0=Fraction(1, 5))
     with raises(ValueError, "lambda must be a finite number"):
         online_fdr.Saffron(ALPHA, lam=float("nan"))
     with raises(ValueError, "lambda must be strictly between 0 and 1"):
         online_fdr.Saffron(ALPHA, lam=1)
     with raises(ValueError, "unexpected or missing rule fields"):
-        online_fdr.RuleConfig.from_dict({"rule": "e-lond"})
+        online_fdr.Settings.from_dict({"rule": "e-lond"})
     with raises(
         ValueError, "rule must be one of ('e-lond', 'lord++', 'saffron')"
     ):
-        online_fdr.RuleConfig("x", ALPHA)
+        online_fdr.Settings("x", ALPHA)
     with raises(ValueError, "lord++ needs a p-value"):
-        online_fdr.LordPlusPlus(ALPHA).step(
+        online_fdr.Lord(ALPHA).step(
             online_fdr.State(), online_fdr.Evidence(e=1.0)
         )
 
 
 def test_config_parse_errors_name_the_field():
-    good = online_fdr.RuleConfig(
+    good = online_fdr.Settings(
         online_fdr.SAFFRON, ALPHA, w0=Fraction(1, 25)
     ).to_dict()
     for field, label in (
@@ -89,21 +89,21 @@ def test_config_parse_errors_name_the_field():
     ):
         bad = {**good, field: "not-a-fraction"}
         with raises(ValueError, f"{label}: invalid fraction 'not-a-fraction'"):
-            online_fdr.RuleConfig.from_dict(bad)
+            online_fdr.Settings.from_dict(bad)
 
 
 def test_alpha_one_is_a_valid_level():
-    rule = online_fdr.ELond(1)
+    rule = online_fdr.Lond(1)
     assert rule.alpha == 1
-    assert online_fdr.LordPlusPlus(1).w0 == Fraction(1, 2)
+    assert online_fdr.Lord(1).w0 == Fraction(1, 2)
 
 
 def test_only_saffron_reports_candidates():
     items = [online_fdr.Evidence(p=0.0)]
-    elond = online_fdr.ELond(ALPHA).step(
+    elond = online_fdr.Lond(ALPHA).step(
         online_fdr.State(), online_fdr.Evidence(p=0.0)
     )
-    lord = online_fdr.LordPlusPlus(ALPHA).step(online_fdr.State(), items[0])
+    lord = online_fdr.Lord(ALPHA).step(online_fdr.State(), items[0])
     assert elond.candidate is False and lord.candidate is False
     assert (
         online_fdr.Saffron(ALPHA).step(online_fdr.State(), items[0]).candidate
@@ -139,17 +139,17 @@ def test_saffron_boundary_and_wealth_by_hand():
 
 
 def test_config_parameters_reach_the_rule():
-    elond = online_fdr.RuleConfig(
+    elond = online_fdr.Settings(
         online_fdr.ELOND, ALPHA, horizon=4, kappa=0.25
     ).build()
     assert elond.kappa == 0.25 and elond.discount.horizon == 4
     assert elond.level(elond.initial()) == ALPHA / 4
-    lord = online_fdr.RuleConfig(
+    lord = online_fdr.Settings(
         online_fdr.LORD_PLUS_PLUS, ALPHA, horizon=4, w0=Fraction(1, 100)
     ).build()
     assert lord.w0 == Fraction(1, 100) and lord.discount.horizon == 4
     assert lord.level(lord.initial()) == Fraction(1, 100) / 4
-    saffron = online_fdr.RuleConfig(
+    saffron = online_fdr.Settings(
         online_fdr.SAFFRON,
         ALPHA,
         horizon=4,
@@ -233,10 +233,7 @@ def test_multiplicity_messages_are_exact():
         multiplicity.adjust(
             [1.5], scmle.data.ledger.budget.Correction.BH, Fraction(1, 20)
         )
-    assert (
-        multiplicity.harmonic_exact(0) == 0
-        and multiplicity.harmonic_exact(1) == 1
-    )
+    assert multiplicity.harmonics(0) == 0 and multiplicity.harmonics(1) == 1
 
 
 # --- controls ---------------------------------------------------------------
@@ -264,18 +261,15 @@ def test_percentile_interval_values(size, confidence, expected):
     # binom.ppf(1 - tail, B, 0.95) + 1, mapped to order statistics (counts
     # equal to their rank, 0-based) and clipped to the range.
     assert (
-        controls.percentile_interval(tuple(range(size)), confidence=confidence)
-        == expected
+        controls.bracket(tuple(range(size)), confidence=confidence) == expected
     )
 
 
 def test_percentile_interval_ignores_the_input_order():
     counts = tuple(range(40))
-    assert controls.percentile_interval(
-        counts[::-1]
-    ) == controls.percentile_interval(counts)
+    assert controls.bracket(counts[::-1]) == controls.bracket(counts)
     with raises(ValueError, "counts must not be empty"):
-        controls.percentile_interval(())
+        controls.bracket(())
     with raises(ValueError, "counts must not be empty"):
         controls.percentile(())
 
@@ -315,7 +309,7 @@ def test_control_messages_are_exact():
     with raises(ValueError, "observed must be non-negative"):
         controls.summarize("x", "strata", -1, (0,) * 20)
     with raises(ValueError, "b must be at least 20"):
-        controls.permuted_target_control(
+        controls.placebo(
             lambda f, t: 0,
             pandas.DataFrame({"a": [1.0, 2.0]}),
             pandas.Series([1.0, 2.0]),
@@ -370,10 +364,10 @@ def test_default_random_streams_are_the_documented_ones():
     def count(frame, shuffled):
         return int(shuffled.iloc[0] % 5)
 
-    default = controls.permuted_target_control(
+    default = controls.placebo(
         count, features, target, observed=3, b=25, seed=4, strata=None
     )
-    named = controls.permuted_target_control(
+    named = controls.placebo(
         count,
         features,
         target,
@@ -383,7 +377,7 @@ def test_default_random_streams_are_the_documented_ones():
         strata=None,
         component="ledger.control.permuted_target",
     )
-    other = controls.permuted_target_control(
+    other = controls.placebo(
         count,
         features,
         target,
@@ -427,7 +421,7 @@ def test_controls_keep_the_index_and_name_of_what_they_shuffle():
         seen.append(1)
         return 0
 
-    controls.permuted_target_control(
+    controls.placebo(
         spy, features, target, observed=0, b=20, seed=1, strata=None
     )
     controls.resampling_control(spy, features, target, observed=0, b=20, seed=1)
@@ -592,15 +586,15 @@ def test_run_statistic_passes_every_argument_through():
 
 
 def test_p_values_are_calibrated_with_the_rules_own_kappa():
-    rule = online_fdr.ELond(ALPHA, kappa=0.25)
+    rule = online_fdr.Lond(ALPHA, kappa=0.25)
     step = rule.step(rule.initial(), online_fdr.Evidence(p=0.01))
     assert step.e_value == online_fdr.calibrate(0.01, 0.25)
     assert step.e_value != online_fdr.calibrate(0.01)
 
 
 def test_harmonic_numbers_are_exact_fractions():
-    assert isinstance(multiplicity.harmonic_exact(0), Fraction)
-    assert multiplicity.harmonic_exact(4) == Fraction(25, 12)
+    assert isinstance(multiplicity.harmonics(0), Fraction)
+    assert multiplicity.harmonics(4) == Fraction(25, 12)
 
 
 def test_percentile_takes_the_requested_quantile():
@@ -614,7 +608,7 @@ def test_percentile_takes_the_requested_quantile():
     [((5,), (5, 5)), ((5, 6), (5, 6)), ((5, 6, 7), (6, 7))],
 )
 def test_percentile_interval_for_tiny_samples(counts, expected):
-    assert controls.percentile_interval(counts) == expected
+    assert controls.bracket(counts) == expected
 
 
 def test_permute_within_follows_the_stable_order_of_members():
@@ -646,7 +640,7 @@ def test_block_labels_use_a_stable_rank_for_ties():
 def test_shuffle_blocks_is_reproducible_from_a_hand_built_oracle():
     features = pandas.DataFrame({"a": numpy.arange(300.0)})
     blocks = numpy.repeat(numpy.arange(30), 10)
-    out = controls.shuffle_blocks(features, blocks, numpy.random.default_rng(5))
+    out = controls.jumble(features, blocks, numpy.random.default_rng(5))
     rng = numpy.random.default_rng(5)
     pieces = [numpy.flatnonzero(blocks == label) for label in range(30)]
     sequence = numpy.concatenate([pieces[i] for i in rng.permutation(30)])
@@ -657,7 +651,7 @@ def test_shuffle_blocks_is_reproducible_from_a_hand_built_oracle():
 
 def test_remaining_control_messages_and_streams_are_exact():
     with raises(ValueError, "strata needs one label per row"):
-        controls.permuted_target_control(
+        controls.placebo(
             lambda f, t: 0,
             pandas.DataFrame({"a": numpy.arange(5.0)}),
             pandas.Series(numpy.arange(5.0)),

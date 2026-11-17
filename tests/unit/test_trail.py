@@ -90,7 +90,7 @@ def test_every_step_names_the_records_it_rests_on(folder):
                 if relative == records.INPUTS
                 else folder / records.RETAINED / relative
             )
-            assert records.sha256_file(path) == held
+            assert records.checksum(path) == held
 
 
 def test_the_joins_hold_across_the_records(folder):
@@ -140,7 +140,7 @@ def test_a_step_removed_and_rechained_is_a_missing_link(folder):
         )
     )
     document["head"] = document["steps"][-1]["hash"]
-    document["builder_signature"] = chain.signature_for(
+    document["builder_signature"] = chain.sign(
         document["head"], document["retained"], KEYS["analyst"]
     )
     records.write_json(path, document)
@@ -227,7 +227,7 @@ def test_self_approval_is_an_unapproved_step(folder):
     record = promotion_row(rows)["approval_record"]
     record["reviewer"] = "sachin"
     record.pop("signature")
-    record["signature"] = signing.sign_payload(record, KEYS["reviewer"])
+    record["signature"] = signing.mac(record, KEYS["reviewer"])
     write_rows(path, rows)
     report = reseal(folder)
     assert trace.UNAPPROVED in kinds(report)
@@ -240,7 +240,7 @@ def test_an_approval_of_another_bundle_is_not_accepted(folder):
     record = promotion_row(rows)["approval_record"]
     record["content_id"] = "0" * 64
     record.pop("signature")
-    record["signature"] = signing.sign_payload(record, KEYS["reviewer"])
+    record["signature"] = signing.mac(record, KEYS["reviewer"])
     write_rows(path, rows)
     assert trace.UNAPPROVED in kinds(reseal(folder))
 
@@ -302,10 +302,10 @@ def test_inputs_structure_problems_are_listed():
     record = copy.deepcopy(
         records.read_json(EVIDENCE / "trail" / records.INPUTS)
     )
-    assert inputs.structure_problems(record) == []
+    assert inputs.lint(record) == []
     record["stakeholder"].pop("expectation")
     record["reviewer"]["thresholds"][0]["op"] = "~"
-    found = inputs.structure_problems(record)
+    found = inputs.lint(record)
     assert any("expectation" in item for item in found)
     assert any("operator" in item for item in found)
 

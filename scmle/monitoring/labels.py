@@ -14,20 +14,20 @@ from memory, not read). With the probability ``pi`` that a case is labelled
 *logged at decision time*, the Horvitz-Thompson mean ``(1/n) sum_i obs_i *
 loss_i / pi_i`` is unbiased for the mean loss over all `n` cases without a
 model of the selection. It needs ``pi_i >= epsilon > 0`` and the logged ``pi``
-to be the true one; `check_randomization` tests the uniformity of an audit
+to be the true one; `randomization` tests the uniformity of an audit
 slice's own draws. Each term is at most ``bound / epsilon``, so a batch mean is
 rescaled by ``epsilon / bound`` into ``[0, 1]`` before it goes into a betting
 monitor (wider intervals are the price).
 
 Without a logged propensity and without an audit slice the selection cannot be
-tested and is not assumed away: the stream is `unverified` and `permits_action`
+tested and is not assumed away: the stream is `unverified` and `actionable`
 is False, so no retrain, promotion or rollback may rest on it. With an audit
 slice only, the estimate uses the audit-labelled cases alone, each with weight
 ``1 / audit_rate``.
 
 Feedback. A model's decisions can change the data that later trains and
 evaluates it. Only a randomized bypass slice (a logged fraction of cases that
-skip the model) can show it: `bypass_test` compares next-period features of
+skip the model) can show it: `circularity` compares next-period features of
 bypass and model-decided cases with a kernel two-sample test. Without a
 bypass slice the loop is undetectable and `FEEDBACK_UNVERIFIED` says so.
 """
@@ -91,7 +91,7 @@ def is_matured(batch: int, now: int, window: int) -> bool:
     return now - batch >= window
 
 
-def permits_action(mechanism: Mechanism) -> bool:
+def actionable(mechanism: Mechanism) -> bool:
     """Reports whether a retrain, promotion or rollback may rest on this stream.
 
     Args:
@@ -104,7 +104,7 @@ def permits_action(mechanism: Mechanism) -> bool:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class BatchEstimate:
+class Estimate:
     """The risk estimate of one matured batch.
 
     Attributes:
@@ -158,7 +158,7 @@ def classify(
     return Mechanism.UNVERIFIED
 
 
-def estimate_batch(
+def weigh(
     loss: numpy.ndarray,
     observed: numpy.ndarray,
     propensity: numpy.ndarray | None,
@@ -166,7 +166,7 @@ def estimate_batch(
     epsilon: float,
     bound: float = 1.0,
     signed: bool = False,
-) -> BatchEstimate:
+) -> Estimate:
     """Estimates the Horvitz-Thompson mean loss of one matured batch.
 
     Args:
@@ -209,10 +209,10 @@ def estimate_batch(
     mechanism = classify(seen, propensity, audit, epsilon)
     cases = int(seen.size)
     if mechanism is Mechanism.UNVERIFIED:
-        return BatchEstimate(mechanism, cases, 0, None, None, bound)
+        return Estimate(mechanism, cases, 0, None, None, bound)
     if mechanism is Mechanism.COMPLETE:
         mean = float(used.mean())
-        return BatchEstimate(
+        return Estimate(
             mechanism, cases, int(seen.sum()), mean, mean / bound, bound
         )
     scale = bound / epsilon
@@ -227,7 +227,7 @@ def estimate_batch(
         total = float(numpy.sum(numpy.where(slice_mask, losses, 0.0))) / epsilon
         counted = int(slice_mask.sum())
     mean = total / cases
-    return BatchEstimate(
+    return Estimate(
         mechanism, cases, counted, mean, min(mean / scale, 1.0), scale
     )
 
@@ -251,7 +251,7 @@ class Uniformity:
     passed: bool
 
 
-def check_randomization(
+def randomization(
     audit: numpy.ndarray, rate: float, alpha: float = 0.001
 ) -> Uniformity:
     """Tests that the audit slice's draws have the declared rate.
@@ -285,7 +285,7 @@ def check_randomization(
     )
 
 
-def bypass_test(
+def circularity(
     bypass_features: pandas.DataFrame,
     model_features: pandas.DataFrame,
     seed: int,
@@ -318,14 +318,12 @@ def bypass_test(
     )
 
 
-def feedback_verdict(
-    bypass_rate: float, check: qualification.Check | None
-) -> str:
+def assessment(bypass_rate: float, check: qualification.Check | None) -> str:
     """Summarizes the feedback-loop evidence.
 
     Args:
         bypass_rate: Share of cases that bypassed the model.
-        check: The result of `bypass_test`, or None.
+        check: The result of `circularity`, or None.
 
     Returns:
         `unverified` without a bypass slice or check, `loop_detected` if the
@@ -338,7 +336,7 @@ def feedback_verdict(
     return "no_loop_detected"
 
 
-def stream_mechanism(batches: Sequence[BatchEstimate]) -> Mechanism:
+def worst(batches: Sequence[Estimate]) -> Mechanism:
     """Finds the weakest mechanism over a window of batches.
 
     Args:

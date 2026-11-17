@@ -128,10 +128,10 @@ def test_write_statements_are_refused_at_construction(query):
 
 
 def test_reads_with_quoted_keywords_are_allowed():
-    connectors.refuse_writes(
+    connectors.readonly(
         "SELECT 'delete' AS a, \"update\" FROM t -- drop\n;", URI
     )
-    connectors.refuse_writes("WITH x AS (SELECT 1) SELECT * FROM x", URI)
+    connectors.readonly("WITH x AS (SELECT 1) SELECT * FROM x", URI)
 
 
 def test_session_is_query_only(tmp_path):
@@ -183,14 +183,14 @@ def test_read_only_statement_runs_before_the_query():
 
 
 def test_warehouse_snapshot_token_change_is_refused():
-    schema = connectors.SourceSchema((connectors.SourceColumn("a", "int"),))
+    schema = connectors.Columns((connectors.Field("a", "int"),))
     token = ["v1"]
 
     def reader(query, offset, limit):
         rows = [(i,) for i in range(offset, min(offset + limit, 6))]
         return schema, rows, offset + limit < 6
 
-    conn = connectors.WarehouseConnector(
+    conn = connectors.Lakehouse(
         "warehouse://x/t",
         "select a from t",
         lambda query: schema,

@@ -35,8 +35,8 @@ def refusal(call):
 
 
 def test_every_lifecycle_event_is_logged_with_its_exact_fields():
-    log = sealed.OpenLog()
-    held = sealed.SealedSet("C", resident(), log)
+    log = sealed.Journal()
+    held = sealed.Locker("C", resident(), log)
     held.commit("claims-1", "ledger-1")
     token = held.issue_token()
     refusal(lambda: held.open("guess", "attacker"))
@@ -65,8 +65,8 @@ def test_every_lifecycle_event_is_logged_with_its_exact_fields():
 
 
 def test_a_denied_open_records_the_reason_of_the_refusal():
-    log = sealed.OpenLog()
-    held = sealed.SealedSet("F", resident(), log)
+    log = sealed.Journal()
+    held = sealed.Locker("F", resident(), log)
     held.commit("c", "l")
     token = held.issue_token()
     refusal(lambda: held.open(token, "x"))
@@ -83,18 +83,18 @@ def test_the_binding_digest_is_the_sha256_of_its_canonical_json():
 
 
 def test_the_mac_is_a_real_hmac_of_the_entry_hash(tmp_path):
-    log = sealed.OpenLog(signing_key="secret")
+    log = sealed.Journal(signing_key="secret")
     entry = log.append("C", "sealed", "o")
     expected = hmac.new(
         b"secret", entry["hash"].encode(), hashlib.sha256
     ).hexdigest()
     assert entry["mac"] == expected
-    assert sealed.entry_mac(entry["hash"], b"secret") == expected
+    assert sealed.authenticate(entry["hash"], b"secret") == expected
 
 
 def test_entries_are_written_sorted_and_the_folder_is_created(tmp_path):
     path = tmp_path / "deep" / "er" / "log.jsonl"
-    log = sealed.OpenLog(path)
+    log = sealed.Journal(path)
     entry = log.append("C", "sealed", "o", {"b": 1, "a": 2})
     line = path.read_text(encoding="utf-8").rstrip("\n")
     assert line == json.dumps(entry, sort_keys=True)
@@ -110,7 +110,7 @@ def forged(path, change):
         body = {k: v for k, v in record.items() if k not in ("hash", "mac")}
         body["seq"], body["prev"] = index, previous
         body.update(change(index))
-        rewritten = {**body, "hash": sealed.entry_hash(body)}
+        rewritten = {**body, "hash": sealed.hashed(body)}
         previous = rewritten["hash"]
         out.append(json.dumps(rewritten))
     path.write_text("\n".join(out) + "\n")
@@ -121,7 +121,7 @@ def test_the_chain_fails_on_either_a_wrong_sequence_or_a_wrong_link(
     tmp_path, field
 ):
     path = tmp_path / "log.jsonl"
-    log = sealed.OpenLog(path)
+    log = sealed.Journal(path)
     log.append("C", "sealed", "o")
     log.append("C", "open", "o")
     lines = [json.loads(x) for x in path.read_text().splitlines()]
@@ -132,27 +132,27 @@ def test_the_chain_fails_on_either_a_wrong_sequence_or_a_wrong_link(
         body["prev"] = previous
         if index == 1:
             body[field] = 7 if field == "seq" else "f" * 64
-        rewritten = {**body, "hash": sealed.entry_hash(body)}
+        rewritten = {**body, "hash": sealed.hashed(body)}
         previous = rewritten["hash"]
         out.append(json.dumps(rewritten))
     path.write_text("\n".join(out) + "\n")
     with pytest.raises(errors.ArtifactError) as caught:
-        sealed.OpenLog(path)
+        sealed.Journal(path)
     assert str(caught.value) == "custody log chain broken at entry 1"
 
 
 def test_the_mac_error_names_the_entry(tmp_path):
     path = tmp_path / "log.jsonl"
-    sealed.OpenLog(path, signing_key="k").append("C", "sealed", "o")
+    sealed.Journal(path, signing_key="k").append("C", "sealed", "o")
     with pytest.raises(errors.ArtifactError) as caught:
-        sealed.OpenLog(path, signing_key="other")
+        sealed.Journal(path, signing_key="other")
     assert str(caught.value) == "custody log MAC invalid at entry 0"
 
 
 def test_the_vault_seals_in_process_only_when_asked_not_to_use_one():
     frame = pandas.DataFrame({"a": [1.0, 2.0, 3.0]})
     target = pandas.Series([0, 1, 0], name="y")
-    protocol = sealed.Vault(sealed.OpenLog(), process=False)
+    protocol = sealed.Vault(sealed.Journal(), process=False)
     held = protocol.seal("C", frame, target, (4, 5, 6))
     assert isinstance(held.locked, splitters.ResidentTestSet)
     assert protocol.level == sealed.PROTOCOL_LEVEL
@@ -162,7 +162,7 @@ def test_the_vault_seals_in_process_only_when_asked_not_to_use_one():
     )
     assert features.equals(frame) and labels.equals(target)
     assert held.ids == (4, 5, 6)
-    process = sealed.Vault(sealed.OpenLog(), process=True)
+    process = sealed.Vault(sealed.Journal(), process=True)
     try:
         real = process.seal("C", frame, target, (4, 5, 6))
         assert isinstance(real.locked, vault.SealedTestSet)
@@ -177,7 +177,7 @@ def test_the_vault_seals_in_process_only_when_asked_not_to_use_one():
 
 
 def test_adopting_a_set_names_it_in_the_log_and_refuses_a_repeat():
-    log = sealed.OpenLog()
+    log = sealed.Journal()
     custody = sealed.Vault(log, process=False)
     custody.adopt("C", resident())
     assert log.entries[0]["set"] == "C"
@@ -187,7 +187,7 @@ def test_adopting_a_set_names_it_in_the_log_and_refuses_a_repeat():
 
 
 def test_a_partial_binding_is_not_enough_for_a_committed_set():
-    held = sealed.SealedSet("C", resident(), sealed.OpenLog())
+    held = sealed.Locker("C", resident(), sealed.Journal())
     held.commit("c", "l")
     token = held.issue_token()
     for claims, ledger in (("c", None), (None, "l")):
@@ -249,5 +249,7 @@ def test_merkle_pairs_are_adjacent_and_an_odd_leaf_is_carried_up():
 
 def test_row_hashes_reject_a_misaligned_row_instead_of_truncating():
     frame = pandas.DataFrame({"a": [1.0, 2.0]})
-    assert len(merkle.row_hashes(frame, [0, 1])) == 2
-    assert merkle.row_hashes(frame, [1])[0] == merkle.row_hash(1, [("a", 2.0)])
+    assert len(merkle.fingerprints(frame, [0, 1])) == 2
+    assert merkle.fingerprints(frame, [1])[0] == merkle.row_hash(
+        1, [("a", 2.0)]
+    )

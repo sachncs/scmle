@@ -22,7 +22,7 @@ NULL_POLICIES = ("impute", "reject")
 UNSEEN_POLICIES = ("report", "reject")
 
 
-class SchemaChangeError(errors.ScmleError):
+class MismatchError(errors.ScmleError):
     """The caller and the service disagree about the model's input schema."""
 
     category = "schema_change"
@@ -35,7 +35,7 @@ class PolicyError(errors.DataError):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ScoreRequest:
+class Inquiry:
     """A parsed prediction request."""
 
     records: list[dict[str, Any]]
@@ -59,7 +59,7 @@ def schema_digest(schema: Mapping[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def parse(payload: object, max_records: int) -> ScoreRequest:
+def parse(payload: object, max_records: int) -> Inquiry:
     """Validates a decoded JSON body against request schema version 1.
 
     Args:
@@ -73,7 +73,7 @@ def parse(payload: object, max_records: int) -> ScoreRequest:
     Raises:
         ValueError: If the body has unknown fields or no records.
         OverflowError: If it holds more than `max_records` records.
-        SchemaChangeError: If it names an unsupported schema version.
+        MismatchError: If it names an unsupported schema version.
         TypeError: If the body is not an object, the records are not a list
             of objects, or the expected digest is not text.
     """
@@ -81,7 +81,7 @@ def parse(payload: object, max_records: int) -> ScoreRequest:
         raise TypeError("the request body must be a JSON object")
     version = payload.get("schema_version", SCHEMA_VERSION)
     if version not in SUPPORTED_VERSIONS:
-        raise SchemaChangeError(
+        raise MismatchError(
             f"unsupported request schema_version {version!r}",
             {"supported": list(SUPPORTED_VERSIONS)},
         )
@@ -102,7 +102,7 @@ def parse(payload: object, max_records: int) -> ScoreRequest:
     expected = payload.get("expected_schema_digest")
     if expected is not None and not isinstance(expected, str):
         raise TypeError("'expected_schema_digest' must be text")
-    return ScoreRequest(records, str(version), expected)
+    return Inquiry(records, str(version), expected)
 
 
 REQUEST_JSON_SCHEMA: dict[str, Any] = {

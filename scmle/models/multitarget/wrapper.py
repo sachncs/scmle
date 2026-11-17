@@ -94,5 +94,5 @@ class MultiLabelEstimator(base.ClassifierMixin, Multitarget):  # type: ignore[mi
         return probabilities
 
 
-class MultiOutputEstimator(base.RegressorMixin, Multitarget):  # type: ignore[misc]  # scikit-learn ships no type information
+class Multioutput(base.RegressorMixin, Multitarget):  # type: ignore[misc]  # scikit-learn ships no type information
     """Multi-output regression flavour."""

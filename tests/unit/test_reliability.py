@@ -20,7 +20,7 @@ from scmle.models import registry
 def test_a_perfectly_confident_correct_model_has_no_error():
     probabilities = numpy.array([[1.0, 0.0], [0.0, 1.0]])
 
-    error, curve = reliability.top_label_curve(probabilities, [0, 1], [0, 1])
+    error, curve = reliability.topclass(probabilities, [0, 1], [0, 1])
 
     assert error == 0.0
     assert curve[0]["accuracy"] == 1.0
@@ -30,7 +30,7 @@ def test_overconfidence_is_measured_as_the_gap_to_accuracy():
     probabilities = numpy.tile([0.9, 0.1], (10, 1))
     labels = [0] * 5 + [1] * 5  # right half the time at 0.9 confidence
 
-    error = reliability.top_label_curve(probabilities, labels, [0, 1])[0]
+    error = reliability.topclass(probabilities, labels, [0, 1])[0]
 
     assert error == pytest.approx(0.4)
 
@@ -67,10 +67,10 @@ def test_calibrating_a_multiclass_bundle_lowers_its_calibration_error():
         [features.a, features.b, -features.a - features.b]
     ) + rng.normal(0, 1.5, (900, 3))
     target = pandas.Series(scores.argmax(axis=1))
-    plan = data.FeaturePlan(("a", "b"), ())
-    pipe = preprocessing.build_pipeline(
+    plan = data.Blueprint(("a", "b"), ())
+    pipe = preprocessing.instantiate(
         plan,
-        registry.Catalog.with_builtins().get("logistic_regression"),
+        registry.Catalog.stock().get("logistic_regression"),
         tasks.Task.MULTICLASS,
         0,
     )
@@ -97,10 +97,10 @@ def overconfident_bundle():
         [features.a, features.b, -features.a - features.b]
     ) + rng.normal(0, 1.5, (900, 3))
     target = pandas.Series(scores.argmax(axis=1))
-    plan = data.FeaturePlan(("a", "b"), ())
-    pipe = preprocessing.build_pipeline(
+    plan = data.Blueprint(("a", "b"), ())
+    pipe = preprocessing.instantiate(
         plan,
-        registry.Catalog.with_builtins().get("logistic_regression"),
+        registry.Catalog.stock().get("logistic_regression"),
         tasks.Task.MULTICLASS,
         0,
     )

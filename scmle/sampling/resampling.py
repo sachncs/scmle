@@ -42,7 +42,7 @@ class Resampler(abc.ABC):
         ...
 
 
-class IndexResampler(Resampler):
+class Indexed(Resampler):
     """Resampler whose output is selected from existing row positions."""
 
     @abc.abstractmethod
@@ -79,7 +79,7 @@ class IndexResampler(Resampler):
         )
 
 
-class RandomOverSampler(IndexResampler):
+class RandomOverSampler(Indexed):
     """Duplicates minority-class rows until every class matches the largest."""
 
     name = "random_oversample"
@@ -110,7 +110,7 @@ class RandomOverSampler(IndexResampler):
         return rng.permutation(numpy.concatenate(chosen))
 
 
-class RandomUnderSampler(IndexResampler):
+class RandomUnderSampler(Indexed):
     """Drops majority-class rows until every class matches the smallest."""
 
     name = "random_undersample"
@@ -139,7 +139,7 @@ class RandomUnderSampler(IndexResampler):
         return rng.permutation(numpy.concatenate(chosen))
 
 
-class JitterOverSampler(RandomOverSampler):
+class Jittered(RandomOverSampler):
     """Experimental: oversamples with Gaussian-jittered copies of minority rows.
 
     Synthetic rows copy a real minority row and add noise (a fraction of the

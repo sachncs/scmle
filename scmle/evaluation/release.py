@@ -21,7 +21,7 @@ from scmle.contracts import evaluation
 from scmle.contracts import evidence
 
 
-class FindingKind(enum.StrEnum):
+class Kind(enum.StrEnum):
     """Category of one release finding."""
 
     DIAGNOSTIC = "diagnostic"
@@ -34,7 +34,7 @@ class FindingKind(enum.StrEnum):
     SECURITY = "security"
 
 
-class ReleaseStatus(enum.StrEnum):
+class Readiness(enum.StrEnum):
     """Machine-readable release readiness status."""
 
     READY = "ready"
@@ -57,7 +57,7 @@ def finite_real(value: Any) -> float | None:
     return numeric if math.isfinite(numeric) else None
 
 
-def normalize_measure(field_name: str, value: Any) -> float | str | None:
+def quantify(field_name: str, value: Any) -> float | str | None:
     """Validates an observed or expected value of a finding.
 
     Args:
@@ -85,7 +85,7 @@ def normalize_measure(field_name: str, value: Any) -> float | str | None:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ReleaseFinding:
+class Finding:
     """One immutable pass or fail finding from release evaluation.
 
     Attributes:
@@ -101,7 +101,7 @@ class ReleaseFinding:
         evidence: Evidence-index references required for this finding.
     """
 
-    kind: FindingKind
+    kind: Kind
     name: str
     passed: bool
     blocking: bool
@@ -116,7 +116,7 @@ class ReleaseFinding:
         Numeric `observed` and `expected` values are converted to floats.
 
         Raises:
-            TypeError: If `kind` is not a `FindingKind`, `passed` or
+            TypeError: If `kind` is not a `Kind`, `passed` or
                 `blocking` is not a bool, `evidence` is not a tuple,
                 `observed` or `expected` is a bool, or is neither a number,
                 text nor None.
@@ -124,8 +124,8 @@ class ReleaseFinding:
                 an evidence item is not a string, is blank or is repeated,
                 or a numeric `observed` or `expected` is not finite.
         """
-        if not isinstance(self.kind, FindingKind):
-            raise errors.KindError("kind must be FindingKind")
+        if not isinstance(self.kind, Kind):
+            raise errors.KindError("kind must be Kind")
         name: object = self.name  # may be a non-string at runtime
         if not isinstance(name, str) or not name.strip():
             raise errors.InputError("name must not be empty")
@@ -149,7 +149,7 @@ class ReleaseFinding:
             object.__setattr__(
                 self,
                 field_name,
-                normalize_measure(field_name, getattr(self, field_name)),
+                quantify(field_name, getattr(self, field_name)),
             )
 
     def to_dict(self) -> dict[str, Any]:
@@ -175,7 +175,7 @@ class ReleaseFinding:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FindingCounts:
+class Tally:
     """Validated aggregate counts for a set of release findings.
 
     Attributes:
@@ -241,7 +241,7 @@ class FindingCounts:
         }
 
 
-def check_count_values(values: Mapping[str, Any]) -> None:
+def tallies(values: Mapping[str, Any]) -> None:
     """Checks that every named count is a non-negative integer.
 
     Args:
@@ -258,30 +258,28 @@ def check_count_values(values: Mapping[str, Any]) -> None:
             raise errors.InputError(f"{name} must be a non-negative integer")
 
 
-def check_kind_coverage(counts_by_kind: Any) -> None:
+def exhaustive(counts_by_kind: Any) -> None:
     """Checks that the counts cover every finding kind and only those.
 
     Args:
         counts_by_kind: The candidate mapping from kind value to counts.
 
     Raises:
-        TypeError: If it is not a mapping of strings to `FindingCounts`.
+        TypeError: If it is not a mapping of strings to `Tally`.
         ValueError: If its keys are not exactly the finding kinds.
     """
     if not isinstance(counts_by_kind, Mapping):
         raise errors.KindError("counts_by_kind must be a mapping")
-    expected_kinds = {kind.value for kind in FindingKind}
+    expected_kinds = {kind.value for kind in Kind}
     if set(counts_by_kind) != expected_kinds:
         raise errors.InputError(
             "counts_by_kind must contain every finding kind"
         )
     if not all(
-        isinstance(kind, str) and isinstance(counts, FindingCounts)
+        isinstance(kind, str) and isinstance(counts, Tally)
         for kind, counts in counts_by_kind.items()
     ):
-        raise errors.KindError(
-            "counts_by_kind must map strings to FindingCounts"
-        )
+        raise errors.KindError("counts_by_kind must map strings to Tally")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -290,7 +288,7 @@ class ReleaseReadinessSummary:
 
     The summary intentionally contains counts rather than duplicating the
     findings. Callers can use it for release dashboards and automation, then
-    retain ``ReleaseEvaluation`` as the detailed evidence-backed record.
+    retain ``Verdict`` as the detailed evidence-backed record.
 
     Attributes:
         task: Task type the policy applies to.
@@ -308,14 +306,14 @@ class ReleaseReadinessSummary:
 
     task: str
     policy_schema_version: int
-    status: ReleaseStatus
+    status: Readiness
     total_findings: int
     passed_findings: int
     failed_findings: int
     blocking_findings: int
     blocking_failures: int
     non_blocking_failures: int
-    counts_by_kind: Mapping[str, FindingCounts]
+    counts_by_kind: Mapping[str, Tally]
 
     def __post_init__(self) -> None:
         """Validates summary counts, status, and kind coverage.
@@ -327,9 +325,9 @@ class ReleaseReadinessSummary:
                 inconsistent with one another, `status` does not match
                 `blocking_failures`, `counts_by_kind` does not cover every
                 finding kind, or its totals differ from the aggregate counts.
-            TypeError: If `status` is not a `ReleaseStatus`, a count is not
+            TypeError: If `status` is not a `Readiness`, a count is not
                 an integer, or `counts_by_kind` is not a mapping of strings
-                to `FindingCounts`.
+                to `Tally`.
         """
         task: object = self.task  # may be a non-string at runtime
         if not isinstance(task, str) or not task.strip():
@@ -343,8 +341,8 @@ class ReleaseReadinessSummary:
             raise errors.InputError(
                 "policy_schema_version must be non-negative"
             )
-        if not isinstance(self.status, ReleaseStatus):
-            raise errors.KindError("status must be ReleaseStatus")
+        if not isinstance(self.status, Readiness):
+            raise errors.KindError("status must be Readiness")
         values = {
             "total_findings": self.total_findings,
             "passed_findings": self.passed_findings,
@@ -353,7 +351,7 @@ class ReleaseReadinessSummary:
             "blocking_failures": self.blocking_failures,
             "non_blocking_failures": self.non_blocking_failures,
         }
-        check_count_values(values)
+        tallies(values)
         if self.total_findings != self.passed_findings + self.failed_findings:
             raise errors.InputError(
                 "total_findings must equal passed plus failed"
@@ -369,19 +367,17 @@ class ReleaseReadinessSummary:
                 "blocking_failures must not exceed blocking_findings"
             )
         expected_status = (
-            ReleaseStatus.BLOCKED
-            if self.blocking_failures
-            else ReleaseStatus.READY
+            Readiness.BLOCKED if self.blocking_failures else Readiness.READY
         )
         if self.status is not expected_status:
             raise errors.InputError("status does not match blocking_failures")
-        check_kind_coverage(self.counts_by_kind)
+        exhaustive(self.counts_by_kind)
         object.__setattr__(
             self,
             "counts_by_kind",
             types.MappingProxyType(dict(self.counts_by_kind)),
         )
-        combined = FindingCounts(
+        combined = Tally(
             total=self.total_findings,
             passed=self.passed_findings,
             failed=self.failed_findings,
@@ -389,7 +385,7 @@ class ReleaseReadinessSummary:
             blocking_failures=self.blocking_failures,
         )
         by_kind = list(self.counts_by_kind.values())
-        if combined != FindingCounts(
+        if combined != Tally(
             total=sum(item.total for item in by_kind),
             passed=sum(item.passed for item in by_kind),
             failed=sum(item.failed for item in by_kind),
@@ -440,7 +436,7 @@ class ReleaseReadinessSummary:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ReleaseEvaluation:
+class Verdict:
     """Immutable outcome of evaluating one policy and its supplied evidence.
 
     Attributes:
@@ -455,7 +451,7 @@ class ReleaseEvaluation:
     task: str
     policy_schema_version: int
     passed: bool
-    findings: tuple[ReleaseFinding, ...]
+    findings: tuple[Finding, ...]
     blocking_reasons: tuple[str, ...]
 
     def __post_init__(self) -> None:
@@ -467,7 +463,7 @@ class ReleaseEvaluation:
                 differs from the reasons of the failed blocking findings,
                 or `passed` disagrees with them.
             TypeError: If `passed` is not a bool, `findings` is not a tuple
-                of `ReleaseFinding`, or `blocking_reasons` is not a tuple.
+                of `Finding`, or `blocking_reasons` is not a tuple.
         """
         task: object = self.task  # may be a non-string at runtime
         if not isinstance(task, str) or not task.strip():
@@ -480,10 +476,8 @@ class ReleaseEvaluation:
             raise errors.KindError("passed must be bool")
         if not isinstance(self.findings, tuple):
             raise errors.KindError("findings must be a tuple")
-        if not all(isinstance(item, ReleaseFinding) for item in self.findings):
-            raise errors.KindError(
-                "findings must contain ReleaseFinding values"
-            )
+        if not all(isinstance(item, Finding) for item in self.findings):
+            raise errors.KindError("findings must contain Finding values")
         if not isinstance(self.blocking_reasons, tuple):
             raise errors.KindError("blocking_reasons must be a tuple")
         expected_reasons = tuple(
@@ -516,7 +510,7 @@ class ReleaseEvaluation:
             "blocked": self.blocked,
             "blocking_reasons": list(self.blocking_reasons),
             "findings": [item.to_dict() for item in self.findings],
-            "readiness": self.readiness_summary().to_dict(),
+            "readiness": self.tally().to_dict(),
         }
 
     def canonical_json(self) -> str:
@@ -534,19 +528,19 @@ class ReleaseEvaluation:
             sort_keys=True,
         )
 
-    def readiness_summary(self) -> ReleaseReadinessSummary:
+    def tally(self) -> ReleaseReadinessSummary:
         """Returns deterministic readiness counts derived from findings.
 
         Returns:
             The summary, with overall counts and counts for every finding
             kind.
         """
-        counts: dict[str, FindingCounts] = {}
-        for kind in FindingKind:
+        counts: dict[str, Tally] = {}
+        for kind in Kind:
             matching = tuple(
                 item for item in self.findings if item.kind is kind
             )
-            counts[kind.value] = FindingCounts(
+            counts[kind.value] = Tally(
                 total=len(matching),
                 passed=sum(item.passed for item in matching),
                 failed=sum(not item.passed for item in matching),
@@ -565,9 +559,7 @@ class ReleaseEvaluation:
             task=self.task,
             policy_schema_version=self.policy_schema_version,
             status=(
-                ReleaseStatus.BLOCKED
-                if blocking_failures
-                else ReleaseStatus.READY
+                Readiness.BLOCKED if blocking_failures else Readiness.READY
             ),
             total_findings=len(self.findings),
             passed_findings=passed,
@@ -579,7 +571,7 @@ class ReleaseEvaluation:
         )
 
 
-def required_evidence_references(
+def citations(
     policy: evaluation.Criteria,
 ) -> tuple[str, ...]:
     """Returns every evidence reference declared by a policy in sorted order.
@@ -606,7 +598,7 @@ def required_evidence_references(
     return tuple(sorted(references))
 
 
-def fairness_metric_values(report: Any, metric: str) -> tuple[float, ...]:
+def disparities(report: Any, metric: str) -> tuple[float, ...]:
     """Finds finite values for one fairness metric in a nested report.
 
     Fairness reports may be keyed by sensitive column, or may be wrapped in a
@@ -651,7 +643,7 @@ def fairness_metric_values(report: Any, metric: str) -> tuple[float, ...]:
     return tuple(sorted(values))
 
 
-def explanation_quality_value(report: Any, field_name: str) -> float | None:
+def grade(report: Any, field_name: str) -> float | None:
     """Returns one finite quality score from an explanation report.
 
     Args:
@@ -677,9 +669,7 @@ def explanation_quality_value(report: Any, field_name: str) -> float | None:
     return score
 
 
-def apply_reliability_gate(
-    outcome: ReleaseEvaluation, reliability_plan: Any
-) -> ReleaseEvaluation:
+def faults(outcome: Verdict, reliability_plan: Any) -> Verdict:
     """Blocks release until the persisted fault plan has verified evidence.
 
     A model may satisfy its statistical success criteria while still being
@@ -697,10 +687,10 @@ def apply_reliability_gate(
         evaluation with an added failed blocking finding.
 
     Raises:
-        TypeError: If `outcome` is not a `ReleaseEvaluation`.
+        TypeError: If `outcome` is not a `Verdict`.
     """
-    if not isinstance(outcome, ReleaseEvaluation):
-        raise errors.KindError("outcome must be ReleaseEvaluation")
+    if not isinstance(outcome, Verdict):
+        raise errors.KindError("outcome must be Verdict")
     passed = (
         isinstance(reliability_plan, Mapping)
         and reliability_plan.get("execution_status") == "passed"
@@ -708,8 +698,8 @@ def apply_reliability_gate(
     )
     if passed:
         return outcome
-    finding = ReleaseFinding(
-        FindingKind.RELIABILITY,
+    finding = Finding(
+        Kind.RELIABILITY,
         "fault_injection",
         passed=False,
         blocking=True,
@@ -733,7 +723,7 @@ def apply_reliability_gate(
     blocking_reasons = tuple(
         item.reason for item in findings if not item.passed and item.blocking
     )
-    return ReleaseEvaluation(
+    return Verdict(
         task=outcome.task,
         policy_schema_version=outcome.policy_schema_version,
         passed=False,
@@ -742,11 +732,11 @@ def apply_reliability_gate(
     )
 
 
-def apply_attestation_gate(
-    outcome: ReleaseEvaluation,
+def certify(
+    outcome: Verdict,
     attestation_record: Any,
     verified: bool,
-) -> ReleaseEvaluation:
+) -> Verdict:
     """Blocks release until packaged evidence has a valid signed attestation.
 
     Args:
@@ -763,10 +753,10 @@ def apply_attestation_gate(
         finding.
 
     Raises:
-        TypeError: If `outcome` is not a `ReleaseEvaluation`.
+        TypeError: If `outcome` is not a `Verdict`.
     """
-    if not isinstance(outcome, ReleaseEvaluation):
-        raise errors.KindError("outcome must be ReleaseEvaluation")
+    if not isinstance(outcome, Verdict):
+        raise errors.KindError("outcome must be Verdict")
     signature = (
         attestation_record.get("signature")
         if isinstance(attestation_record, Mapping)
@@ -781,8 +771,8 @@ def apply_attestation_gate(
     )
     if passed:
         return outcome
-    finding = ReleaseFinding(
-        FindingKind.SECURITY,
+    finding = Finding(
+        Kind.SECURITY,
         "release_attestation",
         passed=False,
         blocking=True,
@@ -806,7 +796,7 @@ def apply_attestation_gate(
     blocking_reasons = tuple(
         item.reason for item in findings if not item.passed and item.blocking
     )
-    return ReleaseEvaluation(
+    return Verdict(
         task=outcome.task,
         policy_schema_version=outcome.policy_schema_version,
         passed=False,
@@ -815,11 +805,11 @@ def apply_attestation_gate(
     )
 
 
-def apply_evidence_index_gate(
-    outcome: ReleaseEvaluation,
+def countersign(
+    outcome: Verdict,
     index: evidence.Index | None,
     verified: bool,
-) -> ReleaseEvaluation:
+) -> Verdict:
     """Blocks release until the persisted evidence index is signed.
 
     Args:
@@ -833,10 +823,10 @@ def apply_evidence_index_gate(
         finding.
 
     Raises:
-        TypeError: If `outcome` is not a `ReleaseEvaluation`.
+        TypeError: If `outcome` is not a `Verdict`.
     """
-    if not isinstance(outcome, ReleaseEvaluation):
-        raise errors.KindError("outcome must be ReleaseEvaluation")
+    if not isinstance(outcome, Verdict):
+        raise errors.KindError("outcome must be Verdict")
     passed = (
         isinstance(index, evidence.Index)
         and index.signature is not None
@@ -844,8 +834,8 @@ def apply_evidence_index_gate(
     )
     if passed:
         return outcome
-    finding = ReleaseFinding(
-        FindingKind.SECURITY,
+    finding = Finding(
+        Kind.SECURITY,
         "release_evidence",
         passed=False,
         blocking=True,
@@ -872,7 +862,7 @@ def apply_evidence_index_gate(
     blocking_reasons = tuple(
         item.reason for item in findings if not item.passed and item.blocking
     )
-    return ReleaseEvaluation(
+    return Verdict(
         task=outcome.task,
         policy_schema_version=outcome.policy_schema_version,
         passed=False,
@@ -881,7 +871,7 @@ def apply_evidence_index_gate(
     )
 
 
-def blocked_input_finding(name: str, reason: str) -> ReleaseFinding:
+def unreadable(name: str, reason: str) -> Finding:
     """Builds the blocking finding for an input the evaluator cannot read.
 
     Args:
@@ -891,8 +881,8 @@ def blocked_input_finding(name: str, reason: str) -> ReleaseFinding:
     Returns:
         A failed, blocking input finding.
     """
-    return ReleaseFinding(
-        FindingKind.INPUT,
+    return Finding(
+        Kind.INPUT,
         name,
         passed=False,
         blocking=True,
@@ -900,11 +890,11 @@ def blocked_input_finding(name: str, reason: str) -> ReleaseFinding:
     )
 
 
-def metric_gate_finding(
-    metric_gate: evaluation.MetricGate,
+def judge(
+    metric_gate: evaluation.Hurdle,
     declared_metrics: set[str],
     metric_values: Mapping[str, Any],
-) -> ReleaseFinding:
+) -> Finding:
     """Applies one metric gate to the supplied metric values.
 
     Args:
@@ -919,8 +909,8 @@ def metric_gate_finding(
     name = metric_gate.metric
     threshold = metric_gate.threshold
     if name not in declared_metrics:
-        return ReleaseFinding(
-            FindingKind.METRIC,
+        return Finding(
+            Kind.METRIC,
             name,
             passed=False,
             blocking=True,
@@ -928,8 +918,8 @@ def metric_gate_finding(
             expected=threshold,
         )
     if name not in metric_values:
-        return ReleaseFinding(
-            FindingKind.METRIC,
+        return Finding(
+            Kind.METRIC,
             name,
             passed=False,
             blocking=True,
@@ -938,8 +928,8 @@ def metric_gate_finding(
         )
     value = metric_values[name]
     if isinstance(value, bool) or not isinstance(value, Real):
-        return ReleaseFinding(
-            FindingKind.METRIC,
+        return Finding(
+            Kind.METRIC,
             name,
             passed=False,
             blocking=True,
@@ -948,8 +938,8 @@ def metric_gate_finding(
         )
     observed = float(value)
     if not math.isfinite(observed):
-        return ReleaseFinding(
-            FindingKind.METRIC,
+        return Finding(
+            Kind.METRIC,
             name,
             passed=False,
             blocking=True,
@@ -958,18 +948,18 @@ def metric_gate_finding(
             expected=threshold,
         )
     direction: object = metric_gate.direction  # may be a raw value at runtime
-    if direction is evaluation.MetricDirection.MAXIMIZE:
+    if direction is evaluation.Orientation.MAXIMIZE:
         passed = observed >= threshold
         operator = ">="
-    elif direction is evaluation.MetricDirection.MINIMIZE:
+    elif direction is evaluation.Orientation.MINIMIZE:
         passed = observed <= threshold
         operator = "<="
     else:
         passed = False
         operator = "?"
     result = "passed" if passed else "failed"
-    return ReleaseFinding(
-        FindingKind.METRIC,
+    return Finding(
+        Kind.METRIC,
         name,
         passed,
         blocking=True,
@@ -980,7 +970,7 @@ def metric_gate_finding(
     )
 
 
-def diagnostic_verdict(report: Mapping[str, Any]) -> Any:
+def ruling(report: Mapping[str, Any]) -> Any:
     """Reads the pass verdict a diagnostic report carries.
 
     Args:
@@ -1010,10 +1000,10 @@ def diagnostic_verdict(report: Mapping[str, Any]) -> Any:
     return verdict
 
 
-def diagnostic_gate_finding(
-    diagnostic_gate: evaluation.DiagnosticGate,
+def adjudge(
+    diagnostic_gate: evaluation.Requirement,
     diagnostic_reports: Mapping[str, Any],
-) -> ReleaseFinding:
+) -> Finding:
     """Applies one diagnostic gate to the supplied diagnostic reports.
 
     Args:
@@ -1027,10 +1017,10 @@ def diagnostic_gate_finding(
     """
     name = diagnostic_gate.name
     report = diagnostic_reports.get(name)
-    blocking = diagnostic_gate.action is evaluation.DiagnosticAction.BLOCK
+    blocking = diagnostic_gate.action is evaluation.Remedy.BLOCK
     if report is None:
-        return ReleaseFinding(
-            FindingKind.DIAGNOSTIC,
+        return Finding(
+            Kind.DIAGNOSTIC,
             name,
             passed=False,
             blocking=blocking,
@@ -1039,8 +1029,8 @@ def diagnostic_gate_finding(
             evidence=diagnostic_gate.required_evidence,
         )
     if not isinstance(report, Mapping) or not report:
-        return ReleaseFinding(
-            FindingKind.DIAGNOSTIC,
+        return Finding(
+            Kind.DIAGNOSTIC,
             name,
             passed=False,
             blocking=True,
@@ -1057,10 +1047,10 @@ def diagnostic_gate_finding(
         failed = True
         reason = f"diagnostic '{name}' is unavailable"
     else:
-        verdict = diagnostic_verdict(report)
+        verdict = ruling(report)
         if verdict is not None and not isinstance(verdict, bool):
-            return ReleaseFinding(
-                FindingKind.DIAGNOSTIC,
+            return Finding(
+                Kind.DIAGNOSTIC,
                 name,
                 passed=False,
                 blocking=True,
@@ -1075,8 +1065,8 @@ def diagnostic_gate_finding(
             failed = True
             reason = f"diagnostic '{name}' reported no verdict"
 
-    return ReleaseFinding(
-        FindingKind.DIAGNOSTIC,
+    return Finding(
+        Kind.DIAGNOSTIC,
         name,
         not failed,
         blocking,
@@ -1088,7 +1078,7 @@ def diagnostic_gate_finding(
 
 def explanation_findings(
     policy: evaluation.Criteria, diagnostic_reports: Mapping[str, Any]
-) -> list[ReleaseFinding]:
+) -> list[Finding]:
     """Applies the required explanation quality thresholds.
 
     Args:
@@ -1115,7 +1105,7 @@ def explanation_findings(
             "fidelity",
         ),
     )
-    findings: list[ReleaseFinding] = []
+    findings: list[Finding] = []
     for method in policy.explanations.required_methods:
         report = diagnostic_reports.get(method)
         for field_name, required, threshold, label in quality_requirements:
@@ -1126,11 +1116,11 @@ def explanation_findings(
                 raise errors.InputError(
                     f"explanation '{method}' has no {label} threshold"
                 )
-            score = explanation_quality_value(report, field_name)
+            score = grade(report, field_name)
             if score is None:
                 findings.append(
-                    ReleaseFinding(
-                        FindingKind.EXPLANATION,
+                    Finding(
+                        Kind.EXPLANATION,
                         name,
                         passed=False,
                         blocking=True,
@@ -1144,8 +1134,8 @@ def explanation_findings(
             passed = score >= threshold
             result = "passed" if passed else "failed"
             findings.append(
-                ReleaseFinding(
-                    FindingKind.EXPLANATION,
+                Finding(
+                    Kind.EXPLANATION,
                     name,
                     passed,
                     blocking=True,
@@ -1158,9 +1148,9 @@ def explanation_findings(
     return findings
 
 
-def fairness_gate_finding(
-    fairness_gate: evaluation.FairnessGate, fairness_reports: Mapping[str, Any]
-) -> ReleaseFinding:
+def audit(
+    fairness_gate: evaluation.Equity, fairness_reports: Mapping[str, Any]
+) -> Finding:
     """Applies one fairness gate to the supplied fairness reports.
 
     Args:
@@ -1181,13 +1171,11 @@ def fairness_gate_finding(
             fairness_reports[name] for name in sorted(fairness_reports, key=str)
         )
     values = tuple(
-        value
-        for report in reports
-        for value in fairness_metric_values(report, metric)
+        value for report in reports for value in disparities(report, metric)
     )
     if not values:
-        return ReleaseFinding(
-            FindingKind.FAIRNESS,
+        return Finding(
+            Kind.FAIRNESS,
             metric,
             passed=False,
             blocking=True,
@@ -1209,8 +1197,8 @@ def fairness_gate_finding(
         expected = fairness_gate.minimum
         operator = ">="
     else:
-        return ReleaseFinding(
-            FindingKind.FAIRNESS,
+        return Finding(
+            Kind.FAIRNESS,
             metric,
             passed=False,
             blocking=True,
@@ -1218,8 +1206,8 @@ def fairness_gate_finding(
             evidence=fairness_gate.required_evidence,
         )
     result = "passed" if passed else "failed"
-    return ReleaseFinding(
-        FindingKind.FAIRNESS,
+    return Finding(
+        Kind.FAIRNESS,
         metric,
         passed,
         blocking=True,
@@ -1233,9 +1221,9 @@ def fairness_gate_finding(
     )
 
 
-def evidence_reference_finding(
+def referenced(
     reference: str, evidence_index: evidence.Index | None
-) -> ReleaseFinding:
+) -> Finding:
     """Checks one evidence reference the policy requires.
 
     Args:
@@ -1268,8 +1256,8 @@ def evidence_reference_finding(
             f"{record.result.value}:{record.decision.value}"
         )
         observed_value = f"{record.result.value}:{record.decision.value}"
-    return ReleaseFinding(
-        FindingKind.EVIDENCE,
+    return Finding(
+        Kind.EVIDENCE,
         reference,
         record is not None
         and record.result is evidence.Outcome.PASS
@@ -1282,13 +1270,13 @@ def evidence_reference_finding(
     )
 
 
-def evaluate_release(
+def assess(
     policy: evaluation.Criteria,
     metric_values: Mapping[str, Any],
     diagnostic_reports: Mapping[str, Any],
     fairness_reports: Mapping[str, Any],
     evidence_index: evidence.Index | None,
-) -> ReleaseEvaluation:
+) -> Verdict:
     """Evaluates supplied release outputs against a declared policy.
 
     Args:
@@ -1313,10 +1301,8 @@ def evaluate_release(
     """
     supplied_policy: object = policy  # callers may pass any object
     if not isinstance(supplied_policy, evaluation.Criteria):
-        finding = blocked_input_finding(
-            "policy", "unsupported evaluation policy"
-        )
-        return ReleaseEvaluation(
+        finding = unreadable("policy", "unsupported evaluation policy")
+        return Verdict(
             "unknown",
             0,
             passed=False,
@@ -1324,13 +1310,13 @@ def evaluate_release(
             blocking_reasons=(finding.reason,),
         )
 
-    findings: list[ReleaseFinding] = []
+    findings: list[Finding] = []
 
     supplied_metrics: object = metric_values  # callers may pass any object
     if not isinstance(supplied_metrics, Mapping):
         metric_values = {}
         findings.append(
-            blocked_input_finding(
+            unreadable(
                 "metric_values",
                 "metric values are unsupported; expected a mapping",
             )
@@ -1339,7 +1325,7 @@ def evaluate_release(
     if not isinstance(supplied_diagnostics, Mapping):
         diagnostic_reports = {}
         findings.append(
-            blocked_input_finding(
+            unreadable(
                 "diagnostic_reports",
                 "diagnostic reports are unsupported; expected a mapping",
             )
@@ -1348,7 +1334,7 @@ def evaluate_release(
     if not isinstance(supplied_fairness, Mapping):
         fairness_reports = {}
         findings.append(
-            blocked_input_finding(
+            unreadable(
                 "fairness_reports",
                 "fairness reports are unsupported; expected a mapping",
             )
@@ -1356,7 +1342,7 @@ def evaluate_release(
 
     declared_metrics = {metric.name for metric in policy.metrics}
     findings.extend(
-        blocked_input_finding(
+        unreadable(
             str(name),
             f"metric '{name}' is not declared by the evaluation policy",
         )
@@ -1364,28 +1350,27 @@ def evaluate_release(
         if name not in declared_metrics
     )
     findings.extend(
-        metric_gate_finding(metric_gate, declared_metrics, metric_values)
+        judge(metric_gate, declared_metrics, metric_values)
         for metric_gate in policy.release.metric_gates
     )
     findings.extend(
-        diagnostic_gate_finding(diagnostic_gate, diagnostic_reports)
+        adjudge(diagnostic_gate, diagnostic_reports)
         for diagnostic_gate in policy.release.diagnostic_gates
     )
     findings.extend(explanation_findings(policy, diagnostic_reports))
     findings.extend(
-        fairness_gate_finding(fairness_gate, fairness_reports)
+        audit(fairness_gate, fairness_reports)
         for fairness_gate in policy.release.fairness_gates
     )
 
-    references = required_evidence_references(policy)
+    references = citations(policy)
     findings.extend(
-        evidence_reference_finding(reference, evidence_index)
-        for reference in references
+        referenced(reference, evidence_index) for reference in references
     )
     if references and not isinstance(evidence_index, evidence.Index):
         findings.append(
-            ReleaseFinding(
-                FindingKind.INPUT,
+            Finding(
+                Kind.INPUT,
                 "evidence_index",
                 passed=False,
                 blocking=True,
@@ -1401,7 +1386,7 @@ def evaluate_release(
         for item in immutable_findings
         if not item.passed and item.blocking
     )
-    return ReleaseEvaluation(
+    return Verdict(
         task=policy.task.value,
         policy_schema_version=policy.schema_version,
         passed=not blocking_reasons,

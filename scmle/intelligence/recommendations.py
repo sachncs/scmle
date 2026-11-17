@@ -46,7 +46,7 @@ class Advisor(abc.ABC):
 
     @abc.abstractmethod
     def advise(
-        self, profile: data.DatasetProfile, spec: tasks.Config
+        self, profile: data.Portrait, spec: tasks.Config
     ) -> list[Recommendation]:
         """Returns the recommendations that apply, possibly none.
 
@@ -63,7 +63,7 @@ class Imbalance(Advisor):
     """Suggests decision and metric choices for rare positive classes."""
 
     def advise(
-        self, profile: data.DatasetProfile, spec: tasks.Config
+        self, profile: data.Portrait, spec: tasks.Config
     ) -> list[Recommendation]:
         """Advises on a severely imbalanced binary target.
 
@@ -106,7 +106,7 @@ class Missingness(Advisor):
 
     def advise(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         spec: tasks.Config,  # noqa: ARG002 -- Advisor.advise interface
     ) -> list[Recommendation]:
         """Advises on heavy missingness.
@@ -143,7 +143,7 @@ class Leakage(Advisor):
     """Points at leakage hypotheses raised by the profile."""
 
     def advise(
-        self, profile: data.DatasetProfile, spec: tasks.Config
+        self, profile: data.Portrait, spec: tasks.Config
     ) -> list[Recommendation]:
         """Advises when leakage hypotheses exist and are not blocking.
 
@@ -184,7 +184,7 @@ class Duplication(Advisor):
     """Flags heavily duplicated rows."""
 
     def advise(
-        self, profile: data.DatasetProfile, spec: tasks.Config
+        self, profile: data.Portrait, spec: tasks.Config
     ) -> list[Recommendation]:
         """Advises when many rows are exact duplicates.
 
@@ -220,7 +220,7 @@ class Scarcity(Advisor):
 
     def advise(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         spec: tasks.Config,  # noqa: ARG002 -- Advisor.advise interface
     ) -> list[Recommendation]:
         """Advises on small development sets.
@@ -263,7 +263,7 @@ def default_rules() -> tuple[Advisor, ...]:
 
 
 def recommend(
-    profile: data.DatasetProfile,
+    profile: data.Portrait,
     spec: tasks.Config,
     rules: tuple[Advisor, ...] | None = None,
 ) -> tuple[Recommendation, ...]:

@@ -35,7 +35,7 @@ BLOCK_FORMATS = (
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class VerifiedCharter:
+class Verified:
     """A charter read back from disk after its checks.
 
     Attributes:
@@ -64,21 +64,19 @@ def envelope(
         signature algorithm and the signature (None when no key is
         available).
     """
-    key = signing.resolve_key(signing_key)
+    key = signing.keying(signing_key)
     return {
         "format": charter.format_version,
         "charter": charter.to_dict(),
         "charter_hash": charter.charter_hash,
         "algorithm": signing.SIGNATURE_ALGORITHM,
         SIGNATURE_FIELD: (
-            None
-            if key is None
-            else signing.sign_payload(charter.to_dict(), key)
+            None if key is None else signing.mac(charter.to_dict(), key)
         ),
     }
 
 
-def write_charter(
+def inscribe(
     path: str | Path,
     charter: contracts.AnalysisCharter,
     signing_key: str | bytes | None = None,
@@ -181,7 +179,7 @@ def read_verified(
     path: str | Path,
     signing_key: str | bytes | None = None,
     require_signature: bool = False,
-) -> VerifiedCharter:
+) -> Verified:
     """Reads a charter and verifies its hash and signature.
 
     Args:
@@ -191,7 +189,7 @@ def read_verified(
 
     A file that cannot be read, is not a JSON object, is not a valid
     charter, or fails `check_format` raises `ConfigError` (from
-    `contracts.load_json`, `contracts.charter_from_record` and
+    `contracts.load_json`, `contracts.parse` and
     `check_format`). A bare charter has no wrapper and so no hash or
     signature to check.
 
@@ -209,36 +207,36 @@ def read_verified(
     """
     record = contracts.load_json(path)
     if "charter" not in record:
-        charter = contracts.charter_from_record(record)
+        charter = contracts.parse(record)
         if require_signature:
             raise errors.ArtifactError(f"charter {path} is unsigned")
-        return VerifiedCharter(charter, charter.charter_hash, signed=False)
+        return Verified(charter, charter.charter_hash, signed=False)
     if record.get("algorithm") != signing.SIGNATURE_ALGORITHM:
         raise errors.ArtifactError(f"charter {path}: unknown algorithm")
     check_format(path, record)
-    charter = contracts.charter_from_record(record["charter"])
+    charter = contracts.parse(record["charter"])
     if record.get("charter_hash") != charter.charter_hash:
         raise errors.ArtifactError(
             f"charter hash mismatch in {path}: the file was edited"
         )
     signature = record.get(SIGNATURE_FIELD)
-    key = signing.resolve_key(signing_key)
+    key = signing.keying(signing_key)
     if signature is None:
         if require_signature:
             raise errors.ArtifactError(f"charter {path} is unsigned")
-        return VerifiedCharter(charter, charter.charter_hash, signed=False)
+        return Verified(charter, charter.charter_hash, signed=False)
     if key is None:
         if require_signature:
             raise errors.ArtifactError(
                 f"charter {path} is signed but no signing key is configured"
             )
-        return VerifiedCharter(charter, charter.charter_hash, signed=False)
-    expected = signing.sign_payload(charter.to_dict(), key)
+        return Verified(charter, charter.charter_hash, signed=False)
+    expected = signing.mac(charter.to_dict(), key)
     if not hmac.compare_digest(str(signature), expected):
         raise errors.ArtifactError(
             f"charter signature does not verify for {path}"
         )
-    return VerifiedCharter(charter, charter.charter_hash, signed=True)
+    return Verified(charter, charter.charter_hash, signed=True)
 
 
 def tighter(old: Any, new: Any) -> bool:
@@ -254,7 +252,7 @@ def tighter(old: Any, new: Any) -> bool:
     return bool(new <= old)
 
 
-def check_amendment(
+def permit(
     old: contracts.AnalysisCharter, new: contracts.AnalysisCharter
 ) -> None:
     """Allows an amendment only if it tightens the budget.

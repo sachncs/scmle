@@ -190,7 +190,7 @@ def test_a_finished_run_id_is_idempotent_and_a_different_spec_is_refused(
     again = runner.run(spec_for())
     assert log == [(1, 0)] and again.state == first.state
     assert again.attempts == first.attempts
-    with pytest.raises(base.RunConflictError):
+    with pytest.raises(base.ConflictError):
         runner.run(spec_for(project={"data": "data/other.csv", "target": "y"}))
 
 
@@ -308,12 +308,12 @@ def test_the_entrypoint_checks_the_spec_digest_and_the_store_scheme(tmp_path):
         support_runners.run_container(store, {"SCMLE_RUN_ID": "nope"}, work)
         == 1
     )
-    assert entrypoint.open_store(tmp_path.as_uri()).scheme == "file"
+    assert entrypoint.mount(tmp_path.as_uri()).scheme == "file"
     with pytest.raises(errors.ConfigError):
-        entrypoint.open_store("ftp://host/x")
+        entrypoint.mount("ftp://host/x")
     with pytest.raises(errors.ConfigError):
-        entrypoint.load_workload("no_colon")
-    assert callable(entrypoint.load_workload("tests.support_runners:current"))
+        entrypoint.resolve("no_colon")
+    assert callable(entrypoint.resolve("tests.support_runners:current"))
 
 
 def test_reproducibility_is_reported_against_declared_tolerances():

@@ -19,7 +19,7 @@ def training_frame(rows=1500, seed=0):
 
 def test_rows_far_from_the_training_data_are_flagged_and_typical_rows_are_not():
     train = training_frame()
-    detector = novelty.NoveltyDetector.fit(train, ("a", "b"), ("c",))
+    detector = novelty.Strangeness.fit(train, ("a", "b"), ("c",))
     typical = training_frame(rows=500, seed=1)
     strange = pandas.DataFrame(
         {
@@ -39,18 +39,18 @@ def test_rows_far_from_the_training_data_are_flagged_and_typical_rows_are_not():
 
 
 def test_unseen_categories_do_not_break_scoring():
-    detector = novelty.NoveltyDetector.fit(training_frame(), ("a", "b"), ("c",))
+    detector = novelty.Strangeness.fit(training_frame(), ("a", "b"), ("c",))
     odd = pandas.DataFrame({"a": [0.0], "b": [0.0], "c": ["never seen"]})
 
     assert len(detector.score(odd)) == 1
 
 
 def test_there_is_nothing_to_learn_without_numeric_or_categorical_columns():
-    assert novelty.NoveltyDetector.fit(training_frame(), (), ()) is None
+    assert novelty.Strangeness.fit(training_frame(), (), ()) is None
 
 
 def test_a_single_wild_value_is_flagged_and_the_feature_is_named():
-    detector = novelty.NoveltyDetector.fit(training_frame(), ("a", "b"), ("c",))
+    detector = novelty.Strangeness.fit(training_frame(), ("a", "b"), ("c",))
     row = pandas.DataFrame({"a": [0.1], "b": [500.0], "c": ["x"]})
 
     scored = detector.score(row)

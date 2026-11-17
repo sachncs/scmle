@@ -13,8 +13,8 @@ from scmle.evaluation import metrics
 from scmle.evaluation import slices
 from scmle.models import registry
 
-REGISTRY = registry.Catalog.with_builtins()
-PLAN = scmle.contracts.data.FeaturePlan(("signal",), ("region",))
+REGISTRY = registry.Catalog.stock()
+PLAN = scmle.contracts.data.Blueprint(("signal",), ("region",))
 
 
 def make_inputs(rows=1200):
@@ -31,7 +31,7 @@ def make_inputs(rows=1200):
     noisy = rng.integers(0, 2, rows)
     target = pandas.Series(numpy.where(frame.region == "south", noisy, clean))
     half = rows // 2
-    model = preprocessing.build_pipeline(
+    model = preprocessing.instantiate(
         PLAN, REGISTRY.get("logistic_regression"), tasks.Task.BINARY, 0
     ).fit(frame.iloc[:half], target.iloc[:half])
     metric = metrics.CATALOG.resolve(None, tasks.Task.BINARY)

@@ -9,7 +9,7 @@ import pandas
 MAX_BACKGROUND = 50
 
 
-class OcclusionExplainer:
+class Occlusion:
     """Attributes a prediction to features by occluding them.
 
     A feature is occluded by replacing it with background values.

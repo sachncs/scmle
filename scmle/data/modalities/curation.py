@@ -33,23 +33,23 @@ class Curation:
     dataset_hash: str
     sample_count: int
     profile: Mapping[str, Any]
-    quality_findings: tuple[data.CurationFinding, ...] = ()
-    risk_findings: tuple[data.CurationFinding, ...] = ()
+    quality_findings: tuple[data.Finding, ...] = ()
+    risk_findings: tuple[data.Finding, ...] = ()
     schema_version: int = 1
 
     @property
     def unresolved_blocking_findings(
         self,
-    ) -> tuple[data.CurationFinding, ...]:
+    ) -> tuple[data.Finding, ...]:
         """The blocking findings without a safe review disposition.
 
         A disposition is safe when it is resolved, waived or a false
         positive. Quality findings come before risk findings.
         """
         safe_dispositions = {
-            data.FindingDisposition.RESOLVED,
-            data.FindingDisposition.WAIVED,
-            data.FindingDisposition.FALSE_POSITIVE,
+            data.Disposition.RESOLVED,
+            data.Disposition.WAIVED,
+            data.Disposition.FALSE_POSITIVE,
         }
         return tuple(
             finding
@@ -90,7 +90,7 @@ class Curation:
         }
 
 
-def check_card_text(
+def proofread(
     modality: str,
     dataset_hash: str,
     sample_count: int,
@@ -123,7 +123,7 @@ def check_card_text(
         raise errors.InputError("limitations must contain non-empty values")
 
 
-def normalized_curation(curation: Mapping[str, Any]) -> dict[str, Any]:
+def roundtrip(curation: Mapping[str, Any]) -> dict[str, Any]:
     """Round-trips a curation report through strict JSON.
 
     Args:
@@ -170,7 +170,7 @@ def govern(name: str, values: Mapping[str, str]) -> None:
 
 
 def check_manifest(
-    manifest: data.ModalityManifest,
+    manifest: data.Passport,
     dataset_hash: str,
     sample_count: int,
     modality: str,
@@ -184,12 +184,12 @@ def check_manifest(
         modality: The card's modality.
 
     Raises:
-        TypeError: If `manifest` is not a ModalityManifest.
+        TypeError: If `manifest` is not a Passport.
         ValueError: If the manifest disagrees with the card on content hash,
             sample count or modality.
     """
-    if not isinstance(manifest, data.ModalityManifest):
-        raise errors.KindError("manifest must be ModalityManifest")
+    if not isinstance(manifest, data.Passport):
+        raise errors.KindError("manifest must be Passport")
     if manifest.content_hash != dataset_hash:
         raise errors.InputError("manifest does not match dataset_hash")
     if manifest.sample_count != sample_count:
@@ -198,9 +198,7 @@ def check_manifest(
         raise errors.InputError("manifest does not match modality")
 
 
-def check_split_fractions(
-    validation_fraction: float, test_fraction: float
-) -> None:
+def proportions(validation_fraction: float, test_fraction: float) -> None:
     """Checks the fractions of a group split.
 
     Args:
@@ -221,7 +219,7 @@ def check_split_fractions(
         )
 
 
-def partition_group_ids(
+def allocate(
     group_ids: Iterable[str],
     validation_fraction: float,
     test_fraction: float,
@@ -298,7 +296,7 @@ class DatasetCard:
     limitations: tuple[str, ...]
     provenance: Mapping[str, str]
     privacy: Mapping[str, str]
-    manifest: data.ModalityManifest | None = None
+    manifest: data.Passport | None = None
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -312,16 +310,16 @@ class DatasetCard:
                 dataset_hash or sample_count, provenance or privacy is empty
                 or holds a blank key or value, or the manifest disagrees
                 with the card on dataset_hash, sample_count or modality.
-            TypeError: If manifest is not a ModalityManifest.
+            TypeError: If manifest is not a Passport.
         """
-        check_card_text(
+        proofread(
             self.modality,
             self.dataset_hash,
             self.sample_count,
             self.intended_use,
             self.limitations,
         )
-        object.__setattr__(self, "curation", normalized_curation(self.curation))
+        object.__setattr__(self, "curation", roundtrip(self.curation))
         if self.curation.get("dataset_hash") != self.dataset_hash:
             raise errors.InputError(
                 "curation report does not match dataset_hash"
@@ -346,7 +344,7 @@ class DatasetCard:
         modality: str,
         report: Mapping[str, Any],
         limitations: Iterable[str],
-        manifest: data.ModalityManifest | None = None,
+        manifest: data.Passport | None = None,
         task: str = "classification",
     ) -> Self:
         """Builds a card without inventing missing governance decisions.
@@ -384,7 +382,7 @@ class DatasetCard:
         if not isinstance(sample_count_value, int):
             raise errors.InputError("curation report must contain sample_count")
         if manifest is None:
-            manifest = data.ModalityManifest(
+            manifest = data.Passport(
                 dataset_id=f"{modality}-{dataset_hash_value[:16]}",
                 snapshot_id=dataset_hash_value,
                 modality=modality,
@@ -392,7 +390,7 @@ class DatasetCard:
                 sample_count=sample_count_value,
                 content_hash=dataset_hash_value,
                 findings=tuple(
-                    data.CurationFinding.from_dict(finding)
+                    data.Finding.from_dict(finding)
                     for finding in (
                         *report.get("quality_findings", ()),
                         *report.get("risk_findings", ()),
@@ -541,14 +539,14 @@ def conflicting_label_groups(
     )
 
 
-def build_finding(
+def flaw(
     finding_id: str,
     severity: data.FindingSeverity,
     scope: Mapping[str, Any],
     evidence: Mapping[str, Any],
     remediation: str,
     blocking: bool,
-) -> data.CurationFinding:
+) -> data.Finding:
     """Builds one modality curation finding with a shared rule version.
 
     The finding has confidence 1.0, owner `data-curation`, no reviewer and
@@ -565,7 +563,7 @@ def build_finding(
     Returns:
         The new finding.
     """
-    return data.CurationFinding(
+    return data.Finding(
         finding_id=finding_id,
         rule_version="multimodal-curation.v1",
         severity=severity,
@@ -575,7 +573,7 @@ def build_finding(
         remediation=remediation,
         owner="data-curation",
         reviewer=None,
-        disposition=data.FindingDisposition.OPEN,
+        disposition=data.Disposition.OPEN,
         blocking=blocking,
     )
 
@@ -583,8 +581,8 @@ def build_finding(
 __all__ = [
     "Curation",
     "DatasetCard",
-    "build_finding",
     "conflicting_label_groups",
     "dataset_hash",
+    "flaw",
     "label_counts",
 ]

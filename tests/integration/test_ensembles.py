@@ -42,7 +42,7 @@ def test_stack_is_evaluated_against_its_members(binary_frame, tmp_path):
 
 
 def test_stack_is_cross_fitted_inside_each_training_fold(binary_frame):
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     adapter = registry.get("stacking")
     params = {
         "members": [
@@ -87,7 +87,7 @@ def test_a_winning_stack_is_selected_refit_and_packaged(
 
 
 def test_stacking_is_never_a_screening_candidate(binary_frame):
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     names = {a.name for a in registry.candidates(tasks.Task.BINARY)[0]}
     assert "stacking" not in names
     rejected = registry.candidates(tasks.Task.BINARY)[1]
@@ -95,7 +95,7 @@ def test_stacking_is_never_a_screening_candidate(binary_frame):
 
 
 def test_stacking_needs_two_members():
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     with pytest.raises(errors.ConfigError, match="at least two"):
         registry.get("stacking").build(
             tasks.Task.BINARY, 0, {"members": [{"model": "ridge"}]}

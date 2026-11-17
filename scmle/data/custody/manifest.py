@@ -41,10 +41,10 @@ def ids(value: Any, name: str) -> tuple[int, ...]:
 
     Raises:
         ValueError: If a member is not an integer (a bool does not count).
-            `qualification.require_tuple` raises first when `value` is not
+            `qualification.tupled` raises first when `value` is not
             a tuple.
     """
-    qualification.require_tuple(value, name)
+    qualification.tupled(value, name)
     if not all(isinstance(i, int) and not isinstance(i, bool) for i in value):
         raise errors.InputError(f"{name} must hold integers")
     members: tuple[int, ...] = value
@@ -97,7 +97,7 @@ class Manifest:
             ValueError: If `scope` is not a known scope, or a set repeats a
                 row, or two sets share a row. The field checks of
                 `evidence.require_text`, `qualification.count`,
-                `qualification.require_tuple` and `ids` raise on a malformed
+                `qualification.tupled` and `ids` raise on a malformed
                 field.
         """
         evidence.require_text(self.strategy, "strategy")
@@ -120,10 +120,10 @@ class Manifest:
             if seen & set(members):
                 raise errors.InputError(f"{name} overlap another set")
             seen |= set(members)
-        qualification.require_tuple(self.folds, "folds")
-        qualification.require_tuple(self.isolation, "isolation")
-        qualification.require_tuple(self.notes, "notes")
-        qualification.require_tuple(self.row_roots, "row_roots")
+        qualification.tupled(self.folds, "folds")
+        qualification.tupled(self.isolation, "isolation")
+        qualification.tupled(self.notes, "notes")
+        qualification.tupled(self.row_roots, "row_roots")
 
     def body(self) -> dict[str, Any]:
         """Builds the hashed content: everything except the hash itself.
@@ -167,7 +167,7 @@ class Manifest:
         """
         return {**self.body(), HASH_FIELD: self.sha256}
 
-    def set_ids(self) -> dict[str, tuple[int, ...]]:
+    def rowids(self) -> dict[str, tuple[int, ...]]:
         """Lists the row ids of each set that carries a content root.
 
         Returns:
@@ -192,9 +192,9 @@ class Manifest:
         """
         if not self.row_roots:
             raise errors.ArtifactError("manifest holds no row content roots")
-        ids_of = self.set_ids()
+        ids_of = self.rowids()
         for name, root in self.row_roots:
-            if merkle.frame_root(frame, ids_of[name]) != root:
+            if merkle.merkleize(frame, ids_of[name]) != root:
                 raise errors.ArtifactError(
                     f"rows of {name} differ from the manifest: a value changed"
                 )
@@ -255,7 +255,7 @@ class Manifest:
         return manifest
 
 
-def load_manifest(
+def restore(
     record: Mapping[str, Any],
 ) -> Manifest | splitters.Manifest:
     """Reads a manifest of either version and verifies it.

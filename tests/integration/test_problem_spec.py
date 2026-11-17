@@ -39,7 +39,7 @@ def run(tmp_path, criteria):
 def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
     result = run(tmp_path, {"roc_auc": 0.8})
 
-    assert result.meets_criteria
+    assert result.accomplished
     assert result.evaluation["success_criteria"][0]["met"]
     assert not result.evaluation["release_evaluation"]["passed"]
     assert any(
@@ -94,7 +94,7 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
 def test_missed_criteria_are_named_with_the_gap(tmp_path):
     result = run(tmp_path, {"roc_auc": 0.9999, "log_loss": 0.0001})
 
-    assert not result.meets_criteria
+    assert not result.accomplished
     assert not result.evaluation["release_evaluation"]["passed"]
     assert result.evaluation["release_evaluation"]["blocked"]
     text = result.summary()
@@ -104,7 +104,7 @@ def test_missed_criteria_are_named_with_the_gap(tmp_path):
 def test_no_criteria_means_nothing_to_miss(tmp_path):
     result = run(tmp_path, {})
 
-    assert result.meets_criteria and result.evaluation["success_criteria"] == []
+    assert result.accomplished and result.evaluation["success_criteria"] == []
     assert result.evaluation["release_evaluation"]["status"] == (
         "policy_not_declared"
     )
@@ -122,7 +122,7 @@ def test_packaged_release_attestation_is_signed_when_key_is_configured(
     monkeypatch.setenv("SCMLE_SIGNING_KEY", "release-key")
 
     result = run(tmp_path, {"roc_auc": 0.8})
-    record = attestation.ReleaseAttestation.from_dict(
+    record = attestation.Attestation.from_dict(
         result.evaluation["release_attestation"]
     )
 

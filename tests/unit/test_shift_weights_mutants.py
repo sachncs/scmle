@@ -36,7 +36,7 @@ def test_the_defaults_are_the_documented_ones():
     assert shift_weights.DEFAULT_CLIP == 20.0
     assert parameters["clip"].default == 20.0
     assert parameters["minimum"].default == 50.0
-    bare = shift_weights.ShiftWeights(numpy.ones(1), numpy.ones(1), 1.0, 2.0)
+    bare = shift_weights.Ratios(numpy.ones(1), numpy.ones(1), 1.0, 2.0)
     assert bare.discriminator is None
     assert bare.scale == 1.0
 
@@ -96,7 +96,7 @@ def test_the_minimum_is_inclusive_and_the_refusal_says_both_sizes():
     size = shift_weights.weigh(calibration, target, minimum=0.0).effective_size
     kept = shift_weights.weigh(calibration, target, minimum=size)
     assert kept.effective_size == size
-    with pytest.raises(shift_weights.WeightRefusedError) as raised:
+    with pytest.raises(shift_weights.RefusedError) as raised:
         shift_weights.weigh(calibration, target, minimum=size + 1)
     assert str(raised.value) == (
         f"effective sample size {size:.1f} is below {size + 1:.0f}; "
@@ -106,7 +106,7 @@ def test_the_minimum_is_inclusive_and_the_refusal_says_both_sizes():
 
 def test_the_default_minimum_refuses_a_handful_of_effective_rows():
     calibration, target = sample(seed=4, rows=(30, 30), shift=0.0)
-    with pytest.raises(shift_weights.WeightRefusedError, match="below 50;"):
+    with pytest.raises(shift_weights.RefusedError, match="below 50;"):
         shift_weights.weigh(calibration, target)
 
 
@@ -120,7 +120,7 @@ def test_the_effective_size_of_known_weights():
 
 def test_ratio_is_the_clipped_scaled_odds_of_the_second_column():
     stub = Discriminator([0.5, 0.9, 1.0])
-    weights = shift_weights.ShiftWeights(
+    weights = shift_weights.Ratios(
         numpy.ones(2), numpy.ones(2), 2.0, 3.0, stub, 2.0
     )
     features = [[1, 2], [3, 4], [5, 6]]
@@ -132,7 +132,7 @@ def test_ratio_is_the_clipped_scaled_odds_of_the_second_column():
 
 def test_ratio_uses_the_small_floor_not_one_for_certain_rows():
     stub = Discriminator([1.0])
-    weights = shift_weights.ShiftWeights(
+    weights = shift_weights.Ratios(
         numpy.ones(1), numpy.ones(1), 1.0, 1e15, stub, 1.0
     )
     assert weights.ratio(numpy.zeros((1, 1)))[0] == pytest.approx(1e12)
@@ -140,7 +140,7 @@ def test_ratio_uses_the_small_floor_not_one_for_certain_rows():
 
 def test_the_stored_weights_read_the_named_columns_in_order():
     stub = Discriminator([0.5, 0.5])
-    weights = shift_weights.ShiftWeights(
+    weights = shift_weights.Ratios(
         numpy.ones(1), numpy.ones(1), 1.0, 5.0, stub, 1.0
     )
     stored = shift_weights.StoredShiftWeights(weights, ("b", "a"))

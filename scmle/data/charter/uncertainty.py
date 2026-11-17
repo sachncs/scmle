@@ -54,7 +54,7 @@ class Uncertainty:
         """
         if not isinstance(self.coverage_on_confirmation, bool):
             raise errors.InputError("coverage_on_confirmation must be a bool")
-        qualification.require_tuple(self.slice_columns, "slice_columns")
+        qualification.tupled(self.slice_columns, "slice_columns")
         columns: Iterable[object] = self.slice_columns
         if len(set(self.slice_columns)) != len(self.slice_columns) or any(
             not isinstance(c, str) or not c.strip() for c in columns

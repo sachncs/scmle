@@ -24,7 +24,7 @@ log's one-time open of a sealed set stay in force underneath; the guard only
 adds the deployment ledger's attestation in front of them.
 
 Reach. `Loop`'s wrappers, a `ModelRegistryStore` with an attached guard (so
-`Maintainer.promote_challenger`, `check_rollback` and
+`Maintainer.elevate`, `check_rollback` and
 `register_run(promote=True)` too) and nothing else. The custody API
 (`scmle.data.custody`) is not routed through the guard: its own one-time open
 of a sealed set stays the only check there, and `Loop.reopen_sealed` is the
@@ -48,7 +48,7 @@ import scmle.data.ledger.ledger
 from scmle.governance import deployment_ledger
 
 
-class NeverAction(enum.StrEnum):
+class Forbidden(enum.StrEnum):
     """The eleven actions that need an attestation, in a fixed order."""
 
     MOVE_CHAMPION = "move_champion_or_roll_back"
@@ -64,17 +64,17 @@ class NeverAction(enum.StrEnum):
     SELF_ATTEST = "create_or_sign_attestation"
 
 
-ITEM_NUMBER = {action: number for number, action in enumerate(NeverAction, 1)}
+ITEM_NUMBER = {action: number for number, action in enumerate(Forbidden, 1)}
 ALLOWING = (
-    deployment_ledger.ReplyDecision.APPROVE,
-    deployment_ledger.ReplyDecision.OVERRIDE,
+    deployment_ledger.Reply.APPROVE,
+    deployment_ledger.Reply.OVERRIDE,
 )
 
 
 class AttestationRequired(errors.ArtifactError):
     """An action on the never list was requested without an attestation."""
 
-    def __init__(self, action: NeverAction, escalation_id: str) -> None:
+    def __init__(self, action: Forbidden, escalation_id: str) -> None:
         """Records the action and the escalation that now waits.
 
         Args:
@@ -89,8 +89,8 @@ class AttestationRequired(errors.ArtifactError):
         self.escalation_id = escalation_id
 
 
-def question_for(
-    action: NeverAction, detail: Mapping[str, Any], scope: str
+def interrogate(
+    action: Forbidden, detail: Mapping[str, Any], scope: str
 ) -> dict[str, Any]:
     """Builds the question an attestation must answer for this exact action.
 
@@ -133,13 +133,13 @@ class Guard:
         self.verification_keys = dict(verification_keys or {})
         self.on_write: Callable[[], None] | None = None
 
-    def valid_attestation(
+    def vouch(
         self, question: Mapping[str, Any]
     ) -> deployment_ledger.Attestation | None:
         """Finds the first valid attestation for `question`.
 
         Args:
-            question: The question, as built by `question_for`.
+            question: The question, as built by `interrogate`.
 
         Returns:
             The first unused attestation, in ledger order, to an escalation
@@ -183,11 +183,11 @@ class Guard:
             return key is not None and reply.verify(key)
         return True
 
-    def pending_for(self, question: Mapping[str, Any]) -> str | None:
+    def outstanding(self, question: Mapping[str, Any]) -> str | None:
         """Finds a pending escalation with this exact question.
 
         Args:
-            question: The question, as built by `question_for`.
+            question: The question, as built by `interrogate`.
 
         Returns:
             The identifier of the oldest pending escalation with this
@@ -201,7 +201,7 @@ class Guard:
 
     def require(
         self,
-        action: NeverAction,
+        action: Forbidden,
         detail: Mapping[str, Any],
         scope: str,
         proposed_default: str = "action_not_performed",
@@ -227,8 +227,8 @@ class Guard:
                 `escalation` row has been written (once per pending
                 question).
         """
-        question = question_for(action, detail, scope)
-        reply = self.valid_attestation(question)
+        question = interrogate(action, detail, scope)
+        reply = self.vouch(question)
         if reply is not None:
             if self.single_use:
                 self.ledger.commit(
@@ -241,7 +241,7 @@ class Guard:
                 if self.on_write is not None:
                     self.on_write()
             return reply
-        pending = self.pending_for(question)
+        pending = self.outstanding(question)
         if pending is None:
             pending = f"esc-{len(self.ledger.rows)}"
             self.ledger.commit(
@@ -262,7 +262,7 @@ class Guard:
 
     def perform(
         self,
-        action: NeverAction,
+        action: Forbidden,
         detail: Mapping[str, Any],
         scope: str,
         do: Callable[[], Any],

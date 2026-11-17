@@ -4,7 +4,7 @@ The leakage screen (`screen.py`) cannot tell a strong legitimate predictor
 from a leak without provenance: both have a large, significant effect. In a
 charter run a certified suspect is therefore quarantined, and the only way to
 keep it is evidence a person is willing to put their name to. That evidence is
-a `LeakageAttestation`: the column, who states what, the evidence a third
+a `Affidavit`: the column, who states what, the evidence a third
 party could check, the dates it is valid, the charter it covers and how long
 before the prediction moment the value is known. It is the same record as an
 as-of attestation in `provenance.py`, so the admissibility rules treat the
@@ -66,7 +66,7 @@ OWN_FIELDS = ("column", "lead_seconds")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class LeakageAttestation:
+class Affidavit:
     """A named person's statement that one column is a legitimate predictor.
 
     Attributes:
@@ -104,11 +104,11 @@ class LeakageAttestation:
             name=self.column,
             origin=provenance.Origin.DERIVED,
             writer=WRITER,
-            written_at=provenance.WrittenAt.UNKNOWN,
+            written_at=provenance.Stamp.UNKNOWN,
             overwritten=provenance.Overwritten.UNKNOWN,
             definition_history=(),
-            as_of=provenance.AsOf(provenance.AsOfKind.LAG, self.lead_seconds),
-            as_of_source=provenance.AsOfSource.ATTESTED,
+            as_of=provenance.Lead(provenance.Cutoff.LAG, self.lead_seconds),
+            as_of_source=provenance.Provenance.ATTESTED,
             available_at_serving=provenance.Availability.YES,
             attestation=self.attestation,
         )
@@ -163,11 +163,11 @@ class Applied:
         rejected: Column -> why its attestation does not count.
     """
 
-    valid: Mapping[str, LeakageAttestation]
+    valid: Mapping[str, Affidavit]
     rejected: Mapping[str, str]
 
 
-def load(path: str | Path) -> tuple[LeakageAttestation, ...]:
+def load(path: str | Path) -> tuple[Affidavit, ...]:
     """Reads an attestation file.
 
     Args:
@@ -198,7 +198,7 @@ def load(path: str | Path) -> tuple[LeakageAttestation, ...]:
         raise errors.InputError(
             "attestations must hold a list under 'attestations'"
         )
-    found = tuple(LeakageAttestation.from_dict(r) for r in records)
+    found = tuple(Affidavit.from_dict(r) for r in records)
     names = [a.column for a in found]
     if len(set(names)) != len(names):
         raise errors.InputError("at most one attestation per column")
@@ -206,7 +206,7 @@ def load(path: str | Path) -> tuple[LeakageAttestation, ...]:
 
 
 def apply(
-    attestations: Sequence[LeakageAttestation],
+    attestations: Sequence[Affidavit],
     scope: str,
     today: str,
 ) -> Applied:
@@ -224,7 +224,7 @@ def apply(
         an ISO date is rejected with a `ValueError`.
     """
     day = provenance.parse_date(today, "today")
-    valid: dict[str, LeakageAttestation] = {}
+    valid: dict[str, Affidavit] = {}
     rejected: dict[str, str] = {}
     for item in attestations:
         given = item.attestation
@@ -232,7 +232,7 @@ def apply(
             rejected[item.column] = (
                 f"scope {given.scope!r} is not this charter ({scope!r})"
             )
-        elif not given.valid_on(day):
+        elif not given.effective(day):
             rejected[item.column] = (
                 f"valid {given.date} to {given.expires}, not on {today}"
             )

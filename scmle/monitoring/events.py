@@ -30,7 +30,7 @@ import scmle.monitoring.observability
 
 
 @dataclasses.dataclass(frozen=True)
-class PredictionEvent:
+class Served:
     """One served prediction.
 
     Attributes:
@@ -51,7 +51,7 @@ class PredictionEvent:
 
 
 @dataclasses.dataclass(frozen=True)
-class OutcomeEvent:
+class Outcome:
     """The true outcome for an earlier prediction.
 
     Attributes:
@@ -65,7 +65,7 @@ class OutcomeEvent:
     actual: Any
 
 
-def inference_timestamp(line: str) -> datetime.datetime:
+def moment(line: str) -> datetime.datetime:
     """Reads the timestamp of one observability sidecar line.
 
     Args:
@@ -133,12 +133,12 @@ class PredictionLog:
         line = json.dumps({"type": kind, **record}, default=str)
         durability.append_text(self.path, line + "\n")
 
-    def log_predictions(
+    def chronicle(
         self,
         bundle: scmle.artifacts.bundle.Bundle,
         data: pandas.DataFrame,
         event_ids: list[str] | None = None,
-    ) -> list[PredictionEvent]:
+    ) -> list[Served]:
         """Predicts with a bundle and logs every row.
 
         When an observability policy is set, a redacted inference event is
@@ -166,7 +166,7 @@ class PredictionLog:
             )
         )
         try:
-            frame = bundle.prepare_frame(data)
+            frame = bundle.prepare(data)
             predictions = bundle.predict(data)
             probabilities: list[float | None] = (
                 [float(p) for p in bundle.predict_proba(data)[:, 1]]
@@ -208,15 +208,15 @@ class PredictionLog:
             )
         logged = []
         for row, event_id in enumerate(ids):
-            event = PredictionEvent(
+            event = Served(
                 event_id=event_id,
                 model_version=bundle.info.model_version,
-                timestamp=events.utc_timestamp(),
+                timestamp=events.stamp(),
                 features={
                     str(k): (None if pandas.isna(v) else v)
                     for k, v in frame.iloc[row].to_dict().items()
                 },
-                prediction=to_plain(predictions[row]),
+                prediction=unwrap(predictions[row]),
                 probability=probabilities[row],
             )
             self.append("prediction", dataclasses.asdict(event))
@@ -248,13 +248,13 @@ class PredictionLog:
         model_fingerprint = bundle.info.files.get(
             scmle.artifacts.bundle.MODEL_FILE, bundle.info.model_version
         )
-        event = observability.InferenceEvent(
+        event = observability.Inference(
             request_id=request_id,
             run_id=self.run_id or bundle.info.model_version,
             model_fingerprint=model_fingerprint,
             outcome=outcome,
             latency_ms=(time.perf_counter() - started) * 1000.0,
-            timestamp=events.utc_timestamp(),
+            timestamp=events.stamp(),
             input_fingerprint=input_fingerprint,
             error_category=error_category,
             redacted_fields=self.observability_policy.redacted_fields,
@@ -269,9 +269,7 @@ class PredictionLog:
             + "\n",
         )
 
-    def enforce_retention(
-        self, observed_at: str | None = None
-    ) -> dict[str, Any]:
+    def purge(self, observed_at: str | None = None) -> dict[str, Any]:
         """Atomically remove redacted events older than the policy window.
 
         The raw prediction log is intentionally untouched. Retention applies
@@ -288,7 +286,7 @@ class PredictionLog:
             The evaluation time, the cutoff and the number of events retained
             and removed.
         """
-        with durability.path_lock(self.observability_path):
+        with durability.latch(self.observability_path):
             return self.prune(observed_at)
 
     def prune(self, observed_at: str | None) -> dict[str, Any]:
@@ -310,7 +308,7 @@ class PredictionLog:
             raise errors.InputError(
                 "retention enforcement requires an observability policy"
             )
-        observed_text = observed_at or events.utc_timestamp()
+        observed_text = observed_at or events.stamp()
         observed_timestamp = scmle.monitoring.observability.parse_timestamp(
             observed_text, "observed_at"
         )
@@ -336,7 +334,7 @@ class PredictionLog:
             ) as handle:
                 with path.open(encoding="utf-8") as source:
                     for line in source:
-                        timestamp = inference_timestamp(line)
+                        timestamp = moment(line)
                         if timestamp < cutoff:
                             removed += 1
                             continue
@@ -356,7 +354,7 @@ class PredictionLog:
             "removed": removed,
         }
 
-    def record_outcomes(self, outcomes: dict[str, Any]) -> list[OutcomeEvent]:
+    def record_outcomes(self, outcomes: dict[str, Any]) -> list[Outcome]:
         """Logs outcomes that became known.
 
         Args:
@@ -367,9 +365,7 @@ class PredictionLog:
         """
         logged = []
         for event_id, actual in outcomes.items():
-            event = OutcomeEvent(
-                event_id, events.utc_timestamp(), to_plain(actual)
-            )
+            event = Outcome(event_id, events.stamp(), unwrap(actual))
             self.append("outcome", dataclasses.asdict(event))
             logged.append(event)
         return logged
@@ -403,7 +399,7 @@ class PredictionLog:
         return features, predicted, actual
 
 
-def to_plain(value: Any) -> Any:
+def unwrap(value: Any) -> Any:
     """Converts numpy scalars to plain Python values.
 
     Args:

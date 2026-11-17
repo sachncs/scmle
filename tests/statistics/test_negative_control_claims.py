@@ -61,7 +61,7 @@ def interval_coverage(rng, kind, reruns, runs):
     hits = 0
     for ignored in range(runs):
         counts = tuple(draws(rng, kind, reruns).tolist())
-        low, high = controls.percentile_interval(counts)
+        low, high = controls.bracket(counts)
         hits += low <= truth <= high
     return hits / runs
 

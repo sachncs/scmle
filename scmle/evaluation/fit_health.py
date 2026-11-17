@@ -112,7 +112,7 @@ def assess(
     return Health(verdict, train, held_out, retained, noise, note)
 
 
-def assess_trial(
+def sanity(
     trial: Any, trials: Sequence[Any], greater_is_better: bool
 ) -> Health | None:
     """Judges a trial against the constant baseline trained in the same run.

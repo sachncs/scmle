@@ -26,7 +26,7 @@ def spec(**changes) -> causal.Question:
             "no_interference",
         ),
         "strategies": ("backdoor_aipw",),
-        "negative_controls": (causal.NegativeControl("outcome", "prior"),),
+        "negative_controls": (causal.Control("outcome", "prior"),),
         "strata": ("region",),
         "sensitivity": causal.Confounding("strongest_observed", 1.0),
     }
@@ -100,9 +100,9 @@ def test_invalid_blocks_are_refused(changes, message):
 
 
 def test_covariates_are_read_from_the_attestation():
-    assert causal.covariates_of(["positivity"]) is None
-    assert causal.covariates_of(["unconfoundedness_given:a, b"]) == ("a", "b")
-    assert causal.covariates_of(["unconfoundedness_given:none"]) == ()
+    assert causal.adjusters(["positivity"]) is None
+    assert causal.adjusters(["unconfoundedness_given:a, b"]) == ("a", "b")
+    assert causal.adjusters(["unconfoundedness_given:none"]) == ()
 
 
 def test_m_max_is_part_of_the_hash_and_must_not_be_negative():
@@ -177,9 +177,7 @@ def test_subgroups_need_format_nine_and_round_trip():
 
 def test_subgroups_in_an_older_format_are_refused(tmp_path):
     path = tmp_path / "charter.json"
-    sealing.write_charter(
-        path, causal_charter(subgroups=SUBGROUPS), signing_key=KEY
-    )
+    sealing.inscribe(path, causal_charter(subgroups=SUBGROUPS), signing_key=KEY)
     wrapper = json.loads(path.read_text())
     wrapper["format"] = 8
     path.write_text(json.dumps(wrapper))
@@ -224,7 +222,7 @@ def test_attestors_need_format_nine_and_round_trip():
 @pytest.mark.parametrize("field", ["attestors", "attestations"])
 def test_attestors_in_an_older_format_are_refused(tmp_path, field):
     path = tmp_path / "charter.json"
-    sealing.write_charter(
+    sealing.inscribe(
         path,
         causal_charter(attestors=ATTESTORS, attestations="signed.json"),
         signing_key=KEY,

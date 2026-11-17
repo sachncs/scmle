@@ -120,7 +120,7 @@ class Test:
     statistic: str
     null: str
     direction: str
-    set_id: qualification.SetId
+    set_id: qualification.Subset
     column: str | None
     code_hash: str
 
@@ -129,7 +129,7 @@ class Test:
 
         Raises:
             ValueError: If `direction` is not a known alternative or
-                `set_id` is not a `SetId`. A blank text field is refused with
+                `set_id` is not a `Subset`. A blank text field is refused with
                 a `ValueError` by `evidence.require_text`.
         """
         for field, value in (
@@ -144,8 +144,8 @@ class Test:
             raise errors.InputError(
                 f"direction must be one of {bivariate.DIRECTIONS}"
             )
-        if not isinstance(self.set_id, qualification.SetId):
-            raise errors.InputError("set_id must be a SetId")
+        if not isinstance(self.set_id, qualification.Subset):
+            raise errors.InputError("set_id must be a Subset")
 
     @classmethod
     def create(
@@ -157,7 +157,7 @@ class Test:
         null: str,
         column: str | None = None,
         direction: str = bivariate.TWO_SIDED,
-        set_id: qualification.SetId = qualification.SetId.EXPLORATION,
+        set_id: qualification.Subset = qualification.Subset.EXPLORATION,
     ) -> "Test":
         """Builds a specification, filling the code hash from the registry.
 
@@ -236,7 +236,7 @@ class Test:
             statistic=record["statistic"],
             null=record["null"],
             direction=record["direction"],
-            set_id=qualification.SetId(record["set"]),
+            set_id=qualification.Subset(record["set"]),
             column=record["column"],
             code_hash=record["code_hash"],
         )
@@ -324,7 +324,7 @@ class Ledger:
         self.results: dict[str, Outcome] = {}
         self.header: dict[str, Any] = {}
         self.rule: online_fdr.Tester | None = None
-        self.config: online_fdr.RuleConfig | None = None
+        self.config: online_fdr.Settings | None = None
         self.state = online_fdr.State()
         self.survivor_set: Selection | None = None
         self.control: dict[str, Any] | None = None
@@ -339,7 +339,7 @@ class Ledger:
         path: str | Path | None,
         *,
         charter_hash: str,
-        config: online_fdr.RuleConfig,
+        config: online_fdr.Settings,
         alpha_confirm: Fraction,
         seed: int,
     ) -> "Ledger":
@@ -456,11 +456,11 @@ class Ledger:
                 was created with a different rule configuration (rule, level,
                 horizon or other parameters), or fails to load (see `load`).
                 An unknown `rule` or invalid `horizon` is refused with a
-                `ValueError` by `online_fdr.RuleConfig`.
+                `ValueError` by `online_fdr.Settings`.
         """
         directory = Path(run_dir)
         path = directory / FILE_NAME
-        config = online_fdr.RuleConfig(
+        config = online_fdr.Settings(
             rule=rule,
             alpha=charter.error_budget.exploration.initial,
             horizon=horizon,
@@ -489,14 +489,14 @@ class Ledger:
     @property
     def wealth(self) -> Fraction:
         """The wealth of the online rule at present."""
-        return self.require_rule().wealth(self.state)
+        return self.tester().wealth(self.state)
 
     @property
     def frozen(self) -> bool:
         """Whether the survivors were frozen (no more hypotheses)."""
         return self.survivor_set is not None
 
-    def require_rule(self) -> online_fdr.Tester:
+    def tester(self) -> online_fdr.Tester:
         """Returns the online rule, which exists once the `open` row is in.
 
         Returns:
@@ -567,13 +567,13 @@ class Ledger:
             raise LedgerError("no row may follow the confirmation")
         handlers: dict[str, Callable[[Mapping[str, Any]], None]] = {
             OPEN: self.apply_open,
-            REGISTER: self.apply_register,
+            REGISTER: self.enrol,
             RESULT: self.apply_result,
-            CONTROL: self.apply_control,
-            DIAGNOSTIC: self.apply_diagnostic,
-            CLAIM: self.apply_claim,
-            SURVIVORS: self.apply_survivors,
-            CONFIRMATION: self.apply_confirmation,
+            CONTROL: self.benchmark,
+            DIAGNOSTIC: self.diagnose,
+            CLAIM: self.lodge,
+            SURVIVORS: self.survive,
+            CONFIRMATION: self.conclude,
         }
         if kind not in handlers:
             raise LedgerError(f"unknown ledger row kind {kind!r}")
@@ -600,7 +600,7 @@ class Ledger:
         if body.get("ledger_version") != LEDGER_VERSION:
             raise LedgerError("unsupported ledger version")
         try:
-            self.config = online_fdr.RuleConfig.from_dict(body["rule"])
+            self.config = online_fdr.Settings.from_dict(body["rule"])
         except (KeyError, ValueError) as error:
             raise LedgerError(f"invalid rule in the ledger: {error}") from error
         self.rule = self.config.build()
@@ -608,7 +608,7 @@ class Ledger:
         self.header = dict(body)
         self.seed = int(body["seed"])
 
-    def require_unfrozen(self) -> None:
+    def guard(self) -> None:
         """Requires that the survivors are not yet frozen.
 
         Hypotheses may only be added before the survivors are frozen.
@@ -619,7 +619,7 @@ class Ledger:
         if self.survivor_set is not None:
             raise LedgerError("survivors are frozen: no new hypotheses")
 
-    def apply_register(self, body: Mapping[str, Any]) -> None:
+    def enrol(self, body: Mapping[str, Any]) -> None:
         """Adds a hypothesis to the registry.
 
         Args:
@@ -630,7 +630,7 @@ class Ledger:
                 invalid, its id is not the next sequential one or its name
                 is already registered.
         """
-        self.require_unfrozen()
+        self.guard()
         try:
             spec = Test.from_dict(body["spec"])
             hypothesis_id = str(body["hypothesis_id"])
@@ -655,8 +655,8 @@ class Ledger:
                 one, the e-value is not the calibrated p-value, or the
                 decision is invalid.
         """
-        self.require_unfrozen()
-        rule = self.require_rule()
+        self.guard()
+        rule = self.tester()
         hypothesis_id = body.get("hypothesis_id")
         if hypothesis_id not in self.hypotheses:
             raise LedgerError(
@@ -690,7 +690,7 @@ class Ledger:
                 f"replay of {hypothesis_id} differs from the stored "
                 f"decision: stored {stored}, replayed {replayed}"
             )
-        self.check_calibration(rule, evidence)
+        self.audit(rule, evidence)
         check = (
             None
             if body["check"] is None
@@ -714,7 +714,7 @@ class Ledger:
         )
         self.state = step.state
 
-    def check_calibration(
+    def audit(
         self, rule: online_fdr.Tester, evidence: Mapping[str, Any]
     ) -> None:
         """Checks that a stored e-value is the calibrated p-value.
@@ -730,7 +730,7 @@ class Ledger:
                 by more than ``1e-12 * max(1, calibrated value)``.
         """
         if (
-            isinstance(rule, online_fdr.ELond)
+            isinstance(rule, online_fdr.Lond)
             and evidence["p"] is not None
             and evidence["e"] is not None
         ):
@@ -738,7 +738,7 @@ class Ledger:
             if abs(evidence["e"] - expected) > 1e-12 * max(1.0, expected):
                 raise LedgerError("stored e-value is not the calibrated p")
 
-    def apply_control(self, body: Mapping[str, Any]) -> None:
+    def benchmark(self, body: Mapping[str, Any]) -> None:
         """Stores the negative-control summary (before the survivors).
 
         A control row after the survivors are frozen is refused with a
@@ -747,10 +747,10 @@ class Ledger:
         Args:
             body: The `control` row's content.
         """
-        self.require_unfrozen()
+        self.guard()
         self.control = dict(body)
 
-    def apply_diagnostic(self, body: Mapping[str, Any]) -> None:
+    def diagnose(self, body: Mapping[str, Any]) -> None:
         """Stores a detector check; it never touches the online rule.
 
         Args:
@@ -760,13 +760,13 @@ class Ledger:
             LedgerError: If the survivors are frozen or the check read a set
                 other than the exploration set.
         """
-        self.require_unfrozen()
+        self.guard()
         check = qualification.Check.from_dict(body["check"])
-        if check.set_id is not qualification.SetId.EXPLORATION:
+        if check.set_id is not qualification.Subset.EXPLORATION:
             raise LedgerError("diagnostics may only read the exploration set")
         self.diagnostics.append(check)
 
-    def apply_claim(self, body: Mapping[str, Any]) -> None:
+    def lodge(self, body: Mapping[str, Any]) -> None:
         """Registers a claim by the hash of its registration.
 
         Args:
@@ -776,7 +776,7 @@ class Ledger:
             LedgerError: If the survivors are frozen or the claim id is
                 already used by a claim or a hypothesis.
         """
-        self.require_unfrozen()
+        self.guard()
         claim_id = scmle.contracts.evidence.require_text(
             str(body["claim_id"]), "claim_id"
         )
@@ -795,7 +795,7 @@ class Ledger:
             ),
         }
 
-    def apply_survivors(self, body: Mapping[str, Any]) -> None:
+    def survive(self, body: Mapping[str, Any]) -> None:
         """Freezes the survivor set, which must be the rejected hypotheses.
 
         Args:
@@ -805,7 +805,7 @@ class Ledger:
             LedgerError: If the survivors are already frozen, the ids differ
                 from the rejected hypotheses or the hash does not match.
         """
-        self.require_unfrozen()
+        self.guard()
         ids = tuple(
             i
             for i in self.hypotheses
@@ -818,7 +818,7 @@ class Ledger:
             raise LedgerError("survivor hash does not match")
         self.survivor_set = Selection(ids, str(body["sha256"]))
 
-    def apply_confirmation(self, body: Mapping[str, Any]) -> None:
+    def conclude(self, body: Mapping[str, Any]) -> None:
         """Seals the ledger with the confirmation outcome.
 
         Args:
@@ -858,7 +858,7 @@ class Ledger:
             LedgerError: If the survivors are frozen, the name repeats or the
                 hypothesis reads a set other than `X`.
         """
-        if spec.set_id is not qualification.SetId.EXPLORATION:
+        if spec.set_id is not qualification.Subset.EXPLORATION:
             raise LedgerError("only exploration-set hypotheses are registered")
         hypothesis_id = f"h{len(self.hypotheses) + 1:06d}"
         self.commit(
@@ -866,7 +866,7 @@ class Ledger:
         )
         return self.hypotheses[hypothesis_id]
 
-    def register_claim(
+    def enroll(
         self, claim_id: str, kind: str, statement: str, sha256: str
     ) -> dict[str, Any]:
         """Registers a claim by hash before the survivors are frozen.
@@ -901,7 +901,7 @@ class Ledger:
         )
         return self.claims[claim_id]
 
-    def require_registered(self, hypothesis: Hypothesis) -> None:
+    def pending(self, hypothesis: Hypothesis) -> None:
         """Requires an untested hypothesis of this ledger.
 
         Args:
@@ -944,8 +944,8 @@ class Ledger:
             The recorded result. A hypothesis that is unregistered or already
             tested is refused with a `LedgerError`.
         """
-        self.require_registered(hypothesis)
-        rule = self.require_rule()
+        self.pending(hypothesis)
+        rule = self.tester()
         if rule.level(self.state) == 0:
             return self.abstain(
                 hypothesis, "wealth exhausted: descriptive only"
@@ -972,8 +972,8 @@ class Ledger:
         Returns:
             The recorded result.
         """
-        self.require_registered(hypothesis)
-        rule = self.require_rule()
+        self.pending(hypothesis)
+        rule = self.tester()
         step = rule.step(self.state, online_fdr.Evidence(p=outcome.p))
         index = len(self.results)
         decision = REJECT if step.rejected else RETAIN
@@ -990,7 +990,7 @@ class Ledger:
                 if step.rejected
                 else qualification.Decision.PASS
             ),
-            set_id=qualification.SetId.EXPLORATION,
+            set_id=qualification.Subset.EXPLORATION,
             seed_path=randomness.seed_path(
                 self.seed, f"ledger.{hypothesis.spec.statistic}", index
             ),
@@ -1013,8 +1013,8 @@ class Ledger:
         Returns:
             The recorded result, with decision `not_tested`.
         """
-        self.require_registered(hypothesis)
-        rule = self.require_rule()
+        self.pending(hypothesis)
+        rule = self.tester()
         step = rule.step(self.state, online_fdr.Evidence(p=1.0))
         return self.settle(hypothesis, None, 1.0, step, NOT_TESTED, reason)
 
@@ -1086,7 +1086,7 @@ class Ledger:
             if i in self.results and self.results[i].rejected
         )
 
-    def record_control(self, summary: Mapping[str, Any]) -> None:
+    def negatives(self, summary: Mapping[str, Any]) -> None:
         """Logs the negative-control summary; call before `freeze`.
 
         Args:

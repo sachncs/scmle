@@ -13,7 +13,7 @@ from scmle.data.robustness import qualify
 from scmle.data.robustness import report
 from scmle.data.robustness import stability
 from tests.unit.test_charter_contracts import make_charter
-from tests.unit.test_ledger_governed import source_for
+from tests.unit.test_ledger_governed import locate
 from tests.unit.test_robustness_qualify import RICH
 
 SEED = 1
@@ -48,7 +48,7 @@ def stage_for(features, target, requested, reference=None, rule=None, **extra):
             **extra,
         )
 
-    return prefilter.StabilityStage(compute, requested, len(features), SEED)
+    return prefilter.Prefilter(compute, requested, len(features), SEED)
 
 
 def run(requested, tmp_path=None, reference=None, rule=None):
@@ -60,7 +60,7 @@ def run(requested, tmp_path=None, reference=None, rule=None):
         features=features,
         target=target,
         classification=False,
-        source=source_for(cfeatures, ctarget),
+        source=locate(cfeatures, ctarget),
         run_dir=tmp_path,
         second_stage=stage,
     )
@@ -77,7 +77,7 @@ def tiers(result):
 def test_a_fragile_planted_effect_is_not_tested_on_c(tmp_path):
     result, stage = run(True, tmp_path)
 
-    assert stage.found.stability_gate is certificates.GateStatus.GATING
+    assert stage.found.stability_gate is certificates.Authority.GATING
     assert {f.name: f.status for f in stage.found.findings} == {
         "s": stability.STABLE,
         "o": stability.FRAGILE,
@@ -136,7 +136,7 @@ def test_shift_results_are_diagnostics_when_a_reference_exists(tmp_path):
         features=features,
         target=target,
         classification=False,
-        source=source_for(cfeatures, ctarget),
+        source=locate(cfeatures, ctarget),
         run_dir=tmp_path,
         second_stage=stage,
     )
@@ -177,7 +177,7 @@ def test_thresholds_other_than_the_certified_rule_never_withdraw():
     loose = stability.Thresholds(s_min=0.5, band=0.9, q_min=0.5)
     result, stage = run(True, rule=loose)
 
-    assert stage.found.stability_gate is certificates.GateStatus.DESCRIPTIVE
+    assert stage.found.stability_gate is certificates.Authority.DESCRIPTIVE
     assert "differ from the certified" in stage.found.rule_note
     assert not stage.applied
     assert stage.note.startswith("requested but not applied")
@@ -199,10 +199,10 @@ def test_a_missing_certificate_means_a_warning_not_a_withdrawal(tmp_path):
         features=features,
         target=target,
         classification=False,
-        source=source_for(cfeatures, ctarget),
+        source=locate(cfeatures, ctarget),
         run_dir=None,
         second_stage=stage,
     )
-    assert stage.found.stability_gate is certificates.GateStatus.DESCRIPTIVE
+    assert stage.found.stability_gate is certificates.Authority.DESCRIPTIVE
     assert not stage.applied and "no current passing certificate" in stage.note
     assert result.confirmation.stage_two["withdrawn"] == {}

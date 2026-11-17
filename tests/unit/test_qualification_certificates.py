@@ -210,18 +210,18 @@ def test_a_current_certified_detector_may_gate_for_that_defect_only():
     assert store.state("d1", HASH_A) is certificates.Freshness.CURRENT
     assert (
         store.status("d1", HASH_A, "label_flip")
-        is certificates.GateStatus.GATING
+        is certificates.Authority.GATING
     )
     assert (
         store.status("d1", HASH_A, "sentinel")
-        is certificates.GateStatus.DESCRIPTIVE
+        is certificates.Authority.DESCRIPTIVE
     )
     assert (
-        store.mark_gating("d1", HASH_A, "label_flip")
-        is certificates.GateStatus.GATING
+        store.authorise("d1", HASH_A, "label_flip")
+        is certificates.Authority.GATING
     )
     with pytest.raises(certificates.CertificateError, match="sentinel"):
-        store.mark_gating("d1", HASH_A, "sentinel")
+        store.authorise("d1", HASH_A, "sentinel")
 
 
 def test_a_code_change_makes_the_certificate_stale_and_blocks_gating():
@@ -229,17 +229,17 @@ def test_a_code_change_makes_the_certificate_stale_and_blocks_gating():
     assert store.state("d1", HASH_B) is certificates.Freshness.STALE
     assert (
         store.status("d1", HASH_B, "label_flip")
-        is certificates.GateStatus.DESCRIPTIVE
+        is certificates.Authority.DESCRIPTIVE
     )
-    with pytest.raises(certificates.StaleCertificateError):
-        store.mark_gating("d1", HASH_B, "label_flip")
+    with pytest.raises(certificates.StaleError):
+        store.authorise("d1", HASH_B, "label_flip")
 
 
 def test_a_detector_without_a_certificate_cannot_be_marked_gating():
     store = certificates.Store()
     assert store.state("d1", HASH_A) is certificates.Freshness.MISSING
     with pytest.raises(certificates.CertificateError, match="no certificate"):
-        store.mark_gating("d1", HASH_A, "label_flip")
+        store.authorise("d1", HASH_A, "label_flip")
 
 
 def test_a_failed_outcome_does_not_certify_gating():
@@ -247,10 +247,10 @@ def test_a_failed_outcome_does_not_certify_gating():
     store = certificates.Store([weak])
     assert (
         store.status("d1", HASH_A, "label_flip")
-        is certificates.GateStatus.DESCRIPTIVE
+        is certificates.Authority.DESCRIPTIVE
     )
     with pytest.raises(certificates.CertificateError):
-        store.mark_gating("d1", HASH_A, "label_flip")
+        store.authorise("d1", HASH_A, "label_flip")
 
 
 def test_add_replaces_the_entry_with_the_same_key():
@@ -266,8 +266,8 @@ def test_add_replaces_the_entry_with_the_same_key():
 
 
 def test_descriptive_status_demotes_blocking_decisions():
-    descriptive = certificates.GateStatus.DESCRIPTIVE
-    gating = certificates.GateStatus.GATING
+    descriptive = certificates.Authority.DESCRIPTIVE
+    gating = certificates.Authority.GATING
     decision = qualification.Decision
     assert certificates.demote(decision.BLOCK, descriptive) is decision.WARN
     assert (

@@ -74,7 +74,7 @@ def frame_of(db, table, order):
     connector = connectors.DbApiConnector(
         ingest_worlds.URI, f"SELECT * FROM {table} ORDER BY {order}", db.factory
     )
-    return profile.consistent_read(connector, 100).frame
+    return profile.untorn(connector, 100).frame
 
 
 def run_pipeline(db, tmp_path):
@@ -98,25 +98,25 @@ def run_pipeline(db, tmp_path):
         "scope",
         "2099-01-01",
     )
-    rule = asof_view.KnownTime(asof_view.TRANSACTION, "recorded", 0.0, note)
-    orders = asof_view.AsOfView(
+    rule = asof_view.Timing(asof_view.TRANSACTION, "recorded", 0.0, note)
+    orders = asof_view.View(
         frame_of(db, "orders", "order_id"),
         "customer_id",
         rule,
         "created",
         "orders",
     )
-    events = asof_view.AsOfView(
+    events = asof_view.View(
         frame_of(db, "events", "order_id, created"),
         "order_id",
         rule,
         "created",
         "events",
     )
-    dim = asof_view.AsOfView(
+    dim = asof_view.View(
         frame_of(db, "customers", "customer_id"),
         "customer_id",
-        asof_view.KnownTime(asof_view.NON_VERSIONED),
+        asof_view.Timing(asof_view.NON_VERSIONED),
         name="customers_now",
     )
     targets = pandas.DataFrame(
@@ -130,8 +130,8 @@ def run_pipeline(db, tmp_path):
         [synthesize.Nest(source, events, "order_id")],
         lag_days=1.0,
     )
-    table = synthesize.feature_provenance(found, 1.0, [orders, events, dim])
-    report = reconcile.reconcile_extract(
+    table = synthesize.lineage(found, 1.0, [orders, events, dim])
+    report = reconcile.crosscheck(
         db.source(),
         frame_of(db, "customers", "customer_id"),
         "customers",
@@ -257,7 +257,7 @@ def test_cli_source_is_read_only(tmp_path):
     keeper.execute("INSERT INTO t VALUES (1)")
     keeper.commit()
     keeper.close()
-    connection = scmle.data.ingest.plan.sqlite_factory(path)()
+    connection = scmle.data.ingest.plan.opener(path)()
     try:
         connection.execute("INSERT INTO t VALUES (2)")
     except sqlite3.OperationalError:

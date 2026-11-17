@@ -140,7 +140,7 @@ def test_a_malformed_definition_is_reported():
 
 
 def test_every_supported_capability_is_tabular_library_inference():
-    found = context.tabular_beta_capability_registry().list_capabilities()
+    found = context.enrol().catalogue()
     supported = [c for c in found if c.status is capabilities.Status.SUPPORTED]
     assert supported
     for capability in supported:
@@ -149,14 +149,14 @@ def test_every_supported_capability_is_tabular_library_inference():
 
 
 def test_no_pretrained_or_multimodal_family_is_supported():
-    found = context.tabular_beta_capability_registry().list_capabilities()
+    found = context.enrol().catalogue()
     for capability in found:
         if capability.key.model_family in FAMILIES:
             assert capability.status is capabilities.Status.EXPERIMENTAL
 
 
 def test_streaming_inference_is_not_declared_supported():
-    found = context.tabular_beta_capability_registry().list_capabilities()
+    found = context.enrol().catalogue()
     assert not [
         c
         for c in found

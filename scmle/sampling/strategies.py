@@ -55,7 +55,7 @@ class Strategy(abc.ABC):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,  # noqa: ARG002 -- subclasses override with it
+        profile: data.Portrait,  # noqa: ARG002 -- subclasses override with it
         task: tasks.Task,  # noqa: ARG002 -- subclasses override with it
         adapter: models.Model,
     ) -> str | None:
@@ -76,7 +76,7 @@ class Strategy(abc.ABC):
     @abc.abstractmethod
     def build(
         self,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         adapter: models.Model,
         task: tasks.Task,
         seed: int,
@@ -104,7 +104,7 @@ class Default(Strategy):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,  # noqa: ARG002 -- Strategy interface
+        profile: data.Portrait,  # noqa: ARG002 -- Strategy interface
         task: tasks.Task,  # noqa: ARG002 -- Strategy interface
         adapter: models.Model,  # noqa: ARG002 -- Strategy interface
     ) -> str | None:
@@ -122,7 +122,7 @@ class Default(Strategy):
 
     def build(
         self,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         adapter: models.Model,
         task: tasks.Task,
         seed: int,
@@ -140,7 +140,7 @@ class Default(Strategy):
         Returns:
             The unfitted candidate estimator, preprocessing included.
         """
-        pipeline: models.Estimator = preprocessing.build_pipeline(
+        pipeline: models.Estimator = preprocessing.instantiate(
             plan, adapter, task, seed, params
         )
         return pipeline
@@ -151,7 +151,7 @@ class Rebalancing(Strategy):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -187,7 +187,7 @@ class Weighting(Rebalancing):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -210,7 +210,7 @@ class Weighting(Rebalancing):
 
     def build(
         self,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         adapter: models.Model,
         task: tasks.Task,
         seed: int,
@@ -229,7 +229,7 @@ class Weighting(Rebalancing):
             The unfitted candidate estimator, preprocessing included.
         """
         weighted = {**(params or {}), "class_weight": "balanced"}
-        pipeline: models.Estimator = preprocessing.build_pipeline(
+        pipeline: models.Estimator = preprocessing.instantiate(
             plan, adapter, task, seed, weighted
         )
         return pipeline
@@ -246,7 +246,7 @@ class Resampling(Rebalancing):
 
     def build(
         self,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         adapter: models.Model,
         task: tasks.Task,
         seed: int,
@@ -264,7 +264,7 @@ class Resampling(Rebalancing):
         Returns:
             The unfitted candidate estimator, preprocessing included.
         """
-        inner = preprocessing.build_pipeline(plan, adapter, task, seed, params)
+        inner = preprocessing.instantiate(plan, adapter, task, seed, params)
         return resampling.ResamplingClassifier(
             inner, self.resampler_class(), seed
         )
@@ -294,7 +294,7 @@ class Recalibration(Strategy):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -321,7 +321,7 @@ class Recalibration(Strategy):
 
     def build(
         self,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         adapter: models.Model,
         task: tasks.Task,
         seed: int,
@@ -339,7 +339,7 @@ class Recalibration(Strategy):
         Returns:
             The unfitted candidate estimator, preprocessing included.
         """
-        inner = preprocessing.build_pipeline(plan, adapter, task, seed, params)
+        inner = preprocessing.instantiate(plan, adapter, task, seed, params)
         calibrated: models.Estimator = calibration.CalibratedClassifierCV(
             inner,
             method="sigmoid",
@@ -359,7 +359,7 @@ class Jitter(Resampling):
 
     name = "jitter_augment"
     description = "EXPERIMENTAL jittered minority augmentation inside the fold"
-    resampler_class = resampling.JitterOverSampler
+    resampler_class = resampling.Jittered
 
 
 class Copula(Resampling):
@@ -386,7 +386,7 @@ class Smote(Rebalancing):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -413,7 +413,7 @@ class Smote(Rebalancing):
 
     def build(
         self,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         adapter: models.Model,
         task: tasks.Task,
         seed: int,
@@ -435,7 +435,7 @@ class Smote(Rebalancing):
         sampler = getattr(over_sampling, self.sampler_name)(random_state=seed)
         options = data.Preprocessing(scale=adapter.capabilities.needs_scaling)
         return resampling.PreprocessedResamplingClassifier(
-            preprocessing.build_front_end(plan, options),
+            preprocessing.frontend(plan, options),
             sampler,
             cast("base.BaseEstimator", adapter.build(task, seed, params)),
         )
@@ -484,7 +484,7 @@ class Features(Strategy):
 
     def build(
         self,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         adapter: models.Model,
         task: tasks.Task,
         seed: int,
@@ -512,7 +512,7 @@ class Features(Strategy):
         )
         if self.select:
             options = dataclasses.replace(options, scale=True)
-        pipeline: models.Estimator = preprocessing.build_pipeline(
+        pipeline: models.Estimator = preprocessing.instantiate(
             plan, adapter, task, seed, params, options
         )
         return pipeline
@@ -527,7 +527,7 @@ class Logarithm(Features):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -573,7 +573,7 @@ class Rarity(Strategy):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -609,7 +609,7 @@ class Rarity(Strategy):
 
     def build(
         self,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         adapter: models.Model,
         task: tasks.Task,
         seed: int,
@@ -627,7 +627,7 @@ class Rarity(Strategy):
         Returns:
             The unfitted candidate estimator, preprocessing included.
         """
-        inner = preprocessing.build_pipeline(plan, adapter, task, seed, params)
+        inner = preprocessing.instantiate(plan, adapter, task, seed, params)
         return resampling.DensityWeightedRegressor(inner)
 
 
@@ -644,7 +644,7 @@ class Encoding(Strategy):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -667,7 +667,7 @@ class Encoding(Strategy):
 
     def build(
         self,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         adapter: models.Model,
         task: tasks.Task,
         seed: int,
@@ -690,7 +690,7 @@ class Encoding(Strategy):
             high_cardinality="target",
             sparse=False,
         )
-        pipeline: models.Estimator = preprocessing.build_pipeline(
+        pipeline: models.Estimator = preprocessing.instantiate(
             plan, adapter, task, seed, params, options
         )
         return pipeline
@@ -705,7 +705,7 @@ class Interactions(Features):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -739,7 +739,7 @@ class Construction(Features):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -770,7 +770,7 @@ class Selection(Features):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -800,7 +800,7 @@ class Imputation(Features):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -842,7 +842,7 @@ class Indicators(Imputation):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -860,7 +860,7 @@ class Indicators(Imputation):
         if reason is not None:
             return reason
         plan = profile.feature_plan
-        problem = preprocessing.monotonic_layout_problem(
+        problem = preprocessing.misalignment(
             plan, select=False, missing=self.missing
         )
         if problem:
@@ -882,7 +882,7 @@ class IterativeImputation(Imputation):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -918,7 +918,7 @@ class Transformation(Strategy):
 
     def applicability(
         self,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         task: tasks.Task,
         adapter: models.Model,
     ) -> str | None:
@@ -949,7 +949,7 @@ class Transformation(Strategy):
 
     def build(
         self,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         adapter: models.Model,
         task: tasks.Task,
         seed: int,
@@ -968,7 +968,7 @@ class Transformation(Strategy):
             The unfitted candidate estimator, preprocessing included.
         """
         transformed: models.Estimator = compose.TransformedTargetRegressor(
-            regressor=preprocessing.build_pipeline(
+            regressor=preprocessing.instantiate(
                 plan, adapter, task, seed, params
             ),
             transformer=transformers.AsinhTarget(),

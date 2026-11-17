@@ -65,7 +65,7 @@ class IncrementalError(errors.DataError):
         super().__init__(message, self.details)
 
 
-class LateData(enum.StrEnum):
+class Lateness(enum.StrEnum):
     """Action for an event older than the committed sequence checkpoint.
 
     Attributes:
@@ -195,7 +195,7 @@ class Event:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EventCheckpoint:
+class Checkpoint:
     """Committed position and watermark for one incremental source.
 
     Attributes:
@@ -229,7 +229,7 @@ class EventCheckpoint:
         if self.watermark:
             parse_timestamp(self.watermark, "watermark")
 
-    def bind(self, source_identity: str) -> "EventCheckpoint":
+    def bind(self, source_identity: str) -> "Checkpoint":
         """Binds an uninitialized checkpoint to exactly one source.
 
         Args:
@@ -276,7 +276,7 @@ class EventCheckpoint:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EventBatch:
+class Batch:
     """Events selected for processing and the checkpoint they can advance.
 
     Attributes:
@@ -293,7 +293,7 @@ class EventBatch:
 
     source_identity: str
     events: tuple[Event, ...]
-    next_checkpoint: EventCheckpoint
+    next_checkpoint: Checkpoint
     duplicate_event_ids: tuple[str, ...] = ()
     late_event_ids: tuple[str, ...] = ()
     has_more: bool = False
@@ -329,7 +329,7 @@ class EventBatch:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EventCommitReceipt:
+class Ack:
     """Result of an idempotent sink commit attempt.
 
     Attributes:
@@ -344,7 +344,7 @@ class EventCommitReceipt:
     source_identity: str
     accepted_event_ids: tuple[str, ...]
     duplicate_event_ids: tuple[str, ...]
-    checkpoint: EventCheckpoint
+    checkpoint: Checkpoint
 
     def __post_init__(self) -> None:
         """Validates deterministic accepted and duplicate identities.
@@ -404,7 +404,7 @@ class EventAcknowledgement:
     source_identity: str
     consumer_group: str
     event_ids: tuple[str, ...]
-    checkpoint: EventCheckpoint
+    checkpoint: Checkpoint
 
     def __post_init__(self) -> None:
         """Validates the acknowledgement's source and deterministic IDs.
@@ -460,7 +460,7 @@ class EventAcknowledgement:
             source_identity=str(record["source_identity"]),
             consumer_group=str(record["consumer_group"]),
             event_ids=tuple(str(value) for value in record["event_ids"]),
-            checkpoint=EventCheckpoint.from_dict(record["checkpoint"]),
+            checkpoint=Checkpoint.from_dict(record["checkpoint"]),
         )
 
 
@@ -478,7 +478,7 @@ class Consumption:
 
     source_identity: str
     consumer_group: str
-    receipt: EventCommitReceipt
+    receipt: Ack
     acknowledged_event_ids: tuple[str, ...]
 
     def __post_init__(self) -> None:
@@ -530,18 +530,18 @@ class Source(abc.ABC):
     def __init__(
         self,
         source_uri: str,
-        late_data_policy: LateData | str = LateData.REJECT,
+        late_data_policy: Lateness | str = Lateness.REJECT,
     ) -> None:
         """Initializes source identity and late-data policy.
 
         Args:
             source_uri: URI of the source; canonicalized on binding.
             late_data_policy: Policy for late events; a plain string value of
-                LateData is accepted.
+                Lateness is accepted.
         """
-        if not isinstance(late_data_policy, LateData):
-            late_data_policy = LateData(late_data_policy)
-        self.source_uri = connectors.canonical_source_uri(source_uri)
+        if not isinstance(late_data_policy, Lateness):
+            late_data_policy = Lateness(late_data_policy)
+        self.source_uri = connectors.canonicalize(source_uri)
         self.source_identity = connectors.source_identity(self.source_uri)
         self.late_data_policy = late_data_policy
 
@@ -553,9 +553,7 @@ class Source(abc.ABC):
             The events the transport currently offers.
         """
 
-    def validate_checkpoint(
-        self, checkpoint: EventCheckpoint | None
-    ) -> EventCheckpoint:
+    def validate_checkpoint(self, checkpoint: Checkpoint | None) -> Checkpoint:
         """Binds a checkpoint to this source, failing before any polling.
 
         Args:
@@ -569,7 +567,7 @@ class Source(abc.ABC):
             IncrementalError: With code "checkpoint_mismatch" if the
                 checkpoint belongs to another source.
         """
-        current = checkpoint or EventCheckpoint(self.source_identity)
+        current = checkpoint or Checkpoint(self.source_identity)
         try:
             current.bind(self.source_identity)
         except ValueError as error:
@@ -584,10 +582,10 @@ class Source(abc.ABC):
     def select_events(
         self,
         records: Iterable[Event],
-        checkpoint: EventCheckpoint | None = None,
+        checkpoint: Checkpoint | None = None,
         seen_event_ids: Iterable[str] = (),
         limit: int = 1_000,
-    ) -> EventBatch:
+    ) -> Batch:
         """Selects a bounded, deduplicated batch from transport records.
 
         Records are ordered by sequence then event identity. A record whose
@@ -639,9 +637,9 @@ class Source(abc.ABC):
                 continue
             if event.sequence <= current.sequence:
                 late.add(event.event_id)
-                if self.late_data_policy is LateData.DROP:
+                if self.late_data_policy is Lateness.DROP:
                     continue
-                if self.late_data_policy is LateData.REJECT:
+                if self.late_data_policy is Lateness.REJECT:
                     raise IncrementalError(
                         "late_event",
                         f"event '{event.event_id}' is older than checkpoint",
@@ -672,12 +670,12 @@ class Source(abc.ABC):
         if current_watermark is not None:
             watermark_values.append(current_watermark)
         next_watermark = max(watermark_values, default=None)
-        checkpoint_value = EventCheckpoint(
+        checkpoint_value = Checkpoint(
             self.source_identity,
             next_sequence,
             next_watermark.isoformat() if next_watermark else "",
         )
-        return EventBatch(
+        return Batch(
             self.source_identity,
             selected,
             checkpoint_value,
@@ -688,10 +686,10 @@ class Source(abc.ABC):
 
     def read_events(
         self,
-        checkpoint: EventCheckpoint | None = None,
+        checkpoint: Checkpoint | None = None,
         seen_event_ids: Iterable[str] = (),
         limit: int = 1_000,
-    ) -> EventBatch:
+    ) -> Batch:
         """Selects a bounded batch without committing its side effects.
 
         Failures from `available_events` and from `select_events` (such as an
@@ -718,7 +716,7 @@ class SequenceEventSource(Source):
         self,
         source_uri: str,
         events: Iterable[Event] | Callable[[], Iterable[Event]],
-        late_data_policy: LateData = LateData.REJECT,
+        late_data_policy: Lateness = Lateness.REJECT,
     ) -> None:
         """Initializes a source from a fixed sequence or event factory.
 
@@ -745,7 +743,7 @@ class SequenceEventSource(Source):
         return self.event_factory()
 
 
-class EventStreamSource(Source):
+class Stream(Source):
     """Bounded event-stream adapter around a caller-owned poll boundary.
 
     The callback is the only transport-specific surface. It receives the
@@ -772,9 +770,9 @@ class EventStreamSource(Source):
     def __init__(
         self,
         source_uri: str,
-        event_reader: Callable[[str, EventCheckpoint, int], Iterable[Event]],
-        late_data_policy: LateData = LateData.REJECT,
-        retry_budget: connectors.RetryBudget | None = None,
+        event_reader: Callable[[str, Checkpoint, int], Iterable[Event]],
+        late_data_policy: Lateness = Lateness.REJECT,
+        retry_budget: connectors.Retries | None = None,
     ) -> None:
         """Initializes a source around an injected broker poll callback.
 
@@ -786,21 +784,19 @@ class EventStreamSource(Source):
                 budget is used when None.
 
         Raises:
-            UnsupportedUriSchemeError: If the URI scheme is not one of
+            SchemeError: If the URI scheme is not one of
                 `supported_schemes`.
             TypeError: If `event_reader` is not callable.
         """
         value = source_uri.strip()
         scheme = urlsplit(value).scheme.lower()
         if scheme not in self.supported_schemes:
-            raise connectors.UnsupportedUriSchemeError(
-                value, scheme, self.supported_schemes
-            )
+            raise connectors.SchemeError(value, scheme, self.supported_schemes)
         if not callable(event_reader):
             raise errors.KindError("event_reader must be callable")
         super().__init__(value, late_data_policy)
         self.event_reader = event_reader
-        self.retry_budget = retry_budget or connectors.RetryBudget()
+        self.retry_budget = retry_budget or connectors.Retries()
 
     def available_events(self) -> Iterable[Event]:
         """Rejects unbounded polling without a checkpoint and limit.
@@ -817,7 +813,7 @@ class EventStreamSource(Source):
         )
 
     def poll_events(
-        self, checkpoint: EventCheckpoint, limit: int
+        self, checkpoint: Checkpoint, limit: int
     ) -> tuple[Event, ...]:
         """Polls a bounded transport batch with retry evidence.
 
@@ -838,7 +834,7 @@ class EventStreamSource(Source):
         """
         if limit <= 0:
             raise errors.InputError("limit must be positive")
-        records = connectors.execute_with_retries(
+        records = connectors.persevere(
             lambda: tuple(
                 self.event_reader(self.source_uri, checkpoint, limit)
             ),
@@ -857,10 +853,10 @@ class EventStreamSource(Source):
 
     def read_events(
         self,
-        checkpoint: EventCheckpoint | None = None,
+        checkpoint: Checkpoint | None = None,
         seen_event_ids: Iterable[str] = (),
         limit: int = 1_000,
-    ) -> EventBatch:
+    ) -> Batch:
         """Polls and selects one bounded event batch without acknowledging it.
 
         Args:
@@ -886,7 +882,7 @@ class CommittedState:
         seen_event_ids: Sorted, unique identities of all committed events.
     """
 
-    checkpoint: EventCheckpoint
+    checkpoint: Checkpoint
     seen_event_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -929,7 +925,7 @@ class CommittedState:
                 "unsupported incremental state schema version"
             )
         return cls(
-            checkpoint=EventCheckpoint.from_dict(record["checkpoint"]),
+            checkpoint=Checkpoint.from_dict(record["checkpoint"]),
             seen_event_ids=tuple(
                 str(item) for item in record["seen_event_ids"]
             ),
@@ -937,7 +933,7 @@ class CommittedState:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class IngestionLedger:
+class Ledger:
     """Atomic durable commit boundary for incremental event processing.
 
     Attributes:
@@ -1006,7 +1002,7 @@ class IngestionLedger:
                 state belongs to another source.
         """
         if not self.path.exists():
-            return CommittedState(EventCheckpoint(self.source_identity))
+            return CommittedState(Checkpoint(self.source_identity))
         record = json.loads(self.path.read_text(encoding="utf-8"))
         state = CommittedState.from_dict(record)
         if state.checkpoint.source_identity != self.source_identity:
@@ -1018,7 +1014,7 @@ class IngestionLedger:
             )
         return state
 
-    def read_batch(self, source: Source, limit: int = 1_000) -> EventBatch:
+    def read_batch(self, source: Source, limit: int = 1_000) -> Batch:
         """Reads an uncommitted batch using the durable deduplication state.
 
         Args:
@@ -1170,7 +1166,7 @@ class IngestionLedger:
         self.pending_acknowledgement_path.unlink(missing_ok=True)
         durability.sync_directory(self.pending_acknowledgement_path.parent)
 
-    def commit(self, batch: EventBatch) -> CommittedState:
+    def commit(self, batch: Batch) -> CommittedState:
         """Atomically publishes a processed batch's IDs and checkpoint.
 
         Args:
@@ -1228,7 +1224,7 @@ class IngestionLedger:
         events: Iterable[Event],
         writer: Callable[[tuple[Event, ...]], None],
         acknowledgement: EventAcknowledgement | None = None,
-    ) -> EventCommitReceipt:
+    ) -> Ack:
         """Writes unseen events and commit their IDs under one ledger lock.
 
         The writer receives only events not already present in the durable
@@ -1303,7 +1299,7 @@ class IngestionLedger:
                 )
                 if current_watermark is not None:
                     timestamps.append(current_watermark)
-                checkpoint = EventCheckpoint(
+                checkpoint = Checkpoint(
                     self.source_identity,
                     max(
                         current.checkpoint.sequence,
@@ -1320,7 +1316,7 @@ class IngestionLedger:
                 self.write_pending_acknowledgement(
                     dataclasses.replace(acknowledgement, checkpoint=checkpoint)
                 )
-            return EventCommitReceipt(
+            return Ack(
                 self.source_identity,
                 tuple(sorted(accepted_ids)),
                 tuple(sorted(duplicates)),
@@ -1328,7 +1324,7 @@ class IngestionLedger:
             )
 
 
-class EventConsumer:
+class Ingestor:
     """Consume events with a durable sink commit and explicit acknowledgements.
 
     This class is the transport-neutral consumer-group boundary. The source
@@ -1351,7 +1347,7 @@ class EventConsumer:
     def __init__(
         self,
         source: Source,
-        ledger: IngestionLedger,
+        ledger: Ledger,
         consumer_group: str,
         writer: Callable[[tuple[Event, ...]], None],
         acknowledge: Callable[[EventAcknowledgement], None],

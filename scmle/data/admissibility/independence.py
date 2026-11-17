@@ -47,7 +47,7 @@ FINITE_CAP = 1e308
 MIN_TABLE_SIDE = 2
 
 
-class CIKind(enum.StrEnum):
+class Procedure(enum.StrEnum):
     """Which test was used."""
 
     FISHER_Z = "fisher_z"
@@ -90,7 +90,7 @@ class Statement:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CITest:
+class Independence:
     """Result of one conditional-independence test.
 
     Attributes:
@@ -107,7 +107,7 @@ class CITest:
         skipped_strata: Strata dropped as degenerate (chi-square only).
     """
 
-    kind: CIKind
+    kind: Procedure
     statistic: float
     p_value: float
     effect: float
@@ -132,7 +132,7 @@ def residuals(values: numpy.ndarray, given: numpy.ndarray) -> numpy.ndarray:
     return fitted_residuals
 
 
-def partial_correlation(
+def correlate(
     frame: pandas.DataFrame, x: str, y: str, given: Sequence[str]
 ) -> float:
     """Computes the sample partial correlation of two columns given others.
@@ -165,7 +165,7 @@ def partial_correlation(
 
 def fisher_z(
     frame: pandas.DataFrame, x: str, y: str, given: Sequence[str]
-) -> CITest:
+) -> Independence:
     """Fisher's z test of zero partial correlation.
 
     Args:
@@ -186,17 +186,17 @@ def fisher_z(
     dof = n - len(given) - 3
     if dof <= 0:
         raise errors.InputError("too few rows for this conditioning set")
-    r = partial_correlation(frame, x, y, given)
+    r = correlate(frame, x, y, given)
     if abs(r) >= 1.0:
-        return CITest(CIKind.FISHER_Z, math.inf, 0.0, r, n, 0, 0)
+        return Independence(Procedure.FISHER_Z, math.inf, 0.0, r, n, 0, 0)
     z = math.sqrt(dof) * math.atanh(r)
     p = float(2.0 * stats.norm.sf(abs(z)))
-    return CITest(CIKind.FISHER_Z, z, p, r, n, 0, 0)
+    return Independence(Procedure.FISHER_Z, z, p, r, n, 0, 0)
 
 
 def stratified_chi2(
     frame: pandas.DataFrame, x: str, y: str, given: Sequence[str]
-) -> CITest:
+) -> Independence:
     """Chi-square test of independence summed over strata of `given`.
 
     Args:
@@ -225,12 +225,12 @@ def stratified_chi2(
     p = float(stats.chi2.sf(total, df)) if df > 0 else 1.0
     smaller = min(pooled.shape) - 1
     effect = math.sqrt(total / (len(frame) * smaller)) if smaller > 0 else 0.0
-    return CITest(
-        CIKind.STRATIFIED_CHI2, total, p, effect, len(frame), df, skipped
+    return Independence(
+        Procedure.STRATIFIED_CHI2, total, p, effect, len(frame), df, skipped
     )
 
 
-def is_discrete(series: pandas.Series) -> bool:
+def nominal(series: pandas.Series) -> bool:
     """Decides whether a column is treated as categorical.
 
     Args:
@@ -248,7 +248,7 @@ def is_discrete(series: pandas.Series) -> bool:
 
 def run_test(
     frame: pandas.DataFrame, x: str, y: str, given: Sequence[str]
-) -> CITest:
+) -> Independence:
     """Runs Fisher's z on numeric data or the chi-square on categories.
 
     Args:
@@ -272,7 +272,7 @@ def run_test(
         raise errors.InputError(
             "conditional-independence tests need complete rows"
         )
-    flags = [is_discrete(sub[c]) for c in names]
+    flags = [nominal(sub[c]) for c in names]
     if all(flags):
         if any(sub[c].nunique() > MAX_DISCRETE_LEVELS for c in names):
             raise errors.InputError("too many levels for the chi-square test")
@@ -284,7 +284,7 @@ def run_test(
     )
 
 
-def implied_statements(
+def entail(
     graph: dag.Dag,
 ) -> tuple[list[Statement], list[str]]:
     """Lists the local Markov statements of the observed part of a graph.
@@ -332,7 +332,7 @@ class Outcome:
 
     statement: Statement
     verdict: Verdict
-    test: CITest | None
+    test: Independence | None
     reason: str
     check: qualification.Check | None
 
@@ -374,7 +374,7 @@ def falsify(
     frame: pandas.DataFrame,
     alpha: float = 0.05,
     run_seed: int = 0,
-    set_id: qualification.SetId = qualification.SetId.EXPLORATION,
+    set_id: qualification.Subset = qualification.Subset.EXPLORATION,
 ) -> Falsification:
     """Tests each implied independence of `graph` on the data.
 
@@ -406,7 +406,7 @@ def falsify(
     missing = [n for n in graph.observed if n not in frame.columns]
     if missing:
         raise errors.InputError(f"observed nodes not in the data: {missing}")
-    statements, skipped_nodes = implied_statements(graph)
+    statements, skipped_nodes = entail(graph)
     level = level_in / max(1, len(statements))
     outcomes: list[Outcome] = []
     for index, statement in enumerate(statements):

@@ -44,10 +44,10 @@ class Pointwise(models.Model):
             )
         )
 
-    search_space = search.SearchSpace(
+    search_space = search.Space(
         (
-            search.FloatParameter("learning_rate", 0.02, 0.3, log=True),
-            search.IntParameter("max_leaf_nodes", 8, 64),
+            search.Real("learning_rate", 0.02, 0.3, log=True),
+            search.Integer("max_leaf_nodes", 8, 64),
         )
     )
 
@@ -64,10 +64,10 @@ class Ranker(models.Model):
     capabilities = models.Capabilities(
         RANKING, handles_missing=True, cost=3, memory_factor=3.0
     )
-    search_space = search.SearchSpace(
+    search_space = search.Space(
         (
-            search.FloatParameter("learning_rate", 0.02, 0.3, log=True),
-            search.IntParameter("max_leaves", 8, 64),
+            search.Real("learning_rate", 0.02, 0.3, log=True),
+            search.Integer("max_leaves", 8, 64),
         )
     )
 

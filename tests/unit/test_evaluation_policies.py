@@ -26,7 +26,7 @@ def test_criteria_become_directional_metric_and_evidence_gates():
         "log_loss",
     ]
     assert policy.release.metric_gates[1].direction is (
-        evaluation.MetricDirection.MINIMIZE
+        evaluation.Orientation.MINIMIZE
     )
     assert "diagnostics/metric_uncertainty.json" in (
         policy.release.required_evidence
@@ -35,7 +35,7 @@ def test_criteria_become_directional_metric_and_evidence_gates():
 
 def test_unknown_metric_direction_fails_closed():
     with pytest.raises(
-        evaluation.UnsupportedEvaluationPolicyError,
+        evaluation.UnsupportedError,
         match="no declared release direction",
     ):
         policies.derive(tasks.Task.BINARY, "roc_auc", True, {"unknown": 0.8})

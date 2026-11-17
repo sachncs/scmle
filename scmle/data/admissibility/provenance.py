@@ -42,7 +42,7 @@ class Origin(enum.StrEnum):
     MANUAL = "manual"
 
 
-class WrittenAt(enum.StrEnum):
+class Stamp(enum.StrEnum):
     """Clock that stamps the write."""
 
     EVENT_TIME = "event_time"
@@ -58,7 +58,7 @@ class Overwritten(enum.StrEnum):
     UNKNOWN = "unknown"
 
 
-class AsOfKind(enum.StrEnum):
+class Cutoff(enum.StrEnum):
     """How the as-of rule is expressed."""
 
     TIMESTAMP = "timestamp"
@@ -66,7 +66,7 @@ class AsOfKind(enum.StrEnum):
     UNKNOWN = "unknown"
 
 
-class AsOfSource(enum.StrEnum):
+class Provenance(enum.StrEnum):
     """Where the as-of rule came from."""
 
     LOG = "log"
@@ -83,7 +83,7 @@ class Availability(enum.StrEnum):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class AsOf:
+class Lead:
     """How long before the prediction moment a value is known.
 
     Attributes:
@@ -94,19 +94,19 @@ class AsOf:
             after it. None exactly when `kind` is `unknown`.
     """
 
-    kind: AsOfKind
+    kind: Cutoff
     lead_seconds: float | None
 
     def __post_init__(self) -> None:
         """Validates the rule.
 
         Raises:
-            ValueError: If `kind` is not an `AsOfKind`, if an unknown rule
+            ValueError: If `kind` is not an `Cutoff`, if an unknown rule
                 has a lead, or if a known rule has no finite lead.
         """
-        if not isinstance(self.kind, AsOfKind):
-            raise errors.InputError("kind must be an AsOfKind")
-        if self.kind is AsOfKind.UNKNOWN:
+        if not isinstance(self.kind, Cutoff):
+            raise errors.InputError("kind must be an Cutoff")
+        if self.kind is Cutoff.UNKNOWN:
             if self.lead_seconds is not None:
                 raise errors.InputError("an unknown as-of rule has no lead")
         else:
@@ -121,12 +121,12 @@ class AsOf:
         Returns:
             A rule of kind `unknown` with no lead.
         """
-        return cls(AsOfKind.UNKNOWN, None)
+        return cls(Cutoff.UNKNOWN, None)
 
     @property
-    def is_known(self) -> bool:
+    def given(self) -> bool:
         """Whether a lead is stated."""
-        return self.kind is not AsOfKind.UNKNOWN
+        return self.kind is not Cutoff.UNKNOWN
 
     def to_dict(self) -> dict[str, Any]:
         """Converts the rule to a JSON-ready record.
@@ -148,7 +148,7 @@ class AsOf:
             an invalid rule are rejected with a `ValueError`.
         """
         qualification.require(cls, record)
-        return cls(AsOfKind(record["kind"]), record["lead_seconds"])
+        return cls(Cutoff(record["kind"]), record["lead_seconds"])
 
 
 def parse_date(value: str, name: str) -> datetime.date:
@@ -217,7 +217,7 @@ class Attestation:
         if parse_date(self.expires, "expires") < issued:
             raise errors.InputError("expires must not precede date")
 
-    def valid_on(self, day: datetime.date) -> bool:
+    def effective(self, day: datetime.date) -> bool:
         """Tests whether the statement counts on a day.
 
         Args:
@@ -253,7 +253,7 @@ class Attestation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class LogCheck:
+class Reconstruction:
     """Result of reconstructing a field from a change log.
 
     Attributes:
@@ -335,14 +335,14 @@ class FieldProvenance:
     name: str
     origin: Origin
     writer: str
-    written_at: WrittenAt
+    written_at: Stamp
     overwritten: Overwritten
     definition_history: tuple[str, ...]
-    as_of: AsOf
-    as_of_source: AsOfSource
+    as_of: Lead
+    as_of_source: Provenance
     available_at_serving: Availability
     attestation: Attestation | None = None
-    log_check: LogCheck | None = None
+    log_check: Reconstruction | None = None
 
     def __post_init__(self) -> None:
         """Validates the record.
@@ -355,36 +355,34 @@ class FieldProvenance:
         """
         evidence.require_text(self.name, "name")
         evidence.require_text(self.writer, "writer")
-        qualification.require_tuple(
-            self.definition_history, "definition_history"
-        )
+        qualification.tupled(self.definition_history, "definition_history")
         for note in self.definition_history:
             evidence.require_text(note, "definition_history")
         for value, kind in (
             (self.origin, Origin),
-            (self.written_at, WrittenAt),
+            (self.written_at, Stamp),
             (self.overwritten, Overwritten),
-            (self.as_of_source, AsOfSource),
+            (self.as_of_source, Provenance),
             (self.available_at_serving, Availability),
-            (self.as_of, AsOf),
+            (self.as_of, Lead),
         ):
             if not isinstance(value, kind):
                 raise errors.InputError(f"expected a {kind.__name__}")
-        known = self.as_of.is_known
-        if known and self.as_of_source is AsOfSource.NONE:
+        known = self.as_of.given
+        if known and self.as_of_source is Provenance.NONE:
             raise errors.InputError("a known as-of rule needs a source")
-        if not known and self.as_of_source is not AsOfSource.NONE:
+        if not known and self.as_of_source is not Provenance.NONE:
             raise errors.InputError(
                 "an unknown as-of rule cannot have a source"
             )
         if (
-            self.as_of_source is AsOfSource.ATTESTED
+            self.as_of_source is Provenance.ATTESTED
             and self.attestation is None
         ):
             raise errors.InputError(
                 "an attested as-of rule needs an attestation"
             )
-        if self.as_of_source is AsOfSource.LOG and self.log_check is None:
+        if self.as_of_source is Provenance.LOG and self.log_check is None:
             raise errors.InputError(
                 "a log-derived as-of rule needs a log_check"
             )
@@ -403,9 +401,9 @@ class FieldProvenance:
             `unverified` otherwise.
         """
         attested = self.attestation is not None and (
-            today is None or self.attestation.valid_on(today)
+            today is None or self.attestation.effective(today)
         )
-        if self.as_of_source is AsOfSource.LOG:
+        if self.as_of_source is Provenance.LOG:
             if self.log_check is not None and self.log_check.passed:
                 return qualification.Tier.CONFIRMED
             return (
@@ -413,7 +411,7 @@ class FieldProvenance:
                 if attested
                 else qualification.Tier.UNVERIFIED
             )
-        if self.as_of_source is AsOfSource.ATTESTED and attested:
+        if self.as_of_source is Provenance.ATTESTED and attested:
             return qualification.Tier.ATTESTED
         return qualification.Tier.UNVERIFIED
 
@@ -461,18 +459,18 @@ class FieldProvenance:
             name=record["name"],
             origin=Origin(record["origin"]),
             writer=record["writer"],
-            written_at=WrittenAt(record["written_at"]),
+            written_at=Stamp(record["written_at"]),
             overwritten=Overwritten(record["overwritten"]),
             definition_history=tuple(record["definition_history"]),
-            as_of=AsOf.from_dict(record["as_of"]),
-            as_of_source=AsOfSource(record["as_of_source"]),
+            as_of=Lead.from_dict(record["as_of"]),
+            as_of_source=Provenance(record["as_of_source"]),
             available_at_serving=Availability(record["available_at_serving"]),
             attestation=None
             if attestation is None
             else Attestation.from_dict(attestation),
             log_check=None
             if log_check is None
-            else LogCheck.from_dict(log_check),
+            else Reconstruction.from_dict(log_check),
         )
 
 
@@ -489,11 +487,11 @@ def undeclared(name: str) -> FieldProvenance:
         name=name,
         origin=Origin.DERIVED,
         writer="undeclared",
-        written_at=WrittenAt.UNKNOWN,
+        written_at=Stamp.UNKNOWN,
         overwritten=Overwritten.UNKNOWN,
         definition_history=(),
-        as_of=AsOf.unknown(),
-        as_of_source=AsOfSource.NONE,
+        as_of=Lead.unknown(),
+        as_of_source=Provenance.NONE,
         available_at_serving=Availability.UNKNOWN,
     )
 
@@ -514,7 +512,7 @@ class Dictionary:
         Raises:
             ValueError: If `fields` is not a tuple or names repeat.
         """
-        qualification.require_tuple(self.fields, "fields")
+        qualification.tupled(self.fields, "fields")
         names = [f.name for f in self.fields]
         if len(set(names)) != len(names):
             raise errors.InputError("field names must be unique")

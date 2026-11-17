@@ -20,47 +20,40 @@ def labelled(rows=2000, positive_rate=0.1, seed=0):
 
 def test_f1_optimum_is_not_the_default_cutoff_on_imbalanced_data():
     probability, actual = labelled()
-    best, score = thresholds.optimize_threshold(
-        probability, actual, thresholds.F1Objective()
-    )
-    default = thresholds.F1Objective().score(actual, probability >= 0.5)
+    best, score = thresholds.argmax(probability, actual, thresholds.F1())
+    default = thresholds.F1().score(actual, probability >= 0.5)
     assert best != 0.5 and score >= default
 
 
 def test_cost_objective_moves_the_threshold_with_the_costs():
     probability, actual = labelled()
-    cheap_miss = thresholds.CostObjective(
+    cheap_miss = thresholds.Costs(
         false_positive_cost=5.0, false_negative_cost=1.0
     )
-    costly_miss = thresholds.CostObjective(
+    costly_miss = thresholds.Costs(
         false_positive_cost=1.0, false_negative_cost=10.0
     )
-    high = thresholds.optimize_threshold(probability, actual, cheap_miss)[0]
-    low = thresholds.optimize_threshold(probability, actual, costly_miss)[0]
+    high = thresholds.argmax(probability, actual, cheap_miss)[0]
+    low = thresholds.argmax(probability, actual, costly_miss)[0]
     assert low < high
 
 
 def test_objectives_on_known_decisions():
     actual = numpy.array([True, True, False, False])
     flagged = numpy.array([True, False, True, False])
-    assert thresholds.F1Objective().score(actual, flagged) == pytest.approx(0.5)
-    assert thresholds.AccuracyObjective().score(actual, flagged) == 0.5
+    assert thresholds.F1().score(actual, flagged) == pytest.approx(0.5)
+    assert thresholds.Accuracy().score(actual, flagged) == 0.5
     assert thresholds.BalancedAccuracyObjective().score(actual, flagged) == 0.5
-    assert thresholds.CostObjective(2.0, 3.0).score(
-        actual, flagged
-    ) == pytest.approx(-1.25)
-    assert (
-        thresholds.F1Objective().score(actual, numpy.zeros(4, dtype=bool))
-        == 0.0
+    assert thresholds.Costs(2.0, 3.0).score(actual, flagged) == pytest.approx(
+        -1.25
     )
+    assert thresholds.F1().score(actual, numpy.zeros(4, dtype=bool)) == 0.0
 
 
 def test_ties_prefer_thresholds_near_one_half():
     probability = numpy.array([0.1, 0.9])
     actual = numpy.array([False, True])
-    best = thresholds.optimize_threshold(
-        probability, actual, thresholds.AccuracyObjective()
-    )[0]
+    best = thresholds.argmax(probability, actual, thresholds.Accuracy())[0]
     assert 0.1 < best <= 0.9 and abs(best - 0.5) <= 0.4
 
 
@@ -84,7 +77,7 @@ def test_around_fitted_does_not_refit_and_clone_resets():
     features = pandas.DataFrame({"a": numpy.arange(100.0)})
     target = pandas.Series([0] * 50 + [1] * 50)
     fitted = linear_model.LogisticRegression().fit(features, target)
-    wrapper = thresholds.Classifier.around_fitted(fitted, 0.3)
+    wrapper = thresholds.Classifier.around(fitted, 0.3)
     assert wrapper.estimator_ is fitted and wrapper.predict(features).shape == (
         100,
     )

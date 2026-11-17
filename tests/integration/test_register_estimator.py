@@ -56,9 +56,7 @@ def test_a_registered_classifier_competes_in_a_run(tmp_path):
 
 
 def test_a_registered_regressor_gets_a_search_space(tmp_path):
-    space = search.SearchSpace(
-        (search.FloatParameter("alpha_1", 1e-8, 1e-3, log=True),)
-    )
+    space = search.Space((search.Real("alpha_1", 1e-8, 1e-3, log=True),))
     adapter = scmle.models.custom.register_estimator(
         "bayes_ridge", regressor=linear_model.BayesianRidge, search_space=space
     )

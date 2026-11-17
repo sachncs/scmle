@@ -1,6 +1,6 @@
 """Fairness as explicit constraints on a frozen rule.
 
-Default: no constraint. A `FairnessConstraint` in the charter bounds the gap
+Default: no constraint. A `Constraint` in the charter bounds the gap
 between the groups of one attribute in the declared criterion for the frozen
 decision rule. The constraint is solved on development data (group thresholds
 that match the criterion's rate across groups, picking the one that
@@ -47,7 +47,7 @@ MIN_CLUSTERS = 20
 MIN_GROUPS = 2
 
 
-class InfeasibleConstraintsError(ValueError):
+class InfeasibleError(ValueError):
     """The declared criteria cannot hold together for these base rates."""
 
 
@@ -123,7 +123,7 @@ def newcombe(
     return lower, upper
 
 
-def rate_tables(
+def tabulate(
     y: NDArray[numpy.float64],
     acts: NDArray[numpy.float64],
     groups: NDArray[Any],
@@ -204,11 +204,11 @@ class Satisfaction:
         return dataclasses.asdict(self)
 
 
-def satisfaction_test(
+def satisfy(
     y: ArrayLike,
     acts: ArrayLike,
     groups: ArrayLike,
-    constraint: decision.FairnessConstraint,
+    constraint: decision.Constraint,
     alpha: float = 0.05,
 ) -> Satisfaction:
     """Tests whether the frozen rule's group gap is at most `max_gap`.
@@ -236,7 +236,7 @@ def satisfaction_test(
     outcomes, actions, labels = prepared(y, acts, groups)
     if not 0.0 < alpha < 1.0:
         raise errors.InputError("alpha must be strictly between 0 and 1")
-    tables = rate_tables(outcomes, actions, labels, constraint.criterion)
+    tables = tabulate(outcomes, actions, labels, constraint.criterion)
     names = sorted(str(g) for g in numpy.unique(labels))
     small = sorted(
         {
@@ -299,14 +299,14 @@ def cluster_satisfaction_test(
     acts: ArrayLike,
     groups: ArrayLike,
     clusters: ArrayLike,
-    constraint: decision.FairnessConstraint,
+    constraint: decision.Constraint,
     alpha: float = 0.05,
     draws: int = 1000,
     seed: int = 0,
 ) -> Satisfaction:
     """Tests satisfaction by resampling whole clusters of rows.
 
-    `satisfaction_test` takes rows as independent, so rows that share a
+    `satisfy` takes rows as independent, so rows that share a
     cluster (a branch, a household, a repeated customer) make its interval
     too narrow and can call a rule fair that is not. Here the clusters are
     resampled with replacement `draws` times, the largest absolute gap over
@@ -351,7 +351,7 @@ def cluster_satisfaction_test(
         raise errors.InputError("alpha must be strictly between 0 and 1")
     if draws < 1:
         raise errors.InputError("draws must be positive")
-    tables = rate_tables(outcomes, actions, labels, constraint.criterion)
+    tables = tabulate(outcomes, actions, labels, constraint.criterion)
     names = sorted(numpy.unique(labels).tolist())
     small = sorted(
         {
@@ -439,7 +439,7 @@ def base_rates(
     Raises:
         ValueError: If `groups` and `y` differ in length.
     """
-    outcomes = costs.binary_vector(y, "y")
+    outcomes = costs.dichotomous(y, "y")
     labels = numpy.asarray(groups)
     if labels.shape != outcomes.shape:
         raise errors.InputError("groups and y must have the same length")
@@ -453,7 +453,7 @@ def base_rates(
 
 
 def check_feasibility(
-    constraints: Sequence[decision.FairnessConstraint],
+    constraints: Sequence[decision.Constraint],
     y: ArrayLike,
     groups: ArrayLike,
     alpha: float = 0.05,
@@ -478,7 +478,7 @@ def check_feasibility(
         `refused` (always False, since a refusal raises).
 
     Raises:
-        InfeasibleConstraintsError: Naming the conflicting pair, when two
+        InfeasibleError: Naming the conflicting pair, when two
             declared criteria are incompatible and the groups' base rates
             differ (their interval for the difference excludes zero).
     """
@@ -500,7 +500,7 @@ def check_feasibility(
     ]
     if conflicts and differ:
         pair = conflicts[0]
-        raise InfeasibleConstraintsError(
+        raise InfeasibleError(
             f"{pair[0]} and {pair[1]} cannot both hold: the base rates "
             f"differ ({ {n: round(c / t, 4) for n, (c, t) in rates.items()} })"
         )
@@ -570,17 +570,17 @@ def development_gap(
         as rate 0.
     """
     worst = 0.0
-    for table in rate_tables(y, acts, labels, criterion).values():
+    for table in tabulate(y, acts, labels, criterion).values():
         rates = [c / t if t > 0 else 0.0 for c, t in table.values()]
         worst = max(worst, max(rates) - min(rates))
     return worst
 
 
-def fit_group_thresholds(
+def equalize(
     scores: ArrayLike,
     y: ArrayLike,
     groups: ArrayLike,
-    constraint: decision.FairnessConstraint,
+    constraint: decision.Constraint,
     t: float,
     *,
     margin: float = 0.5,
@@ -610,7 +610,7 @@ def fit_group_thresholds(
         `target_rate` is None and `constrained` is False.
 
     Raises:
-        InfeasibleConstraintsError: If no sweep point meets the bound.
+        InfeasibleError: If no sweep point meets the bound.
         ValueError: If the criterion is predictive parity, which group
             thresholds cannot move. Invalid inputs are also rejected with a
             `ValueError` by `prepared`.
@@ -662,7 +662,7 @@ def fit_group_thresholds(
                     cuts, float(rate), value, achieved, constrained=True
                 )
     if best is None:
-        raise InfeasibleConstraintsError(
+        raise InfeasibleError(
             "no group thresholds meet the development bound "
             f"{bound:.4f} for {constraint.criterion}"
         )
@@ -673,7 +673,7 @@ def frontier(
     scores: ArrayLike,
     y: ArrayLike,
     groups: ArrayLike,
-    constraint: decision.FairnessConstraint,
+    constraint: decision.Constraint,
     t: float,
     gaps: Sequence[float],
 ) -> list[dict[str, Any]]:
@@ -692,16 +692,16 @@ def frontier(
         One record per bound, in the order of `gaps`, with `max_gap` and
         `feasible`; a feasible point also carries its development
         `net_benefit` and `development_gap`. The default `margin` of
-        `fit_group_thresholds` is used. Errors other than infeasibility,
+        `equalize` is used. Errors other than infeasibility,
         including the refusal of predictive parity, propagate from
-        `fit_group_thresholds`.
+        `equalize`.
     """
     rows = []
     for gap in gaps:
         trial = dataclasses.replace(constraint, max_gap=gap)
         try:
-            fitted = fit_group_thresholds(scores, y, groups, trial, t)
-        except InfeasibleConstraintsError:
+            fitted = equalize(scores, y, groups, trial, t)
+        except InfeasibleError:
             # handled: recorded as infeasible row
             rows.append({"max_gap": gap, "feasible": False})
             continue
@@ -716,7 +716,7 @@ def frontier(
     return rows
 
 
-def price_of_constraint(
+def toll(
     y: ArrayLike,
     unconstrained: ArrayLike,
     constrained: ArrayLike,
@@ -770,7 +770,7 @@ def price_of_constraint(
 
     rng = randomness.component_rng(seed, "decision.constraints.price", 0)
     boot = price(
-        netbenefit.resample_means(
+        netbenefit.redraw(
             stats_matrix, netbenefit.factorize(clusters), replicates, rng
         )
     )

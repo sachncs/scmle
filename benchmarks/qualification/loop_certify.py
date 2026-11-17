@@ -189,7 +189,7 @@ def gate_h1(replicates: int, base: int = 0) -> dict[str, Any]:
     out: dict[str, Any] = {"replicates": replicates, "batches": T_FALSE_ALARM}
     for name, risk in (("stable", R_REF), ("boundary", R_REF + DELTA)):
         rng = numpy.random.default_rng(base)
-        monitor = sequential_tests.MixtureTest(
+        monitor = sequential_tests.Mixture(
             numpy.full(replicates, (R_REF + DELTA)),
             sequential_tests.GREATER,
             ALPHA_ALARM,
@@ -231,7 +231,7 @@ def detection(
         the fixed rule (None when none was detected).
     """
     rng = numpy.random.default_rng(base)
-    monitor = sequential_tests.MixtureTest(
+    monitor = sequential_tests.Mixture(
         numpy.full(replicates, R_REF + DELTA),
         sequential_tests.GREATER,
         ALPHA_ALARM,
@@ -313,7 +313,7 @@ def gate_h3(replicates: int, base: int = 0) -> dict[str, Any]:
                 seed=base + index,
             )
         )
-        monitor = sequential_tests.MixtureTest(
+        monitor = sequential_tests.Mixture(
             R_REF + DELTA, sequential_tests.GREATER, ALPHA_ALARM
         )
         for step in range(stream.spec.batches):
@@ -323,7 +323,7 @@ def gate_h3(replicates: int, base: int = 0) -> dict[str, Any]:
         edges[0], edges[-1] = -numpy.inf, numpy.inf
         expected = numpy.histogram(stream.z[:100].ravel(), edges)[0]
         actual = numpy.histogram(stream.z[150:].ravel(), edges)[0]
-        psi = reference.population_stability_index(
+        psi = reference.divergence(
             expected / expected.sum(), actual / actual.sum()
         )
         psi_flag += int(psi >= scmle.monitoring.monitor.Thresholds().psi_high)
@@ -386,7 +386,7 @@ def eprocess_paths(gaps: numpy.ndarray) -> numpy.ndarray:
         The log capital of each row's test after each batch, same shape.
     """
     count, batches = gaps.shape
-    test = sequential_tests.MixtureTest(
+    test = sequential_tests.Mixture(
         numpy.full(count, (DELTA_PROMO + 1.0) / 2.0),
         sequential_tests.GREATER,
         ALPHA_PROMO,
@@ -532,7 +532,7 @@ def gate_h5(replicates: int, base: int = 0) -> dict[str, Any]:
     rows: dict[str, Any] = {}
     for name, factor in (("0", 0.0), ("1", 1.0), ("2", 2.0)):
         rng = numpy.random.default_rng(base)
-        process = sequential_tests.MixtureTest(
+        process = sequential_tests.Mixture(
             numpy.full(replicates, (DELTA_RB + 1.0) / 2.0),
             sequential_tests.GREATER,
             ALPHA_RB,
@@ -665,12 +665,12 @@ def gate_h6(replicates: int, base: int = 0) -> dict[str, Any]:
         stream = mar_stream(base + index)
         estimates, seen_loss, seen_n = [], 0.0, 0
         truth.append(streams.marginal_risk(R_REF, stream.spec.dependence))
-        sequence = sequential_tests.ConfidenceSequence(ALPHA_ALARM, 99)
+        sequence = sequential_tests.Confidence(ALPHA_ALARM, 99)
         inside = True
         scale = 1.0 / 0.1
         for step in range(stream.spec.batches):
             observed = stream.selected[step]
-            estimate = labels.estimate_batch(
+            estimate = labels.weigh(
                 numpy.where(observed, stream.loss[step], numpy.nan),
                 observed,
                 stream.pi[step],
@@ -792,25 +792,23 @@ def gate_h8(replicates: int, base: int = 0) -> dict[str, Any]:
             )
             frame = pandas.DataFrame({"z": stream.next_z.reshape(-1)})
             flags = stream.bypass.reshape(-1)
-            check = labels.bypass_test(
+            check = labels.circularity(
                 frame[~flags].iloc[:300],
                 frame[flags].iloc[:300],
                 base + index,
                 permutations=99,
             )
-            fired += int(
-                labels.feedback_verdict(bypass, check) == "loop_detected"
-            )
+            fired += int(labels.assessment(bypass, check) == "loop_detected")
         results[name] = fired / runs
     bound = ALPHA_ALARM + 2 * math.sqrt(ALPHA_ALARM * (1 - ALPHA_ALARM) / runs)
     return {
         "replicates": runs,
         "detection_rate": results,
         "false_detection_bound": bound,
-        "without_bypass_slice": labels.feedback_verdict(0.0, None),
+        "without_bypass_slice": labels.assessment(0.0, None),
         "passed": bool(
             results["loop_free"] <= bound
-            and labels.feedback_verdict(0.0, None) == labels.UNVERIFIED
+            and labels.assessment(0.0, None) == labels.UNVERIFIED
         ),
     }
 
@@ -832,10 +830,10 @@ def gate_h9(replicates: int, base: int = 0) -> dict[str, Any]:
     grid = numpy.linspace(1.0, 0.0, escalation.DEFAULT_GRID)
     for index in range(runs):
         data = streams.draw_calibration(2000, R_STAR, base + index)
-        result = escalation.select_threshold(
+        result = escalation.select(
             data["score"], data["loss"], R_STAR, DELTA_CONF
         )
-        if result.everything_escalates:
+        if result.saturated:
             infinite += 1
         else:
             violations += int(streams.oracle_risk(result.tau) > R_STAR)
@@ -877,7 +875,7 @@ def gate_h10(replicates: int, base: int = 0) -> dict[str, Any]:
     rows: dict[str, Any] = {}
     for name, level in (("r_star_x_2", 2 * R_STAR), ("r_star_x_3", 3 * R_STAR)):
         rng = numpy.random.default_rng(base)
-        monitor = sequential_tests.MixtureTest(
+        monitor = sequential_tests.Mixture(
             numpy.full(replicates, R_STAR), sequential_tests.GREATER, DELTA_CONF
         )
         first = numpy.full(replicates, -1)
@@ -935,11 +933,11 @@ def sources() -> dict[str, list[Any]]:
         Mapping of gate key to the functions its certificate covers.
     """
     return {
-        "H1": [sequential_tests.MixtureTest, fixed_rule, batch_means, gate_h1],
-        "H2": [sequential_tests.MixtureTest, fixed_rule, detection, gate_h2],
-        "H3": [sequential_tests.MixtureTest, streams.simulate, gate_h3],
+        "H1": [sequential_tests.Mixture, fixed_rule, batch_means, gate_h1],
+        "H2": [sequential_tests.Mixture, fixed_rule, detection, gate_h2],
+        "H3": [sequential_tests.Mixture, streams.simulate, gate_h3],
         "H4": [
-            sequential_tests.MixtureTest,
+            sequential_tests.Mixture,
             sequential_tests.PromotionSequence,
             sequence_gaps,
             eprocess_paths,
@@ -947,11 +945,11 @@ def sources() -> dict[str, list[Any]]:
             bootstrap_rule,
             gate_h4,
         ],
-        "H5": [sequential_tests.MixtureTest, gate_h5],
+        "H5": [sequential_tests.Mixture, gate_h5],
         "H6": [
-            labels.estimate_batch,
+            labels.weigh,
             labels.classify,
-            sequential_tests.ConfidenceSequence,
+            sequential_tests.Confidence,
             streams.simulate,
             run_mnar_loop,
             scmle.governance.loop.Loop.step,
@@ -960,18 +958,18 @@ def sources() -> dict[str, list[Any]]:
         ],
         "H7": [labels.is_matured, streams.simulate, gate_h7],
         "H8": [
-            labels.bypass_test,
-            labels.feedback_verdict,
+            labels.circularity,
+            labels.assessment,
             streams.feedback_stream,
             gate_h8,
         ],
         "H9": [
-            escalation.select_threshold,
+            escalation.select,
             escalation.binomial_p_value,
             streams.draw_calibration,
             gate_h9,
         ],
-        "H10": [sequential_tests.MixtureTest, escalation.route, gate_h10],
+        "H10": [sequential_tests.Mixture, escalation.route, gate_h10],
     }
 
 

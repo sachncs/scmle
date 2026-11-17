@@ -30,7 +30,7 @@ import scmle.core.stages
 STAGES = (
     scmle.core.stages.IngestStage,
     scmle.core.stages.ProfileStage,
-    scmle.core.stages.PlanStage,
+    scmle.core.stages.Planning,
     scmle.core.stages.TrainStage,
     scmle.core.stages.SelectStage,
     scmle.core.stages.FinalEvaluationStage,

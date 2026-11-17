@@ -95,15 +95,13 @@ def audit(model_directory: pathlib.Path) -> None:
         path = model_directory / name
         if not path.is_file():
             raise errors.ArtifactError(f"missing {name}")
-        if bundle.file_sha256(path) != recorded:
+        if bundle.shasum(path) != recorded:
             raise errors.ArtifactError(
                 f"checksum mismatch: {name} was modified or corrupted"
             )
 
 
-def verify_service(
-    folder: str | pathlib.Path, environ: Mapping[str, str]
-) -> Verified:
+def inspect(folder: str | pathlib.Path, environ: Mapping[str, str]) -> Verified:
     """Verifies a service folder without deserializing anything.
 
     In production the bundle must be signed, the provenance statement must be
@@ -133,7 +131,7 @@ def verify_service(
         )
     root = pathlib.Path(folder)
     model_directory = root / "model"
-    key = signing.key_from_environment(environ)
+    key = signing.lookup(environ)
     refuse(key, production, environ.get(ALLOW_PUBLISHED_KEY) == "1")
     digest = provenance.bundle_digest(model_directory)
     signed = bundle.verify_signature(model_directory, key)
@@ -147,16 +145,14 @@ def verify_service(
     verified = False
     statement_path = root / attest.PROVENANCE_FILE
     if statement_path.exists():
-        body, verified = attest.verify_document(
-            attest.read_document(statement_path), key
-        )
+        body, verified = attest.authenticate(attest.parse(statement_path), key)
         subject = "sha256:" + str(body["subject"][0]["digest"].get("sha256"))
         if subject != digest:
             raise errors.ArtifactError(
                 "provenance names a different bundle digest than the one "
                 "in the folder"
             )
-        problems = attest.material_problems(root, body)
+        problems = attest.discrepancies(root, body)
         if problems:
             raise errors.ArtifactError(
                 "build materials changed since packaging: "

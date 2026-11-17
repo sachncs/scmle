@@ -21,8 +21,8 @@ pytestmark = pytest.mark.skipif(
     reason="the onnx extra is not installed",
 )
 
-PLAN = data.FeaturePlan(("num", "num2"), ("cat",))
-REGISTRY = registry.Catalog.with_builtins()
+PLAN = data.Blueprint(("num", "num2"), ("cat",))
+REGISTRY = registry.Catalog.stock()
 
 
 def frame(rows=400, seed=0):
@@ -48,9 +48,9 @@ def make_bundle(name, task, features=None):
                 features.num2 + (features.cat == "a") > 0.5, "yes", "no"
             )
         )
-    fitted = preprocessing.build_pipeline(
-        PLAN, REGISTRY.get(name), task, 0
-    ).fit(features, target)
+    fitted = preprocessing.instantiate(PLAN, REGISTRY.get(name), task, 0).fit(
+        features, target
+    )
     return scmle.artifacts.bundle.Bundle.create(
         fitted, PLAN, features, "y", task.value, "roc_auc", name
     ), features
@@ -192,7 +192,7 @@ def test_nan_outputs_do_not_pass_the_parity_check(monkeypatch, tmp_path):
     bundle = types.SimpleNamespace(
         classes=None,
         pipeline=Pipeline(),
-        prepare_frame=lambda rows: rows,
+        prepare=lambda rows: rows,
     )
     monkeypatch.setattr(
         onnx_export,

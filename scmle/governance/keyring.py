@@ -25,7 +25,7 @@ from scmle.contracts import errors
 from scmle.contracts import signing
 
 
-class KeyState(enum.StrEnum):
+class State(enum.StrEnum):
     """Lifecycle state of a signing key identifier."""
 
     ACTIVE = "active"
@@ -73,14 +73,14 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SigningKeyRecord:
+class Credential:
     """Public lifecycle metadata for one externally-held signing secret."""
 
     key_id: str
     owner: str
     created_at: str
     expires_at: str | None = None
-    state: KeyState = KeyState.ACTIVE
+    state: State = State.ACTIVE
     state_changed_at: str | None = None
     reason: str = ""
     replacement_key_id: str | None = None
@@ -88,12 +88,12 @@ class SigningKeyRecord:
     def __post_init__(self) -> None:
         """Validates lifecycle fields and time boundaries.
 
-        A `state` given as text is converted to `KeyState`.
+        A `state` given as text is converted to `State`.
 
         Raises:
             ValueError: If the key id, owner or a timestamp is invalid, the key
                 expires at or before its creation, the state is not a
-                `KeyState` value, a non-active key has no change time or
+                `State` value, a non-active key has no change time or
                 reason, the change precedes creation, or the replacement key
                 is blank or the key itself.
         """
@@ -105,9 +105,9 @@ class SigningKeyRecord:
             if expires <= created:
                 raise errors.InputError("expires_at must be after created_at")
         state: Any = self.state  # may be text from a persisted record
-        if not isinstance(state, KeyState):
-            object.__setattr__(self, "state", KeyState(state))
-        if self.state is not KeyState.ACTIVE:
+        if not isinstance(state, State):
+            object.__setattr__(self, "state", State(state))
+        if self.state is not State.ACTIVE:
             if self.state_changed_at is None:
                 raise errors.InputError(
                     "non-active keys require state_changed_at"
@@ -145,7 +145,7 @@ class SigningKeyRecord:
             else None
         )
         return (
-            self.state is KeyState.ACTIVE
+            self.state is State.ACTIVE
             and observed >= created
             and (expires is None or observed < expires)
         )
@@ -176,7 +176,7 @@ class SigningKeyRecord:
         signed = parse_timestamp(signed_at, "signed_at")
         observed = parse_timestamp(observed_at, "observed_at")
         created = parse_timestamp(self.created_at, "created_at")
-        if self.state is KeyState.REVOKED or signed < created:
+        if self.state is State.REVOKED or signed < created:
             return False
         if self.expires_at is not None:
             expires = parse_timestamp(self.expires_at, "expires_at")
@@ -184,7 +184,7 @@ class SigningKeyRecord:
                 return False
             if observed >= expires and not historical:
                 return False
-        if self.state is KeyState.ACTIVE:
+        if self.state is State.ACTIVE:
             return True
         if not historical or self.state_changed_at is None:
             return False
@@ -227,7 +227,7 @@ class SigningKeyRecord:
                 if record.get("expires_at") is not None
                 else None
             ),
-            state=KeyState(record.get("state", KeyState.ACTIVE)),
+            state=State(record.get("state", State.ACTIVE)),
             state_changed_at=(
                 str(record["state_changed_at"])
                 if record.get("state_changed_at") is not None
@@ -243,7 +243,7 @@ class SigningKeyRecord:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SignatureEnvelope:
+class Wrapper:
     """A signature plus the metadata needed to evaluate its lifecycle."""
 
     key_id: str
@@ -294,32 +294,32 @@ class SignatureEnvelope:
         )
 
 
-class SigningKeyRegistry:
+class Keyring:
     """Metadata registry that enforces signing and verification policy."""
 
-    def __init__(self, records: Iterable[SigningKeyRecord] = ()) -> None:
+    def __init__(self, records: Iterable[Credential] = ()) -> None:
         """Creates a registry from unique key records.
 
         Args:
             records: The key records to register.
         """
         self.lock = threading.RLock()
-        self.records: dict[str, SigningKeyRecord] = {}
+        self.records: dict[str, Credential] = {}
         for record in records:
             self.register(record)
 
-    def register(self, record: SigningKeyRecord) -> None:
+    def register(self, record: Credential) -> None:
         """Adds a key record without replacing an existing identity.
 
         Args:
             record: The key record.
 
         Raises:
-            TypeError: If `record` is not a `SigningKeyRecord`.
+            TypeError: If `record` is not a `Credential`.
             ValueError: If the key id is already registered.
         """
-        if not isinstance(record, SigningKeyRecord):
-            raise errors.KindError("record must be SigningKeyRecord")
+        if not isinstance(record, Credential):
+            raise errors.KindError("record must be Credential")
         with self.lock:
             if record.key_id in self.records:
                 raise errors.InputError(
@@ -327,7 +327,7 @@ class SigningKeyRegistry:
                 )
             self.records[record.key_id] = record
 
-    def get(self, key_id: str) -> SigningKeyRecord:
+    def get(self, key_id: str) -> Credential:
         """Returns the record of a key, refusing an unknown one.
 
         Args:
@@ -350,7 +350,7 @@ class SigningKeyRegistry:
         changed_at: str,
         reason: str,
         replacement_key_id: str | None = None,
-    ) -> SigningKeyRecord:
+    ) -> Credential:
         """Stops new signatures while retaining historical verification.
 
         The refusals are those of `transition`.
@@ -366,15 +366,13 @@ class SigningKeyRegistry:
         """
         return self.transition(
             key_id,
-            KeyState.RETIRED,
+            State.RETIRED,
             changed_at,
             reason,
             replacement_key_id,
         )
 
-    def revoke(
-        self, key_id: str, changed_at: str, reason: str
-    ) -> SigningKeyRecord:
+    def revoke(self, key_id: str, changed_at: str, reason: str) -> Credential:
         """Immediately invalidates signatures made by a compromised key.
 
         An active or a retired key can be revoked (a retired key still
@@ -389,16 +387,16 @@ class SigningKeyRegistry:
         Returns:
             The updated record.
         """
-        return self.transition(key_id, KeyState.REVOKED, changed_at, reason)
+        return self.transition(key_id, State.REVOKED, changed_at, reason)
 
     def transition(
         self,
         key_id: str,
-        state: KeyState,
+        state: State,
         changed_at: str,
         reason: str,
         replacement_key_id: str | None = None,
-    ) -> SigningKeyRecord:
+    ) -> Credential:
         """Applies one explicit lifecycle transition.
 
         Args:
@@ -421,13 +419,13 @@ class SigningKeyRegistry:
         """
         with self.lock:  # Read, validate and replace as one step.
             current = self.get(key_id)
-            if current.state is not KeyState.ACTIVE and not (
-                current.state is KeyState.RETIRED and state is KeyState.REVOKED
+            if current.state is not State.ACTIVE and not (
+                current.state is State.RETIRED and state is State.REVOKED
             ):
                 raise errors.InputError(
                     f"key is already {current.state.value}: {key_id}"
                 )
-            if state is KeyState.ACTIVE:
+            if state is State.ACTIVE:
                 raise errors.InputError("active is not a terminal transition")
             updated = dataclasses.replace(
                 current,
@@ -442,7 +440,7 @@ class SigningKeyRegistry:
             )
             if replacement_key_id is not None:
                 replacement = self.get(replacement_key_id)
-                if replacement.state is not KeyState.ACTIVE:
+                if replacement.state is not State.ACTIVE:
                     raise errors.InputError("replacement key must be active")
             self.records[key_id] = updated
             return updated
@@ -453,7 +451,7 @@ class SigningKeyRegistry:
         key_id: str,
         secret: str | bytes,
         signed_at: str,
-    ) -> SignatureEnvelope:
+    ) -> Wrapper:
         """Creates a signature only with an active, non-expired key.
 
         Args:
@@ -473,16 +471,16 @@ class SigningKeyRegistry:
         record = self.get(key_id)
         if not record.signs(signed_at):
             raise errors.InputError(f"signing key cannot sign: {key_id}")
-        return SignatureEnvelope(
+        return Wrapper(
             key_id=key_id,
             signed_at=signed_at,
-            value=signing.sign_payload(payload, secret),
+            value=signing.mac(payload, secret),
         )
 
     def verify(
         self,
         payload: Mapping[str, Any],
-        envelope: SignatureEnvelope,
+        envelope: Wrapper,
         secrets: Mapping[str, str | bytes],
         observed_at: str,
         historical: bool = False,
@@ -502,17 +500,17 @@ class SigningKeyRegistry:
             the signature and the signature matches the payload.
 
         Raises:
-            TypeError: If `envelope` is not a `SignatureEnvelope`.
+            TypeError: If `envelope` is not a `Wrapper`.
         """
-        if not isinstance(envelope, SignatureEnvelope):
-            raise errors.KindError("envelope must be SignatureEnvelope")
+        if not isinstance(envelope, Wrapper):
+            raise errors.KindError("envelope must be Wrapper")
         record = self.records.get(envelope.key_id)
         secret = secrets.get(envelope.key_id)
         if record is None or secret is None:
             return False
         if not record.verifies(envelope.signed_at, observed_at, historical):
             return False
-        expected = signing.sign_payload(payload, secret)
+        expected = signing.mac(payload, secret)
         return hmac.compare_digest(envelope.value, expected)
 
     def to_dict(self) -> dict[str, Any]:
@@ -555,7 +553,7 @@ class SigningKeyRegistry:
         keys = record.get("keys")
         if not isinstance(keys, list):
             raise errors.InputError("signing-key registry keys must be a list")
-        return cls(SigningKeyRecord.from_dict(item) for item in keys)
+        return cls(Credential.from_dict(item) for item in keys)
 
     @classmethod
     def from_json(cls, value: str) -> Self:
@@ -622,10 +620,10 @@ class SigningKeyRegistry:
 
 
 __all__ = [
-    "KeyState",
-    "SignatureEnvelope",
-    "SigningKeyRecord",
-    "SigningKeyRegistry",
+    "Credential",
+    "Keyring",
+    "State",
+    "Wrapper",
     "parse_timestamp",
     "require_text",
 ]

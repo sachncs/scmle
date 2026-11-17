@@ -6,13 +6,11 @@ import pytest
 from scmle.data.charter import contracts
 from scmle.data.framing import costs
 
-HUMAN = (costs.CostSource.HUMAN,) * 4
+HUMAN = (costs.Basis.HUMAN,) * 4
 
 
 def model(c00=0.0, c01=5.0, c10=1.0, c11=0.0, lo=0.05, hi=0.5):
-    return costs.DecisionCostModel(
-        c00, c01, c10, c11, lo, hi, HUMAN, costs.CostSource.HUMAN
-    )
+    return costs.Tariff(c00, c01, c10, c11, lo, hi, HUMAN, costs.Basis.HUMAN)
 
 
 def reference_nb(y, a, t):
@@ -33,7 +31,7 @@ def test_identity_over_random_cost_matrices():
         rng = numpy.random.default_rng(draw)
         c00, c11 = rng.normal(size=2)
         c_fp, c_fn = rng.uniform(0.1, 5.0, size=2)
-        m = costs.DecisionCostModel(
+        m = costs.Tariff(
             c00,
             c11 + c_fn,
             c00 + c_fp,
@@ -41,7 +39,7 @@ def test_identity_over_random_cost_matrices():
             0.001,
             0.999,
             HUMAN,
-            costs.CostSource.HUMAN,
+            costs.Basis.HUMAN,
         )
         y = (rng.random(40) < rng.uniform(0.05, 0.95)).astype(float)
         a = (rng.random(40) < 0.5).astype(float)
@@ -76,13 +74,13 @@ def test_decision_curve_rethresholds_and_matches_reference():
     for t, got in zip(grid, curve["model"], strict=True):
         rule = [int(s >= t) for s in scores]
         assert got == pytest.approx(reference_nb(list(y), rule, t), abs=1e-9)
-    assert len(costs.net_benefit_curve(y, scores > 0.5, grid)["all"]) == 3
+    assert len(costs.benefits(y, scores > 0.5, grid)["all"]) == 3
 
 
 def test_dominated_action_is_refused():
-    with pytest.raises(costs.DominatedActionError):
+    with pytest.raises(costs.DominatedError):
         model(c10=0.0)  # c_FP = 0
-    with pytest.raises(costs.DominatedActionError):
+    with pytest.raises(costs.DominatedError):
         model(c01=-1.0)  # c_FN < 0
 
 
@@ -96,22 +94,22 @@ def test_range_must_contain_the_implied_threshold():
 
 def test_round_trip_and_unverified_entries():
     m = model()
-    assert costs.DecisionCostModel.from_dict(m.to_dict()) == m
-    assert m.unverified_entries == ()
-    data = costs.DecisionCostModel(
+    assert costs.Tariff.from_dict(m.to_dict()) == m
+    assert m.unreviewed == ()
+    data = costs.Tariff(
         0,
         5,
         1,
         0,
         0.05,
         0.5,
-        (costs.CostSource.DATA, *HUMAN[1:]),
-        costs.CostSource.TEMPLATE,
+        (costs.Basis.DATA, *HUMAN[1:]),
+        costs.Basis.TEMPLATE,
     )
-    assert data.unverified_entries == ("c_00",)
+    assert data.unreviewed == ("c_00",)
     assert data.model_hash != m.model_hash
     with pytest.raises(ValueError):
-        costs.DecisionCostModel.from_dict({**m.to_dict(), "extra": 1})
+        costs.Tariff.from_dict({**m.to_dict(), "extra": 1})
 
 
 @pytest.mark.parametrize("bad", [[0, 2], [], [[0, 1]]])

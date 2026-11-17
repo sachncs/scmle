@@ -26,7 +26,7 @@ BINARY_CLASSES = 2
 MIN_DISTINCT_VALUES = 2
 
 
-class FeatureConstructor(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
+class Constructor(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
     """Appends pairwise differences and ratios of the most informative columns.
 
     The columns that are combined are the numeric ones most associated with

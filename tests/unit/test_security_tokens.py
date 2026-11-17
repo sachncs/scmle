@@ -11,7 +11,7 @@ from tests import support_identity
 
 def verifier(clock, *keys, revocations=None, **options):
     return tokens.Verifier(
-        tokens.KeySet([tokens.Key.from_jwk(k) for k in keys]),
+        tokens.KeySet([tokens.Key.jwk(k) for k in keys]),
         support_identity.ISSUER,
         support_identity.AUDIENCE,
         revocations=revocations,
@@ -76,9 +76,9 @@ def test_a_tampered_payload_is_refused():
     clock = support_identity.Clock()
     check = verifier(clock, support_identity.hs_jwk("hs-1"))
     head, body, signature = hs_token(clock).split(".")
-    claims = json.loads(tokens.decode_segment(body))
+    claims = json.loads(tokens.unbase(body))
     claims["scope"] = "model:admin"
-    changed = tokens.encode_segment(json.dumps(claims).encode())
+    changed = tokens.pack(json.dumps(claims).encode())
     assert refused(check, f"{head}.{changed}.{signature}") == (
         tokens.BAD_SIGNATURE
     )
@@ -209,8 +209,8 @@ def test_rotation_keeps_old_tokens_until_the_old_key_expires():
     assert check.verify(old)
     both = tokens.KeySet(
         [
-            tokens.Key.from_jwk(support_identity.rsa_jwk("k1", "rs-old")),
-            tokens.Key.from_jwk(support_identity.rsa_jwk("k2", "rs-new")),
+            tokens.Key.jwk(support_identity.rsa_jwk("k1", "rs-old")),
+            tokens.Key.jwk(support_identity.rsa_jwk("k2", "rs-new")),
         ]
     )
     check.keys = both
@@ -219,7 +219,7 @@ def test_rotation_keeps_old_tokens_until_the_old_key_expires():
     )
     assert check.verify(old) and check.verify(new)
     check.keys = tokens.KeySet(
-        [tokens.Key.from_jwk(support_identity.rsa_jwk("k2", "rs-new"))]
+        [tokens.Key.jwk(support_identity.rsa_jwk("k2", "rs-new"))]
     )
     assert refused(check, old) == tokens.UNKNOWN_KEY
     assert check.verify(new)
@@ -233,7 +233,7 @@ def test_weak_or_malformed_keys_are_refused():
     with pytest.raises(errors.ConfigError):
         tokens.Key("k", "ES256")
     with pytest.raises(errors.ConfigError):
-        tokens.Key.from_jwk({"kty": "EC", "kid": "k"})
+        tokens.Key.jwk({"kty": "EC", "kid": "k"})
     with pytest.raises(errors.ConfigError):
         tokens.KeySet([])
     twin = tokens.Key("k", tokens.HS256, secret=support_identity.HS_SECRET)
@@ -265,7 +265,7 @@ def test_a_short_hs256_secret_cannot_mint():
 
 def test_a_non_numeric_validity_bound_is_a_config_error():
     with pytest.raises(errors.ConfigError):
-        tokens.Key.from_jwk({**support_identity.hs_jwk("hs-1"), "exp": "soon"})
+        tokens.Key.jwk({**support_identity.hs_jwk("hs-1"), "exp": "soon"})
 
 
 @pytest.mark.parametrize("document", ["[]", '"keys"', "5", "null"])

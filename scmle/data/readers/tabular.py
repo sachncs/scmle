@@ -1,6 +1,6 @@
 """Dataset ingestion and manifest construction.
 
-Readers are polymorphic: `DatasetLoader` dispatches on file suffix to a
+Readers are polymorphic: `Loader` dispatches on file suffix to a
 `TableReader` subclass, so supporting a new format means adding one class.
 """
 
@@ -57,7 +57,7 @@ class Csv(TableReader):
         return pandas.read_csv(path)
 
 
-class TsvReader(TableReader):
+class Tsv(TableReader):
     """Tab-separated values."""
 
     suffixes = (".tsv", ".tab", ".tsv.gz", ".tab.gz")
@@ -168,7 +168,7 @@ class Feather(TableReader):
         return pandas.read_feather(path)
 
 
-class DatasetLoader:
+class Loader:
     """Dispatches file reads to the matching `TableReader`.
 
     Attributes:
@@ -183,7 +183,7 @@ class DatasetLoader:
         """
         self.readers = readers or (
             Csv(),
-            TsvReader(),
+            Tsv(),
             Json(),
             Jsonl(),
             Excel(),
@@ -191,7 +191,7 @@ class DatasetLoader:
             Feather(),
         )
 
-    def supported_suffixes(self) -> list[str]:
+    def extensions(self) -> list[str]:
         """Lists every suffix some reader handles.
 
         Returns:
@@ -199,7 +199,7 @@ class DatasetLoader:
         """
         return sorted(s for reader in self.readers for s in reader.suffixes)
 
-    def reader_for(self, path: pathlib.Path) -> TableReader:
+    def pick(self, path: pathlib.Path) -> TableReader:
         """Selects the reader for `path`.
 
         Args:
@@ -218,7 +218,7 @@ class DatasetLoader:
                 return reader
         raise errors.DataError(
             f"unsupported file type '{path.name}'; "
-            f"use one of {self.supported_suffixes()}"
+            f"use one of {self.extensions()}"
         )
 
     def load(self, uri: str | pathlib.Path) -> pandas.DataFrame:
@@ -237,7 +237,7 @@ class DatasetLoader:
         path = pathlib.Path(uri)
         if not path.exists():
             raise errors.DataError(f"dataset not found: {path}")
-        reader = self.reader_for(path)
+        reader = self.pick(path)
         try:
             frame = reader.load(path)
         except Exception as error:  # Parser errors vary by engine.
@@ -260,9 +260,9 @@ def read_table(uri: str | pathlib.Path) -> pandas.DataFrame:
         uri: Path to a supported file.
 
     Returns:
-        The table, as validated by `DatasetLoader.load`.
+        The table, as validated by `Loader.load`.
     """
-    return DatasetLoader().load(uri)
+    return Loader().load(uri)
 
 
 def schema_hash(frame: pandas.DataFrame) -> str:
@@ -294,7 +294,7 @@ def data_hash(frame: pandas.DataFrame) -> str:
     return hashlib.sha256(rows.tobytes()).hexdigest()[:16]
 
 
-def canonical_uri(uri: str | pathlib.Path) -> str:
+def canonicalize(uri: str | pathlib.Path) -> str:
     """Returns the canonical URI used for snapshot identity and lineage.
 
     Empty strings and the two supported in-memory markers are represented as
@@ -325,7 +325,7 @@ def canonical_uri(uri: str | pathlib.Path) -> str:
     return pathlib.Path(value).expanduser().resolve(strict=False).as_uri()
 
 
-def uri_semantics(uri: str | pathlib.Path) -> str:
+def semantic(uri: str | pathlib.Path) -> str:
     """Returns the acquisition semantics directly implied by ``uri``.
 
     Args:
@@ -334,7 +334,7 @@ def uri_semantics(uri: str | pathlib.Path) -> str:
     Returns:
         ``memory``, ``local-file``, or ``<scheme>-uri``.
     """
-    scheme = urlsplit(canonical_uri(uri)).scheme
+    scheme = urlsplit(canonicalize(uri)).scheme
     if scheme == "memory":
         return "memory"
     if scheme == "file":
@@ -360,7 +360,7 @@ def raw_source_hash(uri: str | pathlib.Path) -> str:
         DataError: If the file exists but cannot be read; an empty digest
             would be indistinguishable from "not a file" (ERR-14).
     """
-    parsed = urlsplit(canonical_uri(uri))
+    parsed = urlsplit(canonicalize(uri))
     if parsed.scheme != "file":
         return ""
     path = pathlib.Path(url2pathname(parsed.path))
@@ -378,7 +378,7 @@ def raw_source_hash(uri: str | pathlib.Path) -> str:
     return digest.hexdigest()
 
 
-def snapshot_identity(frame: pandas.DataFrame, uri: str | pathlib.Path) -> str:
+def identify(frame: pandas.DataFrame, uri: str | pathlib.Path) -> str:
     """Returns a full deterministic identity for a tabular snapshot.
 
     The identity includes the ordered schema, ordered row content, shape,
@@ -411,14 +411,14 @@ def snapshot_identity(frame: pandas.DataFrame, uri: str | pathlib.Path) -> str:
             content_digest,
             str(frame.shape[0]),
             str(frame.shape[1]),
-            canonical_uri(uri),
+            canonicalize(uri),
             raw_source_hash(uri),
         )
     )
     return f"snap_{hashlib.sha256(payload.encode('utf-8')).hexdigest()}"
 
 
-def build_manifest(
+def manifested(
     frame: pandas.DataFrame,
     target: str,
     uri: str | pathlib.Path = "",
@@ -445,7 +445,7 @@ def build_manifest(
             f"columns: {list(frame.columns)[:20]}"
         )
     content_hash = data_hash(frame)
-    identity = snapshot_identity(frame, uri)
+    identity = identify(frame, uri)
     raw_hash = raw_source_hash(uri)
     object_hashes = {"tabular-frame": content_hash}
     if raw_hash:
@@ -460,17 +460,17 @@ def build_manifest(
         uri=str(uri),
         snapshot_id=identity,
         modality=modality,
-        source=data.SourceMetadata(
-            acquisition_method=uri_semantics(uri),
+        source=data.Origin(
+            acquisition_method=semantic(uri),
         ),
-        lineage=data.LineageMetadata(
+        lineage=data.Ancestry(
             source_snapshot=identity,
             object_hashes=object_hashes,
         ),
     )
 
 
-def replace_infinities(
+def sanitize(
     frame: pandas.DataFrame,
 ) -> tuple[pandas.DataFrame, dict[str, int]]:
     """Maps +/-inf in numeric columns to NaN (they carry no usable value).

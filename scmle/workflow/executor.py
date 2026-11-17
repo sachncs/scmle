@@ -27,7 +27,7 @@ leaves a consistent record and a new one continues from it.
   decision from a listed approver, who must not be the requester, is recorded;
   a rejection or expiry ends the run without the approved actions.
 * **Leases.** A run holds a lease with an owner and a fencing token, renewed
-  by a heartbeat while steps run. A second executor gets `RunInFlightError`
+  by a heartbeat while steps run. A second executor gets `BusyError`
   while it is valid and may take over after it expires (the first one is
   presumed dead) with one compare-and-swap that raises the token, so two
   executors racing for it cannot both win. Renewal and release check owner
@@ -65,7 +65,7 @@ LEASE_SECONDS = 300.0
 LEASE_ATTEMPTS = 3
 LOGGER = logging.getLogger(__name__)
 # A conditional write on a lease that changed or vanished under us.
-CHANGED = (objectstore.ConflictError, objectstore.NotFoundError)
+CHANGED = (objectstore.ConflictError, objectstore.AbsentError)
 # Retries for writing a step's success record after the handler succeeded:
 # store writes only, never the handler (ERR-7). Policy: three attempts over
 # about three seconds ride out a throttled or briefly unreachable store.
@@ -157,13 +157,13 @@ class Phase(enum.StrEnum):
     EXPIRED = "expired"
 
 
-class RunInFlightError(errors.ScmleError):
+class BusyError(errors.ScmleError):
     """Another executor holds a valid lease on the run."""
 
     category = "run_in_flight"
 
 
-class EvictionError(RunInFlightError):
+class EvictionError(BusyError):
     """This executor no longer holds the run's lease and must stop writing."""
 
     category = "lease_lost"
@@ -175,7 +175,7 @@ class ConcurrencyLimitError(errors.ScmleError):
     category = "concurrency_limit"
 
 
-class StepTimeoutError(errors.ScmleError):
+class DeadlineError(errors.ScmleError):
     """A step passed its timeout."""
 
     category = "timeout"
@@ -187,7 +187,7 @@ class StepBudgetError(errors.ScmleError):
     category = "budget"
 
 
-class StepInterruptedError(retry.TransientError):
+class PreemptedError(retry.TransientError):
     """The step's compute was taken away; the step is retried."""
 
     category = "interrupted"
@@ -233,11 +233,11 @@ class StepContext:
         """Raises if the step is past its timeout.
 
         Raises:
-            StepTimeoutError: If more than the step's timeout has passed since
+            DeadlineError: If more than the step's timeout has passed since
                 the attempt started.
         """
         if self.clock() - self.started > self.step.timeout_seconds:
-            raise StepTimeoutError(
+            raise DeadlineError(
                 f"{self.step.name} passed {self.step.timeout_seconds}s"
             )
 
@@ -384,7 +384,7 @@ class Executor:
         """
         try:
             data = self.store.get(key)[0]
-        except objectstore.NotFoundError:
+        except objectstore.AbsentError:
             # handled: missing object returned as None, documented
             return None
         return parse(key, data)
@@ -455,8 +455,8 @@ class Executor:
             }
         ).encode()
 
-    def take_lease(self, run_id: str) -> None:
-        """Acquires the run's lease, or raises `RunInFlightError`.
+    def acquire(self, run_id: str) -> None:
+        """Acquires the run's lease, or raises `BusyError`.
 
         A free run is taken with a conditional create. An expired lease is
         taken over with one compare-and-swap from the version just read, so
@@ -467,14 +467,14 @@ class Executor:
             run_id: The run.
 
         Raises:
-            RunInFlightError: If another executor holds a valid lease, or wins
+            BusyError: If another executor holds a valid lease, or wins
                 the race for an expired one.
         """
         key = self.base(run_id) + "lock"
         for ignored in range(LEASE_ATTEMPTS):
             try:
                 self.store.put(key, self.lease(run_id, 1), if_absent=True)
-            except objectstore.AlreadyExistsError:
+            except objectstore.ExistsError:
                 # handled: existing lease is expected; falls through to read and
                 # check it
                 pass
@@ -483,15 +483,13 @@ class Executor:
                 return
             try:
                 data, meta = self.store.get(key)
-            except objectstore.NotFoundError:
+            except objectstore.AbsentError:
                 # handled: lease vanished mid-read; bounded retry then
-                # RunInFlightError
+                # BusyError
                 continue
             held = parse(key, data)
             if held["expires"] > self.clock():
-                raise RunInFlightError(
-                    f"run {run_id} is held by {held['owner']}"
-                )
+                raise BusyError(f"run {run_id} is held by {held['owner']}")
             fence = int(held.get("fence", 0)) + 1
             try:
                 self.store.put(
@@ -499,14 +497,12 @@ class Executor:
                 )
             except (
                 objectstore.ConflictError,
-                objectstore.NotFoundError,
+                objectstore.AbsentError,
             ) as error:
-                raise RunInFlightError(
-                    f"run {run_id} was just taken"
-                ) from error
+                raise BusyError(f"run {run_id} was just taken") from error
             self.fences[run_id] = fence
             return
-        raise RunInFlightError(f"run {run_id} is changing hands; retry")
+        raise BusyError(f"run {run_id} is changing hands; retry")
 
     def hold(self, run_id: str) -> objectstore.ObjectMeta:
         """Checks that this executor still holds the run's lease.
@@ -525,7 +521,7 @@ class Executor:
         fence = self.fences.get(run_id)
         try:
             data, meta = self.store.get(self.base(run_id) + "lock")
-        except objectstore.NotFoundError:
+        except objectstore.AbsentError:
             raise EvictionError(f"the lease on run {run_id} is gone") from None
         held = parse(self.base(run_id) + "lock", data)
         if (
@@ -561,7 +557,7 @@ class Executor:
                 f"the lease on run {run_id} changed while renewing"
             ) from error
 
-    def release_lease(self, run_id: str) -> None:
+    def relinquish(self, run_id: str) -> None:
         """Gives the lease up, never one another executor now holds.
 
         Args:
@@ -644,7 +640,7 @@ class Executor:
         Invoking the same trigger again returns the finished record without
         running anything, or continues an unfinished run after its lease
         expired. Driving a run can raise `ConcurrencyLimitError` (the workflow
-        has its maximum of runs in flight), `RunInFlightError` (another
+        has its maximum of runs in flight), `BusyError` (another
         executor holds the run's lease) and ConfigError (the run was started
         with a different workflow definition).
 
@@ -700,7 +696,7 @@ class Executor:
 
         Returns:
             The run record when the run stops. Another executor holding the
-            lease raises `RunInFlightError` (from `take_lease`).
+            lease raises `BusyError` (from `acquire`).
 
         Raises:
             ConcurrencyLimitError: If the workflow already has its maximum
@@ -713,7 +709,7 @@ class Executor:
             raise ConcurrencyLimitError(
                 f"{len(others)} runs of {self.workflow.name} are in flight"
             )
-        self.take_lease(run_id)
+        self.acquire(run_id)
         try:
             if len(self.scan()) > self.workflow.max_concurrent_runs:
                 raise ConcurrencyLimitError(
@@ -740,7 +736,7 @@ class Executor:
             self.write(self.base(run_id) + "run.json", record)
             return record
         finally:
-            self.release_lease(run_id)
+            self.relinquish(run_id)
 
     # ---- the run loop ----------------------------------------------------
 
@@ -838,7 +834,7 @@ class Executor:
         ):
             return False
         states[step.name] = Phase.SKIPPED.value
-        self.save_step(run_id, step, Phase.SKIPPED, reason="upstream")
+        self.stash(run_id, step, Phase.SKIPPED, reason="upstream")
         return True
 
     def admit(
@@ -861,11 +857,11 @@ class Executor:
         if any(states[d] != Phase.SUCCEEDED for d in step.depends_on):
             return False
         group = step.concurrency_group
-        return group is None or group_use.get(
-            group, 0
-        ) < self.workflow.group_limit(group)
+        return group is None or group_use.get(group, 0) < self.workflow.quota(
+            group
+        )
 
-    def settle_approval_step(
+    def adjudicate(
         self,
         run_id: str,
         step: definition.Step,
@@ -930,8 +926,7 @@ class Executor:
                 continue
             if step.kind is definition.StepKind.APPROVAL:
                 changed = (
-                    self.settle_approval_step(run_id, step, states, outputs)
-                    or changed
+                    self.adjudicate(run_id, step, states, outputs) or changed
                 )
                 continue
             if len(in_flight) >= self.workflow.max_parallel:
@@ -1006,7 +1001,7 @@ class Executor:
         ):
             for name, state in states.items():
                 if state == Phase.PENDING.value:
-                    self.save_step(
+                    self.stash(
                         run_id,
                         self.workflow.step(name),
                         Phase.SKIPPED,
@@ -1085,7 +1080,7 @@ class Executor:
             ]
         )
 
-    def save_step(
+    def stash(
         self,
         run_id: str,
         step: definition.Step,
@@ -1154,7 +1149,7 @@ class Executor:
                 run_spent=run_spent + total,
                 run_budget=self.workflow.cost_budget,
             )
-            self.save_step(
+            self.stash(
                 run_id,
                 step,
                 Phase.RUNNING,
@@ -1217,7 +1212,7 @@ class Executor:
                 total += context.spent
                 attempts.append({"attempt": attempt, "state": "succeeded"})
                 save = functools.partial(
-                    self.save_step,
+                    self.stash,
                     run_id,
                     step,
                     Phase.SUCCEEDED,
@@ -1228,7 +1223,7 @@ class Executor:
                 )
                 retry.call(save, WRITES, sleep=self.sleep)
                 return Phase.SUCCEEDED.value, result, total
-        self.save_step(
+        self.stash(
             run_id,
             step,
             Phase.FAILED,
@@ -1265,7 +1260,7 @@ class Executor:
             "at": at,
         }
 
-    def sign_approval(
+    def decide(
         self,
         run_id: str,
         step: str,
@@ -1290,13 +1285,13 @@ class Executor:
         """
         moment = self.clock() if at is None else at
         payload = self.compose(run_id, step, approver, decision, moment)
-        return {**payload, "signature": signing.sign_payload(payload, key)}
+        return {**payload, "signature": signing.mac(payload, key)}
 
-    def submit_approval(self, decision: Mapping[str, Any]) -> None:
+    def ratify(self, decision: Mapping[str, Any]) -> None:
         """Records a signed decision after checking it.
 
         Args:
-            decision: A decision produced by `sign_approval`. A decision that
+            decision: A decision produced by `decide`. A decision that
                 names a step the workflow does not have raises `ConfigError`
                 (from `Workflow.step`).
 
@@ -1328,7 +1323,7 @@ class Executor:
             float(decision["at"]),
         )
         if key is None or not hmac.compare_digest(
-            signing.sign_payload(payload, key),
+            signing.mac(payload, key),
             str(decision.get("signature", "")),
         ):
             raise ApprovalError("the approval signature does not verify")
@@ -1355,7 +1350,7 @@ class Executor:
         decision = self.read(f"{self.base(run_id)}approvals/{step.name}.json")
         if decision is not None:
             if decision["decision"] == "approve":
-                self.save_step(
+                self.stash(
                     run_id,
                     step,
                     Phase.SUCCEEDED,
@@ -1364,7 +1359,7 @@ class Executor:
                     idempotency_key="approval",
                 )
                 return Phase.SUCCEEDED
-            self.save_step(
+            self.stash(
                 run_id, step, Phase.REJECTED, approver=decision["approver"]
             )
             return Phase.REJECTED
@@ -1375,7 +1370,7 @@ class Executor:
             else self.clock()
         )
         if self.clock() - since > step.expires_seconds:
-            self.save_step(run_id, step, Phase.EXPIRED, waiting_since=since)
+            self.stash(run_id, step, Phase.EXPIRED, waiting_since=since)
             return Phase.EXPIRED
-        self.save_step(run_id, step, Phase.WAITING, waiting_since=since)
+        self.stash(run_id, step, Phase.WAITING, waiting_since=since)
         return Phase.WAITING

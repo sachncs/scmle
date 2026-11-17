@@ -16,7 +16,7 @@ from scmle.data.readers import connectors
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SourceSnapshot:
+class Observation:
     """Immutable identity and source schema for one observed snapshot.
 
     Attributes:
@@ -73,7 +73,7 @@ class SourceSnapshot:
             raise errors.InputError("schema names and types must not be empty")
 
     @classmethod
-    def from_manifest(
+    def restore(
         cls,
         manifest: data.DatasetManifest,
         schema: Mapping[str, str],
@@ -92,9 +92,7 @@ class SourceSnapshot:
             manifest; the raw source hash is taken from the manifest's
             ``raw-source`` lineage hash, or is empty when absent.
         """
-        source_uri = connectors.canonical_source_uri(
-            manifest.uri or "memory://"
-        )
+        source_uri = connectors.canonicalize(manifest.uri or "memory://")
         return cls(
             source_id=connectors.source_identity(source_uri),
             source_uri=source_uri,
@@ -217,9 +215,7 @@ class Compatibility:
         }
 
 
-def diff(
-    previous: SourceSnapshot | None, current: SourceSnapshot
-) -> Compatibility:
+def diff(previous: Observation | None, current: Observation) -> Compatibility:
     """Compares two snapshots without silently accepting breaking changes.
 
     Args:
@@ -255,7 +251,7 @@ def diff(
 
 
 @dataclasses.dataclass
-class SourceRegistry:
+class Sources:
     """Append-only source snapshot history for a run or source project.
 
     Attributes:
@@ -263,11 +259,11 @@ class SourceRegistry:
             registration order.
     """
 
-    snapshots: dict[str, tuple[SourceSnapshot, ...]] = dataclasses.field(
+    snapshots: dict[str, tuple[Observation, ...]] = dataclasses.field(
         default_factory=dict
     )
 
-    def register(self, snapshot: SourceSnapshot) -> None:
+    def register(self, snapshot: Observation) -> None:
         """Registers a snapshot idempotently and rejects conflicting repeats.
 
         Registering a snapshot whose id is already present with identical
@@ -301,7 +297,7 @@ class SourceRegistry:
                 return
         self.snapshots[snapshot.source_id] = (*history, snapshot)
 
-    def latest(self, source_id: str) -> SourceSnapshot | None:
+    def latest(self, source_id: str) -> Observation | None:
         """Finds the most recently registered snapshot for a source.
 
         Args:
@@ -313,7 +309,7 @@ class SourceRegistry:
         history = self.snapshots.get(source_id, ())
         return history[-1] if history else None
 
-    def compatibility(self, snapshot: SourceSnapshot) -> Compatibility:
+    def compatibility(self, snapshot: Observation) -> Compatibility:
         """Compares a candidate snapshot with the source's latest snapshot.
 
         Args:
@@ -392,7 +388,7 @@ class SourceRegistry:
             if not isinstance(snapshots, list):
                 raise errors.InputError("source snapshots must be a list")
             for item in snapshots:
-                snapshot = SourceSnapshot.from_dict(item)
+                snapshot = Observation.from_dict(item)
                 if snapshot.source_id != source_id:
                     raise errors.InputError(
                         "snapshot source id does not match registry"
@@ -420,7 +416,7 @@ class SourceRegistry:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SourceRegistryStore:
+class Registry:
     """Durable, atomic file store for source history across runs.
 
     Attributes:
@@ -429,17 +425,17 @@ class SourceRegistryStore:
 
     path: pathlib.Path
 
-    def load(self) -> SourceRegistry:
+    def load(self) -> Sources:
         """Loads the registry or returns an empty registry for a new store.
 
         Returns:
             The stored registry, or an empty one if the file does not exist.
         """
         if not self.path.exists():
-            return SourceRegistry()
-        return SourceRegistry.from_json(self.path.read_text(encoding="utf-8"))
+            return Sources()
+        return Sources.from_json(self.path.read_text(encoding="utf-8"))
 
-    def save(self, registry: SourceRegistry) -> None:
+    def save(self, registry: Sources) -> None:
         """Atomically publishes a complete registry snapshot.
 
         A failed serialization or write leaves the previous registry intact.
@@ -450,10 +446,10 @@ class SourceRegistryStore:
             registry: The complete registry to publish.
 
         Raises:
-            TypeError: If `registry` is not a `SourceRegistry`.
+            TypeError: If `registry` is not a `Sources`.
         """
-        if not isinstance(registry, SourceRegistry):
-            raise errors.KindError("registry must be SourceRegistry")
+        if not isinstance(registry, Sources):
+            raise errors.KindError("registry must be Sources")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(
             prefix=f".{self.path.name}.", dir=self.path.parent
@@ -472,7 +468,7 @@ class SourceRegistryStore:
             pathlib.Path(temporary_name).unlink(missing_ok=True)
             raise
 
-    def register(self, snapshot: SourceSnapshot) -> Compatibility:
+    def register(self, snapshot: Observation) -> Compatibility:
         """Compares, registers, and durably publishes one source snapshot.
 
         Args:

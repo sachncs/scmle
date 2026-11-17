@@ -3,7 +3,7 @@
 Unpickling executes code, so a payload is unpickled only after it is
 authenticated. An envelope is a magic line, one JSON header line and the raw
 payload bytes. The header holds the caller's metadata, the payload's SHA-256
-and an HMAC over both, made with the signing key (`signing.resolve_key`).
+and an HMAC over both, made with the signing key (`signing.keying`).
 `read` parses the header without executing anything, checks the digest and
 the HMAC, and returns the payload bytes for the caller to unpickle. An
 envelope without an HMAC, or one read with no key, is refused unless the
@@ -51,7 +51,7 @@ def seal(
     Returns:
         The path written.
     """
-    key = signing.resolve_key(signing_key)
+    key = signing.keying(signing_key)
     header: dict[str, Mapping[str, Any] | str | None] = {
         "meta": dict(meta),
         "sha256": hashlib.sha256(payload).hexdigest(),
@@ -103,7 +103,7 @@ def read(
     digest = str(header.get("sha256", ""))
     if not hmac.compare_digest(hashlib.sha256(payload).hexdigest(), digest):
         raise errors.InputError(f"{path} does not match its digest")
-    key = signing.resolve_key(signing_key)
+    key = signing.keying(signing_key)
     signed = isinstance(header.get("mac"), str)
     if signed and key is not None:
         if not hmac.compare_digest(str(header["mac"]), mac(header, key)):
@@ -135,7 +135,7 @@ def sign(
         when no key is available (the package then loads only when
         trusted).
     """
-    key = signing.resolve_key(signing_key)
+    key = signing.keying(signing_key)
     body = {k: v for k, v in manifest.items() if k != "signature"}
     return {**body, "signature": None if key is None else mac(body, key)}
 
@@ -161,7 +161,7 @@ def check(
         ArtifactError: If the manifest's signature does not verify, or it is
             unsigned (or no key is set) and `trusted` is false.
     """
-    key = signing.resolve_key(signing_key)
+    key = signing.keying(signing_key)
     signature = manifest.get("signature")
     signed = isinstance(signature, str)
     if signed and key is not None:

@@ -37,7 +37,7 @@ DIFFICULTY_ROWS = 2000
 DIFFICULTY_FOLDS = 3
 
 
-def redundant_pairs(
+def redundant(
     frame: pandas.DataFrame, numeric: tuple[str, ...]
 ) -> list[dict[str, Any]]:
     """Finds strongly correlated numeric feature pairs.
@@ -70,7 +70,7 @@ def redundant_pairs(
     return pairs[:MAX_REDUNDANT_PAIRS]
 
 
-def order_drift(frame: pandas.DataFrame, numeric: tuple[str, ...]) -> float:
+def ordering(frame: pandas.DataFrame, numeric: tuple[str, ...]) -> float:
     """Measures drift along row order.
 
     Compares the first and last third of the rows. A high value means the data's
@@ -91,8 +91,8 @@ def order_drift(frame: pandas.DataFrame, numeric: tuple[str, ...]) -> float:
     head, tail = frame.iloc[:size], frame.iloc[-size:]
     worst = 0.0
     for column in numeric:
-        ref = reference.NumericReference.fit(head[column])
-        worst = max(worst, ref.adjusted_psi(tail[column]))
+        ref = reference.Deciles.fit(head[column])
+        worst = max(worst, ref.adjust(tail[column]))
     return float(worst)
 
 
@@ -130,8 +130,8 @@ def summarise(features: pandas.DataFrame) -> dict[str, Any]:
     }
 
 
-def text_like_columns(
-    frame: pandas.DataFrame, plan: scmle.contracts.data.FeaturePlan
+def texts(
+    frame: pandas.DataFrame, plan: scmle.contracts.data.Blueprint
 ) -> list[str]:
     """Finds categorical columns holding free text rather than short labels.
 
@@ -155,7 +155,7 @@ def text_like_columns(
     return found
 
 
-def scale_range(frame: pandas.DataFrame, numeric: tuple[str, ...]) -> float:
+def magnitudes(frame: pandas.DataFrame, numeric: tuple[str, ...]) -> float:
     """Measures the orders of magnitude between the widest and narrowest column.
 
     Args:
@@ -180,7 +180,7 @@ def ml_difficulty(
     frame: pandas.DataFrame,
     spec: tasks.Config,
     task: tasks.Task,
-    plan: scmle.contracts.data.FeaturePlan,
+    plan: scmle.contracts.data.Blueprint,
 ) -> dict[str, Any]:
     """Runs cheap baselines that show how hard the problem looks.
 
@@ -303,11 +303,11 @@ def structure(frame: pandas.DataFrame, spec: tasks.Config) -> dict[str, Any]:
     return result
 
 
-def build_fingerprint(
+def imprint(
     frame: pandas.DataFrame,
     spec: tasks.Config,
     task: tasks.Task,
-    plan: scmle.contracts.data.FeaturePlan,
+    plan: scmle.contracts.data.Blueprint,
     column_statistics: dict[str, dict[str, Any]],
     duplicate_rows: int,
     read_seconds: float,
@@ -346,7 +346,7 @@ def build_fingerprint(
         kind: sum(1 for s in column_statistics.values() if s["kind"] == kind)
         for kind in ("numeric", "categorical", "datetime")
     }
-    kinds["text_like"] = len(text_like_columns(frame, plan))
+    kinds["text_like"] = len(texts(frame, plan))
     kinds["id_like"] = sum(
         1 for reason in plan.dropped.values() if reason.startswith("id-like")
     ) + len(spec.data.id_columns)
@@ -399,7 +399,7 @@ def build_fingerprint(
             )
             if plan.numeric
             else 0.0,
-            "scale_orders_of_magnitude": scale_range(frame, plan.numeric),
+            "scale_orders_of_magnitude": magnitudes(frame, plan.numeric),
             "mean_categorical_entropy_bits": float(
                 numpy.mean(
                     [
@@ -412,7 +412,7 @@ def build_fingerprint(
             else 0.0,
         },
         "relationships": {
-            "redundant_numeric_pairs": redundant_pairs(frame, plan.numeric),
+            "redundant_numeric_pairs": redundant(frame, plan.numeric),
             "max_target_association": max(
                 (
                     s.get("target_association", 0.0)
@@ -436,7 +436,7 @@ def build_fingerprint(
         },
         "risk": {
             "leakage_hypotheses": leakage_flags,
-            "order_drift_psi": order_drift(frame, plan.numeric),
+            "order_drift_psi": ordering(frame, plan.numeric),
             "rare_classes": task.is_classification
             and target_block["min_class_count"] < spec.validation.folds * 2,
         },

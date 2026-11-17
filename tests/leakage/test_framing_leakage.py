@@ -6,10 +6,8 @@ from scmle.data.framing import baseline
 from scmle.data.framing import costs
 from scmle.data.framing import draft
 
-HUMAN = (costs.CostSource.HUMAN,) * 4
-MODEL = costs.DecisionCostModel(
-    0.0, 5.0, 1.0, 0.0, 0.1, 0.4, HUMAN, costs.CostSource.HUMAN
-)
+HUMAN = (costs.Basis.HUMAN,) * 4
+MODEL = costs.Tariff(0.0, 5.0, 1.0, 0.0, 0.1, 0.4, HUMAN, costs.Basis.HUMAN)
 
 
 def test_framing_reads_only_the_rows_it_is_given():
@@ -22,13 +20,13 @@ def test_framing_reads_only_the_rows_it_is_given():
             "y": (rng.random(200) < 0.3).astype(int),
         }
     )
-    source = draft.SourceDescription("u://x", tuple(x.columns), ("id",))
+    source = draft.Offer("u://x", tuple(x.columns), ("id",))
     request = draft.Request("predict target y", source)
     first = draft.frame(request, x, cost_model=MODEL)
     sealed = pandas.concat([x, x.assign(y=1 - x["y"])], ignore_index=True)
     assert sealed.shape[0] == 400  # the sealed rows exist but are not passed
     second = draft.frame(request, x, cost_model=MODEL)
-    assert first.draft_hash == second.draft_hash
+    assert first.sha == second.sha
 
 
 def test_baseline_claim_cannot_be_evaluated_twice_or_unregistered():

@@ -17,7 +17,7 @@ from scmle.contracts import errors
 ARROW_STREAM = "__arrow_c_stream__"
 
 
-def is_tabular(data: Any) -> bool:
+def tablelike(data: Any) -> bool:
     """Reports whether `data` looks like an in-memory table (not a path).
 
     Args:

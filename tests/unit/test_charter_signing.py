@@ -15,7 +15,7 @@ KEY = "unit-test-key"
 
 def test_signed_charter_verifies(tmp_path):
     path = tmp_path / "analysis_charter.json"
-    sealing.write_charter(path, make_charter(), signing_key=KEY)
+    sealing.inscribe(path, make_charter(), signing_key=KEY)
     loaded = sealing.read_verified(path, signing_key=KEY)
     assert loaded.charter == make_charter()
     assert loaded.signed is True
@@ -23,7 +23,7 @@ def test_signed_charter_verifies(tmp_path):
 
 def test_unsigned_charter_is_allowed_but_reported_unsigned(tmp_path):
     path = tmp_path / "analysis_charter.json"
-    sealing.write_charter(path, make_charter())
+    sealing.inscribe(path, make_charter())
     loaded = sealing.read_verified(path)
     assert loaded.signed is False
     assert loaded.charter_hash == make_charter().charter_hash
@@ -31,14 +31,14 @@ def test_unsigned_charter_is_allowed_but_reported_unsigned(tmp_path):
 
 def test_wrong_key_fails_verification(tmp_path):
     path = tmp_path / "analysis_charter.json"
-    sealing.write_charter(path, make_charter(), signing_key=KEY)
+    sealing.inscribe(path, make_charter(), signing_key=KEY)
     with pytest.raises(errors.ArtifactError, match="signature"):
         sealing.read_verified(path, signing_key="another-key")
 
 
 def test_a_signed_charter_needs_a_key_to_be_trusted(tmp_path):
     path = tmp_path / "analysis_charter.json"
-    sealing.write_charter(path, make_charter(), signing_key=KEY)
+    sealing.inscribe(path, make_charter(), signing_key=KEY)
     with pytest.raises(errors.ArtifactError, match="key"):
         sealing.read_verified(path, require_signature=True)
 
@@ -46,7 +46,7 @@ def test_a_signed_charter_needs_a_key_to_be_trusted(tmp_path):
 @pytest.mark.parametrize("offset", [0, 40, 120, 300])
 def test_tampering_with_any_byte_fails_verification(tmp_path, offset):
     path = tmp_path / "analysis_charter.json"
-    sealing.write_charter(path, make_charter(), signing_key=KEY)
+    sealing.inscribe(path, make_charter(), signing_key=KEY)
     raw = bytearray(path.read_bytes())
     index = min(offset, len(raw) - 1)
     # Flip one character to a different printable one.
@@ -58,7 +58,7 @@ def test_tampering_with_any_byte_fails_verification(tmp_path, offset):
 
 def test_editing_a_field_without_resigning_fails(tmp_path):
     path = tmp_path / "analysis_charter.json"
-    sealing.write_charter(path, make_charter(), signing_key=KEY)
+    sealing.inscribe(path, make_charter(), signing_key=KEY)
     record = json.loads(path.read_text())
     record["charter"]["question"] = "A different question?"
     path.write_text(json.dumps(record))
@@ -70,12 +70,12 @@ def test_an_amendment_may_only_tighten_the_budget():
     base = make_charter()
     tighter = make_charter(k_max=5)
     looser = make_charter(k_max=20)
-    sealing.check_amendment(base, tighter)
+    sealing.permit(base, tighter)
     with pytest.raises(errors.ConfigError, match="tighten"):
-        sealing.check_amendment(base, looser)
+        sealing.permit(base, looser)
     other_question = make_charter(question="Something else entirely?")
     with pytest.raises(errors.ConfigError, match="tighten"):
-        sealing.check_amendment(base, other_question)
+        sealing.permit(base, other_question)
 
 
 def test_cli_init_writes_a_template_that_fails_check(tmp_path):
@@ -111,7 +111,7 @@ def test_cli_sign_without_a_key_fails(tmp_path, monkeypatch):
 
 def test_charter_is_a_plain_dict_when_unsigned(tmp_path):
     path = tmp_path / "analysis_charter.json"
-    sealing.write_charter(path, make_charter())
+    sealing.inscribe(path, make_charter())
     record = json.loads(path.read_text())
     assert record["charter_hash"] == make_charter().charter_hash
     assert "signature" not in record or record["signature"] is None

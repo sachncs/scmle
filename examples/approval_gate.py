@@ -25,7 +25,7 @@ def make_dataset(rows: int = 500) -> pandas.DataFrame:
     return frame
 
 
-def reviewer(review: policies.GateReview) -> bool:
+def reviewer(review: policies.Review) -> bool:
     """Approves the plan, rejects the selection (a stand-in for a person)."""
     LOGGER.info("review at %s: %s", review.gate, review.summary)
     return review.gate == state.RunState.PLANNING

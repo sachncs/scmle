@@ -54,7 +54,7 @@ def test_within_fold_auc_matches_sklearn_per_fold(seed):
     truth = rng.integers(0, 2, n)
     score = numpy.round(rng.normal(size=n) + truth, 1)
     tests = [numpy.arange(0, 60), numpy.arange(60, 120)]
-    wins, pairs = screen.fold_concordance(
+    wins, pairs = screen.concordance(
         score[None, :], (truth == 1)[None, :], tests
     )
     expected = [roc_auc_score(truth[t], score[t]) for t in tests]
@@ -69,12 +69,12 @@ def test_a_pooled_auc_would_differ_from_the_within_fold_one():
     truth = rng.integers(0, 2, 200)
     score = rng.normal(size=200) + numpy.repeat([0.0, 3.0], 100)
     tests = [numpy.arange(100), numpy.arange(100, 200)]
-    within = screen.auc_rows(score[None, :], (truth == 1)[None, :], tests)[0]
+    within = screen.aucs(score[None, :], (truth == 1)[None, :], tests)[0]
     assert within != pytest.approx(roc_auc_score(truth, score), abs=1e-3)
 
 
 def test_auc_is_nan_when_no_fold_has_both_classes():
-    out = screen.auc_rows(
+    out = screen.aucs(
         numpy.arange(4.0)[None, :],
         numpy.ones((1, 4), dtype=bool),
         [numpy.arange(2), numpy.arange(2, 4)],
@@ -126,7 +126,7 @@ def test_constant_column_has_a_single_basis_column():
 def test_permutations_stay_inside_their_strata():
     strata = numpy.repeat([0, 1, 2], [5, 7, 3])
     rng = numpy.random.default_rng(0)
-    index = screen.batch_permutations(strata, 50, rng)
+    index = screen.permute(strata, 50, rng)
     assert index.shape == (50, 15)
     for row in index:
         assert sorted(row) == list(range(15))
@@ -135,39 +135,39 @@ def test_permutations_stay_inside_their_strata():
 
 
 def test_permutations_are_global_with_one_stratum():
-    index = screen.batch_permutations(
+    index = screen.permute(
         numpy.zeros(30, dtype=int), 20, numpy.random.default_rng(1)
     )
     assert (index != numpy.arange(30)).any(axis=1).all()
 
 
 def test_strata_follow_groups_blocks_or_nothing():
-    assert screen.strata_of(6, None, None).tolist() == [0] * 6
-    assert screen.strata_of(6, None, 2).tolist() == [0, 0, 1, 1, 2, 2]
+    assert screen.stratify(6, None, None).tolist() == [0] * 6
+    assert screen.stratify(6, None, 2).tolist() == [0, 0, 1, 1, 2, 2]
     groups = numpy.array(["b", "a", "b", "a"])
-    assert screen.strata_of(4, groups, None).tolist() == [0, 1, 0, 1]
+    assert screen.stratify(4, groups, None).tolist() == [0, 1, 0, 1]
 
 
 def test_required_permutations_reach_the_by_threshold():
     alpha = Fraction(1, 20)
     for family in (1, 2, 10, 30):
-        need = screen.required_permutations(family, alpha)
-        h = multiplicity.harmonic_exact(family)
+        need = screen.resamples(family, alpha)
+        h = multiplicity.harmonics(family)
         assert Fraction(1, need + 1) <= alpha / (family * h)
         assert Fraction(1, need) > alpha / (family * h)
-    assert screen.required_permutations(0, alpha) == 0
+    assert screen.resamples(0, alpha) == 0
 
 
 def test_purity_bound_is_clopper_pearson():
     classes = numpy.array([0] * 40 + [1] * 60)
     recorded = numpy.zeros(100, dtype=bool)
     recorded[:30] = True
-    bound = screen.purity_bound(recorded, classes, FAST, None)
+    bound = screen.dominance(recorded, classes, FAST, None)
     assert bound == pytest.approx(0.05 ** (1 / 30), abs=1e-12)
     mixed = numpy.zeros(100, dtype=bool)
     mixed[35:65] = True
     expected = stats.beta.ppf(0.05, 25, 6)
-    assert screen.purity_bound(mixed, classes, FAST, None) == pytest.approx(
+    assert screen.dominance(mixed, classes, FAST, None) == pytest.approx(
         expected
     )
 
@@ -176,9 +176,9 @@ def test_purity_bound_counts_groups_not_rows_when_grouped():
     classes = numpy.zeros(40, dtype=int)
     recorded = numpy.ones(40, dtype=bool)
     groups = numpy.repeat(numpy.arange(4), 10)
-    one_per_group = screen.purity_bound(recorded, classes, FAST, groups)
+    one_per_group = screen.dominance(recorded, classes, FAST, groups)
     assert one_per_group == pytest.approx(0.05 ** (1 / 4))
-    assert one_per_group < screen.purity_bound(recorded, classes, FAST, None)
+    assert one_per_group < screen.dominance(recorded, classes, FAST, None)
 
 
 def test_chi_square_rows_match_scipy():
@@ -188,7 +188,7 @@ def test_chi_square_rows_match_scipy():
     totals = numpy.bincount(labels).astype(float)
     table = pandas.crosstab(missing, labels).to_numpy()
     expected = stats.chi2_contingency(table, correction=False)[0]
-    got = screen.chi_square_rows(missing, labels[None, :], totals)[0]
+    got = screen.chisquare(missing, labels[None, :], totals)[0]
     assert got == pytest.approx(expected, rel=1e-12)
 
 
@@ -230,7 +230,7 @@ def test_the_family_counts_every_column_and_every_mechanism():
     assert mechanisms.count(screen.SKILL) == 3
     assert mechanisms.count(screen.MISSING) == 1
     assert mechanisms.count(screen.PURITY) == 1
-    assert report.permutations >= screen.required_permutations(
+    assert report.permutations >= screen.resamples(
         report.family, Fraction(1, 20)
     )
 
@@ -462,7 +462,7 @@ def test_a_table_where_every_plant_is_found_gates_every_mechanism():
     report = probed(world(20))
     assert report.probe == dict.fromkeys(plants.DEFECTS, True)
     assert set(report.gates) == set(screen.MECHANISM_DEFECTS)
-    assert set(report.gates.values()) == {certificates.GateStatus.GATING}
+    assert set(report.gates.values()) == {certificates.Authority.GATING}
 
 
 def test_too_few_rows_say_what_the_screen_would_miss():
@@ -483,7 +483,7 @@ def test_a_stale_certificate_is_reported_and_does_not_decide(monkeypatch):
     monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
     report = probed(world(20))
     assert "published certificate for binary targets: stale" in report.notes
-    assert set(report.gates.values()) == {certificates.GateStatus.GATING}
+    assert set(report.gates.values()) == {certificates.Authority.GATING}
 
 
 def test_the_probe_never_reaches_the_real_report():
@@ -502,7 +502,7 @@ def test_without_gates_a_suspect_warns_and_cannot_block():
     report = run(frame)
     (found,) = report.suspects
     assert (
-        found.gate is certificates.GateStatus.DESCRIPTIVE and not found.blocking
+        found.gate is certificates.Authority.DESCRIPTIVE and not found.blocking
     )
     assert report.blocking == ()
     assert "warning only" in report.sentences()[0]
@@ -548,7 +548,7 @@ def test_r2_matches_sklearn_for_the_observed_regression_fit():
     n = 200
     x = rng.normal(size=n)
     y = x + rng.normal(size=n)
-    folds = screen.fold_splits(n, 5, None, None, 0)
+    folds = screen.crossfit(n, 5, None, None, 0)
     problem = screen.Problem(
         y, "regression", 0, folds, float(((y - y.mean()) ** 2).sum())
     )

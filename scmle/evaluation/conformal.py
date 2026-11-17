@@ -12,10 +12,10 @@ each true class so that sets can be class-conditional (Mondrian): the margin
 for class `k` comes from the calibration rows of class `k` only, so coverage
 holds within each class given exchangeability inside the class. A class with
 too few calibration rows gets an infinite margin, which puts the label in
-every set; the report of that is the caller's duty (`thin_classes`).
+every set; the report of that is the caller's duty (`scarce`).
 `weighted_quantile` is the weighted conformal quantile for covariate shift
 with a known or estimated likelihood ratio (Tibshirani, Barber, Candes and
-Ramdas, arXiv:1904.06019). `cv_plus_bounds` is the CV+ interval of Barber,
+Ramdas, arXiv:1904.06019). `cvplus` is the CV+ interval of Barber,
 Candes, Ramdas and Tibshirani (arXiv:1905.02928) from stored fold models. Both
 papers were read on 2026-11-05. Weighted conformal (their Corollary 1) gives
 coverage at least `1 - alpha` under covariate shift when the weights are the
@@ -46,7 +46,7 @@ MIN_CALIBRATION_ROWS = 20
 DEFAULT_COVERAGE = 0.9
 
 
-def finite_sample_quantile(scores: numpy.ndarray, coverage: float) -> float:
+def cutoff(scores: numpy.ndarray, coverage: float) -> float:
     """Conformal quantile of nonconformity scores.
 
     Args:
@@ -160,7 +160,7 @@ def weighted_margins(
     return margins
 
 
-def cv_plus_bounds(
+def cvplus(
     fold_predictions: numpy.ndarray,
     fold_of_row: numpy.ndarray,
     residuals: numpy.ndarray,
@@ -218,7 +218,7 @@ def cv_plus_bounds(
     return lower, upper
 
 
-def one_row_per_entity(
+def representatives(
     entities: Sequence[Any], rng: numpy.random.Generator
 ) -> list[int]:
     """Positions of one randomly chosen row of each entity, in entity order.
@@ -285,7 +285,7 @@ class ConformalCalibrator:
         return cls("regression", cls.checked(errors))
 
     @classmethod
-    def for_classification(
+    def classify(
         cls,
         labels: Sequence[Any],
         probabilities: numpy.ndarray,
@@ -363,7 +363,7 @@ class ConformalCalibrator:
             raise scmle.contracts.errors.InputError(
                 "coverage must lie strictly between 0 and 1"
             )
-        return finite_sample_quantile(numpy.asarray(self.scores), coverage)
+        return cutoff(numpy.asarray(self.scores), coverage)
 
     def interval(
         self,
@@ -418,11 +418,11 @@ class ConformalCalibrator:
                 "this calibrator has no per-class scores"
             )
         return tuple(
-            finite_sample_quantile(numpy.asarray(scores), coverage)
+            cutoff(numpy.asarray(scores), coverage)
             for scores in self.class_scores
         )
 
-    def thin_classes(self, coverage: float = DEFAULT_COVERAGE) -> list[Any]:
+    def scarce(self, coverage: float = DEFAULT_COVERAGE) -> list[Any]:
         """Classes too rare for a finite class-conditional margin.
 
         Args:

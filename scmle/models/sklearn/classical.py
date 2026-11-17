@@ -71,7 +71,7 @@ class Learner(models.Model):
         classifier: type | None = None,
         regressor: type | None = None,
         fixed_params: Mapping[str, Any] | None = None,
-        search_space: search.SearchSpace | None = None,
+        search_space: search.Space | None = None,
         monotonic_param: str | None = None,
     ) -> None:
         """Sets the declared data on this instance.
@@ -177,9 +177,9 @@ class Dummy(models.Model):
             An unfitted baseline estimator for the task.
         """
         if task is tasks.Task.SURVIVAL:
-            return scmle.models.survival.estimators.MarginalSurvival()
+            return scmle.models.survival.estimators.Marginal()
         if task is tasks.Task.UPLIFT:
-            return scmle.models.uplift.estimators.ZeroEffect()
+            return scmle.models.uplift.estimators.Inert()
         if task in (
             tasks.Task.MULTILABEL,
             tasks.Task.MULTIOUTPUT,
@@ -263,12 +263,12 @@ class Svm(Learner):
         return support
 
 
-TREE_ENSEMBLE_SPACE = search.SearchSpace(
+TREE_ENSEMBLE_SPACE = search.Space(
     (
-        search.IntParameter("n_estimators", 50, 300),
-        search.IntParameter("max_depth", 3, 25),
-        search.IntParameter("min_samples_leaf", 1, 20, log=True),
-        search.ChoiceParameter("max_features", ("sqrt", 0.5, 1.0)),
+        search.Integer("n_estimators", 50, 300),
+        search.Integer("max_depth", 3, 25),
+        search.Integer("min_samples_leaf", 1, 20, log=True),
+        search.Choice("max_features", ("sqrt", 0.5, 1.0)),
     )
 )
 
@@ -280,9 +280,7 @@ LOGISTIC_REGRESSION = Learner(
     ),
     classifier=linear_model.LogisticRegression,
     fixed_params={"max_iter": 1000},
-    search_space=search.SearchSpace(
-        (search.FloatParameter("C", 1e-3, 1e2, log=True),)
-    ),
+    search_space=search.Space((search.Real("C", 1e-3, 1e2, log=True),)),
 )
 
 RIDGE = Learner(
@@ -295,9 +293,7 @@ RIDGE = Learner(
         memory_factor=2.0,
     ),
     regressor=linear_model.Ridge,
-    search_space=search.SearchSpace(
-        (search.FloatParameter("alpha", 1e-3, 1e3, log=True),)
-    ),
+    search_space=search.Space((search.Real("alpha", 1e-3, 1e3, log=True),)),
 )
 
 SGD_LOGISTIC = Learner(
@@ -313,9 +309,7 @@ SGD_LOGISTIC = Learner(
     ),
     classifier=linear_model.SGDClassifier,
     fixed_params={"loss": "log_loss", "max_iter": 50, "tol": 1e-4},
-    search_space=search.SearchSpace(
-        (search.FloatParameter("alpha", 1e-7, 1e-1, log=True),)
-    ),
+    search_space=search.Space((search.Real("alpha", 1e-7, 1e-1, log=True),)),
 )
 
 SGD_REGRESSION = Learner(
@@ -331,9 +325,7 @@ SGD_REGRESSION = Learner(
     ),
     regressor=linear_model.SGDRegressor,
     fixed_params={"max_iter": 50, "tol": 1e-4},
-    search_space=search.SearchSpace(
-        (search.FloatParameter("alpha", 1e-7, 1e-1, log=True),)
-    ),
+    search_space=search.Space((search.Real("alpha", 1e-7, 1e-1, log=True),)),
 )
 
 ELASTIC_NET = Learner(
@@ -348,10 +340,10 @@ ELASTIC_NET = Learner(
     ),
     regressor=linear_model.ElasticNet,
     fixed_params={"alpha": 0.1, "max_iter": 5000},
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.FloatParameter("alpha", 1e-3, 10.0, log=True),
-            search.FloatParameter("l1_ratio", 0.05, 0.95),
+            search.Real("alpha", 1e-3, 10.0, log=True),
+            search.Real("l1_ratio", 0.05, 0.95),
         )
     ),
 )
@@ -364,10 +356,10 @@ DECISION_TREE = Learner(
     ),
     classifier=tree.DecisionTreeClassifier,
     regressor=tree.DecisionTreeRegressor,
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.IntParameter("max_depth", 2, 20),
-            search.IntParameter("min_samples_leaf", 1, 30, log=True),
+            search.Integer("max_depth", 2, 20),
+            search.Integer("min_samples_leaf", 1, 30, log=True),
         )
     ),
 )
@@ -404,12 +396,12 @@ HIST_GRADIENT_BOOSTING = HistGradientBoosting(
     classifier=ensemble.HistGradientBoostingClassifier,
     regressor=ensemble.HistGradientBoostingRegressor,
     monotonic_param="monotonic_cst",
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.FloatParameter("learning_rate", 0.02, 0.3, log=True),
-            search.IntParameter("max_leaf_nodes", 8, 64),
-            search.IntParameter("min_samples_leaf", 5, 50),
-            search.FloatParameter("l2_regularization", 1e-4, 1.0, log=True),
+            search.Real("learning_rate", 0.02, 0.3, log=True),
+            search.Integer("max_leaf_nodes", 8, 64),
+            search.Integer("min_samples_leaf", 5, 50),
+            search.Real("l2_regularization", 1e-4, 1.0, log=True),
         )
     ),
 )
@@ -427,10 +419,10 @@ SUPPORT_VECTOR = Svm(
     ),
     classifier=svm.SVC,
     regressor=svm.SVR,
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.FloatParameter("C", 1e-2, 1e2, log=True),
-            search.FloatParameter("gamma", 1e-4, 1.0, log=True),
+            search.Real("C", 1e-2, 1e2, log=True),
+            search.Real("gamma", 1e-4, 1.0, log=True),
         )
     ),
 )
@@ -448,10 +440,10 @@ KNN = Learner(
     ),
     classifier=neighbors.KNeighborsClassifier,
     regressor=neighbors.KNeighborsRegressor,
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.IntParameter("n_neighbors", 3, 50),
-            search.ChoiceParameter("weights", ("uniform", "distance")),
+            search.Integer("n_neighbors", 3, 50),
+            search.Choice("weights", ("uniform", "distance")),
         )
     ),
 )
@@ -478,13 +470,13 @@ NEURAL_NETWORK = Learner(
         "early_stopping": True,
         "n_iter_no_change": 10,
     },
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.ChoiceParameter(
+            search.Choice(
                 "hidden_layer_sizes", ((32,), (64,), (64, 32), (128, 64))
             ),
-            search.FloatParameter("alpha", 1e-5, 1e-1, log=True),
-            search.FloatParameter("learning_rate_init", 1e-4, 1e-2, log=True),
+            search.Real("alpha", 1e-5, 1e-1, log=True),
+            search.Real("learning_rate_init", 1e-4, 1e-2, log=True),
         )
     ),
 )

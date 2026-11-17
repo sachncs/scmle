@@ -362,7 +362,7 @@ def test_audit_reports_each_pair_the_store_would_refuse(monkeypatch):
     def refuse(self, detector_id, digest, defect):
         raise certificates.CertificateError(f"no {defect}")
 
-    monkeypatch.setattr(certificates.Store, "mark_gating", refuse)
+    monkeypatch.setattr(certificates.Store, "authorise", refuse)
     assert f5.audit_problems(store) == ["f5-sentinel/sentinel: no sentinel"]
 
 

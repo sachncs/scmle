@@ -26,7 +26,7 @@ TERMINAL = {
 }
 
 
-class MlflowExperimentStore(stores.ExperimentStore):
+class MlflowExperimentStore(stores.Store):
     """Experiment store backed by an MLflow tracking server or database."""
 
     def __init__(
@@ -273,7 +273,7 @@ class MlflowExperimentStore(stores.ExperimentStore):
         ]
         return sorted(rows, key=lambda row: row["trial_id"])
 
-    def history(self) -> list[experiments.HistoricalRun]:
+    def history(self) -> list[experiments.Precedent]:
         """Returns completed, fingerprinted runs for meta-learning.
 
         Returns:
@@ -292,7 +292,7 @@ class MlflowExperimentStore(stores.ExperimentStore):
             ):
                 continue
             history.append(
-                experiments.HistoricalRun(
+                experiments.Precedent(
                     run_id=tags[RUN_TAG],
                     dataset_id=tags.get("scmle.dataset_id", ""),
                     data_hash=tags.get("scmle.data_hash", ""),

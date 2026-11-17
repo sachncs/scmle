@@ -89,7 +89,7 @@ def test_item_names_the_field_it_rejects():
 
 def test_an_explained_verdict_serialises_every_field():
     item = make_item(explanations=(explanation(),))
-    verdict = reconciliation.reconcile_item(item, 0.0)
+    verdict = reconciliation.settle(item, 0.0)
     assert verdict.to_dict() == {
         "name": "rows",
         "extract": 900.0,
@@ -105,11 +105,11 @@ def test_an_explained_verdict_serialises_every_field():
 
 def test_the_check_records_the_statistic_interval_and_seed():
     item = make_item(explanations=(explanation(-40.0),))
-    verdict = reconciliation.reconcile_item(
+    verdict = reconciliation.settle(
         item,
         0.02,
-        certificates.GateStatus.GATING,
-        qualification.SetId.ALL,
+        certificates.Authority.GATING,
+        qualification.Subset.ALL,
         (3, "x", 4),
     )
     check = verdict.check
@@ -130,59 +130,56 @@ def test_the_check_records_the_statistic_interval_and_seed():
 
 def test_the_interval_is_ordered_when_the_residual_exceeds_the_gap():
     item = make_item(explanations=(explanation(+100.0),))
-    verdict = reconciliation.reconcile_item(item, 0.0)
+    verdict = reconciliation.settle(item, 0.0)
     low, high = verdict.check.interval
     assert low == pytest.approx(0.1)
     assert high == pytest.approx(0.2)
 
 
 def test_default_arguments_describe_and_record_a_zero_seed():
-    verdict = reconciliation.reconcile_item(make_item())
+    verdict = reconciliation.settle(make_item())
     assert verdict.check.seed_path == (0, "f4-reconciliation", 0)
-    assert verdict.check.set_id is qualification.SetId.ALL
+    assert verdict.check.set_id is qualification.Subset.ALL
     assert verdict.check.decision is qualification.Decision.WARN
 
 
 def test_an_explanation_must_close_the_gap_within_the_tolerance():
     partial = make_item(explanations=(explanation(-60.0),))
     assert (
-        reconciliation.reconcile_item(partial, 0.039).status
+        reconciliation.settle(partial, 0.039).status
         is reconciliation.Status.UNEXPLAINED
     )
     assert (
-        reconciliation.reconcile_item(partial, 0.0405).status
+        reconciliation.settle(partial, 0.0405).status
         is reconciliation.Status.EXPLAINED
     )
     boundary = make_item(explanations=(explanation(-50.0),))
     assert (
-        reconciliation.reconcile_item(boundary, 0.05).status
+        reconciliation.settle(boundary, 0.05).status
         is reconciliation.Status.EXPLAINED
     )
 
 
 def test_amounts_are_summed_and_every_attester_is_required():
     two = make_item(explanations=(explanation(-60.0), explanation(-40.0, None)))
-    verdict = reconciliation.reconcile_item(two)
+    verdict = reconciliation.settle(two)
     assert verdict.status is reconciliation.Status.EXPLAINED
     assert verdict.residual_gap == 0.0
     assert verdict.tier is qualification.Tier.UNVERIFIED
     attested = make_item(
         explanations=(explanation(-60.0), explanation(-40.0, "a"))
     )
-    assert (
-        reconciliation.reconcile_item(attested).tier
-        is qualification.Tier.ATTESTED
-    )
+    assert reconciliation.settle(attested).tier is qualification.Tier.ATTESTED
 
 
 def test_an_unexplained_gap_is_unverified_and_blocks_only_when_gating():
-    verdict = reconciliation.reconcile_item(
-        make_item(), 0.0, certificates.GateStatus.GATING
+    verdict = reconciliation.settle(
+        make_item(), 0.0, certificates.Authority.GATING
     )
     assert verdict.tier is qualification.Tier.UNVERIFIED
     assert verdict.check.decision is qualification.Decision.BLOCK
-    matched = reconciliation.reconcile_item(
-        make_item(1000.0), 0.0, certificates.GateStatus.GATING
+    matched = reconciliation.settle(
+        make_item(1000.0), 0.0, certificates.Authority.GATING
     )
     assert matched.check.decision is qualification.Decision.PASS
     assert matched.tier is qualification.Tier.ATTESTED
@@ -192,12 +189,12 @@ def test_tolerance_must_be_a_probability():
     with pytest.raises(
         ValueError, match=r"^tolerance must be within \[0, 1\]$"
     ):
-        reconciliation.reconcile_item(make_item(), 1.5)
+        reconciliation.settle(make_item(), 1.5)
     with pytest.raises(
         ValueError, match=r"^tolerance must be within \[0, 1\]$"
     ):
-        reconciliation.reconcile_item(make_item(), -0.1)
-    assert reconciliation.reconcile_item(make_item(), 1.0).status is (
+        reconciliation.settle(make_item(), -0.1)
+    assert reconciliation.settle(make_item(), 1.0).status is (
         reconciliation.Status.MATCHED
     )
 
@@ -205,7 +202,7 @@ def test_tolerance_must_be_a_probability():
 def test_reconcile_numbers_the_seed_paths_and_reports_the_document():
     items = [make_item(name="a"), make_item(1000.0, name="b")]
     result = reconciliation.reconcile(
-        items, 0.05, certificates.GateStatus.GATING, qualification.SetId.ALL
+        items, 0.05, certificates.Authority.GATING, qualification.Subset.ALL
     )
     assert [c.seed_path for c in result.checks] == [
         (0, "f4-reconciliation", 0),

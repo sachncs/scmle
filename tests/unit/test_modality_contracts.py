@@ -14,10 +14,10 @@ from scmle.data.modalities import curation
 
 
 def make_evidence(
-    stage: modalities.LifecycleStage,
+    stage: modalities.Phase,
     links: tuple[str, ...] = ("tests/lifecycle/test_stage.py",),
-) -> modalities.StageEvidence:
-    return modalities.StageEvidence(
+) -> modalities.Proof:
+    return modalities.Proof(
         stage=stage,
         evidence_links=links,
         notes=(f"verified {stage.value}",),
@@ -26,7 +26,7 @@ def make_evidence(
 
 def make_declaration(
     status: modalities.Status = modalities.Status.SUPPORTED,
-    stage_evidence: tuple[modalities.StageEvidence, ...] | None = None,
+    stage_evidence: tuple[modalities.Proof, ...] | None = None,
     modality: modalities.ModalityIdentity = modalities.Modality.TABULAR,
 ) -> modalities.Declaration:
     return modalities.Declaration(
@@ -41,7 +41,7 @@ def make_declaration(
             else stage_evidence
         ),
         required_extras=("core",),
-        resources=capabilities.ResourceAssumptions(
+        resources=capabilities.Resources(
             cpu_cores=2,
             memory_gb=4.0,
             disk_gb=1.0,
@@ -65,26 +65,26 @@ def test_enums_define_all_required_modalities_and_lifecycle_stages():
         "raster",
     ]
     assert len(modalities.REQUIRED_LIFECYCLE_STAGES) == 15
-    assert modalities.LifecycleStage.RECOVERY_AND_RESOURCE_TESTS.value == (
+    assert modalities.Phase.RECOVERY_AND_RESOURCE_TESTS.value == (
         "recovery_and_resource_tests"
     )
 
 
 def test_extension_modality_has_stable_namespaced_identity():
     """Caller-defined families serialize without colliding with built-ins."""
-    identity = modalities.ExtensionModality("acme/point-cloud")
+    identity = modalities.Bespoke("acme/point-cloud")
 
     assert identity.value == "extension:acme/point-cloud"
     assert modalities.restore(identity.value) == identity
     with pytest.raises(ValueError, match="lowercase namespaced"):
-        modalities.ExtensionModality("Acme point cloud")
+        modalities.Bespoke("Acme point cloud")
     with pytest.raises(ValueError, match="conflicts"):
-        modalities.ExtensionModality("image")
+        modalities.Bespoke("image")
 
 
 def test_extension_declarations_are_never_promoted_to_supported():
     """Complete extension evidence still requires an explicit extension gate."""
-    identity = modalities.ExtensionModality("acme/point-cloud")
+    identity = modalities.Bespoke("acme/point-cloud")
     declaration = make_declaration(
         modality=identity,
         status=modalities.Status.EXTENSION_ONLY,
@@ -123,8 +123,8 @@ def test_complete_declaration_serializes_evidence_in_required_stage_order():
 
 def test_stage_evidence_requires_json_native_structured_output():
     """Stage payloads remain machine-readable and reject non-JSON values."""
-    record = modalities.StageEvidence(
-        stage=modalities.LifecycleStage.INGESTION,
+    record = modalities.Proof(
+        stage=modalities.Phase.INGESTION,
         evidence={"sample_count": 2, "groups": ["a", "b"]},
     )
 
@@ -133,8 +133,8 @@ def test_stage_evidence_requires_json_native_structured_output():
         "sample_count": 2,
     }
     with pytest.raises(ValueError, match="JSON-native"):
-        modalities.StageEvidence(
-            stage=modalities.LifecycleStage.INGESTION,
+        modalities.Proof(
+            stage=modalities.Phase.INGESTION,
             evidence={"invalid": object()},
         )
 
@@ -194,23 +194,23 @@ def test_modality_curation_card_can_describe_an_empty_snapshot():
 
 def test_modality_manifest_round_trip_binds_governance_to_content():
     """A modality manifest preserves source and privacy evidence exactly."""
-    manifest = data.ModalityManifest(
+    manifest = data.Passport(
         dataset_id="image-dataset",
         snapshot_id="snapshot-1",
         modality="image",
         task="binary_classification",
         sample_count=3,
         content_hash="b" * 64,
-        source=data.SourceMetadata(
+        source=data.Origin(
             owner="vision-team",
             acquisition_method="licensed object export",
             license="internal-use",
         ),
-        lineage=data.LineageMetadata(
+        lineage=data.Ancestry(
             source_snapshot="source-1",
             transformations=("resize-v1",),
         ),
-        privacy=data.PrivacyMetadata(
+        privacy=data.Confidentiality(
             classification="confidential",
             contains_pii=True,
             consent_basis="contract",
@@ -219,7 +219,7 @@ def test_modality_manifest_round_trip_binds_governance_to_content():
         ),
     )
 
-    restored = data.ModalityManifest.from_dict(manifest.to_dict())
+    restored = data.Passport.from_dict(manifest.to_dict())
 
     assert restored == manifest
     assert restored.privacy.contains_pii is True
@@ -229,7 +229,7 @@ def test_modality_manifest_round_trip_binds_governance_to_content():
 def test_modality_manifest_rejects_non_integer_sample_counts(sample_count):
     """Lifecycle counts must remain exact integers in persisted evidence."""
     with pytest.raises(TypeError, match="sample_count must be an integer"):
-        data.ModalityManifest(
+        data.Passport(
             dataset_id="image-dataset",
             snapshot_id="snapshot-1",
             modality="image",
@@ -252,7 +252,7 @@ def test_supported_declaration_requires_every_stage_with_evidence():
     evidence = tuple(
         make_evidence(stage)
         for stage in modalities.REQUIRED_LIFECYCLE_STAGES
-        if stage is not modalities.LifecycleStage.MONITORING
+        if stage is not modalities.Phase.MONITORING
     )
 
     with pytest.raises(
@@ -265,7 +265,7 @@ def test_supported_declaration_requires_every_stage_with_evidence():
 def test_empty_stage_evidence_is_incomplete_and_fails_closed():
     evidence = tuple(
         make_evidence(stage)
-        if stage is not modalities.LifecycleStage.INFERENCE
+        if stage is not modalities.Phase.INFERENCE
         else make_evidence(stage, links=())
         for stage in modalities.REQUIRED_LIFECYCLE_STAGES
     )
@@ -275,9 +275,9 @@ def test_empty_stage_evidence_is_incomplete_and_fails_closed():
     )
     registry = modalities.Registry((declaration,))
 
-    assert declaration.missing_stages == (modalities.LifecycleStage.INFERENCE,)
+    assert declaration.missing_stages == (modalities.Phase.INFERENCE,)
     with pytest.raises(
-        modalities.UnsupportedModalityError,
+        modalities.UnsupportedError,
         match="declaration is incomplete",
     ) as failure:
         registry.require(
@@ -291,7 +291,7 @@ def test_registry_fails_closed_for_undeclared_modality():
     registry = modalities.Registry((make_declaration(),))
 
     with pytest.raises(
-        modalities.UnsupportedModalityError,
+        modalities.UnsupportedError,
         match="no declaration exists",
     ) as failure:
         registry.require(modalities.Modality.IMAGE)
@@ -309,7 +309,7 @@ def test_status_requires_explicit_opt_in_after_completeness_is_proven():
     registry = modalities.Registry((declaration,))
 
     with pytest.raises(
-        modalities.UnsupportedModalityError,
+        modalities.UnsupportedError,
         match="registered as experimental",
     ):
         registry.require(modalities.Modality.TABULAR)
@@ -333,7 +333,7 @@ def test_registry_serialization_is_deterministic_and_duplicate_safe():
 
     assert first.to_json() == second.to_json()
     assert json.loads(first.to_json()) == first.to_dict()
-    assert [item.modality for item in first.list_declarations()] == [
+    assert [item.modality for item in first.catalog()] == [
         modalities.Modality.IMAGE,
         modalities.Modality.TABULAR,
     ]
@@ -343,7 +343,7 @@ def test_registry_serialization_is_deterministic_and_duplicate_safe():
 
 
 def test_declaration_rejects_duplicate_stages_and_missing_failure_modes():
-    duplicate = make_evidence(modalities.LifecycleStage.INGESTION)
+    duplicate = make_evidence(modalities.Phase.INGESTION)
     with pytest.raises(ValueError, match="duplicate stages"):
         make_declaration(stage_evidence=(duplicate, duplicate))
 

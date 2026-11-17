@@ -110,7 +110,7 @@ TABULAR_BETA_EVALUATIONS = {
 """Canonical evaluation contract for each tabular task path."""
 
 
-def fairness_options(task: tasks.Task) -> tuple[capabilities.Fairness, ...]:
+def fairnesses(task: tasks.Task) -> tuple[capabilities.Fairness, ...]:
     """Lists the fairness declarations a tabular task path is registered with.
 
     Args:
@@ -128,7 +128,7 @@ def fairness_options(task: tasks.Task) -> tuple[capabilities.Fairness, ...]:
     return (capabilities.Fairness.NONE,)
 
 
-def supported_tabular_capability(
+def advertise(
     task: tasks.Task,
     model_family: str,
     fairness: capabilities.Fairness,
@@ -159,7 +159,7 @@ def supported_tabular_capability(
         required_extras=(
             ("deeplearning",) if model_family == "deep_learning" else ("core",)
         ),
-        resources=capabilities.ResourceAssumptions(memory_gb=1.0),
+        resources=capabilities.Resources(memory_gb=1.0),
         failure_modes=(
             "malformed or schema-incompatible input",
             "model-family dependency unavailable",
@@ -210,7 +210,7 @@ def experimental_tabular_capability(
         ),
         status=capabilities.Status.EXPERIMENTAL,
         required_extras=("deeplearning",),
-        resources=capabilities.ResourceAssumptions(
+        resources=capabilities.Resources(
             memory_gb=4.0,
             max_rows=100_000,
         ),
@@ -220,7 +220,7 @@ def experimental_tabular_capability(
     )
 
 
-def tabular_beta_capability_registry() -> capabilities.Registry:
+def enrol() -> capabilities.Registry:
     """Builds the explicit capability registry for the tabular beta.
 
     The registry intentionally declares only the library inference path with
@@ -236,8 +236,8 @@ def tabular_beta_capability_registry() -> capabilities.Registry:
     for task, families in TABULAR_BETA_TASK_FAMILIES:
         for model_family in families:
             records.extend(
-                supported_tabular_capability(task, model_family, fairness)
-                for fairness in fairness_options(task)
+                advertise(task, model_family, fairness)
+                for fairness in fairnesses(task)
             )
     experimental_families = (
         (
@@ -304,7 +304,7 @@ def tabular_beta_capability_registry() -> capabilities.Registry:
                     evidence_links,
                     limitations,
                 )
-                for fairness in fairness_options(task)
+                for fairness in fairnesses(task)
             )
     return capabilities.Registry.seed(records)
 
@@ -329,7 +329,7 @@ def extension_capability(
         key=key,
         status=capabilities.Status.EXTENSION_ONLY,
         required_extras=(),
-        resources=capabilities.ResourceAssumptions(memory_gb=1.0),
+        resources=capabilities.Resources(memory_gb=1.0),
         failure_modes=(
             "adapter conformance or dependency failure",
             "resource limits exceeded",
@@ -449,17 +449,15 @@ class Context:
 
     spec: tasks.Config
     registry: scmle.models.registry.Catalog
-    catalog: metrics.MetricCatalog
+    catalog: metrics.Repertoire
     policy: selection.Selector
     capability_registry: capabilities.Registry = dataclasses.field(
-        default_factory=tabular_beta_capability_registry
+        default_factory=enrol
     )
     capability_observation: resource_observation.Observation | None = None
-    store: scmle.artifacts.store.RunStore | None = None
+    store: scmle.artifacts.store.Workspace | None = None
     log: events.Log | None = None
-    tracker: stores.ExperimentStore = dataclasses.field(
-        default_factory=stores.NullExperimentStore
-    )
+    tracker: stores.Store = dataclasses.field(default_factory=stores.Null)
     checkpoints: dict[str, experiments.Trial] = dataclasses.field(
         default_factory=dict
     )
@@ -480,7 +478,7 @@ class Context:
         default_factory=lineage.Graph
     )
     task: tasks.Task | None = None
-    profile: scmle.contracts.data.DatasetProfile | None = None
+    profile: scmle.contracts.data.Portrait | None = None
     curation: scmle.contracts.data.Curation | None = None
     cluster_column: str | None = None
     split: splitters.Split | None = None
@@ -492,7 +490,7 @@ class Context:
     ] = ()
     metric: scmle.contracts.metrics.Metric | None = None
     trials: list[experiments.Trial] = dataclasses.field(default_factory=list)
-    history: tuple[experiments.HistoricalRun, ...] = ()
+    history: tuple[experiments.Precedent, ...] = ()
     outcomes: list[experiments.Decision] = dataclasses.field(
         default_factory=list
     )
@@ -507,7 +505,7 @@ class Context:
     coverage_claim_sha256: str | None = None
     final_pipeline: Any = None
     test_rows: tuple[pandas.DataFrame, pandas.Series] | None = None
-    stream: tuple[streaming.ChunkSource, streaming.Totals] | None = None
+    stream: tuple[streaming.Feed, streaming.Totals] | None = None
     pareto_front: list[dict[str, Any]] | None = None
     seasonal_baseline: Any = None
     propensity: dict[str, Any] | None = None
@@ -529,7 +527,7 @@ class Context:
             )
 
     @property
-    def resource_governor(self) -> limits.Governor:
+    def regulator(self) -> limits.Governor:
         """The governor, created on first use from the specification."""
         if self.governor is None:
             self.governor = limits.Governor(
@@ -543,7 +541,7 @@ class Context:
         return self.started_at + self.spec.resources.time_budget_seconds
 
     @property
-    def run_store(self) -> scmle.artifacts.store.RunStore:
+    def run_store(self) -> scmle.artifacts.store.Workspace:
         """The run store; raises for previews that have none."""
         return require(self.store, "store")
 
@@ -585,7 +583,7 @@ class Context:
         if self.store is not None:
             self.store.write_text(relative, text)
 
-    def persist_capability_observation(self) -> None:
+    def observe(self) -> None:
         """Persists the runtime facts immediately before capability planning."""
         observation = require(
             self.capability_observation, "capability_observation"
@@ -640,7 +638,7 @@ class Context:
         self.trial_counter += count
         return [f"trial_{start + offset + 1:03d}" for offset in range(count)]
 
-    def add_outcome(
+    def enter(
         self,
         technique: str,
         action: experiments.DecisionAction,

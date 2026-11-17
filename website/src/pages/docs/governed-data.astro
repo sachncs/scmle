@@ -7,7 +7,7 @@ const backends = [
 ];
 const policies = [
   ["<code>fail</code>", "<code>QualityGateError</code> with the report; nothing continues."],
-  ["<code>quarantine</code>", "Row-level rules remove the rows and write them with the report under <code>quarantine/&lt;snapshot id&gt;/</code>. Dataset-level rules (<code>SchemaCheck</code>, <code>FreshnessCheck</code>, <code>MinRowsCheck</code>, <code>NullFractionCheck</code>) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until a person calls <code>release</code>."],
+  ["<code>quarantine</code>", "Row-level rules remove the rows and write them with the report under <code>quarantine/&lt;snapshot id&gt;/</code>. Dataset-level rules (<code>SchemaCheck</code>, <code>Freshness</code>, <code>MinRowsCheck</code>, <code>NullFractionCheck</code>) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until a person calls <code>release</code>."],
   ["<code>warn</code>", "Recorded in the report, data unchanged."],
 ];
 ---
@@ -30,7 +30,7 @@ const policies = [
   <h2>Quality gates</h2>
   <p><code>QualityGate(rules, store).run(frame, record, contract, stage)</code> runs for stage <code>train</code> or <code>inference</code>. Each rule declares its policy in advance:</p>
   <DocTable label="Quality gate policies" head={["Policy", "Effect"]} rows={policies} />
-  <p>Rules: <code>SchemaCheck</code>, <code>FreshnessCheck</code>, <code>MinRowsCheck</code>, <code>NullFractionCheck</code>, <code>NoNullsCheck</code>, <code>UniqueKeyCheck</code>, <code>RangeCheck</code> and <code>AllowedValuesCheck</code>, each limited to the stages it names. Every rule is evaluated before any action, and the report is written to <code>quality/</code> whatever the outcome.</p>
+  <p>Rules: <code>SchemaCheck</code>, <code>Freshness</code>, <code>MinRowsCheck</code>, <code>NullFractionCheck</code>, <code>Complete</code>, <code>UniqueKeyCheck</code>, <code>RangeCheck</code> and <code>Membership</code>, each limited to the stages it names. Every rule is evaluated before any action, and the report is written to <code>quality/</code> whatever the outcome.</p>
 
   <h2>Incremental processing</h2>
   <p><code>IncrementalProcessor</code> processes new objects under an input prefix in sorted key order, once each. It deduplicates repeated row keys and repeated uploads, writes a checkpoint with its own digest after each object, retries transient errors under a <code>Retries</code> (reproducible backoff, no jitter), writes the output before the checkpoint, and takes a lock object so two runs cannot share a checkpoint.</p>

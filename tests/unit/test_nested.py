@@ -9,7 +9,7 @@ from sklearn import model_selection
 from scmle.contracts import search
 from scmle.evaluation import nested
 
-SPACE = search.SearchSpace((search.FloatParameter("C", 1e-3, 100.0, log=True),))
+SPACE = search.Space((search.Real("C", 1e-3, 100.0, log=True),))
 
 
 def noise(rows=300, seed=0):

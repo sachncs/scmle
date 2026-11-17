@@ -11,7 +11,7 @@ from typing import Self
 from scmle.contracts import errors
 
 
-class FaultScenario(enum.StrEnum):
+class Contingency(enum.StrEnum):
     """Fault condition that must have a safe, reviewable response."""
 
     PROCESS_DEATH = "process_death"
@@ -58,7 +58,7 @@ class Recoverability(enum.StrEnum):
     TERMINAL_SAFE_FAILURE = "terminal_safe_failure"
 
 
-class VerificationStatus(enum.StrEnum):
+class Verification(enum.StrEnum):
     """Evidence state of one fault scenario."""
 
     PLANNED = "planned"
@@ -163,7 +163,7 @@ class Evidence:
         )
 
 
-def check_evidence_requirements(requirements: tuple[str, ...]) -> None:
+def require(requirements: tuple[str, ...]) -> None:
     """Checks the evidence types a fault scenario requires.
 
     Args:
@@ -203,12 +203,12 @@ class Plan:
         evidence: Evidence records from actual executions.
     """
 
-    scenario: FaultScenario
+    scenario: Contingency
     expected_safe_outcome: SafeOutcome
     recoverability: Recoverability
     evidence_requirements: tuple[str, ...]
     release_blocking: bool
-    verification_status: VerificationStatus = VerificationStatus.PLANNED
+    verification_status: Verification = Verification.PLANNED
     evidence: tuple[Evidence, ...] = ()
 
     def __post_init__(self) -> None:
@@ -224,19 +224,19 @@ class Plan:
                 ``safe_outcome_observed``.
         """
         enum_fields = (
-            ("scenario", self.scenario, FaultScenario),
+            ("scenario", self.scenario, Contingency),
             ("expected_safe_outcome", self.expected_safe_outcome, SafeOutcome),
             ("recoverability", self.recoverability, Recoverability),
             (
                 "verification_status",
                 self.verification_status,
-                VerificationStatus,
+                Verification,
             ),
         )
         for name, value, expected in enum_fields:
             if not isinstance(value, expected):
                 raise errors.KindError(f"{name} must be {expected.__name__}")
-        check_evidence_requirements(self.evidence_requirements)
+        require(self.evidence_requirements)
         if not isinstance(self.release_blocking, bool):
             raise errors.KindError("release_blocking must be bool")
         evidence_types = [item.evidence_type for item in self.evidence]
@@ -245,13 +245,13 @@ class Plan:
                 "evidence types must be unique per scenario"
             )
         if (
-            self.verification_status is not VerificationStatus.PLANNED
+            self.verification_status is not Verification.PLANNED
             and not self.evidence
         ):
             raise errors.InputError(
                 "verification status requires execution evidence"
             )
-        if self.verification_status is VerificationStatus.PASSED:
+        if self.verification_status is Verification.PASSED:
             missing = set(self.evidence_requirements) - set(evidence_types)
             if missing:
                 missing_text = ", ".join(sorted(missing))
@@ -291,14 +291,12 @@ class Plan:
             The scenario plan.
         """
         return cls(
-            scenario=FaultScenario(record["scenario"]),
+            scenario=Contingency(record["scenario"]),
             expected_safe_outcome=SafeOutcome(record["expected_safe_outcome"]),
             recoverability=Recoverability(record["recoverability"]),
             evidence_requirements=tuple(record["evidence_requirements"]),
             release_blocking=bool(record["release_blocking"]),
-            verification_status=VerificationStatus(
-                record["verification_status"]
-            ),
+            verification_status=Verification(record["verification_status"]),
             evidence=tuple(
                 Evidence.from_dict(item) for item in record["evidence"]
             ),
@@ -317,7 +315,7 @@ class Registry:
         plans: Scenario plans keyed by their stable scenario enum.
     """
 
-    plans: dict[FaultScenario, Plan] = dataclasses.field(default_factory=dict)
+    plans: dict[Contingency, Plan] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Re-registers the plans supplied at construction time.
@@ -331,16 +329,16 @@ class Registry:
             self.register(plan)
 
     @classmethod
-    def production_beta(cls) -> Self:
+    def prerelease(cls) -> Self:
         """Builds the complete reliability plan for the production beta.
 
         Returns:
             A registry holding a plan for every required scenario.
         """
         registry = cls()
-        for plan in default_fault_injection_plans():
+        for plan in drills():
             registry.register(plan)
-        registry.validate_complete()
+        registry.insist()
         return registry
 
     def register(self, plan: Plan) -> None:
@@ -361,9 +359,9 @@ class Registry:
             )
         self.plans[plan.scenario] = plan
 
-    def record_evidence(
+    def log(
         self,
-        scenario: FaultScenario,
+        scenario: Contingency,
         evidence: tuple[Evidence, ...],
     ) -> Plan:
         """Records one execution and derives its verification status.
@@ -387,15 +385,15 @@ class Registry:
             The updated scenario plan.
 
         Raises:
-            TypeError: If `scenario` is not a `FaultScenario` or an item is
+            TypeError: If `scenario` is not a `Contingency` or an item is
                 not a `Evidence`.
             ValueError: If `evidence` is not a non-empty tuple, comes from
                 more than one execution, repeats an evidence type, has a type
                 outside the scenario's requirements, or would give a passed
                 plan an unsafe or inconclusive outcome.
         """
-        if not isinstance(scenario, FaultScenario):
-            raise errors.KindError("scenario must be FaultScenario")
+        if not isinstance(scenario, Contingency):
+            raise errors.KindError("scenario must be Contingency")
         supplied: object = evidence  # callers may pass a non-tuple
         if not isinstance(supplied, tuple) or not supplied:
             raise errors.InputError("evidence must be a non-empty tuple")
@@ -420,11 +418,11 @@ class Registry:
             for item in evidence
         )
         if has_unsafe:
-            status = VerificationStatus.FAILED
+            status = Verification.FAILED
         elif missing:
-            status = VerificationStatus.INCONCLUSIVE
+            status = Verification.INCONCLUSIVE
         else:
-            status = VerificationStatus.PASSED
+            status = Verification.PASSED
         updated = dataclasses.replace(
             plan,
             verification_status=status,
@@ -433,13 +431,13 @@ class Registry:
         self.plans[scenario] = updated
         return updated
 
-    def validate_complete(self) -> None:
+    def insist(self) -> None:
         """Rejects a registry that omits any required production scenario.
 
         Raises:
             ValueError: If a scenario has no plan.
         """
-        missing = set(FaultScenario) - set(self.plans)
+        missing = set(Contingency) - set(self.plans)
         if missing:
             missing_text = ", ".join(
                 item.value
@@ -457,7 +455,7 @@ class Registry:
             records ordered by scenario value. Raises `ValueError` if a
             required scenario has no plan.
         """
-        self.validate_complete()
+        self.insist()
         ordered_plans = sorted(
             self.plans.values(), key=lambda plan: plan.scenario.value
         )
@@ -509,7 +507,7 @@ class Registry:
             if not isinstance(item, Mapping):
                 raise errors.KindError("each scenario must be a mapping")
             registry.register(Plan.from_dict(item))
-        registry.validate_complete()
+        registry.insist()
         return registry
 
     @classmethod
@@ -532,7 +530,7 @@ class Registry:
         return cls.from_dict(record)
 
 
-def default_fault_injection_plans() -> tuple[Plan, ...]:
+def drills() -> tuple[Plan, ...]:
     """Returns the complete, unexecuted production-beta fault plan.
 
     These declarations describe what must be injected and what evidence a
@@ -541,19 +539,19 @@ def default_fault_injection_plans() -> tuple[Plan, ...]:
     """
     scenarios = (
         (
-            FaultScenario.PROCESS_DEATH,
+            Contingency.PROCESS_DEATH,
             SafeOutcome.RESUME_DURABLE_CHECKPOINT,
             Recoverability.AUTOMATIC,
             ("process_termination", "checkpoint_resume", "artifact_integrity"),
         ),
         (
-            FaultScenario.STALE_CHECKPOINT,
+            Contingency.STALE_CHECKPOINT,
             SafeOutcome.REJECT_STALE_CHECKPOINT,
             Recoverability.OPERATOR_ASSISTED,
             ("checkpoint_identity", "stale_checkpoint_rejection", "run_state"),
         ),
         (
-            FaultScenario.DISK_FULL,
+            Contingency.DISK_FULL,
             SafeOutcome.PRESERVE_DURABLE_ARTIFACT,
             Recoverability.OPERATOR_ASSISTED,
             (
@@ -563,43 +561,43 @@ def default_fault_injection_plans() -> tuple[Plan, ...]:
             ),
         ),
         (
-            FaultScenario.CORRUPT_ARTIFACT,
+            Contingency.CORRUPT_ARTIFACT,
             SafeOutcome.QUARANTINE_CORRUPT_ARTIFACT,
             Recoverability.OPERATOR_ASSISTED,
             ("corruption_injection", "digest_mismatch", "quarantine_record"),
         ),
         (
-            FaultScenario.WORKER_LOSS,
+            Contingency.WORKER_LOSS,
             SafeOutcome.RETRY_IDEMPOTENT_WORK,
             Recoverability.AUTOMATIC,
             ("worker_termination", "idempotent_retry", "event_deduplication"),
         ),
         (
-            FaultScenario.TIMEOUT,
+            Contingency.TIMEOUT,
             SafeOutcome.CANCEL_AND_RECORD_TERMINAL_FAILURE,
             Recoverability.OPERATOR_ASSISTED,
             ("timeout_injection", "cancellation_record", "resource_error"),
         ),
         (
-            FaultScenario.MEMORY_EXHAUSTION,
+            Contingency.MEMORY_EXHAUSTION,
             SafeOutcome.ABORT_BEFORE_PUBLICATION,
             Recoverability.OPERATOR_ASSISTED,
             ("memory_pressure", "publication_absence", "resource_error"),
         ),
         (
-            FaultScenario.PARTIAL_WRITE,
+            Contingency.PARTIAL_WRITE,
             SafeOutcome.PRESERVE_DURABLE_ARTIFACT,
             Recoverability.AUTOMATIC,
             ("write_interruption", "atomicity_check", "artifact_integrity"),
         ),
         (
-            FaultScenario.DEPENDENCY_MISMATCH,
+            Contingency.DEPENDENCY_MISMATCH,
             SafeOutcome.REJECT_INCOMPATIBLE_DEPENDENCY,
             Recoverability.OPERATOR_ASSISTED,
             ("environment_identity", "dependency_rejection", "run_state"),
         ),
         (
-            FaultScenario.INVALID_SIGNATURE,
+            Contingency.INVALID_SIGNATURE,
             SafeOutcome.REJECT_UNTRUSTED_ARTIFACT,
             Recoverability.OPERATOR_ASSISTED,
             (
@@ -609,31 +607,31 @@ def default_fault_injection_plans() -> tuple[Plan, ...]:
             ),
         ),
         (
-            FaultScenario.RETRY_EXHAUSTION,
+            Contingency.RETRY_EXHAUSTION,
             SafeOutcome.TERMINATE_AFTER_RETRY_EXHAUSTION,
             Recoverability.TERMINAL_SAFE_FAILURE,
             ("retry_history", "terminal_event", "partial_publication_check"),
         ),
         (
-            FaultScenario.DUPLICATE_EVENT,
+            Contingency.DUPLICATE_EVENT,
             SafeOutcome.IGNORE_DUPLICATE_EVENT,
             Recoverability.AUTOMATIC,
             ("duplicate_event", "idempotency_key", "state_transition"),
         ),
         (
-            FaultScenario.INCOMPLETE_LINEAGE,
+            Contingency.INCOMPLETE_LINEAGE,
             SafeOutcome.BLOCK_RELEASE_FOR_MISSING_LINEAGE,
             Recoverability.TERMINAL_SAFE_FAILURE,
             ("lineage_gap", "release_block", "audit_record"),
         ),
         (
-            FaultScenario.REJECTED_APPROVAL,
+            Contingency.REJECTED_APPROVAL,
             SafeOutcome.BLOCK_RELEASE_FOR_REJECTED_APPROVAL,
             Recoverability.TERMINAL_SAFE_FAILURE,
             ("approval_rejection", "release_block", "audit_record"),
         ),
         (
-            FaultScenario.CHANGED_SNAPSHOT,
+            Contingency.CHANGED_SNAPSHOT,
             SafeOutcome.INVALIDATE_CHANGED_SNAPSHOT,
             Recoverability.OPERATOR_ASSISTED,
             ("snapshot_digest_change", "run_invalidation", "lineage_record"),

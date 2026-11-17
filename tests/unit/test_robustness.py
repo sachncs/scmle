@@ -32,7 +32,7 @@ def test_corruptions_leave_the_input_untouched_and_apply_as_described():
     original = data.features.copy()
     rng = numpy.random.default_rng(0)
 
-    blanked = robustness.MissingValues(0.3).corrupt(data.features, data, rng)
+    blanked = robustness.Blanking(0.3).corrupt(data.features, data, rng)
     unseen = robustness.UnseenCategories(0.5).corrupt(data.features, data, rng)
 
     assert data.features.equals(original)
@@ -51,7 +51,5 @@ def test_a_model_ignoring_the_noise_feature_is_not_fragile_to_it():
 def test_gaussian_noise_leaves_a_column_with_undefined_spread_unchanged():
     data = inputs()
     one = data.features.iloc[:1].copy()
-    out = robustness.GaussianNoise(0.5).corrupt(
-        one, data, numpy.random.default_rng(0)
-    )
+    out = robustness.Noise(0.5).corrupt(one, data, numpy.random.default_rng(0))
     assert numpy.isfinite(out["signal"]).all()

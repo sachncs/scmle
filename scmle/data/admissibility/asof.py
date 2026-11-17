@@ -149,9 +149,7 @@ def agrees(
     )
 
 
-def classify_rows(
-    stored: pandas.Series, joined: pandas.DataFrame
-) -> pandas.Series:
+def classify(stored: pandas.Series, joined: pandas.DataFrame) -> pandas.Series:
     """Classifies every row against the reconstruction.
 
     Args:
@@ -172,7 +170,7 @@ def classify_rows(
     return status
 
 
-def reconstruction_mismatch(
+def disagree(
     rows: pandas.DataFrame,
     log: pandas.DataFrame,
     key: str,
@@ -197,7 +195,7 @@ def reconstruction_mismatch(
         a `match` (overwritten or not yet written).
     """
     joined = point_in_time(rows, log, key, moment, written_at, value)
-    status = classify_rows(rows[stored], joined)
+    status = classify(rows[stored], joined)
     return pandas.Series(
         (status != Status.MATCH.value).to_numpy(),
         index=rows.index,
@@ -221,8 +219,8 @@ class Audit:
 
     field: str
     status: pandas.Series
-    log_check: provenance.LogCheck
-    as_of: provenance.AsOf
+    log_check: provenance.Reconstruction
+    as_of: provenance.Lead
     interval: tuple[float, float]
     check: qualification.Check
 

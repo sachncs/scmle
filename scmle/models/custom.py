@@ -38,7 +38,7 @@ class Registration:
     name: str
     classifier: type | None
     regressor: type | None
-    search_space: search.SearchSpace | None = None
+    search_space: search.Space | None = None
     family: str = "custom"
     needs_scaling: bool = False
     handles_missing: bool = False
@@ -92,7 +92,7 @@ def register_estimator(
     classifier: type[base.BaseEstimator] | None = None,
     regressor: type[base.BaseEstimator] | None = None,
     *,
-    search_space: search.SearchSpace | None = None,
+    search_space: search.Space | None = None,
     family: str = "custom",
     needs_scaling: bool = False,
     handles_missing: bool = False,
@@ -130,7 +130,7 @@ def register_estimator(
         )
     if name in registry.builtin_names():
         raise errors.ConfigError(f"'{name}' is a built-in model name")
-    if name in registry.user_adapters() and not replace:
+    if name in registry.extensions() and not replace:
         raise errors.ConfigError(f"model '{name}' is already registered")
     adapter = rebuild(
         Registration(
@@ -145,8 +145,8 @@ def register_estimator(
             cost,
         )
     )
-    conformance.check_conformance(adapter)
-    registry.add_user_adapter(adapter, replace)  # Authoritative, atomic check.
+    conformance.comply(adapter)
+    registry.adopt(adapter, replace)  # Authoritative, atomic check.
     return adapter
 
 
@@ -158,4 +158,4 @@ def unregister_estimator(name: str) -> None:
     """
     from scmle.models import registry  # noqa: PLC0415 -- circular: registry imports this module
 
-    registry.remove_user_adapter(name)
+    registry.deregister(name)

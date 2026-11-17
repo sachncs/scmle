@@ -65,7 +65,7 @@ def target(document=None, **changes):
 
 
 def golden():
-    loaded = parity.load_golden(GOLDEN)
+    loaded = parity.goldens(GOLDEN)
     return loaded, parity.read_json(GOLDEN / "expected.json")
 
 
@@ -78,7 +78,7 @@ def run_live(document=None, **changes):
 
 
 def version(signed=True):
-    return registry.VersionRecord(
+    return registry.Release(
         model="churn",
         version=3,
         registered_at=NOW,
@@ -97,14 +97,14 @@ def approval(**changes):
         "version": 3,
         "content_id": "9" * 64,
         "reviewer": "reviewer-1",
-        "decision": registry.PromotionDecision.APPROVED,
+        "decision": registry.Verdict.APPROVED,
         "reason": "evidence reviewed",
         "evidence": ("ticket-17",),
         "approved_at": NOW,
         "independent": True,
     }
     values.update(changes)
-    return registry.PromotionApproval(**values).sign(KEY)
+    return registry.Sanction(**values).sign(KEY)
 
 
 def seen(**changes):

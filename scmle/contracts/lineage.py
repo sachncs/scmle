@@ -214,11 +214,11 @@ class Graph:
             raise errors.InputError("evidence edge refers to an unknown node")
         if edge in self.edges:
             return
-        if self.path_exists(edge.target_id, edge.source_id):
+        if self.reachable(edge.target_id, edge.source_id):
             raise errors.InputError("evidence graph must remain acyclic")
         self.edges.append(edge)
 
-    def path_exists(self, source_id: str, target_id: str) -> bool:
+    def reachable(self, source_id: str, target_id: str) -> bool:
         """Returns whether a directed path connects two registered nodes.
 
         Args:

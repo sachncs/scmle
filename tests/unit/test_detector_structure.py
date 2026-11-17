@@ -27,12 +27,12 @@ def test_exact_flags_keep_the_first_copy():
     frame = table(20)
     frame.loc[15] = frame.loc[3]
     frame.loc[17] = frame.loc[3]
-    flags = duplicates.exact_flags(frame, list(frame.columns))
+    flags = duplicates.verbatim(frame, list(frame.columns))
     assert list(numpy.flatnonzero(flags)) == [15, 17]
 
 
 def test_exact_flags_with_no_columns_flag_nothing():
-    assert not duplicates.exact_flags(table(5), []).any()
+    assert not duplicates.verbatim(table(5), []).any()
 
 
 def test_near_flags_find_jittered_copies_but_not_distinct_rows():
@@ -89,9 +89,7 @@ def test_assess_duplicates_report_and_exact_interval():
     conflict = frame.iloc[5:6].copy()
     conflict["y"] = 1 - conflict["y"]
     both = pandas.concat([frame, extra, conflict], ignore_index=True)
-    report = duplicates.assess_duplicates(
-        both, columns=["a", "b", "c"], target="y"
-    )
+    report = duplicates.assess(both, columns=["a", "b", "c"], target="y")
     assert report.rows == 106 and report.exact_extra == 6 and report.groups == 6
     assert report.label_conflicts == 1
     assert report.exact_rate == pytest.approx(6 / 106)
@@ -99,7 +97,7 @@ def test_assess_duplicates_report_and_exact_interval():
     assert report.exact_interval == pytest.approx((ref.low, ref.high))
     assert report.near_extra == 0 and report.cut == duplicates.DEFAULT_CUT
     assert report.to_dict()["groups"] == 6
-    plain = duplicates.assess_duplicates(both)
+    plain = duplicates.assess(both)
     assert plain.label_conflicts == 0
 
 
@@ -158,7 +156,7 @@ def test_range_violation_is_an_error_even_when_not_a_ranked_candidate():
         frame, {"v": outliers.FieldProvenance(instrument_range=(0, 100))}
     )
     assert result.classes[5] == "error" and not result.candidates[5]
-    flags = outliers.error_flags(
+    flags = outliers.misrecorded(
         frame, {"v": outliers.FieldProvenance(instrument_range=(0, 100))}
     )
     assert list(numpy.flatnonzero(flags)) == [5]
@@ -260,23 +258,23 @@ def passing_store(detector_id, defect):
 
 def test_gate_status_is_descriptive_without_a_current_passing_certificate():
     none = pipeline.gate_status(None, "f5-sentinel")
-    assert set(none.values()) == {certificates.GateStatus.DESCRIPTIVE}
+    assert set(none.values()) == {certificates.Authority.DESCRIPTIVE}
     store = passing_store("f5-sentinel", "sentinel")
     status = pipeline.gate_status(store, "f5-sentinel")
-    assert status["sentinel"] is certificates.GateStatus.GATING
+    assert status["sentinel"] is certificates.Authority.GATING
     empty = pipeline.gate_status(certificates.Store(), "f5-sentinel")
-    assert empty["sentinel"] is certificates.GateStatus.DESCRIPTIVE
+    assert empty["sentinel"] is certificates.Authority.DESCRIPTIVE
     other = passing_store("f5-duplicates", "duplicate_exact")
     assert pipeline.gate_status(other, "f5-sentinel")["sentinel"] is (
-        certificates.GateStatus.DESCRIPTIVE
+        certificates.Authority.DESCRIPTIVE
     )
     result = pipeline.run(sentinel_table(), store=store)
     assert (
         result.status["f5-sentinel"]["sentinel"]
-        is certificates.GateStatus.GATING
+        is certificates.Authority.GATING
     )
     assert result.status["f5-duplicates"]["duplicate_exact"] is (
-        certificates.GateStatus.DESCRIPTIVE
+        certificates.Authority.DESCRIPTIVE
     )
 
 

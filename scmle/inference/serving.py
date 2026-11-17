@@ -1,9 +1,9 @@
 """Serving adapters: how a bundle is exposed to callers.
 
-`Server` is the contract; `BatchServing` scores files and
+`Server` is the contract; `Batcher` scores files and
 `HttpServing` exposes a JSON API using only the standard library, so serving
 needs no extra dependencies. Online and batch scoring share one path,
-`Server.respond_frame`, so they cannot drift apart: the same
+`Server.infer`, so they cannot drift apart: the same
 validation, the same preprocessing, the same model call, the same response.
 """
 
@@ -96,10 +96,10 @@ class Server(abc.ABC):
         """The loaded bundle.
 
         Raises:
-            NotReadyError: Before verification and loading finished.
+            UnreadyError: Before verification and loading finished.
         """
         if self.loaded is None:
-            raise guard.NotReadyError("the model is not loaded")
+            raise guard.UnreadyError("the model is not loaded")
         return self.loaded
 
     @property
@@ -203,9 +203,9 @@ class Server(abc.ABC):
                     ][:20],
                 },
             )
-        return self.respond_frame(pandas.DataFrame(records))
+        return self.infer(pandas.DataFrame(records))
 
-    def respond_frame(
+    def infer(
         self, frame: pandas.DataFrame, remember: bool = True
     ) -> dict[str, Any]:
         """Scores a frame; the one path used by online and batch serving.
@@ -227,7 +227,7 @@ class Server(abc.ABC):
         """
         with self.lock:
             bundle = self.bundle
-            rows = validation.InputValidator(bundle.schema).row_report(frame)
+            rows = validation.Validator(bundle.schema).describe(frame)
             response = bundle.score(frame)
             self.enforce(rows)
             if remember and not guard.abandoned():
@@ -278,7 +278,7 @@ class Server(abc.ABC):
         """Stops serving and releases resources."""
 
 
-class BatchServing(Server):
+class Batcher(Server):
     """Scores CSV / Parquet files through the same path as online serving."""
 
     def start(self) -> None:
@@ -300,7 +300,7 @@ class BatchServing(Server):
         `<destination>.manifest.json`, which carries the model version,
         artifact digest, schema digest, row count, the SHA-256 of the CSV and
         the counts of rows with nulls and with unseen categories. Chunks are
-        scored through `respond_frame`, so a policy set to `reject` raises
+        scored through `infer`, so a policy set to `reject` raises
         `PolicyError` before anything is written, and the scored rows are
         added to the bundle's remembered series history.
 
@@ -325,7 +325,7 @@ class BatchServing(Server):
             chunk = frame.iloc[start : start + chunk_rows].reset_index(
                 drop=True
             )
-            response = self.respond_frame(chunk)
+            response = self.infer(chunk)
             result = pandas.DataFrame({"prediction": response["predictions"]})
             if "classes" in response:
                 probabilities = response["probabilities"]
@@ -362,7 +362,7 @@ class BatchServing(Server):
         return len(output)
 
 
-class RequestObserver(Protocol):
+class Observer(Protocol):
     """What `HttpServing` tells an operations monitor (duck-typed)."""
 
     def record_request(
@@ -424,7 +424,7 @@ class HttpServing(Server):
         on_unseen: str = "report",
         warmup_records: list[dict[str, Any]] | None = None,
         gateway: access.Gateway | None = None,
-        monitor: RequestObserver | None = None,
+        monitor: Observer | None = None,
     ) -> None:
         """Initializes the HTTP adapter and its admission limits.
 
@@ -480,7 +480,7 @@ class HttpServing(Server):
         self.max_request_bytes = max_request_bytes
         self.max_records = max_records
         self.request_timeout_seconds = request_timeout_seconds
-        self.admission = guard.AdmissionControl(
+        self.admission = guard.Admission(
             max_concurrent, scoring_timeout_seconds
         )
         self.httpd: server.ThreadingHTTPServer | None = None
@@ -621,7 +621,7 @@ class HttpServing(Server):
         except Exception:  # monitoring must not change a response
             LOGGER.exception("the signal monitor failed on features")
 
-    def score(self, request: serving.ScoreRequest) -> dict[str, Any]:
+    def score(self, request: serving.Inquiry) -> dict[str, Any]:
         """Scores a parsed request.
 
         Args:
@@ -632,14 +632,14 @@ class HttpServing(Server):
             The response of `respond` for the request's records.
 
         Raises:
-            SchemaChangeError: If the caller's expected schema digest differs
+            MismatchError: If the caller's expected schema digest differs
                 from the served schema's.
         """
         if (
             request.expected_schema_digest is not None
             and request.expected_schema_digest != self.schema_digest
         ):
-            raise serving.SchemaChangeError(
+            raise serving.MismatchError(
                 "the model's input schema differs from the one the caller "
                 "expects",
                 {
@@ -795,12 +795,10 @@ class Responder(server.BaseHTTPRequestHandler):
         self.started = time.monotonic()
         caller = self.headers.get("X-Request-ID")
         if caller is None:
-            self.request_id = guard.new_request_id()
+            self.request_id = guard.mint()
             return True
         self.request_id = (
-            caller
-            if guard.is_valid_request_id(caller)
-            else guard.new_request_id()
+            caller if guard.is_valid_request_id(caller) else guard.mint()
         )
         if self.request_id != caller:
             self.fail(
@@ -980,10 +978,10 @@ class Responder(server.BaseHTTPRequestHandler):
         except guard.DeadlineError as error:
             # handled: scoring deadline exceeded answered with HTTP 504
             self.fail(504, str(error), error.category)
-        except guard.NotReadyError as error:
+        except guard.UnreadyError as error:
             # handled: not-ready scorer answered with HTTP 503
             self.fail(503, str(error), error.category)
-        except serving.SchemaChangeError as error:
+        except serving.MismatchError as error:
             # handled: schema change answered with HTTP 409 and details
             self.fail(409, str(error), error.category, error.details)
         except errors.ScmleError as error:

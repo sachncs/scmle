@@ -133,7 +133,7 @@ class Representativeness:
         }
 
 
-def column_gap(sample: pandas.Series, reference: pandas.Series) -> Gap:
+def contrast(sample: pandas.Series, reference: pandas.Series) -> Gap:
     """Measures how one column differs between sample and reference.
 
     Args:
@@ -158,7 +158,7 @@ def column_gap(sample: pandas.Series, reference: pandas.Series) -> Gap:
     return Gap(str(sample.name), float(gap), None)
 
 
-def compare_to_reference(
+def distinguish(
     sample: pandas.DataFrame, reference: pandas.DataFrame, seed: int = 0
 ) -> Representativeness:
     """Measures how distinguishable the sample is from the reference.
@@ -202,7 +202,7 @@ def compare_to_reference(
     )[:, 1]
     auc = float(metrics.roc_auc_score(side, scores))
     gaps = sorted(
-        (column_gap(sample[name], reference[name]) for name in columns),
+        (contrast(sample[name], reference[name]) for name in columns),
         key=lambda gap: -gap.statistic,
     )
     return Representativeness(
@@ -212,7 +212,7 @@ def compare_to_reference(
 
 def assess_representativeness(
     sample: pandas.DataFrame, reference: pandas.DataFrame, seed: int = 0
-) -> data.QualityObservation:
+) -> data.Observation:
     """Compares bounded samples and retains the complete quality evidence.
 
     Args:
@@ -227,7 +227,7 @@ def assess_representativeness(
     reference_rows = len(reference)
     shared = tuple(name for name in sample.columns if name in reference.columns)
     if not shared:
-        return data.QualityObservation(
+        return data.Observation(
             note="representativeness: the reference shares no feature columns",
             evidence={
                 "observation": "representativeness",
@@ -257,10 +257,10 @@ def assess_representativeness(
     checked_sample = sample[list(shared)].head(MAX_ROWS)
     checked_reference = reference[list(shared)].head(MAX_ROWS)
     try:
-        report = compare_to_reference(checked_sample, checked_reference, seed)
+        report = distinguish(checked_sample, checked_reference, seed)
     except ValueError as error:
         # handled: returned as failed finding/problem/refusal with error text
-        return data.QualityObservation(
+        return data.Observation(
             note=None,
             evidence={
                 "observation": "representativeness",
@@ -302,7 +302,7 @@ def assess_representativeness(
             f"the reference sample (AUC {report.auc:.2f}); the largest gap is "
             f"in '{worst.column}'"
         )
-    return data.QualityObservation(
+    return data.Observation(
         note=note,
         evidence=report.quality_evidence(
             sample_rows,

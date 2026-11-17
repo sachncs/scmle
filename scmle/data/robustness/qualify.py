@@ -13,7 +13,7 @@ unreadable or stale for the current code, the checks are descriptive: a
 
 The stability verdicts are reported. They remove findings from the
 confirmation family only through the pre-registered second stage
-(`prefilter.StabilityStage`), which runs this module between exploration and
+(`prefilter.Prefilter`), which runs this module between exploration and
 the opening of `C` when the charter's rules ask for it.
 """
 
@@ -70,11 +70,11 @@ class Robustness:
     stability_note: str
     notes: tuple[str, ...]
     shift: shift.Shift
-    coverage: tuple[coverage.LevelCoverage, ...]
-    forward: forward.ForwardCheck
-    stability_gate: certificates.GateStatus
-    c2st_gate: certificates.GateStatus
-    mmd_gate: certificates.GateStatus
+    coverage: tuple[coverage.Cell, ...]
+    forward: forward.Forward
+    stability_gate: certificates.Authority
+    c2st_gate: certificates.Authority
+    mmd_gate: certificates.Authority
     store_note: str
     rule: stability.Thresholds = stability.DEFAULT_RULE
     rule_note: str = ""
@@ -144,19 +144,19 @@ def run(
     stability_gate = stability.gate_status(store)
     rule_note = ""
     if rule != stability.DEFAULT_RULE:
-        stability_gate = certificates.GateStatus.DESCRIPTIVE
+        stability_gate = certificates.Authority.DESCRIPTIVE
         rule_note = (
             "the chartered stability thresholds differ from the certified "
             "rule: the verdicts are descriptive"
         )
     c2st_gate, mmd_gate = (
-        certificates.GateStatus.DESCRIPTIVE
+        certificates.Authority.DESCRIPTIVE
         if store is None
         else store.status(detector, shift.code_digest(), shift.DEFECT_TYPE)
         for detector in (shift.C2ST_ID, shift.MMD_ID)
     )
-    applicable, notes = stability.applicable_choices(choices)
-    grid = multiverse.enumerate_grid(applicable, seed)
+    applicable, notes = stability.actionable(choices)
+    grid = multiverse.universe(applicable, seed)
     findings: list[stability.Stability] = []
     stability_note = ""
     if multiclass:
@@ -212,7 +212,7 @@ def run(
         c2st_gate=c2st_gate,
         mmd_gate=mmd_gate,
     )
-    rows: list[coverage.LevelCoverage] = []
+    rows: list[coverage.Cell] = []
     for name in sensitive:
         if name not in features.columns:
             continue
@@ -221,7 +221,7 @@ def run(
             if reference is not None and name in reference.columns
             else None
         )
-        rows.extend(coverage.subgroup_coverage(features[name], deployment))
+        rows.extend(coverage.represent(features[name], deployment))
     skipped_forward = (
         forward.skipped(
             "F is the final test set, which only the final evaluation opens; "

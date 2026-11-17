@@ -292,7 +292,7 @@ def calibrate(p: float, kappa: float = DEFAULT_KAPPA) -> float:
     return result
 
 
-def exact_alpha(value: Any, name: str) -> Fraction:
+def rational(value: Any, name: str) -> Fraction:
     """Reads a level in [0, 1] as an exact fraction.
 
     Args:
@@ -333,7 +333,7 @@ class Tester(abc.ABC):
             alpha: Target FDR level in [0, 1].
             discount: The discount sequence (default ``1 / (j (j + 1))``).
         """
-        self.alpha = exact_alpha(alpha, "alpha")
+        self.alpha = rational(alpha, "alpha")
         self.discount = discount if discount is not None else Discount()
 
     def initial(self) -> State:
@@ -456,7 +456,7 @@ class Tester(abc.ABC):
         return Fraction(0)
 
 
-class ELond(Tester):
+class Lond(Tester):
     """e-LOND: FDR control under arbitrary dependence from valid e-values."""
 
     name = ELOND
@@ -578,7 +578,7 @@ class PValueTester(Tester):
             ValueError: If `w0` is outside [0, alpha].
         """
         super().__init__(alpha, discount)
-        start = self.alpha / 2 if w0 is None else exact_alpha(w0, "w0")
+        start = self.alpha / 2 if w0 is None else rational(w0, "w0")
         if not 0 <= start <= self.alpha:
             raise errors.InputError("w0 must be within [0, alpha]")
         self.w0 = start
@@ -613,7 +613,7 @@ class PValueTester(Tester):
         return Fraction(evidence.p)
 
 
-class LordPlusPlus(PValueTester):
+class Lord(PValueTester):
     """LORD++: FDR control for independent p-values."""
 
     name = LORD_PLUS_PLUS
@@ -797,7 +797,7 @@ class Saffron(PValueTester):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RuleConfig:
+class Settings:
     """Serializable choice of rule and parameters.
 
     Attributes:
@@ -836,9 +836,9 @@ class RuleConfig:
         """
         discount = Discount(self.horizon)
         if self.rule == ELOND:
-            return ELond(self.alpha, discount, self.kappa)
+            return Lond(self.alpha, discount, self.kappa)
         if self.rule == LORD_PLUS_PLUS:
-            return LordPlusPlus(self.alpha, discount, self.w0)
+            return Lord(self.alpha, discount, self.w0)
         if self.rule == SAFFRON:
             return Saffron(self.alpha, discount, self.w0, self.lam)
         raise errors.InputError(f"rule must be one of {RULE_NAMES}")
@@ -890,7 +890,7 @@ class RuleConfig:
         )
 
 
-def replay(config: RuleConfig, evidence: list[Evidence]) -> list[Step]:
+def replay(config: Settings, evidence: list[Evidence]) -> list[Step]:
     """Runs a rule over a fixed evidence sequence from the start.
 
     Args:

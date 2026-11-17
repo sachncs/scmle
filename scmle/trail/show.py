@@ -21,7 +21,7 @@ def clip(text: str) -> str:
     return text if len(text) <= WIDTH else text[: WIDTH - 3] + "..."
 
 
-def facts_lines(facts: dict[str, Any]) -> list[str]:
+def describe(facts: dict[str, Any]) -> list[str]:
     """Formats the facts of a step.
 
     Args:
@@ -74,7 +74,7 @@ def render(directory: str | Path) -> str:
     ]
     for index, step in enumerate(document["steps"], start=1):
         lines.append(f"{index}. {step['title']}  [{step['kind']}]")
-        lines.extend(facts_lines(step["facts"]))
+        lines.extend(describe(step["facts"]))
         for relative, held in step["records"].items():
             lines.append(f"    record {relative}  {held[:12]}")
         lines.append("")

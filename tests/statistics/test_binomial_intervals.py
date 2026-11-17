@@ -47,7 +47,7 @@ def test_wilson_endpoints_match_scipy(successes, trials):
 @pytest.mark.parametrize(("successes", "trials"), CASES)
 def test_wilson_half_width_matches_scipy(successes, trials):
     low, high = reference(successes, trials, "wilson")
-    half = feasibility.wilson_half_width(successes / trials, trials)
+    half = feasibility.halfwidth(successes / trials, trials)
     assert half == pytest.approx((high - low) / 2.0, abs=TOLERANCE)
 
 
@@ -69,7 +69,7 @@ def test_one_sided_upper_bound_is_the_two_sided_bound_at_double_tail(
 ):
     # An upper bound at level 0.95 is the upper end of the 0.90 two-sided one.
     expected = stats.binomtest(errors, trials).proportion_ci(0.90).high
-    found = refusal.clopper_pearson_upper(errors, trials, 0.95)
+    found = refusal.ceiling(errors, trials, 0.95)
     assert found == pytest.approx(float(expected), abs=TOLERANCE)
 
 
@@ -156,7 +156,7 @@ def test_clopper_pearson_coverage_is_at_least_nominal_in_simulation(
 @pytest.mark.parametrize(("trials", "proportion"), [(25, 0.1), (200, 0.15)])
 def test_one_sided_upper_bound_covers_at_least_nominal(trials, proportion):
     def interval(count, size):
-        return 0.0, refusal.clopper_pearson_upper(count, size, LEVEL)
+        return 0.0, refusal.ceiling(count, size, LEVEL)
 
     observed = simulated_coverage(interval, trials, proportion, seed=13)
     support_statistics.assert_rate_at_least(

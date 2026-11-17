@@ -34,7 +34,7 @@ class Parameter(abc.ABC):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FloatParameter(Parameter):
+class Real(Parameter):
     """A float in `[low, high]`, optionally log-uniform.
 
     Attributes:
@@ -64,7 +64,7 @@ class FloatParameter(Parameter):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class IntParameter(Parameter):
+class Integer(Parameter):
     """An integer in `[low, high]` (inclusive), optionally log-uniform.
 
     Attributes:
@@ -96,7 +96,7 @@ class IntParameter(Parameter):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ChoiceParameter(Parameter):
+class Choice(Parameter):
     """One of a fixed set of values.
 
     Attributes:
@@ -118,7 +118,7 @@ class ChoiceParameter(Parameter):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SearchSpace:
+class Space:
     """A set of parameters tuned together.
 
     Attributes:

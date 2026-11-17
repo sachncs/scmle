@@ -104,7 +104,7 @@ def encode_target(
     return target.astype(float)
 
 
-def plan_exploration(
+def hypothesize(
     features: pandas.DataFrame, kind: str, exclude: tuple[str, ...] = ()
 ) -> Plan:
     """Chooses the hypotheses from the feature columns and the target kind.
@@ -173,8 +173,8 @@ def run_exploration(
     return tuple(ledger.test(handle, features, codes) for handle in handles)
 
 
-def count_discoveries(
-    config: online_fdr.RuleConfig,
+def tally(
+    config: online_fdr.Settings,
     plan: Plan,
     features: pandas.DataFrame,
     codes: pandas.Series,

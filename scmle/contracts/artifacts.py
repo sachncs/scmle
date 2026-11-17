@@ -6,7 +6,7 @@ from typing import Self
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class BundleSchema:
+class Interface:
     """Input contract of a trained model.
 
     Attributes:
@@ -55,7 +55,7 @@ class BundleSchema:
         )
 
     @property
-    def pipeline_columns(self) -> list[str]:
+    def consumed(self) -> list[str]:
         """Columns the fitted pipeline reads (supplied plus computed series)."""
         return list(dict.fromkeys([*self.features, *self.series_columns]))
 

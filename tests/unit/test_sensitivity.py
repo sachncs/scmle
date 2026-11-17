@@ -29,7 +29,7 @@ def auc(model, features, target):
 def test_a_deterministic_model_has_no_seed_sensitivity_but_does_resample():
     features, target = data()
 
-    by_seed, by_resample = sensitivity.training_sensitivity(
+    by_seed, by_resample = sensitivity.variability(
         linear_model.LogisticRegression, features, target, auc, repeats=6
     )
 
@@ -40,7 +40,7 @@ def test_a_deterministic_model_has_no_seed_sensitivity_but_does_resample():
 def test_a_random_model_moves_with_its_seed():
     features, target = data()
 
-    by_seed = sensitivity.training_sensitivity(
+    by_seed = sensitivity.variability(
         lambda: ensemble.RandomForestClassifier(n_estimators=10),
         features,
         target,
@@ -54,7 +54,7 @@ def test_a_random_model_moves_with_its_seed():
 def test_the_split_alone_moves_the_score():
     features, target = data(200)
 
-    spread = sensitivity.evaluation_sensitivity(
+    spread = sensitivity.resplit(
         linear_model.LogisticRegression, features, target, auc, repeats=8
     )
 
@@ -65,9 +65,7 @@ def test_noise_lowers_performance_and_the_slope_says_so():
     features, target = data(600)
     model = linear_model.LogisticRegression().fit(features, target)
 
-    curve, slope = sensitivity.performance_sensitivity(
-        model, features, target, auc
-    )
+    curve, slope = sensitivity.jitter(model, features, target, auc)
 
     assert curve[0.0] > curve[1.0] and slope < 0
 

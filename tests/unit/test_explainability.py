@@ -24,7 +24,7 @@ def test_occlusion_attributes_the_prediction_to_the_feature_that_drives_it():
     background = pandas.DataFrame(
         {"signal": rng.normal(size=50), "noise": rng.normal(size=50)}
     )
-    explainer = local.OcclusionExplainer(
+    explainer = local.Occlusion(
         lambda frame: 3 * frame["signal"].to_numpy(), ["signal", "noise"]
     )
 
@@ -39,7 +39,7 @@ def test_occlusion_attributes_the_prediction_to_the_feature_that_drives_it():
 def test_partial_dependence_follows_the_driving_feature():
     inputs = test_diagnostics.make_inputs(tasks.Task.REGRESSION)
 
-    report = dependence.PartialDependence().compute(inputs)["features"]
+    report = dependence.Dependence().compute(inputs)["features"]
 
     curve = report["signal"]["mean_prediction"]
     assert curve == sorted(curve) and curve[-1] - curve[0] > 3.0
@@ -50,7 +50,7 @@ def test_partial_dependence_follows_the_driving_feature():
 def test_partial_dependence_for_binary_is_a_probability_curve():
     inputs = test_diagnostics.make_inputs(tasks.Task.BINARY)
 
-    report = dependence.PartialDependence().compute(inputs)["features"]
+    report = dependence.Dependence().compute(inputs)["features"]
 
     curve = report["signal"]["mean_prediction"]
     assert all(0.0 <= value <= 1.0 for value in curve)
@@ -61,8 +61,8 @@ def test_pairwise_interaction_is_bounded_and_deterministic():
     """Interaction evidence reports a stable second-order model effect."""
     inputs = test_diagnostics.make_inputs(tasks.Task.REGRESSION)
 
-    first = interaction.PairwiseInteraction().compute(inputs)
-    second = interaction.PairwiseInteraction().compute(inputs)
+    first = interaction.Pairwise().compute(inputs)
+    second = interaction.Pairwise().compute(inputs)
 
     assert first == second
     assert first["features_considered"] == ["signal", "noise"]
@@ -77,7 +77,7 @@ def test_pairwise_interaction_respects_the_shared_deadline():
     inputs = test_diagnostics.make_inputs(tasks.Task.BINARY)
     expired = dataclasses.replace(inputs, deadline=time.monotonic() - 1.0)
 
-    report = interaction.PairwiseInteraction().compute(expired)
+    report = interaction.Pairwise().compute(expired)
 
     assert report["truncated"] is True
     assert report["features"] == []
@@ -87,10 +87,10 @@ def test_importance_stops_at_its_deadline_and_says_it_was_partial():
     inputs = test_diagnostics.make_inputs(tasks.Task.BINARY)
     expired = dataclasses.replace(inputs, deadline=time.monotonic() - 1.0)
 
-    report = importance.PermutationImportance().compute(expired)
+    report = importance.Importance().compute(expired)
 
     assert report["truncated"] is True and report["features_measured"] == 0
-    full = importance.PermutationImportance().compute(inputs)
+    full = importance.Importance().compute(inputs)
     assert full["truncated"] is False
     assert full["features_measured"] == full["features_total"]
 
@@ -98,8 +98,8 @@ def test_importance_stops_at_its_deadline_and_says_it_was_partial():
 def test_importance_is_deterministic_and_ranks_the_signal_first():
     inputs = test_diagnostics.make_inputs(tasks.Task.REGRESSION)
 
-    first = importance.PermutationImportance().compute(inputs)
-    second = importance.PermutationImportance().compute(inputs)
+    first = importance.Importance().compute(inputs)
+    second = importance.Importance().compute(inputs)
 
     assert first == second and first["features"][0]["feature"] == "signal"
 
@@ -107,8 +107,6 @@ def test_importance_is_deterministic_and_ranks_the_signal_first():
 def test_a_suite_shares_its_time_allowance_among_diagnostics():
     inputs = test_diagnostics.make_inputs(tasks.Task.BINARY)
 
-    reports = diagnostics.run_suite(
-        inputs, suite.full_suite(), total_seconds=0.0
-    )
+    reports = diagnostics.run_suite(inputs, suite.lineup(), total_seconds=0.0)
 
     assert reports["permutation_importance"]["truncated"] is True

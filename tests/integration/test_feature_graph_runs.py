@@ -15,9 +15,7 @@ from scmle.contracts import tasks
 
 
 def node(name, op, inputs, **params):
-    return tasks.FeatureNode(
-        name=name, op=op, inputs=list(inputs), params=params
-    )
+    return tasks.Node(name=name, op=op, inputs=list(inputs), params=params)
 
 
 def graph_frame(rows=700, seed=0):
@@ -41,7 +39,7 @@ def graph_frame(rows=700, seed=0):
     return frame
 
 
-GRAPH = tasks.FeatureGraph(
+GRAPH = tasks.Derivation(
     nodes=[
         node("unit_price", "ratio", ["price", "area"]),
         node("log_unit", "log1p", ["unit_price"]),
@@ -84,7 +82,7 @@ def test_derived_features_are_used_and_inference_needs_only_raw_columns(
     tmp_path,
 ):
     frame = interaction_frame()
-    graph = tasks.FeatureGraph(
+    graph = tasks.Derivation(
         nodes=[
             node("cross", "product", ["x1", "x2"]),
             node("month", "datepart", ["when"], part="month"),
@@ -95,7 +93,7 @@ def test_derived_features_are_used_and_inference_needs_only_raw_columns(
     plain = run(
         frame,
         tmp_path / "without",
-        graph=tasks.FeatureGraph(),
+        graph=tasks.Derivation(),
         models=linear,
     )
     plan = result.profile.feature_plan
@@ -155,7 +153,7 @@ def test_fitted_nodes_are_learned_from_training_rows_only(tmp_path):
 
 def test_a_different_graph_is_a_different_configuration(tmp_path):
     frame = graph_frame()
-    other = tasks.FeatureGraph(
+    other = tasks.Derivation(
         nodes=[node("unit_price", "difference", ["price", "area"])]
     )
     one, two = (
@@ -169,13 +167,13 @@ def test_a_different_graph_is_a_different_configuration(tmp_path):
 
 def test_invalid_graphs_are_refused_before_training(tmp_path):
     frame = graph_frame()
-    bad = tasks.FeatureGraph(nodes=[node("oops", "log1p", ["not_a_column"])])
+    bad = tasks.Derivation(nodes=[node("oops", "log1p", ["not_a_column"])])
     with pytest.raises(errors.ConfigError, match="unknown columns") as caught:
         run(frame, tmp_path, graph=bad)
     events_path = pathlib.Path(caught.value.details["run_dir"]) / "events.jsonl"
     last = json.loads(events_path.read_text().splitlines()[-1])
     assert last["kind"] == "state.FAILED"
-    leaky = tasks.FeatureGraph(nodes=[node("t", "square", ["y"])])
+    leaky = tasks.Derivation(nodes=[node("t", "square", ["y"])])
     with pytest.raises(errors.ConfigError, match="target"):
         run(frame, tmp_path / "leak", graph=leaky)
 
@@ -212,7 +210,7 @@ def series_frame(entities=25, steps=40, seed=1):
     return frame.dropna(subset=["y"])
 
 
-SERIES = tasks.FeatureGraph(
+SERIES = tasks.Derivation(
     nodes=[
         node("load_prev", "lag", ["load"], k=1),
         node("load_change", "diff", ["load"], k=1),
@@ -258,8 +256,8 @@ def test_time_series_features_are_generated_within_groups_and_scored_with_histor
     truncated = batch[
         batch.day <= batch.day.sort_values().iloc[len(batch) // 2]
     ]
-    full_view = result.bundle.prepare_frame(batch)
-    cut_view = result.bundle.prepare_frame(truncated)
+    full_view = result.bundle.prepare(batch)
+    cut_view = result.bundle.prepare(truncated)
     shared = cut_view.index
     pandas.testing.assert_frame_equal(cut_view, full_view.loc[shared])
 
@@ -295,10 +293,10 @@ def test_a_single_new_record_gets_lag_and_rolling_values_from_stored_history(
     new = last.copy()
     new["day"] = last.day + pandas.Timedelta(days=1)
     new["load"] = 0.5
-    alone = result.bundle.prepare_frame(new)
+    alone = result.bundle.prepare(new)
     assert alone[["load_prev", "load_change", "load_avg3"]].notna().all().all()
     # It equals the features computed with the full history in the batch.
-    together = result.bundle.prepare_frame(pandas.concat([unit, new]))
+    together = result.bundle.prepare(pandas.concat([unit, new]))
     expected = together.iloc[[-1]]
     pandas.testing.assert_frame_equal(
         alone.reset_index(drop=True), expected.reset_index(drop=True)
@@ -327,7 +325,7 @@ def test_serving_remembers_records_so_the_next_single_record_sees_them(
     from scmle.inference import serving
 
     result = run_series(series_frame(), tmp_path)
-    adapter = serving.BatchServing(result.bundle)
+    adapter = serving.Batcher(result.bundle)
     raw = series_frame().drop(columns=["y"])
     last_day = raw.day.max()
     first = raw[raw.unit == "u1"].iloc[[0]].copy()
@@ -337,5 +335,5 @@ def test_serving_remembers_records_so_the_next_single_record_sees_them(
     second = first.copy()
     second["day"] = last_day + pandas.Timedelta(days=2)
     second["load"] = 1.0
-    view = result.bundle.prepare_frame(second)
+    view = result.bundle.prepare(second)
     assert view["load_prev"].iloc[0] == pytest.approx(7.0)

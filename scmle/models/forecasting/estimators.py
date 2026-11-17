@@ -9,7 +9,7 @@ import pandas
 from scmle.models.multitarget import wrapper
 
 
-class ForecastEstimator(wrapper.MultiOutputEstimator):
+class Forecaster(wrapper.Multioutput):
     """A multi-output pipeline that also knows which column is the series.
 
     Attributes:
@@ -34,7 +34,7 @@ class ForecastEstimator(wrapper.MultiOutputEstimator):
         self.value_column = value_column
 
 
-class LastValueForecaster(wrapper.MultiOutputEstimator):
+class Naive(wrapper.Multioutput):
     """The naive baseline: the next `horizon` values equal the current one.
 
     It reads the current value straight from the rows (no preprocessing), so

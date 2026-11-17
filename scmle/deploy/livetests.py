@@ -315,10 +315,10 @@ def inspect(fetch: Fetch, target: Target) -> Check:
     return finish("schema", target, wire, problems)
 
 
-def check_inference(
+def infer(
     fetch: Fetch,
     target: Target,
-    golden: parity.GoldenSet,
+    golden: parity.Goldens,
     expected: dict[str, Any],
 ) -> Check:
     """Checks that the golden records score within the declared bound.
@@ -410,7 +410,7 @@ def breach(fetch: Fetch, target: Target) -> Check:
 def run_checks(
     fetch: Fetch,
     target: Target,
-    golden: parity.GoldenSet,
+    golden: parity.Goldens,
     expected: dict[str, Any],
 ) -> list[Check]:
     """Runs the four checks in order; a failing check does not stop the rest.
@@ -428,7 +428,7 @@ def run_checks(
     return [
         probe(fetch, target),
         inspect(fetch, target),
-        check_inference(fetch, target, golden, expected),
+        infer(fetch, target, golden, expected),
         breach(fetch, target),
     ]
 
@@ -452,7 +452,7 @@ def http_fetch(base_url: str, timeout: float = 30.0) -> Fetch:
         raise errors.ConfigError("base_url must be an absolute http(s) URL")
     root = base_url.rstrip("/")
 
-    class NoRedirect(urllib.request.HTTPRedirectHandler):
+    class Stopper(urllib.request.HTTPRedirectHandler):
         """Redirects are answers, not something to follow with a token."""
 
         def redirect_request(self, *arguments: Any, **keywords: Any) -> None:
@@ -463,7 +463,7 @@ def http_fetch(base_url: str, timeout: float = 30.0) -> Fetch:
                 **keywords: Ignored.
             """
 
-    opener = urllib.request.build_opener(NoRedirect)
+    opener = urllib.request.build_opener(Stopper)
 
     def fetch(
         method: str,

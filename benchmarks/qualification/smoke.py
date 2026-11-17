@@ -406,7 +406,7 @@ def check_corpora() -> SmokeCheck:
         otherwise true with the verified and candidate counts.
     """
     try:
-        manifest = corpora.load_manifest()
+        manifest = corpora.restore()
     except corpora.CorpusError as error:
         return SmokeCheck(
             "corpus manifest is valid", ok=False, detail=str(error)
@@ -426,7 +426,7 @@ def check_certificates() -> list[SmokeCheck]:
     Returns:
         Two checks: that the stand-ins pass their policy and certification
         is reproducible, and that a certificate for other code is stale,
-        demotes gating and is refused by `mark_gating`.
+        demotes gating and is refused by `authorise`.
     """
     first = standins.certify_all()
     second = standins.certify_all()
@@ -451,16 +451,16 @@ def check_certificates() -> list[SmokeCheck]:
     stale = first.state(name, altered) is certificates.Freshness.STALE
     demoted = (
         first.status(name, altered, standin.plan.defect_type)
-        is certificates.GateStatus.DESCRIPTIVE
+        is certificates.Authority.DESCRIPTIVE
         and certificates.demote(
-            qualification.Decision.BLOCK, certificates.GateStatus.DESCRIPTIVE
+            qualification.Decision.BLOCK, certificates.Authority.DESCRIPTIVE
         )
         is qualification.Decision.WARN
     )
     try:
-        first.mark_gating(name, altered, standin.plan.defect_type)
+        first.authorise(name, altered, standin.plan.defect_type)
         refused = False
-    except certificates.StaleCertificateError:
+    except certificates.StaleError:
         refused = True
     return [
         SmokeCheck(

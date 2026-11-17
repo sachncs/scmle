@@ -60,7 +60,7 @@ def majority(values: list[int]) -> int:
     return min(value for value, count in counts.items() if count == best)
 
 
-def fold_of_held_rows(
+def locate(
     dev_ids: numpy.ndarray,
     folds: list[tuple[numpy.ndarray, numpy.ndarray]],
     members: dict[int, list[int]],
@@ -95,7 +95,7 @@ def fold_of_held_rows(
     return held_in
 
 
-def keep_together(
+def cohere(
     dev_ids: numpy.ndarray,
     test_ids: numpy.ndarray,
     folds: list[tuple[numpy.ndarray, numpy.ndarray]],
@@ -130,7 +130,7 @@ def keep_together(
             side[row] = target
     new_dev = numpy.array(sorted(r for r, s in side.items() if s == 0))
     new_test = numpy.array(sorted(r for r, s in side.items() if s == 1))
-    held_in = fold_of_held_rows(dev_ids, folds, members, side)
+    held_in = locate(dev_ids, folds, members, side)
     rebuilt = []
     for index in range(len(folds)):
         held_rows = {row for row, fold in held_in.items() if fold == index}

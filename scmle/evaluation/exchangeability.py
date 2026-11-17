@@ -77,7 +77,7 @@ def compare(
     }
 
 
-def released_scores(bundle: Any, features: Any, target: Any) -> numpy.ndarray:
+def conformity(bundle: Any, features: Any, target: Any) -> numpy.ndarray:
     """Nonconformity scores of the released rows under the bundle's model.
 
     Absolute error for regression and one minus the probability of the true
@@ -120,5 +120,5 @@ def describe(bundle: Any, features: Any, target: Any) -> dict[str, Any]:
         released scores.
     """
     return compare(
-        bundle.conformal.scores, released_scores(bundle, features, target)
+        bundle.conformal.scores, conformity(bundle, features, target)
     )

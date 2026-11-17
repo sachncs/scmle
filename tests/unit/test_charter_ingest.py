@@ -28,7 +28,7 @@ def test_a_charter_without_the_block_keeps_its_hash_and_format():
 
 def test_a_signed_older_charter_still_verifies(tmp_path):
     path = tmp_path / "charter.json"
-    sealing.write_charter(path, make_charter(), signing_key="k")
+    sealing.inscribe(path, make_charter(), signing_key="k")
     assert sealing.read_verified(path, signing_key="k").signed
 
 
@@ -43,7 +43,7 @@ def test_the_block_changes_the_hash_round_trips_and_needs_format_seven():
 def test_the_block_in_an_older_format_is_refused(tmp_path):
     charter = make_charter(ingest=ingest.Ingestion())
     path = tmp_path / "charter.json"
-    sealing.write_charter(path, charter, signing_key="k")
+    sealing.inscribe(path, charter, signing_key="k")
     wrapper = json.loads(path.read_text())
     wrapper["format"] = 6
     path.write_text(json.dumps(wrapper))
@@ -80,10 +80,10 @@ FORMAT_SEVEN_SIGNATURE = (
 
 def entity_block():
     return ingest.Entity(
-        fields=(ingest.EntityField("name"), ingest.EntityField("email", False)),
+        fields=(ingest.Attribute("name"), ingest.Attribute("email", False)),
         passes=(
-            ingest.EntityPass("email"),
-            ingest.EntityPass("name", "soundex"),
+            ingest.Pass("email"),
+            ingest.Pass("name", "soundex"),
         ),
     )
 
@@ -108,7 +108,7 @@ def test_the_entity_block_needs_format_eight_and_round_trips():
 def test_the_entity_block_in_format_seven_is_refused(tmp_path):
     charter = make_charter(ingest=ingest.Ingestion(entity=entity_block()))
     path = tmp_path / "charter.json"
-    sealing.write_charter(path, charter, signing_key="k")
+    sealing.inscribe(path, charter, signing_key="k")
     wrapper = json.loads(path.read_text())
     wrapper["format"] = 7
     path.write_text(json.dumps(wrapper))
@@ -119,16 +119,16 @@ def test_the_entity_block_in_format_seven_is_refused(tmp_path):
 @pytest.mark.parametrize(
     "build",
     [
-        lambda: ingest.Entity((), (ingest.EntityPass("a"),)),
-        lambda: ingest.Entity((ingest.EntityField("a"),), ()),
+        lambda: ingest.Entity((), (ingest.Pass("a"),)),
+        lambda: ingest.Entity((ingest.Attribute("a"),), ()),
         lambda: ingest.Entity(
-            (ingest.EntityField("a"),), (ingest.EntityPass("a"),), ""
+            (ingest.Attribute("a"),), (ingest.Pass("a"),), ""
         ),
         lambda: ingest.Entity(
-            (ingest.EntityField("a"), ingest.EntityField("a")),
-            (ingest.EntityPass("a"),),
+            (ingest.Attribute("a"), ingest.Attribute("a")),
+            (ingest.Pass("a"),),
         ),
-        lambda: ingest.EntityPass("a", "metaphone"),
+        lambda: ingest.Pass("a", "metaphone"),
     ],
 )
 def test_an_invalid_entity_block_is_refused(build):
@@ -142,7 +142,7 @@ def reconcile_block():
             ingest.TableTotals(
                 "orders",
                 rows=100,
-                sums=(ingest.ColumnTotal("amount", 5000.0),),
+                sums=(ingest.Total("amount", 5000.0),),
                 checksum_column="order_id",
                 checksum="ab" * 32,
             ),
@@ -165,7 +165,7 @@ def test_the_reconcile_block_needs_format_eight_and_round_trips():
 def test_the_reconcile_block_in_format_seven_is_refused(tmp_path):
     charter = make_charter(ingest=ingest.Ingestion(reconcile=reconcile_block()))
     path = tmp_path / "charter.json"
-    sealing.write_charter(path, charter, signing_key="k")
+    sealing.inscribe(path, charter, signing_key="k")
     wrapper = json.loads(path.read_text())
     wrapper["format"] = 7
     path.write_text(json.dumps(wrapper))
@@ -182,7 +182,7 @@ def test_the_reconcile_block_in_format_seven_is_refused(tmp_path):
         lambda: ingest.TableTotals("t", checksum_column="k"),
         lambda: ingest.TableTotals("t", checksum="ab" * 32),
         lambda: ingest.TableTotals("t", checksum_column="k", checksum="zz"),
-        lambda: ingest.ColumnTotal("a", float("nan")),
+        lambda: ingest.Total("a", float("nan")),
         lambda: ingest.Expectation(
             (ingest.TableTotals("t", rows=1), ingest.TableTotals("t", rows=2))
         ),

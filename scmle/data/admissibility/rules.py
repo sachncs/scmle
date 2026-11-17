@@ -56,7 +56,7 @@ class Admission(enum.StrEnum):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FieldDecision:
+class Decision:
     """The decision for one field and why.
 
     Attributes:
@@ -140,14 +140,14 @@ def diagnose(
     return None
 
 
-def decide_timing(
+def clock(
     record: provenance.FieldProvenance,
     mode: Mode,
     declared_lag_seconds: float,
     today: datetime.date | None,
     suspect: bool,
-    leakage_gate: certificates.GateStatus,
-) -> FieldDecision:
+    leakage_gate: certificates.Authority,
+) -> Decision:
     """Applies the timing rule to one field.
 
     Args:
@@ -172,7 +172,7 @@ def decide_timing(
     tier = record.tier(today)
     failure = diagnose(record, declared_lag_seconds)
     if failure is not None:
-        return FieldDecision(
+        return Decision(
             record.name, Admission.QUARANTINE, tier, (failure,), suspect
         )
     reasons: list[str] = []
@@ -191,11 +191,9 @@ def decide_timing(
         )
         if suspect:
             reasons.append("leakage suspicion with no as-of evidence")
-            if leakage_gate is certificates.GateStatus.GATING:
+            if leakage_gate is certificates.Authority.GATING:
                 admission = Admission.QUARANTINE
-        return FieldDecision(
-            record.name, admission, tier, tuple(reasons), suspect
-        )
+        return Decision(record.name, admission, tier, tuple(reasons), suspect)
     admission = Admission.ADMIT
     if suspect:
         if tier is qualification.Tier.CONFIRMED:
@@ -207,17 +205,17 @@ def decide_timing(
             reasons.append("leakage suspicion; as-of is attested, not logged")
     else:
         reasons.append("known before the moment and available at serving")
-    return FieldDecision(record.name, admission, tier, tuple(reasons), suspect)
+    return Decision(record.name, admission, tier, tuple(reasons), suspect)
 
 
-def decide_predictive(
+def forecastable(
     record: provenance.FieldProvenance,
     mode: Mode = Mode.STRICT,
     declared_lag_seconds: float = 0.0,
     today: datetime.date | None = None,
     suspect: bool = False,
-    leakage_gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
-) -> FieldDecision:
+    leakage_gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
+) -> Decision:
     """Decides the admissibility of one field for a predictive estimand.
 
     Causal roles (mediator, collider, post-treatment) are not consulted.
@@ -239,17 +237,17 @@ def decide_predictive(
     lag = qualification.finite(declared_lag_seconds, "declared_lag_seconds")
     if lag < 0.0:
         raise errors.InputError("declared_lag_seconds must be non-negative")
-    return decide_timing(record, mode, lag, today, suspect, leakage_gate)
+    return clock(record, mode, lag, today, suspect, leakage_gate)
 
 
 def decide_graph_rule(
-    timing: FieldDecision,
+    timing: Decision,
     name: str,
     graph: dag.Dag,
     treatment: str,
     outcome: str,
     mode: Mode,
-) -> FieldDecision:
+) -> Decision:
     """Applies the graph rule to a field that passed the timing rule.
 
     Args:
@@ -290,7 +288,7 @@ def decide_graph_rule(
                 "no valid adjustment set from observed variables",
             ),
         )
-    if graph.backdoor_valid(treatment, outcome, {*base, name}):
+    if graph.adjusts(treatment, outcome, {*base, name}):
         return dataclasses.replace(
             timing,
             reasons=(*timing.reasons, "keeps the back-door set valid"),
@@ -305,7 +303,7 @@ def decide_graph_rule(
     )
 
 
-def decide_causal(
+def adjudicate(
     record: provenance.FieldProvenance,
     graph: dag.Dag,
     treatment: str,
@@ -314,8 +312,8 @@ def decide_causal(
     declared_lag_seconds: float = 0.0,
     today: datetime.date | None = None,
     suspect: bool = False,
-    leakage_gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
-) -> FieldDecision:
+    leakage_gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
+) -> Decision:
     """Decides the admissibility of one field as a covariate.
 
     Applies the predictive timing rule first, then the graph rule. A field
@@ -345,7 +343,7 @@ def decide_causal(
         `graph`, the same node given as both, or a search for the adjustment
         set that `Dag.adjustment_set` refuses as too large.
     """
-    timing = decide_predictive(
+    timing = forecastable(
         record, mode, declared_lag_seconds, today, suspect, leakage_gate
     )
     if timing.admission is Admission.QUARANTINE:
@@ -372,7 +370,7 @@ class Admissibility:
 
     kind: str
     mode: Mode
-    decisions: tuple[FieldDecision, ...]
+    decisions: tuple[Decision, ...]
     dag_hash: str | None
     adjustment_set: tuple[str, ...] | None
 
@@ -427,8 +425,8 @@ def build_table(
     today: datetime.date | None = None,
     suspects: Mapping[str, bool] | None = None,
     leakage_gate: (
-        certificates.GateStatus | Mapping[str, certificates.GateStatus]
-    ) = certificates.GateStatus.DESCRIPTIVE,
+        certificates.Authority | Mapping[str, certificates.Authority]
+    ) = certificates.Authority.DESCRIPTIVE,
     graph: dag.Dag | None = None,
     treatment: str | None = None,
     outcome: str | None = None,
@@ -460,14 +458,14 @@ def build_table(
         raise errors.InputError(f"kind must be one of {KINDS}")
     flags = suspects or {}
 
-    def gate(name: str) -> certificates.GateStatus:
+    def gate(name: str) -> certificates.Authority:
         if isinstance(leakage_gate, Mapping):
-            return leakage_gate.get(name, certificates.GateStatus.DESCRIPTIVE)
+            return leakage_gate.get(name, certificates.Authority.DESCRIPTIVE)
         return leakage_gate
 
     if kind == "predictive":
         decisions = tuple(
-            decide_predictive(
+            forecastable(
                 f,
                 mode,
                 declared_lag_seconds,
@@ -483,7 +481,7 @@ def build_table(
             "a causal estimand needs a graph, treatment, outcome"
         )
     decisions = tuple(
-        decide_causal(
+        adjudicate(
             f,
             graph,
             treatment,

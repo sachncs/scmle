@@ -12,13 +12,13 @@ SECTIONS = {
     "strategies": tasks.Strategies,
     "models": tasks.Candidates,
     "ensemble": tasks.Stacking,
-    "feature_graph": tasks.FeatureGraph,
+    "feature_graph": tasks.Derivation,
     "selection": tasks.Selection,
     "decision": tasks.Threshold,
 }
 
 
-def load_sections(path: str | pathlib.Path | None) -> dict[str, Any]:
+def overlay(path: str | pathlib.Path | None) -> dict[str, Any]:
     """Reads the optional JSON file of nested specification sections.
 
     Args:

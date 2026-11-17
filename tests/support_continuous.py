@@ -41,9 +41,7 @@ def make_loop(tmp_path, **changes):
         tmp_path / "deploy",
         CHARTER,
         scmle.governance.loop.Preregistration(**values),
-        verification_keys={
-            deployment_ledger.key_fingerprint(HUMAN_KEY): HUMAN_KEY
-        },
+        verification_keys={deployment_ledger.thumbprint(HUMAN_KEY): HUMAN_KEY},
         system_keys=[SYSTEM_KEY],
         today=lambda: TODAY,
     )
@@ -93,7 +91,7 @@ class Stream:
             name: dict(zip(ids, predict(error), strict=True))
             for name, error in challengers.items()
         }
-        self.evaluation.feed_labels(
+        self.evaluation.absorb(
             made, dict(zip(ids, truth, strict=True)), theirs or None
         )
         self.index += 1
@@ -165,12 +163,8 @@ def release_world(tmp_path):
     release = release_state.ReleaseRegistry(
         store, None, support_runtime.NO_WAIT
     )
-    release.approve(
-        MODEL, 1, support_runtime.approval_for(1), support_release.KEY
-    )
-    release.approve(
-        MODEL, 2, support_runtime.approval_for(2), support_release.KEY
-    )
+    release.approve(MODEL, 1, support_runtime.sanction(1), support_release.KEY)
+    release.approve(MODEL, 2, support_runtime.sanction(2), support_release.KEY)
     plane = support_runtime.MemoryPlane()
     return release, plane, store
 
@@ -178,7 +172,7 @@ def release_world(tmp_path):
 def candidate_for(store, version=2, **changes):
     values = {
         "model": store.resolve(MODEL, version),
-        "approval": support_runtime.approval_for(version),
+        "approval": support_runtime.sanction(version),
     }
     values.update(changes)
     return support_release.candidate("staging", **values)

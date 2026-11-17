@@ -42,9 +42,9 @@ def test_positive_delta_bounds_and_types():
 
 
 def test_k_must_be_an_integer_of_at_least_one():
-    assert feasibility.check_k(1) == 1
+    assert feasibility.countable(1) == 1
     for bad in (0, True, 1.5, "2"):
-        assert message(lambda bad=bad: feasibility.check_k(bad)) == (
+        assert message(lambda bad=bad: feasibility.countable(bad)) == (
             "k_max must be an integer of at least 1"
         )
 
@@ -76,17 +76,17 @@ def test_mean_formulas_agree_with_each_other_and_their_boundaries():
         lambda: feasibility.n_required_mean(0, alpha=0.05, k_max=2, power=0.8)
     ) == ("delta must be a finite number greater than 0")
     critical = stats.norm.ppf(1 - 0.05 / 4)
-    assert feasibility.power_mean(
+    assert feasibility.detectability(
         0.3, 100, alpha=0.05, k_max=2
     ) == pytest.approx(stats.norm.cdf(3.0 - critical), rel=1e-12)
-    assert feasibility.power_mean(0.3, 0, alpha=0.05, k_max=2) == pytest.approx(
-        stats.norm.cdf(-critical), rel=1e-12
-    )
+    assert feasibility.detectability(
+        0.3, 0, alpha=0.05, k_max=2
+    ) == pytest.approx(stats.norm.cdf(-critical), rel=1e-12)
     assert message(
-        lambda: feasibility.power_mean(0, 5, alpha=0.05, k_max=2)
+        lambda: feasibility.detectability(0, 5, alpha=0.05, k_max=2)
     ) == ("delta must be a finite number greater than 0")
     assert message(
-        lambda: feasibility.power_mean(0.3, 5, alpha=2, k_max=2)
+        lambda: feasibility.detectability(0.3, 5, alpha=2, k_max=2)
     ) == ("alpha must be strictly between 0.0 and 1")
 
 
@@ -95,15 +95,13 @@ def test_correlation_formulas_follow_fisher_z():
     assert feasibility.n_required_correlation(
         0.3, alpha=0.05, k_max=1, power=0.8
     ) == math.ceil((z / math.atanh(0.3)) ** 2 + 3)
-    assert feasibility.mde_correlation(103, alpha=0.05, k_max=1, power=0.8) == (
+    assert feasibility.resolution(103, alpha=0.05, k_max=1, power=0.8) == (
         pytest.approx(math.tanh(z / 10))
     )
-    assert feasibility.mde_correlation(4, alpha=0.05, k_max=1, power=0.8) == (
+    assert feasibility.resolution(4, alpha=0.05, k_max=1, power=0.8) == (
         pytest.approx(math.tanh(z))
     )
-    assert math.isnan(
-        feasibility.mde_correlation(3, alpha=0.05, k_max=1, power=0.8)
-    )
+    assert math.isnan(feasibility.resolution(3, alpha=0.05, k_max=1, power=0.8))
     assert message(
         lambda: feasibility.n_required_correlation(
             1.0, alpha=0.05, k_max=1, power=0.8
@@ -156,22 +154,18 @@ def test_two_proportions_matches_the_pooled_variance_formula():
 @pytest.mark.parametrize("confidence", [0.9, 0.95, 0.99])
 def test_wilson_half_width_equals_half_the_wilson_interval(n, confidence):
     low, high = certificates.wilson_interval(n // 2, n, confidence)
-    assert feasibility.wilson_half_width(0.5, n, confidence) == pytest.approx(
+    assert feasibility.halfwidth(0.5, n, confidence) == pytest.approx(
         (high - low) / 2, rel=1e-12
     )
 
 
 def test_wilson_half_width_at_the_edges():
-    assert math.isinf(feasibility.wilson_half_width(0.5, 0))
+    assert math.isinf(feasibility.halfwidth(0.5, 0))
     low, high = certificates.wilson_interval(0, 1, 0.95)
-    assert feasibility.wilson_half_width(0.0, 1) == pytest.approx(
-        (high - low) / 2
-    )
+    assert feasibility.halfwidth(0.0, 1) == pytest.approx((high - low) / 2)
     z = stats.norm.ppf(0.975)
     expected = z * math.sqrt(0.25 / 4 + z * z / 64) / (1 + z * z / 4)
-    assert feasibility.wilson_half_width(0.5, 4) == pytest.approx(
-        expected, rel=1e-12
-    )
+    assert feasibility.halfwidth(0.5, 4) == pytest.approx(expected, rel=1e-12)
 
 
 def test_assess_boundaries_and_record():
@@ -193,7 +187,7 @@ def test_assess_boundaries_and_record():
     assert at.verdict is not feasibility.Verdict.INFEASIBLE
     assert at.n_confirmation == feasibility.MIN_CONFIRMATION_ROWS
     assert at.power_at_min_effect == pytest.approx(
-        feasibility.power_mean(
+        feasibility.detectability(
             0.3, feasibility.MIN_CONFIRMATION_ROWS, alpha=0.05, k_max=3
         )
     )
@@ -210,7 +204,7 @@ def test_a_wide_minority_interval_downgrades_only_at_a_strict_inequality():
         "k_max": 3,
         "power": 0.8,
     }
-    width = feasibility.wilson_half_width(0.5, 40)
+    width = feasibility.halfwidth(0.5, 40)
     exact = feasibility.assess(**plenty, n_minority=40, max_half_width=width)
     tighter = feasibility.assess(
         **plenty, n_minority=40, max_half_width=width / 2

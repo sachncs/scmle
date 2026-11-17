@@ -33,7 +33,7 @@ def make_capability(
         key=key or make_key(),
         status=status,
         required_extras=("core",),
-        resources=capabilities.ResourceAssumptions(
+        resources=capabilities.Resources(
             cpu_cores=2,
             memory_gb=4.0,
             disk_gb=1.0,
@@ -88,7 +88,7 @@ def test_supported_capability_is_required_by_default():
 
     assert registry.records.get(record.key) is record
     assert registry.require(record.key) is record
-    assert registry.list_capabilities() == (record,)
+    assert registry.catalogue() == (record,)
 
 
 def test_non_supported_status_requires_explicit_opt_in():
@@ -96,7 +96,7 @@ def test_non_supported_status_requires_explicit_opt_in():
     registry = capabilities.Registry((record,))
 
     with pytest.raises(
-        capabilities.UnsupportedCapabilityError,
+        capabilities.UnsupportedError,
         match="registered as experimental",
     ):
         registry.require(record.key)
@@ -118,7 +118,7 @@ def test_unknown_combination_fails_before_training_with_structured_diagnostic():
     )
     registry = capabilities.Registry((registered,))
 
-    with pytest.raises(capabilities.UnsupportedCapabilityError) as failure:
+    with pytest.raises(capabilities.UnsupportedError) as failure:
         registry.require(requested)
 
     assert failure.value.category == "capability"
@@ -152,7 +152,7 @@ def test_contract_rejects_noncanonical_dimensions_and_resources():
     with pytest.raises(ValueError, match="model_family"):
         make_key(model_family=" Tree ")
     with pytest.raises(ValueError, match="memory_gb"):
-        capabilities.ResourceAssumptions(memory_gb=0)
+        capabilities.Resources(memory_gb=0)
 
 
 def test_registry_serialization_is_canonical_across_registration_order():
@@ -251,7 +251,7 @@ def test_unsupported_family_modality_reports_structured_diagnostic(
     )
     assert modality_diagnostic.observed == modality.value
     assert modality.value not in modality_diagnostic.expected
-    with pytest.raises(capabilities.UnsupportedCapabilityError) as failure:
+    with pytest.raises(capabilities.UnsupportedError) as failure:
         registry.require(key)
     assert {item["code"] for item in failure.value.details["diagnostics"]} >= {
         "missing_declaration",
@@ -273,7 +273,7 @@ def test_experimental_family_requires_explicit_status_opt_in():
         "missing_declaration",
         "model_family_status_not_allowed",
     }
-    with pytest.raises(capabilities.UnsupportedCapabilityError):
+    with pytest.raises(capabilities.UnsupportedError):
         registry.require(key)
 
 
@@ -296,7 +296,7 @@ def test_environment_checks_collect_missing_extras_and_resources():
         "insufficient_memory_gb",
         "insufficient_disk_gb",
     }
-    with pytest.raises(capabilities.UnsupportedCapabilityError) as failure:
+    with pytest.raises(capabilities.UnsupportedError) as failure:
         registry.require(record.key, environment=environment)
     assert [item["code"] for item in failure.value.details["diagnostics"]] == [
         item.code for item in diagnostics
@@ -310,7 +310,7 @@ def test_required_resources_reject_unknown_runtime_facts():
     gpu_record = dataclasses.replace(
         record,
         key=gpu_key,
-        resources=capabilities.ResourceAssumptions(
+        resources=capabilities.Resources(
             memory_gb=4.0,
             gpu_required=True,
             network_required=True,
@@ -339,7 +339,7 @@ def test_row_limits_are_checked_before_training():
     """A bounded capability requires an observed row count."""
     record = dataclasses.replace(
         make_capability(),
-        resources=capabilities.ResourceAssumptions(
+        resources=capabilities.Resources(
             memory_gb=4.0,
             max_rows=10,
         ),
@@ -353,5 +353,5 @@ def test_row_limits_are_checked_before_training():
             expected=10,
         ),
     )
-    with pytest.raises(capabilities.UnsupportedCapabilityError):
+    with pytest.raises(capabilities.UnsupportedError):
         registry.require(record.key, row_count=11)

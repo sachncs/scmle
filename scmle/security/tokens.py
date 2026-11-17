@@ -84,7 +84,7 @@ class TokenError(errors.ScmleError):
         self.reason = reason
 
 
-def decode_segment(text: str) -> bytes:
+def unbase(text: str) -> bytes:
     """Decodes one base64url segment; padding is optional.
 
     Args:
@@ -103,7 +103,7 @@ def decode_segment(text: str) -> bytes:
         raise TokenError(MALFORMED) from error
 
 
-def encode_segment(raw: bytes) -> str:
+def pack(raw: bytes) -> str:
     """Encodes bytes as an unpadded base64url segment.
 
     Args:
@@ -122,10 +122,10 @@ def unpack(text: str) -> int:
         text: The segment.
 
     Returns:
-        The integer. The `TokenError` that `decode_segment` raises for a
+        The integer. The `TokenError` that `unbase` raises for a
         segment that is not base64url is not caught.
     """
-    return int.from_bytes(decode_segment(text), "big")
+    return int.from_bytes(unbase(text), "big")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -179,7 +179,7 @@ class Key:
             )
 
     @classmethod
-    def from_jwk(cls, entry: Mapping[str, Any]) -> Self:
+    def jwk(cls, entry: Mapping[str, Any]) -> Self:
         """Builds a key from a JWK object.
 
         `kty` `oct` (field `k`) gives HS256, `RSA` (fields `n`, `e`) gives
@@ -206,7 +206,7 @@ class Key:
                 return cls(
                     kid,
                     HS256,
-                    secret=decode_segment(entry["k"]),
+                    secret=unbase(entry["k"]),
                     not_before=not_before,
                     expires=expires,
                 )
@@ -302,7 +302,7 @@ class KeySet:
         self.keys = by_kid
 
     @classmethod
-    def from_jwks(cls, document: Mapping[str, Any]) -> Self:
+    def jwks(cls, document: Mapping[str, Any]) -> Self:
         """Builds a set from a JWKS document (`{"keys": [...]}`).
 
         Args:
@@ -319,7 +319,7 @@ class KeySet:
         entries = parsed.get("keys") if isinstance(parsed, Mapping) else None
         if not isinstance(entries, list):
             raise errors.ConfigError("a JWKS document needs a keys list")
-        return cls([Key.from_jwk(entry) for entry in entries])
+        return cls([Key.jwk(entry) for entry in entries])
 
     @classmethod
     def from_file(cls, path: str | pathlib.Path) -> Self:
@@ -338,7 +338,7 @@ class KeySet:
         """
         try:
             text = pathlib.Path(path).read_text(encoding="utf-8")
-            return cls.from_jwks(json.loads(text))
+            return cls.jwks(json.loads(text))
         except (OSError, ValueError) as error:
             raise errors.ConfigError(f"cannot read key set {path}") from error
 
@@ -505,7 +505,7 @@ class Verifier:
         self.leeway = leeway_seconds
         self.clock = clock
 
-    def current_revocations(self) -> RevocationList | None:
+    def denylist(self) -> RevocationList | None:
         """Returns the revocation list now in force.
 
         Returns:
@@ -552,7 +552,7 @@ class Verifier:
         now = self.clock()
         key.validate(now)
         signing_input = f"{parts[0]}.{parts[1]}".encode("ascii", "replace")
-        if not key.verify(signing_input, decode_segment(parts[2])):
+        if not key.verify(signing_input, unbase(parts[2])):
             raise TokenError(BAD_SIGNATURE)
         claims = self.parse(parts[1])
         return self.admit(header, claims, key, now)
@@ -570,7 +570,7 @@ class Verifier:
             TokenError: `malformed` if the segment is not a JSON object.
         """
         try:
-            value = json.loads(decode_segment(segment))
+            value = json.loads(unbase(segment))
         except (ValueError, UnicodeError) as error:
             raise TokenError(MALFORMED) from error
         if not isinstance(value, dict):
@@ -622,7 +622,7 @@ class Verifier:
             value = quantify(claims, name)
             if value is not None and value > now + self.leeway:
                 raise TokenError(NOT_YET_VALID, name)
-        revocations = self.current_revocations()
+        revocations = self.denylist()
         if revocations is not None and revocations.revokes(header, claims):
             raise TokenError(REVOKED)
         tenant = claims.get(self.tenant_claim)
@@ -697,8 +697,8 @@ def sign_hs256(secret: bytes, kid: str, claims: Mapping[str, Any]) -> str:
         )
     header = {"alg": HS256, "typ": "JWT", "kid": kid}
     body = ".".join(
-        encode_segment(json.dumps(part, sort_keys=True).encode())
+        pack(json.dumps(part, sort_keys=True).encode())
         for part in (header, dict(claims))
     )
     signature = hmac.new(secret, body.encode("ascii"), "sha256").digest()
-    return f"{body}.{encode_segment(signature)}"
+    return f"{body}.{pack(signature)}"

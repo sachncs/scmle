@@ -53,11 +53,11 @@ class CertificateError(ValueError):
     """A certificate is missing, malformed or does not permit gating."""
 
 
-class StaleCertificateError(CertificateError):
+class StaleError(CertificateError):
     """A certificate exists but was issued for different code."""
 
 
-class GateStatus(enum.StrEnum):
+class Authority(enum.StrEnum):
     """Whether a check may act on its result."""
 
     GATING = "gating"
@@ -104,7 +104,7 @@ def wilson_interval(
     return max(0.0, min(centre - half, p)), min(1.0, max(centre + half, p))
 
 
-def docstring_lines(tree: ast.Module) -> set[int]:
+def documentation(tree: ast.Module) -> set[int]:
     """Finds the lines occupied only by a docstring statement.
 
     Args:
@@ -156,7 +156,7 @@ def hash_source(source: str) -> str:
         if token.type == tokenize.COMMENT:
             row, column = token.start
             lines[row - 1] = lines[row - 1][:column]
-    dropped = docstring_lines(tree)
+    dropped = documentation(tree)
     kept = [
         line.rstrip()
         for number, line in enumerate(lines, start=1)
@@ -418,12 +418,12 @@ class Certification:
         evidence.require_text(self.detector_id, "detector_id")
         require_digest(self.code_hash, "code_hash")
         require_digest(self.corpus_hash, "corpus_hash")
-        qualification.require_tuple(self.seeds, "seeds")
+        qualification.tupled(self.seeds, "seeds")
         if not self.seeds:
             raise errors.InputError("seeds must not be empty")
         for seed in self.seeds:
             qualification.count(seed, "seeds")
-        qualification.require_tuple(self.outcomes, "outcomes")
+        qualification.tupled(self.outcomes, "outcomes")
         if not self.outcomes:
             raise errors.InputError("outcomes must not be empty")
         kinds = [o.certificate.defect_type for o in self.outcomes]
@@ -533,7 +533,7 @@ def certify(
 
 
 def demote(
-    decision: qualification.Decision, status: GateStatus
+    decision: qualification.Decision, status: Authority
 ) -> qualification.Decision:
     """Limits a descriptive check to a warning at most.
 
@@ -545,7 +545,7 @@ def demote(
         `decision` when the check is gating or the decision is not a block
         or quarantine; otherwise a warning.
     """
-    if status is GateStatus.GATING:
+    if status is Authority.GATING:
         return decision
     if decision in (
         qualification.Decision.BLOCK,
@@ -640,7 +640,7 @@ class Store:
 
     def status(
         self, detector_id: str, code_digest: str, defect_type: str
-    ) -> GateStatus:
+    ) -> Authority:
         """Finds whether a detector may gate on a defect type.
 
         Args:
@@ -654,12 +654,12 @@ class Store:
         """
         for item in self.current(detector_id, code_digest):
             if defect_type in item.certified_defect_types:
-                return GateStatus.GATING
-        return GateStatus.DESCRIPTIVE
+                return Authority.GATING
+        return Authority.DESCRIPTIVE
 
-    def mark_gating(
+    def authorise(
         self, detector_id: str, code_digest: str, defect_type: str
-    ) -> GateStatus:
+    ) -> Authority:
         """Returns `GATING`, or raises when the detector may not gate.
 
         Args:
@@ -668,10 +668,10 @@ class Store:
             defect_type: The defect type.
 
         Returns:
-            `GateStatus.GATING`.
+            `Authority.GATING`.
 
         Raises:
-            StaleCertificateError: The certificate is for other code.
+            StaleError: The certificate is for other code.
             CertificateError: There is no certificate, or it does not pass
                 for `defect_type`.
         """
@@ -681,16 +681,16 @@ class Store:
                 f"no certificate for detector '{detector_id}'"
             )
         if state is Freshness.STALE:
-            raise StaleCertificateError(
+            raise StaleError(
                 f"certificate for '{detector_id}' is for different code"
             )
         if self.status(detector_id, code_digest, defect_type) is not (
-            GateStatus.GATING
+            Authority.GATING
         ):
             raise CertificateError(
                 f"'{detector_id}' is not certified for '{defect_type}'"
             )
-        return GateStatus.GATING
+        return Authority.GATING
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the store as a JSON-ready document.
@@ -777,7 +777,7 @@ def audit(store: Store, gating: Mapping[str, tuple[str, str]]) -> Audit:
         elif state is Freshness.STALE:
             stale.append(detector_id)
         elif store.status(detector_id, digest, defect) is not (
-            GateStatus.GATING
+            Authority.GATING
         ):
             uncertified.append(detector_id)
     return Audit(tuple(missing), tuple(stale), tuple(uncertified))

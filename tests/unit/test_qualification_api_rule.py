@@ -16,7 +16,7 @@ NEW_NAMES = {
     "Certificate",
     "Tier",
     "Decision",
-    "SetId",
+    "Subset",
     "ErrorBudget",
     "ExplorationBudget",
     "ConfirmationBudget",

@@ -26,7 +26,7 @@ def test_integrating_two_points_is_their_mean():
     times = numpy.array([1.5, 2.5])
     predicted = numpy.array([[0.2, 0.1], [0.9, 0.3], [0.8, 0.6]])
 
-    value = survival.integrated_brier(duration, event, predicted, times)
+    value = survival.brier(duration, event, predicted, times)
 
     scores = survival.brier_scores(duration, event, predicted, times)
     assert value == pytest.approx(scores.mean())
@@ -37,8 +37,8 @@ def test_dynamic_auc_is_one_for_a_perfect_ordering_and_half_for_ties():
     event = numpy.ones(4)
     times = numpy.array([2.5])
 
-    assert survival.dynamic_auc(duration, event, -duration, times) == 1.0
-    assert survival.dynamic_auc(duration, event, numpy.zeros(4), times) == 0.5
+    assert survival.auc(duration, event, -duration, times) == 1.0
+    assert survival.auc(duration, event, numpy.zeros(4), times) == 0.5
 
 
 def test_a_better_model_has_a_lower_integrated_brier_score():
@@ -50,23 +50,21 @@ def test_a_better_model_has_a_lower_integrated_brier_score():
         numpy.minimum(happens, stops),
         (happens <= stops).astype(int),
     )
-    times = survival.time_grid(duration, event)
+    times = survival.horizons(duration, event)
 
     informed = numpy.exp(-numpy.outer(rate, times))
     ignorant = numpy.tile(numpy.exp(-numpy.mean(rate) * times), (600, 1))
 
-    assert survival.integrated_brier(
-        duration, event, informed, times
-    ) < survival.integrated_brier(duration, event, ignorant, times)
+    assert survival.brier(duration, event, informed, times) < survival.brier(
+        duration, event, ignorant, times
+    )
 
 
 def test_heavy_censoring_does_not_break_the_weights():
     duration = numpy.array([1.0, 2.0, 3.0, 4.0, 5.0])
     event = numpy.array([1, 0, 0, 0, 0])
 
-    probability = survival.censoring_probability(
-        survival.censoring_curve(duration, event), duration
-    )
+    probability = survival.survivor(survival.censor(duration, event), duration)
 
     assert (probability >= survival.MIN_CENSORING_PROBABILITY).all()
     assert (probability <= 1.0).all()

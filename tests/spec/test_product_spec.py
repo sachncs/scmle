@@ -155,7 +155,7 @@ def test_l23_to_l39_decision_table(run):
     assert {"sequential", "process", "ray"} <= {
         scheduler.Serial.name,
         scheduler.Pool.name,
-        ray_backend.RayBackend.name,
+        ray_backend.Remote.name,
     }  # local-first, distributed-capable
     assert (
         result.evaluation["split_fingerprint"]
@@ -165,9 +165,7 @@ def test_l23_to_l39_decision_table(run):
     assert "content_id" in {
         f.name
         for f in dataclasses.fields(
-            __import__(
-                "scmle.governance.registry", fromlist=["x"]
-            ).VersionRecord
+            __import__("scmle.governance.registry", fromlist=["x"]).Release
         )
     }  # content-addressed artifacts
     assert {"tracking", "distributed", "optimization"} <= set(
@@ -204,7 +202,7 @@ def test_l41_l43_no_mandatory_infrastructure_on_the_base_install():
     assert not names & forbidden
     code = (
         "import sys, scmle; from scmle.models import registry; "
-        "registry.Catalog.with_builtins(); "
+        "registry.Catalog.stock(); "
         "bad=[m for m in ('ray','mlflow','torch','kubernetes') if m in sys.modules]; "
         "assert not bad, bad"
     )
@@ -365,7 +363,7 @@ def test_l198_l206_foundational_and_production_contracts(run):
     assert dataclasses.fields(models.Capabilities)  # capability discovery
     from scmle.experimentation import trials
 
-    assert {f.name for f in dataclasses.fields(trials.TrialPayload)} >= {
+    assert {f.name for f in dataclasses.fields(trials.Payload)} >= {
         "job",
         "adapter",
         "task",
@@ -395,7 +393,7 @@ def test_l198_l206_foundational_and_production_contracts(run):
         result.bundle.info.format == scmle.artifacts.bundle.BUNDLE_FORMAT
     )  # serialization format
     assert isinstance(
-        result.bundle.info.compatibility_problems(), list
+        result.bundle.info.incompatibilities(), list
     )  # compat versions
 
 
@@ -408,12 +406,12 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
 
     frame = make_frame(200)
     before = frame.copy()
-    tabular.build_manifest(frame, "y")
+    tabular.manifested(frame, "y")
     pandas.testing.assert_frame_equal(
         frame, before
     )  # ingestion: input immutable
     spec = project.spec
-    manifest = tabular.build_manifest(frame, "y")
+    manifest = tabular.manifested(frame, "y")
     task = scmle.data.validation.target.TaskResolver(spec).resolve(frame["y"])
     profiler.Profiler(spec).profile(frame, manifest, task)
     pandas.testing.assert_frame_equal(
@@ -423,7 +421,7 @@ def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     assert not set(split.manifest.train_ids) & set(
         split.manifest.test_ids
     )  # splitting
-    assert {t.status for t in result.trials} >= {experiments.TrialStatus.OK}
+    assert {t.status for t in result.trials} >= {experiments.Termination.OK}
     assert result.selected_model  # selector: defined policy
     assert (
         result.run_dir / "model" / "model_manifest.json"
@@ -457,7 +455,7 @@ def test_l226_plugins_are_conformance_tested():
             return Broken()
 
     with pytest.raises(Exception):  # noqa: B017 - any contract violation
-        conformance.check_conformance(Bad())
+        conformance.comply(Bad())
 
 
 # ---------------------------------------------------------------- section 6
@@ -664,7 +662,7 @@ def test_l327_l345_stages_a_to_e(run):
 
 def test_l347_l356_model_family_registry():
     """The initial model families."""
-    names = set(scmle.models.registry.Catalog.with_builtins().adapters)
+    names = set(scmle.models.registry.Catalog.stock().adapters)
     assert {
         "dummy",
         "logistic_regression",
@@ -696,15 +694,13 @@ def test_l358_adapter_capability_declarations():
         "memory_factor",
         "serializable",
     } <= declared
-    for (
-        adapter
-    ) in scmle.models.registry.Catalog.with_builtins().adapters.values():
+    for adapter in scmle.models.registry.Catalog.stock().adapters.values():
         assert adapter.capabilities.memory_factor >= 1.0
 
 
 def test_l360_planner_reads_capabilities_not_library_names():
     """Planning uses declared capabilities (here: size limits and tasks)."""
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     rejected = registry.candidates(tasks.Task.REGRESSION, 1_000_000)[1]
     assert (
         "svm" in rejected and "logistic_regression" in rejected
@@ -715,8 +711,8 @@ def test_l370_optimizer_library_is_not_the_architecture():
     """Optuna sits behind our ask/tell interface."""
     from scmle.optimization import optimizers
 
-    assert issubclass(optimizers.OptunaOptimizer, optimizers.Optimizer)
-    assert issubclass(optimizers.RandomOptimizer, optimizers.Optimizer)
+    assert issubclass(optimizers.Parzen, optimizers.Optimizer)
+    assert issubclass(optimizers.Uniform, optimizers.Optimizer)
 
 
 # ---------------------------------------------------------------- section 9
@@ -753,14 +749,14 @@ def test_l374_l393_balancing_and_augmentation(frame):
         {"x": numpy.arange(100.0), "y": numpy.arange(100.0) * 2}
     )
     profile = profiler.Profiler(spec).profile(
-        reg, tabular.build_manifest(reg, "y"), tasks.Task.REGRESSION
+        reg, tabular.manifested(reg, "y"), tasks.Task.REGRESSION
     )
-    adapter = scmle.models.registry.Catalog.with_builtins().get("ridge")
+    adapter = scmle.models.registry.Catalog.stock().get("ridge")
     reason = strategies.STRATEGIES["random_oversample"].applicability(
         profile, tasks.Task.REGRESSION, adapter
     )
     assert reason is not None and "classification" in reason
-    assert isinstance(profile, scmle.contracts.data.DatasetProfile)
+    assert isinstance(profile, scmle.contracts.data.Portrait)
 
 
 def test_l385_l387_calibration_and_threshold_use_validation_evidence(run):
@@ -789,7 +785,7 @@ def test_l399_l409_evaluation_contract(run):
     } <= set(result.diagnostics)
     from scmle.evaluation import metrics
 
-    defaults = set(metrics.MetricCatalog.default_metric.values())
+    defaults = set(metrics.Repertoire.default_metric.values())
     assert not defaults & {
         "accuracy",
         "f1",
@@ -887,14 +883,8 @@ def test_l439_deployment_scenario_splits(frame):
     with_group = support.make_project(
         frame.assign(g=numpy.arange(len(frame)) % 40), "y", group_column="g"
     ).spec
-    assert (
-        splitters.resolve_strategy_name(with_time, tasks.Task.BINARY)
-        == "temporal"
-    )
-    assert (
-        splitters.resolve_strategy_name(with_group, tasks.Task.BINARY)
-        == "group"
-    )
+    assert splitters.scheme(with_time, tasks.Task.BINARY) == "temporal"
+    assert splitters.scheme(with_group, tasks.Task.BINARY) == "group"
 
 
 # --------------------------------------------------------------- section 12-13
@@ -980,7 +970,7 @@ def test_l480_l496_inference_contract(run, frame, tmp_path):
         == 3
     )
     renamed = features.rename(columns={"a": "alpha"})
-    mapping = scmle.inference.mapping.ColumnMapping({"alpha": "a"})
+    mapping = scmle.inference.mapping.Mapper({"alpha": "a"})
     numpy.testing.assert_array_equal(
         result.bundle.predict(renamed, mapping),
         result.predict(features),
@@ -992,11 +982,11 @@ def test_l480_l496_inference_contract(run, frame, tmp_path):
     features.to_csv(path, index=False)
     from scmle.inference import serving
 
-    assert serving.BatchServing(result.bundle).score_file(
+    assert serving.Batcher(result.bundle).score_file(
         path, tmp_path / "out.csv"
     ) == len(features)  # batch
     assert result.bundle.pipeline.predict(
-        result.bundle.prepare_frame(features)
+        result.bundle.prepare(features)
     ).shape  # whole pipeline
 
 
@@ -1032,7 +1022,7 @@ def test_l548_no_heavy_imports_until_a_model_is_selected():
     """A registry entry must not import GPU/deep-learning dependencies."""
     code = (
         "import sys; from scmle.contracts import tasks; from scmle.models import registry; "
-        "r = registry.Catalog.with_builtins(); r.candidates(tasks.Task.BINARY, 100); "
+        "r = registry.Catalog.stock(); r.candidates(tasks.Task.BINARY, 100); "
         "assert not [m for m in ('lightgbm','xgboost','catboost','torch','tensorflow') if m in sys.modules]"
     )
     assert (
@@ -1078,21 +1068,19 @@ def test_l610_l629_backlog_priorities(run):
     )  # project API and inference-ready artifact
     assert issubclass(serving.HttpServing, serving.Server)  # serving
     assert callable(registry.ModelRegistryStore.promote)  # deployment
-    report = monitor.ModelMonitor(result.bundle).assess(
+    report = monitor.Watcher(result.bundle).assess(
         make_frame(seed=3).drop(columns="y"), make_frame(seed=3)["y"]
     )
     assert report.recommendation.action  # monitoring
     assert issubclass(
-        importance.PermutationImportance, diagnostics.Diagnostic
+        importance.Importance, diagnostics.Diagnostic
     )  # explainability
     assert "permutation_importance" in result.diagnostics
     assert issubclass(ensembles.Stacking, models.Model)
-    generator = synthesis.GaussianCopulaGenerator().fit(
-        make_frame()[["a", "b"]]
-    )
+    generator = synthesis.Copula().fit(make_frame()[["a", "b"]])
     fake = generator.sample(30, numpy.random.default_rng(0))
     assert fake.shape == (30, 2)  # augmentation
-    assert knowledge.MetaLearner([]).recommend  # meta-learning
+    assert knowledge.Recommender([]).recommend  # meta-learning
 
 
 def test_l637_l669_test_categories_and_quality_gates(run):
@@ -1152,7 +1140,7 @@ def test_l679_l735_v01_scope_matches_the_spec(frame, tmp_path):
         ).run()
         assert result.state == "COMPLETED"
     assert issubclass(
-        ray_backend.RayBackend, scheduler.Executor
+        ray_backend.Remote, scheduler.Executor
     )  # distributed: optional
 
 
@@ -1167,7 +1155,7 @@ def test_l739_l747_first_sprint_outcomes(run):
     from scmle.data.splitting import splitters
 
     frame = make_frame()
-    manifest = tabular.build_manifest(frame, "y", "<memory>")
+    manifest = tabular.manifested(frame, "y", "<memory>")
     assert manifest.row_count == len(frame)  # 3 ingestion
     profile = profiler.Profiler(
         tasks.Config(data=tasks.Dataset(uri="x", target="y"))
@@ -1229,9 +1217,9 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     from scmle.sampling import resampling
     from scmle.sampling import synthesis
 
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     neural = registry.get("neural_network")  # deep learning: a plugin family
-    conformance.check_conformance(neural)
+    conformance.comply(neural)
 
     series = pandas.DataFrame(
         {
@@ -1262,19 +1250,19 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     profile.plan()
     assert "t" not in profile.profile.feature_plan.features
 
-    generator = synthesis.GaussianCopulaGenerator().fit(frame[["a", "b"]])
+    generator = synthesis.Copula().fit(frame[["a", "b"]])
     fake = generator.sample(40, numpy.random.default_rng(0))
     assert fake.shape == (40, 2)
     assert issubclass(synthesis.GeneratorOverSampler, resampling.Resampler)
 
-    one = tasks.FeatureGraph(
-        nodes=[tasks.FeatureNode(name="sq", op="square", inputs=["b"])]
+    one = tasks.Derivation(
+        nodes=[tasks.Node(name="sq", op="square", inputs=["b"])]
     )
-    two = tasks.FeatureGraph(
-        nodes=[tasks.FeatureNode(name="sq", op="sqrt", inputs=["b"])]
+    two = tasks.Derivation(
+        nodes=[tasks.Node(name="sq", op="sqrt", inputs=["b"])]
     )
     assert one.fingerprint() != two.fingerprint()  # versioned graph
-    graph = feature_graph.FeatureGraphTransformer(tuple(one.nodes))
+    graph = feature_graph.Transformer(tuple(one.nodes))
     out = graph.fit(frame[["b"]]).transform(frame[["b"]])
     numpy.testing.assert_allclose(out["sq"], frame["b"] ** 2)
 
@@ -1290,15 +1278,13 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     with pytest.raises(errors.BlockedError):
         gated.run()  # human approval: a rejection stops the run
 
-    prediction = scmle.monitoring.events.PredictionEvent(
+    prediction = scmle.monitoring.events.Served(
         "e1", "v1", "2026-01-01T00:00:00Z", {"a": 1.0}, 1, 0.8
     )
-    outcome = scmle.monitoring.events.OutcomeEvent(
-        "e1", "2026-01-02T00:00:00Z", 1
-    )
+    outcome = scmle.monitoring.events.Outcome("e1", "2026-01-02T00:00:00Z", 1)
     assert prediction.event_id == outcome.event_id  # label schema joins
 
-    job = trials.TrialJob("trial_001", "dummy", {"strategy": "x"})
+    job = trials.Job("trial_001", "dummy", {"strategy": "x"})
     assert pickle.loads(pickle.dumps(job)) == job  # scheduler-independent
     for backend in (scheduler.Serial(), scheduler.Pool(2)):
         assert backend.map(abs, [-1, -2, -3]) == [1, 2, 3]
@@ -1309,7 +1295,7 @@ def scmle_profile(frame):
     from scmle.data.profiling import profiler
     from scmle.data.readers import tabular
 
-    manifest = tabular.build_manifest(frame, "y", "<memory>")
+    manifest = tabular.manifested(frame, "y", "<memory>")
     spec = tasks.Config(data=tasks.Dataset(uri="x", target="y"))
     return profiler.Profiler(spec).profile(frame, manifest, tasks.Task.BINARY)
 
@@ -1320,7 +1306,7 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
     """A candidate is a complete, independently evaluable pipeline."""
     from scmle.sampling import strategies
 
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     plan = scmle.api.project.Project(frame, "y").plan()
     profile = scmle.api.project.Project(frame, "y")
     profile.plan()

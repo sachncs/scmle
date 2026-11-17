@@ -92,7 +92,7 @@ def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
     stages.IngestStage().execute(context)
     stages.ProfileStage().execute(context)
 
-    plan = stages.build_plan(context)
+    plan = stages.devise(context)
 
     assert {transformer.name, representation.name} <= set(plan.candidate_models)
     decisions = {
@@ -108,7 +108,7 @@ def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
 
 def test_jepa_has_a_complete_experimental_tabular_capability():
     """The public JEPA path has a task-level capability declaration."""
-    registry = scmle.core.context.tabular_beta_capability_registry()
+    registry = scmle.core.context.enrol()
 
     key = capabilities.Coordinate(
         modality=capabilities.Modality.TABULAR,
@@ -142,7 +142,7 @@ def test_jepa_ignores_supervised_labels(monkeypatch):
     features = numpy.ones((8, 2))
     labels = numpy.arange(8)
 
-    jepa.JepaEstimator().fit(features, labels)
+    jepa.Embedder().fit(features, labels)
 
     numpy.testing.assert_array_equal(received_targets[0], numpy.zeros(8))
 

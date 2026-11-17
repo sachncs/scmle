@@ -14,7 +14,7 @@ from scmle.data.robustness import shift
 
 def test_without_a_reference_every_level_is_unverifiable_never_pass():
     sample = pandas.Series(["a"] * 30 + ["b"] * 70, name="g")
-    rows = coverage.subgroup_coverage(sample, None)
+    rows = coverage.represent(sample, None)
     assert {r.status for r in rows} == {shift.Status.UNVERIFIABLE}
     assert [r.level for r in rows] == ["a", "b"]
 
@@ -22,16 +22,12 @@ def test_without_a_reference_every_level_is_unverifiable_never_pass():
 def test_the_interval_is_the_exact_one_and_decides_pass_or_fail():
     sample = pandas.Series(["a"] * 30 + ["b"] * 70, name="g")
     rows = {
-        r.level: r
-        for r in coverage.subgroup_coverage(sample, {"a": 0.3, "b": 0.7})
+        r.level: r for r in coverage.represent(sample, {"a": 0.3, "b": 0.7})
     }
     exact = stats.binomtest(30, 100).proportion_ci(0.95, method="exact")
     assert rows["a"].interval == pytest.approx((exact.low, exact.high))
     assert rows["a"].status is shift.Status.PASS and rows["a"].share == 0.3
-    gap = {
-        r.level: r
-        for r in coverage.subgroup_coverage(sample, {"a": 0.6, "b": 0.4})
-    }
+    gap = {r.level: r for r in coverage.represent(sample, {"a": 0.6, "b": 0.4})}
     assert (
         gap["a"].status is shift.Status.FAIL
         and gap["b"].status is shift.Status.FAIL
@@ -41,28 +37,25 @@ def test_the_interval_is_the_exact_one_and_decides_pass_or_fail():
 def test_a_level_missing_from_the_sample_or_the_deployment_is_listed():
     sample = pandas.Series(["a"] * 50, name="g")
     rows = {
-        r.level: r
-        for r in coverage.subgroup_coverage(sample, {"a": 0.5, "z": 0.5})
+        r.level: r for r in coverage.represent(sample, {"a": 0.5, "z": 0.5})
     }
     assert rows["z"].count == 0 and rows["z"].status is shift.Status.FAIL
-    only_sample = {
-        r.level: r for r in coverage.subgroup_coverage(sample, {"a": 1.0})
-    }
+    only_sample = {r.level: r for r in coverage.represent(sample, {"a": 1.0})}
     assert only_sample["a"].status is shift.Status.PASS
 
 
 def test_missing_values_are_their_own_level_and_input_is_validated():
     sample = pandas.Series(["a", None, "a", None], name="g")
-    assert {r.level for r in coverage.subgroup_coverage(sample, None)} == {
+    assert {r.level for r in coverage.represent(sample, None)} == {
         "a",
         coverage.MISSING_LEVEL,
     }
     assert coverage.shares(sample)["a"] == 0.5
     with pytest.raises(ValueError, match="empty"):
-        coverage.subgroup_coverage(pandas.Series([], dtype=object), None)
+        coverage.represent(pandas.Series([], dtype=object), None)
     with pytest.raises(ValueError, match="alpha"):
-        coverage.subgroup_coverage(sample, None, alpha=1.0)
-    record = coverage.subgroup_coverage(sample, {"a": 0.5})[0].to_dict()
+        coverage.represent(sample, None, alpha=1.0)
+    record = coverage.represent(sample, {"a": 0.5})[0].to_dict()
     assert record["status"] in {"pass", "fail"}
 
 
@@ -71,7 +64,7 @@ def forward_set(rows=300, beta=0.8, seed=0):
     x = rng.normal(size=rows)
     frame = pandas.DataFrame({"f": x, "g": rng.normal(size=rows)})
     target = pandas.Series(beta * x + rng.normal(size=rows), name="y")
-    vault = sealed.Vault(sealed.OpenLog(), process=False)
+    vault = sealed.Vault(sealed.Journal(), process=False)
     held = vault.seal("final_test", frame, target, tuple(range(rows)))
     return vault, held
 
@@ -148,8 +141,8 @@ def test_a_finding_whose_column_is_absent_is_inconclusive():
 
 
 def test_labels_follow_the_interval_and_the_sign_on_x():
-    assert forward.label_for(0.3, 0.1, 0.4) == forward.HOLDS
-    assert forward.label_for(0.3, -0.4, -0.1) == forward.UNSTABLE
-    assert forward.label_for(-0.3, -0.4, -0.1) == forward.HOLDS
-    assert forward.label_for(-0.3, 0.1, 0.4) == forward.UNSTABLE
-    assert forward.label_for(0.3, -0.1, 0.4) == forward.INCONCLUSIVE
+    assert forward.verdict(0.3, 0.1, 0.4) == forward.HOLDS
+    assert forward.verdict(0.3, -0.4, -0.1) == forward.UNSTABLE
+    assert forward.verdict(-0.3, -0.4, -0.1) == forward.HOLDS
+    assert forward.verdict(-0.3, 0.1, 0.4) == forward.UNSTABLE
+    assert forward.verdict(0.3, -0.1, 0.4) == forward.INCONCLUSIVE

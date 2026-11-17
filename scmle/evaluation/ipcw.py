@@ -9,7 +9,7 @@ event plays the role of the event), or by the marginal curve when the charter
 declares censoring independent of covariates. Every weight is floored and the
 number of floored weights is returned, never hidden.
 
-`truncated_concordance` is the IPCW concordance of Uno et al. (2011),
+`uno` is the IPCW concordance of Uno et al. (2011),
 truncated at a horizon `tau` that the charter must fix: statistics cannot
 choose it. The estimator's form here is written from memory of that paper and
 is checked by simulation and against the Harrell index when nothing is
@@ -29,7 +29,7 @@ MIN_CENSORING_PROBABILITY = 0.05
 
 
 @dataclasses.dataclass(frozen=True)
-class CensoringWeights:
+class Censoring:
     """Inverse-probability-of-censoring weights at each row's own time.
 
     Attributes:
@@ -48,13 +48,13 @@ class CensoringWeights:
     survival_of: Callable[[float, numpy.ndarray], numpy.ndarray] | None = None
 
 
-def censoring_weights(
+def reweight(
     duration: numpy.ndarray,
     event: numpy.ndarray,
     features: numpy.ndarray | None = None,
     floor: float = MIN_CENSORING_PROBABILITY,
     penalty: float = 1e-3,
-) -> CensoringWeights:
+) -> Censoring:
     """Fits the censoring distribution and returns the weights.
 
     Args:
@@ -83,10 +83,10 @@ def censoring_weights(
     censored = 1.0 - seen
     if features is None:
         curve = estimators.kaplan_meier(time, censored)
-        raw = estimators.step_lookup(curve[0], curve[1], time, 1.0)
+        raw = estimators.stair(curve[0], curve[1], time, 1.0)
 
         def survive(moment: float, rows: numpy.ndarray) -> numpy.ndarray:
-            level = estimators.step_lookup(
+            level = estimators.stair(
                 curve[0], curve[1], numpy.array([moment]), 1.0
             )[0]
             return numpy.full(len(rows), level)
@@ -96,15 +96,15 @@ def censoring_weights(
         matrix = numpy.asarray(features, dtype=float)
         if len(matrix) != len(time):
             raise errors.InputError("features and duration differ in length")
-        model = estimators.CoxRegressor(penalty).fit(matrix, time, censored)
-        cumulative = estimators.step_lookup(
+        model = estimators.Hazards(penalty).fit(matrix, time, censored)
+        cumulative = estimators.stair(
             model.moments_, model.baseline_, time, 0.0
         )
         relative = numpy.exp(model.predict(matrix) - model.scale_)
         raw = numpy.exp(-cumulative * relative)
 
         def survive(moment: float, rows: numpy.ndarray) -> numpy.ndarray:
-            level = estimators.step_lookup(
+            level = estimators.stair(
                 model.moments_, model.baseline_, numpy.array([moment]), 0.0
             )[0]
             survival: numpy.ndarray = numpy.exp(-level * relative[rows])
@@ -112,7 +112,7 @@ def censoring_weights(
 
         survival_of = survive
     floored = raw < floor
-    return CensoringWeights(
+    return Censoring(
         1.0 / numpy.maximum(raw, floor),
         floor,
         int(floored.sum()),
@@ -121,12 +121,12 @@ def censoring_weights(
     )
 
 
-def truncated_concordance(
+def uno(
     duration: numpy.ndarray,
     event: numpy.ndarray,
     risk: numpy.ndarray,
     tau: float,
-    weights: CensoringWeights,
+    weights: Censoring,
 ) -> float:
     """IPCW concordance truncated at `tau` (Uno et al. 2011).
 
@@ -140,7 +140,7 @@ def truncated_concordance(
         event: 1 where the event was observed.
         risk: Predicted risk (larger means earlier event).
         tau: Truncation time fixed in the charter.
-        weights: Output of `censoring_weights` for the same rows.
+        weights: Output of `reweight` for the same rows.
 
     Returns:
         The concordance, NaN when no pair is comparable.

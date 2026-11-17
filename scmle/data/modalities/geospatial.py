@@ -20,11 +20,11 @@ import numpy
 
 from scmle.contracts import data
 from scmle.contracts import errors
-from scmle.data.modalities.curation import build_finding
-from scmle.data.modalities.curation import check_split_fractions
+from scmle.data.modalities.curation import allocate
 from scmle.data.modalities.curation import Curation
+from scmle.data.modalities.curation import flaw
 from scmle.data.modalities.curation import label_counts
-from scmle.data.modalities.curation import partition_group_ids
+from scmle.data.modalities.curation import proportions
 
 GEOMETRY_TYPES = frozenset(
     {
@@ -47,7 +47,7 @@ AFFINE_TRANSFORM_LENGTH = 6
 RasterDecoder = Callable[[bytes], numpy.ndarray]
 
 
-class GeospatialValidationError(errors.DataError):
+class GeometryError(errors.DataError):
     """A vector or raster sample violates a geospatial invariant."""
 
     category = "geospatial_validation"
@@ -69,7 +69,7 @@ def verify(field_name: str, value: str) -> None:
         raise errors.InputError(f"{field_name} must be a SHA-256 hex digest")
 
 
-class GeospatialTemporalError(GeospatialValidationError):
+class TemporalError(GeometryError):
     """Temporal geospatial evidence is incomplete or invalid."""
 
 
@@ -103,7 +103,7 @@ def canonical_observation_time(value: datetime | str) -> datetime:
         The observation time converted to UTC.
 
     Raises:
-        GeospatialTemporalError: If the text is not a valid ISO 8601
+        TemporalError: If the text is not a valid ISO 8601
             timestamp, if the value is neither a datetime nor text, or if the
             parsed time has no timezone offset.
     """
@@ -114,19 +114,19 @@ def canonical_observation_time(value: datetime | str) -> datetime:
         try:
             parsed = datetime.fromisoformat(normalized)
         except ValueError as error:
-            raise GeospatialTemporalError(
+            raise TemporalError(
                 f"invalid observation time: {value!r}",
                 {"code": "invalid_observation_time"},
             ) from error
     elif isinstance(value, datetime):
         parsed = value
     else:
-        raise GeospatialTemporalError(
+        raise TemporalError(
             "observation time must be datetime or text",
             {"code": "invalid_observation_time"},
         )
     if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise GeospatialTemporalError(
+        raise TemporalError(
             "observation time must be timezone-aware",
             {"code": "timezone_required"},
         )
@@ -144,13 +144,13 @@ def flatten(value: Any) -> tuple[float, ...]:
         Every coordinate number, as floats, flattened in document order.
 
     Raises:
-        GeospatialValidationError: If an array is empty, a position has fewer
+        GeometryError: If an array is empty, a position has fewer
             than two numbers or a non-finite number, or a value is not a
             list, tuple, or number.
     """
     if isinstance(value, (list, tuple)):
         if not value:
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "coordinate arrays must not be empty",
                 {"code": "empty_coordinates"},
             )
@@ -162,7 +162,7 @@ def flatten(value: Any) -> tuple[float, ...]:
             if len(numbers) < MIN_COORDINATE_VALUES or not all(
                 math.isfinite(item) for item in numbers
             ):
-                raise GeospatialValidationError(
+                raise GeometryError(
                     "coordinates must contain finite x/y values",
                     {"code": "invalid_coordinates"},
                 )
@@ -171,7 +171,7 @@ def flatten(value: Any) -> tuple[float, ...]:
         for item in value:
             flattened.extend(flatten(item))
         return tuple(flattened)
-    raise GeospatialValidationError(
+    raise GeometryError(
         "coordinates must be nested numeric arrays",
         {"code": "invalid_coordinates"},
     )
@@ -189,27 +189,27 @@ def unpack(geometry: Mapping[str, Any]) -> tuple[float, ...]:
         (x, y, then any further dimensions of each position).
 
     Raises:
-        GeospatialValidationError: If the geometry type is not a supported
+        GeometryError: If the geometry type is not a supported
             GeoJSON type, a geometry collection has no geometries or has a
             member that is not an object, or the coordinates are invalid.
     """
     geometry_type = geometry.get("type")
     if geometry_type not in GEOMETRY_TYPES:
-        raise GeospatialValidationError(
+        raise GeometryError(
             "geometry type is not supported",
             {"code": "unsupported_geometry", "geometry_type": geometry_type},
         )
     if geometry_type == "GeometryCollection":
         geometries = geometry.get("geometries")
         if not isinstance(geometries, list) or not geometries:
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "geometry collection must contain geometries",
                 {"code": "empty_geometry_collection"},
             )
         values: list[float] = []
         for nested in geometries:
             if not isinstance(nested, Mapping):
-                raise GeospatialValidationError(
+                raise GeometryError(
                     "geometry collection members must be objects",
                     {"code": "invalid_geometry_collection"},
                 )
@@ -259,7 +259,7 @@ def autocorrelate(
     return float(len(numeric) * numerator / (weight_total * denominator))
 
 
-def mask_geometry_axis(
+def substitute(
     geometry: Mapping[str, Any], axis: int, baseline: float
 ) -> dict[str, Any]:
     """Replaces one coordinate axis while preserving geometry structure.
@@ -280,7 +280,7 @@ def mask_geometry_axis(
         the chosen axis of every position set to ``baseline``. Other
         coordinates are converted to floats. A coordinate array that is
         empty or not a nested list or tuple, or a geometry collection with no
-        geometries, raises ``GeospatialValidationError``.
+        geometries, raises ``GeometryError``.
 
     Raises:
         ValueError: If ``axis`` is not 0 or 1 or ``baseline`` is not finite.
@@ -292,7 +292,7 @@ def mask_geometry_axis(
 
     def overwrite(value: Any) -> list[Any]:
         if not isinstance(value, (list, tuple)) or not value:
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "coordinates must be non-empty nested arrays",
                 {"code": "invalid_coordinates"},
             )
@@ -312,7 +312,7 @@ def mask_geometry_axis(
         if geometry_type == "GeometryCollection":
             geometries = value.get("geometries")
             if not isinstance(geometries, list) or not geometries:
-                raise GeospatialValidationError(
+                raise GeometryError(
                     "geometry collection must contain geometries",
                     {"code": "empty_geometry_collection"},
                 )
@@ -325,7 +325,7 @@ def mask_geometry_axis(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GeoFeature:
+class Placemark:
     """Validated GeoJSON feature with stable serialized identity.
 
     Attributes:
@@ -355,16 +355,16 @@ class GeoFeature:
 
         Raises:
             ValueError: If ``feature_id`` is empty.
-            GeospatialValidationError: If the geometry is not an object or is
+            GeometryError: If the geometry is not an object or is
                 invalid, if a property name is not a string, or if the
                 properties and label are not JSON-native. An invalid or
                 timezone-naive observation time raises
-                ``GeospatialTemporalError``.
+                ``TemporalError``.
         """
         if not self.feature_id.strip():
             raise errors.InputError("feature_id must not be empty")
         if not isinstance(self.geometry, Mapping):
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "geometry must be an object", {"code": "invalid_geometry"}
             )
         unpack(self.geometry)
@@ -376,7 +376,7 @@ class GeoFeature:
             )
         properties = dict(self.properties)
         if any(not isinstance(key, str) for key in properties):
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "feature property names must be strings",
                 {"code": "invalid_property_name"},
             )
@@ -389,7 +389,7 @@ class GeoFeature:
                 allow_nan=False,
             )
         except (TypeError, ValueError) as error:
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "feature properties and label must be JSON-native",
                 {"code": "invalid_feature_metadata"},
             ) from error
@@ -443,7 +443,7 @@ class GeoFeature:
         minimum_x, minimum_y, maximum_x, maximum_y = self.bounds
         return (minimum_x + maximum_x) / 2, (minimum_y + maximum_y) / 2
 
-    def masked_geometry_axis(self, axis: int, baseline: float) -> "GeoFeature":
+    def substituted(self, axis: int, baseline: float) -> "Placemark":
         """Returns a copy with one source-coordinate axis replaced.
 
         Args:
@@ -457,16 +457,16 @@ class GeoFeature:
         """
         return dataclasses.replace(
             self,
-            geometry=mask_geometry_axis(self.geometry, axis, baseline),
+            geometry=substitute(self.geometry, axis, baseline),
         )
 
 
-SpatialJoinPredicate = Callable[[GeoFeature, GeoFeature], bool]
-CoordinateTransformer = Callable[[GeoFeature, str, str], GeoFeature]
+SpatialJoinPredicate = Callable[[Placemark, Placemark], bool]
+CoordinateTransformer = Callable[[Placemark, str, str], Placemark]
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SpatialJoinMatch:
+class Match:
     """One deterministic pair emitted by a bounded spatial join.
 
     Attributes:
@@ -530,7 +530,7 @@ class Join:
     unmatched_right_count: int
     comparison_limit: int
     match_limit: int
-    matches: tuple[SpatialJoinMatch, ...]
+    matches: tuple[Match, ...]
 
     def __post_init__(self) -> None:
         """Rejects incomplete or internally inconsistent join evidence.
@@ -801,13 +801,13 @@ class Partition:
             ``"validation"``, and ``"test"``.
     """
 
-    train: tuple[GeoFeature, ...]
-    validation: tuple[GeoFeature, ...]
-    test: tuple[GeoFeature, ...]
+    train: tuple[Placemark, ...]
+    validation: tuple[Placemark, ...]
+    test: tuple[Placemark, ...]
     block_size: float
     blocks: Mapping[str, tuple[str, ...]]
 
-    def block_ids(self) -> dict[str, tuple[str, ...]]:
+    def tiles(self) -> dict[str, tuple[str, ...]]:
         """Returns the stable spatial blocks assigned to each partition.
 
         Returns:
@@ -827,8 +827,8 @@ class TemporalSplit:
     """
 
     cutoff: datetime
-    train: tuple[GeoFeature, ...]
-    future: tuple[GeoFeature, ...]
+    train: tuple[Placemark, ...]
+    future: tuple[Placemark, ...]
 
     def __post_init__(self) -> None:
         """Validates the cutoff and timestamp completeness of each partition.
@@ -946,10 +946,10 @@ class Features:
         return numpy.asarray(self.values, dtype=numpy.float64).copy()
 
 
-def evaluate_predicate(
+def probe(
     predicate: SpatialJoinPredicate,
-    left: GeoFeature,
-    right: GeoFeature,
+    left: Placemark,
+    right: Placemark,
     predicate_name: str,
 ) -> bool | numpy.bool_:
     """Runs a caller-owned spatial join predicate on one pair of features.
@@ -964,13 +964,13 @@ def evaluate_predicate(
         The predicate's boolean result.
 
     Raises:
-        GeospatialValidationError: If the predicate raises or returns a
+        GeometryError: If the predicate raises or returns a
             value that is not a boolean.
     """
     try:
         result = predicate(left, right)
     except Exception as error:
-        raise GeospatialValidationError(
+        raise GeometryError(
             "caller-owned spatial join predicate failed",
             {
                 "code": "predicate_failure",
@@ -979,7 +979,7 @@ def evaluate_predicate(
             },
         ) from error
     if not isinstance(result, (bool, numpy.bool_)):
-        raise GeospatialValidationError(
+        raise GeometryError(
             "spatial join predicate must return a boolean",
             {
                 "code": "invalid_predicate_result",
@@ -1037,7 +1037,7 @@ class Dataset:
             identities, independent of feature order.
     """
 
-    features: tuple[GeoFeature, ...]
+    features: tuple[Placemark, ...]
     crs: str = ""
     source: str = "memory://"
     content_hash: str = dataclasses.field(init=False)
@@ -1046,13 +1046,13 @@ class Dataset:
         """Rejects duplicate identities and derive CRS-bound content.
 
         Raises:
-            GeospatialValidationError: If there are no features or feature
+            GeometryError: If there are no features or feature
                 IDs are duplicated.
             TypeError: If ``crs`` is not a string.
         """
         normalized = tuple(self.features)
         if not normalized:
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "geospatial dataset must contain at least one feature",
                 {"code": "empty_dataset"},
             )
@@ -1061,7 +1061,7 @@ class Dataset:
         canonical_crs_value = self.crs.strip()
         ids = [feature.feature_id for feature in normalized]
         if len(ids) != len(set(ids)):
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "geospatial dataset contains duplicate feature IDs",
                 {"code": "duplicate_feature_id"},
             )
@@ -1100,28 +1100,28 @@ class Dataset:
             A dataset with one feature per GeoJSON feature.
 
         Raises:
-            GeospatialValidationError: If the root is not a
+            GeometryError: If the root is not a
                 FeatureCollection, ``features`` is not a list, or a member is
                 not a Feature with object geometry and properties.
         """
         if document.get("type") != "FeatureCollection":
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "GeoJSON document must be a FeatureCollection",
                 {"code": "unsupported_geojson_root"},
             )
         raw_features = document.get("features")
         if not isinstance(raw_features, list):
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "FeatureCollection features must be a list",
                 {"code": "invalid_features"},
             )
-        features: list[GeoFeature] = []
+        features: list[Placemark] = []
         for index, raw_feature in enumerate(raw_features):
             if (
                 not isinstance(raw_feature, Mapping)
                 or raw_feature.get("type") != "Feature"
             ):
-                raise GeospatialValidationError(
+                raise GeometryError(
                     "FeatureCollection members must be GeoJSON Features",
                     {"code": "invalid_feature", "index": index},
                 )
@@ -1131,11 +1131,11 @@ class Dataset:
             if not isinstance(geometry, Mapping) or not isinstance(
                 properties, Mapping
             ):
-                raise GeospatialValidationError(
+                raise GeometryError(
                     "feature geometry and properties must be objects",
                     {"code": "invalid_feature", "index": index},
                 )
-            features.append(GeoFeature(feature_id, geometry, properties))
+            features.append(Placemark(feature_id, geometry, properties))
         return cls(tuple(features), crs=crs, source=source)
 
     def profile(self) -> Profile:
@@ -1203,7 +1203,7 @@ class Dataset:
         risk_findings = []
         if observation_times and len(observation_times) != len(self.features):
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.geospatial-mixed-temporal-state",
                     data.FindingSeverity.WARNING,
                     {"source": self.source},
@@ -1237,7 +1237,7 @@ class Dataset:
             )
         if not self.crs.strip():
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.geospatial-missing-crs",
                     data.FindingSeverity.ERROR,
                     {"source": self.source},
@@ -1249,7 +1249,7 @@ class Dataset:
             )
         if len(profile.geometry_types) > 1:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.geospatial-mixed-geometry",
                     data.FindingSeverity.WARNING,
                     {"source": self.source},
@@ -1261,7 +1261,7 @@ class Dataset:
             )
         if "unlabeled" in labels and len(labels) > 1:
             risk_findings.append(
-                build_finding(
+                flaw(
                     "risk.geospatial-mixed-label-state",
                     data.FindingSeverity.WARNING,
                     {"source": self.source},
@@ -1296,12 +1296,12 @@ class Dataset:
             index pairs. Ties in distance break by feature index.
 
         Raises:
-            GeospatialValidationError: If the dataset declares no CRS.
+            GeometryError: If the dataset declares no CRS.
             ValueError: If ``neighbor_count`` is outside
                 ``[1, feature_count)``.
         """
         if not self.crs.strip():
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "spatial neighbors require a declared CRS",
                 {"code": "missing_crs"},
             )
@@ -1355,7 +1355,7 @@ class Dataset:
                 callable.
             ValueError: If ``predicate_name`` is empty or a limit is not
                 positive.
-            GeospatialValidationError: If either dataset lacks a CRS or the
+            GeometryError: If either dataset lacks a CRS or the
                 CRS values differ.
         """
         if not isinstance(other, Dataset):
@@ -1367,12 +1367,12 @@ class Dataset:
         if comparison_limit < 1 or match_limit < 1:
             raise errors.InputError("join limits must be positive")
         if not self.crs.strip() or not other.crs.strip():
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "spatial joins require a declared CRS on both datasets",
                 {"code": "missing_crs"},
             )
         if self.crs.strip() != other.crs.strip():
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "spatial joins require matching CRS declarations; reproject "
                 "through an explicit caller-owned policy first",
                 {
@@ -1414,7 +1414,7 @@ class Dataset:
                 callable.
             ValueError: If ``predicate_name`` is empty or a limit is not
                 positive.
-            GeospatialValidationError: If either dataset lacks a CRS, the
+            GeometryError: If either dataset lacks a CRS, the
                 CRS values differ, the number of comparisons exceeds
                 ``comparison_limit``, the predicate raises or returns a
                 non-boolean, or the matches exceed ``match_limit``.
@@ -1424,7 +1424,7 @@ class Dataset:
         )
         total_comparisons = len(self.features) * len(other.features)
         if total_comparisons > comparison_limit:
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "spatial join exceeds the comparison limit; provide a "
                 "bounded indexed policy",
                 {
@@ -1433,18 +1433,14 @@ class Dataset:
                     "comparison_limit": comparison_limit,
                 },
             )
-        matches: list[SpatialJoinMatch] = []
+        matches: list[Match] = []
         for left in self.features:
             for right in other.features:
-                result = evaluate_predicate(
-                    predicate, left, right, predicate_name
-                )
+                result = probe(predicate, left, right, predicate_name)
                 if bool(result):
-                    matches.append(
-                        SpatialJoinMatch(left.feature_id, right.feature_id)
-                    )
+                    matches.append(Match(left.feature_id, right.feature_id))
                     if len(matches) > match_limit:
-                        raise GeospatialValidationError(
+                        raise GeometryError(
                             "spatial join exceeds the match limit; provide a "
                             "bounded output policy",
                             {
@@ -1498,7 +1494,7 @@ class Dataset:
             A transformed dataset and its source/target evidence report.
 
         Raises:
-            GeospatialValidationError: If the source CRS is missing, the
+            GeometryError: If the source CRS is missing, the
                 transformer raises, returns a non-feature, or changes a
                 feature's ID, properties, label, or observation time.
             ValueError: If ``target_crs`` is empty or equals the source CRS,
@@ -1506,7 +1502,7 @@ class Dataset:
             TypeError: If ``transformer`` is not callable.
         """
         if not self.crs.strip():
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "reprojection requires a declared source CRS",
                 {"code": "missing_crs"},
             )
@@ -1522,14 +1518,14 @@ class Dataset:
             raise errors.KindError("transformer must be callable")
         if not transformer_name.strip():
             raise errors.InputError("transformer_name must not be empty")
-        transformed_features: list[GeoFeature] = []
+        transformed_features: list[Placemark] = []
         for feature in self.features:
             try:
                 transformed = transformer(
                     feature, self.crs, canonical_target_crs
                 )
             except Exception as error:
-                raise GeospatialValidationError(
+                raise GeometryError(
                     "caller-owned coordinate transformer failed",
                     {
                         "code": "transformer_failure",
@@ -1537,9 +1533,9 @@ class Dataset:
                         "exception": type(error).__name__,
                     },
                 ) from error
-            if not isinstance(transformed, GeoFeature):
-                raise GeospatialValidationError(
-                    "coordinate transformer must return a GeoFeature",
+            if not isinstance(transformed, Placemark):
+                raise GeometryError(
+                    "coordinate transformer must return a Placemark",
                     {
                         "code": "invalid_transformer_result",
                         "transformer_name": transformer_name,
@@ -1551,7 +1547,7 @@ class Dataset:
                 or transformed.label != feature.label
                 or transformed.observation_time != feature.observation_time
             ):
-                raise GeospatialValidationError(
+                raise GeometryError(
                     "coordinate transformation changed feature metadata",
                     {
                         "code": "transformer_metadata_changed",
@@ -1585,7 +1581,7 @@ class Dataset:
             The values as a float array.
 
         Raises:
-            GeospatialValidationError: If the value count differs from the
+            GeometryError: If the value count differs from the
                 feature count or a value is not numeric.
         """
         if values is None:
@@ -1593,7 +1589,7 @@ class Dataset:
         else:
             raw_values = list(values)
         if len(raw_values) != len(self.features):
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "spatial values must match feature count",
                 {
                     "code": "value_count_mismatch",
@@ -1605,7 +1601,7 @@ class Dataset:
             isinstance(value, bool) or not isinstance(value, Real)
             for value in raw_values
         ):
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "spatial autocorrelation requires numeric values",
                 {"code": "numeric_values_required"},
             )
@@ -1641,7 +1637,7 @@ class Dataset:
         Raises:
             ValueError: If ``permutations`` is outside ``[0, 10000]`` or
                 ``neighbor_count`` is below one.
-            GeospatialValidationError: If there are fewer than three
+            GeometryError: If there are fewer than three
                 features, the value count differs from the feature count,
                 a value is not numeric, the dataset has no CRS, or the
                 statistic is not estimable.
@@ -1649,7 +1645,7 @@ class Dataset:
         if permutations < 0 or permutations > MAX_PERMUTATIONS:
             raise errors.InputError("permutations must be in [0, 10000]")
         if len(self.features) < MIN_OBSERVATIONS:
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "spatial autocorrelation requires at least three features",
                 {"code": "insufficient_features"},
             )
@@ -1661,7 +1657,7 @@ class Dataset:
         try:
             statistic = autocorrelate(numeric, edges)
         except ValueError as error:
-            raise GeospatialValidationError(
+            raise GeometryError(
                 str(error), {"code": "statistic_not_estimable"}
             ) from error
 
@@ -1690,11 +1686,11 @@ class Dataset:
             count of coordinate values, in the dataset CRS units.
 
         Raises:
-            GeospatialValidationError: If the dataset has no CRS or a
+            GeometryError: If the dataset has no CRS or a
                 prepared value is not finite.
         """
         if not self.crs.strip():
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "geospatial feature preparation requires a declared CRS",
                 {"code": "missing_crs"},
             )
@@ -1728,7 +1724,7 @@ class Dataset:
             )
         values: numpy.ndarray = numpy.asarray(rows, dtype=numpy.float64)
         if not numpy.isfinite(values).all():
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "geospatial features must be finite",
                 {"code": "non_finite_features"},
             )
@@ -1760,11 +1756,11 @@ class Dataset:
             x and y.
 
         Raises:
-            GeospatialValidationError: If the dataset has no CRS.
+            GeometryError: If the dataset has no CRS.
             ValueError: If ``block_size`` is not positive and finite.
         """
         if not self.crs.strip():
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "spatial block envelopes require a declared CRS",
                 {"code": "missing_crs"},
             )
@@ -1785,7 +1781,7 @@ class Dataset:
             )
         return envelopes
 
-    def boundary_leakage(
+    def straddle(
         self,
         block_size: float,
         max_blocks_per_feature: int = 10_000,
@@ -1806,7 +1802,7 @@ class Dataset:
         Returns:
             Per-feature block counts and the IDs of crossing and truncated
             features. A dataset without a CRS raises
-            ``GeospatialValidationError``.
+            ``GeometryError``.
 
         Raises:
             ValueError: If ``max_blocks_per_feature`` is below one or
@@ -1839,7 +1835,7 @@ class Dataset:
             max_blocks_per_feature=max_blocks_per_feature,
         )
 
-    def split_spatial(
+    def tile(
         self,
         block_size: float,
         validation_fraction: float = 0.2,
@@ -1879,12 +1875,12 @@ class Dataset:
             raise errors.InputError(
                 "block_size must be a positive finite number"
             )
-        check_split_fractions(validation_fraction, test_fraction)
+        proportions(validation_fraction, test_fraction)
         dataset_bounds = self.profile().bounds
         origin_x = dataset_bounds[0]
         origin_y = dataset_bounds[1]
 
-        def locate(feature: GeoFeature) -> str:
+        def locate(feature: Placemark) -> str:
             minimum_x, minimum_y, maximum_x, maximum_y = feature.bounds
             centroid_x = (minimum_x + maximum_x) / 2
             centroid_y = (minimum_y + maximum_y) / 2
@@ -1892,15 +1888,15 @@ class Dataset:
             block_y = math.floor((centroid_y - origin_y) / block_size)
             return f"{block_x}:{block_y}"
 
-        grouped: dict[str, list[GeoFeature]] = {}
+        grouped: dict[str, list[Placemark]] = {}
         for feature in self.features:
             grouped.setdefault(locate(feature), []).append(feature)
         blocks = sorted(grouped)
-        validation_blocks, test_blocks = partition_group_ids(
+        validation_blocks, test_blocks = allocate(
             grouped, validation_fraction, test_fraction, seed
         )
 
-        def features_for(selected: set[str]) -> tuple[GeoFeature, ...]:
+        def features_for(selected: set[str]) -> tuple[Placemark, ...]:
             return tuple(
                 feature
                 for feature in self.features
@@ -1936,12 +1932,12 @@ class Dataset:
             after it, with the cutoff in UTC.
 
         Raises:
-            GeospatialTemporalError: If the cutoff is invalid or lacks a
+            TemporalError: If the cutoff is invalid or lacks a
                 timezone, or any feature has no observation time.
         """
         cutoff_time = canonical_observation_time(cutoff)
         if any(feature.observation_time is None for feature in self.features):
-            raise GeospatialTemporalError(
+            raise TemporalError(
                 "temporal splitting requires an observation time on every "
                 "feature",
                 {"code": "incomplete_observation_times"},
@@ -2008,7 +2004,7 @@ class Reprojection:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RasterSample:
+class Tile:
     """Raster identity and metadata without assuming a raster codec.
 
     Attributes:
@@ -2049,7 +2045,7 @@ class RasterSample:
                 bands are not positive, the transform length is not 0, 6, or
                 9, nodata values are non-numeric, non-finite, or out of
                 range, or ``file_hash`` does not match the payload.
-            GeospatialValidationError: If the payload is empty.
+            GeometryError: If the payload is empty.
         """
         raw = bytes(self.encoded_bytes)
         object.__setattr__(self, "encoded_bytes", raw)
@@ -2069,7 +2065,7 @@ class RasterSample:
             )
         self.normalize()
         if not raw:
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "raster payload is empty", {"code": "empty_payload"}
             )
         if hashlib.sha256(raw).hexdigest() != self.file_hash:
@@ -2109,7 +2105,7 @@ class RasterSample:
             return "declared"
         return "unknown"
 
-    def pixel_window_bounds(
+    def extent(
         self,
         row_start: int,
         row_end: int,
@@ -2134,7 +2130,7 @@ class RasterSample:
             Minimum x, minimum y, maximum x, and maximum y in the source CRS,
             or ``None`` when the sample has no transform. A homogeneous
             transform that is singular at a window boundary raises
-            ``GeospatialValidationError``.
+            ``GeometryError``.
 
         Raises:
             ValueError: If the window is outside the raster or empty.
@@ -2179,7 +2175,7 @@ class RasterSample:
             def project(column: int, row: int) -> tuple[float, float]:
                 denominator = seventh * column + eighth * row + ninth
                 if denominator == 0:
-                    raise GeospatialValidationError(
+                    raise GeometryError(
                         "raster transform is singular at a pixel boundary",
                         {"code": "singular_transform"},
                     )
@@ -2216,7 +2212,7 @@ class RasterSample:
         Raises:
             TypeError: If the decoder is not callable.
             ValueError: If ``max_pixels`` is not positive.
-            GeospatialValidationError: If the decoder raises, the decoded
+            GeometryError: If the decoder raises, the decoded
                 array is not 2-D or 3-D, is empty or larger than
                 ``max_pixels``, does not match the declared dimensions, is
                 not real numeric, or contains non-finite values.
@@ -2228,12 +2224,12 @@ class RasterSample:
         try:
             decoded = numpy.asarray(decoder(self.encoded_bytes))
         except Exception as error:
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "raster decoding failed",
                 {"code": "decode_failed", "source": self.source},
             ) from error
         if decoded.ndim not in {2, 3}:
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "decoded raster pixels must be grayscale or channel-last",
                 {
                     "code": "invalid_pixel_shape",
@@ -2242,7 +2238,7 @@ class RasterSample:
                 },
             )
         if decoded.size < 1 or decoded.size > max_pixels:
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "decoded raster exceeds the configured pixel limit",
                 {
                     "code": "pixel_limit",
@@ -2255,7 +2251,7 @@ class RasterSample:
         if self.bands == 1 and decoded.shape == expected_shape:
             pass
         elif decoded.shape != (self.height, self.width, self.bands):
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "decoded raster dimensions do not match metadata",
                 {
                     "code": "pixel_dimension_mismatch",
@@ -2267,13 +2263,13 @@ class RasterSample:
         if not numpy.issubdtype(
             decoded.dtype, numpy.number
         ) or numpy.issubdtype(decoded.dtype, numpy.complexfloating):
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "decoded raster pixels must be real numeric values",
                 {"code": "invalid_pixel_type", "source": self.source},
             )
         values = numpy.asarray(decoded, dtype=numpy.float64).copy()
         if not numpy.isfinite(values).all():
-            raise GeospatialValidationError(
+            raise GeometryError(
                 "decoded raster pixels must be finite",
                 {"code": "non_finite_pixels", "source": self.source},
             )
@@ -2307,14 +2303,14 @@ __all__ = [
     "Autocorrelation",
     "Dataset",
     "Features",
-    "GeoFeature",
-    "GeospatialTemporalError",
-    "GeospatialValidationError",
+    "GeometryError",
     "Partition",
+    "Placemark",
     "Profile",
     "RasterDecoder",
-    "RasterSample",
+    "TemporalError",
     "TemporalSplit",
+    "Tile",
     "autocorrelate",
     "canonical_observation_time",
     "canonical_source",

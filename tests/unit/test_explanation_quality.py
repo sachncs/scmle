@@ -16,7 +16,7 @@ def report(*features: str) -> dict[str, object]:
 
 
 def test_ranking_stability_measures_top_k_overlap():
-    score = quality.ranking_stability(
+    score = quality.topk(
         (report("signal", "age", "noise"), report("signal", "noise", "age")),
         top_k=2,
     )
@@ -25,7 +25,7 @@ def test_ranking_stability_measures_top_k_overlap():
 
 
 def test_linear_contribution_report_is_ranked_and_json_native():
-    result = quality.linear_contribution_report(
+    result = quality.decompose(
         "sample-1",
         ("signal", "noise", "age"),
         (2.0, 10.0, -1.0),
@@ -46,15 +46,11 @@ def test_linear_contribution_report_is_ranked_and_json_native():
 @pytest.mark.parametrize(
     "factory",
     [
-        lambda: quality.linear_contribution_report(
-            "", ("signal",), (1.0,), (1.0,)
-        ),
-        lambda: quality.linear_contribution_report(
+        lambda: quality.decompose("", ("signal",), (1.0,), (1.0,)),
+        lambda: quality.decompose(
             "sample", ("signal",), (1.0,), (1.0,), top_k=2
         ),
-        lambda: quality.linear_contribution_report(
-            "sample", ("signal",), (1.0,), (1.0, 2.0)
-        ),
+        lambda: quality.decompose("sample", ("signal",), (1.0,), (1.0, 2.0)),
     ],
 )
 def test_linear_contribution_report_rejects_incomplete_contract(factory):
@@ -71,7 +67,7 @@ def test_quality_evaluation_fails_closed_for_missing_required_measure():
     result = quality.evaluate(
         "permutation_importance",
         sample_count=2,
-        thresholds=quality.QualityThresholds(stability_minimum=0.8),
+        thresholds=quality.Thresholds(stability_minimum=0.8),
     )
 
     assert result.passed is False
@@ -82,7 +78,7 @@ def test_quality_evaluation_passes_declared_measures():
     result = quality.evaluate(
         "permutation_importance",
         sample_count=2,
-        thresholds=quality.QualityThresholds(
+        thresholds=quality.Thresholds(
             stability_minimum=0.8, fidelity_minimum=0.9
         ),
         stability=0.95,
@@ -98,7 +94,7 @@ def test_quality_evaluation_passes_declared_measures():
 
 def test_independent_ground_truth_evaluation_is_explicit_and_deterministic():
     """Reference rankings are compared without making causal claims."""
-    ground_truth = quality.ExplanationGroundTruth(
+    ground_truth = quality.Truth(
         method="annotated_feature_reference",
         reference="tests/fixtures/explanation-reference-v1.json",
         expected_features=("signal", "age"),
@@ -106,7 +102,7 @@ def test_independent_ground_truth_evaluation_is_explicit_and_deterministic():
         limitations=("The reference covers this synthetic fixture only.",),
     )
 
-    result = quality.evaluate_ground_truth(
+    result = quality.truth(
         ground_truth,
         report("signal", "age", "noise"),
         "sample-1",
@@ -122,13 +118,13 @@ def test_independent_ground_truth_evaluation_is_explicit_and_deterministic():
 
 def test_independent_ground_truth_evaluation_fails_on_mismatched_ranking():
     """A supplied reference cannot be silently treated as satisfied."""
-    ground_truth = quality.ExplanationGroundTruth(
+    ground_truth = quality.Truth(
         method="annotated_feature_reference",
         reference="fixture://reference",
         expected_features=("signal", "age"),
     )
 
-    result = quality.evaluate_ground_truth(
+    result = quality.truth(
         ground_truth,
         report("noise", "age", "signal"),
         "sample-1",
@@ -143,13 +139,13 @@ def test_independent_ground_truth_evaluation_fails_on_mismatched_ranking():
 
 def test_independent_ground_truth_suite_fails_closed_for_partial_references():
     """A suite cannot pass when only part of the held-out set is referenced."""
-    ground_truth = quality.ExplanationGroundTruth(
+    ground_truth = quality.Truth(
         method="synthetic_oracle",
         reference="fixture://reference",
         expected_features=("signal",),
     )
 
-    result = quality.evaluate_ground_truth_suite(
+    result = quality.referee(
         sample_count=2,
         references=((ground_truth, report("signal", "noise"), "sample-1"),),
     )
@@ -162,9 +158,9 @@ def test_independent_ground_truth_suite_fails_closed_for_partial_references():
 @pytest.mark.parametrize(
     "factory",
     [
-        quality.QualityThresholds,
+        quality.Thresholds,
         lambda: quality.fidelity_score((1.0,), (1.0, 2.0)),
-        lambda: quality.ranking_stability((report("signal"),)),
+        lambda: quality.topk((report("signal"),)),
     ],
 )
 def test_quality_contract_rejects_incomplete_evidence(factory):

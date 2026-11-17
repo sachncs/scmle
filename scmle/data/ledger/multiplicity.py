@@ -69,7 +69,7 @@ class Adjustment:
     rejected: tuple[bool, ...]
 
 
-def harmonic_exact(m: int) -> Fraction:
+def harmonics(m: int) -> Fraction:
     """Computes the harmonic number as an exact fraction.
 
     Args:
@@ -110,9 +110,7 @@ def adjust(
     order = sorted(range(m), key=lambda i: (values[i], i))
     exact = [Fraction(values[i]) for i in order]
     if rule in (budget.Correction.BH, budget.Correction.BY):
-        factor = (
-            harmonic_exact(m) if rule is budget.Correction.BY else Fraction(1)
-        )
+        factor = harmonics(m) if rule is budget.Correction.BY else Fraction(1)
         count = max(
             (
                 k
@@ -122,7 +120,7 @@ def adjust(
             default=0,
         )
         scale = float(m * factor)
-        adjusted_sorted = step_up(
+        adjusted_sorted = monotone(
             [min(1.0, values[order[k]] * scale / (k + 1)) for k in range(m)]
         )
     elif rule is budget.Correction.HOLM:
@@ -143,7 +141,7 @@ def adjust(
     return Adjustment(rule, alpha, tuple(adjusted), tuple(rejected))
 
 
-def step_up(scaled: list[float]) -> list[float]:
+def monotone(scaled: list[float]) -> list[float]:
     """Takes the running minimum from the largest rank down (BH and BY).
 
     Args:

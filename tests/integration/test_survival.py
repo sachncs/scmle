@@ -147,17 +147,15 @@ def test_the_selected_model_has_a_lower_brier_score_than_kaplan_meier(result):
 
     train = censored_frame(1200, seed=0)
     fresh = censored_frame(1500, seed=5)
-    baseline = estimators.MarginalSurvival().fit(
-        train[["x1"]], train.time, train.event
-    )
-    times = survival.time_grid(fresh.time.to_numpy(), fresh.event.to_numpy())
+    baseline = estimators.Marginal().fit(train[["x1"]], train.time, train.event)
+    times = survival.horizons(fresh.time.to_numpy(), fresh.event.to_numpy())
     features = fresh[["x1", "x2", "noise"]]
 
     model_curves = result.bundle.predict_survival(features, times)
     base_curves = baseline.predict_survival(features, times)
 
     def score(curves):
-        return survival.integrated_brier(
+        return survival.brier(
             fresh.time.to_numpy(), fresh.event.to_numpy(), curves, times
         )
 

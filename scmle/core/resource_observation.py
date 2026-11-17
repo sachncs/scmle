@@ -119,11 +119,11 @@ def observe_runtime_resources(
         extras, with the source of each. GPU and network availability are
         never probed and are recorded as unknown.
     """
-    cpu_cores, cpu_source = observe_cpu_cores()
+    cpu_cores, cpu_source = processors()
     memory_gb, memory_source = observe_memory_gb()
     selected_path = pathlib.Path(disk_path or pathlib.Path.cwd())
-    disk_gb, disk_source = observe_disk_gb(selected_path)
-    extras, extra_observations, extra_sources = observe_extras()
+    disk_gb, disk_source = freespace(selected_path)
+    extras, extra_observations, extra_sources = optionals()
     environment = capabilities.Environment(
         available_extras=extras,
         cpu_cores=cpu_cores,
@@ -148,7 +148,7 @@ def observe_runtime_resources(
     )
 
 
-def observe_cpu_cores() -> tuple[int | None, str]:
+def processors() -> tuple[int | None, str]:
     """Returns CPUs available to this process, respecting affinity when able."""
     affinity_probe = getattr(os, "sched_getaffinity", None)
     try:
@@ -200,7 +200,7 @@ def observe_windows_memory_gb() -> tuple[float | None, str]:
     return total / BYTES_PER_GB, "psutil.virtual_memory()"
 
 
-def observe_disk_gb(path: pathlib.Path) -> tuple[float | None, str]:
+def freespace(path: pathlib.Path) -> tuple[float | None, str]:
     """Returns the free space of the filesystem containing ``path``.
 
     Args:
@@ -218,7 +218,7 @@ def observe_disk_gb(path: pathlib.Path) -> tuple[float | None, str]:
     return free / BYTES_PER_GB, f"shutil.disk_usage({path})"
 
 
-def observe_extras() -> tuple[
+def optionals() -> tuple[
     frozenset[str], dict[str, bool | None], dict[str, str]
 ]:
     """Observes project extras by checking their declared distributions.
@@ -236,7 +236,7 @@ def observe_extras() -> tuple[
     sources = {"extra:core": "running scmle package"}
     requirements = project_extra_requirements()
     for extra, packages in requirements.items():
-        observations[extra] = all(is_installed(package) for package in packages)
+        observations[extra] = all(present(package) for package in packages)
         sources[f"extra:{extra}"] = "importlib.metadata"
     available = frozenset(
         extra for extra, observed in observations.items() if observed is True
@@ -275,7 +275,7 @@ def project_extra_requirements() -> dict[str, tuple[str, ...]]:
     }
 
 
-def is_installed(package: str) -> bool:
+def present(package: str) -> bool:
     """Returns whether distribution metadata for ``package`` is available.
 
     Args:

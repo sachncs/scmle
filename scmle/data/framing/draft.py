@@ -50,7 +50,7 @@ COST_RANGE = (0.05, 0.5)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SourceDescription:
+class Offer:
     """What the data source offers.
 
     Attributes:
@@ -66,7 +66,7 @@ class SourceDescription:
     target_time_column: str | None = None
 
     @classmethod
-    def from_dict(cls, record: Mapping[str, Any]) -> "SourceDescription":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Offer":
         """Builds the description from a JSON object.
 
         Args:
@@ -94,11 +94,11 @@ class Request:
     """
 
     text: str
-    source: SourceDescription
+    source: Offer
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DataCheck:
+class Probe:
     """One LLM-free check of a draft against `X`.
 
     Attributes:
@@ -142,9 +142,9 @@ class Draft:
 
     status: str
     charter: contracts.AnalysisCharter | None
-    fields: dict[str, provenance.FieldSource]
-    checks: tuple[DataCheck, ...]
-    questions: tuple[scmle.data.framing.questions.HumanQuestion, ...]
+    fields: dict[str, provenance.Filling]
+    checks: tuple[Probe, ...]
+    questions: tuple[scmle.data.framing.questions.Question, ...]
     robust: tuple[dict[str, Any], ...]
     open_items: tuple[str, ...]
     baseline: dict[str, Any] | None
@@ -180,7 +180,7 @@ class Draft:
         }
 
     @property
-    def draft_hash(self) -> str:
+    def sha(self) -> str:
         """The SHA-256 hex digest of the stored draft document."""
         return hashlib.sha256(signing.canonicalise(self.to_dict())).hexdigest()
 
@@ -220,9 +220,7 @@ def mentioned(text: str, columns: Sequence[str]) -> list[str]:
     ]
 
 
-def deterministic_slots(
-    request: Request, frame: pandas.DataFrame
-) -> dict[str, Any]:
+def prefill(request: Request, frame: pandas.DataFrame) -> dict[str, Any]:
     """Fills slots by rules from the request and the schema.
 
     Args:
@@ -270,11 +268,11 @@ def deterministic_slots(
     return slots
 
 
-def check_draft(
+def vet(
     frame: pandas.DataFrame,
     slots: Mapping[str, Any],
-    source: SourceDescription,
-) -> tuple[DataCheck, ...]:
+    source: Offer,
+) -> tuple[Probe, ...]:
     """Runs the data-side checks on the slots, using `X` rows only.
 
     Args:
@@ -286,12 +284,12 @@ def check_draft(
         The checks in the order target, prediction moment, unit and
         population, for the slots present.
     """
-    found: list[DataCheck] = []
+    found: list[Probe] = []
     target = slots.get("target")
     if target is not None:
         if target not in frame.columns:
             found.append(
-                DataCheck(
+                Probe(
                     "target_exists",
                     ok=False,
                     blocking=True,
@@ -302,7 +300,7 @@ def check_draft(
             missing = float(frame[target].isna().mean())
             constant = frame[target].nunique(dropna=True) < MIN_DISTINCT_VALUES
             found.append(
-                DataCheck(
+                Probe(
                     "target_complete",
                     ok=missing <= MAX_TARGET_MISSING and not constant,
                     blocking=False,
@@ -313,7 +311,7 @@ def check_draft(
     if moment is not None:
         if moment not in frame.columns:
             found.append(
-                DataCheck(
+                Probe(
                     "moment_exists",
                     ok=False,
                     blocking=True,
@@ -327,7 +325,7 @@ def check_draft(
             )
             bad = int((start >= end).sum())
             found.append(
-                DataCheck(
+                Probe(
                     "moment_before_target",
                     ok=bad <= MAX_MOMENT_VIOLATIONS,
                     blocking=True,
@@ -342,7 +340,7 @@ def check_draft(
         keys = [declared] if isinstance(declared, str) else list(declared)
         if not all(k in frame.columns for k in keys):
             found.append(
-                DataCheck(
+                Probe(
                     "unit_exists",
                     ok=False,
                     blocking=True,
@@ -352,7 +350,7 @@ def check_draft(
         else:
             share = float(frame.duplicated(subset=keys).mean())
             found.append(
-                DataCheck(
+                Probe(
                     "unit_unique",
                     ok=share <= UNIT_DUPLICATE_TOLERANCE,
                     blocking=False,
@@ -361,11 +359,11 @@ def check_draft(
             )
     population = slots.get("population")
     if population:
-        ids = refusal.population_ids(frame, population)
+        ids = refusal.members(frame, population)
         coverage = None if ids is None else len(ids) / max(len(frame), 1)
         ok = coverage is not None and MIN_POPULATION_SHARE <= coverage < 1.0
         found.append(
-            DataCheck(
+            Probe(
                 "population_coverage",
                 ok=ok,
                 blocking=ids is None,
@@ -380,7 +378,7 @@ def check_draft(
 def assemble(
     slots: Mapping[str, Any],
     request: Request,
-    cost_model: costs.DecisionCostModel | None,
+    cost_model: costs.Tariff | None,
 ) -> tuple[contracts.AnalysisCharter, list[str]]:
     """Builds the unsigned charter, filling blanks with placeholders.
 
@@ -436,7 +434,7 @@ def assemble(
 def refused(
     reason: str,
     detail: Mapping[str, Any],
-    checks: Sequence[DataCheck] = (),
+    checks: Sequence[Probe] = (),
     llm: dict[str, Any] | None = None,
     discarded: Sequence[str] = (),
 ) -> Draft:
@@ -468,9 +466,7 @@ def refused(
     )
 
 
-def column_refusal(
-    request: Request, data_sample: pandas.DataFrame
-) -> Draft | None:
+def mismatch(request: Request, data_sample: pandas.DataFrame) -> Draft | None:
     """Refuses a request whose columns do not match the source or the sample.
 
     Args:
@@ -498,12 +494,12 @@ def column_refusal(
     return None
 
 
-def consult_sampler(
+def consult(
     request: Request,
     data_sample: pandas.DataFrame,
     slots: dict[str, Any],
-    sources: dict[str, provenance.FieldSource],
-    sampler: refusal.SlotSampler | None,
+    sources: dict[str, provenance.Filling],
+    sampler: refusal.Sampler | None,
     tau: float | None,
     k: int,
 ) -> tuple[dict[str, Any] | None, list[str], Draft | None]:
@@ -529,7 +525,7 @@ def consult_sampler(
     if sampler is None:
         return None, [], None
     source = request.source
-    prompt = refusal.prompt_for(request.text, source.columns)
+    prompt = refusal.instruct(request.text, source.columns)
     samples = refusal.draw(sampler, prompt, k)
     agreed = refusal.consensus(data_sample, samples)
     llm = {
@@ -559,27 +555,27 @@ def consult_sampler(
         for k_, v in agreed.values.items()  # noqa: PD011 -- `Consensus.values` is a dataclass field, not a pandas attribute
         if v not in (None, "", [])
     }
-    trial_checks = check_draft(data_sample, proposal, source)
+    trial_checks = vet(data_sample, proposal, source)
     if any(not c.ok and c.blocking for c in trial_checks):
         discarded.append("llm draft failed a blocking data-side check")
     else:
         for name, value in proposal.items():
             if name not in slots:
                 slots[name] = value
-                sources[name] = provenance.FieldSource.LLM
+                sources[name] = provenance.Filling.LLM
     return llm, discarded, None
 
 
-def baseline_and_questions(
+def interview(
     data_sample: pandas.DataFrame,
     target: str,
     baseline_column: str | None,
-    cost_model: costs.DecisionCostModel | None,
+    cost_model: costs.Tariff | None,
     pilot_actions: Sequence[int] | None,
     open_items: list[str],
 ) -> tuple[
     dict[str, Any] | None,
-    list[scmle.data.framing.questions.HumanQuestion],
+    list[scmle.data.framing.questions.Question],
     list[dict[str, Any]],
 ]:
     """Profiles the baseline on `X` and asks for the unknown cost threshold.
@@ -600,14 +596,14 @@ def baseline_and_questions(
         questions that remain for a person, and the robust verdicts.
     """
     profile = None
-    asked: list[scmle.data.framing.questions.HumanQuestion] = []
+    asked: list[scmle.data.framing.questions.Question] = []
     robust: list[dict[str, Any]] = []
     if (
         baseline_column
         and baseline_column in data_sample.columns
         and cost_model
     ):
-        profile = baseline.profile_on_exploration(
+        profile = baseline.gauge(
             pandas.to_numeric(data_sample[target], errors="coerce").to_numpy(),
             data_sample[baseline_column].to_numpy(),
             cost_model,
@@ -628,7 +624,7 @@ def baseline_and_questions(
                     COST_RANGE[0],
                     COST_RANGE[1],
                     "a threshold t = c_FP / (c_FP + c_FN) in (0, 1)",
-                    scmle.data.framing.questions.gain_sign_verdict(
+                    scmle.data.framing.questions.judge(
                         outcome.to_numpy()[seen],
                         numpy.asarray(pilot_actions)[seen],
                         data_sample[baseline_column].to_numpy()[seen],
@@ -645,11 +641,11 @@ def frame(
     request: Request,
     data_sample: pandas.DataFrame,
     *,
-    cost_model: costs.DecisionCostModel | None = None,
+    cost_model: costs.Tariff | None = None,
     baseline_column: str | None = None,
     pilot_actions: Sequence[int] | None = None,
     human: Mapping[str, Any] | None = None,
-    sampler: refusal.SlotSampler | None = None,
+    sampler: refusal.Sampler | None = None,
     tau: float | None = None,
     k: int = refusal.DEFAULT_K,
 ) -> Draft:
@@ -674,20 +670,20 @@ def frame(
         drafts disagree by more than `tau`.
     """
     source = request.source
-    stopped = column_refusal(request, data_sample)
+    stopped = mismatch(request, data_sample)
     if stopped is not None:
         return stopped
-    slots = deterministic_slots(request, data_sample)
-    sources = dict.fromkeys(slots, provenance.FieldSource.TEMPLATE)
-    llm, discarded, stopped = consult_sampler(
+    slots = prefill(request, data_sample)
+    sources = dict.fromkeys(slots, provenance.Filling.TEMPLATE)
+    llm, discarded, stopped = consult(
         request, data_sample, slots, sources, sampler, tau, k
     )
     if stopped is not None:
         return stopped
     for name, value in (human or {}).items():
         slots[name] = value
-        sources[name] = provenance.FieldSource.HUMAN
-    checks = check_draft(data_sample, slots, source)
+        sources[name] = provenance.Filling.HUMAN
+    checks = vet(data_sample, slots, source)
     blocked = [c for c in checks if not c.ok and c.blocking]
     if blocked:
         return refused(
@@ -720,7 +716,7 @@ def frame(
             llm,
             discarded,
         )
-    profile, asked, robust = baseline_and_questions(
+    profile, asked, robust = interview(
         data_sample,
         slots["target"],
         baseline_column,
@@ -734,7 +730,7 @@ def frame(
         {
             **sources,
             **{
-                n: provenance.FieldSource.TEMPLATE
+                n: provenance.Filling.TEMPLATE
                 for n in open_items
                 if n not in sources
             },
@@ -750,7 +746,7 @@ def frame(
     )
 
 
-def write_artifacts(draft: Draft, directory: str | Path) -> list[str]:
+def emit(draft: Draft, directory: str | Path) -> list[str]:
     """Writes the framing artifacts to a directory.
 
     The directory is created if needed. The files are the draft, the
@@ -787,7 +783,7 @@ def write_artifacts(draft: Draft, directory: str | Path) -> list[str]:
     return sorted(documents)
 
 
-def link_report(
+def linkage(
     charter: contracts.AnalysisCharter, columns: Sequence[str]
 ) -> dict[str, Any]:
     """Reports whether the charter's words name real columns, descriptively.

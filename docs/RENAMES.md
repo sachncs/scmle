@@ -6,6 +6,13 @@ single word fits. Each entry is `old -> new`, grouped by module. Signatures
 and behaviour are unchanged; replace the old name to migrate. Renames of
 names in the public API snapshot are also listed in the changelog.
 
+## `scmle.api.non_tabular`
+
+- `raster_scope` -> `delimit`
+- `fixed_scope` -> `invariant`
+- `capability_for_adapter` -> `entitle`
+- `check_observed_adapter` -> `conform`
+
 ## `scmle.api.project`
 
 - `build_parameter_estimation_declaration` -> `declare`
@@ -16,10 +23,21 @@ names in the public API snapshot are also listed in the changelog.
 - `require_treatment_column` -> `locate`
 - `estimate_parameters_for_project` -> `estimate`
 - `verify_existing_curation` -> `verify`
+- `check_manifest_matches_adapter` -> `conform`
+- `publish_curation_artifact` -> `emplace`
+- `parameter_estimation_declaration_digest` -> `fingerprint`
 
 ## `scmle.api.results`
 
 - `unattested_suspects` -> `suspect`
+- `feature_importance` -> `salience`
+- `health_label` -> `diagnose`
+- `meets_criteria` -> `accomplished`
+- `claim_tiers` -> `tally`
+
+## `scmle.api.sequential`
+
+- `resolve_tabular_input` -> `tabulate`
 
 ## `scmle.artifacts.bundle`
 
@@ -29,16 +47,58 @@ names in the public API snapshot are also listed in the changelog.
 - `verify_core_files` -> `authenticate`
 - `verified_member_path` -> `resolve`
 - `shifted_interval` -> `reweight`
+- `installed_distributions` -> `inventory`
+- `prepare_frame` -> `prepare`
+- `require_conformal` -> `require`
+- `verify_round_trip` -> `roundtrip`
+- `file_sha256` -> `shasum`
+- `novelty_of` -> `atypical`
+- `read_manifest_and_schema` -> `unpack`
+- `series_builder` -> `assemble`
+- `attach_shift_weights` -> `tilt`
+- `load_monitoring_members` -> `hydrate`
+- `write_monitoring_members` -> `persist`
+- `load_interval_members` -> `restore`
+- `rank_for_labeling` -> `prioritize`
+- `compatibility_problems` -> `incompatibilities`
 
 ## `scmle.artifacts.claims_audit`
 
 - `coverage_status_problems` -> `reconcile`
 - `evaluate_attestation` -> `assess`
+- `baseline_report_problems` -> `misnamed`
+- `check_replay` -> `rederive`
+- `decision_file_problems` -> `tampered`
+- `show_claim` -> `inspect`
+- `read_claims` -> `recall`
+- `read_ledger` -> `rehydrate`
+- `check_charter` -> `authenticate`
+- `check_stage_two` -> `tally`
+- `check_control` -> `witness`
+- `check_coverage_claim` -> `corroborate`
+- `custody_open_finding` -> `openings`
+- `evaluate_attestations` -> `vet`
+- `ledger_header_mismatches` -> `compare`
+- `list_claims` -> `inventory`
+- `registered_rows` -> `enrolled`
+- `check_claims_against_ledger` -> `crosscheck`
+- `unregistered_coverage_finding` -> `orphaned`
+- `check_attestations` -> `vouch`
+- `check_coverage_confirmation` -> `reconfirm`
+- `check_custody` -> `custodial`
+- `is_confirmed` -> `upheld`
 
 ## `scmle.artifacts.reproducibility`
 
 - `trial_identity` -> `identify`
 - `structural_differences` -> `compare`
+- `load_run` -> `reread`
+- `compare_runs` -> `judge`
+- `ReplayVerdict` -> `Comparison`
+
+## `scmle.artifacts.store`
+
+- `RunStore` -> `Workspace`
 
 ## `scmle.cli`
 
@@ -59,16 +119,43 @@ names in the public API snapshot are also listed in the changelog.
 - `ClaimsCommand` -> `Claims`
 - `FrameCommand` -> `Frame`
 - `TrailCommand` -> `Trail`
+- `build_project` -> `scaffold`
+- `add_validation_arguments` -> `validators`
+- `ServeCommand` -> `Serve`
+
+## `scmle.contracts.artifacts`
+
+- `BundleSchema` -> `Interface`
+- `pipeline_columns` -> `consumed`
 
 ## `scmle.contracts.capabilities`
 
 - `ModelFamilyDeclaration` -> `Declaration`
 - `register_model_family` -> `enroll`
 - `resource_diagnostics` -> `audit`
+- `ResourceAssumptions` -> `Resources`
+- `UnsupportedCapabilityError` -> `UnsupportedError`
+- `list_capabilities` -> `catalogue`
 
 ## `scmle.contracts.data`
 
 - `check_findings` -> `vet`
+- `FindingDisposition` -> `Disposition`
+- `ModalityManifest` -> `Passport`
+- `blocking_leaks` -> `blockers`
+- `CurationFinding` -> `Finding`
+- `FeaturePlan` -> `Blueprint`
+- `unchecked_columns` -> `untested`
+- `SourceMetadata` -> `Origin`
+- `DatasetProfile` -> `Portrait`
+- `screen_warning` -> `admonition`
+- `LineageMetadata` -> `Ancestry`
+- `derived_names` -> `engineered`
+- `from_curation` -> `distill`
+- `QualityObservation` -> `Observation`
+- `PrivacyMetadata` -> `Confidentiality`
+- `input_columns` -> `sourced`
+- `columns_for` -> `pick`
 
 ## `scmle.contracts.evaluation`
 
@@ -76,6 +163,31 @@ names in the public API snapshot are also listed in the changelog.
 - `validate_finite` -> `quantify`
 - `check_open_unit_interval` -> `confine`
 - `check_explanation_threshold` -> `qualify`
+- `CalibrationMethod` -> `Procedure`
+- `MetricDeclaration` -> `Declaration`
+- `validate_fairness` -> `scope`
+- `FairnessMethod` -> `Technique`
+- `MetricGate` -> `Hurdle`
+- `ExplanationAvailability` -> `Explicability`
+- `FairnessGate` -> `Equity`
+- `validate_metric_gates` -> `gatekeep`
+- `DiagnosticAction` -> `Remedy`
+- `SmallGroups` -> `Subgroups`
+- `validate_release` -> `audit`
+- `MetricDirection` -> `Orientation`
+- `UnsupportedEvaluationPolicyError` -> `UnsupportedError`
+- `DiagnosticGate` -> `Requirement`
+- `UndeclaredEvaluationPolicyError` -> `UndeclaredError`
+- `validate_uncertainty` -> `enforce`
+
+## `scmle.contracts.events`
+
+- `utc_timestamp` -> `stamp`
+
+## `scmle.contracts.experiments`
+
+- `TrialStatus` -> `Termination`
+- `HistoricalRun` -> `Precedent`
 
 ## `scmle.contracts.explanations`
 
@@ -87,14 +199,74 @@ names in the public API snapshot are also listed in the changelog.
 - `validate_uri` -> `screen`
 - `validate_json_fields` -> `normalise`
 - `validate_measurement_object` -> `require`
+- `EvidenceLink` -> `Link`
+- `validate_json_value` -> `sanitise`
+- `DatasetSnapshot` -> `Snapshot`
+- `validate_evidence_links` -> `linked`
+- `FeatureGraphReference` -> `Lineage`
+- `PrivacyDecision` -> `Clearance`
 
 ## `scmle.contracts.lineage`
 
 - `topological_order_without_validation` -> `linearise`
+- `path_exists` -> `reachable`
+
+## `scmle.contracts.metrics`
+
+- `FunctionMetric` -> `Formula`
+
+## `scmle.contracts.modalities`
+
+- `check_no_blank_values` -> `blanks`
+- `UnsupportedModalityError` -> `UnsupportedError`
+- `ExtensionModality` -> `Bespoke`
+- `list_declarations` -> `catalog`
+- `LifecycleStage` -> `Phase`
+- `StageEvidence` -> `Proof`
+
+## `scmle.contracts.observability`
+
+- `InferenceEvent` -> `Inference`
+- `SignalKind` -> `Indicator`
+- `MetricSample` -> `Sample`
 
 ## `scmle.contracts.performance`
 
 - `sample_count_violations` -> `tally`
+- `relative_change` -> `rise`
+
+## `scmle.contracts.qualification`
+
+- `SetId` -> `Subset`
+- `require_tuple` -> `tupled`
+
+## `scmle.contracts.reliability`
+
+- `FaultScenario` -> `Contingency`
+- `production_beta` -> `prerelease`
+- `record_evidence` -> `log`
+- `VerificationStatus` -> `Verification`
+- `validate_complete` -> `insist`
+- `check_evidence_requirements` -> `require`
+- `default_fault_injection_plans` -> `drills`
+
+## `scmle.contracts.search`
+
+- `SearchSpace` -> `Space`
+- `FloatParameter` -> `Real`
+- `IntParameter` -> `Integer`
+- `ChoiceParameter` -> `Choice`
+
+## `scmle.contracts.serving`
+
+- `SchemaChangeError` -> `MismatchError`
+- `ScoreRequest` -> `Inquiry`
+
+## `scmle.contracts.signing`
+
+- `key_from_environment` -> `lookup`
+- `resolve_key` -> `keying`
+- `sign_payload` -> `mac`
 
 ## `scmle.contracts.tasks`
 
@@ -104,30 +276,91 @@ names in the public API snapshot are also listed in the changelog.
 - `check_structure` -> `verify`
 - `expand_feature_delays` -> `lag`
 - `check_validation_rules` -> `validate`
+- `check_target_column_rules` -> `exclusive`
+- `effective_strategies` -> `effective`
+- `horizon_names` -> `horizons`
+- `FeatureNode` -> `Node`
+- `FeatureGraph` -> `Derivation`
+- `fast_budget` -> `brief`
+- `effective_search` -> `budgeted`
+
+## `scmle.core.causal_claim`
+
+- `load_dag` -> `unseal`
+- `verified_attestors` -> `credit`
 
 ## `scmle.core.compiler`
 
 - `WorkflowStage` -> `Node`
 
+## `scmle.core.config`
+
+- `load_sections` -> `overlay`
+
+## `scmle.core.context`
+
+- `add_outcome` -> `enter`
+- `supported_tabular_capability` -> `advertise`
+- `tabular_beta_capability_registry` -> `enrol`
+- `resource_governor` -> `regulator`
+- `fairness_options` -> `fairnesses`
+- `persist_capability_observation` -> `observe`
+
+## `scmle.core.decision_reports`
+
+- `file_digests` -> `hashsums`
+
 ## `scmle.core.ingest_stage`
 
 - `read_view` -> `load`
+- `load_plan` -> `recipe`
+- `rule_of` -> `decode`
+
+## `scmle.core.ipc`
+
+- `wait_for_helper` -> `rendezvous`
+- `connect_to_parent` -> `attach`
 
 ## `scmle.core.limits`
 
 - `kill_descendants` -> `reap`
 - `memory_exceeded` -> `exceeds`
 - `enforcement_text` -> `explain`
+- `forkserver_environment` -> `preforked`
+- `process_tree` -> `footprint`
+- `child_main` -> `execute`
+- `proc_table` -> `tabulate`
+- `thread_limit` -> `threadcap`
+- `trial_ceiling_seconds` -> `deadline`
+- `TrialLimitError` -> `TrialError`
+- `process_table` -> `pids`
 
 ## `scmle.core.orchestrator`
 
 - `load_history` -> `recall`
 - `apply_plan` -> `adopt`
 - `load_checkpoints` -> `restore`
+- `for_run_directory` -> `reload`
+
+## `scmle.core.policies`
+
+- `GateReview` -> `Review`
 
 ## `scmle.core.randomness`
 
 - `validate_key` -> `vet`
+- `name_words` -> `derive`
+
+## `scmle.core.resource_observation`
+
+- `observe_extras` -> `optionals`
+- `observe_cpu_cores` -> `processors`
+- `is_installed` -> `present`
+- `observe_disk_gb` -> `freespace`
+
+## `scmle.core.scheduler`
+
+- `create_backend` -> `select`
 
 ## `scmle.core.stages`
 
@@ -170,15 +403,51 @@ names in the public API snapshot are also listed in the changelog.
 - `quantile_intervals` -> `bracket`
 - `build_evidence_graph` -> `trace`
 - `measure_coverage` -> `gauge`
+- `chartered_rule` -> `governing`
+- `pareto_report` -> `frontier`
+- `synthesize_features` -> `synthesize`
+- `build_plan` -> `devise`
+- `reliability_plan_record` -> `persist`
+- `capability_key` -> `requisition`
+- `register_decision_files` -> `notarize`
+- `PlanStage` -> `Planning`
+- `declared_slice_columns` -> `slicers`
+- `note_conformal_skipped` -> `waive`
+- `write_decision_reports` -> `decide`
+- `chartered_decision_model` -> `decisional`
+- `add_quality_notes` -> `annotate`
+- `entity_calibration_column` -> `grouping`
+- `cv_plus_cap` -> `allowance`
+
+## `scmle.core.state`
+
+- `InvalidTransitionError` -> `TransitionError`
 
 ## `scmle.data.admissibility.asof`
 
 - `RowStatus` -> `Status`
 - `AsOfAudit` -> `Audit`
+- `classify_rows` -> `classify`
+- `reconstruction_mismatch` -> `disagree`
+
+## `scmle.data.admissibility.attestations`
+
+- `LeakageAttestation` -> `Affidavit`
 
 ## `scmle.data.admissibility.dag`
 
 - `require_nodes` -> `require`
+- `children_map` -> `successors`
+- `parents_map` -> `ancestry`
+- `backdoor_valid` -> `adjusts`
+
+## `scmle.data.admissibility.independence`
+
+- `is_discrete` -> `nominal`
+- `CIKind` -> `Procedure`
+- `implied_statements` -> `entail`
+- `CITest` -> `Independence`
+- `partial_correlation` -> `correlate`
 
 ## `scmle.data.admissibility.leakage`
 
@@ -187,15 +456,48 @@ names in the public API snapshot are also listed in the changelog.
 - `ConditionalTest` -> `Conditional`
 - `MissingnessTest` -> `Missingness`
 - `FeatureAssessment` -> `Assessment`
+- `assess_feature` -> `assess`
+- `skill_of` -> `predictiveness`
+- `skill_test` -> `probe`
+- `cross_fit_skill` -> `crossfit`
+- `within_strata` -> `scramble`
+- `bootstrap_skill` -> `rescore`
+- `conditional_test` -> `condition`
+- `make_splits` -> `carve`
+- `permutation_p` -> `significance`
+- `binned_target` -> `bucket`
+- `binary_auc` -> `auc`
+- `enough_rows` -> `sufficient`
+
+## `scmle.data.admissibility.provenance`
+
+- `is_known` -> `given`
+- `WrittenAt` -> `Stamp`
+- `valid_on` -> `effective`
+- `AsOfKind` -> `Cutoff`
+- `AsOfSource` -> `Provenance`
+- `AsOf` -> `Lead`
+- `LogCheck` -> `Reconstruction`
 
 ## `scmle.data.admissibility.qualify`
 
 - `causal_admissibility` -> `admit`
+- `LoadedStore` -> `Shelf`
+- `finding_check` -> `screened`
+- `attestation_check` -> `waiver`
+
+## `scmle.data.admissibility.reconciliation`
+
+- `reconcile_item` -> `settle`
 
 ## `scmle.data.admissibility.rules`
 
 - `timing_failure` -> `diagnose`
 - `gate_of` -> `gate`
+- `FieldDecision` -> `Decision`
+- `decide_timing` -> `clock`
+- `decide_predictive` -> `forecastable`
+- `decide_causal` -> `adjudicate`
 
 ## `scmle.data.admissibility.screen`
 
@@ -204,43 +506,174 @@ names in the public API snapshot are also listed in the changelog.
 - `build_problem` -> `encode`
 - `limit_report` -> `halt`
 - `finding_bound` -> `floor`
+- `auc_rows` -> `aucs`
+- `missingness_statistic` -> `cramer`
+- `work_cap` -> `allowance`
+- `strata_of` -> `stratify`
+- `batch_permutations` -> `permute`
+- `observed_predictions` -> `predict`
+- `purity_bound` -> `dominance`
+- `ceilings_of` -> `caps`
+- `fold_splits` -> `crossfit`
+- `missingness_hypotheses` -> `hypothesize`
+- `required_permutations` -> `resamples`
+- `sample_skill` -> `replicate`
+- `scan_frame` -> `scan`
+- `chi_square_rows` -> `chisquare`
+- `fold_concordance` -> `concordance`
+- `shipped_store` -> `bundled`
 
 ## `scmle.data.catalog`
 
 - `frame_shape` -> `measure`
 - `canonical_scalar` -> `normalise`
+- `frame_for_array` -> `tabulate`
+- `normalize_uri` -> `normalize`
+- `schema_for_frame` -> `describe`
+- `MissingnessSummary` -> `Missingness`
+- `missingness_for_frame` -> `tally`
+- `DuplicateSummary` -> `Duplication`
+- `frame_for_data` -> `coerce`
+- `duplicates_for_frame` -> `dedupe`
+- `content_dict` -> `contents`
+- `LabelSummary` -> `Labeling`
+- `frame_for_other` -> `fallback`
+- `label_for_frame` -> `summarize`
+- `is_sequence_value` -> `sequential`
+- `canonical_value` -> `canonicalize`
+- `observe_data` -> `examine`
 
 ## `scmle.data.charter.causal`
 
 - `check_assumption` -> `vet`
 - `check_attestors` -> `reconcile`
+- `covariates_of` -> `adjusters`
+- `NegativeControl` -> `Control`
 
 ## `scmle.data.charter.contracts`
 
 - `check_decision_map` -> `cover`
+- `IntercurrentEvent` -> `Event`
+- `read_charter` -> `peek`
+- `DecisionRow` -> `Trigger`
+- `charter_from_record` -> `parse`
 
 ## `scmle.data.charter.decision`
 
 - `positive_number` -> `check`
+- `DecisionLayer` -> `Layer`
+- `DecisionModel` -> `Policy`
+- `FairnessConstraint` -> `Constraint`
+- `RolloutPlan` -> `Experiment`
+
+## `scmle.data.charter.feasibility`
+
+- `power_mean` -> `detectability`
+- `check_k` -> `countable`
+- `mde_correlation` -> `resolution`
+- `wilson_half_width` -> `halfwidth`
+
+## `scmle.data.charter.ingest`
+
+- `EntityField` -> `Attribute`
+- `EntityPass` -> `Pass`
+- `ColumnTotal` -> `Total`
+- `non_negative` -> `nonnegative`
+
+## `scmle.data.charter.sealing`
+
+- `check_amendment` -> `permit`
+- `VerifiedCharter` -> `Verified`
+- `write_charter` -> `inscribe`
+
+## `scmle.data.curation.embedding`
+
+- `TextEmbedder` -> `Embedder`
 
 ## `scmle.data.curation.preprocessing`
 
 - `split_flagged` -> `partition`
 - `split_high_cardinality` -> `isolate`
 - `with_weights` -> `weigh`
+- `build_front_end` -> `frontend`
+- `preprocessing_steps` -> `preprocess`
+- `wrap_estimator` -> `wrap`
+- `monotonic_signs` -> `monotonicity`
+- `build_pipeline` -> `instantiate`
+- `monotonic_layout_problem` -> `misalignment`
+
+## `scmle.data.curation.selection`
+
+- `FeatureConstructor` -> `Constructor`
+
+## `scmle.data.curation.transformers`
+
+- `TextVectorizer` -> `Vectorizer`
+
+## `scmle.data.custody.carve`
+
+- `restrict_folds` -> `restrict`
+- `unit_labels` -> `unitize`
+- `pick_units` -> `pick`
+- `check_inputs` -> `validate`
+- `pick_blocks` -> `choose`
+- `carve_confirmation` -> `divide`
+- `close_over_units` -> `enclose`
+- `derived_seed` -> `derive`
+- `embargo_mask` -> `quarantine`
+- `acf_embargo` -> `acf`
+- `link_equal_codes` -> `link`
+
+## `scmle.data.custody.manifest`
+
+- `load_manifest` -> `restore`
+- `set_ids` -> `rowids`
+
+## `scmle.data.custody.merkle`
+
+- `row_hashes` -> `fingerprints`
+- `frame_root` -> `merkleize`
 
 ## `scmle.data.custody.pipeline`
 
 - `empty_carve` -> `forgo`
+- `apply_custody` -> `sequester`
+- `minority_rows` -> `scarce`
+- `classes_complete` -> `complete`
+- `measured_embargo` -> `gap`
+
+## `scmle.data.custody.sealed`
+
+- `ExplorationView` -> `View`
+- `entry_hash` -> `hashed`
+- `entry_mac` -> `authenticate`
+- `OpenLog` -> `Journal`
+- `SealedSet` -> `Locker`
 
 ## `scmle.data.detectors.certificates`
 
 - `DefectOutcome` -> `Outcome`
+- `StaleCertificateError` -> `StaleError`
+- `GateStatus` -> `Authority`
+- `mark_gating` -> `authorise`
+- `docstring_lines` -> `documentation`
+
+## `scmle.data.detectors.duplicates`
+
+- `assess_duplicates` -> `assess`
+- `exact_flags` -> `verbatim`
 
 ## `scmle.data.detectors.labels`
 
 - `NoiseRate` -> `Rate`
 - `mean_margins` -> `integrate`
+- `noise_rate` -> `noisiness`
+- `class_thresholds` -> `cutoffs`
+- `hoeffding_bound` -> `hoeffding`
+- `confident_assignment` -> `assign`
+- `confident_learning_flags` -> `mislabeled`
+- `margin_flags` -> `margins`
+- `ppi_mean` -> `ppi`
 
 ## `scmle.data.detectors.missingness`
 
@@ -249,28 +682,168 @@ names in the public API snapshot are also listed in the changelog.
 - `little_statistic` -> `measure`
 - `oof_linear_scores` -> `crossfit`
 - `TippingPoint` -> `Sensitivity`
+- `auc_from_ranks` -> `ranksum`
+- `imputation_errors` -> `benchmark`
+- `numeric_columns` -> `numerics`
+- `assess_mechanism` -> `investigate`
+- `em_normal` -> `em`
+- `fold_imputers` -> `imputers`
+
+## `scmle.data.detectors.outliers`
+
+- `error_flags` -> `misrecorded`
 
 ## `scmle.data.detectors.sentinels`
 
 - `SentinelFinding` -> `Suspect`
 - `numeric_spikes` -> `spot`
 - `text_findings` -> `scour`
+- `sentinel_mask` -> `coded`
+- `recode_missing` -> `nullify`
+- `sentinel_rows` -> `placeholders`
+- `grid_spacing` -> `pitch`
+- `expected_share` -> `expect`
+- `find_sentinels` -> `hunt`
+
+## `scmle.data.framing.baseline`
+
+- `profile_on_exploration` -> `gauge`
+- `rule_digest` -> `fingerprint`
+- `ClusterTest` -> `Clustered`
+- `paired_difference` -> `advantage`
+- `cluster_test` -> `ttest`
+
+## `scmle.data.framing.claim`
+
+- `freeze_rule` -> `solidify`
+
+## `scmle.data.framing.costs`
+
+- `CostSource` -> `Basis`
+- `unverified_entries` -> `unreviewed`
+- `DominatedActionError` -> `DominatedError`
+- `DecisionCostModel` -> `Tariff`
+- `net_benefit_curve` -> `benefits`
+- `binary_vector` -> `dichotomous`
+
+## `scmle.data.framing.draft`
+
+- `column_refusal` -> `mismatch`
+- `consult_sampler` -> `consult`
+- `SourceDescription` -> `Offer`
+- `baseline_and_questions` -> `interview`
+- `DataCheck` -> `Probe`
+- `write_artifacts` -> `emit`
+- `deterministic_slots` -> `prefill`
+- `link_report` -> `linkage`
+- `check_draft` -> `vet`
+- `draft_hash` -> `sha`
 
 ## `scmle.data.framing.feasibility`
 
 - `BaselineFeasibility` -> `Verdict`
 
+## `scmle.data.framing.provenance`
+
+- `FieldSource` -> `Filling`
+
+## `scmle.data.framing.questions`
+
+- `HumanQuestion` -> `Question`
+- `gain_sign_verdict` -> `judge`
+
+## `scmle.data.framing.refusal`
+
+- `population_ids` -> `members`
+- `clopper_pearson_upper` -> `ceiling`
+- `SlotSampler` -> `Sampler`
+- `prompt_for` -> `instruct`
+- `ReplaySampler` -> `Replayer`
+
+## `scmle.data.identification.aipw`
+
+- `overlap_report` -> `propensities`
+- `make_learners` -> `spawn`
+- `fit_nuisances` -> `prefit`
+- `weighted_smd` -> `imbalance`
+
+## `scmle.data.identification.battery`
+
+- `wald_test` -> `wald`
+
+## `scmle.data.identification.certified`
+
+- `subgroup_method_hash` -> `fingerprint`
+- `certified_gates` -> `certificated`
+
 ## `scmle.data.identification.did`
 
 - `pretrend_p_value` -> `pretest`
+- `max_pre_event_change` -> `pretrend`
+- `wide_panel` -> `widen`
+- `event_arms` -> `arms`
+- `event_covariance` -> `vcov`
+- `overall_att` -> `aggregate`
+
+## `scmle.data.identification.iv`
+
+- `exclusion_bound` -> `exclude`
 
 ## `scmle.data.identification.overid`
 
 - `two_stage` -> `estimate`
 
+## `scmle.data.identification.rd`
+
+- `cv_bandwidth` -> `crossvalidate`
+- `chosen_bandwidth` -> `choose`
+- `local_fit` -> `polyfit`
+
+## `scmle.data.identification.run`
+
+- `IvEstimator` -> `Instrument`
+- `balance_columns` -> `pretreatment`
+- `sensitivity_of` -> `fragility`
+- `wald_from` -> `waldify`
+- `SynthEstimator` -> `Synth`
+- `closing_notes` -> `caveats`
+- `BackdoorEstimator` -> `Backdoor`
+- `refusal_outcome` -> `refuse`
+- `subgroup_report` -> `stratify`
+- `needed_assumptions` -> `prerequisites`
+- `DidEstimator` -> `DiD`
+- `label_subgroups` -> `certify`
+
+## `scmle.data.identification.select`
+
+- `check_adjustment` -> `verify`
+
 ## `scmle.data.identification.sensitivity`
 
 - `OlsFit` -> `Regression`
+- `robustness_value` -> `rvalue`
+- `bias_bound` -> `ceiling`
+- `evalue_interval` -> `evalues`
+- `adjusted_interval` -> `robustify`
+- `benchmark_strength` -> `calibrate`
+- `partial_r2` -> `rsquared`
+- `ols_fit` -> `regress`
+
+## `scmle.data.identification.synth`
+
+- `min_donors` -> `quorum`
+- `fit_weights` -> `weigh`
+
+## `scmle.data.identification.tier`
+
+- `tier_conditions` -> `assess`
+- `design_shortfalls` -> `shortfalls`
+
+## `scmle.data.ingest.asof_view`
+
+- `KnownTime` -> `Timing`
+- `AsOfView` -> `View`
+- `NoAsOfRuleError` -> `HistoryError`
 
 ## `scmle.data.ingest.budget`
 
@@ -279,6 +852,33 @@ names in the public API snapshot are also listed in the changelog.
 ## `scmle.data.ingest.declared`
 
 - `source_totals` -> `compare`
+- `key_checksum` -> `sha`
+
+## `scmle.data.ingest.entities`
+
+- `fit_em` -> `em`
+- `measure_quality` -> `grade`
+- `BandEstimate` -> `Band`
+- `geometric_bands` -> `stratify`
+- `jaro_winkler` -> `jarowinkler`
+- `lowest_weight` -> `weakest`
+- `candidate_pairs` -> `pairing`
+- `thresholds_from_bands` -> `cutoffs`
+
+## `scmle.data.ingest.grain`
+
+- `bound_ok` -> `feasible`
+- `match_columns` -> `align`
+- `name_tokens` -> `tokenize`
+- `scan_single_columns` -> `sweep`
+- `subset_verdict` -> `shrink`
+- `unit_components` -> `grains`
+- `level_candidates` -> `layer`
+- `KeyCandidate` -> `Candidate`
+- `key_like` -> `identifies`
+- `measure_level` -> `levels`
+- `KeyScan` -> `Scan`
+- `infer_keys` -> `keysearch`
 
 ## `scmle.data.ingest.joins`
 
@@ -286,29 +886,63 @@ names in the public API snapshot are also listed in the changelog.
 - `kinds_match` -> `match`
 - `measure_link` -> `measure`
 - `resolve_competition` -> `arbitrate`
+- `name_supports` -> `corroborated`
+- `single_column_pairs` -> `couple`
+- `DeclaredKey` -> `Reference`
+- `JoinGraph` -> `Joins`
 
 ## `scmle.data.ingest.plan`
 
 - `write_artifact` -> `persist`
 - `infer_grain` -> `infer`
 - `discover_joins` -> `link`
+- `sqlite_factory` -> `opener`
+- `declared_from_json` -> `declarations`
 
 ## `scmle.data.ingest.profile`
 
 - `ConsistentRead` -> `Reading`
+- `SqlSource` -> `Sql`
+- `TornReadError` -> `TornError`
+- `value_kind` -> `classify`
+- `has_total_order` -> `deterministic`
+- `ColumnProfile` -> `Aggregates`
+- `read_once` -> `slurp`
+- `TableProfile` -> `Census`
+- `consistent_read` -> `untorn`
+- `profile_table` -> `survey`
+- `quote_all` -> `quoting`
 
 ## `scmle.data.ingest.reconcile`
 
 - `ExtractReconciliation` -> `Report`
+- `reconcile_extract` -> `crosscheck`
+- `JoinCheck` -> `Cardinality`
+- `FeatureTotal` -> `Sum`
 
 ## `scmle.data.ingest.synthesize`
 
 - `candidate_columns` -> `sift`
 - `reduce_numeric` -> `aggregate`
+- `FeatureSet` -> `Selection`
+- `window_label` -> `caption`
+- `feature_provenance` -> `lineage`
+- `aggregate_features` -> `roll`
+- `register_family` -> `enlist`
+- `target_frame` -> `outcomes`
+- `reduce_rows` -> `fold`
 
 ## `scmle.data.ledger.bivariate`
 
 - `complete_pairs` -> `prune`
+
+## `scmle.data.ledger.budget`
+
+- `discount_weight` -> `gammas`
+- `DetectorTolerance` -> `Tolerance`
+- `assign_experiment` -> `enroll`
+- `BudgetExhaustedError` -> `ExhaustedError`
+- `split_budget` -> `apportion`
 
 ## `scmle.data.ledger.confirm`
 
@@ -319,6 +953,31 @@ names in the public API snapshot are also listed in the changelog.
 - `open_and_test` -> `unseal`
 - `family_block` -> `block`
 - `failure_reason` -> `phrase`
+- `ClaimRun` -> `Output`
+- `head_of` -> `tip`
+- `ClaimRunner` -> `Docket`
+- `merge_runners` -> `merge`
+- `ConfirmationSource` -> `Source`
+- `RegisteredClaim` -> `Commitment`
+- `log_selection` -> `preregister`
+
+## `scmle.data.ledger.controls`
+
+- `shuffle_columns` -> `scramble`
+- `shuffle_blocks` -> `jumble`
+- `percentile_interval` -> `bracket`
+- `permuted_target_control` -> `placebo`
+
+## `scmle.data.ledger.explore`
+
+- `plan_exploration` -> `hypothesize`
+- `count_discoveries` -> `tally`
+
+## `scmle.data.ledger.governed`
+
+- `GovernedRun` -> `Governance`
+- `explore_governed` -> `scout`
+- `confirm_explored` -> `finalise`
 
 ## `scmle.data.ledger.ledger`
 
@@ -326,20 +985,50 @@ names in the public API snapshot are also listed in the changelog.
 - `survivors_hash` -> `fingerprint`
 - `record_not_tested` -> `abstain`
 - `commit_result` -> `settle`
+- `apply_confirmation` -> `conclude`
+- `check_calibration` -> `audit`
+- `register_claim` -> `enroll`
+- `apply_control` -> `benchmark`
+- `require_registered` -> `pending`
+- `apply_diagnostic` -> `diagnose`
+- `record_control` -> `negatives`
+- `require_rule` -> `tester`
+- `require_unfrozen` -> `guard`
+- `apply_claim` -> `lodge`
+- `apply_register` -> `enrol`
+- `apply_survivors` -> `survive`
+
+## `scmle.data.ledger.multiplicity`
+
+- `step_up` -> `monotone`
+- `harmonic_exact` -> `harmonics`
 
 ## `scmle.data.ledger.online_fdr`
 
 - `RuleInvariantError` -> `InvariantError`
 - `require_p` -> `read`
+- `RuleConfig` -> `Settings`
+- `exact_alpha` -> `rational`
+- `ELond` -> `Lond`
+- `LordPlusPlus` -> `Lord`
 
 ## `scmle.data.modalities.audio`
 
 - `wav_metadata` -> `parse`
 - `wav_signal_features` -> `extract`
+- `AudioValidationError` -> `ValidationError`
+- `AudioDependencyError` -> `DecoderError`
+- `TranscriptSegment` -> `Segment`
+- `wav_pcm_values` -> `pcm`
 
 ## `scmle.data.modalities.curation`
 
 - `check_governance` -> `govern`
+- `build_finding` -> `flaw`
+- `check_card_text` -> `proofread`
+- `normalized_curation` -> `roundtrip`
+- `check_split_fractions` -> `proportions`
+- `partition_group_ids` -> `allocate`
 
 ## `scmle.data.modalities.document`
 
@@ -350,6 +1039,14 @@ names in the public API snapshot are also listed in the changelog.
 - `default_document_id` -> `fingerprint`
 - `language_heuristic` -> `detect`
 - `provenance_for_content` -> `segment`
+- `document_finding` -> `flaw`
+- `DocumentValidationError` -> `DocumentError`
+- `DocumentDependencyError` -> `DependencyError`
+- `sensitive_summary` -> `sensitivity`
+- `sensitive_matches` -> `pii`
+- `decode_utf8` -> `unicode`
+- `label_key` -> `bucketize`
+- `read_layout` -> `overlay`
 
 ## `scmle.data.modalities.geospatial`
 
@@ -369,6 +1066,18 @@ names in the public API snapshot are also listed in the changelog.
 - `spatial_block_envelopes` -> `envelop`
 - `block_for` -> `locate`
 - `check_nodata` -> `normalize`
+- `GeospatialValidationError` -> `GeometryError`
+- `RasterSample` -> `Tile`
+- `GeospatialTemporalError` -> `TemporalError`
+- `boundary_leakage` -> `straddle`
+- `mask_geometry_axis` -> `substitute`
+- `masked_geometry_axis` -> `substituted`
+- `split_spatial` -> `tile`
+- `GeoFeature` -> `Placemark`
+- `block_ids` -> `tiles`
+- `SpatialJoinMatch` -> `Match`
+- `pixel_window_bounds` -> `extent`
+- `evaluate_predicate` -> `probe`
 
 ## `scmle.data.modalities.graph`
 
@@ -377,19 +1086,52 @@ names in the public API snapshot are also listed in the changelog.
 - `PreparedFeatures` -> `Features`
 - `edge_key` -> `canonicalize`
 - `edge_key_counts` -> `tally`
+- `GraphInputError` -> `ParseError`
+- `read_edges` -> `edgelist`
+- `GraphValidationError` -> `ValidationError`
+- `edges_from_records` -> `link`
+- `node_partitions` -> `divisions`
+- `profile_nodes` -> `census`
+- `NodeProfile` -> `Degrees`
+- `inductive_node_split` -> `induct`
+- `from_edges` -> `connect`
+- `EdgeProfile` -> `Connectivity`
+- `structural_degrees` -> `valence`
+- `InductiveNodeSplit` -> `Partition`
+- `feature_values` -> `featurize`
+- `require_valid` -> `ensure`
 
 ## `scmle.data.modalities.image`
 
 - `perceptual_hash` -> `fingerprint`
 - `validate_limits` -> `validate`
+- `check_dimensions` -> `bounds`
+- `neighbor_components` -> `islands`
+- `prepare_tabular_features` -> `flatten`
+- `validate_feature_options` -> `configure`
+- `ImageDependencyError` -> `DependencyError`
+- `image_content_hash` -> `imprint`
+- `require_pillow` -> `pillow`
+
+## `scmle.data.modalities.video`
+
+- `prepare_frame_features` -> `summarize`
+- `frame_indices_for` -> `stride`
+- `VideoValidationError` -> `VideoError`
+- `synchronization_status` -> `synchrony`
+- `prepare_metadata_features` -> `numerize`
 
 ## `scmle.data.profiling.label_noise`
 
 - `LabelNoise` -> `Noise`
+- `find_label_noise` -> `contradict`
+- `assess_label_noise` -> `inspect`
 
 ## `scmle.data.profiling.missingness`
 
 - `MissingnessFinding` -> `Finding`
+- `class_association` -> `chisquare`
+- `value_association` -> `mannwhitney`
 
 ## `scmle.data.profiling.profiler`
 
@@ -398,10 +1140,15 @@ names in the public API snapshot are also listed in the changelog.
 - `inspect_columns` -> `inspect`
 - `datetime_nodes` -> `derive`
 - `describe_associations` -> `describe`
+- `column_exclusion_reason` -> `disqualify`
+- `balance_findings` -> `balance`
+- `duplicate_findings` -> `dupes`
 
 ## `scmle.data.profiling.representativeness`
 
 - `ColumnGap` -> `Gap`
+- `column_gap` -> `contrast`
+- `compare_to_reference` -> `distinguish`
 
 ## `scmle.data.readers.connectors`
 
@@ -420,14 +1167,47 @@ names in the public API snapshot are also listed in the changelog.
 - `read_record_lines` -> `scan`
 - `decode_records` -> `interpret`
 - `json_type_name` -> `classify`
+- `LocalFileConnector` -> `Filesystem`
+- `RowBatch` -> `Page`
+- `canonical_source_uri` -> `canonicalize`
+- `cursor_for` -> `bookmark`
+- `execute_with_retries` -> `persevere`
+- `decode_cursor` -> `unwrap`
+- `refuse_writes` -> `readonly`
+- `WarehouseConnector` -> `Lakehouse`
+- `SourceCheckpoint` -> `Bookmark`
+- `digest_rows` -> `feed`
+- `read_tabular_bytes` -> `unpack`
+- `UnsupportedUriSchemeError` -> `SchemeError`
+- `SourceColumn` -> `Field`
+- `SourceConnector` -> `Adapter`
+- `ObjectStoreConnector` -> `Bucket`
+- `RetryBudget` -> `Retries`
+- `SourceSchema` -> `Columns`
+- `file_content_sha256` -> `checksum`
 
 ## `scmle.data.readers.incremental`
 
 - `EventSource` -> `Source`
+- `EventStreamSource` -> `Stream`
+- `LateData` -> `Lateness`
+- `EventCheckpoint` -> `Checkpoint`
+- `IngestionLedger` -> `Ledger`
+- `EventBatch` -> `Batch`
+- `EventConsumer` -> `Ingestor`
+- `EventCommitReceipt` -> `Ack`
+
+## `scmle.data.readers.interchange`
+
+- `is_tabular` -> `tablelike`
 
 ## `scmle.data.readers.registry`
 
 - `SchemaCompatibility` -> `Compatibility`
+- `SourceSnapshot` -> `Observation`
+- `SourceRegistry` -> `Sources`
+- `SourceRegistryStore` -> `Registry`
+- `from_manifest` -> `restore`
 
 ## `scmle.data.readers.streaming`
 
@@ -435,6 +1215,18 @@ names in the public API snapshot are also listed in the changelog.
 - `CommitReceipt` -> `Receipt`
 - `JsonLinesChunks` -> `Ndjson`
 - `keep_smallest` -> `retain`
+- `ChunkSource` -> `Feed`
+- `CsvChunks` -> `Csv`
+- `SinkCommitReceipt` -> `Voucher`
+- `source_for` -> `locate`
+- `validate_batch` -> `validate`
+- `TransactionalSink` -> `Sink`
+- `validate_acknowledgement` -> `vouch`
+- `CommitEvidence` -> `Commitment`
+- `sample_caps` -> `budgets`
+- `sample_pass` -> `sweep`
+- `ParquetChunks` -> `Chunked`
+- `estimated_bytes` -> `footprint`
 
 ## `scmle.data.readers.tabular`
 
@@ -444,27 +1236,80 @@ names in the public API snapshot are also listed in the changelog.
 - `ExcelReader` -> `Excel`
 - `ParquetReader` -> `Parquet`
 - `FeatherReader` -> `Feather`
+- `TsvReader` -> `Tsv`
+- `reader_for` -> `pick`
+- `uri_semantics` -> `semantic`
+- `DatasetLoader` -> `Loader`
+- `snapshot_identity` -> `identify`
+- `build_manifest` -> `manifested`
+- `replace_infinities` -> `sanitize`
+- `canonical_uri` -> `canonicalize`
+- `supported_suffixes` -> `extensions`
+
+## `scmle.data.robustness.coverage`
+
+- `LevelCoverage` -> `Cell`
+- `subgroup_coverage` -> `represent`
 
 ## `scmle.data.robustness.forward`
 
 - `ForwardFinding` -> `Finding`
 - `evaluate_finding` -> `evaluate`
+- `ForwardCheck` -> `Forward`
+- `label_for` -> `verdict`
+
+## `scmle.data.robustness.html_report`
+
+- `stability_section` -> `section`
 
 ## `scmle.data.robustness.multiverse`
 
 - `GridRun` -> `Sweep`
+- `tier_after_declaration` -> `downgrade`
+- `enumerate_grid` -> `universe`
+- `ResultCache` -> `Memo`
+
+## `scmle.data.robustness.prefilter`
+
+- `feature_checks` -> `shifts`
+- `diagnostic_rows` -> `gather`
+- `StabilityStage` -> `Prefilter`
+
+## `scmle.data.robustness.report`
+
+- `validate_stability` -> `conform`
 
 ## `scmle.data.robustness.shift`
 
 - `check_pair` -> `align`
 - `FeatureShift` -> `Drift`
 - `categorical_test` -> `contrast`
+- `median_bandwidth` -> `sigma`
+- `gaussian_kernel` -> `gaussian`
+- `auc_delong` -> `delong`
+- `mmd_statistics` -> `mmds`
+- `pooled_codes` -> `pool`
+- `holdout_split` -> `holdout`
+- `feature_tests` -> `compare`
 
 ## `scmle.data.robustness.stability`
 
 - `estimate_spec` -> `estimate`
 - `CurveTest` -> `Curve`
 - `curve_statistics` -> `summarize`
+- `rank_effect` -> `rankcorr`
+- `SpecEffect` -> `Variant`
+- `curve_test` -> `specify`
+- `applicable_choices` -> `actionable`
+
+## `scmle.data.splitting.duplicates`
+
+- `fold_of_held_rows` -> `locate`
+- `keep_together` -> `cohere`
+
+## `scmle.data.splitting.inner_cv`
+
+- `StructuredKFold` -> `Splitter`
 
 ## `scmle.data.splitting.splitters`
 
@@ -474,54 +1319,156 @@ names in the public API snapshot are also listed in the changelog.
 - `label_matrix` -> `stack`
 - `PresetSplit` -> `Preset`
 - `keep_duplicates_together` -> `gather`
+- `LockedTestSet` -> `Lockbox`
+- `resolve_strategy_name` -> `scheme`
+
+## `scmle.data.store.conformance`
+
+- `check_head_matches_get` -> `headcheck`
+- `check_pagination` -> `paginate`
 
 ## `scmle.data.store.objectstore`
 
 - `check_key` -> `validate`
 - `meta_of` -> `describe`
 - `create_exclusive` -> `claim`
+- `NotFoundError` -> `AbsentError`
+- `is_temporary` -> `partial`
+- `AlreadyExistsError` -> `ExistsError`
+- `refused_as_existing` -> `occupied`
+- `unlink_tolerantly` -> `discard`
+- `path_of` -> `locate`
+- `sha256_of` -> `checksum`
 
 ## `scmle.data.store.processing`
 
 - `run_locked` -> `sweep`
+- `require_match` -> `matches`
+- `CheckpointCorruptError` -> `CorruptError`
+- `ChangedInputError` -> `ChangedError`
+- `ConcurrentRunError` -> `LockError`
 
 ## `scmle.data.store.quality`
 
 - `dataset_finding` -> `judge`
 - `row_finding` -> `pinpoint`
 - `marker_key` -> `locate`
+- `NoNullsCheck` -> `Complete`
+- `AllowedValuesCheck` -> `Membership`
+- `FreshnessCheck` -> `Freshness`
+
+## `scmle.data.store.snapshot`
+
+- `observed_schema` -> `dtypes`
 
 ## `scmle.data.validation.columns`
 
 - `usable_rows` -> `align`
 - `encoded_with` -> `encode`
+- `NumericKind` -> `Quantitative`
+- `to_finite` -> `scrub`
+- `to_text` -> `stringify`
+- `CategoricalKind` -> `Categorical`
+- `purity_association` -> `determinacy`
+- `threshold_association` -> `stump`
+- `ColumnKind` -> `Family`
+
+## `scmle.data.validation.target`
+
+- `is_numeric_target` -> `quantitative`
 
 ## `scmle.decision.anytime`
 
 - `rescaled_null` -> `orient`
+- `bet_grid` -> `bets`
+- `running_center` -> `centers`
+- `log_wealth` -> `grow`
+- `centered_stream` -> `deviations`
+- `centered_paths` -> `recentre`
+- `EProcess` -> `Martingale`
+- `difference_stream` -> `contrasts`
+- `positive_level` -> `fractional`
+- `bound_stream` -> `clamped`
 
 ## `scmle.decision.constraints`
 
 - `SatisfactionTest` -> `Satisfaction`
 - `largest_gap` -> `spread`
 - `GroupThresholds` -> `Thresholds`
+- `InfeasibleConstraintsError` -> `InfeasibleError`
+- `rate_tables` -> `tabulate`
+- `fit_group_thresholds` -> `equalize`
+- `satisfaction_test` -> `satisfy`
+- `price_of_constraint` -> `toll`
+
+## `scmle.decision.design`
+
+- `srm_rejects` -> `srm`
+- `simulate_stopping` -> `simulate`
+- `srm_p_value` -> `mismatch`
 
 ## `scmle.decision.netbenefit`
 
 - `NetBenefit` -> `Benefit`
+- `net_benefit_band` -> `lowerband`
+- `SecondEvaluationError` -> `RepeatError`
+- `resample_means` -> `redraw`
+- `useful_span` -> `stretch`
 
 ## `scmle.decision.ope`
 
 - `ValueEstimate` -> `Estimate`
 - `EffectThreshold` -> `Cutoff`
+- `difference_value` -> `contrast`
+- `fit_outcome_model` -> `regress`
+- `LoggedBandit` -> `Bandits`
+- `fit_threshold_policy` -> `tune`
+- `support_violations` -> `unsupported`
+- `mean_interval` -> `wald`
+- `estimate_value` -> `evaluate`
+
+## `scmle.decision.rollout`
+
+- `DecisionLog` -> `Journal`
+- `RollbackMonitor` -> `Watchdog`
 
 ## `scmle.decision.threshold`
 
 - `CalibrationCheck` -> `Calibration`
+- `ThresholdDecision` -> `Thresholding`
+- `bayes_threshold` -> `breakeven`
+- `probabilities_and_labels` -> `pair`
+- `stable_span` -> `span`
+- `calibration_check` -> `hosmer`
+- `choose_threshold` -> `operate`
+- `fit_recalibrator` -> `calibrator`
+- `raw_threshold` -> `uncalibrated`
+- `cross_fitted` -> `crossfit`
+
+## `scmle.deploy.attest`
+
+- `verify_document` -> `authenticate`
+- `verify_image` -> `vouch`
+- `read_document` -> `parse`
+- `write_provenance` -> `stamp`
+- `material_problems` -> `discrepancies`
+- `sign_statement` -> `envelope`
+- `write_image_attestation` -> `bind`
 
 ## `scmle.deploy.base_image`
 
 - `fetch_registry_digest` -> `query`
+- `split_image` -> `decompose`
+- `read_lock` -> `peruse`
+
+## `scmle.deploy.contract`
+
+- `secret_problems` -> `mounts`
+- `isolation_problems` -> `diff`
+- `check_config_entries` -> `nonsecret`
+- `require_name` -> `simple`
+- `check_production_rules` -> `harden`
+- `identity_problems` -> `divergences`
 
 ## `scmle.deploy.demo`
 
@@ -537,54 +1484,170 @@ names in the public API snapshot are also listed in the changelog.
 - `round_trip_object_store` -> `mirror`
 - `check_golden_parity` -> `corroborate`
 - `verify_remote` -> `verify`
+- `approval_for` -> `sanction`
+- `download_folder` -> `download`
+- `get_json` -> `retrieve`
+- `records_of` -> `serialize`
+- `process_memory_mb` -> `footprint`
+- `fail_not_ready` -> `unready`
+- `wait_ready` -> `settle`
+- `free_port` -> `unused`
+- `measure_and_ship_metrics` -> `instrument`
+- `upload_folder` -> `sync`
 
 ## `scmle.deploy.gate`
 
 - `model_problems` -> `veto`
 - `staging_problems` -> `audit`
+- `admit_problems` -> `objections`
+- `runtime_problems` -> `absences`
 
 ## `scmle.deploy.livetests`
 
 - `check_health` -> `probe`
 - `check_schema` -> `inspect`
 - `check_security` -> `breach`
+- `check_inference` -> `infer`
+- `NoRedirect` -> `Stopper`
+
+## `scmle.deploy.lockfile`
+
+- `runtime_closure` -> `transitive`
+- `marker_applies` -> `applies`
 
 ## `scmle.deploy.mocks`
 
 - `server_file` -> `append`
+- `put_object` -> `deposit`
+- `safe_key` -> `sanitize`
+- `MockServer` -> `Stub`
+- `post_metrics` -> `transmit`
+- `ObjectStoreResponder` -> `Handler`
+- `MetricsSinkResponder` -> `Sink`
+
+## `scmle.deploy.observation`
+
+- `share_of` -> `portion`
+
+## `scmle.deploy.release`
+
+- `approval_from_dict` -> `revive`
+- `scan_result` -> `triage`
+- `load_candidate` -> `gather`
+
+## `scmle.deploy.runtime`
+
+- `signal_settings` -> `cadence`
+- `emit_signals` -> `emit`
+- `signal_loop` -> `pulse`
+- `make_loader` -> `prime`
+
+## `scmle.deploy.verify`
+
+- `verify_service` -> `inspect`
 
 ## `scmle.deploy.vuln_gate`
 
 - `active_entries` -> `prune`
+- `parse_trivy` -> `parse`
+- `parse_pip_audit` -> `advisories`
+
+## `scmle.durability`
+
+- `replace_file` -> `swap`
+- `path_lock` -> `latch`
+- `sync_file` -> `sync`
 
 ## `scmle.evaluation.backtest`
 
 - `per_step_errors` -> `score`
 
+## `scmle.evaluation.balance`
+
+- `balance_test` -> `randomisation`
+
+## `scmle.evaluation.concordance`
+
+- `concordance_index` -> `harrell`
+- `ConcordanceMetric` -> `Cindex`
+
+## `scmle.evaluation.conformal`
+
+- `finite_sample_quantile` -> `cutoff`
+- `for_classification` -> `classify`
+- `cv_plus_bounds` -> `cvplus`
+- `thin_classes` -> `scarce`
+- `one_row_per_entity` -> `representatives`
+
+## `scmle.evaluation.coverage`
+
+- `coverage_tier` -> `grade`
+- `holm_rejections` -> `stepdown`
+- `undercoverage_p_value` -> `deficit`
+- `coverage_summary` -> `summarise`
+- `slice_flag` -> `undercovered`
+- `class_coverage` -> `classwise`
+
 ## `scmle.evaluation.coverage_confirm`
 
 - `evaluate_document` -> `assess`
+- `primary_choice` -> `principal`
+- `registration_body` -> `prefreeze`
+- `floor_p_value` -> `shortfall`
+- `inside_of` -> `held`
+
+## `scmle.evaluation.coverage_run`
+
+- `regression_reports` -> `regressions`
+- `classification_reports` -> `classwise`
+
+## `scmle.evaluation.coverage_slices`
+
+- `flag_method_hash` -> `fingerprint`
+- `labels_for` -> `bucket`
 
 ## `scmle.evaluation.cv_plus`
 
 - `ScorePlan` -> `Plan`
+- `partition_folds` -> `holdouts`
+- `plan_scores` -> `strategize`
 
 ## `scmle.evaluation.diagnostics`
 
 - `MulticlassCalibration` -> `Reliability`
+- `ClassifierReplay` -> `Replay`
+- `ConfusionMatrix` -> `Contingency`
+- `resample_rows` -> `redraw`
+- `MetricUncertainty` -> `Uncertainty`
+- `ThresholdSweep` -> `Sweep`
+- `ErrorAnalysis` -> `Errors`
+- `out_of_time` -> `expired`
+- `resample_count` -> `replicates`
 
 ## `scmle.evaluation.dirichlet`
 
 - `log_probabilities` -> `featurise`
 
+## `scmle.evaluation.exchangeability`
+
+- `released_scores` -> `conformity`
+
 ## `scmle.evaluation.fit_health`
 
 - `FitHealth` -> `Health`
+- `assess_trial` -> `sanity`
+
+## `scmle.evaluation.forecast`
+
+- `truth_matrix` -> `actuals`
 
 ## `scmle.evaluation.ipcw`
 
 - `marginal_at` -> `survive`
 - `cox_at` -> `survive`
+- `CensoringWeights` -> `Censoring`
+- `censoring_weights` -> `reweight`
+- `truncated_concordance` -> `uno`
 
 ## `scmle.evaluation.learning_curve`
 
@@ -594,6 +1657,26 @@ names in the public API snapshot are also listed in the changelog.
 
 - `prepare_longitudinal_frame` -> `prepare`
 - `fit_logistic_propensity` -> `regress`
+- `require_strictly_increasing` -> `monotone`
+- `influence_covariance` -> `sandwich`
+- `build_period_result` -> `periodise`
+- `fit_period` -> `wave`
+
+## `scmle.evaluation.metrics`
+
+- `MetricCatalog` -> `Repertoire`
+
+## `scmle.evaluation.mitigation`
+
+- `group_cuts` -> `cutoffs`
+
+## `scmle.evaluation.multitarget`
+
+- `MultiTargetMetric` -> `Joint`
+
+## `scmle.evaluation.ordinal`
+
+- `mean_absolute_class_error` -> `distance`
 
 ## `scmle.evaluation.parameter_estimation`
 
@@ -605,23 +1688,115 @@ names in the public API snapshot are also listed in the changelog.
 - `center_influence` -> `center`
 - `project_random_effect_covariance` -> `project`
 - `bootstrap_replicate_estimate` -> `rerun`
+- `check_choices` -> `vet`
+- `check_hierarchical_policy` -> `nesting`
+- `fit_aipw_ate` -> `dr`
+- `fit_linear_estimator` -> `ols`
+- `hajek_ipw_statistics` -> `hajek`
+- `hierarchical_random_effect_precision` -> `precisions`
+- `reml_profile_objective` -> `deviance`
+- `validate_covariance` -> `condition`
+- `check_bayesian_treatment` -> `dichotomous`
+- `fit_estimator` -> `compute`
+- `fit_continuous_ipw_effect` -> `dosage`
+- `deterministic_fold_assignments` -> `interleave`
+- `validate_bayesian_prior_shape` -> `conform`
+- `fit_hierarchical_random_slope_reml` -> `optimise`
+- `hierarchical_gls_system` -> `gls`
+- `reference_hierarchical_linear` -> `crosscheck`
+- `reference_logistic` -> `corroborate`
+- `draw_hierarchical_bootstrap_sample` -> `clone`
+- `check_reml_bounds` -> `fence`
+- `bernoulli_log_likelihood` -> `loglik`
+- `check_field_support` -> `relevant`
+- `fit_bayesian_estimator` -> `bayes`
+- `fit_logistic` -> `logit`
+- `cluster_uncertainty_diagnostics` -> `clustering`
+- `aipw_limitations` -> `caveats`
+- `prior_sensitivity` -> `reprior`
+- `check_bayesian_policy` -> `bayesian`
+- `influence_variance` -> `dispersion`
+- `shift_sensitivity` -> `transport`
+
+## `scmle.evaluation.proper_scores`
+
+- `insample_scale` -> `naivescale`
+- `interval_score` -> `winkler`
+
+## `scmle.evaluation.quantile`
+
+- `predicted_band` -> `corridor`
+- `QuantileBand` -> `Band`
+- `coverage_curve` -> `covering`
+- `raw_band` -> `native`
 
 ## `scmle.evaluation.ranking`
 
 - `query_groups` -> `group`
 - `ranked_hits` -> `sort`
+- `recall_at` -> `recall`
+- `per_query_ndcg` -> `ndcgs`
+- `query_bootstrap_ndcg` -> `cumulate`
+- `precision_at` -> `topk`
+
+## `scmle.evaluation.release`
+
+- `ReleaseStatus` -> `Readiness`
+- `apply_reliability_gate` -> `faults`
+- `check_kind_coverage` -> `exhaustive`
+- `diagnostic_gate_finding` -> `adjudge`
+- `apply_attestation_gate` -> `certify`
+- `normalize_measure` -> `quantify`
+- `ReleaseEvaluation` -> `Verdict`
+- `apply_evidence_index_gate` -> `countersign`
+- `fairness_gate_finding` -> `audit`
+- `ReleaseFinding` -> `Finding`
+- `blocked_input_finding` -> `unreadable`
+- `evidence_reference_finding` -> `referenced`
+- `required_evidence_references` -> `citations`
+- `FindingCounts` -> `Tally`
+- `fairness_metric_values` -> `disparities`
+- `metric_gate_finding` -> `judge`
+- `evaluate_release` -> `assess`
+- `FindingKind` -> `Kind`
+- `check_count_values` -> `tallies`
+- `diagnostic_verdict` -> `ruling`
+- `explanation_quality_value` -> `grade`
+- `readiness_summary` -> `tally`
+
+## `scmle.evaluation.reliability`
+
+- `top_label_curve` -> `topclass`
 
 ## `scmle.evaluation.replay`
 
 - `PredictionReplay` -> `Replay`
+- `RegressorPredictions` -> `Replayed`
+
+## `scmle.evaluation.resources`
+
+- `ResourceUsage` -> `Usage`
+- `ResourceLimits` -> `Constraints`
+
+## `scmle.evaluation.robustness`
+
+- `GaussianNoise` -> `Noise`
+- `MissingValues` -> `Blanking`
 
 ## `scmle.evaluation.selection`
 
 - `tie_key` -> `tiebreak`
+- `MeanSelector` -> `Averager`
+- `probably_equivalent` -> `equivalent`
+- `by_score` -> `merit`
 
 ## `scmle.evaluation.sensitivity`
 
 - `spread_of` -> `summarise`
+- `evaluation_sensitivity` -> `resplit`
+- `performance_sensitivity` -> `jitter`
+- `mean_score` -> `collapse`
+- `training_sensitivity` -> `variability`
 
 ## `scmle.evaluation.sequential`
 
@@ -630,22 +1805,68 @@ names in the public API snapshot are also listed in the changelog.
 - `build_matrices` -> `tabulate`
 - `fit_propensity` -> `regress`
 - `build_regime_estimate` -> `average`
+- `check_propensity_support` -> `overlap`
+- `regime_covariance` -> `covary`
+- `check_contrast` -> `scrutinise`
+- `require_distinct_neighbours` -> `nonrepeating`
+
+## `scmle.evaluation.shift`
+
+- `AdversarialValidation` -> `Adversary`
+
+## `scmle.evaluation.shift_weights`
+
+- `WeightRefusedError` -> `RefusedError`
+- `ShiftWeights` -> `Ratios`
 
 ## `scmle.evaluation.slices`
 
 - `slice_score` -> `grade`
 
+## `scmle.evaluation.suite`
+
+- `full_suite` -> `lineup`
+
+## `scmle.evaluation.survival`
+
+- `integrated_brier` -> `brier`
+- `dynamic_auc` -> `auc`
+- `censoring_curve` -> `censor`
+- `SurvivalMetric` -> `Survival`
+- `censoring_probability` -> `survivor`
+- `time_grid` -> `horizons`
+
+## `scmle.evaluation.uplift`
+
+- `uplift_at` -> `lift`
+- `check_propensity` -> `randomised`
+- `UpliftMetric` -> `Incrementality`
+
+## `scmle.experimentation.ensemble_search`
+
+- `EnsembleSearch` -> `Stacker`
+
 ## `scmle.experimentation.stores`
 
 - `add_column` -> `alter`
+- `NullExperimentStore` -> `Null`
+- `ExperimentStore` -> `Store`
 
 ## `scmle.experimentation.strategy_search`
 
 - `search_model` -> `tune`
+- `StrategySearch` -> `Strategist`
 
 ## `scmle.experimentation.trials`
 
 - `access_record` -> `summarise`
+- `fold_weights` -> `weigh`
+- `lost_trial` -> `lose`
+- `TrialJob` -> `Job`
+- `guarded_evaluate` -> `supervise`
+- `TrialPayload` -> `Payload`
+- `TrialRunner` -> `Runner`
+- `runtime_requirements` -> `requirements`
 
 ## `scmle.experimentation.tuning`
 
@@ -653,15 +1874,32 @@ names in the public API snapshot are also listed in the changelog.
 - `tune_model` -> `optimize`
 - `run_bracket` -> `ascend`
 - `survivor_ids` -> `promote`
+- `rung_schedule` -> `ladder`
 
 ## `scmle.explainability.counterfactual`
 
 - `candidate_values` -> `propose`
 - `scale_of` -> `measure`
+- `CounterfactualSearch` -> `Recourse`
+- `n_changed` -> `edits`
+
+## `scmle.explainability.dependence`
+
+- `PartialDependence` -> `Dependence`
+- `numeric_target` -> `numerify`
+
+## `scmle.explainability.importance`
+
+- `PermutationImportance` -> `Importance`
 
 ## `scmle.explainability.interaction`
 
 - `sort_key` -> `rank`
+- `PairwiseInteraction` -> `Pairwise`
+
+## `scmle.explainability.local`
+
+- `OcclusionExplainer` -> `Occlusion`
 
 ## `scmle.explainability.quality`
 
@@ -670,6 +1908,16 @@ names in the public API snapshot are also listed in the changelog.
 - `GroundTruthEvaluation` -> `Comparison`
 - `GroundTruthSuiteEvaluation` -> `Suite`
 - `explanation_ranking` -> `rank`
+- `ranking_stability` -> `topk`
+- `QualityThresholds` -> `Thresholds`
+- `ExplanationGroundTruth` -> `Truth`
+- `evaluate_ground_truth` -> `truth`
+- `evaluate_ground_truth_suite` -> `referee`
+- `linear_contribution_report` -> `decompose`
+
+## `scmle.explainability.suite`
+
+- `build_evidence` -> `substantiate`
 
 ## `scmle.features.feature_graph`
 
@@ -679,6 +1927,22 @@ names in the public API snapshot are also listed in the changelog.
 - `get_op` -> `lookup`
 - `entity_keys` -> `identify`
 - `compute_with_history` -> `backfill`
+- `history_columns` -> `historical`
+- `split_nodes` -> `segregate`
+- `history_rows` -> `depth`
+- `build_history` -> `retain`
+- `FeatureOp` -> `Operation`
+- `required_raw_inputs` -> `roots`
+- `OrderedOp` -> `Sequential`
+- `SeriesFeatureBuilder` -> `Temporal`
+- `FeatureGraphTransformer` -> `Transformer`
+- `RollingMean` -> `Rolling`
+
+## `scmle.governance.attestation`
+
+- `canonical_digest` -> `checksum`
+- `required_text` -> `mandatory`
+- `ReleaseAttestation` -> `Attestation`
 
 ## `scmle.governance.deployment_ledger`
 
@@ -695,28 +1959,56 @@ names in the public API snapshot are also listed in the changelog.
 - `apply_assignment` -> `assign`
 - `apply_rollout_decision` -> `confirm`
 - `apply_halt` -> `halt`
+- `require_promotion` -> `elond`
+- `DeploymentLedgerError` -> `MisuseError`
+- `ReplyDecision` -> `Reply`
+- `require_object_body` -> `mapped`
+- `key_fingerprint` -> `thumbprint`
 
 ## `scmle.governance.envelope`
 
 - `signature_ok` -> `verifies`
+- `EnvelopeAction` -> `Action`
+- `EnvelopeRefused` -> `RefusedError`
+- `EnvelopeGuard` -> `Guard`
 
 ## `scmle.governance.escalation`
 
 - `RiskCoverage` -> `Curve`
 - `ChowCheck` -> `Comparison`
+- `select_threshold` -> `select`
+- `chow_check` -> `adjudicate`
+- `everything_escalates` -> `saturated`
+- `set_size_score` -> `ambiguity`
 
 ## `scmle.governance.keyring`
 
 - `can_verify` -> `verifies`
+- `SignatureEnvelope` -> `Wrapper`
+- `SigningKeyRegistry` -> `Keyring`
+- `KeyState` -> `State`
+- `SigningKeyRecord` -> `Credential`
 
 ## `scmle.governance.lifecycle`
 
 - `note_rows` -> `tally`
+- `defer_to_rollout` -> `delegate`
+- `restore_previous` -> `revert`
+- `read_state` -> `recall`
+- `write_state` -> `persist`
+- `split_fresh` -> `bisect`
+- `RollbackOutcome` -> `Outcome`
+- `promote_challenger` -> `elevate`
+- `review_locked` -> `locked`
 
 ## `scmle.governance.local_faults`
 
 - `stop_child` -> `halt`
 - `write_events` -> `accept`
+- `reject_over_budget` -> `cap`
+- `reject_over_memory_budget` -> `ration`
+- `fail_connector` -> `unreachable`
+- `LocalFaultExecutor` -> `Executor`
 
 ## `scmle.governance.loop`
 
@@ -727,12 +2019,87 @@ names in the public API snapshot are also listed in the changelog.
 - `process_batch` -> `feed`
 - `update_challengers` -> `challenge`
 - `time_out` -> `expire`
+- `check_feedback` -> `performativity`
+- `promo_level` -> `alpha`
+- `register_challenger` -> `enroll`
+- `rewrite_ledger` -> `rewrite`
+- `watch_rollback` -> `surveil`
+- `verify_ledger` -> `recheck`
+- `estimate_signed` -> `centred`
+- `guard_registry` -> `intercept`
+- `silence_alert` -> `silence`
+- `retrain_challenger` -> `refit`
+- `enter_halt` -> `suspend`
+- `decide_rollback` -> `propose`
+- `execute_rollback` -> `revert`
+- `decide_queue` -> `drain`
+
+## `scmle.governance.model_card`
+
+- `ModelCard` -> `Card`
+
+## `scmle.governance.never_list`
+
+- `pending_for` -> `outstanding`
+- `NeverAction` -> `Forbidden`
+- `question_for` -> `interrogate`
+- `valid_attestation` -> `vouch`
+
+## `scmle.governance.registry`
+
+- `promote_locked` -> `relabel`
+- `validate_target` -> `validate`
+- `PromotionDecision` -> `Verdict`
+- `attach_guard` -> `attach`
+- `PromotionApproval` -> `Sanction`
+- `VersionRecord` -> `Release`
+- `content_id_of` -> `identify`
+- `register_locked` -> `enroll`
+- `check_promotion` -> `vet`
 
 ## `scmle.governance.release_state`
 
 - `record_event` -> `log`
 - `last_ledger_event` -> `recall`
 - `recorded_findings` -> `compare`
+- `state_of` -> `lookup`
+- `commit_promotion` -> `finalize`
+- `commit_rollback` -> `rewind`
+- `deployed_version` -> `live`
+- `stop_rollout` -> `halt`
+- `require_previous` -> `predecessor`
+
+## `scmle.governance.reliability`
+
+- `FaultArtifact` -> `Emission`
+- `FaultInjectionHarness` -> `Harness`
+
+## `scmle.governance.review`
+
+- `IndependentReleaseReview` -> `Signoff`
+- `ReviewDecision` -> `Verdict`
+- `ReviewClaimKind` -> `Kind`
+- `ReviewClaim` -> `Recomputation`
+- `require_independence` -> `separation`
+- `require_claims` -> `vet`
+
+## `scmle.governance.rollout_hook`
+
+- `RolloutHook` -> `Hook`
+
+## `scmle.governance.sbom`
+
+- `build_service` -> `catalogue`
+
+## `scmle.inference.guard`
+
+- `NotReadyError` -> `UnreadyError`
+- `AdmissionControl` -> `Admission`
+- `new_request_id` -> `mint`
+
+## `scmle.inference.mapping`
+
+- `ColumnMapping` -> `Mapper`
 
 ## `scmle.inference.modality_serving`
 
@@ -741,15 +2108,30 @@ names in the public API snapshot are also listed in the changelog.
 - `request_identity` -> `identify`
 - `admit_request` -> `screen`
 - `read_payload` -> `receive`
+- `set_gateway` -> `protect`
 
 ## `scmle.inference.novelty`
 
 - `far_out_fences` -> `fence`
+- `NoveltyDetector` -> `Strangeness`
 
 ## `scmle.inference.onnx_export`
 
 - `register_booster_converters` -> `enrol`
 - `is_token_imputer` -> `imputes`
+- `without_casts` -> `uncast`
+
+## `scmle.inference.packaging`
+
+- `write_service` -> `scaffold`
+
+## `scmle.inference.parity`
+
+- `GoldenSet` -> `Goldens`
+- `load_golden` -> `goldens`
+- `reference_bundle` -> `handwrite`
+- `expected_outputs` -> `expect`
+- `check_remote` -> `crosscheck`
 
 ## `scmle.inference.serving`
 
@@ -762,10 +2144,31 @@ names in the public API snapshot are also listed in the changelog.
 - `ReferenceServer` -> `Listener`
 - `read_body` -> `receive`
 - `answer_prediction` -> `answer`
+- `RequestObserver` -> `Observer`
+- `respond_frame` -> `infer`
+- `BatchServing` -> `Batcher`
+
+## `scmle.inference.validation`
+
+- `row_report` -> `describe`
+- `InputValidator` -> `Validator`
+
+## `scmle.integrations.ray_backend`
+
+- `RayBackend` -> `Remote`
 
 ## `scmle.intelligence.fingerprint`
 
 - `missingness_patterns` -> `summarise`
+- `scale_range` -> `magnitudes`
+- `build_fingerprint` -> `imprint`
+- `redundant_pairs` -> `redundant`
+- `order_drift` -> `ordering`
+- `text_like_columns` -> `texts`
+
+## `scmle.intelligence.knowledge`
+
+- `MetaLearner` -> `Recommender`
 
 ## `scmle.intelligence.planner`
 
@@ -780,6 +2183,7 @@ names in the public API snapshot are also listed in the changelog.
 - `StrategyRecorder` -> `Strategy`
 - `TuningRecorder` -> `Tuning`
 - `EnsembleRecorder` -> `Ensemble`
+- `PlanningContext` -> `Situation`
 
 ## `scmle.intelligence.recommendations`
 
@@ -795,6 +2199,14 @@ names in the public API snapshot are also listed in the changelog.
 - `recorded_iteration` -> `recall`
 - `EarlyStoppingClassifier` -> `Classifier`
 - `EarlyStoppingRegressor` -> `Regressor`
+- `HoldoutEarlyStopping` -> `Holdout`
+
+## `scmle.models.conformance`
+
+- `check_conformance` -> `comply`
+- `toy_problem` -> `toy`
+- `check_declared_capabilities` -> `smoke`
+- `check_search_space` -> `searchable`
 
 ## `scmle.models.deeplearning.architectures`
 
@@ -803,10 +2215,18 @@ names in the public API snapshot are also listed in the changelog.
 - `EnsembleArchitecture` -> `Ensemble`
 - `TransformerArchitecture` -> `Transformer`
 - `SmoothClip` -> `Saturation`
+- `RobustMlpArchitecture` -> `Robust`
+- `EnsembleLinear` -> `Affine`
 
 ## `scmle.models.deeplearning.contracts`
 
 - `CheckpointContract` -> `Checkpoint`
+- `ExplanationContract` -> `Explainability`
+- `FeatureExplanation` -> `Contribution`
+- `ModelFamilyContract` -> `Boundary`
+- `model_family_contract` -> `resolve`
+- `validate_features` -> `validate`
+- `InferenceContract` -> `Contract`
 
 ## `scmle.models.deeplearning.engines`
 
@@ -816,11 +2236,16 @@ names in the public API snapshot are also listed in the changelog.
 - `set_learning_rate` -> `adjust`
 - `check_options` -> `vet`
 - `new_network` -> `construct`
+- `new_optimizer` -> `instantiate`
 
 ## `scmle.models.deeplearning.estimators`
 
 - `TabPfnEstimator` -> `TabPfn`
 - `KerasEstimator` -> `Keras`
+
+## `scmle.models.deeplearning.jepa`
+
+- `JepaEstimator` -> `Embedder`
 
 ## `scmle.models.deeplearning.jepa_engine`
 
@@ -834,14 +2259,25 @@ names in the public API snapshot are also listed in the changelog.
 - `load_keras` -> `load`
 - `build_network` -> `build`
 
+## `scmle.models.deeplearning.training`
+
+- `resolve_batch_size` -> `batching`
+- `learning_rate_at` -> `anneal`
+
 ## `scmle.models.documents`
 
 - `mean_characters` -> `measure`
+- `term_ablation_explanation` -> `ablate`
 
 ## `scmle.models.ensembles`
 
 - `GreedyBlender` -> `Blender`
 - `members_of` -> `enlist`
+
+## `scmle.models.forecasting.estimators`
+
+- `ForecastEstimator` -> `Forecaster`
+- `LastValueForecaster` -> `Naive`
 
 ## `scmle.models.modality_lifecycle`
 
@@ -887,6 +2323,22 @@ names in the public API snapshot are also listed in the changelog.
 - `persist_checkpoint` -> `persist`
 - `evaluate_performance` -> `benchmark`
 - `normalize_json_object` -> `normalise`
+- `VideoPreparer` -> `Footage`
+- `check_package_signature` -> `authenticate`
+- `parse_package` -> `unpack`
+- `perturbed_contribution_reports` -> `sensitivities`
+- `check_run_option_types` -> `typecheck`
+- `check_package_classifier` -> `vet`
+- `RasterPreparer` -> `Imagery`
+- `TextPreparer` -> `Plaintext`
+- `check_checkpoint_options` -> `coherent`
+- `one_hop_subgraph` -> `neighbourhood`
+- `CurationStage` -> `Curating`
+- `execute_with_performance` -> `clocked`
+- `is_sha256` -> `hashlike`
+- `pixel_feature_names` -> `headers`
+- `DataExplainabilityStage` -> `Composition`
+- `parse_stage_evidence` -> `rehydrate`
 
 ## `scmle.models.multitarget.adapters`
 
@@ -900,23 +2352,73 @@ names in the public API snapshot are also listed in the changelog.
 ## `scmle.models.multitarget.wrapper`
 
 - `MultiTargetEstimator` -> `Multitarget`
+- `MultiOutputEstimator` -> `Multioutput`
 
 ## `scmle.models.ordinal.estimators`
 
 - `level_probabilities` -> `apportion`
 - `best_scale` -> `tune`
 
+## `scmle.models.ranking.wrapper`
+
+- `QueryAwareEstimator` -> `Ranker`
+
+## `scmle.models.registry`
+
+- `with_builtins` -> `stock`
+- `user_adapters` -> `extensions`
+- `add_user_adapter` -> `adopt`
+- `remove_user_adapter` -> `deregister`
+
+## `scmle.models.sklearn.bagging`
+
+- `BaggedTree` -> `Bagger`
+
 ## `scmle.models.sklearn.classical`
 
 - `SupportVector` -> `Svm`
 
+## `scmle.models.survival.adapters`
+
+- `DiscreteTime` -> `Hazard`
+
 ## `scmle.models.survival.estimators`
 
 - `interval_of` -> `locate`
+- `step_lookup` -> `stair`
+- `MarginalSurvival` -> `Marginal`
+- `CoxRegressor` -> `Hazards`
+
+## `scmle.models.thresholds`
+
+- `optimize_threshold` -> `argmax`
+- `GroupAssigner` -> `Grouper`
+- `F1Objective` -> `F1`
+- `GroupClassifier` -> `Segmenter`
+- `AccuracyObjective` -> `Accuracy`
+- `around_fitted` -> `around`
+- `CostObjective` -> `Costs`
+
+## `scmle.models.uplift.estimators`
+
+- `ZeroEffect` -> `Inert`
+- `outcome_model` -> `booster`
+- `TwoModelLearner` -> `TLearner`
 
 ## `scmle.models.weighting`
 
 - `WeightedRegressor` -> `Regressor`
+- `WeightedEstimator` -> `Reweighter`
+- `WeightedClassifier` -> `Classifier`
+
+## `scmle.models.wrappers`
+
+- `FitParamsRegressor` -> `Curried`
+- `LabelEncodedClassifier` -> `Encoded`
+
+## `scmle.monitoring.abtest`
+
+- `score_arm` -> `tally`
 
 ## `scmle.monitoring.alerts`
 
@@ -924,23 +2426,51 @@ names in the public API snapshot are also listed in the changelog.
 - `AlertDelivery` -> `Delivery`
 - `AlertSink` -> `Sink`
 - `successful_alerts` -> `delivered`
+- `dispatch_locked` -> `relay`
+- `JsonlAlertSink` -> `Jsonl`
+- `WebhookAlertSink` -> `Pager`
+- `AlertDispatcher` -> `Dispatcher`
+
+## `scmle.monitoring.champion`
+
+- `ChampionChallenger` -> `Referee`
 
 ## `scmle.monitoring.events`
 
 - `enforce_retention_locked` -> `prune`
+- `to_plain` -> `unwrap`
+- `PredictionEvent` -> `Served`
+- `log_predictions` -> `chronicle`
+- `OutcomeEvent` -> `Outcome`
+- `inference_timestamp` -> `moment`
+- `enforce_retention` -> `purge`
 
 ## `scmle.monitoring.incidents`
 
 - `event_digest` -> `digest`
 - `require_record` -> `require`
+- `IncidentStatus` -> `Phase`
+- `check_transition` -> `proceed`
+- `IncidentWorkflow` -> `Incidents`
+- `append_event` -> `log`
 
 ## `scmle.monitoring.labels`
 
 - `RandomizationCheck` -> `Uniformity`
+- `permits_action` -> `actionable`
+- `stream_mechanism` -> `worst`
+- `BatchEstimate` -> `Estimate`
+- `estimate_batch` -> `weigh`
+- `check_randomization` -> `randomization`
+- `bypass_test` -> `circularity`
+- `feedback_verdict` -> `assessment`
 
 ## `scmle.monitoring.monitor`
 
 - `model_output` -> `infer`
+- `ModelMonitor` -> `Watcher`
+- `PerformanceAdvisor` -> `Degradation`
+- `UnseenCategoryAdvisor` -> `Novelty`
 
 ## `scmle.monitoring.observability`
 
@@ -950,20 +2480,52 @@ names in the public API snapshot are also listed in the changelog.
 
 - `DistributionReference` -> `Reference`
 - `reference_from_dict` -> `rebuild`
+- `adjusted_psi` -> `adjust`
+- `population_stability_index` -> `divergence`
+- `NumericReference` -> `Deciles`
+- `ReferenceProfile` -> `Baseline`
 
 ## `scmle.monitoring.sequential_tests`
 
 - `start_term` -> `spawn`
+- `PairedEProcess` -> `Comparison`
+- `BettingTest` -> `Betting`
+- `update_gap` -> `ingest`
+- `MixtureTest` -> `Mixture`
+- `ConfidenceSequence` -> `Confidence`
+- `RiskAlarm` -> `Tripwire`
+
+## `scmle.monitoring.shadow`
+
+- `ShadowEvaluator` -> `Understudy`
+
+## `scmle.monitoring.slo`
+
+- `SLOEvaluation` -> `Assessment`
+- `SLOStatus` -> `Status`
+- `SLOTarget` -> `Slo`
 
 ## `scmle.operations.continuous`
 
 - `canonical_csv` -> `serialize`
 - `pending_id` -> `find`
 - `start_challenger` -> `train`
+- `check_after_promotion` -> `followup`
+- `judge_retraining` -> `decide`
+- `of_kind` -> `select`
+- `bootstrap_difference` -> `contrast`
+- `feed_labels` -> `absorb`
+- `feed_outcomes` -> `feed`
+- `holdback_assignment` -> `reserve`
+- `promotion_proposals` -> `nominations`
 
 ## `scmle.operations.controller`
 
 - `authorized_retrain` -> `train`
+
+## `scmle.operations.cost`
+
+- `from_allocation` -> `allocate`
 
 ## `scmle.operations.faults`
 
@@ -977,34 +2539,102 @@ names in the public API snapshot are also listed in the changelog.
 - `state_writer_trials` -> `stress`
 - `rolling_restart` -> `restart`
 - `register_image` -> `enroll`
+- `detect_performance_loss` -> `degradation`
+- `secret_rotation` -> `rekey`
+- `metrics_destination_outage` -> `blackout`
+- `audit_continuity` -> `resilience`
+- `await_unready` -> `failing`
+- `ProcessPlane` -> `Processes`
+
+## `scmle.operations.logs`
+
+- `traceparent_for` -> `traceheader`
+- `trace_for` -> `propagate`
+- `StructuredLog` -> `Journal`
+- `new_trace_id` -> `traceid`
 
 ## `scmle.operations.metrics`
 
 - `render_labels` -> `stringify`
 - `merged_histogram` -> `merge`
 - `render_histogram` -> `tabulate`
+- `ServiceMetrics` -> `Instrumentation`
+- `record_resources` -> `poll`
+- `format_number` -> `spell`
+- `MetricsRegistry` -> `Registry`
+- `cpu_seconds` -> `cpu`
+
+## `scmle.operations.notify`
+
+- `urllib_transport` -> `courier`
+
+## `scmle.operations.respond`
+
+- `ResponseDesk` -> `Desk`
+- `telemetry_path` -> `archive`
+
+## `scmle.operations.signals`
+
+- `service_signals` -> `assess`
+- `data_signals` -> `gauge`
+- `performance_signals` -> `degradation`
+- `zero_one_losses` -> `misses`
 
 ## `scmle.optimization.optimizers`
 
 - `suggest_choice` -> `choose`
 - `GridOptimizer` -> `Grid`
+- `OptunaOptimizer` -> `Parzen`
+- `create_optimizer` -> `instantiate`
+- `RandomOptimizer` -> `Uniform`
 
 ## `scmle.runners.base`
 
 - `cost_of` -> `estimate`
 - `confirm_stopped` -> `confirm`
+- `manifest_key` -> `locate`
+- `JobHandle` -> `Ticket`
+- `JobStatus` -> `Status`
+- `JobState` -> `State`
+- `RunConflictError` -> `ConflictError`
+
+## `scmle.runners.entrypoint`
+
+- `spec_from_store` -> `respec`
+- `open_store` -> `mount`
+- `load_workload` -> `resolve`
 
 ## `scmle.runners.local`
 
 - `JobStoppedError` -> `StoppedError`
+- `JobInterruptedError` -> `PreemptedError`
+- `JobContext` -> `Context`
+
+## `scmle.runners.project`
+
+- `project_options` -> `configure`
+- `WorkdirSync` -> `Mirror`
+- `saved_run` -> `locate`
 
 ## `scmle.runners.reproducibility`
 
 - `for_metric` -> `lookup`
 
+## `scmle.runners.roles`
+
+- `allows_write` -> `permits`
+- `need_write` -> `permit`
+
 ## `scmle.sampling.pseudo_labeling`
 
 - `SelfTrainingOutcome` -> `Outcome`
+- `confident_rows` -> `assured`
+- `augmented_fit` -> `selftrain`
+
+## `scmle.sampling.resampling`
+
+- `JitterOverSampler` -> `Jittered`
+- `IndexResampler` -> `Indexed`
 
 ## `scmle.sampling.strategies`
 
@@ -1019,9 +2649,19 @@ names in the public API snapshot are also listed in the changelog.
 - `MissingIndicators` -> `Indicators`
 - `TargetTransform` -> `Transformation`
 
+## `scmle.sampling.synthesis`
+
+- `SyntheticGenerator` -> `Synthesizer`
+- `GaussianCopulaGenerator` -> `Copula`
+
 ## `scmle.security.access`
 
 - `from_environment` -> `load`
+
+## `scmle.security.remote`
+
+- `fetch_json` -> `retrieve`
+- `revocation_list_of` -> `revoked`
 
 ## `scmle.security.tokens`
 
@@ -1032,11 +2672,33 @@ names in the public API snapshot are also listed in the changelog.
 - `check_claims` -> `admit`
 - `number_claim` -> `quantify`
 - `scopes_of` -> `collect`
+- `current_revocations` -> `denylist`
+- `decode_segment` -> `unbase`
+- `encode_segment` -> `pack`
+- `from_jwk` -> `jwk`
+- `from_jwks` -> `jwks`
+
+## `scmle.trail.chain`
+
+- `manifest_of` -> `inventory`
+- `signature_for` -> `sign`
+- `check_chain` -> `linkage`
+- `check_steps` -> `rederive`
 
 ## `scmle.trail.inputs`
 
 - `section_payload` -> `cover`
 - `missing_fields` -> `lack`
+- `signature_problem` -> `diagnose`
+- `structure_problems` -> `lint`
+
+## `scmle.trail.records`
+
+- `sha256_file` -> `checksum`
+
+## `scmle.trail.show`
+
+- `facts_lines` -> `describe`
 
 ## `scmle.trail.trace`
 
@@ -1045,9 +2707,17 @@ names in the public API snapshot are also listed in the changelog.
 - `reconcile_feed` -> `reconcile`
 - `outcomes_step` -> `observe`
 
+## `scmle.unsupervised.clustering`
+
+- `find_clusters` -> `discover`
+- `external_scores` -> `compare`
+- `score_candidate` -> `attempt`
+
 ## `scmle.workflow.definition`
 
 - `check_name` -> `vet`
+- `group_limit` -> `quota`
+- `has_approval_upstream` -> `gated`
 
 ## `scmle.workflow.executor`
 
@@ -1063,6 +2733,19 @@ names in the public API snapshot are also listed in the changelog.
 - `recorded_cost` -> `tally`
 - `approval_payload` -> `compose`
 - `settle_approval` -> `settle`
+- `RunInFlightError` -> `BusyError`
+- `save_step` -> `stash`
+- `take_lease` -> `acquire`
+- `sign_approval` -> `decide`
+- `StepTimeoutError` -> `DeadlineError`
+- `submit_approval` -> `ratify`
+- `release_lease` -> `relinquish`
+- `StepInterruptedError` -> `PreemptedError`
+- `settle_approval_step` -> `adjudicate`
+
+## `scmle.workflow.handlers`
+
+- `runner_handler` -> `delegate`
 
 ## `scmle.workflow.schedule`
 

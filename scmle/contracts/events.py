@@ -12,7 +12,7 @@ from typing import Any
 LOGGER = logging.getLogger(__name__)
 
 
-def utc_timestamp() -> str:
+def stamp() -> str:
     """Returns the current UTC time as an ISO-8601 string."""
     return datetime.datetime.now(datetime.UTC).isoformat()
 
@@ -37,7 +37,7 @@ class Event:
     config_hash: str = ""
     artifacts: tuple[str, ...] = ()
     data: dict[str, Any] = dataclasses.field(default_factory=dict)
-    timestamp: str = dataclasses.field(default_factory=utc_timestamp)
+    timestamp: str = dataclasses.field(default_factory=stamp)
 
     def to_json(self) -> str:
         """Serializes the event as one canonical JSON line.

@@ -16,7 +16,7 @@ from sklearn import model_selection
 from scmle.contracts import data
 
 
-class StructuredKFold(model_selection.BaseCrossValidator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base class is Any
+class Splitter(model_selection.BaseCrossValidator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base class is Any
     """K-fold over a training frame that keeps groups and time order intact.
 
     * With a group column, whole groups go to one inner fold.
@@ -121,11 +121,11 @@ class StructuredKFold(model_selection.BaseCrossValidator):  # type: ignore[misc]
 
 
 def for_plan(
-    plan: data.FeaturePlan,
+    plan: data.Blueprint,
     classification: bool,
     folds: int,
     seed: int,
-) -> StructuredKFold:
+) -> Splitter:
     """Builds the inner splitter matching a feature plan's structure.
 
     Args:
@@ -138,6 +138,6 @@ def for_plan(
         A splitter using the group and time columns of the
         feature plan.
     """
-    return StructuredKFold(
+    return Splitter(
         folds, plan.group_column, plan.time_column, classification, seed
     )

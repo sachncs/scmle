@@ -39,7 +39,7 @@ Tests: `test_online_fdr.py`, `test_online_fdr_properties.py`,
 | Total | 3122 | 227 | 1 | 93.2% |
 
 Five survivors were pinned by `test_ledger_mutants_edges.py` and checked by
-applying each mutant (`quantile_index` floor, two `percentile_interval`
+applying each mutant (`quantile_index` floor, two `bracket`
 indices, `nunique(dropna=...)`, the regression-target message), which brings
 the total to 3127 killed and 222 survived. The other survivors of
 `controls.py`, `multiplicity.py` and `bivariate.py` that were read are

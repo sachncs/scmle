@@ -248,7 +248,7 @@ def check_determinism(directory: pathlib.Path) -> CheckRecord:
     return record
 
 
-def check_replay(directory: pathlib.Path) -> CheckRecord:
+def rederive(directory: pathlib.Path) -> CheckRecord:
     """The replay verifier agrees that an unchanged rerun is exact.
 
     Args:
@@ -337,7 +337,7 @@ def check_leak_detection(directory: pathlib.Path) -> CheckRecord:
     screen = result.profile.leakage
     flagged = (
         screen["suspects"] == ["leak"]
-        and result.profile.blocking_leaks == ("leak",)
+        and result.profile.blockers == ("leak",)
         and any("'leak'" in item for item in result.profile.risk_findings)
     )
     try:
@@ -486,7 +486,7 @@ def check_drift_detection(directory: pathlib.Path) -> CheckRecord:
         threshold="shifted != none and clean == none",
     )
     result = fast_project(binary_data(), "y", directory / "run").run()
-    watcher = monitor.ModelMonitor(result.bundle)
+    watcher = monitor.Watcher(result.bundle)
     clean = watcher.assess(binary_data(500, seed=11).drop(columns="y"))
     moved = binary_data(500, seed=12).drop(columns="y")
     moved["a"] = moved["a"] + 3.0
@@ -544,7 +544,7 @@ def check_failure_isolation(directory: pathlib.Path) -> CheckRecord:
 
 CHECKS: dict[str, Callable[[pathlib.Path], CheckRecord]] = {
     "determinism": check_determinism,
-    "replay": check_replay,
+    "replay": rederive,
     "no_false_skill": check_no_false_skill,
     "leak_detection": check_leak_detection,
     "bundle_roundtrip": check_bundle_roundtrip,

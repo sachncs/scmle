@@ -134,7 +134,7 @@ def check_round_trip(store: objectstore.ObjectStore, base: str) -> None:
     written = store.put(f"{base}/a.txt", data)
     content, meta = store.get(f"{base}/a.txt")
     require(content == data, "content differs")
-    require(meta.sha256 == objectstore.sha256_of(data), "hash is wrong")
+    require(meta.sha256 == objectstore.checksum(data), "hash is wrong")
     require(meta.size == len(data) == written.size, "size is wrong")
     require(written.sha256 == meta.sha256, "put and get disagree on the hash")
     require(meta.key == f"{base}/a.txt", "key is not reported as given")
@@ -193,10 +193,10 @@ def check_overwrite(store: objectstore.ObjectStore, base: str) -> None:
 
 
 def check_missing(store: objectstore.ObjectStore, base: str) -> None:
-    """Reading a missing object is `NotFoundError`; `exists` says no.
+    """Reading a missing object is `AbsentError`; `exists` says no.
 
     The check fails with `ConformanceError` (through `require`) if if
-    `get` or `head` of a missing key does not raise `NotFoundError`, or
+    `get` or `head` of a missing key does not raise `AbsentError`, or
     `exists` is wrong for a missing or written key.
 
     Args:
@@ -204,12 +204,12 @@ def check_missing(store: objectstore.ObjectStore, base: str) -> None:
         base: Key prefix reserved for this check.
     """
     raises(
-        objectstore.NotFoundError,
+        objectstore.AbsentError,
         lambda: store.get(f"{base}/nope"),
         "get of a missing key",
     )
     raises(
-        objectstore.NotFoundError,
+        objectstore.AbsentError,
         lambda: store.head(f"{base}/nope"),
         "head of a missing key",
     )
@@ -218,7 +218,7 @@ def check_missing(store: objectstore.ObjectStore, base: str) -> None:
     require(store.exists(f"{base}/there"), "a written key does not exist")
 
 
-def check_head_matches_get(store: objectstore.ObjectStore, base: str) -> None:
+def headcheck(store: objectstore.ObjectStore, base: str) -> None:
     """`head` reports what `get` reports.
 
     The check fails with `ConformanceError` (through `require`) if the
@@ -239,7 +239,7 @@ def check_if_absent(store: objectstore.ObjectStore, base: str) -> None:
     """A conditional put creates once and then refuses without changes.
 
     The check fails with `ConformanceError` (through `require`) if the
-    second conditional put does not raise `AlreadyExistsError`, or it
+    second conditional put does not raise `ExistsError`, or it
     changes the object.
 
     Args:
@@ -249,7 +249,7 @@ def check_if_absent(store: objectstore.ObjectStore, base: str) -> None:
     key = f"{base}/once"
     store.put(key, b"first", if_absent=True)
     raises(
-        objectstore.AlreadyExistsError,
+        objectstore.ExistsError,
         lambda: store.put(key, b"second", if_absent=True),
         "second conditional put",
     )
@@ -260,7 +260,7 @@ def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
     """Of several simultaneous conditional puts exactly one wins.
 
     The check fails with `ConformanceError` (through `require`) if a
-    racer fails with any error other than `AlreadyExistsError`, a racer does
+    racer fails with any error other than `ExistsError`, a racer does
     not finish, or the outcomes are not one winner and the rest refused.
 
     Args:
@@ -282,7 +282,7 @@ def check_if_absent_race(store: objectstore.ObjectStore, base: str) -> None:
         try:
             store.put(key, f"racer-{index}".encode(), if_absent=True)
             result = "won"
-        except objectstore.AlreadyExistsError:
+        except objectstore.ExistsError:
             # handled: recorded as racer outcome 'lost'
             result = "lost"
         except Exception as error:  # noqa: BLE001 -- any backend failure is recorded as this racer's outcome
@@ -414,7 +414,7 @@ def check_listing(store: objectstore.ObjectStore, base: str) -> None:
     require(store.list_objects(f"{base}/zzz") == [], "empty prefix not empty")
 
 
-def check_pagination(store: objectstore.ObjectStore, base: str) -> None:
+def paginate(store: objectstore.ObjectStore, base: str) -> None:
     """More objects than one page are all listed once.
 
     The check fails with `ConformanceError` (through `require`) if the
@@ -500,13 +500,13 @@ CHECKS: tuple[Callable[[objectstore.ObjectStore, str], None], ...] = (
     check_large,
     check_overwrite,
     check_missing,
-    check_head_matches_get,
+    headcheck,
     check_if_absent,
     check_if_absent_race,
     check_if_version,
     check_if_version_race,
     check_listing,
-    check_pagination,
+    paginate,
     check_delete,
     check_key_rules,
     check_isolation,

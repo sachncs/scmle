@@ -97,7 +97,7 @@ class Sentinels:
         return dataclasses.asdict(self)
 
 
-def grid_spacing(unique_values: numpy.ndarray) -> float:
+def pitch(unique_values: numpy.ndarray) -> float:
     """Finds the grid spacing of a column.
 
     Args:
@@ -112,9 +112,7 @@ def grid_spacing(unique_values: numpy.ndarray) -> float:
     return float(numpy.median(gaps)) if gaps.size else 0.0
 
 
-def expected_share(
-    others: numpy.ndarray, value: float, spacing: float
-) -> float:
+def expect(others: numpy.ndarray, value: float, spacing: float) -> float:
     """Share of all draws a smooth density would put on `value`.
 
     Args:
@@ -160,16 +158,16 @@ def spot(
         return []
     unique, counts = numpy.unique(values, return_counts=True)
     found = []
-    spacing = grid_spacing(unique[counts < min_count])
+    spacing = pitch(unique[counts < min_count])
     if spacing == 0.0:
-        spacing = grid_spacing(unique)
+        spacing = pitch(unique)
     for value, count in zip(unique, counts, strict=True):
         if count < min_count:
             continue
         others = values[values != value]
         if len(others) < 2 * MIN_WINDOW:
             continue
-        share = expected_share(others, float(value), spacing)
+        share = expect(others, float(value), spacing)
         if count < MIN_RATIO * share * len(values):
             continue
         p_value = float(
@@ -216,7 +214,7 @@ def scour(
     return out
 
 
-def find_sentinels(
+def hunt(
     frame: pandas.DataFrame,
     columns: Sequence[str] | None = None,
     text_codes: Sequence[str] = TEXT_CODES,
@@ -279,14 +277,12 @@ def find_sentinels(
     return Sentinels(tuple(findings), len(frame))
 
 
-def sentinel_mask(
-    frame: pandas.DataFrame, report: Sentinels
-) -> pandas.DataFrame:
+def coded(frame: pandas.DataFrame, report: Sentinels) -> pandas.DataFrame:
     """Marks the cells that hold a reported code.
 
     Args:
         frame: The table the report was made on.
-        report: Findings from `find_sentinels`.
+        report: Findings from `hunt`.
 
     Returns:
         A boolean frame of the shape of `frame`, True where a cell holds a
@@ -307,19 +303,19 @@ def sentinel_mask(
     return mask
 
 
-def recode_missing(
+def nullify(
     frame: pandas.DataFrame, report: Sentinels
 ) -> tuple[pandas.DataFrame, list[dict[str, Any]]]:
     """Replaces reported codes by missing values and logs each recode.
 
     Args:
         frame: The table; it is not modified.
-        report: Findings from `find_sentinels`.
+        report: Findings from `hunt`.
 
     Returns:
         The recoded copy and one log record per finding.
     """
-    mask = sentinel_mask(frame, report)
+    mask = coded(frame, report)
     out = frame.copy()
     log = []
     for finding in report.findings:
@@ -341,7 +337,7 @@ def recode_missing(
     return out, log
 
 
-def sentinel_rows(frame: pandas.DataFrame) -> pandas.Series:
+def placeholders(frame: pandas.DataFrame) -> pandas.Series:
     """Flags the rows that hold a sentinel code.
 
     Args:
@@ -349,10 +345,10 @@ def sentinel_rows(frame: pandas.DataFrame) -> pandas.Series:
 
     Returns:
         A boolean per row, True when any cell holds a code found by
-        `find_sentinels` with its default settings.
+        `hunt` with its default settings.
     """
-    report = find_sentinels(frame)
+    report = hunt(frame)
     return pandas.Series(
-        sentinel_mask(frame, report).any(axis=1).to_numpy(dtype=bool),
+        coded(frame, report).any(axis=1).to_numpy(dtype=bool),
         index=frame.index,
     )

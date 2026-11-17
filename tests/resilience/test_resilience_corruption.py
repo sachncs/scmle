@@ -111,7 +111,7 @@ def test_a_damaged_checkpoint_stops_the_run_and_is_not_reset(finished, kind):
     damaged = store.get(failpoints.STATE_KEY)[0]
     store.put("input/o9.csv", failpoints.object_bytes(9))
     for attempt in range(2):
-        with pytest.raises(processing.CheckpointCorruptError):
+        with pytest.raises(processing.CorruptError):
             failpoints.processor(store).run()
         assert store.get(failpoints.STATE_KEY)[0] == damaged, attempt
         assert failpoints.files_of(store) == before, attempt
@@ -125,7 +125,7 @@ def test_a_damaged_checkpoint_stops_the_run_and_is_not_reset(finished, kind):
 def test_a_damaged_checkpoint_stops_a_bounded_run_too(finished):
     store = finished
     store.put(failpoints.STATE_KEY, b"{")
-    with pytest.raises(processing.CheckpointCorruptError):
+    with pytest.raises(processing.CorruptError):
         failpoints.processor(store).run(max_objects=1)
     assert store.get(failpoints.STATE_KEY)[0] == b"{"
 
@@ -176,13 +176,13 @@ def test_a_stale_lock_from_a_dead_process_is_released_only_by_break_lock(
     assert child.returncode == -signal.SIGKILL, child.stderr[-2000:]
     assert store.exists(failpoints.LOCK_KEY)
     for attempt in range(3):
-        with pytest.raises(processing.ConcurrentRunError):
+        with pytest.raises(processing.LockError):
             failpoints.processor(store).run()
         assert store.exists(failpoints.LOCK_KEY), attempt
         assert failpoints.files_of(store) == {}, attempt
     # Waiting does not release it, and neither does a run that bounds itself.
     time.sleep(0.2)
-    with pytest.raises(processing.ConcurrentRunError):
+    with pytest.raises(processing.LockError):
         failpoints.processor(store).run(max_objects=1)
     failpoints.processor(store).break_lock()
     assert not store.exists(failpoints.LOCK_KEY)
@@ -202,7 +202,7 @@ def test_a_refused_run_leaves_the_holders_lock_alone(tmp_path):
     store = objectstore.LocalObjectStore(tmp_path / "root")
     failpoints.seed(store)
     store.put(failpoints.LOCK_KEY, b"someone else")
-    with pytest.raises(processing.ConcurrentRunError):
+    with pytest.raises(processing.LockError):
         failpoints.processor(store).run()
     assert store.get(failpoints.LOCK_KEY)[0] == b"someone else"
 
@@ -217,7 +217,7 @@ def race_for_lock(store, racers):
         barrier.wait()
         try:
             store.put(failpoints.LOCK_KEY, str(number).encode(), if_absent=True)
-        except objectstore.AlreadyExistsError:
+        except objectstore.ExistsError:
             losers.append(number)
         else:
             winners.append(number)
@@ -269,7 +269,7 @@ def test_racing_processors_never_work_at_the_same_time(tmp_path):
         barrier.wait()
         try:
             outcomes.append(run.run())
-        except processing.ConcurrentRunError as error:
+        except processing.LockError as error:
             outcomes.append(error)
 
     threads = [threading.Thread(target=race) for number in range(racers)]
@@ -314,7 +314,7 @@ def test_a_second_process_is_refused_while_the_first_holds_the_lock(tmp_path):
             assert time.monotonic() < deadline, "holder never took the lock"
             time.sleep(0.02)
         assert store.exists(failpoints.LOCK_KEY)
-        with pytest.raises(processing.ConcurrentRunError):
+        with pytest.raises(processing.LockError):
             failpoints.processor(store).run()
         assert store.exists(failpoints.LOCK_KEY)
         release.write_text("go")

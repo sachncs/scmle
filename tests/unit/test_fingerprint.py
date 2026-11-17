@@ -15,7 +15,7 @@ def profile_of(frame, task=tasks.Task.BINARY, **data_overrides):
     spec = tasks.Config(
         data=tasks.Dataset(uri="m", target="y", **data_overrides)
     )
-    manifest = tabular.build_manifest(frame, "y")
+    manifest = tabular.manifested(frame, "y")
     return profiler.Profiler(spec).profile(frame, manifest, task, 0.25)
 
 
@@ -45,10 +45,10 @@ def test_redundant_pairs_detects_near_duplicates_only():
             "c": rng.normal(size=500),
         }
     )
-    pairs = fingerprint.redundant_pairs(frame, ("a", "b", "c"))
+    pairs = fingerprint.redundant(frame, ("a", "b", "c"))
     assert [(p["a"], p["b"]) for p in pairs] == [("a", "b")]
     assert pairs[0]["correlation"] > 0.99
-    assert fingerprint.redundant_pairs(frame, ("a",)) == []
+    assert fingerprint.redundant(frame, ("a",)) == []
 
 
 def test_order_drift_flags_trending_data_not_stationary_data():
@@ -57,9 +57,9 @@ def test_order_drift_flags_trending_data_not_stationary_data():
     trending = pandas.DataFrame(
         {"x": rng.normal(size=600) + numpy.linspace(0, 6, 600)}
     )
-    assert fingerprint.order_drift(stationary, ("x",)) < 0.1
-    assert fingerprint.order_drift(trending, ("x",)) > 0.25
-    assert fingerprint.order_drift(stationary.head(40), ("x",)) == 0.0
+    assert fingerprint.ordering(stationary, ("x",)) < 0.1
+    assert fingerprint.ordering(trending, ("x",)) > 0.25
+    assert fingerprint.ordering(stationary.head(40), ("x",)) == 0.0
 
 
 def frame_with_everything(rows=600):
@@ -172,7 +172,7 @@ def test_ml_difficulty_fails_closed_when_scores_are_all_undefined(
         fingerprint.model_selection, "cross_val_score", undefined_scores
     )
     spec = tasks.Config(data=tasks.Dataset(uri="m", target="y"))
-    manifest = tabular.build_manifest(frame, "y")
+    manifest = tabular.manifested(frame, "y")
     task = tasks.Task.BINARY
     plan = (
         profiler.Profiler(spec)

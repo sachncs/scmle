@@ -310,7 +310,7 @@ class Stacking(models.Model):
 
     def assemble(
         self,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
@@ -336,7 +336,7 @@ class Stacking(models.Model):
         estimators = [
             (
                 f"m{index}_{member['model']}",
-                preprocessing.build_pipeline(
+                preprocessing.instantiate(
                     plan,
                     self.registry.get(member["model"]),
                     task,

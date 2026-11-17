@@ -1,6 +1,6 @@
 """The stability filter as the pre-registered second stage of a charter run.
 
-`governed.run_governed` calls `StabilityStage` after exploration and the
+`governed.run_governed` calls `Prefilter` after exploration and the
 negative control and before `C` is opened. The stage re-runs the survivors
 over the declared specification grid on the exploration set and, when the
 charter's `Procedure.stability_filter` is true and the verdicts are allowed to
@@ -50,7 +50,7 @@ FEATURE_SHIFT_ID = "f6-shift-feature"
 MAX_FEATURE_ROWS = 200
 
 
-def feature_checks(
+def shifts(
     result: shift.Shift, rows: int, seed: int
 ) -> tuple[qualification.Check, ...]:
     """Per-column shift tests as checks (descriptive, never gating).
@@ -83,7 +83,7 @@ def feature_checks(
                     if row.rejected
                     else qualification.Decision.PASS
                 ),
-                set_id=qualification.SetId.EXPLORATION,
+                set_id=qualification.Subset.EXPLORATION,
                 seed_path=randomness.seed_path(seed, FEATURE_SHIFT_ID, index),
                 tier=qualification.Tier.UNVERIFIED,
             )
@@ -91,7 +91,7 @@ def feature_checks(
     return tuple(checks)
 
 
-def diagnostic_rows(
+def gather(
     found: qualify.Robustness, rows: int, seed: int
 ) -> tuple[tuple[str, qualification.Check], ...]:
     """Collects stability and shift results as ledger diagnostics.
@@ -121,18 +121,17 @@ def diagnostic_rows(
         if check is not None:
             out.append((name, check))
     out.extend(
-        (FEATURE_SHIFT_ID, check)
-        for check in feature_checks(found.shift, rows, seed)
+        (FEATURE_SHIFT_ID, check) for check in shifts(found.shift, rows, seed)
     )
     return tuple(
         (source, check)
         for source, check in out
-        if check.set_id is qualification.SetId.EXPLORATION
+        if check.set_id is qualification.Subset.EXPLORATION
     )
 
 
 @dataclasses.dataclass
-class StabilityStage:
+class Prefilter:
     """The second stage handed to `run_governed`.
 
     Attributes:
@@ -174,7 +173,7 @@ class StabilityStage:
         columns = tuple(h.spec.column for h in survivors if h.spec.column)
         found = self.compute(columns)
         self.found = found
-        gating = found.stability_gate is certificates.GateStatus.GATING
+        gating = found.stability_gate is certificates.Authority.GATING
         self.applied = self.requested and gating
         fragile = set(found.fragile)
         reasons: dict[str, str] = {}
@@ -222,6 +221,6 @@ class StabilityStage:
         return confirm.Withdrawal(
             reasons,
             record,
-            diagnostic_rows(found, self.rows, self.seed),
+            gather(found, self.rows, self.seed),
             accounted=self.requested,
         )

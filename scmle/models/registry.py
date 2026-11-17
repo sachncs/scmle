@@ -32,14 +32,14 @@ ENTRY_POINT_GROUP = "scmle.models"
 USER_ADAPTERS: dict[str, models.Model] = {}
 """Adapters added with `register_estimator`, shared by later projects.
 
-Change it only through `add_user_adapter` and `remove_user_adapter`, and read
-it only through `user_adapters`; all three hold `USER_LOCK`.
+Change it only through `adopt` and `deregister`, and read
+it only through `extensions`; all three hold `USER_LOCK`.
 """
 USER_LOCK = threading.RLock()
 """Serializes check-then-act changes to `USER_ADAPTERS`."""
 
 
-def user_adapters() -> dict[str, models.Model]:
+def extensions() -> dict[str, models.Model]:
     """Returns a consistent copy of the registered user adapters.
 
     Returns:
@@ -50,7 +50,7 @@ def user_adapters() -> dict[str, models.Model]:
         return dict(USER_ADAPTERS)
 
 
-def add_user_adapter(adapter: models.Model, replace: bool = False) -> None:
+def adopt(adapter: models.Model, replace: bool = False) -> None:
     """Registers a user adapter atomically.
 
     Args:
@@ -68,7 +68,7 @@ def add_user_adapter(adapter: models.Model, replace: bool = False) -> None:
         USER_ADAPTERS[adapter.name] = adapter
 
 
-def remove_user_adapter(name: str) -> None:
+def deregister(name: str) -> None:
     """Removes a user adapter atomically (no-op if it is not registered).
 
     Args:
@@ -84,7 +84,7 @@ def builtin_names() -> frozenset[str]:
     Returns:
         The names of the built-in adapters, excluding user registrations.
     """
-    return frozenset(Catalog.with_builtins(include_user=False).adapters)
+    return frozenset(Catalog.stock(include_user=False).adapters)
 
 
 class Catalog:
@@ -102,7 +102,7 @@ class Catalog:
             self.register(adapter)
 
     @classmethod
-    def with_builtins(cls, include_user: bool = True) -> Self:
+    def stock(cls, include_user: bool = True) -> Self:
         """Creates a registry with the built-in adapters.
 
         These are scikit-learn, boosting and PyTorch families.
@@ -137,7 +137,7 @@ class Catalog:
         registry.register(ensembles.Stacking(registry))
         registry.register(ensembles.Blending(registry))
         if include_user:
-            for adapter in user_adapters().values():
+            for adapter in extensions().values():
                 registry.register(adapter, overwrite=True)
         return registry
 
@@ -183,7 +183,7 @@ class Catalog:
                 found: Any = loaded() if callable(loaded) else loaded
                 items = found if isinstance(found, (list, tuple)) else [found]
                 for adapter in items:
-                    conformance.check_conformance(adapter)
+                    conformance.comply(adapter)
                     self.register(adapter, overwrite=True)
             except Exception as error:
                 LOGGER.warning(

@@ -27,7 +27,7 @@ SETTINGS = settings(
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.data_too_large],
 )
-REGISTRY = registry.Catalog.with_builtins()
+REGISTRY = registry.Catalog.stock()
 
 
 @strategies.composite
@@ -88,7 +88,7 @@ JSON_VALUES = strategies.recursive(
 def test_attestation_parser_fails_closed_on_arbitrary_json(payload):
     """Malformed persisted evidence never escapes as an incidental error."""
     try:
-        parsed = attestation.ReleaseAttestation.from_dict(payload)
+        parsed = attestation.Attestation.from_dict(payload)
     except (TypeError, ValueError):
         return
     assert parsed.to_dict()["run_id"] == parsed.run_id
@@ -102,7 +102,7 @@ def test_document_reader_fails_closed_on_arbitrary_bytes(payload):
     rejection = None
     try:
         sample = reader.load(payload, document_id="fuzzed")
-    except document.DocumentValidationError as error:
+    except document.DocumentError as error:
         rejection = error
     if rejection is not None:
         assert rejection.category == "document_validation"
@@ -115,7 +115,7 @@ def test_document_reader_fails_closed_on_arbitrary_bytes(payload):
 @given(frame=frames())
 def test_profiling_yields_a_consistent_plan_or_a_clear_refusal(frame):
     spec = spec_for()
-    manifest = tabular.build_manifest(frame, "y")
+    manifest = tabular.manifested(frame, "y")
     try:
         task = scmle.data.validation.target.TaskResolver(spec).resolve(
             frame["y"]
@@ -138,7 +138,7 @@ def test_profiling_yields_a_consistent_plan_or_a_clear_refusal(frame):
 @given(frame=frames(min_rows=60), seed=strategies.integers(0, 100))
 def test_pipelines_fit_and_predict_on_arbitrary_clean_frames(frame, seed):
     spec = spec_for()
-    manifest = tabular.build_manifest(frame, "y")
+    manifest = tabular.manifested(frame, "y")
     try:
         task = scmle.data.validation.target.TaskResolver(spec).resolve(
             frame["y"]
@@ -154,9 +154,7 @@ def test_pipelines_fit_and_predict_on_arbitrary_clean_frames(frame, seed):
         "random_forest",
         "hist_gradient_boosting",
     ):
-        pipe = preprocessing.build_pipeline(
-            plan, REGISTRY.get(name), task, seed
-        )
+        pipe = preprocessing.instantiate(plan, REGISTRY.get(name), task, seed)
         pipe.fit(features, frame["y"])
         proba = pipe.predict_proba(features)
         assert proba.shape == (len(frame), 2) and numpy.isfinite(proba).all()
@@ -297,13 +295,11 @@ def test_optimized_threshold_never_loses_to_the_default(values, seed):
     rng = numpy.random.default_rng(seed)
     actual = rng.random(len(values)) < probabilities
     for objective in (
-        thresholds.F1Objective(),
-        thresholds.AccuracyObjective(),
+        thresholds.F1(),
+        thresholds.Accuracy(),
         thresholds.BalancedAccuracyObjective(),
     ):
-        best, score = thresholds.optimize_threshold(
-            probabilities, actual, objective
-        )
+        best, score = thresholds.argmax(probabilities, actual, objective)
         assert best in thresholds.GRID
         assert score >= objective.score(actual, probabilities >= 0.5) - 1e-12
 
@@ -321,11 +317,9 @@ def test_psi_is_non_negative_and_symmetric(left, right):
     size = min(len(left), len(right))
     a = numpy.array(left[:size]) / sum(left[:size])
     b = numpy.array(right[:size]) / sum(right[:size])
-    forward = reference.population_stability_index(a, b)
-    backward = reference.population_stability_index(b, a)
+    forward = reference.divergence(a, b)
+    backward = reference.divergence(b, a)
     assert forward >= 0.0 and forward == pytest.approx(
         backward, rel=1e-6, abs=1e-9
     )
-    assert reference.population_stability_index(a, a) == pytest.approx(
-        0.0, abs=1e-12
-    )
+    assert reference.divergence(a, a) == pytest.approx(0.0, abs=1e-12)

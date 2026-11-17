@@ -8,7 +8,7 @@ import numpy
 BINS = 10
 
 
-def top_label_curve(
+def topclass(
     probabilities: numpy.ndarray,
     labels: Sequence[Any] | numpy.ndarray,
     classes: Sequence[Any],

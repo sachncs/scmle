@@ -37,7 +37,7 @@ def test_a_perfect_ranking_has_a_positive_qini_and_a_random_one_does_not():
 def test_uplift_at_k_compares_treated_and_control_in_the_top_share():
     d = experiment()
 
-    top = uplift.uplift_at(d.outcome, d.arm, d.effect, share=0.25)
+    top = uplift.lift(d.outcome, d.arm, d.effect, share=0.25)
     overall = uplift.average_effect(d.outcome, d.arm)
 
     assert top > overall + 0.1
@@ -46,7 +46,7 @@ def test_uplift_at_k_compares_treated_and_control_in_the_top_share():
 @pytest.mark.parametrize(
     "learner",
     [
-        estimators.TwoModelLearner,
+        estimators.TLearner,
         estimators.SingleModelLearner,
         estimators.CrossLearner,
     ],
@@ -65,7 +65,7 @@ def test_meta_learners_recover_who_responds(learner):
 def test_the_zero_baseline_has_no_signal():
     d = experiment()
 
-    scores = estimators.ZeroEffect().fit(d.x, d.outcome, d.arm).predict(d.x)
+    scores = estimators.Inert().fit(d.x, d.outcome, d.arm).predict(d.x)
 
     assert not scores.any()
 
@@ -73,7 +73,7 @@ def test_the_zero_baseline_has_no_signal():
 def test_randomized_treatment_looks_randomized():
     d = experiment()
 
-    found = uplift.check_propensity(pandas.DataFrame(d.x), d.arm)
+    found = uplift.randomised(pandas.DataFrame(d.x), d.arm)
 
     assert found.randomized and found.auc < 0.56
     assert found.balance_p_value is not None and found.balance_p_value > 0.05
@@ -85,7 +85,7 @@ def test_assignment_driven_by_covariates_is_flagged():
     noise = numpy.random.default_rng(2).normal(0, 0.3, len(d.arm))
     chosen = ((d.x[:, 1] + noise) > 0).astype(int)
 
-    found = uplift.check_propensity(pandas.DataFrame(d.x), chosen)
+    found = uplift.randomised(pandas.DataFrame(d.x), chosen)
 
     assert not found.randomized and found.auc > 0.8
     assert found.balance_p_value is not None and found.balance_p_value <= 0.05
@@ -96,7 +96,7 @@ def test_a_tiny_arm_is_reported_not_modelled():
     d = experiment()
     sparse = (numpy.arange(len(d.arm)) < 20).astype(int)
 
-    found = uplift.check_propensity(pandas.DataFrame(d.x), sparse)
+    found = uplift.randomised(pandas.DataFrame(d.x), sparse)
 
     assert not found.randomized and numpy.isnan(found.auc)
     assert found.balance_p_value is None
@@ -125,7 +125,7 @@ def test_configured_instances_and_class_style_subclasses_build_learners():
         for adapter in adapters.UPLIFT_ADAPTERS
     ]
     assert built == [
-        ("uplift_t_learner", estimators.TwoModelLearner),
+        ("uplift_t_learner", estimators.TLearner),
         ("uplift_s_learner", estimators.SingleModelLearner),
         ("uplift_x_learner", estimators.CrossLearner),
     ]
@@ -134,4 +134,4 @@ def test_configured_instances_and_class_style_subclasses_build_learners():
     assert isinstance(
         legacy.build(tasks.Task.UPLIFT, 0), estimators.SingleModelLearner
     )
-    assert adapters.Uplift.learner is estimators.TwoModelLearner
+    assert adapters.Uplift.learner is estimators.TLearner

@@ -311,16 +311,16 @@ class Config:
                 estimator's required prior, treatment position, cluster name,
                 covariance kind or exact assumption set is missing or wrong.
         """
-        self.check_choices()
+        self.vet()
         self.check_ranges()
-        self.check_reml_bounds()
-        self.check_field_support()
+        self.fence()
+        self.relevant()
         if self.estimator in {"bayesian_linear", "bayesian_ate"}:
-            self.check_bayesian_policy()
+            self.bayesian()
         elif self.estimator in CAUSAL_ESTIMATORS:
             self.check_causal_policy()
         elif self.estimator == "hierarchical_linear":
-            self.check_hierarchical_policy()
+            self.nesting()
         elif self.prior is not None:
             raise errors.InputError(
                 "a Bayesian prior is supported only by bayesian_linear or "
@@ -328,7 +328,7 @@ class Config:
             )
         self.check_hierarchical_only_fields()
 
-    def check_choices(self) -> None:
+    def vet(self) -> None:
         """Validates the named choices and the first scalar limits.
 
         Raises:
@@ -403,7 +403,7 @@ class Config:
                 "random_slope_position must be a non-negative integer or None"
             )
 
-    def check_reml_bounds(self) -> None:
+    def fence(self) -> None:
         """Validates the variance bounds of the REML search.
 
         Raises:
@@ -430,7 +430,7 @@ class Config:
                 "values in increasing order"
             )
 
-    def check_field_support(self) -> None:
+    def relevant(self) -> None:
         """Rejects fields set for an estimator that ignores them.
 
         Raises:
@@ -485,7 +485,7 @@ class Config:
                 "hierarchical_linear"
             )
 
-    def check_bayesian_policy(self) -> None:
+    def bayesian(self) -> None:
         """Validates the policy of a Bayesian estimator.
 
         Raises:
@@ -575,7 +575,7 @@ class Config:
                 "and positivity assumptions"
             )
 
-    def check_hierarchical_policy(self) -> None:
+    def nesting(self) -> None:
         """Validates the policy of the hierarchical estimator.
 
         Raises:
@@ -1156,7 +1156,7 @@ def check_prepared_rows(
             )
 
 
-def fit_linear_estimator(
+def ols(
     design: numpy.ndarray,
     values: numpy.ndarray,
     policy: Config,
@@ -1240,14 +1240,14 @@ def fit_logistic_estimator(
     Returns:
         The fitted quantities.
     """
-    coefficients, probabilities, diagnostics = fit_logistic(
+    coefficients, probabilities, diagnostics = logit(
         design, values, policy.max_iterations, policy.tolerance
     )
     residuals = values - probabilities
     covariance = covariance_matrix(
         design, residuals, policy.covariance, cluster_values, probabilities
     )
-    reference = reference_logistic(design, values, coefficients, policy)
+    reference = corroborate(design, values, coefficients, policy)
     likelihood = "bernoulli"
     pivot = stats.norm.ppf(0.5 + policy.confidence_level / 2.0)
     p_values = 2.0 * stats.norm.sf(
@@ -1269,9 +1269,7 @@ def fit_logistic_estimator(
     )
 
 
-def check_bayesian_treatment(
-    matrix: numpy.ndarray, policy: Config
-) -> tuple[int, int, int]:
+def dichotomous(matrix: numpy.ndarray, policy: Config) -> tuple[int, int, int]:
     """Checks the binary treatment of the Bayesian average treatment effect.
 
     Args:
@@ -1304,7 +1302,7 @@ def check_bayesian_treatment(
     return treatment_position, treated_rows, control_rows
 
 
-def fit_bayesian_estimator(
+def bayes(
     matrix: numpy.ndarray,
     design: numpy.ndarray,
     values: numpy.ndarray,
@@ -1336,8 +1334,8 @@ def fit_bayesian_estimator(
         )
     treatment_position, treated_rows, control_rows = 0, 0, 0
     if policy.estimator == "bayesian_ate":
-        treatment_position, treated_rows, control_rows = (
-            check_bayesian_treatment(matrix, policy)
+        treatment_position, treated_rows, control_rows = dichotomous(
+            matrix, policy
         )
     coefficients, covariance, diagnostics = fit_bayesian_linear(
         design, values, policy.prior
@@ -1456,7 +1454,7 @@ def fit_propensity_estimator(
             covariance,
             diagnostics,
             aipw_inputs,
-        ) = fit_aipw_ate(
+        ) = dr(
             matrix,
             values,
             policy.treatment_position,
@@ -1515,7 +1513,7 @@ def fit_continuous_estimator(
         raise errors.InputError(
             "continuous_ipw_ate requires treatment_position"
         )
-    coefficients, covariance, diagnostics = fit_continuous_ipw_effect(
+    coefficients, covariance, diagnostics = dosage(
         matrix,
         values,
         policy.treatment_position,
@@ -1623,7 +1621,7 @@ def hierarchical_reference(
             diagnostics["reml_objective"],
             policy,
         )
-    return reference_hierarchical_linear(
+    return crosscheck(
         design,
         values,
         cluster_values,
@@ -1706,7 +1704,7 @@ def fit_hierarchical_estimator(
     )
 
 
-def fit_estimator(
+def compute(
     matrix: numpy.ndarray,
     design: numpy.ndarray,
     values: numpy.ndarray,
@@ -1729,17 +1727,13 @@ def fit_estimator(
     """
     names = ("intercept", *estimand.feature_names)
     if policy.estimator == "linear":
-        return fit_linear_estimator(
-            design, values, policy, cluster_values, names
-        )
+        return ols(design, values, policy, cluster_values, names)
     if policy.estimator == "logistic":
         return fit_logistic_estimator(
             design, values, policy, cluster_values, names
         )
     if policy.estimator in {"bayesian_linear", "bayesian_ate"}:
-        return fit_bayesian_estimator(
-            matrix, design, values, policy, estimand, names
-        )
+        return bayes(matrix, design, values, policy, estimand, names)
     if policy.estimator in {"ipw_ate", "aipw_ate"}:
         return fit_propensity_estimator(matrix, values, policy, cluster_values)
     if policy.estimator == "continuous_ipw_ate":
@@ -1800,15 +1794,13 @@ def estimate_parameters(
     check_prepared_rows(matrix, values, clusters, policy)
     cluster_values = kept if input_clusters is not None else None
     design = numpy.column_stack((numpy.ones(matrix.shape[0]), matrix))
-    fit = fit_estimator(
-        matrix, design, values, estimand, policy, cluster_values
-    )
+    fit = compute(matrix, design, values, estimand, policy, cluster_values)
     names = fit.names
     coefficients = fit.coefficients
     covariance = fit.covariance
     diagnostics = fit.diagnostics
 
-    covariance_conditioning = validate_covariance(covariance, len(names))
+    covariance_conditioning = condition(covariance, len(names))
     diagnostics = {
         **diagnostics,
         "covariance_conditioning": covariance_conditioning,
@@ -1818,9 +1810,7 @@ def estimate_parameters(
             raise errors.InputError(
                 "cluster labels are required for cluster diagnostics"
             )
-        diagnostics["cluster_uncertainty"] = cluster_uncertainty_diagnostics(
-            cluster_values
-        )
+        diagnostics["cluster_uncertainty"] = clustering(cluster_values)
 
     if fit.standard_errors is None:
         standard_errors = numpy.sqrt(numpy.maximum(numpy.diag(covariance), 0.0))
@@ -2010,9 +2000,7 @@ def validate_clusters(
     return cluster_values
 
 
-def validate_covariance(
-    covariance: numpy.ndarray, dimension: int
-) -> dict[str, Any]:
+def condition(covariance: numpy.ndarray, dimension: int) -> dict[str, Any]:
     """Validates covariance shape and reports rank and numerical conditioning.
 
     Args:
@@ -2197,7 +2185,7 @@ def fit_treatment_density(
     return conditional_mean, density_residuals, conditional_scale
 
 
-def fit_continuous_ipw_effect(
+def dosage(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     treatment_position: int,
@@ -2377,9 +2365,7 @@ def fit_continuous_ipw_effect(
         ],
     }
     if policy.covariance == "clustered":
-        diagnostics["cluster_uncertainty"] = cluster_uncertainty_diagnostics(
-            clusters
-        )
+        diagnostics["cluster_uncertainty"] = clustering(clusters)
     return coefficients, covariance, diagnostics
 
 
@@ -2394,7 +2380,7 @@ def reference_continuous_ipw_effect(
     """Recomputes the GPS-weighted dose-response with dense linear algebra.
 
     This reference intentionally uses a separate least-squares and normal
-    equation calculation from :func:`fit_continuous_ipw_effect`. It verifies
+    equation calculation from :func:`dosage`. It verifies
     the point estimate, while the primary fit separately records covariance
     and overlap evidence.
 
@@ -2452,7 +2438,7 @@ def reference_continuous_ipw_effect(
     }
 
 
-def cluster_uncertainty_diagnostics(
+def clustering(
     clusters: numpy.ndarray | None,
 ) -> dict[str, Any]:
     """Returns explicit sampling-unit diagnostics for clustered covariance.
@@ -2542,19 +2528,17 @@ def fit_ipw_ate(
     propensity_design = numpy.column_stack(
         (numpy.ones(confounders.shape[0]), confounders)
     )
-    propensity_coefficients, raw_propensity, propensity_diagnostics = (
-        fit_logistic(
-            propensity_design,
-            treatment,
-            policy.max_iterations,
-            policy.tolerance,
-        )
+    propensity_coefficients, raw_propensity, propensity_diagnostics = logit(
+        propensity_design,
+        treatment,
+        policy.max_iterations,
+        policy.tolerance,
     )
     del propensity_coefficients
     propensity = numpy.clip(
         raw_propensity, policy.propensity_clip, 1.0 - policy.propensity_clip
     )
-    ate, variance, evidence = hajek_ipw_statistics(
+    ate, variance, evidence = hajek(
         treatment,
         values,
         propensity,
@@ -2609,7 +2593,7 @@ def fit_ipw_ate(
     )
 
 
-def fit_aipw_ate(
+def dr(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     treatment_position: int | None,
@@ -2681,12 +2665,10 @@ def fit_aipw_ate(
             "status": "disabled",
             "fold_count": 1,
             "assignment_method": "not_applicable",
-            "limitations": aipw_limitations(cross_fitted=False),
+            "limitations": caveats(crossfit=False),
         }
     else:
-        fold_assignments = deterministic_fold_assignments(
-            len(values), fold_count
-        )
+        fold_assignments = interleave(len(values), fold_count)
         support = validate_cross_fitting_support(
             treatment, fold_assignments, fold_count
         )
@@ -2751,7 +2733,7 @@ def fit_aipw_ate(
                 for fold in range(fold_count)
             },
             "nuisance_fits": fold_diagnostics,
-            "limitations": aipw_limitations(cross_fitted=True),
+            "limitations": caveats(crossfit=True),
         }
     score = (
         outcome_treated
@@ -2761,9 +2743,7 @@ def fit_aipw_ate(
     )
     ate = float(numpy.mean(score))
     influence = score - ate
-    variance, uncertainty = influence_variance(
-        influence, policy.covariance, clusters
-    )
+    variance, uncertainty = dispersion(influence, policy.covariance, clusters)
     clipped = numpy.abs(raw_propensity - propensity) > CLIP_TOLERANCE
     diagnostics = {
         "converged": True,
@@ -2880,7 +2860,7 @@ def fit_aipw_nuisance_models(
         propensity_coefficients,
         propensity_probabilities,
         propensity_diagnostics,
-    ) = fit_logistic(
+    ) = logit(
         training_design,
         training_treatment,
         policy.max_iterations,
@@ -2926,7 +2906,7 @@ def fit_aipw_nuisance_models(
     )
 
 
-def deterministic_fold_assignments(rows: int, fold_count: int) -> numpy.ndarray:
+def interleave(rows: int, fold_count: int) -> numpy.ndarray:
     """Assigns rows to balanced folds using a deterministic row-order rule.
 
     Args:
@@ -3000,11 +2980,11 @@ def validate_cross_fitting_support(
     return support
 
 
-def aipw_limitations(cross_fitted: bool) -> list[str]:
+def caveats(crossfit: bool) -> list[str]:
     """Returns limitations of the AIPW estimator.
 
     Args:
-        cross_fitted: Whether the nuisance models were cross-fitted.
+        crossfit: Whether the nuisance models were cross-fitted.
 
     Returns:
         Plain-language limitation statements; one extra statement is added
@@ -3019,7 +2999,7 @@ def aipw_limitations(cross_fitted: bool) -> list[str]:
             "treatment effects"
         ),
     ]
-    if not cross_fitted:
+    if not crossfit:
         limitations.append(
             "nuisance models are fitted on the same rows used for scoring"
         )
@@ -3054,7 +3034,7 @@ def center(influence: numpy.ndarray) -> numpy.ndarray:
     return centered
 
 
-def influence_variance(
+def dispersion(
     influence: numpy.ndarray,
     covariance: CovarianceKind,
     clusters: numpy.ndarray | None,
@@ -3145,7 +3125,7 @@ def influence_variance(
     }
 
 
-def hajek_ipw_statistics(
+def hajek(
     treatment: numpy.ndarray,
     values: numpy.ndarray,
     propensity: numpy.ndarray,
@@ -3187,7 +3167,7 @@ def hajek_ipw_statistics(
     influence = treated_weights * (values - treated_mean) - control_weights * (
         values - control_mean
     )
-    variance, uncertainty = influence_variance(influence, covariance, clusters)
+    variance, uncertainty = dispersion(influence, covariance, clusters)
     effective_sample_size = {
         "treated": float(
             treated_denominator**2 / numpy.sum(treated_weights**2)
@@ -3235,7 +3215,7 @@ def fit_bayesian_linear(
             variance scale is invalid, or the posterior has two or fewer
             degrees of freedom.
     """
-    validate_bayesian_prior_shape(prior, design.shape[1])
+    conform(prior, design.shape[1])
     prior_mean = numpy.asarray(prior.mean, dtype=float)
     prior_precision = numpy.asarray(prior.precision, dtype=float)
     posterior_precision = prior_precision + design.T @ design
@@ -3289,7 +3269,7 @@ def fit_bayesian_linear(
     )
 
 
-def validate_bayesian_prior_shape(prior: BayesianPrior, dimension: int) -> None:
+def conform(prior: BayesianPrior, dimension: int) -> None:
     """Validates prior vector and matrix dimensions against a design.
 
     Args:
@@ -3399,7 +3379,7 @@ def fit_hierarchical_linear(
             random_intercept_variance,
             policy,
         )
-    information, right_hand_side = hierarchical_gls_system(
+    information, right_hand_side = gls(
         design,
         values,
         clusters,
@@ -3560,7 +3540,7 @@ def fit_hierarchical_random_slope(
     )
     random_effect_covariance = project(effect_covariance)
     if policy.hierarchical_method == "reml":
-        return fit_hierarchical_random_slope_reml(
+        return optimise(
             design,
             values,
             clusters,
@@ -3649,7 +3629,7 @@ def hierarchical_random_slope_gls_system(
         The GLS information matrix and right-hand-side vector summed over
         clusters.  A cluster whose marginal covariance is not positive
         definite raises the ValueError of
-        `hierarchical_random_effect_precision`.
+        `precisions`.
     """
     information = numpy.zeros((design.shape[1], design.shape[1]))
     right_hand_side = numpy.zeros(design.shape[1])
@@ -3662,7 +3642,7 @@ def hierarchical_random_slope_gls_system(
                 group_design[:, random_slope_position + 1],
             )
         )
-        precision = hierarchical_random_effect_precision(
+        precision = precisions(
             random_effect_design,
             residual_variance,
             random_effect_covariance,
@@ -3672,7 +3652,7 @@ def hierarchical_random_slope_gls_system(
     return information, right_hand_side
 
 
-def hierarchical_random_effect_precision(
+def precisions(
     random_effect_design: numpy.ndarray,
     residual_variance: float,
     random_effect_covariance: numpy.ndarray,
@@ -3784,7 +3764,7 @@ def hierarchical_random_slope_diagnostics(
     }
 
 
-def fit_hierarchical_random_slope_reml(
+def optimise(
     design: numpy.ndarray,
     values: numpy.ndarray,
     clusters: numpy.ndarray,
@@ -3988,7 +3968,7 @@ def random_slope_reml_profile_objective(
     Raises:
         ValueError: If `parameters` does not have exactly four values, or if
             the GLS system building rejects a covariance block (see
-            `hierarchical_random_effect_precision`).
+            `precisions`).
     """
     point = numpy.asarray(parameters, dtype=float)
     if point.shape != (4,):
@@ -4113,7 +4093,7 @@ def fit_hierarchical_reml(
         (math.log(lower_bound), math.log(upper_bound)),
     )
     optimizer_result = optimize.minimize(
-        reml_profile_objective,
+        deviance,
         numpy.log(initial_variances),
         args=(design, values, clusters, labels),
         method="L-BFGS-B",
@@ -4130,7 +4110,7 @@ def fit_hierarchical_reml(
     )
     residual_variance = float(variance_components[0])
     random_intercept_variance = float(variance_components[1])
-    information, right_hand_side = hierarchical_gls_system(
+    information, right_hand_side = gls(
         design,
         values,
         clusters,
@@ -4208,7 +4188,7 @@ def fit_hierarchical_reml(
     )
 
 
-def reml_profile_objective(
+def deviance(
     log_variances: numpy.ndarray,
     design: numpy.ndarray,
     values: numpy.ndarray,
@@ -4241,7 +4221,7 @@ def reml_profile_objective(
     if not numpy.isfinite(variances).all() or numpy.any(variances <= 0.0):
         return float("inf")
     residual_variance, random_intercept_variance = variances
-    information, right_hand_side = hierarchical_gls_system(
+    information, right_hand_side = gls(
         design,
         values,
         clusters,
@@ -4348,7 +4328,7 @@ def validate_reml_optimizer_result(
         )
 
 
-def hierarchical_gls_system(
+def gls(
     design: numpy.ndarray,
     values: numpy.ndarray,
     clusters: numpy.ndarray,
@@ -4392,7 +4372,7 @@ def hierarchical_gls_system(
     return information, right_hand_side
 
 
-def fit_logistic(
+def logit(
     design: numpy.ndarray,
     values: numpy.ndarray,
     max_iterations: int,
@@ -4433,7 +4413,7 @@ def fit_logistic(
             1.0 + numpy.linalg.norm(coefficients)
         ):
             probabilities = special.expit(design @ coefficients)
-            log_likelihood = bernoulli_log_likelihood(values, probabilities)
+            log_likelihood = loglik(values, probabilities)
             return (
                 coefficients,
                 probabilities,
@@ -4574,7 +4554,7 @@ def reference_ipw_ate(
         reference_ate,
         reference_variance,
         reference_evidence,
-    ) = hajek_ipw_statistics(
+    ) = hajek(
         treatment,
         values,
         reference_propensity,
@@ -4680,7 +4660,7 @@ def reference_aipw_ate(
         - (1.0 - treatment) * (values - outcome_control) / (1.0 - propensity)
     )
     reference_ate = float(numpy.mean(score))
-    reference_variance, reference_uncertainty = influence_variance(
+    reference_variance, reference_uncertainty = dispersion(
         score - reference_ate,
         policy.covariance,
         clusters,
@@ -4819,7 +4799,7 @@ def reference_cross_fitted_aipw_ate(
             }
         )
     reference_ate = float(numpy.mean(reference_scores))
-    reference_variance, reference_uncertainty = influence_variance(
+    reference_variance, reference_uncertainty = dispersion(
         reference_scores - reference_ate,
         policy.covariance,
         clusters,
@@ -4843,7 +4823,7 @@ def reference_cross_fitted_aipw_ate(
     }
 
 
-def reference_hierarchical_linear(
+def crosscheck(
     design: numpy.ndarray,
     values: numpy.ndarray,
     clusters: numpy.ndarray,
@@ -5214,7 +5194,7 @@ def reference_bayesian_ate(
         ValueError: If the prior dimension does not match the design or the
             policy has no treatment position.
     """
-    validate_bayesian_prior_shape(prior, design.shape[1])
+    conform(prior, design.shape[1])
     prior_mean = numpy.asarray(prior.mean, dtype=float)
     prior_precision = numpy.asarray(prior.precision, dtype=float)
     posterior_precision = prior_precision + design.T @ design
@@ -5237,7 +5217,7 @@ def reference_bayesian_ate(
     }
 
 
-def reference_logistic(
+def corroborate(
     design: numpy.ndarray,
     values: numpy.ndarray,
     coefficients: numpy.ndarray,
@@ -5270,7 +5250,7 @@ def reference_logistic(
             `candidate`.
         """
         probabilities = special.expit(design @ candidate)
-        value = -bernoulli_log_likelihood(values, probabilities)
+        value = -loglik(values, probabilities)
         gradient = design.T @ (probabilities - values)
         return value, gradient
 
@@ -5293,9 +5273,7 @@ def reference_logistic(
     }
 
 
-def bernoulli_log_likelihood(
-    values: numpy.ndarray, probabilities: numpy.ndarray
-) -> float:
+def loglik(values: numpy.ndarray, probabilities: numpy.ndarray) -> float:
     """Returns a numerically stable Bernoulli log likelihood.
 
     Args:
@@ -5311,7 +5289,7 @@ def bernoulli_log_likelihood(
     return float(numpy.sum(values * logits + (1.0 - values) * complements))
 
 
-def prior_sensitivity(
+def reprior(
     prior: BayesianPrior,
     design: numpy.ndarray,
     values: numpy.ndarray,
@@ -5335,7 +5313,7 @@ def prior_sensitivity(
         ValueError: If the Bayesian causal estimator has no treatment
             position.
     """
-    validate_bayesian_prior_shape(prior, design.shape[1])
+    conform(prior, design.shape[1])
     baseline = numpy.asarray(coefficients, dtype=float)
     alternatives = []
     prior_mean = numpy.asarray(prior.mean, dtype=float)
@@ -5372,9 +5350,7 @@ def prior_sensitivity(
     }
 
 
-def shift_sensitivity(
-    matrix: numpy.ndarray, shift_reference: Any
-) -> dict[str, Any]:
+def transport(matrix: numpy.ndarray, shift_reference: Any) -> dict[str, Any]:
     """Compares the fitted rows with a target-population feature matrix.
 
     Args:
@@ -5466,13 +5442,9 @@ def sensitivity_report(
         },
     }
     if prior is not None:
-        report["prior"] = prior_sensitivity(
-            prior, design, values, coefficients, policy
-        )
+        report["prior"] = reprior(prior, design, values, coefficients, policy)
     if shift_reference is not None:
-        report["distribution_shift"] = shift_sensitivity(
-            matrix, shift_reference
-        )
+        report["distribution_shift"] = transport(matrix, shift_reference)
     if policy.bootstrap_replicates and policy.estimator in {
         "ipw_ate",
         "aipw_ate",
@@ -5512,7 +5484,7 @@ def sensitivity_report(
                 linear_fit = regress(design[sample], values[sample], 1, 1e-8)
                 estimate = linear_fit[0]
             else:
-                logistic_fit = fit_logistic(
+                logistic_fit = logit(
                     design[sample],
                     values[sample],
                     policy.max_iterations,
@@ -5641,8 +5613,8 @@ def hierarchical_bootstrap_sensitivity(
     source_unit_count = len(source_labels)
 
     for replicate in range(policy.bootstrap_replicates):
-        sampled_matrix, sampled_values, sampled_clusters, draw = (
-            draw_hierarchical_bootstrap_sample(matrix, values, clusters, rng)
+        sampled_matrix, sampled_values, sampled_clusters, draw = clone(
+            matrix, values, clusters, rng
         )
         draws.append(
             {
@@ -5720,7 +5692,7 @@ def hierarchical_bootstrap_sensitivity(
     }
 
 
-def draw_hierarchical_bootstrap_sample(
+def clone(
     matrix: numpy.ndarray,
     values: numpy.ndarray,
     clusters: numpy.ndarray,

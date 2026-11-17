@@ -1,6 +1,6 @@
 """Column kinds.
 
-Each `ColumnKind` subclass encapsulates everything kind-specific: detection,
+Each `Family` subclass encapsulates everything kind-specific: detection,
 statistics, exclusion rules, the preprocessing transformer and the
 target-association heuristic used for leakage hypotheses. Profiling and
 preprocessing therefore iterate over kinds instead of branching on dtype.
@@ -80,7 +80,7 @@ def outlier_rate(series: pandas.Series) -> float:
     return float(outside.mean())
 
 
-def to_finite(series: pandas.Series) -> pandas.Series:
+def scrub(series: pandas.Series) -> pandas.Series:
     """Coerces a column to float, mapping unparseable and infinite to NaN.
 
     Args:
@@ -103,11 +103,11 @@ def to_float(values: Any) -> numpy.ndarray:
     Returns:
         A writable float array of the same shape as `values`.
     """
-    frame = pandas.DataFrame(values).apply(to_finite)
+    frame = pandas.DataFrame(values).apply(scrub)
     return numpy.array(frame.to_numpy(), dtype=float, copy=True)
 
 
-def to_text(values: Any) -> numpy.ndarray:
+def stringify(values: Any) -> numpy.ndarray:
     """Casts a one-column block to a 1-D array of strings ("" if missing).
 
     Args:
@@ -133,7 +133,7 @@ def to_object(values: Any) -> numpy.ndarray:
     return frame.where(frame.notna(), numpy.nan).to_numpy()
 
 
-def purity_association(key: pandas.Series, target: pandas.Series) -> float:
+def determinacy(key: pandas.Series, target: pandas.Series) -> float:
     """Measures how well `key` groups determine the target class.
 
     Args:
@@ -153,9 +153,7 @@ def purity_association(key: pandas.Series, target: pandas.Series) -> float:
     return float((group_majority.sum() - majority) / (len(target) - majority))
 
 
-def threshold_association(
-    values: pandas.Series, labels: pandas.Series
-) -> float:
+def stump(values: pandas.Series, labels: pandas.Series) -> float:
     """Class-separation gain of a small decision tree on one numeric feature.
 
     Fixed-width or quantile bins blur a sharp threshold (the bin that
@@ -183,11 +181,11 @@ def threshold_association(
     return max(0.0, (accuracy - majority) / (1.0 - majority))
 
 
-class ColumnKind(abc.ABC):
+class Family(abc.ABC):
     """Behaviour shared by a family of columns.
 
     Attributes:
-        name: Kind name; matches `FeaturePlan` fields for feature kinds.
+        name: Kind name; matches `Blueprint` fields for feature kinds.
     """
 
     name: ClassVar[str]
@@ -220,7 +218,7 @@ class ColumnKind(abc.ABC):
             "n_unique": int(series.nunique(dropna=True)),
         }
 
-    def exclusion_reason(self, series: pandas.Series) -> str | None:  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
+    def exclusion_reason(self, series: pandas.Series) -> str | None:  # noqa: ARG002 -- Family hook; every kind shares this signature
         """Returns why the column cannot be a feature, if it cannot.
 
         Args:
@@ -231,7 +229,7 @@ class ColumnKind(abc.ABC):
         """
         return None
 
-    def transformer(self, options: data.Preprocessing) -> Any | None:  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
+    def transformer(self, options: data.Preprocessing) -> Any | None:  # noqa: ARG002 -- Family hook; every kind shares this signature
         """Builds the preprocessing transformer, or None for non-features.
 
         Args:
@@ -245,9 +243,9 @@ class ColumnKind(abc.ABC):
 
     def association(
         self,
-        series: pandas.Series,  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
-        target: pandas.Series,  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
-        task: tasks.Task,  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
+        series: pandas.Series,  # noqa: ARG002 -- Family hook; every kind shares this signature
+        target: pandas.Series,  # noqa: ARG002 -- Family hook; every kind shares this signature
+        task: tasks.Task,  # noqa: ARG002 -- Family hook; every kind shares this signature
     ) -> float:
         """Returns a [0, 1] single-feature association with the target.
 
@@ -295,7 +293,7 @@ class ColumnKind(abc.ABC):
                 target.astype(float), method="spearman"
             )
             return 0.0 if numpy.isnan(corr) else float(abs(corr))
-        gain = purity_association(indicator, target)
+        gain = determinacy(indicator, target)
         one_sided = (
             target[~indicator].nunique() == 1  # noqa: PD101 -- counts distinct non-missing labels; an equality check would treat missing labels as different
             and target[indicator].nunique() > 1  # noqa: PD101 -- counts distinct non-missing labels; an equality check would treat missing labels as different
@@ -325,7 +323,7 @@ class ColumnKind(abc.ABC):
         return series[mask], target[mask]
 
 
-class NumericKind(ColumnKind):
+class Quantitative(Family):
     """Numeric and boolean columns."""
 
     name = "numeric"
@@ -356,7 +354,7 @@ class NumericKind(ColumnKind):
         """
         stats = super().statistics(series)
         if not pandas.api.types.is_bool_dtype(series):
-            finite = to_finite(series)
+            finite = scrub(series)
             names = ["skew", "mean", "std", "min", "max"]
             moments = finite.agg(names).to_dict()
             stats |= {
@@ -467,11 +465,11 @@ class NumericKind(ColumnKind):
             )
             return 0.0 if numpy.isnan(corr) else float(abs(corr))
         if values.nunique() <= MAX_DIRECT_VALUES:
-            return purity_association(values, labels)
-        return threshold_association(values.astype(float), labels)
+            return determinacy(values, labels)
+        return stump(values.astype(float), labels)
 
 
-class DatetimeKind(ColumnKind):
+class DatetimeKind(Family):
     """Datetime columns: expanded into calendar and trend features."""
 
     name = "datetime"
@@ -487,7 +485,7 @@ class DatetimeKind(ColumnKind):
         """
         return pandas.api.types.is_datetime64_any_dtype(series)
 
-    def exclusion_reason(self, series: pandas.Series) -> str | None:  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
+    def exclusion_reason(self, series: pandas.Series) -> str | None:  # noqa: ARG002 -- Family hook; every kind shares this signature
         """Datetimes are kept: the profiler expands them into features.
 
         Args:
@@ -499,7 +497,7 @@ class DatetimeKind(ColumnKind):
         return None
 
 
-class TextKind(ColumnKind):
+class TextKind(Family):
     """Free text: sentences or descriptions, encoded as TF-IDF terms."""
 
     name = "text"
@@ -555,16 +553,16 @@ class TextKind(ColumnKind):
             most `TEXT_TERMS` terms or embedding dimensions.
         """
         encoder: Any = (
-            embedding.TextEmbedder(options.embedding_model, TEXT_TERMS)
+            embedding.Embedder(options.embedding_model, TEXT_TERMS)
             if options.text_encoding == "embedding"
-            else transformers.TextVectorizer(max_terms=TEXT_TERMS)
+            else transformers.Vectorizer(max_terms=TEXT_TERMS)
         )
         return pipeline.Pipeline(
             [
                 (
                     "text",
                     preprocessing.FunctionTransformer(
-                        to_text, feature_names_out="one-to-one"
+                        stringify, feature_names_out="one-to-one"
                     ),
                 ),
                 (
@@ -575,12 +573,12 @@ class TextKind(ColumnKind):
         )
 
 
-class CategoricalKind(ColumnKind):
+class Categorical(Family):
     """Everything else: strings, categories, objects."""
 
     name = "categorical"
 
-    def matches(self, series: pandas.Series) -> bool:  # noqa: ARG002 -- ColumnKind hook; every kind shares this signature
+    def matches(self, series: pandas.Series) -> bool:  # noqa: ARG002 -- Family hook; every kind shares this signature
         """Fallback kind; matches any column.
 
         Args:
@@ -721,18 +719,18 @@ class CategoricalKind(ColumnKind):
         values, labels = rows
         if values.nunique() > len(values) / 2:
             return 0.0  # Near-unique keys are trivially pure; see id rule.
-        return purity_association(values, labels)
+        return determinacy(values, labels)
 
 
-KINDS: tuple[ColumnKind, ...] = (
-    NumericKind(),
+KINDS: tuple[Family, ...] = (
+    Quantitative(),
     DatetimeKind(),
     TextKind(),
-    CategoricalKind(),
+    Categorical(),
 )
 
 
-def kind_of(series: pandas.Series) -> ColumnKind:
+def kind_of(series: pandas.Series) -> Family:
     """Returns the first kind that matches `series`.
 
     Args:

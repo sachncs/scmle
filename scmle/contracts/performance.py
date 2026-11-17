@@ -464,7 +464,7 @@ class Baseline:
             for observation in reference_observations
             if observation is not None
         ]
-        time_regression = relative_change(
+        time_regression = rise(
             statistics.median(reference_times),
             current_observation.elapsed_seconds,
         )
@@ -480,7 +480,7 @@ class Baseline:
                     f"missing peak memory observation: {operation.value}"
                 )
             else:
-                memory_regression = relative_change(
+                memory_regression = rise(
                     statistics.median(
                         [
                             value
@@ -519,7 +519,7 @@ class Baseline:
         }
 
 
-def relative_change(reference: float, current: float) -> float:
+def rise(reference: float, current: float) -> float:
     """Returns the non-negative relative increase from reference to current.
 
     Args:
@@ -674,5 +674,5 @@ __all__ = [
     "Run",
     "Verdict",
     "parse_timestamp",
-    "relative_change",
+    "rise",
 ]

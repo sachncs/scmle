@@ -53,7 +53,7 @@ NOTE = (
 )
 
 
-def primary_choice(task: str) -> dict[str, Any] | None:
+def principal(task: str) -> dict[str, Any] | None:
     """The one served interval or set the claim is about, or None.
 
     Args:
@@ -78,14 +78,12 @@ def primary_choice(task: str) -> dict[str, Any] | None:
     }
 
 
-def registration_body(
-    claim_sha256: str, choice: Mapping[str, Any]
-) -> dict[str, Any]:
+def prefreeze(claim_sha256: str, choice: Mapping[str, Any]) -> dict[str, Any]:
     """What is frozen before `C` opens.
 
     Args:
         claim_sha256: Hash of `coverage_claim.json`.
-        choice: The primary choice from `primary_choice`.
+        choice: The primary choice from `principal`.
 
     Returns:
         The claim hash, the primary choice and the decision rule in words.
@@ -100,28 +98,28 @@ def registration_body(
 
 def registration(
     claim_sha256: str, choice: Mapping[str, Any]
-) -> confirm.RegisteredClaim:
+) -> confirm.Commitment:
     """The ledger registration of the claim.
 
     Args:
         claim_sha256: Hash of `coverage_claim.json`.
-        choice: The primary choice from `primary_choice`.
+        choice: The primary choice from `principal`.
 
     Returns:
         The registered claim, whose statement names the method, level and
         floor `level - tolerance` and whose digest covers the frozen body.
     """
     floor = float(choice["level"]) - float(choice["tolerance"])
-    return confirm.RegisteredClaim(
+    return confirm.Commitment(
         CLAIM_ID,
         KIND,
         f"the {choice['method']} interval or set at level {choice['level']:g} "
         f"covers at least {floor:g} of the rows of C",
-        ledger.digest(registration_body(claim_sha256, choice)),
+        ledger.digest(prefreeze(claim_sha256, choice)),
     )
 
 
-def floor_p_value(covered: int, rows: int, floor: float) -> float:
+def shortfall(covered: int, rows: int, floor: float) -> float:
     """One-sided exact p-value of "coverage is at most `floor`".
 
     Small values say the coverage is above the floor.
@@ -148,7 +146,7 @@ def decide(
     Args:
         covered: Number of rows inside their interval or set.
         rows: Number of rows scored.
-        choice: The primary choice from `primary_choice`.
+        choice: The primary choice from `principal`.
 
     Returns:
         The counts, observed coverage (None without rows), floor, p-value,
@@ -156,7 +154,7 @@ def decide(
         p-value is at most `ALPHA`, otherwise `unverified`.
     """
     floor = float(choice["level"]) - float(choice["tolerance"])
-    p_value = floor_p_value(covered, rows, floor)
+    p_value = shortfall(covered, rows, floor)
     lower = (
         coverage.clopper_pearson(covered, rows, 1.0 - 2.0 * ALPHA)[0]
         if rows
@@ -194,7 +192,7 @@ def capped(task: str, status: str) -> str:
     return task_gate.tier_ceiling(tasks.Task(task), status)
 
 
-def inside_of(
+def held(
     bundle: Any,
     features: pandas.DataFrame,
     target: Any,
@@ -206,7 +204,7 @@ def inside_of(
         bundle: The frozen bundle that serves intervals and sets.
         features: Features of the released rows.
         target: True values (regression) or labels (classification).
-        choice: The primary choice from `primary_choice`.
+        choice: The primary choice from `principal`.
 
     Returns:
         A boolean array: True where the value lies in the interval, or the
@@ -250,7 +248,7 @@ def assess(
         features: Features of the released rows of `C`.
         target: True values or labels of those rows.
         claim_sha256: Hash of `coverage_claim.json`.
-        choice: The primary choice from `primary_choice`.
+        choice: The primary choice from `principal`.
         task: The task type value.
 
     Returns:
@@ -258,7 +256,7 @@ def assess(
         status after the cap, the task gate, and a description of the other
         methods and levels and of exchangeability on the same rows.
     """
-    inside = inside_of(bundle, features, target, choice)
+    inside = held(bundle, features, target, choice)
     result = decide(int(inside.sum()), len(inside), choice)
     tested = result["status"]
     result["status"] = capped(task, tested)
@@ -267,11 +265,9 @@ def assess(
     )
     levels = (0.5, 0.8, 0.9, 0.95)
     others = (
-        coverage_run.regression_reports(bundle, features, target, levels)
+        coverage_run.regressions(bundle, features, target, levels)
         if kind == "regression"
-        else coverage_run.classification_reports(
-            bundle, features, target, levels
-        )
+        else coverage_run.classwise(bundle, features, target, levels)
     )
     return {
         "schema_version": 1,
@@ -317,7 +313,7 @@ def build_runner(
     bundle: Any,
     task: str,
     claim_sha256: str,
-) -> confirm.ClaimRunner | None:
+) -> confirm.Docket | None:
     """The runner of the registered claim, or None when there is none.
 
     There is none when the task type has no served interval or set, or the
@@ -332,16 +328,16 @@ def build_runner(
         A runner holding the registration and the evaluation of `C`, or
         None.
     """
-    choice = primary_choice(task)
+    choice = principal(task)
     if choice is None or bundle.conformal is None:
         return None
 
     def evaluate(
         features: pandas.DataFrame, target: pandas.Series
-    ) -> confirm.ClaimRun:
+    ) -> confirm.Output:
         document = assess(bundle, features, target, claim_sha256, choice, task)
-        return confirm.ClaimRun(
+        return confirm.Output(
             {CLAIM_ID: str(document["status"])}, {DOCUMENT: document}
         )
 
-    return confirm.ClaimRunner((registration(claim_sha256, choice),), evaluate)
+    return confirm.Docket((registration(claim_sha256, choice),), evaluate)

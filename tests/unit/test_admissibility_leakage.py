@@ -12,7 +12,7 @@ from sklearn.metrics import roc_auc_score
 
 from scmle.contracts import qualification
 from scmle.contracts.qualification import Decision
-from scmle.contracts.qualification import SetId
+from scmle.contracts.qualification import Subset
 from scmle.contracts.qualification import Tier
 from scmle.data.admissibility import leakage
 from scmle.data.detectors import certificates
@@ -41,43 +41,43 @@ def test_binary_auc_matches_sklearn_with_ties(seed):
     rng = numpy.random.default_rng(seed)
     truth = rng.integers(0, 2, 200)
     score = numpy.round(rng.normal(size=200) + truth, 1)  # many ties
-    assert leakage.binary_auc(truth, score) == pytest.approx(
+    assert leakage.auc(truth, score) == pytest.approx(
         roc_auc_score(truth, score), abs=1e-12
     )
 
 
 def test_binary_auc_needs_both_classes():
     with pytest.raises(ValueError, match="both classes"):
-        leakage.binary_auc(numpy.zeros(5, dtype=int), numpy.arange(5.0))
+        leakage.auc(numpy.zeros(5, dtype=int), numpy.arange(5.0))
 
 
 def test_skill_of_matches_sklearn_for_each_task():
     rng = numpy.random.default_rng(0)
     y3 = rng.integers(0, 3, 300)
     prob = rng.dirichlet(numpy.ones(3), 300)
-    assert leakage.skill_of(prob, y3, CLS) == pytest.approx(
+    assert leakage.predictiveness(prob, y3, CLS) == pytest.approx(
         roc_auc_score(y3, prob, multi_class="ovr", average="macro")
     )
     y2 = rng.integers(0, 2, 300)
     p2 = rng.dirichlet(numpy.ones(2), 300)
-    assert leakage.skill_of(p2, y2, CLS) == pytest.approx(
+    assert leakage.predictiveness(p2, y2, CLS) == pytest.approx(
         roc_auc_score(y2, p2[:, 1])
     )
     yr = rng.normal(size=300)
     pr = yr + rng.normal(size=300)
-    assert leakage.skill_of(pr, yr, "regression") == pytest.approx(
+    assert leakage.predictiveness(pr, yr, "regression") == pytest.approx(
         r2_score(yr, pr)
     )
     with pytest.raises(ValueError, match="constant"):
-        leakage.skill_of(pr, numpy.ones(300), "regression")
+        leakage.predictiveness(pr, numpy.ones(300), "regression")
 
 
 def test_permutation_p_value_formula_and_tie_direction():
     null = [0.5, 0.6, 0.7, 0.8]
-    assert leakage.permutation_p(0.9, null) == pytest.approx(1 / 5)
-    assert leakage.permutation_p(0.7, null) == pytest.approx(3 / 5)  # >= counts
-    assert leakage.permutation_p(0.0, null) == pytest.approx(1.0)
-    assert leakage.permutation_p(0.71, null) == pytest.approx(2 / 5)
+    assert leakage.significance(0.9, null) == pytest.approx(1 / 5)
+    assert leakage.significance(0.7, null) == pytest.approx(3 / 5)  # >= counts
+    assert leakage.significance(0.0, null) == pytest.approx(1.0)
+    assert leakage.significance(0.71, null) == pytest.approx(2 / 5)
 
 
 def test_cramers_v_matches_scipy_association():
@@ -170,7 +170,7 @@ def test_null_features_are_rarely_suspect_and_p_values_are_valid():
     for seed in range(runs):
         y, noise = binary_world(seed)
         cfg = dataclasses.replace(FAST, run_seed=seed)
-        out = leakage.skill_test(noise, y, CLS, cfg)
+        out = leakage.probe(noise, y, CLS, cfg)
         small += out.p_value <= 0.05
         suspects += out.suspect
     band = 0.05 + 2.576 * math.sqrt(0.05 * 0.95 / runs)
@@ -198,9 +198,7 @@ def planted(kind, seed, n=300):
 def test_planted_leaks_are_suspects(kind):
     for seed in range(6):
         x, y = planted(kind, seed)
-        out = leakage.skill_test(
-            x, y, CLS, dataclasses.replace(FAST, run_seed=seed)
-        )
+        out = leakage.probe(x, y, CLS, dataclasses.replace(FAST, run_seed=seed))
         assert out.suspect, (kind, seed, out.skill, out.lower_bound)
         assert out.p_value == pytest.approx(1 / 40)
         assert out.lower_bound > FAST.skill_ceiling
@@ -212,7 +210,7 @@ def test_a_strong_legitimate_predictor_below_the_ceiling_is_not_a_suspect():
     x = pandas.Series(
         y + rng.normal(scale=1.0, size=400), name="x"
     )  # AUC ~ 0.76
-    out = leakage.skill_test(x, y, CLS, FAST)
+    out = leakage.probe(x, y, CLS, FAST)
     assert out.p_value <= 0.05 and 0.6 < out.skill < 0.9
     assert not out.suspect
 
@@ -222,55 +220,53 @@ def test_suspect_requires_the_p_value_and_a_strictly_higher_bound(monkeypatch):
     monkeypatch.setattr(
         leakage, "lower_bound", lambda *a, **k: FAST.skill_ceiling
     )
-    assert not leakage.skill_test(x, y, CLS, FAST).suspect  # bound == ceiling
+    assert not leakage.probe(x, y, CLS, FAST).suspect  # bound == ceiling
     monkeypatch.setattr(
         leakage, "lower_bound", lambda *a, **k: FAST.skill_ceiling + 1e-9
     )
-    assert leakage.skill_test(x, y, CLS, FAST).suspect
-    monkeypatch.setattr(leakage, "permutation_p", lambda *a, **k: FAST.alpha)
-    assert leakage.skill_test(x, y, CLS, FAST).suspect  # p == alpha counts
+    assert leakage.probe(x, y, CLS, FAST).suspect
+    monkeypatch.setattr(leakage, "significance", lambda *a, **k: FAST.alpha)
+    assert leakage.probe(x, y, CLS, FAST).suspect  # p == alpha counts
     monkeypatch.setattr(
-        leakage, "permutation_p", lambda *a, **k: FAST.alpha + 1e-9
+        leakage, "significance", lambda *a, **k: FAST.alpha + 1e-9
     )
-    assert not leakage.skill_test(x, y, CLS, FAST).suspect
+    assert not leakage.probe(x, y, CLS, FAST).suspect
 
 
 def test_few_rows_report_low_power_and_never_a_suspect():
     x, y = planted("copy", 0, n=99)
-    out = leakage.skill_test(x, y, CLS, FAST)
+    out = leakage.probe(x, y, CLS, FAST)
     assert out.low_power and not out.suspect
     assert out.check.decision is Decision.WARN
     x, y = planted("copy", 0, n=100)
-    assert not leakage.skill_test(x, y, CLS, FAST).low_power
+    assert not leakage.probe(x, y, CLS, FAST).low_power
 
 
 def test_a_rare_class_is_low_power():
     y = pandas.Series([1] * 4 + [0] * 296)
     x = y.astype(float).rename("x")
-    assert leakage.skill_test(x, y, CLS, FAST).low_power  # 4 < 5 folds
+    assert leakage.probe(x, y, CLS, FAST).low_power  # 4 < 5 folds
 
 
 def test_the_decision_is_demoted_until_the_detector_is_certified():
     x, y = planted("copy", 0)
-    soft = leakage.skill_test(x, y, CLS, FAST)
-    hard = leakage.skill_test(
-        x, y, CLS, FAST, gate=certificates.GateStatus.GATING
-    )
+    soft = leakage.probe(x, y, CLS, FAST)
+    hard = leakage.probe(x, y, CLS, FAST, gate=certificates.Authority.GATING)
     assert soft.check.decision is Decision.WARN
     assert hard.check.decision is Decision.QUARANTINE
     yy, clean = binary_world(0)
-    assert leakage.skill_test(
-        clean, yy, CLS, FAST, gate=certificates.GateStatus.GATING
+    assert leakage.probe(
+        clean, yy, CLS, FAST, gate=certificates.Authority.GATING
     ).check.decision is (Decision.PASS)
 
 
 def test_the_ledger_record_is_complete():
     x, y = planted("copy", 0)
     cfg = dataclasses.replace(FAST, run_seed=11)
-    out = leakage.skill_test(x, y, CLS, cfg)
+    out = leakage.probe(x, y, CLS, cfg)
     check = out.check
     assert check.check_id == "leakage.skill.copy"
-    assert check.set_id is SetId.EXPLORATION and check.tier is Tier.UNVERIFIED
+    assert check.set_id is Subset.EXPLORATION and check.tier is Tier.UNVERIFIED
     assert check.p_value == out.p_value and check.n == 300
     assert check.seed_path[0] == 11
     assert check.interval is not None and check.interval[0] == out.lower_bound
@@ -280,9 +276,9 @@ def test_the_ledger_record_is_complete():
 
 def test_results_are_deterministic_and_seed_dependent():
     y, noise = binary_world(0)
-    a = leakage.skill_test(noise, y, CLS, FAST)
-    b = leakage.skill_test(noise, y, CLS, FAST)
-    c = leakage.skill_test(noise, y, CLS, dataclasses.replace(FAST, run_seed=5))
+    a = leakage.probe(noise, y, CLS, FAST)
+    b = leakage.probe(noise, y, CLS, FAST)
+    c = leakage.probe(noise, y, CLS, dataclasses.replace(FAST, run_seed=5))
     assert a == b
     assert (a.p_value, a.lower_bound) != (c.p_value, c.lower_bound)
 
@@ -292,9 +288,9 @@ def test_regression_target_is_supported():
     y = pandas.Series(rng.normal(size=300))
     leak = (y + rng.normal(scale=0.05, size=300)).rename("leak")
     cfg = dataclasses.replace(FAST, skill_ceiling=0.9)
-    assert leakage.skill_test(leak, y, "regression", cfg).suspect
+    assert leakage.probe(leak, y, "regression", cfg).suspect
     noise = pandas.Series(rng.normal(size=300), name="n")
-    assert not leakage.skill_test(noise, y, "regression", cfg).suspect
+    assert not leakage.probe(noise, y, "regression", cfg).suspect
 
 
 def test_groups_and_blocks_are_respected():
@@ -302,14 +298,14 @@ def test_groups_and_blocks_are_respected():
     groups = pandas.Series(numpy.repeat(numpy.arange(30), 10))
     y = pandas.Series(rng.integers(0, 2, 300))
     x = y.astype(float).rename("x")
-    grouped = leakage.skill_test(x, y, CLS, FAST, groups=groups)
+    grouped = leakage.probe(x, y, CLS, FAST, groups=groups)
     assert grouped.suspect
-    blocked = leakage.skill_test(x, y, CLS, FAST, block_size=50)
+    blocked = leakage.probe(x, y, CLS, FAST, block_size=50)
     assert blocked.suspect
     with pytest.raises(ValueError, match="not both"):
-        leakage.skill_test(x, y, CLS, FAST, groups=groups, block_size=50)
+        leakage.probe(x, y, CLS, FAST, groups=groups, block_size=50)
     with pytest.raises(ValueError, match="same length"):
-        leakage.skill_test(x.iloc[:10], y, CLS, FAST)
+        leakage.probe(x.iloc[:10], y, CLS, FAST)
 
 
 def test_group_level_signal_is_not_suspicious_under_within_group_permutation():
@@ -320,7 +316,7 @@ def test_group_level_signal_is_not_suspicious_under_within_group_permutation():
     level = rng.integers(0, 2, 40)
     y = pandas.Series(level[groups.to_numpy()])
     x = y.astype(float).rename("x")
-    out = leakage.skill_test(x, y, CLS, FAST, groups=groups)
+    out = leakage.probe(x, y, CLS, FAST, groups=groups)
     assert out.p_value == pytest.approx(1.0)
     assert not out.suspect
 
@@ -409,9 +405,9 @@ def test_conditional_test_explains_away_a_feature_carried_by_others():
     y = pandas.Series((rng.random(n) < 1 / (1 + numpy.exp(-6 * z))).astype(int))
     x = pandas.Series(z + rng.normal(scale=0.05, size=n), name="x")
     others = pandas.DataFrame({"z": z})
-    marginal = leakage.skill_test(x, y, CLS, FAST)
+    marginal = leakage.probe(x, y, CLS, FAST)
     assert marginal.skill > 0.85
-    out = leakage.conditional_test(x, others, y, CLS, FAST)
+    out = leakage.condition(x, others, y, CLS, FAST)
     assert not out.keeps_signal and out.p_value > 0.05
     assert out.strata >= 2
 
@@ -420,10 +416,10 @@ def test_conditional_test_keeps_the_signal_of_a_leak_given_the_others():
     y, noise = binary_world(0, 400)
     others = pandas.DataFrame({"n": noise})
     leak = y.astype(float).rename("leak")
-    out = leakage.conditional_test(leak, others, y, CLS, FAST)
+    out = leakage.condition(leak, others, y, CLS, FAST)
     assert out.keeps_signal and out.p_value == pytest.approx(1 / 40)
     assert out.check.decision is Decision.WARN
-    nothing = leakage.conditional_test(leak, others.iloc[:, :0], y, CLS, FAST)
+    nothing = leakage.condition(leak, others.iloc[:, :0], y, CLS, FAST)
     assert nothing.strata == 1 and nothing.keeps_signal
 
 
@@ -468,7 +464,7 @@ def test_scan_reports_every_feature_and_never_claims_proof():
 def test_missing_for_class_is_found_by_both_tests():
     x, y = planted("missing", 0)
     frame = pandas.DataFrame({"x": x, "y": y})
-    out = leakage.assess_feature(frame["x"], frame.iloc[:, :0], y, CLS, FAST)
+    out = leakage.assess(frame["x"], frame.iloc[:, :0], y, CLS, FAST)
     assert out.missingness is not None and out.missingness.suspect
     assert out.skill.suspect and out.suspect
 
@@ -505,9 +501,9 @@ def test_gate_requires_current_passing_certificates_for_every_leak_type():
     good = store_for(digest)
     assert (
         leakage.gate_status(good, leakage.CERTIFIED)
-        is certificates.GateStatus.GATING
+        is certificates.Authority.GATING
     )
-    descriptive = certificates.GateStatus.DESCRIPTIVE
+    descriptive = certificates.Authority.DESCRIPTIVE
     assert (
         leakage.gate_status(certificates.Store(), leakage.CERTIFIED)
         is descriptive
@@ -526,12 +522,12 @@ def test_gate_requires_current_passing_certificates_for_every_leak_type():
 
 def test_gate_requires_the_certified_settings_and_a_binary_target():
     good = store_for(leakage.code_digest())
-    descriptive = certificates.GateStatus.DESCRIPTIVE
+    descriptive = certificates.Authority.DESCRIPTIVE
     assert (
         leakage.gate_status(
             good, dataclasses.replace(leakage.CERTIFIED, run_seed=9)
         )
-        is certificates.GateStatus.GATING
+        is certificates.Authority.GATING
     )
     for change in (
         {"skill_ceiling": 0.96},
@@ -558,14 +554,14 @@ def test_code_digest_is_a_sha256_of_the_module_source():
 
 def test_enough_rows_boundaries_are_exact():
     balanced = numpy.array([0, 1] * 50)
-    assert leakage.enough_rows(balanced, CLS, FAST)  # 100 rows, 50 per class
-    assert not leakage.enough_rows(balanced[:98], CLS, FAST)
+    assert leakage.sufficient(balanced, CLS, FAST)  # 100 rows, 50 per class
+    assert not leakage.sufficient(balanced[:98], CLS, FAST)
     five = numpy.array([1] * 5 + [0] * 95)
     four = numpy.array([1] * 4 + [0] * 96)
-    assert leakage.enough_rows(five, CLS, FAST)  # 5 == folds
-    assert not leakage.enough_rows(four, CLS, FAST)
-    assert leakage.enough_rows(numpy.arange(100.0), "regression", FAST)
-    assert not leakage.enough_rows(numpy.arange(99.0), "regression", FAST)
+    assert leakage.sufficient(five, CLS, FAST)  # 5 == folds
+    assert not leakage.sufficient(four, CLS, FAST)
+    assert leakage.sufficient(numpy.arange(100.0), "regression", FAST)
+    assert not leakage.sufficient(numpy.arange(99.0), "regression", FAST)
 
 
 def test_lower_bound_is_the_requested_bootstrap_quantile():
@@ -581,7 +577,7 @@ def test_lower_bound_is_the_requested_bootstrap_quantile():
     low = leakage.lower_bound(
         pred, y, CLS, tight, None, numpy.random.default_rng(1)
     )
-    point = leakage.skill_of(pred, y, CLS)
+    point = leakage.predictiveness(pred, y, CLS)
     assert low < mid <= point + 0.02
     # cluster bootstrap resamples whole groups
     groups = numpy.repeat(numpy.arange(20), 10)

@@ -86,9 +86,7 @@ def evalue(rr: float) -> float:
     return ratio + math.sqrt(ratio * (ratio - 1.0))
 
 
-def evalue_interval(
-    estimate: float, low: float, high: float
-) -> dict[str, float]:
+def evalues(estimate: float, low: float, high: float) -> dict[str, float]:
     """Computes the E-values of a risk ratio and of its limit nearest null.
 
     Args:
@@ -146,7 +144,7 @@ class Regression:
     benchmarks: dict[str, tuple[float, float]]
 
 
-def partial_r2(t: float, dof: int) -> float:
+def rsquared(t: float, dof: int) -> float:
     """Computes a partial R-squared from a t statistic.
 
     Args:
@@ -159,7 +157,7 @@ def partial_r2(t: float, dof: int) -> float:
     return t * t / (t * t + dof)
 
 
-def ols_fit(
+def regress(
     frame: pandas.DataFrame,
     treatment: str,
     outcome: str,
@@ -205,20 +203,18 @@ def ols_fit(
     benchmarks = {}
     for j, name in enumerate(covariates):
         t_y = float(coef[2 + j] / math.sqrt(cov[2 + j, 2 + j]))
-        r2y = partial_r2(t_y, dof)
+        r2y = rsquared(t_y, dof)
         design = numpy.column_stack([numpy.ones(n), x])
         cd = numpy.linalg.lstsq(design, d, rcond=None)[0]
         rd = d - design @ cd
         dof_d = n - design.shape[1]
         cov_d = float(rd @ rd) / dof_d * numpy.linalg.inv(design.T @ design)
         t_d = float(cd[1 + j] / math.sqrt(cov_d[1 + j, 1 + j]))
-        benchmarks[name] = (partial_r2(t_d, dof_d), r2y)
-    return Regression(
-        float(coef[1]), se, dof, t, partial_r2(t, dof), benchmarks
-    )
+        benchmarks[name] = (rsquared(t_d, dof_d), r2y)
+    return Regression(float(coef[1]), se, dof, t, rsquared(t, dof), benchmarks)
 
 
-def robustness_value(
+def rvalue(
     t: float, dof: int, q: float = 1.0, alpha: float | None = None
 ) -> float:
     """Computes the robustness value of an estimate.
@@ -249,7 +245,7 @@ def robustness_value(
     return 0.5 * (math.sqrt(fq**4 + 4 * fq**2) - fq**2)
 
 
-def bias_bound(fit: Regression, r2yz: float, r2dz: float) -> float:
+def ceiling(fit: Regression, r2yz: float, r2dz: float) -> float:
     """Computes the largest absolute bias of a confounder.
 
     Args:
@@ -270,7 +266,7 @@ def bias_bound(fit: Regression, r2yz: float, r2dz: float) -> float:
     return fit.se * math.sqrt(fit.dof) * math.sqrt(r2yz * r2dz / (1 - r2dz))
 
 
-def adjusted_interval(
+def robustify(
     fit: Regression, r2yz: float, r2dz: float, level: float = 0.95
 ) -> tuple[float, float]:
     """Computes the interval over both directions of a confounder.
@@ -284,9 +280,9 @@ def adjusted_interval(
     Returns:
         The lower and upper limits, the estimate moved by the bias bound and
         the adjusted standard error times a t quantile. Partial R-squareds
-        outside [0, 1) are refused with a `ValueError` by `bias_bound`.
+        outside [0, 1) are refused with a `ValueError` by `ceiling`.
     """
-    bias = bias_bound(fit, r2yz, r2dz)
+    bias = ceiling(fit, r2yz, r2dz)
     se_adj = (
         fit.se
         * math.sqrt((1 - r2yz) / (1 - r2dz))
@@ -296,7 +292,7 @@ def adjusted_interval(
     return fit.estimate - bias - z * se_adj, fit.estimate + bias + z * se_adj
 
 
-def benchmark_strength(
+def calibrate(
     r2dxj: float, r2yxj: float, kd: float, ky: float
 ) -> tuple[float, float]:
     """Converts benchmark multiples into confounder strengths.
@@ -418,7 +414,7 @@ def assess(
             too few residual degrees of freedom remain, or if a `fixed`
             strength is negative.
     """
-    fit = ols_fit(frame, treatment, outcome, covariates)
+    fit = regress(frame, treatment, outcome, covariates)
     chosen: str | None = None
     if benchmark == "fixed":
         r2yz = r2dz = float(strength)
@@ -430,10 +426,10 @@ def assess(
         r2yz = r2dz = 0.0
         for name, (r2d, r2y) in fit.benchmarks.items():
             try:
-                a, b = benchmark_strength(r2d, r2y, strength, strength)
+                a, b = calibrate(r2d, r2y, strength, strength)
             except ValueError:  # handled: set infeasible; wording says so
                 a, b = INFEASIBLE, INFEASIBLE
-            width = bias_bound(fit, min(a, INFEASIBLE), min(b, INFEASIBLE))
+            width = ceiling(fit, min(a, INFEASIBLE), min(b, INFEASIBLE))
             if width > best:
                 best, r2yz, r2dz, chosen = width, a, b, name
         words = (
@@ -447,15 +443,15 @@ def assess(
             f"so both strengths are set to {INFEASIBLE} and the gate fails"
         )
     r2yz, r2dz = min(r2yz, INFEASIBLE), min(r2dz, INFEASIBLE)
-    low, high = adjusted_interval(fit, r2yz, r2dz, level)
+    low, high = robustify(fit, r2yz, r2dz, level)
     return Sensitivity(
         estimate=fit.estimate,
-        rv=robustness_value(fit.t, fit.dof, 1.0),
-        rv_alpha=robustness_value(fit.t, fit.dof, 1.0, 1 - level),
+        rv=rvalue(fit.t, fit.dof, 1.0),
+        rv_alpha=rvalue(fit.t, fit.dof, 1.0, 1 - level),
         benchmark=words,
         r2yz=r2yz,
         r2dz=r2dz,
-        bias=bias_bound(fit, r2yz, r2dz),
+        bias=ceiling(fit, r2yz, r2dz),
         low=low,
         high=high,
         holds=bool(low > 0 or high < 0),

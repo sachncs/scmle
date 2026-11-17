@@ -194,7 +194,7 @@ def test_standard_errors_without_interval_errors_use_them_for_intervals(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """A fit that sets only standard errors scales its intervals by them."""
-    real_fit_estimator = parameter_estimation.fit_estimator
+    real_fit_estimator = parameter_estimation.compute
     seen: dict[str, Any] = {}
 
     def only_standard_errors(*args: Any, **kwargs: Any) -> Any:
@@ -206,9 +206,7 @@ def test_standard_errors_without_interval_errors_use_them_for_intervals(
             interval_errors=None,
         )
 
-    monkeypatch.setattr(
-        parameter_estimation, "fit_estimator", only_standard_errors
-    )
+    monkeypatch.setattr(parameter_estimation, "compute", only_standard_errors)
     rng = numpy.random.default_rng(7)
     features = rng.normal(size=(60, 2))
     outcome = 1.0 + features[:, 0] + rng.normal(scale=0.2, size=60)
@@ -1062,7 +1060,7 @@ def test_causal_bootstrap_fails_closed_when_too_few_replicates_succeed(
             "positivity",
         ),
     )
-    original_fit = parameter_estimation.fit_aipw_ate
+    original_fit = parameter_estimation.dr
     calls = 0
 
     def fail_bootstrap(*args: Any, **kwargs: Any) -> Any:
@@ -1072,7 +1070,7 @@ def test_causal_bootstrap_fails_closed_when_too_few_replicates_succeed(
             raise ValueError("forced bootstrap failure")
         return original_fit(*args, **kwargs)
 
-    monkeypatch.setattr(parameter_estimation, "fit_aipw_ate", fail_bootstrap)
+    monkeypatch.setattr(parameter_estimation, "dr", fail_bootstrap)
     with pytest.raises(
         ValueError,
         match="at least two successful replicates; received 0 of 3",

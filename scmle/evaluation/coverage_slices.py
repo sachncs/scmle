@@ -6,7 +6,7 @@ read. For each level of a slice the report gives the number of rows, the
 share covered with its Clopper-Pearson interval and the mean width (regression)
 or set size (classification).
 
-The per-slice flag (`coverage.slice_flag`) replaces the Holm flag of
+The per-slice flag (`coverage.undercovered`) replaces the Holm flag of
 `coverage.slice_coverage`, whose measured familywise false-flag rate was
 0.0755 against a bound of 0.0597: each slice is tested against the nominal
 level less a margin fixed in advance (0.05) and Holm is applied over the
@@ -72,17 +72,17 @@ class FlagGate:
         return dataclasses.asdict(self)
 
 
-def flag_method_hash() -> str:
+def fingerprint() -> str:
     """Hash of the package code the slice-flag certificate measured.
 
     Returns:
-        The code hash of `coverage.slice_flag`, `coverage.holm_rejections`
-        and `coverage.undercoverage_p_value`.
+        The code hash of `coverage.undercovered`, `coverage.stepdown`
+        and `coverage.deficit`.
     """
     return certificates.code_hash(
-        coverage.slice_flag,
-        coverage.holm_rejections,
-        coverage.undercoverage_p_value,
+        coverage.undercovered,
+        coverage.stepdown,
+        coverage.deficit,
     )
 
 
@@ -111,7 +111,7 @@ def flag_gate(path: Path | None = None) -> FlagGate:
     )
     if entry is None:
         return FlagGate(DESCRIPTIVE, "no certificate for the slice flag")
-    if entry.get("method_hash") != flag_method_hash():
+    if entry.get("method_hash") != fingerprint():
         return FlagGate(
             DESCRIPTIVE, "stale: the code changed since it was measured"
         )
@@ -126,7 +126,7 @@ def flag_gate(path: Path | None = None) -> FlagGate:
     )
 
 
-def labels_for(
+def bucket(
     values: pandas.Series, reference: pandas.Series | None = None
 ) -> pandas.Series | None:
     """Slice label of each row, or None when the column cannot be sliced.
@@ -192,7 +192,7 @@ def summary(
         is gating.
     """
     gate = flag_gate() if gate is None else gate
-    flags_found = coverage.slice_flag(inside, labels, nominal)
+    flags_found = coverage.undercovered(inside, labels, nominal)
     gating = gate.status == GATING
     flags = numpy.asarray(inside, dtype=bool)
     widths = numpy.asarray(sizes, dtype=float)

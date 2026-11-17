@@ -52,7 +52,7 @@ class Finding:
         return dataclasses.asdict(self)
 
 
-def class_association(
+def chisquare(
     gaps: pandas.Series, target: pandas.Series
 ) -> tuple[str, float, float]:
     """Tests gaps against class labels with a chi-square test.
@@ -77,7 +77,7 @@ def class_association(
     return "chi-square", float(result.pvalue), effect  # pyright: ignore[reportAttributeAccessIssue]  # scipy.stats result types are untyped tuples
 
 
-def value_association(
+def mannwhitney(
     gaps: pandas.Series, target: pandas.Series
 ) -> tuple[str, float, float]:
     """Tests gaps against a numeric target with a Mann-Whitney test.
@@ -129,9 +129,9 @@ def assess(
     findings = []
     for column, gaps in candidates:
         test, p_value, effect = (
-            class_association(gaps, target)
+            chisquare(gaps, target)
             if classification
-            else value_association(gaps, target)
+            else mannwhitney(gaps, target)
         )
         findings.append(
             Finding(

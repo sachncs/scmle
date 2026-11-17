@@ -155,8 +155,8 @@ def test_a_selected_subset_marks_the_rest_not_selected_and_the_report_is_json():
 
 
 def sample(n):
-    return observability.MetricSample(
-        f"m{n}", observability.SignalKind.THROUGHPUT, float(n), "count", STAMP
+    return observability.Sample(
+        f"m{n}", observability.Indicator.THROUGHPUT, float(n), "count", STAMP
     )
 
 
@@ -237,9 +237,9 @@ def test_a_killed_writers_temp_file_does_not_make_the_store_unlistable(
     (tmp_path / "runs" / "a" / ".step.json.q1w2e3r4.tmp").write_bytes(b"half")
     (tmp_path / "runs" / "a" / ".put-abcdef").write_bytes(b"half")
     assert [m.key for m in store.list_objects("runs/")] == ["runs/a/step.json"]
-    assert objectstore.is_temporary(".x.json.abc.tmp")
-    assert not objectstore.is_temporary("x.tmp")
-    assert not objectstore.is_temporary("step.json")
+    assert objectstore.partial(".x.json.abc.tmp")
+    assert not objectstore.partial("x.tmp")
+    assert not objectstore.partial("step.json")
 
 
 def test_the_time_scale_defaults_to_one_and_is_validated(monkeypatch):

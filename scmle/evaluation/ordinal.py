@@ -25,9 +25,7 @@ def quadratic_weighted_kappa(
     )
 
 
-def mean_absolute_class_error(
-    truth: numpy.ndarray, guess: numpy.ndarray
-) -> float:
+def distance(truth: numpy.ndarray, guess: numpy.ndarray) -> float:
     """Average number of levels the guess is away from the truth.
 
     Args:

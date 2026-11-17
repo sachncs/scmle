@@ -47,7 +47,7 @@ RUN_ID_PATTERN = (
 SECRET_WORDS = ("SECRET", "PASSWORD", "TOKEN", "CREDENTIAL", "PRIVATE", "KEY")
 
 
-class JobState(enum.StrEnum):
+class State(enum.StrEnum):
     """Where one attempt is.
 
     Attributes:
@@ -69,10 +69,10 @@ class JobState(enum.StrEnum):
 
 TERMINAL = frozenset(
     {
-        JobState.SUCCEEDED,
-        JobState.FAILED,
-        JobState.INTERRUPTED,
-        JobState.CANCELLED,
+        State.SUCCEEDED,
+        State.FAILED,
+        State.INTERRUPTED,
+        State.CANCELLED,
     }
 )
 
@@ -101,7 +101,7 @@ class RunState(enum.StrEnum):
 FINAL = frozenset(set(RunState) - {RunState.STARTED})
 
 
-class RunConflictError(errors.ScmleError):
+class ConflictError(errors.ScmleError):
     """A run id is being reused for a different spec."""
 
     category = "run_conflict"
@@ -288,7 +288,7 @@ class Job:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class JobHandle:
+class Ticket:
     """A started attempt.
 
     Attributes:
@@ -302,7 +302,7 @@ class JobHandle:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class JobStatus:
+class Status:
     """What a platform reports about an attempt.
 
     Attributes:
@@ -311,7 +311,7 @@ class JobStatus:
         retryable: For `FAILED`: whether another attempt may succeed.
     """
 
-    state: JobState
+    state: State
     reason: str = ""
     retryable: bool = False
 
@@ -355,7 +355,7 @@ class Attempt:
     Attributes:
         attempt: Attempt number, from 1.
         job_id: The platform's id of the attempt.
-        state: Final (or current) `JobState` value.
+        state: Final (or current) `State` value.
         started_at: UTC start time.
         ended_at: UTC end time; empty while running.
         seconds: Elapsed seconds.
@@ -535,7 +535,7 @@ class Runner(abc.ABC):
         self.watcher: Callable[[], RunState | None] = lambda: None
 
     @abc.abstractmethod
-    def submit(self, spec: Job, attempt: int) -> JobHandle:
+    def submit(self, spec: Job, attempt: int) -> Ticket:
         """Starts one attempt.
 
         Args:
@@ -547,7 +547,7 @@ class Runner(abc.ABC):
         """
 
     @abc.abstractmethod
-    def poll(self, handle: JobHandle) -> JobStatus:
+    def poll(self, handle: Ticket) -> Status:
         """Reports the attempt's state.
 
         Args:
@@ -558,7 +558,7 @@ class Runner(abc.ABC):
         """
 
     @abc.abstractmethod
-    def cancel(self, handle: JobHandle, reason: str) -> None:
+    def cancel(self, handle: Ticket, reason: str) -> None:
         """Asks the platform to stop the attempt.
 
         Args:
@@ -566,7 +566,7 @@ class Runner(abc.ABC):
             reason: Why it is stopped.
         """
 
-    def manifest_key(self, run_id: str) -> str:
+    def locate(self, run_id: str) -> str:
         """Builds the key of a run's manifest.
 
         Args:
@@ -606,7 +606,7 @@ class Runner(abc.ABC):
             manifest: The manifest to store.
         """
         body = json.dumps(manifest.to_dict(), indent=2, sort_keys=True)
-        self.store.put(self.manifest_key(manifest.run_id), body.encode())
+        self.store.put(self.locate(manifest.run_id), body.encode())
 
     def load(self, run_id: str) -> RunManifest | None:
         """Reads a run's manifest.
@@ -618,8 +618,8 @@ class Runner(abc.ABC):
             The stored manifest, or None if the run has none.
         """
         try:
-            data = self.store.get(self.manifest_key(run_id))[0]
-        except objectstore.NotFoundError:
+            data = self.store.get(self.locate(run_id))[0]
+        except objectstore.AbsentError:
             # handled: documented None when run has no manifest
             return None
         return RunManifest.from_dict(json.loads(data))
@@ -637,16 +637,16 @@ class Runner(abc.ABC):
             The run's stored manifest, or a new one if the run is new.
 
         Raises:
-            RunConflictError: If the id exists with a different spec.
+            ConflictError: If the id exists with a different spec.
         """
         roles.check_distinct(spec.identity, self.serving_identity)
         body = json.dumps(spec.to_dict(), indent=2, sort_keys=True).encode()
         try:
             self.store.put(self.spec_key(spec.run_id), body, if_absent=True)
-        except objectstore.AlreadyExistsError:
+        except objectstore.ExistsError:
             stored = self.store.get(self.spec_key(spec.run_id))[0]
             if stored != body:
-                raise RunConflictError(
+                raise ConflictError(
                     f"run {spec.run_id} exists with a different spec"
                 ) from None
         existing = self.load(spec.run_id)
@@ -671,7 +671,7 @@ class Runner(abc.ABC):
         recorded manifest and starts nothing; after an interruption of the
         caller itself it continues the numbering and resumes from the run's
         checkpoints. A spec that clashes with the stored one is refused with
-        `RunConflictError`, and a job that would run as the serving identity
+        `ConflictError`, and a job that would run as the serving identity
         with `ConfigError`.
 
         Args:
@@ -734,10 +734,10 @@ class Runner(abc.ABC):
 
         self.watcher = watch
         handle = self.submit(spec, number)
-        record = Attempt(number, handle.job_id, JobState.RUNNING.value, stamp())
+        record = Attempt(number, handle.job_id, State.RUNNING.value, stamp())
         manifest.attempts.append(record)
         self.save(manifest)
-        status = JobStatus(JobState.PENDING)
+        status = Status(State.PENDING)
         stopped: RunState | None = None
         while True:
             status = self.poll(handle)
@@ -761,15 +761,15 @@ class Runner(abc.ABC):
         self.save(manifest)
         if stopped is not None:
             return stopped
-        if status.state is JobState.SUCCEEDED:
+        if status.state is State.SUCCEEDED:
             return RunState.SUCCEEDED
-        if status.state is JobState.INTERRUPTED or (
-            status.state is JobState.FAILED and status.retryable
+        if status.state is State.INTERRUPTED or (
+            status.state is State.FAILED and status.retryable
         ):
             return None
         return RunState.FAILED
 
-    def confirm(self, handle: JobHandle) -> JobStatus:
+    def confirm(self, handle: Ticket) -> Status:
         """Polls a cancelled attempt a few times for its terminal state.
 
         Args:
@@ -787,7 +787,7 @@ class Runner(abc.ABC):
                 return status
             self.clock.sleep(self.poll_seconds)
             status = self.poll(handle)
-        return JobStatus(JobState.CANCELLED, "cancel requested")
+        return Status(State.CANCELLED, "cancel requested")
 
     def finish(
         self, spec: Job, manifest: RunManifest, state: RunState
@@ -813,7 +813,7 @@ class Runner(abc.ABC):
         if state is RunState.SUCCEEDED:
             try:
                 meta = self.store.get(self.result_key(spec.run_id))[1]
-            except objectstore.NotFoundError:
+            except objectstore.AbsentError:
                 # handled: run marked FAILED with reason
                 state = RunState.FAILED
                 manifest.attempts[-1].reason = "job ended without a result"
@@ -822,7 +822,7 @@ class Runner(abc.ABC):
         manifest.evidence = [
             {"key": meta.key, "sha256": meta.sha256, "size": meta.size}
             for meta in self.store.list_objects(f"runs/{spec.run_id}/")
-            if meta.key != self.manifest_key(spec.run_id)
+            if meta.key != self.locate(spec.run_id)
         ]
         manifest.state = state.value
         manifest.ended_at = stamp()

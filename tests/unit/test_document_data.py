@@ -142,14 +142,14 @@ def test_reader_accepts_an_explicit_layout_extractor_contract():
                     generator for generator in ()
                 ).throw(ImportError())
             ),
-            document.DocumentDependencyError,
+            document.DependencyError,
             "missing_dependency",
         ),
         (
             document.Reader(
                 layout_reader=lambda *arguments: "invalid"  # type: ignore[return-value]
             ),
-            document.DocumentValidationError,
+            document.DocumentError,
             "layout_invalid_result",
         ),
     ],
@@ -172,9 +172,7 @@ def test_layout_source_digest_mismatch_fails_closed():
         source_digest="0" * 64,
     )
 
-    with pytest.raises(
-        document.DocumentValidationError, match="does not match"
-    ):
+    with pytest.raises(document.DocumentError, match="does not match"):
         document.Reader().load(b"Heading", document_id="doc-1", layout=layout)
 
 
@@ -259,7 +257,7 @@ def test_document_layout_confidence_and_offsets_fail_closed():
         provider_version="3.2",
         elements=(document.Element("ocr", 0, 9, 1),),
     )
-    with pytest.raises(document.DocumentValidationError, match="exceeds"):
+    with pytest.raises(document.DocumentError, match="exceeds"):
         document.Sample("invalid", content, layout=invalid_layout)
 
 
@@ -269,7 +267,7 @@ def test_document_sensitive_content_is_detected_without_leaking_values():
     sample = document.Sample("sensitive", content)
     report = document.Dataset((sample,)).curate()
 
-    assert document.sensitive_matches(content) == {"email": 1, "ssn": 1}
+    assert document.pii(content) == {"email": 1, "ssn": 1}
     assert report.sensitive_match_counts == {"email": 1, "ssn": 1}
     assert report.release_ready is False
     assert [finding.finding_id for finding in report.risk_findings] == [
@@ -281,7 +279,7 @@ def test_document_sensitive_content_is_detected_without_leaking_values():
 
 def test_empty_fixture_fails_with_structured_validation(empty_document: bytes):
     """Whitespace-only content cannot enter the immutable contract."""
-    with pytest.raises(document.DocumentValidationError) as caught:
+    with pytest.raises(document.DocumentError) as caught:
         document.Reader().load(empty_document, document_id="empty")
 
     assert caught.value.category == "document_validation"
@@ -295,7 +293,7 @@ def test_malformed_bytes_fixture_reports_encoding_offset(
     malformed_bytes: bytes,
 ):
     """Malformed bytes fail closed with the decoder offset."""
-    with pytest.raises(document.DocumentValidationError) as caught:
+    with pytest.raises(document.DocumentError) as caught:
         document.Reader().load(malformed_bytes, document_id="bad")
 
     assert caught.value.details["code"] == "invalid_encoding"
@@ -305,7 +303,7 @@ def test_malformed_bytes_fixture_reports_encoding_offset(
 
 def test_size_validation_is_bounded_and_structured():
     """Oversized input is rejected before decoding."""
-    with pytest.raises(document.DocumentValidationError) as caught:
+    with pytest.raises(document.DocumentError) as caught:
         document.Reader(max_bytes=4).load(b"hello", document_id="large")
 
     assert caught.value.details == {
@@ -368,7 +366,7 @@ def test_shifted_fixture_splits_by_document_id_without_leakage(shifted_dataset):
 
 def test_pdf_without_optional_reader_has_structured_dependency_error():
     """PDF support fails explicitly when the optional reader is absent."""
-    with pytest.raises(document.DocumentDependencyError) as caught:
+    with pytest.raises(document.DependencyError) as caught:
         document.Reader().load(
             b"%PDF-1.7", document_id="pdf", document_format="pdf"
         )

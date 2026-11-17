@@ -38,17 +38,17 @@ def test_workdir_sync_pushes_changes_and_restores(tmp_path):
     (source / "sub").mkdir(parents=True)
     (source / "a.txt").write_text("one")
     (source / "sub" / "b.txt").write_text("two")
-    sync = project.WorkdirSync(store, "runs/x/workdir/", source)
+    sync = project.Mirror(store, "runs/x/workdir/", source)
     assert sync.push() == 2 and sync.push() == 0
     (source / "a.txt").write_text("changed")
     assert sync.push() == 1
     target = tmp_path / "restored"
     target.mkdir()
-    other = project.WorkdirSync(store, "runs/x/workdir/", target)
+    other = project.Mirror(store, "runs/x/workdir/", target)
     assert other.restore() == 2
     assert (target / "a.txt").read_text() == "changed"
     assert (target / "sub" / "b.txt").read_text() == "two"
-    assert project.saved_run(target) is None
+    assert project.locate(target) is None
 
 
 def spec_of(run_id="churn-1"):

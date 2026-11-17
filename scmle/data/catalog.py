@@ -64,7 +64,7 @@ def digest_value(value: Any) -> str:
     )
 
 
-def normalize_uri(uri: str) -> str:
+def normalize(uri: str) -> str:
     """Normalizes a source URI without resolving caller-owned remote data.
 
     Args:
@@ -141,7 +141,7 @@ class Source:
         uri_value = str(self.uri)
         if not uri_value.strip():
             raise errors.InputError("uri must not be empty")
-        object.__setattr__(self, "uri", normalize_uri(uri_value))
+        object.__setattr__(self, "uri", normalize(uri_value))
         for field_name in (
             "version",
             "owner",
@@ -263,7 +263,7 @@ class Field:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class MissingnessSummary:
+class Missingness:
     """Observed missing-value state, including fields with missingness."""
 
     status: str
@@ -375,7 +375,7 @@ class MissingnessSummary:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DuplicateSummary:
+class Duplication:
     """Observed duplicate-row state and the method used to measure it."""
 
     status: str
@@ -444,7 +444,7 @@ class DuplicateSummary:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class LabelSummary:
+class Labeling:
     """Explicit label state without inferring a learning task."""
 
     status: str
@@ -581,9 +581,9 @@ class Catalog:
     shape: tuple[int, ...]
     schema: tuple[Field, ...]
     sample_count: int
-    missingness: MissingnessSummary
-    duplicates: DuplicateSummary
-    label: LabelSummary
+    missingness: Missingness
+    duplicates: Duplication
+    label: Labeling
     content_identity: str
     limitations: tuple[str, ...]
     release_blockers: tuple[str, ...]
@@ -620,12 +620,12 @@ class Catalog:
         fields = tuple(self.schema)
         if any(not isinstance(field, Field) for field in fields):
             raise errors.KindError("schema must contain Field records")
-        if not isinstance(self.missingness, MissingnessSummary):
-            raise errors.KindError("missingness must be MissingnessSummary")
-        if not isinstance(self.duplicates, DuplicateSummary):
-            raise errors.KindError("duplicates must be DuplicateSummary")
-        if not isinstance(self.label, LabelSummary):
-            raise errors.KindError("label must be LabelSummary")
+        if not isinstance(self.missingness, Missingness):
+            raise errors.KindError("missingness must be Missingness")
+        if not isinstance(self.duplicates, Duplication):
+            raise errors.KindError("duplicates must be Duplication")
+        if not isinstance(self.label, Labeling):
+            raise errors.KindError("label must be Labeling")
         limitation_notes: Iterable[object] = self.limitations
         blocker_notes: Iterable[object] = self.release_blockers
         if not self.limitations or any(
@@ -664,9 +664,9 @@ class Catalog:
         shape: Sequence[int],
         schema: Sequence[Field],
         sample_count: int,
-        missingness: MissingnessSummary,
-        duplicates: DuplicateSummary,
-        label: LabelSummary,
+        missingness: Missingness,
+        duplicates: Duplication,
+        label: Labeling,
         content_identity: str,
         limitations: Sequence[str],
         release_blockers: Sequence[str] = (),
@@ -744,7 +744,7 @@ class Catalog:
             first-seen order.
         """
         source_value = source if isinstance(source, Source) else Source(source)
-        observation = observe_data(data, label_column, content_identity)
+        observation = examine(data, label_column, content_identity)
         limitation_values = [
             "curation_only_no_model_fit_or_performance_claim",
             *observation.limitations,
@@ -777,11 +777,11 @@ class Catalog:
     def catalog_digest(self) -> str:
         """The digest of all catalog evidence except this digest.
 
-        This is the ``sha256:`` digest of ``content_dict()``.
+        This is the ``sha256:`` digest of ``contents()``.
         """
-        return digest_value(self.content_dict())
+        return digest_value(self.contents())
 
-    def content_dict(self) -> dict[str, Any]:
+    def contents(self) -> dict[str, Any]:
         """Returns canonical catalog content without the external digest.
 
         Returns:
@@ -809,7 +809,7 @@ class Catalog:
         Returns:
             The content dictionary plus a ``catalog_digest`` entry.
         """
-        record = self.content_dict()
+        record = self.contents()
         record["catalog_digest"] = self.catalog_digest
         return record
 
@@ -817,9 +817,9 @@ class Catalog:
         """Returns canonical catalog content suitable for verification.
 
         Returns:
-            Canonical JSON text of ``content_dict()``.
+            Canonical JSON text of ``contents()``.
         """
-        return canonical_json(self.content_dict())
+        return canonical_json(self.contents())
 
     def write(self, path: str | pathlib.Path) -> None:
         """Persists the catalog atomically as verified JSON evidence.
@@ -908,9 +908,9 @@ class Catalog:
             shape=tuple(int(value) for value in record["shape"]),
             schema=tuple(Field.from_dict(field) for field in record["schema"]),
             sample_count=int(record["sample_count"]),
-            missingness=MissingnessSummary.from_dict(record["missingness"]),
-            duplicates=DuplicateSummary.from_dict(record["duplicates"]),
-            label=LabelSummary.from_dict(record["label"]),
+            missingness=Missingness.from_dict(record["missingness"]),
+            duplicates=Duplication.from_dict(record["duplicates"]),
+            label=Labeling.from_dict(record["label"]),
             content_identity=str(record["content_identity"]),
             limitations=tuple(str(item) for item in record["limitations"]),
             release_blockers=tuple(
@@ -927,15 +927,15 @@ class Observation:
     shape: tuple[int, ...]
     schema: tuple[Field, ...]
     sample_count: int
-    missingness: MissingnessSummary
-    duplicates: DuplicateSummary
-    label: LabelSummary
+    missingness: Missingness
+    duplicates: Duplication
+    label: Labeling
     content_identity: str
     limitations: tuple[str, ...]
     release_blockers: tuple[str, ...]
 
 
-def is_sequence_value(value: Any) -> bool:
+def sequential(value: Any) -> bool:
     """Returns whether a value can represent an ordered column.
 
     Args:
@@ -981,7 +981,7 @@ def frame_for_pandas(
     return frame, "pandas_series", measure(frame)
 
 
-def frame_for_array(
+def tabulate(
     data: numpy.ndarray,
 ) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
     """Converts a NumPy array to an observation frame.
@@ -1024,7 +1024,7 @@ def frame_for_mapping(
         ValueError: If a mapping of columns has columns of unequal length.
     """
     values = list(data.values())
-    if values and all(is_sequence_value(value) for value in values):
+    if values and all(sequential(value) for value in values):
         lengths = {len(value) for value in values}
         if len(lengths) != 1:
             raise errors.InputError("mapping columns must have equal lengths")
@@ -1034,7 +1034,7 @@ def frame_for_mapping(
     return frame, "record_mapping", measure(frame)
 
 
-def frame_for_data(
+def coerce(
     data: Any,
 ) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
     """Converts supported record-shaped data to a bounded observation frame.
@@ -1055,7 +1055,7 @@ def frame_for_data(
     if isinstance(data, (pandas.DataFrame, pandas.Series)):
         return frame_for_pandas(data)
     if isinstance(data, numpy.ndarray):
-        return frame_for_array(data)
+        return tabulate(data)
     if isinstance(data, Mapping):
         return frame_for_mapping(data)
     if isinstance(data, (list, tuple)):
@@ -1064,10 +1064,10 @@ def frame_for_data(
             return frame, "record_sequence", measure(frame)
         frame = pandas.DataFrame({"value": list(data)})
         return frame, "sequence", measure(frame)
-    return frame_for_other(data)
+    return fallback(data)
 
 
-def frame_for_other(
+def fallback(
     data: Any,
 ) -> tuple[pandas.DataFrame | None, str, tuple[int, ...]]:
     """Describes bytes, scalars and opaque objects.
@@ -1087,7 +1087,7 @@ def frame_for_other(
     return None, type(data).__name__, ()
 
 
-def canonical_value(value: Any) -> Any:
+def canonicalize(value: Any) -> Any:
     """Converts one supported value into deterministic JSON-native content.
 
     Args:
@@ -1114,7 +1114,7 @@ def canonical_value(value: Any) -> Any:
             "bytes_sha256": hashlib.sha256(raw).hexdigest(),
         }
     if isinstance(value, numpy.generic):
-        return canonical_value(value.item())
+        return canonicalize(value.item())
     if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
         return value.isoformat()
     if isinstance(value, (Mapping, list, tuple, set, frozenset)):
@@ -1141,14 +1141,14 @@ def canonical_collection(
     """
     if isinstance(value, Mapping):
         return {
-            str(key): canonical_value(item)
+            str(key): canonicalize(item)
             for key, item in sorted(
                 value.items(), key=lambda pair: str(pair[0])
             )
         }
     if isinstance(value, (list, tuple)):
-        return [canonical_value(item) for item in value]
-    values = [canonical_value(item) for item in value]
+        return [canonicalize(item) for item in value]
+    values = [canonicalize(item) for item in value]
     return sorted(values, key=canonical_json)
 
 
@@ -1178,13 +1178,13 @@ def normalise(value: Any) -> Any:
     if isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, numpy.ndarray):
-        return [canonical_value(item) for item in value.tolist()]
+        return [canonicalize(item) for item in value.tolist()]
     raise errors.KindError(
         f"cannot deterministically catalog value of type {type(value).__name__}"
     )
 
 
-def schema_for_frame(frame: pandas.DataFrame) -> tuple[Field, ...]:
+def describe(frame: pandas.DataFrame) -> tuple[Field, ...]:
     """Returns ordered field metadata, preserving duplicate column positions.
 
     Args:
@@ -1201,7 +1201,7 @@ def schema_for_frame(frame: pandas.DataFrame) -> tuple[Field, ...]:
     )
 
 
-def missingness_for_frame(frame: pandas.DataFrame) -> MissingnessSummary:
+def tally(frame: pandas.DataFrame) -> Missingness:
     """Measures missingness over a frame without imputing or modifying it.
 
     Args:
@@ -1221,7 +1221,7 @@ def missingness_for_frame(frame: pandas.DataFrame) -> MissingnessSummary:
             zip(names, counts, strict=True)
         )
     }
-    return MissingnessSummary(
+    return Missingness(
         status="observed",
         total_values=int(frame.shape[0] * frame.shape[1]),
         missing_values=missing_values,
@@ -1230,7 +1230,7 @@ def missingness_for_frame(frame: pandas.DataFrame) -> MissingnessSummary:
     )
 
 
-def duplicates_for_frame(frame: pandas.DataFrame) -> DuplicateSummary:
+def dedupe(frame: pandas.DataFrame) -> Duplication:
     """Measures duplicate rows and preserves unsupported cases as evidence.
 
     Args:
@@ -1246,7 +1246,7 @@ def duplicates_for_frame(frame: pandas.DataFrame) -> DuplicateSummary:
         duplicate_mask = frame.duplicated(keep=False)
     except (TypeError, ValueError):
         # handled: returned as not_observed summary; documented
-        return DuplicateSummary(
+        return Duplication(
             status="not_observed",
             duplicate_rows=0,
             duplicate_fraction=0.0,
@@ -1254,7 +1254,7 @@ def duplicates_for_frame(frame: pandas.DataFrame) -> DuplicateSummary:
         )
     duplicate_rows = int(duplicate_mask.sum())
     fraction = duplicate_rows / len(frame) if len(frame) else 0.0
-    return DuplicateSummary(
+    return Duplication(
         status="observed",
         duplicate_rows=duplicate_rows,
         duplicate_fraction=fraction,
@@ -1262,9 +1262,9 @@ def duplicates_for_frame(frame: pandas.DataFrame) -> DuplicateSummary:
     )
 
 
-def label_for_frame(
+def summarize(
     frame: pandas.DataFrame | None, label_column: str | None
-) -> tuple[LabelSummary, tuple[str, ...], tuple[str, ...]]:
+) -> tuple[Labeling, tuple[str, ...], tuple[str, ...]]:
     """Summarize only an explicitly named label column.
 
     Args:
@@ -1280,19 +1280,19 @@ def label_for_frame(
     """
     if label_column is None:
         return (
-            LabelSummary("not_declared", None, 0, 0, 0, {}),
+            Labeling("not_declared", None, 0, 0, 0, {}),
             ("label_was_not_declared",),
             ("label_contract_not_declared_for_supervised_use",),
         )
     if frame is None or label_column not in frame.columns:
         return (
-            LabelSummary("not_observed", label_column, 0, 0, 0, {}),
+            Labeling("not_observed", label_column, 0, 0, 0, {}),
             ("declared_label_could_not_be_observed",),
             ("declared_label_field_is_not_available",),
         )
     if list(frame.columns).count(label_column) != 1:
         return (
-            LabelSummary("not_observed", label_column, 0, 0, 0, {}),
+            Labeling("not_observed", label_column, 0, 0, 0, {}),
             ("declared_label_field_is_ambiguous",),
             ("declared_label_field_is_ambiguous",),
         )
@@ -1301,7 +1301,7 @@ def label_for_frame(
     observed = series[~series.isna()]
     distribution: dict[str, int] = {}
     for value in observed.tolist():
-        bucket = canonical_json(canonical_value(value))
+        bucket = canonical_json(canonicalize(value))
         distribution[bucket] = distribution.get(bucket, 0) + 1
     observed_count = len(observed)
     distinct_count = len(distribution)
@@ -1311,7 +1311,7 @@ def label_for_frame(
         else ("constant" if distinct_count == 1 else "observed")
     )
     return (
-        LabelSummary(
+        Labeling(
             status,
             label_column,
             observed_count,
@@ -1339,18 +1339,18 @@ def frame_content(
         in order, with each value canonicalized.
     """
     rows = [
-        [canonical_value(value) for value in row]
+        [canonicalize(value) for value in row]
         for row in frame.itertuples(index=False, name=None)
     ]
     return {
         "data_kind": data_kind,
         "shape": list(shape),
-        "schema": [field.to_dict() for field in schema_for_frame(frame)],
+        "schema": [field.to_dict() for field in describe(frame)],
         "rows": rows,
     }
 
 
-def observe_data(
+def examine(
     data: Any,
     label_column: str | None,
     supplied_identity: str | None,
@@ -1373,15 +1373,15 @@ def observe_data(
         TypeError: If the object is opaque (neither frame-backed nor
             bytes) and no ``supplied_identity`` is given.
     """
-    frame, data_kind, shape = frame_for_data(data)
+    frame, data_kind, shape = coerce(data)
     limitations: list[str] = []
     blockers: list[str] = []
     if frame is not None:
-        schema = schema_for_frame(frame)
+        schema = describe(frame)
         sample_count = int(frame.shape[0])
-        missingness = missingness_for_frame(frame)
-        duplicates = duplicates_for_frame(frame)
-        label, label_limitations, label_blockers = label_for_frame(
+        missingness = tally(frame)
+        duplicates = dedupe(frame)
+        label, label_limitations, label_blockers = summarize(
             frame, label_column
         )
         limitations.extend(label_limitations)
@@ -1423,9 +1423,7 @@ def observe_data(
         if supplied_identity is not None:
             limitations.append("content_identity_was_supplied_by_caller")
         limitations.append("modality_specific_decoding_was_not_attempted")
-        label, label_limitations, label_blockers = label_for_frame(
-            None, label_column
-        )
+        label, label_limitations, label_blockers = summarize(None, label_column)
         limitations.extend(label_limitations)
         blockers.extend(label_blockers)
         blockers.append("modality_specific_decoder_not_declared")
@@ -1434,8 +1432,8 @@ def observe_data(
             shape=shape,
             schema=schema,
             sample_count=1,
-            missingness=MissingnessSummary("not_observed", 0, 0, 0, {}),
-            duplicates=DuplicateSummary(
+            missingness=Missingness("not_observed", 0, 0, 0, {}),
+            duplicates=Duplication(
                 "not_observed", 0, 0.0, "raw bytes have no row identity"
             ),
             label=label,
@@ -1448,9 +1446,7 @@ def observe_data(
             "opaque data needs a caller-supplied SHA-256 content_identity"
         )
     content_identity = validate_digest(supplied_identity, "content_identity")
-    label, label_limitations, label_blockers = label_for_frame(
-        None, label_column
-    )
+    label, label_limitations, label_blockers = summarize(None, label_column)
     limitations.extend(
         (
             "schema_and_quality_metrics_were_not_observed",
@@ -1464,8 +1460,8 @@ def observe_data(
         shape=shape,
         schema=(Field("value", type(data).__name__),),
         sample_count=1,
-        missingness=MissingnessSummary("not_observed", 0, 0, 0, {}),
-        duplicates=DuplicateSummary(
+        missingness=Missingness("not_observed", 0, 0, 0, {}),
+        duplicates=Duplication(
             "not_observed", 0, 0.0, "opaque object has no row identity"
         ),
         label=label,
@@ -1477,9 +1473,9 @@ def observe_data(
 
 __all__ = [
     "Catalog",
-    "DuplicateSummary",
+    "Duplication",
     "Field",
-    "LabelSummary",
-    "MissingnessSummary",
+    "Labeling",
+    "Missingness",
     "Source",
 ]

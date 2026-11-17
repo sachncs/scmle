@@ -142,7 +142,7 @@ def test_the_default_build_uses_the_named_tabpfn_class(monkeypatch):
 
 
 def test_the_adapter_is_rejected_without_the_package_and_explains_why():
-    adapter = registry.Catalog.with_builtins().get("tabpfn")
+    adapter = registry.Catalog.stock().get("tabpfn")
 
     if adapter.is_available():
         pytest.skip("tabpfn is installed here")
@@ -157,7 +157,7 @@ def test_the_adapter_stays_extension_only_when_its_package_is_available(
     monkeypatch,
 ):
     """Installing TabPFN must not silently promote it into the beta."""
-    adapter = registry.Catalog.with_builtins().get("tabpfn")
+    adapter = registry.Catalog.stock().get("tabpfn")
     monkeypatch.setattr(adapter, "is_available", lambda: True)
 
     reason = adapter.rejection_reason(tasks.Task.BINARY)

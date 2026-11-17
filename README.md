@@ -94,7 +94,7 @@ The hosted documentation is available at
    mechanisms with a passing certificate may block a run.
 2. **Splits** without leakage (stratified / random / group / temporal) behind
    a locked test set that opens once.
-3. **Engineers features** declaratively (`FeatureGraph`: ratios, bins,
+3. **Engineers features** declaratively (`Derivation`: ratios, bins,
    clipping, datetime parts, lags and rolling statistics per entity), with
    every statistic learned on the training fold only.
 4. **Searches** the planned compatible model families (scikit-learn,
@@ -208,13 +208,13 @@ wide data). The full tables, and where it is behind, are in
 | `scmle.durability` | Atomic, crash-safe file writes used by the stores |
 | `scmle.api` | `Project`, `RunResult`, `load_model` / `predict` |
 
-Extension points are polymorphic: add a `TableReader`, `ColumnKind`,
+Extension points are polymorphic: add a `TableReader`, `Family`,
 `Partitioner`, `Strategy`, `Model`, `Optimizer`, `Refiner`,
 `Selector`, `Diagnostic`, `Reviewer`, `Executor`,
-`ExperimentStore`, `Server` or `Stage` subclass; no core edits are
+`Store`, `Server` or `Stage` subclass; no core edits are
 needed ([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)). Third-party adapters
 can also register via the `scmle.models` entry-point group and must pass
-`scmle.models.conformance.check_conformance`.
+`scmle.models.conformance.comply`.
 
 ## Conventions
 

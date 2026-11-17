@@ -178,7 +178,7 @@ def shift_replicate(test: str, planted: bool, seed: int) -> tuple[bool, float]:
     """
     first, second = shift_samples(planted, seed)
     run = shift.c2st if test == shift.C2ST_ID else shift.mmd_test
-    check = run(first, second, seed, gate=certificates.GateStatus.GATING)
+    check = run(first, second, seed, gate=certificates.Authority.GATING)
     return check.decision is not qualification.Decision.PASS, float(
         check.p_value or 1.0
     )
@@ -251,7 +251,7 @@ def stability_replicate(kind: str, seed: int) -> str:
         The stability status of the finding.
     """
     x, y = stability_world(kind, seed)
-    grid = multiverse.enumerate_grid(
+    grid = multiverse.universe(
         GRID_CHOICES, seed, multiverse.DEFAULT_MAX_SPECS * 2
     )
     result = stability.assess_finding(
@@ -432,7 +432,7 @@ def stability_certificate(
         "rule": stability.DEFAULT_RULE.to_dict(),
         "bootstrap": BOOTSTRAP,
         "specifications": len(
-            multiverse.enumerate_grid(
+            multiverse.universe(
                 GRID_CHOICES, 0, multiverse.DEFAULT_MAX_SPECS * 2
             ).specs
         ),

@@ -15,7 +15,7 @@ Three tests, each returning `Check` records:
   median heuristic on the pooled sample before any permutation (the pooled
   sample does not change when labels are permuted, so the heuristic keeps the
   permutation test exact), and a permutation p-value.
-* `feature_tests`: Kolmogorov-Smirnov for numeric columns and chi-square for
+* `compare`: Kolmogorov-Smirnov for numeric columns and chi-square for
   categorical ones, with Benjamini-Hochberg adjustment over the family.
 
 Permutation p-values are ``(1 + #{T_b >= T}) / (B + 1)``, exact under
@@ -93,7 +93,7 @@ def permutation_p_value(observed: float, null: numpy.ndarray) -> float:
     return (1.0 + hits) / (draws.size + 1.0)
 
 
-def auc_delong(
+def delong(
     scores: numpy.ndarray, side: numpy.ndarray, confidence: float = 0.95
 ) -> tuple[float, tuple[float, float]]:
     """ROC AUC with the DeLong interval, from midranks.
@@ -129,7 +129,7 @@ def auc_delong(
     return auc, (max(0.0, auc - half), min(1.0, auc + half))
 
 
-def pooled_codes(
+def pool(
     sample: pandas.DataFrame, reference: pandas.DataFrame
 ) -> pandas.DataFrame:
     """Stacks the two tables into one numeric table.
@@ -155,7 +155,7 @@ def pooled_codes(
     return both.astype(float)
 
 
-def holdout_split(
+def holdout(
     side: numpy.ndarray, rng: numpy.random.Generator
 ) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Splits the pooled rows into train and test, stratified by side.
@@ -183,7 +183,7 @@ def holdout_split(
 def decide(
     rejected: bool,
     requested: qualification.Decision,
-    gate: certificates.GateStatus,
+    gate: certificates.Authority,
 ) -> qualification.Decision:
     """Chooses the decision for a test outcome.
 
@@ -210,7 +210,7 @@ def c2st(
     alpha: float = ALPHA,
     delta: float = 0.0,
     strata: numpy.ndarray | None = None,
-    gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
+    gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
     on_shift: qualification.Decision = qualification.Decision.WARN,
 ) -> qualification.Check:
     """Classifier two-sample test with a permutation p-value.
@@ -237,14 +237,14 @@ def c2st(
         `align`).
     """
     align(sample, reference)
-    both = pooled_codes(sample, reference)
+    both = pool(sample, reference)
     # The side of each pooled row: 0 for each sample row, then 1 for each
-    # reference row, in the row order of `pooled_codes`.
+    # reference row, in the row order of `pool`.
     side: numpy.ndarray = numpy.r_[
         numpy.zeros(len(sample)), numpy.ones(len(reference))
     ]
     rng = randomness.component_rng(seed, C2ST_ID, 0)
-    train, test = holdout_split(side, rng)
+    train, test = holdout(side, rng)
     model = ensemble.HistGradientBoostingClassifier(
         random_state=randomness.derive_int_seed(seed, C2ST_ID, 1)
     )
@@ -267,7 +267,7 @@ def c2st(
         )
     )
     p_value = permutation_p_value(observed, null)
-    auc, interval = auc_delong(scores, held)
+    auc, interval = delong(scores, held)
     fires = p_value <= alpha and interval[0] > 0.5 + delta
     return qualification.Check(
         check_id=C2ST_ID,
@@ -279,7 +279,7 @@ def c2st(
         effect=auc - 0.5,
         n=len(test),
         decision=decide(fires, on_shift, gate),
-        set_id=qualification.SetId.EXPLORATION,
+        set_id=qualification.Subset.EXPLORATION,
         seed_path=randomness.seed_path(seed, C2ST_ID, 0),
         tier=qualification.Tier.UNVERIFIED,
     )
@@ -345,7 +345,7 @@ def design_matrix(both: pandas.DataFrame, rows: int) -> numpy.ndarray:
     return numpy.hstack(parts)
 
 
-def median_bandwidth(design: numpy.ndarray) -> float:
+def sigma(design: numpy.ndarray) -> float:
     """Computes the median-heuristic kernel bandwidth.
 
     Args:
@@ -360,7 +360,7 @@ def median_bandwidth(design: numpy.ndarray) -> float:
     return middle if middle > 0.0 else 1.0
 
 
-def gaussian_kernel(design: numpy.ndarray, bandwidth: float) -> numpy.ndarray:
+def gaussian(design: numpy.ndarray, bandwidth: float) -> numpy.ndarray:
     """Computes ``exp(-|a - b|^2 / (2 h^2))`` for every pair of rows.
 
     Args:
@@ -375,9 +375,7 @@ def gaussian_kernel(design: numpy.ndarray, bandwidth: float) -> numpy.ndarray:
     return kernel
 
 
-def mmd_statistics(
-    kernel: numpy.ndarray, first: numpy.ndarray
-) -> numpy.ndarray:
+def mmds(kernel: numpy.ndarray, first: numpy.ndarray) -> numpy.ndarray:
     """Unbiased squared MMD for each column of 0/1 membership indicators.
 
     Args:
@@ -409,7 +407,7 @@ def mmd_test(
     permutations: int = PERMUTATIONS,
     alpha: float = ALPHA,
     strata: numpy.ndarray | None = None,
-    gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
+    gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
     on_shift: qualification.Decision = qualification.Decision.WARN,
 ) -> qualification.Check:
     """Kernel MMD two-sample test with a permutation p-value.
@@ -447,7 +445,7 @@ def mmd_test(
         [sample.iloc[first], reference.iloc[second]], ignore_index=True
     )
     design = design_matrix(both, len(both))
-    kernel = gaussian_kernel(design, median_bandwidth(design))
+    kernel = gaussian(design, sigma(design))
     labels = (
         None
         if strata is None
@@ -457,7 +455,7 @@ def mmd_test(
         ]
     )
     indicator = numpy.r_[numpy.ones(len(first)), numpy.zeros(len(second))]
-    observed = float(mmd_statistics(kernel, indicator[:, None])[0])
+    observed = float(mmds(kernel, indicator[:, None])[0])
     null = numpy.empty(permutations)
     for start in range(0, permutations, CHUNK):
         stop = min(start + CHUNK, permutations)
@@ -472,7 +470,7 @@ def mmd_test(
                 )
             )
         )
-        null[start:stop] = mmd_statistics(kernel, block)
+        null[start:stop] = mmds(kernel, block)
     p_value = permutation_p_value(observed, null)
     return qualification.Check(
         check_id=MMD_ID,
@@ -484,7 +482,7 @@ def mmd_test(
         effect=math.sqrt(max(observed, 0.0)),
         n=len(both),
         decision=decide(p_value <= alpha, on_shift, gate),
-        set_id=qualification.SetId.EXPLORATION,
+        set_id=qualification.Subset.EXPLORATION,
         seed_path=randomness.seed_path(seed, MMD_ID, 0),
         tier=qualification.Tier.UNVERIFIED,
     )
@@ -560,7 +558,7 @@ def contrast(
     )
 
 
-def feature_tests(
+def compare(
     sample: pandas.DataFrame, reference: pandas.DataFrame, alpha: float = ALPHA
 ) -> tuple[Drift, ...]:
     """KS or chi-square per shared column, adjusted by Benjamini-Hochberg.
@@ -680,8 +678,8 @@ def assess(
     permutations: int = PERMUTATIONS,
     alpha: float = ALPHA,
     delta: float = 0.0,
-    c2st_gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
-    mmd_gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
+    c2st_gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
+    mmd_gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
 ) -> Shift:
     """Compares exploration rows with a deployment sample.
 
@@ -738,7 +736,7 @@ def assess(
         else "no shift detected (not evidence that none exists)",
         first,
         second,
-        feature_tests(left, right, alpha),
+        compare(left, right, alpha),
         agree,
     )
 

@@ -62,7 +62,7 @@ OPERATORS = {
 }
 
 
-def sha256_file(path: Path) -> str:
+def checksum(path: Path) -> str:
     """Digests a file's bytes.
 
     Args:

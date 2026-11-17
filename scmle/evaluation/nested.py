@@ -99,7 +99,7 @@ def average(
 
 def nest(
     build: Callable[[dict[str, Any]], models.Estimator],
-    space: search.SearchSpace | None,
+    space: search.Space | None,
     features: pandas.DataFrame,
     target: pandas.Series,
     outer_folds: list[tuple[Any, Any]],

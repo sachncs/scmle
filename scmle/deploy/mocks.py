@@ -31,7 +31,7 @@ MINIMUM_KEY_PARTS = 2  # an object path is a bucket and at least a key
 DIGEST_HEADER = "X-Content-SHA256"
 
 
-def safe_key(raw: str) -> pathlib.PurePosixPath:
+def sanitize(raw: str) -> pathlib.PurePosixPath:
     """Validates an object path of the form `bucket/key...`.
 
     Args:
@@ -52,7 +52,7 @@ def safe_key(raw: str) -> pathlib.PurePosixPath:
     return path
 
 
-class MockServer:
+class Stub:
     """A background HTTP server with a lifecycle.
 
     Attributes:
@@ -122,7 +122,7 @@ class MockServer:
         self.httpd = self.thread = None
 
 
-class ObjectStoreResponder(server.BaseHTTPRequestHandler):
+class Handler(server.BaseHTTPRequestHandler):
     """Serves the object store's requests.
 
     Attributes:
@@ -167,7 +167,7 @@ class ObjectStoreResponder(server.BaseHTTPRequestHandler):
             not a valid `/<bucket>/<key>`.
         """
         try:
-            relative = safe_key(self.path)
+            relative = sanitize(self.path)
         except ValueError as error:
             # handled: 400 response sent; None documented
             self.problem(400, str(error))
@@ -250,7 +250,7 @@ class ObjectStoreResponder(server.BaseHTTPRequestHandler):
         """
 
 
-class ObjectStore(MockServer):
+class ObjectStore(Stub):
     """PUT, GET, HEAD and list over `/<bucket>/<key>`, with SHA-256 etags.
 
     Attributes:
@@ -278,7 +278,7 @@ class ObjectStore(MockServer):
             The handler class.
         """
 
-        class Responder(ObjectStoreResponder):
+        class Responder(Handler):
             """The responder bound to this object store."""
 
             store = self
@@ -286,7 +286,7 @@ class ObjectStore(MockServer):
         return Responder
 
 
-class MetricsSinkResponder(server.BaseHTTPRequestHandler):
+class Sink(server.BaseHTTPRequestHandler):
     """Serves the metrics sink's requests.
 
     Attributes:
@@ -338,8 +338,7 @@ class MetricsSinkResponder(server.BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length))
             batch = payload if isinstance(payload, list) else [payload]
             samples = [
-                observability.MetricSample.from_dict(item).to_dict()
-                for item in batch
+                observability.Sample.from_dict(item).to_dict() for item in batch
             ]
         except (ValueError, KeyError, TypeError) as error:
             # handled: 400 response with error
@@ -371,7 +370,7 @@ class MetricsSinkResponder(server.BaseHTTPRequestHandler):
         """
 
 
-class MetricsSink(MockServer):
+class MetricsSink(Stub):
     """Accepts metric samples on POST /metrics and replays them on GET.
 
     Attributes:
@@ -416,7 +415,7 @@ class MetricsSink(MockServer):
             The handler class.
         """
 
-        class Responder(MetricsSinkResponder):
+        class Responder(Sink):
             """The responder bound to this metrics sink."""
 
             sink = self
@@ -424,7 +423,7 @@ class MetricsSink(MockServer):
         return Responder
 
 
-def put_object(base: str, path: str, data: bytes, timeout: float = 30.0) -> str:
+def deposit(base: str, path: str, data: bytes, timeout: float = 30.0) -> str:
     """Uploads `data` to `base/path`.
 
     Args:
@@ -482,8 +481,8 @@ def get_object(
     return body
 
 
-def post_metrics(
-    base: str, samples: list[observability.MetricSample], timeout: float = 30.0
+def transmit(
+    base: str, samples: list[observability.Sample], timeout: float = 30.0
 ) -> int:
     """Sends samples to a sink.
 
@@ -526,7 +525,7 @@ def main(arguments: list[str] | None = None) -> int:
         action.add_argument("--host", default="127.0.0.1")
         action.add_argument("--port", type=int, required=True)
     options = parser.parse_args(arguments)
-    service: MockServer = (
+    service: Stub = (
         ObjectStore(options.root, options.host, options.port)
         if options.service == "object-store"
         else MetricsSink(options.file, options.host, options.port)

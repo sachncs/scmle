@@ -63,7 +63,7 @@ class Config:
             ValueError: If `target_size` or `mode` is unsupported,
                 `regularization` is not positive, or `max_iter` is below 1.
         """
-        image.validate_feature_options(self.target_size, self.mode)
+        image.configure(self.target_size, self.mode)
         if self.regularization <= 0:
             raise errors.InputError("regularization must be positive")
         if self.max_iter < 1:
@@ -312,7 +312,7 @@ class Classifier:
             raise errors.InputError("every training image must have a label")
         if len(set(labels)) < MIN_CLASS_COUNT:
             raise errors.InputError("training images must contain two classes")
-        features = training_data.prepare_tabular_features(
+        features = training_data.flatten(
             self.config.target_size,
             self.config.mode,
             self.config.normalize,
@@ -640,7 +640,7 @@ class Classifier:
             )
             model_path = temporary_directory / "model.joblib"
             joblib.dump(self, model_path, compress=3)
-            durability.sync_file(model_path)
+            durability.sync(model_path)
             manifest = {
                 "schema_version": 1,
                 "model_path": "model.joblib",
@@ -734,7 +734,7 @@ class Classifier:
             Array with one row of flattened pixels per image.
         """
         self.require_fitted()
-        return dataset.prepare_tabular_features(
+        return dataset.flatten(
             self.config.target_size,
             self.config.mode,
             self.config.normalize,

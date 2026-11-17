@@ -17,15 +17,15 @@ def test_evalue_matches_the_papers_worked_example():
 
 
 def test_evalue_of_the_interval_uses_the_limit_nearest_the_null():
-    both = sensitivity.evalue_interval(1.8, 1.2, 2.7)
+    both = sensitivity.evalues(1.8, 1.2, 2.7)
     assert both["point"] == pytest.approx(sensitivity.evalue(1.8))
     assert both["limit"] == pytest.approx(sensitivity.evalue(1.2))
-    assert sensitivity.evalue_interval(0.5, 0.3, 0.8)["limit"] == pytest.approx(
+    assert sensitivity.evalues(0.5, 0.3, 0.8)["limit"] == pytest.approx(
         sensitivity.evalue(0.8)
     )
-    assert sensitivity.evalue_interval(1.3, 0.9, 1.9)["limit"] == 1.0
+    assert sensitivity.evalues(1.3, 0.9, 1.9)["limit"] == 1.0
     with pytest.raises(ValueError):
-        sensitivity.evalue_interval(5.0, 1.0, 2.0)
+        sensitivity.evalues(5.0, 1.0, 2.0)
     with pytest.raises(ValueError):
         sensitivity.evalue(0.0)
 
@@ -36,14 +36,12 @@ def test_smd_conversion():
 
 def test_robustness_values_reproduce_the_sensemakr_readme_example():
     t, dof = 4.18445, 783
-    assert sensitivity.partial_r2(t, dof) == pytest.approx(0.02187, abs=2e-5)
-    assert sensitivity.robustness_value(t, dof, 1.0) == pytest.approx(
-        0.13878, abs=2e-4
-    )
-    assert sensitivity.robustness_value(t, dof, 1.0, 0.05) == pytest.approx(
+    assert sensitivity.rsquared(t, dof) == pytest.approx(0.02187, abs=2e-5)
+    assert sensitivity.rvalue(t, dof, 1.0) == pytest.approx(0.13878, abs=2e-4)
+    assert sensitivity.rvalue(t, dof, 1.0, 0.05) == pytest.approx(
         0.07626, abs=2e-4
     )
-    assert sensitivity.robustness_value(0.5, 100, 1.0, 0.05) == 0.0
+    assert sensitivity.rvalue(0.5, 100, 1.0, 0.05) == 0.0
 
 
 def synthetic(n: int, seed: int, a_d: float, a_y: float, tau: float = 1.0):
@@ -66,15 +64,15 @@ def synthetic(n: int, seed: int, a_d: float, a_y: float, tau: float = 1.0):
 def test_the_bias_formula_is_the_exact_omitted_variable_bias():
     frame = synthetic(5000, 0, 0.7, 0.9)
     base = ("x1", "x2", "x3")
-    short = sensitivity.ols_fit(frame, "d", "y", base)
-    full = sensitivity.ols_fit(frame, "d", "y", (*base, "u"))
+    short = sensitivity.regress(frame, "d", "y", base)
+    full = sensitivity.regress(frame, "d", "y", (*base, "u"))
     r2dz, r2yz = full.benchmarks["u"]
     true_bias = short.estimate - full.estimate
     assert abs(true_bias) > 0.1
     assert abs(true_bias) == pytest.approx(
-        sensitivity.bias_bound(short, r2yz, r2dz), rel=1e-9
+        sensitivity.ceiling(short, r2yz, r2dz), rel=1e-9
     )
-    se_adjusted = sensitivity.adjusted_interval(short, r2yz, r2dz)
+    se_adjusted = sensitivity.robustify(short, r2yz, r2dz)
     assert se_adjusted[0] < full.estimate < se_adjusted[1]
 
 
@@ -122,12 +120,12 @@ def test_assess_flags_a_fragile_estimate_and_a_robust_one():
 
 def test_benchmark_multiples_that_exceed_the_data_are_refused():
     with pytest.raises(ValueError, match="too large"):
-        sensitivity.benchmark_strength(0.4, 0.2, 5.0, 1.0)
-    r2yz, r2dz = sensitivity.benchmark_strength(0.1, 0.05, 1.0, 1.0)
+        sensitivity.calibrate(0.4, 0.2, 5.0, 1.0)
+    r2yz, r2dz = sensitivity.calibrate(0.1, 0.05, 1.0, 1.0)
     assert 0 < r2dz < 1 and r2yz > 0.05 / 0.95 - 1e-9
     with pytest.raises(ValueError):
-        sensitivity.bias_bound(
-            sensitivity.ols_fit(synthetic(100, 5, 0, 0), "d", "y", ("x1",)),
+        sensitivity.ceiling(
+            sensitivity.regress(synthetic(100, 5, 0, 0), "d", "y", ("x1",)),
             1.2,
             0.1,
         )

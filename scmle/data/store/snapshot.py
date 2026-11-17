@@ -11,7 +11,7 @@ one. Every read is appended to a `ReadLog` (and to a JSON-lines file when one
 is given), which is what a later training run is traced back through.
 
 `connector_reader` adapts a store to the `read_bytes` callable of
-`ObjectStoreConnector`, and decoding uses the same `read_tabular_bytes` as the
+`Bucket`, and decoding uses the same `unpack` as the
 source connectors.
 """
 
@@ -69,7 +69,7 @@ def kind_of(series: pandas.Series) -> str:
     return "string"
 
 
-def observed_schema(frame: pandas.DataFrame) -> dict[str, str]:
+def dtypes(frame: pandas.DataFrame) -> dict[str, str]:
     """Reads the schema a frame actually has.
 
     Args:
@@ -151,7 +151,7 @@ class DataContract:
             One message per missing column, unexpected column and column of
             the wrong kind, in that order; empty if the schemas are equal.
         """
-        seen = observed_schema(frame)
+        seen = dtypes(frame)
         problems = [
             f"missing column {c}" for c in self.columns if c not in seen
         ]
@@ -324,7 +324,7 @@ class SnapshotReader:
 
         A schema mismatch or a stale object does not stop the read; it is
         recorded, and the quality gate decides what happens (fail,
-        quarantine or warn). Errors from the store, such as `NotFoundError`
+        quarantine or warn). Errors from the store, such as `AbsentError`
         for a missing object, propagate unchanged.
 
         Args:
@@ -341,10 +341,10 @@ class SnapshotReader:
         payload, meta = self.store.get(key)
         uri = self.store.uri(key)
         try:
-            frame = connectors.read_tabular_bytes(uri, payload)
+            frame = connectors.unpack(uri, payload)
         except (ValueError, errors.ScmleError) as error:
             raise SnapshotError(f"cannot decode {uri}: {error}") from error
-        observed = observed_schema(frame)
+        observed = dtypes(frame)
         digest = schema_digest(observed)
         now = self.clock().astimezone(datetime.UTC)
         age = max(0.0, (now - parse_time(meta.modified)).total_seconds())
@@ -381,7 +381,7 @@ class SnapshotReader:
 
 
 def connector_reader(store: objectstore.ObjectStore) -> Callable[[str], bytes]:
-    """Adapts a store to the `read_bytes` callable of `ObjectStoreConnector`.
+    """Adapts a store to the `read_bytes` callable of `Bucket`.
 
     The URI's path (after the store's own prefix) is the object key, so a
     connector constructed with `store.uri(key)` reads through the store.
@@ -392,7 +392,7 @@ def connector_reader(store: objectstore.ObjectStore) -> Callable[[str], bytes]:
     Returns:
         A function from a source URI to the bytes of the object whose key is
         the URI's path without the store's own prefix. It raises whatever
-        `store.get` raises, such as `NotFoundError`.
+        `store.get` raises, such as `AbsentError`.
     """
     root = urlsplit(store.location).path.strip("/")
 

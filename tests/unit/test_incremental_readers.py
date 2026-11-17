@@ -44,7 +44,7 @@ def test_ingestion_ledger_commits_atomically_and_retries_idempotently(tmp_path):
     source = incremental.SequenceEventSource(
         "memory://events", [event("a", 1, 0), event("b", 2, 1)]
     )
-    ledger = incremental.IngestionLedger(
+    ledger = incremental.Ledger(
         tmp_path / "ingestion.json", source.source_identity
     )
 
@@ -52,9 +52,7 @@ def test_ingestion_ledger_commits_atomically_and_retries_idempotently(tmp_path):
     committed = ledger.commit(batch)
     retried = ledger.commit(batch)
     next_batch = ledger.read_batch(source)
-    reopened = incremental.IngestionLedger(
-        ledger.path, source.source_identity
-    ).load()
+    reopened = incremental.Ledger(ledger.path, source.source_identity).load()
 
     assert committed == retried == reopened
     assert committed.checkpoint.sequence == 1
@@ -68,15 +66,15 @@ def test_late_data_policy_is_explicit():
     source_identity = incremental.SequenceEventSource(
         "memory://events", records
     ).source_identity
-    checkpoint = incremental.EventCheckpoint(
+    checkpoint = incremental.Checkpoint(
         source_identity, sequence=2, watermark="2026-10-20T10:01:00+00:00"
     )
 
     dropped = incremental.SequenceEventSource(
-        "memory://events", records, incremental.LateData.DROP
+        "memory://events", records, incremental.Lateness.DROP
     ).read_events(checkpoint)
     accepted = incremental.SequenceEventSource(
-        "memory://events", records, incremental.LateData.ACCEPT
+        "memory://events", records, incremental.Lateness.ACCEPT
     ).read_events(checkpoint)
 
     assert dropped.event_ids == ("fresh",)
@@ -85,7 +83,7 @@ def test_late_data_policy_is_explicit():
     assert accepted.next_checkpoint.sequence == 3
     with pytest.raises(incremental.IncrementalError, match="older"):
         incremental.SequenceEventSource(
-            "memory://events", records, incremental.LateData.REJECT
+            "memory://events", records, incremental.Lateness.REJECT
         ).read_events(checkpoint)
 
 
@@ -93,9 +91,9 @@ def test_accepting_only_late_events_never_moves_the_checkpoint_back():
     source = incremental.SequenceEventSource(
         "memory://events",
         [event("late", 1, 0)],
-        incremental.LateData.ACCEPT,
+        incremental.Lateness.ACCEPT,
     )
-    checkpoint = incremental.EventCheckpoint(
+    checkpoint = incremental.Checkpoint(
         source.source_identity,
         sequence=5,
         watermark="2026-10-20T10:01:00+00:00",
@@ -121,10 +119,10 @@ def test_event_stream_source_polls_bounded_batches_with_retry_and_checkpoint():
             raise OSError("broker temporarily unavailable")
         return records.get(checkpoint.sequence, ())
 
-    source = incremental.EventStreamSource(
+    source = incremental.Stream(
         "kafka://cluster/orders",
         read,
-        retry_budget=incremental.connectors.RetryBudget(max_retries=1),
+        retry_budget=incremental.connectors.Retries(max_retries=1),
     )
 
     first = source.read_events(limit=2)
@@ -141,7 +139,7 @@ def test_event_stream_source_polls_bounded_batches_with_retry_and_checkpoint():
 
 def test_event_stream_source_fails_closed_for_unbounded_or_oversized_reads():
     """Transport callbacks cannot bypass the bounded event contract."""
-    source = incremental.EventStreamSource(
+    source = incremental.Stream(
         "pulsar://cluster/topic",
         lambda uri, checkpoint, limit: (
             event("a", 1, 0),
@@ -165,13 +163,13 @@ def test_event_stream_source_rejects_wrong_checkpoint_before_polling():
         calls.append((uri, checkpoint, limit))
         return ()
 
-    source = incremental.EventStreamSource("nats://cluster/topic", read)
+    source = incremental.Stream("nats://cluster/topic", read)
     other = incremental.SequenceEventSource(
         "memory://other", ()
     ).source_identity
 
     with pytest.raises(incremental.IncrementalError, match="different source"):
-        source.read_events(incremental.EventCheckpoint(other))
+        source.read_events(incremental.Checkpoint(other))
     assert calls == []
 
 
@@ -182,7 +180,7 @@ def test_incremental_state_rejects_cross_source_reads_and_commits(tmp_path):
     second = incremental.SequenceEventSource(
         "memory://second", [event("b", 1, 0)]
     )
-    ledger = incremental.IngestionLedger(
+    ledger = incremental.Ledger(
         tmp_path / "ingestion.json", first.source_identity
     )
 
@@ -191,10 +189,10 @@ def test_incremental_state_rejects_cross_source_reads_and_commits(tmp_path):
     batch = ledger.read_batch(first)
     with pytest.raises(incremental.IncrementalError, match="does not match"):
         ledger.commit(
-            incremental.EventBatch(
+            incremental.Batch(
                 second.source_identity,
                 batch.events,
-                incremental.EventCheckpoint(second.source_identity, 1),
+                incremental.Checkpoint(second.source_identity, 1),
             )
         )
 
@@ -205,9 +203,7 @@ def test_idempotent_sink_commit_filters_duplicates_and_persists_receipt(
     source = incremental.SequenceEventSource(
         "memory://events", [event("a", 1, 0), event("b", 2, 1)]
     )
-    ledger = incremental.IngestionLedger(
-        tmp_path / "sink.json", source.source_identity
-    )
+    ledger = incremental.Ledger(tmp_path / "sink.json", source.source_identity)
     written = []
 
     first = ledger.commit_with_writer(
@@ -230,9 +226,7 @@ def test_idempotent_sink_keeps_state_unchanged_when_writer_fails(tmp_path):
     source = incremental.SequenceEventSource(
         "memory://events", [event("a", 1, 0)]
     )
-    ledger = incremental.IngestionLedger(
-        tmp_path / "sink.json", source.source_identity
-    )
+    ledger = incremental.Ledger(tmp_path / "sink.json", source.source_identity)
 
     def fail(events: tuple[incremental.Event, ...]):
         del events
@@ -250,13 +244,13 @@ def test_event_consumer_commits_before_acknowledging(tmp_path):
     source = incremental.SequenceEventSource(
         "memory://events", [event("a", 1, 0), event("b", 2, 1)]
     )
-    ledger = incremental.IngestionLedger(
+    ledger = incremental.Ledger(
         tmp_path / "consumer.json", source.source_identity
     )
     written = []
     acknowledgements = []
 
-    consumer = incremental.EventConsumer(
+    consumer = incremental.Ingestor(
         source,
         ledger,
         "orders-worker",
@@ -279,7 +273,7 @@ def test_event_consumer_retries_ack_without_replaying_the_sink(tmp_path):
     source = incremental.SequenceEventSource(
         "memory://events", lambda: tuple(available)
     )
-    ledger = incremental.IngestionLedger(
+    ledger = incremental.Ledger(
         tmp_path / "consumer.json", source.source_identity
     )
     written = []
@@ -291,7 +285,7 @@ def test_event_consumer_retries_ack_without_replaying_the_sink(tmp_path):
             raise OSError("broker unavailable")
         available.clear()
 
-    consumer = incremental.EventConsumer(
+    consumer = incremental.Ingestor(
         source,
         ledger,
         "orders-worker",

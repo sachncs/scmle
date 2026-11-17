@@ -2,7 +2,7 @@
 
 Row identifiers are positional indices into the ingested frame. Each
 `Partitioner` subclass owns one validation protocol; `Splitter` selects
-and applies it. The test partition lives behind `LockedTestSet`, which opens
+and applies it. The test partition lives behind `Lockbox`, which opens
 exactly once, with the token the orchestrator issues after selection.
 """
 
@@ -113,7 +113,7 @@ class Partition:
     notes: list[str] = dataclasses.field(default_factory=list)
 
 
-class LockedTestSet(abc.ABC):
+class Lockbox(abc.ABC):
     """The test partition: unavailable to search, released once.
 
     Attributes:
@@ -179,7 +179,7 @@ class LockedTestSet(abc.ABC):
 
 
 @dataclasses.dataclass(slots=True)
-class ResidentTestSet(LockedTestSet):
+class ResidentTestSet(Lockbox):
     """Test rows kept in this process, behind a one-time token.
 
     Python cannot hide attributes, so the lock is a protocol: trial code only
@@ -279,7 +279,7 @@ class Split:
     manifest: Manifest
     dev_features: pandas.DataFrame
     dev_target: pandas.Series
-    locked_test: LockedTestSet
+    locked_test: Lockbox
 
 
 def tuplify(values: numpy.ndarray) -> tuple[int, ...]:
@@ -1074,7 +1074,7 @@ TASK_STRATEGIES = {
 }
 
 
-def resolve_strategy_name(spec: tasks.Config, task: tasks.Task) -> str:
+def scheme(spec: tasks.Config, task: tasks.Task) -> str:
     """Chooses the split strategy for a project.
 
     Args:
@@ -1115,7 +1115,7 @@ class Splitter:
         """
         self.spec = spec
         self.task = task
-        self.strategy_name = resolve_strategy_name(spec, task)
+        self.strategy_name = scheme(spec, task)
 
     def feature_columns(self, frame: pandas.DataFrame) -> list[str]:
         """Finds the columns that describe a record.
@@ -1162,7 +1162,7 @@ class Splitter:
         groups = duplicates.duplicate_groups(frame, self.feature_columns(frame))
         if (groups == duplicates.NOT_DUPLICATED).all():
             return part
-        dev, test, folds, count = duplicates.keep_together(
+        dev, test, folds, count = duplicates.cohere(
             part.dev_ids, part.test_ids, part.folds, groups
         )
         covered = int((groups != duplicates.NOT_DUPLICATED).sum())

@@ -52,7 +52,7 @@ ValidationStrategy = Literal[
 LeakagePolicy = Literal["warn", "block"]
 
 
-def publish_curation_artifact(path: pathlib.Path, content: bytes) -> None:
+def emplace(path: pathlib.Path, content: bytes) -> None:
     """Publishes curation bytes atomically without replacing an artifact.
 
     A hard link from a fully flushed sibling file gives the destination a
@@ -127,7 +127,7 @@ def declare(
     return declaration
 
 
-def parameter_estimation_declaration_digest(
+def fingerprint(
     declaration: dict[str, Any],
 ) -> str:
     """Computes the canonical digest for a declaration without its digest.
@@ -186,10 +186,7 @@ def unwrap(
             "parameter estimation declaration digest is missing",
             {"run_dir": str(artifact_path)},
         )
-    if (
-        digest != parameter_estimation_declaration_digest(envelope)
-        or lock_digest != digest
-    ):
+    if digest != fingerprint(envelope) or lock_digest != digest:
         raise errors.ArtifactError(
             "parameter estimation declaration digest mismatch",
             {"run_dir": str(artifact_path)},
@@ -345,7 +342,7 @@ def bind(
         lineage.Node(
             "evaluation",
             lineage.Kind.EVALUATION,
-            bundle.file_sha256(run_directory / "evaluation.json"),
+            bundle.shasum(run_directory / "evaluation.json"),
             {"artifact": "evaluation.json"},
         )
     )
@@ -550,7 +547,7 @@ def estimate(
     if policy.cluster_name is not None:
         clusters = frame.loc[:, policy.cluster_name]
     cluster_values = None if clusters is None else clusters.tolist()
-    snapshot_id = tabular.snapshot_identity(frame, orchestrator.spec.data.uri)
+    snapshot_id = tabular.identify(frame, orchestrator.spec.data.uri)
     source_identity = None
     if orchestrator.spec.data.uri not in {"<memory>", "<in-memory>"}:
         source_identity = connectors.source_identity(orchestrator.spec.data.uri)
@@ -656,7 +653,7 @@ class Project:
         strategies: tasks.Strategies | None = None,
         models: tasks.Candidates | None = None,
         ensemble: tasks.Stacking | None = None,
-        feature_graph: tasks.FeatureGraph | None = None,
+        feature_graph: tasks.Derivation | None = None,
         selection: tasks.Selection | None = None,
         decision: tasks.Threshold | None = None,
         fairness: tasks.Parity | None = None,
@@ -821,9 +818,7 @@ class Project:
                 given.
         """
         frame = (
-            interchange.to_pandas(data)
-            if interchange.is_tabular(data)
-            else None
+            interchange.to_pandas(data) if interchange.tablelike(data) else None
         )
         self.spec = tasks.Config(
             data=tasks.Dataset(
@@ -889,7 +884,7 @@ class Project:
             strategies=strategies or tasks.Strategies(),
             models=models or tasks.Candidates(),
             ensemble=ensemble or tasks.Stacking(),
-            feature_graph=feature_graph or tasks.FeatureGraph(),
+            feature_graph=feature_graph or tasks.Derivation(),
             selection=selection or tasks.Selection(),
             decision=decision or tasks.Threshold(),
             fairness=fairness or tasks.Parity(),
@@ -914,7 +909,7 @@ class Project:
             self.spec, frame, checkpoints=checkpoints
         )
         self.orchestrator.tracking_path = self.output_dir / "experiments.sqlite"
-        self.profile: scmle.contracts.data.DatasetProfile | None = None
+        self.profile: scmle.contracts.data.Portrait | None = None
 
     def plan(self) -> experiments.Plan:
         """Analyzes the data and proposes a workflow; trains nothing.
@@ -1025,7 +1020,7 @@ class Project:
             The completed run.
         """
         run_path = pathlib.Path(run_directory)
-        orchestrator = scmle.core.orchestrator.Orchestrator.for_run_directory(
+        orchestrator = scmle.core.orchestrator.Orchestrator.reload(
             run_path, frame=data
         )
         estimand, policy = restore(
@@ -1046,7 +1041,7 @@ class Project:
         run_directory: str | pathlib.Path,
         data: pandas.DataFrame | None = None,
         output_dir: str | pathlib.Path | None = None,
-    ) -> reproducibility.ReplayVerdict:
+    ) -> reproducibility.Comparison:
         """Re-executes a finished run's configuration and compares the runs.
 
         Args:
@@ -1059,7 +1054,7 @@ class Project:
             A verdict whose level is `exact`, `comparable` or `different`.
         """
         original = pathlib.Path(run_directory)
-        orchestrator = scmle.core.orchestrator.Orchestrator.for_run_directory(
+        orchestrator = scmle.core.orchestrator.Orchestrator.reload(
             original, frame=data
         )
         estimand, policy = restore(
@@ -1076,9 +1071,9 @@ class Project:
         )
         if estimation is not None:
             persist(rerun, estimation)
-        return reproducibility.compare_runs(
-            reproducibility.load_run(original),
-            reproducibility.load_run(rerun.run_dir),
+        return reproducibility.judge(
+            reproducibility.reread(original),
+            reproducibility.reread(rerun.run_dir),
         )
 
     def cancel(self) -> None:
@@ -1124,7 +1119,7 @@ class ModalityProject:
         observed_adapter: modality_lifecycle.Preparer | None = None,
         performance_budget: performance.Budget | None = None,
         performance_baseline: performance.Baseline | None = None,
-        manifest: scmle.contracts.data.ModalityManifest | None = None,
+        manifest: scmle.contracts.data.Passport | None = None,
         require_independent_ground_truth: bool = False,
         cancellation: modality_lifecycle.Cancellation | None = None,
         checkpoint_path: str | pathlib.Path | None = None,
@@ -1249,8 +1244,8 @@ class ModalityProject:
         return self.lifecycle.declaration(self.report)
 
 
-def check_manifest_matches_adapter(
-    manifest: scmle.contracts.data.ModalityManifest,
+def conform(
+    manifest: scmle.contracts.data.Passport,
     modality: str,
     dataset_hash: str,
     sample_count: int,
@@ -1318,8 +1313,8 @@ def verify(
         raise errors.InputError(
             "existing curation artifact must be an object"
         ) from None
-    if attestation.canonical_digest(existing_record) != (
-        attestation.canonical_digest(candidate.to_dict())
+    if attestation.checksum(existing_record) != (
+        attestation.checksum(candidate.to_dict())
     ):
         raise errors.InputError(
             "existing curation canonical content does not match current adapter"
@@ -1347,7 +1342,7 @@ class Curator:
         signing_key: str | bytes,
         *,
         output_dir: str | pathlib.Path = "runs",
-        manifest: scmle.contracts.data.ModalityManifest | None = None,
+        manifest: scmle.contracts.data.Passport | None = None,
     ) -> None:
         """Defines a curation-only run over a typed modality adapter.
 
@@ -1366,9 +1361,9 @@ class Curator:
         if not signing_key:
             raise errors.InputError("signing_key must not be empty")
         if manifest is not None and not isinstance(
-            manifest, scmle.contracts.data.ModalityManifest
+            manifest, scmle.contracts.data.Passport
         ):
-            raise errors.KindError("manifest must be ModalityManifest")
+            raise errors.KindError("manifest must be Passport")
         self.adapter = adapter
         self.signing_key = signing_key
         self.output_dir = pathlib.Path(output_dir)
@@ -1401,9 +1396,7 @@ class Curator:
         dataset_hash = self.adapter.dataset_hash
         sample_count = len(samples)
         if self.manifest is not None:
-            check_manifest_matches_adapter(
-                self.manifest, modality, dataset_hash, sample_count
-            )
+            conform(self.manifest, modality, dataset_hash, sample_count)
         report = self.adapter.curate()
         if not isinstance(
             report,
@@ -1438,7 +1431,7 @@ class Curator:
             "curation": curation_payload,
             "dataset_card": card.to_dict(),
         }
-        signature = signing.sign_payload(unsigned, self.signing_key)
+        signature = signing.mac(unsigned, self.signing_key)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         path = self.output_dir / "modality_curation.json"
         candidate = modality_lifecycle.Curation(
@@ -1455,7 +1448,7 @@ class Curator:
             json.dumps(payload, indent=2, sort_keys=True) + "\n"
         ).encode("utf-8")
         try:
-            publish_curation_artifact(path, serialized_payload)
+            emplace(path, serialized_payload)
         except FileExistsError:
             # handled: existing artifact verified and returned (idempotent
             # publish)

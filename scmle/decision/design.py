@@ -108,7 +108,7 @@ def fixed_horizon_rows(
     return math.ceil(2 * per_arm * design_effect)
 
 
-def srm_p_value(challenger: int, total: int, assignment_prob: float) -> float:
+def mismatch(challenger: int, total: int, assignment_prob: float) -> float:
     """Exact two-sided binomial p-value of the assignment counts.
 
     Args:
@@ -165,7 +165,7 @@ def srm_log_bayes_factor(
     return result
 
 
-def srm_rejects(
+def srm(
     challenger: int, total: int, assignment_prob: float, level: float
 ) -> bool:
     """Anytime-valid sample-ratio check at the current counts.
@@ -184,8 +184,8 @@ def srm_rejects(
     return bool(value >= -math.log(level))
 
 
-def simulate_stopping(
-    plan: decision.RolloutPlan,
+def simulate(
+    plan: decision.Experiment,
     p_control: float,
     effect: float,
     runs: int,
@@ -225,7 +225,7 @@ def simulate_stopping(
         float
     )
     scaled = plan.delta_min / (plan.high - plan.low)
-    paths = anytime.centered_paths(arm, y, q, scaled)
+    paths = anytime.recentre(arm, y, q, scaled)
     hit = paths >= -math.log(chosen)
     crossed = hit.any(axis=1)
     when = numpy.where(crossed, hit.argmax(axis=1) + 1, plan.n_max)

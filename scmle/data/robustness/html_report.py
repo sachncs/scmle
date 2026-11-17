@@ -100,7 +100,7 @@ def curve(specs: list[dict[str, Any]]) -> str:
     return "".join(parts)
 
 
-def stability_section(document: dict[str, Any]) -> str:
+def section(document: dict[str, Any]) -> str:
     """Renders the stability part of the page.
 
     Args:
@@ -175,6 +175,6 @@ def render(stability: dict[str, Any], shift: dict[str, Any]) -> str:
         "<title>SCMLE stability and shift report</title>"
         f"<style>{STYLE}</style></head><body>"
         "<h1>Stability and shift</h1>"
-        f"{stability_section(stability)}{shift_section(shift)}"
+        f"{section(stability)}{shift_section(shift)}"
         "</body></html>"
     )

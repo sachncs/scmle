@@ -65,7 +65,7 @@ def test_sets_never_overlap_and_units_never_straddle(scenario):
     }
     refusal = None
     try:
-        result = carve.carve_confirmation(dev, folds, **arguments)
+        result = carve.divide(dev, folds, **arguments)
     except errors.ConfigError as error:
         refusal = error
     if refusal is not None:
@@ -88,5 +88,5 @@ def test_sets_never_overlap_and_units_never_straddle(scenario):
         for label in set(duplicates[duplicates >= 0].tolist()):
             members = {i for i in dev if duplicates[position[int(i)]] == label}
             assert not (members & c and members & x)
-    again = carve.carve_confirmation(dev, folds, **arguments)
+    again = carve.divide(dev, folds, **arguments)
     assert numpy.array_equal(again.confirmation_ids, result.confirmation_ids)

@@ -505,7 +505,7 @@ class Estimation:
             )
         self.check_covariance()
         self.check_counts()
-        self.check_contrast()
+        self.scrutinise()
         for mapping_name, mapping_value in (
             ("diagnostics", self.diagnostics),
             ("limitations", self.limitations),
@@ -575,7 +575,7 @@ class Estimation:
                 "subject accounting must reconcile to subjects_input"
             )
 
-    def check_contrast(self) -> None:
+    def scrutinise(self) -> None:
         """Checks that the contrast, its error and its interval are valid.
 
         Raises:
@@ -893,9 +893,7 @@ class Estimator:
             denominator, denominator_iterations = regress(
                 denominator_features, current_treatment, self.policy
             )
-            check_propensity_support(
-                denominator, value, self.policy.propensity_clip
-            )
+            overlap(denominator, value, self.policy.propensity_clip)
             increment = numpy.where(
                 current_treatment == 1.0,
                 numerator / denominator,
@@ -962,7 +960,7 @@ class Estimator:
             critical_value,
         )
         regimes = (target, comparator)
-        covariance = regime_covariance(
+        covariance = covary(
             target_mask,
             comparator_mask,
             final_weights,
@@ -1145,7 +1143,7 @@ def convert_numeric_columns(
             )
 
 
-def require_distinct_neighbours(values: list[Any]) -> None:
+def nonrepeating(values: list[Any]) -> None:
     """Rejects equal consecutive time values.
 
     Args:
@@ -1263,7 +1261,7 @@ def validate_time_order(frame: pandas.DataFrame, estimand: Estimand) -> None:
         for item in frame.groupby(
             estimand.subject_identity, sort=False, dropna=False
         ):
-            require_distinct_neighbours(item[1][estimand.time_column].tolist())
+            nonrepeating(item[1][estimand.time_column].tolist())
     except (TypeError, ValueError) as error:
         if "strictly increasing" in str(error):
             raise
@@ -1431,9 +1429,7 @@ def regress(
     )
 
 
-def check_propensity_support(
-    propensity: numpy.ndarray, period: Any, minimum: float
-) -> None:
+def overlap(propensity: numpy.ndarray, period: Any, minimum: float) -> None:
     """Rejects fitted propensities outside the declared positivity support.
 
     Args:
@@ -1536,7 +1532,7 @@ def average(
     )
 
 
-def regime_covariance(
+def covary(
     target_mask: numpy.ndarray,
     comparator_mask: numpy.ndarray,
     weights: numpy.ndarray,

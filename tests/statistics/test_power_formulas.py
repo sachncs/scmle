@@ -35,9 +35,11 @@ def test_mean_effect_size_gives_the_promised_power():
         support_statistics.assert_rate_near(
             observed, POWER, runs, f"mean effect {delta}, K={claims}"
         )
-        closed = feasibility.power_mean(delta, rows, alpha=ALPHA, k_max=claims)
+        closed = feasibility.detectability(
+            delta, rows, alpha=ALPHA, k_max=claims
+        )
         support_statistics.assert_rate_near(
-            observed, closed, runs, f"power_mean {delta}, K={claims}"
+            observed, closed, runs, f"detectability {delta}, K={claims}"
         )
 
 

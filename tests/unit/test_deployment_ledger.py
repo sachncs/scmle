@@ -15,7 +15,7 @@ def make(path=None):
         charter_hash="c" * 64,
         policy={"r_star": 0.05},
         alpha_promo="1/20",
-        system_keys=[deployment_ledger.key_fingerprint(SYSTEM_KEY)],
+        system_keys=[deployment_ledger.thumbprint(SYSTEM_KEY)],
     )
 
 
@@ -81,9 +81,7 @@ def rewrite(tmp_path, change):
 def test_deleting_a_middle_row_fails_verification(tmp_path):
     filled(tmp_path)
     rewrite(tmp_path, lambda lines: lines[:2] + lines[3:])
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="chain broken"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="chain broken"):
         deployment_ledger.DeploymentLedger.load(
             tmp_path / deployment_ledger.FILE_NAME
         )
@@ -92,9 +90,7 @@ def test_deleting_a_middle_row_fails_verification(tmp_path):
 def test_reordering_rows_fails_verification(tmp_path):
     filled(tmp_path)
     rewrite(tmp_path, lambda lines: [lines[0], lines[2], lines[1], *lines[3:]])
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="chain broken"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="chain broken"):
         deployment_ledger.DeploymentLedger.load(
             tmp_path / deployment_ledger.FILE_NAME
         )
@@ -109,9 +105,7 @@ def test_editing_a_row_fails_verification(tmp_path):
         return [lines[0], json.dumps(row, sort_keys=True), *lines[2:]]
 
     rewrite(tmp_path, edit)
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="chain broken"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="chain broken"):
         deployment_ledger.DeploymentLedger.load(
             tmp_path / deployment_ledger.FILE_NAME
         )
@@ -124,9 +118,7 @@ def test_tail_truncation_is_caught_with_the_recorded_head(tmp_path):
     assert deployment_ledger.DeploymentLedger.load(
         tmp_path / deployment_ledger.FILE_NAME
     )
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="recorded head"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="recorded head"):
         deployment_ledger.DeploymentLedger.load(
             tmp_path / deployment_ledger.FILE_NAME, head
         )
@@ -134,13 +126,9 @@ def test_tail_truncation_is_caught_with_the_recorded_head(tmp_path):
 
 def test_unknown_kinds_and_a_second_open_are_refused():
     ledger = make()
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="unknown"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="unknown"):
         ledger.commit("confirmation", {})
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="exactly one"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="exactly one"):
         ledger.commit(deployment_ledger.OPEN, {})
 
 
@@ -154,9 +142,7 @@ def test_a_challenger_must_be_registered_before_it_is_scored():
         "rejected": True,
         "wealth_after": "1/40",
     }
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="not registered"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="not registered"):
         ledger.commit(deployment_ledger.CHALLENGER_RESULT, body)
 
 
@@ -166,8 +152,8 @@ def test_challenger_decisions_are_replayed_exactly():
         deployment_ledger.CHALLENGER_RESULT,
         {"name": "c1", "phase": deployment_ledger.REGISTERED},
     )
-    step = ledger.require_promotion().rule.step(
-        ledger.require_promotion().state,
+    step = ledger.elond().rule.step(
+        ledger.elond().state,
         deployment_ledger.sequential_tests.online_fdr.Evidence(e=100.0),
     )
     good = {
@@ -179,7 +165,7 @@ def test_challenger_decisions_are_replayed_exactly():
         "wealth_after": str(step.wealth_after),
     }
     bad = {**good, "rejected": not step.rejected}
-    with pytest.raises(deployment_ledger.DeploymentLedgerError, match="replay"):
+    with pytest.raises(deployment_ledger.MisuseError, match="replay"):
         make_with_registered(bad)
     row = make_with_registered(good)
     assert row["kind"] == deployment_ledger.CHALLENGER_RESULT
@@ -199,7 +185,7 @@ def test_an_attestation_is_bound_to_its_question_hash():
     identity, digest = escalate(ledger)
     wrong = reply(identity, "0" * 64)
     with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="different question"
+        deployment_ledger.MisuseError, match="different question"
     ):
         ledger.commit(deployment_ledger.ATTESTATION, wrong.to_dict())
     ledger.commit(
@@ -211,9 +197,7 @@ def test_an_attestation_is_bound_to_its_question_hash():
 def test_an_attestation_signed_with_a_system_key_is_refused():
     ledger = make()
     identity, digest = escalate(ledger)
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="system holds"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="system holds"):
         ledger.commit(
             deployment_ledger.ATTESTATION,
             reply(identity, digest, key=SYSTEM_KEY).to_dict(),
@@ -226,9 +210,7 @@ def test_an_escalation_is_answered_once_and_timeouts_close_it():
     ledger.commit(
         deployment_ledger.ATTESTATION, reply(identity, digest).to_dict()
     )
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="already closed"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="already closed"):
         ledger.commit(
             deployment_ledger.ATTESTATION, reply(identity, digest).to_dict()
         )
@@ -238,9 +220,7 @@ def test_an_escalation_is_answered_once_and_timeouts_close_it():
         {"phase": deployment_ledger.PHASE_TIMEOUT, "id": other},
     )
     assert ledger.pending() == []
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="not pending"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="not pending"):
         ledger.commit(
             deployment_ledger.ESCALATION,
             {"phase": deployment_ledger.PHASE_TIMEOUT, "id": other},
@@ -258,16 +238,14 @@ def test_escalation_needs_a_matching_hash_id_and_evidence():
         "evidence": [],
         "proposed_default": "d",
     }
-    with pytest.raises(deployment_ledger.DeploymentLedgerError, match="hash"):
+    with pytest.raises(deployment_ledger.MisuseError, match="hash"):
         ledger.commit(
             deployment_ledger.ESCALATION, {**body, "question_hash": "1" * 64}
         )
-    with pytest.raises(deployment_ledger.DeploymentLedgerError, match="id"):
+    with pytest.raises(deployment_ledger.MisuseError, match="id"):
         ledger.commit(deployment_ledger.ESCALATION, {**body, "id": "esc-7"})
     del body["proposed_default"]
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="proposed_default"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="proposed_default"):
         ledger.commit(deployment_ledger.ESCALATION, body)
 
 
@@ -278,29 +256,19 @@ def test_attestation_signature_and_fields():
     assert not deployment_ledger.Attestation.from_dict(
         {**answer.to_dict(), "statement": "changed"}
     ).verify(KEY)
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="expires"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="expires"):
         reply("esc-1", "a" * 64, expires="2026-01-01")
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="YYYY-MM-DD"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="YYYY-MM-DD"):
         reply("esc-1", "a" * 64, date="11/01/2026")
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="statement"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="statement"):
         reply("esc-1", "a" * 64, statement=" ")
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="unexpected"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="unexpected"):
         deployment_ledger.Attestation.from_dict({"escalation_id": "x"})
 
 
 def test_halt_is_released_only_with_a_recalibration():
     ledger = make()
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="without a halt"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="without a halt"):
         ledger.commit(
             deployment_ledger.HALT,
             {"phase": deployment_ledger.RELEASE, "recalibration": {"p": 0}},
@@ -310,9 +278,7 @@ def test_halt_is_released_only_with_a_recalibration():
         {"phase": deployment_ledger.ENTER, "reason": "risk"},
     )
     assert ledger.halted
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="recalibration"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="recalibration"):
         ledger.commit(
             deployment_ledger.HALT, {"phase": deployment_ledger.RELEASE}
         )
@@ -328,7 +294,7 @@ def test_in_memory_verify_replays_the_rows():
     ledger.commit(deployment_ledger.ALARM, {"batch": 1})
     ledger.verify()
     ledger.rows[1]["body"]["batch"] = 2
-    with pytest.raises(deployment_ledger.DeploymentLedgerError):
+    with pytest.raises(deployment_ledger.MisuseError):
         ledger.verify()
 
 
@@ -345,9 +311,7 @@ def test_replay_is_deterministic_across_loads(tmp_path):
 
 def test_an_experiment_level_with_a_zero_denominator_is_a_ledger_error():
     ledger = make()
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="malformed"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="malformed"):
         ledger.commit(
             deployment_ledger.ROLLOUT_EXPERIMENT,
             {"experiment_id": "e1", "level": "1/0"},

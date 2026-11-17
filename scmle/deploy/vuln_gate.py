@@ -59,7 +59,7 @@ def load_json(path: Path) -> Any:
         raise GateError(f"cannot read {path}: {error}") from error
 
 
-def parse_pip_audit(
+def advisories(
     report: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], set[str], str]:
     """Parses a pip-audit report.
@@ -97,7 +97,7 @@ def parse_pip_audit(
     return findings, scanned, "pip-audit"
 
 
-def parse_trivy(
+def parse(
     report: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], set[str], str]:
     """Parses a Trivy report.
@@ -152,9 +152,9 @@ def parse_report(report: Any) -> tuple[list[dict[str, Any]], set[str], str]:
         GateError: If the report is neither pip-audit nor Trivy format.
     """
     if isinstance(report, dict) and "dependencies" in report:
-        return parse_pip_audit(report)
+        return advisories(report)
     if isinstance(report, dict) and "Results" in report:
-        return parse_trivy(report)
+        return parse(report)
     raise GateError("unrecognised scanner report (expected pip-audit or Trivy)")
 
 

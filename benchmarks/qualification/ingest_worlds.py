@@ -60,13 +60,13 @@ class Database:
         """
         return sqlite3.connect(self.address, uri=True)
 
-    def source(self) -> profile.SqlSource:
-        """A read-only `SqlSource` over the database.
+    def source(self) -> profile.Sql:
+        """A read-only `Sql` over the database.
 
         Returns:
             A source that opens a fresh connection per read.
         """
-        return profile.SqlSource(self.factory)
+        return profile.Sql(self.factory)
 
     def execute(
         self, sql: str, rows: list[tuple[Any, ...]] | None = None
@@ -156,9 +156,9 @@ class MutatingConnector(connectors.DbApiConnector):
 
     def read_rows(
         self,
-        checkpoint: connectors.SourceCheckpoint | None = None,
+        checkpoint: connectors.Bookmark | None = None,
         limit: int = 1_000,
-    ) -> connectors.RowBatch:
+    ) -> connectors.Page:
         """Reads a batch, mutating the source first on the chosen call.
 
         Args:

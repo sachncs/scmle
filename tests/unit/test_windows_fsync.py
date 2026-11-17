@@ -59,14 +59,14 @@ def test_sync_file_flushes_an_existing_file_without_changing_it(
     target = tmp_path / "file.bin"
     target.write_bytes(b"payload")
 
-    durability.sync_file(target)
+    durability.sync(target)
 
     assert target.read_bytes() == b"payload"
 
 
 def test_sync_file_reports_a_missing_file(tmp_path, strict_fsync):
     with pytest.raises(FileNotFoundError):
-        durability.sync_file(tmp_path / "absent.bin")
+        durability.sync(tmp_path / "absent.bin")
 
 
 def test_no_module_flushes_a_file_opened_read_only():

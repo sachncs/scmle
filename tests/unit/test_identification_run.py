@@ -69,7 +69,7 @@ def block(**changes) -> causal.Question:
         "estimand": "ATE",
         "assumptions": ASSUMPTIONS,
         "strategies": ("backdoor_aipw",),
-        "negative_controls": (causal.NegativeControl("outcome", "nco"),),
+        "negative_controls": (causal.Control("outcome", "nco"),),
         "strata": ("region",),
         "sensitivity": causal.Confounding("strongest_observed", 1.0),
     }
@@ -252,7 +252,7 @@ def test_difference_in_differences_runs_through_the_same_documents():
         adoption="g",
         assumptions=("parallel_trends", "no_anticipation", "no_interference"),
         strategies=("did",),
-        negative_controls=(causal.NegativeControl("outcome", "nco"),),
+        negative_controls=(causal.Control("outcome", "nco"),),
         strata=("region",),
         sensitivity=causal.Confounding(m_max=1.0),
     )

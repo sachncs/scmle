@@ -10,7 +10,7 @@ The project specification is a JSON mapping::
 
 The data object is copied from the store to local scratch space, the project
 runs there, and its run directory is mirrored to ``runs/<id>/workdir/`` in the
-store: periodically while it runs (`WorkdirSync`) and once more when it ends,
+store: periodically while it runs (`Mirror`) and once more when it ends,
 however it ends. After a restart on a machine with an empty disk the
 workdir is restored and `Project.resume` reuses the completed trials. A
 hard kill therefore loses at most the trials finished since the last
@@ -43,7 +43,7 @@ SECTIONS = {
     "strategies": tasks.Strategies,
     "models": tasks.Candidates,
     "ensemble": tasks.Stacking,
-    "feature_graph": tasks.FeatureGraph,
+    "feature_graph": tasks.Derivation,
     "selection": tasks.Selection,
     "decision": tasks.Threshold,
     "fairness": tasks.Parity,
@@ -52,7 +52,7 @@ SECTIONS = {
 CONFIG_NAMES = ("config.json", "spec.json")
 
 
-class WorkdirSync:
+class Mirror:
     """Mirrors a local directory to ``<prefix>`` in a store, and back.
 
     Attributes:
@@ -168,7 +168,7 @@ class WorkdirSync:
         self.push()
 
 
-def saved_run(directory: pathlib.Path) -> pathlib.Path | None:
+def locate(directory: pathlib.Path) -> pathlib.Path | None:
     """Finds the run directory inside a restored workdir.
 
     Args:
@@ -184,7 +184,7 @@ def saved_run(directory: pathlib.Path) -> pathlib.Path | None:
     return None
 
 
-def project_options(options: Mapping[str, Any]) -> dict[str, Any]:
+def configure(options: Mapping[str, Any]) -> dict[str, Any]:
     """Builds keyword arguments for `Project` from a JSON mapping.
 
     The nested sections (`search`, `models`, ...) arrive as mappings and are
@@ -204,7 +204,7 @@ def project_options(options: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def run_project(
-    context: local.JobContext,
+    context: local.Context,
     sync_seconds: float = SYNC_SECONDS,
     on_start: Callable[[Any], None] | None = None,
 ) -> None:
@@ -225,7 +225,7 @@ def run_project(
 
     Raises:
         ConfigError: If the project mapping lacks `data` or `target`.
-        JobInterruptedError: If the project was cancelled.
+        PreemptedError: If the project was cancelled.
     """
     spec = context.spec.project
     if "data" not in spec or "target" not in spec:
@@ -239,9 +239,7 @@ def run_project(
         data_path.write_bytes(content)
         workdir = root / "runs"
         workdir.mkdir()
-        sync = WorkdirSync(
-            context.store, f"runs/{context.run_id}/workdir/", workdir
-        )
+        sync = Mirror(context.store, f"runs/{context.run_id}/workdir/", workdir)
         restored = sync.restore()
         sync.start(sync_seconds)
         try:
@@ -249,7 +247,7 @@ def run_project(
                 spec, data_path, workdir, restored > 0, on_start
             )
         except errors.CancelledError as error:
-            raise local.JobInterruptedError("project cancelled") from error
+            raise local.PreemptedError("project cancelled") from error
         finally:
             sync.close()
         context.step(1, {"run": result.run_id})
@@ -282,7 +280,7 @@ def execute(
             that the run had already completed (in which case a new run is
             started).
     """
-    previous = saved_run(workdir) if restored else None
+    previous = locate(workdir) if restored else None
     if previous is not None:
         try:
             return scmle.api.project.Project.resume(previous), True
@@ -293,7 +291,7 @@ def execute(
         data_path,
         spec["target"],
         output_dir=workdir,
-        **project_options(spec.get("options", {})),
+        **configure(spec.get("options", {})),
     )
     if on_start is not None:
         on_start(started)

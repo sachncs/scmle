@@ -80,9 +80,9 @@ class Candidate:
     environment: str
     provider: str
     source_commit: str
-    model: registry.VersionRecord
+    model: registry.Release
     model_digest: str
-    approval: registry.PromotionApproval | None
+    approval: registry.Sanction | None
     container_digest: str
     config_digest: str
     requested_by: str
@@ -123,7 +123,7 @@ class GateDecision:
 
 
 def model_digest_of(
-    store: registry.ModelRegistryStore, version: registry.VersionRecord
+    store: registry.ModelRegistryStore, version: registry.Release
 ) -> str:
     """Computes the digest a service running this registered bundle reports.
 
@@ -155,7 +155,7 @@ def veto(candidate: Candidate, key: str | bytes) -> list[str]:
         problems.append("the model has no approval")
     else:
         try:
-            approval.validate_target(
+            approval.validate(
                 candidate.model.model,
                 candidate.model.version,
                 candidate.model.content_id,
@@ -173,7 +173,7 @@ def veto(candidate: Candidate, key: str | bytes) -> list[str]:
     return problems
 
 
-def admit_problems(candidate: Candidate, key: str | bytes) -> list[str]:
+def objections(candidate: Candidate, key: str | bytes) -> list[str]:
     """Lists the reasons the build may not be deployed to the environment.
 
     Args:
@@ -272,7 +272,7 @@ def check_problems(candidate: Candidate) -> list[str]:
     return problems
 
 
-def runtime_problems(candidate: Candidate) -> list[str]:
+def absences(candidate: Candidate) -> list[str]:
     """Lists the reasons the platform does not show the candidate running.
 
     Args:
@@ -308,7 +308,7 @@ def admit(candidate: Candidate, key: str | bytes) -> GateDecision:
     Returns:
         The decision with every reason for a refusal.
     """
-    problems = admit_problems(candidate, key)
+    problems = objections(candidate, key)
     return GateDecision(not problems, tuple(problems))
 
 
@@ -327,9 +327,9 @@ def certify(
     Returns:
         The decision; when allowed, it carries the signed record.
     """
-    problems = admit_problems(candidate, key)
+    problems = objections(candidate, key)
     problems.extend(check_problems(candidate))
-    problems.extend(runtime_problems(candidate))
+    problems.extend(absences(candidate))
     seen = candidate.observation
     if problems or seen is None:
         return GateDecision(allowed=False, reasons=tuple(problems))
@@ -348,6 +348,6 @@ def certify(
         approved_at=candidate.approved_at,
         evidence=tuple(sorted(results.items())),
         revision=seen.revision,
-        recorded_at=now or events.utc_timestamp(),
+        recorded_at=now or events.stamp(),
     )
     return GateDecision(allowed=True, reasons=(), record=unsigned.signed(key))

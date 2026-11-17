@@ -6,7 +6,7 @@ from scmle.data.framing import questions
 
 
 def test_unsigned_llm_field_caps_the_claim_and_a_signature_lifts_it():
-    sources = [provenance.FieldSource.TEMPLATE, provenance.FieldSource.LLM]
+    sources = [provenance.Filling.TEMPLATE, provenance.Filling.LLM]
     assert (
         provenance.grade(qualification.Tier.CONFIRMED, sources, signed=False)
         is qualification.Tier.UNVERIFIED
@@ -15,7 +15,7 @@ def test_unsigned_llm_field_caps_the_claim_and_a_signature_lifts_it():
         provenance.grade(qualification.Tier.CONFIRMED, sources, signed=True)
         is qualification.Tier.CONFIRMED
     )
-    human = [provenance.FieldSource.HUMAN]
+    human = [provenance.Filling.HUMAN]
     assert (
         provenance.grade(qualification.Tier.CONFIRMED, human, signed=False)
         is qualification.Tier.CONFIRMED
@@ -56,8 +56,6 @@ def test_gain_sign_verdict_flips_with_the_threshold():
     a = (rng.random(2000) < numpy.where(y == 1, 0.8, 0.45)).astype(float)
     b = (rng.random(2000) < numpy.where(y == 1, 0.55, 0.15)).astype(float)
     found = questions.tipping_point(
-        questions.Unknown(
-            "t", 0.05, 0.5, "x", questions.gain_sign_verdict(y, a, b)
-        )
+        questions.Unknown("t", 0.05, 0.5, "x", questions.judge(y, a, b))
     )
     assert found is not None and 0.05 < found.tipping_value < 0.5

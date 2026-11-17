@@ -18,7 +18,7 @@ def test_happy_path_emits_event_per_transition():
 
 def test_cannot_skip_states():
     machine = state.Tracker("r1", events.Log())
-    with pytest.raises(state.InvalidTransitionError):
+    with pytest.raises(state.TransitionError):
         machine.transition(state.RunState.TRAINING)
 
 
@@ -26,5 +26,5 @@ def test_abort_then_terminal():
     machine = state.Tracker("r1", events.Log())
     machine.transition(state.RunState.VALIDATING)
     machine.transition(state.RunState.BLOCKED, "ambiguous target")
-    with pytest.raises(state.InvalidTransitionError):
+    with pytest.raises(state.TransitionError):
         machine.transition(state.RunState.PROFILING)

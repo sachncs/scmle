@@ -13,15 +13,15 @@ from scmle.explainability import importance
 from scmle.explainability import interaction
 
 
-def build_evidence(
+def substantiate(
     diagnostic: diagnostics.Diagnostic,
     result: Mapping[str, Any],
     *,
     model_fingerprint: str,
     bundle_digest: str,
     input_fingerprint: str,
-    dataset_snapshot: explanations.DatasetSnapshot,
-    feature_graph: explanations.FeatureGraphReference,
+    dataset_snapshot: explanations.Snapshot,
+    feature_graph: explanations.Lineage,
     method_parameters: Mapping[str, Any],
     timestamp: datetime.datetime,
     software_version: str,
@@ -29,8 +29,8 @@ def build_evidence(
     stability: Mapping[str, Any],
     limitations: Sequence[str],
     causal_warning: str,
-    privacy_decision: explanations.PrivacyDecision,
-    evidence_links: Sequence[explanations.EvidenceLink],
+    privacy_decision: explanations.Clearance,
+    evidence_links: Sequence[explanations.Link],
 ) -> explanations.Evidence:
     """Builds deterministic explanation evidence from a diagnostic result.
 
@@ -77,7 +77,7 @@ def build_evidence(
     supplied_links: object = evidence_links  # callers may pass a string
     if isinstance(supplied_links, str):
         raise errors.KindError(
-            "evidence_links must be a sequence of EvidenceLink values"
+            "evidence_links must be a sequence of Link values"
         )
 
     return explanations.Evidence(
@@ -110,7 +110,7 @@ def default_suite() -> tuple[diagnostics.Diagnostic, ...]:
         in that order.
     """
     return (
-        importance.PermutationImportance(),
-        dependence.PartialDependence(),
-        interaction.PairwiseInteraction(),
+        importance.Importance(),
+        dependence.Dependence(),
+        interaction.Pairwise(),
     )

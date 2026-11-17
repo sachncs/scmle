@@ -47,7 +47,7 @@ DEFAULT_MAX_STALE = 3600.0
 DISCOVERY_PATH = "/.well-known/openid-configuration"
 
 
-def fetch_json(
+def retrieve(
     url: str,
     *,
     timeout: float = TIMEOUT_SECONDS,
@@ -94,7 +94,7 @@ def discover(
     issuer: str,
     *,
     allow_http: bool = False,
-    fetch: Callable[..., Any] = fetch_json,
+    fetch: Callable[..., Any] = retrieve,
 ) -> dict[str, Any]:
     """Fetches the discovery document of `issuer`, checked to name that issuer.
 
@@ -147,7 +147,7 @@ class KeySet(tokens.KeySet):
         max_stale: float = DEFAULT_MAX_STALE,
         clock: Callable[[], float] = time.time,
         allow_http: bool = False,
-        fetch: Callable[..., Any] = fetch_json,
+        fetch: Callable[..., Any] = retrieve,
     ) -> None:
         """Fetches the key set once; it must succeed.
 
@@ -189,7 +189,7 @@ class KeySet(tokens.KeySet):
             ConfigError: If the fetch fails or the document is not a valid
                 JWKS.
         """
-        return tokens.KeySet.from_jwks(
+        return tokens.KeySet.jwks(
             self.fetcher(self.uri, allow_http=self.allow_http)
         )
 
@@ -243,7 +243,7 @@ class KeySet(tokens.KeySet):
         return super().get(kid)
 
 
-def revocation_list_of(document: Any) -> tokens.RevocationList:
+def revoked(document: Any) -> tokens.RevocationList:
     """Builds a revocation list from a fetched document.
 
     Args:
@@ -287,7 +287,7 @@ class Revocations:
         max_stale: float = DEFAULT_MAX_STALE,
         clock: Callable[[], float] = time.time,
         allow_http: bool = False,
-        fetch: Callable[..., Any] = fetch_json,
+        fetch: Callable[..., Any] = retrieve,
     ) -> None:
         """Creates the puller; the first call fetches.
 
@@ -328,9 +328,7 @@ class Revocations:
         if self.current is not None and now - self.fetched_at < self.ttl:
             return self.current
         try:
-            fresh = revocation_list_of(
-                self.fetcher(self.url, allow_http=self.allow_http)
-            )
+            fresh = revoked(self.fetcher(self.url, allow_http=self.allow_http))
         except errors.ConfigError as error:
             if (
                 self.current is not None

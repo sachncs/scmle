@@ -92,7 +92,7 @@ const layout = [
 
   <h2 id="layout">Package layout</h2>
   <DocTable label="Package layout" head={["Package", "Responsibility"]} rows={layout} />
-  <p>Extension points are polymorphic: add a <code>TableReader</code>, <code>ColumnKind</code>, <code>Partitioner</code>, <code>Strategy</code>, <code>Model</code>, <code>Optimizer</code>, <code>Refiner</code>, <code>Selector</code>, <code>Diagnostic</code>, <code>Reviewer</code>, <code>Executor</code>, <code>ExperimentStore</code>, <code>Server</code> or <code>Stage</code> subclass, and no core edit is needed. Third-party adapters can also register through the <code>scmle.models</code> entry-point group and must pass the conformance check. The contracts for these seams are on <a href={`${base}/docs/extensions/`}>Extension contracts</a>; which of them are pinned is on <a href={`${base}/docs/api-stability/`}>API stability</a>.</p>
+  <p>Extension points are polymorphic: add a <code>TableReader</code>, <code>Family</code>, <code>Partitioner</code>, <code>Strategy</code>, <code>Model</code>, <code>Optimizer</code>, <code>Refiner</code>, <code>Selector</code>, <code>Diagnostic</code>, <code>Reviewer</code>, <code>Executor</code>, <code>Store</code>, <code>Server</code> or <code>Stage</code> subclass, and no core edit is needed. Third-party adapters can also register through the <code>scmle.models</code> entry-point group and must pass the conformance check. The contracts for these seams are on <a href={`${base}/docs/extensions/`}>Extension contracts</a>; which of them are pinned is on <a href={`${base}/docs/api-stability/`}>API stability</a>.</p>
 
   <h2 id="known-limits">Known limits</h2>
   <ul>

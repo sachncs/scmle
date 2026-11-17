@@ -23,7 +23,7 @@ class StartError(OSError):
     """Raised when a helper process exits or never connects."""
 
 
-def wait_for_helper(
+def rendezvous(
     thread: threading.Thread,
     process: subprocess.Popen[bytes],
     module: str,
@@ -58,7 +58,7 @@ def launch(
     """Starts `python -m module ADDRESS` and connects to it.
 
     Args:
-        module: Module whose `__main__` calls `connect_to_parent`.
+        module: Module whose `__main__` calls `attach`.
 
     Returns:
         The helper process and the parent end of the channel.
@@ -94,7 +94,7 @@ def launch(
     thread.start()
     deadline = time.monotonic() + CONNECT_SECONDS
     try:
-        wait_for_helper(thread, process, module, deadline)
+        rendezvous(thread, process, module, deadline)
     except StartError:
         process.kill()
         process.wait()
@@ -109,7 +109,7 @@ def launch(
     return process, accepted[0]
 
 
-def connect_to_parent() -> connection.Connection:
+def attach() -> connection.Connection:
     """Connects a helper to its parent, from the helper's side.
 
     Reads the hex secret key from standard input and the listener address

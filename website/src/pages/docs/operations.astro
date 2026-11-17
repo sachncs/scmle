@@ -31,15 +31,15 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 )</code></pre>
 
   <h2>Read the release controls</h2>
-  <p>A packaged run includes <code>provenance.json</code> for dataset, model, software, and environment identity; <code>sbom.json</code> for the deterministic CycloneDX component inventory; <code>release_attestation.json</code> for the canonical HMAC binding across those records; and <code>fault_injection_plan.json</code> for the release-blocking recovery scenarios. Set <code>SCMLE_SIGNING_KEY</code> in the release environment. The release evaluator verifies the attestation and blocks unsigned or tampered evidence. <code>FaultInjectionHarness</code> persists digest-bound scenario artifacts, while <code>LocalFaultExecutor</code> supplies bounded local execution evidence. External transport, container, and kernel-resource injectors remain a separate release requirement.</p>
+  <p>A packaged run includes <code>provenance.json</code> for dataset, model, software, and environment identity; <code>sbom.json</code> for the deterministic CycloneDX component inventory; <code>release_attestation.json</code> for the canonical HMAC binding across those records; and <code>fault_injection_plan.json</code> for the release-blocking recovery scenarios. Set <code>SCMLE_SIGNING_KEY</code> in the release environment. The release evaluator verifies the attestation and blocks unsigned or tampered evidence. <code>Harness</code> persists digest-bound scenario artifacts, while <code>Executor</code> supplies bounded local execution evidence. External transport, container, and kernel-resource injectors remain a separate release requirement.</p>
   <p>For inference telemetry, use the redacted observability sidecar and evaluate it against an explicit policy. Missing required signals, stale or future timestamps, and threshold breaches must remain visible as failed evidence instead of being silently dropped.</p>
 
   <h2>Make reliability operable</h2>
-  <p>An alert threshold is not an SLO until someone owns the response. <code>SLOTarget</code> binds a metric and worst-sample window to a minimum sample count, an owner, a runbook, and an alert route. Missing telemetry and future-dated samples are incident-visible states; they are never treated as healthy.</p>
-  <pre><code>{`target = SLOTarget(
+  <p>An alert threshold is not an SLO until someone owns the response. <code>Slo</code> binds a metric and worst-sample window to a minimum sample count, an owner, a runbook, and an alert route. Missing telemetry and future-dated samples are incident-visible states; they are never treated as healthy.</p>
+  <pre><code>{`target = Slo(
     name="prediction-latency",
     metric_name="p95_latency_ms",
-    kind=SignalKind.LATENCY,
+    kind=Indicator.LATENCY,
     maximum=250.0,
     window_days=7,
     minimum_samples=30,
@@ -51,8 +51,8 @@ evaluation = slo.evaluate(target, metrics, observed_at=now)`}</code></pre>
   <p>Use the result's status, remaining error budget, owner, runbook, and route in the incident record. The evaluation uses the worst observation in the window so a breach cannot disappear inside an average.</p>
 
   <h2>Deliver the alert once</h2>
-  <p><code>AlertDispatcher</code> keeps the SLO decision separate from delivery. It derives a stable alert identity from the evidence, records successful delivery, and deduplicates replays. Use the local JSONL sink for an operator handoff or the bounded HTTPS webhook sink for an authenticated incident gateway.</p>
-  <pre><code>{`from scmle.monitoring.alerts import Alert, AlertDispatcher, WebhookAlertSink
+  <p><code>Dispatcher</code> keeps the SLO decision separate from delivery. It derives a stable alert identity from the evidence, records successful delivery, and deduplicates replays. Use the local JSONL sink for an operator handoff or the bounded HTTPS webhook sink for an authenticated incident gateway.</p>
+  <pre><code>{`from scmle.monitoring.alerts import Alert, Dispatcher, Pager
 
 alert = Alert.from_evidence(
     route="on-call",
@@ -62,17 +62,17 @@ alert = Alert.from_evidence(
     evidence=evaluation.to_dict(),
     created_at=now,
 )
-delivery = AlertDispatcher(
-    {"on-call": WebhookAlertSink("https://pager.example/alerts", token=token)},
+delivery = Dispatcher(
+    {"on-call": Pager("https://pager.example/alerts", token=token)},
     "runs/run-42/alert-deliveries.jsonl",
 ).dispatch(alert)`}</code></pre>
   <p>Retries are bounded and a failed webhook is recorded as failed rather than silently treated as a page. This proves the local routing contract; the organisation still needs to exercise its real pager, ticketing, authentication, and on-call escalation path.</p>
 
   <h2>Turn a breach into an incident</h2>
   <p>An alert is not a recovery plan. Open an incident with the affected run and the exact rollback target, then require an explicit acknowledgement before resolution. The journal is append-only, hash-chained, and rejects tampering; repeating a transition is idempotent.</p>
-  <pre><code>{`from scmle.monitoring.incidents import IncidentWorkflow
+  <pre><code>{`from scmle.monitoring.incidents import Incidents
 
-workflow = IncidentWorkflow("runs/&lt;run-id&gt;/incidents.jsonl")
+workflow = Incidents("runs/&lt;run-id&gt;/incidents.jsonl")
 incident = workflow.open(
     evaluation,
     opened_at=now,
@@ -129,28 +129,28 @@ only a verified, digest-bound state may move forward`}</code></pre>
   <pre><code>{`from pathlib import Path
 
 from scmle.contracts import reliability
-from scmle.governance.local_faults import LocalFaultExecutor
+from scmle.governance.local_faults import Executor
 
-executor = LocalFaultExecutor(Path("rehearsal/faults"))
-for scenario in reliability.FaultScenario:
+executor = Executor(Path("rehearsal/faults"))
+for scenario in reliability.Contingency:
     artifacts = executor.execute(scenario)
     print(scenario.value, len(artifacts))`}</code></pre>
-  <p>Pass the executor to <code>FaultInjectionHarness</code> to persist digest-bound evidence and update the release plan. The disk and memory cases use deterministic local capacity guards; they do not claim physical disk exhaustion or host-wide OOM coverage. Remote transport outages and kernel-level resource tests require environment-specific injectors before a release can be marked production-proven.</p>
+  <p>Pass the executor to <code>Harness</code> to persist digest-bound evidence and update the release plan. The disk and memory cases use deterministic local capacity guards; they do not claim physical disk exhaustion or host-wide OOM coverage. Remote transport outages and kernel-level resource tests require environment-specific injectors before a release can be marked production-proven.</p>
 
   <h2>Promote only an approved bundle</h2>
   <p>A better challenger is not automatically the new champion. The lifecycle stages it under the <code>challenger</code> alias. An independent reviewer must approve the exact model version and content digest, and the approval must be HMAC-signed, before the registry moves <code>champion</code>.</p>
   <pre><code>candidate = registry.resolve("customers", "challenger")
-approval = PromotionApproval(
+approval = Sanction(
     model="customers",
     version=candidate.version,
     content_id=candidate.content_id,
     reviewer="reviewer@example.com",
-    decision=PromotionDecision.APPROVED,
+    decision=Verdict.APPROVED,
     reason="held-out, slice, explanation, and recovery evidence reviewed",
     evidence=("evidence/release-2026-10-20.json",),
     approved_at="2026-10-20T00:00:00+00:00",
 ).sign("release-key")
-manager.promote_challenger(approval, signing_key="release-key")</code></pre>
+manager.elevate(approval, signing_key="release-key")</code></pre>
   <p>The approval is bound to the bundle content, reviewer decision, evidence, and timestamp, then written to the append-only audit log. A missing, rejected, mismatched, tampered, or non-independent approval cannot move the serving alias. Rollback uses the same gate.</p>
 
   <h2>Deployment boundary</h2>

@@ -131,7 +131,7 @@ class Verification:
         }
 
 
-def read_claims(run_dir: str | Path) -> dict[str, Any]:
+def recall(run_dir: str | Path) -> dict[str, Any]:
     """Reads ``confirmed_claims.json`` of a run.
 
     Args:
@@ -154,7 +154,7 @@ def read_claims(run_dir: str | Path) -> dict[str, Any]:
     return document
 
 
-def read_ledger(run_dir: str | Path) -> scmle.data.ledger.ledger.Ledger:
+def rehydrate(run_dir: str | Path) -> scmle.data.ledger.ledger.Ledger:
     """Loads the run's ledger (verifying its chain and replaying it).
 
     Args:
@@ -190,7 +190,7 @@ def column_of(
     return None if hypothesis is None else hypothesis.spec.column
 
 
-def list_claims(run_dir: str | Path) -> list[dict[str, Any]]:
+def inventory(run_dir: str | Path) -> list[dict[str, Any]]:
     """Lists the claims of a run.
 
     Args:
@@ -200,8 +200,8 @@ def list_claims(run_dir: str | Path) -> list[dict[str, Any]]:
         One row per claim: id, feature, tier, adjusted p-value, effect and
         whether it was withdrawn, followed by the claims registered by hash.
     """
-    document = read_claims(run_dir)
-    ledger = read_ledger(run_dir)
+    document = recall(run_dir)
+    ledger = rehydrate(run_dir)
     stage_two = document.get("stage_two") or {}
     withdrawn = stage_two.get("withdrawn", {})
     listed = [
@@ -215,10 +215,10 @@ def list_claims(run_dir: str | Path) -> list[dict[str, Any]]:
         }
         for claim in document["claims"]
     ]
-    return listed + registered_rows(run_dir, ledger)
+    return listed + enrolled(run_dir, ledger)
 
 
-def registered_rows(
+def enrolled(
     run_dir: str | Path, ledger: scmle.data.ledger.ledger.Ledger
 ) -> list[dict[str, Any]]:
     """Lists one row per claim registered by hash (baseline, causal primary).
@@ -285,7 +285,7 @@ def read_optional(path: Path) -> dict[str, Any] | None:
     return loaded if isinstance(loaded, dict) else None
 
 
-def show_claim(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
+def inspect(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
     """Shows everything the run recorded about one claim.
 
     Args:
@@ -301,8 +301,8 @@ def show_claim(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
     Raises:
         ArtifactError: If the claim is unknown or is not in the ledger.
     """
-    document = read_claims(run_dir)
-    ledger = read_ledger(run_dir)
+    document = recall(run_dir)
+    ledger = rehydrate(run_dir)
     if claim_id in ledger.claims:
         return {
             "registered": ledger.claims[claim_id],
@@ -361,7 +361,7 @@ def check_ledger_head(
     )
 
 
-def check_charter(
+def authenticate(
     run_dir: Path,
     ledger: scmle.data.ledger.ledger.Ledger,
     signing_key: str | bytes | None,
@@ -424,7 +424,7 @@ def check_charter(
     return findings
 
 
-def ledger_header_mismatches(
+def compare(
     document: dict[str, Any],
     sealed_row: dict[str, Any],
     survivors: Any,
@@ -451,7 +451,7 @@ def ledger_header_mismatches(
     return problems
 
 
-def check_claims_against_ledger(
+def crosscheck(
     document: dict[str, Any], ledger: scmle.data.ledger.ledger.Ledger
 ) -> Finding:
     """Checks that survivors, outcome and confirmed set agree with the ledger.
@@ -470,7 +470,7 @@ def check_claims_against_ledger(
     survivors = ledger.survivor_set
     if sealed_row is None or survivors is None:
         return Finding(name, FAIL, "the ledger is not sealed")
-    problems = ledger_header_mismatches(document, sealed_row, survivors)
+    problems = compare(document, sealed_row, survivors)
     ids = [c["claim_id"] for c in document["claims"]]
     if document.get("outcome") == confirm.NO_SURVIVORS:
         ok_ids = ids == []
@@ -478,7 +478,7 @@ def check_claims_against_ledger(
         ok_ids = ids == list(survivors.hypothesis_ids)
     if not ok_ids:
         problems.append("claim ids differ from the frozen survivors")
-    confirmed = [c["claim_id"] for c in document["claims"] if is_confirmed(c)]
+    confirmed = [c["claim_id"] for c in document["claims"] if upheld(c)]
     if confirmed != list(sealed_row.get("confirmed", [])):
         problems.append("confirmed set")
     if document.get("stage_two") != sealed_row.get("stage_two"):
@@ -492,7 +492,7 @@ def check_claims_against_ledger(
     )
 
 
-def is_confirmed(claim: dict[str, Any]) -> bool:
+def upheld(claim: dict[str, Any]) -> bool:
     """Reports whether a claim record has tier `confirmed`.
 
     Args:
@@ -504,7 +504,7 @@ def is_confirmed(claim: dict[str, Any]) -> bool:
     return claim.get("tier") == "confirmed"
 
 
-def check_replay(document: dict[str, Any]) -> Finding:
+def rederive(document: dict[str, Any]) -> Finding:
     """Replays the multiplicity rule on the p-values of `C`.
 
     Args:
@@ -537,7 +537,7 @@ def check_replay(document: dict[str, Any]) -> Finding:
                 return Finding(
                     name, FAIL, f"{claim['claim_id']}: adjusted p differs"
                 )
-            if is_confirmed(claim) != adjustment.rejected[index]:
+            if upheld(claim) != adjustment.rejected[index]:
                 return Finding(name, FAIL, f"{claim['claim_id']}: tier differs")
     except (
         ValueError,
@@ -583,7 +583,7 @@ def stage_two_record_problems(
     return problems
 
 
-def check_stage_two(
+def tally(
     document: dict[str, Any], ledger: scmle.data.ledger.ledger.Ledger
 ) -> Finding:
     """Checks the withdrawal accounting and that withdrawn ids were not tested.
@@ -621,7 +621,7 @@ def check_stage_two(
     problems.extend(
         "a withdrawn survivor is confirmed"
         for claim in document["claims"]
-        if claim["claim_id"] in withdrawn and is_confirmed(claim)
+        if claim["claim_id"] in withdrawn and upheld(claim)
     )
     if problems:
         return Finding(name, FAIL, "; ".join(problems))
@@ -632,7 +632,7 @@ def check_stage_two(
     )
 
 
-def custody_open_finding(
+def openings(
     name: str, document: dict[str, Any], opened: int
 ) -> Finding | None:
     """Judges how often `C` was opened, when that alone decides the check.
@@ -692,7 +692,7 @@ def frozen_selection_problem(
     return None
 
 
-def check_custody(
+def custodial(
     run_dir: Path,
     document: dict[str, Any],
     signing_key: str | bytes | None,
@@ -716,14 +716,14 @@ def check_custody(
     if not path.exists():
         return Finding(name, SKIPPED, f"{CUSTODY_FILE} is not in the run")
     try:
-        log = sealed.OpenLog(path, signing_key)
+        log = sealed.Journal(path, signing_key)
     except errors.ScmleError as error:
         # handled: returned as failed finding/problem/refusal with error text
         return Finding(name, FAIL, str(error))
     entries = [e for e in log.entries if e.get("set") == "C"]
     names = [e["event"] for e in entries]
     opened = names.count("open")
-    early = custody_open_finding(name, document, opened)
+    early = openings(name, document, opened)
     if early is not None:
         return early
     problem = frozen_selection_problem(entries, names, document)
@@ -732,9 +732,7 @@ def check_custody(
     return Finding(name, PASS, f"{len(log.entries)} entries, chain verified")
 
 
-def decision_file_problems(
-    run_dir: Path, registered: dict[str, Any]
-) -> list[str]:
+def tampered(run_dir: Path, registered: dict[str, Any]) -> list[str]:
     """Compares each decision file with the hash the custody log registered.
 
     Args:
@@ -784,7 +782,7 @@ def check_decision_files(
     entries: list[dict[str, Any]] = []
     if path.exists():
         try:
-            log = sealed.OpenLog(path, signing_key)
+            log = sealed.Journal(path, signing_key)
         except errors.ScmleError as error:
             # handled: returned as failed finding/problem/refusal with error
             # text
@@ -808,7 +806,7 @@ def check_decision_files(
     if len(entries) > 1:
         return Finding(name, FAIL, "the decision files were registered twice")
     registered = entries[0].get("detail", {}).get("files", {})
-    problems = decision_file_problems(run_dir, registered)
+    problems = tampered(run_dir, registered)
     if problems:
         return Finding(name, FAIL, "; ".join(problems))
     count = sum(1 for v in registered.values() if v is not None)
@@ -842,7 +840,7 @@ def coverage_report_problems(
     return []
 
 
-def check_coverage_claim(
+def corroborate(
     run_dir: Path, signing_key: str | bytes | None
 ) -> Finding | None:
     """Checks that the coverage claim hashes to its registration.
@@ -873,7 +871,7 @@ def check_coverage_claim(
         problems.append(f"{coverage_run.CLAIM_FILE}: missing or unreadable")
     if log_path.exists():
         try:
-            log = sealed.OpenLog(log_path, signing_key)
+            log = sealed.Journal(log_path, signing_key)
         except errors.ScmleError as error:
             # handled: returned as failed finding/problem/refusal with error
             # text
@@ -900,7 +898,7 @@ def check_coverage_claim(
     return Finding(name, PASS, "claim hash registered; the report names it")
 
 
-def unregistered_coverage_finding(
+def orphaned(
     name: str, document: dict[str, Any], registered: dict[str, Any] | None
 ) -> Finding | None:
     """Judges a coverage confirmation whose registration decides the check.
@@ -956,7 +954,7 @@ def reconcile(
     return problems
 
 
-def check_coverage_confirmation(
+def reconfirm(
     run_dir: Path, ledger: scmle.data.ledger.ledger.Ledger
 ) -> Finding | None:
     """Checks the coverage claim on `C`: registered, recomputed and consistent.
@@ -979,7 +977,7 @@ def check_coverage_confirmation(
     if document is None:
         return None
     registered = ledger.claims.get(coverage_confirm.CLAIM_ID)
-    early = unregistered_coverage_finding(name, document, registered)
+    early = orphaned(name, document, registered)
     if early is not None:
         return early
     problems = []
@@ -987,10 +985,10 @@ def check_coverage_confirmation(
     try:
         claim_hash = scmle.data.ledger.ledger.digest(claim or {})
         choice = document["primary"]
-        body = coverage_confirm.registration_body(claim_hash, choice)
+        body = coverage_confirm.prefreeze(claim_hash, choice)
         if document.get("coverage_claim_sha256") != claim_hash:
             problems.append("the document names another coverage claim")
-        # `unregistered_coverage_finding` returned None: it is registered.
+        # `orphaned` returned None: it is registered.
         registration = cast("dict[str, Any]", registered)
         if scmle.data.ledger.ledger.digest(body) != registration["sha256"]:
             problems.append("the registration hash differs from the ledger's")
@@ -1013,7 +1011,7 @@ def check_coverage_confirmation(
     )
 
 
-def baseline_report_problems(
+def misnamed(
     run_dir: Path, ledger: scmle.data.ledger.ledger.Ledger
 ) -> list[str]:
     """Checks that the baseline report names the registered baseline claim.
@@ -1071,7 +1069,7 @@ def check_registered(
             problems.append(f"{file_name}: differs from the sealed hash")
     if document.get("attachments") != attachments:
         problems.append("attachment hashes differ from the claims file")
-    problems.extend(baseline_report_problems(run_dir, ledger))
+    problems.extend(misnamed(run_dir, ledger))
     if problems:
         return Finding(name, FAIL, "; ".join(problems))
     return Finding(
@@ -1081,9 +1079,7 @@ def check_registered(
     )
 
 
-def check_control(
-    run_dir: Path, ledger: scmle.data.ledger.ledger.Ledger
-) -> Finding:
+def witness(run_dir: Path, ledger: scmle.data.ledger.ledger.Ledger) -> Finding:
     """Checks that the negative-control file is the one the ledger recorded.
 
     Args:
@@ -1149,14 +1145,14 @@ def assess(
     if not valid:
         problems.append(f"{given.assumption}: not valid on {day!r}")
     unchecked = False
-    if signing_key is None and not signing.resolve_key(None):
+    if signing_key is None and not signing.keying(None):
         unchecked = True
     elif not given.verify(signing_key):
         problems.append(f"{given.assumption}: signature does not verify")
     return given, problems, unchecked
 
 
-def evaluate_attestations(
+def vet(
     report: dict[str, Any],
     charter: Any,
     allowed: dict[str, set[str]],
@@ -1190,9 +1186,7 @@ def evaluate_attestations(
     return accepted, problems, unchecked
 
 
-def check_attestations(
-    run_dir: Path, signing_key: str | bytes | None
-) -> Finding:
+def vouch(run_dir: Path, signing_key: str | bytes | None) -> Finding:
     """Checks that a claim above `unverified` rests on verified attestors.
 
     Args:
@@ -1216,7 +1210,7 @@ def check_attestations(
     if claims is None or record is None:
         return Finding(name, SKIPPED, "no causal claims or charter file")
     try:
-        charter = contracts.charter_from_record(record.get("charter", record))
+        charter = contracts.parse(record.get("charter", record))
     except errors.ConfigError as error:
         # handled: returned as failed finding/problem/refusal with error text
         return Finding(name, FAIL, str(error))
@@ -1231,9 +1225,7 @@ def check_attestations(
             "tier above unverified but the charter names no attestors"
         )
     allowed = {a.name: set(a.assumptions) for a in block.attestors}
-    accepted, found, unchecked = evaluate_attestations(
-        report, charter, allowed, signing_key
-    )
+    accepted, found, unchecked = vet(report, charter, allowed, signing_key)
     problems.extend(found)
     for assumption, named in (claims.get("assumptions") or {}).items():
         if named and accepted.get(assumption) != named:
@@ -1286,28 +1278,28 @@ def verify(
         )
     )
     try:
-        document = read_claims(folder)
+        document = recall(folder)
     except errors.ArtifactError as error:
         # handled: returned as failed finding/problem/refusal with error text
         findings.append(Finding("claims file reads", FAIL, str(error)))
         return Verification(str(folder), tuple(findings))
     findings.append(check_ledger_head(document, ledger))
-    findings.extend(check_charter(folder, ledger, signing_key))
-    findings.append(check_claims_against_ledger(document, ledger))
-    findings.append(check_replay(document))
-    findings.append(check_stage_two(document, ledger))
-    findings.append(check_custody(folder, document, signing_key))
+    findings.extend(authenticate(folder, ledger, signing_key))
+    findings.append(crosscheck(document, ledger))
+    findings.append(rederive(document))
+    findings.append(tally(document, ledger))
+    findings.append(custodial(folder, document, signing_key))
     if ledger.claims:
         findings.append(check_registered(folder, document, ledger))
-    findings.append(check_control(folder, ledger))
-    findings.append(check_attestations(folder, signing_key))
+    findings.append(witness(folder, ledger))
+    findings.append(vouch(folder, signing_key))
     decided = check_decision_files(folder, signing_key)
     if decided is not None:
         findings.append(decided)
-    measured = check_coverage_claim(folder, signing_key)
+    measured = corroborate(folder, signing_key)
     if measured is not None:
         findings.append(measured)
-    on_c = check_coverage_confirmation(folder, ledger)
+    on_c = reconfirm(folder, ledger)
     if on_c is not None:
         findings.append(on_c)
     return Verification(str(folder), tuple(findings))

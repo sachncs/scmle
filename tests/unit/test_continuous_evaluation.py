@@ -134,7 +134,7 @@ def test_a_proposal_is_not_repeated_during_the_cooldown(tmp_path):
 
 
 def judge(rows, **options):
-    return continuous.judge_retraining(
+    return continuous.decide(
         continuous.RetrainPolicy(**options.pop("policy", {})),
         rows,
         options.pop("alarm", False),
@@ -185,7 +185,7 @@ def test_a_held_back_reason_is_recorded_and_nothing_is_escalated(tmp_path):
     decision = ev.review(rows)
     assert decision.action == "none" and "infrastructure" in decision.held_back
     assert not loop.pending_escalations()
-    assert ev.history.of_kind("retrain_review")
+    assert ev.history.select("retrain_review")
 
 
 def test_policy_and_spec_validation():
@@ -212,7 +212,7 @@ def test_business_outcomes_become_bounded_losses_and_are_kept(tmp_path):
         numpy.zeros(3),
         ["approve"] * 3,
     )
-    assert ev.feed_outcomes({"a": 0.0, "b": 50.0, "c": 400.0}, cap=100.0) == 3
+    assert ev.feed({"a": 0.0, "b": 50.0, "c": 400.0}, cap=100.0) == 3
     stored = loop.pending_batches[0]["labels"]
     assert stored == {"a": 0.0, "b": 0.5, "c": 1.0}
     kept = [
@@ -224,9 +224,9 @@ def test_business_outcomes_become_bounded_losses_and_are_kept(tmp_path):
     assert kept[0]["kind"] == "business_outcomes"
     assert kept[0]["values"]["c"] == 400.0
     with pytest.raises(ValueError):
-        ev.feed_outcomes({"a": -1.0}, cap=10.0)
+        ev.feed({"a": -1.0}, cap=10.0)
     with pytest.raises(ValueError):
-        ev.feed_outcomes({"a": 1.0}, cap=0.0)
+        ev.feed({"a": 1.0}, cap=0.0)
 
 
 # ---- history -----------------------------------------------------------
@@ -280,8 +280,8 @@ def test_the_history_chain_detects_edits(tmp_path):
 
 def test_a_challenger_that_wins_is_proposed_by_the_loop_in_order(tmp_path):
     loop, ev = winning_challenger(tmp_path)
-    assert ev.promotion_proposals() == ["challenger-1"]
-    assert ev.history.of_kind("promotion_proposal")
+    assert ev.nominations() == ["challenger-1"]
+    assert ev.history.select("promotion_proposal")
     decided = [
         r["body"]
         for r in kinds(loop, deployment_ledger.CHALLENGER_RESULT)
@@ -345,7 +345,7 @@ def test_production_replacement_needs_the_signed_staging_record(tmp_path):
     prod = support_release.candidate(
         "production",
         model=store.resolve(MODEL, 2),
-        approval=support_runtime.approval_for(2),
+        approval=support_runtime.sanction(2),
     )
     refused = ev.replace(
         "challenger-1", release, plane, prod, support_release.KEY
@@ -442,10 +442,10 @@ def test_the_check_is_deterministic_and_validates_inputs(tmp_path):
     with pytest.raises(ValueError):
         continuous.post_promotion_check(SPECS, {"conversion": [1.0]}, after)
     ev = evaluation(tmp_path, make_loop(tmp_path))
-    recorded = ev.check_after_promotion(SPECS, before, after)
+    recorded = ev.followup(SPECS, before, after)
     assert (
         recorded["overall"]
-        == ev.history.of_kind("post_promotion_check")[0]["facts"]["overall"]
+        == ev.history.select("post_promotion_check")[0]["facts"]["overall"]
     )
 
 
@@ -454,24 +454,19 @@ def test_the_check_is_deterministic_and_validates_inputs(tmp_path):
 
 def test_holdback_assignment_is_deterministic_and_hits_its_fraction():
     ids = [f"user-{k}" for k in range(20000)]
-    first = continuous.holdback_assignment(ids, 0.1, "release-7")
-    assert (
-        first == continuous.holdback_assignment(ids, 0.1, "release-7")
-    ).all()
+    first = continuous.reserve(ids, 0.1, "release-7")
+    assert (first == continuous.reserve(ids, 0.1, "release-7")).all()
     assert abs(first.mean() - 0.1) < 0.01
-    other = continuous.holdback_assignment(ids, 0.1, "release-8")
+    other = continuous.reserve(ids, 0.1, "release-8")
     assert (first != other).any()
     # a unit's side does not depend on the other units in the call
-    assert (
-        first[17]
-        == continuous.holdback_assignment(ids[17:18], 0.1, "release-7")[0]
-    )
+    assert first[17] == continuous.reserve(ids[17:18], 0.1, "release-7")[0]
 
 
 def test_holdback_assignment_rejects_a_fraction_outside_the_open_unit_interval():
     for bad in (0.0, 1.0, -0.2, 1.5):
         with pytest.raises(ValueError):
-            continuous.holdback_assignment(["a"], bad, "s")
+            continuous.reserve(["a"], bad, "s")
 
 
 def test_a_concurrent_holdback_attributes_the_change_to_the_model():

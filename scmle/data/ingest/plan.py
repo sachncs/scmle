@@ -53,7 +53,7 @@ class Config:
     eps_null: float = 0.0
     eps_fk: float = 0.0
     max_key_size: int = grain.LEVELS
-    declared: tuple[joins.DeclaredKey, ...] = ()
+    declared: tuple[joins.Reference, ...] = ()
 
     def __post_init__(self) -> None:
         """Validates scope.
@@ -119,11 +119,11 @@ class Plan:
             if clock is None
             else scmle.data.ingest.budget.BudgetMeter(limits, clock)
         )
-        self.source = profile.SqlSource(connection_factory, self.meter)
+        self.source = profile.Sql(connection_factory, self.meter)
         self.catalog: profile.Catalog | None = None
-        self.scans: dict[str, grain.KeyScan] = {}
+        self.scans: dict[str, grain.Scan] = {}
         self.verdict: grain.UnitVerdict | None = None
-        self.graph: joins.JoinGraph | None = None
+        self.graph: joins.Joins | None = None
 
     def run_profile(self) -> profile.Catalog:
         """Profiles the tables and writes `ingest_catalog.json`.
@@ -137,7 +137,7 @@ class Plan:
         persist(self.run_dir, CATALOG, self.catalog.to_dict())
         return self.catalog
 
-    def infer(self) -> dict[str, grain.KeyScan]:
+    def infer(self) -> dict[str, grain.Scan]:
         """Finds keys per table, judges the unit, writes `grain_report.json`.
 
         Profiles first if that has not been done.
@@ -153,7 +153,7 @@ class Plan:
         catalog = self.catalog or self.run_profile()
         self.scans = {}
         for table in catalog.tables:
-            self.scans[table.name] = grain.infer_keys(
+            self.scans[table.name] = grain.keysearch(
                 self.source,
                 table,
                 self.settings.eps_key,
@@ -187,7 +187,7 @@ class Plan:
         persist(self.run_dir, GRAIN, document)
         return self.scans
 
-    def link(self) -> joins.JoinGraph:
+    def link(self) -> joins.Joins:
         """Measures links, writes `join_graph.json`.
 
         Profiles and infers grain first if that has not been done.
@@ -245,7 +245,7 @@ class Plan:
         }
 
 
-def sqlite_factory(
+def opener(
     path: str | pathlib.Path,
 ) -> Callable[[], sqlite3.Connection]:
     """Builds a factory of read-only connections to a SQLite file.
@@ -264,9 +264,9 @@ def sqlite_factory(
     return connect
 
 
-def declared_from_json(
+def declarations(
     items: Sequence[dict[str, Any]],
-) -> tuple[joins.DeclaredKey, ...]:
+) -> tuple[joins.Reference, ...]:
     """Builds declared keys from `[{child, child_columns, parent, ...}]`.
 
     Args:
@@ -277,7 +277,7 @@ def declared_from_json(
         One declared key per mapping, in order.
     """
     return tuple(
-        joins.DeclaredKey(
+        joins.Reference(
             str(i["child"]),
             tuple(i["child_columns"]),
             str(i["parent"]),

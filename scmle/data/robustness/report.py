@@ -1,6 +1,6 @@
 """`stability_report.json` and `shift_report.json` for a charter run.
 
-Both documents carry a `schema_version` and are checked by `validate_stability`
+Both documents carry a `schema_version` and are checked by `conform`
 and `validate_shift`, which raise `ValueError` on a missing key or an unknown
 status. Specification-curve data (one effect and interval per specification)
 and the choice-to-result attribution are inside each finding.
@@ -185,7 +185,7 @@ def require_keys(
         raise errors.InputError(f"{name} has an unsupported schema_version")
 
 
-def validate_stability(document: dict[str, Any]) -> None:
+def conform(document: dict[str, Any]) -> None:
     """Checks the structure of a stability report.
 
     Args:

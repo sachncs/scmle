@@ -6,7 +6,7 @@ Three layers, all with a known truth:
   correlated Bayesian t test) of two models with the same expected loss, scored
   on real cross-validation folds, must call one of them better with
   probability at most the stated 0.05;
-* `MeanSelector` with the Bayesian rule declares a winner credibly better than
+* `Averager` with the Bayesian rule declares a winner credibly better than
   every other candidate; with three equal candidates that can happen at most
   as often as the union of the three pairwise claims allows;
 * a handful of full runs on pure-noise labels (the 200-run version is
@@ -76,7 +76,7 @@ def trial_of(name, losses):
     return experiments.Trial(
         f"t_{name}",
         name,
-        experiments.TrialStatus.OK,
+        experiments.Termination.OK,
         "rmse",
         score_mean=float(numpy.mean(rmse)),
         score_std=float(numpy.std(rmse, ddof=1)),
@@ -87,9 +87,9 @@ def trial_of(name, losses):
 def test_the_bayesian_selector_rarely_names_a_credible_winner_among_equals():
     rng = numpy.random.default_rng(1)
     names = ["ridge", "decision_tree", "random_forest"]
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     metric = metrics.CATALOG.metrics["rmse"]
-    policy = selection.MeanSelector(
+    policy = selection.Averager(
         tasks.Selection(uncertainty="bayesian", bayesian_confidence=CONFIDENCE)
     )
     rows, folds, features, runs = 100, 5, 5, 1000
@@ -105,8 +105,7 @@ def test_the_bayesian_selector_rarely_names_a_credible_winner_among_equals():
         ranked = policy.rank(trials, metric, registry)
         best, others = ranked[0], ranked[1:]
         claims += all(
-            not policy.probably_equivalent(best, other, sign)
-            for other in others
+            not policy.equivalent(best, other, sign) for other in others
         )
     pairs = len(list(itertools.combinations(names, 2)))
     support_statistics.assert_rate_at_most(
@@ -124,7 +123,7 @@ def noise_table(seed, rows=1000):
 
 def test_a_run_on_pure_noise_does_not_claim_skill_over_the_baseline(tmp_path):
     keep = {"decision_tree", "knn", "logistic_regression", "dummy"}
-    names = scmle.models.registry.Catalog.with_builtins().adapters
+    names = scmle.models.registry.Catalog.stock().adapters
     excluded = sorted(set(names) - keep)
     runs = 10
     claims = 0

@@ -15,9 +15,9 @@ def orders():
 def spec(**changes):
     values = {
         "rows": 100,
-        "sums": (ingest.ColumnTotal("amount", 5000.0),),
+        "sums": (ingest.Total("amount", 5000.0),),
         "checksum_column": "order_id",
-        "checksum": declared.key_checksum(orders()["order_id"]),
+        "checksum": declared.sha(orders()["order_id"]),
     }
     values.update(changes)
     return ingest.Expectation((ingest.TableTotals("orders", **values),))
@@ -68,7 +68,7 @@ def test_a_changed_key_fails_the_checksum_only():
 
 def test_the_checksum_ignores_row_order():
     keys = orders()["order_id"]
-    assert declared.key_checksum(keys) == declared.key_checksum(keys[::-1])
+    assert declared.sha(keys) == declared.sha(keys[::-1])
 
 
 def test_an_unknown_view_or_column_is_a_config_error():
@@ -102,9 +102,9 @@ def test_the_source_is_queried_and_a_zero_total_is_compared_not_skipped():
         (
             ingest.TableTotals(
                 "orders",
-                sums=(ingest.ColumnTotal("amount", 0.0),),
+                sums=(ingest.Total("amount", 0.0),),
                 checksum_column="order_id",
-                checksum=declared.key_checksum(orders()["order_id"]),
+                checksum=declared.sha(orders()["order_id"]),
             ),
         )
     )

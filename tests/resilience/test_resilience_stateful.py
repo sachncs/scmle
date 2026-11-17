@@ -142,7 +142,7 @@ class ProcessorMachine(RuleBasedStateMachine):
         if self.corrupt:
             self.expect_refusal()
         elif self.stale_lock:
-            with pytest.raises(processing.ConcurrentRunError):
+            with pytest.raises(processing.LockError):
                 self.make_processor().run()
             assert self.store.exists(failpoints.LOCK_KEY)
         else:
@@ -173,7 +173,7 @@ class ProcessorMachine(RuleBasedStateMachine):
     @precondition(lambda self: self.stale_lock and not self.corrupt)
     @rule()
     def resume(self):
-        with pytest.raises(processing.ConcurrentRunError):
+        with pytest.raises(processing.LockError):
             self.make_processor().run()
         self.make_processor().break_lock()
         self.stale_lock = False
@@ -197,7 +197,7 @@ class ProcessorMachine(RuleBasedStateMachine):
     def expect_refusal(self):
         damaged = self.store.get(failpoints.STATE_KEY)[0]
         outputs = self.outputs()
-        with pytest.raises(processing.CheckpointCorruptError):
+        with pytest.raises(processing.CorruptError):
             self.make_processor().run()
         assert self.store.get(failpoints.STATE_KEY)[0] == damaged
         assert self.outputs() == outputs

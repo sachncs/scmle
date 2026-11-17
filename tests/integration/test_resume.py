@@ -69,7 +69,7 @@ def test_cancelled_run_resumes_and_reuses_completed_trials(
     counting, canceller = Counting, Canceller
     counting.fits = canceller.fits = 0
     canceller.armed = True
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     registry.register(CountedAdapter())
     registry.register(CancellerAdapter())
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
@@ -87,7 +87,7 @@ def test_cancelled_run_resumes_and_reuses_completed_trials(
     assert saved == ["trial_001.json", "trial_002.json"]
 
     canceller.armed = False
-    resumed = scmle.core.orchestrator.Orchestrator.for_run_directory(
+    resumed = scmle.core.orchestrator.Orchestrator.reload(
         run_dir, frame=binary_frame, registry=registry
     ).resume(run_dir)
     assert resumed.state == "COMPLETED"
@@ -188,11 +188,11 @@ def test_tracking_database_records_runs_trials_and_lineage(
     } <= set(lineage)
 
     for name, digest in lineage.items():
-        assert bundle.file_sha256(first.run_dir / name) == digest
+        assert bundle.shasum(first.run_dir / name) == digest
 
 
 def test_custom_tracker_is_honoured(binary_frame, tmp_path):
-    class Recording(stores.NullExperimentStore):
+    class Recording(stores.Null):
         def __init__(self):
             self.seen = []
 
@@ -215,7 +215,7 @@ def test_resume_refuses_checkpoints_computed_on_different_data(
     counting, canceller = Counting, Canceller
     counting.fits = canceller.fits = 0
     canceller.armed = True
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     registry.register(CancellerAdapter())
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
     project.orchestrator.registry = registry
@@ -229,7 +229,7 @@ def test_resume_refuses_checkpoints_computed_on_different_data(
     canceller.armed = False
     changed = binary_frame.copy()
     changed.iloc[1, 1] = changed.iloc[1, 1] + 1000.0
-    orchestrator = scmle.core.orchestrator.Orchestrator.for_run_directory(
+    orchestrator = scmle.core.orchestrator.Orchestrator.reload(
         run_dir, frame=changed, registry=registry
     )
     with pytest.raises(errors.ConfigError, match="data changed"):

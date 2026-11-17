@@ -34,52 +34,50 @@ def derive(
         there are no success criteria.
 
     Raises:
-        UnsupportedEvaluationPolicyError: If a success criterion names a
+        UnsupportedError: If a success criterion names a
             metric with no declared release direction.
     """
     if not success_criteria:
         return None
     primary_direction = (
-        evaluation.MetricDirection.MAXIMIZE
+        evaluation.Orientation.MAXIMIZE
         if primary_greater_is_better
-        else evaluation.MetricDirection.MINIMIZE
+        else evaluation.Orientation.MINIMIZE
     )
-    declarations: dict[str, evaluation.MetricDeclaration] = {
-        primary_metric: evaluation.MetricDeclaration(
+    declarations: dict[str, evaluation.Declaration] = {
+        primary_metric: evaluation.Declaration(
             name=primary_metric,
             direction=primary_direction,
         )
     }
-    gates: list[evaluation.MetricGate] = []
+    gates: list[evaluation.Hurdle] = []
     for name, threshold in success_criteria.items():
         direction = evaluation.METRIC_DIRECTIONS.get(name)
         if direction is None:
-            raise evaluation.UnsupportedEvaluationPolicyError(
+            raise evaluation.UnsupportedError(
                 f"metric '{name}' has no declared release direction"
             )
-        declarations[name] = evaluation.MetricDeclaration(
+        declarations[name] = evaluation.Declaration(
             name=name,
             direction=direction,
         )
-        gates.append(evaluation.MetricGate(name, direction, float(threshold)))
+        gates.append(evaluation.Hurdle(name, direction, float(threshold)))
     evidence_ref = "diagnostics/metric_uncertainty.json"
     return evaluation.Criteria(
         task=task,
         primary_metric=primary_metric,
         metrics=tuple(declarations.values()),
         uncertainty=evaluation.Uncertainty(evaluation.UncertaintyMethod.NONE),
-        calibration=evaluation.Calibration(evaluation.CalibrationMethod.NONE),
-        fairness=evaluation.Fairness(evaluation.FairnessMethod.NONE),
-        small_groups=evaluation.SmallGroups(warning_threshold=30),
-        explanations=evaluation.Explanations(
-            evaluation.ExplanationAvailability.NONE
-        ),
+        calibration=evaluation.Calibration(evaluation.Procedure.NONE),
+        fairness=evaluation.Fairness(evaluation.Technique.NONE),
+        small_groups=evaluation.Subgroups(warning_threshold=30),
+        explanations=evaluation.Explanations(evaluation.Explicability.NONE),
         release=evaluation.Gates(
             metric_gates=tuple(gates),
             diagnostic_gates=(
-                evaluation.DiagnosticGate(
+                evaluation.Requirement(
                     "metric_uncertainty",
-                    evaluation.DiagnosticAction.BLOCK,
+                    evaluation.Remedy.BLOCK,
                     (evidence_ref,),
                 ),
             ),

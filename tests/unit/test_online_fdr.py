@@ -80,7 +80,7 @@ def test_calibrated_values_have_unit_integral_numerically():
 
 
 def test_elond_levels_by_hand():
-    rule = online_fdr.ELond(ALPHA)
+    rule = online_fdr.Lond(ALPHA)
     steps = run(rule, [e(20.0), e(30.0), e(1.0)])
     # alpha * gamma_t * (R_{t-1} + 1) with gamma = 1/2, 1/6, 1/12.
     assert [s.level for s in steps] == [
@@ -92,14 +92,14 @@ def test_elond_levels_by_hand():
 
 
 def test_elond_boundary_is_inclusive_and_exact():
-    rule = online_fdr.ELond(ALPHA)
+    rule = online_fdr.Lond(ALPHA)
     assert run(rule, [e(20.0)])[0].rejected is True
     assert run(rule, [e(math.nextafter(20.0, 0.0))])[0].rejected is False
     assert run(rule, [e(0.0)])[0].rejected is False
 
 
 def test_elond_calibrates_a_p_value_when_given_no_e_value():
-    rule = online_fdr.ELond(ALPHA)
+    rule = online_fdr.Lond(ALPHA)
     # e = 0.5 / sqrt(p) >= 20  <=>  p <= 1/1600
     assert run(rule, [p(1 / 1600 * 0.99)])[0].rejected is True
     assert run(rule, [p(1 / 1600 * 1.01)])[0].rejected is False
@@ -108,14 +108,14 @@ def test_elond_calibrates_a_p_value_when_given_no_e_value():
 
 
 def test_elond_prefers_an_explicit_e_value_over_the_p_value():
-    rule = online_fdr.ELond(ALPHA)
+    rule = online_fdr.Lond(ALPHA)
     both = online_fdr.Evidence(p=1e-12, e=1.0)
     step = run(rule, [both])[0]
     assert step.rejected is False and step.e_value == 1.0
 
 
 def test_elond_wealth_is_the_unassigned_level():
-    rule = online_fdr.ELond(ALPHA)
+    rule = online_fdr.Lond(ALPHA)
     steps = run(rule, [e(0.0)] * 3)
     assert steps[0].wealth_before == ALPHA
     assert [s.wealth_after for s in steps] == [
@@ -126,13 +126,13 @@ def test_elond_wealth_is_the_unassigned_level():
 
 
 def test_elond_zero_alpha_never_rejects():
-    steps = run(online_fdr.ELond(0), [e(1e300), e(1e300)])
+    steps = run(online_fdr.Lond(0), [e(1e300), e(1e300)])
     assert [s.rejected for s in steps] == [False, False]
     assert all(s.level == 0 for s in steps)
 
 
 def test_lordpp_levels_and_wealth_by_hand():
-    rule = online_fdr.LordPlusPlus(ALPHA)
+    rule = online_fdr.Lord(ALPHA)
     steps = run(rule, [p(0.0), p(0.0), p(0.9)])
     assert rule.w0 == Fraction(1, 20)
     assert [s.level for s in steps] == [
@@ -149,9 +149,7 @@ def test_lordpp_levels_and_wealth_by_hand():
 
 
 def test_lordpp_rejection_boundary_is_inclusive():
-    rule = online_fdr.LordPlusPlus(
-        Fraction(1, 4)
-    )  # first level 1/16, exact in binary
+    rule = online_fdr.Lord(Fraction(1, 4))  # first level 1/16, exact in binary
     level = 1 / 16
     assert run(rule, [p(level)])[0].rejected is True
     assert run(rule, [p(math.nextafter(level, 1.0))])[0].rejected is False
@@ -159,16 +157,16 @@ def test_lordpp_rejection_boundary_is_inclusive():
 
 def test_lordpp_needs_a_p_value():
     with pytest.raises(ValueError, match="needs a p-value"):
-        online_fdr.LordPlusPlus(ALPHA).step(online_fdr.State(), e(5.0))
+        online_fdr.Lord(ALPHA).step(online_fdr.State(), e(5.0))
 
 
 def test_lordpp_initial_wealth_is_validated():
     with pytest.raises(ValueError, match="w0"):
-        online_fdr.LordPlusPlus(ALPHA, w0=Fraction(2, 10))
+        online_fdr.Lord(ALPHA, w0=Fraction(2, 10))
     with pytest.raises(ValueError, match="w0"):
-        online_fdr.LordPlusPlus(ALPHA, w0=-1)
-    assert online_fdr.LordPlusPlus(ALPHA, w0=0).w0 == 0
-    assert online_fdr.LordPlusPlus(ALPHA, w0=ALPHA).w0 == ALPHA
+        online_fdr.Lord(ALPHA, w0=-1)
+    assert online_fdr.Lord(ALPHA, w0=0).w0 == 0
+    assert online_fdr.Lord(ALPHA, w0=ALPHA).w0 == ALPHA
 
 
 def test_saffron_levels_by_hand():
@@ -214,13 +212,13 @@ def test_saffron_lambda_is_validated():
 def test_alpha_is_validated():
     for bad in (-0.1, 1.1, float("nan"), True):
         with pytest.raises(ValueError, match="alpha"):
-            online_fdr.ELond(bad)
+            online_fdr.Lond(bad)
 
 
 def test_kappa_is_validated():
     for bad in (0.0, 1.0, float("nan")):
         with pytest.raises(ValueError, match="kappa"):
-            online_fdr.ELond(ALPHA, kappa=bad)
+            online_fdr.Lond(ALPHA, kappa=bad)
 
 
 def test_evidence_validation():
@@ -233,17 +231,17 @@ def test_evidence_validation():
 
 
 def test_guarantees_state_their_dependence_assumption():
-    assert online_fdr.ELond.guarantee.dependence == "arbitrary"
-    assert online_fdr.LordPlusPlus.guarantee.dependence == "independent"
+    assert online_fdr.Lond.guarantee.dependence == "arbitrary"
+    assert online_fdr.Lord.guarantee.dependence == "independent"
     assert online_fdr.Saffron.guarantee.dependence == "independent"
-    for cls in (online_fdr.ELond, online_fdr.LordPlusPlus, online_fdr.Saffron):
+    for cls in (online_fdr.Lond, online_fdr.Lord, online_fdr.Saffron):
         assert cls.guarantee.verified
         assert cls.guarantee.citation
         assert cls.guarantee.assumptions
 
 
 def test_config_round_trips_and_rejects_bad_records():
-    config = online_fdr.RuleConfig(
+    config = online_fdr.Settings(
         online_fdr.SAFFRON,
         ALPHA,
         horizon=7,
@@ -251,19 +249,19 @@ def test_config_round_trips_and_rejects_bad_records():
         lam=Fraction(2, 5),
         kappa=0.3,
     )
-    again = online_fdr.RuleConfig.from_dict(config.to_dict())
+    again = online_fdr.Settings.from_dict(config.to_dict())
     assert again == config
     assert isinstance(again.build(), online_fdr.Saffron)
     record = config.to_dict()
     record["extra"] = 1
     with pytest.raises(ValueError, match="unexpected"):
-        online_fdr.RuleConfig.from_dict(record)
+        online_fdr.Settings.from_dict(record)
     with pytest.raises(ValueError, match="rule"):
-        online_fdr.RuleConfig("bonferroni", ALPHA)
+        online_fdr.Settings("bonferroni", ALPHA)
 
 
 def test_replay_matches_stepping():
-    config = online_fdr.RuleConfig(online_fdr.LORD_PLUS_PLUS, ALPHA)
+    config = online_fdr.Settings(online_fdr.LORD_PLUS_PLUS, ALPHA)
     items = [p(0.001), p(0.5), p(0.0001), p(0.2)]
     direct = run(config.build(), items)
     assert online_fdr.replay(config, items) == direct
@@ -297,7 +295,7 @@ def test_levels_match_a_brute_force_rederivation_on_fixed_sequences():
         [0.002, 0.003, 0.4, 0.45, 0.0, 0.7, 0.01, 0.0001, 0.3, 0.2, 0.0],
     ]
     for values in sequences:
-        lord = run(online_fdr.LordPlusPlus(ALPHA), [p(v) for v in values])
+        lord = run(online_fdr.Lord(ALPHA), [p(v) for v in values])
         saff = run(online_fdr.Saffron(ALPHA), [p(v) for v in values])
         rejected, cands = [], []
         for t, step in enumerate(lord, start=1):
@@ -316,7 +314,7 @@ def test_levels_match_a_brute_force_rederivation_on_fixed_sequences():
 
 def test_elond_equals_lond_levels_of_the_paper():
     # alpha_t = alpha * gamma_t * (|R_{t-1}| + 1), Section 3.2.
-    rule = online_fdr.ELond(ALPHA, online_fdr.Discount(horizon=5))
+    rule = online_fdr.Lond(ALPHA, online_fdr.Discount(horizon=5))
     steps = run(rule, [e(1e9), e(1e9), e(0.0), e(1e9), e(0.0), e(1e9)])
     expected = [ALPHA / 5 * k for k in (1, 2, 3, 3, 4, 4)]
     assert [s.level for s in steps[:5]] == expected[:5]
@@ -325,7 +323,7 @@ def test_elond_equals_lond_levels_of_the_paper():
 
 
 def test_a_float_p_value_is_compared_exactly():
-    rule = online_fdr.LordPlusPlus(ALPHA)
+    rule = online_fdr.Lord(ALPHA)
     level = rule.level(rule.initial())
     assert level == Fraction(1, 40)
     # The double nearest 0.025 lies a hair above 1/40, so it is not rejected.
@@ -334,7 +332,7 @@ def test_a_float_p_value_is_compared_exactly():
 
 
 def test_wealth_is_never_negative_over_long_adversarial_runs():
-    for make in (online_fdr.LordPlusPlus, online_fdr.Saffron):
+    for make in (online_fdr.Lord, online_fdr.Saffron):
         for pattern in ([0.0] * 30, [0.9] * 30, [0.0, 0.9] * 15, [0.3] * 30):
             steps = run(make(ALPHA), [p(v) for v in pattern])
             assert all(s.wealth_after >= 0 for s in steps)

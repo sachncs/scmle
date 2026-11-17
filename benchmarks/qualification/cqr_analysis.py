@@ -101,13 +101,13 @@ def replicate(index: int, base: int, trees: int, depth: int) -> list[float]:
     mean = ensemble.GradientBoostingRegressor(**kw).fit(xf, yf)
     low_c = numpy.minimum(lo.predict(xc), hi.predict(xc))
     high_c = numpy.maximum(lo.predict(xc), hi.predict(xc))
-    band = quantile.QuantileBand.calibrate(yc.tolist(), low_c, high_c)
+    band = quantile.Band.calibrate(yc.tolist(), low_c, high_c)
     margin = band.margin(uncertainty_certify.LEVEL)
     a, b = lo.predict(xt), hi.predict(xt)
     inside = (yt >= numpy.minimum(a, b) - margin) & (
         yt <= numpy.maximum(a, b) + margin
     )
-    resid = conformal.finite_sample_quantile(
+    resid = conformal.cutoff(
         numpy.abs(yc - mean.predict(xc)), uncertainty_certify.LEVEL
     )
     plain = numpy.abs(yt - mean.predict(xt)) <= resid

@@ -23,8 +23,8 @@ import pandas
 
 from scmle.contracts import data
 from scmle.contracts import errors
-from scmle.data.modalities.curation import build_finding
 from scmle.data.modalities.curation import Curation
+from scmle.data.modalities.curation import flaw
 from scmle.data.modalities.curation import label_counts
 
 
@@ -32,7 +32,7 @@ class GraphError(ValueError):
     """Base error for invalid graph data or graph input."""
 
 
-class GraphInputError(GraphError):
+class ParseError(GraphError):
     """Raised when a graph input file cannot be parsed."""
 
 
@@ -40,7 +40,7 @@ class TemporalError(GraphError):
     """Raised when temporal graph evidence is incomplete or invalid."""
 
 
-class GraphValidationError(GraphError):
+class ValidationError(GraphError):
     """Raised when a graph fails structural validation.
 
     Attributes:
@@ -289,7 +289,7 @@ class Validation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class NodeProfile:
+class Degrees:
     """Summary statistics for graph nodes and their degrees.
 
     Attributes:
@@ -320,7 +320,7 @@ class NodeProfile:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EdgeProfile:
+class Connectivity:
     """Summary statistics for graph edges and weights.
 
     Attributes:
@@ -364,8 +364,8 @@ class Profile:
     graph_identity: str
     directed: bool
     component_count: int
-    node: NodeProfile
-    edge: EdgeProfile
+    node: Degrees
+    edge: Connectivity
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible graph profile.
@@ -384,7 +384,7 @@ class Profile:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class InductiveNodeSplit:
+class Partition:
     """Leakage-safe node partitions and within-partition edge partitions.
 
     Attributes:
@@ -408,7 +408,7 @@ class InductiveNodeSplit:
     seed: int
 
     @property
-    def node_partitions(self) -> tuple[tuple[str, ...], ...]:
+    def divisions(self) -> tuple[tuple[str, ...], ...]:
         """The train, validation and test node partitions, in that order."""
         return (self.train_nodes, self.validation_nodes, self.test_nodes)
 
@@ -509,7 +509,7 @@ class Dataset:
         object.__setattr__(self, "feature_names", tuple(self.feature_names))
 
     @classmethod
-    def from_edges(
+    def connect(
         cls,
         edges: Iterable[Edge],
         nodes: Iterable[Node | str] | None = None,
@@ -529,7 +529,7 @@ class Dataset:
 
         Returns:
             The new graph. It is not validated beyond the invariants checked
-            on construction; call `require_valid` for endpoint checks.
+            on construction; call `ensure` for endpoint checks.
         """
         edge_values = tuple(edges)
         if nodes is None:
@@ -584,10 +584,10 @@ class Dataset:
 
         Returns:
             The graph, with its source URI set to the file's URI. Errors
-            from `read_edges` propagate; a graph that fails `validate`
-            raises GraphValidationError.
+            from `edgelist` propagate; a graph that fails `validate`
+            raises ValidationError.
         """
-        edges = read_edges(
+        edges = edgelist(
             path,
             source_column=source_column,
             target_column=target_column,
@@ -595,13 +595,13 @@ class Dataset:
             relation_column=relation_column,
             time_column=time_column,
         )
-        graph = cls.from_edges(
+        graph = cls.connect(
             edges,
             nodes=nodes,
             directed=directed,
             source_uri=Path(path).expanduser().resolve(strict=False).as_uri(),
         )
-        graph.require_valid()
+        graph.ensure()
         return graph
 
     @property
@@ -680,15 +680,15 @@ class Dataset:
                 )
         return Validation(tuple(issues))
 
-    def require_valid(self) -> None:
-        """Raises `GraphValidationError` unless the graph is valid.
+    def ensure(self) -> None:
+        """Raises `ValidationError` unless the graph is valid.
 
         Raises:
-            GraphValidationError: If `validate` finds any issue.
+            ValidationError: If `validate` finds any issue.
         """
         report = self.validate()
         if not report.is_valid:
-            raise GraphValidationError(report)
+            raise ValidationError(report)
 
     def canonicalize(self, edge: Edge) -> tuple[str, str, str, str]:
         """Returns the canonical duplicate-detection key for an edge.
@@ -740,7 +740,7 @@ class Dataset:
             components.append(frozenset(component))
         return tuple(sorted(components, key=min))
 
-    def profile_nodes(self) -> NodeProfile:
+    def census(self) -> Degrees:
         """Profiles node counts, labels, features, and undirected degree.
 
         A self-loop adds one to its node's degree.
@@ -755,7 +755,7 @@ class Dataset:
             if edge.target in degrees and edge.target != edge.source:
                 degrees[edge.target] += 1
         degree_values = tuple(degrees.values())
-        return NodeProfile(
+        return Degrees(
             node_count=len(self.nodes),
             isolated_node_count=sum(value == 0 for value in degree_values),
             labeled_node_count=sum(
@@ -771,7 +771,7 @@ class Dataset:
             else 0.0,
         )
 
-    def profile_edges(self) -> EdgeProfile:
+    def profile_edges(self) -> Connectivity:
         """Profiles edge counts, duplicate edges, loops, and weights.
 
         Returns:
@@ -781,7 +781,7 @@ class Dataset:
         duplicate_count = sum(
             max(0, count - 1) for count in self.tally().values()
         )
-        return EdgeProfile(
+        return Connectivity(
             edge_count=len(self.edges),
             duplicate_edge_count=duplicate_count,
             self_loop_count=sum(
@@ -814,7 +814,7 @@ class Dataset:
             graph_identity=self.identity,
             directed=self.directed,
             component_count=len(self.connected_components()),
-            node=self.profile_nodes(),
+            node=self.census(),
             edge=self.profile_edges(),
         )
 
@@ -859,7 +859,7 @@ class Dataset:
         risk_findings = []
         if temporal_edges and len(temporal_edges) != len(self.edges):
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.graph-mixed-temporal-state",
                     data.FindingSeverity.WARNING,
                     {"source": self.source_uri},
@@ -871,7 +871,7 @@ class Dataset:
             )
         if profile.edge.duplicate_edge_count:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.graph-duplicate-edges",
                     data.FindingSeverity.WARNING,
                     {"source": self.source_uri},
@@ -887,7 +887,7 @@ class Dataset:
             )
         if profile.node.isolated_node_count:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.graph-isolated-nodes",
                     data.FindingSeverity.WARNING,
                     {"source": self.source_uri},
@@ -898,7 +898,7 @@ class Dataset:
             )
         if not self.feature_names:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.graph-no-declared-features",
                     data.FindingSeverity.INFO,
                     {"source": self.source_uri},
@@ -910,7 +910,7 @@ class Dataset:
             )
         if "unlabeled" in labels and len(labels) > 1:
             risk_findings.append(
-                build_finding(
+                flaw(
                     "risk.graph-mixed-label-state",
                     data.FindingSeverity.WARNING,
                     {"source": self.source_uri},
@@ -1002,7 +1002,7 @@ def graph_identity(
     return hashlib.sha256(encoded).hexdigest()
 
 
-def read_edges(
+def edgelist(
     path: str | Path,
     source_column: str = "source",
     target_column: str = "target",
@@ -1030,13 +1030,13 @@ def read_edges(
         The edges in file order.
 
     Raises:
-        GraphInputError: If the file does not exist, has another extension,
+        ParseError: If the file does not exist, has another extension,
             cannot be read or parsed, a JSONL line is not an object, or a
-            record is invalid (see `edges_from_records`).
+            record is invalid (see `link`).
     """
     input_path = Path(path)
     if not input_path.exists():
-        raise GraphInputError(f"graph edge file not found: {input_path}")
+        raise ParseError(f"graph edge file not found: {input_path}")
     suffix = input_path.name.lower()
     if suffix.endswith(".csv"):
         try:
@@ -1046,14 +1046,12 @@ def read_edges(
             pandas.errors.ParserError,
             UnicodeDecodeError,
         ) as error:
-            raise GraphInputError(
-                f"failed to read CSV edges: {error}"
-            ) from error
+            raise ParseError(f"failed to read CSV edges: {error}") from error
         csv_records = [
             {str(key): value for key, value in record.items()}
             for record in frame.to_dict(orient="records")
         ]
-        return edges_from_records(
+        return link(
             csv_records,
             source_column=source_column,
             target_column=target_column,
@@ -1072,20 +1070,18 @@ def read_edges(
                     try:
                         record = json.loads(content)
                     except json.JSONDecodeError as error:
-                        raise GraphInputError(
+                        raise ParseError(
                             f"malformed JSONL at line {line_number}: "
                             f"{error.msg}"
                         ) from error
                     if not isinstance(record, dict):
-                        raise GraphInputError(
+                        raise ParseError(
                             f"JSONL line {line_number} must be an object"
                         )
                     records.append(record)
         except OSError as error:
-            raise GraphInputError(
-                f"failed to read JSONL edges: {error}"
-            ) from error
-        return edges_from_records(
+            raise ParseError(f"failed to read JSONL edges: {error}") from error
+        return link(
             records,
             source_column=source_column,
             target_column=target_column,
@@ -1093,12 +1089,10 @@ def read_edges(
             relation_column=relation_column,
             time_column=time_column,
         )
-    raise GraphInputError(
-        "graph edges must use a .csv, .jsonl, or .ndjson file"
-    )
+    raise ParseError("graph edges must use a .csv, .jsonl, or .ndjson file")
 
 
-def edges_from_records(
+def link(
     records: Iterable[Mapping[str, Any]],
     source_column: str = "source",
     target_column: str = "target",
@@ -1122,7 +1116,7 @@ def edges_from_records(
         The edges in record order; identifiers are converted to text.
 
     Raises:
-        GraphInputError: If a record lacks the source or target key or has a
+        ParseError: If a record lacks the source or target key or has a
             null endpoint, a null or non-numeric weight, an invalid event
             time, or values that `Edge` rejects. The message gives the
             1-based record number.
@@ -1130,21 +1124,21 @@ def edges_from_records(
     edges: list[Edge] = []
     for index, record in enumerate(records, start=1):
         if source_column not in record or target_column not in record:
-            raise GraphInputError(
+            raise ParseError(
                 f"edge record {index} must contain '{source_column}' and "
                 f"'{target_column}'"
             )
         source = record[source_column]
         target = record[target_column]
         if pandas.isna(source) or pandas.isna(target):
-            raise GraphInputError(f"edge record {index} has a missing endpoint")
+            raise ParseError(f"edge record {index} has a missing endpoint")
         weight_value = record.get(weight_column, 1.0)
         if pandas.isna(weight_value):
-            raise GraphInputError(f"edge record {index} has an invalid weight")
+            raise ParseError(f"edge record {index} has an invalid weight")
         try:
             weight = float(weight_value)
         except (TypeError, ValueError) as error:
-            raise GraphInputError(
+            raise ParseError(
                 f"edge record {index} has a non-numeric weight"
             ) from error
         relation_value = record.get(relation_column, "default")
@@ -1156,7 +1150,7 @@ def edges_from_records(
             try:
                 event_time = normalize(time_value)
             except TemporalError as error:
-                raise GraphInputError(
+                raise ParseError(
                     f"edge record {index} has an invalid event time"
                 ) from error
         try:
@@ -1170,19 +1164,17 @@ def edges_from_records(
                 )
             )
         except (TypeError, ValueError) as error:
-            raise GraphInputError(
-                f"invalid edge record {index}: {error}"
-            ) from error
+            raise ParseError(f"invalid edge record {index}: {error}") from error
     return tuple(edges)
 
 
-def inductive_node_split(
+def induct(
     graph: Dataset,
     train_fraction: float = 0.8,
     validation_fraction: float = 0.1,
     test_fraction: float = 0.1,
     seed: int = 0,
-) -> InductiveNodeSplit:
+) -> Partition:
     """Creates deterministic node partitions with no retained edge leakage.
 
     Nodes are shuffled with the seed and divided by the fractions; every
@@ -1203,9 +1195,9 @@ def inductive_node_split(
     Raises:
         ValueError: If a fraction is negative or not finite, or the
             fractions do not sum to one. An invalid graph raises
-            GraphValidationError from `Dataset.require_valid`.
+            ValidationError from `Dataset.ensure`.
     """
-    graph.require_valid()
+    graph.ensure()
     fractions = (train_fraction, validation_fraction, test_fraction)
     if any(value < 0 or not math.isfinite(value) for value in fractions):
         raise errors.InputError(
@@ -1271,7 +1263,7 @@ def inductive_node_split(
             retained[source_partition].append(edge)
         else:
             withheld.append(edge)
-    return InductiveNodeSplit(
+    return Partition(
         train_nodes=train_nodes,
         validation_nodes=validation_nodes,
         test_nodes=test_nodes,
@@ -1283,7 +1275,7 @@ def inductive_node_split(
     )
 
 
-def structural_degrees(graph: Dataset) -> dict[str, list[float]]:
+def valence(graph: Dataset) -> dict[str, list[float]]:
     """Computes the out-degree, in-degree and weighted degree of each node.
 
     Args:
@@ -1305,7 +1297,7 @@ def structural_degrees(graph: Dataset) -> dict[str, list[float]]:
     return degrees
 
 
-def feature_values(
+def featurize(
     rows: list[list[float]], width: int, *, standardize: bool
 ) -> tuple[tuple[float, ...], ...]:
     """Turns feature rows into the immutable values of a feature matrix.
@@ -1365,9 +1357,9 @@ def prepare_features(
     Raises:
         ValueError: If ``max_nodes`` or ``max_features`` is below one, or a
             feature value is not finite. An invalid graph raises
-            GraphValidationError from `Dataset.require_valid`.
+            ValidationError from `Dataset.ensure`.
     """
-    graph.require_valid()
+    graph.ensure()
     if max_nodes < 1 or max_features < 1:
         raise errors.InputError(
             "max_nodes and max_features must be at least one"
@@ -1379,7 +1371,7 @@ def prepare_features(
         names = [f"feature_{index}" for index in range(feature_dimension)]
     rows = [list(node.features) for node in nodes]
     if include_structural:
-        degrees = structural_degrees(graph)
+        degrees = valence(graph)
         for index, node in enumerate(nodes):
             rows[index].extend(degrees[node.node_id])
         names.extend(("out_degree", "in_degree", "weighted_degree"))
@@ -1389,30 +1381,30 @@ def prepare_features(
     return Features(
         node_ids=tuple(node.node_id for node in nodes),
         feature_names=tuple(names),
-        values=feature_values(rows, width, standardize=standardize),
+        values=featurize(rows, width, standardize=standardize),
         standardized=standardize,
     )
 
 
 __all__ = [
+    "Connectivity",
     "Dataset",
+    "Degrees",
     "Edge",
-    "EdgeProfile",
     "Features",
     "GraphError",
-    "GraphValidationError",
-    "InductiveNodeSplit",
     "Issue",
     "Node",
-    "NodeProfile",
+    "Partition",
     "Profile",
     "TemporalError",
     "TemporalSplit",
     "Validation",
-    "edges_from_records",
+    "ValidationError",
+    "edgelist",
     "graph_identity",
-    "inductive_node_split",
+    "induct",
+    "link",
     "normalize",
     "prepare_features",
-    "read_edges",
 ]

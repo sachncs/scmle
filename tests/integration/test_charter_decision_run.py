@@ -14,15 +14,15 @@ KEY = "decision-key"
 
 
 def charter_with_costs(tmp_path, c_fp=1.0, c_fn=2.0):
-    human = (costs.CostSource.HUMAN,) * 4
-    model = costs.DecisionCostModel(
-        0.0, c_fn, c_fp, 0.0, 0.05, 0.9, human, costs.CostSource.HUMAN
+    human = (costs.Basis.HUMAN,) * 4
+    model = costs.Tariff(
+        0.0, c_fn, c_fp, 0.0, 0.05, 0.9, human, costs.Basis.HUMAN
     )
-    layer = scmle.data.charter.decision.DecisionLayer(
-        scmle.data.charter.decision.DecisionModel("EUR per case")
+    layer = scmle.data.charter.decision.Layer(
+        scmle.data.charter.decision.Policy("EUR per case")
     )
     path = tmp_path / "charter.json"
-    sealing.write_charter(
+    sealing.inscribe(
         path,
         make_charter(min_effect=0.5, k_max=3, cost_model=model, decision=layer),
         signing_key=KEY,

@@ -3,7 +3,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import DocTable from "../../components/DocTable.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const adapters = [
-  ["<code>Runner</code>", "the workload, in this process", "the training role of <code>RoleStore</code>", "injected, or <code>JobInterruptedError</code>"],
+  ["<code>Runner</code>", "the workload, in this process", "the training role of <code>RoleStore</code>", "injected, or <code>PreemptedError</code>"],
 ];
 ---
 
@@ -15,7 +15,7 @@ const adapters = [
   <h2>The spec and the run</h2>
   <p>A <code>Job</code> names a durable <code>run_id</code> (the idempotency key), the project specification (opaque JSON), the training identity, resources, a timeout, a <code>Retries</code>, an optional <code>CostBudget</code> and a non-secret environment. A GPU needs a stated <code>gpu_reason</code>: specialised compute only behind a declared need. <code>Runner.run(spec)</code> behaves the same on every runner:</p>
   <ul>
-    <li>The spec is stored at <code>runs/&lt;id&gt;/spec.json</code>. The same id with a different spec is a <code>RunConflictError</code>; a finished id returns its recorded manifest and starts nothing.</li>
+    <li>The spec is stored at <code>runs/&lt;id&gt;/spec.json</code>. The same id with a different spec is a <code>ConflictError</code>; a finished id returns its recorded manifest and starts nothing.</li>
     <li><code>runs/&lt;id&gt;/manifest.json</code> is rewritten atomically at every transition: attempts with state, seconds, cost and reason; checkpoint digests; result digest; evidence list; final state.</li>
     <li>An attempt that ends <strong>interrupted</strong> (preemption, spot reclaim, SIGTERM) or <strong>failed with a retryable cause</strong> is retried after the policy's backoff, up to its attempt limit, and the retry resumes from the run's checkpoints. Other failures, timeouts and budget stops are final.</li>
     <li>The <strong>cost budget</strong> is the declared rate times resources times elapsed time, accumulated across attempts. Past the ceiling the job is cancelled and the run ends <code>budget_stopped</code>. It is an estimate from declared rates, not billing data.</li>

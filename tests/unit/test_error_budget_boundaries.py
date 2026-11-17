@@ -121,32 +121,28 @@ def test_create_names_the_offending_argument_for_non_finite_input():
 
 def test_detector_tolerance_names_each_invalid_field():
     with pytest.raises(ValueError, match=r"^detector_id must not be empty$"):
-        scmle.data.ledger.budget.DetectorTolerance("  ", 0.1, 0.9)
+        scmle.data.ledger.budget.Tolerance("  ", 0.1, 0.9)
     with pytest.raises(
         ValueError, match=r"^max_false_alarm_rate must be within"
     ):
-        scmle.data.ledger.budget.DetectorTolerance("d", 1.1, 0.9)
+        scmle.data.ledger.budget.Tolerance("d", 1.1, 0.9)
     with pytest.raises(
         ValueError, match=r"^min_recall_lower_bound must be within"
     ):
-        scmle.data.ledger.budget.DetectorTolerance("d", 0.1, -0.1)
+        scmle.data.ledger.budget.Tolerance("d", 0.1, -0.1)
     with pytest.raises(
         ValueError, match=r"^min_recall_lower_bound must be a finite"
     ):
-        scmle.data.ledger.budget.DetectorTolerance("d", 0.1, float("nan"))
+        scmle.data.ledger.budget.Tolerance("d", 0.1, float("nan"))
 
 
 def test_detector_tolerance_accepts_the_probability_ends():
     assert (
-        scmle.data.ledger.budget.DetectorTolerance(
-            "d", 0.0, 1.0
-        ).min_recall_lower_bound
+        scmle.data.ledger.budget.Tolerance("d", 0.0, 1.0).min_recall_lower_bound
         == 1.0
     )
     assert (
-        scmle.data.ledger.budget.DetectorTolerance(
-            "d", 1.0, 0.0
-        ).max_false_alarm_rate
+        scmle.data.ledger.budget.Tolerance("d", 1.0, 0.0).max_false_alarm_rate
         == 1.0
     )
 
@@ -172,9 +168,9 @@ def test_error_budget_validation_messages():
             good.confirmation,
             good.exploration,
             20,
-            [scmle.data.ledger.budget.DetectorTolerance("d", 0.1, 0.9)],  # type: ignore[arg-type]
+            [scmle.data.ledger.budget.Tolerance("d", 0.1, 0.9)],  # type: ignore[arg-type]
         )
-    tolerance = scmle.data.ledger.budget.DetectorTolerance("d", 0.1, 0.9)
+    tolerance = scmle.data.ledger.budget.Tolerance("d", 0.1, 0.9)
     with pytest.raises(
         ValueError, match=r"^duplicate detector_id in detector_tolerances$"
     ):
@@ -207,7 +203,7 @@ def test_spending_zero_is_allowed_and_changes_nothing():
 def test_spending_the_smallest_overdraft_is_refused():
     budget = make_budget()
     just_over = budget.exploration.wealth + Fraction(1, 10**12)
-    with pytest.raises(scmle.data.ledger.budget.BudgetExhaustedError):
+    with pytest.raises(scmle.data.ledger.budget.ExhaustedError):
         scmle.data.ledger.budget.spend(budget, just_over)
     just_under = budget.exploration.wealth - Fraction(1, 10**12)
     assert scmle.data.ledger.budget.spend(
@@ -221,7 +217,7 @@ def test_spend_error_messages_name_the_amount_and_the_wealth():
     with pytest.raises(ValueError, match=r"^amount must be a finite number$"):
         scmle.data.ledger.budget.spend(make_budget(), float("inf"))
     with pytest.raises(
-        scmle.data.ledger.budget.BudgetExhaustedError,
+        scmle.data.ledger.budget.ExhaustedError,
         match=r"^amount 0.25 exceeds remaining wealth 0.1$",
     ):
         scmle.data.ledger.budget.spend(make_budget(), 0.25)
@@ -231,7 +227,7 @@ def test_spend_keeps_the_initial_wealth_and_other_fields():
     budget = make_budget(
         permutations_b=77,
         detector_tolerances=(
-            scmle.data.ledger.budget.DetectorTolerance("d", 0.1, 0.9),
+            scmle.data.ledger.budget.Tolerance("d", 0.1, 0.9),
         ),
     )
     spent = scmle.data.ledger.budget.spend(budget, 0.04)
@@ -256,27 +252,25 @@ def test_spend_conserves_wealth_and_is_order_independent():
     assert results == {Fraction(1, 3) - sum(amounts)}
 
 
-# --- split_budget ---------------------------------------------------------
+# --- apportion ---------------------------------------------------------
 
 
 def test_split_budget_error_messages():
     with pytest.raises(ValueError, match=r"^weights must not be empty$"):
-        scmle.data.ledger.budget.split_budget(make_budget(), {})
+        scmle.data.ledger.budget.apportion(make_budget(), {})
     with pytest.raises(ValueError, match=r"^family name must not be empty$"):
-        scmle.data.ledger.budget.split_budget(make_budget(), {" ": 1})
+        scmle.data.ledger.budget.apportion(make_budget(), {" ": 1})
     with pytest.raises(
         ValueError, match=r"^weight\[x\] must be a finite number$"
     ):
-        scmle.data.ledger.budget.split_budget(
-            make_budget(), {"x": float("nan")}
-        )
+        scmle.data.ledger.budget.apportion(make_budget(), {"x": float("nan")})
     for weight in (0, -1, Fraction(-1, 10**9)):
         with pytest.raises(ValueError, match=r"^weight\[x\] must be positive$"):
-            scmle.data.ledger.budget.split_budget(make_budget(), {"x": weight})
+            scmle.data.ledger.budget.apportion(make_budget(), {"x": weight})
 
 
 def test_split_budget_accepts_the_smallest_positive_weight():
-    parts = scmle.data.ledger.budget.split_budget(
+    parts = scmle.data.ledger.budget.apportion(
         make_budget(), {"a": Fraction(1, 10**9), "b": 1}
     )
     assert parts["a"].confirmation.alpha_confirm > 0
@@ -284,7 +278,7 @@ def test_split_budget_accepts_the_smallest_positive_weight():
 
 def test_split_budget_shares_are_exact_proportions_and_keep_order():
     budget = scmle.data.ledger.budget.spend(make_budget(), Fraction(1, 100))
-    parts = scmle.data.ledger.budget.split_budget(budget, {"z": 1, "a": 3})
+    parts = scmle.data.ledger.budget.apportion(budget, {"z": 1, "a": 3})
     assert list(parts) == ["z", "a"]
     assert parts["z"].confirmation.alpha_confirm == Fraction(1, 80)
     assert parts["a"].confirmation.alpha_confirm == Fraction(3, 80)
@@ -296,8 +290,8 @@ def test_split_budget_shares_are_exact_proportions_and_keep_order():
 
 def test_split_budget_does_not_depend_on_weight_scale_or_input_order():
     budget = make_budget()
-    one = scmle.data.ledger.budget.split_budget(budget, {"x": 1, "y": 2})
-    scaled = scmle.data.ledger.budget.split_budget(budget, {"y": 20, "x": 10})
+    one = scmle.data.ledger.budget.apportion(budget, {"x": 1, "y": 2})
+    scaled = scmle.data.ledger.budget.apportion(budget, {"y": 20, "x": 10})
     assert one["x"] == scaled["x"]
     assert one["y"] == scaled["y"]
 

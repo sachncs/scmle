@@ -27,11 +27,11 @@ from scmle.models.deeplearning import worker
 
 MIN_JEPA_ROWS = 16
 COMMON_SPACE = (
-    search.FloatParameter("dropout", 0.0, 0.4),
-    search.FloatParameter("learning_rate", 1e-4, 1e-2, log=True),
-    search.FloatParameter("weight_decay", 1e-6, 1e-2, log=True),
-    search.ChoiceParameter("batch_size", ("auto", 64, 128, 256)),
-    search.ChoiceParameter("schedule", ("cosine", "constant")),
+    search.Real("dropout", 0.0, 0.4),
+    search.Real("learning_rate", 1e-4, 1e-2, log=True),
+    search.Real("weight_decay", 1e-6, 1e-2, log=True),
+    search.Choice("batch_size", ("auto", 64, 128, 256)),
+    search.Choice("schedule", ("cosine", "constant")),
 )
 
 
@@ -50,9 +50,7 @@ class Network(models.Model):
     family = "deep_learning"
     requires: tuple[str, ...] = ("torch",)
     architecture: str
-    family_contract: contracts.ModelFamilyContract = (
-        contracts.TABULAR_TORCH_CONTRACT
-    )
+    family_contract: contracts.Boundary = contracts.TABULAR_TORCH_CONTRACT
     capabilities = models.Capabilities(
         tasks.STANDARD_TASKS,
         probabilities=True,
@@ -69,10 +67,10 @@ class Network(models.Model):
         *,
         name: str | None = None,
         architecture: str | None = None,
-        search_space: search.SearchSpace | None = None,
+        search_space: search.Space | None = None,
         capabilities: models.Capabilities | None = None,
         capability_family: str | None = None,
-        family_contract: contracts.ModelFamilyContract | None = None,
+        family_contract: contracts.Boundary | None = None,
         auto_candidate: bool | None = None,
     ) -> None:
         """Sets the declared data on this instance.
@@ -148,9 +146,9 @@ class Network(models.Model):
 MLP = Network(
     name="torch_mlp",
     architecture="mlp",
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.ChoiceParameter(
+            search.Choice(
                 "hidden_sizes", ((64,), (128,), (128, 64), (256, 128))
             ),
             *COMMON_SPACE,
@@ -163,9 +161,9 @@ MLP = Network(
 RESIDUAL_MLP = Network(
     name="torch_residual",
     architecture="residual",
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.ChoiceParameter(
+            search.Choice(
                 "hidden_sizes", ((64,), (64, 64), (128, 128), (128, 128, 128))
             ),
             *COMMON_SPACE,
@@ -178,11 +176,9 @@ RESIDUAL_MLP = Network(
 TABM = Network(
     name="torch_tabm",
     architecture="tabm",
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.ChoiceParameter(
-                "hidden_sizes", ((64,), (128, 64), (256, 128))
-            ),
+            search.Choice("hidden_sizes", ((64,), (128, 64), (256, 128))),
             *COMMON_SPACE,
         )
     ),
@@ -204,9 +200,9 @@ FT_TRANSFORMER = Network(
     capabilities=dataclasses.replace(
         Network.capabilities, max_rows=100_000, cost=5, memory_factor=8.0
     ),
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.ChoiceParameter("hidden_sizes", ((32,), (64,), (64, 64))),
+            search.Choice("hidden_sizes", ((32,), (64,), (64, 64))),
             *COMMON_SPACE,
         )
     ),
@@ -217,11 +213,9 @@ FT_TRANSFORMER = Network(
 ROBUST_MLP = Network(
     name="torch_realmlp",
     architecture="robust_mlp",
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.ChoiceParameter(
-                "hidden_sizes", ((128,), (256, 128), (256, 256))
-            ),
+            search.Choice("hidden_sizes", ((128,), (256, 128), (256, 256))),
             *COMMON_SPACE,
         )
     ),
@@ -250,17 +244,17 @@ class Jepa(Network):
         cost=5,
         memory_factor=8.0,
     )
-    search_space = search.SearchSpace(
+    search_space = search.Space(
         (
-            search.ChoiceParameter("hidden_size", (32, 64, 128)),
-            search.ChoiceParameter("embedding_size", (16, 32, 64)),
-            search.FloatParameter("mask_probability", 0.15, 0.5),
-            search.FloatParameter("ema_decay", 0.95, 0.999),
-            search.FloatParameter("variance_weight", 0.05, 0.3),
-            search.FloatParameter("learning_rate", 1e-4, 1e-2, log=True),
-            search.FloatParameter("weight_decay", 1e-6, 1e-2, log=True),
-            search.ChoiceParameter("epochs", (20, 40, 80)),
-            search.ChoiceParameter("batch_size", ("auto", 64, 128)),
+            search.Choice("hidden_size", (32, 64, 128)),
+            search.Choice("embedding_size", (16, 32, 64)),
+            search.Real("mask_probability", 0.15, 0.5),
+            search.Real("ema_decay", 0.95, 0.999),
+            search.Real("variance_weight", 0.05, 0.3),
+            search.Real("learning_rate", 1e-4, 1e-2, log=True),
+            search.Real("weight_decay", 1e-6, 1e-2, log=True),
+            search.Choice("epochs", (20, 40, 80)),
+            search.Choice("batch_size", ("auto", 64, 128)),
         )
     )
 
@@ -348,7 +342,7 @@ class Jepa(Network):
             [
                 (
                     "representation",
-                    jepa.JepaEstimator(**representation_params),
+                    jepa.Embedder(**representation_params),
                 ),
                 ("model", head),
             ]
@@ -356,7 +350,7 @@ class Jepa(Network):
 
     def assemble(  # pyright: ignore[reportIncompatibleMethodOverride]  # sklearn types Pipeline.predict as an available_if descriptor, which the Estimator protocol rejects
         self,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         task: tasks.Task,
         seed: int,
         params: Mapping[str, Any] | None = None,
@@ -380,7 +374,7 @@ class Jepa(Network):
             representation and prediction head.
         """
         options = preprocessing.default_options(plan, self)
-        front_end = preprocessing.build_front_end(plan, options)
+        front_end = preprocessing.frontend(plan, options)
         representation_pipeline = self.build(task, seed, params)
         return pipeline.Pipeline(
             [("prep", front_end), *representation_pipeline.steps]
@@ -392,15 +386,15 @@ class KerasMlp(Network):
 
     name = "keras_mlp"
     requires = ("torch", "keras")
-    search_space = search.SearchSpace(
+    search_space = search.Space(
         (
-            search.ChoiceParameter(
+            search.Choice(
                 "hidden_sizes", ((64,), (128,), (128, 64), (256, 128))
             ),
-            search.FloatParameter("dropout", 0.0, 0.4),
-            search.FloatParameter("learning_rate", 1e-4, 1e-2, log=True),
-            search.FloatParameter("l2", 1e-6, 1e-2, log=True),
-            search.ChoiceParameter("batch_size", (64, 128, 256)),
+            search.Real("dropout", 0.0, 0.4),
+            search.Real("learning_rate", 1e-4, 1e-2, log=True),
+            search.Real("l2", 1e-6, 1e-2, log=True),
+            search.Choice("batch_size", (64, 128, 256)),
         )
     )
 

@@ -112,7 +112,7 @@ Online (level `alpha_promote = 1/50` for one experiment, `alpha_rollback =
   beyond `tau`): false rollback `<= 0.01 + tol(0.01, R)`. (d) drifting from 0
   to -0.06: rollback share filed. Amendment of 2026-11-06, written before the
   first run of the hook path and leaving the four floors above as they were:
-  the same worlds are also run through `RolloutHook` on a real
+  the same worlds are also run through `Hook` on a real
   `Maintainer` and a registry of two small bundles (`through_hook`). Per
   scenario `HOOK_WORLDS = 100` worlds (seeds `0 .. 99` of the scenario's
   stream, the first worlds of the vectorised run), fed in batches of 500 to
@@ -312,16 +312,16 @@ def rng_for(base: int, name: str, index: int = 0) -> numpy.random.Generator:
     return randomness.component_rng(base + index, f"f11.{name}", 0)
 
 
-def cost_model() -> costs.DecisionCostModel:
+def cost_model() -> costs.Tariff:
     """The cost model of the threshold worlds.
 
     Returns:
         A model with false-positive cost `C_FP` and false-negative cost
         `C_FN`, both from a human source.
     """
-    human = (costs.CostSource.HUMAN,) * 4
-    return costs.DecisionCostModel(
-        0.0, C_FN, C_FP, 0.0, 0.02, 0.15, human, costs.CostSource.HUMAN
+    human = (costs.Basis.HUMAN,) * 4
+    return costs.Tariff(
+        0.0, C_FN, C_FP, 0.0, 0.02, 0.15, human, costs.Basis.HUMAN
     )
 
 
@@ -361,7 +361,7 @@ def gate_a1(runs: int, base: int = 0) -> dict[str, Any]:
         and `passed`.
     """
     model = cost_model()
-    target = threshold.bayes_threshold(C_FP, C_FN)
+    target = threshold.breakeven(C_FP, C_FN)
     result: dict[str, Any] = {"worlds": {}}
     passed = True
     for skew in (1.0, 0.6, 1.6):
@@ -377,7 +377,7 @@ def gate_a1(runs: int, base: int = 0) -> dict[str, Any]:
         for index in range(runs):
             rng = rng_for(base, f"a1.{skew}", index)
             score, _, y = f11_generators.calibration_world(rng, 5000, skew)
-            decision = threshold.choose_threshold(
+            decision = threshold.operate(
                 score, y, model, seed=base + index, replicates=50
             )
             paths[decision.rule.path] = paths.get(decision.rule.path, 0) + 1
@@ -417,7 +417,7 @@ def gate_a1c(runs: int, base: int = 0) -> dict[str, Any]:
         for skew in rejects:
             rng = rng_for(base, f"a1c.{skew}", index)
             score, _, y = f11_generators.calibration_world(rng, 5000, skew)
-            check = threshold.calibration_check(score, y, level)
+            check = threshold.hosmer(score, y, level)
             rejects[skew] += int(not check.calibrated)
     size = rejects[1.0] / runs
     power = {str(k): v / runs for k, v in rejects.items() if k != 1.0}
@@ -453,9 +453,9 @@ def gate_a2(runs: int, base: int = 0) -> dict[str, Any]:
         y = (rng.random(n) < rng.uniform(0.1, 0.6)).astype(float)
         a = (rng.random(n) < RANDOM_TABLE_ACT_SHARE).astype(float)
         fp, fn = rng.uniform(1, 9), rng.uniform(1, 90)
-        human = (costs.CostSource.HUMAN,) * 4
-        model = costs.DecisionCostModel(
-            0.0, fn, fp, 0.0, 0.001, 0.999, human, costs.CostSource.HUMAN
+        human = (costs.Basis.HUMAN,) * 4
+        model = costs.Tariff(
+            0.0, fn, fp, 0.0, 0.001, 0.999, human, costs.Basis.HUMAN
         )
         t = fp / (fp + fn)
         lhs = costs.net_benefit(y, a, t)
@@ -524,7 +524,7 @@ def band_setting(runs: int, n: int, cluster: bool, base: int) -> dict[str, Any]:
             size,
             shared,
         )
-        report = netbenefit.net_benefit_band(
+        report = netbenefit.lowerband(
             y,
             (score >= CUT).astype(float),
             RANGE,
@@ -591,7 +591,7 @@ def gate_a4(runs: int, base: int = 0) -> dict[str, Any]:
             rng = rng_for(base, f"a4.{n}", index)
             y = (rng.random(n) < PREVALENCE).astype(float)
             acts = (rng.random(n) < PREVALENCE).astype(float)
-            report = netbenefit.net_benefit_band(
+            report = netbenefit.lowerband(
                 y,
                 acts,
                 RANGE,
@@ -616,7 +616,7 @@ def gate_a4(runs: int, base: int = 0) -> dict[str, Any]:
                 PREVALENCE,
                 delta,
             )
-            report = netbenefit.net_benefit_band(
+            report = netbenefit.lowerband(
                 y,
                 (score >= CUT).astype(float),
                 RANGE,
@@ -654,13 +654,13 @@ def outcome_models(base: int) -> dict[str, Any]:
         `dr_misspec`, which does not.
     """
     dev = f11_generators.bandit(rng_for(base, "a5.dev", 0), DEV_ROWS, 1.0)
-    full = ope.fit_outcome_model(
+    full = ope.regress(
         f11_generators.outcome_features(dev["x"]),
         dev["action"],
         dev["reward"],
         2,
     )
-    plain = ope.fit_outcome_model(dev["x"], dev["action"], dev["reward"], 2)
+    plain = ope.regress(dev["x"], dev["action"], dev["reward"], 2)
     return {
         "dr": lambda x: full(f11_generators.outcome_features(x)),
         "dr_misspec": plain,
@@ -699,14 +699,14 @@ def gate_a5(runs: int, base: int = 0) -> dict[str, Any]:
         target = f11_generators.target_policy(data["x"])
         for name, (estimator, clip, model_name) in cells.items():
             q = None if model_name is None else models[model_name](data["x"])
-            log = ope.LoggedBandit(
+            log = ope.Bandits(
                 data["action"],
                 data["reward"],
                 data["behaviour"],
                 target,
                 q,
             )
-            estimate = ope.estimate_value(log, estimator, clip=clip)
+            estimate = ope.evaluate(log, estimator, clip=clip)
             tally[name]["ess"].append(estimate.ess_ratio)
             if estimate.status == ope.REFUSED:
                 continue
@@ -769,10 +769,10 @@ def refusal_rows(base: int) -> dict[str, Any]:
                 tail = data["x"][:, 0] > WEAK_SUPPORT_CUT
                 data["behaviour"][tail] = numpy.array([0.995, 0.005])
             target = f11_generators.target_policy(data["x"])
-            log = ope.LoggedBandit(
+            log = ope.Bandits(
                 data["action"], data["reward"], data["behaviour"], target
             )
-            estimate = ope.estimate_value(log, "ipw")
+            estimate = ope.evaluate(log, "ipw")
             fired[kind] += int(estimate.status == ope.REFUSED)
     hard = wilson(fired["hard"], runs)
     weak = wilson(fired["weak"], runs)
@@ -879,23 +879,23 @@ def gate_a6(runs: int, base: int = 0) -> dict[str, Any]:
     x = covariates(two)
     order = rng_for(base, "a6.split", 0).permutation(len(two))
     dev, evaluation = order[: len(two) // 2], order[len(two) // 2 :]
-    predict = ope.fit_outcome_model(x[dev], arm[dev], y[dev], 2, ridge=10.0)
+    predict = ope.regress(x[dev], arm[dev], y[dev], 2, ridge=10.0)
     tau_dev = predict(x[dev])[:, 1] - predict(x[dev])[:, 0]
-    dev_log = ope.LoggedBandit(
+    dev_log = ope.Bandits(
         arm[dev],
         y[dev],
         numpy.full((len(dev), 2), 0.5),
         numpy.full((len(dev), 2), 0.5),
         predict(x[dev]),
     )
-    policy = ope.fit_threshold_policy(dev_log, tau_dev)
+    policy = ope.tune(dev_log, tau_dev)
     x_e, a_e, y_e = x[evaluation], arm[evaluation], y[evaluation]
     tau_e = predict(x_e)[:, 1] - predict(x_e)[:, 0]
     pi_e = policy.probabilities(tau_e)
-    full_log = ope.LoggedBandit(
+    full_log = ope.Bandits(
         a_e, y_e, numpy.full((len(a_e), 2), 0.5), pi_e, predict(x_e)
     )
-    reference = ope.estimate_value(full_log, "dr")
+    reference = ope.evaluate(full_log, "dr")
     assert reference.value is not None
     treat_p = numpy.clip(1 / (1 + numpy.exp(-x_e[:, 0])), 0.1, 0.9)
     behaviour = numpy.column_stack([1 - treat_p, treat_p])
@@ -904,14 +904,14 @@ def gate_a6(runs: int, base: int = 0) -> dict[str, Any]:
     kept_rows = []
     for index in range(runs):
         keep = rng_for(base, "a6.keep", index).random(len(a_e)) < logged / 0.9
-        log = ope.LoggedBandit(
+        log = ope.Bandits(
             a_e[keep],
             y_e[keep],
             behaviour[keep],
             pi_e[keep],
             predict(x_e[keep]),
         )
-        estimate = ope.estimate_value(log, "dr")
+        estimate = ope.evaluate(log, "dr")
         low, high = estimate.interval or (math.nan, math.nan)
         hits += int(low <= reference.value <= high)
         kept_rows.append(int(keep.sum()))
@@ -947,7 +947,7 @@ def peeking_paths(
     Returns:
         The log wealth after each unit, same shape.
     """
-    return anytime.centered_paths(arm, outcome, q, delta_min)
+    return anytime.recentre(arm, outcome, q, delta_min)
 
 
 def gate_b7(runs: int, base: int = 0) -> dict[str, Any]:
@@ -1034,9 +1034,9 @@ def gate_b8(runs: int, base: int = 0) -> dict[str, Any]:
     promoted = [s for s in stops if s is not None]
     direction = (p1 - p0) > 0 and bool(promoted)
     z_stream = anytime.pseudo_outcomes(
-        arm_all, y_all, share, anytime.running_center(y_all)
+        arm_all, y_all, share, anytime.centers(y_all)
     )
-    stream = anytime.centered_stream(share, delta_min)
+    stream = anytime.deviations(share, delta_min)
     bound = anytime.confidence_bound(z_stream, stream, ALPHA_PROMOTE)
     share_promoted = len(promoted) / runs
     return {
@@ -1058,7 +1058,7 @@ def gate_b8(runs: int, base: int = 0) -> dict[str, Any]:
 
 def fair_constraint(
     gap: float = 0.05,
-) -> scmle.data.charter.decision.FairnessConstraint:
+) -> scmle.data.charter.decision.Constraint:
     """The constraint of the fairness worlds.
 
     Args:
@@ -1067,7 +1067,7 @@ def fair_constraint(
     Returns:
         An equal-opportunity constraint on `group` with that gap.
     """
-    return scmle.data.charter.decision.FairnessConstraint(
+    return scmle.data.charter.decision.Constraint(
         "group", "equal_opportunity", gap, "group_thresholds", "certify"
     )
 
@@ -1094,7 +1094,7 @@ def gate_a7(runs: int, base: int = 0) -> dict[str, Any]:
             score, y, groups = f11_generators.fairness_world(
                 rng_for(base, f"a7.{gap}", index), 20000, gap
             )
-            test = constraints.satisfaction_test(
+            test = constraints.satisfy(
                 y, (score >= 0.0).astype(float), groups, rule
             )
             satisfied += int(test.status == constraints.SATISFIED)
@@ -1145,9 +1145,7 @@ def gate_a7b(runs: int, base: int = 0) -> dict[str, Any]:
         # The fit reads probabilities; a monotone map of the score keeps the
         # equal-true-positive-rate oracle unchanged.
         risk = 1.0 / (1.0 + numpy.exp(-score))
-        fitted = constraints.fit_group_thresholds(
-            risk, y, groups, rule, t, margin=0.5
-        )
+        fitted = constraints.equalize(risk, y, groups, rule, t, margin=0.5)
         value = 0.0
         for g in (0, 1):
             cut = float(
@@ -1185,7 +1183,7 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
     refused = {}
     for pair in pairs:
         declared = tuple(
-            scmle.data.charter.decision.FairnessConstraint(
+            scmle.data.charter.decision.Constraint(
                 "group", c, 0.05, "reweighing"
             )
             for c in pair
@@ -1199,13 +1197,11 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
             )
             try:
                 constraints.check_feasibility(declared, y, groups)
-            except constraints.InfeasibleConstraintsError:
+            except constraints.InfeasibleError:
                 count += 1
         refused["/".join(pair)] = count
     declared = tuple(
-        scmle.data.charter.decision.FairnessConstraint(
-            "group", c, 0.05, "reweighing"
-        )
+        scmle.data.charter.decision.Constraint("group", c, 0.05, "reweighing")
         for c in pairs[0]
     )
     false_refusals = 0
@@ -1216,7 +1212,7 @@ def gate_a8(runs: int, base: int = 0) -> dict[str, Any]:
         )
         try:
             constraints.check_feasibility(declared, y, groups)
-        except constraints.InfeasibleConstraintsError:
+        except constraints.InfeasibleError:
             false_refusals += 1
     bound = 0.05 + tol(0.05, equal_runs)
     return {
@@ -1240,7 +1236,7 @@ def plan_for(
     n_max: int = 3000,
     guardrails: tuple[scmle.data.charter.decision.Guardrail, ...] = (),
     tolerance: float = 0.02,
-) -> scmle.data.charter.decision.RolloutPlan:
+) -> scmle.data.charter.decision.Experiment:
     """The rollout plan the online worlds use.
 
     Args:
@@ -1253,7 +1249,7 @@ def plan_for(
         A plan for a conversion experiment with assignment probability 0.5
         and the module's promotion and rollback levels.
     """
-    return scmle.data.charter.decision.RolloutPlan(
+    return scmle.data.charter.decision.Experiment(
         unit="user",
         primary="conversion",
         assignment_prob=0.5,
@@ -1404,9 +1400,8 @@ def gate_b2(runs: int, base: int = 0) -> dict[str, Any]:
         bounce = (rng.random(arm.shape) < 0.20 + 0.05 * arm).astype(float)
         target = -math.log(ALPHA_PROMOTE)
         both = [
-            anytime.centered_paths(arm, primary, 0.5, plan.delta_min) >= target,
-            anytime.centered_paths(arm, bounce, 0.5, guard.margin, "less")
-            >= target,
+            anytime.recentre(arm, primary, 0.5, plan.delta_min) >= target,
+            anytime.recentre(arm, bounce, 0.5, guard.margin, "less") >= target,
         ]
         hits += int((both[0] & both[1]).any(axis=1).sum())
     bound = ALPHA_PROMOTE + tol(ALPHA_PROMOTE, runs)
@@ -1545,7 +1540,7 @@ def rollback_paths(
     Returns:
         The log wealth after each unit, same shape.
     """
-    return anytime.centered_paths(arm, y, 0.5, -tolerance, "less")
+    return anytime.recentre(arm, y, 0.5, -tolerance, "less")
 
 
 def gate_b4(runs: int, base: int = 0) -> dict[str, Any]:
@@ -1629,20 +1624,20 @@ def gate_b5(runs: int, base: int = 0) -> dict[str, Any]:
         total = Fraction(0)
         for index in range(int(rng.integers(0, 40))):
             try:
-                budget, level = scmle.data.ledger.budget.assign_experiment(
+                budget, level = scmle.data.ledger.budget.enroll(
                     budget, f"e{index}"
                 )
-            except scmle.data.ledger.budget.BudgetExhaustedError:
+            except scmle.data.ledger.budget.ExhaustedError:
                 break
             total += level
         if budget.spent != total or total > alpha:
             violations += 1
         try:
-            scmle.data.ledger.budget.assign_experiment(
+            scmle.data.ledger.budget.enroll(
                 budget, "overspend", alpha - budget.spent + 1
             )
             violations += 1
-        except scmle.data.ledger.budget.BudgetExhaustedError:
+        except scmle.data.ledger.budget.ExhaustedError:
             pass
         rebuilt = scmle.data.ledger.budget.DecisionBudget.from_dict(
             json.loads(json.dumps(budget.to_dict()))
@@ -1683,8 +1678,7 @@ def gate_b6(runs: int, base: int = 0) -> dict[str, Any]:
             bf = design.srm_log_bayes_factor(counts, totals, 0.5)
             anytime_hits += int((bf.max(axis=1) >= target).sum())
             exact_hits += sum(
-                design.srm_p_value(int(k), n, 0.5) < level
-                for k in counts[:, -1]
+                design.mismatch(int(k), n, 0.5) < level for k in counts[:, -1]
             )
         out[label] = {
             "anytime": anytime_hits / runs,
@@ -1728,10 +1722,10 @@ def hook_bundle(seed: int) -> bundle.Bundle:
     frame["y"] = (frame.a + 0.3 * frame.b + rng.normal(0, 0.5, 300) > 0).astype(
         int
     )
-    plan = scmle.contracts.data.FeaturePlan(("a", "b"), ())
-    models = scmle.models.registry.Catalog.with_builtins()
+    plan = scmle.contracts.data.Blueprint(("a", "b"), ())
+    models = scmle.models.registry.Catalog.stock()
     features = frame.drop(columns="y")
-    fitted = preprocessing.build_pipeline(
+    fitted = preprocessing.instantiate(
         plan, models.get("logistic_regression"), tasks.Task.BINARY, 0
     ).fit(features, frame.y)
     return bundle.Bundle.create(
@@ -1745,7 +1739,7 @@ def hook_bundle(seed: int) -> bundle.Bundle:
     )
 
 
-def hook_approval(record: Any) -> scmle.governance.registry.PromotionApproval:
+def hook_approval(record: Any) -> scmle.governance.registry.Sanction:
     """A signed independent approval for one registered version.
 
     Args:
@@ -1754,12 +1748,12 @@ def hook_approval(record: Any) -> scmle.governance.registry.PromotionApproval:
     Returns:
         An approved, signed promotion approval for that version.
     """
-    return scmle.governance.registry.PromotionApproval(
+    return scmle.governance.registry.Sanction(
         model=record.model,
         version=record.version,
         content_id=record.content_id,
         reviewer="f11-b9-reviewer",
-        decision=scmle.governance.registry.PromotionDecision.APPROVED,
+        decision=scmle.governance.registry.Verdict.APPROVED,
         reason="benchmark fixture",
         evidence=("f11_certify.py",),
         approved_at="2026-11-06T00:00:00+00:00",
@@ -1791,7 +1785,7 @@ def hook_registry(root: Path) -> tuple[Any, Any, Any]:
     return store, manager, second
 
 
-def hook_in(manager: Any, plan: Any) -> rollout_hook.RolloutHook:
+def hook_in(manager: Any, plan: Any) -> rollout_hook.Hook:
     """A fresh hook, with its own in-memory ledger, on the shared manager.
 
     Args:
@@ -1804,12 +1798,10 @@ def hook_in(manager: Any, plan: Any) -> rollout_hook.RolloutHook:
     ledger = deployment_ledger.DeploymentLedger.create(
         None, charter_hash="b" * 64, policy={"b9": 1}, alpha_promo="1/20"
     )
-    return rollout_hook.RolloutHook(manager, plan, ledger)
+    return rollout_hook.Hook(manager, plan, ledger)
 
 
-def hook_promotes(
-    hook: rollout_hook.RolloutHook, record: Any, seed: int
-) -> None:
+def hook_promotes(hook: rollout_hook.Hook, record: Any, seed: int) -> None:
     """Starts an experiment, wins it on strong traffic and promotes.
 
     Args:
@@ -1826,7 +1818,7 @@ def hook_promotes(
 
 
 def hook_path(base: int = 0) -> dict[str, Any]:
-    """The four lifecycle scenarios run through `RolloutHook` on a registry.
+    """The four lifecycle scenarios run through `Hook` on a registry.
 
     Each of the first `HOOK_WORLDS` worlds of a scenario is fed to the hook in
     batches; the hook's decision is compared with the vectorised e-process on
@@ -2083,13 +2075,11 @@ def battery_digest(base: int) -> str:
     """
     rng = rng_for(base, "b10", 0)
     score, _, y = f11_generators.calibration_world(rng, 3000, 0.7)
-    decision = threshold.choose_threshold(
-        score, y, cost_model(), seed=1, replicates=50
-    )
+    decision = threshold.operate(score, y, cost_model(), seed=1, replicates=50)
     sample, outcome, groups = f11_generators.binormal(
         rng, 2000, 0.2, 1.5, 10, 0.5
     )
-    band = netbenefit.net_benefit_band(
+    band = netbenefit.lowerband(
         outcome, (sample >= CUT).astype(float), RANGE, clusters=groups, seed=2
     )
     arm, y2 = f11_generators.experiment(rng, 1, 3000, 0.5, 0.1, 0.04)
@@ -2157,128 +2147,128 @@ def sources() -> dict[str, list[Any]]:
     """
     return {
         "A1": [
-            threshold.choose_threshold,
-            threshold.calibration_check,
-            threshold.fit_recalibrator,
-            threshold.cross_fitted,
+            threshold.operate,
+            threshold.hosmer,
+            threshold.calibrator,
+            threshold.crossfit,
             threshold.Threshold,
-            threshold.bayes_threshold,
+            threshold.breakeven,
             gate_a1,
             f11_generators.calibration_world,
         ],
-        "A1c": [threshold.calibration_check, gate_a1c],
+        "A1c": [threshold.hosmer, gate_a1c],
         "A2": [costs.net_benefit, costs.expected_cost, gate_a2],
         "A3": [
-            netbenefit.net_benefit_band,
-            netbenefit.resample_means,
+            netbenefit.lowerband,
+            netbenefit.redraw,
             netbenefit.diffs,
             band_setting,
             gate_a3,
             f11_generators.binormal,
             f11_generators.binormal_differences,
         ],
-        "A4": [netbenefit.net_benefit_band, netbenefit.resample_means, gate_a4],
+        "A4": [netbenefit.lowerband, netbenefit.redraw, gate_a4],
         "A5": [
-            ope.estimate_value,
+            ope.evaluate,
             ope.terms,
             ope.weights,
-            ope.mean_interval,
-            ope.support_violations,
-            ope.fit_outcome_model,
+            ope.wald,
+            ope.unsupported,
+            ope.regress,
             gate_a5,
             refusal_rows,
             f11_generators.bandit,
         ],
         "A6": [
-            ope.estimate_value,
+            ope.evaluate,
             ope.terms,
-            ope.fit_threshold_policy,
+            ope.tune,
             gate_a6,
         ],
         "A7": [
-            constraints.satisfaction_test,
+            constraints.satisfy,
             constraints.newcombe,
-            constraints.rate_tables,
+            constraints.tabulate,
             gate_a7,
             f11_generators.fairness_world,
         ],
-        "A7b": [constraints.fit_group_thresholds, gate_a7b],
+        "A7b": [constraints.equalize, gate_a7b],
         "A8": [constraints.check_feasibility, gate_a8],
         "B1": [
-            anytime.log_wealth,
-            anytime.bet_grid,
+            anytime.grow,
+            anytime.bets,
             anytime.pseudo_outcomes,
-            anytime.running_center,
-            anytime.centered_paths,
-            anytime.centered_stream,
+            anytime.centers,
+            anytime.recentre,
+            anytime.deviations,
             rollout.Rollout,
             gate_b1,
             peeking_paths,
             class_agreement,
         ],
         "B2": [
-            anytime.log_wealth,
+            anytime.grow,
             anytime.pseudo_outcomes,
-            anytime.running_center,
-            anytime.centered_paths,
-            anytime.centered_stream,
+            anytime.centers,
+            anytime.recentre,
+            anytime.deviations,
             rollout.metric_stream,
             rollout.metric_values,
             gate_b2,
         ],
         "B3": [
-            anytime.log_wealth,
+            anytime.grow,
             anytime.pseudo_outcomes,
-            anytime.running_center,
-            anytime.centered_paths,
-            anytime.centered_stream,
+            anytime.centers,
+            anytime.recentre,
+            anytime.deviations,
             gate_b3,
             esn_metric,
         ],
         "B4": [
-            anytime.log_wealth,
+            anytime.grow,
             anytime.pseudo_outcomes,
-            anytime.running_center,
-            anytime.centered_paths,
-            anytime.centered_stream,
+            anytime.centers,
+            anytime.recentre,
+            anytime.deviations,
             rollback_paths,
             gate_b4,
         ],
         "B5": [
-            scmle.data.ledger.budget.assign_experiment,
+            scmle.data.ledger.budget.enroll,
             scmle.data.ledger.budget.DecisionBudget,
             gate_b5,
         ],
-        "B6": [design.srm_log_bayes_factor, design.srm_p_value, gate_b6],
+        "B6": [design.srm_log_bayes_factor, design.mismatch, gate_b6],
         "B7": [
-            anytime.log_wealth,
+            anytime.grow,
             anytime.pseudo_outcomes,
-            anytime.running_center,
-            anytime.centered_paths,
-            anytime.centered_stream,
+            anytime.centers,
+            anytime.recentre,
+            anytime.deviations,
             peeking_paths,
             gate_b7,
         ],
         "B8": [
-            anytime.log_wealth,
+            anytime.grow,
             anytime.pseudo_outcomes,
-            anytime.running_center,
-            anytime.centered_paths,
-            anytime.centered_stream,
+            anytime.centers,
+            anytime.recentre,
+            anytime.deviations,
             anytime.confidence_bound,
             gate_b8,
         ],
         "B9": [
-            anytime.log_wealth,
+            anytime.grow,
             anytime.pseudo_outcomes,
-            anytime.running_center,
-            anytime.centered_paths,
-            anytime.centered_stream,
+            anytime.centers,
+            anytime.recentre,
+            anytime.deviations,
             rollback_paths,
             rollout.Rollout,
-            rollout.RollbackMonitor,
-            rollout_hook.RolloutHook,
-            lifecycle.Maintainer.defer_to_rollout,
+            rollout.Watchdog,
+            rollout_hook.Hook,
+            lifecycle.Maintainer.delegate,
             hook_bundle,
             hook_approval,
             hook_registry,

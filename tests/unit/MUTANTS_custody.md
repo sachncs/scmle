@@ -46,21 +46,21 @@ distinguish on the machine used, except where the reason says otherwise.
 | --- | --- | --- |
 | 4 | `encoding="utf-8"` becomes `None` or a missing argument | Equivalent on a UTF-8 locale. On Windows the locale encoding differs, so a test with non-ASCII content could kill it there; none was written |
 | 2 | `"utf-8"` becomes `"UTF-8"` | Same codec |
-| 8 | `strict=True` becomes `False`, `None` or is dropped in `zip` calls of `merkle.row_hashes` | The zipped sequences have equal length by construction (one value per column per row), so `strict` never raises |
+| 8 | `strict=True` becomes `False`, `None` or is dropped in `zip` calls of `merkle.fingerprints` | The zipped sequences have equal length by construction (one value per column per row), so `strict` never raises |
 | 4 | `kind="stable"` of `argsort` becomes `None`, `"STABLE"` or is dropped | `"STABLE"` is accepted by numpy; `None` selects an unstable sort that only differs for tied times in arrays too large to rely on insertion sort. Not killed: a test would need tied times in a large array and a seed-dependent outcome |
 | 11 | `dtype=int`/`float` argument becomes `None` or is dropped in `asarray`, `to_numpy`, `ones` | Inputs are already integer or float, so the default dtype gives the same values |
 | 4 | `in_c[...] = False` or `embargo[:] = False` becomes `= None` | Assigning `None` to a boolean array stores `False` |
-| 3 | default of `entry.get("mac", ...)` in `OpenLog.verify` | Any default fails the comparison with a real MAC |
+| 3 | default of `entry.get("mac", ...)` in `Journal.verify` | Any default fails the comparison with a real MAC |
 | 3 | `np.full(size, "all")` becomes `None`, `"ALL"`, `"XXallXX"` | The strata only need to be equal for all rows |
-| 2 | `n_minority` is not passed to `feasibility.assess`, or `minority_rows(None, ...)` | `assess` uses `n_minority` only when `max_half_width` is given, and `pipeline.assess` never passes it. Becomes testable when that argument is wired |
-| 2 | `SealedSet.open`: `claims_hash is not None or ledger_hash is not None`, and `... or True` | A partial or absent pair offers a digest that cannot match a committed set, and an uncommitted set ignores the offer, so outcomes are the same |
-| 1 | `rows == 0 and not in_c.any()` in `embargo_mask` | With `rows == 0` the convolution window has width 1 and flags only `C` rows, which are then removed: the mask is empty either way |
-| 1 | `<=` becomes `<` in `acf_embargo` | Differs only if an autocorrelation equals the band to the last bit |
+| 2 | `n_minority` is not passed to `feasibility.assess`, or `scarce(None, ...)` | `assess` uses `n_minority` only when `max_half_width` is given, and `pipeline.assess` never passes it. Becomes testable when that argument is wired |
+| 2 | `Locker.open`: `claims_hash is not None or ledger_hash is not None`, and `... or True` | A partial or absent pair offers a digest that cannot match a committed set, and an uncommitted set ignores the offer, so outcomes are the same |
+| 1 | `rows == 0 and not in_c.any()` in `quarantine` | With `rows == 0` the convolution window has width 1 and flags only `C` rows, which are then removed: the mask is empty either way |
+| 1 | `<=` becomes `<` in `acf` | Differs only if an autocorrelation equals the band to the last bit |
 | 1 | `int.from_bytes(digest[:4], "big")` loses `"big"` | Big-endian is the default since Python 3.11, the minimum supported version |
-| 2 | `-1` becomes `-2` as the "no position" or "no duplicate" marker in `restrict_folds` and `unit_labels` | Only negative-ness is tested |
-| 1 | `order = None` in `carve_confirmation` | Overwritten before use on the only path that reads it |
+| 2 | `-1` becomes `-2` as the "no position" or "no duplicate" marker in `restrict` and `unitize` | Only negative-ness is tested |
+| 1 | `order = None` in `divide` | Overwritten before use on the only path that reads it |
 | 2 | `process.wait(timeout=...)` becomes `None` or 11 | A timeout only matters if the vault hangs |
-| 5 | Loop conditions in `merkle_root` (`>= 1`, `/ 2`, `% 3`) and `unit_labels` (`==`) | Infinite loops: counted as timeouts |
+| 5 | Loop conditions in `merkle_root` (`>= 1`, `/ 2`, `% 3`) and `unitize` (`==`) | Infinite loops: counted as timeouts |
 
 ## Charter modules and attestations
 
@@ -79,7 +79,7 @@ Modules: `scmle/data/charter/{contracts,feasibility,rules,sealing}.py`,
 
 The 7 left are 5 `encoding=` mutants (`None`, `"UTF-8"`; same
 Windows caveat as above), 1 `)` that only moves a closing bracket in
-`write_charter`, and 1 missing `encoding` argument in
+`inscribe`, and 1 missing `encoding` argument in
 `attestations.load`; all are equivalent on a UTF-8 locale. The mutants
 that wrapped a message in extra characters survived the older tests because
 `pytest.raises(match=...)` accepts a substring; the new tests compare whole

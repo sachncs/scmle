@@ -21,7 +21,7 @@ CHOICES = (
 
 
 def grid(seed=0, size=18):
-    return multiverse.enumerate_grid(CHOICES, seed, size)
+    return multiverse.universe(CHOICES, seed, size)
 
 
 def data(rows=300, beta=0.6, seed=0, missing=0.1):
@@ -38,19 +38,17 @@ def spec_of(**values):
 
 def test_rank_effect_matches_scipy_spearman_and_the_ledger_statistic():
     x, y = data(seed=1, missing=0.0)
-    assert stability.rank_effect(x, y) == pytest.approx(
+    assert stability.rankcorr(x, y) == pytest.approx(
         stats.spearmanr(x, y).statistic
     )
-    assert stability.rank_effect(x, y) == pytest.approx(
+    assert stability.rankcorr(x, y) == pytest.approx(
         bivariate.spearman(x, y).effect
     )
 
 
 def test_rank_effect_is_nan_when_undefined():
-    assert math.isnan(
-        stability.rank_effect(numpy.arange(5.0), numpy.arange(5.0))
-    )
-    assert math.isnan(stability.rank_effect(numpy.ones(20), numpy.arange(20.0)))
+    assert math.isnan(stability.rankcorr(numpy.arange(5.0), numpy.arange(5.0)))
+    assert math.isnan(stability.rankcorr(numpy.ones(20), numpy.arange(20.0)))
 
 
 def test_each_specification_does_what_it_says():
@@ -103,7 +101,7 @@ def test_only_implemented_choices_and_options_are_run_and_the_rest_noted():
         contracts.Choice("outlier_rule", ("none", "robust_z"), "robust_z"),
         contracts.Choice("mnar_delta", ("0", "1"), "0"),
     )
-    kept, notes = stability.applicable_choices(declared)
+    kept, notes = stability.actionable(declared)
     assert [(k.name, k.options) for k in kept] == [("imputation", ("median",))]
     text = " ".join(notes)
     assert "encoding" in text and "mice" in text and "robust_z" in text
@@ -115,7 +113,7 @@ def test_a_strong_and_robust_effect_is_stable():
     result = stability.assess_finding("x", x, y, grid(), 0, bootstrap=60)
     assert result.status == stability.STABLE, result.reason
     assert result.check.decision is qualification.Decision.PASS
-    assert result.check.set_id is qualification.SetId.EXPLORATION
+    assert result.check.set_id is qualification.Subset.EXPLORATION
     assert result.check.interval[0] > 0.0
     assert result.headline == pytest.approx(
         next(
@@ -144,7 +142,7 @@ def test_a_fragile_finding_quarantines_only_when_the_detector_is_gating():
     rng = numpy.random.default_rng(4)
     x = rng.normal(size=300)
     y = rng.normal(size=300)
-    gate = certificates.GateStatus.GATING
+    gate = certificates.Authority.GATING
     result = stability.assess_finding(
         "x", x, y, grid(), 0, bootstrap=30, gate=gate
     )
@@ -154,7 +152,7 @@ def test_a_fragile_finding_quarantines_only_when_the_detector_is_gating():
 
 def test_a_flipped_sign_in_more_than_the_allowed_share_is_fragile_by_rule():
     def row(effect, low, high):
-        return stability.SpecEffect("h", {}, effect, low, high)
+        return stability.Variant("h", {}, effect, low, high)
 
     rule = stability.Thresholds(s_min=0.8, band=0.5, q_min=0.8)
     good = [row(0.5, 0.3, 0.7)] * 10
@@ -171,7 +169,7 @@ def test_a_flipped_sign_in_more_than_the_allowed_share_is_fragile_by_rule():
 
 def test_size_band_and_interval_share_each_fail_on_their_own():
     def row(effect, low, high):
-        return stability.SpecEffect("h", {}, effect, low, high)
+        return stability.Variant("h", {}, effect, low, high)
 
     rule = stability.Thresholds()
     drifted = [row(0.2, 0.1, 0.3)] * 10
@@ -183,14 +181,14 @@ def test_size_band_and_interval_share_each_fail_on_their_own():
 
 
 def test_too_few_specifications_cannot_be_evaluated():
-    row = stability.SpecEffect("h", {}, 0.5, 0.3, 0.7)
+    row = stability.Variant("h", {}, 0.5, 0.3, 0.7)
     assert stability.verdict([row] * 3, 0.5, stability.Thresholds())[0] == (
         stability.NOT_EVALUABLE
     )
     assert stability.verdict([row] * 9, None, stability.Thresholds())[0] == (
         stability.NOT_EVALUABLE
     )
-    single = multiverse.enumerate_grid((), 0)
+    single = multiverse.universe((), 0)
     x, y = data()
     result = stability.assess_finding("x", x, y, single, 0, bootstrap=10)
     assert result.status == stability.NOT_EVALUABLE and result.check is None
@@ -205,7 +203,7 @@ def test_the_rule_validates_its_thresholds():
 
 def test_the_same_seed_gives_the_same_verdict_and_a_cache_resumes_it():
     x, y = data(seed=5)
-    cache = multiverse.ResultCache()
+    cache = multiverse.Memo()
     first = stability.assess_finding(
         "x", x, y, grid(), 7, bootstrap=20, cache=cache
     )
@@ -244,10 +242,10 @@ def test_cluster_bootstrap_draws_whole_groups():
 
 def test_the_curve_test_separates_a_real_effect_from_noise():
     x, y = data(rows=300, beta=0.8, seed=7)
-    real = stability.curve_test(x, y, grid(), 0, "x", permutations=49)
+    real = stability.specify(x, y, grid(), 0, "x", permutations=49)
     assert real.p_median <= 0.05 and real.p_share <= 0.05
     rng = numpy.random.default_rng(8)
-    noise = stability.curve_test(
+    noise = stability.specify(
         rng.normal(size=300),
         rng.normal(size=300),
         grid(),
@@ -280,7 +278,7 @@ def test_stable_findings_under_a_permuted_target_stay_under_the_floor():
 
 def test_attribution_names_the_choice_that_moves_the_estimate():
     effects = [
-        stability.SpecEffect(f"s{k}", {"a": a, "b": b}, v, None, None)
+        stability.Variant(f"s{k}", {"a": a, "b": b}, v, None, None)
         for k, (a, b, v) in enumerate(
             [
                 ("p", "u", 0.1),
@@ -298,8 +296,8 @@ def test_attribution_names_the_choice_that_moves_the_estimate():
 
 
 def test_gate_status_needs_every_defect_type_current_and_passing():
-    assert stability.gate_status(None) is certificates.GateStatus.DESCRIPTIVE
+    assert stability.gate_status(None) is certificates.Authority.DESCRIPTIVE
     assert (
         stability.gate_status(certificates.Store())
-        is certificates.GateStatus.DESCRIPTIVE
+        is certificates.Authority.DESCRIPTIVE
     )

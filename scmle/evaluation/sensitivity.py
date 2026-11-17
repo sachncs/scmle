@@ -143,7 +143,7 @@ def reseeded(build: Callable[[], models.Estimator], seed: int) -> Any:
     return model
 
 
-def training_sensitivity(
+def variability(
     build: Callable[[], models.Estimator],
     features: pandas.DataFrame,
     target: pandas.Series,
@@ -192,7 +192,7 @@ def training_sensitivity(
     return summarise(by_seed), summarise(by_resample)
 
 
-def evaluation_sensitivity(
+def resplit(
     build: Callable[[], models.Estimator],
     features: pandas.DataFrame,
     target: pandas.Series,
@@ -258,7 +258,7 @@ def noisy(
     return result
 
 
-def performance_sensitivity(
+def jitter(
     model: Any,
     features: pandas.DataFrame,
     target: pandas.Series,
@@ -283,7 +283,7 @@ def performance_sensitivity(
     """
     generator = numpy.random.default_rng(seed)
 
-    def mean_score(level: float) -> float:
+    def collapse(level: float) -> float:
         """Averages the scores of the noise draws at one level."""
         draws = itertools.repeat(
             lambda: scorer(model, noisy(features, level, generator), target),
@@ -291,7 +291,7 @@ def performance_sensitivity(
         )
         return float(numpy.mean(list(map(operator.call, draws))))
 
-    curve = {level: mean_score(level) for level in levels}
+    curve = {level: collapse(level) for level in levels}
     slope = float(numpy.polyfit(list(curve), list(curve.values()), 1)[0])
     return curve, slope
 
@@ -307,7 +307,7 @@ def analyze(
     """Computes training, evaluation and performance sensitivity of a model.
 
     The noise curve is computed for a model fitted on the 70% training part of
-    the same split as `training_sensitivity`, scored on the held-out 30% with
+    the same split as `variability`, scored on the held-out 30% with
     the default noise levels and draws.
 
     Args:
@@ -326,12 +326,10 @@ def analyze(
     """
     if len(target) < MIN_ROWS:
         raise errors.InputError(f"sensitivity analysis needs {MIN_ROWS}+ rows")
-    by_seed, by_resample = training_sensitivity(
+    by_seed, by_resample = variability(
         build, features, target, scorer, repeats, seed
     )
-    by_split = evaluation_sensitivity(
-        build, features, target, scorer, repeats, seed
-    )
+    by_split = resplit(build, features, target, scorer, repeats, seed)
     train, test = cast(
         "tuple[numpy.ndarray, numpy.ndarray]",
         model_selection.train_test_split(
@@ -339,7 +337,7 @@ def analyze(
         ),
     )
     model = reseeded(build, seed).fit(features.iloc[train], target.iloc[train])
-    curve, slope = performance_sensitivity(
+    curve, slope = jitter(
         model, features.iloc[test], target.iloc[test], scorer, seed=seed
     )
     return Sensitivity(by_seed, by_resample, by_split, curve, slope)

@@ -46,7 +46,7 @@ NEGATIVE_CONTROL_KINDS = ("outcome", "exposure")
 BENCHMARKS = ("strongest_observed", "fixed")
 
 
-def covariates_of(assumptions: Iterable[str]) -> tuple[str, ...] | None:
+def adjusters(assumptions: Iterable[str]) -> tuple[str, ...] | None:
     """Extracts the covariates named by `unconfoundedness_given:...`.
 
     Only the first item that starts with the `unconfoundedness_given:`
@@ -85,7 +85,7 @@ def vet(item: str) -> None:
         return
     if item.startswith(UNCONFOUNDEDNESS_PREFIX):
         if (
-            covariates_of([item]) is None
+            adjusters([item]) is None
             or not item[len(UNCONFOUNDEDNESS_PREFIX) :].strip()
         ):
             raise errors.InputError(
@@ -100,7 +100,7 @@ def vet(item: str) -> None:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class NegativeControl:
+class Control:
     """A variable the treatment cannot affect that shares the confounding.
 
     Attributes:
@@ -174,7 +174,7 @@ class Subgroup:
                 a tuple, is empty, or contains a duplicate.
         """
         evidence.require_text(self.column, "column")
-        qualification.require_tuple(self.values, "values")
+        qualification.tupled(self.values, "values")
         if not self.values:
             raise errors.InputError("a subgroup needs at least one value")
         for value in self.values:
@@ -231,7 +231,7 @@ class Attestor:
         """
         evidence.require_text(self.name, "name")
         evidence.require_text(self.role, "role")
-        qualification.require_tuple(self.assumptions, "assumptions")
+        qualification.tupled(self.assumptions, "assumptions")
         if not self.assumptions:
             raise errors.InputError("an attestor needs at least one assumption")
         for item in self.assumptions:
@@ -380,7 +380,7 @@ class Question:
     dag: str | None = None
     assumptions: tuple[str, ...] = ()
     strategies: tuple[str, ...] = ()
-    negative_controls: tuple[NegativeControl, ...] = ()
+    negative_controls: tuple[Control, ...] = ()
     strata: tuple[str, ...] = ()
     sensitivity: Confounding | None = None
     trim: float = 0.0
@@ -416,7 +416,7 @@ class Question:
             "subgroups",
             "attestors",
         ):
-            qualification.require_tuple(getattr(self, name), name)
+            qualification.tupled(getattr(self, name), name)
         for item in self.assumptions:
             vet(item)
         self.check_repeats()
@@ -538,8 +538,7 @@ class Question:
             assumptions=tuple(record["assumptions"]),
             strategies=tuple(record["strategies"]),
             negative_controls=tuple(
-                NegativeControl.from_dict(c)
-                for c in record["negative_controls"]
+                Control.from_dict(c) for c in record["negative_controls"]
             ),
             strata=tuple(record["strata"]),
             sensitivity=(

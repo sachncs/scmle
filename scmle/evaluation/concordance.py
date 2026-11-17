@@ -11,7 +11,7 @@ from scmle.contracts import metrics
 MAX_CONCORDANCE_ROWS = 4000
 
 
-def concordance_index(
+def harrell(
     duration: numpy.ndarray, event: numpy.ndarray, risk: numpy.ndarray
 ) -> float:
     """Harrell's concordance index.
@@ -52,7 +52,7 @@ def concordance_index(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ConcordanceMetric(metrics.Metric):
+class Cindex(metrics.Metric):
     """Harrell's concordance index as a catalog metric.
 
     The scorer reads the event indicator from the frame the estimator was
@@ -85,7 +85,7 @@ class ConcordanceMetric(metrics.Metric):
             target: pandas.Series,
             sample_weight: Any = None,  # noqa: ARG001 -- scorer protocol passes sample_weight
         ) -> float:
-            return concordance_index(
+            return harrell(
                 numpy.asarray(target, dtype=float),
                 features[estimator.event_column].to_numpy(dtype=float),
                 numpy.asarray(estimator.predict(features), dtype=float),

@@ -41,7 +41,7 @@ def test_what_was_not_measured_is_listed():
 def test_the_package_counts_only_passing_current_gates():
     document = stored()
     passed = {k for k, v in document["gates"].items() if v["passed"]}
-    assert certified.certified_gates() == passed
+    assert certified.certificated() == passed
     assert set(certified.NOT_MEASURED).isdisjoint(passed)
 
 
@@ -51,8 +51,8 @@ def test_a_changed_method_makes_its_gate_uncertified(tmp_path):
         entry["method_hash"] = "0" * 64
     path = tmp_path / "f10.json"
     path.write_text(json.dumps(document))
-    assert certified.certified_gates(path) == set()
-    assert certified.certified_gates(tmp_path / "missing.json") == set()
+    assert certified.certificated(path) == set()
+    assert certified.certificated(tmp_path / "missing.json") == set()
 
 
 def test_rate_and_floor_helpers():

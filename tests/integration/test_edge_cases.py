@@ -23,7 +23,7 @@ def run(frame, tmp_path, target="y", **kwargs):
     ).run()
 
 
-def check_inference(result, frame, target="y"):
+def infer(result, frame, target="y"):
     features = frame.drop(columns=[target])
     predictions = result.predict(features)
     assert len(predictions) == len(features)
@@ -33,12 +33,12 @@ def check_inference(result, frame, target="y"):
 def test_tiny_dataset(tmp_path):
     frame = base(60)
     result = run(frame, tmp_path, folds=3)
-    check_inference(result, frame)
+    infer(result, frame)
 
 
 def test_single_feature(tmp_path):
     frame = base()[["a", "y"]]
-    check_inference(run(frame, tmp_path), frame)
+    infer(run(frame, tmp_path), frame)
 
 
 def test_all_missing_and_constant_columns_are_dropped(tmp_path):
@@ -46,7 +46,7 @@ def test_all_missing_and_constant_columns_are_dropped(tmp_path):
     result = run(frame, tmp_path)
     dropped = result.profile.feature_plan.dropped
     assert dropped["empty"] == "missing >95%" and dropped["same"] == "constant"
-    check_inference(result, frame)
+    infer(result, frame)
 
 
 def test_unicode_and_spaced_column_names(tmp_path):
@@ -55,7 +55,7 @@ def test_unicode_and_spaced_column_names(tmp_path):
     )
     result = run(frame, tmp_path)
     assert "año de ingreso" in result.bundle.features
-    check_inference(result, frame)
+    infer(result, frame)
 
 
 def test_boolean_target_and_features(tmp_path):
@@ -75,13 +75,13 @@ def test_pandas_nullable_and_string_dtypes(tmp_path):
     )
     frame["ok"] = pandas.array(frame.b > 0, dtype="boolean")
     result = run(frame, tmp_path)
-    check_inference(result, frame)
+    infer(result, frame)
 
 
 def test_categorical_dtype_column(tmp_path):
     frame = base()
     frame["segment"] = pandas.Categorical(numpy.where(frame.a > 0, "hi", "lo"))
-    check_inference(run(frame, tmp_path), frame)
+    infer(run(frame, tmp_path), frame)
 
 
 def test_very_high_cardinality_categorical(tmp_path):
@@ -89,7 +89,7 @@ def test_very_high_cardinality_categorical(tmp_path):
     frame = base(400)
     frame["code"] = rng.choice([f"c{i}" for i in range(150)], 400)
     result = run(frame, tmp_path)
-    check_inference(result, frame)
+    infer(result, frame)
 
 
 def test_infinite_values_are_treated_as_missing(tmp_path):
@@ -97,7 +97,7 @@ def test_infinite_values_are_treated_as_missing(tmp_path):
     frame.loc[::17, "a"] = numpy.inf
     frame.loc[::23, "b"] = -numpy.inf
     result = run(frame, tmp_path)
-    check_inference(result, frame)
+    infer(result, frame)
     notes = [q for q in result.profile.quality_findings if "infinite" in q]
     assert len(notes) == 2 and "treated as missing" in notes[0]
     assert numpy.isfinite(result.predict_proba(frame.drop(columns="y"))).all()
@@ -117,7 +117,7 @@ def test_wide_dataset_with_few_rows(tmp_path):
     )
     frame["y"] = (frame.f0 + frame.f1 > 0).astype(int)
     result = run(frame, tmp_path)
-    check_inference(result, frame)
+    infer(result, frame)
 
 
 def test_datetime_feature_becomes_date_parts_and_inference_needs_the_raw_column(
@@ -130,7 +130,7 @@ def test_datetime_feature_becomes_date_parts_and_inference_needs_the_raw_column(
     plan = result.profile.feature_plan
     assert "when" in plan.extra_inputs
     assert {"when__month", "when__dayofweek"} <= set(plan.numeric)
-    check_inference(result, frame)
+    infer(result, frame)
 
 
 def test_rare_class_is_blocked_or_reduced_clearly(tmp_path):
@@ -147,7 +147,7 @@ def test_rare_class_is_blocked_or_reduced_clearly(tmp_path):
     if blocked is not None:
         assert "class" in str(blocked)
     else:
-        check_inference(result, frame)
+        infer(result, frame)
 
 
 def test_regression_with_outliers_and_nans(tmp_path):
@@ -156,12 +156,12 @@ def test_regression_with_outliers_and_nans(tmp_path):
     frame.loc[::31, "y"] = 1e6
     frame.loc[::13, "b"] = numpy.nan
     result = run(frame, tmp_path, task="regression")
-    check_inference(result, frame)
+    infer(result, frame)
 
 
 def test_numeric_strings_in_object_columns(tmp_path):
     frame = base().assign(code=lambda f: (f.index % 5).astype(str))
-    check_inference(run(frame, tmp_path), frame)
+    infer(run(frame, tmp_path), frame)
 
 
 def test_target_named_like_a_feature_prefix(tmp_path):
@@ -171,7 +171,7 @@ def test_target_named_like_a_feature_prefix(tmp_path):
         .assign(outcome_date_id=lambda f: f.index)
     )
     result = run(frame, tmp_path, target="outcome")
-    check_inference(result, frame, "outcome")
+    infer(result, frame, "outcome")
 
 
 def test_shuffled_columns_at_inference(tmp_path):
@@ -186,7 +186,7 @@ def test_shuffled_columns_at_inference(tmp_path):
 def test_dataset_with_index_not_starting_at_zero(tmp_path):
     frame = base()
     frame.index = frame.index + 1000
-    check_inference(run(frame, tmp_path), frame)
+    infer(run(frame, tmp_path), frame)
 
 
 def test_degenerate_targets_block_the_run_with_a_clear_reason(tmp_path):

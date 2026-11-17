@@ -63,9 +63,7 @@ ORDINAL_RIDGE = Ordinal(
         ORDINAL, needs_scaling=True, cost=2, probabilities=True
     ),
     regressor=linear_model.Ridge,
-    search_space=search.SearchSpace(
-        (search.FloatParameter("alpha", 1e-3, 100.0, log=True),)
-    ),
+    search_space=search.Space((search.Real("alpha", 1e-3, 100.0, log=True),)),
 )
 
 ORDINAL_FOREST = Ordinal(
@@ -75,10 +73,10 @@ ORDINAL_FOREST = Ordinal(
         ORDINAL, cost=3, memory_factor=6.0, probabilities=True
     ),
     regressor=ensemble.RandomForestRegressor,
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.IntParameter("n_estimators", 50, 300),
-            search.IntParameter("min_samples_leaf", 1, 20, log=True),
+            search.Integer("n_estimators", 50, 300),
+            search.Integer("min_samples_leaf", 1, 20, log=True),
         )
     ),
 )
@@ -94,10 +92,10 @@ ORDINAL_BOOSTING = Ordinal(
         probabilities=True,
     ),
     regressor=ensemble.HistGradientBoostingRegressor,
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.FloatParameter("learning_rate", 0.02, 0.3, log=True),
-            search.IntParameter("max_leaf_nodes", 8, 64),
+            search.Real("learning_rate", 0.02, 0.3, log=True),
+            search.Integer("max_leaf_nodes", 8, 64),
         )
     ),
 )

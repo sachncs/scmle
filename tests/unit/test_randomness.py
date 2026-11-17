@@ -72,8 +72,8 @@ def test_component_names_are_hashed_stably_not_with_python_hash():
         first.tolist()
         == randomness.component_seed_sequence(1, "x").generate_state(2).tolist()
     )
-    assert randomness.name_words("x") == randomness.name_words("x")
-    assert randomness.name_words("x") != randomness.name_words("y")
+    assert randomness.derive("x") == randomness.derive("x")
+    assert randomness.derive("x") != randomness.derive("y")
 
 
 def test_seed_path_records_the_key():
@@ -114,7 +114,7 @@ for index, name in enumerate(("alpha", "beta", "gamma")):
             effect=float(rng.random()),
             n=100,
             decision=q.Decision.PASS,
-            set_id=q.SetId.EXPLORATION,
+            set_id=q.Subset.EXPLORATION,
             seed_path=randomness.seed_path(42, name, index),
             tier=q.Tier.UNVERIFIED,
         ).to_dict()

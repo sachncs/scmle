@@ -1,6 +1,6 @@
 """Stored fold models for CV+ intervals (regression).
 
-`conformal.cv_plus_bounds` needs the K models that were each fit without one
+`conformal.cvplus` needs the K models that were each fit without one
 held-out fold, the fold of every calibration row and the absolute error of
 that row under the model that did not see it. `CvPlusEnsemble` keeps exactly
 that, so a served bundle can answer with the CV+ interval of Barber, Candes,
@@ -8,14 +8,14 @@ Ramdas and Tibshirani (arXiv:1905.02928) instead of a margin pooled from
 scores of different refits.
 
 The rule needs every calibration row to be held out in exactly one fold.
-`partition_folds` checks it and returns the fold index of each row; with
+`holdouts` checks it and returns the fold index of each row; with
 overlapping held-out sets (repeated or expanding-window folds) it returns
 None and the caller keeps the pooled split-conformal margin. The size of the
 stored models is bounded by `MAX_BYTES` (a charter's `uncertainty` block may
 set another cap): a larger ensemble is not kept and the run says why, so a
 bundle does not grow by a factor of K without notice. From
 `MIN_ROWS_FOR_SPLIT` calibration rows the pooled out-of-fold scores alone are
-served and no model is kept (`plan_scores`).
+served and no model is kept (`strategize`).
 """
 
 from collections.abc import Sequence
@@ -34,7 +34,7 @@ MAX_BYTES = 200_000_000
 MIN_ROWS_FOR_SPLIT = 1000
 
 
-def partition_folds(
+def holdouts(
     held_out: Sequence[Sequence[int]], rows: int
 ) -> numpy.ndarray | None:
     """Fold index of each held-out row when no row is held out twice.
@@ -82,7 +82,7 @@ class Plan:
     reason: str | None
 
 
-def plan_scores(
+def strategize(
     held_out: Sequence[Sequence[int]],
     rows: int,
     observed: int,
@@ -111,7 +111,7 @@ def plan_scores(
         `observed`; `observed` at or above `MIN_ROWS_FOR_SPLIT`; models
         larger than `max_bytes`, checked in that order).
     """
-    folds = partition_folds(held_out, rows)
+    folds = holdouts(held_out, rows)
     reason = None
     if folds is None or len(folds) != observed:
         reason = "held-out folds overlap; no CV+ ensemble"
@@ -197,7 +197,7 @@ class CvPlusEnsemble:
             The lower and the upper limit, each with one value per row of
             `features`. A side is infinite where its rank falls outside
             the calibration rows. A coverage outside (0, 1) makes
-            `conformal.cv_plus_bounds` raise ValueError.
+            `conformal.cvplus` raise ValueError.
         """
         predictions = numpy.column_stack(
             [
@@ -205,6 +205,6 @@ class CvPlusEnsemble:
                 for m in self.models
             ]
         )
-        return conformal.cv_plus_bounds(
+        return conformal.cvplus(
             predictions, self.fold_of_row, self.residuals, coverage
         )

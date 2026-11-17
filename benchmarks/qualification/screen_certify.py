@@ -499,7 +499,7 @@ def uncertified(store: certificates.Store) -> list[str]:
         for kind in KINDS
         for defect in DEFECTS
         if store.status(screen.DETECTORS[kind], digest, defect)
-        is not certificates.GateStatus.GATING
+        is not certificates.Authority.GATING
     ]
 
 

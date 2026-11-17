@@ -23,7 +23,7 @@ LOWER_LEVEL = 0.05
 UPPER_LEVEL = 0.95
 
 
-def predicted_band(
+def corridor(
     lower_model: Any, upper_model: Any, features: pandas.DataFrame
 ) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Uncalibrated band with the lower edge never above the upper.
@@ -45,7 +45,7 @@ def predicted_band(
 
 
 @dataclasses.dataclass(frozen=True)
-class QuantileBand:
+class Band:
     """Out-of-fold misses of the quantile band.
 
     Attributes:
@@ -62,7 +62,7 @@ class QuantileBand:
         observed: Sequence[float],
         lower: Sequence[float],
         upper: Sequence[float],
-    ) -> "QuantileBand":
+    ) -> "Band":
         """Scores held-out rows against their predicted band.
 
         Args:
@@ -101,9 +101,7 @@ class QuantileBand:
             raise errors.InputError(
                 "coverage must lie strictly between 0 and 1"
             )
-        return conformal.finite_sample_quantile(
-            numpy.asarray(self.scores), coverage
-        )
+        return conformal.cutoff(numpy.asarray(self.scores), coverage)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -118,7 +116,7 @@ class QuantileIntervals:
 
     lower_model: Any
     upper_model: Any
-    band: QuantileBand
+    band: Band
 
     def interval(
         self, features: pandas.DataFrame, coverage: float
@@ -128,17 +126,17 @@ class QuantileIntervals:
         Args:
             features: Rows to predict for.
             coverage: Desired coverage, strictly between 0 and 1; an invalid
-                value is rejected by `QuantileBand.margin` with a
+                value is rejected by `Band.margin` with a
                 `ValueError`.
 
         Returns:
             The raw band widened by the margin on each side.
         """
-        low, high = self.raw_band(features)
+        low, high = self.native(features)
         margin = self.band.margin(coverage)
         return low - margin, high + margin
 
-    def coverage_curve(
+    def covering(
         self,
         features: pandas.DataFrame,
         target: Any,
@@ -169,7 +167,7 @@ class QuantileIntervals:
             )
         return curve
 
-    def raw_band(
+    def native(
         self, features: pandas.DataFrame
     ) -> tuple[numpy.ndarray, numpy.ndarray]:
         """The model band before calibration.
@@ -178,6 +176,6 @@ class QuantileIntervals:
             features: Rows to predict for.
 
         Returns:
-            The lower and upper edges from `predicted_band`.
+            The lower and upper edges from `corridor`.
         """
-        return predicted_band(self.lower_model, self.upper_model, features)
+        return corridor(self.lower_model, self.upper_model, features)

@@ -25,7 +25,7 @@
         "fixed_rule_rate": 1.0,
         "true_risk": 0.15000000000000002
       },
-      "code_hash": "83b6e480616b44e2121400c39535c780575ca1d443cd41525e08d603c6ccbb0c",
+      "code_hash": "3f8eb72a56ac35d0c6e667bfd42febfec465cdd1e9afa78c548242941614106a",
       "passed": true,
       "replicates": 2000,
       "seeds": [
@@ -59,7 +59,7 @@
           "within_d_max_lower": 0.9985032551048117
         }
       },
-      "code_hash": "8d0774da56ab00ec97b24e4facd163d78efc9f2753007b2122c66a4deb200b34",
+      "code_hash": "0e62d09bb214038785d9ec673a49c5e0717a0b41f43e610e8c4abec627b30cca",
       "coverage_after_halt": 0.0,
       "passed": false,
       "replicates": 2000,
@@ -95,7 +95,7 @@
           "within_d_max_lower": 0.9985032551048117
         }
       },
-      "code_hash": "3a474759d4d7e0823f4244ec3a7f3feb06e65102e6884a94745fa3ce2cfcbff3",
+      "code_hash": "096fa9b8567540d032fcbf65626b5ed638cc044097e0f28039d656f18da5e11b",
       "d_max": 50,
       "passed": false,
       "replicates": 2000,
@@ -105,7 +105,7 @@
       ]
     },
     "H3": {
-      "code_hash": "339a3a184f8658598b69ecb677b6f1252e4a0122fc834b98abf8a547a1b39c0d",
+      "code_hash": "e1e993d1d3c5b4c20815ea2311d083453349ef3c514352fd690d125072302b00",
       "passed": true,
       "psi_rule_flag_rate": 1.0,
       "replicates": 300,
@@ -124,7 +124,7 @@
       "bootstrap_fdr": 0.6136285926448561,
       "bootstrap_power": 1.0,
       "challengers": 200,
-      "code_hash": "76ca96b7746c1fed28929171788d4078beaccc9ff272385e401fa24bf1b0dba3",
+      "code_hash": "2fe66efe160178186157f94bfd80d0ae4e5efdaeb964d231c1fb94521c8068b2",
       "elond_fdr": 0.0,
       "elond_power": 1.0,
       "elond_se": 0.0,
@@ -156,7 +156,7 @@
           "worse_by": 0.1
         }
       },
-      "code_hash": "25c8f04bb85ff767913ec381a117a29aaa7134b012b8122407270882db0ea4d3",
+      "code_hash": "5cd49e3d0c531ad6998691b9b40aa271fc7459210e4748d0114d82affa9cdad6",
       "passed": true,
       "replicates": 2000,
       "seeds": [
@@ -165,7 +165,7 @@
       ]
     },
     "H6": {
-      "code_hash": "9b70fd4628786b1cf8f7a7bf75b1091afb7e6d50211560bc0fd36159bb7b90e7",
+      "code_hash": "8a63502fdd6c4fc617be5175b30a441da411fad7dbd58f82b938d00724c5ac8d",
       "cs_coverage_floor": 0.9122508278236462,
       "cs_time_uniform_coverage": 1.0,
       "mnar_without_audit_slice": {
@@ -197,7 +197,7 @@
       ]
     },
     "H8": {
-      "code_hash": "3cf67b42ffd4a63ac16216dc88b7636119e06566bfbb2020a8895204881725a8",
+      "code_hash": "f9477e4e39bc48147c0d254e7fa54fe9b6955ece0dce2d4dabb29aee36c708ea",
       "detection_rate": {
         "loop_bypass_0.05": 0.9,
         "loop_bypass_0.10": 0.98,
@@ -214,7 +214,7 @@
       "without_bypass_slice": "unverified"
     },
     "H9": {
-      "code_hash": "957206f32fe5f0bab54862bf2485c8fc86fa7fa2f3f1bec34d2ac78ad186e9dc",
+      "code_hash": "b9f211426ae9ee9abf8b61d76ed68b774513ac4397c61f39e37ed258b36e8ba9",
       "everything_escalates_rate": 0.008,
       "mean_coverage_at_tau": 0.6387600806451614,
       "naive_best_cut_violation_rate": 0.464,

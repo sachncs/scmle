@@ -88,7 +88,7 @@ def test_the_wrapper_hands_the_ranker_contiguous_query_sizes():
             ("model", Spy()),
         ]
     )
-    model = wrapper.QueryAwareEstimator(steps, "query").fit(shuffled, labels)
+    model = wrapper.Ranker(steps, "query").fit(shuffled, labels)
 
     assert sum(seen["group"]) == len(shuffled)
     assert sorted(seen["group"]) == [12] * 60
@@ -131,7 +131,7 @@ def test_precision_and_recall_at_k_count_hits_in_the_top():
     scores = numpy.array([5.0, 4.0, 3.0, 2.0, 1.0])
     queries = numpy.zeros(5)
 
-    assert ranking.precision_at(truth, scores, queries, cutoff=2) == 0.5
-    assert ranking.recall_at(truth, scores, queries, cutoff=3) == pytest.approx(
+    assert ranking.topk(truth, scores, queries, cutoff=2) == 0.5
+    assert ranking.recall(truth, scores, queries, cutoff=3) == pytest.approx(
         2 / 3
     )

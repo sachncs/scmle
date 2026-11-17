@@ -49,5 +49,5 @@ def test_the_field_in_an_older_format_is_refused(tmp_path):
 
 def test_a_format_six_charter_is_read_back(tmp_path):
     charter = make_charter(unit_of_prediction=contracts.KNOWN_ENTITY_FUTURE)
-    path = sealing.write_charter(tmp_path / "charter.json", charter, "k")
+    path = sealing.inscribe(tmp_path / "charter.json", charter, "k")
     assert sealing.read_verified(path, signing_key="k").charter == charter

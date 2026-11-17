@@ -92,8 +92,8 @@ def scenario_promotion(tmp_path):
         ),
     )
     stream, sequence = test_loop.paired([0.0, 0.12])
-    loop.register_challenger("null")
-    loop.register_challenger("better")
+    loop.enroll("null")
+    loop.enroll("better")
     test_loop.feed(
         loop,
         stream,
@@ -115,7 +115,7 @@ def scenario_rollback(tmp_path):
     sequence = streams.challenger_sequence([-0.1], 120, 100, 0.2, 1)
     stream = streams.simulate(test_loop.spec(batches=120, size=100, seed=1))
     object.__setattr__(stream, "loss", sequence.champion)
-    loop.watch_rollback("previous")
+    loop.surveil("previous")
     test_loop.feed(
         loop, stream, challengers={"previous": sequence.challengers[0]}
     )
@@ -221,7 +221,7 @@ def scenario_replies(tmp_path):
         outcomes.append(type(error).__name__)
     outcomes.append(loop.amend_policy(r_star=0.04))
     try:
-        loop.rewrite_ledger(lambda: None, {"op": "truncate"})
+        loop.rewrite(lambda: None, {"op": "truncate"})
     except Exception as error:  # noqa: BLE001 -- the golden record keeps the type name of whatever error is raised
         outcomes.append(type(error).__name__)
     test_loop.feed(
@@ -235,7 +235,7 @@ def scenario_wiring(tmp_path):
     stream = streams.feedback_stream(100, 100, gamma=0.8, bypass=0.3, seed=1)
     frame = pandas.DataFrame({"z": stream.next_z.reshape(-1)})
     flags = stream.bypass.reshape(-1)
-    check = loop.check_feedback(
+    check = loop.performativity(
         frame[flags].iloc[:300], frame[~flags].iloc[:300]
     )
     return record(loop, check)

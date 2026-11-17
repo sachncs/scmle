@@ -8,13 +8,13 @@ from scmle.governance import escalation
 
 
 def test_score_from_set_sizes_and_novelty():
-    score = escalation.set_size_score(
+    score = escalation.ambiguity(
         [1, 2, 4, 0, numpy.inf, numpy.nan, 1],
         [False, False, False, False, False, False, True],
     )
     assert score.tolist() == [1.0, 0.5, 0.25, 0.0, 0.0, 0.0, 0.0]
     with pytest.raises(ValueError):
-        escalation.set_size_score([1, 2], [True])
+        escalation.ambiguity([1, 2], [True])
 
 
 def test_binomial_p_value_is_the_exact_lower_tail():
@@ -25,10 +25,10 @@ def test_binomial_p_value_is_the_exact_lower_tail():
 
 def test_threshold_stops_at_the_first_non_rejection():
     data = streams.draw_calibration(2000, 0.05, seed=1)
-    result = escalation.select_threshold(
+    result = escalation.select(
         data["score"], data["loss"], r_star=0.05, delta=0.1
     )
-    assert not result.everything_escalates
+    assert not result.saturated
     rejected = [s for s in result.steps if s.rejected]
     assert result.tau == rejected[-1].tau
     assert result.risk <= 0.05 + 0.02
@@ -40,13 +40,8 @@ def test_validity_over_replicates_and_the_naive_cut_violates():
     wrong, naive_wrong = 0, 0
     for seed in range(replicates):
         data = streams.draw_calibration(2000, r_star, seed=seed)
-        result = escalation.select_threshold(
-            data["score"], data["loss"], r_star, delta
-        )
-        if (
-            not result.everything_escalates
-            and streams.oracle_risk(result.tau) > r_star
-        ):
+        result = escalation.select(data["score"], data["loss"], r_star, delta)
+        if not result.saturated and streams.oracle_risk(result.tau) > r_star:
             wrong += 1
         # naive: the loosest cut whose observed risk is at most r_star
         best = 1.0
@@ -63,15 +58,15 @@ def test_validity_over_replicates_and_the_naive_cut_violates():
 
 def test_too_few_cases_escalate_everything():
     data = streams.draw_calibration(20, 0.05, seed=2)
-    result = escalation.select_threshold(data["score"], data["loss"], 0.05, 0.1)
-    assert result.everything_escalates
+    result = escalation.select(data["score"], data["loss"], 0.05, 0.1)
+    assert result.saturated
     assert result.to_dict()["tau"] is None
 
 
 def test_weighted_selection_is_flagged_as_approximate():
     data = streams.draw_calibration(3000, 0.05, seed=3)
     weights = numpy.full(3000, 2.0)
-    result = escalation.select_threshold(
+    result = escalation.select(
         data["score"], data["loss"], 0.05, 0.1, weights=weights
     )
     assert result.weighted
@@ -80,15 +75,15 @@ def test_weighted_selection_is_flagged_as_approximate():
 def test_invalid_inputs_are_refused():
     ok = numpy.array([0.1, 0.9])
     with pytest.raises(ValueError, match="strictly between"):
-        escalation.select_threshold(ok, ok, 0.0, 0.1)
+        escalation.select(ok, ok, 0.0, 0.1)
     with pytest.raises(ValueError, match="aligned"):
-        escalation.select_threshold(ok, ok[:1], 0.05, 0.1)
+        escalation.select(ok, ok[:1], 0.05, 0.1)
     with pytest.raises(ValueError, match="within"):
-        escalation.select_threshold([2.0], [0.0], 0.05, 0.1)
+        escalation.select([2.0], [0.0], 0.05, 0.1)
     with pytest.raises(ValueError, match="decreasing"):
-        escalation.select_threshold(ok, ok, 0.05, 0.1, grid=[0.1, 0.9])
+        escalation.select(ok, ok, 0.05, 0.1, grid=[0.1, 0.9])
     with pytest.raises(ValueError, match="weights"):
-        escalation.select_threshold(ok, ok, 0.05, 0.1, weights=[1.0, -1.0])
+        escalation.select(ok, ok, 0.05, 0.1, weights=[1.0, -1.0])
 
 
 def test_risk_coverage_curve_and_area():
@@ -103,13 +98,13 @@ def test_risk_coverage_curve_and_area():
 def test_chow_check_reports_disagreement():
     confidence = numpy.linspace(0.5, 1.0, 1000)
     score = confidence
-    same = escalation.chow_check(confidence, score, 0.8, 1.0, 5.0)
+    same = escalation.adjudicate(confidence, score, 0.8, 1.0, 5.0)
     assert same.cut == pytest.approx(0.2)
     assert same.consistent and same.disagreement < 0.01
-    off = escalation.chow_check(confidence, score, 0.8, 1.0, 2.0)
+    off = escalation.adjudicate(confidence, score, 0.8, 1.0, 2.0)
     assert not off.consistent
     with pytest.raises(ValueError):
-        escalation.chow_check(confidence, score, 0.8, 0.0, 1.0)
+        escalation.adjudicate(confidence, score, 0.8, 0.0, 1.0)
 
 
 def test_route_escalates_low_scores_and_never_raises_tau():

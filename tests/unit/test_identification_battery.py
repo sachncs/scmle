@@ -8,8 +8,8 @@ from scmle.data.identification import battery
 
 def test_wald_tests_and_holm_rejections():
     tests = [
-        battery.wald_test("a", "negative_outcome", 0.1, 1.0),
-        battery.wald_test("b", "negative_exposure", 5.0, 1.0),
+        battery.wald("a", "negative_outcome", 0.1, 1.0),
+        battery.wald("b", "negative_exposure", 5.0, 1.0),
     ]
     report = battery.run_battery(tests, 0.05)
     assert report.rejected == ("b",) and not report.passed and report.ran
@@ -27,7 +27,7 @@ def test_the_false_alarm_rate_is_at_most_alpha():
     for seed in range(runs):
         draws = numpy.random.default_rng(seed).standard_normal(3)
         tests = [
-            battery.wald_test(f"t{i}", "placebo", float(d), 1.0)
+            battery.wald(f"t{i}", "placebo", float(d), 1.0)
             for i, d in enumerate(draws)
         ]
         flagged += not battery.run_battery(tests, alpha).passed
@@ -51,6 +51,6 @@ def test_bad_inputs_are_refused():
     with pytest.raises(ValueError, match="positive"):
         battery.replicate({"a": (1.0, 0.0), "b": (1.0, 0.1)}, 1.0)
     with pytest.raises(ValueError, match="positive standard error"):
-        battery.wald_test("x", "placebo", 1.0, 0.0)
+        battery.wald("x", "placebo", 1.0, 0.0)
     with pytest.raises(ValueError, match="alpha"):
         battery.run_battery([], 1.5)

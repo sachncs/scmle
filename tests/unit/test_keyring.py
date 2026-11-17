@@ -13,12 +13,12 @@ OBSERVED = "2026-10-21T01:00:00+00:00"
 
 def record(
     key_id: str = "release-2026-10",
-    state: keyring.KeyState = keyring.KeyState.ACTIVE,
+    state: keyring.State = keyring.State.ACTIVE,
     created_at: str = CREATED,
     **kwargs: str,
-) -> keyring.SigningKeyRecord:
+) -> keyring.Credential:
     """Build representative key metadata."""
-    return keyring.SigningKeyRecord(
+    return keyring.Credential(
         key_id=key_id,
         owner="release-engineering",
         created_at=created_at,
@@ -29,7 +29,7 @@ def record(
 
 def test_active_key_signs_and_verifies_without_persisting_secret():
     """The registry binds identity while secret custody stays external."""
-    registry = keyring.SigningKeyRegistry((record(),))
+    registry = keyring.Keyring((record(),))
     payload = {"release": "candidate-1", "digest": "abc"}
     envelope = registry.sign(payload, "release-2026-10", "secret", OBSERVED)
 
@@ -45,7 +45,7 @@ def test_active_key_signs_and_verifies_without_persisting_secret():
 
 def test_retirement_stops_signing_but_allows_explicit_historical_verification():
     """Rotation preserves old evidence without permitting new signatures."""
-    registry = keyring.SigningKeyRegistry((record(), record("release-2026-11")))
+    registry = keyring.Keyring((record(), record("release-2026-11")))
     payload = {"release": "candidate-1"}
     envelope = registry.sign(
         payload,
@@ -79,7 +79,7 @@ def test_retirement_stops_signing_but_allows_explicit_historical_verification():
 
 def test_revocation_invalidates_even_historical_signatures():
     """Compromise response is immediate and cannot be bypassed."""
-    registry = keyring.SigningKeyRegistry((record(),))
+    registry = keyring.Keyring((record(),))
     payload = {"release": "candidate-1"}
     envelope = registry.sign(payload, "release-2026-10", "secret", OBSERVED)
     registry.revoke("release-2026-10", ROTATED, "credential compromise")
@@ -96,7 +96,7 @@ def test_revocation_invalidates_even_historical_signatures():
 def test_expired_key_can_only_verify_pre_expiry_historical_evidence():
     """Expiry blocks current acceptance while preserving explicit history."""
     expires = "2026-10-21T00:30:00+00:00"
-    registry = keyring.SigningKeyRegistry((record(expires_at=expires),))
+    registry = keyring.Keyring((record(expires_at=expires),))
     payload = {"release": "candidate-1"}
     envelope = registry.sign(
         payload,
@@ -124,10 +124,10 @@ def test_expired_key_can_only_verify_pre_expiry_historical_evidence():
 
 def test_registry_round_trip_is_deterministic_and_atomic(tmp_path):
     """The persisted registry contains only reviewable public metadata."""
-    registry = keyring.SigningKeyRegistry((record(),))
+    registry = keyring.Keyring((record(),))
     path = tmp_path / "signing-keys.json"
     registry.write(path)
-    restored = keyring.SigningKeyRegistry.read(path)
+    restored = keyring.Keyring.read(path)
 
     assert restored.to_json() == registry.to_json()
     assert restored.get("release-2026-10") == record()
@@ -139,7 +139,7 @@ def test_key_metadata_rejects_naive_or_invalid_transitions():
     with pytest.raises(ValueError, match="timezone"):
         record(created_at="2026-10-20T00:00:00")
     with pytest.raises(ValueError, match="state_changed_at"):
-        record(state=keyring.KeyState.REVOKED)
+        record(state=keyring.State.REVOKED)
     with pytest.raises(ValueError, match="after created_at"):
         record(expires_at=CREATED)
 
@@ -147,14 +147,14 @@ def test_key_metadata_rejects_naive_or_invalid_transitions():
 def test_signature_envelope_rejects_tampering_and_wrong_algorithm():
     """Envelope parsing fails before cryptographic verification."""
     with pytest.raises(ValueError, match="unsupported signature algorithm"):
-        keyring.SignatureEnvelope(
+        keyring.Wrapper(
             key_id="release-2026-10",
             signed_at=OBSERVED,
             value="signature",
             algorithm="none",
         )
     with pytest.raises(ValueError, match="key_id"):
-        keyring.SignatureEnvelope(
+        keyring.Wrapper(
             key_id="",
             signed_at=OBSERVED,
             value="signature",
@@ -171,7 +171,7 @@ def test_timestamp_parser_accepts_zulu_and_offset_forms():
 
 def test_a_retired_key_found_compromised_can_still_be_revoked():
     """Retirement keeps historical proof alive, so revocation must stay open."""
-    registry = keyring.SigningKeyRegistry((record(),))
+    registry = keyring.Keyring((record(),))
     payload = {"release": "candidate-1"}
     envelope = registry.sign(
         payload, "release-2026-10", "secret", "2026-10-20T12:00:00+00:00"

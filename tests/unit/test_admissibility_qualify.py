@@ -46,7 +46,7 @@ def test_an_unreadable_store_is_descriptive_and_says_so(tmp_path):
 
 def test_the_shipped_stores_are_found_from_a_checkout():
     assert qualify.load_store(qualify.F5_STORE).store is not None
-    assert screen.shipped_store() is not None
+    assert screen.bundled() is not None
 
 
 def test_without_detector_certificates_only_the_screen_gates(tmp_path):
@@ -63,13 +63,13 @@ def test_without_detector_certificates_only_the_screen_gates(tmp_path):
         directory=tmp_path,
     )
 
-    assert found.leakage_gate is certificates.GateStatus.GATING
+    assert found.leakage_gate is certificates.Authority.GATING
     assert "copy" in found.suspects
     assert "copy" in found.quarantined
     assert found.f5_store is None
     assert any("detectors are descriptive" in note for note in found.notes)
     assert all(
-        s is certificates.GateStatus.DESCRIPTIVE
+        s is certificates.Authority.DESCRIPTIVE
         for by_defect in found.detectors.status.values()
         for s in by_defect.values()
     )
@@ -103,7 +103,7 @@ def test_a_certified_suspect_is_quarantined_and_ledgered():
         features, target, kind="predictive", classification=True, seed=0
     )
 
-    assert found.leakage_gate is certificates.GateStatus.GATING
+    assert found.leakage_gate is certificates.Authority.GATING
     assert set(found.quarantined) == {"copy"}
     assert "leakage suspicion" in found.quarantined["copy"]
     sources = {source for source, check in found.checks}
@@ -124,8 +124,8 @@ def test_a_suspect_without_a_gate_only_warns():
         frame, "y", "classification", screen.leakage.CERTIFIED
     )
     (finding,) = [f for f in report.suspects if f.feature == "copy"]
-    assert finding.gate is certificates.GateStatus.DESCRIPTIVE
-    check = qualify.finding_check(finding, report.rows, 0, 0)
+    assert finding.gate is certificates.Authority.DESCRIPTIVE
+    check = qualify.screened(finding, report.rows, 0, 0)
     assert check.decision is qualification.Decision.WARN
 
 
@@ -140,7 +140,7 @@ def test_a_regression_leak_is_gated_and_quarantined():
         features, target, kind="predictive", classification=False, seed=0
     )
 
-    assert found.leakage_gate is certificates.GateStatus.GATING
+    assert found.leakage_gate is certificates.Authority.GATING
     assert "copy" in found.quarantined
 
 
@@ -293,7 +293,7 @@ def make_ledger(path=None):
     return scmle.data.ledger.ledger.Ledger.create(
         path,
         charter_hash=charter.charter_hash,
-        config=online_fdr.RuleConfig(
+        config=online_fdr.Settings(
             online_fdr.ELOND, charter.error_budget.exploration.initial
         ),
         alpha_confirm=charter.error_budget.confirmation.alpha_confirm,
@@ -301,7 +301,7 @@ def make_ledger(path=None):
     )
 
 
-def sample_check(set_id=qualification.SetId.EXPLORATION):
+def sample_check(set_id=qualification.Subset.EXPLORATION):
     return qualification.Check(
         check_id="leakage.skill:copy",
         null_hypothesis="no skill",
@@ -342,7 +342,7 @@ def test_a_diagnostic_cannot_follow_the_freeze():
 
 def test_a_diagnostic_that_read_c_is_refused():
     ledger = make_ledger()
-    check = sample_check(qualification.SetId.CONFIRMATION)
+    check = sample_check(qualification.Subset.CONFIRMATION)
 
     with pytest.raises(
         scmle.data.ledger.ledger.LedgerError, match="exploration"

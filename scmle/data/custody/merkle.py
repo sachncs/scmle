@@ -86,7 +86,7 @@ def row_hash(row_id: int, cells: Sequence[tuple[str, Any]]) -> str:
     return hashlib.sha256(LEAF + text.encode("utf-8")).hexdigest()
 
 
-def row_hashes(frame: pandas.DataFrame, ids: Sequence[int]) -> list[str]:
+def fingerprints(frame: pandas.DataFrame, ids: Sequence[int]) -> list[str]:
     """Hashes the rows of a frame at the given positions.
 
     Args:
@@ -144,7 +144,7 @@ def merkle_root(leaves: Sequence[str]) -> str:
     return level[0]
 
 
-def frame_root(frame: pandas.DataFrame, ids: Sequence[int]) -> str:
+def merkleize(frame: pandas.DataFrame, ids: Sequence[int]) -> str:
     """Computes the Merkle root over the content of selected rows.
 
     Args:
@@ -154,4 +154,4 @@ def frame_root(frame: pandas.DataFrame, ids: Sequence[int]) -> str:
     Returns:
         The root hex digest of the rows in ascending id order.
     """
-    return merkle_root(row_hashes(frame, ids))
+    return merkle_root(fingerprints(frame, ids))

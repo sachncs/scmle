@@ -167,7 +167,7 @@ def test_a_transform_that_keeps_failing_stops_at_that_object(store, after_two):
 PERMANENT = {
     "store_error": lambda: objectstore.StoreError("denied"),
     "corrupt_object": lambda: objectstore.CorruptObjectError("torn read"),
-    "not_found": lambda: objectstore.NotFoundError("vanished"),
+    "not_found": lambda: objectstore.AbsentError("vanished"),
     "framework_error": lambda: errors.DataError("bad bytes"),
 }
 
@@ -268,7 +268,7 @@ def test_a_lock_release_that_fails_past_budget_leaves_finished_work_intact(
     assert failpoints.files_of(store) == reference.files
     assert store.get(failpoints.STATE_KEY)[0] == reference.checkpoint
     assert store.exists(failpoints.LOCK_KEY)
-    with pytest.raises(processing.ConcurrentRunError):
+    with pytest.raises(processing.LockError):
         failpoints.processor(store).run()
     failpoints.processor(store).break_lock()
     again = failpoints.processor(store).run()
@@ -312,7 +312,7 @@ def test_an_unusable_input_stops_at_it_and_leaves_the_checkpoint_alone(
     except Exception as error:  # noqa: BLE001 -- any stop is acceptable; the test checks which one and that the checkpoint survives
         failure = error
     if failure is not None:
-        assert not isinstance(failure, processing.CheckpointCorruptError)
+        assert not isinstance(failure, processing.CorruptError)
         stopped_by = type(failure).__name__
     else:
         assert result.failed == "input/o2-bad.csv"

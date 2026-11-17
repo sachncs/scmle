@@ -43,7 +43,7 @@ class Criterion:
 def check(
     criteria: dict[str, float],
     test_metrics: dict[str, float],
-    catalog: metrics.MetricCatalog = metrics.CATALOG,
+    catalog: metrics.Repertoire = metrics.CATALOG,
 ) -> list[Criterion]:
     """Compares each criterion with the achieved score.
 

@@ -164,7 +164,7 @@ def statuses(rows, log):
     joined = asof.point_in_time(
         rows, log, "key", "moment", "written_at", "value"
     )
-    return asof.classify_rows(rows["stored"], joined)
+    return asof.classify(rows["stored"], joined)
 
 
 @pytest.mark.parametrize("seed", range(8))
@@ -174,7 +174,7 @@ def test_planted_overwrites_are_recovered_exactly(seed):
     chosen = rng.choice(60, size=9, replace=False)
     planted = rows.copy()
     planted.loc[chosen, "stored"] = values[chosen, 2] + 1.0  # later, new value
-    flagged = asof.reconstruction_mismatch(
+    flagged = asof.disagree(
         planted, log, "key", "moment", "stored", "written_at", "value"
     )
     assert set(numpy.flatnonzero(flagged)) == set(chosen)

@@ -205,9 +205,7 @@ def claim_p(seed: int, clusters: int, se_a: float, fp_a: float) -> float:
     """
     y, a, b, group = world(seed, clusters, se_a, fp_a)
     return max(
-        baseline.cluster_test(
-            baseline.paired_difference(y, a, b, t), group
-        ).p_value
+        baseline.ttest(baseline.advantage(y, a, b, t), group).p_value
         for t in RANGE
     )
 
@@ -278,7 +276,7 @@ def closed_form_power(se_a: float, fp_a: float, clusters: int) -> float:
     y, a, b, group = world(DEV_SEED_BASE, 4000, se_a, fp_a)
     worst = 1.0
     for t in RANGE:
-        d = baseline.paired_difference(y, a, b, t)
+        d = baseline.advantage(y, a, b, t)
         rho, m = feasibility.intraclass(d, group)
         deff = 1 + (m - 1) * rho
         n = clusters * CLUSTER_SIZE
@@ -431,7 +429,7 @@ def feasibility_run(seed: int, ratio: float) -> tuple[str, str]:
     """
     se_a, fp_a = 0.85, 0.12
     big = world(DEV_SEED_BASE, 4000, se_a, fp_a)
-    d_big = baseline.paired_difference(*big[:3], RANGE[0])
+    d_big = baseline.advantage(*big[:3], RANGE[0])
     rho, m = feasibility.intraclass(d_big, big[3])
     deff = 1 + (m - 1) * rho
     s_true = float(d_big.std(ddof=1))
@@ -441,7 +439,7 @@ def feasibility_run(seed: int, ratio: float) -> tuple[str, str]:
     )
     n_conf = round(ratio * required * deff)
     y, a, b, group = world(seed, FEASIBILITY_CLUSTERS, se_a, fp_a)
-    d = baseline.paired_difference(y, a, b, RANGE[0])
+    d = baseline.advantage(y, a, b, RANGE[0])
     got = feasibility.assess(
         d,
         group,
@@ -535,22 +533,22 @@ def omission_asks(seed: int, flips: bool, given: bool) -> bool:
         True if the draft contains a question about the cost threshold.
     """
     frame, pilot = omission_frame(seed, flips)
-    source = draft.SourceDescription(
+    source = draft.Offer(
         "warehouse://crm/accounts",
         tuple(frame.columns),
         primary_key=("customer_id",),
     )
     request = draft.Request("Predict churn for each customer.", source)
     model = (
-        costs.DecisionCostModel(
+        costs.Tariff(
             0.0,
             5.0,
             1.0,
             0.0,
             0.05,
             0.5,
-            (costs.CostSource.HUMAN,) * 4,
-            costs.CostSource.HUMAN,
+            (costs.Basis.HUMAN,) * 4,
+            costs.Basis.HUMAN,
         )
         if given
         else None

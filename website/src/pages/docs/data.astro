@@ -12,11 +12,11 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
     <div class="doc-card"><small>FILES</small><h3>Open tabular formats</h3><p>CSV, TSV, TAB, JSON records, JSONL / NDJSON, Parquet, Feather, Arrow, XLSX, and XLSM. Local-file resume checkpoints bind to the raw-byte SHA-256 and reject a changed snapshot.</p></div>
     <div class="doc-card"><small>IN MEMORY</small><h3>Table interchange</h3><p>pandas DataFrame, PyArrow Table, Polars DataFrame or LazyFrame, and Arrow stream protocol objects.</p></div>
     <div class="doc-card"><small>STREAMING</small><h3>Large inputs</h3><p>Chunked CSV and newline-delimited JSON can be profiled without loading every row into memory.</p></div>
-    <div class="doc-card"><small>INCREMENTAL</small><h3>Event semantics</h3><p>Event IDs, ordered checkpoints, watermarks, duplicate classification, late-data policy, atomic commit state, and an idempotent sink boundary are transport-neutral. <code>EventConsumer</code> stages broker acknowledgements durably after the sink commit and retries them after a restart. It does not claim distributed exactly-once delivery.</p></div>
-    <div class="doc-card"><small>WAREHOUSE</small><h3>Query engines</h3><p><code>WarehouseConnector</code> gives warehouse and lakehouse engines one bounded reader contract. Inject a schema callback and a paged batch callback; the connector owns query-bound identity, retries, row limits, schema validation, and resumable checkpoints without hiding a vendor SDK.</p></div>
-    <div class="doc-card"><small>EVENT STREAMS</small><h3>Bounded broker polling</h3><p><code>EventStreamSource</code> accepts a caller-owned poll callback for Kafka-, Pulsar-, Kinesis-, Pub/Sub-, Event Hubs-, NATS-, and Redpanda-style URI boundaries. Pair it with <code>EventConsumer</code> to bind a consumer group, retry reads, reject oversized batches, persist pending acknowledgements, and keep the broker SDK at the transport edge.</p></div>
+    <div class="doc-card"><small>INCREMENTAL</small><h3>Event semantics</h3><p>Event IDs, ordered checkpoints, watermarks, duplicate classification, late-data policy, atomic commit state, and an idempotent sink boundary are transport-neutral. <code>Ingestor</code> stages broker acknowledgements durably after the sink commit and retries them after a restart. It does not claim distributed exactly-once delivery.</p></div>
+    <div class="doc-card"><small>WAREHOUSE</small><h3>Query engines</h3><p><code>Lakehouse</code> gives warehouse and lakehouse engines one bounded reader contract. Inject a schema callback and a paged batch callback; the connector owns query-bound identity, retries, row limits, schema validation, and resumable checkpoints without hiding a vendor SDK.</p></div>
+    <div class="doc-card"><small>EVENT STREAMS</small><h3>Bounded broker polling</h3><p><code>Stream</code> accepts a caller-owned poll callback for Kafka-, Pulsar-, Kinesis-, Pub/Sub-, Event Hubs-, NATS-, and Redpanda-style URI boundaries. Pair it with <code>Ingestor</code> to bind a consumer group, retry reads, reject oversized batches, persist pending acknowledgements, and keep the broker SDK at the transport edge.</p></div>
     <div class="doc-card"><small>RANGE READS</small><h3>Bounded object scans</h3><p>Range-backed JSONL and NDJSON sources read only the requested byte windows and resume from byte checkpoints. Record-size limits, invalid JSON, and in-object schema changes fail with structured errors; arbitrary binary formats still require an explicit decoder or streaming adapter.</p></div>
-    <div class="doc-card"><small>OBJECT BYTES</small><h3>Bring a versioned decoder</h3><p><code>ObjectStoreConnector</code> accepts bounded bytes from any object store and a caller-owned decoder that returns a DataFrame. The decoder name and version become part of source identity, so checkpoints cannot mix decoding semantics.</p></div>
+    <div class="doc-card"><small>OBJECT BYTES</small><h3>Bring a versioned decoder</h3><p><code>Bucket</code> accepts bounded bytes from any object store and a caller-owned decoder that returns a DataFrame. The decoder name and version become part of source identity, so checkpoints cannot mix decoding semantics.</p></div>
     <div class="doc-card"><small>DOCUMENTS</small><h3>Curate before NLP</h3><p>Document collections preserve content hashes, page and section provenance, bounded language profiles, duplicate groups, label composition, and conflicting-label findings before a tokenizer or model is chosen.</p></div>
     <div class="doc-card"><small>EXTENSION</small><h3>Custom readers</h3><p>Register a <code>TableReader</code> when your source needs a domain-specific parser before it becomes a table.</p></div>
   </div>
@@ -58,9 +58,9 @@ print(verified.release_blockers)
 
   <h2>Consume an event stream safely</h2>
   <p>The consumer contract separates three responsibilities. The source polls a bounded batch. Your writer commits unseen events to the downstream sink with event IDs as idempotency keys. Your broker adapter acknowledges only after that commit is durable. If acknowledgement delivery fails, the ledger keeps a JSON sidecar and retries it before polling the next batch; the sink is not run again.</p>
-  <pre><code>{`source = EventStreamSource("kafka://cluster/orders", poll)
-ledger = IngestionLedger("state/orders.json", source.source_identity)
-consumer = EventConsumer(
+  <pre><code>{`source = Stream("kafka://cluster/orders", poll)
+ledger = Ledger("state/orders.json", source.source_identity)
+consumer = Ingestor(
     source,
     ledger,
     consumer_group="orders-worker",
@@ -73,11 +73,11 @@ print(evidence.to_dict())`}</code></pre>
 
   <h2>Read a large local snapshot with a durable ledger</h2>
   <p>For CSV, JSONL, and Parquet files, <code>CommitLedger</code> binds each bounded batch to the raw snapshot digest, row offset, watermark column, and deterministic batch id. The sink receives that id as its idempotency key. A changed file, malformed state file, checkpoint from another source, or acknowledgement from another consumer group fails closed before the next commit.</p>
-  <p>When the sink can return a transport-owned receipt, use <code>TransactionalSink</code> and <code>commit_transaction()</code>. The ledger atomically stores the receipt with the matching acknowledgement and checkpoint evidence, and a matching retry after restart does not call the sink again. This is a local idempotency boundary; it is not a broker transaction or distributed exactly-once guarantee.</p>
+  <p>When the sink can return a transport-owned receipt, use <code>Sink</code> and <code>commit_transaction()</code>. The ledger atomically stores the receipt with the matching acknowledgement and checkpoint evidence, and a matching retry after restart does not call the sink again. This is a local idempotency boundary; it is not a broker transaction or distributed exactly-once guarantee.</p>
   <pre><code>{`from pathlib import Path
-from scmle.data.readers import Consumer, CommitLedger, source_for
+from scmle.data.readers import Consumer, CommitLedger, locate
 
-source = source_for(Path("events.csv"))
+source = locate(Path("events.csv"))
 ledger = CommitLedger(Path("state/events.json"), source)
 consumer = Consumer(
     ledger,
@@ -95,7 +95,7 @@ print(receipt.batch_id, receipt.duplicate, receipt.checkpoint.to_dict())`}</code
 
 import pandas as pd
 
-from scmle.data.readers import ObjectStoreConnector
+from scmle.data.readers import Bucket
 
 
 def decode_custom(uri: str, payload: bytes) -> pd.DataFrame:
@@ -103,7 +103,7 @@ def decode_custom(uri: str, payload: bytes) -> pd.DataFrame:
     return pd.read_json(BytesIO(payload), lines=True)
 
 
-connector = ObjectStoreConnector(
+connector = Bucket(
     "store://events/events.custom",
     read_bytes=object_store.read,
     decoder=decode_custom,
@@ -126,22 +126,22 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)`}</code></pre>
 }`}</code></pre>
 
   <h2>Bind non-tabular governance before modelling</h2>
-  <p>Non-tabular lifecycles accept a typed <code>ModalityManifest</code>. It binds the exact content hash and sample count to the modality, task, source ownership, transformation and label lineage, privacy policy, and curation findings. The lifecycle rejects a manifest that does not match the adapter before it starts training. For unlabeled or unsupervised snapshots, <code>Curator</code> persists the data-understanding evidence without entering modelling.</p>
-  <pre><code>{`from scmle.contracts.data import ModalityManifest, PrivacyMetadata, SourceMetadata
+  <p>Non-tabular lifecycles accept a typed <code>Passport</code>. It binds the exact content hash and sample count to the modality, task, source ownership, transformation and label lineage, privacy policy, and curation findings. The lifecycle rejects a manifest that does not match the adapter before it starts training. For unlabeled or unsupervised snapshots, <code>Curator</code> persists the data-understanding evidence without entering modelling.</p>
+  <pre><code>{`from scmle.contracts.data import Passport, Confidentiality, Origin
 
-manifest = ModalityManifest(
+manifest = Passport(
     dataset_id="documents-2026-10-21",
     snapshot_id="approved-export-17",
     modality="document",
     task="binary_classification",
     sample_count=len(dataset.samples),
     content_hash=dataset.content_hash,
-    source=SourceMetadata(
+    source=Origin(
         owner="records-team",
         acquisition_method="approved export",
         license="internal-use",
     ),
-    privacy=PrivacyMetadata(
+    privacy=Confidentiality(
         classification="restricted",
         contains_pii=True,
         consent_basis="employment-contract",
@@ -217,13 +217,13 @@ assert not video_split.has_future_leakage
   </div>
   <p class="meta">Hand-off rule · identity → curation → split → representation → model</p>
   <h2>Spatial split boundary</h2>
-  <p><code>Dataset.prepare_features()</code> emits CRS-preserving bounds, widths, heights, centroids, and coordinate counts for a deterministic numeric hand-off. <code>Dataset.split_spatial(block_size=...)</code> requires a block size in the dataset CRS units and assigns each feature to one spatial block using its geometry centroid. Blocks, not individual features, are assigned to train, validation, and test. This prevents the common mistake of evaluating on points immediately adjacent to training points.</p>
+  <p><code>Dataset.prepare_features()</code> emits CRS-preserving bounds, widths, heights, centroids, and coordinate counts for a deterministic numeric hand-off. <code>Dataset.tile(block_size=...)</code> requires a block size in the dataset CRS units and assigns each feature to one spatial block using its geometry centroid. Blocks, not individual features, are assigned to train, validation, and test. This prevents the common mistake of evaluating on points immediately adjacent to training points.</p>
   <p>Large polygons or lines that cross block boundaries need a domain-specific spatial join policy. <code>Dataset.spatial_join()</code> provides a bounded same-CRS evidence boundary for that policy: the caller supplies a versioned predicate, while the contract records both dataset hashes, CRS, comparison and match limits, matched feature IDs, and unmatched counts. When coordinates must change CRS, <code>Dataset.reproject()</code> accepts a caller-owned versioned transformer and verifies that feature ownership and metadata survive the transformation. Both operations fail closed on incompatible CRS or resource/identity violations. The core contract does not choose a geometry engine or pretend that centroid assignment solves every spatial leakage problem.</p>
   <h2>Audio feature boundary</h2>
   <p><code>Dataset.prepare_features()</code> produces a small, inspectable baseline matrix: amplitude mean and spread, RMS, peak level, clipping fraction, silence fraction, observed duration, PCM scale, and recorded metadata. It reads a bounded prefix and exposes <code>frames_observed</code> and <code>frames_truncated</code> beside the values. This makes resource limits and measurement scope visible in data evidence.</p>
   <p>The core implementation intentionally decodes WAV only. A sample accepted through an explicit FLAC, MP3, or other codec probe can be curated, but signal preparation stops until the caller supplies a versioned decoder adapter. There is no hidden resampling, speaker identification, transcript generation, spectrogram claim, or production audio model behind this API.</p>
   <h2>Video feature boundary</h2>
-  <p><code>Dataset.prepare_metadata_features()</code> produces numeric evidence from the probe output: duration, dimensions, pixel count, aspect ratio, frame count and rate, audio-track count, byte size, and bytes per frame. It never decodes or samples frames, so it cannot silently choose a temporal windowing policy or claim that container metadata represents visual content.</p>
+  <p><code>Dataset.numerize()</code> produces numeric evidence from the probe output: duration, dimensions, pixel count, aspect ratio, frame count and rate, audio-track count, byte size, and bytes per frame. It never decodes or samples frames, so it cannot silently choose a temporal windowing policy or claim that container metadata represents visual content.</p>
   <p>A caller-owned decoder can now provide bounded frame sampling with a pixel budget, sampled-frame provenance, and temporal frame-statistics occlusion evidence in the experimental lifecycle. If each clip has a timezone-aware <code>observation_time</code>, <code>Dataset.split_temporal(cutoff)</code> assigns clips at or before the UTC-normalized cutoff to training and later clips to future evaluation. Missing or mixed timestamps are surfaced by curation and rejected by the temporal split; the framework will not invent ordering from filenames or file modification times. Audio/video synchronization, raw saliency or motion attribution, reference serving, and production video modelling remain explicit extension work. The metadata, temporal boundary, and frame-statistics matrices are curation and baseline evidence, not a production video capability.</p>
   <h2>Image privacy boundary</h2>
   <p>Image samples preserve encoded bytes for lineage, so decoding pixels does not erase metadata risk. Ingestion records the EXIF tags observed in the source and normalizes sensitive tags such as GPS, artist, camera make/model, copyright, software, and original capture time. Curation emits <code>risk.image-sensitive-metadata</code> as a blocking finding; a reviewer must redact, approve, or otherwise document the disposition before training or distribution.</p>

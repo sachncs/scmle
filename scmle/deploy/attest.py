@@ -75,7 +75,7 @@ def statement(
     }
 
 
-def sign_statement(
+def envelope(
     body: Mapping[str, Any], signing_key: str | bytes | None
 ) -> dict[str, Any]:
     """Wraps a statement with its signature; unsigned without a key.
@@ -88,21 +88,21 @@ def sign_statement(
         A dict with the `statement`, the signature `algorithm` and the
         `signature`, which is None when no key could be resolved.
     """
-    key = signing.resolve_key(signing_key)
+    key = signing.keying(signing_key)
     return {
         "statement": dict(body),
         "algorithm": signing.SIGNATURE_ALGORITHM,
-        "signature": None if key is None else signing.sign_payload(body, key),
+        "signature": None if key is None else signing.mac(body, key),
     }
 
 
-def verify_document(
+def authenticate(
     document: Mapping[str, Any], signing_key: str | bytes | None
 ) -> tuple[dict[str, Any], bool]:
     """Checks a signed statement.
 
     Args:
-        document: A document produced by `sign_statement`.
+        document: A document produced by `envelope`.
         signing_key: Signing key, or None to resolve it from the environment.
 
     Returns:
@@ -124,10 +124,10 @@ def verify_document(
     if document.get("algorithm") != signing.SIGNATURE_ALGORITHM:
         raise errors.ArtifactError("unsupported attestation algorithm")
     recorded = document.get("signature")
-    key = signing.resolve_key(signing_key)
+    key = signing.keying(signing_key)
     if recorded is None or key is None:
         return body, False
-    expected = signing.sign_payload(body, key)
+    expected = signing.mac(body, key)
     if not isinstance(recorded, str) or not hmac.compare_digest(
         recorded, expected
     ):
@@ -138,7 +138,7 @@ def verify_document(
     return body, True
 
 
-def read_document(path: pathlib.Path) -> dict[str, Any]:
+def parse(path: pathlib.Path) -> dict[str, Any]:
     """Reads an attestation file.
 
     Args:
@@ -176,7 +176,7 @@ def write_document(path: pathlib.Path, document: Mapping[str, Any]) -> None:
     )
 
 
-def write_provenance(
+def stamp(
     folder: pathlib.Path,
     bundle_digest: str,
     builder: str,
@@ -219,14 +219,12 @@ def write_provenance(
             "materials": materials,
         },
     )
-    document = sign_statement(body, signing_key)
+    document = envelope(body, signing_key)
     write_document(folder / PROVENANCE_FILE, document)
     return document
 
 
-def material_problems(
-    folder: pathlib.Path, body: Mapping[str, Any]
-) -> list[str]:
+def discrepancies(folder: pathlib.Path, body: Mapping[str, Any]) -> list[str]:
     """Lists materials of a service statement that differ from the folder.
 
     Args:
@@ -249,7 +247,7 @@ def material_problems(
     return problems
 
 
-def write_image_attestation(
+def bind(
     folder: pathlib.Path,
     image_digest: str,
     base_image_lock: Mapping[str, str],
@@ -276,12 +274,12 @@ def write_image_attestation(
             "base_image": dict(base_image_lock),
         },
     )
-    document = sign_statement(body, signing_key)
+    document = envelope(body, signing_key)
     write_document(folder / IMAGE_ATTESTATION_FILE, document)
     return document
 
 
-def verify_image(
+def vouch(
     folder: pathlib.Path,
     image_digest: str,
     signing_key: str | bytes | None,
@@ -305,8 +303,8 @@ def verify_image(
             missing, the image digest differs, or the provenance file is not
             the one attested.
     """
-    body, signed = verify_document(
-        read_document(folder / IMAGE_ATTESTATION_FILE), signing_key
+    body, signed = authenticate(
+        parse(folder / IMAGE_ATTESTATION_FILE), signing_key
     )
     if require_signature and not signed:
         raise errors.ArtifactError("image attestation is not verified")
@@ -346,9 +344,7 @@ def main(arguments: list[str] | None = None) -> int:
         metadata = json.loads(options.metadata.read_text(encoding="utf-8"))
         digest = metadata["containerimage.digest"]
         lock = json.loads(options.lock.read_text(encoding="utf-8"))
-        document = write_image_attestation(
-            options.folder, digest, lock, signing.resolve_key(None)
-        )
+        document = bind(options.folder, digest, lock, signing.keying(None))
     except (OSError, KeyError, ValueError, errors.ScmleError) as error:
         # handled: error printed to stderr, exit code 1, documented
         print(f"error: {error}", file=sys.stderr)  # noqa: T201 -- command-line output

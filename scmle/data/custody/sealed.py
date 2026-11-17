@@ -4,7 +4,7 @@ Protection model. A sealed set lives in a separate operating-system
 process (`scmle.governance.vault`): after sealing, the orchestrator keeps only
 row ids and a release token, and the rows travel to the token holder once, over
 a channel keyed by a secret that only the parent and the vault hold. Code that
-is given only an `ExplorationView` has no reference to a sealed set, a vault
+is given only an `View` has no reference to a sealed set, a vault
 or a token, so it cannot open one by accident or by attribute access. This is
 tamper-evident custody on one machine, not adversary-proof: a process with the
 same operating-system privileges could still attach to the vault or read the
@@ -53,7 +53,7 @@ def binding_digest(claims_hash: str, ledger_hash: str) -> str:
     ).hexdigest()
 
 
-def entry_hash(body: Mapping[str, Any]) -> str:
+def hashed(body: Mapping[str, Any]) -> str:
     """Hashes the content of a log entry.
 
     Args:
@@ -65,7 +65,7 @@ def entry_hash(body: Mapping[str, Any]) -> str:
     return hashlib.sha256(signing.canonicalise(body)).hexdigest()
 
 
-def entry_mac(entry_hash_value: str, key: bytes) -> str:
+def authenticate(entry_hash_value: str, key: bytes) -> str:
     """Computes the HMAC-SHA256 of an entry's hash.
 
     Args:
@@ -78,7 +78,7 @@ def entry_mac(entry_hash_value: str, key: bytes) -> str:
     return hmac.new(key, entry_hash_value.encode(), hashlib.sha256).hexdigest()
 
 
-class OpenLog:
+class Journal:
     """Append-only, hash-chained record of custody events.
 
     Each entry stores the hash of the previous one, so editing, removing or
@@ -108,7 +108,7 @@ class OpenLog:
                 a WARNING says so (ERR-3).
         """
         self.path = Path(path) if path is not None else None
-        self.key = signing.resolve_key(signing_key)
+        self.key = signing.keying(signing_key)
         if self.key is None:
             LOGGER.warning(
                 "WARNING custody log %s is not signed: set %s to MAC it",
@@ -152,10 +152,10 @@ class OpenLog:
             "detail": dict(detail or {}),
             "prev": self.entries[-1]["hash"] if self.entries else GENESIS,
         }
-        digest = entry_hash(body)
+        digest = hashed(body)
         entry = {**body, "hash": digest}
         if self.key is not None:
-            entry["mac"] = entry_mac(digest, self.key)
+            entry["mac"] = authenticate(digest, self.key)
         self.entries.append(entry)
         if self.path is not None:
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -175,7 +175,7 @@ class OpenLog:
             if (
                 entry.get("seq") != index
                 or entry.get("prev") != previous
-                or entry.get("hash") != entry_hash(body)
+                or entry.get("hash") != hashed(body)
             ):
                 raise errors.ArtifactError(
                     f"custody log chain broken at entry {index}"
@@ -186,7 +186,7 @@ class OpenLog:
                     "given: it cannot be verified"
                 )
             if self.key is not None and not hmac.compare_digest(
-                str(entry.get("mac", "")), entry_mac(entry["hash"], self.key)
+                str(entry.get("mac", "")), authenticate(entry["hash"], self.key)
             ):
                 raise errors.ArtifactError(
                     f"custody log MAC invalid at entry {index}"
@@ -199,11 +199,11 @@ class OpenLog:
         return str(self.entries[-1]["hash"]) if self.entries else GENESIS
 
 
-class SealedSet:
+class Locker:
     """A named set behind a one-time, token-gated release, with a log."""
 
     def __init__(
-        self, set_id: str, locked: splitters.LockedTestSet, log: OpenLog
+        self, set_id: str, locked: splitters.Lockbox, log: Journal
     ) -> None:
         """Wraps a locked set and records that it was sealed.
 
@@ -314,7 +314,7 @@ class SealedSet:
 class Vault:
     """Holds every sealed set of a run and the shared custody log."""
 
-    def __init__(self, log: OpenLog, process: bool = True) -> None:
+    def __init__(self, log: Journal, process: bool = True) -> None:
         """Creates an empty vault.
 
         Args:
@@ -325,14 +325,14 @@ class Vault:
         """
         self.log = log
         self.process = process
-        self.sets: dict[str, SealedSet] = {}
+        self.sets: dict[str, Locker] = {}
 
     @property
     def level(self) -> str:
         """Isolation level this vault gives."""
         return VAULT_LEVEL if self.process else PROTOCOL_LEVEL
 
-    def adopt(self, set_id: str, locked: splitters.LockedTestSet) -> SealedSet:
+    def adopt(self, set_id: str, locked: splitters.Lockbox) -> Locker:
         """Registers an already-locked set under a name.
 
         Args:
@@ -347,7 +347,7 @@ class Vault:
         """
         if set_id in self.sets:
             raise errors.InputError(f"set {set_id} is already sealed")
-        held = SealedSet(set_id, locked, self.log)
+        held = Locker(set_id, locked, self.log)
         self.sets[set_id] = held
         return held
 
@@ -357,7 +357,7 @@ class Vault:
         features: pandas.DataFrame,
         target: pandas.Series,
         ids: tuple[int, ...],
-    ) -> SealedSet:
+    ) -> Locker:
         """Locks the rows as a named set behind the custody protocol.
 
         The rows are held by a vault process when `process` is True and by an
@@ -373,7 +373,7 @@ class Vault:
         Returns:
             The sealed set wrapping the locked rows.
         """
-        locked: splitters.LockedTestSet = (
+        locked: splitters.Lockbox = (
             vault.SealedTestSet(features, target, ids)
             if self.process
             else splitters.ResidentTestSet(features, target, ids)
@@ -387,7 +387,7 @@ class Vault:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ExplorationView:
+class View:
     """Everything exploration code may receive: `X` and nothing sealed.
 
     It holds no reference to a vault, a sealed set, a token or the log.

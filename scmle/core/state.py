@@ -40,7 +40,7 @@ ABORT_STATES = frozenset(
 TERMINAL_STATES = ABORT_STATES | {RunState.COMPLETED}
 
 
-class InvalidTransitionError(errors.ScmleError):
+class TransitionError(errors.ScmleError):
     """A state change violated the lifecycle order."""
 
     category = "state"
@@ -107,19 +107,19 @@ class Tracker:
             artifacts: Run-relative artifact paths relevant to the change.
 
         Raises:
-            InvalidTransitionError: If the machine is in a terminal state, or
+            TransitionError: If the machine is in a terminal state, or
                 `target` is neither the immediate successor of the current
                 state nor an abort state (an abort is allowed from any
                 non-terminal state).
         """
         if self.state in TERMINAL_STATES:
-            raise InvalidTransitionError(
+            raise TransitionError(
                 f"{self.state} is terminal; cannot go to {target}"
             )
         if target not in ABORT_STATES:
             expected = FORWARD_ORDER.index(self.state) + 1
             if FORWARD_ORDER.index(target) != expected:
-                raise InvalidTransitionError(
+                raise TransitionError(
                     f"{self.state} -> {target} is not a valid step"
                 )
         self.state = target

@@ -56,7 +56,7 @@ def test_the_constants_are_the_documented_ones():
 
 
 def test_the_prompt_lists_slots_columns_and_request_in_order():
-    assert refusal.prompt_for("Who leaves?", ["a", "b"]) == (
+    assert refusal.instruct("Who leaves?", ["a", "b"]) == (
         "Fill these charter slots as JSON: question, target, "
         "prediction_moment, unit, population, deployment_population, "
         "summary_measure. Columns: a, b. Request: Who leaves?"
@@ -65,7 +65,7 @@ def test_the_prompt_lists_slots_columns_and_request_in_order():
 
 def test_the_replay_sampler_copies_and_serves_by_index():
     original = [{"target": "x"}, {"target": "y"}]
-    sampler = refusal.ReplaySampler("model", original)
+    sampler = refusal.Replayer("model", original)
     original[0]["target"] = "changed"
     original.append({"target": "z"})
     assert sampler.model_id == "model"
@@ -113,19 +113,19 @@ def test_population_predicates_select_row_positions_for_each_operator():
         "  age>=30  ": {2, 3, 4},
     }
     for text, expected in cases.items():
-        assert refusal.population_ids(data, text) == frozenset(expected), text
-    assert isinstance(refusal.population_ids(data, "age == 30"), frozenset)
+        assert refusal.members(data, text) == frozenset(expected), text
+    assert isinstance(refusal.members(data, "age == 30"), frozenset)
 
 
 def test_population_predicates_join_with_and_and_reject_everything_else():
     data = frame()
-    assert refusal.population_ids(data, "age > 10 and region == 's'") == (
+    assert refusal.members(data, "age > 10 and region == 's'") == (
         frozenset({1, 4})
     )
-    assert refusal.population_ids(data, "age > 10  AND region == 's'") is None
-    assert refusal.population_ids(
-        data, "age > 10 and age < 40 and age != 20"
-    ) == (frozenset({2}))
+    assert refusal.members(data, "age > 10  AND region == 's'") is None
+    assert refusal.members(data, "age > 10 and age < 40 and age != 20") == (
+        frozenset({2})
+    )
     for bad in (
         "age > 10 and",
         "nope == 1",
@@ -135,22 +135,22 @@ def test_population_predicates_join_with_and_and_reject_everything_else():
         "region > 5",
         "age == 'x' and region == 'n'",
     ):
-        assert refusal.population_ids(data, bad) is None, bad
+        assert refusal.members(data, bad) is None, bad
 
 
 def test_empty_and_all_like_predicates_select_every_row():
     data = frame()
     everything = frozenset(range(5))
     for text in ("", None, "true", "TRUE", " All ", "all", False):
-        assert refusal.population_ids(data, text) == everything, text
-    assert refusal.population_ids(data.iloc[0:0], "") == frozenset()
+        assert refusal.members(data, text) == everything, text
+    assert refusal.members(data.iloc[0:0], "") == frozenset()
 
 
 def test_a_type_mismatch_in_an_ordering_is_invalid_not_an_error():
-    assert refusal.population_ids(frame(), "region < 5") is None
-    assert refusal.population_ids(frame(), "region <= 5") is None
-    assert refusal.population_ids(frame(), "region >= 5") is None
-    assert refusal.population_ids(frame(), "region > 5") is None
+    assert refusal.members(frame(), "region < 5") is None
+    assert refusal.members(frame(), "region <= 5") is None
+    assert refusal.members(frame(), "region >= 5") is None
+    assert refusal.members(frame(), "region > 5") is None
 
 
 def test_canonical_forms_by_slot():
@@ -300,21 +300,15 @@ def test_invalid_population_proposals_lower_the_agreement():
 
 
 def test_clopper_pearson_upper_edges_and_level():
-    assert refusal.clopper_pearson_upper(0, 0) == 1.0
-    assert refusal.clopper_pearson_upper(3, 3) == 1.0
-    assert refusal.clopper_pearson_upper(4, 3) == 1.0
-    assert refusal.clopper_pearson_upper(2, 3) < 1.0
-    assert refusal.clopper_pearson_upper(0, 1) == pytest.approx(0.95)
-    assert refusal.clopper_pearson_upper(1, 10) == pytest.approx(
-        0.3941, abs=1e-4
-    )
-    assert refusal.clopper_pearson_upper(1, 10, 0.9) == pytest.approx(
-        0.3368, abs=1e-4
-    )
-    assert refusal.clopper_pearson_upper(0, 59) == pytest.approx(
-        1 - 0.05 ** (1 / 59)
-    )
-    assert isinstance(refusal.clopper_pearson_upper(1, 10), float)
+    assert refusal.ceiling(0, 0) == 1.0
+    assert refusal.ceiling(3, 3) == 1.0
+    assert refusal.ceiling(4, 3) == 1.0
+    assert refusal.ceiling(2, 3) < 1.0
+    assert refusal.ceiling(0, 1) == pytest.approx(0.95)
+    assert refusal.ceiling(1, 10) == pytest.approx(0.3941, abs=1e-4)
+    assert refusal.ceiling(1, 10, 0.9) == pytest.approx(0.3368, abs=1e-4)
+    assert refusal.ceiling(0, 59) == pytest.approx(1 - 0.05 ** (1 / 59))
+    assert isinstance(refusal.ceiling(1, 10), float)
 
 
 def test_the_calibration_record_lists_its_curve_as_lists():

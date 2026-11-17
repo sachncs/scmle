@@ -51,7 +51,7 @@ class Outcome:
         return dataclasses.asdict(self)
 
 
-def confident_rows(
+def assured(
     fitted: Any, unlabeled: pandas.DataFrame, confidence: float
 ) -> tuple[pandas.DataFrame, pandas.Series]:
     """Selects the unlabeled rows the classifier labels confidently.
@@ -75,7 +75,7 @@ def confident_rows(
     )
 
 
-def augmented_fit(
+def selftrain(
     plain: Any,
     features: pandas.DataFrame,
     target: pandas.Series,
@@ -95,7 +95,7 @@ def augmented_fit(
         A fresh fit on labeled plus pseudo-labeled rows and the number of
         pseudo-labeled rows (`plain` itself when too few qualified).
     """
-    rows, labels = confident_rows(plain, unlabeled, confidence)
+    rows, labels = assured(plain, unlabeled, confidence)
     if len(rows) < MIN_PSEUDO_ROWS:
         return plain, 0
     both = pandas.concat([features, rows], ignore_index=True)
@@ -145,7 +145,7 @@ def judge(
         plain = cast("models.Estimator", base.clone(template)).fit(
             features.iloc[fit], target.iloc[fit]
         )
-        augmented, count = augmented_fit(
+        augmented, count = selftrain(
             plain,
             features.iloc[fit],
             target.iloc[fit],

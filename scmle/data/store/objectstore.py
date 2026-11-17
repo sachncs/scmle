@@ -8,7 +8,7 @@ the shared conformance suite in `tests/unit/test_object_store_conformance.py`.
 
 Delivery semantics: `put` replaces atomically (a reader sees the old or the
 new object, never a mix); `put(..., if_absent=True)` creates only if no
-object exists and otherwise raises `AlreadyExistsError`, which is the
+object exists and otherwise raises `ExistsError`, which is the
 building block for locks and for idempotent writers; `put(...,
 if_version=v)` and `delete(..., if_version=v)` act only if the object's
 current version is `v` and otherwise raise `ConflictError`, which is the
@@ -53,13 +53,13 @@ class StoreError(errors.DataError):
     category = "store"
 
 
-class NotFoundError(StoreError):
+class AbsentError(StoreError):
     """No object exists under the key."""
 
     category = "store_not_found"
 
 
-class AlreadyExistsError(StoreError):
+class ExistsError(StoreError):
     """An object already exists and the write was conditional."""
 
     category = "store_exists"
@@ -102,7 +102,7 @@ class ObjectMeta:
     version: str | None = None
 
 
-def sha256_of(data: bytes) -> str:
+def checksum(data: bytes) -> str:
     """Computes the SHA-256 of some bytes.
 
     Args:
@@ -146,7 +146,7 @@ def validate(key: str) -> str:
     return key
 
 
-def is_temporary(name: str) -> bool:
+def partial(name: str) -> bool:
     """Whether a file name is a half-written temp file, not an object.
 
     Both the exclusive-create path (``.put-*``) and
@@ -235,7 +235,7 @@ class ObjectStore(abc.ABC):
             The metadata of the stored object.
 
         Raises:
-            AlreadyExistsError: With `if_absent` and an existing object.
+            ExistsError: With `if_absent` and an existing object.
             ConflictError: With `if_version` and a missing object or another
                 version.
             TransientStoreError: On a retryable service failure.
@@ -252,7 +252,7 @@ class ObjectStore(abc.ABC):
             The content and the object's metadata.
 
         Raises:
-            NotFoundError: If there is no such object.
+            AbsentError: If there is no such object.
             CorruptObjectError: If the bytes do not match the recorded hash.
         """
 
@@ -267,7 +267,7 @@ class ObjectStore(abc.ABC):
             The object's metadata.
 
         Raises:
-            NotFoundError: If there is no such object.
+            AbsentError: If there is no such object.
         """
 
     @abc.abstractmethod
@@ -303,8 +303,8 @@ class ObjectStore(abc.ABC):
         """
         try:
             self.head(key)
-        except NotFoundError:
-            # handled: NotFoundError mapped to False, documented
+        except AbsentError:
+            # handled: AbsentError mapped to False, documented
             return False
         return True
 
@@ -316,7 +316,7 @@ RETRY_ATTEMPTS = 20
 EXISTS_ATTEMPTS = 6
 
 
-def refused_as_existing(error: OSError, path: pathlib.Path) -> bool:
+def occupied(error: OSError, path: pathlib.Path) -> bool:
     """Whether a failed exclusive link means the target is already taken.
 
     Args:
@@ -344,7 +344,7 @@ def refused_as_existing(error: OSError, path: pathlib.Path) -> bool:
     return False
 
 
-def unlink_tolerantly(path: pathlib.Path) -> None:
+def discard(path: pathlib.Path) -> None:
     """Removes a temp file, retrying while Windows still holds it open.
 
     After `RETRY_ATTEMPTS` attempts that fail with PermissionError it gives
@@ -412,7 +412,7 @@ class LocalObjectStore(ObjectStore):
         self.root = pathlib.Path(root).resolve()
         super().__init__(self.root.as_uri())
 
-    def path_of(self, key: str) -> pathlib.Path:
+    def locate(self, key: str) -> pathlib.Path:
         """The file for a key, never outside the root.
 
         The check is lexical on the normalised absolute path: keys are
@@ -448,7 +448,7 @@ class LocalObjectStore(ObjectStore):
             compares.
         """
         stat = path.stat()
-        digest = sha256_of(data)
+        digest = checksum(data)
         return ObjectMeta(key, len(data), digest, iso(stat.st_mtime), digest)
 
     def put(
@@ -464,7 +464,7 @@ class LocalObjectStore(ObjectStore):
         An unconditional put replaces the file through
         `scmle.durability.write_atomically`; `if_absent` links a fully
         written temp file into place only if no object exists, and raises
-        `AlreadyExistsError` if one does; `if_version` compares and replaces
+        `ExistsError` if one does; `if_version` compares and replaces
         under an exclusive lock that other processes respect. An invalid
         key raises `StoreError`.
 
@@ -482,7 +482,7 @@ class LocalObjectStore(ObjectStore):
         """
         if if_absent and if_version is not None:
             raise errors.InputError("use if_absent or if_version, not both")
-        path = self.path_of(key)
+        path = self.locate(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         if if_absent:
             self.claim(path, data)
@@ -503,7 +503,7 @@ class LocalObjectStore(ObjectStore):
             version: The version the caller expects.
         """
         try:
-            current = sha256_of(path.read_bytes())
+            current = checksum(path.read_bytes())
         except FileNotFoundError:
             raise ConflictError(
                 f"no object {key!r} to replace", {"key": key}
@@ -521,7 +521,7 @@ class LocalObjectStore(ObjectStore):
             data: The content to write.
 
         Raises:
-            AlreadyExistsError: If the destination already exists.
+            ExistsError: If the destination already exists.
             OSError: If linking fails for a reason other than the
                 destination existing.
         """
@@ -539,13 +539,13 @@ class LocalObjectStore(ObjectStore):
                 # creating at that moment as PermissionError or a sharing
                 # violation, not FileExistsError; either way the object is
                 # not ours.
-                if not refused_as_existing(error, path):
+                if not occupied(error, path):
                     raise
-                raise AlreadyExistsError(
+                raise ExistsError(
                     f"{path.name} already exists", {"key": path.name}
                 ) from error
         finally:
-            unlink_tolerantly(temporary)
+            discard(temporary)
 
     def get(self, key: str) -> tuple[bytes, ObjectMeta]:
         """Reads an object.
@@ -561,20 +561,20 @@ class LocalObjectStore(ObjectStore):
             corrupt.
 
         Raises:
-            NotFoundError: If there is no file under the key.
+            AbsentError: If there is no file under the key.
         """
-        path = self.path_of(key)
+        path = self.locate(key)
         try:
             data = path.read_bytes()
         except (FileNotFoundError, IsADirectoryError, NotADirectoryError):
-            raise NotFoundError(f"no object {key!r}") from None
+            raise AbsentError(f"no object {key!r}") from None
         return data, self.describe(key, path, data)
 
     def head(self, key: str) -> ObjectMeta:
         """Reads an object's metadata; the file is read to hash it.
 
         An invalid key raises `StoreError`, and a key with no file raises
-        `NotFoundError`.
+        `AbsentError`.
 
         Args:
             key: The object key.
@@ -600,7 +600,7 @@ class LocalObjectStore(ObjectStore):
             validate(prefix.removesuffix("/"))
         found = []
         for path in sorted(self.root.rglob("*")):
-            if not path.is_file() or is_temporary(path.name):
+            if not path.is_file() or partial(path.name):
                 continue
             key = path.relative_to(self.root).as_posix()
             if key.startswith(prefix):
@@ -616,7 +616,7 @@ class LocalObjectStore(ObjectStore):
             key: The object key.
             if_version: Remove only if the current version is this one.
         """
-        path = self.path_of(key)
+        path = self.locate(key)
         if if_version is None:
             path.unlink(missing_ok=True)
             return
@@ -679,7 +679,7 @@ class RetryingStore(ObjectStore):
         """See `ObjectStore.put`.
 
         A conditional put whose first try landed but was reported as a
-        timeout fails on the retry with `AlreadyExistsError` or
+        timeout fails on the retry with `ExistsError` or
         `ConflictError`; that is reported as it is, not hidden.
 
         Args:

@@ -61,7 +61,7 @@ def contents(folder):
 def test_no_artifact_holds_a_canary_of_c_or_the_final_test_set(tmp_path):
     frame = canary_frame()
     path = tmp_path / "charter.json"
-    sealing.write_charter(
+    sealing.inscribe(
         path, make_charter(min_effect=0.5, k_max=3), signing_key=KEY
     )
     result = support.make_project(

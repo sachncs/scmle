@@ -92,11 +92,11 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
     parameter_node = graph.nodes["parameter-estimation"]
     assert parameter_node.digest == restored.digest()
     assert parameter_node.attributes["artifact"] == "parameter_estimation.json"
-    assert graph.nodes["evaluation"].digest == bundle.file_sha256(
+    assert graph.nodes["evaluation"].digest == bundle.shasum(
         result.run_dir / "evaluation.json"
     )
-    assert graph.path_exists("snapshot", "parameter-estimation")
-    assert graph.path_exists("evaluation", "parameter-estimation")
+    assert graph.reachable("snapshot", "parameter-estimation")
+    assert graph.reachable("evaluation", "parameter-estimation")
     identity = result.estimation.diagnostics["data_identity"]
     assert identity["source_identity"] is None
     assert identity["snapshot_id"].startswith("snap_")
@@ -199,8 +199,8 @@ def test_resume_reconstructs_estimation_and_rebinds_evidence(tmp_path):
     }
     graph = Linker.load(original.run_dir / "evidence_graph.json")
     assert graph.nodes["parameter-estimation"].digest == report.digest()
-    assert graph.path_exists("snapshot", "parameter-estimation")
-    assert graph.path_exists("evaluation", "parameter-estimation")
+    assert graph.reachable("snapshot", "parameter-estimation")
+    assert graph.reachable("evaluation", "parameter-estimation")
 
 
 def test_resume_fails_closed_when_estimation_declaration_is_missing(tmp_path):

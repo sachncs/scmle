@@ -122,7 +122,7 @@ class Attestation:
             A copy carrying the signature computed under `key`.
         """
         return dataclasses.replace(
-            self, signature=signing.sign_payload(self.payload(), key)
+            self, signature=signing.mac(self.payload(), key)
         )
 
     def verify(self, key: str | bytes | None) -> bool:
@@ -135,10 +135,10 @@ class Attestation:
             True when a key is available, the attestation is signed and the
             signature matches the content; False otherwise.
         """
-        resolved = signing.resolve_key(key)
+        resolved = signing.keying(key)
         if resolved is None or not self.signature:
             return False
-        expected = signing.sign_payload(self.payload(), resolved)
+        expected = signing.mac(self.payload(), resolved)
         return hmac.compare_digest(expected, self.signature)
 
     def to_dict(self) -> dict[str, Any]:
@@ -290,7 +290,7 @@ def apply(
             rejected[assumption] = (
                 f"valid {item.date} to {item.expires}, not on {today}"
             )
-        elif signing.resolve_key(key) is None:
+        elif signing.keying(key) is None:
             rejected[assumption] = "no signing key to verify the signature"
         elif not item.verify(key):
             rejected[assumption] = "the signature does not verify"

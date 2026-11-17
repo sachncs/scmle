@@ -16,7 +16,7 @@ result = project.run()
 logging.info(
     "\n%s", result.leaderboard()[["model_name", "status", "score_mean"]]
 )
-logging.info("\n%s", result.feature_importance().head())
+logging.info("\n%s", result.salience().head())
 result.save("artifacts/churn", signing_key="...")  # or set SCMLE_SIGNING_KEY
 ```
 
@@ -56,27 +56,27 @@ scmle.api.project.Project(
 ```python
 from scmle.contracts import tasks
 
-graph = tasks.FeatureGraph(
+graph = tasks.Derivation(
     nodes=[
-        tasks.FeatureNode(
+        tasks.Node(
             name="unit_price", op="ratio", inputs=["price", "area"]
         ),
-        tasks.FeatureNode(
+        tasks.Node(
             name="month",
             op="datepart",
             inputs=["when"],
             params={"part": "month"},
         ),
-        tasks.FeatureNode(
+        tasks.Node(
             name="price_clip",
             op="clip",
             inputs=["price"],
             params={"upper": 0.98},
         ),
-        tasks.FeatureNode(
+        tasks.Node(
             name="load_prev", op="lag", inputs=["load"], params={"k": 1}
         ),
-        tasks.FeatureNode(
+        tasks.Node(
             name="load_avg3",
             op="rolling_mean",
             inputs=["load"],
@@ -147,19 +147,19 @@ bundle = scmle.artifacts.bundle.Bundle.load(
 api = serving.HttpServing(bundle)
 api.start()  # POST /predict {"records": [...]}
 
-report = monitor.ModelMonitor(bundle).assess(recent_rows, outcomes=known_labels)
+report = monitor.Watcher(bundle).assess(recent_rows, outcomes=known_labels)
 logging.info(report.recommendation)  # none / investigate / retrain
 
 store = registry.ModelRegistryStore("registry")
 manager = lifecycle.Maintainer(store, "churn", "work")
 record = manager.register_run(result)  # registers a staged version
 approval_key = "loaded-from-your-release-secret"
-approval = registry.PromotionApproval(
+approval = registry.Sanction(
     model="churn",
     version=record.version,
     content_id=record.content_id,
     reviewer="reviewer@example.com",
-    decision=registry.PromotionDecision.APPROVED,
+    decision=registry.Verdict.APPROVED,
     reason="reviewed evaluation, limitations, and recovery evidence",
     evidence=("evidence/release-review.json",),
     approved_at="2026-10-20T00:00:00+00:00",
@@ -171,17 +171,17 @@ outcome = manager.review(fresh_labeled_rows, target="churn")
 # A better challenger is staged, then promoted only after a second review.
 if outcome.comparison and outcome.comparison.decision == "promote":
     candidate = store.resolve("churn", "challenger")
-    candidate_approval = registry.PromotionApproval(
+    candidate_approval = registry.Sanction(
         model="churn",
         version=candidate.version,
         content_id=candidate.content_id,
         reviewer="reviewer@example.com",
-        decision=registry.PromotionDecision.APPROVED,
+        decision=registry.Verdict.APPROVED,
         reason="reviewed challenger evidence independently",
         evidence=("evidence/challenger-review.json",),
         approved_at="2026-10-20T00:00:00+00:00",
     ).sign(approval_key)
-    manager.promote_challenger(candidate_approval, signing_key=approval_key)
+    manager.elevate(candidate_approval, signing_key=approval_key)
 ```
 
 Inference is strict about column names unless you state a policy:
@@ -189,7 +189,7 @@ Inference is strict about column names unless you state a policy:
 ```python
 from scmle.inference import mapping
 
-policy = mapping.ColumnMapping({"cust_age": "age"}, case_insensitive=True)
+policy = mapping.Mapper({"cust_age": "age"}, case_insensitive=True)
 bundle.predict(new_rows, policy)
 ```
 
@@ -248,7 +248,7 @@ project = scmle.api.project.Project(
 
 # Rows without a label: set aside, or self-train when it measurably helps.
 project = scmle.api.project.Project(data, "churn", unlabeled="pseudo_label")
-# result.bundle.rank_for_labeling(pool, count=20) -> rows to label next
+# result.bundle.prioritize(pool, count=20) -> rows to label next
 
 # Time to an event with censored rows (target = time, event_column = 0/1).
 project = scmle.api.project.Project(
@@ -307,6 +307,6 @@ file a run writes, and [`CLI.md`](CLI.md) the shell interface.
 
 ## 11. Extending
 
-Subclass `Model` and pass `check_conformance`, or register it through
+Subclass `Model` and pass `comply`, or register it through
 the `scmle.models` entry point. See `docs/ARCHITECTURE.md` for every extension
 point.

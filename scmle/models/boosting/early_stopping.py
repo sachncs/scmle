@@ -23,7 +23,7 @@ MIN_ROWS = 60
 MIN_CLASS_COUNT_TO_STRATIFY = 2
 
 
-class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Holdout(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Stops boosting when a held-out slice stops improving.
 
     Attributes:
@@ -210,7 +210,7 @@ class HoldoutEarlyStopping(base.BaseEstimator):  # type: ignore[misc]  # scikit-
         return numpy.asarray(self.estimator_.predict_proba(features))
 
 
-class Classifier(base.ClassifierMixin, HoldoutEarlyStopping):  # type: ignore[misc]  # scikit-learn ships no type information
+class Classifier(base.ClassifierMixin, Holdout):  # type: ignore[misc]  # scikit-learn ships no type information
     """Early-stopped boosting classifier."""
 
     @property
@@ -219,13 +219,13 @@ class Classifier(base.ClassifierMixin, HoldoutEarlyStopping):  # type: ignore[mi
         return numpy.asarray(self.encoder_.classes_)
 
 
-class Regressor(base.RegressorMixin, HoldoutEarlyStopping):  # type: ignore[misc]  # scikit-learn ships no type information
+class Regressor(base.RegressorMixin, Holdout):  # type: ignore[misc]  # scikit-learn ships no type information
     """Early-stopped boosting regressor."""
 
 
 def wrap(
     estimator: base.BaseEstimator, rounds: int = DEFAULT_ROUNDS, seed: int = 0
-) -> HoldoutEarlyStopping:
+) -> Holdout:
     """Wraps an estimator in the early-stopping wrapper of its kind.
 
     Args:

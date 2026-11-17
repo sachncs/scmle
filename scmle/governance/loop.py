@@ -10,7 +10,7 @@
 What the loop does by itself, and how each rule behaves:
 
 * L1. A betting alarm on the matured, propensity-weighted mean loss
-  (`RiskAlarm`): false alarm probability at most ``alpha_alarm`` over all time
+  (`Tripwire`): false alarm probability at most ``alpha_alarm`` over all time
   for the first alarm of an episode. On an alarm with a verified label
   mechanism it records an `alarm` row. If ``alarm_gates_retrain`` is set it
   then records a `retrain` request (and calls the `retrain` hook, if given,
@@ -22,7 +22,7 @@ What the loop does by itself, and how each rule behaves:
   by an e-process on paired losses, and decided in registration order by
   e-LOND. A crossing becomes a `promotion_proposal`; the signed approval of
   the registry is still needed to move the champion alias.
-* L3. After a promotion, a reverse e-process (`watch_rollback`) on the new
+* L3. After a promotion, a reverse e-process (`surveil`) on the new
   champion against the previous one can create a `rollback_proposal` and
   tightens `tau`.
 * E1. Cases below the calibrated threshold, and any case beyond the model's
@@ -200,7 +200,7 @@ class Preregistration:
             raise errors.InputError("safe_default and scope are required")
 
     @property
-    def promo_level(self) -> float:
+    def alpha(self) -> float:
         """`alpha_promo` as a float."""
         return float(Fraction(self.alpha_promo))
 
@@ -308,7 +308,7 @@ class Consequence:
     """
 
     tier: qualification.Tier
-    decision: deployment_ledger.ReplyDecision
+    decision: deployment_ledger.Reply
     safe_default_applies: bool
 
 
@@ -434,7 +434,7 @@ class Loop:
             charter: Anything with a `charter_hash` (the analysis charter).
             policy: The pre-registered inputs.
             hooks: Optional callbacks.
-            verification_keys: Map from key id (`key_fingerprint`) to the
+            verification_keys: Map from key id (`thumbprint`) to the
                 key that verifies a person's attestation. The system must not
                 hold the signing side of these keys.
             system_keys: Keys the system itself holds; attestations signed
@@ -451,24 +451,22 @@ class Loop:
             The open loop, with its saved state loaded.
 
         Raises:
-            DeploymentLedgerError: If an existing ledger fails verification
+            MisuseError: If an existing ledger fails verification
                 or belongs to another charter or policy.
         """
         directory = Path(deploy_dir)
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / deployment_ledger.FILE_NAME
-        fingerprints = [
-            deployment_ledger.key_fingerprint(k) for k in system_keys
-        ]
-        environment = signing.resolve_key(None)
+        fingerprints = [deployment_ledger.thumbprint(k) for k in system_keys]
+        environment = signing.keying(None)
         if environment is not None:
-            fingerprints.append(deployment_ledger.key_fingerprint(environment))
+            fingerprints.append(deployment_ledger.thumbprint(environment))
         keys = dict(verification_keys or {})
         if path.exists():
             ledger = deployment_ledger.DeploymentLedger.load(path)
             header = ledger.header
             if header["charter_hash"] != charter.charter_hash:
-                raise deployment_ledger.DeploymentLedgerError(
+                raise deployment_ledger.MisuseError(
                     "ledger belongs to a different charter"
                 )
             effective = dict(header["policy"])
@@ -477,7 +475,7 @@ class Loop:
                 if row["kind"] == deployment_ledger.OBSERVE_SUMMARY:
                     effective.update(body.get("policy_amendment", {}))
             if effective != jsonify(policy.to_dict()):
-                raise deployment_ledger.DeploymentLedgerError(
+                raise deployment_ledger.MisuseError(
                     "ledger was opened with a different policy"
                 )
         else:
@@ -514,7 +512,7 @@ class Loop:
         The charter hash and the policy (with its recorded amendments) are
         read from the ledger, so a command line needs only the directory. A
         missing ledger, or one that fails verification, is refused by the
-        ledger with a `DeploymentLedgerError`. `system_keys` has no effect
+        ledger with a `MisuseError`. `system_keys` has no effect
         here, because the ledger already exists (see `open`).
 
         Args:
@@ -555,31 +553,31 @@ class Loop:
     def arm(self) -> None:
         """Creates fresh monitors from the policy."""
         policy = self.policy
-        self.alarm = sequential_tests.RiskAlarm(
+        self.alarm = sequential_tests.Tripwire(
             policy.reference_risk,
             policy.tolerance,
             policy.alpha_alarm,
             policy.scale,
         )
-        self.naive_alarm = sequential_tests.RiskAlarm(
+        self.naive_alarm = sequential_tests.Tripwire(
             policy.reference_risk,
             policy.tolerance,
             policy.alpha_alarm,
             policy.loss_bound,
         )
-        self.selective = sequential_tests.RiskAlarm(
+        self.selective = sequential_tests.Tripwire(
             policy.r_star, 0.0, policy.delta, policy.scale
         )
-        self.coverage_test: sequential_tests.MixtureTest | None = (
+        self.coverage_test: sequential_tests.Mixture | None = (
             None
             if policy.coverage_target is None
-            else sequential_tests.MixtureTest(
+            else sequential_tests.Mixture(
                 policy.coverage_target,
                 sequential_tests.LESS,
                 policy.alpha_alarm,
             )
         )
-        self.novelty_test = sequential_tests.MixtureTest(
+        self.novelty_test = sequential_tests.Mixture(
             min(max(policy.novelty_bound, 1e-6), 1 - 1e-6),
             sequential_tests.GREATER,
             policy.alpha_alarm,
@@ -664,23 +662,21 @@ class Loop:
         self.escalation_batch = dict(state["escalation_batch"])
         self.queue = list(state["queue"])
         self.stopped = dict(state["stopped"])
-        self.alarm = sequential_tests.RiskAlarm.from_dict(state["alarm"])
-        self.naive_alarm = sequential_tests.RiskAlarm.from_dict(
+        self.alarm = sequential_tests.Tripwire.from_dict(state["alarm"])
+        self.naive_alarm = sequential_tests.Tripwire.from_dict(
             state["naive_alarm"]
         )
-        self.selective = sequential_tests.RiskAlarm.from_dict(
-            state["selective"]
-        )
+        self.selective = sequential_tests.Tripwire.from_dict(state["selective"])
         if state["coverage_test"] is not None:
-            self.coverage_test = sequential_tests.MixtureTest.from_dict(
+            self.coverage_test = sequential_tests.Mixture.from_dict(
                 state["coverage_test"]
             )
-        self.novelty_test = sequential_tests.MixtureTest.from_dict(
+        self.novelty_test = sequential_tests.Mixture.from_dict(
             state["novelty_test"]
         )
         self.active = {
             name: {
-                "process": sequential_tests.PairedEProcess.from_dict(
+                "process": sequential_tests.Comparison.from_dict(
                     item["process"]
                 ),
                 "batches": item["batches"],
@@ -691,7 +687,7 @@ class Loop:
         if watch is not None:
             self.rollback_watch = {
                 "previous": watch["previous"],
-                "process": sequential_tests.PairedEProcess.from_dict(
+                "process": sequential_tests.Comparison.from_dict(
                     watch["process"]
                 ),
             }
@@ -705,7 +701,7 @@ class Loop:
 
     # --------------------------------------------------------------- helpers
 
-    def verify_ledger(self) -> bool:
+    def recheck(self) -> bool:
         """Re-checks the ledger file; enters a halt (in memory) if it fails.
 
         Returns:
@@ -714,7 +710,7 @@ class Loop:
         """
         try:
             self.ledger.verify()
-        except deployment_ledger.DeploymentLedgerError:
+        except deployment_ledger.MisuseError:
             # handled: loop halted with reason; returns False
             self.halted_by_state = True
             self.halt_reason = HALT_LEDGER
@@ -740,7 +736,7 @@ class Loop:
 
     def escalate(
         self,
-        action: never_list.NeverAction | str,
+        action: never_list.Forbidden | str,
         detail: Mapping[str, Any],
         evidence: tuple[str, ...] = (),
         proposed_default: str | None = None,
@@ -759,16 +755,14 @@ class Loop:
             pending.
         """
         name = (
-            action.value
-            if isinstance(action, never_list.NeverAction)
-            else action
+            action.value if isinstance(action, never_list.Forbidden) else action
         )
         question = {
             "action": name,
             "detail": jsonify(dict(detail)),
             "scope": self.policy.scope,
         }
-        if self.guard.pending_for(question) is not None:
+        if self.guard.outstanding(question) is not None:
             return None
         identity = f"esc-{len(self.ledger.rows)}"
         self.ledger.commit(
@@ -786,7 +780,7 @@ class Loop:
         self.escalation_batch[identity] = self.batch
         return next(e for e in self.pending_escalations() if e.id == identity)
 
-    def enter_halt(self, reason: str, detail: Mapping[str, Any]) -> None:
+    def suspend(self, reason: str, detail: Mapping[str, Any]) -> None:
         """Writes a halt row and an incident row, then calls the incident hook.
 
         Does nothing if the ledger is already halted. Otherwise it commits a
@@ -865,7 +859,7 @@ class Loop:
             raise errors.InputError(
                 "batch, predictions and decisions must align"
             )
-        self.verify_ledger()
+        self.recheck()
         frame = batch.reset_index(drop=True)
         ids = (
             [str(v) for v in frame["case_id"]]
@@ -880,7 +874,7 @@ class Loop:
             sizes = (
                 frame["set_size"] if "set_size" in frame else numpy.ones(size)
             )
-            score = escalation.set_size_score(sizes, novel)
+            score = escalation.ambiguity(sizes, novel)
         high = numpy.isin(
             numpy.asarray(decisions, dtype=object),
             list(self.policy.high_impact_actions),
@@ -1004,7 +998,7 @@ class Loop:
 
     # ------------------------------------------------------------ challengers
 
-    def register_challenger(self, name: str) -> int:
+    def enroll(self, name: str) -> int:
         """Registers a challenger in the ledger before it is scored.
 
         Args:
@@ -1023,9 +1017,9 @@ class Loop:
         )
         policy = self.policy
         self.active[name] = {
-            "process": sequential_tests.PairedEProcess(
+            "process": sequential_tests.Comparison(
                 policy.delta_promo,
-                policy.promo_level,
+                policy.alpha,
                 policy.scale,
             ),
             "batches": 0,
@@ -1034,7 +1028,7 @@ class Loop:
         self.save_state()
         return len(self.queue)
 
-    def watch_rollback(self, previous: str) -> None:
+    def surveil(self, previous: str) -> None:
         """Starts the reverse e-process after a promotion.
 
         Args:
@@ -1044,7 +1038,7 @@ class Loop:
         policy = self.policy
         self.rollback_watch = {
             "previous": previous,
-            "process": sequential_tests.PairedEProcess(
+            "process": sequential_tests.Comparison(
                 policy.delta_rb, policy.alpha_rb, policy.scale
             ),
         }
@@ -1058,7 +1052,7 @@ class Loop:
         losses: numpy.ndarray,
         observed: numpy.ndarray,
         mask: numpy.ndarray | None = None,
-    ) -> labels.BatchEstimate:
+    ) -> labels.Estimate:
         """Estimates the Horvitz-Thompson mean loss of a batch or a subset.
 
         Args:
@@ -1074,7 +1068,7 @@ class Loop:
         keep = numpy.ones(len(observed), dtype=bool) if mask is None else mask
         propensity = record["propensity"]
         audit = record["audit"]
-        return labels.estimate_batch(
+        return labels.weigh(
             losses[keep],
             observed[keep],
             None
@@ -1085,13 +1079,13 @@ class Loop:
             self.policy.loss_bound,
         )
 
-    def estimate_signed(
+    def centred(
         self,
         record: dict[str, Any],
         values: numpy.ndarray,
         observed: numpy.ndarray,
         mask: numpy.ndarray,
-    ) -> labels.BatchEstimate:
+    ) -> labels.Estimate:
         """Like `estimate`, for values in ``[-loss_bound, loss_bound]``.
 
         Args:
@@ -1106,7 +1100,7 @@ class Loop:
         """
         propensity = record["propensity"]
         audit = record["audit"]
-        return labels.estimate_batch(
+        return labels.weigh(
             values[mask],
             observed[mask],
             None
@@ -1132,7 +1126,7 @@ class Loop:
             had enough labels, else `insufficient_labels`. Its events, newest
             escalation and mechanism are described by `Outcome`.
         """
-        if not self.verify_ledger():
+        if not self.recheck():
             self.save_state()
             return Outcome(
                 HALTED, (("halt", HALT_LEDGER),), None, self.mechanism
@@ -1203,9 +1197,9 @@ class Loop:
         self.mechanism = estimate.mechanism
         naive = float(numpy.mean(losses[observed & model_cases]))
         crossed = self.naive_alarm.update(naive)
-        if crossed and not labels.permits_action(estimate.mechanism):
+        if crossed and not labels.actionable(estimate.mechanism):
             self.naive_flag = True
-        if not labels.permits_action(estimate.mechanism):
+        if not labels.actionable(estimate.mechanism):
             return True
         if estimate.mean is None:
             raise errors.ScmleError("estimate has no mean")
@@ -1263,11 +1257,11 @@ class Loop:
                 [other.get(i, math.nan) for i in ids], dtype=float
             )
             gap = numpy.where(needed, losses - second, 0.0)
-            estimate = self.estimate_signed(record, gap, observed, model_cases)
+            estimate = self.centred(record, gap, observed, model_cases)
             if estimate.mean is None:
                 continue
             scale = self.policy.scale
-            holder["process"].update_gap(min(max(estimate.mean, -scale), scale))
+            holder["process"].ingest(min(max(estimate.mean, -scale), scale))
             if "batches" in holder:
                 holder["batches"] += 1
 
@@ -1290,14 +1284,14 @@ class Loop:
         """
         newest: Escalation | None = None
         batch = self.batch - 1
-        verified = labels.permits_action(self.mechanism)
+        verified = labels.actionable(self.mechanism)
         if self.naive_flag and not verified:
             self.naive_flag = False
             self.ledger.commit(
                 deployment_ledger.ALARM,
                 {"rule": "L1_naive", "reason": HALT_UNVERIFIED, "batch": batch},
             )
-            self.enter_halt(HALT_UNVERIFIED, {"batch": batch})
+            self.suspend(HALT_UNVERIFIED, {"batch": batch})
             newest = (
                 self.escalate(
                     "l1_alarm_unverified_label_mechanism",
@@ -1325,8 +1319,8 @@ class Loop:
                     or newest
                 )
             else:
-                self.retrain_challenger(batch)
-            self.alarm = sequential_tests.RiskAlarm(
+                self.refit(batch)
+            self.alarm = sequential_tests.Tripwire(
                 self.policy.reference_risk,
                 self.policy.tolerance,
                 self.policy.alpha_alarm,
@@ -1341,11 +1335,11 @@ class Loop:
                     "batch": batch,
                 },
             )
-            self.enter_halt(HALT_SELECTIVE, {"batch": batch})
+            self.suspend(HALT_SELECTIVE, {"batch": batch})
             newest = (
                 self.escalate("halt_selective_risk", {"batch": batch}) or newest
             )
-            self.selective = sequential_tests.RiskAlarm(
+            self.selective = sequential_tests.Tripwire(
                 self.policy.r_star, 0.0, self.policy.delta, self.policy.scale
             )
         if self.coverage_test is not None and bool(self.coverage_test.crossed):
@@ -1353,7 +1347,7 @@ class Loop:
                 self.escalate("coverage_below_nominal", {"batch": batch})
                 or newest
             )
-            self.coverage_test = sequential_tests.MixtureTest(
+            self.coverage_test = sequential_tests.Mixture(
                 self.policy.coverage_target or 0.9,
                 sequential_tests.LESS,
                 self.policy.alpha_alarm,
@@ -1365,17 +1359,17 @@ class Loop:
                 )
                 or newest
             )
-            self.novelty_test = sequential_tests.MixtureTest(
+            self.novelty_test = sequential_tests.Mixture(
                 min(max(self.policy.novelty_bound, 1e-6), 1 - 1e-6),
                 sequential_tests.GREATER,
                 self.policy.alpha_alarm,
             )
         if verified:
-            newest = self.decide_rollback() or newest
-            newest = self.decide_queue() or newest
+            newest = self.propose() or newest
+            newest = self.drain() or newest
         return newest
 
-    def retrain_challenger(self, batch: int) -> None:
+    def refit(self, batch: int) -> None:
         """Records a retrain request and registers the hook's challenger.
 
         If a challenger is already queued, the hook is not called and the
@@ -1397,9 +1391,9 @@ class Loop:
             body["skipped"] = skipped
         self.ledger.commit(deployment_ledger.RETRAIN, body)
         if name is not None and name not in self.ledger.registered:
-            self.register_challenger(name)
+            self.enroll(name)
 
-    def decide_rollback(self) -> Escalation | None:
+    def propose(self) -> Escalation | None:
         """Turns a crossed reverse process into a rollback proposal.
 
         If the watch has crossed, commits the proposal, raises a finite
@@ -1433,7 +1427,7 @@ class Loop:
             )
         return None
 
-    def decide_queue(self) -> Escalation | None:
+    def drain(self) -> Escalation | None:
         """Decides challengers in registration order with e-LOND.
 
         Decides the first queued challenger once its evidence reaches the
@@ -1446,7 +1440,7 @@ class Loop:
             without enough evidence, or None.
         """
         newest: Escalation | None = None
-        sequence = self.ledger.require_promotion()
+        sequence = self.ledger.elond()
         while self.queue:
             name = self.queue[0]
             item = self.active[name]
@@ -1555,7 +1549,7 @@ class Loop:
             `risk_coverage.json` first, then to the ledger: as the halt
             release when it ends a halt, otherwise as an observation summary.
         """
-        result = escalation.select_threshold(
+        result = escalation.select(
             score, loss, self.policy.r_star, self.policy.delta, weights
         )
         curve = escalation.risk_coverage(score, loss, weights)
@@ -1569,7 +1563,7 @@ class Loop:
             newline="\n",
         )
         released = False
-        if self.ledger.halted and not result.everything_escalates:
+        if self.ledger.halted and not result.saturated:
             self.ledger.commit(
                 deployment_ledger.HALT,
                 {
@@ -1582,7 +1576,7 @@ class Loop:
             released = True
         elif result.tau < self.tau and self.calibrated:
             self.guard.require(
-                never_list.NeverAction.RELAX_THRESHOLD,
+                never_list.Forbidden.RELAX_THRESHOLD,
                 {"tau_from": self.tau, "tau_to": result.tau},
                 self.policy.scope,
             )
@@ -1603,14 +1597,14 @@ class Loop:
         self.save_state()
         return result
 
-    def check_feedback(
+    def performativity(
         self,
         bypass_features: pandas.DataFrame,
         model_features: pandas.DataFrame,
     ) -> qualification.Check:
         """Tests whether the model's decisions shift the next-period features.
 
-        Runs `labels.bypass_test` on the next-period features of the
+        Runs `labels.circularity` on the next-period features of the
         randomized bypass slice against those of model-decided cases, records
         the result in the ledger and in `label_mechanism.json`, and escalates
         if a feedback loop is detected. The test is not run by `step`: the
@@ -1632,10 +1626,10 @@ class Loop:
                 "no bypass slice is declared (policy.bypass_rate is 0): "
                 "feedback cannot be tested"
             )
-        check = labels.bypass_test(
+        check = labels.circularity(
             bypass_features, model_features, seed=len(self.ledger.rows)
         )
-        verdict = labels.feedback_verdict(self.policy.bypass_rate, check)
+        verdict = labels.assessment(self.policy.bypass_rate, check)
         self.feedback = {
             "verdict": verdict,
             "p_value": check.p_value,
@@ -1662,7 +1656,7 @@ class Loop:
         """Writes `label_mechanism.json`."""
         record = {
             "mechanism": self.mechanism.value,
-            "actions_permitted": labels.permits_action(self.mechanism),
+            "actions_permitted": labels.actionable(self.mechanism),
             "epsilon": self.policy.epsilon,
             "bypass_rate": self.policy.bypass_rate,
             "feedback": (
@@ -1716,7 +1710,7 @@ class Loop:
                 with a key the system holds (or is verified by one), no
                 verification key is known for its key id, it does not verify,
                 or it is expired or dated in the future. A malformed date
-                raises the ledger's `DeploymentLedgerError` instead.
+                raises the ledger's `MisuseError` instead.
         """
         pending = {e.id: e for e in self.pending_escalations()}
         target = pending.get(escalation_id)
@@ -1739,10 +1733,7 @@ class Loop:
         )
         if verifier is None:
             raise ReplyRefused("no verification key for the reply's key id")
-        if (
-            deployment_ledger.key_fingerprint(verifier)
-            in self.ledger.system_keys
-        ):
+        if deployment_ledger.thumbprint(verifier) in self.ledger.system_keys:
             raise ReplyRefused("the verification key is one the system holds")
         if not attestation.verify(verifier):
             raise ReplyRefused("the reply's signature does not verify")
@@ -1766,7 +1757,7 @@ class Loop:
 
     def perform(
         self,
-        action: never_list.NeverAction,
+        action: never_list.Forbidden,
         detail: Mapping[str, Any],
         do: Callable[[], Any],
         proposed_default: str = "action_not_performed",
@@ -1794,10 +1785,10 @@ class Loop:
         finally:
             self.save_state()
 
-    def guard_registry(self, registry: Any) -> None:
+    def intercept(self, registry: Any) -> None:
         """Routes every champion move of `registry` through this guard.
 
-        `promote_challenger`, `check_rollback` and `register_run(promote=True)`
+        `elevate`, `check_rollback` and `register_run(promote=True)`
         of a `Maintainer` over this registry then need an attestation,
         as `move_champion` does. Moving the alias by editing the registry's
         files is not stopped.
@@ -1805,7 +1796,7 @@ class Loop:
         Args:
             registry: The model registry to guard.
         """
-        registry.attach_guard(self.guard, self.policy.scope)
+        registry.attach(self.guard, self.policy.scope)
 
     def move_champion(
         self,
@@ -1841,14 +1832,12 @@ class Loop:
             finally:
                 self.save_state()
         return self.perform(
-            never_list.NeverAction.MOVE_CHAMPION,
+            never_list.Forbidden.MOVE_CHAMPION,
             {"model": model, "version": version},
             move,
         )
 
-    def execute_rollback(
-        self, do: Callable[[], Any], detail: Mapping[str, Any]
-    ) -> Any:
+    def revert(self, do: Callable[[], Any], detail: Mapping[str, Any]) -> Any:
         """Runs a rollback, with an attestation for the move-champion action.
 
         Args:
@@ -1859,7 +1848,7 @@ class Loop:
             Whatever `do` returns.
         """
         return self.perform(
-            never_list.NeverAction.MOVE_CHAMPION, {"rollback": dict(detail)}, do
+            never_list.Forbidden.MOVE_CHAMPION, {"rollback": dict(detail)}, do
         )
 
     def reopen_sealed(
@@ -1877,12 +1866,10 @@ class Loop:
             Whatever `do` returns.
         """
         return self.perform(
-            never_list.NeverAction.REOPEN_SEALED, dict(detail), do
+            never_list.Forbidden.REOPEN_SEALED, dict(detail), do
         )
 
-    def rewrite_ledger(
-        self, do: Callable[[], Any], detail: Mapping[str, Any]
-    ) -> Any:
+    def rewrite(self, do: Callable[[], Any], detail: Mapping[str, Any]) -> Any:
         """Runs `do()` that edits, deletes, reorders or truncates ledger rows.
 
         It runs only with an attestation for that exact detail.
@@ -1894,9 +1881,7 @@ class Loop:
         Returns:
             Whatever `do` returns.
         """
-        return self.perform(
-            never_list.NeverAction.EDIT_LEDGER, dict(detail), do
-        )
+        return self.perform(never_list.Forbidden.EDIT_LEDGER, dict(detail), do)
 
     def act_on_unverified(self, kind: str, do: Callable[[], Any]) -> Any:
         """Runs `do()` that retrains, promotes or rolls back unverified.
@@ -1911,10 +1896,10 @@ class Loop:
             Whatever `do` returns.
         """
         return self.perform(
-            never_list.NeverAction.ACT_ON_UNVERIFIED, {"kind": kind}, do
+            never_list.Forbidden.ACT_ON_UNVERIFIED, {"kind": kind}, do
         )
 
-    def silence_alert(self, name: str, do: Callable[[], Any]) -> Any:
+    def silence(self, name: str, do: Callable[[], Any]) -> Any:
         """Runs `do()` that suppresses, silences or reroutes an alert.
 
         It runs only with an attestation naming the alert.
@@ -1927,7 +1912,7 @@ class Loop:
             Whatever `do` returns.
         """
         return self.perform(
-            never_list.NeverAction.SUPPRESS_ALERT, {"alert": name}, do
+            never_list.Forbidden.SUPPRESS_ALERT, {"alert": name}, do
         )
 
     def change_label_policy(
@@ -1945,7 +1930,7 @@ class Loop:
             Whatever `do` returns.
         """
         return self.perform(
-            never_list.NeverAction.CHANGE_LABEL_POLICY, dict(change), do
+            never_list.Forbidden.CHANGE_LABEL_POLICY, dict(change), do
         )
 
     def delete_or_send(self, what: str, do: Callable[[], Any]) -> Any:
@@ -1961,7 +1946,7 @@ class Loop:
             Whatever `do` returns.
         """
         return self.perform(
-            never_list.NeverAction.DELETE_OR_EXTERNAL, {"what": what}, do
+            never_list.Forbidden.DELETE_OR_EXTERNAL, {"what": what}, do
         )
 
     def amend_policy(self, **changes: Any) -> Preregistration:
@@ -1996,9 +1981,9 @@ class Loop:
             if orientation is not None and new is not None:
                 if (new - old) * orientation >= 0:
                     continue
-                action = never_list.NeverAction.RELAX_THRESHOLD
+                action = never_list.Forbidden.RELAX_THRESHOLD
             else:
-                action = never_list.NeverAction.CHANGE_CHARTER
+                action = never_list.Forbidden.CHANGE_CHARTER
             self.guard.require(
                 action,
                 {

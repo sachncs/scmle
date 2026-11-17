@@ -44,8 +44,8 @@ def test_dependency_error_is_structured_when_dependency_is_disabled(
 ):
     monkeypatch.setattr(image, "PILLOW_AVAILABLE", False)
 
-    with pytest.raises(image.ImageDependencyError) as raised:
-        image.require_pillow("test operation")
+    with pytest.raises(image.DependencyError) as raised:
+        image.pillow("test operation")
 
     assert raised.value.category == "dependency"
     assert raised.value.details == {
@@ -316,10 +316,8 @@ def test_features_are_flattened_with_stable_shape_and_normalization():
         (image.Sample.from_bytes(png_bytes((255, 0, 128)), "sample.png"),)
     )
 
-    features = dataset.prepare_tabular_features((2, 2), "RGB")
-    raw_features = dataset.prepare_tabular_features(
-        (2, 2), "RGB", normalize=False
-    )
+    features = dataset.flatten((2, 2), "RGB")
+    raw_features = dataset.flatten((2, 2), "RGB", normalize=False)
 
     assert features.shape == (1, 12)
     assert features.dtype == numpy.float32
@@ -329,7 +327,7 @@ def test_features_are_flattened_with_stable_shape_and_normalization():
 
 @PILLOW_SKIP
 def test_empty_dataset_has_typed_feature_matrix():
-    features = image.Dataset().prepare_tabular_features((3, 2), "L")
+    features = image.Dataset().flatten((3, 2), "L")
 
     assert features.shape == (0, 6)
     assert features.dtype == numpy.float32

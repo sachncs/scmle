@@ -1,4 +1,4 @@
-"""`apply_custody`: the three-way split over a real `Splitter` result."""
+"""`sequester`: the three-way split over a real `Splitter` result."""
 
 import typing
 
@@ -45,9 +45,9 @@ class Ran(typing.NamedTuple):
 def run(frame, charter=None, spec=None):
     spec = spec or make_spec()
     split = splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
-    log = sealed.OpenLog()
+    log = sealed.Journal()
     vault = sealed.Vault(log)
-    outcome = pipeline.apply_custody(
+    outcome = pipeline.sequester(
         charter=charter or make_charter(min_effect=0.3, k_max=5),
         split=split,
         frame=frame,
@@ -140,9 +140,9 @@ def test_the_group_column_keeps_groups_out_of_both_sets():
     frame["g"] = numpy.arange(len(frame)) // 5
     spec = make_spec(group_column="g")
     split = splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
-    log = sealed.OpenLog()
+    log = sealed.Journal()
     vault = sealed.Vault(log)
-    outcome = pipeline.apply_custody(
+    outcome = pipeline.sequester(
         charter=make_charter(min_effect=0.3, k_max=5),
         split=split,
         frame=frame,
@@ -171,7 +171,7 @@ def test_a_refused_carve_becomes_a_run_with_no_confirmation_set(monkeypatch):
             "carving the confirmation set left a validation fold empty"
         )
 
-    monkeypatch.setattr(carve, "carve_confirmation", refuse)
+    monkeypatch.setattr(carve, "divide", refuse)
     frame = make_frame()
     ran = run(frame)
     manifest = ran.outcome.manifest
@@ -219,8 +219,8 @@ def run_temporal(frame, charter):
     )
     task = tasks.Task.REGRESSION
     split = splitters.Splitter(spec, task).split(frame)
-    vault = sealed.Vault(sealed.OpenLog(), process=False)
-    return pipeline.apply_custody(
+    vault = sealed.Vault(sealed.Journal(), process=False)
+    return pipeline.sequester(
         charter=charter,
         split=split,
         frame=frame,

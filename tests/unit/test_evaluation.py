@@ -62,17 +62,17 @@ def test_evaluate_reports_nan_for_undefined_metric():
     assert numpy.isnan(scores["roc_auc"])
 
 
-def make_trial(name, score, status=experiments.TrialStatus.OK):
+def make_trial(name, score, status=experiments.Termination.OK):
     return experiments.Trial(f"t_{name}", name, status, "m", score_mean=score)
 
 
 @pytest.fixture(scope="module")
 def registry():
-    return scmle.models.registry.Catalog.with_builtins()
+    return scmle.models.registry.Catalog.stock()
 
 
 def test_best_mean_respects_orientation(registry):
-    policy = selection.MeanSelector()
+    policy = selection.Averager()
     trials = [
         make_trial("decision_tree", 0.7),
         make_trial("random_forest", 0.9),
@@ -84,7 +84,7 @@ def test_best_mean_respects_orientation(registry):
 
 
 def test_ties_prefer_cheaper_model_and_baseline_excluded(registry):
-    policy = selection.MeanSelector()
+    policy = selection.Averager()
     trials = [
         make_trial("random_forest", 0.8),
         make_trial("decision_tree", 0.8),
@@ -95,18 +95,18 @@ def test_ties_prefer_cheaper_model_and_baseline_excluded(registry):
 
 
 def test_baseline_selected_only_when_alone(registry):
-    policy = selection.MeanSelector()
+    policy = selection.Averager()
     trials = [
         make_trial("dummy", 0.5),
-        make_trial("ridge", 0.0, experiments.TrialStatus.FAILED),
+        make_trial("ridge", 0.0, experiments.Termination.FAILED),
     ]
     winner = policy.select(trials, metrics.CATALOG.metrics["roc_auc"], registry)
     assert winner.model_name == "dummy"
 
 
 def test_all_failed_raises(registry):
-    policy = selection.MeanSelector()
-    trials = [make_trial("ridge", 0.0, experiments.TrialStatus.FAILED)]
+    policy = selection.Averager()
+    trials = [make_trial("ridge", 0.0, experiments.Termination.FAILED)]
     with pytest.raises(errors.ScmleError, match="all trials failed"):
         policy.select(trials, metrics.CATALOG.metrics["rmse"], registry)
 
@@ -167,7 +167,7 @@ def scored_trial(name, score, std, folds=5):
     return experiments.Trial(
         f"t_{name}",
         name,
-        experiments.TrialStatus.OK,
+        experiments.Termination.OK,
         "m",
         score_mean=score,
         score_std=std,
@@ -181,9 +181,9 @@ def test_tolerance_turns_small_gaps_into_ties_resolved_by_simplicity(registry):
         scored_trial("decision_tree", 0.800, 0.01),
     ]
     auc = metrics.CATALOG.metrics["roc_auc"]
-    strict = selection.MeanSelector().select(trials, auc, registry)
+    strict = selection.Averager().select(trials, auc, registry)
     assert strict.model_name == "random_forest"
-    loose = selection.MeanSelector(tasks.Selection(tie_tolerance=0.005)).select(
+    loose = selection.Averager(tasks.Selection(tie_tolerance=0.005)).select(
         trials, auc, registry
     )
     assert loose.model_name == "decision_tree"  # cheaper wins the tie
@@ -196,7 +196,7 @@ def test_one_standard_error_rule_treats_noise_as_a_tie(registry):
     ]
     auc = metrics.CATALOG.metrics["roc_auc"]
     rule = tasks.Selection(uncertainty="one_standard_error")
-    policy = selection.MeanSelector(rule)
+    policy = selection.Averager(rule)
     assert policy.select(trials, auc, registry).model_name == "decision_tree"
     assert "one standard error" in policy.description
 
@@ -207,11 +207,9 @@ def test_lower_variance_tie_breaker_prefers_the_steadier_model(registry):
         scored_trial("random_forest", 0.800, 0.01),
     ]
     auc = metrics.CATALOG.metrics["roc_auc"]
-    policy = selection.MeanSelector(
-        tasks.Selection(tie_breaker="lower_variance")
-    )
+    policy = selection.Averager(tasks.Selection(tie_breaker="lower_variance"))
     assert policy.select(trials, auc, registry).model_name == "random_forest"
-    default = selection.MeanSelector().select(trials, auc, registry)
+    default = selection.Averager().select(trials, auc, registry)
     assert default.model_name == "decision_tree"
 
 
@@ -232,10 +230,10 @@ def test_maximize_sets_the_metric_and_conflicts_are_rejected():
 def test_latency_safety_factor_scales_the_measured_latency():
     from scmle.evaluation import resources
 
-    usage = resources.ResourceUsage(1.0, 10.0, 30, "test machine")
-    plain = resources.ResourceLimits(max_p95_latency_ms=15.0)
+    usage = resources.Usage(1.0, 10.0, 30, "test machine")
+    plain = resources.Constraints(max_p95_latency_ms=15.0)
     assert plain.violations(usage) == []
-    slower = resources.ResourceLimits(
+    slower = resources.Constraints(
         max_p95_latency_ms=15.0, latency_safety_factor=2.0
     )
     assert "safety factor 2" in slower.violations(usage)[0]
@@ -245,7 +243,7 @@ def folds_trial(name, scores):
     return experiments.Trial(
         f"t_{name}",
         name,
-        experiments.TrialStatus.OK,
+        experiments.Termination.OK,
         "m",
         score_mean=float(numpy.mean(scores)),
         score_std=float(numpy.std(scores)),
@@ -256,7 +254,7 @@ def folds_trial(name, scores):
 def test_bayesian_selection_prefers_the_simpler_model_when_gain_is_noise(
     registry,
 ):
-    policy = selection.MeanSelector(tasks.Selection(uncertainty="bayesian"))
+    policy = selection.Averager(tasks.Selection(uncertainty="bayesian"))
     noisy_winner = folds_trial("random_forest", [0.80, 0.86, 0.78, 0.85, 0.79])
     simpler = folds_trial("decision_tree", [0.83, 0.82, 0.82, 0.82, 0.83])
 
@@ -269,7 +267,7 @@ def test_bayesian_selection_prefers_the_simpler_model_when_gain_is_noise(
 
 
 def test_bayesian_selection_keeps_a_credibly_better_model(registry):
-    policy = selection.MeanSelector(tasks.Selection(uncertainty="bayesian"))
+    policy = selection.Averager(tasks.Selection(uncertainty="bayesian"))
     clear_winner = folds_trial("random_forest", [0.90, 0.91, 0.90, 0.92, 0.91])
     simpler = folds_trial("decision_tree", [0.80, 0.81, 0.80, 0.82, 0.81])
 
@@ -282,7 +280,7 @@ def test_bayesian_selection_keeps_a_credibly_better_model(registry):
 
 
 def test_a_rope_makes_negligible_gains_ties(registry):
-    policy = selection.MeanSelector(
+    policy = selection.Averager(
         tasks.Selection(uncertainty="bayesian", rope=0.02)
     )
     slightly_better = folds_trial(

@@ -9,15 +9,15 @@ from scmle.decision import threshold
 
 
 def model(fp=5.0, fn=100.0, lo=0.02, hi=0.15):
-    return costs.DecisionCostModel(
+    return costs.Tariff(
         0.0,
         fn,
         fp,
         0.0,
         lo,
         hi,
-        (costs.CostSource.HUMAN,) * 4,
-        costs.CostSource.HUMAN,
+        (costs.Basis.HUMAN,) * 4,
+        costs.Basis.HUMAN,
     )
 
 
@@ -29,9 +29,9 @@ def world(n, seed, skew=1.0):
 
 
 def test_the_bayes_threshold_is_the_closed_form():
-    assert threshold.bayes_threshold(5, 100) == pytest.approx(5 / 105)
+    assert threshold.breakeven(5, 100) == pytest.approx(5 / 105)
     with pytest.raises(ValueError):
-        threshold.bayes_threshold(0, 1)
+        threshold.breakeven(0, 1)
 
 
 def test_the_net_benefit_identity_holds_on_random_tables():
@@ -40,15 +40,15 @@ def test_the_net_benefit_identity_holds_on_random_tables():
         y = (rng.random(300) < rng.uniform(0.1, 0.6)).astype(float)
         a = (rng.random(300) < 0.4).astype(float)
         fp, fn = rng.uniform(1, 9), rng.uniform(1, 90)
-        m = costs.DecisionCostModel(
+        m = costs.Tariff(
             0,
             fn,
             fp,
             0,
             0.001,
             0.999,
-            (costs.CostSource.HUMAN,) * 4,
-            costs.CostSource.HUMAN,
+            (costs.Basis.HUMAN,) * 4,
+            costs.Basis.HUMAN,
         )
         t = fp / (fp + fn)
         none = fn * y.mean()
@@ -59,7 +59,7 @@ def test_the_net_benefit_identity_holds_on_random_tables():
 
 def test_a_calibrated_score_passes_and_takes_the_bayes_path():
     p, y = world(6000, 1)
-    decision = threshold.choose_threshold(p, y, model(), seed=1)
+    decision = threshold.operate(p, y, model(), seed=1)
     assert decision.rule.path == "bayes"
     assert decision.rule.threshold == pytest.approx(5 / 105)
     assert decision.tier == "attested"
@@ -70,7 +70,7 @@ def test_a_calibrated_score_passes_and_takes_the_bayes_path():
 
 def test_a_miscalibrated_score_is_recalibrated_or_falls_back():
     p, y = world(6000, 2, skew=0.5)
-    decision = threshold.choose_threshold(p, y, model(), seed=2)
+    decision = threshold.operate(p, y, model(), seed=2)
     assert decision.check.calibrated is False
     assert decision.rule.path in ("recalibrated", "grid")
     if decision.rule.path == "recalibrated":
@@ -82,17 +82,17 @@ def test_a_miscalibrated_score_is_recalibrated_or_falls_back():
 
 def test_a_cost_that_is_not_human_lowers_the_tier():
     p, y = world(4000, 3)
-    weak = costs.DecisionCostModel(
+    weak = costs.Tariff(
         0,
         100.0,
         5.0,
         0,
         0.02,
         0.15,
-        (costs.CostSource.TEMPLATE,) * 4,
-        costs.CostSource.HUMAN,
+        (costs.Basis.TEMPLATE,) * 4,
+        costs.Basis.HUMAN,
     )
-    assert threshold.choose_threshold(p, y, weak).tier == "unverified"
+    assert threshold.operate(p, y, weak).tier == "unverified"
 
 
 def test_platt_scaling_recovers_a_planted_map():
@@ -100,18 +100,18 @@ def test_platt_scaling_recovers_a_planted_map():
     raw = rng.uniform(0.02, 0.98, 20000)
     truth = 1 / (1 + numpy.exp(-(0.4 + 1.5 * numpy.log(raw / (1 - raw)))))
     y = (rng.random(raw.size) < truth).astype(float)
-    fitted = threshold.fit_recalibrator(raw, y)
+    fitted = threshold.calibrator(raw, y)
     assert fitted.intercept == pytest.approx(0.4, abs=0.08)
     assert fitted.slope == pytest.approx(1.5, abs=0.08)
 
 
 def test_the_calibration_check_refuses_small_or_bad_inputs():
     with pytest.raises(ValueError):
-        threshold.calibration_check([0.5] * 10, [1.0, 0.0] * 5)
+        threshold.hosmer([0.5] * 10, [1.0, 0.0] * 5)
     with pytest.raises(ValueError):
-        threshold.calibration_check([2.0] * 100, [1.0, 0.0] * 50)
+        threshold.hosmer([2.0] * 100, [1.0, 0.0] * 50)
     with pytest.raises(ValueError):
-        threshold.calibration_check([0.5] * 100, [1.0, 0.0] * 50, level=1.0)
+        threshold.hosmer([0.5] * 100, [1.0, 0.0] * 50, level=1.0)
 
 
 def test_cluster_intervals_are_wider_than_independent_ones():
@@ -134,14 +134,14 @@ def test_a_useful_rule_is_called_useful_and_a_random_one_is_not():
     good = numpy.where(y == 1, rng.random(n) < 0.9, rng.random(n) < 0.1).astype(
         float
     )
-    rule = netbenefit.net_benefit_band(y, good, (0.1, 0.4), seed=1)
+    rule = netbenefit.lowerband(y, good, (0.1, 0.4), seed=1)
     assert rule.claim == "useful" and rule.useful_range == (0.1, 0.4)
     assert rule.incumbent is None and rule.baselines == (
         "treat_none",
         "treat_all",
     )
     noise = (rng.random(n) < 0.5).astype(float)
-    assert netbenefit.net_benefit_band(y, noise, (0.1, 0.4), seed=1).claim == (
+    assert netbenefit.lowerband(y, noise, (0.1, 0.4), seed=1).claim == (
         "not_useful_in_range"
     )
 
@@ -151,7 +151,7 @@ def test_the_band_matches_point_net_benefit_and_includes_the_incumbent():
     y = (rng.random(2000) < 0.3).astype(float)
     a = (rng.random(2000) < 0.4).astype(float)
     b = (rng.random(2000) < 0.5).astype(float)
-    report = netbenefit.net_benefit_band(y, a, (0.1, 0.3), incumbent=b, seed=2)
+    report = netbenefit.lowerband(y, a, (0.1, 0.3), incumbent=b, seed=2)
     assert report.baselines[-1] == "incumbent"
     t = report.thresholds[3]
     assert report.rule[3] == pytest.approx(costs.net_benefit(y, a, t))
@@ -172,10 +172,8 @@ def test_clusters_widen_the_band():
     base = numpy.repeat(rng.uniform(0.05, 0.6, 100), 20)
     y = (rng.random(2000) < base).astype(float)
     a = (rng.random(2000) < 0.3 + 0.4 * base).astype(float)
-    flat = netbenefit.net_benefit_band(y, a, (0.1, 0.3), seed=3)
-    grouped = netbenefit.net_benefit_band(
-        y, a, (0.1, 0.3), clusters=clusters, seed=3
-    )
+    flat = netbenefit.lowerband(y, a, (0.1, 0.3), seed=3)
+    grouped = netbenefit.lowerband(y, a, (0.1, 0.3), clusters=clusters, seed=3)
     assert grouped.critical > 0 and flat.clusters == 2000
     assert grouped.clusters == 100
     assert (
@@ -188,11 +186,11 @@ def test_the_final_table_is_evaluated_once_for_the_registered_rule():
     y = numpy.array([1.0, 0.0] * 100)
     a = y.copy()
     guard = netbenefit.FinalNetBenefit("abc")
-    with pytest.raises(netbenefit.SecondEvaluationError, match="differs"):
+    with pytest.raises(netbenefit.RepeatError, match="differs"):
         guard.evaluate("other", y, a, (0.1, 0.3))
     first = guard.evaluate("abc", y, a, (0.1, 0.3), replicates=50)
     assert first.claim == "useful"
-    with pytest.raises(netbenefit.SecondEvaluationError, match="already"):
+    with pytest.raises(netbenefit.RepeatError, match="already"):
         guard.evaluate("abc", y, a, (0.1, 0.3))
     with pytest.raises(ValueError):
         netbenefit.FinalNetBenefit(" ")
@@ -210,4 +208,4 @@ def test_the_final_table_is_evaluated_once_for_the_registered_rule():
 def test_bad_band_inputs_are_refused(args):
     y = numpy.array([1.0, 0.0] * 20)
     with pytest.raises(ValueError):
-        netbenefit.net_benefit_band(y, y, **args)
+        netbenefit.lowerband(y, y, **args)

@@ -53,8 +53,8 @@ OPTIONAL_COLUMN_ROLES = (
 )
 
 
-def column_exclusion_reason(
-    kind: columns.ColumnKind, series: pandas.Series, stats: dict[str, Any]
+def disqualify(
+    kind: columns.Family, series: pandas.Series, stats: dict[str, Any]
 ) -> str | None:
     """Finds why a column cannot be a feature.
 
@@ -115,7 +115,7 @@ MIN_BALANCE_CLASSES = 2
 
 
 class Profiler:
-    """Builds a `DatasetProfile` for a dataset under a project spec."""
+    """Builds a `Portrait` for a dataset under a project spec."""
 
     def __init__(self, spec: tasks.Config) -> None:
         """Initializes the profiler.
@@ -223,7 +223,7 @@ class Profiler:
             statistics[name] = stats
             if name in dropped:
                 continue
-            reason = column_exclusion_reason(kind, series, stats)
+            reason = disqualify(kind, series, stats)
             if reason is not None:
                 dropped[name] = reason
                 quality.append(f"column '{name}' dropped: {reason}")
@@ -260,7 +260,7 @@ class Profiler:
     @staticmethod
     def derive(
         frame: pandas.DataFrame, stamps: tuple[str, ...]
-    ) -> list[tasks.FeatureNode]:
+    ) -> list[tasks.Node]:
         """Builds calendar and trend features for each datetime column.
 
         Only parts that vary in the data are produced: a column holding one
@@ -284,7 +284,7 @@ class Profiler:
                     varies = getattr(values.dt, part).nunique() > 1  # noqa: PD101 -- counts distinct non-missing values; an equality check against the first value would treat NaT as different
                 if varies:
                     nodes.append(
-                        tasks.FeatureNode(
+                        tasks.Node(
                             name=f"{column}__{part}",
                             op="datepart",
                             inputs=[column],
@@ -308,7 +308,7 @@ class Profiler:
         return int(deduplicated.duplicated().sum())
 
     @staticmethod
-    def balance_findings(target: pandas.Series, task: tasks.Task) -> list[str]:
+    def balance(target: pandas.Series, task: tasks.Task) -> list[str]:
         """Warns when classes are exactly equal in size.
 
         Real data are rarely perfectly balanced, so equal counts usually mean
@@ -340,7 +340,7 @@ class Profiler:
             ]
         return []
 
-    def duplicate_findings(
+    def dupes(
         self,
         frame: pandas.DataFrame,
         feature_columns: list[str],
@@ -453,7 +453,7 @@ class Profiler:
         task: tasks.Task,
         read_seconds: float = 0.0,
         total_rows: int | None = None,
-    ) -> scmle.contracts.data.DatasetProfile:
+    ) -> scmle.contracts.data.Portrait:
         """Profiles the dataset.
 
         A configured column that is absent from the data raises DataError
@@ -490,8 +490,8 @@ class Profiler:
             )
         stamps = tuple(features["datetime"])
         derived = tuple(self.derive(frame, stamps))
-        quality += self.duplicate_findings(frame, usable, task)
-        quality += self.balance_findings(target, task)
+        quality += self.dupes(frame, usable, task)
+        quality += self.balance(target, task)
         gaps = missingness.assess(frame, usable, target, task.is_classification)
         informative = tuple(f.column for f in gaps if f.informative)
         quality += [
@@ -508,7 +508,7 @@ class Profiler:
         if report is not None:
             quality += [f"leakage screen: {note}" for note in report.notes]
         target_summary, target_risks = summarize(target, task)
-        base_plan = scmle.contracts.data.FeaturePlan(
+        base_plan = scmle.contracts.data.Blueprint(
             numeric=tuple(features["numeric"]),
             categorical=tuple(features["categorical"]),
             text=tuple(features["text"]),
@@ -533,7 +533,7 @@ class Profiler:
                 >= scmle.contracts.data.HIGH_CARDINALITY_LEVELS
             ),
         )
-        dataset_statistics = fingerprint.build_fingerprint(
+        dataset_statistics = fingerprint.imprint(
             frame,
             self.spec,
             task,
@@ -551,7 +551,7 @@ class Profiler:
             extra_inputs=tuple(c for c in stamps if derived) + base_plan.text,
             informative_missing=informative,
         )
-        return scmle.contracts.data.DatasetProfile(
+        return scmle.contracts.data.Portrait(
             manifest=manifest,
             column_statistics=statistics,
             quality_findings=tuple(quality),

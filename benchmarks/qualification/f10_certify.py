@@ -32,7 +32,7 @@ Gates (`R` is the replicate count):
   rate is `<= 0.05`.
 * size_synth: with no effect, placebo-in-space rejects at `p <= 0.05` no more
   often than `0.05 + 2 sqrt(0.05 * 0.95 / R)` (`R = 500`).
-* overlap: the overlap gate (`aipw.overlap_report`) refuses valid overlap
+* overlap: the overlap gate (`aipw.propensities`) refuses valid overlap
   (minimum propensity 0.5 and 0.1) in `<= 0.05` of replicates and flags the
   two worst settings (0.02 and 0.005) with recall (Wilson lower) `>= 0.8`;
   coverage and effective sample size are reported as curves, not gated.
@@ -399,7 +399,7 @@ def aipw_world(
         c = f10_generators.backdoor(
             stream(base, i, 1), 1500, nonlinear=nonlinear
         )
-        nuisances = aipw.fit_nuisances(x, cols, "t", "y", i, learner)
+        nuisances = aipw.prefit(x, cols, "t", "y", i, learner)
         out = aipw.estimate(nuisances, c, "t", "y", estimand, LEVEL)
         covered.append(out.low <= AIPW_TRUE_EFFECT <= out.high)
         z.append((out.estimate - AIPW_TRUE_EFFECT) / out.se)
@@ -646,10 +646,10 @@ def gate_overlap(replicates: int, base: int = 0) -> dict[str, Any]:
         for i in range(runs):
             x = f10_generators.backdoor(stream(base, i, 0), 1000, p_min=p_min)
             c = f10_generators.backdoor(stream(base, i, 1), 1500, p_min=p_min)
-            nuisances = aipw.fit_nuisances(x, cols, "t", "y", i)
+            nuisances = aipw.prefit(x, cols, "t", "y", i)
             e = nuisances.predict(x)[0]
             t = x["t"].to_numpy()
-            report = aipw.overlap_report(e, t)
+            report = aipw.propensities(e, t)
             flagged += not report["passed"]
             lowest.append(report["min_propensity"])
             out = aipw.estimate(nuisances, c, "t", "y", "ATE", LEVEL)
@@ -709,11 +709,9 @@ def gate_battery_nco(replicates: int, base: int = 0) -> dict[str, Any]:
         c = f10_generators.backdoor(
             rc, 3000, hidden_d=delta, hidden_y=delta, hidden_nco=delta
         )
-        nuisances = aipw.fit_nuisances(x, cols, "t", "nco")
+        nuisances = aipw.prefit(x, cols, "t", "nco")
         out = aipw.estimate(nuisances, c, "t", "nco", "ATE", LEVEL)
-        test = battery.wald_test(
-            "nco", "negative_outcome", out.estimate, out.se
-        )
+        test = battery.wald("nco", "negative_outcome", out.estimate, out.se)
         return not battery.run_battery([test], ALPHA_FALSIFY).passed
 
     return alarm_gate(detect, [0.0, 0.1, 0.2, 0.3, 0.5, 0.8], replicates, base)
@@ -974,7 +972,7 @@ def confirm_world(kind: str, runs: int, base: int) -> dict[str, Any]:
             "no_interference",
         ),
         strategies=("backdoor_aipw",),
-        negative_controls=(causal.NegativeControl("outcome", "nco"),),
+        negative_controls=(causal.Control("outcome", "nco"),),
         strata=("region",),
         sensitivity=causal.Confounding("strongest_observed", 0.2),
     )

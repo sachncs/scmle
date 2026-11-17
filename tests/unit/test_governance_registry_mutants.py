@@ -12,8 +12,8 @@ from scmle.contracts import errors
 from scmle.governance import never_list
 from scmle.governance import registry
 from tests.support_release import KEY
-from tests.support_runtime import approval_for
 from tests.support_runtime import make_registry
+from tests.support_runtime import sanction
 from tests.unit.test_lifecycle_extras import bundle_of
 from tests.unit.test_lifecycle_extras import traffic
 
@@ -34,13 +34,13 @@ def review(**changes):
         "version": 1,
         "content_id": "c" * 64,
         "reviewer": "r",
-        "decision": registry.PromotionDecision.APPROVED,
+        "decision": registry.Verdict.APPROVED,
         "reason": "ok",
         "evidence": ("e1", "e2"),
         "approved_at": "2026-01-01T00:00:00+00:00",
     }
     values.update(changes)
-    return registry.PromotionApproval(**values)
+    return registry.Sanction(**values)
 
 
 def test_the_constants_and_decisions_are_the_documented_ones():
@@ -49,8 +49,8 @@ def test_the_constants_and_decisions_are_the_documented_ones():
     assert registry.CHAMPION == "champion"
     assert registry.CHALLENGER == "challenger"
     assert registry.PREVIOUS == "previous"
-    assert registry.PromotionDecision.APPROVED.value == "approved"
-    assert registry.PromotionDecision.REJECTED.value == "rejected"
+    assert registry.Verdict.APPROVED.value == "approved"
+    assert registry.Verdict.REJECTED.value == "rejected"
 
 
 @pytest.mark.parametrize(
@@ -70,7 +70,7 @@ def test_the_version_must_be_positive():
 
 def test_a_decision_given_as_text_is_converted_and_a_bad_one_is_refused():
     converted = review(decision="rejected")
-    assert converted.decision is registry.PromotionDecision.REJECTED
+    assert converted.decision is registry.Verdict.REJECTED
     with pytest.raises(ValueError):
         review(decision="maybe")
 
@@ -143,7 +143,7 @@ def test_each_signed_field_is_covered_by_the_signature():
         {"version": 2},
         {"content_id": "d" * 64},
         {"reviewer": "s"},
-        {"decision": registry.PromotionDecision.REJECTED},
+        {"decision": registry.Verdict.REJECTED},
         {"reason": "no"},
         {"evidence": ("e1",)},
         {"approved_at": "2027-01-01T00:00:00+00:00"},
@@ -154,51 +154,51 @@ def test_each_signed_field_is_covered_by_the_signature():
 
 def test_validate_target_checks_identity_decision_independence_and_signature():
     good = review().sign(KEY)
-    good.validate_target("m", 1, "c" * 64, KEY)
+    good.validate("m", 1, "c" * 64, KEY)
     for args in (("x", 1, "c" * 64), ("m", 2, "c" * 64), ("m", 1, "d" * 64)):
         with pytest.raises(
             ValueError,
             match=r"^promotion approval does not match bundle identity$",
         ):
-            good.validate_target(*args, KEY)
+            good.validate(*args, KEY)
     rejected = review(decision="rejected").sign(KEY)
     with pytest.raises(
         ValueError, match=r"^promotion was rejected by the reviewer$"
     ):
-        rejected.validate_target("m", 1, "c" * 64, KEY)
+        rejected.validate("m", 1, "c" * 64, KEY)
     dependent = review(independent=False).sign(KEY)
     with pytest.raises(
         ValueError,
         match=r"^champion promotion requires independent review$",
     ):
-        dependent.validate_target("m", 1, "c" * 64, KEY)
+        dependent.validate("m", 1, "c" * 64, KEY)
     with pytest.raises(
         ValueError, match=r"^champion promotion requires a valid signature$"
     ):
-        review().validate_target("m", 1, "c" * 64, KEY)
+        review().validate("m", 1, "c" * 64, KEY)
     with pytest.raises(
         ValueError, match=r"^champion promotion requires a valid signature$"
     ):
-        good.validate_target("m", 1, "c" * 64, "wrong")
+        good.validate("m", 1, "c" * 64, "wrong")
 
 
 def test_a_version_record_defaults_to_an_unsigned_unaddressed_one():
-    record = registry.VersionRecord("m", 1, "t", {}, {}, "r", "m/v1")
+    record = registry.Release("m", 1, "t", {}, {}, "r", "m/v1")
     assert record.content_id == "" and record.signed is False
 
 
 def test_the_content_id_is_the_hash_of_the_manifest(trained, tmp_path):
     root = trained.save(tmp_path / "b", signing_key=KEY)
-    expected = bundle.file_sha256(root / bundle.MANIFEST_FILE)
-    assert registry.content_id_of(root) == expected
-    assert registry.content_id_of(str(root)) == expected
+    expected = bundle.shasum(root / bundle.MANIFEST_FILE)
+    assert registry.identify(root) == expected
+    assert registry.identify(str(root)) == expected
 
 
 def test_a_new_store_creates_its_root_and_has_an_empty_index(tmp_path):
     store = registry.ModelRegistryStore(tmp_path / "a" / "b")
     assert store.root == tmp_path / "a" / "b" and store.root.is_dir()
     assert store.guard is None and store.scope == "stream"
-    assert store.lock is durability.path_lock(store.root)
+    assert store.lock is durability.latch(store.root)
     assert store.read_index() == {"models": {}}
     assert not (store.root / registry.INDEX_FILE).exists()
 
@@ -230,9 +230,9 @@ def test_audit_records_are_appended_one_json_line_each(tmp_path):
 def test_attaching_a_guard_sets_it_and_its_scope(tmp_path):
     store = registry.ModelRegistryStore(tmp_path)
     sentinel = object()
-    store.attach_guard(sentinel, "scope-1")
+    store.attach(sentinel, "scope-1")
     assert store.guard is sentinel and store.scope == "scope-1"
-    store.attach_guard(None, "s2")
+    store.attach(None, "s2")
     assert store.guard is None and store.scope == "s2"
     guarded = registry.ModelRegistryStore(tmp_path, sentinel, "s3")
     assert guarded.guard is sentinel and guarded.scope == "s3"
@@ -254,7 +254,7 @@ def test_registering_records_the_version_the_index_and_the_audit(
     assert record.model == "m" and record.version == 1
     assert record.metrics == {"auc": 0.9} and record.config == {"seed": 1}
     assert record.run_id == "run-7" and record.path == "m/v1"
-    assert record.content_id == registry.content_id_of(root)
+    assert record.content_id == registry.identify(root)
     assert record.signed is True and record.registered_at
     assert (store.root / "m" / "v1" / bundle.MANIFEST_FILE).is_file()
     index = store.read_index()
@@ -363,12 +363,12 @@ def test_the_champion_needs_an_approval_that_names_the_exact_bundle(tmp_path):
         errors.ArtifactError,
         match=r"^promotion approval does not match bundle identity$",
     ):
-        store.promote("churn", 1, approval=approval_for(2), signing_key=KEY)
+        store.promote("churn", 1, approval=sanction(2), signing_key=KEY)
     with pytest.raises(
         errors.ArtifactError,
         match=r"^champion promotion requires a valid signature$",
     ):
-        store.promote("churn", 1, approval=approval_for(1), signing_key="wrong")
+        store.promote("churn", 1, approval=sanction(1), signing_key="wrong")
     assert store.aliases("churn") == {}
 
 
@@ -388,24 +388,24 @@ def test_a_type_error_in_an_approval_is_reported_as_an_artifact_error(tmp_path):
     store = make_registry(tmp_path / "reg")
 
     class Broken:
-        def validate_target(self, *args):
+        def validate(self, *args):
             raise TypeError("odd approval")
 
     with pytest.raises(errors.ArtifactError, match=r"^odd approval$"):
-        store.check_promotion("churn", 1, "champion", Broken(), KEY)
+        store.vet("churn", 1, "champion", Broken(), KEY)
 
 
 def test_check_promotion_returns_the_entry_and_reads_the_index_when_not_given(
     tmp_path,
 ):
     store = make_registry(tmp_path / "reg")
-    entry = store.check_promotion("churn", 1, "challenger", None, None)
+    entry = store.vet("churn", 1, "challenger", None, None)
     assert set(entry) == {"versions", "aliases"}
     index = {"models": {"churn": {"versions": {}, "aliases": {}}}}
     with pytest.raises(errors.ArtifactError):
-        store.check_promotion("churn", 1, "challenger", None, None, index)
-    good = store.check_promotion(
-        "churn", 2, "champion", approval_for(2), KEY, store.read_index()
+        store.vet("churn", 1, "challenger", None, None, index)
+    good = store.vet(
+        "churn", 2, "champion", sanction(2), KEY, store.read_index()
     )
     assert "2" in good["versions"]
 
@@ -414,11 +414,11 @@ def test_promoting_the_champion_records_the_previous_one_and_the_approval(
     tmp_path,
 ):
     store = make_registry(tmp_path / "reg")
-    store.promote("churn", 1, approval=approval_for(1), signing_key=KEY)
+    store.promote("churn", 1, approval=sanction(1), signing_key=KEY)
     assert store.aliases("churn") == {"champion": 1}
-    store.promote("churn", 2, approval=approval_for(2), signing_key=KEY)
+    store.promote("churn", 2, approval=sanction(2), signing_key=KEY)
     assert store.aliases("churn") == {"champion": 2, "previous": 1}
-    store.promote("churn", 2, approval=approval_for(2), signing_key=KEY)
+    store.promote("churn", 2, approval=sanction(2), signing_key=KEY)
     assert store.aliases("churn") == {"champion": 2, "previous": 1}
     lines = [
         json.loads(line)
@@ -429,7 +429,7 @@ def test_promoting_the_champion_records_the_previous_one_and_the_approval(
         (2, 1),
         (2, 2),
     ]
-    assert lines[1]["approval_record"] == approval_for(2).to_dict()
+    assert lines[1]["approval_record"] == sanction(2).to_dict()
     assert lines[1]["alias"] == "champion"
 
 
@@ -457,11 +457,11 @@ def test_a_guard_is_asked_for_the_champion_move_with_the_exact_request(
 ):
     store = make_registry(tmp_path / "reg")
     guard = Recorder()
-    store.attach_guard(guard, "scope-9")
-    store.promote("churn", 2, approval=approval_for(2), signing_key=KEY)
+    store.attach(guard, "scope-9")
+    store.promote("churn", 2, approval=sanction(2), signing_key=KEY)
     assert guard.calls == [
         (
-            never_list.NeverAction.MOVE_CHAMPION,
+            never_list.Forbidden.MOVE_CHAMPION,
             {"model": "churn", "version": 2},
             "scope-9",
             (),
@@ -470,7 +470,7 @@ def test_a_guard_is_asked_for_the_champion_move_with_the_exact_request(
     store.promote(
         "churn",
         3,
-        approval=approval_for(3),
+        approval=sanction(3),
         signing_key=KEY,
         guard_detail={"rollback": True},
     )
@@ -481,9 +481,9 @@ def test_a_guard_is_asked_for_the_champion_move_with_the_exact_request(
 
 def test_a_guard_that_refuses_stops_the_move(tmp_path):
     store = make_registry(tmp_path / "reg")
-    store.attach_guard(Recorder(error=RuntimeError("no attestation")), "s")
+    store.attach(Recorder(error=RuntimeError("no attestation")), "s")
     with pytest.raises(RuntimeError, match="no attestation"):
-        store.promote("churn", 1, approval=approval_for(1), signing_key=KEY)
+        store.promote("churn", 1, approval=sanction(1), signing_key=KEY)
     assert store.aliases("churn") == {}
     assert not (store.root / registry.AUDIT_FILE).exists()
 
@@ -491,11 +491,11 @@ def test_a_guard_that_refuses_stops_the_move(tmp_path):
 def test_a_refused_request_does_not_spend_an_attestation(tmp_path):
     store = make_registry(tmp_path / "reg")
     guard = Recorder()
-    store.attach_guard(guard, "s")
+    store.attach(guard, "s")
     with pytest.raises(errors.ArtifactError):
         store.promote("churn", 1)
     with pytest.raises(errors.ArtifactError):
-        store.promote("churn", 9, approval=approval_for(1), signing_key=KEY)
+        store.promote("churn", 9, approval=sanction(1), signing_key=KEY)
     assert guard.calls == []
 
 
@@ -577,9 +577,9 @@ def test_the_move_is_checked_again_under_the_lock_for_the_named_alias(tmp_path):
         errors.ArtifactError,
         match=r"^champion promotion requires independent approval$",
     ):
-        store.promote_locked("churn", 1, registry.CHAMPION, None, None)
+        store.relabel("churn", 1, registry.CHAMPION, None, None)
     assert store.aliases("churn") == {}
-    store.promote_locked("churn", 1, registry.CHALLENGER, None, None)
+    store.relabel("churn", 1, registry.CHALLENGER, None, None)
     assert store.aliases("churn") == {registry.CHALLENGER: 1}
 
 

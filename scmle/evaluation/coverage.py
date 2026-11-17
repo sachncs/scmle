@@ -68,7 +68,7 @@ def clopper_pearson(
     return lower, upper
 
 
-def holm_rejections(p_values: Sequence[float], alpha: float) -> list[bool]:
+def stepdown(p_values: Sequence[float], alpha: float) -> list[bool]:
     """Holm step-down: which hypotheses are rejected at familywise `alpha`.
 
     Args:
@@ -89,7 +89,7 @@ def holm_rejections(p_values: Sequence[float], alpha: float) -> list[bool]:
     return rejected
 
 
-def undercoverage_p_value(covered: int, rows: int, nominal: float) -> float:
+def deficit(covered: int, rows: int, nominal: float) -> float:
     """One-sided exact binomial p-value for "coverage is below nominal".
 
     The null is that each row is covered with probability at least
@@ -109,7 +109,7 @@ def undercoverage_p_value(covered: int, rows: int, nominal: float) -> float:
     return float(stats.binom.cdf(covered, rows, nominal))
 
 
-def coverage_summary(
+def summarise(
     covered: numpy.ndarray,
     widths: numpy.ndarray | None = None,
     nominal: float = 0.9,
@@ -204,10 +204,10 @@ def slice_coverage(
                 "coverage": hits / rows,
                 "lower": lower,
                 "upper": upper,
-                "p_value": undercoverage_p_value(hits, rows, nominal),
+                "p_value": deficit(hits, rows, nominal),
             }
         )
-    rejected = holm_rejections([item["p_value"] for item in found], familywise)
+    rejected = stepdown([item["p_value"] for item in found], familywise)
     for item, flag in zip(found, rejected, strict=True):
         item["flagged"] = bool(flag)
     return {
@@ -220,7 +220,7 @@ def slice_coverage(
     }
 
 
-def slice_flag(
+def undercovered(
     covered: numpy.ndarray,
     labels: Sequence[Any],
     nominal: float = 0.9,
@@ -263,11 +263,9 @@ def slice_flag(
         if rows >= min_rows:
             found[name] = {
                 "rows": rows,
-                "p_value": undercoverage_p_value(
-                    int(flags[mask].sum()), rows, floor
-                ),
+                "p_value": deficit(int(flags[mask].sum()), rows, floor),
             }
-    rejected = holm_rejections(
+    rejected = stepdown(
         [item["p_value"] for item in found.values()], familywise
     )
     for item, flag in zip(found.values(), rejected, strict=True):
@@ -283,7 +281,7 @@ def slice_flag(
     }
 
 
-def class_coverage(
+def classwise(
     covered: numpy.ndarray,
     true_labels: Sequence[Any],
     nominal: float = 0.9,
@@ -298,18 +296,18 @@ def class_coverage(
         level: Confidence level of each interval.
 
     Returns:
-        For each class (as text, sorted), the `coverage_summary` of its
+        For each class (as text, sorted), the `summarise` of its
         rows, with zero tolerance and no widths.
     """
     flags = numpy.asarray(covered, dtype=bool)
     names = numpy.asarray([str(label) for label in true_labels])
     return {
-        name: coverage_summary(flags[names == name], None, nominal, 0.0, level)
+        name: summarise(flags[names == name], None, nominal, 0.0, level)
         for name in sorted(set(names))
     }
 
 
-def coverage_tier(
+def grade(
     summary: Mapping[str, Any],
     attested_exchangeable: bool = False,
     clean_holdout: bool = True,
@@ -324,7 +322,7 @@ def coverage_tier(
     `unverified`.
 
     Args:
-        summary: A `coverage_summary` result.
+        summary: A `summarise` result.
         attested_exchangeable: Whether a named person attests that the data
             are exchangeable with deployment.
         clean_holdout: Whether the measurement comes from untouched data.
@@ -366,13 +364,13 @@ def coverage_report(
         The marginal summary and the coverage tier, plus `by_slice` when
         `labels` is given and `by_class` when `true_classes` is given.
     """
-    summary = coverage_summary(covered, widths, nominal, tolerance)
+    summary = summarise(covered, widths, nominal, tolerance)
     report: dict[str, Any] = {
         "marginal": summary,
-        "tier": coverage_tier(summary, attested_exchangeable, clean_holdout),
+        "tier": grade(summary, attested_exchangeable, clean_holdout),
     }
     if labels is not None:
         report["by_slice"] = slice_coverage(covered, labels, nominal)
     if true_classes is not None:
-        report["by_class"] = class_coverage(covered, true_classes, nominal)
+        report["by_class"] = classwise(covered, true_classes, nominal)
     return report

@@ -46,7 +46,7 @@ def test_wealth_never_goes_negative_and_spending_is_conserved(
     for amount in attempts:
         try:
             budget = scmle.data.ledger.budget.spend(budget, amount)
-        except scmle.data.ledger.budget.BudgetExhaustedError:
+        except scmle.data.ledger.budget.ExhaustedError:
             assert amount > budget.exploration.wealth
             continue
         accepted += amount
@@ -107,7 +107,7 @@ def test_exploration_spending_never_touches_the_confirmation_budget(
 )
 def test_split_shares_sum_exactly_and_stay_valid(alpha, wealth, weights):
     budget = budget_from(alpha, wealth)
-    parts = scmle.data.ledger.budget.split_budget(budget, weights)
+    parts = scmle.data.ledger.budget.apportion(budget, weights)
     assert sum(p.confirmation.alpha_confirm for p in parts.values()) == alpha
     assert sum(p.exploration.initial for p in parts.values()) == wealth
     assert all(

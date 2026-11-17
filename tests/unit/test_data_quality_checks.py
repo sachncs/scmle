@@ -26,7 +26,7 @@ def test_flipped_labels_are_found_first():
     noisy = labels.copy()
     noisy.iloc[flipped] = 1 - noisy.iloc[flipped]
 
-    report = label_noise.find_label_noise(features, noisy)
+    report = label_noise.contradict(features, noisy)
 
     found = set(report.suspects[:30])
     assert len(found & set(flipped.tolist())) >= 20
@@ -38,16 +38,16 @@ def test_flipped_labels_are_found_first():
 
 def test_clean_labels_flag_few_rows():
     features, labels = labelled()
-    assert label_noise.find_label_noise(features, labels).rate < 0.06
+    assert label_noise.contradict(features, labels).rate < 0.06
 
 
 def test_label_noise_needs_data_and_two_classes():
     features, labels = labelled(30)
     with pytest.raises(ValueError, match="rows"):
-        label_noise.find_label_noise(features, labels)
+        label_noise.contradict(features, labels)
     features = population()
     with pytest.raises(ValueError, match="two classes"):
-        label_noise.find_label_noise(features, pandas.Series(numpy.zeros(600)))
+        label_noise.contradict(features, pandas.Series(numpy.zeros(600)))
 
 
 def test_label_noise_observation_retains_reproducible_evidence():
@@ -55,7 +55,7 @@ def test_label_noise_observation_retains_reproducible_evidence():
     noisy = labels.copy()
     noisy.iloc[::6] = 1 - noisy.iloc[::6]
 
-    observation = label_noise.assess_label_noise(features, noisy, seed=17)
+    observation = label_noise.inspect(features, noisy, seed=17)
 
     assert observation.note is not None
     assert observation.evidence["method"] == (
@@ -76,7 +76,7 @@ def test_a_sample_from_the_same_population_is_representative():
     sample = population(500, seed=1)
     reference = population(500, seed=2)
 
-    report = representativeness.compare_to_reference(sample, reference)
+    report = representativeness.distinguish(sample, reference)
 
     assert report.representative and report.auc < 0.6
 
@@ -86,7 +86,7 @@ def test_a_skewed_sample_is_flagged_with_the_shifted_column():
     reference = population(500, seed=2)
     sample["a"] = sample["a"] + 1.5
 
-    report = representativeness.compare_to_reference(sample, reference)
+    report = representativeness.distinguish(sample, reference)
 
     assert not report.representative
     assert report.gaps[0].column == "a" and report.gaps[0].p_value < 0.001
@@ -95,10 +95,10 @@ def test_a_skewed_sample_is_flagged_with_the_shifted_column():
 def test_categorical_gaps_and_mismatched_columns():
     sample = pandas.DataFrame({"c": ["x"] * 80 + ["y"] * 20})
     reference = pandas.DataFrame({"c": ["x"] * 40 + ["y"] * 60})
-    report = representativeness.compare_to_reference(sample, reference)
+    report = representativeness.distinguish(sample, reference)
     assert report.gaps[0].statistic == pytest.approx(0.4)
     with pytest.raises(ValueError, match="same columns"):
-        representativeness.compare_to_reference(
+        representativeness.distinguish(
             sample, reference.rename(columns={"c": "d"})
         )
 

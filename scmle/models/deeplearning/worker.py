@@ -129,7 +129,7 @@ def main() -> None:
     The parent passes the channel address as the first argument and the key
     on standard input, so only the parent can talk to this process.
     """
-    serve(ipc.connect_to_parent())
+    serve(ipc.attach())
 
 
 class Client:

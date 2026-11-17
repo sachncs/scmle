@@ -23,7 +23,7 @@ SYSTEM_KEY = "system-key"
 SCOPE = "model-v1:stream-a"
 TODAY = datetime.date(2026, 11, 4)
 CHARTER = types.SimpleNamespace(charter_hash="a" * 64)
-KEYS = {deployment_ledger.key_fingerprint(PERSON_KEY): PERSON_KEY}
+KEYS = {deployment_ledger.thumbprint(PERSON_KEY): PERSON_KEY}
 ALLOWED_KINDS = frozenset(
     {
         deployment_ledger.OPEN,

@@ -28,12 +28,12 @@ def make_evidence(
 
 
 def make_plan(
-    status: reliability.VerificationStatus = reliability.VerificationStatus.PLANNED,
+    status: reliability.Verification = reliability.Verification.PLANNED,
     evidence: tuple[reliability.Evidence, ...] = (),
 ) -> reliability.Plan:
     """Build one representative scenario plan."""
     return reliability.Plan(
-        scenario=reliability.FaultScenario.PROCESS_DEATH,
+        scenario=reliability.Contingency.PROCESS_DEATH,
         expected_safe_outcome=reliability.SafeOutcome.RESUME_DURABLE_CHECKPOINT,
         recoverability=reliability.Recoverability.AUTOMATIC,
         evidence_requirements=("process_termination", "checkpoint_resume"),
@@ -44,20 +44,20 @@ def make_plan(
 
 
 def test_default_plan_declares_every_required_scenario_without_claiming_execution():
-    registry = reliability.Registry.production_beta()
+    registry = reliability.Registry.prerelease()
 
-    assert set(registry.plans) == set(reliability.FaultScenario)
+    assert set(registry.plans) == set(reliability.Contingency)
     assert all(
-        plan.verification_status is reliability.VerificationStatus.PLANNED
+        plan.verification_status is reliability.Verification.PLANNED
         for plan in registry.plans.values()
     )
     assert all(plan.release_blocking for plan in registry.plans.values())
 
 
 def test_default_plan_has_explicit_safe_outcome_recovery_and_evidence_requirements():
-    plans = reliability.default_fault_injection_plans()
+    plans = reliability.drills()
 
-    assert len(plans) == len(reliability.FaultScenario)
+    assert len(plans) == len(reliability.Contingency)
     assert all(plan.expected_safe_outcome for plan in plans)
     assert all(plan.recoverability for plan in plans)
     assert all(plan.evidence_requirements for plan in plans)
@@ -70,19 +70,19 @@ def test_passed_scenario_requires_all_safe_execution_evidence():
     )
 
     plan = make_plan(
-        status=reliability.VerificationStatus.PASSED,
+        status=reliability.Verification.PASSED,
         evidence=evidence,
     )
 
-    assert plan.verification_status is reliability.VerificationStatus.PASSED
+    assert plan.verification_status is reliability.Verification.PASSED
 
 
 @pytest.mark.parametrize(
     "status",
     [
-        reliability.VerificationStatus.PASSED,
-        reliability.VerificationStatus.FAILED,
-        reliability.VerificationStatus.INCONCLUSIVE,
+        reliability.Verification.PASSED,
+        reliability.Verification.FAILED,
+        reliability.Verification.INCONCLUSIVE,
     ],
 )
 def test_verification_status_cannot_claim_execution_without_evidence(status):
@@ -93,7 +93,7 @@ def test_verification_status_cannot_claim_execution_without_evidence(status):
 def test_passed_scenario_rejects_missing_requirement():
     with pytest.raises(ValueError, match="missing evidence requirements"):
         make_plan(
-            status=reliability.VerificationStatus.PASSED,
+            status=reliability.Verification.PASSED,
             evidence=(make_evidence("process_termination"),),
         )
 
@@ -109,7 +109,7 @@ def test_passed_scenario_rejects_unsafe_evidence():
 
     with pytest.raises(ValueError, match="safe outcome evidence"):
         make_plan(
-            status=reliability.VerificationStatus.PASSED,
+            status=reliability.Verification.PASSED,
             evidence=evidence,
         )
 
@@ -145,10 +145,10 @@ def test_registry_rejects_incomplete_plan_before_serialization():
 
 
 def test_registry_serialization_is_deterministic_and_round_trips():
-    registry = reliability.Registry.production_beta()
+    registry = reliability.Registry.prerelease()
 
     first = registry.to_json()
-    second = reliability.Registry.production_beta().to_json()
+    second = reliability.Registry.prerelease().to_json()
     restored = reliability.Registry.from_json(first)
 
     assert first == second
@@ -160,7 +160,7 @@ def test_registry_serialization_is_deterministic_and_round_trips():
 
 
 def test_registry_rejects_missing_scenario_in_serialized_plan():
-    record = reliability.Registry.production_beta().to_dict()
+    record = reliability.Registry.prerelease().to_dict()
     record["scenarios"] = record["scenarios"][:-1]
 
     with pytest.raises(ValueError, match="plan is incomplete"):
@@ -179,33 +179,33 @@ def test_registry_marks_a_scenario_passed_only_after_full_safe_evidence():
     registry = reliability.Registry()
     registry.register(make_plan())
 
-    plan = registry.record_evidence(
-        reliability.FaultScenario.PROCESS_DEATH,
+    plan = registry.log(
+        reliability.Contingency.PROCESS_DEATH,
         (
             make_evidence("process_termination"),
             make_evidence("checkpoint_resume"),
         ),
     )
 
-    assert plan.verification_status is reliability.VerificationStatus.PASSED
-    assert registry.plans[reliability.FaultScenario.PROCESS_DEATH] == plan
+    assert plan.verification_status is reliability.Verification.PASSED
+    assert registry.plans[reliability.Contingency.PROCESS_DEATH] == plan
 
 
 def test_registry_marks_unsafe_evidence_failed_and_incomplete_safe_evidence_inconclusive():
     registry = reliability.Registry()
     registry.register(make_plan())
 
-    inconclusive = registry.record_evidence(
-        reliability.FaultScenario.PROCESS_DEATH,
+    inconclusive = registry.log(
+        reliability.Contingency.PROCESS_DEATH,
         (make_evidence("process_termination"),),
     )
     assert (
         inconclusive.verification_status
-        is reliability.VerificationStatus.INCONCLUSIVE
+        is reliability.Verification.INCONCLUSIVE
     )
 
-    failed = registry.record_evidence(
-        reliability.FaultScenario.PROCESS_DEATH,
+    failed = registry.log(
+        reliability.Contingency.PROCESS_DEATH,
         (
             make_evidence("process_termination"),
             make_evidence(
@@ -214,7 +214,7 @@ def test_registry_marks_unsafe_evidence_failed_and_incomplete_safe_evidence_inco
             ),
         ),
     )
-    assert failed.verification_status is reliability.VerificationStatus.FAILED
+    assert failed.verification_status is reliability.Verification.FAILED
 
 
 def test_registry_rejects_evidence_not_declared_by_scenario():
@@ -222,8 +222,8 @@ def test_registry_rejects_evidence_not_declared_by_scenario():
     registry.register(make_plan())
 
     with pytest.raises(ValueError, match="unexpected requirements"):
-        registry.record_evidence(
-            reliability.FaultScenario.PROCESS_DEATH,
+        registry.log(
+            reliability.Contingency.PROCESS_DEATH,
             (make_evidence("unknown"),),
         )
 
@@ -237,7 +237,7 @@ def test_registry_rejects_evidence_mixed_across_executions():
     )
 
     with pytest.raises(ValueError, match="execution_id"):
-        registry.record_evidence(
-            reliability.FaultScenario.PROCESS_DEATH,
+        registry.log(
+            reliability.Contingency.PROCESS_DEATH,
             (make_evidence("process_termination"), second_execution),
         )

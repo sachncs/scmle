@@ -9,7 +9,7 @@ from sklearn import base
 from sklearn import preprocessing
 
 
-class LabelEncodedClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Encoded(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Lets estimators that need integer labels accept arbitrary class labels.
 
     Fits the wrapped classifier on integer-encoded labels and decodes its
@@ -201,7 +201,7 @@ class FitParamsClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ig
         return probabilities
 
 
-class FitParamsRegressor(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Curried(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Passes fixed keyword arguments to the wrapped regressor's `fit`.
 
     Attributes:

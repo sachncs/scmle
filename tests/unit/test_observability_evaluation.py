@@ -11,7 +11,7 @@ def make_policy() -> observability.Requirements:
     """Build a policy with one required signal and one upper bound."""
     return observability.Requirements(
         retention_days=30,
-        required_signals=(observability.SignalKind.LATENCY,),
+        required_signals=(observability.Indicator.LATENCY,),
         redacted_fields=("email",),
         alert_thresholds={"latency_p95_ms": 250.0},
     )
@@ -20,11 +20,11 @@ def make_policy() -> observability.Requirements:
 def make_metric(
     name: str = "latency_p95_ms",
     value: float = 100.0,
-    kind: observability.SignalKind = observability.SignalKind.LATENCY,
+    kind: observability.Indicator = observability.Indicator.LATENCY,
     timestamp: str = "2026-10-20T10:00:00+00:00",
-) -> observability.MetricSample:
+) -> observability.Sample:
     """Build a timestamped metric sample."""
-    return observability.MetricSample(
+    return observability.Sample(
         name=name,
         kind=kind,
         value=value,
@@ -48,8 +48,8 @@ def test_evaluation_fails_closed_for_missing_stale_future_and_breached_metrics()
     policy = observability.Requirements(
         retention_days=1,
         required_signals=(
-            observability.SignalKind.LATENCY,
-            observability.SignalKind.ERROR,
+            observability.Indicator.LATENCY,
+            observability.Indicator.ERROR,
         ),
         redacted_fields=(),
         alert_thresholds={"latency_p95_ms": 250.0},
@@ -82,7 +82,7 @@ def test_evaluation_fails_closed_for_missing_stale_future_and_breached_metrics()
 def test_prediction_log_enforces_sidecar_retention_atomically(tmp_path):
     policy = observability.Requirements(
         retention_days=1,
-        required_signals=(observability.SignalKind.LATENCY,),
+        required_signals=(observability.Indicator.LATENCY,),
         redacted_fields=(),
         alert_thresholds={},
     )
@@ -95,7 +95,7 @@ def test_prediction_log_enforces_sidecar_retention_atomically(tmp_path):
         encoding="utf-8",
     )
 
-    result = log.enforce_retention("2026-10-20T10:00:00+00:00")
+    result = log.purge("2026-10-20T10:00:00+00:00")
 
     assert result["removed"] == 1
     assert result["retained"] == 1
@@ -114,6 +114,6 @@ def test_prediction_log_does_not_replace_malformed_sidecar(tmp_path):
     log.observability_path.write_text(original, encoding="utf-8")
 
     with pytest.raises(ValueError):
-        log.enforce_retention("2026-10-20T10:00:00+00:00")
+        log.purge("2026-10-20T10:00:00+00:00")
 
     assert log.observability_path.read_text(encoding="utf-8") == original

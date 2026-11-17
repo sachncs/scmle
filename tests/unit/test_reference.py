@@ -10,19 +10,17 @@ from scmle.monitoring import reference
 
 def test_psi_is_zero_for_identical_and_grows_with_shift():
     even = numpy.full(10, 0.1)
-    assert reference.population_stability_index(even, even) == pytest.approx(
-        0.0
-    )
+    assert reference.divergence(even, even) == pytest.approx(0.0)
     shifted = numpy.array(
         [0.3, 0.2, 0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.03, 0.02]
     )
-    assert reference.population_stability_index(even, shifted) > 0.25
+    assert reference.divergence(even, shifted) > 0.25
 
 
 def test_numeric_reference_detects_a_mean_shift_but_not_resampling():
     rng = numpy.random.default_rng(0)
     base = pandas.Series(rng.normal(size=5000))
-    ref = reference.NumericReference.fit(base)
+    ref = reference.Deciles.fit(base)
     assert ref.psi(pandas.Series(rng.normal(size=2000))) < 0.05
     assert ref.psi(pandas.Series(rng.normal(loc=1.5, size=2000))) > 0.25
     assert len(ref.edges) == 9 and sum(ref.fractions) == pytest.approx(1.0)
@@ -32,7 +30,7 @@ def test_numeric_reference_tracks_missingness_and_coerces_text():
     values = pandas.Series(
         [1.0, 2.0, numpy.nan, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
     )
-    ref = reference.NumericReference.fit(values)
+    ref = reference.Deciles.fit(values)
     assert ref.missing_rate == pytest.approx(0.1)
     assert ref.proportions(pandas.Series(["x", "y"])).sum() == 0.0
 
@@ -67,33 +65,31 @@ def test_profile_roundtrips_through_json():
     frame = pandas.DataFrame(
         {"n": rng.normal(size=500), "c": rng.choice(["x", "y"], 500)}
     )
-    plan = data.FeaturePlan(("n",), ("c",))
+    plan = data.Blueprint(("n",), ("c",))
     scores = pandas.Series(rng.random(500))
-    profile = reference.ReferenceProfile.build(
+    profile = reference.Baseline.build(
         frame, plan, scores, "p", {"roc_auc": 0.9}
     )
-    clone = reference.ReferenceProfile.from_dict(profile.to_dict())
+    clone = reference.Baseline.from_dict(profile.to_dict())
     assert clone == profile
-    labels = reference.ReferenceProfile.build(
+    labels = reference.Baseline.build(
         frame, plan, pandas.Series(rng.choice(["u", "v"], 500)), "class", {}
     )
     assert isinstance(labels.output, reference.CategoricalReference)
-    assert reference.ReferenceProfile.from_dict(labels.to_dict()) == labels
+    assert reference.Baseline.from_dict(labels.to_dict()) == labels
 
 
 def test_noise_floor_shrinks_with_sample_size():
     rng = numpy.random.default_rng(5)
-    small = reference.NumericReference.fit(pandas.Series(rng.normal(size=100)))
-    large = reference.NumericReference.fit(
-        pandas.Series(rng.normal(size=10000))
-    )
+    small = reference.Deciles.fit(pandas.Series(rng.normal(size=100)))
+    large = reference.Deciles.fit(pandas.Series(rng.normal(size=10000)))
     assert small.rows == 100 and large.rows == 10000
     assert small.noise_floor(500) > 5 * large.noise_floor(500)
     assert small.noise_floor(0) == 0.0
 
 
 def fresh_reference(rng, rows=120):
-    return reference.NumericReference.fit(pandas.Series(rng.normal(size=rows)))
+    return reference.Deciles.fit(pandas.Series(rng.normal(size=rows)))
 
 
 def test_noise_floor_tracks_simulated_psi_without_drift():
@@ -114,7 +110,7 @@ def test_adjusted_psi_cuts_false_alarms_but_keeps_real_drift():
         for trial in range(60)
     ]
     raw_alarms = sum(ref.psi(new) >= 0.1 for ref, new in pairs)
-    adjusted_alarms = sum(ref.adjusted_psi(new) >= 0.1 for ref, new in pairs)
+    adjusted_alarms = sum(ref.adjust(new) >= 0.1 for ref, new in pairs)
     assert raw_alarms > 15 and adjusted_alarms <= 2
     shifted = pandas.Series(rng.normal(loc=2.0, size=600))
-    assert fresh_reference(rng).adjusted_psi(shifted) > 0.25
+    assert fresh_reference(rng).adjust(shifted) > 0.25

@@ -33,8 +33,8 @@ def rsa_jwk(name, kid, **window):
     return {
         "kty": "RSA",
         "kid": kid,
-        "n": tokens.encode_segment(modulus.to_bytes(256, "big")),
-        "e": tokens.encode_segment((65537).to_bytes(3, "big")),
+        "n": tokens.pack(modulus.to_bytes(256, "big")),
+        "e": tokens.pack((65537).to_bytes(3, "big")),
         **window,
     }
 
@@ -43,18 +43,18 @@ def hs_jwk(kid, secret=HS_SECRET, **window):
     return {
         "kty": "oct",
         "kid": kid,
-        "k": tokens.encode_segment(secret),
+        "k": tokens.pack(secret),
         **window,
     }
 
 
-def compact(header, claims, signature_for):
+def compact(header, claims, sign):
     parts = [
-        tokens.encode_segment(json.dumps(part, sort_keys=True).encode())
+        tokens.pack(json.dumps(part, sort_keys=True).encode())
         for part in (header, claims)
     ]
     signing_input = ".".join(parts).encode()
-    signature = tokens.encode_segment(signature_for(signing_input))
+    signature = tokens.pack(sign(signing_input))
     return ".".join([*parts, signature])
 
 

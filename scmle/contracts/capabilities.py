@@ -126,7 +126,7 @@ class Declaration:
     status: Status
     modalities: tuple[Modality, ...]
     required_extras: tuple[str, ...]
-    resources: "ResourceAssumptions"
+    resources: "Resources"
     failure_modes: tuple[str, ...]
     evidence_links: tuple[str, ...] = ()
     limitations: tuple[str, ...] = ()
@@ -152,8 +152,8 @@ class Declaration:
             )
         if not isinstance(self.status, Status):
             raise errors.KindError("status must be Status")
-        if not isinstance(self.resources, ResourceAssumptions):
-            raise errors.KindError("resources must be ResourceAssumptions")
+        if not isinstance(self.resources, Resources):
+            raise errors.KindError("resources must be Resources")
         if not self.modalities:
             raise errors.InputError(
                 "modalities must declare at least one value"
@@ -350,7 +350,7 @@ class Coordinate:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ResourceAssumptions:
+class Resources:
     """Minimum resources and environmental assumptions for a capability.
 
     Attributes:
@@ -425,7 +425,7 @@ class Capability:
     key: Coordinate
     status: Status
     required_extras: tuple[str, ...]
-    resources: ResourceAssumptions
+    resources: Resources
     failure_modes: tuple[str, ...]
     evidence_links: tuple[str, ...] = ()
     limitations: tuple[str, ...] = ()
@@ -442,8 +442,8 @@ class Capability:
             raise errors.KindError("key must be Coordinate")
         if not isinstance(self.status, Status):
             raise errors.KindError("status must be Status")
-        if not isinstance(self.resources, ResourceAssumptions):
-            raise errors.KindError("resources must be ResourceAssumptions")
+        if not isinstance(self.resources, Resources):
+            raise errors.KindError("resources must be Resources")
         object.__setattr__(self, "required_extras", tuple(self.required_extras))
         object.__setattr__(self, "failure_modes", tuple(self.failure_modes))
         object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
@@ -492,7 +492,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
         status=Status.EXPERIMENTAL,
         modalities=(Modality.TABULAR,),
         required_extras=("deeplearning",),
-        resources=ResourceAssumptions(memory_gb=4.0, gpu_required=True),
+        resources=Resources(memory_gb=4.0, gpu_required=True),
         failure_modes=(
             "torch runtime or tabular transformer adapter is unavailable",
             "numeric tabular feature tokenization fails",
@@ -509,7 +509,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
         status=Status.EXTENSION_ONLY,
         modalities=(Modality.TEXT, Modality.DOCUMENT),
         required_extras=("embeddings",),
-        resources=ResourceAssumptions(memory_gb=4.0),
+        resources=Resources(memory_gb=4.0),
         failure_modes=(
             "tokenization or text normalization fails",
             "pretrained weights are unavailable",
@@ -526,7 +526,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
         status=Status.EXTENSION_ONLY,
         modalities=(Modality.IMAGE, Modality.VIDEO),
         required_extras=("multimodal",),
-        resources=ResourceAssumptions(memory_gb=8.0, gpu_required=True),
+        resources=Resources(memory_gb=8.0, gpu_required=True),
         failure_modes=(
             "image or video decoder is unavailable",
             "pretrained weights are unavailable",
@@ -543,7 +543,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
         status=Status.EXTENSION_ONLY,
         modalities=(Modality.AUDIO,),
         required_extras=("multimodal",),
-        resources=ResourceAssumptions(memory_gb=8.0, gpu_required=True),
+        resources=Resources(memory_gb=8.0, gpu_required=True),
         failure_modes=(
             "audio decoder or resampler is unavailable",
             "pretrained weights are unavailable",
@@ -560,7 +560,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
         status=Status.EXTENSION_ONLY,
         modalities=(Modality.VIDEO,),
         required_extras=("multimodal",),
-        resources=ResourceAssumptions(memory_gb=12.0, gpu_required=True),
+        resources=Resources(memory_gb=12.0, gpu_required=True),
         failure_modes=(
             "video decoder or frame sampler is unavailable",
             "pretrained weights are unavailable",
@@ -583,7 +583,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
             Modality.VIDEO,
         ),
         required_extras=("multimodal",),
-        resources=ResourceAssumptions(memory_gb=12.0, gpu_required=True),
+        resources=Resources(memory_gb=12.0, gpu_required=True),
         failure_modes=(
             "modality adapter is caller-supplied",
             "cross-modal alignment is not evidenced",
@@ -599,7 +599,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
         status=Status.EXPERIMENTAL,
         modalities=(Modality.TABULAR,),
         required_extras=("deeplearning",),
-        resources=ResourceAssumptions(memory_gb=2.0),
+        resources=Resources(memory_gb=2.0),
         failure_modes=(
             "torch runtime is unavailable",
             "numeric tabular input is not compatible",
@@ -614,7 +614,7 @@ DEFAULT_MODEL_FAMILY_DECLARATIONS = (
 )
 
 
-class UnsupportedCapabilityError(errors.ConfigError):
+class UnsupportedError(errors.ConfigError):
     """Raised when a requested capability cannot cross the support boundary."""
 
     category = "capability"
@@ -1028,7 +1028,7 @@ class Registry:
         Experimental or extension-only declarations may be used only when the
         caller explicitly includes their status in ``allowed_statuses``. A
         request with any diagnostic is refused with
-        `UnsupportedCapabilityError` (raised by `raise_unsupported`) whose
+        `UnsupportedError` (raised by `raise_unsupported`) whose
         message is the first diagnostic. `TypeError` from `diagnose` for
         arguments of the wrong type propagates unchanged.
 
@@ -1062,7 +1062,7 @@ class Registry:
             raise errors.ConfigError("capability resolution failed")
         return capability
 
-    def list_capabilities(self) -> tuple[Capability, ...]:
+    def catalogue(self) -> tuple[Capability, ...]:
         """Returns declarations in deterministic key order."""
         return tuple(
             self.records[key]
@@ -1087,7 +1087,7 @@ class Registry:
                 for declaration in self.list_model_families()
             ],
             "capabilities": [
-                capability.to_dict() for capability in self.list_capabilities()
+                capability.to_dict() for capability in self.catalogue()
             ],
         }
 
@@ -1119,7 +1119,7 @@ class Registry:
             diagnostics: The diagnostics behind the refusal.
 
         Raises:
-            UnsupportedCapabilityError: Always, with details naming the key, the
+            UnsupportedError: Always, with details naming the key, the
                 reason, the diagnostics and the registered keys.
         """
         details = {
@@ -1128,10 +1128,10 @@ class Registry:
             "key": key.to_dict(),
             "diagnostics": [diagnostic.to_dict() for diagnostic in diagnostics],
             "registered_keys": [
-                item.key.to_dict() for item in self.list_capabilities()
+                item.key.to_dict() for item in self.catalogue()
             ],
         }
-        raise UnsupportedCapabilityError(
+        raise UnsupportedError(
             f"unsupported capability before training: {reason}; "
             f"key={key.to_dict()}",
             details,

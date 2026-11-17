@@ -181,11 +181,11 @@ def test_adapter_owned_observation_supports_unknown_shapes():
         shape=(12, 4),
         schema=(catalog.Field("event", "custom"),),
         sample_count=12,
-        missingness=catalog.MissingnessSummary("not_observed", 0, 0, 0, {}),
-        duplicates=catalog.DuplicateSummary(
+        missingness=catalog.Missingness("not_observed", 0, 0, 0, {}),
+        duplicates=catalog.Duplication(
             "not_observed", 0, 0.0, "adapter did not expose row identity"
         ),
-        label=catalog.LabelSummary("not_declared", None, 0, 0, 0, {}),
+        label=catalog.Labeling("not_declared", None, 0, 0, 0, {}),
         content_identity="sha256:" + "b" * 64,
         limitations=("adapter_summary_only",),
         release_blockers=("adapter_schema_review_required",),
@@ -227,15 +227,15 @@ def test_contract_components_reject_invalid_accounting():
     with pytest.raises(ValueError, match="data_type"):
         catalog.Field("x", " ")
     with pytest.raises(ValueError, match="status"):
-        catalog.MissingnessSummary(" ", 0, 0, 0, {})
+        catalog.Missingness(" ", 0, 0, 0, {})
     with pytest.raises(TypeError, match="total_values"):
-        catalog.MissingnessSummary("observed", True, 0, 0, {})
+        catalog.Missingness("observed", True, 0, 0, {})
     with pytest.raises(ValueError, match="missing_values"):
-        catalog.MissingnessSummary("observed", 1, 2, 0, {})
+        catalog.Missingness("observed", 1, 2, 0, {})
     with pytest.raises(ValueError, match="by_field"):
-        catalog.MissingnessSummary("observed", 1, 0, 0, {"x": -1})
+        catalog.Missingness("observed", 1, 0, 0, {"x": -1})
     with pytest.raises(ValueError, match="missing_fraction"):
-        catalog.MissingnessSummary.from_dict(
+        catalog.Missingness.from_dict(
             {
                 "status": "observed",
                 "total_values": 2,
@@ -244,23 +244,23 @@ def test_contract_components_reject_invalid_accounting():
                 "missing_fraction": 0.0,
             }
         )
-    assert catalog.MissingnessSummary("observed", 0, 0, 0, {}).fraction == 0
+    assert catalog.Missingness("observed", 0, 0, 0, {}).fraction == 0
     with pytest.raises(ValueError, match="duplicate status"):
-        catalog.DuplicateSummary(" ", 0, 0.0, "method")
+        catalog.Duplication(" ", 0, 0.0, "method")
     with pytest.raises(TypeError, match="duplicate_rows"):
-        catalog.DuplicateSummary("observed", True, 0.0, "method")
+        catalog.Duplication("observed", True, 0.0, "method")
     with pytest.raises(ValueError, match="duplicate_fraction"):
-        catalog.DuplicateSummary("observed", 0, 1.1, "method")
+        catalog.Duplication("observed", 0, 1.1, "method")
     with pytest.raises(ValueError, match="label status"):
-        catalog.LabelSummary(" ", None, 0, 0, 0, {})
+        catalog.Labeling(" ", None, 0, 0, 0, {})
     with pytest.raises(ValueError, match="label field"):
-        catalog.LabelSummary("observed", " ", 0, 0, 0, {})
+        catalog.Labeling("observed", " ", 0, 0, 0, {})
     with pytest.raises(ValueError, match="distinct_count"):
-        catalog.LabelSummary("observed", "y", 0, 0, 1, {})
+        catalog.Labeling("observed", "y", 0, 0, 1, {})
     with pytest.raises(ValueError, match="distribution"):
-        catalog.LabelSummary("observed", "y", 1, 0, 1, {"a": -1})
+        catalog.Labeling("observed", "y", 1, 0, 1, {"a": -1})
     with pytest.raises(ValueError, match="does not match"):
-        catalog.LabelSummary("observed", "y", 1, 0, 1, {})
+        catalog.Labeling("observed", "y", 1, 0, 1, {})
 
 
 def test_scalar_series_and_nested_value_observers_cover_type_boundaries():
@@ -273,20 +273,18 @@ def test_scalar_series_and_nested_value_observers_cover_type_boundaries():
     assert series_result.data_kind == "pandas_series"
     assert scalar.shape == () and scalar.sample_count == 1
     assert dated.data_kind == "scalar"
-    assert catalog.canonical_value(b"x")["bytes_length"] == 1
-    assert catalog.canonical_value(numpy.int64(4)) == 4
-    assert catalog.canonical_value(datetime.date(2026, 10, 23)) == (
-        "2026-10-23"
-    )
-    assert catalog.canonical_value({"b": 2, "a": 1}) == {"a": 1, "b": 2}
-    assert catalog.canonical_value((1, 2)) == [1, 2]
-    assert catalog.canonical_value({1, 2}) == [1, 2]
-    assert catalog.canonical_value(float("nan")) == {"non_finite": "nan"}
-    assert catalog.canonical_value(float("-inf")) == {"non_finite": "-inf"}
-    assert catalog.canonical_value(numpy.asarray([1, 2])) == [1, 2]
-    assert catalog.canonical_value(pandas.NA) is None
+    assert catalog.canonicalize(b"x")["bytes_length"] == 1
+    assert catalog.canonicalize(numpy.int64(4)) == 4
+    assert catalog.canonicalize(datetime.date(2026, 10, 23)) == ("2026-10-23")
+    assert catalog.canonicalize({"b": 2, "a": 1}) == {"a": 1, "b": 2}
+    assert catalog.canonicalize((1, 2)) == [1, 2]
+    assert catalog.canonicalize({1, 2}) == [1, 2]
+    assert catalog.canonicalize(float("nan")) == {"non_finite": "nan"}
+    assert catalog.canonicalize(float("-inf")) == {"non_finite": "-inf"}
+    assert catalog.canonicalize(numpy.asarray([1, 2])) == [1, 2]
+    assert catalog.canonicalize(pandas.NA) is None
     with pytest.raises(TypeError, match="deterministically catalog"):
-        catalog.canonical_value(object())
+        catalog.canonicalize(object())
 
 
 def test_label_and_source_boundaries_are_explicit():
@@ -329,9 +327,9 @@ def test_raw_and_opaque_identity_overrides_are_validated():
             shape=(),
             schema=(),
             sample_count=1,
-            missingness=catalog.MissingnessSummary("not_observed", 0, 0, 0, {}),
-            duplicates=catalog.DuplicateSummary("not_observed", 0, 0.0, "none"),
-            label=catalog.LabelSummary("not_declared", None, 0, 0, 0, {}),
+            missingness=catalog.Missingness("not_observed", 0, 0, 0, {}),
+            duplicates=catalog.Duplication("not_observed", 0, 0.0, "none"),
+            label=catalog.Labeling("not_declared", None, 0, 0, 0, {}),
             content_identity="bad",
             limitations=("adapter_only",),
         )

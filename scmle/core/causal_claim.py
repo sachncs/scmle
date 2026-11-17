@@ -57,7 +57,7 @@ CLAIM_ID = "causal_primary_theta_zero"
 CLAIM_FILE = "causal_claims.json"
 
 
-def load_dag(path: str | None) -> scmle.data.admissibility.dag.Dag | None:
+def unseal(path: str | None) -> scmle.data.admissibility.dag.Dag | None:
     """Loads the DAG hypothesis a causal block declares, verifying its hash.
 
     Args:
@@ -88,7 +88,7 @@ def registration(
     dag: scmle.data.admissibility.dag.Dag | None,
     error_budget: budget.ErrorBudget,
     exploration_rows: int,
-) -> confirm.RegisteredClaim:
+) -> confirm.Commitment:
     """Returns the claim as it is fixed before `C` is opened.
 
     Args:
@@ -114,7 +114,7 @@ def registration(
         "alpha_confirm": str(error_budget.confirmation.alpha_confirm),
         "exploration_rows": exploration_rows,
     }
-    return confirm.RegisteredClaim(
+    return confirm.Commitment(
         CLAIM_ID,
         KIND,
         f"{spec.estimand} of {spec.treatment} on {spec.outcome} differs from "
@@ -137,7 +137,7 @@ def jsonable(document: Mapping[str, Any]) -> dict[str, Any]:
     return dict(json.loads(json.dumps(document, default=str)))
 
 
-def verified_attestors(
+def credit(
     spec: causal.Question,
     plan: select.Plan,
     charter_hash: str,
@@ -174,7 +174,7 @@ def verified_attestors(
     return attest.apply(
         spec.attestors,
         given,
-        run.needed_assumptions(plan.primary, spec),
+        run.prerequisites(plan.primary, spec),
         charter_hash,
         datetime.datetime.now().astimezone().date().isoformat(),
         signing_key,
@@ -193,7 +193,7 @@ def build_runner(
     dag_report: Mapping[str, Any] | None = None,
     charter_hash: str | None = None,
     signing_key: str | bytes | None = None,
-) -> confirm.ClaimRunner | None:
+) -> confirm.Docket | None:
     """Returns the runner for the registered primary claim, if identified.
 
     Args:
@@ -220,7 +220,7 @@ def build_runner(
     Raises:
         ConfigError: If the block names attestors, none were supplied, and
             no charter hash was given to verify attestations against, or
-            verifying them fails as in `verified_attestors`.
+            verifying them fails as in `credit`.
     """
     plan = select.select(spec, dag)
     if plan.primary is None:
@@ -230,13 +230,13 @@ def build_runner(
     if spec.attestors and attestors is None:
         if charter_hash is None:
             raise errors.ConfigError("attestors need the charter hash")
-        applied = verified_attestors(spec, plan, charter_hash, signing_key)
+        applied = credit(spec, plan, charter_hash, signing_key)
         attestors = applied.accepted
         attestation_report = applied.to_dict()
 
     def evaluate(
         features: pandas.DataFrame, target: pandas.Series
-    ) -> confirm.ClaimRun:
+    ) -> confirm.Output:
         released = features.copy()
         released[target_name] = target
         outcome = run.identify(
@@ -251,8 +251,8 @@ def build_runner(
             attestation_report=attestation_report,
         )
         documents = {k: jsonable(v) for k, v in outcome.documents.items()}
-        return confirm.ClaimRun(
+        return confirm.Output(
             {CLAIM_ID: str(documents[CLAIM_FILE]["status"])}, documents
         )
 
-    return confirm.ClaimRunner((claim,), evaluate)
+    return confirm.Docket((claim,), evaluate)

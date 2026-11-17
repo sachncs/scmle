@@ -11,7 +11,7 @@ from scmle.contracts import errors
 from scmle.contracts import observability
 
 
-class SLOStatus(enum.StrEnum):
+class Status(enum.StrEnum):
     """Outcome of evaluating one SLO window.
 
     Attributes:
@@ -70,7 +70,7 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SLOTarget:
+class Slo:
     """One upper-bound operational objective and its incident ownership.
 
     Attributes:
@@ -87,7 +87,7 @@ class SLOTarget:
 
     name: str
     metric_name: str
-    kind: observability.SignalKind
+    kind: observability.Indicator
     maximum: float
     window_days: int
     minimum_samples: int
@@ -111,8 +111,8 @@ class SLOTarget:
         ):
             require_text(getattr(self, field_name), field_name)
         kind: Any = self.kind  # may be text from a persisted record
-        if not isinstance(kind, observability.SignalKind):
-            object.__setattr__(self, "kind", observability.SignalKind(kind))
+        if not isinstance(kind, observability.Indicator):
+            object.__setattr__(self, "kind", observability.Indicator(kind))
         if not math.isfinite(self.maximum) or self.maximum < 0:
             raise errors.InputError("maximum must be finite and non-negative")
         if self.window_days < 1:
@@ -140,7 +140,7 @@ class SLOTarget:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SLOEvaluation:
+class Assessment:
     """Auditable result of one SLO evaluation window.
 
     Attributes:
@@ -155,9 +155,9 @@ class SLOEvaluation:
         reason: One sentence explaining the status.
     """
 
-    target: SLOTarget
+    target: Slo
     observed_at: str
-    status: SLOStatus
+    status: Status
     sample_count: int
     in_window_count: int
     observed_maximum: float | None
@@ -168,17 +168,17 @@ class SLOEvaluation:
         """Validates the result and its measurable bounds.
 
         Raises:
-            TypeError: If `target` is not an `SLOTarget`.
+            TypeError: If `target` is not an `Slo`.
             ValueError: If a count is negative, the in-window count exceeds the
                 sample count, the observed maximum is negative or not finite,
                 the error budget is outside [0, 1], or the reason is blank.
         """
-        if not isinstance(self.target, SLOTarget):
-            raise errors.KindError("target must be SLOTarget")
+        if not isinstance(self.target, Slo):
+            raise errors.KindError("target must be Slo")
         parse_timestamp(self.observed_at, "observed_at")
         status: Any = self.status  # may be text from a persisted record
-        if not isinstance(status, SLOStatus):
-            object.__setattr__(self, "status", SLOStatus(status))
+        if not isinstance(status, Status):
+            object.__setattr__(self, "status", Status(status))
         if self.sample_count < 0 or self.in_window_count < 0:
             raise errors.InputError("sample counts must not be negative")
         if self.in_window_count > self.sample_count:
@@ -205,9 +205,9 @@ class SLOEvaluation:
     def incident_required(self) -> bool:
         """Whether the operator must follow the target's incident path."""
         return self.status in {
-            SLOStatus.BREACHED,
-            SLOStatus.INSUFFICIENT_DATA,
-            SLOStatus.INVALID,
+            Status.BREACHED,
+            Status.INSUFFICIENT_DATA,
+            Status.INVALID,
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -235,11 +235,11 @@ class SLOEvaluation:
 
 
 def evaluate(
-    target: SLOTarget,
-    samples: Sequence[observability.MetricSample],
+    target: Slo,
+    samples: Sequence[observability.Sample],
     *,
     observed_at: str,
-) -> SLOEvaluation:
+) -> Assessment:
     """Evaluates one target over its declared time window.
 
     The maximum observed value is used deliberately: a single breach is not
@@ -259,10 +259,10 @@ def evaluate(
         window maximum with the target.
 
     Raises:
-        TypeError: If `target` is not an `SLOTarget`.
+        TypeError: If `target` is not an `Slo`.
     """
-    if not isinstance(target, SLOTarget):
-        raise errors.KindError("target must be SLOTarget")
+    if not isinstance(target, Slo):
+        raise errors.KindError("target must be Slo")
     observed_timestamp = parse_timestamp(observed_at, "observed_at")
     window_start = observed_timestamp - datetime.timedelta(
         days=target.window_days
@@ -286,10 +286,10 @@ def evaluate(
         <= observed_timestamp
     )
     if future:
-        return SLOEvaluation(
+        return Assessment(
             target=target,
             observed_at=observed_at,
-            status=SLOStatus.INVALID,
+            status=Status.INVALID,
             sample_count=len(matching),
             in_window_count=len(in_window),
             observed_maximum=None,
@@ -297,10 +297,10 @@ def evaluate(
             reason="future metric samples cannot support an SLO decision",
         )
     if len(in_window) < target.minimum_samples:
-        return SLOEvaluation(
+        return Assessment(
             target=target,
             observed_at=observed_at,
-            status=SLOStatus.INSUFFICIENT_DATA,
+            status=Status.INSUFFICIENT_DATA,
             sample_count=len(matching),
             in_window_count=len(in_window),
             observed_maximum=None,
@@ -313,16 +313,14 @@ def evaluate(
     observed_maximum = max(sample.value for sample in in_window)
     remaining = max(0.0, 1.0 - observed_maximum / max(target.maximum, 1e-12))
     status = (
-        SLOStatus.PASS
-        if observed_maximum <= target.maximum
-        else SLOStatus.BREACHED
+        Status.PASS if observed_maximum <= target.maximum else Status.BREACHED
     )
     reason = (
         f"maximum {observed_maximum:g} is within {target.maximum:g}"
-        if status is SLOStatus.PASS
+        if status is Status.PASS
         else f"maximum {observed_maximum:g} exceeds {target.maximum:g}"
     )
-    return SLOEvaluation(
+    return Assessment(
         target=target,
         observed_at=observed_at,
         status=status,
@@ -335,9 +333,9 @@ def evaluate(
 
 
 __all__ = [
-    "SLOEvaluation",
-    "SLOStatus",
-    "SLOTarget",
+    "Assessment",
+    "Slo",
+    "Status",
     "evaluate",
     "parse_timestamp",
     "require_text",

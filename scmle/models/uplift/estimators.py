@@ -19,7 +19,7 @@ from sklearn import ensemble
 MIN_ARM_ROWS = 20
 
 
-def outcome_model(
+def booster(
     classify: bool, seed: int
 ) -> (
     ensemble.HistGradientBoostingClassifier
@@ -76,7 +76,7 @@ def split(
     return flag, ~flag
 
 
-class TwoModelLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class TLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """T-learner: one outcome model per arm; uplift is their difference.
 
     Attributes:
@@ -112,11 +112,11 @@ class TwoModelLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn
             numpy.zeros(len(outcome)) if treatment is None else treatment
         )
         values = numpy.asarray(outcome)
-        self.treated_ = outcome_model(self.classify, self.random_state).fit(
+        self.treated_ = booster(self.classify, self.random_state).fit(
             features[treated] if treated.any() else features,
             values[treated] if treated.any() else values,
         )
-        self.control_ = outcome_model(self.classify, self.random_state).fit(
+        self.control_ = booster(self.classify, self.random_state).fit(
             features[control] if control.any() else features,
             values[control] if control.any() else values,
         )
@@ -183,7 +183,7 @@ class SingleModelLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-le
             This fitted learner.
         """
         flag = numpy.zeros(len(outcome)) if treatment is None else treatment
-        self.model_ = outcome_model(self.classify, self.random_state).fit(
+        self.model_ = booster(self.classify, self.random_state).fit(
             numpy.column_stack([numpy.asarray(features), numpy.asarray(flag)]),
             numpy.asarray(outcome),
         )
@@ -252,7 +252,7 @@ class CrossLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn sh
         self.degenerate_ = not (treated.any() and control.any())
         if self.degenerate_:
             return self  # One arm only: no effect can be estimated.
-        first = TwoModelLearner(self.classify, self.random_state).fit(
+        first = TLearner(self.classify, self.random_state).fit(
             matrix, values, treated.astype(int)
         )
         treated_gain = values[treated] - expected(
@@ -295,7 +295,7 @@ class CrossLearner(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn sh
         return effect
 
 
-class ZeroEffect(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Inert(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """The baseline: no row is expected to respond differently."""
 
     def fit(self, features: Any, outcome: Any, treatment: Any = None) -> Self:  # noqa: ARG002 -- fit signature of the uplift estimators

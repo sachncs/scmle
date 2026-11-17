@@ -10,7 +10,7 @@ production.
 
 ## The rule
 
-A human approves every promotion. The registry's `PromotionApproval`, bound to
+A human approves every promotion. The registry's `Sanction`, bound to
 the exact bundle digest, is unchanged. The controller never moves the champion
 alias, and neither does an envelope.
 

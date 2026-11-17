@@ -147,7 +147,7 @@ class Item:
             raise errors.InputError(
                 "source must be non-zero to form a gap ratio"
             )
-        qualification.require_tuple(self.explanations, "explanations")
+        qualification.tupled(self.explanations, "explanations")
 
     @property
     def gap(self) -> float:
@@ -196,11 +196,11 @@ class Verdict:
         }
 
 
-def reconcile_item(
+def settle(
     item: Item,
     tolerance: float = 0.0,
-    gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
-    set_id: qualification.SetId = qualification.SetId.ALL,
+    gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
+    set_id: qualification.Subset = qualification.Subset.ALL,
     seed_path: qualification.SeedPath = (0, DETECTOR_ID, 0),
 ) -> Verdict:
     """Reconciles one quantity.
@@ -302,8 +302,8 @@ class Reconciliation:
 def reconcile(
     items: Sequence[Item],
     tolerance: float = 0.0,
-    gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
-    set_id: qualification.SetId = qualification.SetId.ALL,
+    gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
+    set_id: qualification.Subset = qualification.Subset.ALL,
 ) -> Reconciliation:
     """Reconciles every quantity.
 
@@ -326,7 +326,7 @@ def reconcile(
     if len(set(names)) != len(names):
         raise errors.InputError("item names must be unique")
     results = tuple(
-        reconcile_item(i, tolerance, gate, set_id, (0, DETECTOR_ID, k))
+        settle(i, tolerance, gate, set_id, (0, DETECTOR_ID, k))
         for k, i in enumerate(items)
     )
     return Reconciliation(results, tolerance)

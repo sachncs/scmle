@@ -28,27 +28,27 @@ def attestation(date="2026-01-01", expires="2026-12-31", **kw):
 def make_field(
     name="f",
     lead=3600.0,
-    source=provenance.AsOfSource.ATTESTED,
+    source=provenance.Provenance.ATTESTED,
     serving=provenance.Availability.YES,
     att="default",
     log=None,
-    kind=provenance.AsOfKind.LAG,
+    kind=provenance.Cutoff.LAG,
 ):
-    if source is provenance.AsOfSource.NONE:
-        as_of = provenance.AsOf.unknown()
+    if source is provenance.Provenance.NONE:
+        as_of = provenance.Lead.unknown()
     else:
-        as_of = provenance.AsOf(kind, lead)
+        as_of = provenance.Lead(kind, lead)
     if att == "default":
         att = (
-            attestation() if source is provenance.AsOfSource.ATTESTED else None
+            attestation() if source is provenance.Provenance.ATTESTED else None
         )
-    if source is provenance.AsOfSource.LOG and log is None:
-        log = provenance.LogCheck(100, 0, 0.0)
+    if source is provenance.Provenance.LOG and log is None:
+        log = provenance.Reconstruction(100, 0, 0.0)
     return provenance.FieldProvenance(
         name=name,
         origin=provenance.Origin.INSTRUMENT,
         writer="sensor",
-        written_at=provenance.WrittenAt.EVENT_TIME,
+        written_at=provenance.Stamp.EVENT_TIME,
         overwritten=provenance.Overwritten.NEVER,
         definition_history=("2025-01-01 created",),
         as_of=as_of,
@@ -62,7 +62,7 @@ def make_field(
 def test_undeclared_field_is_unverified_with_everything_unknown():
     record = provenance.undeclared("x")
     assert record.tier() is Tier.UNVERIFIED
-    assert record.as_of == provenance.AsOf.unknown()
+    assert record.as_of == provenance.Lead.unknown()
     assert record.available_at_serving is provenance.Availability.UNKNOWN
 
 
@@ -72,21 +72,21 @@ def test_attested_field_is_attested_not_confirmed():
 
 def test_log_field_with_a_passing_check_is_confirmed():
     record = make_field(
-        source=provenance.AsOfSource.LOG, kind=provenance.AsOfKind.TIMESTAMP
+        source=provenance.Provenance.LOG, kind=provenance.Cutoff.TIMESTAMP
     )
     assert record.tier() is Tier.CONFIRMED
 
 
 def test_log_field_with_a_failing_check_and_no_attestation_is_unverified():
-    log = provenance.LogCheck(100, 5, 0.0)
-    record = make_field(source=provenance.AsOfSource.LOG, log=log, att=None)
+    log = provenance.Reconstruction(100, 5, 0.0)
+    record = make_field(source=provenance.Provenance.LOG, log=log, att=None)
     assert record.tier() is Tier.UNVERIFIED
 
 
 def test_failing_log_with_an_attestation_falls_back_to_attested():
-    log = provenance.LogCheck(100, 5, 0.0)
+    log = provenance.Reconstruction(100, 5, 0.0)
     record = make_field(
-        source=provenance.AsOfSource.LOG, log=log, att=attestation()
+        source=provenance.Provenance.LOG, log=log, att=attestation()
     )
     assert record.tier(DAY) is Tier.ATTESTED
 
@@ -99,10 +99,10 @@ def test_expired_attestation_is_unverified():
 
 def test_attestation_validity_is_inclusive_at_both_ends():
     a = attestation(date="2026-06-15", expires="2026-06-20")
-    assert a.valid_on(datetime.date(2026, 6, 15))
-    assert a.valid_on(datetime.date(2026, 6, 20))
-    assert not a.valid_on(datetime.date(2026, 6, 14))
-    assert not a.valid_on(datetime.date(2026, 6, 21))
+    assert a.effective(datetime.date(2026, 6, 15))
+    assert a.effective(datetime.date(2026, 6, 20))
+    assert not a.effective(datetime.date(2026, 6, 14))
+    assert not a.effective(datetime.date(2026, 6, 21))
 
 
 def test_attestation_needs_named_evidence_and_ordered_dates():
@@ -119,13 +119,13 @@ def test_attestation_needs_named_evidence_and_ordered_dates():
 
 def test_as_of_rule_consistency():
     with pytest.raises(ValueError, match="no lead"):
-        provenance.AsOf(provenance.AsOfKind.UNKNOWN, 1.0)
+        provenance.Lead(provenance.Cutoff.UNKNOWN, 1.0)
     with pytest.raises(ValueError, match="needs lead_seconds"):
-        provenance.AsOf(provenance.AsOfKind.LAG, None)
+        provenance.Lead(provenance.Cutoff.LAG, None)
     with pytest.raises(ValueError):
-        provenance.AsOf(provenance.AsOfKind.LAG, float("nan"))
-    assert provenance.AsOf(provenance.AsOfKind.LAG, -5.0).is_known
-    assert not provenance.AsOf.unknown().is_known
+        provenance.Lead(provenance.Cutoff.LAG, float("nan"))
+    assert provenance.Lead(provenance.Cutoff.LAG, -5.0).given
+    assert not provenance.Lead.unknown().given
 
 
 def test_source_and_rule_must_agree():
@@ -134,11 +134,11 @@ def test_source_and_rule_must_agree():
             "f",
             provenance.Origin.MANUAL,
             "w",
-            provenance.WrittenAt.UNKNOWN,
+            provenance.Stamp.UNKNOWN,
             provenance.Overwritten.UNKNOWN,
             (),
-            provenance.AsOf(provenance.AsOfKind.LAG, 1.0),
-            provenance.AsOfSource.NONE,
+            provenance.Lead(provenance.Cutoff.LAG, 1.0),
+            provenance.Provenance.NONE,
             provenance.Availability.YES,
         )
     with pytest.raises(ValueError, match="cannot have a source"):
@@ -146,11 +146,11 @@ def test_source_and_rule_must_agree():
             "f",
             provenance.Origin.MANUAL,
             "w",
-            provenance.WrittenAt.UNKNOWN,
+            provenance.Stamp.UNKNOWN,
             provenance.Overwritten.UNKNOWN,
             (),
-            provenance.AsOf.unknown(),
-            provenance.AsOfSource.LOG,
+            provenance.Lead.unknown(),
+            provenance.Provenance.LOG,
             provenance.Availability.YES,
         )
     with pytest.raises(ValueError, match="needs an attestation"):
@@ -160,27 +160,27 @@ def test_source_and_rule_must_agree():
             "f",
             provenance.Origin.MANUAL,
             "w",
-            provenance.WrittenAt.UNKNOWN,
+            provenance.Stamp.UNKNOWN,
             provenance.Overwritten.UNKNOWN,
             (),
-            provenance.AsOf(provenance.AsOfKind.TIMESTAMP, 1.0),
-            provenance.AsOfSource.LOG,
+            provenance.Lead(provenance.Cutoff.TIMESTAMP, 1.0),
+            provenance.Provenance.LOG,
             provenance.Availability.YES,
         )
 
 
 def test_log_check_passes_at_the_tolerance_and_fails_above_it():
-    assert provenance.LogCheck(100, 5, 0.05).passed
-    assert not provenance.LogCheck(100, 6, 0.05).passed
-    assert provenance.LogCheck(100, 0, 0.0).passed
-    assert not provenance.LogCheck(100, 1, 0.0).passed
-    assert provenance.LogCheck(200, 3, 0.0).rate == pytest.approx(0.015)
+    assert provenance.Reconstruction(100, 5, 0.05).passed
+    assert not provenance.Reconstruction(100, 6, 0.05).passed
+    assert provenance.Reconstruction(100, 0, 0.0).passed
+    assert not provenance.Reconstruction(100, 1, 0.0).passed
+    assert provenance.Reconstruction(200, 3, 0.0).rate == pytest.approx(0.015)
     with pytest.raises(ValueError):
-        provenance.LogCheck(10, 11, 0.0)
+        provenance.Reconstruction(10, 11, 0.0)
     with pytest.raises(ValueError):
-        provenance.LogCheck(0, 0, 0.0)
+        provenance.Reconstruction(0, 0, 0.0)
     with pytest.raises(ValueError):
-        provenance.LogCheck(10, 1, 1.5)
+        provenance.Reconstruction(10, 1, 1.5)
 
 
 def test_records_round_trip_through_json():
@@ -188,8 +188,8 @@ def test_records_round_trip_through_json():
         make_field("a"),
         make_field(
             "b",
-            source=provenance.AsOfSource.LOG,
-            kind=provenance.AsOfKind.TIMESTAMP,
+            source=provenance.Provenance.LOG,
+            kind=provenance.Cutoff.TIMESTAMP,
         ),
         provenance.undeclared("c"),
     ]
@@ -246,7 +246,7 @@ def test_table_rejects_duplicate_names():
 
 
 def test_no_field_is_confirmed_without_a_log():
-    for source in (provenance.AsOfSource.ATTESTED, provenance.AsOfSource.NONE):
+    for source in (provenance.Provenance.ATTESTED, provenance.Provenance.NONE):
         assert make_field(source=source).tier(DAY) is not Tier.CONFIRMED
 
 

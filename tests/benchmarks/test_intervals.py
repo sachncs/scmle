@@ -6,7 +6,7 @@ from benchmarks import intervals
 
 
 def test_the_interval_matches_a_hand_computed_student_t():
-    mean, low, high = intervals.mean_interval([1.0, 2.0, 3.0])
+    mean, low, high = intervals.wald([1.0, 2.0, 3.0])
 
     assert mean == 2.0
     # t(0.975, 2) = 4.3027; s = 1; margin = 4.3027 / sqrt(3)
@@ -15,7 +15,7 @@ def test_the_interval_matches_a_hand_computed_student_t():
 
 
 def test_one_seed_has_no_interval():
-    assert intervals.mean_interval([0.7]) == (0.7, 0.7, 0.7)
+    assert intervals.wald([0.7]) == (0.7, 0.7, 0.7)
 
 
 def test_advantage_follows_the_metric_direction():

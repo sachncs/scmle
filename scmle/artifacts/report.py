@@ -33,7 +33,7 @@ class Renderer:
             *result.profile.quality_findings,
             *result.profile.risk_findings,
         )
-        warning = result.profile.screen_warning
+        warning = result.profile.admonition
         rest = [f for f in findings if f != warning]
         items = (
             "".join(f"<li>{escape(f)}</li>" for f in rest) or "<li>none</li>"
@@ -43,7 +43,7 @@ class Renderer:
                 items if rest else ""
             )
         summary = escape(result.plan.summary()).replace("\n", "<br>")
-        importance = result.feature_importance().head(10)
+        importance = result.salience().head(10)
         importance_html = (
             importance.to_html(
                 index=False, border=0, float_format=lambda v: f"{v:.4f}"

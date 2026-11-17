@@ -26,7 +26,7 @@ pinned or documented as a contract.
 
 The data-qualification records and helpers live below the pinned top-level API
 and are extension surfaces until promoted: `scmle.contracts.qualification`
-(`Check`, `Claim`, `Certificate`, `Tier`, `Decision`, `SetId`),
+(`Check`, `Claim`, `Certificate`, `Tier`, `Decision`, `Subset`),
 `scmle.data.ledger.budget` (`ErrorBudget` and the budget functions) and
 `scmle.core.randomness` (keyed random streams). Rule: new qualification names
 are added without touching any entry in `tests/fixtures/public_api.json`, and
@@ -47,12 +47,12 @@ the `leakage_findings` method and the `"leakage"` string match that drove
 `leakage_policy="block"`) are gone. `leakage_policy` keeps its values and its
 meaning at the top level (`Project(...)` and the snapshot in
 `tests/fixtures/public_api.json` are unchanged); what blocks is now a typed
-result, `DatasetProfile.blocking_leaks`, from the permutation screen in
+result, `Portrait.blockers`, from the permutation screen in
 `scmle.data.admissibility.screen`. Behaviour changes that users may notice:
 blocking needs a passing certificate for the mechanism (binary
 classification only; regression and multiclass targets get warnings with
 p-values), the screen also reports a value recorded only for some outcomes
-when most rows are blank, and `DatasetProfile` gained the optional field
+when most rows are blank, and `Portrait` gained the optional field
 `leakage` (default empty) and its `to_dict` key. The fingerprint keeps its
 keys: `target_association` is still computed as a descriptive statistic with
 no cutoff, and `risk.leakage_hypotheses` now counts screen suspects instead of
@@ -102,7 +102,7 @@ signature.
 Charter format 11 adds the optional `coverage_on_confirmation` field of the
 `uncertainty` block (`scmle.data.charter.uncertainty.Uncertainty`, an
 extension surface; a format 10 charter keeps its hash and signature, both
-pinned). `scmle.evaluation.coverage_confirm`, `coverage.slice_flag`,
+pinned). `scmle.evaluation.coverage_confirm`, `coverage.undercovered`,
 `coverage_slices.flag_gate` and `FlagGate` are additions (extension
 surfaces); the per-slice records of `coverage_report.json` gained `flag`,
 `flag_p_value` and `flag_certified`, and the slice summary `flagged`,
@@ -112,12 +112,12 @@ on C: registered, recomputed, status matches". The snapshot is unchanged.
 `scmle.governance.uncertainty_feed.UncertaintyFeed` is an addition (an
 extension surface; the snapshot is unchanged).
 
-`scmle.governance.rollout_hook.RolloutHook` and
-`Maintainer.restore_previous` are additions (extension surfaces), as
-are `Maintainer.defer_to_rollout` (called by `RolloutHook`; it makes
+`scmle.governance.rollout_hook.Hook` and
+`Maintainer.revert` are additions (extension surfaces), as
+are `Maintainer.delegate` (called by `Hook`; it makes
 the bootstrap rules of `review` and `check_rollback` descriptive, and a
 manager without a bound hook behaves as before) and
-`RolloutHook.review` and `RolloutHook.check_rollback`; the
+`Hook.review` and `Hook.check_rollback`; the
 deployment ledger gained the row kinds `rollout_experiment`,
 `rollout_assignment` and `rollout_decision`, and a ledger without them loads unchanged.
 
@@ -146,7 +146,7 @@ not comparable with published values. Use `proper_scores.mase` or
 requires coverage of at least 0.88 instead of 0.85.
 
 Closed loop (F13). No entry of the pinned surface changed.
-`ModelMonitor.performance` gained the optional arguments `propensity` and
+`Watcher.performance` gained the optional arguments `propensity` and
 `maturity` (default `None`, the previous behaviour). With a propensity, the
 labelled rows are resampled with probability proportional to `1 / propensity`
 before the metrics are computed, a seeded approximation of a weighted metric;
@@ -162,12 +162,12 @@ retrain unless `alarm_gates_retrain` is set, and it should be set only when
 `python -m benchmarks.qualification --check loop` lists the detection-delay
 gate H2 as passed for the policy's settings (today it is descriptive).
 `ModelRegistryStore` gained the optional `guard` and `scope` arguments, the
-method `attach_guard` and the optional `guard_detail` of `promote`; without a
+method `attach` and the optional `guard_detail` of `promote`; without a
 guard behaviour is unchanged.
 
 Causal identification (F10). No entry of the pinned surface changed.
 `scmle.data.charter.contracts.AnalysisEstimand` gained the optional field
-`causal` (`scmle.data.charter.causal.Question`, with `NegativeControl` and
+`causal` (`scmle.data.charter.causal.Question`, with `Control` and
 `Confounding`); it is omitted from the record when unset, so charters of
 format 1 to 3 keep their hash and signature, and a charter that carries it is
 format 4 (an older wrapper carrying it is refused). `DecisionAction` gained the
@@ -184,7 +184,7 @@ cost model when the charter has a decision block and the task is binary, even
 if `decision.threshold_objective` is `none`; without a block it behaves as
 before. `evaluation.json` gained the keys `net_benefit` (null without a block)
 and, inside `decision`, `f11`. `scmle.data.ledger.budget` gained
-`DecisionBudget`, `assign_experiment` and `start_rollback_monitor`.
+`DecisionBudget`, `enroll` and `start_rollback_monitor`.
 
 ## Deployment contract
 
@@ -207,7 +207,7 @@ the request gateway (`Gateway`, `RateLimiter`, `DeniedError`) and the audit
 log (`Log`) are pinned in the snapshot's `surfaces` block. Behaviour changes to existing classes:
 `HttpServing` gained the keyword-only `gateway` and refuses a non-loopback
 `host` without one; `ModalityHttpServing` kept its constructor, gained
-`set_gateway`, and `start` refuses a non-loopback `host` without a gateway.
+`protect`, and `start` refuses a non-loopback `host` without a gateway.
 The deployment ledger gained the row kind `audit`.
 
 ## Governed-data surface

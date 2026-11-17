@@ -58,5 +58,5 @@ def test_to_pandas_copies_and_rejects_non_tables():
     assert frame.loc[0, "a"] == 1
     with pytest.raises(errors.DataError):
         interchange.to_pandas(42)
-    assert not interchange.is_tabular("some/path.csv")
-    assert interchange.is_tabular(pyarrow.table({"a": [1]}))
+    assert not interchange.tablelike("some/path.csv")
+    assert interchange.tablelike(pyarrow.table({"a": [1]}))

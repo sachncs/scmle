@@ -33,7 +33,7 @@ class Modality(enum.StrEnum):
 
 
 @dataclasses.dataclass(frozen=True, slots=True, order=True)
-class ExtensionModality:
+class Bespoke:
     """Stable identity for a caller-defined dataset family.
 
     Extension identities let a dataset family enter the same lifecycle
@@ -72,7 +72,7 @@ class ExtensionModality:
         return f"extension:{self.name}"
 
 
-ModalityIdentity = Modality | ExtensionModality
+ModalityIdentity = Modality | Bespoke
 
 
 def serialise(modality: ModalityIdentity) -> str:
@@ -86,10 +86,10 @@ def serialise(modality: ModalityIdentity) -> str:
         extension name.
 
     Raises:
-        TypeError: If `modality` is not a `Modality` or `ExtensionModality`.
+        TypeError: If `modality` is not a `Modality` or `Bespoke`.
     """
-    if not isinstance(modality, (Modality, ExtensionModality)):
-        raise errors.KindError("modality must be Modality or ExtensionModality")
+    if not isinstance(modality, (Modality, Bespoke)):
+        raise errors.KindError("modality must be Modality or Bespoke")
     return modality.value
 
 
@@ -105,7 +105,7 @@ def restore(value: str) -> ModalityIdentity:
     Raises:
         ValueError: If the value is not a non-empty string, is neither a
             built-in value nor prefixed with ``extension:``, or the text
-            after the prefix is not a valid `ExtensionModality` name.
+            after the prefix is not a valid `Bespoke` name.
     """
     candidate: object = value  # callers may pass a non-string
     if not isinstance(candidate, str) or not candidate.strip():
@@ -118,10 +118,10 @@ def restore(value: str) -> ModalityIdentity:
             raise errors.InputError(
                 f"unknown modality value: {value}"
             ) from None
-        return ExtensionModality(value.removeprefix(prefix))
+        return Bespoke(value.removeprefix(prefix))
 
 
-class LifecycleStage(enum.StrEnum):
+class Phase(enum.StrEnum):
     """Stage that a modality must support before it is production eligible."""
 
     INGESTION = "ingestion"
@@ -141,7 +141,7 @@ class LifecycleStage(enum.StrEnum):
     RECOVERY_AND_RESOURCE_TESTS = "recovery_and_resource_tests"
 
 
-REQUIRED_LIFECYCLE_STAGES = tuple(LifecycleStage)
+REQUIRED_LIFECYCLE_STAGES = tuple(Phase)
 
 
 class Status(enum.StrEnum):
@@ -153,7 +153,7 @@ class Status(enum.StrEnum):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class StageEvidence:
+class Proof:
     """Evidence record for one modality lifecycle stage.
 
     An empty ``evidence_links`` value is allowed while a declaration is being
@@ -168,7 +168,7 @@ class StageEvidence:
         notes: Human-readable boundaries or observations for the stage.
     """
 
-    stage: LifecycleStage
+    stage: Phase
     evidence_links: tuple[str, ...] = ()
     evidence: Mapping[str, object] = dataclasses.field(default_factory=dict)
     notes: tuple[str, ...] = ()
@@ -177,13 +177,13 @@ class StageEvidence:
         """Validates stage identity and evidence text.
 
         Raises:
-            TypeError: If the stage is not a `LifecycleStage` or the evidence is
+            TypeError: If the stage is not a `Phase` or the evidence is
                 not a mapping.
             ValueError: If the evidence is not JSON-native, or a link or note
                 is blank.
         """
-        if not isinstance(self.stage, LifecycleStage):
-            raise errors.KindError("stage must be LifecycleStage")
+        if not isinstance(self.stage, Phase):
+            raise errors.KindError("stage must be Phase")
         object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
         if not isinstance(self.evidence, Mapping):
             raise errors.KindError("evidence must be a mapping")
@@ -225,7 +225,7 @@ class StageEvidence:
         }
 
 
-def check_no_blank_values(
+def blanks(
     fields: tuple[tuple[str, tuple[str, ...]], ...],
 ) -> None:
     """Checks that none of the named text collections holds a blank value.
@@ -259,10 +259,10 @@ class Declaration:
 
     modality: ModalityIdentity
     status: Status
-    stage_evidence: tuple[StageEvidence, ...]
+    stage_evidence: tuple[Proof, ...]
     required_extras: tuple[str, ...] = ()
-    resources: capabilities.ResourceAssumptions = dataclasses.field(
-        default_factory=capabilities.ResourceAssumptions
+    resources: capabilities.Resources = dataclasses.field(
+        default_factory=capabilities.Resources
     )
     failure_modes: tuple[str, ...] = ()
     limitations: tuple[str, ...] = ()
@@ -279,33 +279,24 @@ class Declaration:
                 supported modality lacks evidence for a required lifecycle
                 stage.
         """
-        if not isinstance(self.modality, (Modality, ExtensionModality)):
-            raise errors.KindError(
-                "modality must be Modality or ExtensionModality"
-            )
+        if not isinstance(self.modality, (Modality, Bespoke)):
+            raise errors.KindError("modality must be Modality or Bespoke")
         if not isinstance(self.status, Status):
             raise errors.KindError("status must be Status")
-        if not isinstance(self.resources, capabilities.ResourceAssumptions):
-            raise errors.KindError(
-                "resources must be capabilities.ResourceAssumptions"
-            )
+        if not isinstance(self.resources, capabilities.Resources):
+            raise errors.KindError("resources must be capabilities.Resources")
         object.__setattr__(self, "stage_evidence", tuple(self.stage_evidence))
         object.__setattr__(self, "required_extras", tuple(self.required_extras))
         object.__setattr__(self, "failure_modes", tuple(self.failure_modes))
         object.__setattr__(self, "limitations", tuple(self.limitations))
-        if any(
-            not isinstance(record, StageEvidence)
-            for record in self.stage_evidence
-        ):
-            raise errors.KindError(
-                "stage_evidence must contain StageEvidence records"
-            )
+        if any(not isinstance(record, Proof) for record in self.stage_evidence):
+            raise errors.KindError("stage_evidence must contain Proof records")
         stages = [record.stage for record in self.stage_evidence]
         if len(stages) != len(set(stages)):
             raise errors.InputError(
                 "stage_evidence must not contain duplicate stages"
             )
-        check_no_blank_values(
+        blanks(
             (
                 ("required_extras", self.required_extras),
                 ("failure_modes", self.failure_modes),
@@ -317,7 +308,7 @@ class Declaration:
                 "failure_modes must declare at least one value"
             )
         if (
-            isinstance(self.modality, ExtensionModality)
+            isinstance(self.modality, Bespoke)
             and self.status is not Status.EXTENSION_ONLY
         ):
             raise errors.InputError(
@@ -331,7 +322,7 @@ class Declaration:
             )
 
     @property
-    def missing_stages(self) -> tuple[LifecycleStage, ...]:
+    def missing_stages(self) -> tuple[Phase, ...]:
         """The required lifecycle stages that are missing or lack evidence."""
         evidence = {record.stage: record for record in self.stage_evidence}
         return tuple(
@@ -365,7 +356,7 @@ class Declaration:
         }
 
 
-class UnsupportedModalityError(errors.ConfigError):
+class UnsupportedError(errors.ConfigError):
     """Raised when a modality cannot cross the support boundary."""
 
     category = "modality"
@@ -422,12 +413,10 @@ class Registry:
             The declaration, or None.
 
         Raises:
-            TypeError: If `modality` is not a `Modality` or `ExtensionModality`.
+            TypeError: If `modality` is not a `Modality` or `Bespoke`.
         """
-        if not isinstance(modality, (Modality, ExtensionModality)):
-            raise errors.KindError(
-                "modality must be Modality or ExtensionModality"
-            )
+        if not isinstance(modality, (Modality, Bespoke)):
+            raise errors.KindError("modality must be Modality or Bespoke")
         return self.records.get(modality)
 
     def require(
@@ -440,7 +429,7 @@ class Registry:
         Incomplete declarations fail regardless of requested status. This
         prevents an explicit experimental opt-in from bypassing the lifecycle
         evidence boundary. An absent, incomplete or status-ineligible modality
-        is refused with `UnsupportedModalityError` (raised by
+        is refused with `UnsupportedError` (raised by
         `raise_unsupported`); a non-modality argument raises `TypeError`.
 
         Args:
@@ -474,7 +463,7 @@ class Registry:
             )
         return declaration
 
-    def list_declarations(self) -> tuple[Declaration, ...]:
+    def catalog(self) -> tuple[Declaration, ...]:
         """Returns declarations in deterministic modality order."""
         return tuple(
             self.records[modality]
@@ -485,8 +474,7 @@ class Registry:
         """Returns a deterministic registry representation."""
         return {
             "declarations": [
-                declaration.to_dict()
-                for declaration in self.list_declarations()
+                declaration.to_dict() for declaration in self.catalog()
             ]
         }
 
@@ -509,12 +497,12 @@ class Registry:
 
         Args:
             modality: The modality that was refused; it must be a `Modality`
-                or `ExtensionModality`, otherwise `TypeError` is raised.
+                or `Bespoke`, otherwise `TypeError` is raised.
             reason: Why it was refused.
             details: Extra facts added to the diagnostic.
 
         Raises:
-            UnsupportedModalityError: Always, with a diagnostic naming the
+            UnsupportedError: Always, with a diagnostic naming the
                 modality, the reason and the registered modalities.
         """
         diagnostic: dict[str, object] = {
@@ -522,12 +510,12 @@ class Registry:
             "reason": reason,
             "modality": serialise(modality),
             "registered_modalities": [
-                serialise(item.modality) for item in self.list_declarations()
+                serialise(item.modality) for item in self.catalog()
             ],
         }
         if details:
             diagnostic.update(details)
-        raise UnsupportedModalityError(
+        raise UnsupportedError(
             f"unsupported modality before execution: {reason}; "
             f"modality={serialise(modality)}",
             diagnostic,

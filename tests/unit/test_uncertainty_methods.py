@@ -15,12 +15,12 @@ from scmle.evaluation import ranking
 from scmle.evaluation import reconcile
 from scmle.evaluation import shift_weights
 from scmle.evaluation import task_gate
-from scmle.evaluation.concordance import concordance_index
+from scmle.evaluation.concordance import harrell
 
 
 def test_unit_weights_reduce_to_split_conformal() -> None:
     scores = numpy.random.default_rng(0).random(99)
-    expected = conformal.finite_sample_quantile(scores, 0.9)
+    expected = conformal.cutoff(scores, 0.9)
     assert (
         conformal.weighted_quantile(scores, numpy.ones(99), 1.0, 0.9)
         == expected
@@ -71,35 +71,33 @@ def test_cv_plus_matches_the_definition() -> None:
     folds = rng.permutation(n) % k
     residuals = numpy.abs(rng.standard_normal(n))
     predictions = rng.standard_normal((5, k))
-    lower, upper = conformal.cv_plus_bounds(predictions, folds, residuals, 0.8)
+    lower, upper = conformal.cvplus(predictions, folds, residuals, 0.8)
     for row in range(5):
         expected = brute_force_cv_plus(predictions[row], folds, residuals, 0.8)
         assert (lower[row], upper[row]) == pytest.approx(expected, abs=1e-9)
 
 
 def test_cv_plus_is_unbounded_with_too_few_rows() -> None:
-    lower, upper = conformal.cv_plus_bounds(
+    lower, upper = conformal.cvplus(
         numpy.zeros((1, 2)), numpy.array([0, 1, 0]), numpy.ones(3), 0.95
     )
     assert math.isinf(lower[0]) and math.isinf(upper[0])
     with pytest.raises(ValueError):
-        conformal.cv_plus_bounds(
-            numpy.zeros((1, 2)), numpy.array([5]), numpy.ones(1)
-        )
+        conformal.cvplus(numpy.zeros((1, 2)), numpy.array([5]), numpy.ones(1))
 
 
 def class_calibrator() -> conformal.ConformalCalibrator:
     rng = numpy.random.default_rng(3)
     labels = numpy.array([0] * 60 + [1] * 5)
     probabilities = rng.dirichlet([2, 2], size=65)
-    return conformal.ConformalCalibrator.for_classification(
+    return conformal.ConformalCalibrator.classify(
         labels.tolist(), probabilities, [0, 1]
     )
 
 
 def test_class_conditional_sets_keep_thin_classes_whole() -> None:
     calibrator = class_calibrator()
-    assert calibrator.thin_classes(0.9) == [1]
+    assert calibrator.scarce(0.9) == [1]
     sets = calibrator.sets(numpy.array([[0.99, 0.01]] * 3), 0.9, "class")
     assert all(1 in row for row in sets)
     with pytest.raises(ValueError):
@@ -143,12 +141,12 @@ def test_clopper_pearson_closed_forms() -> None:
 
 
 def test_holm_matches_the_textbook() -> None:
-    assert coverage.holm_rejections([0.001, 0.04, 0.03], 0.05) == [
+    assert coverage.stepdown([0.001, 0.04, 0.03], 0.05) == [
         True,
         False,
         False,
     ]
-    assert coverage.holm_rejections([0.01, 0.02, 0.03], 0.05) == [True] * 3
+    assert coverage.stepdown([0.01, 0.02, 0.03], 0.05) == [True] * 3
 
 
 def test_slice_flag_names_the_undercovered_slice_only() -> None:
@@ -163,17 +161,12 @@ def test_slice_flag_names_the_undercovered_slice_only() -> None:
 
 
 def test_coverage_tier_follows_the_measurement_not_the_attestation() -> None:
-    good = coverage.coverage_summary(numpy.ones(500, dtype=bool), None, 0.9)
-    bad = coverage.coverage_summary(numpy.zeros(500, dtype=bool), None, 0.9)
-    assert coverage.coverage_tier(good) == coverage.CONFIRMED
-    assert (
-        coverage.coverage_tier(bad, attested_exchangeable=True) == "unverified"
-    )
-    assert (
-        coverage.coverage_tier(good, True, clean_holdout=False)
-        == coverage.ATTESTED
-    )
-    assert coverage.coverage_tier(good, False, False) == "unverified"
+    good = coverage.summarise(numpy.ones(500, dtype=bool), None, 0.9)
+    bad = coverage.summarise(numpy.zeros(500, dtype=bool), None, 0.9)
+    assert coverage.grade(good) == coverage.CONFIRMED
+    assert coverage.grade(bad, attested_exchangeable=True) == "unverified"
+    assert coverage.grade(good, True, clean_holdout=False) == coverage.ATTESTED
+    assert coverage.grade(good, False, False) == "unverified"
     report = coverage.coverage_report(
         numpy.ones(100, dtype=bool),
         numpy.ones(100),
@@ -190,7 +183,7 @@ def test_proper_scores_closed_forms() -> None:
     assert proper_scores.pinball_loss(
         y, numpy.array([0.0, 0.0]), 0.9
     ) == pytest.approx(0.9 * 2.0)
-    score = proper_scores.interval_score(
+    score = proper_scores.winkler(
         numpy.array([5.0]), numpy.array([0.0]), numpy.array([4.0]), 0.1
     )
     assert score == pytest.approx(4.0 + 20.0 * 1.0)
@@ -218,14 +211,14 @@ def test_crps_from_quantiles_approaches_the_normal_crps() -> None:
 
 def test_mase_uses_the_training_history_scale() -> None:
     history = numpy.array([1.0, 3.0, 5.0, 7.0])
-    assert proper_scores.insample_scale(history) == 2.0
+    assert proper_scores.naivescale(history) == 2.0
     assert proper_scores.mase(
         numpy.array([9.0]), numpy.array([8.0]), history
     ) == pytest.approx(0.5)
     seasonal = numpy.array([1.0, 2.0, 1.0, 2.0, 1.0])
-    assert proper_scores.insample_scale(seasonal, 2) == 0.0 or True
+    assert proper_scores.naivescale(seasonal, 2) == 0.0 or True
     with pytest.raises(ValueError):
-        proper_scores.insample_scale(history, 4)
+        proper_scores.naivescale(history, 4)
 
 
 def test_same_rows_mase_differs_from_the_standard_one() -> None:
@@ -244,11 +237,11 @@ def test_uncensored_ipcw_concordance_equals_harrell() -> None:
     rng = numpy.random.default_rng(6)
     time = rng.exponential(size=150)
     risk = -time + rng.normal(size=150)
-    weights = ipcw.censoring_weights(time, numpy.ones(150))
+    weights = ipcw.reweight(time, numpy.ones(150))
     assert weights.n_floored == 0
-    assert ipcw.truncated_concordance(
+    assert ipcw.uno(
         time, numpy.ones(150), risk, math.inf, weights
-    ) == pytest.approx(concordance_index(time, numpy.ones(150), risk))
+    ) == pytest.approx(harrell(time, numpy.ones(150), risk))
 
 
 def test_floor_is_counted_and_covariates_change_the_weights() -> None:
@@ -256,12 +249,12 @@ def test_floor_is_counted_and_covariates_change_the_weights() -> None:
     x = rng.standard_normal((300, 1))
     time = rng.exponential(size=300)
     event = (rng.random(300) < 0.4).astype(float)
-    marginal = ipcw.censoring_weights(time, event, None, floor=0.5)
-    covariate = ipcw.censoring_weights(time, event, x)
+    marginal = ipcw.reweight(time, event, None, floor=0.5)
+    covariate = ipcw.reweight(time, event, x)
     assert marginal.n_floored > 0
     assert not numpy.allclose(marginal.weights, covariate.weights)
     with pytest.raises(ValueError):
-        ipcw.censoring_weights(time, event, None, floor=0.0)
+        ipcw.reweight(time, event, None, floor=0.0)
 
 
 def test_mint_is_coherent_and_equals_bottom_up_for_a_bottom_only_covariance() -> (
@@ -286,9 +279,7 @@ def test_query_bootstrap_counts_excluded_queries() -> None:
     relevance = rng.integers(0, 3, 180)
     relevance[queries == 0] = 0
     scores = relevance + rng.normal(size=180)
-    result = ranking.query_bootstrap_ndcg(
-        relevance, scores, queries, replicates=200
-    )
+    result = ranking.cumulate(relevance, scores, queries, replicates=200)
     assert result["excluded"] >= 1 and result["queries"] <= 29
     assert result["lower"] <= result["mean"] <= result["upper"]
 
@@ -301,7 +292,7 @@ def test_shift_weights_estimate_and_refuse() -> None:
     assert same.ratio(first[:3]).shape == (3,)
     small = rng.standard_normal((60, 2))
     far = rng.standard_normal((600, 2)) + numpy.array([2.5, 0.0])
-    with pytest.raises(shift_weights.WeightRefusedError):
+    with pytest.raises(shift_weights.RefusedError):
         shift_weights.weigh(small, far)
 
 

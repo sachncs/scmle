@@ -1,7 +1,7 @@
 """Experiment stores.
 
-`ExperimentStore` is the tracking contract; `SqliteExperimentStore` is the
-zero-service local backend, and `NullExperimentStore` is the do-nothing
+`Store` is the tracking contract; `SqliteExperimentStore` is the
+zero-service local backend, and `Null` is the do-nothing
 implementation that lets callers skip None checks. External trackers (for
 example MLflow) implement the same interface.
 """
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS trials (
 BUSY_TIMEOUT_SECONDS = 30.0
 
 
-class ExperimentStore(abc.ABC):
+class Store(abc.ABC):
     """Persists runs, trials and lineage."""
 
     @abc.abstractmethod
@@ -117,7 +117,7 @@ class ExperimentStore(abc.ABC):
         """
 
     @abc.abstractmethod
-    def history(self) -> list[experiments.HistoricalRun]:
+    def history(self) -> list[experiments.Precedent]:
         """Lists completed runs that carry a dataset fingerprint.
 
         Returns:
@@ -135,7 +135,7 @@ class ExperimentStore(abc.ABC):
             self.update_run(run_id, state=event.kind.removeprefix("state."))
 
 
-class NullExperimentStore(ExperimentStore):
+class Null(Store):
     """Tracking disabled: every operation is a no-op."""
 
     def start_run(
@@ -174,7 +174,7 @@ class NullExperimentStore(ExperimentStore):
         """
         return []
 
-    def trials(self, run_id: str) -> list[dict[str, Any]]:  # noqa: ARG002 -- RunStore.trials interface
+    def trials(self, run_id: str) -> list[dict[str, Any]]:  # noqa: ARG002 -- Workspace.trials interface
         """Returns nothing.
 
         Args:
@@ -185,7 +185,7 @@ class NullExperimentStore(ExperimentStore):
         """
         return []
 
-    def history(self) -> list[experiments.HistoricalRun]:
+    def history(self) -> list[experiments.Precedent]:
         """Returns nothing.
 
         Returns:
@@ -194,7 +194,7 @@ class NullExperimentStore(ExperimentStore):
         return []
 
 
-class SqliteExperimentStore(ExperimentStore):
+class SqliteExperimentStore(Store):
     """Local SQLite tracking database (one file, no services).
 
     Attributes:
@@ -229,7 +229,7 @@ class SqliteExperimentStore(ExperimentStore):
         self.path = pathlib.Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with (
-            durability.path_lock(self.path),
+            durability.latch(self.path),
             self.session(write=False) as connection,
         ):
             connection.executescript(SCHEMA)
@@ -433,7 +433,7 @@ class SqliteExperimentStore(ExperimentStore):
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def history(self) -> list[experiments.HistoricalRun]:
+    def history(self) -> list[experiments.Precedent]:
         """Lists completed, fingerprinted runs, oldest first.
 
         Returns:
@@ -448,7 +448,7 @@ class SqliteExperimentStore(ExperimentStore):
                 "ORDER BY started_at, run_id"
             ).fetchall()
         return [
-            experiments.HistoricalRun(
+            experiments.Precedent(
                 run_id=row["run_id"],
                 dataset_id=row["dataset_id"] or "",
                 data_hash=row["data_hash"] or "",

@@ -9,7 +9,7 @@ promoted.
 
 Two controls:
 
-``permuted_target_control``
+``placebo``
     Permutes the *target* within strata (entity groups, or contiguous time
     blocks) and never globally on structured data, so the dependence between
     rows that share a group or a time block survives while any feature-target
@@ -101,7 +101,7 @@ def percentile(counts: tuple[int, ...], q: float = QUANTILE) -> int:
     return sorted(counts)[quantile_index(len(counts), q)]
 
 
-def percentile_interval(
+def bracket(
     counts: tuple[int, ...],
     q: float = QUANTILE,
     confidence: float = INTERVAL_CONFIDENCE,
@@ -140,7 +140,7 @@ def interval_coverage(
     q: float = QUANTILE,
     confidence: float = INTERVAL_CONFIDENCE,
 ) -> float:
-    """Returns the exact coverage of `percentile_interval` for `b` draws.
+    """Returns the exact coverage of `bracket` for `b` draws.
 
     For continuous draws the number of them below the true q-quantile is
     binomial, and the interval from the k-th to the h-th smallest draw covers
@@ -357,13 +357,13 @@ def summarize(
         observed=observed,
         permuted=counts,
         p95=p95,
-        p95_interval=percentile_interval(counts),
+        p95_interval=bracket(counts),
         exceedance_p=(1 + as_large) / (len(counts) + 1),
         exceeds=observed > p95,
     )
 
 
-def permuted_target_control(
+def placebo(
     discoveries: COUNT_FUNCTION,
     features: pandas.DataFrame,
     target: pandas.Series,
@@ -415,7 +415,7 @@ def permuted_target_control(
     )
 
 
-def shuffle_columns(
+def scramble(
     features: pandas.DataFrame,
     rng: numpy.random.Generator,
     strata: numpy.ndarray | None,
@@ -438,7 +438,7 @@ def shuffle_columns(
     return pandas.DataFrame(out, index=features.index)
 
 
-def shuffle_blocks(
+def jumble(
     features: pandas.DataFrame,
     blocks: numpy.ndarray,
     rng: numpy.random.Generator,
@@ -521,9 +521,9 @@ def resampling_control(
     for repeat in range(b):
         rng = randomness.component_rng(seed, component, repeat)
         if labels is not None and mode == "blocks":
-            changed = shuffle_blocks(features, labels, rng)
+            changed = jumble(features, labels, rng)
         else:
-            changed = shuffle_columns(features, rng, strata)
+            changed = scramble(features, rng, strata)
         counts.append(int(discoveries(changed, target)))
     scope = (
         "blocks"

@@ -20,8 +20,8 @@ from typing import Any
 
 from scmle.contracts import data
 from scmle.contracts import errors
-from scmle.data.modalities.curation import check_split_fractions
-from scmle.data.modalities.curation import partition_group_ids
+from scmle.data.modalities.curation import allocate
+from scmle.data.modalities.curation import proportions
 
 DEVANAGARI_MIN_SHARE = 0.25
 ASCII_LETTER_MIN_SHARE = 0.60
@@ -35,7 +35,7 @@ class Format(enum.StrEnum):
     PDF = "pdf"
 
 
-class DocumentValidationError(errors.DataError):
+class DocumentError(errors.DataError):
     """A document violates an ingestion or contract invariant."""
 
     category = "document_validation"
@@ -59,7 +59,7 @@ class DocumentValidationError(errors.DataError):
         super().__init__(message, context)
 
 
-class DocumentDependencyError(errors.DataError):
+class DependencyError(errors.DataError):
     """An optional parser is required but is not available."""
 
     category = "document_dependency"
@@ -101,7 +101,7 @@ SENSITIVE_PATTERNS: dict[str, re.Pattern[str]] = {
 }
 
 
-def sensitive_matches(content: str) -> dict[str, int]:
+def pii(content: str) -> dict[str, int]:
     """Counts supported sensitive-value patterns without returning values.
 
     Args:
@@ -421,8 +421,8 @@ class Curation:
     language_counts: dict[str, int]
     format_counts: dict[str, int]
     label_counts: dict[str, int]
-    quality_findings: tuple[data.CurationFinding, ...]
-    risk_findings: tuple[data.CurationFinding, ...]
+    quality_findings: tuple[data.Finding, ...]
+    risk_findings: tuple[data.Finding, ...]
     max_characters: int
     max_tokens: int
     layout_coverage: float = 0.0
@@ -440,16 +440,16 @@ class Curation:
     @property
     def unresolved_blocking_findings(
         self,
-    ) -> tuple[data.CurationFinding, ...]:
+    ) -> tuple[data.Finding, ...]:
         """The blocking findings without a safe review disposition.
 
         A disposition is safe when it is resolved, waived or a false
         positive. Quality findings come before risk findings.
         """
         safe_dispositions = {
-            data.FindingDisposition.RESOLVED,
-            data.FindingDisposition.WAIVED,
-            data.FindingDisposition.FALSE_POSITIVE,
+            data.Disposition.RESOLVED,
+            data.Disposition.WAIVED,
+            data.Disposition.FALSE_POSITIVE,
         }
         return tuple(
             finding
@@ -548,25 +548,25 @@ class Sample:
         """Validates content and derives immutable identity fields.
 
         Raises:
-            DocumentValidationError: If the document id or content is blank,
+            DocumentError: If the document id or content is blank,
                 the encoding is not UTF-8, the source digest is not a
                 lowercase SHA-256 digest, a layout element extends past the
                 content, or the layout's source digest differs from the
                 sample's.
         """
         if not self.document_id.strip():
-            raise DocumentValidationError(
+            raise DocumentError(
                 "document_id must not be empty",
                 "empty_document_id",
             )
         if not self.content.strip():
-            raise DocumentValidationError(
+            raise DocumentError(
                 "document content must not be empty",
                 "empty_content",
                 {"document_id": self.document_id},
             )
         if self.encoding.lower().replace("-", "") != "utf8":
-            raise DocumentValidationError(
+            raise DocumentError(
                 "document encoding must be UTF-8",
                 "unsupported_encoding",
                 {"encoding": self.encoding},
@@ -574,7 +574,7 @@ class Sample:
         if self.source_digest is not None and not re.fullmatch(
             r"[0-9a-f]{64}", self.source_digest
         ):
-            raise DocumentValidationError(
+            raise DocumentError(
                 "source_digest must be a lowercase SHA-256 digest",
                 "invalid_source_digest",
                 {"document_id": self.document_id},
@@ -589,7 +589,7 @@ class Sample:
         if self.layout is not None and any(
             element.end > len(self.content) for element in self.layout.elements
         ):
-            raise DocumentValidationError(
+            raise DocumentError(
                 "document layout element exceeds decoded content",
                 "layout_out_of_range",
                 {"document_id": self.document_id},
@@ -600,7 +600,7 @@ class Sample:
             and self.source_digest is not None
             and self.layout.source_digest != self.source_digest
         ):
-            raise DocumentValidationError(
+            raise DocumentError(
                 "document layout source digest does not match the document",
                 "layout_source_mismatch",
                 {"document_id": self.document_id},
@@ -708,7 +708,7 @@ class Split:
         }
 
 
-def label_key(label: str | float | bool | None) -> str:
+def bucketize(label: str | float | bool | None) -> str:
     """Returns a stable human-readable label bucket.
 
     Args:
@@ -722,14 +722,14 @@ def label_key(label: str | float | bool | None) -> str:
     return f"{type(label).__name__}:{label}"
 
 
-def document_finding(
+def flaw(
     finding_id: str,
     severity: data.FindingSeverity,
     scope: dict[str, Any],
     evidence: dict[str, Any],
     remediation: str,
     blocking: bool,
-) -> data.CurationFinding:
+) -> data.Finding:
     """Creates a document-specific finding with one stable rule.
 
     Args:
@@ -743,7 +743,7 @@ def document_finding(
     Returns:
         An open finding with confidence 1.0 and owner ``data-curation``.
     """
-    return data.CurationFinding(
+    return data.Finding(
         finding_id=finding_id,
         rule_version="document-curation.v1",
         severity=severity,
@@ -753,7 +753,7 @@ def document_finding(
         remediation=remediation,
         owner="data-curation",
         reviewer=None,
-        disposition=data.FindingDisposition.OPEN,
+        disposition=data.Disposition.OPEN,
         blocking=blocking,
     )
 
@@ -776,12 +776,12 @@ class Dataset:
         """Validates the collection and derives order-independent identity.
 
         Raises:
-            DocumentValidationError: If there are no samples.
+            DocumentError: If there are no samples.
             TypeError: If an element is not a Sample.
         """
         normalized_samples = tuple(self.samples)
         if not normalized_samples:
-            raise DocumentValidationError(
+            raise DocumentError(
                 "document dataset must contain at least one sample",
                 "empty_dataset",
             )
@@ -869,7 +869,7 @@ class Dataset:
         for sample, profile in zip(self.samples, profiles, strict=True):
             language_counts[profile.language] += 1
             format_counts[sample.format.value] += 1
-            label_counts[label_key(sample.label)] += 1
+            label_counts[bucketize(sample.label)] += 1
 
         layouts = [
             sample.layout
@@ -881,7 +881,7 @@ class Dataset:
             for layout in layouts
             if layout.ocr_confidence is not None
         ]
-        sensitive_counts, sensitive_document_ids = self.sensitive_summary()
+        sensitive_counts, sensitive_document_ids = self.sensitivity()
         quality_findings = self.inspect(
             profiles, duplicate_groups, layouts, max_characters, max_tokens
         )
@@ -933,7 +933,7 @@ class Dataset:
             max_tokens=max_tokens,
         )
 
-    def sensitive_summary(self) -> tuple[dict[str, int], list[str]]:
+    def sensitivity(self) -> tuple[dict[str, int], list[str]]:
         """Counts sensitive-value matches across the corpus.
 
         Returns:
@@ -943,7 +943,7 @@ class Dataset:
         sensitive_counts: defaultdict[str, int] = defaultdict(int)
         sensitive_document_ids: list[str] = []
         for sample in self.samples:
-            matches = sensitive_matches(sample.content)
+            matches = pii(sample.content)
             if matches:
                 sensitive_document_ids.append(sample.document_id)
                 for name, count in matches.items():
@@ -957,7 +957,7 @@ class Dataset:
         layouts: list[Layout],
         max_characters: int,
         max_tokens: int,
-    ) -> list[data.CurationFinding]:
+    ) -> list[data.Finding]:
         """Builds the data-quality findings of the corpus.
 
         Args:
@@ -972,13 +972,13 @@ class Dataset:
             truncated profiles, unknown language and incomplete source
             traceability, in that order.
         """
-        findings: list[data.CurationFinding] = []
+        findings: list[data.Finding] = []
         missing_ocr_confidence = sum(
             layout.ocr_confidence is None for layout in layouts
         )
         if missing_ocr_confidence:
             findings.append(
-                document_finding(
+                flaw(
                     "quality.document-ocr-confidence-missing",
                     data.FindingSeverity.WARNING,
                     {
@@ -997,7 +997,7 @@ class Dataset:
 
         if duplicate_groups:
             findings.append(
-                document_finding(
+                flaw(
                     "quality.duplicate-document-content",
                     data.FindingSeverity.WARNING,
                     {"groups": [list(group) for group in duplicate_groups]},
@@ -1013,7 +1013,7 @@ class Dataset:
         )
         if truncated_ids:
             findings.append(
-                document_finding(
+                flaw(
                     "quality.profile-truncated",
                     data.FindingSeverity.INFO,
                     {"document_ids": list(truncated_ids)},
@@ -1034,7 +1034,7 @@ class Dataset:
         )
         if unknown_ids:
             findings.append(
-                document_finding(
+                flaw(
                     "quality.unknown-language",
                     data.FindingSeverity.WARNING,
                     {"document_ids": list(unknown_ids)},
@@ -1053,7 +1053,7 @@ class Dataset:
         )
         if partially_traceable:
             findings.append(
-                document_finding(
+                flaw(
                     "quality.document-source-traceability-incomplete",
                     data.FindingSeverity.WARNING,
                     {
@@ -1075,7 +1075,7 @@ class Dataset:
         label_counts: Mapping[str, int],
         sensitive_counts: Mapping[str, int],
         sensitive_document_ids: list[str],
-    ) -> list[data.CurationFinding]:
+    ) -> list[data.Finding]:
         """Builds the risk findings of the corpus.
 
         Args:
@@ -1089,11 +1089,11 @@ class Dataset:
             duplicate group and a mix of labelled and unlabelled samples, in
             that order.
         """
-        findings: list[data.CurationFinding] = []
+        findings: list[data.Finding] = []
         sample_by_id = {sample.document_id: sample for sample in self.samples}
         if sensitive_counts:
             findings.append(
-                document_finding(
+                flaw(
                     "risk.document-sensitive-content",
                     data.FindingSeverity.ERROR,
                     {"document_ids": sorted(sensitive_document_ids)},
@@ -1105,12 +1105,12 @@ class Dataset:
             )
         for group in duplicate_groups:
             labels = {
-                label_key(sample_by_id[document_id].label)
+                bucketize(sample_by_id[document_id].label)
                 for document_id in group
             }
             if len(labels) > 1:
                 findings.append(
-                    document_finding(
+                    flaw(
                         "risk.conflicting-duplicate-labels",
                         data.FindingSeverity.ERROR,
                         {"document_ids": list(group)},
@@ -1125,7 +1125,7 @@ class Dataset:
         )
         if mixed_label_state:
             findings.append(
-                document_finding(
+                flaw(
                     "risk.mixed-label-state",
                     data.FindingSeverity.WARNING,
                     {"dataset": self.content_hash},
@@ -1165,12 +1165,12 @@ class Dataset:
             ValueError: If a fraction is outside [0, 1) or the fractions sum
                 to 1 or more.
         """
-        check_split_fractions(validation_fraction, test_fraction)
+        proportions(validation_fraction, test_fraction)
 
         grouped: defaultdict[str, list[Sample]] = defaultdict(list)
         for sample in self.samples:
             grouped[sample.document_id].append(sample)
-        validation_ids, test_ids = partition_group_ids(
+        validation_ids, test_ids = allocate(
             grouped, validation_fraction, test_fraction, seed
         )
         train = tuple(
@@ -1245,7 +1245,7 @@ class Reader:
             ``.text`` or no suffix.
 
         Raises:
-            DocumentValidationError: If no format is given and the suffix is
+            DocumentError: If no format is given and the suffix is
                 not recognised. An explicit value that is not a known format
                 raises ValueError from the enum.
         """
@@ -1258,7 +1258,7 @@ class Reader:
             return Format.PDF
         if suffix in {".txt", ".text", ""}:
             return Format.TEXT
-        raise DocumentValidationError(
+        raise DocumentError(
             f"unsupported document suffix '{suffix}'",
             "unsupported_format",
             {"suffix": suffix},
@@ -1285,10 +1285,10 @@ class Reader:
 
         Returns:
             An immutable decoded document sample. A PDF without a supplied
-            reader raises DocumentDependencyError from `extract`.
+            reader raises DependencyError from `extract`.
 
         Raises:
-            DocumentValidationError: If a path is not an existing file, the
+            DocumentError: If a path is not an existing file, the
                 size exceeds ``max_bytes``, the suffix is not recognised, or
                 the bytes or content are invalid.
         """
@@ -1300,7 +1300,7 @@ class Reader:
         else:
             path = pathlib.Path(source)
             if not path.exists() or not path.is_file():
-                raise DocumentValidationError(
+                raise DocumentError(
                     f"document not found: {path}",
                     "source_not_found",
                     {"source": str(path)},
@@ -1308,7 +1308,7 @@ class Reader:
             resolved_format = self.sniff(path, document_format)
             source_size = path.stat().st_size
             if source_size > self.max_bytes:
-                raise DocumentValidationError(
+                raise DocumentError(
                     "document exceeds the configured size limit",
                     "size_limit",
                     {
@@ -1321,7 +1321,7 @@ class Reader:
             source_uri = path.resolve().as_uri()
 
         if len(raw_bytes) > self.max_bytes:
-            raise DocumentValidationError(
+            raise DocumentError(
                 "document exceeds the configured size limit",
                 "size_limit",
                 {"actual_bytes": len(raw_bytes), "max_bytes": self.max_bytes},
@@ -1330,10 +1330,10 @@ class Reader:
         if resolved_format is Format.PDF:
             content = self.extract(raw_bytes)
         else:
-            content = self.decode_utf8(raw_bytes, resolved_id)
+            content = self.unicode(raw_bytes, resolved_id)
         resolved_layout = layout
         if resolved_layout is None and self.layout_reader is not None:
-            resolved_layout = self.read_layout(
+            resolved_layout = self.overlay(
                 raw_bytes, resolved_id, resolved_format
             )
         return Sample(
@@ -1346,7 +1346,7 @@ class Reader:
             layout=resolved_layout,
         )
 
-    def decode_utf8(self, raw_bytes: bytes, document_id: str) -> str:
+    def unicode(self, raw_bytes: bytes, document_id: str) -> str:
         """Decodes strict UTF-8 and reports the first malformed byte range.
 
         Args:
@@ -1357,14 +1357,14 @@ class Reader:
             The decoded text.
 
         Raises:
-            DocumentValidationError: If the bytes are not valid UTF-8; the
+            DocumentError: If the bytes are not valid UTF-8; the
                 context holds the start and end offsets of the first
                 malformed byte run.
         """
         try:
             content = raw_bytes.decode("utf-8")
         except UnicodeDecodeError as error:
-            raise DocumentValidationError(
+            raise DocumentError(
                 "document is not valid UTF-8",
                 "invalid_encoding",
                 {
@@ -1386,14 +1386,14 @@ class Reader:
             The page texts joined by form feeds.
 
         Raises:
-            DocumentDependencyError: If no PDF reader was supplied or the
+            DependencyError: If no PDF reader was supplied or the
                 reader fails with ImportError.
-            DocumentValidationError: If the reader fails with any other
+            DocumentError: If the reader fails with any other
                 exception, returns no pages, or returns a page that is not
                 text.
         """
         if self.pdf_reader is None:
-            raise DocumentDependencyError(
+            raise DependencyError(
                 "PDF input requires the optional document parser extra",
                 dependency="pypdf",
                 extra="documents",
@@ -1402,27 +1402,27 @@ class Reader:
         try:
             pages = tuple(self.pdf_reader(raw_bytes))
         except ImportError as error:
-            raise DocumentDependencyError(
+            raise DependencyError(
                 "PDF input requires the optional document parser extra",
                 dependency="pypdf",
                 extra="documents",
                 details={"format": Format.PDF.value},
             ) from error
         except Exception as error:
-            raise DocumentValidationError(
+            raise DocumentError(
                 "PDF parser could not decode the source",
                 "pdf_parse_error",
                 {"format": Format.PDF.value},
             ) from error
         if not pages or any(not isinstance(page, str) for page in pages):
-            raise DocumentValidationError(
+            raise DocumentError(
                 "PDF parser returned no valid page text",
                 "pdf_empty_or_invalid",
                 {"page_count": len(pages)},
             )
         return "\f".join(pages)
 
-    def read_layout(
+    def overlay(
         self,
         raw_bytes: bytes,
         document_id: str,
@@ -1440,8 +1440,8 @@ class Reader:
             is set or the callback returns None.
 
         Raises:
-            DocumentDependencyError: If the callback fails with ImportError.
-            DocumentValidationError: If the callback fails with any other
+            DependencyError: If the callback fails with ImportError.
+            DocumentError: If the callback fails with any other
                 exception or returns something other than a Layout
                 or None.
         """
@@ -1450,20 +1450,20 @@ class Reader:
         try:
             layout = self.layout_reader(raw_bytes, document_id, document_format)
         except ImportError as error:
-            raise DocumentDependencyError(
+            raise DependencyError(
                 "document layout extraction requires its optional parser extra",
                 dependency="document-layout-parser",
                 extra="documents",
                 details={"format": document_format.value},
             ) from error
         except Exception as error:
-            raise DocumentValidationError(
+            raise DocumentError(
                 "document layout extractor could not decode the source",
                 "layout_parse_error",
                 {"document_id": document_id, "format": document_format.value},
             ) from error
         if layout is not None and not isinstance(layout, Layout):
-            raise DocumentValidationError(
+            raise DocumentError(
                 "document layout extractor returned an invalid contract",
                 "layout_invalid_result",
                 {"document_id": document_id},

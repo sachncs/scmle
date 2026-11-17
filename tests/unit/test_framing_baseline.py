@@ -7,10 +7,8 @@ from scmle.contracts import qualification
 from scmle.data.framing import baseline
 from scmle.data.framing import costs
 
-HUMAN = (costs.CostSource.HUMAN,) * 4
-MODEL = costs.DecisionCostModel(
-    0.0, 5.0, 1.0, 0.0, 0.1, 0.4, HUMAN, costs.CostSource.HUMAN
-)
+HUMAN = (costs.Basis.HUMAN,) * 4
+MODEL = costs.Tariff(0.0, 5.0, 1.0, 0.0, 0.1, 0.4, HUMAN, costs.Basis.HUMAN)
 RULE = {"column": "score", "threshold": 0.4}
 
 
@@ -30,7 +28,7 @@ def test_cluster_test_matches_reference_loop():
     rng = numpy.random.default_rng(3)
     d = rng.normal(0.1, 1.0, 120)
     clusters = rng.integers(0, 12, 120)
-    got = baseline.cluster_test(d, clusters)
+    got = baseline.ttest(d, clusters)
     assert got.se == pytest.approx(
         reference_cluster_se(list(d), list(clusters)), rel=1e-12
     )
@@ -42,9 +40,9 @@ def test_cluster_test_matches_reference_loop():
 
 def test_cluster_test_needs_two_clusters_and_aligned_inputs():
     with pytest.raises(ValueError):
-        baseline.cluster_test([1.0, 2.0], [0, 0])
+        baseline.ttest([1.0, 2.0], [0, 0])
     with pytest.raises(ValueError):
-        baseline.cluster_test([1.0, 2.0], [0, 1, 2])
+        baseline.ttest([1.0, 2.0], [0, 1, 2])
 
 
 def test_delta_is_linear_in_the_weight():
@@ -54,7 +52,7 @@ def test_delta_is_linear_in_the_weight():
     b = (rng.random(300) < 0.4).astype(float)
 
     def delta(t):
-        return baseline.paired_difference(y, a, b, t).mean()
+        return baseline.advantage(y, a, b, t).mean()
 
     lo, mid, hi = 0.1, 0.25, 0.4
     w = [costs.odds(t) for t in (lo, mid, hi)]
@@ -126,7 +124,7 @@ def test_claim_is_issued_with_a_real_gain_and_only_once():
     assert report.issued and report.status == "issued"
     assert report.claim.tier is qualification.Tier.CONFIRMED
     assert {c.set_id for c in report.checks} == {
-        qualification.SetId.CONFIRMATION
+        qualification.Subset.CONFIRMATION
     }
     assert report.to_dict()["registration_hash"] == (
         g.registration.registration_hash
@@ -139,9 +137,7 @@ def test_changed_rule_or_costs_after_registration_raise():
     y, a, b, group = rows()
     with pytest.raises(baseline.BaselineError, match="differs"):
         guard().evaluate(y, a, b, group, rule={"column": "other"}, model=MODEL)
-    other = costs.DecisionCostModel(
-        0.0, 4.0, 1.0, 0.0, 0.1, 0.4, HUMAN, costs.CostSource.HUMAN
-    )
+    other = costs.Tariff(0.0, 4.0, 1.0, 0.0, 0.1, 0.4, HUMAN, costs.Basis.HUMAN)
     with pytest.raises(baseline.BaselineError, match="differs"):
         guard().evaluate(y, a, b, group, rule=RULE, model=other)
 
@@ -188,10 +184,10 @@ def test_input_tier_caps_the_claim():
 
 def test_profile_on_x_withholds_a_biased_baseline():
     y, b = rows()[0], rows()[2]
-    clean = baseline.profile_on_exploration(y, b, MODEL)
+    clean = baseline.gauge(y, b, MODEL)
     assert len(clean["net_benefit_baseline"]) == 5
     y2 = y.copy()
     y2[b == 0] = numpy.nan
-    biased = baseline.profile_on_exploration(y2, b, MODEL)
+    biased = baseline.gauge(y2, b, MODEL)
     assert biased["net_benefit_baseline"] == baseline.NOT_COMPUTED
     assert biased["selective_labels"]["flagged"]

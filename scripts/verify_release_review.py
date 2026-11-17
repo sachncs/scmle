@@ -9,7 +9,7 @@ import sys
 
 from scmle.governance import review
 
-DEFAULT_REQUIRED_KINDS = [kind.value for kind in review.ReviewClaimKind]
+DEFAULT_REQUIRED_KINDS = [kind.value for kind in review.Kind]
 
 
 def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
@@ -31,7 +31,7 @@ def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
         "--required-kind",
         action="append",
         dest="required_kinds",
-        choices=[kind.value for kind in review.ReviewClaimKind],
+        choices=[kind.value for kind in review.Kind],
         default=DEFAULT_REQUIRED_KINDS,
     )
     parser.add_argument(
@@ -62,13 +62,10 @@ def main(arguments: list[str] | None = None) -> int:
         )
         return 2
     try:
-        artifact = review.IndependentReleaseReview.read(options.review_path)
+        artifact = review.Signoff.read(options.review_path)
         accepted = artifact.accepted(
             options.source_commit,
-            tuple(
-                review.ReviewClaimKind(value)
-                for value in options.required_kinds
-            ),
+            tuple(review.Kind(value) for value in options.required_kinds),
             signing_key,
         )
     except (OSError, TypeError, ValueError, KeyError) as error:

@@ -71,7 +71,7 @@ def row_hash(positions: numpy.ndarray, seed: int) -> numpy.ndarray:
     return unit
 
 
-class ChunkSource(abc.ABC):
+class Feed(abc.ABC):
     """A table that can be read batch by batch.
 
     Attributes:
@@ -109,7 +109,7 @@ class ChunkSource(abc.ABC):
             when it cannot be known without reading the whole file.
         """
 
-    def estimated_bytes(self) -> int:
+    def footprint(self) -> int:
         """Estimates the in-memory size of the whole table.
 
         The estimate is rows x columns x 8 bytes when the row count is known.
@@ -148,7 +148,7 @@ class ChunkSource(abc.ABC):
                 read.
         """
         try:
-            return connectors.file_content_sha256(self.path)
+            return connectors.checksum(self.path)
         except OSError as error:
             raise StreamingError(
                 "source_unreadable",
@@ -665,7 +665,7 @@ class Acknowledgement:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SinkCommitReceipt:
+class Voucher:
     """A transport-neutral receipt bound to one streaming batch.
 
     Attributes:
@@ -730,7 +730,7 @@ class SinkCommitReceipt:
         )
 
 
-class TransactionalSink(abc.ABC):
+class Sink(abc.ABC):
     """Caller-owned sink contract for an idempotent streaming commit.
 
     A sink must commit or deduplicate the supplied ``batch_id`` and return a
@@ -741,7 +741,7 @@ class TransactionalSink(abc.ABC):
     """
 
     @abc.abstractmethod
-    def commit(self, batch: Batch) -> SinkCommitReceipt:
+    def commit(self, batch: Batch) -> Voucher:
         """Commits one batch and returns its transport-owned receipt.
 
         Args:
@@ -755,7 +755,7 @@ class TransactionalSink(abc.ABC):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CommitEvidence:
+class Commitment:
     """Durable binding of a sink receipt and checkpoint acknowledgement.
 
     Attributes:
@@ -767,7 +767,7 @@ class CommitEvidence:
 
     source_identity: str
     batch_id: str
-    sink_receipt: SinkCommitReceipt
+    sink_receipt: Voucher
     acknowledgement: Acknowledgement
 
     def __post_init__(self) -> None:
@@ -826,7 +826,7 @@ class CommitEvidence:
         return cls(
             source_identity=str(record["source_identity"]),
             batch_id=str(record["batch_id"]),
-            sink_receipt=SinkCommitReceipt.from_dict(record["sink_receipt"]),
+            sink_receipt=Voucher.from_dict(record["sink_receipt"]),
             acknowledgement=Acknowledgement.from_dict(
                 record["acknowledgement"]
             ),
@@ -847,7 +847,7 @@ class CommittedState:
 
     checkpoint: Checkpoint
     committed_batch_ids: tuple[str, ...] = ()
-    transaction_evidence: tuple[CommitEvidence, ...] = ()
+    transaction_evidence: tuple[Commitment, ...] = ()
 
     def __post_init__(self) -> None:
         """Validates deterministic committed batch identities.
@@ -913,7 +913,7 @@ class CommittedState:
                 str(value) for value in record["committed_batch_ids"]
             ),
             transaction_evidence=tuple(
-                CommitEvidence.from_dict(value)
+                Commitment.from_dict(value)
                 for value in record.get("transaction_evidence", [])
             ),
         )
@@ -939,7 +939,7 @@ class Receipt:
     accepted: bool
     duplicate: bool
     checkpoint: Checkpoint
-    sink_receipt: SinkCommitReceipt | None = None
+    sink_receipt: Voucher | None = None
     acknowledgement: Acknowledgement | None = None
 
     def __post_init__(self) -> None:
@@ -984,7 +984,7 @@ class CommitLedger:
     """
 
     path: pathlib.Path
-    source: ChunkSource
+    source: Feed
 
     @property
     def lock_path(self) -> pathlib.Path:
@@ -1237,7 +1237,7 @@ class CommitLedger:
             # handled: documented no-op when no acknowledgement staged
             return
 
-    def validate_batch(self, batch: Batch) -> None:
+    def validate(self, batch: Batch) -> None:
         """Validates a batch against this ledger's source snapshot.
 
         Args:
@@ -1263,9 +1263,7 @@ class CommitLedger:
                 {},
             )
 
-    def validate_acknowledgement(
-        self, batch: Batch, acknowledgement: Acknowledgement
-    ) -> None:
+    def vouch(self, batch: Batch, acknowledgement: Acknowledgement) -> None:
         """Validates the acknowledgement that will be bound to a batch.
 
         Args:
@@ -1299,9 +1297,7 @@ class CommitLedger:
                 {},
             )
 
-    def validate_sink_receipt(
-        self, batch: Batch, receipt: SinkCommitReceipt
-    ) -> None:
+    def validate_sink_receipt(self, batch: Batch, receipt: Voucher) -> None:
         """Validates a sink receipt before it enters durable state.
 
         Args:
@@ -1338,7 +1334,7 @@ class CommitLedger:
     def commit_transaction(
         self,
         batch: Batch,
-        sink: TransactionalSink,
+        sink: Sink,
         acknowledgement: Acknowledgement,
     ) -> Receipt:
         """Commits a batch and atomically persists its receipt evidence.
@@ -1364,21 +1360,21 @@ class CommitLedger:
             committed with an equal acknowledgement.
 
         Raises:
-            TypeError: If `sink` is not a TransactionalSink or
+            TypeError: If `sink` is not a Sink or
                 `acknowledgement` is not a Acknowledgement.
             StreamingError: If the batch, acknowledgement or sink receipt does
                 not match the source and snapshot, the batch is bound to a
                 different acknowledgement, the batch is recorded as committed
                 without evidence, the batch does not start at the durable
                 checkpoint, or the sink returns something other than a
-                SinkCommitReceipt.
+                Voucher.
         """
-        if not isinstance(sink, TransactionalSink):
-            raise errors.KindError("sink must implement TransactionalSink")
+        if not isinstance(sink, Sink):
+            raise errors.KindError("sink must implement Sink")
         if not isinstance(acknowledgement, Acknowledgement):
             raise errors.KindError("acknowledgement must be Acknowledgement")
-        self.validate_batch(batch)
-        self.validate_acknowledgement(batch, acknowledgement)
+        self.validate(batch)
+        self.vouch(batch, acknowledgement)
         with self.lock():
             current = self.load()
             evidence = next(
@@ -1424,7 +1420,7 @@ class CommitLedger:
                     },
                 )
             sink_receipt = sink.commit(batch)
-            if not isinstance(sink_receipt, SinkCommitReceipt):
+            if not isinstance(sink_receipt, Voucher):
                 raise StreamingError(
                     "invalid_sink_receipt",
                     "transactional sink returned an invalid receipt",
@@ -1432,7 +1428,7 @@ class CommitLedger:
                     {"type": type(sink_receipt).__name__},
                 )
             self.validate_sink_receipt(batch, sink_receipt)
-            evidence = CommitEvidence(
+            evidence = Commitment(
                 batch.source_identity,
                 batch.batch_id,
                 sink_receipt,
@@ -1675,7 +1671,7 @@ class Consumer:
         return receipt
 
 
-class ParquetChunks(ChunkSource):
+class Chunked(Feed):
     """Parquet read by row group."""
 
     suffixes = (".parquet", ".pq")
@@ -1708,7 +1704,7 @@ class ParquetChunks(ChunkSource):
         return meta.num_rows, meta.num_columns
 
 
-class CsvChunks(ChunkSource):
+class Csv(Feed):
     """CSV read in chunks (types are inferred per chunk)."""
 
     suffixes = (".csv", ".csv.gz", ".csv.bz2", ".csv.xz", ".csv.zip")
@@ -1733,7 +1729,7 @@ class CsvChunks(ChunkSource):
         return None, len(pandas.read_csv(self.path, nrows=1).columns)
 
 
-class Ndjson(ChunkSource):
+class Ndjson(Feed):
     """Newline-delimited JSON read in bounded chunks."""
 
     suffixes = (".jsonl", ".ndjson", ".jsonl.gz", ".ndjson.gz")
@@ -1760,14 +1756,14 @@ class Ndjson(ChunkSource):
         return None, 0 if first is None else len(first.columns)
 
 
-SOURCES: tuple[type[ChunkSource], ...] = (
-    ParquetChunks,
-    CsvChunks,
+SOURCES: tuple[type[Feed], ...] = (
+    Chunked,
+    Csv,
     Ndjson,
 )
 
 
-def source_for(uri: str | pathlib.Path) -> ChunkSource:
+def locate(uri: str | pathlib.Path) -> Feed:
     """Returns the chunked reader for a file.
 
     Args:
@@ -1826,7 +1822,7 @@ class Totals:
     locked_sample: int
 
 
-def sample_caps(
+def budgets(
     columns: int, budget_gb: float, test_fraction: float
 ) -> tuple[int, int]:
     """Rows to keep in memory for development and for the sampled test.
@@ -1868,8 +1864,8 @@ def retain(
     return merged
 
 
-def sample_pass(
-    source: ChunkSource,
+def sweep(
+    source: Feed,
     development_cap: int,
     locked_cap: int,
     test_fraction: float,

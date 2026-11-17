@@ -51,7 +51,7 @@ Rules (all enforced by CI):
 ## Adding a model family
 
 Implement the `Model` contract, register it, and make
-`scmle.models.conformance.check_conformance` pass for it (see
+`scmle.models.conformance.comply` pass for it (see
 `docs/TUTORIAL.md`).
 
 Commit messages: short imperative subject with a conventional prefix

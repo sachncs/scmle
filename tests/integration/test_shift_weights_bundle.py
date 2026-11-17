@@ -34,7 +34,7 @@ def calibration_rows(result):
 
 def test_rows_must_match_the_stored_scores(result):
     with pytest.raises(errors.ArtifactError, match="conformal scores"):
-        result.bundle.attach_shift_weights(world(10, 1), world(100, 2))
+        result.bundle.tilt(world(10, 1), world(100, 2))
 
 
 def test_weighted_intervals_need_attached_weights(result):
@@ -52,9 +52,7 @@ def test_a_mild_shift_gives_weighted_intervals_that_round_trip(
     result, tmp_path
 ):
     rows = calibration_rows(result)
-    stored = result.bundle.attach_shift_weights(
-        rows[["x"]], world(400, 6, centre=0.3)[["x"]]
-    )
+    stored = result.bundle.tilt(rows[["x"]], world(400, 6, centre=0.3)[["x"]])
     assert stored.columns == ("x",)
     fresh = world(1500, 7, centre=0.3)
     band = result.bundle.predict_interval(
@@ -71,9 +69,7 @@ def test_a_mild_shift_gives_weighted_intervals_that_round_trip(
 
 def test_a_changed_weights_file_is_refused(result, tmp_path):
     rows = calibration_rows(result)
-    result.bundle.attach_shift_weights(
-        rows[["x"]], world(400, 6, centre=0.3)[["x"]]
-    )
+    result.bundle.tilt(rows[["x"]], world(400, 6, centre=0.3)[["x"]])
     result.bundle.save(tmp_path / "copy")
     path = tmp_path / "copy" / bundle.SHIFT_WEIGHTS_FILE
     data = bytearray(path.read_bytes())
@@ -86,10 +82,8 @@ def test_a_changed_weights_file_is_refused(result, tmp_path):
 def test_an_extreme_shift_is_refused_and_nothing_is_stored(result):
     result.bundle.shift_weights = None
     rows = calibration_rows(result)
-    with pytest.raises(shift_weights.WeightRefusedError):
-        result.bundle.attach_shift_weights(
-            rows[["x"]], world(400, 8, centre=6.0)[["x"]]
-        )
+    with pytest.raises(shift_weights.RefusedError):
+        result.bundle.tilt(rows[["x"]], world(400, 8, centre=6.0)[["x"]])
     assert result.bundle.shift_weights is None
 
 

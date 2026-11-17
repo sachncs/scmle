@@ -42,7 +42,7 @@ const evidence = [
     <li>Every pull request runs the bounded contract tier and records its coverage artifact. The enforced floor is currently 75% (the bounded suite measured 79% without the optional extras installed); the nightly run enforces 85% on core contracts.</li>
     <li>Every scheduled full-suite run publishes coverage and benchmark evidence.</li>
     <li>Every dataset or schema change requires reviewing the curation report before model comparisons are interpreted.</li>
-    <li>Every candidate promotion requires locked-data evaluation, monitoring reference approval, an independent <code>PromotionApproval</code> bound to the exact bundle digest, and a rollback decision.</li>
+    <li>Every candidate promotion requires locked-data evaluation, monitoring reference approval, an independent <code>Sanction</code> bound to the exact bundle digest, and a rollback decision.</li>
     <li>Every release requires the declared release checks to be complete (see <a href={`${base}/docs/releasing/`}>Releasing the package</a>).</li>
   </ul>
 

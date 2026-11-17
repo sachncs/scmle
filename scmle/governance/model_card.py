@@ -11,7 +11,7 @@ from scmle.contracts import errors
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ModelCard:
+class Card:
     """Reviewable context for one packaged model."""
 
     model_name: str
@@ -68,11 +68,11 @@ class ModelCard:
     def from_run(
         cls,
         manifest: data.DatasetManifest,
-        profile: data.DatasetProfile,
+        profile: data.Portrait,
         bundle: scmle.artifacts.bundle.Bundle,
         evaluation: Mapping[str, Any],
         model_fingerprint: str,
-    ) -> "ModelCard":
+    ) -> "Card":
         """Builds a card from the exact data, model, and evaluation records.
 
         Args:

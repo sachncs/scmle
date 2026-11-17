@@ -4,7 +4,7 @@ Registered on 2026-11-07, before the first run of this module. Every design,
 seed and floor below is fixed here and is not retuned: a design that misses
 its floor is filed with its numbers and `passed` false.
 
-`subgroup_certify.py` measures the Holm family of `run.subgroup_report` on
+`subgroup_certify.py` measures the Holm family of `run.stratify` on
 eight equal levels of one column and lists unequal levels and overlapping
 columns as not measured. This module measures them. It changes nothing in
 that certificate: the word `gating` or `descriptive` that a report carries
@@ -164,7 +164,7 @@ def rejected(
     Returns:
         The pairs whose hypothesis the subgroup report rejects.
     """
-    found = run.subgroup_report(adapter, frame, subgroup_certify.LEVEL, groups)
+    found = run.stratify(adapter, frame, subgroup_certify.LEVEL, groups)
     return {
         (r["column"], r["value"]) for r in found["hypotheses"] if r["rejected"]
     }

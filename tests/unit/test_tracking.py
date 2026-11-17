@@ -8,7 +8,7 @@ from scmle.experimentation import stores
 
 
 def make_trial(
-    trial_id="trial_001", status=experiments.TrialStatus.OK, **kwargs
+    trial_id="trial_001", status=experiments.Termination.OK, **kwargs
 ):
     return experiments.Trial(
         trial_id,
@@ -59,7 +59,7 @@ def test_trials_roundtrip_and_upsert(store):
         "run_1",
         make_trial(
             "trial_002",
-            experiments.TrialStatus.FAILED,
+            experiments.Termination.FAILED,
         ),
     )
     store.record_trial("run_1", make_trial())  # replaces trial_001
@@ -84,13 +84,13 @@ def test_unknown_columns_are_rejected(store):
 
 
 def test_null_store_is_a_safe_noop():
-    null = stores.NullExperimentStore()
+    null = stores.Null()
     null.start_run("r", "h", "d", "t")
     null.update_run("r", state="X")
     null.record_trial("r", make_trial())
     null.listen("r", events.Event("r", "state.X"))
     assert null.runs() == [] and null.trials("r") == []
-    assert isinstance(null, stores.ExperimentStore)
+    assert isinstance(null, stores.Store)
 
 
 def test_every_operation_closes_its_connection(tmp_path):

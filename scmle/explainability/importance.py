@@ -10,7 +10,7 @@ IMPORTANCE_REPEATS = 5
 IMPORTANCE_ROWS = 1000
 
 
-class PermutationImportance(diagnostics.Diagnostic):
+class Importance(diagnostics.Diagnostic):
     """Model-agnostic feature importance on the evaluation data."""
 
     name = "permutation_importance"
@@ -34,7 +34,7 @@ class PermutationImportance(diagnostics.Diagnostic):
             first, each with its mean `importance` and standard deviation
             `std` over the shuffle repeats.
         """
-        columns = list(inputs.feature_plan.input_columns)
+        columns = list(inputs.feature_plan.sourced)
         rng = numpy.random.default_rng(inputs.seed)
         rows = rng.permutation(len(inputs.features))[:IMPORTANCE_ROWS]
         features = inputs.features[columns].iloc[rows].reset_index(drop=True)
@@ -43,7 +43,7 @@ class PermutationImportance(diagnostics.Diagnostic):
         baseline = scorer(inputs.estimator, features, target)
         measured = []
         for index in rng.permutation(len(columns)):
-            if inputs.out_of_time():
+            if inputs.expired():
                 break
             drops = []
             for repeat in range(IMPORTANCE_REPEATS):

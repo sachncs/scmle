@@ -86,7 +86,7 @@ def violations(
             # Repeated runs: a breach needs the whole interval beyond the
             # bound, so noise alone cannot fail the gate.
             scores = record["test_scores"]
-            low, high = intervals.mean_interval(scores)[1:]
+            low, high = intervals.wald(scores)[1:]
             score = low if expected["metric"] in LOWER_IS_BETTER else high
         worse = (
             score > bound

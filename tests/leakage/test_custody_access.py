@@ -1,6 +1,6 @@
 """Access attempts: code that receives only the exploration view.
 
-The build fails if anything reachable from the `ExplorationView` (attributes,
+The build fails if anything reachable from the `View` (attributes,
 containers, DataFrame values, pickles, the open log) gives access to the rows
 of `C`, or to the object that can release them.
 """
@@ -27,7 +27,7 @@ class Built(typing.NamedTuple):
     frame: pandas.DataFrame
     outcome: pipeline.Outcome
     vault: sealed.Vault
-    log: sealed.OpenLog
+    log: sealed.Journal
 
 
 def build():
@@ -45,9 +45,9 @@ def build():
         validation=tasks.Validation(strategy="stratified", seed=3),
     )
     split = splitters.Splitter(spec, tasks.Task.BINARY).split(frame)
-    log = sealed.OpenLog()
+    log = sealed.Journal()
     vault = sealed.Vault(log, process=True)
-    outcome = pipeline.apply_custody(
+    outcome = pipeline.sequester(
         charter=make_charter(min_effect=0.3, k_max=5),
         split=split,
         frame=frame,
@@ -94,11 +94,11 @@ def test_the_view_reaches_no_sealed_object_or_token():
     assert not any(
         isinstance(
             o,
-            sealed.SealedSet
+            sealed.Locker
             | sealed.Vault
-            | sealed.OpenLog
+            | sealed.Journal
             | scmle.governance.vault.SealedTestSet
-            | splitters.LockedTestSet,
+            | splitters.Lockbox,
         )
         for o in objects
     )

@@ -48,7 +48,7 @@ def survey() -> dict[str, object]:
             if leakage is None
             else str(leakage.state(screen.DETECTOR_ID, screen.code_digest()))
         ),
-        "identification": sorted(certified.certified_gates()),
+        "identification": sorted(certified.certificated()),
         "slices": str(coverage_slices.flag_gate().status),
         "tasks": task_gate.load(),
     }

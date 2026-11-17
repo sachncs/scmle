@@ -10,10 +10,10 @@ from scmle.contracts import errors
 MAX_REPORTED_UNSEEN = 20
 
 
-class InputValidator:
+class Validator:
     """Checks incoming data against the input schema of a trained model."""
 
-    def __init__(self, schema: artifacts.BundleSchema) -> None:
+    def __init__(self, schema: artifacts.Interface) -> None:
         """Binds the validator to a schema.
 
         Args:
@@ -57,7 +57,7 @@ class InputValidator:
             unseen_categories=unseen,
         )
 
-    def row_report(self, frame: pandas.DataFrame) -> list[dict[str, Any]]:
+    def describe(self, frame: pandas.DataFrame) -> list[dict[str, Any]]:
         """Describes each row: its null features and its unseen categories.
 
         Args:

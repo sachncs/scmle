@@ -8,7 +8,7 @@ so the test is exact for assignment that is randomized (given the sizes, every
 labelling is equally likely) and its false-alarm rate is the level by
 construction; `tests/unit/test_balance.py` checks that by simulation, and also
 how often assignment that follows a covariate is flagged. It replaces the
-cross-validated AUC cutoff of `uplift.check_propensity` as the judge of
+cross-validated AUC cutoff of `uplift.randomised` as the judge of
 "looks randomized", an uncertified rule, though the AUC stays in that
 report as a description.
 
@@ -38,7 +38,7 @@ NOTE = (
 )
 
 
-def balance_test(
+def randomisation(
     features: pandas.DataFrame,
     treatment: ArrayLike,
     seed: int = 0,

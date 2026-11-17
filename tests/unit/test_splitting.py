@@ -357,10 +357,8 @@ def test_feature_delays_need_a_time_column_and_forbid_reading_the_raw_column():
             data=tasks.Dataset(
                 uri="m", target="y", time_column="t", feature_delays={"r": 2}
             ),
-            feature_graph=tasks.FeatureGraph(
-                nodes=[
-                    tasks.FeatureNode(name="doubled", op="log1p", inputs=["r"])
-                ]
+            feature_graph=tasks.Derivation(
+                nodes=[tasks.Node(name="doubled", op="log1p", inputs=["r"])]
             ),
         )
 

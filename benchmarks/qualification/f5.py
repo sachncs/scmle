@@ -212,10 +212,10 @@ def row_detectors(
     """
     provenance = provenance_for(frame)
     return {
-        "f5-sentinel": sentinels.sentinel_rows,
+        "f5-sentinel": sentinels.placeholders,
         "f5-duplicates": duplicates.duplicate_flags,
         "f5-label-noise": label_detector,
-        "f5-outlier-triage": lambda f: outliers.error_flags(f, provenance),
+        "f5-outlier-triage": lambda f: outliers.misrecorded(f, provenance),
     }
 
 
@@ -254,7 +254,7 @@ def certify_missingness(
                 driver=driver if mechanism == "mar" else None,
             )
             count += int(
-                missingness.assess_mechanism(planted.frame, seed).mcar_rejected
+                missingness.investigate(planted.frame, seed).mcar_rejected
             )
         rejected[mechanism] = count
     results = [
@@ -393,19 +393,19 @@ def gating(
 
 
 def audit_problems(store: certificates.Store) -> list[str]:
-    """Registered gating pairs that `mark_gating` would refuse.
+    """Registered gating pairs that `authorise` would refuse.
 
     Args:
         store: Certificate store to audit.
 
     Returns:
-        A message for each passing pair that `mark_gating` rejects with a
+        A message for each passing pair that `authorise` rejects with a
         `CertificateError`; empty when all are accepted.
     """
     found = []
     for detector_id, digest, defect in gating(store):
         try:
-            store.mark_gating(detector_id, digest, defect)
+            store.authorise(detector_id, digest, defect)
         except certificates.CertificateError as error:
             found.append(f"{detector_id}/{defect}: {error}")
     return found

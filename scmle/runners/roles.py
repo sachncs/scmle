@@ -50,7 +50,7 @@ class Role:
         """
         return key.startswith(self.reads)
 
-    def allows_write(self, key: str) -> bool:
+    def permits(self, key: str) -> bool:
         """Reports whether `key` may be written.
 
         Args:
@@ -149,7 +149,7 @@ class RoleStore(objectstore.ObjectStore):
         if not self.role.allows_read(key):
             raise RoleDeniedError(f"role {self.role.name} may not read {key}")
 
-    def need_write(self, key: str) -> None:
+    def permit(self, key: str) -> None:
         """Raises unless the role may write `key`.
 
         Args:
@@ -158,7 +158,7 @@ class RoleStore(objectstore.ObjectStore):
         Raises:
             RoleDeniedError: If the role may not write it.
         """
-        if not self.role.allows_write(key):
+        if not self.role.permits(key):
             raise RoleDeniedError(f"role {self.role.name} may not write {key}")
 
     def put(
@@ -180,7 +180,7 @@ class RoleStore(objectstore.ObjectStore):
         Returns:
             The metadata of the stored object.
         """
-        self.need_write(key)
+        self.permit(key)
         return self.inner.put(
             key, data, if_absent=if_absent, if_version=if_version
         )
@@ -231,5 +231,5 @@ class RoleStore(objectstore.ObjectStore):
             key: The object key.
             if_version: Remove only if the current version is this one.
         """
-        self.need_write(key)
+        self.permit(key)
         self.inner.delete(key, if_version=if_version)

@@ -43,7 +43,7 @@ class Objective(abc.ABC):
         """
 
 
-class F1Objective(Objective):
+class F1(Objective):
     """Harmonic mean of precision and recall for the positive class."""
 
     name = "f1"
@@ -64,7 +64,7 @@ class F1Objective(Objective):
         return 2 * true_positive / denominator if denominator else 0.0
 
 
-class AccuracyObjective(Objective):
+class Accuracy(Objective):
     """Plain accuracy."""
 
     name = "accuracy"
@@ -106,7 +106,7 @@ class BalancedAccuracyObjective(Objective):
 
 
 @dataclasses.dataclass(frozen=True)
-class CostObjective(Objective):
+class Costs(Objective):
     """Negative expected cost of errors (explicit operational costs).
 
     Attributes:
@@ -137,14 +137,14 @@ class CostObjective(Objective):
 
 
 OBJECTIVES: dict[str, Callable[..., Objective]] = {
-    "f1": F1Objective,
-    "accuracy": AccuracyObjective,
+    "f1": F1,
+    "accuracy": Accuracy,
     "balanced_accuracy": BalancedAccuracyObjective,
-    "cost": CostObjective,
+    "cost": Costs,
 }
 
 
-def optimize_threshold(
+def argmax(
     probabilities: numpy.ndarray,
     actual: numpy.ndarray,
     objective: Objective,
@@ -196,7 +196,7 @@ class Classifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc
         self.threshold = threshold
 
     @classmethod
-    def around_fitted(cls, fitted: Any, threshold: float) -> Self:
+    def around(cls, fitted: Any, threshold: float) -> Self:
         """Wraps an already fitted classifier without refitting it.
 
         Args:
@@ -297,7 +297,7 @@ NUMERIC_BANDS = 4
 
 
 @dataclasses.dataclass(frozen=True)
-class GroupAssigner:
+class Grouper:
     """Maps a sensitive column to group names, fixed at training time.
 
     Categories keep their own name; numbers with many distinct values are cut
@@ -352,7 +352,7 @@ class GroupAssigner:
         return values.astype(object).where(values.notna()).astype(str)
 
 
-class GroupClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Segmenter(base.ClassifierMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Decides with a separate probability threshold for each group.
 
     The wrapped classifier is untouched; only the cut between the two classes
@@ -372,7 +372,7 @@ class GroupClassifier(base.ClassifierMixin, base.BaseEstimator):  # type: ignore
         self,
         estimator: Any,
         column: str,
-        assigner: GroupAssigner,
+        assigner: Grouper,
         thresholds: dict[str, float],
         default_threshold: float = 0.5,
     ) -> None:

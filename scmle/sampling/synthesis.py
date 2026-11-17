@@ -1,7 +1,7 @@
 """Synthetic tabular data: generator contract, copula generator, oversamplers.
 
-`SyntheticGenerator` is the plugin contract (fit on real rows, sample new
-ones). The shipped `GaussianCopulaGenerator` preserves each numeric column's
+`Synthesizer` is the plugin contract (fit on real rows, sample new
+ones). The shipped `Copula` preserves each numeric column's
 marginal distribution and the rank correlations between columns, and samples
 categorical columns from their empirical frequencies. Synthetic rows only
 ever enter a *training fold*; whether they help is decided on the original
@@ -23,7 +23,7 @@ MIN_FIT_ROWS = 5
 RIDGE = 1e-6
 
 
-class SyntheticGenerator(abc.ABC):
+class Synthesizer(abc.ABC):
     """Learns the distribution of real rows and samples new ones.
 
     Attributes:
@@ -58,7 +58,7 @@ class SyntheticGenerator(abc.ABC):
         """
 
 
-class GaussianCopulaGenerator(SyntheticGenerator):
+class Copula(Synthesizer):
     """Gaussian copula over numeric columns, empirical categoricals.
 
     Attributes:
@@ -189,11 +189,11 @@ class GeneratorOverSampler(resampling.Resampler):
     """Oversamples minority classes with synthetic rows from a generator.
 
     Attributes:
-        generator_class: The `SyntheticGenerator` fitted per minority class.
+        generator_class: The `Synthesizer` fitted per minority class.
     """
 
     name = "generator_oversample"
-    generator_class: type[SyntheticGenerator] = GaussianCopulaGenerator
+    generator_class: type[Synthesizer] = Copula
 
     def resample(
         self, features: pandas.DataFrame, target: pandas.Series, seed: int
@@ -238,4 +238,4 @@ class CopulaOverSampler(GeneratorOverSampler):
     """Gaussian-copula oversampling of minority classes."""
 
     name = "copula_oversample"
-    generator_class = GaussianCopulaGenerator
+    generator_class = Copula

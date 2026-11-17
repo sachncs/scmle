@@ -54,10 +54,10 @@ def test_multiclass_members_contribute_one_column_per_class():
 
 
 def test_the_blending_adapter_builds_working_ensembles_and_passes_conformance():
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     adapter = registry.get("blending")
 
-    conformance.check_conformance(adapter)
+    conformance.comply(adapter)
 
     assert adapter.name == "blending" and adapter.family == "ensemble"
     estimator = adapter.build(

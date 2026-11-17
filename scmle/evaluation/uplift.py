@@ -83,7 +83,7 @@ def qini_coefficient(
     return float(numpy.trapezoid(curve - line, rows) / (rows[-1] ** 2))
 
 
-def uplift_at(
+def lift(
     outcome: numpy.ndarray,
     treatment: numpy.ndarray,
     score: numpy.ndarray,
@@ -139,7 +139,7 @@ class Propensity:
         auc: Cross-validated ROC-AUC of predicting treatment from features
             (0.5 in a randomized experiment); a description, not the rule.
         randomized: Whether the treatment looks randomized: the permutation
-            balance test of `balance.balance_test` does not reject at its
+            balance test of `balance.randomisation` does not reject at its
             level (an exact test for randomized assignment). When it cannot
             run (no numeric covariate with non-zero spread) the AUC cutoff
             decides: randomized if `auc` is at most `PROPENSITY_AUC_LIMIT`.
@@ -165,7 +165,7 @@ class Propensity:
         return dataclasses.asdict(self)
 
 
-def check_propensity(
+def randomised(
     features: pandas.DataFrame, treatment: numpy.ndarray, seed: int = 0
 ) -> Propensity:
     """Judges from the covariates whether treatment looks randomized.
@@ -211,7 +211,7 @@ def check_propensity(
         ),
     )[:, 1]
     auc = float(metrics.roc_auc_score(arm, scores))
-    found = balance.balance_test(features, arm, seed)
+    found = balance.randomisation(features, arm, seed)
     p_value = found["p_value"]
     evidence = (
         "AUC rule" if p_value is None else f"permutation p = {p_value:.3g}"
@@ -233,7 +233,7 @@ def check_propensity(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class UpliftMetric(scmle.contracts.metrics.Metric):
+class Incrementality(scmle.contracts.metrics.Metric):
     """A metric of how well predicted uplift ranks real incremental response.
 
     Attributes:
@@ -275,6 +275,6 @@ class UpliftMetric(scmle.contracts.metrics.Metric):
             outcome = numpy.asarray(target, dtype=float)
             if kind == "qini":
                 return qini_coefficient(outcome, arm, predicted)
-            return uplift_at(outcome, arm, predicted)
+            return lift(outcome, arm, predicted)
 
         return score

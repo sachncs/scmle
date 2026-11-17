@@ -8,7 +8,7 @@ from scmle.decision import constraints
 
 
 def constraint(criterion="equal_opportunity", gap=0.05, **kwargs):
-    return decision.FairnessConstraint(
+    return decision.Constraint(
         "sex", criterion, gap, "group_thresholds", "counsel", **kwargs
     )
 
@@ -36,12 +36,12 @@ def test_equal_rates_are_satisfied_and_unequal_rates_are_not():
     groups = rng.integers(0, 2, 20000)
     y = (rng.random(20000) < 0.4).astype(float)
     fair = (rng.random(20000) < 0.2 + 0.5 * y).astype(float)
-    ok = constraints.satisfaction_test(y, fair, groups, constraint(gap=0.08))
+    ok = constraints.satisfy(y, fair, groups, constraint(gap=0.08))
     assert ok.status == constraints.SATISFIED and ok.upper_bound <= 0.08
     unfair = (rng.random(20000) < 0.2 + 0.5 * y - 0.15 * groups * y).astype(
         float
     )
-    bad = constraints.satisfaction_test(y, unfair, groups, constraint(gap=0.08))
+    bad = constraints.satisfy(y, unfair, groups, constraint(gap=0.08))
     assert bad.status == constraints.NOT_SATISFIED
     assert bad.point_gap == pytest.approx(0.15 / 0.7 * 0.7, abs=0.05)
 
@@ -51,7 +51,7 @@ def test_a_point_estimate_below_the_bound_is_not_satisfaction():
     groups = rng.integers(0, 2, 400)
     y = (rng.random(400) < 0.5).astype(float)
     acts = (rng.random(400) < 0.3 + 0.4 * y).astype(float)
-    result = constraints.satisfaction_test(y, acts, groups, constraint(gap=0.1))
+    result = constraints.satisfy(y, acts, groups, constraint(gap=0.1))
     assert result.point_gap < 0.1 < result.upper_bound
     assert result.status == constraints.NOT_SATISFIED
 
@@ -60,9 +60,7 @@ def test_small_groups_are_not_assessable_never_passing():
     groups = numpy.array([0] * 300 + [1] * 10)
     y = numpy.tile([1.0, 0.0], 155)
     acts = y.copy()
-    result = constraints.satisfaction_test(
-        y, acts, groups, constraint(min_group=30)
-    )
+    result = constraints.satisfy(y, acts, groups, constraint(min_group=30))
     assert result.status == constraints.NOT_ASSESSABLE
     assert result.small_groups == ("1",)
     assert result.point_gap is None
@@ -93,25 +91,19 @@ def test_group_thresholds_close_a_gap_and_the_price_is_reported():
     assert (
         constraints.development_gap(y, free, groups, "equal_opportunity") > 0.1
     )
-    fitted = constraints.fit_group_thresholds(
-        score, y, groups, constraint(gap=0.06), t
-    )
+    fitted = constraints.equalize(score, y, groups, constraint(gap=0.06), t)
     assert fitted.constrained and fitted.development_gap <= 0.03
     acts = fitted.act(score, groups)
-    result = constraints.satisfaction_test(
-        y, acts, groups, constraint(gap=0.06)
-    )
+    result = constraints.satisfy(y, acts, groups, constraint(gap=0.06))
     assert result.status == constraints.SATISFIED
-    price = constraints.price_of_constraint(y, free, acts, t, replicates=200)
+    price = constraints.toll(y, free, acts, t, replicates=200)
     assert price["lower"] <= price["price"] <= price["upper"]
     assert numpy.isfinite(price["price"])
 
 
 def test_an_already_fair_rule_keeps_the_common_threshold():
     score, y, groups = binormal(20000, 3, shift=0.0)
-    fitted = constraints.fit_group_thresholds(
-        score, y, groups, constraint(gap=0.2), 0.3
-    )
+    fitted = constraints.equalize(score, y, groups, constraint(gap=0.2), 0.3)
     assert not fitted.constrained and fitted.cuts == {"0": 0.3, "1": 0.3}
 
 
@@ -128,7 +120,7 @@ def test_frontier_marks_unreachable_points():
 def test_predictive_parity_cannot_be_reached_by_group_thresholds():
     score, y, groups = binormal(5000, 5)
     with pytest.raises(ValueError, match="predictive parity"):
-        constraints.fit_group_thresholds(
+        constraints.equalize(
             score, y, groups, constraint("predictive_parity"), 0.3
         )
 
@@ -139,9 +131,7 @@ def test_incompatible_criteria_are_refused_only_when_base_rates_differ():
         constraint("equalized_odds"),
     )
     ignored, y, groups = binormal(20000, 6, rates=(0.2, 0.5))
-    with pytest.raises(
-        constraints.InfeasibleConstraintsError, match="cannot both hold"
-    ):
+    with pytest.raises(constraints.InfeasibleError, match="cannot both hold"):
         constraints.check_feasibility(pair, y, groups)
     ignored, y_equal, groups_equal = binormal(20000, 7, rates=(0.3, 0.3))
     report = constraints.check_feasibility(pair, y_equal, groups_equal)
@@ -152,9 +142,9 @@ def test_incompatible_criteria_are_refused_only_when_base_rates_differ():
 
 def test_inputs_are_validated():
     with pytest.raises(ValueError):
-        constraints.satisfaction_test([1.0, 0.0], [1.0, 0.0], [0], constraint())
+        constraints.satisfy([1.0, 0.0], [1.0, 0.0], [0], constraint())
     with pytest.raises(ValueError):
-        constraints.satisfaction_test(
+        constraints.satisfy(
             [1.0, 0.0], [1.0, 0.0], [0, 1], constraint(), alpha=1.0
         )
 
@@ -185,7 +175,7 @@ def test_clustered_rows_are_not_declared_satisfied_more_often_than_alpha():
     rows = cluster_aware = 0
     for seed in range(worlds):
         y, acts, groups, cluster = clustered_world(seed)
-        rows += constraints.satisfaction_test(y, acts, groups, rule).status == (
+        rows += constraints.satisfy(y, acts, groups, rule).status == (
             constraints.SATISFIED
         )
         cluster_aware += constraints.cluster_satisfaction_test(

@@ -46,7 +46,7 @@ def kaplan_meier(
     return moments, survival
 
 
-def step_lookup(
+def stair(
     moments: numpy.ndarray,
     values: numpy.ndarray,
     times: numpy.ndarray,
@@ -111,7 +111,7 @@ class SurvivalEstimator(base.RegressorMixin, base.BaseEstimator, abc.ABC):  # ty
         """
 
 
-class MarginalSurvival(SurvivalEstimator):
+class Marginal(SurvivalEstimator):
     """Ignores the features and predicts the population curve.
 
     Attributes:
@@ -158,13 +158,11 @@ class MarginalSurvival(SurvivalEstimator):
         Returns:
             Array of shape `(n_rows, len(times))` of survival probabilities.
         """
-        curve = step_lookup(
-            self.moments_, self.curve_, numpy.asarray(times), 1.0
-        )
+        curve = stair(self.moments_, self.curve_, numpy.asarray(times), 1.0)
         return numpy.tile(curve, (features.shape[0], 1))
 
 
-class CoxRegressor(SurvivalEstimator):
+class Hazards(SurvivalEstimator):
     """Cox proportional hazards with a ridge penalty.
 
     The log hazard is linear in the features. Coefficients maximise the
@@ -284,7 +282,7 @@ class CoxRegressor(SurvivalEstimator):
         Returns:
             Array of shape `(n_rows, len(times))` of survival probabilities.
         """
-        cumulative = step_lookup(
+        cumulative = stair(
             self.moments_, self.baseline_, numpy.asarray(times), 0.0
         )
         relative = numpy.exp(self.predict(features) - self.scale_)

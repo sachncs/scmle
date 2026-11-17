@@ -39,7 +39,7 @@ PINNED_LEARNERS = ("linear",)
 def case_aipw():
     out = {}
     for learner in PINNED_LEARNERS:
-        nuis = aipw.fit_nuisances(
+        nuis = aipw.prefit(
             test_identification_aipw.planted(600, 1),
             COLUMNS,
             "t",
@@ -66,7 +66,7 @@ def case_aipw():
         for name in ("ATE", "ATT")
     }
     out["ess"] = aipw.effective_sample_size(numpy.array([1.0, 2.0, 3.0]))
-    out["smd"] = aipw.weighted_smd(
+    out["smd"] = aipw.imbalance(
         numpy.array([[1.0, 5.0], [2.0, 4.0], [3.0, 7.0], [4.0, 1.0]]),
         t,
         numpy.array([0.5, 0.25, 0.75, 0.4]),
@@ -86,7 +86,7 @@ def case_did():
             "g",
             "y",
         ),
-        "wide": did.wide_panel(
+        "wide": did.widen(
             test_identification_did.panel(3, 4, 4, 4, 2), "id", "t", "y"
         ).iloc[:5],
     }
@@ -103,7 +103,7 @@ def case_iv():
         "direct": iv.estimate(
             test_identification_iv.world(600, 3, 1.0, direct=0.3), "d", "y", "z"
         ),
-        "bound": iv.exclusion_bound(
+        "bound": iv.exclude(
             iv.estimate(
                 test_identification_iv.world(600, 1, 1.0), "d", "y", "z"
             ),
@@ -139,8 +139,8 @@ def case_synth():
     target = donors @ numpy.array([0.5, 0.3, 0.2, 0, 0, 0])
     return {
         "estimate": synth.estimate(frame, "u", "t", "y", 0, pre),
-        "weights": synth.fit_weights(target, donors),
-        "donors": [synth.min_donors(a) for a in (0.05, 0.1, 0.2)],
+        "weights": synth.weigh(target, donors),
+        "donors": [synth.quorum(a) for a in (0.05, 0.1, 0.2)],
     }
 
 
@@ -149,26 +149,26 @@ def case_sensitivity():
         columns="u"
     )
     base = ("x1", "x2", "x3")
-    fit = sensitivity.ols_fit(frame, "d", "y", base)
+    fit = sensitivity.regress(frame, "d", "y", base)
     return {
         "evalue": [sensitivity.evalue(v) for v in (0.5, 0.8, 1.0, 1.25, 3.9)],
         "interval": [
-            sensitivity.evalue_interval(1.8, 1.2, 2.7),
-            sensitivity.evalue_interval(0.5, 0.3, 0.8),
-            sensitivity.evalue_interval(1.3, 0.9, 1.9),
+            sensitivity.evalues(1.8, 1.2, 2.7),
+            sensitivity.evalues(0.5, 0.3, 0.8),
+            sensitivity.evalues(1.3, 0.9, 1.9),
         ],
         "smd": [sensitivity.smd_to_rr(d) for d in (0.2, -0.5)],
-        "partial": sensitivity.partial_r2(4.184, 783),
+        "partial": sensitivity.rsquared(4.184, 783),
         "rv": [
-            sensitivity.robustness_value(4.184, 783, 1.0),
-            sensitivity.robustness_value(4.184, 783, 0.5, 0.05),
-            sensitivity.robustness_value(4.184, 783, 1.0, 0.05),
-            sensitivity.robustness_value(0.5, 100, 1.0, 0.05),
+            sensitivity.rvalue(4.184, 783, 1.0),
+            sensitivity.rvalue(4.184, 783, 0.5, 0.05),
+            sensitivity.rvalue(4.184, 783, 1.0, 0.05),
+            sensitivity.rvalue(0.5, 100, 1.0, 0.05),
         ],
         "fit": fit,
-        "bias": sensitivity.bias_bound(fit, 0.1, 0.2),
-        "interval_adj": sensitivity.adjusted_interval(fit, 0.1, 0.2, 0.9),
-        "bench": sensitivity.benchmark_strength(0.1, 0.2, 1.0, 1.5),
+        "bias": sensitivity.ceiling(fit, 0.1, 0.2),
+        "interval_adj": sensitivity.robustify(fit, 0.1, 0.2, 0.9),
+        "bench": sensitivity.calibrate(0.1, 0.2, 1.0, 1.5),
         "assess": sensitivity.assess(frame, "d", "y", base, strength=1.0),
         "assess_fixed": sensitivity.assess(
             frame, "d", "y", base, "fixed", 0.01
@@ -201,9 +201,9 @@ def case_tier():
 
 def case_battery():
     tests = [
-        battery.wald_test("a", "negative_outcome", 0.1, 1.0),
-        battery.wald_test("b", "negative_exposure", 5.0, 1.0),
-        battery.wald_test("c", "placebo", -1.5, 1.0),
+        battery.wald("a", "negative_outcome", 0.1, 1.0),
+        battery.wald("b", "negative_exposure", 5.0, 1.0),
+        battery.wald("c", "placebo", -1.5, 1.0),
     ]
     return {
         "report": battery.run_battery(tests, 0.05),
@@ -237,7 +237,7 @@ def test_the_estimators_reproduce_their_recorded_outputs(name):
 
 
 def test_the_boosted_learner_gives_a_finite_estimate():
-    nuis = aipw.fit_nuisances(
+    nuis = aipw.prefit(
         test_identification_aipw.planted(600, 1),
         COLUMNS,
         "t",

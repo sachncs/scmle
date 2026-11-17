@@ -13,7 +13,7 @@ from scmle.data.ingest import profile
 def graph_of(db, tables, declared=(), eps_fk=0.0):
     source = db.source()
     catalog = profile.profile_catalog(source, tables)
-    scans = {t.name: grain.infer_keys(source, t) for t in catalog.tables}
+    scans = {t.name: grain.keysearch(source, t) for t in catalog.tables}
     return (
         source,
         catalog,
@@ -74,13 +74,13 @@ def test_partial_containment_is_candidate_or_absent():
 
 
 def test_declared_key_is_accepted_and_violation_is_flagged():
-    declared = (joins.DeclaredKey("fact", ("qty",), "customer", ("id",)),)
+    declared = (joins.Reference("fact", ("qty",), "customer", ("id",)),)
     db = two_tables(child_col="qty")
     graph = graph_of(db, ["customer", "fact"], declared)[3]
     link = find(graph, "qty")[0]
     assert link.declared and link.decision == joins.ACCEPTED
     bad = two_tables(child_values=numpy.arange(1, 101) + 30)
-    broken = (joins.DeclaredKey("fact", ("customer_id",), "customer", ("id",)),)
+    broken = (joins.Reference("fact", ("customer_id",), "customer", ("id",)),)
     graph = graph_of(bad, ["customer", "fact"], broken)[3]
     link = find(graph, "customer_id")[0]
     assert link.decision == joins.VIOLATED
@@ -144,13 +144,13 @@ def test_many_to_many_charges_the_budget_per_pair_and_stops_at_a_boundary():
     db = many_to_many_world()
     plain = db.source()
     catalog = profile.profile_catalog(plain, ["a", "b", "c"])
-    scans = {t.name: grain.infer_keys(plain, t) for t in catalog.tables}
+    scans = {t.name: grain.keysearch(plain, t) for t in catalog.tables}
     free = joins.many_to_many(plain, catalog, scans)
     assert len(free) == 3
 
     # room for exactly one pair (60 rows scanned, two queries)
     meter = budget.BudgetMeter(budget.Budget(max_rows_scanned=60))
-    limited = profile.SqlSource(db.factory, meter)
+    limited = profile.Sql(db.factory, meter)
     found = joins.many_to_many(limited, catalog, scans)
     assert len(found) == 1
     assert meter.rows == 60
@@ -163,9 +163,9 @@ def test_many_to_many_without_a_meter_or_with_room_is_unchanged():
     db = many_to_many_world()
     plain = db.source()
     catalog = profile.profile_catalog(plain, ["a", "b", "c"])
-    scans = {t.name: grain.infer_keys(plain, t) for t in catalog.tables}
+    scans = {t.name: grain.keysearch(plain, t) for t in catalog.tables}
     meter = budget.BudgetMeter(budget.Budget())
-    roomy = profile.SqlSource(db.factory, meter)
+    roomy = profile.Sql(db.factory, meter)
     assert len(joins.many_to_many(roomy, catalog, scans)) == 3
     assert not meter.partial
 
@@ -174,9 +174,9 @@ def test_paths_go_up_and_down_to_depth_two_without_revisiting():
     jw = ingest_worlds.surrogate_world(4)
     source = jw.db.source()
     catalog = profile.profile_catalog(source, jw.tables)
-    scans = {t.name: grain.infer_keys(source, t) for t in catalog.tables}
+    scans = {t.name: grain.keysearch(source, t) for t in catalog.tables}
     declared = tuple(
-        joins.DeclaredKey(c, (col,), p, ("id",)) for c, col, p in jw.truth
+        joins.Reference(c, (col,), p, ("id",)) for c, col, p in jw.truth
     )
     graph = joins.discover(source, catalog, scans, declared)
     found = joins.paths(graph, "fact", 2)
@@ -208,9 +208,9 @@ def test_surrogate_worlds_have_no_spurious_accepts():
 
 
 def test_name_supports_rules():
-    assert joins.name_supports(("customer_id",), "customer", ("id",))
-    assert joins.name_supports(("customer_id",), "customers", ("id",))
-    assert joins.name_supports(("user_id",), "accounts", ("user_id",))
-    assert not joins.name_supports(("qty",), "customer", ("id",))
-    assert not joins.name_supports(("label",), "account", ("label",))
-    assert joins.name_supports(("a", "b"), "t", ("a", "b"))
+    assert joins.corroborated(("customer_id",), "customer", ("id",))
+    assert joins.corroborated(("customer_id",), "customers", ("id",))
+    assert joins.corroborated(("user_id",), "accounts", ("user_id",))
+    assert not joins.corroborated(("qty",), "customer", ("id",))
+    assert not joins.corroborated(("label",), "account", ("label",))
+    assert joins.corroborated(("a", "b"), "t", ("a", "b"))

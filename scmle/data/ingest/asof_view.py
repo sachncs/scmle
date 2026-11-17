@@ -1,6 +1,6 @@
 """The as-of view: the only read path to a non-target table.
 
-Every feature read of another table goes through `AsOfView.visible`, which
+Every feature read of another table goes through `View.visible`, which
 returns only rows whose recorded `known_time` is at or before the target
 row's cutoff (`t_i - lag`) and whose event time is also at or before it. The
 synthesizer never receives the table, only the view.
@@ -51,7 +51,7 @@ TIER_ORDER = {
 }
 
 
-class NoAsOfRuleError(ValueError):
+class HistoryError(ValueError):
     """A table without history was read where an as-of rule is required."""
 
 
@@ -83,7 +83,7 @@ def to_days(values: pandas.Series) -> numpy.ndarray:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class KnownTime:
+class Timing:
     """How a table's known time is obtained, and what vouches for it.
 
     Attributes:
@@ -99,7 +99,7 @@ class KnownTime:
     known_column: str | None = None
     delta_rec_days: float | None = None
     attestation: provenance.Attestation | None = None
-    log_check: provenance.LogCheck | None = None
+    log_check: provenance.Reconstruction | None = None
 
     def __post_init__(self) -> None:
         """Validates the combination of fields.
@@ -135,7 +135,7 @@ class KnownTime:
         if self.mode == NON_VERSIONED:
             return qualification.Tier.UNVERIFIED
         attested = self.attestation is not None and (
-            today is None or self.attestation.valid_on(today)
+            today is None or self.attestation.effective(today)
         )
         if (
             self.mode == TRANSACTION
@@ -163,14 +163,14 @@ def weakest(tiers: list[qualification.Tier]) -> qualification.Tier:
     return min(tiers, key=TIER_ORDER.__getitem__)
 
 
-class AsOfView:
+class View:
     """Rows of one table, readable only as of each target row's cutoff."""
 
     def __init__(
         self,
         frame: pandas.DataFrame,
         key: str,
-        rule: KnownTime,
+        rule: Timing,
         event_time: str | None = None,
         name: str = "",
         permissive: bool = False,
@@ -271,10 +271,10 @@ class AsOfView:
             derived `EVENT_COLUMN` and `KNOWN_COLUMN`.
 
         Raises:
-            NoAsOfRuleError: For a `non_versioned` table unless `permissive`.
+            HistoryError: For a `non_versioned` table unless `permissive`.
         """
         if self.rule.mode == NON_VERSIONED and not self.permissive:
-            raise NoAsOfRuleError(
+            raise HistoryError(
                 f"{self.name} has no history, so no as-of rule exists"
             )
         left = targets[[self.key, TARGET_COLUMN, CUTOFF_COLUMN]]

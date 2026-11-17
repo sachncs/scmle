@@ -123,7 +123,7 @@ def source_timestamp() -> str:
     return datetime.datetime.now(datetime.UTC).isoformat()
 
 
-def build_service(
+def catalogue(
     distributions: Mapping[str, str],
     *,
     model_name: str,

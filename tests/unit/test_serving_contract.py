@@ -26,7 +26,7 @@ SHA = r"^sha256:[0-9a-f]{64}$"
 
 @pytest.fixture(scope="module")
 def golden():
-    return parity.load_golden(GOLDEN)
+    return parity.goldens(GOLDEN)
 
 
 @pytest.fixture(scope="module")
@@ -37,7 +37,7 @@ def expected():
 @pytest.fixture(scope="module")
 def bundle(golden, tmp_path_factory):
     folder = tmp_path_factory.mktemp("golden")
-    parity.reference_bundle(golden.spec).save(folder / "bundle")
+    parity.handwrite(golden.spec).save(folder / "bundle")
     return scmle.artifacts.bundle.Bundle.load(folder / "bundle", trusted=True)
 
 
@@ -92,7 +92,7 @@ def test_the_reference_matches_the_closed_form_in_process(
 
 
 def test_the_committed_expected_outputs_are_the_closed_form(golden, expected):
-    recomputed = parity.expected_outputs(golden.spec, golden.records)
+    recomputed = parity.expect(golden.spec, golden.records)
     assert recomputed["labels"] == expected["labels"]
     assert recomputed["probability_of_class_1"] == pytest.approx(
         expected["probability_of_class_1"], abs=0, rel=0
@@ -120,7 +120,7 @@ def test_batch_serving_shares_the_online_path(
     source = tmp_path / "records.csv"
     pandas.DataFrame(golden.records).to_csv(source, index=False)
     destination = tmp_path / "scored.csv"
-    batch = serving.BatchServing(bundle)
+    batch = serving.Batcher(bundle)
     assert batch.score_file(source, destination, chunk_rows=3) == len(
         golden.records
     )
@@ -419,7 +419,7 @@ def test_a_hung_call_makes_the_replica_unready_until_it_returns(
 
 
 def test_consecutive_timeouts_fail_liveness_and_never_queue():
-    control = guard.AdmissionControl(2, 0.05, strikes=2)
+    control = guard.Admission(2, 0.05, strikes=2)
     release = threading.Event()
     try:
         for ignored in range(2):
@@ -443,7 +443,7 @@ def test_consecutive_timeouts_fail_liveness_and_never_queue():
 
 def test_an_abandoned_call_knows_before_it_mutates_anything():
     # SRV-2: work reported as failed still ran and mutated series history.
-    control = guard.AdmissionControl(1, 0.05)
+    control = guard.Admission(1, 0.05)
     release = threading.Event()
     seen = []
 
@@ -583,7 +583,7 @@ def test_the_loader_and_bundle_arguments_are_exclusive(bundle):
     with pytest.raises(errors.ConfigError, match="exactly one"):
         serving.HttpServing(bundle, loader=lambda readiness: bundle)
     with pytest.raises(errors.ConfigError, match="positive"):
-        guard.AdmissionControl(0, 1.0)
+        guard.Admission(0, 1.0)
 
 
 def test_the_batch_command_scores_a_file_and_writes_a_manifest(
@@ -698,7 +698,7 @@ def serve_json(answer):
 def test_a_remote_answer_without_predictions_is_reported_as_failed():
     server = serve_json({"model_version": "v1"})
     try:
-        report = parity.check_remote(
+        report = parity.crosscheck(
             f"http://127.0.0.1:{server.server_port}", GOLDEN
         )
     finally:
@@ -713,11 +713,11 @@ def test_a_remote_answer_without_predictions_is_reported_as_failed():
 )
 def test_a_remote_check_refuses_a_url_that_is_not_http_or_https(url):
     with pytest.raises(ValueError, match="http or https"):
-        parity.check_remote(url, GOLDEN)
+        parity.crosscheck(url, GOLDEN)
 
 
 def test_a_timeout_raised_by_the_work_itself_is_not_a_deadline_error():
-    control = guard.AdmissionControl(1, 5.0)
+    control = guard.Admission(1, 5.0)
 
     def work():
         raise TimeoutError("upstream lookup timed out")

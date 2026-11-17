@@ -64,7 +64,7 @@ def test_fewer_than_twenty_reruns_are_refused():
     with pytest.raises(ValueError, match="at least 20"):
         controls.summarize("x", "strata", 1, tuple(range(19)))
     with pytest.raises(ValueError, match="b"):
-        controls.permuted_target_control(
+        controls.placebo(
             lambda f, t: 0,
             pandas.DataFrame({"a": [1.0]}),
             pandas.Series([1.0]),
@@ -77,11 +77,11 @@ def test_fewer_than_twenty_reruns_are_refused():
 
 def test_the_percentile_interval_is_ordered_and_covers_the_percentile():
     counts = tuple(range(40))
-    low, high = controls.percentile_interval(counts)
+    low, high = controls.bracket(counts)
     assert low <= controls.percentile(counts) <= high
     assert high <= max(counts)
     with pytest.raises(ValueError):
-        controls.percentile_interval(())
+        controls.bracket(())
 
 
 def test_permute_within_never_crosses_strata():
@@ -138,7 +138,7 @@ def test_target_control_permutes_only_the_target_within_strata():
         seen.append(shuffled.to_numpy().copy())
         return 0
 
-    result = controls.permuted_target_control(
+    result = controls.placebo(
         spy, features, target, observed=1, b=20, seed=3, strata=strata
     )
     assert len(seen) == 20 and result.b == 20
@@ -146,7 +146,7 @@ def test_target_control_permutes_only_the_target_within_strata():
     assert len({tuple(s) for s in seen}) == 20  # distinct streams
     assert result.exceeds is True  # 1 > p95 of all zeros
     assert (
-        controls.permuted_target_control(
+        controls.placebo(
             lambda f, t: 0,
             features,
             target,
@@ -166,13 +166,13 @@ def test_controls_are_deterministic_for_a_seed():
     def count(f, t):
         return int(t.iloc[0] % 3)
 
-    one = controls.permuted_target_control(
+    one = controls.placebo(
         count, features, target, observed=2, b=25, seed=9, strata=None
     )
-    two = controls.permuted_target_control(
+    two = controls.placebo(
         count, features, target, observed=2, b=25, seed=9, strata=None
     )
-    other = controls.permuted_target_control(
+    other = controls.placebo(
         count, features, target, observed=2, b=25, seed=10, strata=None
     )
     assert one == two and one != other
@@ -180,7 +180,7 @@ def test_controls_are_deterministic_for_a_seed():
 
 def test_target_control_validates_strata_length():
     with pytest.raises(ValueError, match="one label"):
-        controls.permuted_target_control(
+        controls.placebo(
             lambda f, t: 0,
             pandas.DataFrame({"a": numpy.arange(5.0)}),
             pandas.Series(numpy.arange(5.0)),
@@ -198,13 +198,11 @@ def test_column_shuffle_keeps_marginals_and_breaks_association():
         {"a": x, "b": 2 * x + 0.01 * r.normal(size=400)}
     )
     assert abs(features.corr().iloc[0, 1]) > 0.99
-    shuffled = controls.shuffle_columns(features, rng(6), None)
+    shuffled = controls.scramble(features, rng(6), None)
     for name in features:
         assert sorted(shuffled[name]) == sorted(features[name])
     assert abs(shuffled.corr().iloc[0, 1]) < 0.2
-    grouped = controls.shuffle_columns(
-        features, rng(6), numpy.repeat([0, 1], 200)
-    )
+    grouped = controls.scramble(features, rng(6), numpy.repeat([0, 1], 200))
     assert set(grouped["a"][:200]) == set(features["a"][:200])
 
 
@@ -213,7 +211,7 @@ def test_block_shuffle_keeps_blocks_intact_and_breaks_drift():
     drift = numpy.arange(n, dtype=float)
     features = pandas.DataFrame({"a": drift})
     blocks = numpy.repeat(numpy.arange(12), 10)
-    shuffled = controls.shuffle_blocks(features, blocks, rng(2))
+    shuffled = controls.jumble(features, blocks, rng(2))
     values = shuffled["a"].to_numpy()
     for start in range(0, n, 10):
         piece = values[start : start + 10]

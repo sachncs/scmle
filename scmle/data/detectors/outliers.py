@@ -184,7 +184,7 @@ def triage(
     return Triage(classes, scores, candidate, tier)
 
 
-def error_flags(
+def misrecorded(
     frame: pandas.DataFrame,
     provenance: Mapping[str, FieldProvenance],
     contracts: Mapping[str, Contract] | None = None,

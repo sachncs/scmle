@@ -48,7 +48,7 @@ def test_classification_sets_cover_and_shrink_when_the_model_is_sure():
     probabilities = numpy.exp(logits) / numpy.exp(logits).sum(
         axis=1, keepdims=True
     )
-    calibrator = conformal.ConformalCalibrator.for_classification(
+    calibrator = conformal.ConformalCalibrator.classify(
         labels, probabilities, classes
     )
 
@@ -74,8 +74,8 @@ def test_too_few_rows_or_bad_coverage_is_rejected():
 
 def test_demanding_coverage_with_few_rows_gives_an_infinite_margin():
     scores = numpy.arange(1.0, 21.0)
-    assert math.isinf(conformal.finite_sample_quantile(scores, 0.99))
-    assert conformal.finite_sample_quantile(scores, 0.5) == 11.0
+    assert math.isinf(conformal.cutoff(scores, 0.99))
+    assert conformal.cutoff(scores, 0.5) == 11.0
 
 
 def test_round_trip_and_wrong_kind_errors():
@@ -107,7 +107,7 @@ def test_a_skipped_calibration_is_recorded_as_an_event():
 
     context = RecordingContext()
 
-    stages.PackageStage().note_conformal_skipped(context, "time budget spent")
+    stages.PackageStage().waive(context, "time budget spent")
 
     kind, reason, data = context.events[0]
     assert kind == "conformal.skipped"
@@ -124,7 +124,7 @@ def test_asking_for_intervals_without_calibration_points_at_the_event():
     model.conformal = None
 
     with pytest.raises(errors.ArtifactError, match=r"conformal\.skipped"):
-        model.require_conformal("regression")
+        model.require("regression")
 
 
 def test_sensitivity_below_the_minimum_rows_is_skipped_not_raised():
@@ -136,7 +136,7 @@ def test_sensitivity_below_the_minimum_rows_is_skipped_not_raised():
     context = SimpleNamespace(
         spec=SimpleNamespace(selection=SimpleNamespace(sensitivity_repeats=3)),
         task=tasks.Task.REGRESSION,
-        resource_governor=SimpleNamespace(skip_reason=lambda first: None),
+        regulator=SimpleNamespace(skip_reason=lambda first: None),
         split=SimpleNamespace(dev_target=numpy.arange(10.0)),
     )
 

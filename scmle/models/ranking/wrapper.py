@@ -10,7 +10,7 @@ from sklearn import base
 from sklearn import pipeline
 
 
-class QueryAwareEstimator(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Ranker(base.RegressorMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits a ranking pipeline using the query column of the features frame.
 
     Rows are put in query order (a stable sort), the sizes of the consecutive

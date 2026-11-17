@@ -35,14 +35,14 @@ def normalise(
         TypeError: If a key or value is not JSON-native, or the record does
             not serialize to an object.
     """
-    normalized = explanations.validate_json_value(evidence, field_name)
+    normalized = explanations.sanitise(evidence, field_name)
     if not isinstance(normalized, dict):
         raise errors.KindError(f"{field_name} must serialize to an object")
     return normalized
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class QualityObservation:
+class Observation:
     """One quality check result and its reproducible evidence.
 
     Attributes:
@@ -81,7 +81,7 @@ class FindingSeverity(enum.StrEnum):
     CRITICAL = "critical"
 
 
-class FindingDisposition(enum.StrEnum):
+class Disposition(enum.StrEnum):
     """Review state assigned to a curation finding."""
 
     OPEN = "open"
@@ -92,7 +92,7 @@ class FindingDisposition(enum.StrEnum):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class CurationFinding:
+class Finding:
     """One reviewable, reproducible observation about a dataset.
 
     Attributes:
@@ -119,9 +119,9 @@ class CurationFinding:
     remediation: str
     owner: str
     reviewer: str | None
-    disposition: FindingDisposition
+    disposition: Disposition
     blocking: bool
-    timestamp: str = dataclasses.field(default_factory=events.utc_timestamp)
+    timestamp: str = dataclasses.field(default_factory=events.stamp)
 
     def __post_init__(self) -> None:
         """Validates fields that determine finding identity and decisions.
@@ -151,10 +151,8 @@ class CurationFinding:
         if not isinstance(severity, FindingSeverity):
             object.__setattr__(self, "severity", FindingSeverity(severity))
         disposition: Any = self.disposition  # may be a raw value at runtime
-        if not isinstance(disposition, FindingDisposition):
-            object.__setattr__(
-                self, "disposition", FindingDisposition(disposition)
-            )
+        if not isinstance(disposition, Disposition):
+            object.__setattr__(self, "disposition", Disposition(disposition))
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON- and Arrow-compatible mapping."""
@@ -215,7 +213,7 @@ class CurationFinding:
             remediation="Review the observation and record a disposition.",
             owner="pipeline",
             reviewer=None,
-            disposition=FindingDisposition.OPEN,
+            disposition=Disposition.OPEN,
             blocking=False,
         )
 
@@ -242,7 +240,7 @@ class CurationFinding:
             remediation=str(record["remediation"]),
             owner=str(record["owner"]),
             reviewer=record.get("reviewer"),
-            disposition=FindingDisposition(record["disposition"]),
+            disposition=Disposition(record["disposition"]),
             blocking=bool(record["blocking"]),
             timestamp=str(record["timestamp"]),
         )
@@ -255,14 +253,14 @@ def vet(findings: tuple[Any, ...]) -> None:
         findings: The findings of a manifest.
 
     Raises:
-        TypeError: If an entry is not a `CurationFinding`.
+        TypeError: If an entry is not a `Finding`.
     """
-    if any(not isinstance(finding, CurationFinding) for finding in findings):
-        raise errors.KindError("findings must contain CurationFinding records")
+    if any(not isinstance(finding, Finding) for finding in findings):
+        raise errors.KindError("findings must contain Finding records")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SourceMetadata:
+class Origin:
     """Provenance and semantic context for the dataset source.
 
     Attributes:
@@ -335,7 +333,7 @@ class SourceMetadata:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class LineageMetadata:
+class Ancestry:
     """Transform and label provenance for an immutable dataset snapshot."""
 
     source_snapshot: str = ""
@@ -391,7 +389,7 @@ class LineageMetadata:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PrivacyMetadata:
+class Confidentiality:
     """Privacy, consent, and retention controls for a dataset snapshot."""
 
     classification: str = "unclassified"
@@ -472,14 +470,12 @@ class DatasetManifest:
     modality: str = "tabular"
     task: str = ""
     schema_version: int = 1
-    source: SourceMetadata = dataclasses.field(default_factory=SourceMetadata)
-    lineage: LineageMetadata = dataclasses.field(
-        default_factory=LineageMetadata
+    source: Origin = dataclasses.field(default_factory=Origin)
+    lineage: Ancestry = dataclasses.field(default_factory=Ancestry)
+    privacy: Confidentiality = dataclasses.field(
+        default_factory=Confidentiality
     )
-    privacy: PrivacyMetadata = dataclasses.field(
-        default_factory=PrivacyMetadata
-    )
-    findings: tuple[CurationFinding, ...] = ()
+    findings: tuple[Finding, ...] = ()
 
     def __post_init__(self) -> None:
         """Validates dataset identity before it enters a run or artifact.
@@ -487,7 +483,7 @@ class DatasetManifest:
         Raises:
             TypeError: If a count or the schema version is not an integer,
                 a metadata component has the wrong type, or a finding is not
-                a `CurationFinding`.
+                a `Finding`.
             ValueError: If an identity field (dataset id, hashes, target or
                 modality) is blank or not a string, a count is negative, or
                 the schema version is below one.
@@ -518,9 +514,9 @@ class DatasetManifest:
         if self.schema_version < 1:
             raise errors.InputError("schema_version must be positive")
         for component_name, component, expected in (
-            ("source", self.source, SourceMetadata),
-            ("lineage", self.lineage, LineageMetadata),
-            ("privacy", self.privacy, PrivacyMetadata),
+            ("source", self.source, Origin),
+            ("lineage", self.lineage, Ancestry),
+            ("privacy", self.privacy, Confidentiality),
         ):
             if not isinstance(component, expected):
                 raise errors.KindError(
@@ -571,18 +567,18 @@ class DatasetManifest:
             modality=str(record.get("modality", "tabular")),
             task=str(record.get("task", "")),
             schema_version=int(record.get("schema_version", 1)),
-            source=SourceMetadata.from_dict(record.get("source", {})),
-            lineage=LineageMetadata.from_dict(record.get("lineage", {})),
-            privacy=PrivacyMetadata.from_dict(record.get("privacy", {})),
+            source=Origin.from_dict(record.get("source", {})),
+            lineage=Ancestry.from_dict(record.get("lineage", {})),
+            privacy=Confidentiality.from_dict(record.get("privacy", {})),
             findings=tuple(
-                CurationFinding.from_dict(finding)
+                Finding.from_dict(finding)
                 for finding in record.get("findings", ())
             ),
         )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ModalityManifest:
+class Passport:
     """Immutable identity and governance metadata for any modality.
 
     Unlike ``DatasetManifest``, this contract does not assume rows, columns,
@@ -597,14 +593,12 @@ class ModalityManifest:
     sample_count: int
     content_hash: str
     schema_version: int = 1
-    source: SourceMetadata = dataclasses.field(default_factory=SourceMetadata)
-    lineage: LineageMetadata = dataclasses.field(
-        default_factory=LineageMetadata
+    source: Origin = dataclasses.field(default_factory=Origin)
+    lineage: Ancestry = dataclasses.field(default_factory=Ancestry)
+    privacy: Confidentiality = dataclasses.field(
+        default_factory=Confidentiality
     )
-    privacy: PrivacyMetadata = dataclasses.field(
-        default_factory=PrivacyMetadata
-    )
-    findings: tuple[CurationFinding, ...] = ()
+    findings: tuple[Finding, ...] = ()
 
     def __post_init__(self) -> None:
         """Validates modality identity and attached governance metadata.
@@ -612,7 +606,7 @@ class ModalityManifest:
         Raises:
             TypeError: If the sample count is not an integer, a metadata
                 component has the wrong type, or a finding is not a
-                `CurationFinding`.
+                `Finding`.
             ValueError: If an identity field is blank, the sample count is
                 negative, the schema version is below one, or the content
                 hash is not 64 lowercase hexadecimal characters.
@@ -639,12 +633,12 @@ class ModalityManifest:
             for character in self.content_hash
         ):
             raise errors.InputError("content_hash must be a SHA-256 hex digest")
-        if not isinstance(self.source, SourceMetadata):
-            raise errors.KindError("source must be SourceMetadata")
-        if not isinstance(self.lineage, LineageMetadata):
-            raise errors.KindError("lineage must be LineageMetadata")
-        if not isinstance(self.privacy, PrivacyMetadata):
-            raise errors.KindError("privacy must be PrivacyMetadata")
+        if not isinstance(self.source, Origin):
+            raise errors.KindError("source must be Origin")
+        if not isinstance(self.lineage, Ancestry):
+            raise errors.KindError("lineage must be Ancestry")
+        if not isinstance(self.privacy, Confidentiality):
+            raise errors.KindError("privacy must be Confidentiality")
         object.__setattr__(self, "findings", tuple(self.findings))
         vet(self.findings)
 
@@ -682,18 +676,18 @@ class ModalityManifest:
             sample_count=int(record["sample_count"]),
             content_hash=str(record["content_hash"]),
             schema_version=int(record.get("schema_version", 1)),
-            source=SourceMetadata.from_dict(record.get("source", {})),
-            lineage=LineageMetadata.from_dict(record.get("lineage", {})),
-            privacy=PrivacyMetadata.from_dict(record.get("privacy", {})),
+            source=Origin.from_dict(record.get("source", {})),
+            lineage=Ancestry.from_dict(record.get("lineage", {})),
+            privacy=Confidentiality.from_dict(record.get("privacy", {})),
             findings=tuple(
-                CurationFinding.from_dict(finding)
+                Finding.from_dict(finding)
                 for finding in record.get("findings", ())
             ),
         )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FeaturePlan:
+class Blueprint:
     """Which columns become features and why the others were dropped.
 
     Attributes:
@@ -756,12 +750,12 @@ class FeaturePlan:
         return self.numeric + self.categorical
 
     @property
-    def derived_names(self) -> frozenset[str]:
+    def engineered(self) -> frozenset[str]:
         """Columns computed by the feature graph (row-wise or ordered)."""
         return frozenset(n.name for n in (*self.derived, *self.series))
 
     @property
-    def input_columns(self) -> tuple[str, ...]:
+    def sourced(self) -> tuple[str, ...]:
         """Raw columns the fitted pipeline reads (plus series features).
 
         These exist in the frame a pipeline is fitted on: model features that
@@ -772,7 +766,7 @@ class FeaturePlan:
         columns = [c for c in self.features if c not in rowwise]
         return tuple(dict.fromkeys([*columns, *self.extra_inputs]))
 
-    def columns_for(self, kind_name: str) -> tuple[str, ...]:
+    def pick(self, kind_name: str) -> tuple[str, ...]:
         """Returns the feature columns of one kind.
 
         The name is looked up with `getattr`, so any attribute name returns
@@ -803,7 +797,7 @@ class FeaturePlan:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DatasetProfile:
+class Portrait:
     """Statistical profile and findings for a dataset.
 
     Attributes:
@@ -828,7 +822,7 @@ class DatasetProfile:
     quality_findings: tuple[str, ...]
     risk_findings: tuple[str, ...]
     target_summary: Mapping[str, Any]
-    feature_plan: FeaturePlan
+    feature_plan: Blueprint
     dataset_statistics: Mapping[str, Any] = dataclasses.field(
         default_factory=dict
     )
@@ -837,17 +831,17 @@ class DatasetProfile:
     leakage: Mapping[str, Any] = dataclasses.field(default_factory=dict)
 
     @property
-    def blocking_leaks(self) -> tuple[str, ...]:
+    def blockers(self) -> tuple[str, ...]:
         """Columns whose leakage suspicion is certified and may block a run."""
         return tuple(self.leakage.get("blocking", ()))
 
     @property
-    def unchecked_columns(self) -> tuple[str, ...]:
+    def untested(self) -> tuple[str, ...]:
         """Columns the leakage screen declined to test (not clean)."""
         return tuple(map(str, self.leakage.get("unchecked", ())))
 
     @property
-    def screen_warning(self) -> str:
+    def admonition(self) -> str:
         """The loud statement of an incomplete screen, or an empty string."""
         return str(self.leakage.get("warning", ""))
 
@@ -890,19 +884,19 @@ class Curation:
     read_seconds: float
     streamed: bool
     cleaning_notes: tuple[str, ...]
-    quality_findings: tuple[CurationFinding, ...]
-    risk_findings: tuple[CurationFinding, ...]
+    quality_findings: tuple[Finding, ...]
+    risk_findings: tuple[Finding, ...]
     feature_columns: Mapping[str, tuple[str, ...]]
     dropped_columns: Mapping[str, str]
     schema_version: int = 1
 
     @property
-    def unresolved_blocking_findings(self) -> tuple[CurationFinding, ...]:
+    def unresolved_blocking_findings(self) -> tuple[Finding, ...]:
         """The blocking findings without an explicit safe disposition."""
         safe_dispositions = {
-            FindingDisposition.RESOLVED,
-            FindingDisposition.WAIVED,
-            FindingDisposition.FALSE_POSITIVE,
+            Disposition.RESOLVED,
+            Disposition.WAIVED,
+            Disposition.FALSE_POSITIVE,
         }
         return tuple(
             finding
@@ -964,15 +958,15 @@ class DatasetCard:
     composition: Mapping[str, int]
     feature_summary: Mapping[str, tuple[str, ...]]
     limitations: tuple[str, ...]
-    quality_findings: tuple[CurationFinding, ...]
-    risk_findings: tuple[CurationFinding, ...]
-    source: SourceMetadata
-    lineage: LineageMetadata
-    privacy: PrivacyMetadata
+    quality_findings: tuple[Finding, ...]
+    risk_findings: tuple[Finding, ...]
+    source: Origin
+    lineage: Ancestry
+    privacy: Confidentiality
     owner: str
     review_status: str = "machine_generated_unreviewed"
     schema_version: int = 1
-    generated_at: str = dataclasses.field(default_factory=events.utc_timestamp)
+    generated_at: str = dataclasses.field(default_factory=events.stamp)
 
     def __post_init__(self) -> None:
         """Validates the fields that make the card useful to reviewers.
@@ -1004,7 +998,7 @@ class DatasetCard:
             raise errors.InputError("limitations must not be empty")
 
     @classmethod
-    def from_curation(cls, report: Curation) -> Self:
+    def distill(cls, report: Curation) -> Self:
         """Builds a card from the immutable curation evidence.
 
         Args:

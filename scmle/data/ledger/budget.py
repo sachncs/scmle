@@ -29,7 +29,7 @@ EULER_GAMMA = 0.5772156649015329
 Number = int | float | Fraction
 
 
-class BudgetExhaustedError(ValueError):
+class ExhaustedError(ValueError):
     """Raised when a spend exceeds the remaining exploration wealth."""
 
 
@@ -136,7 +136,7 @@ class ExplorationBudget:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DetectorTolerance:
+class Tolerance:
     """What a detector certificate must show before the detector may gate.
 
     Attributes:
@@ -201,7 +201,7 @@ class ErrorBudget:
     confirmation: ConfirmationBudget
     exploration: ExplorationBudget
     permutations_b: int
-    detector_tolerances: tuple[DetectorTolerance, ...]
+    detector_tolerances: tuple[Tolerance, ...]
 
     def __post_init__(self) -> None:
         """Validates the budget.
@@ -215,9 +215,7 @@ class ErrorBudget:
         qualification.count(
             self.permutations_b, "permutations_b", minimum=MIN_PERMUTATIONS
         )
-        qualification.require_tuple(
-            self.detector_tolerances, "detector_tolerances"
-        )
+        qualification.tupled(self.detector_tolerances, "detector_tolerances")
         names = [t.detector_id for t in self.detector_tolerances]
         if len(set(names)) != len(names):
             raise errors.InputError(
@@ -230,7 +228,7 @@ class ErrorBudget:
         alpha_confirm: Number,
         wealth_exploration: Number,
         permutations_b: int = MIN_PERMUTATIONS,
-        detector_tolerances: tuple[DetectorTolerance, ...] = (),
+        detector_tolerances: tuple[Tolerance, ...] = (),
     ) -> Self:
         """Builds a fresh budget from plain numbers.
 
@@ -310,7 +308,7 @@ class ErrorBudget:
             ),
             permutations_b=record["permutations_b"],
             detector_tolerances=tuple(
-                DetectorTolerance.from_dict(item)
+                Tolerance.from_dict(item)
                 for item in record["detector_tolerances"]
             ),
         )
@@ -341,14 +339,14 @@ def spend(budget: ErrorBudget, amount: Number) -> ErrorBudget:
 
     Raises:
         ValueError: If `amount` is negative or not a finite number.
-        BudgetExhaustedError: If `amount` exceeds the remaining wealth.
+        ExhaustedError: If `amount` exceeds the remaining wealth.
     """
     cost = exact(amount, "amount")
     if cost < 0:
         raise errors.InputError("amount must be non-negative")
     left = budget.exploration.wealth
     if cost > left:
-        raise BudgetExhaustedError(
+        raise ExhaustedError(
             f"amount {float(cost):.6g} exceeds "
             f"remaining wealth {float(left):.6g}"
         )
@@ -360,7 +358,7 @@ def spend(budget: ErrorBudget, amount: Number) -> ErrorBudget:
     )
 
 
-def split_budget(
+def apportion(
     budget: ErrorBudget, weights: Mapping[str, Number]
 ) -> dict[str, ErrorBudget]:
     """Divides a budget among hypothesis families in proportion to weights.
@@ -455,7 +453,7 @@ def confirmation_alpha(
     return float(alpha / n_survivors)
 
 
-def discount_weight(index: int, horizon: int | None) -> Fraction:
+def gammas(index: int, horizon: int | None) -> Fraction:
     """Computes `gamma_index` of the discount sequence.
 
     With no horizon ``gamma_j = 1 / (j (j + 1))``, which sums to less than one
@@ -613,7 +611,7 @@ class DecisionBudget:
         )
 
 
-def assign_experiment(
+def enroll(
     budget: DecisionBudget,
     experiment_id: str,
     level: Number | None = None,
@@ -632,7 +630,7 @@ def assign_experiment(
     Raises:
         ValueError: If the id is blank or already used, or the level is not
             positive.
-        BudgetExhaustedError: If the level would take the total past
+        ExhaustedError: If the level would take the total past
             `alpha_promote`, or the horizon is used up.
     """
     evidence.require_text(experiment_id, "experiment_id")
@@ -641,16 +639,16 @@ def assign_experiment(
             f"experiment {experiment_id} already has a level"
         )
     if level is None:
-        gamma = discount_weight(len(budget.assigned) + 1, budget.horizon)
+        gamma = gammas(len(budget.assigned) + 1, budget.horizon)
         chosen = budget.alpha_promote * gamma
         if chosen == 0:
-            raise BudgetExhaustedError("the experiment horizon is used up")
+            raise ExhaustedError("the experiment horizon is used up")
     else:
         chosen = exact(level, "level")
         if chosen <= 0:
             raise errors.InputError("level must be positive")
     if chosen > budget.remaining:
-        raise BudgetExhaustedError(
+        raise ExhaustedError(
             f"level {float(chosen):.6g} exceeds the remaining promotion "
             f"level {float(budget.remaining):.6g}"
         )

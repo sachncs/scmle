@@ -17,7 +17,7 @@ from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import estimators
 
 
-class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Embedder(base.TransformerMixin, estimators.NetworkEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Worker-backed tabular JEPA representation estimator.
 
     This is a self-supervised numeric-tabular representation path. It is not a
@@ -77,7 +77,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
         features: Any,
         target: Any = None,
         sample_weight: Any = None,
-    ) -> "JepaEstimator":
+    ) -> "Embedder":
         """Learns a representation without using a target label.
 
         Pipeline.fit forwards the supervised target to every intermediate
@@ -96,7 +96,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
         """
         del target
         return cast(
-            "JepaEstimator",
+            "Embedder",
             super().fit(
                 features,
                 numpy.zeros(len(features), dtype=numpy.float32),
@@ -115,15 +115,15 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
         """
         return self.call("encode", features)
 
-    def model_contract(self) -> contracts.ModelFamilyContract:
+    def model_contract(self) -> contracts.Boundary:
         """Returns the explicit tabular JEPA family boundary."""
         return contracts.TABULAR_JEPA_CONTRACT
 
-    def inference_contract(self) -> contracts.InferenceContract:
+    def inference_contract(self) -> contracts.Contract:
         """Returns the embedding inference contract."""
         return self.model_contract().inference
 
-    def explanation_contract(self) -> contracts.ExplanationContract:
+    def explanation_contract(self) -> contracts.Explainability:
         """Returns the embedding-sensitivity explanation contract.
 
         Raises:
@@ -134,7 +134,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
             raise errors.InputError("tabular JEPA has no explanation contract")
         return explanation
 
-    def explain(self, features: Any) -> contracts.FeatureExplanation:
+    def explain(self, features: Any) -> contracts.Contribution:
         """Explains local sensitivity of the learned embedding.
 
         Args:
@@ -145,7 +145,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
             per row and input feature.
         """
         values = self.call("explain", features)
-        return contracts.FeatureExplanation(
+        return contracts.Contribution(
             values=values,
             method=self.explanation_contract().method,
             target="embedding_energy",
@@ -205,7 +205,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
         path: str | pathlib.Path,
         signing_key: str | bytes | None = None,
         trusted: bool = False,
-    ) -> "JepaEstimator":
+    ) -> "Embedder":
         """Loads a checkpoint, authenticating it before anything is unpickled.
 
         Args:
@@ -219,7 +219,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
         Raises:
             ValueError: If the file cannot be read, is not an envelope, fails
                 its digest, or does not hold a matching fitted
-                `JepaEstimator`.
+                `Embedder`.
             ArtifactError: If the checkpoint is unsigned (or no key is set)
                 and `trusted` is false, or its signature does not verify.
         """
@@ -251,9 +251,7 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
             )
         estimator = serialized.get("estimator")
         if not isinstance(estimator, cls):
-            raise errors.InputError(
-                "checkpoint does not contain a JepaEstimator"
-            )
+            raise errors.InputError("checkpoint does not contain a Embedder")
         validation.check_is_fitted(estimator, attributes=["state_"])
         expected = json.loads(json.dumps(estimator.checkpoint_manifest()))
         if meta != expected:
@@ -263,4 +261,4 @@ class JepaEstimator(base.TransformerMixin, estimators.NetworkEstimator):  # type
         return estimator
 
 
-__all__ = ["JepaEstimator"]
+__all__ = ["Embedder"]

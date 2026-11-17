@@ -129,7 +129,7 @@ class Estimate:
         return dataclasses.asdict(self)
 
 
-def wide_panel(
+def widen(
     frame: pandas.DataFrame, unit: str, time: str, outcome: str
 ) -> pandas.DataFrame:
     """Reshapes a balanced panel to one row per unit and column per period.
@@ -158,7 +158,7 @@ def wide_panel(
     return table.sort_index(axis=1)
 
 
-def event_arms(
+def arms(
     y: numpy.ndarray,
     index: Mapping[Any, int],
     n_periods: int,
@@ -203,7 +203,7 @@ def event_arms(
     return treated_vars, control_vars
 
 
-def event_covariance(
+def vcov(
     events: Sequence[int],
     groups: Sequence[Any],
     sizes: Mapping[Any, int],
@@ -241,7 +241,7 @@ def event_covariance(
     return covariance
 
 
-def overall_att(
+def aggregate(
     y: numpy.ndarray,
     index: Mapping[Any, int],
     post_cells: Sequence[tuple[Any, int]],
@@ -311,7 +311,7 @@ def pretest(
     return float(stats.chi2.sf(stat, len(pre)))
 
 
-def max_pre_event_change(
+def pretrend(
     events: Sequence[int], coefficients: Sequence[float]
 ) -> float | None:
     """Finds the largest change between consecutive pre-period coefficients.
@@ -365,7 +365,7 @@ def estimate(
             no adoption group has a pre-period (groups adopting in the first
             period or in a period not observed are dropped).
     """
-    wide = wide_panel(frame, unit, time, outcome)
+    wide = widen(frame, unit, time, outcome)
     periods = list(wide.columns)
     if len(periods) < MIN_PERIODS:
         raise errors.InputError(f"at least {MIN_PERIODS} periods are needed")
@@ -392,7 +392,7 @@ def estimate(
             if j != index[g] - 1
         }
     )
-    treated_vars, control_vars = event_arms(
+    treated_vars, control_vars = arms(
         y, index, len(periods), groups, sizes, members, never, events
     )
     # Mean treated change minus mean never-treated change at each event time.
@@ -404,18 +404,16 @@ def estimate(
         for e in events
     ]
     n_never = int(never.sum())
-    covariance = event_covariance(
+    covariance = vcov(
         events, groups, sizes, treated_vars, control_vars, n_never
     )
     post_cells = [(g, j) for g in groups for j in range(index[g], len(periods))]
     weights = numpy.array([sizes[cell[0]] for cell in post_cells], dtype=float)
     weights /= weights.sum()
-    theta, se = overall_att(
-        y, index, post_cells, weights, members, sizes, never
-    )
+    theta, se = aggregate(y, index, post_cells, weights, members, sizes, never)
     z = float(stats.norm.ppf(0.5 + level / 2))
     pretrend_p = pretest(events, coefficients, covariance)
-    max_change = max_pre_event_change(events, coefficients)
+    max_change = pretrend(events, coefficients)
     horizon = float(
         numpy.average(
             [j - index[g] + 1 for g, j in post_cells], weights=weights

@@ -123,7 +123,7 @@ DEFAULT_METRICS = (
         greater_is_better=True,
         tasks=frozenset({tasks.Task.REGRESSION}),
     ),
-    scmle.contracts.metrics.FunctionMetric(
+    scmle.contracts.metrics.Formula(
         "qwk",
         "",
         greater_is_better=True,
@@ -131,12 +131,12 @@ DEFAULT_METRICS = (
         score_function=ordinal.quadratic_weighted_kappa,
         response_method="predict",
     ),
-    scmle.contracts.metrics.FunctionMetric(
+    scmle.contracts.metrics.Formula(
         "mace",
         "",
         greater_is_better=False,
         tasks=frozenset({tasks.Task.ORDINAL}),
-        score_function=ordinal.mean_absolute_class_error,
+        score_function=ordinal.distance,
         response_method="predict",
     ),
     scmle.contracts.metrics.Metric(
@@ -145,42 +145,42 @@ DEFAULT_METRICS = (
         greater_is_better=True,
         tasks=frozenset({tasks.Task.ORDINAL}),
     ),
-    multitarget.MultiTargetMetric(
+    multitarget.Joint(
         "f1_macro_labels",
         "",
         greater_is_better=True,
         tasks=frozenset({tasks.Task.MULTILABEL}),
         kind="f1_macro_labels",
     ),
-    multitarget.MultiTargetMetric(
+    multitarget.Joint(
         "f1_micro_labels",
         "",
         greater_is_better=True,
         tasks=frozenset({tasks.Task.MULTILABEL}),
         kind="f1_micro_labels",
     ),
-    multitarget.MultiTargetMetric(
+    multitarget.Joint(
         "hamming",
         "",
         greater_is_better=False,
         tasks=frozenset({tasks.Task.MULTILABEL}),
         kind="hamming",
     ),
-    multitarget.MultiTargetMetric(
+    multitarget.Joint(
         "subset_accuracy",
         "",
         greater_is_better=True,
         tasks=frozenset({tasks.Task.MULTILABEL}),
         kind="subset_accuracy",
     ),
-    multitarget.MultiTargetMetric(
+    multitarget.Joint(
         "r2_mean",
         "",
         greater_is_better=True,
         tasks=frozenset({tasks.Task.MULTIOUTPUT}),
         kind="r2_mean",
     ),
-    multitarget.MultiTargetMetric(
+    multitarget.Joint(
         "mae_scaled",
         "",
         greater_is_better=False,
@@ -208,14 +208,14 @@ DEFAULT_METRICS = (
         tasks=frozenset({tasks.Task.FORECAST}),
         kind="smape",
     ),
-    uplift.UpliftMetric(
+    uplift.Incrementality(
         "qini",
         "",
         greater_is_better=True,
         tasks=frozenset({tasks.Task.UPLIFT}),
         kind="qini",
     ),
-    uplift.UpliftMetric(
+    uplift.Incrementality(
         "uplift_at_30",
         "",
         greater_is_better=True,
@@ -257,20 +257,20 @@ DEFAULT_METRICS = (
         tasks=frozenset({tasks.Task.RANKING}),
         kind="recall_at_10",
     ),
-    concordance.ConcordanceMetric(
+    concordance.Cindex(
         "c_index",
         "",
         greater_is_better=True,
         tasks=frozenset({tasks.Task.SURVIVAL}),
     ),
-    survival.SurvivalMetric(
+    survival.Survival(
         "ibs",
         "",
         greater_is_better=False,
         tasks=frozenset({tasks.Task.SURVIVAL}),
         kind="ibs",
     ),
-    survival.SurvivalMetric(
+    survival.Survival(
         "td_auc",
         "",
         greater_is_better=True,
@@ -280,7 +280,7 @@ DEFAULT_METRICS = (
 )
 
 
-class MetricCatalog:
+class Repertoire:
     """Resolves metric names and applies the report protocol."""
 
     default_metric = {
@@ -478,7 +478,7 @@ class MetricCatalog:
         return results
 
 
-CATALOG = MetricCatalog()
+CATALOG = Repertoire()
 
 
 def register_metric(
@@ -488,7 +488,7 @@ def register_metric(
     task_types: tuple[tasks.Task, ...] = tuple(tasks.STANDARD_TASKS),
     response_method: str = "predict",
     replace: bool = False,
-) -> scmle.contracts.metrics.FunctionMetric:
+) -> scmle.contracts.metrics.Formula:
     """Registers a user-defined metric with the default catalog.
 
     Args:
@@ -502,10 +502,10 @@ def register_metric(
         replace: Allow overriding an existing metric of the same name.
 
     Returns:
-        The registered metric. `MetricCatalog.register` raises `ConfigError`
+        The registered metric. `Repertoire.register` raises `ConfigError`
         when the name is taken and `replace` is False.
     """
-    metric = scmle.contracts.metrics.FunctionMetric(
+    metric = scmle.contracts.metrics.Formula(
         name,
         "",
         greater_is_better,

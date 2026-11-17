@@ -19,7 +19,7 @@ LATENCY_ROWS = 30
 
 
 @dataclasses.dataclass(frozen=True)
-class ResourceUsage:
+class Usage:
     """Measured serving cost of a fitted candidate.
 
     Attributes:
@@ -45,7 +45,7 @@ class ResourceUsage:
 
 
 @dataclasses.dataclass(frozen=True)
-class ResourceLimits:
+class Constraints:
     """Serving constraints a candidate must satisfy.
 
     Attributes:
@@ -66,7 +66,7 @@ class ResourceLimits:
             self.max_p95_latency_ms is not None
         )
 
-    def violations(self, usage: ResourceUsage) -> list[str]:
+    def violations(self, usage: Usage) -> list[str]:
         """Lists the limits a measurement breaks.
 
         Args:
@@ -96,7 +96,7 @@ class ResourceLimits:
 
 def measure(
     estimator: Any, features: pandas.DataFrame, rows: int = LATENCY_ROWS
-) -> ResourceUsage:
+) -> Usage:
     """Measures serialized size and single-row prediction latency.
 
     Args:
@@ -118,7 +118,7 @@ def measure(
         started = time.perf_counter()
         estimator.predict(sample.iloc[[position]])
         timings.append((time.perf_counter() - started) * 1000.0)
-    return ResourceUsage(
+    return Usage(
         model_mb=buffer.getbuffer().nbytes / BYTES_PER_MB,
         p95_latency_ms=float(numpy.percentile(timings, 95)),
         rows_timed=len(timings),

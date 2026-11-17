@@ -1,7 +1,7 @@
 {
   "certificates": [
     {
-      "code_hash": "dc7679c0e99e48296a8f9002f767eb4157f3f39589f422fe8422cbe8e0778a68",
+      "code_hash": "57d42dcb0dae15c932820dcb63d22c81ab5e0a19a87a99ec86fbef187683e284",
       "corpus_hash": "46c881a55f36c49c885d1407c0403ca2eb999f1064bac49e7642304f9130390a",
       "created": null,
       "detector_id": "framing-selective-labels",

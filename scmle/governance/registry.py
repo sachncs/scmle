@@ -31,7 +31,7 @@ CHALLENGER = "challenger"
 PREVIOUS = "previous"
 
 
-class PromotionDecision(enum.StrEnum):
+class Verdict(enum.StrEnum):
     """Decision recorded by an independent promotion reviewer."""
 
     APPROVED = "approved"
@@ -39,14 +39,14 @@ class PromotionDecision(enum.StrEnum):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PromotionApproval:
+class Sanction:
     """Approval bound to one exact registered model bundle."""
 
     model: str
     version: int
     content_id: str
     reviewer: str
-    decision: PromotionDecision
+    decision: Verdict
     reason: str
     evidence: tuple[str, ...]
     approved_at: str
@@ -56,12 +56,12 @@ class PromotionApproval:
     def __post_init__(self) -> None:
         """Validates the review record before it can authorize promotion.
 
-        A `decision` given as text is converted to a `PromotionDecision`.
+        A `decision` given as text is converted to a `Verdict`.
 
         Raises:
             TypeError: If `independent` is not a bool.
             ValueError: If a required text field is blank, the version is not
-                positive, the decision is not a valid `PromotionDecision`
+                positive, the decision is not a valid `Verdict`
                 value, the evidence is empty or has blank references, or the
                 signature is blank.
         """
@@ -78,8 +78,8 @@ class PromotionApproval:
         if self.version < 1:
             raise errors.InputError("version must be positive")
         decision: Any = self.decision  # may be text from a persisted record
-        if not isinstance(decision, PromotionDecision):
-            object.__setattr__(self, "decision", PromotionDecision(decision))
+        if not isinstance(decision, Verdict):
+            object.__setattr__(self, "decision", Verdict(decision))
         if not self.evidence or any(not item.strip() for item in self.evidence):
             raise errors.InputError(
                 "evidence must contain non-empty references"
@@ -120,7 +120,7 @@ class PromotionApproval:
         """
         return dataclasses.replace(
             self,
-            signature=signing.sign_payload(self.unsigned_dict(), signing_key),
+            signature=signing.mac(self.unsigned_dict(), signing_key),
         )
 
     def verify(self, signing_key: str | bytes | None = None) -> bool:
@@ -136,13 +136,13 @@ class PromotionApproval:
         """
         if self.signature is None:
             return False
-        key = signing.resolve_key(signing_key)
+        key = signing.keying(signing_key)
         if key is None:
             return False
-        expected = signing.sign_payload(self.unsigned_dict(), key)
+        expected = signing.mac(self.unsigned_dict(), key)
         return hmac.compare_digest(self.signature, expected)
 
-    def validate_target(
+    def validate(
         self,
         model: str,
         version: int,
@@ -171,7 +171,7 @@ class PromotionApproval:
             raise errors.InputError(
                 "promotion approval does not match bundle identity"
             )
-        if self.decision is not PromotionDecision.APPROVED:
+        if self.decision is not Verdict.APPROVED:
             raise errors.InputError("promotion was rejected by the reviewer")
         if not self.independent:
             raise errors.InputError(
@@ -191,7 +191,7 @@ class PromotionApproval:
 
 
 @dataclasses.dataclass(frozen=True)
-class VersionRecord:
+class Release:
     """Metadata of one registered version.
 
     Attributes:
@@ -219,7 +219,7 @@ class VersionRecord:
     signed: bool = False
 
 
-def content_id_of(bundle_directory: str | pathlib.Path) -> str:
+def identify(bundle_directory: str | pathlib.Path) -> str:
     """Returns the content address of a bundle.
 
     It is the hash of the bundle's manifest, which records the checksum of
@@ -232,7 +232,7 @@ def content_id_of(bundle_directory: str | pathlib.Path) -> str:
         The SHA-256 of the bundle's manifest file.
     """
     manifest = pathlib.Path(bundle_directory) / bundle.MANIFEST_FILE
-    return bundle.file_sha256(manifest)
+    return bundle.shasum(manifest)
 
 
 class ModelRegistryStore:
@@ -259,16 +259,16 @@ class ModelRegistryStore:
 
         Args:
             root: Registry directory.
-            guard: Optional never-list guard (see `attach_guard`).
+            guard: Optional never-list guard (see `attach`).
             scope: Model version hash and stream id attestations must name.
         """
         self.root = pathlib.Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
-        self.lock = durability.path_lock(self.root)
+        self.lock = durability.latch(self.root)
         self.guard = guard
         self.scope = scope
 
-    def attach_guard(self, guard: never_list.Guard | None, scope: str) -> None:
+    def attach(self, guard: never_list.Guard | None, scope: str) -> None:
         """Routes champion moves through `guard` (None removes it).
 
         Args:
@@ -308,7 +308,7 @@ class ModelRegistryStore:
             **details: Further fields of the record.
         """
         record = {
-            "timestamp": events.utc_timestamp(),
+            "timestamp": events.stamp(),
             "action": action,
             **details,
         }
@@ -325,7 +325,7 @@ class ModelRegistryStore:
         run_id: str = "",
         trusted: bool = False,
         signing_key: str | bytes | None = None,
-    ) -> VersionRecord:
+    ) -> Release:
         """Registers a bundle as the next version of `model`.
 
         The bundle is verified (checksums, compatibility, and authenticity)
@@ -357,9 +357,9 @@ class ModelRegistryStore:
         signed = bundle.verify_signature(
             pathlib.Path(bundle_directory), signing_key
         )
-        content_id = content_id_of(bundle_directory)
+        content_id = identify(bundle_directory)
         with self.lock:
-            return self.register_locked(
+            return self.enroll(
                 model,
                 bundle_directory,
                 content_id,
@@ -369,7 +369,7 @@ class ModelRegistryStore:
                 run_id,
             )
 
-    def register_locked(
+    def enroll(
         self,
         model: str,
         bundle_directory: str | pathlib.Path,
@@ -378,7 +378,7 @@ class ModelRegistryStore:
         metrics: dict[str, float] | None,
         config: dict[str, Any] | None,
         run_id: str,
-    ) -> VersionRecord:
+    ) -> Release:
         """Assigns the next version and writes it; the caller holds the lock.
 
         Copies the bundle into the store, updates the index and appends an
@@ -404,14 +404,14 @@ class ModelRegistryStore:
         )
         for known in entry["versions"].values():
             if known.get("content_id") == content_id:
-                return VersionRecord(**known)
+                return Release(**known)
         version = max((int(v) for v in entry["versions"]), default=0) + 1
         relative = f"{model}/v{version}"
         shutil.copytree(bundle_directory, self.root / relative)
-        record = VersionRecord(
+        record = Release(
             model,
             version,
-            events.utc_timestamp(),
+            events.stamp(),
             dict(metrics or {}),
             dict(config or {}),
             run_id,
@@ -424,7 +424,7 @@ class ModelRegistryStore:
         self.audit("register", model=model, version=version, run_id=run_id)
         return record
 
-    def versions(self, model: str) -> list[VersionRecord]:
+    def versions(self, model: str) -> list[Release]:
         """Lists a model's versions, oldest first.
 
         Args:
@@ -440,7 +440,7 @@ class ModelRegistryStore:
         if entry is None:
             raise errors.ArtifactError(f"unknown model '{model}'")
         return [
-            VersionRecord(**entry["versions"][v])
+            Release(**entry["versions"][v])
             for v in sorted(entry["versions"], key=int)
         ]
 
@@ -461,7 +461,7 @@ class ModelRegistryStore:
         model: str,
         version: int,
         alias: str = CHAMPION,
-        approval: PromotionApproval | None = None,
+        approval: Sanction | None = None,
         signing_key: str | bytes | None = None,
         guard_detail: Mapping[str, Any] | None = None,
     ) -> None:
@@ -490,21 +490,21 @@ class ModelRegistryStore:
                 model and version. A rollback names itself here.
         """
         with self.lock:
-            self.check_promotion(model, version, alias, approval, signing_key)
+            self.vet(model, version, alias, approval, signing_key)
             if alias == CHAMPION and self.guard is not None:
                 self.guard.require(
-                    never_list.NeverAction.MOVE_CHAMPION,
+                    never_list.Forbidden.MOVE_CHAMPION,
                     dict(guard_detail or {"model": model, "version": version}),
                     self.scope,
                 )
-            self.promote_locked(model, version, alias, approval, signing_key)
+            self.relabel(model, version, alias, approval, signing_key)
 
-    def check_promotion(
+    def vet(
         self,
         model: str,
         version: int,
         alias: str,
-        approval: PromotionApproval | None,
+        approval: Sanction | None,
         signing_key: str | bytes | None,
         index: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -530,14 +530,14 @@ class ModelRegistryStore:
         entry: dict[str, Any] | None = index["models"].get(model)
         if entry is None or str(version) not in entry["versions"]:
             raise errors.ArtifactError(f"{model} v{version} is not registered")
-        record = VersionRecord(**entry["versions"][str(version)])
+        record = Release(**entry["versions"][str(version)])
         if alias == CHAMPION:
             if approval is None:
                 raise errors.ArtifactError(
                     "champion promotion requires independent approval"
                 )
             try:
-                approval.validate_target(
+                approval.validate(
                     model,
                     version,
                     record.content_id,
@@ -547,12 +547,12 @@ class ModelRegistryStore:
                 raise errors.ArtifactError(str(error)) from error
         return entry
 
-    def promote_locked(
+    def relabel(
         self,
         model: str,
         version: int,
         alias: str,
-        approval: PromotionApproval | None,
+        approval: Sanction | None,
         signing_key: str | bytes | None,
     ) -> None:
         """Moves the alias; the caller holds the lock.
@@ -573,9 +573,7 @@ class ModelRegistryStore:
                 has no approval, or the approval is not valid for the bundle.
         """
         index = self.read_index()
-        entry = self.check_promotion(
-            model, version, alias, approval, signing_key, index
-        )
+        entry = self.vet(model, version, alias, approval, signing_key, index)
         previous = entry["aliases"].get(alias)
         entry["aliases"][alias] = version
         if alias == CHAMPION and previous is not None and previous != version:
@@ -590,7 +588,7 @@ class ModelRegistryStore:
             approval_record=approval.to_dict() if approval else None,
         )
 
-    def resolve(self, model: str, ref: str | int = CHAMPION) -> VersionRecord:
+    def resolve(self, model: str, ref: str | int = CHAMPION) -> Release:
         """Resolves an alias or version number to a record.
 
         Args:

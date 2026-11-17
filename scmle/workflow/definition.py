@@ -242,9 +242,7 @@ class Workflow:
                 )
         self.order()
         for step in self.steps:
-            if step.effect == APPROVED and not self.has_approval_upstream(
-                step.name
-            ):
+            if step.effect == APPROVED and not self.gated(step.name):
                 raise errors.ConfigError(
                     f"step {step.name} is an approved action but no approval "
                     "step precedes it"
@@ -325,7 +323,7 @@ class Workflow:
                 pending.extend(self.step(current).depends_on)
         return frozenset(found)
 
-    def has_approval_upstream(self, name: str) -> bool:
+    def gated(self, name: str) -> bool:
         """Reports whether an approval step precedes `name`.
 
         Args:
@@ -338,7 +336,7 @@ class Workflow:
             self.step(a).kind is StepKind.APPROVAL for a in self.ancestors(name)
         )
 
-    def group_limit(self, group: str) -> int:
+    def quota(self, group: str) -> int:
         """Looks up how many steps of a concurrency group may run at once.
 
         Args:

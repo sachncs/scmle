@@ -21,7 +21,7 @@ def frame(rows=600, seed=0):
 def test_the_most_associated_columns_are_combined_and_original_kept():
     data, target = frame()
 
-    constructor = selection.FeatureConstructor(
+    constructor = selection.Constructor(
         ("price", "quantity", "noise"), top=2
     ).fit(data, target)
     built = constructor.transform(data)
@@ -45,7 +45,7 @@ def test_division_by_zero_becomes_missing_not_infinite():
     data.loc[0, "quantity"] = 0.0
 
     built = (
-        selection.FeatureConstructor(("price", "quantity"), top=2)
+        selection.Constructor(("price", "quantity"), top=2)
         .fit(data, target)
         .transform(data)
     )
@@ -56,7 +56,7 @@ def test_division_by_zero_becomes_missing_not_infinite():
 
 def test_construction_learns_only_from_the_training_fold():
     data, target = frame()
-    constructor = selection.FeatureConstructor(
+    constructor = selection.Constructor(
         ("price", "quantity", "noise"), top=2
     ).fit(data.iloc[:300], target.iloc[:300])
 
@@ -68,9 +68,7 @@ def test_construction_learns_only_from_the_training_fold():
 
 def test_names_follow_the_transformed_columns():
     data, target = frame()
-    constructor = selection.FeatureConstructor(("price", "quantity")).fit(
-        data, target
-    )
+    constructor = selection.Constructor(("price", "quantity")).fit(data, target)
 
     names = list(constructor.get_feature_names_out())
 

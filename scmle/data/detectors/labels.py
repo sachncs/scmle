@@ -196,7 +196,7 @@ def out_of_fold_probabilities(
     return probabilities
 
 
-def class_thresholds(
+def cutoffs(
     probabilities: numpy.ndarray, codes: numpy.ndarray
 ) -> numpy.ndarray:
     """Computes the confident-learning thresholds.
@@ -217,7 +217,7 @@ def class_thresholds(
     )
 
 
-def confident_assignment(
+def assign(
     probabilities: numpy.ndarray, thresholds: numpy.ndarray
 ) -> numpy.ndarray:
     """Finds the class each row is confidently counted into, or -1.
@@ -239,7 +239,7 @@ def confident_assignment(
     return numpy.where(eligible.any(axis=1), best, -1)
 
 
-def confident_learning_flags(
+def mislabeled(
     probabilities: numpy.ndarray, codes: numpy.ndarray
 ) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Rows in the off-diagonal cells of the confident joint.
@@ -251,8 +251,8 @@ def confident_learning_flags(
     Returns:
         A boolean flag per row and the class thresholds.
     """
-    thresholds = class_thresholds(probabilities, codes)
-    assigned = confident_assignment(probabilities, thresholds)
+    thresholds = cutoffs(probabilities, codes)
+    assigned = assign(probabilities, thresholds)
     return (assigned >= 0) & (assigned != codes), thresholds
 
 
@@ -286,7 +286,7 @@ def integrate(
     return total / stages
 
 
-def margin_flags(
+def margins(
     features: pandas.DataFrame, codes: numpy.ndarray, seed: int
 ) -> numpy.ndarray:
     """Rows whose given label loses on average over the boosting stages.
@@ -308,7 +308,7 @@ def margin_flags(
     return area < 0.0
 
 
-def ppi_mean(
+def ppi(
     predicted_unlabeled: numpy.ndarray,
     predicted_labeled: numpy.ndarray,
     truth_labeled: numpy.ndarray,
@@ -350,7 +350,7 @@ def ppi_mean(
     return estimate, (estimate - half, estimate + half)
 
 
-def noise_rate(
+def noisiness(
     flags: numpy.ndarray,
     audit: pandas.Series | None = None,
     confidence: float = SAMPLING_CONFIDENCE,
@@ -384,7 +384,7 @@ def noise_rate(
             raise errors.InputError("audit positions must be unique")
         mask = numpy.zeros(n, dtype=bool)
         mask[positions] = True
-        estimate, (low, high) = ppi_mean(
+        estimate, (low, high) = ppi(
             flags[~mask].astype(float),
             flags[positions].astype(float),
             audit.to_numpy(dtype=float),
@@ -418,9 +418,7 @@ def noise_rate(
     )
 
 
-def hoeffding_bound(
-    rows: int, confidence: float = SAMPLING_CONFIDENCE
-) -> float:
+def hoeffding(rows: int, confidence: float = SAMPLING_CONFIDENCE) -> float:
     """Computes the half-width of a Hoeffding interval for a rate.
 
     Args:
@@ -448,7 +446,7 @@ def detect(
         features: Numeric feature frame (exploration rows only).
         labels: Class labels aligned with `features`.
         seed: Run seed.
-        audit: Optional audited sample, see `noise_rate`; positions refer to
+        audit: Optional audited sample, see `noisiness`; positions refer to
             the rows of `features` as given.
 
     Returns:
@@ -484,8 +482,8 @@ def detect(
             )
     codes = encode(labels)[1]
     probabilities = out_of_fold_probabilities(features, codes, seed)
-    cl_flags, thresholds = confident_learning_flags(probabilities, codes)
-    aum_flags = margin_flags(features, codes, seed)
+    cl_flags, thresholds = mislabeled(probabilities, codes)
+    aum_flags = margins(features, codes, seed)
     both = cl_flags & aum_flags
     union = int((cl_flags | aum_flags).sum())
     agreement = 1.0 if union == 0 else float(both.sum()) / union
@@ -497,7 +495,7 @@ def detect(
         agreement=agreement,
         rows_checked=len(features),
         input_rows=input_rows,
-        sampling_bound=hoeffding_bound(len(features)) if capped else 0.0,
-        rate=noise_rate(both, audit),
+        sampling_bound=hoeffding(len(features)) if capped else 0.0,
+        rate=noisiness(both, audit),
         thresholds=tuple(float(t) for t in thresholds),
     )

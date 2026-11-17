@@ -149,7 +149,7 @@ def digest(document: Mapping[str, Any]) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def wald_from(est: Est, name: str, kind: str) -> battery.Test | None:
+def waldify(est: Est, name: str, kind: str) -> battery.Test | None:
     """Builds a Wald test of a placebo estimate.
 
     Args:
@@ -162,7 +162,7 @@ def wald_from(est: Est, name: str, kind: str) -> battery.Test | None:
     """
     if not numpy.isfinite(est.se) or est.se <= 0:
         return None
-    return battery.wald_test(name, kind, est.estimate, est.se)
+    return battery.wald(name, kind, est.estimate, est.se)
 
 
 class Estimator:
@@ -287,7 +287,7 @@ class Estimator:
         }
 
 
-class BackdoorEstimator(Estimator):
+class Backdoor(Estimator):
     """AIPW with nuisances frozen on `X` and no cross-fitting."""
 
     name = "backdoor_aipw"
@@ -301,7 +301,7 @@ class BackdoorEstimator(Estimator):
             *args: The `Adapter` constructor arguments.
         """
         super().__init__(*args)
-        self.covariates = causal.covariates_of(self.spec.assumptions) or ()
+        self.covariates = causal.adjusters(self.spec.assumptions) or ()
         self.nuisances: aipw.Nuisances | None = None
 
     def prepare(self) -> None:
@@ -311,7 +311,7 @@ class BackdoorEstimator(Estimator):
         declares no trimming rule.
         """
         spec = self.spec
-        self.nuisances = aipw.fit_nuisances(
+        self.nuisances = aipw.prefit(
             self.x,
             self.covariates,
             spec.treatment,
@@ -328,7 +328,7 @@ class BackdoorEstimator(Estimator):
             ),
         )
         self.design = {
-            "overlap_on_x": aipw.overlap_report(e, t, matrix),
+            "overlap_on_x": aipw.propensities(e, t, matrix),
             "nuisance_digest": self.nuisances.digest,
             "learner": self.learner,
         }
@@ -396,7 +396,7 @@ class BackdoorEstimator(Estimator):
             The estimate with its standard error and interval.
         """
         spec = self.spec
-        nuisances = aipw.fit_nuisances(
+        nuisances = aipw.prefit(
             self.x,
             self.covariates,
             spec.treatment,
@@ -436,7 +436,7 @@ class BackdoorEstimator(Estimator):
                 est = self.estimate_for(c, level, control.variable)
                 name = f"negative_outcome:{control.variable}"
             else:
-                nuisances = aipw.fit_nuisances(
+                nuisances = aipw.prefit(
                     self.x,
                     self.covariates,
                     control.variable,
@@ -458,7 +458,7 @@ class BackdoorEstimator(Estimator):
                     found.estimate, found.se, found.low, found.high, found.n
                 )
                 name = f"negative_exposure:{control.variable}"
-            test = wald_from(est, name, f"negative_{control.kind}")
+            test = waldify(est, name, f"negative_{control.kind}")
             if test is not None:
                 tests.append(test)
         return tests
@@ -567,7 +567,7 @@ class RandomizedEstimator(Estimator):
             if control.kind != "outcome":
                 continue
             est = self.estimate_for(c, level, control.variable)
-            test = wald_from(
+            test = waldify(
                 est, f"negative_outcome:{control.variable}", "negative_outcome"
             )
             if test is not None:
@@ -591,7 +591,7 @@ class RandomizedEstimator(Estimator):
         }
 
 
-class DidEstimator(Estimator):
+class DiD(Estimator):
     """Group-time difference in differences."""
 
     name = "did"
@@ -706,7 +706,7 @@ class DidEstimator(Estimator):
         for control in self.spec.negative_controls:
             if control.kind == "outcome":
                 est = self.estimate_for(c, level, control.variable)
-                test = wald_from(
+                test = waldify(
                     est,
                     f"negative_outcome:{control.variable}",
                     "negative_outcome",
@@ -750,7 +750,7 @@ class DidEstimator(Estimator):
         }
 
 
-class IvEstimator(Estimator):
+class Instrument(Estimator):
     """Just-identified instrumental variables."""
 
     name = "iv"
@@ -762,7 +762,7 @@ class IvEstimator(Estimator):
             The covariate columns declared in the unconfoundedness
             assumption, or an empty tuple.
         """
-        return causal.covariates_of(self.spec.assumptions) or ()
+        return causal.adjusters(self.spec.assumptions) or ()
 
     def fit(
         self, frame: pandas.DataFrame, level: float, outcome: str | None = None
@@ -868,7 +868,7 @@ class IvEstimator(Estimator):
         for control in self.spec.negative_controls:
             if control.kind == "outcome":
                 est = self.estimate_for(c, level, control.variable)
-                test = wald_from(
+                test = waldify(
                     est,
                     f"negative_outcome:{control.variable}",
                     "negative_outcome",
@@ -892,7 +892,7 @@ class RdEstimator(Estimator):
         super().__init__(*args)
         self.bandwidth = 0.0
 
-    def balance_columns(self) -> tuple[str, ...]:
+    def pretreatment(self) -> tuple[str, ...]:
         """Lists the predetermined covariates tested for a jump.
 
         Returns:
@@ -920,7 +920,7 @@ class RdEstimator(Estimator):
             spec.running_variable,
             spec.outcome,
             spec.cutoff,
-            covariates=self.balance_columns(),
+            covariates=self.pretreatment(),
         )
         self.bandwidth = fit.bandwidth
         self.design = {
@@ -1024,7 +1024,7 @@ class RdEstimator(Estimator):
             A test for each placebo cutoff and each covariate discontinuity
             whose fit was not degenerate.
         """
-        fit = self.fit(c, level, covariates=self.balance_columns())
+        fit = self.fit(c, level, covariates=self.pretreatment())
         tests = [
             battery.Test(
                 f"placebo_cutoff:{name}",
@@ -1075,7 +1075,7 @@ class RdEstimator(Estimator):
         }
 
 
-class SynthEstimator(Estimator):
+class Synth(Estimator):
     """Synthetic control with one treated unit; runs on `X` alone."""
 
     name = "synth"
@@ -1161,16 +1161,16 @@ class SynthEstimator(Estimator):
 
 
 ADAPTERS: dict[str, type[Estimator]] = {
-    "backdoor_aipw": BackdoorEstimator,
+    "backdoor_aipw": Backdoor,
     "randomized_diff": RandomizedEstimator,
-    "did": DidEstimator,
-    "iv": IvEstimator,
+    "did": DiD,
+    "iv": Instrument,
     "rd": RdEstimator,
-    "synth": SynthEstimator,
+    "synth": Synth,
 }
 
 
-def refusal_outcome(
+def refuse(
     plan: select.Plan,
     spec: causal.Question,
     reason: str | None = None,
@@ -1300,7 +1300,7 @@ def alphas(error_budget: budget.ErrorBudget) -> tuple[float, float]:
         ``(alpha_primary, alpha_falsify)``, the confirmation level divided in
         the ratio 4 to 1.
     """
-    parts = budget.split_budget(error_budget, battery.FALSIFY_WEIGHTS)
+    parts = budget.apportion(error_budget, battery.FALSIFY_WEIGHTS)
     return (
         float(parts["estimate"].confirmation.alpha_confirm),
         float(parts["falsify"].confirmation.alpha_confirm),
@@ -1363,7 +1363,7 @@ def replication(
     return {"by_column": results, "passed": passed}
 
 
-def subgroup_report(
+def stratify(
     adapter: Estimator,
     c: pandas.DataFrame,
     level: float,
@@ -1422,7 +1422,7 @@ def subgroup_report(
                     row["skipped"] = str(error)
                 else:
                     if numpy.isfinite(est.se) and est.se > 0:
-                        test = battery.wald_test(
+                        test = battery.wald(
                             f"{group.column}={value}",
                             "subgroup",
                             est.estimate,
@@ -1466,9 +1466,7 @@ def subgroup_report(
     }
 
 
-def label_subgroups(
-    found: dict[str, Any], named: tuple[str, ...] | None
-) -> None:
+def certify(found: dict[str, Any], named: tuple[str, ...] | None) -> None:
     """Labels the subgroup report as gating or only descriptive, in place.
 
     The Holm family is certified by `subgroup_certificates.json` (gate
@@ -1479,7 +1477,7 @@ def label_subgroups(
     is not read from this: the tier rule has no subgroup input.
 
     Args:
-        found: The `subgroup_report` result; gets `gate`, `statement_gate`
+        found: The `stratify` result; gets `gate`, `statement_gate`
             and a `certified_size` flag on each hypothesis row.
         named: The certified gates the caller names (as `identify`'s
             `certified`), or None to read the shipped certificate. When
@@ -1487,7 +1485,7 @@ def label_subgroups(
             from the shipped certificate (None when it is absent, so every
             estimated subgroup then counts as certified size).
     """
-    gate = scmle.data.identification.certified.subgroup_gate(subgroup_report)
+    gate = scmle.data.identification.certified.subgroup_gate(stratify)
     if named is not None:
         listed = scmle.data.identification.certified.SUBGROUP_GATE in named
         gate = scmle.data.identification.certified.SubgroupGate(
@@ -1519,7 +1517,7 @@ def label_subgroups(
     )
 
 
-def sensitivity_of(
+def fragility(
     adapter: Estimator, c: pandas.DataFrame, level: float
 ) -> dict[str, Any]:
     """Assesses sensitivity to unmeasured confounding, if it can be done.
@@ -1558,7 +1556,7 @@ def subgroup_results(
         c: The confirmation rows.
         level: Confidence level.
         named: The certified gates the caller names, or None to read the
-            shipped certificate (see `label_subgroups`).
+            shipped certificate (see `certify`).
 
     Returns:
         The labelled subgroup report, or None when no subgroups are
@@ -1566,17 +1564,17 @@ def subgroup_results(
     """
     weak_before_subgroups = adapter.weak
     found = (
-        subgroup_report(adapter, c, level, spec.subgroups)
+        stratify(adapter, c, level, spec.subgroups)
         if spec.subgroups and not adapter.single_unit
         else None
     )
     adapter.weak = weak_before_subgroups
     if found is not None:
-        label_subgroups(found, named)
+        certify(found, named)
     return found
 
 
-def closing_notes(
+def caveats(
     spec: causal.Question, strategy: str, *, checked: bool
 ) -> list[str]:
     """Lists the notes about what the run could not do or check.
@@ -1648,11 +1646,11 @@ def identify(
     """
     plan = select.select(spec, dag)
     if plan.primary is None:
-        return refusal_outcome(plan, spec, dag_checks=dag_checks)
+        return refuse(plan, spec, dag_checks=dag_checks)
     named = certified
     if certified is None:
         certified = tuple(
-            sorted(scmle.data.identification.certified.certified_gates())
+            sorted(scmle.data.identification.certified.certificated())
         )
     primary_alpha, alpha_falsify = alphas(error_budget)
     level = 1.0 - primary_alpha
@@ -1662,16 +1660,16 @@ def identify(
         adapter.prepare()
     except ValueError as error:
         # handled: returned as failed finding/problem/refusal with error text
-        return refusal_outcome(
+        return refuse(
             plan, spec, f"design could not be assessed: {error}", dag_checks
         )
     if adapter.refusal:
-        return refusal_outcome(plan, spec, adapter.refusal, dag_checks)
+        return refuse(plan, spec, adapter.refusal, dag_checks)
     try:
         primary = adapter.estimate(c, level)
     except ValueError as error:
         # handled: returned as failed finding/problem/refusal with error text
-        return refusal_outcome(plan, spec, str(error), dag_checks)
+        return refuse(plan, spec, str(error), dag_checks)
     tests: list[battery.Test] = []
     notes: list[str] = []
     try:
@@ -1685,9 +1683,9 @@ def identify(
         rep = replication(adapter, c, level, primary.estimate, alpha_falsify)
     else:
         rep = {"by_column": {}, "passed": None}
-    sens = sensitivity_of(adapter, c, level)
+    sens = fragility(adapter, c, level)
     subgroup_found = subgroup_results(adapter, spec, c, level, named)
-    needed = needed_assumptions(strategy, spec)
+    needed = prerequisites(strategy, spec)
     checked = strategy != "backdoor_aipw" or plan.verdict(strategy).checked
     facts = tier.Inputs(
         identified=True,
@@ -1710,7 +1708,7 @@ def identify(
         adjustment_checked=checked,
     )
     decision = tier.decide(facts)
-    notes.extend(closing_notes(spec, strategy, checked=checked))
+    notes.extend(caveats(spec, strategy, checked=checked))
     verdict = verdict_of(spec)
     verdict["interval_excludes_zero"] = (
         primary.excludes_zero() if numpy.isfinite(primary.low) else None
@@ -1799,7 +1797,7 @@ def design_only(
     """
     plan = select.select(spec, dag)
     if plan.primary is None:
-        return refusal_outcome(plan, spec, dag_checks=dag_checks)
+        return refuse(plan, spec, dag_checks=dag_checks)
     alpha_falsify = alphas(error_budget)[1]
     strategy = plan.primary
     adapter = ADAPTERS[strategy](spec, x, seed, learner, alpha_falsify)
@@ -1807,11 +1805,11 @@ def design_only(
         adapter.prepare()
     except ValueError as error:
         # handled: returned as failed finding/problem/refusal with error text
-        return refusal_outcome(
+        return refuse(
             plan, spec, f"design could not be assessed: {error}", dag_checks
         )
     if adapter.refusal:
-        return refusal_outcome(plan, spec, adapter.refusal, dag_checks)
+        return refuse(plan, spec, adapter.refusal, dag_checks)
     report = {
         "status": select.IDENTIFIED,
         "strategy": strategy,
@@ -1838,7 +1836,7 @@ def design_only(
         {"holds": None, "note": NOT_ESTIMATED},
         decision,
         strategy,
-        needed_assumptions(strategy, spec),
+        prerequisites(strategy, spec),
     )
 
 
@@ -1859,7 +1857,7 @@ def verdict_of(spec: causal.Question) -> dict[str, Any]:
     }
 
 
-def needed_assumptions(strategy: str, spec: causal.Question) -> tuple[str, ...]:
+def prerequisites(strategy: str, spec: causal.Question) -> tuple[str, ...]:
     """Lists the attested assumptions the chosen strategy relies on.
 
     Args:

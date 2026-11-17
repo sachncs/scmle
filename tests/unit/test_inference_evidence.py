@@ -62,7 +62,7 @@ def test_linker_persists_exact_bundle_link_and_is_idempotent(tmp_path):
     assert first == second
     restored = linker.load(path)
     assert restored.nodes["inference:event-1"].kind is lineage.Kind.INFERENCE
-    assert restored.path_exists("bundle", "inference:event-1")
+    assert restored.reachable("bundle", "inference:event-1")
     assert first.graph_digest == restored.digest()
 
 

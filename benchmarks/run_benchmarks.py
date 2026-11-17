@@ -169,7 +169,7 @@ def run_one(
                 record.test_scores, record.reference_scores, strict=True
             )
         ]
-        mean, low, high = intervals.mean_interval(gains)
+        mean, low, high = intervals.wald(gains)
         record.advantage = {
             "mean": mean,
             "low": low,
@@ -210,7 +210,7 @@ COLUMNS = (
 )
 
 
-def format_number(value: float | None) -> str:
+def spell(value: float | None) -> str:
     """Formats a score, leaving missing values blank.
 
     Args:
@@ -263,10 +263,10 @@ def to_markdown(records: list[BenchmarkRecord]) -> str:
                 record.task,
                 record.metric,
                 record.selected,
-                format_number(record.baseline_cv),
-                format_number(record.cv_score),
-                format_number(record.test_score),
-                format_number(record.reference_test),
+                spell(record.baseline_cv),
+                spell(record.cv_score),
+                spell(record.test_score),
+                spell(record.reference_test),
                 describe_advantage(record),
                 record.advantage["verdict"],
                 str(record.trials),

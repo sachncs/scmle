@@ -28,19 +28,19 @@ def build(rows=500, seed=0, effect=0.7, kind="regression"):
     return frame.drop(columns="label"), pandas.Series(signal)
 
 
-def source_for(features, target):
-    log = sealed.OpenLog()
+def locate(features, target):
+    log = sealed.Journal()
     locked = splitters.ResidentTestSet(
         features, target, tuple(range(len(target)))
     )
-    return sealed.SealedSet("C", locked, log)
+    return sealed.Locker("C", locked, log)
 
 
 def test_count_discoveries_matches_the_ledger_on_the_same_data():
     features, target = build()
     charter = make_charter()
-    plan = explore.plan_exploration(features, explore.NUMERIC)
-    config = online_fdr.RuleConfig(
+    plan = explore.hypothesize(features, explore.NUMERIC)
+    config = online_fdr.Settings(
         online_fdr.ELOND, charter.error_budget.exploration.initial
     )
     ledger = scmle.data.ledger.ledger.Ledger.create(
@@ -51,7 +51,7 @@ def test_count_discoveries_matches_the_ledger_on_the_same_data():
         seed=1,
     )
     results = explore.run_exploration(ledger, features, target, plan)
-    assert sum(r.rejected for r in results) == explore.count_discoveries(
+    assert sum(r.rejected for r in results) == explore.tally(
         config, plan, features, target
     )
     assert sum(r.rejected for r in results) >= 2
@@ -60,7 +60,7 @@ def test_count_discoveries_matches_the_ledger_on_the_same_data():
 def test_a_planted_signal_is_found_controlled_and_confirmed(tmp_path):
     features, target = build()
     cfeatures, ctarget = build(rows=400, seed=9)
-    source = source_for(cfeatures, ctarget)
+    source = locate(cfeatures, ctarget)
     run = governed.run_governed(
         charter=make_charter(),
         features=features,
@@ -98,7 +98,7 @@ def test_a_planted_signal_is_found_controlled_and_confirmed(tmp_path):
 def test_a_pure_noise_target_is_not_promoted():
     features, target = build(effect=0.0)
     cfeatures, ctarget = build(rows=400, seed=9, effect=0.0)
-    source = source_for(cfeatures, ctarget)
+    source = locate(cfeatures, ctarget)
     run = governed.run_governed(
         charter=make_charter(),
         features=features,
@@ -123,7 +123,7 @@ def test_binary_labels_are_coded_consistently_for_c():
         features=features,
         target=target,
         classification=True,
-        source=source_for(cfeatures, ctarget),
+        source=locate(cfeatures, ctarget),
         run_dir=None,
     )
     assert {
@@ -142,7 +142,7 @@ def test_multiclass_targets_use_the_kruskal_statistic():
             features["a"], [-9, -0.5, 0.5, 9], labels=["lo", "mid", "hi"]
         )
     ).astype(str)
-    plan = explore.plan_exploration(features, explore.target_kind(target, True))
+    plan = explore.hypothesize(features, explore.target_kind(target, True))
     assert {s.statistic for s in plan.specs} == {"kruskal"}
     run = governed.run_governed(
         charter=make_charter(),
@@ -164,7 +164,7 @@ def test_structure_columns_and_non_numeric_features_are_not_candidates():
     features["site"] = ["x", "y"] * (len(features) // 2)
     features["const"] = 1.0
     features["entity"] = numpy.arange(len(features)) // 10
-    plan = explore.plan_exploration(features, explore.NUMERIC, ("entity",))
+    plan = explore.hypothesize(features, explore.NUMERIC, ("entity",))
     assert dict(plan.skipped) == {
         "site": "not numeric: descriptive only",
         "const": "constant or entirely missing",

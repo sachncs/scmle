@@ -258,7 +258,7 @@ def estimate(
     )
 
 
-def exclusion_bound(result: Estimate, direct_effect: float) -> float:
+def exclude(result: Estimate, direct_effect: float) -> float:
     """Returns the 2SLS bias if the instrument had a direct effect.
 
     A direct effect `gamma` of the instrument on the outcome moves the Wald

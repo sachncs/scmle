@@ -71,7 +71,7 @@ class DiagnosticInput:
     target: pandas.Series
     task: tasks.Task
     metric: scmle.contracts.metrics.Metric
-    feature_plan: data.FeaturePlan
+    feature_plan: data.Blueprint
     seed: int
     groups: pandas.Series | None = None
     temporal: bool = False
@@ -79,7 +79,7 @@ class DiagnosticInput:
     sensitive_columns: tuple[str, ...] = ()
     deadline: float | None = None
 
-    def out_of_time(self) -> bool:
+    def expired(self) -> bool:
         """Whether the diagnostic's time allowance has run out.
 
         Returns:
@@ -122,7 +122,7 @@ class Diagnostic(abc.ABC):
         """
 
 
-class ConfusionMatrix(Diagnostic):
+class Contingency(Diagnostic):
     """Confusion matrix and per-class precision / recall / F-measure."""
 
     name = "classification_report"
@@ -237,7 +237,7 @@ class Reliability(Diagnostic):
         )
         classes = list(inputs.estimator.classes_)
         labels = numpy.asarray(inputs.target)
-        error, curve = reliability.top_label_curve(
+        error, curve = reliability.topclass(
             probabilities, labels, classes, CALIBRATION_BINS
         )
         truth = (labels[:, None] == numpy.asarray(classes)[None, :]).astype(
@@ -252,7 +252,7 @@ class Reliability(Diagnostic):
         }
 
 
-class ThresholdSweep(Diagnostic):
+class Sweep(Diagnostic):
     """Precision / recall / F-measure across decision thresholds."""
 
     name = "threshold_analysis"
@@ -354,7 +354,7 @@ class Residuals(Diagnostic):
         return report
 
 
-class ErrorAnalysis(Diagnostic):
+class Errors(Diagnostic):
     """Identifies the highest-risk held-out rows without exposing features."""
 
     name = "error_analysis"
@@ -517,7 +517,7 @@ class CachedPredictions(base.BaseEstimator):  # type: ignore[misc]  # scikit-lea
         return self.probabilities.loc[features.index].to_numpy()
 
 
-class ClassifierReplay(base.ClassifierMixin, CachedPredictions):  # type: ignore[misc]  # scikit-learn is untyped
+class Replay(base.ClassifierMixin, CachedPredictions):  # type: ignore[misc]  # scikit-learn is untyped
     """Cached predictions that scikit-learn treats as a classifier."""
 
 
@@ -525,7 +525,7 @@ class RegressorReplay(base.RegressorMixin, CachedPredictions):  # type: ignore[m
     """Cached predictions that scikit-learn treats as a regressor."""
 
 
-def resample_rows(
+def redraw(
     rows: int,
     groups: pandas.Series | None,
     temporal: bool,
@@ -563,7 +563,7 @@ def resample_rows(
     return rng.integers(0, rows, rows)
 
 
-class MetricUncertainty(Diagnostic):
+class Uncertainty(Diagnostic):
     """Bootstrap confidence interval for the primary test metric.
 
     Resampling follows the independent units of observation: whole groups
@@ -577,7 +577,7 @@ class MetricUncertainty(Diagnostic):
     row_budget = 4_000_000
     confidence = 95
 
-    def resample_count(self, rows: int) -> int:
+    def replicates(self, rows: int) -> int:
         """Chooses how many bootstrap resamples to draw.
 
         Few resamples make the interval ends noisy and the interval too
@@ -610,13 +610,11 @@ class MetricUncertainty(Diagnostic):
             number of evaluation rows and the number of independent units
             (groups, else rows).
         """
-        features = inputs.features[list(inputs.feature_plan.input_columns)]
+        features = inputs.features[list(inputs.feature_plan.sourced)]
         features = features.reset_index(drop=True)
         target = inputs.target.reset_index(drop=True)
         replay_class = (
-            RegressorReplay
-            if inputs.task is tasks.Task.REGRESSION
-            else ClassifierReplay
+            RegressorReplay if inputs.task is tasks.Task.REGRESSION else Replay
         )
         # Scorers only call predict and predict_proba on the replay.
         replay = cast(
@@ -642,10 +640,8 @@ class MetricUncertainty(Diagnostic):
             map(
                 operator.call,
                 itertools.repeat(
-                    lambda: resample_rows(
-                        len(target), groups, inputs.temporal, rng
-                    ),
-                    self.resample_count(len(target)),
+                    lambda: redraw(len(target), groups, inputs.temporal, rng),
+                    self.replicates(len(target)),
                 ),
             )
         )
@@ -694,13 +690,13 @@ def default_suite() -> tuple[Diagnostic, ...]:
         One instance of each diagnostic, in the order they are run.
     """
     return (
-        ConfusionMatrix(),
+        Contingency(),
         Calibration(),
         Reliability(),
-        ThresholdSweep(),
+        Sweep(),
         Residuals(),
-        ErrorAnalysis(),
-        MetricUncertainty(),
+        Errors(),
+        Uncertainty(),
     )
 
 
@@ -717,7 +713,7 @@ def run_suite(
         total_seconds: Time allowance for the whole suite, shared evenly by
             the diagnostics still to run (None = unlimited). It sets
             `DiagnosticInput.deadline`; only diagnostics that check
-            `out_of_time` stop early, and none defined in this module do.
+            `expired` stop early, and none defined in this module do.
 
     Returns:
         Report per name for the diagnostics whose `applies_to` contains the

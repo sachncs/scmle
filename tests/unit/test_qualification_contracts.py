@@ -18,7 +18,7 @@ def make_check(**overrides):
         "effect": 0.2,
         "n": 500,
         "decision": qualification.Decision.WARN,
-        "set_id": qualification.SetId.EXPLORATION,
+        "set_id": qualification.Subset.EXPLORATION,
         "seed_path": (7, "missingness.age", 0),
         "tier": qualification.Tier.UNVERIFIED,
     }
@@ -76,9 +76,9 @@ def test_check_rejects_negative_n_and_blank_text():
 @pytest.mark.parametrize(
     "set_id",
     [
-        qualification.SetId.EXPLORATION,
-        qualification.SetId.FORWARD,
-        qualification.SetId.ALL,
+        qualification.Subset.EXPLORATION,
+        qualification.Subset.FORWARD,
+        qualification.Subset.ALL,
     ],
 )
 def test_confirmed_tier_requires_the_confirmation_set(set_id):
@@ -88,7 +88,7 @@ def test_confirmed_tier_requires_the_confirmation_set(set_id):
 
 def test_confirmed_tier_is_allowed_on_the_confirmation_set():
     check = make_check(
-        set_id=qualification.SetId.CONFIRMATION,
+        set_id=qualification.Subset.CONFIRMATION,
         tier=qualification.Tier.CONFIRMED,
     )
     assert check.tier is qualification.Tier.CONFIRMED

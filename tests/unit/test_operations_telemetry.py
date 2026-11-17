@@ -28,8 +28,8 @@ def fixture(name):
 
 
 def make_service():
-    registry = metrics.MetricsRegistry()
-    return registry, metrics.ServiceMetrics(
+    registry = metrics.Registry()
+    return registry, metrics.Instrumentation(
         registry, "v1", "sha256:" + "a" * 64
     )
 
@@ -54,20 +54,20 @@ def test_a_service_with_no_requests_reports_none_not_perfect():
 
 
 def test_the_quantile_estimate_follows_the_buckets():
-    registry = metrics.MetricsRegistry(buckets=(0.1, 1.0, 10.0))
+    registry = metrics.Registry(buckets=(0.1, 1.0, 10.0))
     for value in [0.05] * 50 + [0.5] * 40 + [5.0] * 10:
         registry.observe("t", value)
     hist = registry.histogram("t")
     assert 0.1 <= hist.quantile(0.7) <= 1.0
     assert 1.0 < hist.quantile(0.99) <= 10.0
-    assert metrics.MetricsRegistry().histogram("t") is None
+    assert metrics.Registry().histogram("t") is None
 
 
 def test_the_text_exposition_is_valid_prometheus():
     registry, service = make_service()
     service.record_request("/predict", 200, 0.02)
     service.record_request("/predict", 500, 0.3)
-    service.record_resources()
+    service.poll()
     text = registry.render()
     assert text.endswith("\n")
     assert "# TYPE scmle_http_requests_total counter" in text
@@ -87,7 +87,7 @@ def test_the_text_exposition_is_valid_prometheus():
 
 
 def test_the_registry_refuses_bad_names_labels_and_values():
-    registry = metrics.MetricsRegistry()
+    registry = metrics.Registry()
     with pytest.raises(ValueError):
         registry.increment("1bad")
     with pytest.raises(ValueError):
@@ -100,7 +100,7 @@ def test_the_registry_refuses_bad_names_labels_and_values():
     with pytest.raises(ValueError):
         registry.observe("h", float("nan"))
     with pytest.raises(ValueError):
-        metrics.MetricsRegistry(buckets=(1.0, 0.5))
+        metrics.Registry(buckets=(1.0, 0.5))
     registry.set("g", 1.0, {"a": 'x"\n\\y'})
     assert 'a="x\\"\\n\\\\y"' in registry.render()
 
@@ -110,10 +110,8 @@ def test_the_registry_refuses_bad_names_labels_and_values():
 
 def test_logs_carry_trace_version_and_digest_and_never_a_secret():
     lines = []
-    log = logs.StructuredLog(
-        "serve", "v1", "sha256:" + "a" * 64, sink=lines.append
-    )
-    trace = logs.new_trace_id()
+    log = logs.Journal("serve", "v1", "sha256:" + "a" * 64, sink=lines.append)
+    trace = logs.traceid()
     log.request(
         trace,
         "/predict",
@@ -134,7 +132,7 @@ def test_logs_carry_trace_version_and_digest_and_never_a_secret():
 
 
 def test_logs_refuse_reserved_fields_and_unknown_levels(tmp_path):
-    log = logs.StructuredLog("s", "v", "d", path=tmp_path / "x.log")
+    log = logs.Journal("s", "v", "d", path=tmp_path / "x.log")
     with pytest.raises(ValueError):
         log.emit("info", "m", model_version="other")
     with pytest.raises(ValueError):
@@ -142,19 +140,19 @@ def test_logs_refuse_reserved_fields_and_unknown_levels(tmp_path):
     log.emit("info", "written")
     assert json.loads((tmp_path / "x.log").read_text())["message"] == "written"
     with pytest.raises(ValueError):
-        logs.StructuredLog("s", "v", "d")
+        logs.Journal("s", "v", "d")
 
 
 def test_traceparent_round_trips_and_bad_headers_get_a_new_id():
-    trace = logs.new_trace_id()
-    header = logs.traceparent_for(trace)
+    trace = logs.traceid()
+    header = logs.traceheader(trace)
     assert logs.parse_traceparent(header) == trace
-    assert logs.trace_for(header) == trace
+    assert logs.propagate(header) == trace
     for bad in (None, "", "00-xyz", f"00-{'0' * 32}-{'1' * 16}-01"):
         assert logs.parse_traceparent(bad) is None
-        assert len(logs.trace_for(bad)) == 32
+        assert len(logs.propagate(bad)) == 32
     with pytest.raises(ValueError):
-        logs.traceparent_for("short")
+        logs.traceheader("short")
 
 
 # ---- windowed signals --------------------------------------------------
@@ -239,9 +237,9 @@ def test_delayed_label_loss_breaches_above_reference_plus_tolerance():
     assert row.threshold == pytest.approx(0.15)
     with pytest.raises(ValueError):
         watch.observe_outcomes(support_ops.START, [1.5])
-    assert list(signals.zero_one_losses([1, 0, 1], [1, 1, 1])) == [0, 1, 0]
+    assert list(signals.misses([1, 0, 1], [1, 1, 1])) == [0, 1, 0]
     with pytest.raises(ValueError):
-        signals.zero_one_losses([1], [1, 2])
+        signals.misses([1], [1, 2])
 
 
 def test_sampling_keeps_a_share_and_is_deterministic():
@@ -282,17 +280,17 @@ def test_signals_become_metric_samples_for_export():
 
 def samples():
     return [
-        observability.MetricSample(
+        observability.Sample(
             "latency_p95_seconds",
-            observability.SignalKind.LATENCY,
+            observability.Indicator.LATENCY,
             0.35,
             "s",
             STAMP,
             {"model_version": "v1"},
         ),
-        observability.MetricSample(
+        observability.Sample(
             "server_error_rate",
-            observability.SignalKind.ERROR,
+            observability.Indicator.ERROR,
             0.02,
             "ratio",
             STAMP,
@@ -395,7 +393,7 @@ def test_the_sender_rejects_bad_configuration_and_notifications():
         made.send({"severity": "apocalyptic"})
     with pytest.raises(ValueError):
         made.send({"severity": "info", "blob": "x" * 70000})
-    plain = notify.urllib_transport()
+    plain = notify.courier()
     with pytest.raises(ValueError):
         plain(notify.Request("http://insecure.test", {}, b"{}"))
 
@@ -557,10 +555,10 @@ RATES = cost.Rates(0.000024, 0.0000025, 0.40, 0.12, source="declared in test")
 
 def test_cost_is_grouped_by_service_and_version_from_declared_rates():
     usages = [
-        cost.Usage.from_allocation("serve", "v1", 1.0, 2.0, 3600, 100000, 1.5),
-        cost.Usage.from_allocation("serve", "v2", 1.0, 2.0, 1800, 50000, 0.5),
-        cost.Usage.from_allocation("serve", "v1", 1.0, 2.0, 3600),
-        cost.Usage.from_allocation("batch", "v1", 4.0, 8.0, 600),
+        cost.Usage.allocate("serve", "v1", 1.0, 2.0, 3600, 100000, 1.5),
+        cost.Usage.allocate("serve", "v2", 1.0, 2.0, 1800, 50000, 0.5),
+        cost.Usage.allocate("serve", "v1", 1.0, 2.0, 3600),
+        cost.Usage.allocate("batch", "v1", 4.0, 8.0, 600),
     ]
     out = cost.report(usages, RATES)
     serve = out["services"]["serve"]
@@ -595,7 +593,7 @@ def make_desk(tmp_path, script=(200,)):
     pager, ignored, ignored = sender(list(script), "pager")
     ticket, ignored, ignored = sender(list(script), "ticket")
     log = audit.Log.open(tmp_path / "audit.jsonl")
-    desk = respond.ResponseDesk(
+    desk = respond.Desk(
         tmp_path / "ops",
         log,
         notify.Notifier(pager, ticket),

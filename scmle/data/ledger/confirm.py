@@ -8,7 +8,7 @@ from this stage:
 2. If the negative-control gate fails, there is nothing to promote and `C` is
    not opened. With no survivors, `C` is not opened either.
 3. The selection is written to the custody log, the release is bound to the
-   family's hash and the ledger head (`SealedSet.commit`), then `C` is opened
+   family's hash and the ledger head (`Locker.commit`), then `C` is opened
    exactly once through the custody API. A set already bound to another
    claim set or ledger state is refused by the vault, so a ledger edited
    after the binding cannot unlock `C`.
@@ -47,7 +47,7 @@ recorded before `C` opens. `tests/unit/test_ledger_withdrawal.py` simulates
 the error rate with an `X`-only withdrawal rule that is correlated with the
 signal, and checks the order of events.
 
-Registered claims. A caller may hand over a `ClaimRunner`: claims that are not
+Registered claims. A caller may hand over a `Docket`: claims that are not
 single-feature statistics (the baseline comparison, the primary causal
 hypothesis). Each is registered in the ledger by the hash of its
 registration before the survivors are frozen, the sealed set is bound to the
@@ -138,8 +138,8 @@ class Log(Protocol):
         ...
 
 
-class ConfirmationSource(Protocol):
-    """A sealed set that opens once (the custody `SealedSet`)."""
+class Source(Protocol):
+    """A sealed set that opens once (the custody `Locker`)."""
 
     log: Any
 
@@ -233,7 +233,7 @@ FAILED = "failed"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RegisteredClaim:
+class Commitment:
     """A claim fixed in the ledger before `C` is opened.
 
     Attributes:
@@ -250,8 +250,8 @@ class RegisteredClaim:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ClaimRun:
-    """What a `ClaimRunner` produced from the opened rows.
+class Output:
+    """What a `Docket` produced from the opened rows.
 
     Attributes:
         statuses: Claim id to a one-word status.
@@ -264,7 +264,7 @@ class ClaimRun:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ClaimRunner:
+class Docket:
     """Registered claims and the function that evaluates them on `C`.
 
     Attributes:
@@ -273,11 +273,11 @@ class ClaimRunner:
             is called at most once, after the family was tested.
     """
 
-    registered: tuple[RegisteredClaim, ...]
-    run: Callable[[pandas.DataFrame, pandas.Series], ClaimRun]
+    registered: tuple[Commitment, ...]
+    run: Callable[[pandas.DataFrame, pandas.Series], Output]
 
 
-def merge_runners(*runners: ClaimRunner | None) -> ClaimRunner | None:
+def merge(*runners: Docket | None) -> Docket | None:
     """Combines several runners into one, all evaluated on the same frame.
 
     A document name two runners produce is refused when it is evaluated,
@@ -306,7 +306,7 @@ def merge_runners(*runners: ClaimRunner | None) -> ClaimRunner | None:
     if len(set(names)) != len(names):
         raise errors.InputError("claim ids must be unique across runners")
 
-    def run_all(features: pandas.DataFrame, target: pandas.Series) -> ClaimRun:
+    def run_all(features: pandas.DataFrame, target: pandas.Series) -> Output:
         statuses: dict[str, str] = {}
         documents: dict[str, Mapping[str, Any]] = {}
         for runner in chosen:
@@ -325,9 +325,9 @@ def merge_runners(*runners: ClaimRunner | None) -> ClaimRunner | None:
                 raise errors.InputError(f"two claims wrote {sorted(clash)}")
             statuses.update(found.statuses)
             documents.update(found.documents)
-        return ClaimRun(statuses, documents)
+        return Output(statuses, documents)
 
-    return ClaimRunner(registered, run_all)
+    return Docket(registered, run_all)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -539,8 +539,8 @@ def finish(
     alpha: Fraction,
     custody_head: str | None,
     stage_two: Mapping[str, Any] | None = None,
-    runner: ClaimRunner | None = None,
-    ran: ClaimRun | None = None,
+    runner: Docket | None = None,
+    ran: Output | None = None,
 ) -> Confirmation:
     """Writes the confirmation row and builds the result.
 
@@ -782,7 +782,7 @@ def verify(
                     if passed
                     else qualification.Decision.PASS
                 ),
-                set_id=qualification.SetId.CONFIRMATION,
+                set_id=qualification.Subset.CONFIRMATION,
                 seed_path=randomness.seed_path(
                     ledger.seed, f"confirm.{spec.statistic}", index
                 ),
@@ -826,7 +826,7 @@ def default_encoding(target: pandas.Series) -> Any:
 
 def confirm(
     ledger: scmle.data.ledger.ledger.Ledger,
-    source: ConfirmationSource | None,
+    source: Source | None,
     *,
     alpha_confirm: Fraction,
     rule: budget.Correction = budget.Correction.BY,
@@ -835,7 +835,7 @@ def confirm(
     custody_log: Log | None = None,
     encode: Callable[[pandas.Series], Any] = default_encoding,
     withdrawal: Withdrawal | None = None,
-    claim_runner: ClaimRunner | None = None,
+    claim_runner: Docket | None = None,
 ) -> Confirmation:
     """Freezes the survivors and tests them once on the confirmation set.
 
@@ -844,7 +844,7 @@ def confirm(
 
     Args:
         ledger: The run's ledger, after exploration (and the negative
-            control, recorded with `Ledger.record_control`).
+            control, recorded with `Ledger.negatives`).
         source: The sealed confirmation set, or None when no `C` exists.
         alpha_confirm: The confirmation level (the charter's).
         rule: `by` (default, arbitrary dependence), `bh`, `holm` or
@@ -891,9 +891,7 @@ def confirm(
         )
     if claim_runner is not None:
         for item in claim_runner.registered:
-            ledger.register_claim(
-                item.claim_id, item.kind, item.statement, item.sha256
-            )
+            ledger.enroll(item.claim_id, item.kind, item.statement, item.sha256)
     survivors = ledger.freeze()
     record = (
         None if withdrawal is None else stage_two_record(ledger, withdrawal)
@@ -946,9 +944,7 @@ def confirm(
             )
     log = custody_log or source.log
     registered = () if claim_runner is None else claim_runner.registered
-    claims_hash = log_selection(
-        log, ledger, survivors, rule, record, registered
-    )
+    claims_hash = preregister(log, ledger, survivors, rule, record, registered)
     return unseal(
         ledger,
         source,
@@ -963,13 +959,13 @@ def confirm(
     )
 
 
-def log_selection(
+def preregister(
     log: Any,
     ledger: scmle.data.ledger.ledger.Ledger,
     survivors: Any,
     rule: budget.Correction,
     record: Mapping[str, Any] | None,
-    registered: Sequence[RegisteredClaim],
+    registered: Sequence[Commitment],
 ) -> str:
     """Writes the `selection_frozen` event and hashes the claim set.
 
@@ -1025,11 +1021,11 @@ def log_selection(
 
 def unseal(
     ledger: scmle.data.ledger.ledger.Ledger,
-    source: ConfirmationSource,
+    source: Source,
     log: Any,
     claims_hash: str,
     blocked: tuple[str, str, tuple[qualification.Claim, ...]] | None,
-    claim_runner: ClaimRunner | None,
+    claim_runner: Docket | None,
     rule: budget.Correction,
     alpha_confirm: Fraction,
     encode: Callable[[pandas.Series], Any],
@@ -1080,11 +1076,11 @@ def unseal(
             checks=(),
             rule=rule,
             alpha=alpha_confirm,
-            custody_head=head_of(log),
+            custody_head=tip(log),
             stage_two=record,
             runner=claim_runner,
         )
-    ran: ClaimRun | None = None
+    ran: Output | None = None
     if claim_runner is not None:
         try:
             ran = claim_runner.run(*rows)
@@ -1093,7 +1089,7 @@ def unseal(
             # FAILED
             failed = phrase("evaluating the registered claims", failure)
             log.append("C", "claims_failed", ACTOR, {"reason": failed})
-            ran = ClaimRun(
+            ran = Output(
                 {i.claim_id: FAILED for i in claim_runner.registered}, {}
             )
     if blocked is not None:
@@ -1106,7 +1102,7 @@ def unseal(
             checks=(),
             rule=rule,
             alpha=alpha_confirm,
-            custody_head=head_of(log),
+            custody_head=tip(log),
             stage_two=record,
             runner=claim_runner,
             ran=ran,
@@ -1126,7 +1122,7 @@ def unseal(
             checks=(),
             rule=rule,
             alpha=alpha_confirm,
-            custody_head=head_of(log),
+            custody_head=tip(log),
             stage_two=record,
             runner=claim_runner,
             ran=ran,
@@ -1144,7 +1140,7 @@ def unseal(
         checks=checks,
         rule=rule,
         alpha=alpha_confirm,
-        custody_head=head_of(log),
+        custody_head=tip(log),
         stage_two=record,
         runner=claim_runner,
         ran=ran,
@@ -1211,7 +1207,7 @@ def phrase(stage: str, failure: Exception) -> str:
     )
 
 
-def head_of(log: Any) -> str | None:
+def tip(log: Any) -> str | None:
     """Reads the hash of the custody log's last entry.
 
     Args:

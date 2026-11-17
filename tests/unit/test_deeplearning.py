@@ -25,7 +25,7 @@ pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("torch") is None, reason="torch is not installed"
 )
 
-REGISTRY = registry.Catalog.with_builtins()
+REGISTRY = registry.Catalog.stock()
 FAST = {"epochs": 60, "patience": 6}
 
 
@@ -141,7 +141,7 @@ def test_unknown_architecture_is_a_configuration_error():
 def test_adapters_pass_conformance_and_support_every_task(name):
     adapter = REGISTRY.get(name)
 
-    conformance.check_conformance(adapter)
+    conformance.comply(adapter)
 
     assert adapter.capabilities.tasks == tasks.STANDARD_TASKS
     assert adapter.rejection_reason(tasks.Task.BINARY) is None

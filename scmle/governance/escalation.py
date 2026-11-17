@@ -11,12 +11,12 @@ risk is at most the target ``r*`` with probability at least ``1 - delta`` over
 an i.i.d. labelled sample (their Theorem 3.2; an i.i.d. assumption, not only
 exchangeability).
 
-Score. `set_size_score` turns the conformal set size and the novelty flag
+Score. `ambiguity` turns the conformal set size and the novelty flag
 into ``g = 1 / |set|`` (0 for an empty or unbounded set, or a novel case). The
 set carries a finite-sample marginal coverage statement; a softmax margin does
 not.
 
-Threshold. `select_threshold` picks ``tau`` on matured calibration cases by
+Threshold. `select` picks ``tau`` on matured calibration cases by
 fixed-sequence testing over a grid fixed in advance: from the most
 conservative ``tau`` (answer only the top score) to the least, test
 ``H: R(tau) > r*`` with the exact binomial p-value
@@ -43,7 +43,7 @@ declared safe default action and a backlog entry.
 
 Under shift the guarantee lapses; the loop watches the selective risk of
 answered cases with an anytime-valid alarm (`scmle.monitoring.
-sequential_tests.RiskAlarm`) and halts when it excludes ``r*``.
+sequential_tests.Tripwire`) and halts when it excludes ``r*``.
 """
 
 from collections.abc import Sequence
@@ -62,7 +62,7 @@ SAFE_DEFAULT = "safe_default"
 DEFAULT_GRID = 101
 
 
-def set_size_score(set_sizes: Any, novel: Any = None) -> numpy.ndarray:
+def ambiguity(set_sizes: Any, novel: Any = None) -> numpy.ndarray:
     """Scores ``g`` from conformal set sizes and a novelty flag.
 
     Args:
@@ -155,7 +155,7 @@ class Threshold:
     steps: tuple[Step, ...]
 
     @property
-    def everything_escalates(self) -> bool:
+    def saturated(self) -> bool:
         """Whether no threshold passed (``tau = +inf``)."""
         return math.isinf(self.tau)
 
@@ -167,7 +167,7 @@ class Threshold:
             written as None and each step as a dict.
         """
         return {
-            "tau": None if self.everything_escalates else self.tau,
+            "tau": None if self.saturated else self.tau,
             "coverage": self.coverage,
             "risk": None if math.isnan(self.risk) else self.risk,
             "r_star": self.r_star,
@@ -224,7 +224,7 @@ def validate_calibration(
     return g, l_values, w
 
 
-def select_threshold(
+def select(
     score: Any,
     loss: Any,
     r_star: float,
@@ -431,7 +431,7 @@ class Comparison:
     consistent: bool
 
 
-def chow_check(
+def adjudicate(
     confidence: Any,
     score: Any,
     tau: float,
@@ -480,8 +480,8 @@ def chow_check(
         )
     cut = review_cost / error_cost
     by_chow = (1.0 - p) > cut
-    by_score = g < tau
-    share = float(numpy.mean(by_chow != by_score))
+    merit = g < tau
+    share = float(numpy.mean(by_chow != merit))
     return Comparison(cut, share, share <= tolerance)
 
 

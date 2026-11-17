@@ -44,7 +44,7 @@ def test_the_auc_matches_sklearn_and_the_pairwise_definition_with_ties():
     rng = numpy.random.default_rng(1)
     scores = numpy.round(rng.normal(size=80), 1)
     side = rng.integers(0, 2, 80)
-    auc, interval = shift.auc_delong(scores, side)
+    auc, interval = shift.delong(scores, side)
     assert auc == pytest.approx(metrics.roc_auc_score(side, scores))
     assert auc == pytest.approx(brute_force_auc(scores, side))
     assert interval[0] <= auc <= interval[1]
@@ -54,7 +54,7 @@ def test_the_delong_variance_matches_the_pairwise_definition():
     rng = numpy.random.default_rng(2)
     scores = numpy.round(rng.normal(size=90), 1) + numpy.arange(90) % 2 * 0.4
     side = numpy.arange(90) % 2
-    low, high = shift.auc_delong(scores, side, confidence=0.9)[1]
+    low, high = shift.delong(scores, side, confidence=0.9)[1]
     variance = brute_force_delong_variance(scores, side)
     z = stats.norm.ppf(0.95)
     assert high - low == pytest.approx(2 * z * numpy.sqrt(variance))
@@ -62,13 +62,13 @@ def test_the_delong_variance_matches_the_pairwise_definition():
 
 def test_delong_rejects_a_class_with_one_row_and_a_bad_level():
     with pytest.raises(ValueError, match="two rows"):
-        shift.auc_delong(numpy.array([0.1, 0.2, 0.3]), numpy.array([1, 0, 0]))
+        shift.delong(numpy.array([0.1, 0.2, 0.3]), numpy.array([1, 0, 0]))
     with pytest.raises(ValueError, match="confidence"):
-        shift.auc_delong(numpy.arange(4.0), numpy.array([0, 1, 0, 1]), 1.0)
+        shift.delong(numpy.arange(4.0), numpy.array([0, 1, 0, 1]), 1.0)
 
 
 def test_a_perfect_separation_gives_a_degenerate_interval():
-    auc, interval = shift.auc_delong(numpy.arange(10.0), numpy.arange(10) // 5)
+    auc, interval = shift.delong(numpy.arange(10.0), numpy.arange(10) // 5)
     assert auc == 1.0 and interval == (1.0, 1.0)
 
 
@@ -82,15 +82,15 @@ def test_the_mmd_statistic_matches_the_definition_from_pairwise_distances():
     left, right = frames(rows=40, shift_by=0.5, columns=3)
     both = pandas.concat([left, right], ignore_index=True)
     design = shift.design_matrix(both, len(both))
-    bandwidth = shift.median_bandwidth(design)
-    kernel = shift.gaussian_kernel(design, bandwidth)
+    bandwidth = shift.sigma(design)
+    kernel = shift.gaussian(design, bandwidth)
     expected = numpy.exp(
         -spatial.distance.cdist(design, design, "sqeuclidean")
         / (2 * bandwidth**2)
     )
     assert numpy.allclose(kernel, expected)
     indicator = numpy.r_[numpy.ones(40), numpy.zeros(40)]
-    got = shift.mmd_statistics(kernel, indicator[:, None])[0]
+    got = shift.mmds(kernel, indicator[:, None])[0]
     xx = expected[:40, :40]
     yy = expected[40:, 40:]
     xy = expected[:40, 40:]
@@ -105,10 +105,10 @@ def test_the_mmd_statistic_matches_the_definition_from_pairwise_distances():
 def test_the_median_heuristic_is_the_median_pairwise_distance():
     rng = numpy.random.default_rng(3)
     design = rng.normal(size=(30, 2))
-    assert shift.median_bandwidth(design) == pytest.approx(
+    assert shift.sigma(design) == pytest.approx(
         numpy.median(spatial.distance.pdist(design))
     )
-    assert shift.median_bandwidth(numpy.zeros((5, 2))) == 1.0
+    assert shift.sigma(numpy.zeros((5, 2))) == 1.0
 
 
 def test_the_mmd_permutation_p_value_agrees_with_scipy_permutation_test():
@@ -116,12 +116,12 @@ def test_the_mmd_permutation_p_value_agrees_with_scipy_permutation_test():
     mine = shift.mmd_test(left, right, 0, permutations=499)
     both = pandas.concat([left, right], ignore_index=True)
     design = shift.design_matrix(both, len(both))
-    kernel = shift.gaussian_kernel(design, shift.median_bandwidth(design))
+    kernel = shift.gaussian(design, shift.sigma(design))
     index = numpy.arange(len(both), dtype=float)
 
     def statistic(first, second):
         labels = numpy.isin(index, first).astype(float)
-        return shift.mmd_statistics(kernel, labels[:, None])[0]
+        return shift.mmds(kernel, labels[:, None])[0]
 
     reference = stats.permutation_test(
         (index[:60], index[60:]),
@@ -151,16 +151,16 @@ def test_a_clear_shift_is_found_by_both_tests_and_no_shift_is_not():
 def test_the_checks_are_exploration_checks_with_the_documented_fields():
     left, right = frames(rows=100, shift_by=1.5)
     check = shift.c2st(
-        left, right, 3, permutations=49, gate=certificates.GateStatus.GATING
+        left, right, 3, permutations=49, gate=certificates.Authority.GATING
     )
-    assert check.set_id is qualification.SetId.EXPLORATION
+    assert check.set_id is qualification.Subset.EXPLORATION
     assert check.tier is qualification.Tier.UNVERIFIED
     assert check.check_id == shift.C2ST_ID
     assert check.effect == pytest.approx(check.statistic - 0.5)
     assert check.interval[0] <= check.statistic <= check.interval[1]
     assert check.seed_path[0] == 3
     again = shift.c2st(
-        left, right, 3, permutations=49, gate=certificates.GateStatus.GATING
+        left, right, 3, permutations=49, gate=certificates.Authority.GATING
     )
     assert again == check
 
@@ -175,7 +175,7 @@ def test_a_descriptive_test_never_blocks_and_a_gating_one_does_what_asked():
         0,
         permutations=49,
         on_shift=block,
-        gate=certificates.GateStatus.GATING,
+        gate=certificates.Authority.GATING,
     )
     assert quiet.decision is qualification.Decision.WARN
     assert loud.decision is block
@@ -229,7 +229,7 @@ def test_feature_tests_match_scipy_and_adjust_with_bh():
     left, right = frames(rows=200, shift_by=0.7, seed=9)
     left["g"] = numpy.where(numpy.arange(200) % 2 == 0, "u", "v")
     right["g"] = numpy.where(numpy.arange(200) % 3 == 0, "u", "v")
-    rows = {r.column: r for r in shift.feature_tests(left, right)}
+    rows = {r.column: r for r in shift.compare(left, right)}
     ks = stats.ks_2samp(left["f0"], right["f0"])
     assert rows["f0"].statistic == pytest.approx(ks.statistic)
     assert rows["f0"].p_value == pytest.approx(ks.pvalue)
@@ -253,7 +253,7 @@ def test_feature_tests_match_scipy_and_adjust_with_bh():
 def test_a_column_with_one_level_and_an_empty_column_have_p_one():
     left = pandas.DataFrame({"c": ["a"] * 60, "n": [numpy.nan] * 60})
     right = pandas.DataFrame({"c": ["a"] * 60, "n": [numpy.nan] * 60})
-    rows = {r.column: r for r in shift.feature_tests(left, right)}
+    rows = {r.column: r for r in shift.compare(left, right)}
     assert rows["c"].p_value == 1.0 and rows["n"].p_value == 1.0
 
 

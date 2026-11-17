@@ -8,7 +8,7 @@ import pytest
 from scipy import stats
 
 from scmle.contracts.qualification import Decision
-from scmle.contracts.qualification import SetId
+from scmle.contracts.qualification import Subset
 from scmle.contracts.qualification import Tier
 from scmle.data.admissibility import dag
 from scmle.data.admissibility import independence
@@ -37,7 +37,7 @@ def precision_partial(frame, x, y, given):
 @pytest.mark.parametrize("given", [[], ["a"], ["a", "d"]])
 def test_partial_correlation_matches_precision_matrix_and_scipy(given):
     frame = sem_frame(300, 1, extra_edge=True)
-    r = independence.partial_correlation(frame, "b", "c", given)
+    r = independence.correlate(frame, "b", "c", given)
     assert r == pytest.approx(
         precision_partial(frame, "b", "c", given), abs=1e-10
     )
@@ -94,7 +94,7 @@ def test_perfect_correlation_gives_a_zero_p_value():
 def test_a_constant_column_is_an_error():
     frame = pandas.DataFrame({"x": numpy.arange(20.0), "y": numpy.ones(20)})
     with pytest.raises(ValueError, match="no spread"):
-        independence.partial_correlation(frame, "x", "y", [])
+        independence.correlate(frame, "x", "y", [])
 
 
 def discrete_frame(seed=0, n=600):
@@ -144,12 +144,12 @@ def test_dispatch_and_refusals():
     num = sem_frame(100, 0)
     assert (
         independence.run_test(num, "a", "b", []).kind
-        is independence.CIKind.FISHER_Z
+        is independence.Procedure.FISHER_Z
     )
     disc = discrete_frame().astype("category")
     assert (
         independence.run_test(disc, "x", "y", ["s"]).kind
-        is independence.CIKind.STRATIFIED_CHI2
+        is independence.Procedure.STRATIFIED_CHI2
     )
     mixed = disc.assign(w=numpy.arange(len(disc), dtype=float))
     with pytest.raises(ValueError, match="mixed"):
@@ -169,7 +169,7 @@ def test_dispatch_and_refusals():
 
 
 def test_implied_statements_of_the_chain():
-    statements, skipped = independence.implied_statements(CHAIN)
+    statements, skipped = independence.entail(CHAIN)
     texts = {s.text() for s in statements}
     assert "c is independent of a given b" in texts
     assert "c is independent of d given b" in texts
@@ -184,7 +184,7 @@ def test_latent_parents_skip_the_node():
     graph = dag.Dag.build(
         [("U", "a"), ("a", "b"), ("b", "c")], "expert", latent=["U"]
     )
-    skipped = independence.implied_statements(graph)[1]
+    skipped = independence.entail(graph)[1]
     assert skipped == ["a"]
 
 
@@ -225,7 +225,7 @@ def test_report_never_confirms_and_records_every_test():
     assert summary["status"] == "hypothesis"
     assert "confirm" not in " ".join(k for k in summary if k != "note")
     for check in report.checks:
-        assert check.set_id is SetId.EXPLORATION
+        assert check.set_id is Subset.EXPLORATION
         assert check.tier is Tier.UNVERIFIED
         assert check.decision in (Decision.PASS, Decision.WARN)
         assert check.seed_path[0] == 7
@@ -235,11 +235,11 @@ def test_report_never_confirms_and_records_every_test():
 
 def test_falsification_threshold_is_inclusive(monkeypatch):
     def fake(frame, x, y, given):
-        return independence.CITest(
-            independence.CIKind.FISHER_Z, 1.0, level, 0.1, len(frame), 0, 0
+        return independence.Independence(
+            independence.Procedure.FISHER_Z, 1.0, level, 0.1, len(frame), 0, 0
         )
 
-    statements = independence.implied_statements(CHAIN)[0]
+    statements = independence.entail(CHAIN)[0]
     level = 0.05 / len(statements)
     monkeypatch.setattr(independence, "run_test", fake)
     report = independence.falsify(CHAIN, sem_frame(50, 0))

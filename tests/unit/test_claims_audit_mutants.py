@@ -23,7 +23,7 @@ from tests.unit.test_claims_audit import edit_claims
 from tests.unit.test_claims_audit import FOUR
 from tests.unit.test_claims_audit import KEY
 from tests.unit.test_claims_audit import make_run
-from tests.unit.test_claims_audit import register_decision_files
+from tests.unit.test_claims_audit import notarize
 from tests.unit.test_ledger_governed import build
 
 SHA = "a" * 64
@@ -74,21 +74,21 @@ def test_verification_serializes_every_field():
 
 def test_read_claims_refuses_unreadable_and_foreign_documents(tmp_path):
     with pytest.raises(errors.ArtifactError, match=r"cannot read .*claims"):
-        claims_audit.read_claims(tmp_path)
+        claims_audit.recall(tmp_path)
     path = tmp_path / confirm.CLAIMS_FILE
     path.write_text("{not json", encoding="utf-8")
     with pytest.raises(errors.ArtifactError, match=r"^cannot read "):
-        claims_audit.read_claims(tmp_path)
+        claims_audit.recall(tmp_path)
     path.write_text(json.dumps({"other": 1}), encoding="utf-8")
     with pytest.raises(
         errors.ArtifactError, match=r"is not a claims document$"
     ):
-        claims_audit.read_claims(tmp_path)
+        claims_audit.recall(tmp_path)
     path.write_text(json.dumps([{"claims": 1}]), encoding="utf-8")
     with pytest.raises(errors.ArtifactError, match=r"is not a claims document"):
-        claims_audit.read_claims(tmp_path)
+        claims_audit.recall(tmp_path)
     path.write_text(json.dumps({"claims": []}), encoding="utf-8")
-    assert claims_audit.read_claims(tmp_path) == {"claims": []}
+    assert claims_audit.recall(tmp_path) == {"claims": []}
 
 
 def test_read_optional_returns_only_json_objects(tmp_path):
@@ -103,7 +103,7 @@ def test_read_optional_returns_only_json_objects(tmp_path):
 
 
 def test_column_of_names_the_feature_or_none(run):
-    ledger = claims_audit.read_ledger(run)
+    ledger = claims_audit.rehydrate(run)
     claim_id = next(iter(ledger.hypotheses))
     assert claims_audit.column_of(ledger, claim_id) == (
         ledger.hypotheses[claim_id].spec.column
@@ -113,31 +113,29 @@ def test_column_of_names_the_feature_or_none(run):
 
 def test_list_and_show_work_when_the_claims_file_has_no_withdrawals(run):
     edit_claims(run, lambda d: d.pop("stage_two"))
-    rows = claims_audit.list_claims(run)
+    rows = claims_audit.inventory(run)
     assert [r["withdrawn"] for r in rows] == [False, False]
-    shown = claims_audit.show_claim(run, rows[0]["claim_id"])
+    shown = claims_audit.inspect(run, rows[0]["claim_id"])
     assert shown["withdrawn"] is None
 
     def hollow(document):
         document["stage_two"] = {}
 
     edit_claims(run, hollow)
-    assert [r["withdrawn"] for r in claims_audit.list_claims(run)] == [
+    assert [r["withdrawn"] for r in claims_audit.inventory(run)] == [
         False,
         False,
     ]
-    assert (
-        claims_audit.show_claim(run, rows[0]["claim_id"])["withdrawn"] is None
-    )
+    assert claims_audit.inspect(run, rows[0]["claim_id"])["withdrawn"] is None
 
 
 def test_show_claim_reports_every_recorded_part(run):
     document = json.loads((run / confirm.CLAIMS_FILE).read_text())
-    ledger = claims_audit.read_ledger(run)
+    ledger = claims_audit.rehydrate(run)
     checks_seen = set()
     for claim in document["claims"]:
         claim_id = claim["claim_id"]
-        shown = claims_audit.show_claim(run, claim_id)
+        shown = claims_audit.inspect(run, claim_id)
         result = ledger.results[claim_id]
         expected_check = (
             None if result.check is None else result.check.to_dict()
@@ -166,11 +164,11 @@ def test_show_claim_names_the_known_claims_when_unknown(run):
     document = json.loads((run / confirm.CLAIMS_FILE).read_text())
     known = ", ".join(c["claim_id"] for c in document["claims"])
     with pytest.raises(errors.ArtifactError) as caught:
-        claims_audit.show_claim(run, "zz")
+        claims_audit.inspect(run, "zz")
     assert str(caught.value) == f"no claim 'zz'; the run has: {known}"
     edit_claims(run, lambda d: d.update(claims=[]))
     with pytest.raises(errors.ArtifactError) as empty:
-        claims_audit.show_claim(run, "zz")
+        claims_audit.inspect(run, "zz")
     assert str(empty.value) == "no claim 'zz'; the run has: none"
 
 
@@ -184,23 +182,23 @@ def test_show_claim_needs_both_a_hypothesis_and_a_result(run, monkeypatch):
     thin = types.SimpleNamespace(
         claims={}, hypotheses={"h1": object()}, results={}
     )
-    monkeypatch.setattr(claims_audit, "read_ledger", lambda folder: thin)
+    monkeypatch.setattr(claims_audit, "rehydrate", lambda folder: thin)
     with pytest.raises(errors.ArtifactError) as caught:
-        claims_audit.show_claim(run, "h1")
+        claims_audit.inspect(run, "h1")
     assert str(caught.value) == "claim 'h1' is not in the sealed ledger"
     other = types.SimpleNamespace(
         claims={}, hypotheses={}, results={"h1": object()}
     )
-    monkeypatch.setattr(claims_audit, "read_ledger", lambda folder: other)
+    monkeypatch.setattr(claims_audit, "rehydrate", lambda folder: other)
     with pytest.raises(errors.ArtifactError, match=r"not in the sealed ledger"):
-        claims_audit.show_claim(run, "h1")
+        claims_audit.inspect(run, "h1")
 
 
 def registered_claim_run(folder, baseline_report=True, causal_report=True):
     features, target = build(rows=500, seed=0, effect=0.7)
     cfeatures, ctarget = build(rows=400, seed=9, effect=0.7)
-    log = sealed.OpenLog(folder / claims_audit.CUSTODY_FILE, KEY)
-    source = sealed.SealedSet(
+    log = sealed.Journal(folder / claims_audit.CUSTODY_FILE, KEY)
+    source = sealed.Locker(
         "C",
         splitters.ResidentTestSet(
             cfeatures, ctarget, tuple(range(len(ctarget)))
@@ -208,7 +206,7 @@ def registered_claim_run(folder, baseline_report=True, causal_report=True):
         log,
     )
     charter = make_charter()
-    sealing.write_charter(
+    sealing.inscribe(
         folder / claims_audit.CHARTER_FILE, charter, signing_key=KEY
     )
 
@@ -226,14 +224,12 @@ def registered_claim_run(folder, baseline_report=True, causal_report=True):
         }
 
     def produce(frame, outcome):
-        return confirm.ClaimRun({"base": "done", "cause": "held"}, documents)
+        return confirm.Output({"base": "done", "cause": "held"}, documents)
 
-    runner = confirm.ClaimRunner(
+    runner = confirm.Docket(
         (
-            confirm.RegisteredClaim("base", "baseline", "a baseline", SHA),
-            confirm.RegisteredClaim(
-                "cause", "causal_primary", "a cause", "b" * 64
-            ),
+            confirm.Commitment("base", "baseline", "a baseline", SHA),
+            confirm.Commitment("cause", "causal_primary", "a cause", "b" * 64),
         ),
         produce,
     )
@@ -253,7 +249,7 @@ def registered_claim_run(folder, baseline_report=True, causal_report=True):
 
 def test_registered_claims_are_listed_with_report_tier_and_status(tmp_path):
     registered_claim_run(tmp_path)
-    rows = claims_audit.list_claims(tmp_path)
+    rows = claims_audit.inventory(tmp_path)
     by_id = {r["claim_id"]: r for r in rows}
     assert by_id["base"] == {
         "claim_id": "base",
@@ -278,7 +274,7 @@ def test_registered_claims_are_listed_with_report_tier_and_status(tmp_path):
         "withdrawn": False,
     }
     assert [r["claim_id"] for r in rows[-2:]] == ["base", "cause"]
-    shown = claims_audit.show_claim(tmp_path, "base")
+    shown = claims_audit.inspect(tmp_path, "base")
     assert shown["registered"]["kind"] == "baseline"
     assert shown["status"]["status"] == "done"
     assert shown["outcome"] == "confirmed"
@@ -287,37 +283,35 @@ def test_registered_claims_are_listed_with_report_tier_and_status(tmp_path):
 
 def test_registered_claims_without_reports_fall_back_to_unverified(tmp_path):
     registered_claim_run(tmp_path, baseline_report=False, causal_report=False)
-    ledger = claims_audit.read_ledger(tmp_path)
-    for row in claims_audit.registered_rows(tmp_path, ledger):
+    ledger = claims_audit.rehydrate(tmp_path)
+    for row in claims_audit.enrolled(tmp_path, ledger):
         assert row["tier"] == "unverified"
         assert row["identification"] is None
         assert row["status"] in ("done", "held")
     stripped = types.SimpleNamespace(
         claims={"x": {"kind": "baseline"}}, confirmation=None
     )
-    only = claims_audit.registered_rows(tmp_path, stripped)
+    only = claims_audit.enrolled(tmp_path, stripped)
     assert only[0]["status"] == "not_stated"
     assert only[0]["tier"] == "unverified"
     empty = types.SimpleNamespace(
         claims={"x": {"kind": "other"}}, confirmation={}
     )
-    assert claims_audit.registered_rows(tmp_path, empty)[0]["status"] == (
-        "not_stated"
-    )
+    assert claims_audit.enrolled(tmp_path, empty)[0]["status"] == ("not_stated")
     thin = types.SimpleNamespace(
         claims={"x": {"kind": "other"}},
         confirmation={"claims": {"x": {"status": "ok"}}},
     )
-    assert claims_audit.registered_rows(tmp_path, thin)[0]["status"] == "ok"
+    assert claims_audit.enrolled(tmp_path, thin)[0]["status"] == "ok"
     (tmp_path / claims_audit.BASELINE_FILE).write_text("[1]", encoding="utf-8")
-    assert claims_audit.registered_rows(tmp_path, stripped)[0]["tier"] == (
+    assert claims_audit.enrolled(tmp_path, stripped)[0]["tier"] == (
         "unverified"
     )
 
 
 def test_ledger_head_findings_are_exact(run):
-    ledger = claims_audit.read_ledger(run)
-    document = claims_audit.read_claims(run)
+    ledger = claims_audit.rehydrate(run)
+    document = claims_audit.recall(run)
     assert claims_audit.check_ledger_head(document, ledger) == finding(
         "claims file names the ledger head",
         "pass",
@@ -340,18 +334,18 @@ def charter_namespace(rules, signed=True):
 
 
 def test_charter_findings_describe_the_signature_state(run):
-    ledger = claims_audit.read_ledger(run)
-    signed = claims_audit.check_charter(run, ledger, KEY)
+    ledger = claims_audit.rehydrate(run)
+    signed = claims_audit.authenticate(run, ledger, KEY)
     assert signed[0].name == CHARTER
     assert signed[0].detail.endswith("(signature verified)")
     assert signed[0].detail[:12] == ledger.header["charter_hash"][:12]
     assert signed[0].detail[12:13] == " "
-    unsigned = claims_audit.check_charter(run, ledger, None)
+    unsigned = claims_audit.authenticate(run, ledger, None)
     assert unsigned[0].detail.endswith("(hash only, not signed)")
     assert unsigned[1] == finding(
         "chartered rules were used", "skipped", "the charter fixes no rules"
     )
-    failed = claims_audit.check_charter(run, ledger, "another-key")
+    failed = claims_audit.authenticate(run, ledger, "another-key")
     assert len(failed) == 1
     assert failed[0].name == CHARTER
     assert failed[0].status == "fail"
@@ -381,20 +375,20 @@ def test_chartered_rules_compare_both_ledger_and_confirmation_rules(
         )
 
     step = "chartered rules were used"
-    same = claims_audit.check_charter(
+    same = claims_audit.authenticate(
         tmp_path, ledger_with("lord++", {"rule": "bh"}), None
     )
     assert same[1] == finding(step, "pass", "lord++ and bh")
-    assert claims_audit.check_charter(
+    assert claims_audit.authenticate(
         tmp_path, ledger_with("lord++", None), None
     )[1] == finding(step, "pass", "lord++ and bh")
     assert (
-        claims_audit.check_charter(
+        claims_audit.authenticate(
             tmp_path, ledger_with("lord++", {"other": 1}), None
         )[1].status
         == "pass"
     )
-    wrong_confirm = claims_audit.check_charter(
+    wrong_confirm = claims_audit.authenticate(
         tmp_path, ledger_with("lord++", {"rule": "holm"}), None
     )
     assert wrong_confirm[1] == finding(
@@ -403,7 +397,7 @@ def test_chartered_rules_compare_both_ledger_and_confirmation_rules(
         "ledger rule 'lord++' / confirmation rule 'holm' differ from the "
         "charter's 'lord++' / 'bh'",
     )
-    wrong_ledger = claims_audit.check_charter(
+    wrong_ledger = claims_audit.authenticate(
         tmp_path, ledger_with("bh", {"rule": "bh"}), None
     )
     assert wrong_ledger[1].status == "fail"
@@ -411,7 +405,7 @@ def test_chartered_rules_compare_both_ledger_and_confirmation_rules(
     other_hash = types.SimpleNamespace(
         header={"charter_hash": "z", "rule": {"rule": "x"}}, confirmation=None
     )
-    assert claims_audit.check_charter(tmp_path, other_hash, None) == [
+    assert claims_audit.authenticate(tmp_path, other_hash, None) == [
         finding(CHARTER, "fail", "the ledger names another charter hash")
     ]
 
@@ -425,11 +419,11 @@ def test_header_mismatches_are_named_in_a_fixed_order():
         "rule": "r",
         "alpha_confirm": "a",
     }
-    assert claims_audit.ledger_header_mismatches(document, row, survivors) == []
-    assert claims_audit.ledger_header_mismatches(
-        {"survivors_sha256": "x"}, {}, survivors
-    ) == ["survivor hash"]
-    assert claims_audit.ledger_header_mismatches(
+    assert claims_audit.compare(document, row, survivors) == []
+    assert claims_audit.compare({"survivors_sha256": "x"}, {}, survivors) == [
+        "survivor hash"
+    ]
+    assert claims_audit.compare(
         {"survivors_sha256": "x", "outcome": "p", "rule": "q"},
         row,
         survivors,
@@ -468,19 +462,16 @@ def make_claims_document(**changes):
 def test_claims_against_ledger_findings_are_exact():
     name = "claims agree with the sealed ledger"
     ledger = make_sealed_ledger(confirmed=["h1"])
-    assert claims_audit.check_claims_against_ledger(
-        make_claims_document(), ledger
-    ) == finding(name, "pass", "1 confirmed of 2 claims")
+    assert claims_audit.crosscheck(make_claims_document(), ledger) == finding(
+        name, "pass", "1 confirmed of 2 claims"
+    )
     unsealed = types.SimpleNamespace(confirmation=None, survivor_set=None)
-    assert claims_audit.check_claims_against_ledger(
-        make_claims_document(), unsealed
-    ) == finding(name, "fail", "the ledger is not sealed")
+    assert claims_audit.crosscheck(make_claims_document(), unsealed) == finding(
+        name, "fail", "the ledger is not sealed"
+    )
     half = types.SimpleNamespace(confirmation={}, survivor_set=None)
     assert (
-        claims_audit.check_claims_against_ledger(
-            make_claims_document(), half
-        ).status
-        == "fail"
+        claims_audit.crosscheck(make_claims_document(), half).status == "fail"
     )
     wrong_set = make_claims_document(
         claims=[
@@ -489,15 +480,13 @@ def test_claims_against_ledger_findings_are_exact():
         ],
         stage_two={"x": 1},
     )
-    assert claims_audit.check_claims_against_ledger(
-        wrong_set, ledger
-    ) == finding(
+    assert claims_audit.crosscheck(wrong_set, ledger) == finding(
         name,
         "fail",
         "differs from the ledger: confirmed set, second-stage accounting",
     )
     odd_ids = make_claims_document(claims=[{"claim_id": "h9"}])
-    assert claims_audit.check_claims_against_ledger(
+    assert claims_audit.crosscheck(
         odd_ids, make_sealed_ledger(confirmed=[])
     ).detail == (
         "differs from the ledger: claim ids differ from the frozen survivors"
@@ -509,13 +498,13 @@ def test_claims_against_ledger_when_there_were_no_survivors():
     none = confirm.NO_SURVIVORS
     ledger = make_sealed_ledger(outcome=none)
     document = make_claims_document(outcome=none, claims=[])
-    assert claims_audit.check_claims_against_ledger(
-        document, ledger
-    ) == finding(name, "pass", "0 confirmed of 0 claims")
+    assert claims_audit.crosscheck(document, ledger) == finding(
+        name, "pass", "0 confirmed of 0 claims"
+    )
     listed = make_claims_document(
         outcome=none, claims=[{"claim_id": "h1", "tier": "unverified"}]
     )
-    assert claims_audit.check_claims_against_ledger(listed, ledger).detail == (
+    assert claims_audit.crosscheck(listed, ledger).detail == (
         "differs from the ledger: claim ids differ from the frozen survivors"
     )
 
@@ -534,24 +523,24 @@ def replay_document(adjusted, p_value=1e-6, tier="confirmed"):
 
 def test_replay_tolerates_tiny_absolute_differences_only():
     name = "confirmation replays from the p-values on C"
-    assert claims_audit.check_replay(replay_document(1e-6 + 5e-13)) == finding(
+    assert claims_audit.rederive(replay_document(1e-6 + 5e-13)) == finding(
         name, "pass", "1 hypotheses, rule holm"
     )
-    assert claims_audit.check_replay(replay_document(1e-6 + 5e-6)) == finding(
+    assert claims_audit.rederive(replay_document(1e-6 + 5e-6)) == finding(
         name, "fail", "h1: adjusted p differs"
     )
-    assert claims_audit.check_replay(replay_document(None)) == finding(
+    assert claims_audit.rederive(replay_document(None)) == finding(
         name, "fail", "h1: adjusted p differs"
     )
-    assert claims_audit.check_replay(
+    assert claims_audit.rederive(
         replay_document(1e-6, tier="unverified")
     ) == finding(name, "fail", "h1: tier differs")
     broken = replay_document(1e-6)
     del broken["checks"]
-    assert claims_audit.check_replay(broken) == finding(
+    assert claims_audit.rederive(broken) == finding(
         name, "fail", "cannot replay: KeyError('checks')"
     )
-    skipped = claims_audit.check_replay({"outcome": "none"})
+    skipped = claims_audit.rederive({"outcome": "none"})
     assert skipped.status == "skipped"
     assert skipped.name == name
     assert skipped.detail == "outcome is 'none'"
@@ -609,58 +598,56 @@ def stage_two_document(**changes):
 def test_stage_two_findings_are_exact():
     name = "second-stage accounting is consistent"
     ledger = stage_two_ledger()
-    assert claims_audit.check_stage_two(stage_two_document(), ledger) == (
+    assert claims_audit.tally(stage_two_document(), ledger) == (
         finding(name, "pass", "2 tested, 1 withdrawn before C opened")
     )
-    assert claims_audit.check_stage_two({}, ledger) == finding(
+    assert claims_audit.tally({}, ledger) == finding(
         name, "skipped", "no withdrawal rule ran"
     )
     unfrozen = types.SimpleNamespace(survivor_set=None)
-    assert claims_audit.check_stage_two(stage_two_document(), unfrozen) == (
+    assert claims_audit.tally(stage_two_document(), unfrozen) == (
         finding(name, "fail", "the ledger has no frozen survivors")
     )
     tested = stage_two_document(
         checks=[{"check_id": "h1:C"}, {"check_id": "h3:C"}]
     )
-    assert claims_audit.check_stage_two(tested, ledger).detail == (
+    assert claims_audit.tally(tested, ledger).detail == (
         "a withdrawn survivor was tested on C; "
         "a check on C is outside the family"
     )
     outside = stage_two_document(checks=[{"check_id": "h7:C"}])
-    assert claims_audit.check_stage_two(outside, ledger).detail == (
+    assert claims_audit.tally(outside, ledger).detail == (
         "a check on C is outside the family"
     )
     confirmed = stage_two_document(
         claims=[{"claim_id": "h3", "tier": "confirmed"}]
     )
-    assert claims_audit.check_stage_two(confirmed, ledger) == finding(
+    assert claims_audit.tally(confirmed, ledger) == finding(
         name, "fail", "a withdrawn survivor is confirmed"
     )
     bad_hash = stage_two_document()
     bad_hash["stage_two"]["family_sha256"] = "x"
-    assert claims_audit.check_stage_two(bad_hash, ledger).detail == (
-        "family hash"
-    )
+    assert claims_audit.tally(bad_hash, ledger).detail == ("family hash")
 
 
 def test_custody_open_finding_judges_how_often_c_was_opened():
     name = "n"
     confirmed = {"outcome": confirm.CONFIRMED}
     other = {"outcome": "none"}
-    assert claims_audit.custody_open_finding(name, confirmed, 2) == finding(
+    assert claims_audit.openings(name, confirmed, 2) == finding(
         name, "fail", "C was opened 2 times"
     )
-    assert claims_audit.custody_open_finding(name, other, 2) == finding(
+    assert claims_audit.openings(name, other, 2) == finding(
         name, "fail", "C was opened 2 times"
     )
-    assert claims_audit.custody_open_finding(name, confirmed, 0) == finding(
+    assert claims_audit.openings(name, confirmed, 0) == finding(
         name, "fail", "outcome is confirmed but C has no open event"
     )
-    assert claims_audit.custody_open_finding(name, other, 0) == finding(
+    assert claims_audit.openings(name, other, 0) == finding(
         name, "pass", "C not opened (outcome none)"
     )
-    assert claims_audit.custody_open_finding(name, confirmed, 1) is None
-    assert claims_audit.custody_open_finding(name, other, 1) is None
+    assert claims_audit.openings(name, confirmed, 1) is None
+    assert claims_audit.openings(name, other, 1) is None
 
 
 def test_frozen_selection_problems_are_named():
@@ -721,7 +708,7 @@ def test_frozen_selection_problems_are_named():
 
 
 def write_custody(folder, events, key=KEY):
-    log = sealed.OpenLog(folder / claims_audit.CUSTODY_FILE, key)
+    log = sealed.Journal(folder / claims_audit.CUSTODY_FILE, key)
     for set_id, event, detail in events:
         log.append(set_id, event, "tester", detail)
     return log
@@ -729,15 +716,15 @@ def write_custody(folder, events, key=KEY):
 
 def test_custody_findings_are_exact_for_hand_made_logs(tmp_path):
     document = {"outcome": confirm.CONFIRMED, "survivors_sha256": "s"}
-    assert claims_audit.check_custody(tmp_path, document, KEY) == finding(
+    assert claims_audit.custodial(tmp_path, document, KEY) == finding(
         CUSTODY, "skipped", "custody_log.jsonl is not in the run"
     )
     write_custody(tmp_path, [("C", "sealed", {})])
-    assert claims_audit.check_custody(tmp_path, document, KEY) == finding(
+    assert claims_audit.custodial(tmp_path, document, KEY) == finding(
         CUSTODY, "fail", "outcome is confirmed but C has no open event"
     )
     other = {"outcome": "none", "survivors_sha256": "s"}
-    assert claims_audit.check_custody(tmp_path, other, KEY) == finding(
+    assert claims_audit.custodial(tmp_path, other, KEY) == finding(
         CUSTODY, "pass", "C not opened (outcome none)"
     )
     write_custody(
@@ -747,7 +734,7 @@ def test_custody_findings_are_exact_for_hand_made_logs(tmp_path):
             ("C", "selection_frozen", {"survivors_sha256": "s"}),
         ],
     )
-    assert claims_audit.check_custody(tmp_path, document, KEY) == finding(
+    assert claims_audit.custodial(tmp_path, document, KEY) == finding(
         CUSTODY, "fail", "no single selection_frozen before the open"
     )
 
@@ -760,18 +747,18 @@ def test_custody_pass_counts_entries_and_a_wrong_key_fails(tmp_path):
     ]
     log = write_custody(tmp_path, events)
     document = {"outcome": confirm.CONFIRMED, "survivors_sha256": "s"}
-    assert claims_audit.check_custody(tmp_path, document, KEY) == finding(
+    assert claims_audit.custodial(tmp_path, document, KEY) == finding(
         CUSTODY, "pass", f"{len(log.entries)} entries, chain verified"
     )
     with pytest.raises(errors.ScmleError) as caught:
-        sealed.OpenLog(tmp_path / claims_audit.CUSTODY_FILE, "wrong-key")
-    bad = claims_audit.check_custody(tmp_path, document, "wrong-key")
+        sealed.Journal(tmp_path / claims_audit.CUSTODY_FILE, "wrong-key")
+    bad = claims_audit.custodial(tmp_path, document, "wrong-key")
     assert bad == finding(CUSTODY, "fail", str(caught.value))
     decision = claims_audit.check_decision_files(tmp_path, "wrong-key")
     assert decision == finding(DECISION, "fail", str(caught.value))
     coverage = tmp_path / coverage_run.CLAIM_FILE
     coverage.write_text("{}", encoding="utf-8")
-    assert claims_audit.check_coverage_claim(tmp_path, "wrong-key") == finding(
+    assert claims_audit.corroborate(tmp_path, "wrong-key") == finding(
         COVERAGE, "fail", str(caught.value)
     )
     assert claims_audit.verify(tmp_path, "wrong-key").ok is False
@@ -796,7 +783,7 @@ def test_decision_files_registration_counts_and_joins_problems(tmp_path):
     names = decision_reports.DECISION_FILES
     for name in names[:3]:
         (folder / name).write_text(json.dumps({"n": name}), encoding="utf-8")
-    digests = decision_reports.file_digests(folder)
+    digests = decision_reports.hashsums(folder)
     write_custody(
         folder,
         [
@@ -855,28 +842,28 @@ def claim_registration(folder, claim, registrations=1):
 
 
 def test_coverage_claim_findings_are_exact(tmp_path):
-    assert claims_audit.check_coverage_claim(tmp_path, KEY) is None
+    assert claims_audit.corroborate(tmp_path, KEY) is None
     claim = {"levels": [0.9]}
     digest = claim_registration(tmp_path, claim)
-    assert claims_audit.check_coverage_claim(tmp_path, KEY) == finding(
+    assert claims_audit.corroborate(tmp_path, KEY) == finding(
         COVERAGE, "pass", "claim hash registered; the report names it"
     )
     report = tmp_path / coverage_run.REPORT_FILE
     report.write_text(json.dumps({"claim_sha256": digest}), encoding="utf-8")
-    assert claims_audit.check_coverage_claim(tmp_path, KEY).status == "pass"
+    assert claims_audit.corroborate(tmp_path, KEY).status == "pass"
     report.write_text(json.dumps({"claim_sha256": "x"}), encoding="utf-8")
-    assert claims_audit.check_coverage_claim(tmp_path, KEY) == finding(
+    assert claims_audit.corroborate(tmp_path, KEY) == finding(
         COVERAGE, "fail", "coverage_report.json: names another claim"
     )
     # Task 2.1: an unreadable report was reported as naming another claim.
     report.write_text("{bad", encoding="utf-8")
-    assert claims_audit.check_coverage_claim(tmp_path, KEY).detail.startswith(
+    assert claims_audit.corroborate(tmp_path, KEY).detail.startswith(
         "coverage_report.json: unreadable ("
     )
     (tmp_path / coverage_run.CLAIM_FILE).write_text(
         json.dumps({"levels": [0.5]}), encoding="utf-8"
     )
-    assert claims_audit.check_coverage_claim(tmp_path, KEY).detail.startswith(
+    assert claims_audit.corroborate(tmp_path, KEY).detail.startswith(
         "coverage_claim.json: differs from the registered hash; "
         "coverage_report.json: unreadable ("
     )
@@ -884,20 +871,20 @@ def test_coverage_claim_findings_are_exact(tmp_path):
 
 def test_coverage_claim_registration_counts(tmp_path):
     claim_registration(tmp_path, {"levels": [0.9]}, registrations=2)
-    assert claims_audit.check_coverage_claim(tmp_path, KEY) == finding(
+    assert claims_audit.corroborate(tmp_path, KEY) == finding(
         COVERAGE, "fail", "2 registrations in the custody log"
     )
     other = tmp_path / "other"
     other.mkdir()
     (other / coverage_run.CLAIM_FILE).write_text("{}", encoding="utf-8")
     write_custody(other, [("C", "sealed", {})])
-    assert claims_audit.check_coverage_claim(other, KEY) == finding(
+    assert claims_audit.corroborate(other, KEY) == finding(
         COVERAGE, "fail", "0 registrations in the custody log (no registration)"
     )
     bare = tmp_path / "bare"
     bare.mkdir()
     (bare / coverage_run.CLAIM_FILE).write_text("{}", encoding="utf-8")
-    assert claims_audit.check_coverage_claim(bare, KEY) == finding(
+    assert claims_audit.corroborate(bare, KEY) == finding(
         COVERAGE, "skipped", "custody_log.jsonl is not in the run"
     )
 
@@ -905,7 +892,7 @@ def test_coverage_claim_registration_counts(tmp_path):
 def test_a_coverage_report_without_its_claim_file_fails(tmp_path):
     (tmp_path / coverage_run.REPORT_FILE).write_text("{}", encoding="utf-8")
     write_custody(tmp_path, [("C", "sealed", {})])
-    found = claims_audit.check_coverage_claim(tmp_path, KEY)
+    found = claims_audit.corroborate(tmp_path, KEY)
     assert found.status == "fail"
     assert found.detail.startswith("coverage_claim.json: missing or unreadable")
     two = found.detail.split("; ")
@@ -915,33 +902,33 @@ def test_a_coverage_report_without_its_claim_file_fails(tmp_path):
 def test_coverage_confirmation_is_skipped_for_an_unevaluated_claim(tmp_path):
     name = "coverage claim on C: registered, recomputed, status matches"
     ledger = types.SimpleNamespace(claims={})
-    assert claims_audit.check_coverage_confirmation(tmp_path, ledger) is None
+    assert claims_audit.reconfirm(tmp_path, ledger) is None
     document = tmp_path / coverage_confirm.DOCUMENT
     document.write_text(
         json.dumps({"status": confirm.NOT_EVALUATED}), encoding="utf-8"
     )
-    assert claims_audit.check_coverage_confirmation(
-        tmp_path, ledger
-    ) == finding(name, "skipped", "the claim could not be tested on C")
+    assert claims_audit.reconfirm(tmp_path, ledger) == finding(
+        name, "skipped", "the claim could not be tested on C"
+    )
     document.write_text(json.dumps({"status": "x"}), encoding="utf-8")
-    assert claims_audit.check_coverage_confirmation(
-        tmp_path, ledger
-    ) == finding(name, "fail", "the claim is not registered in the ledger")
+    assert claims_audit.reconfirm(tmp_path, ledger) == finding(
+        name, "fail", "the claim is not registered in the ledger"
+    )
 
 
 def test_control_findings_are_exact(run):
-    ledger = claims_audit.read_ledger(run)
+    ledger = claims_audit.rehydrate(run)
     name = "negative control matches the ledger"
-    assert claims_audit.check_control(run, ledger) == finding(
+    assert claims_audit.witness(run, ledger) == finding(
         name, "pass", "hash equal"
     )
     path = run / claims_audit.CONTROL_FILE
     path.write_text(json.dumps({"changed": 1}), encoding="utf-8")
-    assert claims_audit.check_control(run, ledger) == finding(
+    assert claims_audit.witness(run, ledger) == finding(
         name, "fail", "the file differs from the ledger's control row"
     )
     path.unlink()
-    assert claims_audit.check_control(run, ledger) == finding(
+    assert claims_audit.witness(run, ledger) == finding(
         name, "skipped", "no control file or no control row"
     )
 
@@ -949,19 +936,19 @@ def test_control_findings_are_exact(run):
 def test_attestations_are_skipped_without_both_files(run, tmp_path):
     name = "causal attestations verify"
     expected = finding(name, "skipped", "no causal claims or charter file")
-    assert claims_audit.check_attestations(run, KEY) == expected
+    assert claims_audit.vouch(run, KEY) == expected
     (run / claims_audit.CAUSAL_FILE).write_text("{}", encoding="utf-8")
     (run / claims_audit.CHARTER_FILE).unlink()
-    assert claims_audit.check_attestations(run, KEY) == expected
+    assert claims_audit.vouch(run, KEY) == expected
     other = tmp_path / "other"
     other.mkdir()
     (other / claims_audit.CHARTER_FILE).write_text("{}", encoding="utf-8")
-    assert claims_audit.check_attestations(other, KEY) == expected
+    assert claims_audit.vouch(other, KEY) == expected
 
 
 def test_verify_reports_the_chain_step_exactly(run, tmp_path):
     result = claims_audit.verify(run, KEY)
-    ledger = claims_audit.read_ledger(run)
+    ledger = claims_audit.rehydrate(run)
     assert result.run_dir == str(run)
     assert result.findings[0] == finding(
         CHAIN, "pass", f"{len(ledger.rows)} rows, head {ledger.head[:12]}"
@@ -1003,9 +990,9 @@ def test_show_claim_reports_a_missing_or_present_check(run, monkeypatch):
         )
 
     monkeypatch.setattr(
-        claims_audit, "read_ledger", lambda folder: ledger_with(None)
+        claims_audit, "rehydrate", lambda folder: ledger_with(None)
     )
-    bare = claims_audit.show_claim(run, "h1")
+    bare = claims_audit.inspect(run, "h1")
     assert bare["exploration"] == {
         "decision": "d",
         "level": "0.5",
@@ -1014,18 +1001,16 @@ def test_show_claim_reports_a_missing_or_present_check(run, monkeypatch):
     assert bare["hypothesis"] == {"column": "c"}
     held = types.SimpleNamespace(to_dict=lambda: {"p": 1})
     monkeypatch.setattr(
-        claims_audit, "read_ledger", lambda folder: ledger_with(held)
+        claims_audit, "rehydrate", lambda folder: ledger_with(held)
     )
-    assert claims_audit.show_claim(run, "h1")["exploration"]["check"] == {
-        "p": 1
-    }
+    assert claims_audit.inspect(run, "h1")["exploration"]["check"] == {"p": 1}
 
 
 def test_registered_rows_of_an_unknown_kind_have_no_identification(tmp_path):
     ledger = types.SimpleNamespace(
         claims={"x": {"kind": "other"}}, confirmation=None
     )
-    row = claims_audit.registered_rows(tmp_path, ledger)[0]
+    row = claims_audit.enrolled(tmp_path, ledger)[0]
     assert row["identification"] is None
     assert row["tier"] == "unverified"
 
@@ -1037,12 +1022,12 @@ def test_baseline_report_problems_name_the_mismatched_registration(tmp_path):
             "cause": {"kind": "causal_primary", "sha256": "b" * 64},
         }
     )
-    assert claims_audit.baseline_report_problems(tmp_path, ledger) == []
+    assert claims_audit.misnamed(tmp_path, ledger) == []
     report = tmp_path / claims_audit.BASELINE_FILE
     report.write_text(json.dumps({"registration_hash": SHA}), encoding="utf-8")
-    assert claims_audit.baseline_report_problems(tmp_path, ledger) == []
+    assert claims_audit.misnamed(tmp_path, ledger) == []
     report.write_text(json.dumps({"registration_hash": "x"}), encoding="utf-8")
-    assert claims_audit.baseline_report_problems(tmp_path, ledger) == [
+    assert claims_audit.misnamed(tmp_path, ledger) == [
         "base: report names another registration"
     ]
 
@@ -1050,8 +1035,8 @@ def test_baseline_report_problems_name_the_mismatched_registration(tmp_path):
 def test_registered_claim_step_is_exact(tmp_path):
     name = "registered claims: files hash to the sealed ledger"
     registered_claim_run(tmp_path)
-    ledger = claims_audit.read_ledger(tmp_path)
-    document = claims_audit.read_claims(tmp_path)
+    ledger = claims_audit.rehydrate(tmp_path)
+    document = claims_audit.recall(tmp_path)
     assert claims_audit.check_registered(tmp_path, document, ledger) == (
         finding(name, "pass", "2 claim(s), 2 file(s) bound")
     )
@@ -1060,8 +1045,8 @@ def test_registered_claim_step_is_exact(tmp_path):
     registered_claim_run(bare, baseline_report=False, causal_report=False)
     plain = claims_audit.check_registered(
         bare,
-        claims_audit.read_claims(bare),
-        claims_audit.read_ledger(bare),
+        claims_audit.recall(bare),
+        claims_audit.rehydrate(bare),
     )
     assert plain == finding(
         name, "fail", "attachment hashes differ from the claims file"
@@ -1108,30 +1093,30 @@ def test_a_registered_coverage_claim_without_a_document_fails(tmp_path):
     (tmp_path / coverage_confirm.DOCUMENT).write_text(
         json.dumps({"status": confirm.NOT_EVALUATED}), encoding="utf-8"
     )
-    assert claims_audit.check_coverage_confirmation(
-        tmp_path, ledger
-    ) == finding(name, "fail", "a registered claim has no evaluation document")
+    assert claims_audit.reconfirm(tmp_path, ledger) == finding(
+        name, "fail", "a registered claim has no evaluation document"
+    )
 
 
 def test_attestations_of_a_causal_charter_without_attestors(run):
     name = "causal attestations verify"
     path = run / claims_audit.CHARTER_FILE
-    sealing.write_charter(path, causal_charter(), signing_key=KEY)
+    sealing.inscribe(path, causal_charter(), signing_key=KEY)
     (run / claims_audit.CAUSAL_FILE).write_text(
         json.dumps({"tier": "unverified"}), encoding="utf-8"
     )
-    assert claims_audit.check_attestations(run, KEY) == finding(
+    assert claims_audit.vouch(run, KEY) == finding(
         name, "pass", "0 attestation(s), none required"
     )
     bare = json.loads(path.read_text(encoding="utf-8"))["charter"]
     path.write_text(json.dumps(bare), encoding="utf-8")
-    assert claims_audit.check_attestations(run, KEY) == finding(
+    assert claims_audit.vouch(run, KEY) == finding(
         name, "pass", "0 attestation(s), none required"
     )
     (run / claims_audit.CAUSAL_FILE).write_text(
         json.dumps({"tier": "attested"}), encoding="utf-8"
     )
-    raised = claims_audit.check_attestations(run, KEY)
+    raised = claims_audit.vouch(run, KEY)
     assert raised == finding(
         name,
         "fail",
@@ -1143,18 +1128,18 @@ def test_attestations_of_a_causal_charter_without_attestors(run):
 def test_attestations_of_a_charter_without_a_causal_block(run):
     name = "causal attestations verify"
     (run / claims_audit.CAUSAL_FILE).write_text("{}", encoding="utf-8")
-    assert claims_audit.check_attestations(run, KEY) == finding(
+    assert claims_audit.vouch(run, KEY) == finding(
         name, "skipped", "the charter has no causal block"
     )
     path = run / claims_audit.CHARTER_FILE
     path.write_text(json.dumps({"charter": {"question": 1}}), encoding="utf-8")
-    broken = claims_audit.check_attestations(run, KEY)
+    broken = claims_audit.vouch(run, KEY)
     assert broken.name == name
     assert broken.status == "fail"
 
 
 def test_verify_passes_its_key_to_every_log_reading_step(run):
-    register_decision_files(run, FOUR)
+    notarize(run, FOUR)
     claim_registration(run, {"levels": [0.9]})
     (run / coverage_confirm.DOCUMENT).write_text(
         json.dumps({"status": confirm.NOT_EVALUATED}), encoding="utf-8"

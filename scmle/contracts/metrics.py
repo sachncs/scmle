@@ -131,7 +131,7 @@ class PositiveLabelMetric(Metric):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FunctionMetric(Metric):
+class Formula(Metric):
     """A metric defined by a user function of the true and predicted values.
 
     The function is pickled by reference into trial processes, so it must be

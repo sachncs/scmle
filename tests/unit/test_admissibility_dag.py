@@ -107,7 +107,7 @@ def test_backdoor_criterion_matches_the_definition(seed):
     others = [n for n in names if n not in (t, y)]
     for size in range(len(others) + 1):
         for z in itertools.combinations(others, size):
-            assert graph.backdoor_valid(t, y, z) == brute_backdoor(
+            assert graph.adjusts(t, y, z) == brute_backdoor(
                 names, graph.edges, t, y, z
             ), (edges, z)
 
@@ -126,10 +126,10 @@ def test_textbook_confounder_mediator_collider():
         "expert",
     )
     assert graph.adjustment_set("T", "Y") == ("C",)
-    assert graph.backdoor_valid("T", "Y", {"C"})
-    assert not graph.backdoor_valid("T", "Y", set())  # confounded
-    assert not graph.backdoor_valid("T", "Y", {"C", "M"})  # mediator
-    assert not graph.backdoor_valid("T", "Y", {"C", "K"})  # descendant
+    assert graph.adjusts("T", "Y", {"C"})
+    assert not graph.adjusts("T", "Y", set())  # confounded
+    assert not graph.adjusts("T", "Y", {"C", "M"})  # mediator
+    assert not graph.adjusts("T", "Y", {"C", "K"})  # descendant
     assert graph.candidates("T", "Y") == ["C"]
 
 
@@ -140,8 +140,8 @@ def test_m_bias_collider_is_not_adjusted_for_and_empty_set_is_valid():
         latent=["U1", "U2"],
     )
     assert graph.adjustment_set("T", "Y") == ()
-    assert not graph.backdoor_valid("T", "Y", {"Z"})
-    assert graph.backdoor_valid("T", "Y", set())
+    assert not graph.adjusts("T", "Y", {"Z"})
+    assert graph.adjusts("T", "Y", set())
 
 
 def test_no_adjustment_set_when_the_confounder_is_latent():
@@ -191,9 +191,9 @@ def test_separation_rejects_overlapping_or_unknown_sets():
     with pytest.raises(ValueError, match="not in the graph"):
         dag.separated(graph.nodes, graph.edges, ["a"], ["q"], [])
     with pytest.raises(ValueError, match="differ"):
-        graph.backdoor_valid("a", "a", [])
+        graph.adjusts("a", "a", [])
     with pytest.raises(ValueError, match="not nodes"):
-        graph.backdoor_valid("a", "b", ["q"])
+        graph.adjusts("a", "b", ["q"])
 
 
 def test_hash_is_stable_and_every_field_changes_it():

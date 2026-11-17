@@ -8,7 +8,7 @@ from scmle.data.ledger import confirm
 from scmle.evaluation import coverage_confirm
 from scmle.evaluation import task_gate
 
-CHOICE = coverage_confirm.primary_choice("regression")
+CHOICE = coverage_confirm.principal("regression")
 
 
 def test_the_primary_choice_is_fixed_by_the_task():
@@ -19,10 +19,10 @@ def test_the_primary_choice_is_fixed_by_the_task():
         "alpha": 0.05,
     }
     assert (
-        coverage_confirm.primary_choice("binary_classification")["method"]
+        coverage_confirm.principal("binary_classification")["method"]
         == "pooled"
     )
-    assert coverage_confirm.primary_choice("ranking") is None
+    assert coverage_confirm.principal("ranking") is None
 
 
 def test_the_p_value_is_the_exact_binomial_tail_above_the_floor():

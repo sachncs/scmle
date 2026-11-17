@@ -49,11 +49,11 @@ def mean_ndcg(
     Returns:
         The mean NDCG over the scorable queries, or NaN if there are none.
     """
-    values = per_query_ndcg(relevance, scores, queries, cutoff)[0]
+    values = ndcgs(relevance, scores, queries, cutoff)[0]
     return float(numpy.mean(values)) if values.size else float("nan")
 
 
-def per_query_ndcg(
+def ndcgs(
     relevance: numpy.ndarray,
     scores: numpy.ndarray,
     queries: Any,
@@ -91,7 +91,7 @@ def per_query_ndcg(
     return numpy.asarray(values, dtype=float), excluded
 
 
-def query_bootstrap_ndcg(
+def cumulate(
     relevance: numpy.ndarray,
     scores: numpy.ndarray,
     queries: Any,
@@ -119,7 +119,7 @@ def query_bootstrap_ndcg(
         scorable), the number of scored `queries` and the number
         `excluded` (queries with a single document or nothing relevant).
     """
-    values, excluded = per_query_ndcg(relevance, scores, queries, cutoff)
+    values, excluded = ndcgs(relevance, scores, queries, cutoff)
     if values.size == 0:
         nan = float("nan")
         return {
@@ -221,7 +221,7 @@ def mean_reciprocal_rank(
     return float(numpy.mean(values)) if values else float("nan")
 
 
-def precision_at(
+def topk(
     relevance: numpy.ndarray,
     scores: numpy.ndarray,
     queries: Any,
@@ -251,7 +251,7 @@ def precision_at(
     return float(numpy.mean(values)) if values else float("nan")
 
 
-def recall_at(
+def recall(
     relevance: numpy.ndarray,
     scores: numpy.ndarray,
     queries: Any,
@@ -283,8 +283,8 @@ FUNCTIONS = {
     "ndcg": mean_ndcg,
     "map": mean_average_precision,
     "mrr": mean_reciprocal_rank,
-    "precision_at_10": precision_at,
-    "recall_at_10": recall_at,
+    "precision_at_10": topk,
+    "recall_at_10": recall,
 }
 
 

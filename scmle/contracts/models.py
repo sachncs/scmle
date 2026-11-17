@@ -142,7 +142,7 @@ class Model(abc.ABC):
     auto_candidate: bool = True
     capabilities: Capabilities
     requires: tuple[str, ...] = ()
-    search_space: search.SearchSpace | None = None
+    search_space: search.Space | None = None
     conformance_params: Mapping[str, Any] | None = None
     monotonic_param: str | None = None
 
@@ -166,7 +166,7 @@ class Model(abc.ABC):
 
     def assemble(
         self,
-        plan: data.FeaturePlan,  # noqa: ARG002 -- overridden by meta-models
+        plan: data.Blueprint,  # noqa: ARG002 -- overridden by meta-models
         task: tasks.Task,  # noqa: ARG002 -- overridden by meta-models
         seed: int,  # noqa: ARG002 -- overridden by meta-models
         params: Mapping[str, Any] | None = None,  # noqa: ARG002 -- overridden

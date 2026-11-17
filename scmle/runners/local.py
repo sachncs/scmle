@@ -1,6 +1,6 @@
 """The local runner: the same job, in this process.
 
-The workload is a callable that receives a `JobContext`. It saves progress
+The workload is a callable that receives a `Context`. It saves progress
 with `context.step(n, state)`, and on a restart asks `context.resume()` for
 the last good checkpoint. `step` is also where this runner checks the cost
 budget and the timeout, and where an injected interruption (a stand-in for a
@@ -23,7 +23,7 @@ from scmle.runners import roles
 LOGGER = logging.getLogger(__name__)
 
 
-class JobInterruptedError(errors.ScmleError):
+class PreemptedError(errors.ScmleError):
     """The platform took the job away (preemption); retry from a checkpoint."""
 
 
@@ -32,7 +32,7 @@ class StoppedError(errors.ScmleError):
 
 
 @dataclasses.dataclass(slots=True)
-class JobContext:
+class Context:
     """What a workload sees.
 
     Attributes:
@@ -62,7 +62,7 @@ class JobContext:
     def step(self, number: int, state: Any) -> None:
         """Saves a checkpoint, then lets the supervisor act.
 
-        The hook may then raise `JobInterruptedError` (the platform interrupts
+        The hook may then raise `PreemptedError` (the platform interrupts
         after this step) or `StoppedError` (the budget or timeout stops the
         job).
 
@@ -83,7 +83,7 @@ class JobContext:
         self.store.put(f"runs/{self.run_id}/result.json", body)
 
 
-Workload = Callable[[JobContext], None]
+Workload = Callable[[Context], None]
 Interruption = Callable[[int, int], bool]
 
 
@@ -95,7 +95,7 @@ class Outcome:
         status: How the attempt ended.
     """
 
-    status: base.JobStatus
+    status: base.Status
 
 
 class Runner(base.Runner):
@@ -133,7 +133,7 @@ class Runner(base.Runner):
         self.interruptions = interruptions
         self.jobs: dict[str, Outcome] = {}
 
-    def submit(self, spec: base.Job, attempt: int) -> base.JobHandle:
+    def submit(self, spec: base.Job, attempt: int) -> base.Ticket:
         """Runs the workload to completion and remembers how it ended.
 
         An interruption becomes `INTERRUPTED`, a supervisor stop `CANCELLED`, a
@@ -148,7 +148,7 @@ class Runner(base.Runner):
         Returns:
             The handle of the finished attempt.
         """
-        handle = base.JobHandle(f"local-{spec.run_id}-{attempt}", attempt)
+        handle = base.Ticket(f"local-{spec.run_id}-{attempt}", attempt)
 
         def hook(step: int) -> None:
             """Lets the supervisor act after a checkpoint.
@@ -158,15 +158,15 @@ class Runner(base.Runner):
 
             Raises:
                 StoppedError: If the supervisor wants the job stopped.
-                JobInterruptedError: If the injected interruption strikes at
+                PreemptedError: If the injected interruption strikes at
                     this attempt and step.
             """
             if self.watcher() is not None:
                 raise StoppedError
             if self.interruptions and self.interruptions(attempt, step):
-                raise JobInterruptedError
+                raise PreemptedError
 
-        context = JobContext(
+        context = Context(
             roles.RoleStore(self.store, roles.TRAINING_ROLE),
             spec.run_id,
             attempt,
@@ -176,26 +176,26 @@ class Runner(base.Runner):
         )
         try:
             self.workload(context)
-            status = base.JobStatus(base.JobState.SUCCEEDED)
-        except JobInterruptedError:
+            status = base.Status(base.State.SUCCEEDED)
+        except PreemptedError:
             # handled: interruption recorded as INTERRUPTED job status
-            status = base.JobStatus(base.JobState.INTERRUPTED, "interrupted")
+            status = base.Status(base.State.INTERRUPTED, "interrupted")
         except StoppedError:
             # handled: supervisor stop recorded as CANCELLED job status
-            status = base.JobStatus(base.JobState.CANCELLED, "stopped")
+            status = base.Status(base.State.CANCELLED, "stopped")
         except retry.TransientError as error:
             # handled: transient error recorded as retryable FAILED status
-            status = base.JobStatus(
-                base.JobState.FAILED, f"transient: {error}", retryable=True
+            status = base.Status(
+                base.State.FAILED, f"transient: {error}", retryable=True
             )
         except Exception as error:
             LOGGER.exception("job %s failed", handle.job_id)
             reason = errors.Failure.of(error).text[:300]
-            status = base.JobStatus(base.JobState.FAILED, reason)
+            status = base.Status(base.State.FAILED, reason)
         self.jobs[handle.job_id] = Outcome(status)
         return handle
 
-    def poll(self, handle: base.JobHandle) -> base.JobStatus:
+    def poll(self, handle: base.Ticket) -> base.Status:
         """Reports the remembered outcome.
 
         Args:
@@ -206,7 +206,7 @@ class Runner(base.Runner):
         """
         return self.jobs[handle.job_id].status
 
-    def cancel(self, handle: base.JobHandle, reason: str) -> None:
+    def cancel(self, handle: base.Ticket, reason: str) -> None:
         """Does nothing: the attempt already ended.
 
         Args:

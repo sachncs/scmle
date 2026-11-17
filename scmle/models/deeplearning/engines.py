@@ -243,7 +243,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         batch_rows = (
             training_rows
             if second_order
-            else scmle.models.deeplearning.training.resolve_batch_size(
+            else scmle.models.deeplearning.training.batching(
                 self.batch_size, training_rows
             )
         )
@@ -290,7 +290,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
             step: Optimizer updates taken so far.
             plan: The run's update plan.
         """
-        rate = scmle.models.deeplearning.training.learning_rate_at(
+        rate = scmle.models.deeplearning.training.anneal(
             step,
             plan.total_steps,
             self.learning_rate,
@@ -429,7 +429,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
             "y": torch.from_numpy(encoded).to(device),
             "w": torch.from_numpy(weights.astype(numpy.float32)).to(device),
         }
-        optimizer = self.new_optimizer(torch, network)
+        optimizer = self.instantiate(torch, network)
         plan = self.apportion(len(training))
         monitor = scmle.models.deeplearning.training.Monitor()
         generator = numpy.random.default_rng(self.random_state + 1)
@@ -497,7 +497,7 @@ class Trainer(base.BaseEstimator, abc.ABC):  # type: ignore[misc]  # scikit-lear
         if self.accumulation_steps < 1:
             raise errors.ConfigError("accumulation_steps must be at least 1")
 
-    def new_optimizer(self, torch: Any, network: Any) -> Any:
+    def instantiate(self, torch: Any, network: Any) -> Any:
         """Creates the configured optimizer for the network's parameters.
 
         Args:

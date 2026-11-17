@@ -10,13 +10,13 @@ from scmle.evaluation import cv_plus
 
 
 def test_disjoint_folds_give_the_fold_of_each_row_in_score_order():
-    folds = cv_plus.partition_folds([[0, 3], [1, 4], [2]], 5)
+    folds = cv_plus.holdouts([[0, 3], [1, 4], [2]], 5)
     assert folds.tolist() == [0, 0, 1, 1, 2]
 
 
 @pytest.mark.parametrize("held", [[[0, 1], [1, 2]], [[0, 1], [5]], [[0], [-1]]])
 def test_overlapping_or_foreign_positions_give_no_partition(held):
-    assert cv_plus.partition_folds(held, 3) is None
+    assert cv_plus.holdouts(held, 3) is None
 
 
 def fitted(shift):
@@ -34,7 +34,7 @@ def test_interval_matches_the_bounds_function_on_the_same_inputs():
     predictions = numpy.column_stack(
         [m.predict(frame.to_numpy()) for m in models]
     )
-    want = conformal.cv_plus_bounds(predictions, fold_of_row, residuals, 0.8)
+    want = conformal.cvplus(predictions, fold_of_row, residuals, 0.8)
     assert numpy.allclose(lower, want[0]) and numpy.allclose(upper, want[1])
     assert (lower < upper).all()
 
@@ -55,7 +55,7 @@ def test_serialized_size_is_positive():
 
 def test_from_a_thousand_rows_the_scores_are_pooled_out_of_fold():
     held = [list(range(i, 1200, 4)) for i in range(4)]
-    plan = cv_plus.plan_scores(held, 1200, 1200, [object()] * 4)
+    plan = cv_plus.strategize(held, 1200, 1200, [object()] * 4)
 
     assert plan.mode == cv_plus.POOLED
     assert plan.folds is None
@@ -64,7 +64,7 @@ def test_from_a_thousand_rows_the_scores_are_pooled_out_of_fold():
 
 def test_below_a_thousand_rows_with_disjoint_folds_the_fold_models_are_kept():
     held = [list(range(i, 200, 4)) for i in range(4)]
-    plan = cv_plus.plan_scores(held, 200, 200, [object()] * 4)
+    plan = cv_plus.strategize(held, 200, 200, [object()] * 4)
 
     assert plan.mode == cv_plus.FOLD_MODELS
     assert plan.folds.tolist() == [
@@ -74,7 +74,7 @@ def test_below_a_thousand_rows_with_disjoint_folds_the_fold_models_are_kept():
 
 
 def test_overlapping_folds_fall_back_to_the_pooled_scores():
-    plan = cv_plus.plan_scores([[0, 1], [1, 2]], 3, 4, [])
+    plan = cv_plus.strategize([[0, 1], [1, 2]], 3, 4, [])
     assert plan.mode == cv_plus.POOLED
     assert "overlap" in plan.reason
 
@@ -84,8 +84,8 @@ def test_a_model_set_above_the_cap_is_not_kept_and_the_cap_is_a_parameter():
     models = [fitted(float(i)) for i in range(4)]
     size = cv_plus.serialized_size(models)
 
-    small = cv_plus.plan_scores(held, 200, 200, models, max_bytes=size - 1)
-    large = cv_plus.plan_scores(held, 200, 200, models, max_bytes=size)
+    small = cv_plus.strategize(held, 200, 200, models, max_bytes=size - 1)
+    large = cv_plus.strategize(held, 200, 200, models, max_bytes=size)
 
     assert small.mode == cv_plus.POOLED and str(size - 1) in small.reason
     assert large.mode == cv_plus.FOLD_MODELS

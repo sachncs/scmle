@@ -48,10 +48,10 @@ def test_audio_wav_ingestion_preserves_identity_and_profile():
 
 def test_audio_non_wav_requires_explicit_probe():
     """Unknown containers do not silently acquire a codec dependency."""
-    with pytest.raises(audio.AudioDependencyError):
+    with pytest.raises(audio.DecoderError):
         audio.Sample.from_bytes(b"opaque-audio", source="clip.flac")
 
-    with pytest.raises(audio.AudioDependencyError):
+    with pytest.raises(audio.DecoderError):
         audio.Sample.from_bytes(
             b"opaque-audio",
             source="clip.flac",
@@ -64,7 +64,7 @@ def test_audio_dataset_rejects_duplicate_sources():
     first = audio.Sample.from_bytes(wav_bytes(), source="one.wav")
     duplicate = audio.Sample.from_bytes(wav_bytes(), source="one.wav")
 
-    with pytest.raises(audio.AudioValidationError, match="duplicate sources"):
+    with pytest.raises(audio.ValidationError, match="duplicate sources"):
         audio.Dataset((first, duplicate))
 
 
@@ -101,8 +101,8 @@ def test_audio_transcript_provenance_is_bounded_and_curated():
         provider_version="2026.10",
         language="en",
         segments=(
-            audio.TranscriptSegment(0.0, 0.5, "hello", 0.9),
-            audio.TranscriptSegment(0.5, 1.0, "world", 0.8),
+            audio.Segment(0.0, 0.5, "hello", 0.9),
+            audio.Segment(0.5, 1.0, "world", 0.8),
         ),
         confidence=0.85,
     )
@@ -130,7 +130,7 @@ def test_audio_transcript_confidence_and_timing_fail_closed():
         provider="acme-asr",
         provider_version="2026.10",
         language="en",
-        segments=(audio.TranscriptSegment(0.0, 0.5, "hello"),),
+        segments=(audio.Segment(0.0, 0.5, "hello"),),
     )
     report = audio.Dataset(
         (
@@ -149,9 +149,9 @@ def test_audio_transcript_confidence_and_timing_fail_closed():
         provider="acme-asr",
         provider_version="2026.10",
         language="en",
-        segments=(audio.TranscriptSegment(0.0, 2.0, "too long"),),
+        segments=(audio.Segment(0.0, 2.0, "too long"),),
     )
-    with pytest.raises(audio.AudioValidationError, match="exceeds audio"):
+    with pytest.raises(audio.ValidationError, match="exceeds audio"):
         audio.Sample.from_bytes(
             wav_bytes(), source="bad.wav", transcript=out_of_range
         )
@@ -215,7 +215,7 @@ def test_audio_feature_preparation_requires_a_wav_decoder():
         b"opaque-audio", source="clip.flac", probe=flac_probe
     )
 
-    with pytest.raises(audio.AudioDependencyError, match="WAV decoder"):
+    with pytest.raises(audio.DecoderError, match="WAV decoder"):
         audio.Dataset((sample,)).prepare_features()
 
 
@@ -282,8 +282,8 @@ def test_video_curation_records_explicit_audio_video_synchronization():
 
     report = video.Dataset((sample,)).curate()
 
-    assert metadata.synchronization_status == "within_tolerance"
-    assert sample.profile().synchronization_status == "within_tolerance"
+    assert metadata.synchrony == "within_tolerance"
+    assert sample.profile().synchrony == "within_tolerance"
     assert report.profile["synchronization_statuses"] == [
         "within_tolerance",
     ]
@@ -466,7 +466,7 @@ def test_video_metadata_features_are_numeric_and_decoder_free():
         b"video-bytes", metadata, source="sample.mp4"
     )
 
-    prepared = video.Dataset((sample,)).prepare_metadata_features()
+    prepared = video.Dataset((sample,)).numerize()
 
     assert prepared.shape == (1, 10)
     assert prepared.feature_names[:5] == (
@@ -489,7 +489,7 @@ def test_video_metadata_features_preserve_sample_order():
         b"two", video.Metadata("mp4", 4, 2, 4, 2.0, "h264"), "two.mp4"
     )
 
-    prepared = video.Dataset((first, second)).prepare_metadata_features()
+    prepared = video.Dataset((first, second)).numerize()
 
     assert prepared.sources[0].endswith("/one.mp4")
     assert prepared.sources[1].endswith("/two.mp4")
@@ -509,7 +509,7 @@ def test_video_frame_features_use_a_bounded_explicit_decoder():
         calls.append(frame_index)
         return numpy.full((2, 2, 3), frame_index, dtype=numpy.uint8)
 
-    prepared = video.Dataset((sample,)).prepare_frame_features(
+    prepared = video.Dataset((sample,)).summarize(
         decoder, max_frames=3, max_frame_pixels=32
     )
 
@@ -529,8 +529,8 @@ def test_video_frame_features_reject_oversized_decoded_frames():
         b"video-bytes", metadata, source="sample.mp4"
     )
 
-    with pytest.raises(video.VideoValidationError, match="pixel limit"):
-        video.Dataset((sample,)).prepare_frame_features(
+    with pytest.raises(video.VideoError, match="pixel limit"):
+        video.Dataset((sample,)).summarize(
             lambda payload, frame_index: numpy.zeros((8, 8), dtype=numpy.uint8),
             max_frame_pixels=16,
         )
@@ -601,10 +601,10 @@ def test_geospatial_feature_collection_preserves_bounds_and_crs():
 
 def test_geospatial_identity_binds_crs_and_ignores_feature_order():
     """Equivalent features share identity only when their CRS also matches."""
-    first_feature = geospatial.GeoFeature(
+    first_feature = geospatial.Placemark(
         "first", {"type": "Point", "coordinates": [0, 0]}
     )
-    second_feature = geospatial.GeoFeature(
+    second_feature = geospatial.Placemark(
         "second", {"type": "Point", "coordinates": [1, 1]}
     )
     first = geospatial.Dataset(
@@ -626,12 +626,12 @@ def test_geospatial_identity_binds_labels_and_properties():
     """Feature metadata changes produce a new immutable dataset identity."""
     geometry = {"type": "Point", "coordinates": [0, 0]}
     baseline = geospatial.Dataset(
-        (geospatial.GeoFeature("feature", geometry, {"kind": "park"}, "open"),),
+        (geospatial.Placemark("feature", geometry, {"kind": "park"}, "open"),),
         crs="EPSG:4326",
     )
     changed_label = geospatial.Dataset(
         (
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "feature", geometry, {"kind": "park"}, "closed"
             ),
         ),
@@ -639,7 +639,7 @@ def test_geospatial_identity_binds_labels_and_properties():
     )
     changed_property = geospatial.Dataset(
         (
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "feature", geometry, {"kind": "school"}, "open"
             ),
         ),
@@ -656,10 +656,10 @@ def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
     """A caller predicate produces deterministic, hash-bound join evidence."""
     left = geospatial.Dataset(
         (
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "left-a", {"type": "Point", "coordinates": [0, 0]}
             ),
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "left-b", {"type": "Point", "coordinates": [10, 0]}
             ),
         ),
@@ -667,10 +667,10 @@ def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
     )
     right = geospatial.Dataset(
         (
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "right-a", {"type": "Point", "coordinates": [1, 0]}
             ),
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "right-b", {"type": "Point", "coordinates": [20, 0]}
             ),
         ),
@@ -688,7 +688,7 @@ def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
     assert report.match_count == 1
     assert report.unmatched_left_count == 1
     assert report.unmatched_right_count == 1
-    assert report.matches == (geospatial.SpatialJoinMatch("left-a", "right-a"),)
+    assert report.matches == (geospatial.Match("left-a", "right-a"),)
     assert report.left_dataset_hash == left.content_hash
     assert report.right_dataset_hash == right.content_hash
     assert report.to_dict()["predicate_name"] == "centroid_distance_lt_5/v1"
@@ -696,25 +696,23 @@ def test_geospatial_spatial_join_records_bounded_same_crs_evidence():
 
 def test_geospatial_spatial_join_rejects_crs_mismatch_and_unbounded_work():
     """Joins fail closed instead of comparing incompatible or huge inputs."""
-    feature = geospatial.GeoFeature(
+    feature = geospatial.Placemark(
         "feature", {"type": "Point", "coordinates": [0, 0]}
     )
     left = geospatial.Dataset((feature,), crs="EPSG:4326")
     right = geospatial.Dataset((feature,), crs="EPSG:3857")
 
-    with pytest.raises(
-        geospatial.GeospatialValidationError, match="matching CRS"
-    ):
+    with pytest.raises(geospatial.GeometryError, match="matching CRS"):
         left.spatial_join(right, lambda first, second: True, "always/v1")
 
     with pytest.raises(
-        geospatial.GeospatialValidationError,
+        geospatial.GeometryError,
         match="comparison limit",
     ):
         left.spatial_join(
             geospatial.Dataset(
                 tuple(
-                    geospatial.GeoFeature(
+                    geospatial.Placemark(
                         f"right-{index}",
                         {"type": "Point", "coordinates": [index, 0]},
                     )
@@ -730,13 +728,13 @@ def test_geospatial_spatial_join_rejects_crs_mismatch_and_unbounded_work():
 
 def test_geospatial_spatial_join_rejects_invalid_predicate_output():
     """Join evidence cannot encode an ambiguous predicate result."""
-    feature = geospatial.GeoFeature(
+    feature = geospatial.Placemark(
         "feature", {"type": "Point", "coordinates": [0, 0]}
     )
     dataset = geospatial.Dataset((feature,), crs="EPSG:4326")
 
     with pytest.raises(
-        geospatial.GeospatialValidationError,
+        geospatial.GeometryError,
         match="must return a boolean",
     ):
         dataset.spatial_join(dataset, lambda first, second: "yes", "bad/v1")
@@ -747,7 +745,7 @@ def test_geospatial_reprojection_records_source_and_target_identity():
     observation_time = datetime(2026, 1, 1, tzinfo=UTC)
     dataset = geospatial.Dataset(
         (
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "feature",
                 {"type": "Point", "coordinates": [1, 2]},
                 {"kind": "park"},
@@ -759,11 +757,11 @@ def test_geospatial_reprojection_records_source_and_target_identity():
     )
 
     def transform(
-        feature: geospatial.GeoFeature, source_crs: str, target_crs: str
-    ) -> geospatial.GeoFeature:
+        feature: geospatial.Placemark, source_crs: str, target_crs: str
+    ) -> geospatial.Placemark:
         assert source_crs == "EPSG:4326"
         assert target_crs == "EPSG:3857"
-        return geospatial.GeoFeature(
+        return geospatial.Placemark(
             feature.feature_id,
             {
                 "type": "Point",
@@ -789,7 +787,7 @@ def test_geospatial_reprojection_records_source_and_target_identity():
 
 def test_geospatial_reprojection_rejects_metadata_changes():
     """A transformer cannot silently alter labels or feature ownership."""
-    feature = geospatial.GeoFeature(
+    feature = geospatial.Placemark(
         "feature",
         {"type": "Point", "coordinates": [0, 0]},
         label="open",
@@ -797,9 +795,9 @@ def test_geospatial_reprojection_rejects_metadata_changes():
     dataset = geospatial.Dataset((feature,), crs="EPSG:4326")
 
     def changes_label(
-        value: geospatial.GeoFeature, source_crs: str, target_crs: str
-    ) -> geospatial.GeoFeature:
-        return geospatial.GeoFeature(
+        value: geospatial.Placemark, source_crs: str, target_crs: str
+    ) -> geospatial.Placemark:
+        return geospatial.Placemark(
             value.feature_id,
             value.geometry,
             dict(value.properties),
@@ -807,7 +805,7 @@ def test_geospatial_reprojection_rejects_metadata_changes():
         )
 
     with pytest.raises(
-        geospatial.GeospatialValidationError,
+        geospatial.GeometryError,
         match="changed feature metadata",
     ):
         dataset.reproject("EPSG:3857", changes_label, "bad/v1")
@@ -815,8 +813,8 @@ def test_geospatial_reprojection_rejects_metadata_changes():
 
 def test_geospatial_rejects_invalid_geometry():
     """Malformed geometry is rejected before it reaches feature preparation."""
-    with pytest.raises(geospatial.GeospatialValidationError):
-        geospatial.GeoFeature(
+    with pytest.raises(geospatial.GeometryError):
+        geospatial.Placemark(
             "broken", {"type": "Point", "coordinates": [float("nan"), 1]}
         )
 
@@ -848,14 +846,12 @@ def test_geospatial_curation_reports_mixed_label_state():
     """Spatial curation exposes mixed labels before spatial modelling."""
     dataset = geospatial.Dataset(
         (
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "a",
                 {"type": "Point", "coordinates": [0, 0]},
                 label="park",
             ),
-            geospatial.GeoFeature(
-                "b", {"type": "Point", "coordinates": [1, 1]}
-            ),
+            geospatial.Placemark("b", {"type": "Point", "coordinates": [1, 1]}),
         ),
         crs="EPSG:4326",
     )
@@ -875,7 +871,7 @@ def test_geospatial_curation_records_deterministic_spatial_autocorrelation():
     """Numeric labels expose bounded spatial-dependence evidence."""
     dataset = geospatial.Dataset(
         tuple(
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 f"feature-{index}",
                 {"type": "Point", "coordinates": [float(index), 0]},
                 label=float(index // 2),
@@ -907,7 +903,7 @@ def test_geospatial_curation_records_deterministic_spatial_autocorrelation():
 def test_spatial_autocorrelation_rejects_non_numeric_and_constant_values():
     """Spatial dependence requires an estimable numeric variable."""
     features = tuple(
-        geospatial.GeoFeature(
+        geospatial.Placemark(
             f"feature-{index}",
             {"type": "Point", "coordinates": [float(index), 0]},
             label="same",
@@ -916,19 +912,17 @@ def test_spatial_autocorrelation_rejects_non_numeric_and_constant_values():
     )
     dataset = geospatial.Dataset(features, crs="EPSG:3857")
 
-    with pytest.raises(geospatial.GeospatialValidationError, match="numeric"):
+    with pytest.raises(geospatial.GeometryError, match="numeric"):
         dataset.spatial_autocorrelation()
 
-    with pytest.raises(
-        geospatial.GeospatialValidationError, match="more than one unique"
-    ):
+    with pytest.raises(geospatial.GeometryError, match="more than one unique"):
         dataset.spatial_autocorrelation(values=[1.0, 1.0, 1.0])
 
 
 def test_geospatial_spatial_split_keeps_blocks_together():
     """Spatial blocks remain isolated across train and evaluation data."""
     features = tuple(
-        geospatial.GeoFeature(
+        geospatial.Placemark(
             f"feature-{index}",
             {"type": "Point", "coordinates": [float(index * 10), 0]},
             label="class",
@@ -937,14 +931,14 @@ def test_geospatial_spatial_split_keeps_blocks_together():
     )
     dataset = geospatial.Dataset(features, crs="EPSG:3857")
 
-    first = dataset.split_spatial(
+    first = dataset.tile(
         block_size=5, validation_fraction=0.25, test_fraction=0.25, seed=3
     )
-    second = dataset.split_spatial(
+    second = dataset.tile(
         block_size=5, validation_fraction=0.25, test_fraction=0.25, seed=3
     )
 
-    block_assignments = first.block_ids()
+    block_assignments = first.tiles()
     blocks = [set(values) for values in block_assignments.values()]
     assert len(set().union(*blocks)) == 6
     assert first == second
@@ -955,10 +949,10 @@ def test_geospatial_boundary_leakage_reports_conservative_envelope_crossings():
     """Bounds crossing blocks are surfaced before centroid-based splitting."""
     dataset = geospatial.Dataset(
         (
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "point", {"type": "Point", "coordinates": [0, 0]}
             ),
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "line",
                 {"type": "LineString", "coordinates": [[0, 0], [2.2, 0]]},
             ),
@@ -966,9 +960,7 @@ def test_geospatial_boundary_leakage_reports_conservative_envelope_crossings():
         crs="EPSG:3857",
     )
 
-    evidence = dataset.boundary_leakage(
-        block_size=1.0, max_blocks_per_feature=2
-    )
+    evidence = dataset.straddle(block_size=1.0, max_blocks_per_feature=2)
 
     assert evidence.status == "potential_leakage"
     assert evidence.crossing_feature_ids == ("line",)
@@ -980,7 +972,7 @@ def test_geospatial_boundary_leakage_reports_conservative_envelope_crossings():
 def test_geospatial_temporal_split_normalizes_time_and_curates_coverage():
     """Observation times support UTC-safe future evaluation evidence."""
     features = tuple(
-        geospatial.GeoFeature(
+        geospatial.Placemark(
             f"feature-{index}",
             {"type": "Point", "coordinates": [float(index), 0]},
             observation_time=timestamp,
@@ -1012,12 +1004,12 @@ def test_geospatial_temporal_state_fails_closed_when_incomplete():
     """Missing or malformed observation times remain explicit before splitting."""
     mixed = geospatial.Dataset(
         (
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "timed",
                 {"type": "Point", "coordinates": [0, 0]},
                 observation_time=datetime(2026, 1, 1, tzinfo=UTC),
             ),
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "untimed", {"type": "Point", "coordinates": [1, 1]}
             ),
         ),
@@ -1033,11 +1025,9 @@ def test_geospatial_temporal_state_fails_closed_when_incomplete():
         "untimed_feature_count": 1,
     }
     assert "quality.geospatial-mixed-temporal-state" in quality_ids
-    with pytest.raises(
-        geospatial.GeospatialTemporalError, match="every feature"
-    ):
+    with pytest.raises(geospatial.TemporalError, match="every feature"):
         mixed.split_temporal("2026-01-02T00:00:00Z")
-    with pytest.raises(geospatial.GeospatialTemporalError, match="timezone"):
+    with pytest.raises(geospatial.TemporalError, match="timezone"):
         geospatial.canonical_observation_time("2026-01-01T00:00:00")
 
 
@@ -1045,10 +1035,10 @@ def test_geospatial_feature_preparation_preserves_crs_units():
     """Geometry envelopes are prepared only after CRS provenance exists."""
     dataset = geospatial.Dataset(
         (
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "point", {"type": "Point", "coordinates": [2, 1]}
             ),
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "line",
                 {"type": "LineString", "coordinates": [[-3, 4], [5, -2]]},
             ),
@@ -1066,7 +1056,7 @@ def test_geospatial_feature_preparation_preserves_crs_units():
 
 def test_geospatial_raw_axis_mask_preserves_nested_geometry_structure():
     """Raw-coordinate masking preserves geometry type and untouched axes."""
-    feature = geospatial.GeoFeature(
+    feature = geospatial.Placemark(
         "collection",
         {
             "type": "GeometryCollection",
@@ -1080,7 +1070,7 @@ def test_geospatial_raw_axis_mask_preserves_nested_geometry_structure():
         },
     )
 
-    masked = feature.masked_geometry_axis(0, 0.5)
+    masked = feature.substituted(0, 0.5)
 
     assert masked.geometry["type"] == "GeometryCollection"
     geometries = masked.geometry["geometries"]
@@ -1091,32 +1081,32 @@ def test_geospatial_raw_axis_mask_preserves_nested_geometry_structure():
 
 def test_geospatial_raw_axis_mask_rejects_invalid_axis():
     """Only x and y axes may be perturbed by the raw evidence policy."""
-    feature = geospatial.GeoFeature(
+    feature = geospatial.Placemark(
         "point", {"type": "Point", "coordinates": [2, 1]}
     )
 
     with pytest.raises(ValueError, match="axis"):
-        feature.masked_geometry_axis(2, 0.0)
+        feature.substituted(2, 0.0)
 
 
 def test_geospatial_feature_preparation_rejects_missing_crs():
     """Coordinates cannot become model features without a reference CRS."""
     dataset = geospatial.Dataset(
         (
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 "point", {"type": "Point", "coordinates": [0, 0]}
             ),
         )
     )
 
-    with pytest.raises(geospatial.GeospatialValidationError, match="CRS"):
+    with pytest.raises(geospatial.GeometryError, match="CRS"):
         dataset.prepare_features()
 
 
 def test_raster_identity_requires_spatial_metadata():
     """Raster bytes are not useful without dimensions and CRS provenance."""
     payload = b"raster"
-    raster = geospatial.RasterSample(
+    raster = geospatial.Tile(
         source="memory://raster",
         encoded_bytes=payload,
         file_hash=hashlib.sha256(payload).hexdigest(),
@@ -1135,7 +1125,7 @@ def test_raster_identity_requires_spatial_metadata():
 def test_raster_decoder_is_bounded_and_shape_checked():
     """Raster decoding preserves metadata and enforces the pixel budget."""
     payload = b"raster"
-    raster = geospatial.RasterSample(
+    raster = geospatial.Tile(
         source="memory://raster",
         encoded_bytes=payload,
         file_hash=hashlib.sha256(payload).hexdigest(),
@@ -1162,7 +1152,7 @@ def test_raster_decoder_is_bounded_and_shape_checked():
         == 0.0
     )
 
-    with pytest.raises(geospatial.GeospatialValidationError, match="limit"):
+    with pytest.raises(geospatial.GeometryError, match="limit"):
         raster.decode(
             lambda value: numpy.zeros((3, 2, 2), dtype=numpy.uint8),
             max_pixels=11,
@@ -1172,7 +1162,7 @@ def test_raster_decoder_is_bounded_and_shape_checked():
 def test_raster_decoder_rejects_metadata_mismatch():
     """A caller-owned decoder cannot override declared raster dimensions."""
     payload = b"raster"
-    raster = geospatial.RasterSample(
+    raster = geospatial.Tile(
         source="memory://raster",
         encoded_bytes=payload,
         file_hash=hashlib.sha256(payload).hexdigest(),
@@ -1184,7 +1174,5 @@ def test_raster_decoder_rejects_metadata_mismatch():
         transform=(1, 0, 0, 0, -1, 0),
     )
 
-    with pytest.raises(
-        geospatial.GeospatialValidationError, match="dimensions"
-    ):
+    with pytest.raises(geospatial.GeometryError, match="dimensions"):
         raster.decode(lambda value: numpy.zeros((2, 2), dtype=numpy.uint8))

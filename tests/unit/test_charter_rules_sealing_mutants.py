@@ -59,7 +59,7 @@ def test_the_band_must_be_positive_and_finite():
 
 def test_a_written_charter_is_sorted_indented_and_in_a_new_folder(tmp_path):
     path = tmp_path / "a" / "b" / "charter.json"
-    written = sealing.write_charter(path, make_charter(), signing_key="k")
+    written = sealing.inscribe(path, make_charter(), signing_key="k")
     assert written == path
     text = path.read_text(encoding="utf-8")
     record = json.loads(text)
@@ -71,15 +71,15 @@ def test_a_written_charter_is_sorted_indented_and_in_a_new_folder(tmp_path):
 def test_an_amendment_that_loosens_any_one_of_the_three_is_refused():
     old = make_charter()
     same = make_charter()
-    sealing.check_amendment(old, same)
-    sealing.check_amendment(old, make_charter(k_max=old.k_max - 1))
+    sealing.permit(old, same)
+    sealing.permit(old, make_charter(k_max=old.k_max - 1))
     for loosened in (
         make_charter(k_max=old.k_max + 1),
         make_charter(question="Another question?"),
         make_charter(seed=99),
     ):
         with pytest.raises(Exception) as caught:
-            sealing.check_amendment(old, loosened)
+            sealing.permit(old, loosened)
         assert str(caught.value) == (
             "an amendment may only tighten the budget (smaller alpha_confirm,"
             " K_max or exploration wealth); everything else must be unchanged"
@@ -95,13 +95,13 @@ def test_an_amendment_may_tighten_alpha_or_wealth_but_not_loosen_either():
         budget.ErrorBudget.create(0.05, 0.05),
         budget.ErrorBudget.create(0.04, 0.05),
     ):
-        sealing.check_amendment(old, make_charter(error_budget=tighter))
+        sealing.permit(old, make_charter(error_budget=tighter))
     for looser in (
         budget.ErrorBudget.create(0.06, 0.1),
         budget.ErrorBudget.create(0.05, 0.2),
     ):
         with pytest.raises(Exception, match="may only tighten"):
-            sealing.check_amendment(old, make_charter(error_budget=looser))
+            sealing.permit(old, make_charter(error_budget=looser))
 
 
 def test_an_amendment_that_changes_another_budget_field_is_refused():
@@ -112,7 +112,7 @@ def test_an_amendment_that_changes_another_budget_field_is_refused():
         )
     )
     with pytest.raises(Exception, match="may only tighten"):
-        sealing.check_amendment(old, other)
+        sealing.permit(old, other)
 
 
 def test_read_verified_reports_signed_or_not_with_the_recomputed_hash(
@@ -126,7 +126,7 @@ def test_read_verified_reports_signed_or_not_with_the_recomputed_hash(
     assert plain.charter == charter
     assert plain.charter_hash == charter.charter_hash
     assert plain.signed is False
-    signed_path = sealing.write_charter(tmp_path / "s.json", charter, "k")
+    signed_path = sealing.inscribe(tmp_path / "s.json", charter, "k")
     signed = sealing.read_verified(signed_path, signing_key="k")
     assert signed.charter == charter and signed.signed is True
     assert signed.charter_hash == charter.charter_hash
@@ -137,7 +137,7 @@ def test_read_verified_reports_signed_or_not_with_the_recomputed_hash(
 
 def test_the_format_errors_name_the_file(tmp_path):
     charter = make_charter()
-    path = sealing.write_charter(tmp_path / "c.json", charter, "k")
+    path = sealing.inscribe(tmp_path / "c.json", charter, "k")
     record = json.loads(path.read_text())
     record["format"] = 99
     path.write_text(json.dumps(record))
@@ -170,7 +170,7 @@ def test_a_signed_charter_read_without_a_key_is_unsigned_not_an_error(
 ):
     monkeypatch.delenv("SCMLE_SIGNING_KEY", raising=False)
     charter = make_charter()
-    path = sealing.write_charter(tmp_path / "s.json", charter, "k")
+    path = sealing.inscribe(tmp_path / "s.json", charter, "k")
     seen = sealing.read_verified(path)
     assert seen.charter == charter and seen.signed is False
     assert seen.charter_hash == charter.charter_hash
@@ -187,7 +187,7 @@ def test_a_signed_charter_read_without_a_key_is_unsigned_not_an_error(
 def test_a_wrapper_without_a_signature_reads_as_unsigned(tmp_path, monkeypatch):
     monkeypatch.delenv("SCMLE_SIGNING_KEY", raising=False)
     charter = make_charter()
-    path = sealing.write_charter(tmp_path / "u.json", charter)
+    path = sealing.inscribe(tmp_path / "u.json", charter)
     assert json.loads(path.read_text())["signature"] is None
     seen = sealing.read_verified(path)
     assert seen.charter == charter and seen.signed is False
@@ -196,11 +196,11 @@ def test_a_wrapper_without_a_signature_reads_as_unsigned(tmp_path, monkeypatch):
 
 def test_read_charter_unwraps_a_signed_file_and_reads_a_bare_one(tmp_path):
     charter = make_charter()
-    wrapped = sealing.write_charter(tmp_path / "w.json", charter, "k")
-    assert contracts.read_charter(wrapped) == charter
+    wrapped = sealing.inscribe(tmp_path / "w.json", charter, "k")
+    assert contracts.peek(wrapped) == charter
     bare = tmp_path / "bare.json"
     bare.write_text(json.dumps(charter.to_dict()))
-    assert contracts.read_charter(bare) == charter
+    assert contracts.peek(bare) == charter
 
 
 def test_unreadable_and_invalid_charters_say_what_went_wrong(tmp_path):
@@ -215,5 +215,5 @@ def test_unreadable_and_invalid_charters_say_what_went_wrong(tmp_path):
         contracts.load_json(listing)
     assert str(caught.value) == f"charter {listing} is not a JSON object"
     with pytest.raises(Exception) as caught:
-        contracts.charter_from_record({"question": "x"})
+        contracts.parse({"question": "x"})
     assert str(caught.value).startswith("invalid analysis charter: ")

@@ -18,14 +18,14 @@ from scmle.contracts import errors
 from scmle.contracts import signing
 
 
-class ReviewDecision(enum.StrEnum):
+class Verdict(enum.StrEnum):
     """Disposition recorded by an independent release reviewer."""
 
     APPROVED = "approved"
     BLOCKED = "blocked"
 
 
-class ReviewClaimKind(enum.StrEnum):
+class Kind(enum.StrEnum):
     """Critical result categories required for independent proof."""
 
     METRIC = "metric"
@@ -54,11 +54,11 @@ def require_text(value: object, field_name: str) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ReviewClaim:
+class Recomputation:
     """One independently recomputed claim in a release review."""
 
     criterion_id: str
-    kind: ReviewClaimKind
+    kind: Kind
     passed: bool
     observed: str
     reference: str
@@ -68,12 +68,12 @@ class ReviewClaim:
     def __post_init__(self) -> None:
         """Checks the claim's identity and independent evidence link.
 
-        A `kind` given as text is converted to a `ReviewClaimKind`.
+        A `kind` given as text is converted to a `Kind`.
 
         Raises:
             TypeError: If `passed` is not a bool.
             ValueError: If a text field is blank or not a string, or the kind
-                is not a valid `ReviewClaimKind` value.
+                is not a valid `Kind` value.
         """
         for field_name in (
             "criterion_id",
@@ -84,8 +84,8 @@ class ReviewClaim:
         ):
             require_text(getattr(self, field_name), field_name)
         kind: Any = self.kind  # may be text from a persisted record
-        if not isinstance(kind, ReviewClaimKind):
-            object.__setattr__(self, "kind", ReviewClaimKind(kind))
+        if not isinstance(kind, Kind):
+            object.__setattr__(self, "kind", Kind(kind))
         if not isinstance(self.passed, bool):
             raise errors.KindError("passed must be bool")
 
@@ -117,7 +117,7 @@ class ReviewClaim:
         """
         return cls(
             criterion_id=str(record["criterion_id"]),
-            kind=ReviewClaimKind(record["kind"]),
+            kind=Kind(record["kind"]),
             passed=record["passed"],
             observed=str(record["observed"]),
             reference=str(record["reference"]),
@@ -126,9 +126,7 @@ class ReviewClaim:
         )
 
 
-def require_independence(
-    reviewer_id: str, implementer_ids: tuple[object, ...]
-) -> None:
+def separation(reviewer_id: str, implementer_ids: tuple[object, ...]) -> None:
     """Checks the implementers are named and do not include the reviewer.
 
     Args:
@@ -150,20 +148,20 @@ def require_independence(
         raise errors.InputError("reviewer must be independent of implementers")
 
 
-def require_claims(claims: tuple[ReviewClaim, ...]) -> None:
+def vet(claims: tuple[Recomputation, ...]) -> None:
     """Checks the claims are present, typed and about distinct criteria.
 
     Args:
         claims: The claims of a review.
 
     Raises:
-        TypeError: If a claim is not a `ReviewClaim`.
+        TypeError: If a claim is not a `Recomputation`.
         ValueError: If there are no claims or a criterion repeats.
     """
     if not claims:
         raise errors.InputError("claims must not be empty")
-    if not all(isinstance(item, ReviewClaim) for item in claims):
-        raise errors.KindError("claims must contain ReviewClaim values")
+    if not all(isinstance(item, Recomputation) for item in claims):
+        raise errors.KindError("claims must contain Recomputation values")
     claim_ids = [claim.criterion_id for claim in claims]
     if len(claim_ids) != len(set(claim_ids)):
         raise errors.InputError("claims must not contain duplicate criteria")
@@ -192,7 +190,7 @@ def require_artifact_digests(artifact_digests: Mapping[Any, Any]) -> None:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class IndependentReleaseReview:
+class Signoff:
     """Signed proof that an independent reviewer checked a release."""
 
     release_id: str
@@ -202,23 +200,23 @@ class IndependentReleaseReview:
     implementer_ids: tuple[str, ...]
     environment_digest: str
     commands: tuple[str, ...]
-    claims: tuple[ReviewClaim, ...]
+    claims: tuple[Recomputation, ...]
     artifact_digests: Mapping[str, str]
     observed_at: str
-    decision: ReviewDecision
+    decision: Verdict
     signature: str | None = None
 
     def __post_init__(self) -> None:
         """Rejects reviews that cannot establish independence or replay.
 
-        A `decision` given as text is converted to a `ReviewDecision`.
+        A `decision` given as text is converted to a `Verdict`.
 
         Raises:
-            TypeError: If a claim is not a `ReviewClaim`.
+            TypeError: If a claim is not a `Recomputation`.
             ValueError: If an identity or digest field is missing, there are no
                 implementers, the reviewer is one of them, commands, claims or
                 artifact digests are empty or malformed, a criterion repeats,
-                the decision is not a valid `ReviewDecision` value, the
+                the decision is not a valid `Verdict` value, the
                 signature is blank, or the observation time is not an ISO 8601
                 time or has no timezone.
         """
@@ -231,16 +229,16 @@ class IndependentReleaseReview:
             "observed_at",
         ):
             require_text(getattr(self, field_name), field_name)
-        require_independence(self.reviewer_id, self.implementer_ids)
+        separation(self.reviewer_id, self.implementer_ids)
         if not self.commands or any(not item.strip() for item in self.commands):
             raise errors.InputError(
                 "commands must contain reproducible commands"
             )
-        require_claims(self.claims)
+        vet(self.claims)
         require_artifact_digests(self.artifact_digests)
         decision: Any = self.decision  # may be text from a persisted record
-        if not isinstance(decision, ReviewDecision):
-            object.__setattr__(self, "decision", ReviewDecision(decision))
+        if not isinstance(decision, Verdict):
+            object.__setattr__(self, "decision", Verdict(decision))
         if self.signature is not None:
             require_text(self.signature, "signature")
         timestamp = datetime.datetime.fromisoformat(
@@ -289,7 +287,7 @@ class IndependentReleaseReview:
             The review.
         """
         claims = tuple(
-            ReviewClaim.from_dict(item) for item in record.get("claims", ())
+            Recomputation.from_dict(item) for item in record.get("claims", ())
         )
         return cls(
             release_id=str(record["release_id"]),
@@ -302,7 +300,7 @@ class IndependentReleaseReview:
             claims=claims,
             artifact_digests=dict(record["artifact_digests"]),
             observed_at=str(record["observed_at"]),
-            decision=ReviewDecision(record["decision"]),
+            decision=Verdict(record["decision"]),
             signature=str(record["signature"])
             if record.get("signature") is not None
             else None,
@@ -328,7 +326,7 @@ class IndependentReleaseReview:
         """
         return dataclasses.replace(
             self,
-            signature=signing.sign_payload(self.unsigned_dict(), signing_key),
+            signature=signing.mac(self.unsigned_dict(), signing_key),
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
@@ -345,7 +343,7 @@ class IndependentReleaseReview:
         """
         if self.signature is None:
             return False
-        expected = signing.sign_payload(self.unsigned_dict(), signing_key)
+        expected = signing.mac(self.unsigned_dict(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     def write(self, path: str | Path) -> None:
@@ -402,7 +400,7 @@ class IndependentReleaseReview:
     def accepted(
         self,
         source_commit: str,
-        required_kinds: Iterable[ReviewClaimKind | str],
+        required_kinds: Iterable[Kind | str],
         signing_key: str | bytes,
     ) -> bool:
         """Returns whether this signed review satisfies release proof gates.
@@ -422,7 +420,7 @@ class IndependentReleaseReview:
         """
         if self.source_commit != require_text(source_commit, "source_commit"):
             return False
-        if self.decision is not ReviewDecision.APPROVED:
+        if self.decision is not Verdict.APPROVED:
             return False
         if not self.verify_signature(signing_key):
             return False
@@ -430,16 +428,16 @@ class IndependentReleaseReview:
             return False
         available = {claim.kind for claim in self.claims}
         required = {
-            item if isinstance(item, ReviewClaimKind) else ReviewClaimKind(item)
+            item if isinstance(item, Kind) else Kind(item)
             for item in required_kinds
         }
         return required.issubset(available)
 
 
 __all__ = [
-    "IndependentReleaseReview",
-    "ReviewClaim",
-    "ReviewClaimKind",
-    "ReviewDecision",
+    "Kind",
+    "Recomputation",
+    "Signoff",
+    "Verdict",
     "require_text",
 ]

@@ -48,7 +48,7 @@ TRACEPARENT = re.compile(
 ZERO_TRACE = "0" * 32
 
 
-def new_trace_id() -> str:
+def traceid() -> str:
     """A random 128-bit trace id as 32 lowercase hex digits.
 
     Returns:
@@ -78,7 +78,7 @@ def parse_traceparent(header: str | None) -> str | None:
     return match.group("trace")
 
 
-def traceparent_for(trace_id: str) -> str:
+def traceheader(trace_id: str) -> str:
     """A ``traceparent`` header for ``trace_id`` with a fresh span id.
 
     Args:
@@ -96,7 +96,7 @@ def traceparent_for(trace_id: str) -> str:
     return f"00-{trace_id}-{secrets.token_hex(8)}-01"
 
 
-def trace_for(header: str | None) -> str:
+def propagate(header: str | None) -> str:
     """The incoming trace id, or a new one when the header is absent/bad.
 
     Args:
@@ -105,7 +105,7 @@ def trace_for(header: str | None) -> str:
     Returns:
         The header's trace id if valid, else a new trace id.
     """
-    return parse_traceparent(header) or new_trace_id()
+    return parse_traceparent(header) or traceid()
 
 
 def scrub(value: Any) -> Any:
@@ -131,7 +131,7 @@ def scrub(value: Any) -> Any:
     return value
 
 
-class StructuredLog:
+class Journal:
     """Writes JSON lines to a file or a callable."""
 
     def __init__(
@@ -198,7 +198,7 @@ class StructuredLog:
             "level": level,
             "message": message,
             "service": self.service,
-            "trace_id": trace_id or new_trace_id(),
+            "trace_id": trace_id or traceid(),
             "model_version": self.model_version,
             "artifact_digest": self.artifact_digest,
             **scrub(fields),

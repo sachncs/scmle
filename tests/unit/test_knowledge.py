@@ -15,14 +15,14 @@ from scmle.intelligence import knowledge
 
 def profile_of(frame):
     spec = tasks.Config(data=tasks.Dataset(uri="m", target="y"))
-    manifest = tabular.build_manifest(frame, "y")
+    manifest = tabular.manifested(frame, "y")
     return profiler.Profiler(spec).profile(frame, manifest, tasks.Task.BINARY)
 
 
 def run_record(
     model, fp, dataset="d", data_hash="h", task="binary_classification"
 ):
-    return experiments.HistoricalRun(
+    return experiments.Precedent(
         f"run_{model}_{dataset}",
         dataset,
         data_hash,
@@ -78,12 +78,12 @@ def test_nearest_datasets_vote_for_their_winners():
         run_record("lightgbm", fp(log_rows=5.1), "big2", "h2"),
         run_record("ridge", fp(log_rows=1.0), "small", "h3"),
     ]
-    learner = knowledge.MetaLearner(history, neighbors=2)
+    learner = knowledge.Recommender(history, neighbors=2)
     near_big = learner.recommend(
         fp(log_rows=5.0), tasks.Task.BINARY, "new", "hn"
     )
     assert [pair[0] for pair in near_big] == ["random_forest", "lightgbm"]
-    near_small = knowledge.MetaLearner(history, neighbors=1).recommend(
+    near_small = knowledge.Recommender(history, neighbors=1).recommend(
         fp(log_rows=1.1), tasks.Task.BINARY, "new", "hn"
     )
     assert near_small[0][0] == "ridge"
@@ -94,7 +94,7 @@ def test_same_dataset_and_other_tasks_are_excluded():
         run_record("random_forest", fp(), "self", "same"),
         run_record("ridge", fp(), "other", "o", task="regression"),
     ]
-    learner = knowledge.MetaLearner(history)
+    learner = knowledge.Recommender(history)
     assert (
         learner.recommend(fp(), tasks.Task.BINARY, "self", "different-hash")
         == []
@@ -106,11 +106,11 @@ def test_same_dataset_and_other_tasks_are_excluded():
 
 def test_weights_accumulate_and_empty_history_is_safe():
     history = [run_record("lightgbm", fp(), f"d{i}", f"h{i}") for i in range(3)]
-    ((model, weight),) = knowledge.MetaLearner(history).recommend(
+    ((model, weight),) = knowledge.Recommender(history).recommend(
         fp(), tasks.Task.BINARY, "n", "x"
     )
     assert model == "lightgbm" and weight == pytest.approx(3.0)
     assert (
-        knowledge.MetaLearner([]).recommend(fp(), tasks.Task.BINARY, "n", "x")
+        knowledge.Recommender([]).recommend(fp(), tasks.Task.BINARY, "n", "x")
         == []
     )

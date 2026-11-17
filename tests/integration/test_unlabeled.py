@@ -65,7 +65,7 @@ def test_labeling_candidates_are_the_rows_near_the_decision_boundary(tmp_path):
         {"x": [-4.0, 0.0, 4.0, 0.05], "other": [0.0, 0.0, 0.0, 0.0]}
     )
 
-    ranked = result.bundle.rank_for_labeling(pool, count=2)
+    ranked = result.bundle.prioritize(pool, count=2)
 
     assert set(ranked["position"]) == {1, 3}
     assert ranked["uncertainty"].is_monotonic_decreasing

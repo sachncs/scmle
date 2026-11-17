@@ -26,7 +26,7 @@ def found_stability(**overrides):
         "rule": Dumped({"s_min": 0.5}),
         "applicable": (),
         "notes": (),
-        "stability_gate": certificates.GateStatus.GATING,
+        "stability_gate": certificates.Authority.GATING,
         "store_note": "",
         "rule_note": "",
         "fragile": (),
@@ -142,7 +142,7 @@ def test_the_certificate_note_prefers_the_store_then_the_rule_note():
 def test_the_default_certificate_note_depends_on_the_gate():
     gating = report.stability_report(found_stability())
     descriptive = report.stability_report(
-        found_stability(stability_gate=certificates.GateStatus.DESCRIPTIVE)
+        found_stability(stability_gate=certificates.Authority.DESCRIPTIVE)
     )
 
     assert gating["certificate"]["note"] == (
@@ -178,8 +178,8 @@ def found_shift(**overrides):
                 "features": [{"column": "x"}],
             }
         ),
-        "c2st_gate": certificates.GateStatus.GATING,
-        "mmd_gate": certificates.GateStatus.DESCRIPTIVE,
+        "c2st_gate": certificates.Authority.GATING,
+        "mmd_gate": certificates.Authority.DESCRIPTIVE,
         "coverage": (Dumped({"level": "l1"}), Dumped({"level": "l2"})),
         "forward": Dumped({"status": "skipped"}),
         "store_note": "note",
@@ -289,24 +289,24 @@ def valid_stability():
 
 def test_validate_stability_messages_and_findings():
     good = valid_stability()
-    report.validate_stability(good)
+    report.conform(good)
 
     with pytest.raises(
         ValueError, match=r"^stability report has an unknown status$"
     ):
-        report.validate_stability({**good, "status": "bogus"})
+        report.conform({**good, "status": "bogus"})
     with pytest.raises(ValueError, match=r"^a finding has an unknown status$"):
-        report.validate_stability(
+        report.conform(
             {**good, "findings": [{**good["findings"][0], "status": "bogus"}]}
         )
     lacking = {k: v for k, v in good["findings"][0].items() if k != "specs"}
     with pytest.raises(ValueError, match=r"^finding is missing \['specs'\]$"):
-        report.validate_stability({**good, "findings": [lacking]})
+        report.conform({**good, "findings": [lacking]})
     for status in ("stable", "fragile", "not_evaluable"):
-        report.validate_stability(
+        report.conform(
             {**good, "findings": [{**good["findings"][0], "status": status}]}
         )
-    report.validate_stability({**good, "status": "not_evaluated"})
+    report.conform({**good, "status": "not_evaluated"})
 
 
 def test_validate_shift_messages_and_statuses():
@@ -332,10 +332,10 @@ def test_validate_shift_messages_and_statuses():
 
 def test_validate_stability_names_the_report_in_its_errors():
     with pytest.raises(ValueError, match=r"^stability report is missing \["):
-        report.validate_stability({"schema_version": 1})
+        report.conform({"schema_version": 1})
     good = valid_stability()
     with pytest.raises(
         ValueError,
         match=r"^stability report has an unsupported schema_version$",
     ):
-        report.validate_stability({**good, "schema_version": 2})
+        report.conform({**good, "schema_version": 2})

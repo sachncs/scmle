@@ -34,7 +34,7 @@ class Agreement:
     mean_probability_gap: float | None
 
 
-class ShadowEvaluator:
+class Understudy:
     """Runs a challenger beside a champion on live rows.
 
     Attributes:
@@ -143,6 +143,6 @@ class ShadowEvaluator:
         with self.lock:
             rows = list(self.rows)
         data = pandas.concat(rows, ignore_index=True)
-        return champion.ChampionChallenger(
-            self.champion, self.challenger
-        ).compare(data, outcomes.reset_index(drop=True), metric_name)
+        return champion.Referee(self.champion, self.challenger).compare(
+            data, outcomes.reset_index(drop=True), metric_name
+        )

@@ -31,6 +31,6 @@ def digests() -> dict[str, str]:
     out: dict[str, str] = {"charter_hash": result.charter.charter_hash}
     with tempfile.TemporaryDirectory() as folder:
         root = pathlib.Path(folder)
-        for name in sorted(draft.write_artifacts(result, root)):
+        for name in sorted(draft.emit(result, root)):
             out[name] = file_digest(root / name)
     return out

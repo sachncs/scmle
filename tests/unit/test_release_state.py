@@ -35,7 +35,7 @@ def world(tmp_path, split=True, **options):
         release.approve(
             MODEL,
             number,
-            support_runtime.approval_for(number),
+            support_runtime.sanction(number),
             support_release.KEY,
         )
     plane = support_runtime.MemoryPlane(split=split, **options)
@@ -104,7 +104,7 @@ def test_states_are_distinct_and_the_hand_moves_are_limited(tmp_path):
     release.transition(
         MODEL, 1, release_state.ReleaseState.CHALLENGER, "compare"
     )
-    assert release.state_of(MODEL, 1) is release_state.ReleaseState.CHALLENGER
+    assert release.lookup(MODEL, 1) is release_state.ReleaseState.CHALLENGER
     for forbidden in (
         release_state.ReleaseState.PRODUCTION,
         release_state.ReleaseState.APPROVED,
@@ -126,14 +126,14 @@ def test_approval_needs_a_signed_bundle_and_a_valid_independent_review(
     store = support_runtime.make_registry(tmp_path / "registry")
     release = release_state.ReleaseRegistry(store)
     bad = {
-        "rejected": support_runtime.approval_for(1, decision="rejected"),
-        "not independent": support_runtime.approval_for(1, independent=False),
+        "rejected": support_runtime.sanction(1, decision="rejected"),
+        "not independent": support_runtime.sanction(1, independent=False),
         "another bundle": support_release.approval(
             version=1, content_id="8" * 64
         ),
-        "unsigned approval": support_runtime.approval_for(1).__class__(
+        "unsigned approval": support_runtime.sanction(1).__class__(
             **{
-                **support_runtime.approval_for(1).unsigned_dict(),
+                **support_runtime.sanction(1).unsigned_dict(),
                 "decision": "approved",
                 "evidence": ("t",),
             }
@@ -143,21 +143,19 @@ def test_approval_needs_a_signed_bundle_and_a_valid_independent_review(
         with pytest.raises(errors.ArtifactError):
             release.approve(MODEL, 1, approval, support_release.KEY)
         assert (
-            release.state_of(MODEL, 1) is release_state.ReleaseState.CANDIDATE
+            release.lookup(MODEL, 1) is release_state.ReleaseState.CANDIDATE
         ), name
     with pytest.raises(errors.ArtifactError):
-        release.approve(MODEL, 1, support_runtime.approval_for(1), "wrong-key")
-    release.approve(
-        MODEL, 1, support_runtime.approval_for(1), support_release.KEY
-    )
-    assert release.state_of(MODEL, 1) is release_state.ReleaseState.APPROVED
+        release.approve(MODEL, 1, support_runtime.sanction(1), "wrong-key")
+    release.approve(MODEL, 1, support_runtime.sanction(1), support_release.KEY)
+    assert release.lookup(MODEL, 1) is release_state.ReleaseState.APPROVED
 
 
 def test_an_unsigned_bundle_cannot_be_approved(tmp_path):
     store = support_runtime.make_registry(tmp_path / "registry", signed=False)
     with pytest.raises(errors.ArtifactError, match="unsigned"):
         release_state.ReleaseRegistry(store).approve(
-            MODEL, 1, support_runtime.approval_for(1), support_release.KEY
+            MODEL, 1, support_runtime.sanction(1), support_release.KEY
         )
 
 
@@ -171,9 +169,9 @@ def test_a_confirmed_promotion_changes_state_alias_and_ledger(tmp_path, split):
     assert first.done and first.restored is None
     second = promote(release, plane, 2, support_runtime.NEW)
     assert second.done and second.version == 2
-    assert release.state_of(MODEL, 2) is release_state.ReleaseState.PRODUCTION
-    assert release.state_of(MODEL, 1) is release_state.ReleaseState.RETIRED
-    assert release.state_of(MODEL, 3) is release_state.ReleaseState.APPROVED
+    assert release.lookup(MODEL, 2) is release_state.ReleaseState.PRODUCTION
+    assert release.lookup(MODEL, 1) is release_state.ReleaseState.RETIRED
+    assert release.lookup(MODEL, 3) is release_state.ReleaseState.APPROVED
     assert release.store.aliases(MODEL)[registry.CHAMPION] == 2
     recorded = release.environment(MODEL, PRODUCTION)
     assert (
@@ -186,7 +184,7 @@ def test_a_confirmed_promotion_changes_state_alias_and_ledger(tmp_path, split):
     release.ledger.verify()
     seen = plane.observe()
     assert release.reconcile(MODEL, PRODUCTION, seen).consistent
-    assert release.deployed_version(MODEL, PRODUCTION, seen) == 2
+    assert release.live(MODEL, PRODUCTION, seen) == 2
 
 
 @pytest.mark.parametrize("split", SPLITS)
@@ -196,7 +194,7 @@ def test_a_staging_release_does_not_make_a_version_production(tmp_path, split):
         release, plane, 1, support_runtime.OLD, environment="staging"
     )
     assert outcome.done
-    assert release.state_of(MODEL, 1) is release_state.ReleaseState.APPROVED
+    assert release.lookup(MODEL, 1) is release_state.ReleaseState.APPROVED
     assert registry.CHAMPION not in release.store.aliases(MODEL)
     assert release.environment(MODEL, "staging")["version"] == 1
     assert release.reconcile(MODEL, "staging", plane.observe()).consistent
@@ -211,7 +209,7 @@ def test_a_staged_rollout_passes_through_each_share_only_where_traffic_splits(
     seen_shares = []
 
     def watch(seen, percent):
-        seen_shares.append((percent, seen.share_of(seen.revision)))
+        seen_shares.append((percent, seen.portion(seen.revision)))
         return []
 
     outcome = promote(
@@ -229,9 +227,7 @@ def test_a_staged_rollout_passes_through_each_share_only_where_traffic_splits(
     else:
         assert outcome.done
         assert [p for p, ignored in seen_shares] == [10, 50, 100]
-        assert (
-            release.state_of(MODEL, 2) is release_state.ReleaseState.PRODUCTION
-        )
+        assert release.lookup(MODEL, 2) is release_state.ReleaseState.PRODUCTION
 
 
 def test_each_unconfirmed_or_refused_promotion_changes_nothing(tmp_path):
@@ -269,7 +265,7 @@ def test_a_platform_that_never_confirms_leaves_the_registry_unchanged(
     assert after["registry"] == before["registry"]
     assert after["state"] == before["state"]
     assert after["aliases"] == before["aliases"]
-    assert release.state_of(MODEL, 2) is release_state.ReleaseState.APPROVED
+    assert release.lookup(MODEL, 2) is release_state.ReleaseState.APPROVED
     assert release.ledger.rows[-1]["body"]["event"] == "rejected"
     assert release.environment(MODEL, PRODUCTION)["version"] == 1
 
@@ -308,7 +304,7 @@ def test_a_failing_health_check_stops_a_staged_rollout_and_restores(tmp_path):
     seen = plane.observe()
     assert (
         seen.image_digest == support_runtime.OLD
-        and seen.share_of(seen.revision) == 100
+        and seen.portion(seen.revision) == 100
     )
     after = snapshot(release)
     assert (after["registry"], after["state"], after["aliases"]) == (
@@ -332,7 +328,7 @@ def test_a_failed_restore_is_reported_and_reconcile_flags_the_runtime(tmp_path):
 def test_the_registry_refusing_the_alias_restores_the_platform(tmp_path):
     release, plane, ignored = world(tmp_path)
     assert promote(release, plane, 1, support_runtime.OLD).done
-    release.store.attach_guard(RefusingGuard(), "scope")
+    release.store.attach(RefusingGuard(), "scope")
     before = snapshot(release)
     outcome = promote(release, plane, 2, support_runtime.NEW)
     assert not outcome.done and outcome.restored is True
@@ -359,8 +355,8 @@ def test_rollback_restores_the_previous_known_good_revision(tmp_path, split):
     outcome = release.rollback(MODEL, PRODUCTION, plane, support_release.KEY)
     assert outcome.done and outcome.version == 1
     assert outcome.revision == first["revision"]
-    assert release.state_of(MODEL, 1) is release_state.ReleaseState.PRODUCTION
-    assert release.state_of(MODEL, 2) is release_state.ReleaseState.RETIRED
+    assert release.lookup(MODEL, 1) is release_state.ReleaseState.PRODUCTION
+    assert release.lookup(MODEL, 2) is release_state.ReleaseState.RETIRED
     assert release.store.aliases(MODEL)[registry.CHAMPION] == 1
     seen = plane.observe()
     assert seen.image_digest == support_runtime.OLD
@@ -424,7 +420,7 @@ def test_reconcile_detects_a_seeded_revision_and_digest_disagreement(released):
     found = kinds(release, other)
     assert {"revision_mismatch", "digest_mismatch", "traffic_split"} <= found
     with pytest.raises(release_state.RuntimeDisagrees) as raised:
-        release.deployed_version(MODEL, PRODUCTION, other)
+        release.live(MODEL, PRODUCTION, other)
     assert raised.value.details["findings"]
 
 
@@ -449,13 +445,13 @@ def test_an_alias_moved_around_the_runtime_is_never_deployed(released):
         MODEL,
         3,
         registry.CHAMPION,
-        support_runtime.approval_for(3),
+        support_runtime.sanction(3),
         support_release.KEY,
     )
     assert release.store.aliases(MODEL)[registry.CHAMPION] == 3
     assert "alias_not_deployed" in kinds(release, seen)
     with pytest.raises(release_state.RuntimeDisagrees):
-        release.deployed_version(MODEL, PRODUCTION, seen)
+        release.live(MODEL, PRODUCTION, seen)
 
 
 def test_reconcile_detects_a_state_that_was_edited(released):
@@ -496,7 +492,7 @@ def test_the_runtime_running_something_unrecorded_is_a_finding(tmp_path):
     report = release.reconcile(MODEL, PRODUCTION, plane.observe())
     assert [f.kind for f in report.findings] == ["no_registry_record"]
     with pytest.raises(release_state.RuntimeDisagrees):
-        release.deployed_version(MODEL, PRODUCTION, plane.observe())
+        release.live(MODEL, PRODUCTION, plane.observe())
 
 
 @pytest.mark.parametrize("split", SPLITS)

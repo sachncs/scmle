@@ -35,15 +35,15 @@ def make_dataset(days: int = 500) -> pandas.DataFrame:
 def main() -> None:
     """Runs with temporal validation and a declarative feature graph."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    graph = tasks.FeatureGraph(
+    graph = tasks.Derivation(
         nodes=[
-            tasks.FeatureNode(
+            tasks.Node(
                 name="temperature_prev_week",
                 op="lag",
                 inputs=["temperature"],
                 params={"k": 7},
             ),
-            tasks.FeatureNode(
+            tasks.Node(
                 name="weekday",
                 op="datepart",
                 inputs=["day"],

@@ -81,12 +81,12 @@ def main() -> None:
     The parent passes the channel address as the first argument and the key
     on standard input, then sends one message with the token and the rows.
     """
-    channel = ipc.connect_to_parent()
+    channel = ipc.attach()
     token, rows = channel.recv()
     serve(channel, token, rows)
 
 
-class SealedTestSet(splitters.LockedTestSet):
+class SealedTestSet(splitters.Lockbox):
     """The locked test set, held by a vault process.
 
     Attributes:

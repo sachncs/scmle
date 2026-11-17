@@ -37,7 +37,7 @@ from scmle.data.ledger import controls
 from scmle.data.ledger import online_fdr
 
 ALPHA = 0.05
-FRACTION_ALPHA = online_fdr.exact_alpha(ALPHA, "alpha")
+FRACTION_ALPHA = online_fdr.rational(ALPHA, "alpha")
 EFFECT_RHO = 0.30
 POWER_FLOOR = 0.80
 KS_DRAWS = 5000
@@ -113,9 +113,7 @@ class RankTester:
         return numpy.asarray(2.0 * stats.t.sf(numpy.abs(t_value), self.n - 2))
 
 
-def rejections(
-    config: online_fdr.RuleConfig, p: numpy.ndarray
-) -> numpy.ndarray:
+def rejections(config: online_fdr.Settings, p: numpy.ndarray) -> numpy.ndarray:
     """Rejection flags of the online rule over p-values, in order.
 
     Args:
@@ -342,7 +340,7 @@ def mixed_world(
 
 
 def empirical_fdr(
-    config: online_fdr.RuleConfig, world: FdrWorld, runs: int
+    config: online_fdr.Settings, world: FdrWorld, runs: int
 ) -> tuple[float, float, float]:
     """Mean false-discovery proportion, discovery rate and mean rejections.
 
@@ -389,7 +387,7 @@ def check_fdr(runs: int, seed: int) -> list[Finding]:
     limit = band(ALPHA, runs)
     findings = []
     for rule in online_fdr.RULE_NAMES:
-        config = online_fdr.RuleConfig(rule, FRACTION_ALPHA)
+        config = online_fdr.Settings(rule, FRACTION_ALPHA)
         for world in worlds:
             mean, _any_rate, rejected = empirical_fdr(config, world, runs)
             held = rule == online_fdr.ELOND or world.independent
@@ -472,7 +470,7 @@ def check_power(runs: int, seed: int) -> list[Finding]:
         rng = randomness.component_rng(seed, "ledger_checks.power", run)
         x = rng.normal(size=(rows, columns))
         y = beta * x[:, 0] + rng.normal(size=rows)
-        config = online_fdr.RuleConfig(online_fdr.ELOND, FRACTION_ALPHA)
+        config = online_fdr.Settings(online_fdr.ELOND, FRACTION_ALPHA)
         flags = rejections(config, RankTester(x).pvalues(y))
         hits += int(flags[0])
     # The planted column is tested first: level alpha * gamma_1 = alpha / 2.
@@ -603,7 +601,7 @@ def control_exceed_rate(
     Returns:
         (exceed rate, mean observed discoveries).
     """
-    config = online_fdr.RuleConfig(online_fdr.ELOND, FRACTION_ALPHA)
+    config = online_fdr.Settings(online_fdr.ELOND, FRACTION_ALPHA)
     exceeded = 0
     observed_total = 0
     for repeat in range(repeats):
@@ -612,7 +610,7 @@ def control_exceed_rate(
         tester = RankTester(x)
 
         def count(
-            frame: pandas.DataFrame,  # noqa: ARG001 -- permuted_target_control calls count(frame, shuffled)
+            frame: pandas.DataFrame,  # noqa: ARG001 -- placebo calls count(frame, shuffled)
             shuffled: pandas.Series,
             tester: RankTester = tester,
         ) -> int:
@@ -632,7 +630,7 @@ def control_exceed_rate(
         observed = int(rejections(config, tester.pvalues(y)).sum())
         observed_total += observed
         strata = None if scope == "global" else labels
-        result = controls.permuted_target_control(
+        result = controls.placebo(
             count,
             pandas.DataFrame(x),
             pandas.Series(y),

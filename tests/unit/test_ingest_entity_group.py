@@ -10,10 +10,10 @@ from scmle.data.charter import ingest
 
 def spec():
     return ingest.Entity(
-        fields=(ingest.EntityField("name"), ingest.EntityField("email", False)),
+        fields=(ingest.Attribute("name"), ingest.Attribute("email", False)),
         passes=(
-            ingest.EntityPass("email"),
-            ingest.EntityPass("name", "prefix"),
+            ingest.Pass("email"),
+            ingest.Pass("name", "prefix"),
         ),
         column="entity_group",
     )

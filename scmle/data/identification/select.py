@@ -225,14 +225,14 @@ def judge(
     missing = []
     for word in strategy.assumptions:
         if word == "unconfoundedness_given":
-            if causal.covariates_of(spec.assumptions) is None:
+            if causal.adjusters(spec.assumptions) is None:
                 missing.append(causal.UNCONFOUNDEDNESS_PREFIX + "<columns>")
         elif word not in attested:
             missing.append(word)
     absent = tuple(n for n in strategy.design if getattr(spec, n) is None)
     checked = False
     if strategy.name == "backdoor_aipw" and not missing and not reasons:
-        reasons, checked = check_adjustment(spec, dag)
+        reasons, checked = verify(spec, dag)
     return Verdict(
         strategy.name,
         not (missing or absent or reasons),
@@ -243,7 +243,7 @@ def judge(
     )
 
 
-def check_adjustment(
+def verify(
     spec: causal.Question, dag: scmle.data.admissibility.dag.Dag | None
 ) -> tuple[list[str], bool]:
     """Verifies the declared adjustment set against a declared DAG.
@@ -257,13 +257,13 @@ def check_adjustment(
         verified it. Without a DAG the set is unchecked: no reason is given
         unless the charter declares a DAG that was not supplied.
     """
-    names = causal.covariates_of(spec.assumptions) or ()
+    names = causal.adjusters(spec.assumptions) or ()
     if dag is None:
         if spec.dag:
             return (["a DAG is declared but was not supplied"], False)
         return ([], False)
     try:
-        valid = dag.backdoor_valid(spec.treatment, spec.outcome, names)
+        valid = dag.adjusts(spec.treatment, spec.outcome, names)
     except ValueError as error:
         # handled: returned as reason message
         return ([f"the declared DAG cannot check the set: {error}"], False)

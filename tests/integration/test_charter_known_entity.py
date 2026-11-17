@@ -40,7 +40,7 @@ def charter_file(tmp_path, **overrides):
         "unit_of_prediction": contracts.KNOWN_ENTITY_FUTURE,
         **overrides,
     }
-    sealing.write_charter(path, make_charter(**values), signing_key=KEY)
+    sealing.inscribe(path, make_charter(**values), signing_key=KEY)
     return path
 
 

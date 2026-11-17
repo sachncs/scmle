@@ -38,7 +38,7 @@ def augment(frame: pandas.DataFrame, data: tasks.Dataset) -> pandas.DataFrame:
         if data.group_column
         else ordered[value]
     )
-    names = tasks.horizon_names(value, horizon)
+    names = tasks.horizons(value, horizon)
     for step, name in enumerate(names, start=1):
         ordered[name] = series.shift(-step)
     return ordered.dropna(subset=names).reset_index(drop=True)

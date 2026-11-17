@@ -40,7 +40,7 @@ OBSERVED_DEPENDENCY: str = (
 )
 
 
-def reject_over_budget(payload: bytes) -> None:
+def cap(payload: bytes) -> None:
     """Refuses a payload larger than the fixed disk budget, as a full disk.
 
     Args:
@@ -53,7 +53,7 @@ def reject_over_budget(payload: bytes) -> None:
         raise OSError(errno.ENOSPC, "controlled capacity exhausted")
 
 
-def reject_over_memory_budget(allocation: bytearray) -> None:
+def ration(allocation: bytearray) -> None:
     """Refuses an allocation larger than the fixed memory budget.
 
     Args:
@@ -66,7 +66,7 @@ def reject_over_memory_budget(allocation: bytearray) -> None:
         raise MemoryError("controlled memory budget exhausted")
 
 
-def fail_connector() -> NoReturn:
+def unreachable() -> NoReturn:
     """Fails like a connector that cannot reach its destination.
 
     Raises:
@@ -76,7 +76,7 @@ def fail_connector() -> NoReturn:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class LocalFaultExecutor:
+class Executor:
     """Execute bounded, reproducible fault scenarios in a local workspace."""
 
     root: pathlib.Path
@@ -88,8 +88,8 @@ class LocalFaultExecutor:
         object.__setattr__(self, "root", workspace)
 
     def execute(
-        self, scenario: reliability.FaultScenario
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+        self, scenario: reliability.Contingency
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Executes one scenario and checks its evidence against its plan.
 
         Args:
@@ -102,51 +102,47 @@ class LocalFaultExecutor:
 
         Raises:
             RuntimeError: If the scenario's handler raises any exception.
-            TypeError: If `scenario` is not a `FaultScenario`.
+            TypeError: If `scenario` is not a `Contingency`.
             ValueError: If the evidence types produced differ from those the
                 plan requires or repeat.
         """
-        if not isinstance(scenario, reliability.FaultScenario):
-            raise errors.KindError("scenario must be FaultScenario")
+        if not isinstance(scenario, reliability.Contingency):
+            raise errors.KindError("scenario must be Contingency")
         handlers: dict[
-            reliability.FaultScenario,
-            Callable[
-                [], tuple[scmle.governance.reliability.FaultArtifact, ...]
-            ],
+            reliability.Contingency,
+            Callable[[], tuple[scmle.governance.reliability.Emission, ...]],
         ] = {
-            reliability.FaultScenario.PROCESS_DEATH: self.run_process_death,
-            reliability.FaultScenario.STALE_CHECKPOINT: (
+            reliability.Contingency.PROCESS_DEATH: self.run_process_death,
+            reliability.Contingency.STALE_CHECKPOINT: (
                 self.run_stale_checkpoint
             ),
-            reliability.FaultScenario.DISK_FULL: self.run_disk_full,
-            reliability.FaultScenario.CORRUPT_ARTIFACT: (
+            reliability.Contingency.DISK_FULL: self.run_disk_full,
+            reliability.Contingency.CORRUPT_ARTIFACT: (
                 self.run_corrupt_artifact
             ),
-            reliability.FaultScenario.WORKER_LOSS: self.run_worker_loss,
-            reliability.FaultScenario.TIMEOUT: self.run_timeout,
-            reliability.FaultScenario.MEMORY_EXHAUSTION: (
+            reliability.Contingency.WORKER_LOSS: self.run_worker_loss,
+            reliability.Contingency.TIMEOUT: self.run_timeout,
+            reliability.Contingency.MEMORY_EXHAUSTION: (
                 self.run_memory_exhaustion
             ),
-            reliability.FaultScenario.PARTIAL_WRITE: self.run_partial_write,
-            reliability.FaultScenario.DEPENDENCY_MISMATCH: (
+            reliability.Contingency.PARTIAL_WRITE: self.run_partial_write,
+            reliability.Contingency.DEPENDENCY_MISMATCH: (
                 self.run_dependency_mismatch
             ),
-            reliability.FaultScenario.INVALID_SIGNATURE: (
+            reliability.Contingency.INVALID_SIGNATURE: (
                 self.run_invalid_signature
             ),
-            reliability.FaultScenario.RETRY_EXHAUSTION: (
+            reliability.Contingency.RETRY_EXHAUSTION: (
                 self.run_retry_exhaustion
             ),
-            reliability.FaultScenario.DUPLICATE_EVENT: (
-                self.run_duplicate_event
-            ),
-            reliability.FaultScenario.INCOMPLETE_LINEAGE: (
+            reliability.Contingency.DUPLICATE_EVENT: (self.run_duplicate_event),
+            reliability.Contingency.INCOMPLETE_LINEAGE: (
                 self.run_incomplete_lineage
             ),
-            reliability.FaultScenario.REJECTED_APPROVAL: (
+            reliability.Contingency.REJECTED_APPROVAL: (
                 self.run_rejected_approval
             ),
-            reliability.FaultScenario.CHANGED_SNAPSHOT: (
+            reliability.Contingency.CHANGED_SNAPSHOT: (
                 self.run_changed_snapshot
             ),
         }
@@ -158,7 +154,7 @@ class LocalFaultExecutor:
             ) from error
         expected = next(
             plan.evidence_requirements
-            for plan in reliability.default_fault_injection_plans()
+            for plan in reliability.drills()
             if plan.scenario is scenario
         )
         names = tuple(item.evidence_type for item in artifacts)
@@ -171,11 +167,11 @@ class LocalFaultExecutor:
 
     def artifact(
         self,
-        scenario: reliability.FaultScenario,
+        scenario: reliability.Contingency,
         evidence_type: str,
         observation: str,
         details: dict[str, Any],
-    ) -> scmle.governance.reliability.FaultArtifact:
+    ) -> scmle.governance.reliability.Emission:
         """Builds an evidence artifact that records a safe outcome as observed.
 
         The outcome is always marked as observed; nothing here checks that
@@ -204,7 +200,7 @@ class LocalFaultExecutor:
             separators=(",", ":"),
             sort_keys=True,
         ).encode("utf-8")
-        return scmle.governance.reliability.FaultArtifact(
+        return scmle.governance.reliability.Emission(
             evidence_type=evidence_type,
             content=content,
             observed_outcome=reliability.EvidenceOutcome.SAFE_OUTCOME_OBSERVED,
@@ -218,7 +214,7 @@ class LocalFaultExecutor:
             path: The destination file.
             record: The content, written as compact sorted JSON.
         """
-        scmle.governance.reliability.FaultInjectionHarness.write_atomically(
+        scmle.governance.reliability.Harness.write_atomically(
             path,
             json.dumps(
                 record,
@@ -262,7 +258,7 @@ class LocalFaultExecutor:
 
     def run_process_death(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Writes a checkpoint, terminates a child and reads it back.
 
         The child is unrelated to the checkpoint. The checkpoint
@@ -274,7 +270,7 @@ class LocalFaultExecutor:
             checkpoint resume (the step read back) and artifact integrity
             (the checkpoint's SHA-256).
         """
-        scenario = reliability.FaultScenario.PROCESS_DEATH
+        scenario = reliability.Contingency.PROCESS_DEATH
         checkpoint = self.root / "process-death-checkpoint.json"
         self.write_json(
             checkpoint, {"run_id": "local-process-death", "step": 3}
@@ -305,7 +301,7 @@ class LocalFaultExecutor:
 
     def run_stale_checkpoint(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Checks that a checkpoint cannot be bound to a different source.
 
         Binds a checkpoint of one source to another source identity and
@@ -317,8 +313,8 @@ class LocalFaultExecutor:
             The three evidence artifacts, in order: checkpoint identity,
             stale-checkpoint rejection and run state.
         """
-        scenario = reliability.FaultScenario.STALE_CHECKPOINT
-        checkpoint = incremental.EventCheckpoint("source-old", sequence=4)
+        scenario = reliability.Contingency.STALE_CHECKPOINT
+        checkpoint = incremental.Checkpoint("source-old", sequence=4)
         rejected = False
         try:
             checkpoint.bind("source-current")
@@ -352,7 +348,7 @@ class LocalFaultExecutor:
 
     def run_disk_full(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Simulates a full disk without filling one.
 
         A 32-byte payload exceeds a fixed 8-byte budget, so `OSError` with
@@ -367,12 +363,12 @@ class LocalFaultExecutor:
             OSError: The simulated ENOSPC; it is caught inside and never
                 reaches the caller.
         """
-        scenario = reliability.FaultScenario.DISK_FULL
+        scenario = reliability.Contingency.DISK_FULL
         destination = self.root / "disk-full-public.json"
         payload = b"x" * 32
         rejected = False
         try:
-            reject_over_budget(payload)
+            cap(payload)
             destination.write_bytes(payload)
         except OSError as error:
             # handled: simulated ENOSPC recorded in disk_capacity_exhaustion
@@ -401,7 +397,7 @@ class LocalFaultExecutor:
 
     def run_corrupt_artifact(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Corrupts a written artifact, detects it by digest and quarantines it.
 
         Writes ``artifact.bin`` under the root, records its SHA-256,
@@ -413,10 +409,10 @@ class LocalFaultExecutor:
             digest mismatch (expected and actual digests) and quarantine
             record.
         """
-        scenario = reliability.FaultScenario.CORRUPT_ARTIFACT
+        scenario = reliability.Contingency.CORRUPT_ARTIFACT
         artifact_path = self.root / "artifact.bin"
         quarantine_path = self.root / "quarantine-artifact.bin"
-        scmle.governance.reliability.FaultInjectionHarness.write_atomically(
+        scmle.governance.reliability.Harness.write_atomically(
             artifact_path, b"valid-artifact"
         )
         expected = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
@@ -448,7 +444,7 @@ class LocalFaultExecutor:
 
     def run_worker_loss(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Terminates a child as a stand-in worker and writes one event output.
 
         No retry or replay is performed: a single output file
@@ -459,7 +455,7 @@ class LocalFaultExecutor:
             The three evidence artifacts, in order: worker termination,
             idempotent retry and event deduplication.
         """
-        scenario = reliability.FaultScenario.WORKER_LOSS
+        scenario = reliability.Contingency.WORKER_LOSS
         terminated, returncode = self.halt()
         output = self.root / "worker-output.json"
         writes = {"event-1"}
@@ -487,7 +483,7 @@ class LocalFaultExecutor:
 
     def run_timeout(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Terminates a child that outlives a short wait and records it.
 
         The wait is the 0.05 seconds of `halt`; the cancellation is
@@ -498,7 +494,7 @@ class LocalFaultExecutor:
             The three evidence artifacts, in order: timeout injection,
             cancellation record and resource error.
         """
-        scenario = reliability.FaultScenario.TIMEOUT
+        scenario = reliability.Contingency.TIMEOUT
         terminated, returncode = self.halt()
         terminal = self.root / "timeout-terminal.json"
         self.write_json(
@@ -527,7 +523,7 @@ class LocalFaultExecutor:
 
     def run_memory_exhaustion(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Simulates memory exhaustion with a tiny allocation budget.
 
         A bytearray grows by 256 bytes at a time until it passes 1024 bytes,
@@ -542,13 +538,13 @@ class LocalFaultExecutor:
             MemoryError: The simulated exhaustion; it is caught inside and
                 never reaches the caller.
         """
-        scenario = reliability.FaultScenario.MEMORY_EXHAUSTION
+        scenario = reliability.Contingency.MEMORY_EXHAUSTION
         allocation = bytearray()
         rejected = False
         try:
             for value in range(9):
                 allocation.extend(b"x" * 256)
-                reject_over_memory_budget(allocation)
+                ration(allocation)
                 del value
         except MemoryError:
             # handled: simulated MemoryError recorded in memory_pressure
@@ -577,7 +573,7 @@ class LocalFaultExecutor:
 
     def run_partial_write(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Writes a temporary file and never replaces the public path.
 
         A temporary file in the root receives and syncs a few bytes; the
@@ -589,7 +585,7 @@ class LocalFaultExecutor:
             (whether the temporary file existed), atomicity check (whether
             the public path existed) and artifact integrity.
         """
-        scenario = reliability.FaultScenario.PARTIAL_WRITE
+        scenario = reliability.Contingency.PARTIAL_WRITE
         public_path = self.root / "partial-public.json"
         descriptor, temporary_name = tempfile.mkstemp(dir=self.root)
         try:
@@ -624,7 +620,7 @@ class LocalFaultExecutor:
 
     def run_dependency_mismatch(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Compares two fixed dependency identities and records the mismatch.
 
         The identities are the constants ``numpy==2.3.0`` and
@@ -634,7 +630,7 @@ class LocalFaultExecutor:
             The three evidence artifacts, in order: environment identity,
             dependency rejection and run state.
         """
-        scenario = reliability.FaultScenario.DEPENDENCY_MISMATCH
+        scenario = reliability.Contingency.DEPENDENCY_MISMATCH
         required = REQUIRED_DEPENDENCY
         observed = OBSERVED_DEPENDENCY
         rejected = required != observed
@@ -661,7 +657,7 @@ class LocalFaultExecutor:
 
     def run_invalid_signature(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Tampers with an attestation signature and records the failed check.
 
         Builds a signed release attestation, replaces its signature with
@@ -672,13 +668,13 @@ class LocalFaultExecutor:
             The three evidence artifacts, in order: signature tampering,
             verification failure and quarantine record.
         """
-        scenario = reliability.FaultScenario.INVALID_SIGNATURE
+        scenario = reliability.Contingency.INVALID_SIGNATURE
         provenance = {
             "run_id": "local-signature",
             "model": {"manifest_sha256": "manifest"},
             "signature": {"present": True},
         }
-        record = attestation.ReleaseAttestation.from_records(
+        record = attestation.Attestation.from_records(
             provenance, {}, signing_key="local-key"
         )
         tampered = dataclasses.replace(record, attestation_signature="0" * 64)
@@ -710,7 +706,7 @@ class LocalFaultExecutor:
 
     def run_retry_exhaustion(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Simulates three failing attempts and records the terminal state.
 
         Each of three attempts raises `OSError` by itself and is counted;
@@ -725,12 +721,12 @@ class LocalFaultExecutor:
             OSError: The simulated connector failure of each attempt; it is
                 caught inside and never reaches the caller.
         """
-        scenario = reliability.FaultScenario.RETRY_EXHAUSTION
+        scenario = reliability.Contingency.RETRY_EXHAUSTION
         attempts = 0
         for attempt in range(3):
             attempts = attempt + 1
             try:
-                fail_connector()
+                unreachable()
             except OSError:
                 # handled: simulated connector failures counted in retry_history
                 # attempts
@@ -762,7 +758,7 @@ class LocalFaultExecutor:
 
     def run_duplicate_event(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Commits one event twice to an ingestion ledger and records both.
 
         Uses an incremental ingestion ledger stored in
@@ -774,9 +770,9 @@ class LocalFaultExecutor:
             The three evidence artifacts, in order: duplicate event,
             idempotency key and state transition.
         """
-        scenario = reliability.FaultScenario.DUPLICATE_EVENT
+        scenario = reliability.Contingency.DUPLICATE_EVENT
         path = self.root / "duplicate-events.json"
-        ledger = incremental.IngestionLedger(path, "local-source")
+        ledger = incremental.Ledger(path, "local-source")
         event = incremental.Event(
             "event-1", 1, "2026-10-20T10:00:00+00:00", {"value": 1}
         )
@@ -815,7 +811,7 @@ class LocalFaultExecutor:
 
     def run_incomplete_lineage(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Adds a lineage edge to a missing node and records the rejection.
 
         The graph holds one raw-source node; an edge to an absent node is
@@ -826,7 +822,7 @@ class LocalFaultExecutor:
             The three evidence artifacts, in order: lineage gap, release
             block and audit record.
         """
-        scenario = reliability.FaultScenario.INCOMPLETE_LINEAGE
+        scenario = reliability.Contingency.INCOMPLETE_LINEAGE
         graph = lineage.Graph(
             (lineage.Node("raw", lineage.Kind.RAW_SOURCE, "raw"),)
         )
@@ -860,7 +856,7 @@ class LocalFaultExecutor:
 
     def run_rejected_approval(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Validates a signed rejected approval and records the refusal.
 
         Builds and signs a reviewer approval whose decision is rejected and
@@ -871,20 +867,20 @@ class LocalFaultExecutor:
             The three evidence artifacts, in order: approval rejection,
             release block and audit record.
         """
-        scenario = reliability.FaultScenario.REJECTED_APPROVAL
-        approval = scmle.governance.registry.PromotionApproval(
+        scenario = reliability.Contingency.REJECTED_APPROVAL
+        approval = scmle.governance.registry.Sanction(
             model="local-model",
             version=1,
             content_id="bundle-digest",
             reviewer="independent-reviewer",
-            decision=scmle.governance.registry.PromotionDecision.REJECTED,
+            decision=scmle.governance.registry.Verdict.REJECTED,
             reason="controlled rejection",
             evidence=("artifact://review",),
             approved_at="2026-10-20T10:00:00+00:00",
         ).sign("local-key")
         rejected = False
         try:
-            approval.validate_target(
+            approval.validate(
                 "local-model", 1, "bundle-digest", signing_key="local-key"
             )
         except ValueError:
@@ -914,7 +910,7 @@ class LocalFaultExecutor:
 
     def run_changed_snapshot(
         self,
-    ) -> tuple[scmle.governance.reliability.FaultArtifact, ...]:
+    ) -> tuple[scmle.governance.reliability.Emission, ...]:
         """Registers a snapshot, then one with the same id and other data.
 
         The second registration in an in-memory source registry is expected
@@ -925,8 +921,8 @@ class LocalFaultExecutor:
             The three evidence artifacts, in order: snapshot digest change,
             run invalidation and lineage record.
         """
-        scenario = reliability.FaultScenario.CHANGED_SNAPSHOT
-        previous = scmle.data.readers.registry.SourceSnapshot(
+        scenario = reliability.Contingency.CHANGED_SNAPSHOT
+        previous = scmle.data.readers.registry.Observation(
             source_id="source",
             source_uri="file:///source.csv",
             snapshot_id="snapshot-1",
@@ -937,7 +933,7 @@ class LocalFaultExecutor:
             schema={"value": "int"},
             captured_at="2026-10-20T10:00:00+00:00",
         )
-        registry = scmle.data.readers.registry.SourceRegistry()
+        registry = scmle.data.readers.registry.Sources()
         registry.register(previous)
         changed = dataclasses.replace(previous, data_hash="data-2")
         rejected = False

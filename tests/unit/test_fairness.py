@@ -12,7 +12,7 @@ from scmle.evaluation import diagnostics
 from scmle.evaluation import fairness
 from scmle.evaluation import metrics
 
-PLAN = data.FeaturePlan(("score",), ("group",))
+PLAN = data.Blueprint(("score",), ("group",))
 
 
 class Rule(base.ClassifierMixin, base.BaseEstimator):
@@ -137,7 +137,7 @@ def test_regression_reports_bias_per_group():
         truth,
         tasks.Task.REGRESSION,
         metrics.CATALOG.resolve("rmse", tasks.Task.REGRESSION),
-        data.FeaturePlan(("x",), ("group",)),
+        data.Blueprint(("x",), ("group",)),
         0,
         sensitive_columns=("group",),
     )
@@ -172,7 +172,7 @@ def test_regression_intersectional_groups_use_the_same_small_cell_guard():
         truth,
         tasks.Task.REGRESSION,
         metrics.CATALOG.resolve("rmse", tasks.Task.REGRESSION),
-        data.FeaturePlan(("x",), ("group",)),
+        data.Blueprint(("x",), ("group",)),
         0,
         sensitive_columns=("group", "x"),
     )

@@ -13,13 +13,13 @@ from tests.unit.test_charter_contracts import make_charter
 
 
 def layer(fairness=(), plan=None):
-    return scmle.data.charter.decision.DecisionLayer(
-        scmle.data.charter.decision.DecisionModel("EUR"), fairness, plan
+    return scmle.data.charter.decision.Layer(
+        scmle.data.charter.decision.Policy("EUR"), fairness, plan
     )
 
 
 def plan():
-    return scmle.data.charter.decision.RolloutPlan(
+    return scmle.data.charter.decision.Experiment(
         unit="user",
         primary="conv",
         assignment_prob=0.5,
@@ -32,10 +32,8 @@ def plan():
 
 
 def charter(**kwargs):
-    human = (costs.CostSource.HUMAN,) * 4
-    model = costs.DecisionCostModel(
-        0.0, 2.0, 1.0, 0.0, 0.1, 0.5, human, costs.CostSource.HUMAN
-    )
+    human = (costs.Basis.HUMAN,) * 4
+    model = costs.Tariff(0.0, 2.0, 1.0, 0.0, 0.1, 0.5, human, costs.Basis.HUMAN)
     return make_charter(cost_model=model, decision=layer(**kwargs))
 
 
@@ -79,10 +77,10 @@ def test_fairness_reports_each_constraint_and_missing_columns():
     outcome = (rng.random(n) < 0.5).astype(float)
     acts = (rng.random(n) < 0.5).astype(float)
     items = (
-        scmle.data.charter.decision.FairnessConstraint(
+        scmle.data.charter.decision.Constraint(
             "g", "demographic_parity", 0.3, "reweighing"
         ),
-        scmle.data.charter.decision.FairnessConstraint(
+        scmle.data.charter.decision.Constraint(
             "absent", "demographic_parity", 0.3, "reweighing"
         ),
     )
@@ -101,7 +99,7 @@ def test_the_rollout_design_has_a_hashed_log_and_no_assignments():
     assert record["expected_sample_number"] is not None
     assert log.verify() and len(log.rows) == 1
     assert log.rows[0]["body"]["plan_hash"] == record["plan_hash"]
-    assert isinstance(log, rollout.DecisionLog)
+    assert isinstance(log, rollout.Journal)
 
 
 def test_no_rollout_plan_means_no_design_and_no_room_means_no_size():

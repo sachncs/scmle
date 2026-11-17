@@ -122,9 +122,7 @@ class Assignment:
         }
 
 
-def tier_conditions(
-    facts: Inputs, certified: Collection[str]
-) -> dict[str, bool]:
+def assess(facts: Inputs, certified: Collection[str]) -> dict[str, bool]:
     """Evaluates the five conditions of the tier rule.
 
     Args:
@@ -155,7 +153,7 @@ def tier_conditions(
     }
 
 
-def design_shortfalls(
+def shortfalls(
     facts: Inputs, conditions: Mapping[str, bool], certified: Collection[str]
 ) -> list[str]:
     """Lists why the design conditions fall short of `confirmed`.
@@ -249,7 +247,7 @@ def decide(facts: Inputs) -> Assignment:
     unnamed = [
         a for a in facts.needed if not facts.attestors.get(a, "").strip()
     ]
-    conditions = tier_conditions(facts, certified)
+    conditions = assess(facts, certified)
     reasons: list[str] = []
     if unnamed:
         reasons.append("no named attestor for: " + ", ".join(unnamed))
@@ -265,7 +263,7 @@ def decide(facts: Inputs) -> Assignment:
             tuple(reasons),
             "downgrade_tier",
         )
-    reasons.extend(design_shortfalls(facts, conditions, certified))
+    reasons.extend(shortfalls(facts, conditions, certified))
     reasons.extend(evidence_shortfalls(facts, conditions, certified))
     if all(conditions.values()):
         return Assignment(

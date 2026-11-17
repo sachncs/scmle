@@ -289,7 +289,7 @@ class SchemaCheck(Check):
         return self.judge(not problems, "; ".join(problems[:5]))
 
 
-class FreshnessCheck(Check):
+class Freshness(Check):
     """The data is not older than the contract allows."""
 
     name = "freshness"
@@ -402,7 +402,7 @@ class NullFractionCheck(Check):
         )
 
 
-class NoNullsCheck(Check):
+class Complete(Check):
     """No row has a null in the column."""
 
     name = "no_nulls"
@@ -535,7 +535,7 @@ class RangeCheck(Check):
         )
 
 
-class AllowedValuesCheck(Check):
+class Membership(Check):
     """Values of a column belong to a declared set."""
 
     name = "allowed_values"

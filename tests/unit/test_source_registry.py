@@ -28,10 +28,10 @@ def make_snapshot(
     snapshot_id: str = "snapshot-1",
     data_hash: str = "data-1",
     schema: dict[str, str] | None = None,
-) -> registry.SourceSnapshot:
+) -> registry.Observation:
     """Build a deterministic source snapshot."""
     frame_schema = schema or {"value": "int64", "label": "int64"}
-    return registry.SourceSnapshot.from_manifest(
+    return registry.Observation.restore(
         make_manifest(snapshot_id, data_hash),
         frame_schema,
         "2026-10-20T10:00:00+00:00",
@@ -43,12 +43,12 @@ def test_registry_round_trips_and_repeats_are_idempotent():
     observed_again = dataclasses.replace(
         source, captured_at="2026-10-20T10:01:00+00:00"
     )
-    registry_value = registry.SourceRegistry()
+    registry_value = registry.Sources()
     registry_value.register(source)
     registry_value.register(observed_again)
 
     serialized = registry_value.to_json()
-    restored = registry.SourceRegistry.from_json(serialized)
+    restored = registry.Sources.from_json(serialized)
 
     assert len(restored.snapshots[source.source_id]) == 1
     assert json.loads(serialized) == json.loads(restored.to_json())
@@ -82,7 +82,7 @@ def test_snapshot_from_frame_preserves_ordered_source_types():
     frame = pandas.DataFrame({"value": [1, 2], "label": [0, 1]})
     manifest = make_manifest("snapshot-1", "data-1")
 
-    source = registry.SourceSnapshot.from_manifest(
+    source = registry.Observation.restore(
         manifest,
         {str(name): str(dtype) for name, dtype in frame.dtypes.items()},
         "2026-10-20T10:00:00+00:00",
@@ -95,7 +95,7 @@ def test_snapshot_from_frame_preserves_ordered_source_types():
 def test_registry_rejects_conflicting_repeated_snapshot():
     first = make_snapshot()
     conflict = make_snapshot(data_hash="different")
-    registry_value = registry.SourceRegistry()
+    registry_value = registry.Sources()
     registry_value.register(first)
 
     with pytest.raises(ValueError, match="different evidence"):
@@ -105,7 +105,7 @@ def test_registry_rejects_conflicting_repeated_snapshot():
 def test_durable_registry_store_compares_snapshots_across_process_runs(
     tmp_path,
 ):
-    store = registry.SourceRegistryStore(tmp_path / "sources.json")
+    store = registry.Registry(tmp_path / "sources.json")
     first = make_snapshot()
     additive = make_snapshot(
         "snapshot-2",
@@ -117,7 +117,7 @@ def test_durable_registry_store_compares_snapshots_across_process_runs(
     assert store.register(first).status == "initial"
     assert store.register(additive).status == "additive"
 
-    restored = registry.SourceRegistryStore(store.path).load()
+    restored = registry.Registry(store.path).load()
     assert [
         item.snapshot_id for item in restored.snapshots[first.source_id]
     ] == [
@@ -130,7 +130,7 @@ def test_durable_registry_store_compares_snapshots_across_process_runs(
 def test_durable_registry_store_does_not_replace_on_conflicting_snapshot(
     tmp_path,
 ):
-    store = registry.SourceRegistryStore(tmp_path / "sources.json")
+    store = registry.Registry(tmp_path / "sources.json")
     first = make_snapshot()
     store.register(first)
     original = store.path.read_text(encoding="utf-8")

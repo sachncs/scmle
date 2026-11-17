@@ -29,12 +29,12 @@ from scmle.data.ledger import multiplicity
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f10_certificates.json"
 METHOD_SOURCES: dict[str, list[Any]] = {
-    "selector": [select.select, select.judge, select.check_adjustment],
+    "selector": [select.select, select.judge, select.verify],
     "coverage_aipw": [
         aipw.scores,
         aipw.estimate,
-        aipw.fit_nuisances,
-        aipw.make_learners,
+        aipw.prefit,
+        aipw.spawn,
         aipw.Design,
     ],
     "coverage_randomized": [aipw.difference_in_means],
@@ -43,22 +43,22 @@ METHOD_SOURCES: dict[str, list[Any]] = {
     "coverage_rd": [
         rd.estimate,
         rd.discontinuity,
-        rd.local_fit,
-        rd.cv_bandwidth,
+        rd.polyfit,
+        rd.crossvalidate,
     ],
-    "size_synth": [synth.estimate, synth.fit_weights, synth.ratio_for],
-    "overlap": [aipw.overlap_report],
+    "size_synth": [synth.estimate, synth.weigh, synth.ratio_for],
+    "overlap": [aipw.propensities],
     "iv_strength": [iv.estimate, iv.anderson_rubin],
     "density_rd": [rd.estimate],
-    "battery_nco": [battery.run_battery, battery.wald_test, aipw.estimate],
+    "battery_nco": [battery.run_battery, battery.wald, aipw.estimate],
     "battery_pretrend": [battery.run_battery, did.estimate],
     "battery_rd": [battery.run_battery, rd.estimate],
     "sensitivity_bound": [
         sensitivity.assess,
-        sensitivity.ols_fit,
-        sensitivity.benchmark_strength,
-        sensitivity.adjusted_interval,
-        sensitivity.bias_bound,
+        sensitivity.regress,
+        sensitivity.calibrate,
+        sensitivity.robustify,
+        sensitivity.ceiling,
     ],
     "sensitivity_did": [did.estimate, did.Estimate.sensitivity],
     "false_confirm": [tier.decide, battery.run_battery],
@@ -76,7 +76,7 @@ def method_hashes() -> dict[str, str]:
     return {k: certificates.code_hash(*v) for k, v in METHOD_SOURCES.items()}
 
 
-def certified_gates(path: Path | None = None) -> set[str]:
+def certificated(path: Path | None = None) -> set[str]:
     """Lists the gates whose stored certificate passed and is current.
 
     Args:
@@ -130,20 +130,18 @@ class SubgroupGate:
         return dataclasses.asdict(self)
 
 
-def subgroup_method_hash(report: Any) -> str:
+def fingerprint(report: Any) -> str:
     """Hashes the code a subgroup certificate measured.
 
     Args:
-        report: `scmle.data.identification.run.subgroup_report`, passed in
+        report: `scmle.data.identification.run.stratify`, passed in
             because that module imports this one's loader.
 
     Returns:
         The code hash of the report function, the Wald test and the
         multiplicity adjustment.
     """
-    return certificates.code_hash(
-        report, battery.wald_test, multiplicity.adjust
-    )
+    return certificates.code_hash(report, battery.wald, multiplicity.adjust)
 
 
 def subgroup_gate(report: Any, path: Path | None = None) -> SubgroupGate:
@@ -153,7 +151,7 @@ def subgroup_gate(report: Any, path: Path | None = None) -> SubgroupGate:
     subgroup input); this decides only which word the report carries.
 
     Args:
-        report: `scmle.data.identification.run.subgroup_report`.
+        report: `scmle.data.identification.run.stratify`.
         path: Certificate file; the shipped one when omitted.
 
     Returns:
@@ -168,7 +166,7 @@ def subgroup_gate(report: Any, path: Path | None = None) -> SubgroupGate:
     entry = document.get("gates", {}).get(SUBGROUP_GATE)
     if entry is None:
         return SubgroupGate(DESCRIPTIVE, "no subgroup certificate")
-    if entry.get("method_hash") != subgroup_method_hash(report):
+    if entry.get("method_hash") != fingerprint(report):
         return SubgroupGate(
             DESCRIPTIVE, "stale: the code changed since it was measured"
         )

@@ -16,11 +16,11 @@ from tests.unit.test_charter_contracts import make_charter
 KEY = "integration-key"
 
 
-def write_charter(tmp_path, **overrides):
+def inscribe(tmp_path, **overrides):
     values = {"min_effect": 0.5, "k_max": 3}
     values.update(overrides)
     path = tmp_path / "charter.json"
-    sealing.write_charter(path, make_charter(**values), signing_key=KEY)
+    sealing.inscribe(path, make_charter(**values), signing_key=KEY)
     return path
 
 
@@ -45,7 +45,7 @@ def event(run_dir, kind):
 
 
 def test_a_charter_run_seals_c_even_in_cooperative_mode(binary_frame, tmp_path):
-    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    result = run(binary_frame, tmp_path, inscribe(tmp_path))
 
     custody = event(result.run_dir, "custody.sealed")["data"]
     assert custody["isolation"] == {
@@ -61,7 +61,7 @@ def test_a_charter_run_seals_c_even_in_cooperative_mode(binary_frame, tmp_path):
 def test_the_charter_artifacts_are_written_and_verifiable(
     binary_frame, tmp_path
 ):
-    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    result = run(binary_frame, tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
     for name in (
@@ -72,19 +72,19 @@ def test_the_charter_artifacts_are_written_and_verifiable(
         "custody_log.jsonl",
     ):
         assert (folder / name).exists(), name
-    loaded = scmle.data.custody.manifest.load_manifest(
+    loaded = scmle.data.custody.manifest.restore(
         json.loads((folder / "split_manifest.json").read_text())
     )
     assert len(loaded.sha256) == 64
     assert sealing.read_verified(
         folder / "analysis_charter.json", signing_key=KEY
     ).signed
-    sealed.OpenLog(folder / "custody_log.jsonl")
+    sealed.Journal(folder / "custody_log.jsonl")
 
 
 def test_profiling_sees_exploration_rows_only(binary_frame, tmp_path):
     plain = run(binary_frame, tmp_path / "plain")
-    governed = run(binary_frame, tmp_path, write_charter(tmp_path))
+    governed = run(binary_frame, tmp_path, inscribe(tmp_path))
 
     def profiled(result):
         folder = pathlib.Path(result.run_dir)
@@ -106,7 +106,7 @@ def test_profiling_sees_exploration_rows_only(binary_frame, tmp_path):
 
 
 def test_the_final_test_still_opens_once_and_scores(binary_frame, tmp_path):
-    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    result = run(binary_frame, tmp_path, inscribe(tmp_path))
     assert result.evaluation["test_set_opened"] is True
     assert result.evaluation["n_test"] > 0
 
@@ -124,7 +124,7 @@ def test_a_run_without_a_charter_is_unchanged(binary_frame, tmp_path):
 def test_a_tampered_charter_stops_the_run_before_profiling(
     binary_frame, tmp_path
 ):
-    path = write_charter(tmp_path)
+    path = inscribe(tmp_path)
     record = json.loads(path.read_text())
     record["charter"]["question"] = "A different question?"
     path.write_text(json.dumps(record))
@@ -143,7 +143,7 @@ def test_too_few_rows_run_unconfirmed_instead_of_failing(tmp_path):
     frame = pandas.DataFrame(
         {"a": rng.normal(size=120), "y": (rng.random(120) < 0.4).astype(int)}
     )
-    result = run(frame, tmp_path, write_charter(tmp_path))
+    result = run(frame, tmp_path, inscribe(tmp_path))
     custody = event(result.run_dir, "custody.sealed")["data"]
     assert custody["confirmation_rows"] == 0
     assert custody["scope"] == "exploratory_unconfirmed"
@@ -158,7 +158,7 @@ def test_a_missing_charter_file_is_a_config_error(binary_frame, tmp_path):
 def test_a_charter_run_writes_the_ledger_control_and_claims(
     binary_frame, tmp_path
 ):
-    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    result = run(binary_frame, tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
     for name in (
         "hypothesis_ledger.jsonl",
@@ -177,7 +177,7 @@ def test_a_charter_run_writes_the_ledger_control_and_claims(
     # Only numeric features are candidates; the categorical one is skipped.
     assert {h.spec.column for h in ledger.hypotheses.values()} == {"a", "b"}
     assert claims["outcome"] == done["outcome"]
-    log = sealed.OpenLog(folder / "custody_log.jsonl")
+    log = sealed.Journal(folder / "custody_log.jsonl")
     events_c = [e["event"] for e in log.entries if e["set"] == "C"]
     if claims["outcome"] == "confirmed":
         assert events_c.count("open") == 1
@@ -203,7 +203,7 @@ def leaky_frame(binary_frame):
 def test_a_charter_run_writes_the_admissibility_artifacts(
     binary_frame, tmp_path
 ):
-    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    result = run(binary_frame, tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
     table = json.loads((folder / "admissibility_table.json").read_text())
@@ -223,7 +223,7 @@ def test_a_charter_run_writes_the_admissibility_artifacts(
 def test_a_certified_leakage_suspect_is_quarantined_and_ledgered(
     binary_frame, tmp_path
 ):
-    result = run(leaky_frame(binary_frame), tmp_path, write_charter(tmp_path))
+    result = run(leaky_frame(binary_frame), tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
     done = event(result.run_dir, "admissibility.completed")["data"]
@@ -249,7 +249,7 @@ def test_a_certified_leakage_suspect_is_quarantined_and_ledgered(
 def test_the_curation_report_and_card_list_the_final_feature_plan(
     binary_frame, tmp_path
 ):
-    result = run(leaky_frame(binary_frame), tmp_path, write_charter(tmp_path))
+    result = run(leaky_frame(binary_frame), tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
     plan = json.loads((folder / "dataset_profile.json").read_text())
@@ -271,7 +271,7 @@ def test_a_stale_certificate_no_longer_keeps_a_suspect_field(
     from scmle.data.admissibility import screen
 
     monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
-    result = run(leaky_frame(binary_frame), tmp_path, write_charter(tmp_path))
+    result = run(leaky_frame(binary_frame), tmp_path, inscribe(tmp_path))
 
     done = event(result.run_dir, "admissibility.completed")["data"]
     assert done["leakage_gate"] == "gating"
@@ -299,7 +299,7 @@ def test_a_valid_attestation_keeps_a_certified_suspect_and_is_ledgered(
     result = run(
         leaky_frame(binary_frame),
         tmp_path,
-        write_charter(tmp_path),
+        inscribe(tmp_path),
         leakage_attestations=path,
     )
     folder = pathlib.Path(result.run_dir)
@@ -332,7 +332,7 @@ def test_a_malformed_attestation_file_is_a_config_error(binary_frame, tmp_path):
         binary_frame,
         "y",
         output_dir=tmp_path / "out",
-        charter=write_charter(tmp_path),
+        charter=inscribe(tmp_path),
         leakage_attestations=path,
     )
     with pytest.raises(errors.ConfigError, match="leakage attestations"):
@@ -370,12 +370,12 @@ def test_a_charter_run_writes_valid_stability_and_shift_reports(
 ):
     import scmle.data.robustness.report
 
-    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    result = run(binary_frame, tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
     stability = json.loads((folder / "stability_report.json").read_text())
     shifted = json.loads((folder / "shift_report.json").read_text())
-    scmle.data.robustness.report.validate_stability(stability)
+    scmle.data.robustness.report.conform(stability)
     scmle.data.robustness.report.validate_shift(shifted)
     # The default charter declares one implemented choice with one usable
     # option, so no finding can be called stable.
@@ -393,7 +393,7 @@ def test_survivors_are_rerun_over_the_declared_multiverse(
 ):
     import scmle.data.ledger.ledger
 
-    path = write_charter(tmp_path, multiverse=RICH_MULTIVERSE)
+    path = inscribe(tmp_path, multiverse=RICH_MULTIVERSE)
     result = run(binary_frame, tmp_path, path)
     folder = pathlib.Path(result.run_dir)
 
@@ -422,7 +422,7 @@ def test_a_reference_sample_gives_a_pass_or_fail_never_unverifiable(
     result = run(
         binary_frame,
         tmp_path,
-        write_charter(tmp_path),
+        inscribe(tmp_path),
         reference=str(reference),
         sensitive_columns=["c"],
     )
@@ -457,7 +457,7 @@ def test_chartered_rules_drive_the_ledger_and_the_second_stage(
     rules = scmle.data.charter.rules.Procedure(
         ledger_rule="lord++", confirmation_rule="bh", stability_filter=True
     )
-    path = write_charter(tmp_path, multiverse=RICH_MULTIVERSE, rules=rules)
+    path = inscribe(tmp_path, multiverse=RICH_MULTIVERSE, rules=rules)
     result = run(binary_frame, tmp_path, path)
     folder = pathlib.Path(result.run_dir)
 
@@ -486,7 +486,7 @@ def test_chartered_rules_drive_the_ledger_and_the_second_stage(
 def test_a_charter_without_rules_is_reported_as_not_chartered(
     binary_frame, tmp_path
 ):
-    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    result = run(binary_frame, tmp_path, inscribe(tmp_path))
     done = event(result.run_dir, "ledger.completed")["data"]
     assert done["rules"] == "not chartered" and done["rule"] == "e-lond"
     folder = pathlib.Path(result.run_dir)
@@ -497,11 +497,11 @@ def test_a_charter_without_rules_is_reported_as_not_chartered(
 def test_a_specification_that_contradicts_the_chartered_rule_is_refused():
     from scmle.core import stages
 
-    assert stages.chartered_rule("x", "by", None, "by") == "by"
-    assert stages.chartered_rule("x", "by", "bh", "by") == "bh"
-    assert stages.chartered_rule("x", "bh", "bh", "by") == "bh"
+    assert stages.governing("x", "by", None, "by") == "by"
+    assert stages.governing("x", "by", "bh", "by") == "bh"
+    assert stages.governing("x", "bh", "bh", "by") == "bh"
     with pytest.raises(errors.ConfigError, match="charter fixes"):
-        stages.chartered_rule("x", "holm", "bh", "by")
+        stages.governing("x", "holm", "bh", "by")
 
 
 def test_the_summary_and_report_put_leaks_and_findings_first(
@@ -518,11 +518,11 @@ def test_the_summary_and_report_put_leaks_and_findings_first(
 
 
 def test_the_summary_counts_claims_by_tier(binary_frame, tmp_path):
-    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    result = run(binary_frame, tmp_path, inscribe(tmp_path))
     claims = {"claims": [{"tier": "confirmed"}, {"tier": "confirmed"}]}
     (pathlib.Path(result.run_dir) / "confirmed_claims.json").write_text(
         json.dumps(claims)
     )
 
-    assert result.claim_tiers() == {"confirmed": 2}
+    assert result.tally() == {"confirmed": 2}
     assert result.summary().endswith("claims: 2 confirmed")

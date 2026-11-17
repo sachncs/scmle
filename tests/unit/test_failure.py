@@ -51,7 +51,7 @@ def test_the_trace_is_bounded_to_its_innermost_part():
 
 def test_a_child_process_failure_reaches_the_parent_with_its_frames():
     supervisor = limits.Supervisor(30.0, None)
-    with pytest.raises(limits.TrialLimitError) as caught:
+    with pytest.raises(limits.TrialError) as caught:
         supervisor.run(explode, "row 7")
     error = caught.value
     assert str(error) == "RuntimeError: child failed on row 7"
@@ -75,7 +75,7 @@ def test_a_lost_trial_records_its_failure():
 
     with pytest.raises(ValueError) as caught:
         chained()
-    trial = trials.lost_trial(Payload(), caught.value)
+    trial = trials.lose(Payload(), caught.value)
     assert trial.error == "WorkerLost: ValueError: bad input"
     assert trial.failure["causes"] == ["ZeroDivisionError: division by zero"]
     assert json.loads(trial.to_dict()["failure"])["kind"] == "ValueError"

@@ -18,7 +18,7 @@ from scmle.data.curation import preprocessing
 import scmle.inference.mapping
 import scmle.models.registry
 
-PLAN = data.FeaturePlan(("num",), ("cat",))
+PLAN = data.Blueprint(("num",), ("cat",))
 
 
 @pytest.fixture
@@ -28,8 +28,8 @@ def trained():
         {"num": rng.normal(size=200), "cat": rng.choice(["a", "b"], 200)}
     )
     target = pandas.Series((features.num > 0).astype(int))
-    registry = scmle.models.registry.Catalog.with_builtins()
-    pipe = preprocessing.build_pipeline(
+    registry = scmle.models.registry.Catalog.stock()
+    pipe = preprocessing.instantiate(
         PLAN, registry.get("random_forest"), tasks.Task.BINARY, 0
     ).fit(features, target)
     bundle = scmle.artifacts.bundle.Bundle.create(
@@ -186,9 +186,9 @@ def test_unknown_signature_algorithm_is_rejected(trained, tmp_path):
 def test_regression_bundle_has_no_probabilities(tmp_path):
     rng = numpy.random.default_rng(1)
     features = pandas.DataFrame({"num": rng.normal(size=80)})
-    registry = scmle.models.registry.Catalog.with_builtins()
-    plan = data.FeaturePlan(("num",), ())
-    pipe = preprocessing.build_pipeline(
+    registry = scmle.models.registry.Catalog.stock()
+    plan = data.Blueprint(("num",), ())
+    pipe = preprocessing.instantiate(
         plan, registry.get("ridge"), tasks.Task.REGRESSION, 0
     ).fit(features, features.num * 2)
     bundle = scmle.artifacts.bundle.Bundle.create(
@@ -200,8 +200,8 @@ def test_regression_bundle_has_no_probabilities(tmp_path):
 
 
 def test_run_store_allocates_unique_directories(tmp_path):
-    first = scmle.artifacts.store.RunStore.create(tmp_path / "runs")
-    second = scmle.artifacts.store.RunStore.create(tmp_path / "runs")
+    first = scmle.artifacts.store.Workspace.create(tmp_path / "runs")
+    second = scmle.artifacts.store.Workspace.create(tmp_path / "runs")
     assert first.run_id != second.run_id and first.directory.is_dir()
     first.write_json("a.json", {"x": 1})
     first.write_text("b.txt", "hi")
@@ -215,7 +215,7 @@ def test_run_store_allocates_unique_directories(tmp_path):
 def test_run_store_cleans_partial_write_when_replace_fails(
     tmp_path, monkeypatch
 ):
-    store = scmle.artifacts.store.RunStore.create(tmp_path / "runs")
+    store = scmle.artifacts.store.Workspace.create(tmp_path / "runs")
     target = store.path("payload.json")
     store.write_text("payload.json", "original")
 
@@ -235,7 +235,7 @@ def test_reference_profile_roundtrips_and_is_checksummed(trained, tmp_path):
 
     bundle, features = trained
     scores = pandas.Series(bundle.predict_proba(features)[:, 1], name="score")
-    bundle.reference = reference.ReferenceProfile.build(
+    bundle.reference = reference.Baseline.build(
         features, PLAN, scores, "score", {"roc_auc": 0.9}
     )
     directory = bundle.save(tmp_path / "m")
@@ -355,7 +355,7 @@ def test_default_policy_requires_exact_column_names(trained):
 def test_explicit_renames_map_incoming_names(trained):
     bundle, features = trained
     renamed = features.rename(columns={"num": "customer_age", "cat": "segment"})
-    mapping = scmle.inference.mapping.ColumnMapping(
+    mapping = scmle.inference.mapping.Mapper(
         {"customer_age": "num", "segment": "cat"}
     )
     numpy.testing.assert_array_equal(
@@ -370,13 +370,13 @@ def test_case_and_whitespace_insensitive_matching_is_opt_in(trained):
     messy = features.rename(columns={"num": "  NUM ", "cat": "Cat"})
     with pytest.raises(errors.SchemaError):
         bundle.predict(messy)
-    loose = scmle.inference.mapping.ColumnMapping(
+    loose = scmle.inference.mapping.Mapper(
         case_insensitive=True, strip_whitespace=True
     )
     numpy.testing.assert_array_equal(
         bundle.predict(messy, loose), bundle.predict(features)
     )
-    only_case = scmle.inference.mapping.ColumnMapping(case_insensitive=True)
+    only_case = scmle.inference.mapping.Mapper(case_insensitive=True)
     with pytest.raises(errors.SchemaError):  # whitespace still differs
         bundle.predict(messy, only_case)
 
@@ -386,23 +386,23 @@ def test_ambiguous_or_unknown_mappings_are_rejected(trained):
     clash = features.rename(columns={"num": "NUM"}).assign(Num=1.0)
     with pytest.raises(errors.SchemaError, match="ambiguous"):
         bundle.predict(
-            clash, scmle.inference.mapping.ColumnMapping(case_insensitive=True)
+            clash, scmle.inference.mapping.Mapper(case_insensitive=True)
         )
     double = features.assign(other=features["num"]).rename(columns={"num": "a"})
     with pytest.raises(errors.SchemaError, match="ambiguous"):
         bundle.predict(
             double,
-            scmle.inference.mapping.ColumnMapping({"a": "num", "other": "num"}),
+            scmle.inference.mapping.Mapper({"a": "num", "other": "num"}),
         )
     with pytest.raises(errors.SchemaError, match="not in the model schema"):
         bundle.predict(
-            features, scmle.inference.mapping.ColumnMapping({"num": "ghost"})
+            features, scmle.inference.mapping.Mapper({"num": "ghost"})
         )
 
 
 def test_exact_matches_are_never_renamed(trained):
     bundle, features = trained
-    mapping = scmle.inference.mapping.ColumnMapping(
+    mapping = scmle.inference.mapping.Mapper(
         {"num": "cat"}, case_insensitive=True
     )
     # "num" already exists exactly, so the rename request is ignored.
@@ -416,7 +416,7 @@ def test_round_trip_verification_passes_and_reports_the_tolerance(
 ):
     bundle, features = trained
     bundle.save(tmp_path / "m")
-    record = bundle.verify_round_trip(tmp_path / "m", features.head(50))
+    record = bundle.roundtrip(tmp_path / "m", features.head(50))
     assert record["rows"] == 50
     assert record["largest_difference"] <= record["tolerance"]
 
@@ -430,7 +430,7 @@ def test_round_trip_verification_catches_a_bundle_that_drifted(
     flipped = features.assign(num=-features.num)
     other.pipeline = other.pipeline.fit(flipped, (flipped.num > 0).astype(int))
     with pytest.raises(errors.ArtifactError, match="does not reproduce"):
-        other.verify_round_trip(tmp_path / "m", features.head(50))
+        other.roundtrip(tmp_path / "m", features.head(50))
 
 
 def test_inference_time_calibration_is_optional_persisted_and_verified(
@@ -448,7 +448,7 @@ def test_inference_time_calibration_is_optional_persisted_and_verified(
     bundle.save(tmp_path / "m")
     loaded = scmle.artifacts.bundle.Bundle.load(tmp_path / "m", trusted=True)
     numpy.testing.assert_allclose(loaded.predict_proba(features), calibrated)
-    assert bundle.verify_round_trip(tmp_path / "m", features)["rows"] == 200
+    assert bundle.roundtrip(tmp_path / "m", features)["rows"] == 200
     (tmp_path / "m" / scmle.artifacts.bundle.CALIBRATOR_FILE).write_bytes(
         b"broken"
     )
@@ -467,13 +467,13 @@ def test_calibration_rejects_unknown_methods_and_regression(trained):
 
 def test_compatibility_checks_every_recorded_library():
     info = scmle.artifacts.bundle.Manifest("m", "v1", "roc_auc")
-    assert info.compatibility_problems() == []
+    assert info.incompatibilities() == []
     older = dataclasses.replace(
         info, libraries={**info.libraries, "numpy": "1.0.0"}
     )
-    assert any("numpy 1.0.0" in p for p in older.compatibility_problems())
+    assert any("numpy 1.0.0" in p for p in older.incompatibilities())
     pandas_off = dataclasses.replace(info, pandas="0.1.0")
-    assert any("pandas" in p for p in pandas_off.compatibility_problems())
+    assert any("pandas" in p for p in pandas_off.incompatibilities())
 
 
 def test_score_returns_the_structured_inference_result(trained):
@@ -531,6 +531,6 @@ def test_a_version_mismatch_arrives_with_the_lock_attached(trained, tmp_path):
 
 def test_an_empty_bytes_key_is_rejected_when_resolved():
     with pytest.raises(ValueError, match="empty"):
-        scmle.contracts.signing.resolve_key(b"")
+        scmle.contracts.signing.keying(b"")
     with pytest.raises(ValueError, match="empty"):
-        scmle.contracts.signing.resolve_key("")
+        scmle.contracts.signing.keying("")

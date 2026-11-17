@@ -237,16 +237,16 @@ def test_a_declared_dag_that_was_not_supplied_blocks_the_strategy():
     assert verdict.eligible is False
     assert verdict.reasons == ("a DAG is declared but was not supplied",)
     assert verdict.checked is False
-    assert select.check_adjustment(declared, None) == (
+    assert select.verify(declared, None) == (
         ["a DAG is declared but was not supplied"],
         False,
     )
-    assert select.check_adjustment(block(), None) == ([], False)
+    assert select.verify(block(), None) == ([], False)
 
 
 def test_an_invalid_adjustment_set_is_refused_with_the_graph_wording():
     bad = graph(("age", "t"), ("age", "y"), ("t", "y"), ("u", "t"), ("u", "y"))
-    reasons, checked = select.check_adjustment(block(), bad)
+    reasons, checked = select.verify(block(), bad)
     assert reasons == [
         (
             "the declared adjustment set is not a valid back-door set for "
@@ -258,7 +258,7 @@ def test_an_invalid_adjustment_set_is_refused_with_the_graph_wording():
 
 def test_a_valid_adjustment_set_is_verified():
     good = graph(("age", "t"), ("age", "y"), ("t", "y"))
-    assert select.check_adjustment(block(), good) == ([], True)
+    assert select.verify(block(), good) == ([], True)
     plan = select.select(block(), good)
     assert plan.primary == "backdoor_aipw"
     assert plan.verdict("backdoor_aipw").reasons == ()
@@ -268,7 +268,7 @@ def test_a_valid_adjustment_set_is_verified():
 def test_a_graph_that_cannot_judge_the_set_gives_its_error_as_the_reason():
     # `age` is not a node of this graph
     other = graph(("z", "t"), ("t", "y"))
-    reasons, checked = select.check_adjustment(block(), other)
+    reasons, checked = select.verify(block(), other)
     assert reasons == [
         "the declared DAG cannot check the set: not nodes of the graph: ['age']"
     ]
@@ -287,7 +287,7 @@ def test_the_adjustment_set_names_are_read_from_the_covariate_assumption():
         )
     )
     good = graph(("age", "t"), ("age", "y"), ("t", "y"), ("z", "y"))
-    assert select.check_adjustment(chosen, good) == ([], True)
+    assert select.verify(chosen, good) == ([], True)
     none = block(
         assumptions=(
             "unconfoundedness_given:none",
@@ -296,7 +296,7 @@ def test_the_adjustment_set_names_are_read_from_the_covariate_assumption():
         )
     )
     open_graph = graph(("t", "y"))
-    assert select.check_adjustment(none, open_graph) == ([], True)
+    assert select.verify(none, open_graph) == ([], True)
 
 
 def test_an_unknown_strategy_is_a_complete_ineligible_verdict():

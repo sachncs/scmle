@@ -22,14 +22,14 @@ needed. Across experiments the levels follow the discount-only rule of
 `DecisionBudget`, so the family-wise probability of a false promotion is at
 most `alpha_promote` by the union bound.
 
-After a promotion the `RollbackMonitor` tests `H0_rb: Delta_new_vs_old >=
+After a promotion the `Watchdog` tests `H0_rb: Delta_new_vs_old >=
 -tau` on fresh randomized traffic and rolls back when its e-process reaches
 `1 / alpha_rollback`; `P(rollback | no worse than tau) <= alpha_rollback`
 over the monitoring lifetime. The converse error is described by the
 detection delay, which the certificates measure.
 
 The pseudo-outcomes are centred by the running mean of earlier outcomes
-(`anytime.running_center`), which leaves their mean unchanged and cuts the
+(`anytime.centers`), which leaves their mean unchanged and cuts the
 variance the e-process has to overcome.
 
 Assumptions, stated in every record: randomized assignment with the recorded
@@ -106,7 +106,7 @@ class Decision:
 
 
 def metric_stream(
-    plan: scmle.data.charter.decision.RolloutPlan,
+    plan: scmle.data.charter.decision.Experiment,
     guard: scmle.data.charter.decision.Guardrail | None,
 ) -> anytime.Stream:
     """The centred pseudo-outcome stream and null of the primary or a guardrail.
@@ -125,15 +125,13 @@ def metric_stream(
     """
     q = plan.assignment_prob
     if guard is None:
-        return anytime.centered_stream(
-            q, plan.delta_min / (plan.high - plan.low)
-        )
+        return anytime.deviations(q, plan.delta_min / (plan.high - plan.low))
     margin = guard.margin / (guard.high - guard.low)
-    return anytime.centered_stream(q, margin, "less")
+    return anytime.deviations(q, margin, "less")
 
 
 def metric_values(
-    plan: scmle.data.charter.decision.RolloutPlan,
+    plan: scmle.data.charter.decision.Experiment,
     guard: scmle.data.charter.decision.Guardrail | None,
     arm: NDArray[numpy.float64],
     outcome: ArrayLike,
@@ -162,7 +160,7 @@ def metric_values(
     )
     y = (numpy.asarray(outcome, dtype=float) - low) / (high - low)
     z = anytime.pseudo_outcomes(
-        arm, y, plan.assignment_prob, anytime.running_center(y, carry=carry)
+        arm, y, plan.assignment_prob, anytime.centers(y, carry=carry)
     )
     if guard is not None and not guard.higher_is_worse:
         z = -z
@@ -188,7 +186,7 @@ class Rollout:
 
     def __init__(
         self,
-        plan: scmle.data.charter.decision.RolloutPlan,
+        plan: scmle.data.charter.decision.Experiment,
         experiment_id: str,
         level: float,
     ) -> None:
@@ -216,7 +214,7 @@ class Rollout:
             *plan.guardrails,
         ]
         self.processes = {
-            name: anytime.EProcess(metric_stream(plan, guard))
+            name: anytime.Martingale(metric_stream(plan, guard))
             for name, guard in zip(names, self.guards, strict=True)
         }
         self.carry: dict[str, tuple[float, int]] = dict.fromkeys(
@@ -334,7 +332,7 @@ class Rollout:
         )
 
 
-class RollbackMonitor:
+class Watchdog:
     """Monitors a promoted champion on fresh randomized traffic.
 
     The previous champion is held out at probability `1 - new_prob`. The
@@ -372,11 +370,9 @@ class RollbackMonitor:
         self.low, self.high = low, high
         self.new_prob = new_prob
         self.target = -math.log(alpha_rollback)
-        self.stream = anytime.centered_stream(
-            new_prob, -tolerance / scale, "less"
-        )
+        self.stream = anytime.deviations(new_prob, -tolerance / scale, "less")
         self.carry = (0.0, 0)
-        self.process = anytime.EProcess(self.stream)
+        self.process = anytime.Martingale(self.stream)
         self.alpha = alpha_rollback
         self.units = 0
         self.status = HOLD
@@ -403,7 +399,7 @@ class RollbackMonitor:
             numpy.asarray(arm, dtype=float),
             y,
             self.new_prob,
-            anytime.running_center(y, carry=self.carry),
+            anytime.centers(y, carry=self.carry),
         )
         self.carry = (self.carry[0] + float(y.sum()), self.carry[1] + len(y))
         self.process.update(z)
@@ -415,7 +411,7 @@ class RollbackMonitor:
         return self.status
 
 
-class DecisionLog:
+class Journal:
     """Hash-chained rows of the rollout decisions.
 
     The pipeline writes it as `rollout_decisions.jsonl`. Each row carries the
@@ -483,7 +479,7 @@ class DecisionLog:
         Path(path).write_text(text, encoding="utf-8", newline="\n")
 
     @classmethod
-    def read(cls, path: str | Path) -> "DecisionLog":
+    def read(cls, path: str | Path) -> "Journal":
         """Reads rows back without verifying the chain; see `verify`.
 
         Args:

@@ -19,12 +19,12 @@ MIN_EFFECTIVE_SIZE = 50.0
 DEFAULT_CLIP = 20.0
 
 
-class WeightRefusedError(ValueError):
+class RefusedError(ValueError):
     """The effective sample size is too small for weighted conformal."""
 
 
 @dataclasses.dataclass(frozen=True)
-class ShiftWeights:
+class Ratios:
     """Estimated likelihood ratios of calibration and target rows.
 
     Attributes:
@@ -81,7 +81,7 @@ def weigh(
     target: numpy.ndarray,
     clip: float = DEFAULT_CLIP,
     minimum: float = MIN_EFFECTIVE_SIZE,
-) -> ShiftWeights:
+) -> Ratios:
     """Fits the discriminator and returns clipped, size-corrected odds.
 
     Args:
@@ -96,7 +96,7 @@ def weigh(
         weights, the clip, the fitted discriminator and the size correction.
 
     Raises:
-        WeightRefusedError: When the effective sample size of the
+        RefusedError: When the effective sample size of the
             calibration weights is below `minimum`.
     """
     first = numpy.asarray(calibration, dtype=float)
@@ -107,7 +107,7 @@ def weigh(
     probability = model.predict_proba(matrix)[:, 1]
     odds = probability / numpy.maximum(1.0 - probability, 1e-12)
     ratio = numpy.minimum(odds * len(first) / len(second), clip)
-    result = ShiftWeights(
+    result = Ratios(
         ratio[: len(first)],
         ratio[len(first) :],
         effective_sample_size(ratio[: len(first)]),
@@ -116,7 +116,7 @@ def weigh(
         len(first) / len(second),
     )
     if result.effective_size < minimum:
-        raise WeightRefusedError(
+        raise RefusedError(
             f"effective sample size {result.effective_size:.1f} is below "
             f"{minimum:.0f}; weighted conformal is refused"
         )
@@ -132,7 +132,7 @@ class StoredShiftWeights:
         columns: Numeric feature columns the discriminator reads, in order.
     """
 
-    weights: ShiftWeights
+    weights: Ratios
     columns: tuple[str, ...]
 
     def test_weights(self, frame: Any) -> numpy.ndarray:

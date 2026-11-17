@@ -59,7 +59,7 @@ class Checkpoint:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class InferenceContract:
+class Contract:
     """Input and output behavior promised by a model family.
 
     Attributes:
@@ -112,7 +112,7 @@ class InferenceContract:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ExplanationContract:
+class Explainability:
     """Local explanation behavior promised by a model family.
 
     Attributes:
@@ -157,7 +157,7 @@ class ExplanationContract:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FeatureExplanation:
+class Contribution:
     """Feature-level attribution returned by a fitted tabular model.
 
     Attributes:
@@ -210,7 +210,7 @@ class FeatureExplanation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ModelFamilyContract:
+class Boundary:
     """Reusable capability boundary for one deep-learning model family.
 
     Attributes:
@@ -230,8 +230,8 @@ class ModelFamilyContract:
     modalities: tuple[capabilities.Modality, ...]
     required_extras: tuple[str, ...]
     checkpoint: Checkpoint
-    inference: InferenceContract
-    explanation: ExplanationContract | None
+    inference: Contract
+    explanation: Explainability | None
     limitations: tuple[str, ...]
 
     def __post_init__(self) -> None:
@@ -283,7 +283,7 @@ class ModelFamilyContract:
         value = capabilities.Modality(modality)
         return value in self.modalities
 
-    def validate_features(
+    def validate(
         self, features: Any, expected_width: int | None = None
     ) -> numpy.ndarray:
         """Converts and validates the numeric tabular inference boundary.
@@ -344,7 +344,7 @@ class ModelFamilyContract:
         }
 
 
-TABULAR_TRANSFORMER_CONTRACT = ModelFamilyContract(
+TABULAR_TRANSFORMER_CONTRACT = Boundary(
     model_family=capabilities.ModelFamily.TRANSFORMER.value,
     status=capabilities.Status.EXPERIMENTAL,
     modalities=(capabilities.Modality.TABULAR,),
@@ -355,7 +355,7 @@ TABULAR_TRANSFORMER_CONTRACT = ModelFamilyContract(
         trusted_local_storage=True,
         atomic_replace=True,
     ),
-    inference=InferenceContract(
+    inference=Contract(
         modality=capabilities.Modality.TABULAR,
         input_rank=2,
         input_dtype="float32",
@@ -363,7 +363,7 @@ TABULAR_TRANSFORMER_CONTRACT = ModelFamilyContract(
         output="prediction or class probability",
         deterministic=True,
     ),
-    explanation=ExplanationContract(
+    explanation=Explainability(
         "gradient_x_input",
         "local",
         "one signed attribution per numeric input feature",
@@ -381,7 +381,7 @@ TABULAR_TRANSFORMER_CONTRACT = ModelFamilyContract(
 )
 
 
-TABULAR_JEPA_CONTRACT = ModelFamilyContract(
+TABULAR_JEPA_CONTRACT = Boundary(
     model_family=capabilities.ModelFamily.JEPA.value,
     status=capabilities.Status.EXPERIMENTAL,
     modalities=(capabilities.Modality.TABULAR,),
@@ -392,7 +392,7 @@ TABULAR_JEPA_CONTRACT = ModelFamilyContract(
         trusted_local_storage=True,
         atomic_replace=True,
     ),
-    inference=InferenceContract(
+    inference=Contract(
         modality=capabilities.Modality.TABULAR,
         input_rank=2,
         input_dtype="float32",
@@ -400,7 +400,7 @@ TABULAR_JEPA_CONTRACT = ModelFamilyContract(
         output="context embedding",
         deterministic=True,
     ),
-    explanation=ExplanationContract(
+    explanation=Explainability(
         "embedding_gradient_x_input",
         "local",
         "one signed sensitivity attribution per numeric input feature",
@@ -418,7 +418,7 @@ TABULAR_JEPA_CONTRACT = ModelFamilyContract(
 )
 
 
-TABULAR_TORCH_CONTRACT = ModelFamilyContract(
+TABULAR_TORCH_CONTRACT = Boundary(
     model_family="deep_learning",
     status=capabilities.Status.SUPPORTED,
     modalities=(capabilities.Modality.TABULAR,),
@@ -429,7 +429,7 @@ TABULAR_TORCH_CONTRACT = ModelFamilyContract(
         trusted_local_storage=True,
         atomic_replace=True,
     ),
-    inference=InferenceContract(
+    inference=Contract(
         modality=capabilities.Modality.TABULAR,
         input_rank=2,
         input_dtype="float32",
@@ -437,7 +437,7 @@ TABULAR_TORCH_CONTRACT = ModelFamilyContract(
         output="prediction or class probability",
         deterministic=True,
     ),
-    explanation=ExplanationContract(
+    explanation=Explainability(
         "gradient_x_input",
         "local",
         "one signed attribution per numeric input feature",
@@ -450,7 +450,7 @@ TABULAR_TORCH_CONTRACT = ModelFamilyContract(
 )
 
 
-def model_family_contract(architecture: str) -> ModelFamilyContract:
+def resolve(architecture: str) -> Boundary:
     """Resolves the explicit contract for a worker-backed architecture.
 
     Args:
@@ -469,10 +469,10 @@ __all__ = [
     "TABULAR_JEPA_CONTRACT",
     "TABULAR_TORCH_CONTRACT",
     "TABULAR_TRANSFORMER_CONTRACT",
+    "Boundary",
     "Checkpoint",
-    "ExplanationContract",
-    "FeatureExplanation",
-    "InferenceContract",
-    "ModelFamilyContract",
-    "model_family_contract",
+    "Contract",
+    "Contribution",
+    "Explainability",
+    "resolve",
 ]

@@ -71,7 +71,7 @@ class Estimate:
         return dataclasses.asdict(self)
 
 
-def fit_weights(target: numpy.ndarray, donors: numpy.ndarray) -> numpy.ndarray:
+def weigh(target: numpy.ndarray, donors: numpy.ndarray) -> numpy.ndarray:
     """Fits simplex-constrained least-squares donor weights.
 
     Args:
@@ -121,7 +121,7 @@ def ratio_for(
         (infinity when the pre-period fit is exact), the post-period gaps
         and the donor weights.
     """
-    w = fit_weights(pre[:, treated], pre[:, pool])
+    w = weigh(pre[:, treated], pre[:, pool])
     pre_gap = pre[:, treated] - pre[:, pool] @ w
     post_gap = post[:, treated] - post[:, pool] @ w
     pre_rmspe = math.sqrt(float(numpy.mean(pre_gap**2)))
@@ -130,7 +130,7 @@ def ratio_for(
     return pre_rmspe, post_rmspe, ratio, post_gap, w
 
 
-def min_donors(alpha: float) -> int:
+def quorum(alpha: float) -> int:
     """Counts the donors needed so that `1 / (J + 1) <= alpha`.
 
     Args:
@@ -174,7 +174,7 @@ def estimate(
             period and one column per unit (or a unit-period pair is
             repeated), the treated unit is absent, fewer than two periods
             precede `first_treated` or none follow it, or fewer than
-            `min_donors(alpha)` donors exist.
+            `quorum(alpha)` donors exist.
     """
     wide = frame.pivot(  # noqa: PD010 -- pivot_table would average repeated unit-period rows; pivot raises on them, as documented
         index=time, columns=unit, values=outcome
@@ -190,10 +190,10 @@ def estimate(
         raise errors.InputError("need two pre-periods and one post-period")
     units = list(wide.columns)
     donors = [u for u in units if u != treated_unit]
-    if len(donors) < min_donors(alpha):
+    if len(donors) < quorum(alpha):
         raise errors.InputError(
             f"{len(donors)} donors cannot reach p <= {alpha}: at least "
-            f"{min_donors(alpha)} are needed"
+            f"{quorum(alpha)} are needed"
         )
     values = wide.to_numpy(dtype=float)
     pre, post = values[is_pre], values[~is_pre]

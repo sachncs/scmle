@@ -32,8 +32,8 @@ def withdraw_f1(survivors):
 def make_run(tmp_path, withdraw=True, rules=None):
     features, target = build(rows=500, seed=0, effect=0.7)
     cfeatures, ctarget = build(rows=400, seed=9, effect=0.7)
-    log = sealed.OpenLog(tmp_path / claims_audit.CUSTODY_FILE, KEY)
-    source = sealed.SealedSet(
+    log = sealed.Journal(tmp_path / claims_audit.CUSTODY_FILE, KEY)
+    source = sealed.Locker(
         "C",
         splitters.ResidentTestSet(
             cfeatures, ctarget, tuple(range(len(ctarget)))
@@ -41,7 +41,7 @@ def make_run(tmp_path, withdraw=True, rules=None):
         log,
     )
     charter = make_charter(rules=rules)
-    sealing.write_charter(
+    sealing.inscribe(
         tmp_path / claims_audit.CHARTER_FILE, charter, signing_key=KEY
     )
     options = {}
@@ -220,26 +220,26 @@ def test_a_directory_without_a_ledger_fails_cleanly(tmp_path):
     result = claims_audit.verify(tmp_path)
     assert not result.ok
     with pytest.raises(errors.ArtifactError):
-        claims_audit.list_claims(tmp_path)
+        claims_audit.inventory(tmp_path)
 
 
 def test_list_and_show_report_the_claims(tmp_path):
     make_run(tmp_path)
-    rows = claims_audit.list_claims(tmp_path)
+    rows = claims_audit.inventory(tmp_path)
     assert {r["feature"]: r["tier"] for r in rows} == {
         "f0": "confirmed",
         "f1": "unverified",
     }
     assert [r["withdrawn"] for r in rows if r["feature"] == "f1"] == [True]
-    detail = claims_audit.show_claim(tmp_path, rows[0]["claim_id"])
+    detail = claims_audit.inspect(tmp_path, rows[0]["claim_id"])
     assert detail["hypothesis"]["column"] == "f0"
     assert detail["confirmation_check"]["check_id"].endswith(":C")
     assert detail["exploration"]["decision"] == "reject"
-    held = claims_audit.show_claim(tmp_path, rows[1]["claim_id"])
+    held = claims_audit.inspect(tmp_path, rows[1]["claim_id"])
     assert held["withdrawn"] == "fragile on X"
     assert held["confirmation_check"] is None
     with pytest.raises(errors.ArtifactError, match="no claim"):
-        claims_audit.show_claim(tmp_path, "h999999")
+        claims_audit.inspect(tmp_path, "h999999")
 
 
 def test_the_cli_lists_shows_and_verifies(tmp_path, capsys, monkeypatch):
@@ -276,18 +276,18 @@ def test_the_cli_lists_shows_and_verifies(tmp_path, capsys, monkeypatch):
 DECISION = "decision files: hashes match the custody log"
 
 
-def register_decision_files(tmp_path, files):
+def notarize(tmp_path, files):
     """Writes the files and the custody event that registers their hashes."""
     from scmle.core import decision_reports
 
     for name, body in files.items():
         (tmp_path / name).write_text(json.dumps(body), encoding="utf-8")
-    log = sealed.OpenLog(tmp_path / claims_audit.CUSTODY_FILE, KEY)
+    log = sealed.Journal(tmp_path / claims_audit.CUSTODY_FILE, KEY)
     log.append(
         "final_test",
         "decision_files",
         "scmle.decision",
-        {"files": decision_reports.file_digests(tmp_path)},
+        {"files": decision_reports.hashsums(tmp_path)},
     )
 
 
@@ -303,7 +303,7 @@ def test_the_four_decision_files_are_checked_against_the_registration(
     tmp_path,
 ):
     make_run(tmp_path)
-    register_decision_files(tmp_path, FOUR)
+    notarize(tmp_path, FOUR)
 
     result = claims_audit.verify(tmp_path, KEY)
 
@@ -313,7 +313,7 @@ def test_the_four_decision_files_are_checked_against_the_registration(
 
 def test_a_tampered_decision_file_fails_with_its_name(tmp_path):
     make_run(tmp_path)
-    register_decision_files(tmp_path, FOUR)
+    notarize(tmp_path, FOUR)
     (tmp_path / "net_benefit.json").write_text(
         json.dumps({"claim": "not_useful_in_range"}), encoding="utf-8"
     )
@@ -328,7 +328,7 @@ def test_a_tampered_decision_file_fails_with_its_name(tmp_path):
 
 def test_a_missing_decision_file_fails_with_its_name(tmp_path):
     make_run(tmp_path)
-    register_decision_files(tmp_path, FOUR)
+    notarize(tmp_path, FOUR)
     (tmp_path / "policy_value.json").unlink()
 
     result = claims_audit.verify(tmp_path, KEY)
@@ -341,7 +341,7 @@ def test_a_missing_decision_file_fails_with_its_name(tmp_path):
 def test_an_unregistered_absent_file_that_appears_fails(tmp_path):
     make_run(tmp_path)
     files = {k: v for k, v in FOUR.items() if k != "rollout_design.json"}
-    register_decision_files(tmp_path, files)
+    notarize(tmp_path, files)
     (tmp_path / "rollout_design.json").write_text("{}", encoding="utf-8")
 
     found = next(
@@ -366,9 +366,9 @@ def test_a_malformed_claims_document_fails_the_replay_instead_of_raising():
         "claims": [{"claim_id": "h1"}],
         "checks": [{"check_id": "h1:C", "p_value": 0.001}],
     }
-    assert claims_audit.check_replay(document).status == "fail"
+    assert claims_audit.rederive(document).status == "fail"
     del document["checks"]
-    assert claims_audit.check_replay(document).status == "fail"
+    assert claims_audit.rederive(document).status == "fail"
 
 
 def test_showing_a_claim_the_ledger_does_not_know_is_an_artifact_error(
@@ -380,4 +380,4 @@ def test_showing_a_claim_the_ledger_does_not_know_is_an_artifact_error(
         lambda d: d["claims"].append(dict(d["claims"][0], claim_id="h424242")),
     )
     with pytest.raises(errors.ArtifactError, match="h424242"):
-        claims_audit.show_claim(tmp_path, "h424242")
+        claims_audit.inspect(tmp_path, "h424242")

@@ -57,7 +57,7 @@ def read_json(path: pathlib.Path) -> Any:
         raise errors.ArtifactError(f"cannot read {path}") from error
 
 
-def approval_from_dict(record: Mapping[str, Any]) -> registry.PromotionApproval:
+def revive(record: Mapping[str, Any]) -> registry.Sanction:
     """Rebuilds a promotion approval from its JSON record.
 
     Args:
@@ -72,7 +72,7 @@ def approval_from_dict(record: Mapping[str, Any]) -> registry.PromotionApproval:
     values = dict(record)
     values["evidence"] = tuple(values.get("evidence", ()))
     try:
-        return registry.PromotionApproval(**values)
+        return registry.Sanction(**values)
     except (TypeError, ValueError) as error:
         raise errors.ArtifactError(f"bad approval record: {error}") from error
 
@@ -98,7 +98,7 @@ def observation_from_dict(record: Mapping[str, Any]) -> observation.Observation:
     )
 
 
-def scan_result(
+def triage(
     report: pathlib.Path,
     container_digest: str,
     policy: pathlib.Path | None = None,
@@ -133,7 +133,7 @@ def scan_result(
     return gate.ImageScan(container_digest, bool(verdict["passed"]), digest)
 
 
-def load_candidate(manifest_path: str | pathlib.Path) -> gate.Candidate:
+def gather(manifest_path: str | pathlib.Path) -> gate.Candidate:
     """Reads a manifest and the evidence it names.
 
     Args:
@@ -185,9 +185,7 @@ def load_candidate(manifest_path: str | pathlib.Path) -> gate.Candidate:
         model=version,
         model_digest=gate.model_digest_of(store, version),
         approval=(
-            None
-            if approval_path is None
-            else approval_from_dict(read_json(approval_path))
+            None if approval_path is None else revive(read_json(approval_path))
         ),
         container_digest=container,
         config_digest=manifest["config_digest"],
@@ -197,7 +195,7 @@ def load_candidate(manifest_path: str | pathlib.Path) -> gate.Candidate:
         scan=(
             None
             if scan_path is None
-            else scan_result(scan_path, container, file("scan_policy"))
+            else triage(scan_path, container, file("scan_policy"))
         ),
         checks=(
             ()

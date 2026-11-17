@@ -21,7 +21,7 @@ from scmle import durability
 from scmle.contracts import errors
 from scmle.contracts import observability
 
-Send = Callable[[list[observability.MetricSample]], int]
+Send = Callable[[list[observability.Sample]], int]
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -87,7 +87,7 @@ class MetricsSpool:
         """
         return len(self.lines())
 
-    def add(self, samples: Sequence[observability.MetricSample]) -> int:
+    def add(self, samples: Sequence[observability.Sample]) -> int:
         """Appends samples to the spool file without sending anything.
 
         The file and its parent directories are created if missing.
@@ -129,7 +129,7 @@ class MetricsSpool:
         while lines:
             batch = lines[: self.batch_size]
             samples = [
-                observability.MetricSample.from_dict(json.loads(line))
+                observability.Sample.from_dict(json.loads(line))
                 for line in batch
             ]
             try:

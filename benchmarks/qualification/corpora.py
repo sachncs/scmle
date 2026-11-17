@@ -238,7 +238,7 @@ def parse_manifest(document: Mapping[str, Any]) -> tuple[Corpus, ...]:
     return entries
 
 
-def load_manifest(path: Path = MANIFEST) -> tuple[Corpus, ...]:
+def restore(path: Path = MANIFEST) -> tuple[Corpus, ...]:
     """Reads and validates a manifest file.
 
     Args:
@@ -310,7 +310,7 @@ def destination(entry: Corpus, root: Path) -> Path:
     return root / entry.id / (name or "corpus.bin")
 
 
-def sha256_of(path: Path) -> str:
+def checksum(path: Path) -> str:
     """SHA-256 of a file, read in chunks.
 
     Args:
@@ -340,7 +340,7 @@ def is_available(entry: Corpus, root: Path) -> bool:
     if entry.status != "verified" or entry.sha256 is None:
         return False
     target = destination(entry, root)
-    return target.is_file() and sha256_of(target) == entry.sha256
+    return target.is_file() and checksum(target) == entry.sha256
 
 
 def fetch(

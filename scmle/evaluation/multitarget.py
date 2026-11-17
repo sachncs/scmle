@@ -119,7 +119,7 @@ FUNCTIONS = {
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class MultiTargetMetric(scmle.contracts.metrics.Metric):
+class Joint(scmle.contracts.metrics.Metric):
     """A metric over all target columns.
 
     Attributes:

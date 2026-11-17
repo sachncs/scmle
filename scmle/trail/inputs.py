@@ -63,13 +63,11 @@ def sign_inputs(
         for key, value in record.items()
     }
     for role in SECTIONS:
-        signed[role]["signature"] = signing.sign_payload(
-            cover(signed, role), keys[role]
-        )
+        signed[role]["signature"] = signing.mac(cover(signed, role), keys[role])
     return signed
 
 
-def signature_problem(
+def diagnose(
     record: Mapping[str, Any], role: str, key: str | bytes | None
 ) -> str | None:
     """Explains why a section's signature is not valid.
@@ -91,7 +89,7 @@ def signature_problem(
         return f"the {role} section is unsigned"
     if key is None:
         return f"no {role} key was supplied to check the signature"
-    expected = signing.sign_payload(cover(record, role), key)
+    expected = signing.mac(cover(record, role), key)
     if not hmac.compare_digest(str(signature), expected):
         return f"the {role} signature does not verify"
     return None
@@ -113,7 +111,7 @@ def lack(
     return [message.format(name=name) for name in names if name not in section]
 
 
-def structure_problems(record: Mapping[str, Any]) -> list[str]:
+def lint(record: Mapping[str, Any]) -> list[str]:
     """Lists missing or malformed fields in the inputs.
 
     Args:

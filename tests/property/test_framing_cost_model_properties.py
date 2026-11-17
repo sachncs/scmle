@@ -5,7 +5,7 @@ import numpy
 
 from scmle.data.framing import costs
 
-HUMAN = (costs.CostSource.HUMAN,) * 4
+HUMAN = (costs.Basis.HUMAN,) * 4
 
 
 @settings(max_examples=200, deadline=None)
@@ -17,7 +17,7 @@ HUMAN = (costs.CostSource.HUMAN,) * 4
     strategies.floats(-3.0, 3.0),
 )
 def test_cost_is_constant_minus_scaled_net_benefit(seed, fp, fn, c00, c11):
-    model = costs.DecisionCostModel(
+    model = costs.Tariff(
         c00,
         c11 + fn,
         c00 + fp,
@@ -25,7 +25,7 @@ def test_cost_is_constant_minus_scaled_net_benefit(seed, fp, fn, c00, c11):
         0.001,
         0.999,
         HUMAN,
-        costs.CostSource.HUMAN,
+        costs.Basis.HUMAN,
     )
     rng = numpy.random.default_rng(seed)
     y = (rng.random(30) < 0.4).astype(float)

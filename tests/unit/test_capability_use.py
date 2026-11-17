@@ -14,7 +14,7 @@ from scmle.sampling import strategies
 
 @pytest.fixture
 def registry():
-    return scmle.models.registry.Catalog.with_builtins()
+    return scmle.models.registry.Catalog.stock()
 
 
 def high_cardinality_frame(rows=900, levels=40, seed=0):
@@ -29,7 +29,7 @@ def high_cardinality_frame(rows=900, levels=40, seed=0):
     )
 
 
-PLAN = scmle.contracts.data.FeaturePlan(
+PLAN = scmle.contracts.data.Blueprint(
     numeric=("x",), categorical=("cat",), high_cardinality=("cat",)
 )
 
@@ -41,10 +41,10 @@ def step_names(pipeline_):
 
 def test_models_that_handle_missing_values_skip_imputation(registry):
     plain = PLAN.__class__(numeric=("x",), categorical=("cat",))
-    native = preprocessing.build_pipeline(
+    native = preprocessing.instantiate(
         plain, registry.get("hist_gradient_boosting"), tasks.Task.BINARY, 0
     )
-    linear = preprocessing.build_pipeline(
+    linear = preprocessing.instantiate(
         plain, registry.get("logistic_regression"), tasks.Task.BINARY, 0
     )
     assert "impute" not in step_names(native)["numeric"].named_steps
@@ -55,7 +55,7 @@ def test_native_categorical_models_get_integer_codes_and_column_marks(
     registry,
 ):
     features, target = high_cardinality_frame()
-    pipeline_ = preprocessing.build_pipeline(
+    pipeline_ = preprocessing.instantiate(
         PLAN, registry.get("hist_gradient_boosting"), tasks.Task.BINARY, 0
     )
     assert "high_cardinality" in step_names(pipeline_)
@@ -66,7 +66,7 @@ def test_native_categorical_models_get_integer_codes_and_column_marks(
 
 
 def test_non_native_models_keep_one_hot_for_high_cardinality(registry):
-    pipeline_ = preprocessing.build_pipeline(
+    pipeline_ = preprocessing.instantiate(
         PLAN, registry.get("logistic_regression"), tasks.Task.BINARY, 0
     )
     assert "high_cardinality" not in step_names(pipeline_)
@@ -77,13 +77,13 @@ def test_sparse_capable_models_get_sparse_one_hot_on_high_cardinality(
     registry,
 ):
     features, target = high_cardinality_frame()
-    pipeline_ = preprocessing.build_pipeline(
+    pipeline_ = preprocessing.instantiate(
         PLAN, registry.get("logistic_regression"), tasks.Task.BINARY, 0
     )
     pipeline_.fit(features, target)
     encoded = pipeline_.named_steps["prep"].transform(features)
     assert hasattr(encoded, "tocsr")  # scipy sparse
-    dense = preprocessing.build_pipeline(
+    dense = preprocessing.instantiate(
         PLAN, registry.get("random_forest"), tasks.Task.BINARY, 0
     )
     dense.fit(features, target)
@@ -99,20 +99,20 @@ def test_target_encoding_strategy_is_cross_fitted_and_conditional(registry):
     encoder = step_names(pipeline_)["high_cardinality"].named_steps["encode"]
     assert type(encoder).__name__ == "TargetEncoder"
     assert pipeline_.predict_proba(features).shape == (len(features), 2)
-    profile = scmle.contracts.data.DatasetProfile(
+    profile = scmle.contracts.data.Portrait(
         manifest=None,
         column_statistics={},
         quality_findings=(),
         risk_findings=(),
         target_summary={},
-        feature_plan=scmle.contracts.data.FeaturePlan(("x",), ("cat",)),
+        feature_plan=scmle.contracts.data.Blueprint(("x",), ("cat",)),
     )
     reason = strategy.applicability(profile, tasks.Task.BINARY, adapter)
     assert reason == "no high-cardinality categorical feature"
 
 
 def planning_context(spec, plan):
-    profile = scmle.contracts.data.DatasetProfile(
+    profile = scmle.contracts.data.Portrait(
         manifest=scmle.contracts.data.DatasetManifest(
             "ds", "s", "h", 900, 3, "y", "<in-memory>"
         ),
@@ -122,7 +122,7 @@ def planning_context(spec, plan):
         target_summary={"imbalance_ratio": 1.0},
         feature_plan=plan,
     )
-    return planner.PlanningContext(spec, profile, tasks.Task.BINARY)
+    return planner.Situation(spec, profile, tasks.Task.BINARY)
 
 
 def make_spec(**resources):
@@ -149,9 +149,7 @@ def test_planner_prefers_native_categorical_models_for_high_cardinality(
 
 
 def test_no_high_cardinality_decisions_without_such_features(registry):
-    plain = scmle.contracts.data.FeaturePlan(
-        numeric=("x",), categorical=("cat",)
-    )
+    plain = scmle.contracts.data.Blueprint(numeric=("x",), categorical=("cat",))
     plan = planner.Planner(registry).plan(
         planning_context(make_spec(time_budget_seconds=900), plain)
     )
@@ -161,12 +159,12 @@ def test_no_high_cardinality_decisions_without_such_features(registry):
 
 def test_short_budget_reduces_search_complexity_and_is_recorded(registry):
     spec = make_spec(time_budget_seconds=120)
-    assert spec.fast_budget
-    search = spec.effective_search()
+    assert spec.brief
+    search = spec.budgeted()
     assert search.top_models == 1 and search.configs_per_model == 3
-    assert spec.effective_strategies().top_models == 1
+    assert spec.effective().top_models == 1
     plan = planner.Planner(registry).plan(planning_context(spec, PLAN))
     by_name = {d.technique: d for d in plan.decisions}
     assert by_name["reduce_search_complexity"].action == "include"
     relaxed = make_spec(time_budget_seconds=900)
-    assert relaxed.effective_search() == relaxed.search
+    assert relaxed.budgeted() == relaxed.search

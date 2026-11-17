@@ -93,7 +93,7 @@ def link(steps: tuple[dict[str, Any], ...]) -> list[dict[str, Any]]:
     return chained
 
 
-def manifest_of(directory: Path) -> dict[str, str]:
+def inventory(directory: Path) -> dict[str, str]:
     """Digests every file under ``retained/`` and ``inputs.json`` if present.
 
     Args:
@@ -107,14 +107,14 @@ def manifest_of(directory: Path) -> dict[str, str]:
     held = {}
     base = directory / records.RETAINED
     for path in sorted(p for p in base.rglob("*") if p.is_file()):
-        held[path.relative_to(directory).as_posix()] = records.sha256_file(path)
+        held[path.relative_to(directory).as_posix()] = records.checksum(path)
     inputs = directory / records.INPUTS
     if inputs.is_file():
-        held[records.INPUTS] = records.sha256_file(inputs)
+        held[records.INPUTS] = records.checksum(inputs)
     return held
 
 
-def signature_for(head: str, held: Mapping[str, str], key: str | bytes) -> str:
+def sign(head: str, held: Mapping[str, str], key: str | bytes) -> str:
     """Signs the head and the record digests.
 
     Args:
@@ -125,7 +125,7 @@ def signature_for(head: str, held: Mapping[str, str], key: str | bytes) -> str:
     Returns:
         The signature over the head and the digest of the record digests.
     """
-    return signing.sign_payload(
+    return signing.mac(
         {"head": head, "retained": records.digest(dict(held))}, key
     )
 
@@ -154,7 +154,7 @@ def seal(
             records.write_json(folder / records.REPORTS / name, report)
     derived = trace.derive(folder, keys)
     steps = link(derived.steps)
-    held = manifest_of(folder)
+    held = inventory(folder)
     head = steps[-1]["hash"]
     inputs = {}
     if (folder / records.INPUTS).is_file():
@@ -168,15 +168,13 @@ def seal(
         "steps": steps,
         "head": head,
         "retained": held,
-        "builder_signature": (
-            signature_for(head, held, analyst) if analyst else None
-        ),
+        "builder_signature": (sign(head, held, analyst) if analyst else None),
     }
     records.write_json(folder / records.TRAIL_FILE, document)
     return verify(folder, keys)
 
 
-def check_chain(
+def linkage(
     document: Mapping[str, Any], keys: Mapping[str, Any]
 ) -> list[trace.Finding]:
     """Checks the hash chain, head and signature of ``trail.json``.
@@ -224,7 +222,7 @@ def check_chain(
             )
         )
     else:
-        expected = signature_for(
+        expected = sign(
             str(document.get("head")), document.get("retained", {}), key
         )
         if not hmac.compare_digest(str(signature), expected):
@@ -258,7 +256,7 @@ def check_manifest(
                     trace.MISSING_LINK, "trail", f"{relative} is absent"
                 )
             )
-        elif records.sha256_file(path) != expected:
+        elif records.checksum(path) != expected:
             found.append(
                 trace.Finding(
                     trace.TAMPERED,
@@ -269,7 +267,7 @@ def check_manifest(
     return found
 
 
-def check_steps(
+def rederive(
     document: Mapping[str, Any], derived: trace.Derived
 ) -> list[trace.Finding]:
     """Checks that the stored steps are what the retained records give now.
@@ -319,8 +317,8 @@ def verify(
         keys: Verification keys by role.
 
     Returns:
-        The report, with the findings of `check_chain`, `check_manifest`,
-        `check_steps` and the derivation itself, without duplicates. An absent
+        The report, with the findings of `linkage`, `check_manifest`,
+        `rederive` and the derivation itself, without duplicates. An absent
         ``trail.json`` gives a single missing-link finding and a file that is
         not JSON a single broken-chain finding, each with an empty head and
         zero steps.
@@ -340,9 +338,9 @@ def verify(
             trace.Finding(trace.BROKEN_CHAIN, "trail", "trail.json is bad"),
         )
         return Verification(str(folder), "", 0, found)
-    problems = check_chain(document, keys) + check_manifest(folder, document)
+    problems = linkage(document, keys) + check_manifest(folder, document)
     derived = trace.derive(folder, keys)
-    problems += list(derived.findings) + check_steps(document, derived)
+    problems += list(derived.findings) + rederive(document, derived)
     unique: list[trace.Finding] = []
     for item in problems:
         if item not in unique:

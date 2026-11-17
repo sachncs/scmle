@@ -100,7 +100,7 @@ class Scheduler:
         """
         try:
             data = self.store.get(self.key)[0]
-        except objectstore.NotFoundError:
+        except objectstore.AbsentError:
             # handled: documented None when nothing dealt with
             return None
         value = json.loads(data)["last_slot"]
@@ -170,7 +170,7 @@ class Scheduler:
             try:
                 record = executor.start(f"slot-{int(slot)}", "scheduler")
             except (
-                scmle.workflow.executor.RunInFlightError,
+                scmle.workflow.executor.BusyError,
                 scmle.workflow.executor.ConcurrencyLimitError,
             ):
                 # handled: slot recorded as deferred

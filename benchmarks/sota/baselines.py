@@ -662,7 +662,7 @@ def lightgbm_params(generator: Any, trial: int) -> dict[str, Any]:
     }
 
 
-def prepare_frame(features: Any) -> Any:
+def prepare(features: Any) -> Any:
     """Gives object columns the category dtype that LightGBM and FLAML use.
 
     Args:
@@ -746,7 +746,7 @@ def work(job: Job, cpus: int) -> Outcome:
         job.task_id, job.fold, job.repeat
     )
     problem_type = problem_types()[job.task_id]
-    frame = prepare_frame(features)
+    frame = prepare(features)
     train_x, test_x = frame.iloc[train], frame.iloc[test]
     train_y, test_y = target.iloc[train], target.iloc[test]
     started = time.monotonic()

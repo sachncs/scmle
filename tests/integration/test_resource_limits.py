@@ -103,7 +103,7 @@ class SleepyAdapter(models.Model):
 def test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues(
     binary_frame, tmp_path
 ):
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     registry.register(SleepyAdapter())
     project = support.make_project(
         binary_frame,
@@ -147,14 +147,14 @@ def test_memory_of_subprocesses_a_trial_starts_counts_and_is_cleaned_up(
     marker = tmp_path / "child.pid"
     supervisor = limits.Supervisor(ceiling_seconds=60, memory_gb=0.4)
 
-    with pytest.raises(limits.TrialLimitError, match="memory limit"):
+    with pytest.raises(limits.TrialError, match="memory limit"):
         supervisor.run(spawn_memory_hungry_subprocess, marker)
 
     child = int(marker.read_text())
     deadline = time.monotonic() + 5
-    while child in limits.process_table() and time.monotonic() < deadline:
+    while child in limits.pids() and time.monotonic() < deadline:
         time.sleep(0.1)
-    assert child not in limits.process_table()
+    assert child not in limits.pids()
 
 
 def test_process_tree_includes_descendants():
@@ -162,7 +162,7 @@ def test_process_tree_includes_descendants():
         [sys.executable, "-c", "import time; time.sleep(30)"]
     )
     try:
-        tree = limits.process_tree(os.getpid())
+        tree = limits.footprint(os.getpid())
         assert child.pid in tree and os.getpid() in tree
     finally:
         child.kill()

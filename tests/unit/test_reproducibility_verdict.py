@@ -45,7 +45,7 @@ def facts() -> dict[str, Any]:
 
 
 def test_identical_runs_are_exact():
-    verdict = reproducibility.compare_runs(facts(), facts())
+    verdict = reproducibility.judge(facts(), facts())
 
     assert verdict.level == reproducibility.EXACT
     assert verdict.reasons == []
@@ -58,7 +58,7 @@ def test_environment_difference_is_a_note_only():
     other = facts()
     other["environment"] = "numpy==2.1"
 
-    verdict = reproducibility.compare_runs(facts(), other)
+    verdict = reproducibility.judge(facts(), other)
 
     assert verdict.level == reproducibility.EXACT
     assert len(verdict.notes) == 1
@@ -69,7 +69,7 @@ def test_small_score_drift_is_comparable():
     other = facts()
     other["trials"][0] = trial("t1", (0.81, 0.9, 0.99))
 
-    verdict = reproducibility.compare_runs(facts(), other)
+    verdict = reproducibility.judge(facts(), other)
 
     assert verdict.level == reproducibility.COMPARABLE
     assert math.isclose(verdict.max_abs_difference, 0.01)
@@ -80,7 +80,7 @@ def test_large_score_drift_is_different():
     other = facts()
     other["trials"][1] = trial("t2", (0.1, 0.2, 0.3))
 
-    verdict = reproducibility.compare_runs(facts(), other)
+    verdict = reproducibility.judge(facts(), other)
 
     assert verdict.level == reproducibility.DIFFERENT
     assert verdict.trials_compared == 2
@@ -91,8 +91,8 @@ def test_tolerance_scales_the_comparable_band():
     other = facts()
     other["trials"][0] = trial("t1", (0.6, 0.7, 0.8))
 
-    strict = reproducibility.compare_runs(facts(), other, tolerance_std=1.0)
-    loose = reproducibility.compare_runs(facts(), other, tolerance_std=3.0)
+    strict = reproducibility.judge(facts(), other, tolerance_std=1.0)
+    loose = reproducibility.judge(facts(), other, tolerance_std=3.0)
 
     assert strict.level == reproducibility.DIFFERENT
     assert loose.level == reproducibility.COMPARABLE
@@ -103,7 +103,7 @@ def test_zero_std_uses_the_floor():
     first["trials"] = [trial("t1", (0.5, 0.5), std=0.0)]
     second["trials"] = [trial("t1", (0.5, 0.5000001), std=0.0)]
 
-    verdict = reproducibility.compare_runs(first, second)
+    verdict = reproducibility.judge(first, second)
 
     assert verdict.level == reproducibility.DIFFERENT
 
@@ -112,7 +112,7 @@ def test_status_change_is_different():
     other = facts()
     other["trials"][0] = trial("t1", (), status="failed")
 
-    verdict = reproducibility.compare_runs(facts(), other)
+    verdict = reproducibility.judge(facts(), other)
 
     assert verdict.level == reproducibility.DIFFERENT
     assert "t1: status ok -> failed" in verdict.reasons
@@ -124,7 +124,7 @@ def test_matching_failed_trials_without_scores_are_exact():
     second["trials"] = [trial("t1", (), status="failed")]
     first["trials"][0]["score_mean"] = 0.0
 
-    verdict = reproducibility.compare_runs(first, second)
+    verdict = reproducibility.judge(first, second)
 
     assert verdict.level == reproducibility.EXACT
 
@@ -133,7 +133,7 @@ def test_different_selection_is_different_even_with_equal_scores():
     other = facts()
     other["selected"] = ("lasso", "single", "{}")
 
-    verdict = reproducibility.compare_runs(facts(), other)
+    verdict = reproducibility.judge(facts(), other)
 
     assert verdict.level == reproducibility.DIFFERENT
     assert "a different candidate was selected" in verdict.reasons
@@ -147,7 +147,7 @@ def test_structural_differences_short_circuit():
     other["parameter_estimation"] = "digest"
     other["trials"] = other["trials"][:1]
 
-    verdict = reproducibility.compare_runs(facts(), other)
+    verdict = reproducibility.judge(facts(), other)
 
     assert verdict.level == reproducibility.DIFFERENT
     assert verdict.reasons == [
@@ -165,7 +165,7 @@ def test_changed_trial_params_are_detected():
     other = facts()
     other["trials"][0]["params"] = {"alpha": 2.0}
 
-    verdict = reproducibility.compare_runs(facts(), other)
+    verdict = reproducibility.judge(facts(), other)
 
     assert verdict.reasons == ["the executed trials differ"]
 
@@ -198,7 +198,7 @@ def write_run(root: pathlib.Path, with_extras: bool = False) -> None:
 def test_load_run_reads_sorted_trials_and_defaults(tmp_path):
     write_run(tmp_path)
 
-    loaded = reproducibility.load_run(str(tmp_path))
+    loaded = reproducibility.reread(str(tmp_path))
 
     assert [t["trial_id"] for t in loaded["trials"]] == ["t1", "t2"]
     assert loaded["config"] == {"seed": 1}
@@ -216,7 +216,7 @@ def test_load_run_reads_sorted_trials_and_defaults(tmp_path):
 def test_load_run_reads_environment_lock(tmp_path):
     write_run(tmp_path, with_extras=True)
 
-    loaded = reproducibility.load_run(tmp_path)
+    loaded = reproducibility.reread(tmp_path)
 
     assert loaded["environment"] == "numpy==2.0"
 
@@ -241,7 +241,7 @@ def test_load_run_digests_parameter_estimation(tmp_path):
     )
     expected = result.write(tmp_path / "parameter_estimation.json")
 
-    loaded = reproducibility.load_run(tmp_path)
+    loaded = reproducibility.reread(tmp_path)
 
     assert loaded["parameter_estimation"] == expected
 
@@ -251,12 +251,12 @@ def test_loaded_reruns_compare_exact_and_detect_new_evidence(tmp_path):
     write_run(first, with_extras=True)
     write_run(second, with_extras=True)
 
-    same = reproducibility.compare_runs(
-        reproducibility.load_run(first), reproducibility.load_run(second)
+    same = reproducibility.judge(
+        reproducibility.reread(first), reproducibility.reread(second)
     )
     write_json(second / "config.json", {"seed": 2})
-    changed = reproducibility.compare_runs(
-        reproducibility.load_run(first), reproducibility.load_run(second)
+    changed = reproducibility.judge(
+        reproducibility.reread(first), reproducibility.reread(second)
     )
 
     assert same.level == reproducibility.EXACT

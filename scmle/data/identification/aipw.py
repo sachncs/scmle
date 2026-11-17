@@ -161,7 +161,7 @@ class Nuisances:
         )
 
 
-def make_learners(learner: str, seed: int) -> tuple[Any, Any]:
+def spawn(learner: str, seed: int) -> tuple[Any, Any]:
     """Builds an unfitted propensity classifier and outcome regressor.
 
     Args:
@@ -211,7 +211,7 @@ def binary(values: pandas.Series, name: str) -> numpy.ndarray:
     return array
 
 
-def fit_nuisances(
+def prefit(
     frame: pandas.DataFrame,
     covariates: tuple[str, ...],
     treatment: str,
@@ -251,9 +251,9 @@ def fit_nuisances(
         raw = numpy.zeros((len(frame), 1))
     scaler = preprocessing.StandardScaler().fit(raw)
     matrix = scaler.transform(raw)
-    classifier = make_learners(learner, seed)[0].fit(matrix, t)
-    control = make_learners(learner, seed)[1].fit(matrix[t == 0], y[t == 0])
-    treated = make_learners(learner, seed)[1].fit(matrix[t == 1], y[t == 1])
+    classifier = spawn(learner, seed)[0].fit(matrix, t)
+    control = spawn(learner, seed)[1].fit(matrix[t == 0], y[t == 0])
+    treated = spawn(learner, seed)[1].fit(matrix[t == 1], y[t == 1])
     e = classifier.predict_proba(matrix)[:, 1]
     probe = numpy.round(
         numpy.concatenate(
@@ -280,7 +280,7 @@ def effective_sample_size(weights: numpy.ndarray) -> float:
     return sequential.effective_sample_size(numpy.asarray(weights, dtype=float))
 
 
-def weighted_smd(
+def imbalance(
     matrix: numpy.ndarray, t: numpy.ndarray, e: numpy.ndarray
 ) -> numpy.ndarray:
     """Computes absolute standardized mean differences after IPW.
@@ -307,7 +307,7 @@ def weighted_smd(
     return out
 
 
-def overlap_report(
+def propensities(
     e: numpy.ndarray,
     t: numpy.ndarray,
     matrix: numpy.ndarray | None = None,
@@ -344,7 +344,7 @@ def overlap_report(
         "passed": bool(outside.mean() <= OVERLAP_SHARE),
     }
     if matrix is not None and matrix.shape[1]:
-        smd = weighted_smd(matrix, t, e)
+        smd = imbalance(matrix, t, e)
         report["max_weighted_smd"] = float(smd.max())
     return report
 
@@ -496,7 +496,7 @@ def estimate(
         level=level,
         n=n,
         n_input=len(frame),
-        overlap=overlap_report(e, t, matrix),
+        overlap=propensities(e, t, matrix),
         population=population,
         nuisance_digest=nuisances.digest,
     )

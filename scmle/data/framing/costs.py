@@ -40,7 +40,7 @@ from scmle.contracts import signing
 ENTRY_NAMES = ("c_00", "c_01", "c_10", "c_11")
 
 
-class CostSource(enum.StrEnum):
+class Basis(enum.StrEnum):
     """Where a number in the cost model came from."""
 
     DATA = "data"
@@ -48,12 +48,12 @@ class CostSource(enum.StrEnum):
     TEMPLATE = "template"
 
 
-class DominatedActionError(ValueError):
+class DominatedError(ValueError):
     """One action dominates, so there is no decision to make."""
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DecisionCostModel:
+class Tariff:
     """Costs of the four (action, outcome) cells and a plausible range.
 
     Attributes:
@@ -73,14 +73,14 @@ class DecisionCostModel:
     c_11: float
     t_lo: float
     t_hi: float
-    sources: tuple[CostSource, ...]
-    range_source: CostSource
+    sources: tuple[Basis, ...]
+    range_source: Basis
 
     def __post_init__(self) -> None:
         """Validates the model, refusing one that is not a decision.
 
         Raises:
-            DominatedActionError: If `c_FP` or `c_FN` is not positive.
+            DominatedError: If `c_FP` or `c_FN` is not positive.
             ValueError: If a cost or a range bound is not a finite number,
                 the range does not satisfy `0 < t_lo <= t_hi < 1`, the
                 implied threshold lies outside the range, or `sources` or
@@ -89,7 +89,7 @@ class DecisionCostModel:
         for name in ENTRY_NAMES:
             qualification.finite(getattr(self, name), name)
         if self.c_fp <= 0 or self.c_fn <= 0:
-            raise DominatedActionError(
+            raise DominatedError(
                 "one action dominates (c_FP and c_FN must both be positive): "
                 f"c_FP={self.c_fp}, c_FN={self.c_fn}"
             )
@@ -104,13 +104,13 @@ class DecisionCostModel:
                 f"the implied threshold {self.threshold:.4f} lies outside "
                 f"the range [{low}, {high}]"
             )
-        qualification.require_tuple(self.sources, "sources")
+        qualification.tupled(self.sources, "sources")
         if len(self.sources) != len(ENTRY_NAMES) or not all(
-            isinstance(s, CostSource) for s in self.sources
+            isinstance(s, Basis) for s in self.sources
         ):
-            raise errors.InputError("sources must hold four CostSource values")
-        if not isinstance(self.range_source, CostSource):
-            raise errors.InputError("range_source must be a CostSource")
+            raise errors.InputError("sources must hold four Basis values")
+        if not isinstance(self.range_source, Basis):
+            raise errors.InputError("range_source must be a Basis")
 
     @property
     def c_fp(self) -> float:
@@ -128,7 +128,7 @@ class DecisionCostModel:
         return self.c_fp / (self.c_fp + self.c_fn)
 
     @property
-    def unverified_entries(self) -> tuple[str, ...]:
+    def unreviewed(self) -> tuple[str, ...]:
         """Names of the costs that came from data or a template, not a person.
 
         The names follow the order of `ENTRY_NAMES`.
@@ -136,7 +136,7 @@ class DecisionCostModel:
         return tuple(
             name
             for name, source in zip(ENTRY_NAMES, self.sources, strict=True)
-            if source is not CostSource.HUMAN
+            if source is not Basis.HUMAN
         )
 
     @property
@@ -167,7 +167,7 @@ class DecisionCostModel:
         """Rebuilds the model from a record made by `to_dict`.
 
         A record that is invalid, or fails the checks in `__post_init__`,
-        raises `ValueError` or `DominatedActionError`.
+        raises `ValueError` or `DominatedError`.
 
         Args:
             record: A mapping holding exactly the fields of the model.
@@ -176,7 +176,7 @@ class DecisionCostModel:
             The model.
         """
         qualification.require(cls, record)
-        sources = tuple(CostSource(v) for v in record["sources"])
+        sources = tuple(Basis(v) for v in record["sources"])
         if len(sources) != len(ENTRY_NAMES):
             raise errors.InputError("sources must hold one entry per cost")
         return cls(
@@ -187,7 +187,7 @@ class DecisionCostModel:
             t_lo=record["t_lo"],
             t_hi=record["t_hi"],
             sources=sources,
-            range_source=CostSource(record["range_source"]),
+            range_source=Basis(record["range_source"]),
         )
 
 
@@ -209,7 +209,7 @@ def odds(t: float) -> float:
     return threshold / (1.0 - threshold)
 
 
-def binary_vector(values: ArrayLike, name: str) -> NDArray[numpy.float64]:
+def dichotomous(values: ArrayLike, name: str) -> NDArray[numpy.float64]:
     """Checks that `values` is a non-empty 1-d array of zeros and ones.
 
     Args:
@@ -247,8 +247,8 @@ def pair(
         ValueError: If either is not a non-empty 1-d array of zeros and ones,
             or the lengths differ.
     """
-    outcomes = binary_vector(y, "y")
-    actions = binary_vector(a, "a")
+    outcomes = dichotomous(y, "y")
+    actions = dichotomous(a, "a")
     if outcomes.shape != actions.shape:
         raise errors.InputError("y and a must have the same length")
     return outcomes, actions
@@ -277,7 +277,7 @@ def net_benefit_all(y: ArrayLike, t: float) -> float:
     """Returns the net benefit of acting on every row.
 
     The value is `P - (1 - P) t / (1 - t)`, with `P` the prevalence. Input
-    that `binary_vector` or `odds` rejects raises `ValueError`.
+    that `dichotomous` or `odds` rejects raises `ValueError`.
 
     Args:
         y: Outcomes, 0 or 1.
@@ -286,7 +286,7 @@ def net_benefit_all(y: ArrayLike, t: float) -> float:
     Returns:
         Net benefit per row.
     """
-    outcomes = binary_vector(y, "y")
+    outcomes = dichotomous(y, "y")
     prevalence = float(numpy.mean(outcomes))
     return prevalence - (1.0 - prevalence) * odds(t)
 
@@ -300,9 +300,7 @@ def net_benefit_none() -> float:
     return 0.0
 
 
-def expected_cost(
-    y: ArrayLike, a: ArrayLike, model: DecisionCostModel
-) -> float:
+def expected_cost(y: ArrayLike, a: ArrayLike, model: Tariff) -> float:
     """Returns the mean cost per row, read straight from the four cells.
 
     Input that `pair` rejects raises `ValueError`.
@@ -324,7 +322,7 @@ def expected_cost(
     return float(numpy.mean(cost))
 
 
-def net_benefit_curve(
+def benefits(
     y: ArrayLike, a: ArrayLike, thresholds: ArrayLike
 ) -> dict[str, list[float]]:
     """Computes model, treat-all and treat-none net benefit on a grid.

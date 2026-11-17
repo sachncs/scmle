@@ -35,7 +35,7 @@ bundle = Bundle.load(
   <p>The key shown above must come from a deployment secret or approved key service. Do not commit it, print it into logs, or use one shared development key as release identity.</p>
 
   <h2>Key identity and emergency rotation</h2>
-  <p>Bundle rotation changes the signature, but release operations also need to know which signer was allowed to create it. The metadata-only <code>SigningKeyRegistry</code> records key identity, owner, expiry, retirement, replacement, and revocation without storing the secret. Keep the secret in the deployment secret manager.</p>
+  <p>Bundle rotation changes the signature, but release operations also need to know which signer was allowed to create it. The metadata-only <code>Keyring</code> records key identity, owner, expiry, retirement, replacement, and revocation without storing the secret. Keep the secret in the deployment secret manager.</p>
   <pre><code>{`registry.sign(payload, key_id, secret, signed_at)
 registry.retire(key_id, changed_at, "scheduled rotation", replacement_key_id)
 registry.revoke(key_id, changed_at, "credential compromise")

@@ -13,23 +13,23 @@ from scmle.data.ingest import profile
 def scan_of(frame, eps_key=0.0, eps_null=0.0, size=3, meter=None):
     db = ingest_worlds.new_database("g")
     ingest_worlds.load(db, "t", frame)
-    source = profile.SqlSource(db.factory, meter)
-    table = profile.profile_table(source, "t")
+    source = profile.Sql(db.factory, meter)
+    table = profile.survey(source, "t")
     return (
         source,
         table,
-        grain.infer_keys(source, table, eps_key, eps_null, size),
+        grain.keysearch(source, table, eps_key, eps_null, size),
     )
 
 
 def test_unit_text_parsing():
-    assert grain.unit_components("customer-month") == ("customer", "month")
-    assert grain.unit_components("one row per customers per Month") == (
+    assert grain.grains("customer-month") == ("customer", "month")
+    assert grain.grains("one row per customers per Month") == (
         "customer",
         "month",
     )
-    assert grain.name_tokens("customerID") == ("customer", "id")
-    assert grain.name_tokens("order_items") == ("order", "item")
+    assert grain.tokenize("customerID") == ("customer", "id")
+    assert grain.tokenize("order_items") == ("order", "item")
 
 
 def test_single_and_composite_keys_are_found_minimal():
@@ -90,8 +90,8 @@ def test_hopeless_sets_cost_no_query():
     frame = pandas.DataFrame({"a": [0, 1] * 50, "b": [0, 1, 2, 3] * 25})
     source, table = scan_of(frame)[:2]
     before = source.queries
-    assert not grain.bound_ok(table, ("a", "b"), 0.0)
-    grain.infer_keys(source, table)
+    assert not grain.feasible(table, ("a", "b"), 0.0)
+    grain.keysearch(source, table)
     assert source.queries == before
 
 
@@ -103,11 +103,11 @@ def test_budget_stops_the_lattice_at_a_level_boundary():
     meter = budget.BudgetMeter(budget.Budget(max_queries=100))
     db = ingest_worlds.new_database("gb")
     ingest_worlds.load(db, "t", frame)
-    source = profile.SqlSource(db.factory, meter)
-    table = profile.profile_table(source, "t")
+    source = profile.Sql(db.factory, meter)
+    table = profile.survey(source, "t")
     tight = budget.BudgetMeter(budget.Budget(max_queries=0))
     source.meter = tight
-    scan = grain.infer_keys(source, table)
+    scan = grain.keysearch(source, table)
     assert scan.partial
     assert scan.levels_done == 1
     assert tight.stops[0].unit == "level 2"
@@ -118,8 +118,8 @@ def test_budget_stops_the_lattice_at_a_level_boundary():
 def test_unit_verdict_matches_construction(unit, shape):
     db, table = ingest_worlds.grain_world(7, shape)
     source = db.source()
-    profiled = profile.profile_table(source, table)
-    scan = grain.infer_keys(source, profiled)
+    profiled = profile.survey(source, table)
+    scan = grain.keysearch(source, profiled)
     verdict = grain.unit_verdict(source, profiled, unit, scan)
     assert verdict.verdict == ingest_worlds.expected_verdict(unit, shape)
 
@@ -127,8 +127,8 @@ def test_unit_verdict_matches_construction(unit, shape):
 def test_unmapped_unit_words_are_unknown_and_asked():
     db, table = ingest_worlds.grain_world(7, "customers")
     source = db.source()
-    profiled = profile.profile_table(source, table)
-    scan = grain.infer_keys(source, profiled)
+    profiled = profile.survey(source, table)
+    scan = grain.keysearch(source, profiled)
     verdict = grain.unit_verdict(source, profiled, "warehouse-shift", scan)
     assert verdict.verdict == grain.UNKNOWN
     assert verdict.blocks
@@ -147,8 +147,8 @@ def test_coarser_is_never_match_across_tolerances():
         for seed in range(8):
             db, table = ingest_worlds.grain_world(seed, "customers")
             source = db.source()
-            profiled = profile.profile_table(source, table)
-            scan = grain.infer_keys(source, profiled, eps_key=eps)
+            profiled = profile.survey(source, table)
+            scan = grain.keysearch(source, profiled, eps_key=eps)
             verdict = grain.unit_verdict(
                 source, profiled, "customer-month", scan
             )
@@ -158,6 +158,6 @@ def test_coarser_is_never_match_across_tolerances():
 def test_invalid_tolerances_are_rejected():
     source, table = scan_of(pandas.DataFrame({"a": [1, 2]}))[:2]
     with pytest.raises(ValueError):
-        grain.infer_keys(source, table, eps_key=1.5)
+        grain.keysearch(source, table, eps_key=1.5)
     with pytest.raises(ValueError):
-        grain.infer_keys(source, table, max_size=0)
+        grain.keysearch(source, table, max_size=0)

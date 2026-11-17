@@ -7,12 +7,12 @@ from scmle.monitoring import incidents
 from scmle.monitoring import slo
 
 
-def evaluation() -> slo.SLOEvaluation:
+def evaluation() -> slo.Assessment:
     """Build one breached SLO evaluation."""
-    target = slo.SLOTarget(
+    target = slo.Slo(
         name="latency",
         metric_name="p95_latency_ms",
-        kind=observability.SignalKind.LATENCY,
+        kind=observability.Indicator.LATENCY,
         maximum=250.0,
         window_days=7,
         minimum_samples=1,
@@ -20,9 +20,9 @@ def evaluation() -> slo.SLOEvaluation:
         runbook="https://runbooks.example/latency",
         alert_route="on-call",
     )
-    sample = observability.MetricSample(
+    sample = observability.Sample(
         name="p95_latency_ms",
-        kind=observability.SignalKind.LATENCY,
+        kind=observability.Indicator.LATENCY,
         value=400.0,
         unit="ms",
         timestamp="2026-10-20T12:00:00+00:00",
@@ -32,7 +32,7 @@ def evaluation() -> slo.SLOEvaluation:
     )
 
 
-def open_incident(workflow: incidents.IncidentWorkflow) -> incidents.Incident:
+def open_incident(workflow: incidents.Incidents) -> incidents.Incident:
     """Open the shared fixture incident."""
     return workflow.open(
         evaluation(),
@@ -43,12 +43,12 @@ def open_incident(workflow: incidents.IncidentWorkflow) -> incidents.Incident:
 
 
 def test_workflow_is_idempotent_and_preserves_runbook_and_rollback(tmp_path):
-    workflow = incidents.IncidentWorkflow(tmp_path / "incidents.jsonl")
+    workflow = incidents.Incidents(tmp_path / "incidents.jsonl")
     first = open_incident(workflow)
     second = open_incident(workflow)
 
     assert first == second
-    assert first.status is incidents.IncidentStatus.OPEN
+    assert first.status is incidents.Phase.OPEN
     assert first.run_id == "run-42"
     assert first.rollback_target == "model-previous"
     assert len(workflow.read_events()) == 1
@@ -57,7 +57,7 @@ def test_workflow_is_idempotent_and_preserves_runbook_and_rollback(tmp_path):
 def test_workflow_requires_acknowledgement_before_evidence_backed_resolution(
     tmp_path,
 ):
-    workflow = incidents.IncidentWorkflow(tmp_path / "incidents.jsonl")
+    workflow = incidents.Incidents(tmp_path / "incidents.jsonl")
     opened = open_incident(workflow)
 
     with pytest.raises(ValueError, match="acknowledged"):
@@ -82,8 +82,8 @@ def test_workflow_requires_acknowledgement_before_evidence_backed_resolution(
         evidence_digest="sha256:fix",
     )
 
-    assert acknowledged.status is incidents.IncidentStatus.ACKNOWLEDGED
-    assert resolved.status is incidents.IncidentStatus.RESOLVED
+    assert acknowledged.status is incidents.Phase.ACKNOWLEDGED
+    assert resolved.status is incidents.Phase.RESOLVED
     assert resolved.evidence_digest == "sha256:fix"
     assert (
         workflow.resolve(
@@ -99,7 +99,7 @@ def test_workflow_requires_acknowledgement_before_evidence_backed_resolution(
 
 def test_tampered_or_reordered_journal_fails_closed(tmp_path):
     path = tmp_path / "incidents.jsonl"
-    workflow = incidents.IncidentWorkflow(path)
+    workflow = incidents.Incidents(path)
     open_incident(workflow)
     original = path.read_text(encoding="utf-8")
     path.write_text(
@@ -112,9 +112,9 @@ def test_tampered_or_reordered_journal_fails_closed(tmp_path):
 
 
 def test_a_valid_digest_cannot_hide_an_invalid_transition(tmp_path):
-    workflow = incidents.IncidentWorkflow(tmp_path / "incidents.jsonl")
+    workflow = incidents.Incidents(tmp_path / "incidents.jsonl")
     opened = open_incident(workflow)
-    workflow.append_event("resolved", opened)
+    workflow.log("resolved", opened)
 
     with pytest.raises(ValueError, match="event type"):
         workflow.records()
@@ -122,10 +122,10 @@ def test_a_valid_digest_cannot_hide_an_invalid_transition(tmp_path):
 
 def test_passing_evaluation_cannot_open_an_incident(tmp_path):
     current = evaluation()
-    passing = slo.SLOEvaluation(
+    passing = slo.Assessment(
         target=current.target,
         observed_at=current.observed_at,
-        status=slo.SLOStatus.PASS,
+        status=slo.Status.PASS,
         sample_count=1,
         in_window_count=1,
         observed_maximum=100.0,
@@ -134,7 +134,7 @@ def test_passing_evaluation_cannot_open_an_incident(tmp_path):
     )
 
     with pytest.raises(ValueError, match="passing"):
-        incidents.IncidentWorkflow(tmp_path / "incidents.jsonl").open(
+        incidents.Incidents(tmp_path / "incidents.jsonl").open(
             passing,
             opened_at="2026-10-20T12:01:00+00:00",
             run_id="run-42",

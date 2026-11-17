@@ -38,7 +38,7 @@ def fresh(path=None, alpha=TEN_PERCENT, rule=online_fdr.ELOND):
     return scmle.data.ledger.ledger.Ledger.create(
         path,
         charter_hash="c" * 64,
-        config=online_fdr.RuleConfig(rule, alpha),
+        config=online_fdr.Settings(rule, alpha),
         alpha_confirm=Fraction(1, 20),
         seed=7,
     )
@@ -223,12 +223,12 @@ def test_the_direction_and_seed_path_reach_the_check():
 # --- confirmation record ----------------------------------------------------
 
 
-def source_for(features, target):
-    log = sealed.OpenLog()
+def locate(features, target):
+    log = sealed.Journal()
     locked = splitters.ResidentTestSet(
         features, target, tuple(range(len(target)))
     )
-    return sealed.SealedSet("C", locked, log)
+    return sealed.Locker("C", locked, log)
 
 
 def explored_ledger(alpha=TEN_PERCENT, control_observed=5):
@@ -238,9 +238,9 @@ def explored_ledger(alpha=TEN_PERCENT, control_observed=5):
         ledger,
         features,
         target,
-        explore.plan_exploration(features, explore.NUMERIC),
+        explore.hypothesize(features, explore.NUMERIC),
     )
-    ledger.record_control(
+    ledger.negatives(
         controls.summarize(
             "permuted_target", "strata", control_observed, (0,) * 20
         ).to_dict()
@@ -252,7 +252,7 @@ def test_the_claims_file_is_indented_sorted_json_in_a_new_folder(tmp_path):
     ledger = explored_ledger()
     features, target = signal_data(400, 2)
     result = confirm.confirm(
-        ledger, source_for(features, target), alpha_confirm=Fraction(1, 20)
+        ledger, locate(features, target), alpha_confirm=Fraction(1, 20)
     )
     path = tmp_path / "new" / "folder" / confirm.CLAIMS_FILE
     result.write(path)
@@ -312,7 +312,7 @@ def test_reasons_and_event_names_are_exact():
     # Confirmed: reason sentence, custody events, check decisions and seeds.
     ledger = explored_ledger()
     features, target = signal_data(400, 2)
-    source = source_for(features, target)
+    source = locate(features, target)
     result = confirm.confirm(ledger, source, alpha_confirm=Fraction(1, 20))
     assert result.reason == "1 of 1 survivors confirmed on C by by at 0.05"
     frozen = source.log.entries[1]
@@ -342,7 +342,7 @@ def test_non_rejected_survivors_pass_and_stay_unverified():
         size=400
     )  # no effect on C
     result = confirm.confirm(
-        ledger, source_for(features, target), alpha_confirm=Fraction(1, 20)
+        ledger, locate(features, target), alpha_confirm=Fraction(1, 20)
     )
     check = result.checks[0]
     assert check.decision is qualification.Decision.PASS
@@ -357,11 +357,11 @@ def test_no_survivors_reason_and_crash_reasons():
         quiet,
         features.assign(s=numpy.random.default_rng(0).normal(size=300)),
         target,
-        explore.plan_exploration(features, explore.NUMERIC),
+        explore.hypothesize(features, explore.NUMERIC),
     )
     result = confirm.confirm(
         quiet,
-        source_for(*signal_data(300, 4)),
+        locate(*signal_data(300, 4)),
         alpha_confirm=Fraction(1, 20),
         require_control=False,
     )
@@ -371,7 +371,7 @@ def test_no_survivors_reason_and_crash_reasons():
     ledger = explored_ledger()
     result = confirm.confirm(
         ledger,
-        source_for(*signal_data(300, 4)),
+        locate(*signal_data(300, 4)),
         alpha_confirm=Fraction(1, 20),
         encode=lambda y: 1 / 0,
     )
@@ -380,7 +380,7 @@ def test_no_survivors_reason_and_crash_reasons():
     )
 
     class Dies:
-        log = sealed.OpenLog()
+        log = sealed.Journal()
         committed = True
 
         def issue_token(self):
@@ -406,12 +406,12 @@ def test_a_custody_log_without_entries_gives_no_head():
     features, target = signal_data(400, 2)
     result = confirm.confirm(
         ledger,
-        source_for(features, target),
+        locate(features, target),
         alpha_confirm=Fraction(1, 20),
         custody_log=Appender(),
     )
     assert result.custody_head is None
-    assert confirm.head_of(object()) is None
+    assert confirm.tip(object()) is None
 
 
 def test_hypotheses_without_a_column_or_with_a_direction_run_on_c():
@@ -423,12 +423,12 @@ def test_hypotheses_without_a_column_or_with_a_direction_run_on_c():
     up = spec("s", "up", bivariate.GREATER)
     for s in (plain, up):
         ledger.test(ledger.register(s), features, target)
-    ledger.record_control(
+    ledger.negatives(
         controls.summarize("permuted_target", "strata", 5, (0,) * 20).to_dict()
     )
     cfeatures, ctarget = signal_data(400, 2)
     result = confirm.confirm(
-        ledger, source_for(cfeatures, ctarget), alpha_confirm=Fraction(1, 20)
+        ledger, locate(cfeatures, ctarget), alpha_confirm=Fraction(1, 20)
     )
     expected = bivariate.spearman(cfeatures["s"].to_numpy(), ctarget.to_numpy())
     expected_up = bivariate.spearman(
@@ -463,7 +463,7 @@ def test_the_plan_keeps_going_after_a_skipped_column_and_names_the_null():
             "y": [3.0, 1.0, 2.0, 0.0],
         }
     )
-    plan = explore.plan_exploration(frame, explore.NUMERIC, ("entity",))
+    plan = explore.hypothesize(frame, explore.NUMERIC, ("entity",))
     assert [s.column for s in plan.specs] == ["x", "y"]
     assert dict(plan.skipped) == {
         "entity": "structure column, not a candidate",
@@ -476,9 +476,7 @@ def test_the_plan_keeps_going_after_a_skipped_column_and_names_the_null():
         == "x is not monotonically associated with the target"
     )
     assert plan.specs[0].family == "bivariate" and plan.target_kind == "numeric"
-    kruskal_plan = explore.plan_exploration(
-        frame, explore.MULTICLASS, ("entity",)
-    )
+    kruskal_plan = explore.hypothesize(frame, explore.MULTICLASS, ("entity",))
     assert kruskal_plan.specs[0].statistic == "kruskal"
     assert (
         kruskal_plan.specs[0].null
@@ -513,7 +511,7 @@ def test_a_governed_run_reports_exact_counts_and_artifacts(tmp_path):
         features=features,
         target=target,
         classification=False,
-        source=source_for(cfeatures, ctarget),
+        source=locate(cfeatures, ctarget),
         run_dir=tmp_path,
         exclude=("f5",),
         rule=online_fdr.LORD_PLUS_PLUS,
@@ -560,9 +558,9 @@ def two_signal_ledger():
         ledger,
         features,
         target,
-        explore.plan_exploration(features, explore.NUMERIC),
+        explore.hypothesize(features, explore.NUMERIC),
     )
-    ledger.record_control(
+    ledger.negatives(
         controls.summarize("permuted_target", "strata", 5, (0,) * 20).to_dict()
     )
     return ledger
@@ -589,7 +587,7 @@ def test_unconfirmed_outcomes_carry_empty_checks_the_level_and_reasons():
         bare,
         features,
         target,
-        explore.plan_exploration(features, explore.NUMERIC),
+        explore.hypothesize(features, explore.NUMERIC),
     )
     result = confirm.confirm(bare, None, alpha_confirm=Fraction(1, 20))
     assert result.outcome == confirm.NO_CONTROL
@@ -607,7 +605,7 @@ def test_unconfirmed_outcomes_carry_empty_checks_the_level_and_reasons():
 def test_a_crash_records_the_custody_head_and_the_level():
     ledger = two_signal_ledger()
     features, target = signal_data(300, 4)
-    source = source_for(features, target)
+    source = locate(features, target)
     result = confirm.confirm(
         ledger, source, alpha_confirm=Fraction(1, 20), encode=lambda y: 1 / 0
     )
@@ -615,7 +613,7 @@ def test_a_crash_records_the_custody_head_and_the_level():
     assert result.checks == () and result.alpha_confirm == Fraction(1, 20)
 
     class Dies:
-        log = sealed.OpenLog()
+        log = sealed.Journal()
         committed = True
 
         def issue_token(self):
@@ -642,7 +640,7 @@ def test_every_check_on_c_has_its_own_seed_index():
         cfeatures["a"] + cfeatures["b"] + rng.normal(size=400)
     )
     result = confirm.confirm(
-        ledger, source_for(cfeatures, ctarget), alpha_confirm=Fraction(1, 20)
+        ledger, locate(cfeatures, ctarget), alpha_confirm=Fraction(1, 20)
     )
     assert [c.seed_path for c in result.checks] == [
         randomness.seed_path(7, "confirm.spearman", 0),

@@ -32,11 +32,11 @@ class Bagging(models.Model):
 
     family = "bagging"
     base: models.Model
-    search_space = search.SearchSpace(
+    search_space = search.Space(
         (
-            search.IntParameter("n_estimators", 10, 60),
-            search.FloatParameter("max_samples", 0.5, 1.0),
-            search.FloatParameter("max_features", 0.5, 1.0),
+            search.Integer("n_estimators", 10, 60),
+            search.Real("max_samples", 0.5, 1.0),
+            search.Real("max_features", 0.5, 1.0),
         )
     )
 
@@ -89,7 +89,7 @@ class Bagging(models.Model):
         return bagged
 
 
-class BaggedTree(Bagging):
+class Bagger(Bagging):
     """Bagged deep decision trees."""
 
     name = "bagged_decision_tree"
@@ -111,7 +111,7 @@ class BaggedLogistic(Bagging):
 
 
 BAGGING_ADAPTERS: tuple[type[models.Model], ...] = (
-    BaggedTree,
+    Bagger,
     BaggedKnn,
     BaggedLogistic,
 )

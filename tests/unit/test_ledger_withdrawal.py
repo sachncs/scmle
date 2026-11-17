@@ -12,7 +12,7 @@ from scmle.data.ledger import governed
 from scmle.data.ledger import ledger
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_ledger_governed import build
-from tests.unit.test_ledger_governed import source_for
+from tests.unit.test_ledger_governed import locate
 
 WORLD = {"rows": 500, "seed": 0, "effect": 0.7}
 
@@ -39,7 +39,7 @@ def run(second_stage, tmp_path=None, source=None, **world):
     values = {**WORLD, **world}
     features, target = build(**values)
     cfeatures, ctarget = build(rows=400, seed=9, effect=values["effect"])
-    source = source or source_for(cfeatures, ctarget)
+    source = source or locate(cfeatures, ctarget)
     return governed.run_governed(
         charter=make_charter(),
         features=features,
@@ -98,7 +98,7 @@ def test_the_accounting_is_in_the_claims_file_and_the_sealed_ledger(tmp_path):
 
 def test_the_family_hash_is_logged_before_c_opens_and_x_only_ran_first():
     cfeatures, ctarget = build(rows=400, seed=9, effect=0.7)
-    source = source_for(cfeatures, ctarget)
+    source = locate(cfeatures, ctarget)
     seen = {}
     result = run(
         withdraw_columns("f1", seen=seen, log=source.log), source=source
@@ -118,7 +118,7 @@ def test_the_family_hash_is_logged_before_c_opens_and_x_only_ran_first():
 
 def test_withdrawing_everything_leaves_c_unopened():
     cfeatures, ctarget = build(rows=400, seed=9, effect=0.7)
-    source = source_for(cfeatures, ctarget)
+    source = locate(cfeatures, ctarget)
     result = run(withdraw_columns("f0", "f1"), source=source)
 
     assert result.confirmation.outcome == confirm.ALL_WITHDRAWN
@@ -201,7 +201,7 @@ def test_the_false_claim_rate_stays_below_alpha_with_an_x_only_withdrawal():
                 features=features,
                 target=target,
                 classification=False,
-                source=source_for(cfeatures, ctarget),
+                source=locate(cfeatures, ctarget),
                 run_dir=None,
                 second_stage=(
                     below_median_rule(features, target)

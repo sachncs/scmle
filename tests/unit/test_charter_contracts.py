@@ -19,9 +19,7 @@ def make_charter(**overrides):
             target="churned within 30 days of the prediction moment",
             prediction_moment="first day of each billing month",
             intercurrent_events=(
-                contracts.IntercurrentEvent(
-                    "account closed", "treat as outcome"
-                ),
+                contracts.Event("account closed", "treat as outcome"),
             ),
             summary_measure="ROC AUC",
         ),
@@ -29,7 +27,7 @@ def make_charter(**overrides):
         "deployment_population": "stated marginals: all active subscribers",
         "gating_checks": ("leakage.skill",),
         "decision_map": (
-            contracts.DecisionRow(
+            contracts.Trigger(
                 check_id="leakage.skill",
                 trigger="lower bound above floor at the budgeted level",
                 action=contracts.DecisionAction.QUARANTINE_COLUMN,
@@ -100,7 +98,7 @@ def test_gating_check_without_a_decision_row_is_rejected():
 
 
 def test_gating_row_needs_a_certificate_id():
-    row = contracts.DecisionRow(
+    row = contracts.Trigger(
         check_id="leakage.skill",
         trigger="t",
         action=contracts.DecisionAction.BLOCK_RUN,
@@ -175,4 +173,4 @@ def test_load_rejects_malformed_json_as_a_config_error(tmp_path):
     path = tmp_path / "charter.json"
     path.write_text("{not json")
     with pytest.raises(errors.ConfigError):
-        contracts.read_charter(path)
+        contracts.peek(path)

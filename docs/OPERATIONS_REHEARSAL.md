@@ -23,7 +23,7 @@ Automated evidence: `tests/integration/test_resume.py` and
 ## 2. Rollback
 
 1. Register a known-good bundle and promote it with a signed
-   `PromotionApproval` bound to its content digest, review decision, and
+   `Sanction` bound to its content digest, review decision, and
    evidence references. Pass the release verification key to the promotion
    call.
 2. Stage a challenger under the `challenger` alias; do not move the serving
@@ -42,9 +42,9 @@ Automated evidence: `tests/unit/test_lifecycle_extras.py` and
 
 1. Build the complete `Registry` for the disposable
    release candidate.
-2. Use `FaultInjectionHarness` with a unique execution ID, reviewer, and
+2. Use `Harness` with a unique execution ID, reviewer, and
    evidence directory.
-3. Run one scenario-specific injector and return one `FaultArtifact` for
+3. Run one scenario-specific injector and return one `Emission` for
    every declared evidence requirement.
 4. Confirm each artifact is atomically persisted, its SHA-256 digest is
    recorded, and missing or unsafe observations remain inconclusive or

@@ -41,7 +41,7 @@ def passing_control(observed=6):
 
 def explored(tmp_path=None, effect=0.6, control=True, rule=online_fdr.ELOND):
     x, y = world(600, 1, effect)
-    config = online_fdr.RuleConfig(rule, Fraction(1, 10))
+    config = online_fdr.Settings(rule, Fraction(1, 10))
     path = None if tmp_path is None else tmp_path / "hypothesis_ledger.jsonl"
     ledger = scmle.data.ledger.ledger.Ledger.create(
         path,
@@ -50,19 +50,19 @@ def explored(tmp_path=None, effect=0.6, control=True, rule=online_fdr.ELOND):
         alpha_confirm=ALPHA,
         seed=3,
     )
-    plan = explore.plan_exploration(x, explore.NUMERIC)
+    plan = explore.hypothesize(x, explore.NUMERIC)
     explore.run_exploration(ledger, x, y, plan)
     if control:
-        ledger.record_control(passing_control().to_dict())
+        ledger.negatives(passing_control().to_dict())
     return ledger
 
 
 def source_with(features, target, ids=None):
-    log = sealed.OpenLog()
+    log = sealed.Journal()
     locked = splitters.ResidentTestSet(
         features, target, tuple(ids or range(len(target)))
     )
-    return sealed.SealedSet("C", locked, log)
+    return sealed.Locker("C", locked, log)
 
 
 def c_rows(effect=0.6, seed=2):
@@ -79,7 +79,7 @@ def test_the_full_flow_confirms_true_effects_and_only_those():
     assert {names[s] for s in SIGNAL} == confirmed
     assert source.opened
     for check in result.checks:
-        assert check.set_id is qualification.SetId.CONFIRMATION
+        assert check.set_id is qualification.Subset.CONFIRMATION
     for claim in result.confirmed:
         assert claim.tier is qualification.Tier.CONFIRMED
         assert claim.adjusted_p_value is not None
@@ -180,12 +180,12 @@ def test_no_survivors_means_c_is_never_opened():
     ledger = scmle.data.ledger.ledger.Ledger.create(
         None,
         charter_hash="c" * 64,
-        config=online_fdr.RuleConfig(online_fdr.ELOND, Fraction(1, 100)),
+        config=online_fdr.Settings(online_fdr.ELOND, Fraction(1, 100)),
         alpha_confirm=ALPHA,
         seed=0,
     )
     explore.run_exploration(
-        ledger, x, y, explore.plan_exploration(x, explore.NUMERIC)
+        ledger, x, y, explore.hypothesize(x, explore.NUMERIC)
     )
     source = source_with(*c_rows())
     result = confirm.confirm(
@@ -199,7 +199,7 @@ def test_no_survivors_means_c_is_never_opened():
 
 def test_a_failed_gate_promotes_nothing_and_leaves_c_closed():
     ledger = explored(control=False)
-    ledger.record_control(passing_control(observed=0).to_dict())
+    ledger.negatives(passing_control(observed=0).to_dict())
     source = source_with(*c_rows())
     result = confirm.confirm(ledger, source, alpha_confirm=ALPHA)
     assert result.outcome == confirm.FLOOR_NOT_EXCEEDED
@@ -252,7 +252,7 @@ def test_a_crash_while_opening_is_a_failure_not_an_exception():
     ledger = explored()
 
     class Broken:
-        log = sealed.OpenLog()
+        log = sealed.Journal()
         committed = True
 
         def issue_token(self):

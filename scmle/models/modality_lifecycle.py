@@ -216,7 +216,7 @@ class Package:
         signature: object = self.signature
         if not isinstance(path, str) or not path.strip():
             raise errors.InputError("package path must be non-empty")
-        if not isinstance(model_sha256, str) or not is_sha256(model_sha256):
+        if not isinstance(model_sha256, str) or not hashlike(model_sha256):
             raise errors.InputError(
                 "package model_sha256 must be a SHA-256 digest"
             )
@@ -376,7 +376,7 @@ class Predictor:
                 Path(package_path),
                 (dataset_hash, model_digest, signature["value"]),
             )
-            report_digest = attestation.canonical_digest(report.unsigned_dict())
+            report_digest = attestation.checksum(report.unsigned_dict())
         package = Package(
             path=str(package_path),
             model_sha256=model_digest,
@@ -468,9 +468,9 @@ class Predictor:
         return health
 
 
-def parse_stage_evidence(
+def rehydrate(
     raw_stage_evidence: object,
-) -> tuple[modalities.StageEvidence, ...]:
+) -> tuple[modalities.Proof, ...]:
     """Restores the per-stage evidence of a persisted lifecycle report.
 
     Args:
@@ -487,7 +487,7 @@ def parse_stage_evidence(
         raise errors.InputError(
             "lifecycle report stage_evidence must be a list"
         )
-    stage_evidence: list[modalities.StageEvidence] = []
+    stage_evidence: list[modalities.Proof] = []
     for item in raw_stage_evidence:
         if not isinstance(item, Mapping):
             raise errors.InputError(
@@ -512,8 +512,8 @@ def parse_stage_evidence(
         ):
             raise errors.InputError("lifecycle report notes are invalid")
         stage_evidence.append(
-            modalities.StageEvidence(
-                stage=modalities.LifecycleStage(stage),
+            modalities.Proof(
+                stage=modalities.Phase(stage),
                 evidence_links=tuple(evidence_links),
                 evidence=evidence,
                 notes=tuple(notes),
@@ -522,7 +522,7 @@ def parse_stage_evidence(
     return tuple(stage_evidence)
 
 
-def parse_package(raw_package: object) -> Package:
+def unpack(raw_package: object) -> Package:
     """Restores the package identity of a persisted lifecycle report.
 
     Args:
@@ -624,7 +624,7 @@ class Record:
 
     modality: str
     dataset_hash: str
-    stage_evidence: tuple[modalities.StageEvidence, ...]
+    stage_evidence: tuple[modalities.Proof, ...]
     evaluation: dict[str, object]
     performance: dict[str, object]
     package: Package
@@ -658,12 +658,9 @@ class Record:
             raise errors.KindError("package must be Package")
         stages = tuple(self.stage_evidence)
         if any(
-            not isinstance(evidence, modalities.StageEvidence)
-            for evidence in stages
+            not isinstance(evidence, modalities.Proof) for evidence in stages
         ):
-            raise errors.KindError(
-                "stage_evidence must contain StageEvidence records"
-            )
+            raise errors.KindError("stage_evidence must contain Proof records")
         expected_stages = modalities.REQUIRED_LIFECYCLE_STAGES
         actual_stages = tuple(evidence.stage for evidence in stages)
         if actual_stages != expected_stages:
@@ -689,7 +686,7 @@ class Record:
                 field_name,
                 normalise(getattr(self, field_name), field_name),
             )
-        if self.signature is not None and not is_sha256(self.signature):
+        if self.signature is not None and not hashlike(self.signature):
             raise errors.InputError("signature must be a SHA-256 digest")
 
     def unsigned_dict(self) -> dict[str, object]:
@@ -725,7 +722,7 @@ class Record:
         """
         return dataclasses.replace(
             self,
-            signature=signing.sign_payload(self.unsigned_dict(), signing_key),
+            signature=signing.mac(self.unsigned_dict(), signing_key),
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
@@ -740,7 +737,7 @@ class Record:
         """
         if self.signature is None:
             return False
-        expected = signing.sign_payload(self.unsigned_dict(), signing_key)
+        expected = signing.mac(self.unsigned_dict(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     @classmethod
@@ -762,8 +759,8 @@ class Record:
                 "unsupported lifecycle report schema version"
             )
 
-        stage_evidence = parse_stage_evidence(record.get("stage_evidence"))
-        package = parse_package(record.get("package"))
+        stage_evidence = rehydrate(record.get("stage_evidence"))
+        package = unpack(record.get("package"))
 
         def pluck(name: str) -> dict[str, object]:
             value = record.get(name)
@@ -999,7 +996,7 @@ class Checkpoint:
         """
         return dataclasses.replace(
             self,
-            signature=signing.sign_payload(self.unsigned_dict(), signing_key),
+            signature=signing.mac(self.unsigned_dict(), signing_key),
         )
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
@@ -1014,7 +1011,7 @@ class Checkpoint:
         """
         if self.signature is None:
             return False
-        expected = signing.sign_payload(self.unsigned_dict(), signing_key)
+        expected = signing.mac(self.unsigned_dict(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     @classmethod
@@ -1190,12 +1187,12 @@ class Curation:
             raise errors.InputError(
                 "sample_count must be a non-negative integer"
             )
-        if not isinstance(signature, str) or not is_sha256(signature):
+        if not isinstance(signature, str) or not hashlike(signature):
             raise errors.InputError("signature must be a SHA-256 digest")
-        normalized_curation = normalise(self.curation, "curation")
+        roundtrip = normalise(self.curation, "curation")
         normalized_card = normalise(self.dataset_card, "dataset_card")
         for name, record in (
-            ("curation", normalized_curation),
+            ("curation", roundtrip),
             ("dataset_card", normalized_card),
         ):
             if "modality" in record and record.get("modality") != self.modality:
@@ -1204,7 +1201,7 @@ class Curation:
                 raise errors.InputError(f"{name} does not match dataset_hash")
             if record.get("sample_count") != self.sample_count:
                 raise errors.InputError(f"{name} does not match sample_count")
-        object.__setattr__(self, "curation", normalized_curation)
+        object.__setattr__(self, "curation", roundtrip)
         object.__setattr__(self, "dataset_card", normalized_card)
 
     def unsigned_dict(self) -> dict[str, object]:
@@ -1227,7 +1224,7 @@ class Curation:
     @property
     def content_digest(self) -> str:
         """The deterministic digest of the unsigned evidence."""
-        return attestation.canonical_digest(self.unsigned_dict())
+        return attestation.checksum(self.unsigned_dict())
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
         """Checks the persisted curation signature.
@@ -1240,7 +1237,7 @@ class Curation:
         Returns:
             True if the signature matches the unsigned evidence, else False.
         """
-        expected = signing.sign_payload(self.unsigned_dict(), signing_key)
+        expected = signing.mac(self.unsigned_dict(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     def to_dict(self) -> dict[str, object]:
@@ -1303,7 +1300,7 @@ class Curation:
         if signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
             raise errors.InputError("unsupported modality curation signature")
         signature_value = signature.get("value")
-        if not isinstance(signature_value, str) or not is_sha256(
+        if not isinstance(signature_value, str) or not hashlike(
             signature_value
         ):
             raise errors.InputError("modality curation signature is invalid")
@@ -1331,7 +1328,7 @@ class Curation:
             ValueError: If it is not a SHA-256 digest or differs from the
                 digest of this result's content.
         """
-        if not isinstance(content_digest, str) or not is_sha256(content_digest):
+        if not isinstance(content_digest, str) or not hashlike(content_digest):
             raise errors.InputError(
                 "modality curation content_digest is invalid"
             )
@@ -1437,7 +1434,7 @@ class ExtensionCurator(Curator):
         limitations: Non-empty statements of the dataset's boundaries.
     """
 
-    extension: modalities.ExtensionModality
+    extension: modalities.Bespoke
     sample_values: tuple[Any, ...]
     dataset_hash_value: str
     curation_callback: Callable[[], curation.Curation]
@@ -1447,13 +1444,13 @@ class ExtensionCurator(Curator):
         """Validates the caller-owned curation boundary.
 
         Raises:
-            TypeError: If `extension` is not an `ExtensionModality` or the
+            TypeError: If `extension` is not an `Bespoke` or the
                 callback is not callable.
             ValueError: If the dataset hash is blank or the limitations are
                 empty or contain blank values.
         """
-        if not isinstance(self.extension, modalities.ExtensionModality):
-            raise errors.KindError("extension must be ExtensionModality")
+        if not isinstance(self.extension, modalities.Bespoke):
+            raise errors.KindError("extension must be Bespoke")
         if not self.dataset_hash_value.strip():
             raise errors.InputError("dataset_hash_value must not be empty")
         if not callable(self.curation_callback):
@@ -1466,7 +1463,7 @@ class ExtensionCurator(Curator):
         object.__setattr__(self, "limitations", tuple(self.limitations))
 
     @property
-    def modality(self) -> modalities.ExtensionModality:
+    def modality(self) -> modalities.Bespoke:
         """The namespaced extension identity."""
         return self.extension
 
@@ -1620,7 +1617,7 @@ class Preparer(Curator):
         self,
         sample: Any,
         feature_names: Sequence[str],
-    ) -> quality.ExplanationGroundTruth | None:
+    ) -> quality.Truth | None:
         """Gives caller-owned independent explanation evidence, if known.
 
         Built-in adapters return no reference by default because raw-modality
@@ -1962,7 +1959,7 @@ class DocumentPreparer(Preparer):
         )
 
 
-class TextPreparer(DocumentPreparer):
+class Plaintext(DocumentPreparer):
     """Document adapter with an explicit text modality declaration."""
 
     modality = modalities.Modality.TEXT
@@ -2032,7 +2029,7 @@ class ImagePreparer(Preparer):
             16 x 16 RGB image, named "pixel[row,column,channel]".
         """
         dataset = image.Dataset(tuple(samples))
-        values = dataset.prepare_tabular_features()
+        values = dataset.flatten()
         width, height = (16, 16)
         channels = 3
         names = tuple(
@@ -2194,7 +2191,7 @@ class ImagePreparer(Preparer):
             raise errors.InputError(
                 "decoded RGB image must have three channels"
             )
-        image_library = image.require_pillow("raw image explanation")
+        image_library = image.pillow("raw image explanation")
         row_step = max(1, int(numpy.ceil(source_height / 4)))
         column_step = max(1, int(numpy.ceil(source_width / 4)))
         terms: list[tuple[str, float]] = []
@@ -2538,7 +2535,7 @@ class AudioPreparer(Preparer):
             raise errors.InputError(
                 "snr_db values must be finite and in [0, 120]"
             )
-        parameters, values = audio.wav_pcm_values(sample.encoded_bytes)
+        parameters, values = audio.pcm(sample.encoded_bytes)
         signal_rms = float(numpy.sqrt(numpy.mean(numpy.square(values))))
         if signal_rms <= 0.0:
             return {
@@ -2690,7 +2687,7 @@ class AudioPreparer(Preparer):
         }
 
 
-class VideoPreparer(Preparer):
+class Footage(Preparer):
     """Adapter for probed video metadata or an explicit frame decoder.
 
     Attributes:
@@ -2809,13 +2806,13 @@ class VideoPreparer(Preparer):
         """
         dataset = video.Dataset(tuple(samples))
         prepared = (
-            dataset.prepare_frame_features(
+            dataset.summarize(
                 self.frame_decoder,
                 max_frames=self.max_frames,
                 max_frame_pixels=self.max_frame_pixels,
             )
             if self.frame_decoder is not None
-            else dataset.prepare_metadata_features()
+            else dataset.numerize()
         )
         return Batch(
             tuple(prepared.sources), prepared.feature_names, prepared.to_numpy()
@@ -2854,10 +2851,10 @@ class VideoPreparer(Preparer):
             minus reference) and, per profile key, whether its value differs.
 
         Raises:
-            TypeError: If `observed` is not a `VideoPreparer`.
+            TypeError: If `observed` is not a `Footage`.
         """
-        if not isinstance(observed, VideoPreparer):
-            raise errors.KindError("observed adapter must be a VideoPreparer")
+        if not isinstance(observed, Footage):
+            raise errors.KindError("observed adapter must be a Footage")
         reference = self.dataset.curate()
         current = observed.dataset.curate()
         return {
@@ -2930,7 +2927,7 @@ class VideoPreparer(Preparer):
         )
         terms: list[dict[str, object]] = []
         slot_width = 5
-        frame_indices = self.dataset.frame_indices_for(sample, self.max_frames)
+        frame_indices = self.dataset.stride(sample, self.max_frames)
         for slot, frame_index in enumerate(frame_indices):
             occluded = values.copy()
             start = slot * slot_width
@@ -3000,21 +2997,21 @@ class VideoPreparer(Preparer):
                 "reason": "an explicit frame decoder is required",
             }
         decoder = self.frame_decoder
-        frame_indices = self.dataset.frame_indices_for(sample, self.max_frames)
+        frame_indices = self.dataset.stride(sample, self.max_frames)
         windows: list[dict[str, object]] = []
-        for target_frame in frame_indices:
+        for outcomes in frame_indices:
 
             def blackout(
                 payload: bytes,
                 frame_index: int,
-                target_frame_index: int = target_frame,
+                target_frame_index: int = outcomes,
             ) -> numpy.ndarray:
                 frame = numpy.asarray(decoder(payload, frame_index))
                 if frame_index == target_frame_index:
                     return numpy.zeros_like(frame)
                 return frame
 
-            prepared = video.Dataset((sample,)).prepare_frame_features(
+            prepared = video.Dataset((sample,)).summarize(
                 blackout,
                 max_frames=self.max_frames,
                 max_frame_pixels=self.max_frame_pixels,
@@ -3027,8 +3024,8 @@ class VideoPreparer(Preparer):
             )
             windows.append(
                 {
-                    "frame_index": target_frame,
-                    "time_seconds": target_frame
+                    "frame_index": outcomes,
+                    "time_seconds": outcomes
                     / sample.metadata.frames_per_second,
                     "score_delta_from_full": score - original_score,
                 }
@@ -3099,7 +3096,7 @@ class GraphPreparer(Preparer):
             Train, validation and test partitions of nodes, with the node IDs of
             each under `groups`.
         """
-        result = graph.inductive_node_split(self.dataset, seed=seed)
+        result = graph.induct(self.dataset, seed=seed)
         by_id = {node.node_id: node for node in self.dataset.nodes}
         return Partitions(
             tuple(by_id[node_id] for node_id in result.train_nodes),
@@ -3160,7 +3157,7 @@ class GraphPreparer(Preparer):
         """
         return sample.label
 
-    def one_hop_subgraph(
+    def neighbourhood(
         self,
         node_id: str,
         max_nodes: int = MAX_GRAPH_CONTEXT_NODES,
@@ -3267,7 +3264,7 @@ class GraphPreparer(Preparer):
         """
         if not isinstance(sample, graph.Node):
             raise errors.KindError("sample must be a Node")
-        subgraph = self.one_hop_subgraph(sample.node_id)
+        subgraph = self.neighbourhood(sample.node_id)
         subgraph_node_ids = cast("list[str]", subgraph["node_ids"])
         neighbors = subgraph_node_ids[1:]
         edges = cast("list[dict[str, object]]", subgraph["edges"])
@@ -3427,7 +3424,7 @@ class GeospatialPreparer(Preparer):
         return self.dataset.content_hash
 
     @property
-    def samples(self) -> tuple[geospatial.GeoFeature, ...]:
+    def samples(self) -> tuple[geospatial.Placemark, ...]:
         """The geospatial features in the dataset."""
         return self.dataset.features
 
@@ -3447,11 +3444,11 @@ class GeospatialPreparer(Preparer):
                 "block_size": self.block_size,
             }
         else:
-            leakage = self.dataset.boundary_leakage(self.block_size)
+            leakage = self.dataset.straddle(self.block_size)
             profile["spatial_boundary_leakage"] = leakage.to_dict()
             if leakage.crossing_feature_ids:
                 quality_findings.append(
-                    curation.build_finding(
+                    curation.flaw(
                         "quality.geospatial-boundary-leakage",
                         data.FindingSeverity.WARNING,
                         {
@@ -3480,19 +3477,19 @@ class GeospatialPreparer(Preparer):
             Train, validation and test partitions, with the block IDs of each
             under `groups`.
         """
-        result = self.dataset.split_spatial(self.block_size, seed=seed)
+        result = self.dataset.tile(self.block_size, seed=seed)
         return Partitions(
             result.train,
             result.validation,
             result.test,
-            result.block_ids(),
+            result.tiles(),
         )
 
-    def features(self, samples: Sequence[geospatial.GeoFeature]) -> Batch:
+    def features(self, samples: Sequence[geospatial.Placemark]) -> Batch:
         """Prepares bounded geometry envelope and centroid features.
 
         The dataset is rebuilt with the adapter's CRS and source; a missing
-        CRS or a non-finite prepared value raises GeospatialValidationError
+        CRS or a non-finite prepared value raises GeometryError
         from the dataset.
 
         Args:
@@ -3511,7 +3508,7 @@ class GeospatialPreparer(Preparer):
             prepared.to_numpy(),
         )
 
-    def sample_id(self, sample: geospatial.GeoFeature) -> str:
+    def sample_id(self, sample: geospatial.Placemark) -> str:
         """Gives a feature identity.
 
         Args:
@@ -3522,7 +3519,7 @@ class GeospatialPreparer(Preparer):
         """
         return sample.feature_id
 
-    def label(self, sample: geospatial.GeoFeature) -> object | None:
+    def label(self, sample: geospatial.Placemark) -> object | None:
         """Gives the feature label.
 
         Args:
@@ -3556,10 +3553,10 @@ class GeospatialPreparer(Preparer):
             replaced by the bounds midpoint.
 
         Raises:
-            TypeError: If `sample` is not a `GeoFeature`.
+            TypeError: If `sample` is not a `Placemark`.
         """
-        if not isinstance(sample, geospatial.GeoFeature):
-            raise errors.KindError("sample must be a GeoFeature")
+        if not isinstance(sample, geospatial.Placemark):
+            raise errors.KindError("sample must be a Placemark")
         feature_index = next(
             index
             for index, item in enumerate(self.dataset.features)
@@ -3596,7 +3593,7 @@ class GeospatialPreparer(Preparer):
         for axis, axis_name, baseline in zip(
             (0, 1), baselines, baseline_values, strict=True
         ):
-            masked_sample = sample.masked_geometry_axis(axis, baseline)
+            masked_sample = sample.substituted(axis, baseline)
             masked_values = self.features((masked_sample,)).values
             masked_decision = numpy.asarray(
                 model.decision_function(masked_values)
@@ -3698,7 +3695,7 @@ class GeospatialPreparer(Preparer):
         )
 
 
-class RasterPreparer(Preparer):
+class Imagery(Preparer):
     """Adapter for labelled raster metadata or bounded decoded pixels.
 
     Attributes:
@@ -3713,7 +3710,7 @@ class RasterPreparer(Preparer):
 
     def __init__(
         self,
-        samples: Sequence[geospatial.RasterSample],
+        samples: Sequence[geospatial.Tile],
         labels: Mapping[str, object],
         decoder: geospatial.RasterDecoder | None = None,
         decoder_name: str | None = None,
@@ -3783,7 +3780,7 @@ class RasterPreparer(Preparer):
         return curation.dataset_hash(identities)
 
     @property
-    def samples(self) -> tuple[geospatial.RasterSample, ...]:
+    def samples(self) -> tuple[geospatial.Tile, ...]:
         """The raster samples in the dataset."""
         return self.dataset
 
@@ -3879,10 +3876,10 @@ class RasterPreparer(Preparer):
                     if value is not None
                 ),
             }
-        quality_findings: list[data.CurationFinding] = []
+        quality_findings: list[data.Finding] = []
         if len(crs_values) > 1 or len(dimensions) > 1 or len(dtypes) > 1:
             quality_findings.append(
-                curation.build_finding(
+                curation.flaw(
                     "quality.raster-shape-or-crs-drift",
                     data.FindingSeverity.WARNING,
                     {"dataset": self.dataset_hash},
@@ -3898,7 +3895,7 @@ class RasterPreparer(Preparer):
             )
         if any(sample.nodata_status == "unknown" for sample in self.dataset):
             quality_findings.append(
-                curation.build_finding(
+                curation.flaw(
                     "quality.raster-nodata-unknown",
                     data.FindingSeverity.WARNING,
                     {"dataset": self.dataset_hash},
@@ -3962,7 +3959,7 @@ class RasterPreparer(Preparer):
             },
         )
 
-    def features(self, samples: Sequence[geospatial.RasterSample]) -> Batch:
+    def features(self, samples: Sequence[geospatial.Tile]) -> Batch:
         """Prepares raster metadata or bounded decoded pixel features.
 
         Args:
@@ -3974,19 +3971,19 @@ class RasterPreparer(Preparer):
             count, byte size and six transform values.
 
         Raises:
-            GeospatialValidationError: If decoding is on and the rasters do not
+            GeometryError: If decoding is on and the rasters do not
                 share one band count (an empty sequence counts as not sharing
                 one).
         """
         if self.decoder is not None:
             band_counts = {sample.bands for sample in samples}
             if len(band_counts) != 1:
-                raise geospatial.GeospatialValidationError(
+                raise geospatial.GeometryError(
                     "decoded raster features require a consistent band count",
                     {"code": "pixel_band_mismatch"},
                 )
             band_count = next(iter(band_counts))
-            names = self.pixel_feature_names(band_count)
+            names = self.headers(band_count)
             rows = []
             for sample in samples:
                 pixels = sample.decode(self.decoder, max_pixels=self.max_pixels)
@@ -4027,7 +4024,7 @@ class RasterPreparer(Preparer):
         )
 
     @staticmethod
-    def pixel_feature_names(band_count: int) -> tuple[str, ...]:
+    def headers(band_count: int) -> tuple[str, ...]:
         """Names the bounded decoded-pixel summary features.
 
         Args:
@@ -4062,13 +4059,13 @@ class RasterPreparer(Preparer):
             maximum of its values.
 
         Raises:
-            GeospatialValidationError: If the pixel shape does not match the
+            GeometryError: If the pixel shape does not match the
                 declared band count.
         """
         values = numpy.asarray(pixels)
         if values.ndim == MATRIX_RANK:
             if band_count != 1:
-                raise geospatial.GeospatialValidationError(
+                raise geospatial.GeometryError(
                     "single-band decoded pixels must declare one band",
                     {"code": "pixel_band_mismatch"},
                 )
@@ -4079,7 +4076,7 @@ class RasterPreparer(Preparer):
         ):
             channels = values
         else:
-            raise geospatial.GeospatialValidationError(
+            raise geospatial.GeometryError(
                 "decoded pixels do not match the declared band count",
                 {"code": "pixel_band_mismatch"},
             )
@@ -4094,7 +4091,7 @@ class RasterPreparer(Preparer):
             )
         )
 
-    def sample_id(self, sample: geospatial.RasterSample) -> str:
+    def sample_id(self, sample: geospatial.Tile) -> str:
         """Gives the canonical raster source identity.
 
         Args:
@@ -4105,7 +4102,7 @@ class RasterPreparer(Preparer):
         """
         return sample.source
 
-    def label(self, sample: geospatial.RasterSample) -> object | None:
+    def label(self, sample: geospatial.Tile) -> object | None:
         """Gives the caller-owned raster label.
 
         Args:
@@ -4139,12 +4136,12 @@ class RasterPreparer(Preparer):
             "not_available" if no decoder is set.
 
         Raises:
-            TypeError: If `sample` is not a `RasterSample`.
+            TypeError: If `sample` is not a `Tile`.
             ValueError: If the feature names or coefficients do not match the
                 raster's pixel features.
         """
-        if not isinstance(sample, geospatial.RasterSample):
-            raise errors.KindError("sample must be a RasterSample")
+        if not isinstance(sample, geospatial.Tile):
+            raise errors.KindError("sample must be a Tile")
         if self.decoder is None:
             return {
                 "status": "not_available",
@@ -4162,7 +4159,7 @@ class RasterPreparer(Preparer):
         original_values = numpy.asarray(
             self.summarise(pixels, sample.bands), dtype=numpy.float64
         )
-        if tuple(feature_names) != self.pixel_feature_names(sample.bands):
+        if tuple(feature_names) != self.headers(sample.bands):
             raise errors.InputError(
                 "raster explanation feature schema does not match"
             )
@@ -4208,9 +4205,7 @@ class RasterPreparer(Preparer):
                     masked_score = float(masked_decision[0, selected_class])
                 region_name = f"region[{row}:{end_row},{column}:{end_column}]"
                 score_delta = original_score - masked_score
-                spatial_bounds = sample.pixel_window_bounds(
-                    row, end_row, column, end_column
-                )
+                spatial_bounds = sample.extent(row, end_row, column, end_column)
                 terms.append((region_name, score_delta))
                 windows.append(
                     {
@@ -4263,10 +4258,10 @@ class RasterPreparer(Preparer):
             Mapping with both dataset hashes and whether the profile differs.
 
         Raises:
-            TypeError: If `observed` is not a `RasterPreparer`.
+            TypeError: If `observed` is not a `Imagery`.
         """
-        if not isinstance(observed, RasterPreparer):
-            raise errors.KindError("observed adapter must be a RasterPreparer")
+        if not isinstance(observed, Imagery):
+            raise errors.KindError("observed adapter must be a Imagery")
         reference = self.curate()
         current = observed.curate()
         return {
@@ -4334,10 +4329,10 @@ class Context:
     signing_key: str | bytes
     seed: int
     observed_adapter: Preparer
-    manifest: data.ModalityManifest | None = None
+    manifest: data.Passport | None = None
     require_independent_ground_truth: bool = False
     resume_replay: bool = False
-    stage_records: dict[modalities.LifecycleStage, dict[str, object]] = (
+    stage_records: dict[modalities.Phase, dict[str, object]] = (
         dataclasses.field(default_factory=dict)
     )
     curation_report: Any = None
@@ -4363,7 +4358,7 @@ class Context:
 
     def record(
         self,
-        stage: modalities.LifecycleStage,
+        stage: modalities.Phase,
         payload: dict[str, object],
     ) -> None:
         """Records one stage result for the final evidence index.
@@ -4397,7 +4392,7 @@ class Context:
             peak_memory_gb=limits.peak_memory_gb(),
             sample_count=sample_count,
             machine=platform.platform(),
-            observed_at=events.utc_timestamp(),
+            observed_at=events.stamp(),
             software=(
                 f"{platform.python_implementation()} "
                 f"{platform.python_version()}"
@@ -4414,7 +4409,7 @@ class Stage(abc.ABC):
             stage, or None if it is not timed.
     """
 
-    stage: ClassVar[modalities.LifecycleStage]
+    stage: ClassVar[modalities.Phase]
     performance_operation: ClassVar[performance.Operation | None] = None
 
     @abc.abstractmethod
@@ -4429,7 +4424,7 @@ class Stage(abc.ABC):
 class Ingestion(Stage):
     """Confirm source identity and sample cardinality."""
 
-    stage = modalities.LifecycleStage.INGESTION
+    stage = modalities.Phase.INGESTION
     performance_operation = performance.Operation.INGEST
 
     def execute(self, context: Context) -> None:
@@ -4455,7 +4450,7 @@ class Ingestion(Stage):
 class Validation(Stage):
     """Reject missing labels and malformed feature prerequisites."""
 
-    stage = modalities.LifecycleStage.VALIDATION
+    stage = modalities.Phase.VALIDATION
 
     def execute(self, context: Context) -> None:
         """Validates labels and dataset-level curation state.
@@ -4485,7 +4480,7 @@ class Validation(Stage):
 class Profiling(Stage):
     """Capture modality-specific profile evidence."""
 
-    stage = modalities.LifecycleStage.PROFILING
+    stage = modalities.Phase.PROFILING
 
     def execute(self, context: Context) -> None:
         """Persists the curation/profile object in lifecycle state.
@@ -4499,10 +4494,10 @@ class Profiling(Stage):
         )
 
 
-class CurationStage(Stage):
+class Curating(Stage):
     """Block unresolved data-quality findings before representation."""
 
-    stage = modalities.LifecycleStage.CURATION
+    stage = modalities.Phase.CURATION
 
     def execute(self, context: Context) -> None:
         """Requires a release-ready curation report.
@@ -4533,7 +4528,7 @@ class CurationStage(Stage):
 class Splitting(Stage):
     """Create leakage-aware train, validation, and test partitions."""
 
-    stage = modalities.LifecycleStage.SPLITTING
+    stage = modalities.Phase.SPLITTING
 
     def execute(self, context: Context) -> None:
         """Splits and rejects overlapping sample identities.
@@ -4579,7 +4574,7 @@ class Splitting(Stage):
 class Preparation(Stage):
     """Prepare partition-local finite feature matrices."""
 
-    stage = modalities.LifecycleStage.FEATURE_PREPARATION
+    stage = modalities.Phase.FEATURE_PREPARATION
 
     def execute(self, context: Context) -> None:
         """Prepares and aligns features without fitting on held-out rows.
@@ -4620,7 +4615,7 @@ class Preparation(Stage):
 class Modelling(Stage):
     """Fit the bounded regularized linear baseline on training features."""
 
-    stage = modalities.LifecycleStage.MODELLING
+    stage = modalities.Phase.MODELLING
     performance_operation = performance.Operation.FIT
 
     def execute(self, context: Context) -> None:
@@ -4648,7 +4643,7 @@ class Modelling(Stage):
 class Evaluation(Stage):
     """Evaluate once on the untouched test partition."""
 
-    stage = modalities.LifecycleStage.EVALUATION
+    stage = modalities.Phase.EVALUATION
 
     def execute(self, context: Context) -> None:
         """Computes deterministic classification metrics and predictions.
@@ -4686,10 +4681,10 @@ class Evaluation(Stage):
         context.record(self.stage, context.evaluation.copy())
 
 
-class DataExplainabilityStage(Stage):
+class Composition(Stage):
     """Explain source composition, split boundaries, and feature ranges."""
 
-    stage = modalities.LifecycleStage.DATA_EXPLAINABILITY
+    stage = modalities.Phase.DATA_EXPLAINABILITY
 
     def execute(self, context: Context) -> None:
         """Records data lineage and non-causal feature summaries.
@@ -4835,7 +4830,7 @@ def ablate(
     )
 
 
-def perturbed_contribution_reports(
+def sensitivities(
     batch: Batch,
     sample_index: int,
     sample_coefficients: numpy.ndarray,
@@ -4856,7 +4851,7 @@ def perturbed_contribution_reports(
     sample_row = batch.values[sample_index]
     top_k = min(10, len(batch.feature_names))
     reports = [
-        quality.linear_contribution_report(
+        quality.decompose(
             batch.sample_ids[sample_index],
             batch.feature_names,
             sample_row.tolist(),
@@ -4871,7 +4866,7 @@ def perturbed_contribution_reports(
                 direction * perturbation_size[feature_index]
             )
             reports.append(
-                quality.linear_contribution_report(
+                quality.decompose(
                     batch.sample_ids[sample_index],
                     batch.feature_names,
                     perturbed_row.tolist(),
@@ -4916,11 +4911,11 @@ def perturb(
         if sample_decision.ndim > 1:
             sample_class = int(numpy.argmax(sample_decision[0]))
         sample_coefficients = model.coef_[sample_class]
-        sample_reports = perturbed_contribution_reports(
+        sample_reports = sensitivities(
             batch, sample_index, sample_coefficients, perturbation_size
         )
         explanation_reports.append(sample_reports[0])
-        sample_stability = quality.ranking_stability(
+        sample_stability = quality.topk(
             tuple(sample_reports),
             top_k=min(10, len(batch.feature_names)),
         )
@@ -4984,7 +4979,7 @@ def replicate(model: LogisticRegression, batch: Batch) -> float:
 class ModelExplainabilityStage(Stage):
     """Explain linear weights and test feature-space stability."""
 
-    stage = modalities.LifecycleStage.MODEL_EXPLAINABILITY
+    stage = modalities.Phase.MODEL_EXPLAINABILITY
 
     @staticmethod
     def corroborate(
@@ -5024,9 +5019,7 @@ class ModelExplainabilityStage(Stage):
                     )
                 )
         ground_truth_evidence = {
-            **quality.evaluate_ground_truth_suite(
-                evaluated_sample_count, references
-            ).to_dict(),
+            **quality.referee(evaluated_sample_count, references).to_dict(),
             "feature_space_only": True,
             "limitations": [
                 (
@@ -5092,7 +5085,7 @@ class ModelExplainabilityStage(Stage):
         quality_evaluation = quality.evaluate(
             method="linear_reference_zero_ablation_and_perturbation",
             sample_count=len(batch.sample_ids),
-            thresholds=quality.QualityThresholds(
+            thresholds=quality.Thresholds(
                 stability_minimum=0.9,
                 fidelity_minimum=0.999999,
             ),
@@ -5162,7 +5155,7 @@ class ModelExplainabilityStage(Stage):
 class Packaging(Stage):
     """Writes and signs a digest-bound model package atomically."""
 
-    stage = modalities.LifecycleStage.PACKAGING
+    stage = modalities.Phase.PACKAGING
     performance_operation = performance.Operation.PACKAGE
 
     def execute(self, context: Context) -> None:
@@ -5222,7 +5215,7 @@ class Packaging(Stage):
         try:
             model_path = temporary / "model.joblib"
             joblib.dump(model, model_path, compress=3)
-            durability.sync_file(model_path)
+            durability.sync(model_path)
             unsigned = {
                 "schema_version": 1,
                 "modality": modalities.serialise(context.adapter.modality),
@@ -5237,7 +5230,7 @@ class Packaging(Stage):
                     if key != "predictions"
                 },
             }
-            signature = signing.sign_payload(unsigned, context.signing_key)
+            signature = signing.mac(unsigned, context.signing_key)
             manifest = {
                 **unsigned,
                 "signature": {
@@ -5251,7 +5244,7 @@ class Packaging(Stage):
                 encoding="utf-8",
                 newline="\n",
             )
-            durability.sync_file(manifest_path)
+            durability.sync(manifest_path)
             durability.sync_directory(temporary)
             Path(temporary).replace(target)
             durability.sync_directory(target.parent)
@@ -5267,7 +5260,7 @@ class Packaging(Stage):
 class Inference(Stage):
     """Verify the package before loading and reproducing predictions."""
 
-    stage = modalities.LifecycleStage.INFERENCE
+    stage = modalities.Phase.INFERENCE
 
     def execute(self, context: Context) -> None:
         """Loads trusted bytes and compares predictions with the fitted model.
@@ -5315,7 +5308,7 @@ class Inference(Stage):
 class Monitoring(Stage):
     """Emit reference-to-observed data drift evidence."""
 
-    stage = modalities.LifecycleStage.MONITORING
+    stage = modalities.Phase.MONITORING
 
     def execute(self, context: Context) -> None:
         """Records modality-specific monitoring output.
@@ -5330,7 +5323,7 @@ class Monitoring(Stage):
 class Documentation(Stage):
     """Build a truthful dataset and model card for the baseline."""
 
-    stage = modalities.LifecycleStage.DOCUMENTATION
+    stage = modalities.Phase.DOCUMENTATION
 
     def execute(self, context: Context) -> None:
         """Records support status, intended use, and limitations.
@@ -5353,9 +5346,7 @@ class Documentation(Stage):
             "modality": modalities.serialise(context.adapter.modality),
             "status": (
                 "extension-only"
-                if isinstance(
-                    context.adapter.modality, modalities.ExtensionModality
-                )
+                if isinstance(context.adapter.modality, modalities.Bespoke)
                 else "experimental"
             ),
             "intended_use": (
@@ -5377,7 +5368,7 @@ class Documentation(Stage):
 class Recovery(Stage):
     """Prove bounded resource claims and reject a tampered package."""
 
-    stage = modalities.LifecycleStage.RECOVERY_AND_RESOURCE_TESTS
+    stage = modalities.Phase.RECOVERY_AND_RESOURCE_TESTS
 
     def execute(self, context: Context) -> None:
         """Tampers with a copy of the package and verifies it is rejected.
@@ -5423,7 +5414,7 @@ class Recovery(Stage):
             shutil.rmtree(temporary, ignore_errors=True)
 
 
-def check_run_option_types(
+def typecheck(
     require_independent_ground_truth: object,
     cancellation_check: object,
     resume: object,
@@ -5447,7 +5438,7 @@ def check_run_option_types(
         raise errors.KindError("resume must be bool")
 
 
-def check_checkpoint_options(
+def coherent(
     resume: bool, checkpoint_target: Path | None, report_target: Path | None
 ) -> None:
     """Rejects inconsistent checkpoint and report paths.
@@ -5472,7 +5463,7 @@ def check_checkpoint_options(
         raise errors.InputError("checkpoint_path and report_path must differ")
 
 
-def execute_with_performance(context: Context, stage: Stage) -> None:
+def clocked(context: Context, stage: Stage) -> None:
     """Executes one stage and records its duration when it is measured.
 
     Args:
@@ -5523,7 +5514,7 @@ class Plan:
     signing_key: str | bytes
     seed: int
     require_independent_ground_truth: bool
-    manifest: data.ModalityManifest | None
+    manifest: data.Passport | None
     cancellation_check: Callable[[], bool] | None
     package_preexisting: bool
     report_preexisting: bool
@@ -5533,7 +5524,7 @@ class Plan:
         """The digest of the manifest, or None without one."""
         if self.manifest is None:
             return None
-        return attestation.canonical_digest(self.manifest.to_dict())
+        return attestation.checksum(self.manifest.to_dict())
 
     def poll(self) -> None:
         """Stops before publication and removes this run's artifacts.
@@ -5835,12 +5826,12 @@ class Lifecycle:
         Ingestion(),
         Validation(),
         Profiling(),
-        CurationStage(),
+        Curating(),
         Splitting(),
         Preparation(),
         Modelling(),
         Evaluation(),
-        DataExplainabilityStage(),
+        Composition(),
         ModelExplainabilityStage(),
         Packaging(),
         Inference(),
@@ -5876,8 +5867,8 @@ class Lifecycle:
         for stage_index, stage in enumerate(self.stages):
             plan.poll()
             context.resume_replay = stage_index < resume_count
-            execute_with_performance(context, stage)
-            stage_digest = attestation.canonical_digest(
+            clocked(context, stage)
+            stage_digest = attestation.checksum(
                 context.stage_records[stage.stage]
             )
             if stage_index < resume_count:
@@ -5903,7 +5894,7 @@ class Lifecycle:
         report_path: str | Path | None = None,
         performance_budget: performance.Budget | None = None,
         performance_baseline: performance.Baseline | None = None,
-        manifest: data.ModalityManifest | None = None,
+        manifest: data.Passport | None = None,
         require_independent_ground_truth: bool = False,
         cancellation_check: Callable[[], bool] | None = None,
         checkpoint_path: str | Path | None = None,
@@ -5961,14 +5952,12 @@ class Lifecycle:
             FileNotFoundError: If `resume` is True and the checkpoint does not
                 exist.
         """
-        check_run_option_types(
-            require_independent_ground_truth, cancellation_check, resume
-        )
+        typecheck(require_independent_ground_truth, cancellation_check, resume)
         report_target = Path(report_path) if report_path is not None else None
         checkpoint_target = (
             Path(checkpoint_path) if checkpoint_path is not None else None
         )
-        check_checkpoint_options(resume, checkpoint_target, report_target)
+        coherent(resume, checkpoint_target, report_target)
         package_target = Path(package_path)
         plan = Plan(
             adapter=adapter,
@@ -6032,7 +6021,7 @@ class Lifecycle:
         )
         plan.poll()
         records = tuple(
-            modalities.StageEvidence(
+            modalities.Proof(
                 stage=stage,
                 evidence_links=("modality_lifecycle.json",),
                 evidence=context.stage_records[stage],
@@ -6144,7 +6133,7 @@ def require_feature_names(feature_names: object) -> list[str]:
     return feature_names
 
 
-def check_package_signature(
+def authenticate(
     signature: object, unsigned: Mapping[str, object], signing_key: str | bytes
 ) -> None:
     """Checks a package manifest's signature over its unsigned content.
@@ -6168,7 +6157,7 @@ def check_package_signature(
     value = signature.get("value")
     if not isinstance(value, str) or not value.strip():
         raise errors.InputError("modality package signature is empty")
-    expected = signing.sign_payload(unsigned, signing_key)
+    expected = signing.mac(unsigned, signing_key)
     if not hmac.compare_digest(value, expected):
         raise errors.InputError("modality package signature does not verify")
 
@@ -6208,15 +6197,15 @@ def verify_package_manifest(
         raise errors.InputError("modality package dataset_hash is invalid")
     feature_names = require_feature_names(unsigned.get("feature_names"))
     model_digest = unsigned.get("model_sha256")
-    if not isinstance(model_digest, str) or not is_sha256(model_digest):
+    if not isinstance(model_digest, str) or not hashlike(model_digest):
         raise errors.InputError("modality package model_sha256 is invalid")
     if not isinstance(unsigned.get("evaluation"), Mapping):
         raise errors.InputError("modality package evaluation is invalid")
-    check_package_signature(signature, unsigned, signing_key)
+    authenticate(signature, unsigned, signing_key)
     return feature_names, model_digest
 
 
-def check_package_classifier(loaded: object, feature_count: int) -> None:
+def vet(loaded: object, feature_count: int) -> None:
     """Checks a deserialized package classifier against its feature schema.
 
     Args:
@@ -6276,11 +6265,11 @@ def load_package(
     if file_digest(model_path) != model_digest:
         raise errors.InputError("modality package model digest does not verify")
     loaded = joblib.load(model_path)
-    check_package_classifier(loaded, len(feature_names))
+    vet(loaded, len(feature_names))
     return loaded
 
 
-def is_sha256(value: str) -> bool:
+def hashlike(value: str) -> bool:
     """Checks for a canonical lowercase SHA-256 digest.
 
     Args:
@@ -6327,26 +6316,26 @@ __all__ = [
     "Batch",
     "Cancellation",
     "Checkpoint",
+    "Composition",
     "Curation",
-    "DataExplainabilityStage",
     "DocumentPreparer",
+    "Footage",
     "GeospatialPreparer",
     "GraphPreparer",
     "ImagePreparer",
+    "Imagery",
     "Inference",
     "Lifecycle",
     "LifecycleCancelledError",
     "Modelling",
     "Package",
     "Partitions",
+    "Plaintext",
     "Predictor",
     "Preparer",
-    "RasterPreparer",
     "Record",
-    "TextPreparer",
-    "VideoPreparer",
     "file_digest",
-    "is_sha256",
+    "hashlike",
     "load_package",
     "normalise",
 ]

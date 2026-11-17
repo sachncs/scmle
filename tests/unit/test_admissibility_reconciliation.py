@@ -22,7 +22,7 @@ def test_gap_is_the_relative_absolute_difference():
 
 
 def test_an_exact_match_passes_without_an_explanation():
-    result = reconciliation.reconcile_item(item(1000.0))
+    result = reconciliation.settle(item(1000.0))
     assert result.status is reconciliation.Status.MATCHED
     assert result.tier is Tier.ATTESTED
     assert result.check.decision is Decision.PASS
@@ -30,25 +30,25 @@ def test_an_exact_match_passes_without_an_explanation():
 
 def test_a_gap_exactly_at_the_tolerance_matches_and_above_it_does_not():
     assert (
-        reconciliation.reconcile_item(item(950.0), 0.05).status
+        reconciliation.settle(item(950.0), 0.05).status
         is reconciliation.Status.MATCHED
     )
-    over = reconciliation.reconcile_item(
-        item(949.9), 0.05, certificates.GateStatus.GATING
+    over = reconciliation.settle(
+        item(949.9), 0.05, certificates.Authority.GATING
     )
     assert over.status is reconciliation.Status.UNEXPLAINED
     assert over.check.decision is Decision.BLOCK
 
 
 def test_an_unexplained_gap_fails_the_gate_and_blocks_when_certified():
-    result = reconciliation.reconcile_item(
-        item(900.0), gate=certificates.GateStatus.GATING
+    result = reconciliation.settle(
+        item(900.0), gate=certificates.Authority.GATING
     )
     assert result.status is reconciliation.Status.UNEXPLAINED
     assert result.check.decision is Decision.BLOCK
     assert result.tier is Tier.UNVERIFIED
     # not certified: described, never blocking
-    soft = reconciliation.reconcile_item(item(900.0))
+    soft = reconciliation.settle(item(900.0))
     assert soft.check.decision is Decision.WARN
 
 
@@ -59,8 +59,8 @@ def test_an_explained_gap_passes_with_the_explanation_recorded():
         -100.0,
         "j.doe",
     )
-    result = reconciliation.reconcile_item(
-        item(900.0, explanations=(why,)), gate=certificates.GateStatus.GATING
+    result = reconciliation.settle(
+        item(900.0, explanations=(why,)), gate=certificates.Authority.GATING
     )
     assert result.status is reconciliation.Status.EXPLAINED
     assert result.residual_gap == pytest.approx(0.0)
@@ -73,15 +73,13 @@ def test_an_explanation_must_cover_the_gap_within_the_tolerance():
     partial = reconciliation.Explanation(
         reconciliation.Mechanism.DEDUPE, "duplicate orders", -60.0
     )
-    result = reconciliation.reconcile_item(
+    result = reconciliation.settle(
         item(900.0, explanations=(partial,)),
-        gate=certificates.GateStatus.GATING,
+        gate=certificates.Authority.GATING,
     )
     assert result.status is reconciliation.Status.UNEXPLAINED
     assert result.residual_gap == pytest.approx(0.04)
-    lenient = reconciliation.reconcile_item(
-        item(900.0, explanations=(partial,)), 0.04
-    )
+    lenient = reconciliation.settle(item(900.0, explanations=(partial,)), 0.04)
     assert (
         lenient.status is reconciliation.Status.EXPLAINED
     )  # residual == tolerance
@@ -97,12 +95,10 @@ def test_several_mechanisms_add_up_with_their_signs():
     filt = reconciliation.Explanation(
         reconciliation.Mechanism.FILTER, "voided", -50.0
     )
-    result = reconciliation.reconcile_item(
-        item(900.0, explanations=(late, dup, filt))
-    )
+    result = reconciliation.settle(item(900.0, explanations=(late, dup, filt)))
     assert result.status is reconciliation.Status.EXPLAINED
     # sum of amounts is -100, the observed difference
-    over = reconciliation.reconcile_item(item(900.0, explanations=(late, filt)))
+    over = reconciliation.settle(item(900.0, explanations=(late, filt)))
     assert over.status is reconciliation.Status.UNEXPLAINED
 
 
@@ -111,7 +107,7 @@ def test_an_explanation_that_overshoots_is_not_accepted():
         reconciliation.Mechanism.FILTER, "everything", -400.0
     )
     assert (
-        reconciliation.reconcile_item(item(900.0, explanations=(big,))).status
+        reconciliation.settle(item(900.0, explanations=(big,))).status
         is reconciliation.Status.UNEXPLAINED
     )
 
@@ -120,7 +116,7 @@ def test_unattested_explanations_leave_the_tier_unverified():
     why = reconciliation.Explanation(
         reconciliation.Mechanism.FILTER, "voided", -100.0
     )
-    result = reconciliation.reconcile_item(item(900.0, explanations=(why,)))
+    result = reconciliation.settle(item(900.0, explanations=(why,)))
     assert result.status is reconciliation.Status.EXPLAINED
     assert result.tier is Tier.UNVERIFIED
 
@@ -137,7 +133,7 @@ def test_inputs_are_validated():
     with pytest.raises(ValueError, match="Mechanism"):
         reconciliation.Explanation("filter", "x", 1.0)  # type: ignore[arg-type]
     with pytest.raises(ValueError):
-        reconciliation.reconcile_item(item(1.0), tolerance=1.5)
+        reconciliation.settle(item(1.0), tolerance=1.5)
     with pytest.raises(ValueError, match="at least one"):
         reconciliation.reconcile([])
     with pytest.raises(ValueError, match="unique"):

@@ -137,11 +137,11 @@ def test_the_gate_tables_and_documents_are_pinned():
         k: k for k in select.STRATEGIES
     }
     assert set(run.ADAPTERS) == set(select.STRATEGIES)
-    assert run.ADAPTERS["backdoor_aipw"] is run.BackdoorEstimator
-    assert run.ADAPTERS["synth"] is run.SynthEstimator
+    assert run.ADAPTERS["backdoor_aipw"] is run.Backdoor
+    assert run.ADAPTERS["synth"] is run.Synth
 
 
-# Est, digest, wald_from
+# Est, digest, waldify
 
 
 @pytest.mark.parametrize(
@@ -191,10 +191,10 @@ def test_the_digest_writes_other_values_as_text():
 
 def test_a_wald_test_is_built_from_a_usable_standard_error_only():
     est = run.Est(2.0, 1.0, 0.0, 4.0, 10)
-    assert run.wald_from(est, "n", "k") == battery.wald_test("n", "k", 2.0, 1.0)
+    assert run.waldify(est, "n", "k") == battery.wald("n", "k", 2.0, 1.0)
     for se in (float("nan"), 0.0, -1.0, float("inf")):
-        assert run.wald_from(run.Est(2.0, se, 0, 1, 1), "n", "k") is None
-    tiny = run.wald_from(run.Est(1.0, 1e-9, 0, 1, 1), "n", "k")
+        assert run.waldify(run.Est(2.0, se, 0, 1, 1), "n", "k") is None
+    tiny = run.waldify(run.Est(1.0, 1e-9, 0, 1, 1), "n", "k")
     assert tiny is not None
     assert tiny.name == "n"
     assert tiny.kind == "k"
@@ -232,7 +232,7 @@ def test_the_base_adapter_stores_its_settings_and_does_nothing_by_default():
         adapter.estimate_for(frame, 0.95)
 
 
-# alphas, assemble, refusal_outcome
+# alphas, assemble, refuse
 
 
 def test_the_confirmation_level_is_split_four_to_one_exactly():
@@ -363,7 +363,7 @@ def test_subgroup_and_attestation_summaries_are_copied_into_the_claim_file():
 def test_a_refusal_has_five_documents_and_no_tier():
     spec = block(assumptions=("positivity",))
     plan = select.select(spec)
-    out = run.refusal_outcome(plan, spec)
+    out = run.refuse(plan, spec)
     assert set(out.documents) == set(run.DOCUMENTS)
     report = out.documents["identification_report.json"]
     assert report == dict(select.refusal(plan, spec))
@@ -385,11 +385,11 @@ def test_a_refusal_has_five_documents_and_no_tier():
 def test_a_refusal_carries_its_reason_and_the_dag_findings():
     spec = block(assumptions=("positivity",))
     plan = select.select(spec)
-    out = run.refusal_outcome(plan, spec, "why not", {"hash": "abc"})
+    out = run.refuse(plan, spec, "why not", {"hash": "abc"})
     report = out.documents["identification_report.json"]
     assert report["reason"] == "why not"
     assert report["dag"] == {"hash": "abc"}
-    empty = run.refusal_outcome(plan, spec, None, {})
+    empty = run.refuse(plan, spec, None, {})
     assert empty.documents["identification_report.json"]["dag"] == {}
     assert "reason" not in empty.documents["identification_report.json"]
 
@@ -510,7 +510,7 @@ def test_the_subgroup_report_has_one_row_per_declared_value():
     adapter = stub_for(spec)
     adapter.design = {"keep": 1}
     frame = strata_frame(a=60, b=40, c=70)
-    report = run.subgroup_report(adapter, frame, 0.95, spec.subgroups)
+    report = run.stratify(adapter, frame, 0.95, spec.subgroups)
     rows = report["hypotheses"]
     assert [(r["column"], r["value"]) for r in rows] == [
         ("region", "a"),
@@ -522,7 +522,7 @@ def test_the_subgroup_report_has_one_row_per_declared_value():
     assert (first["estimate"], first["se"], first["n"]) == (1.0, 0.1, 60)
     assert (first["low"], first["high"]) == (0.0, 2.0)
     assert first["p_value"] == pytest.approx(
-        battery.wald_test("region=a", "subgroup", 1.0, 0.1).p_value
+        battery.wald("region=a", "subgroup", 1.0, 0.1).p_value
     )
     assert second["skipped"] == "fewer than 50 rows"
     assert second["p_value"] == 1.0
@@ -544,7 +544,7 @@ def test_a_strong_subgroup_is_rejected_and_named():
     spec = block(subgroups=(causal.Subgroup("region", ("a", "b")),))
     adapter = stub_for(spec, se=0.01, estimate=5.0)
     frame = strata_frame(a=60, b=60)
-    report = run.subgroup_report(adapter, frame, 0.9, spec.subgroups)
+    report = run.stratify(adapter, frame, 0.9, spec.subgroups)
     assert report["alpha"] == pytest.approx(0.1)
     assert report["rejected"] == ["region=a", "region=b"]
     assert all(r["rejected"] is True for r in report["hypotheses"])
@@ -557,7 +557,7 @@ def test_a_subgroup_value_is_matched_as_text_and_errors_are_recorded():
         {"region": [1] * 60 + [2] * 60, "y": 0.0, "t": 0, "shift": 2.0}
     )
     adapter = stub_for(spec)
-    report = run.subgroup_report(adapter, frame, 0.95, spec.subgroups)
+    report = run.stratify(adapter, frame, 0.95, spec.subgroups)
     assert report["hypotheses"][0]["n"] == 60
     assert report["hypotheses"][0]["estimate"] == 2.0
     assert report["hypotheses"][1]["skipped"] == "fewer than 50 rows"
@@ -565,7 +565,7 @@ def test_a_subgroup_value_is_matched_as_text_and_errors_are_recorded():
         {"region": ["x"] * 60, "y": 0.0, "t": 0, "bad": 1.0}
     )
     spec = block(subgroups=(causal.Subgroup("region", ("x",)),))
-    out = run.subgroup_report(stub_for(spec), failing, 0.95, spec.subgroups)
+    out = run.stratify(stub_for(spec), failing, 0.95, spec.subgroups)
     row = out["hypotheses"][0]
     assert row["skipped"] == "cannot estimate here"
     assert row["p_value"] == 1.0
@@ -576,9 +576,7 @@ def test_a_subgroup_without_a_standard_error_stays_in_the_family():
     spec = block(subgroups=(causal.Subgroup("region", ("a",)),))
     for se in (0.0, float("nan")):
         adapter = stub_for(spec, se=se)
-        report = run.subgroup_report(
-            adapter, strata_frame(a=60), 0.95, spec.subgroups
-        )
+        report = run.stratify(adapter, strata_frame(a=60), 0.95, spec.subgroups)
         row = report["hypotheses"][0]
         assert row["skipped"] == "no usable standard error"
         assert row["p_value"] == 1.0
@@ -587,7 +585,7 @@ def test_a_subgroup_without_a_standard_error_stays_in_the_family():
 
 def label(named, status_path=None):
     found = {"hypotheses": [{"n": 100}, {"n": 10}, {"n": None}, {}]}
-    run.label_subgroups(found, named)
+    run.certify(found, named)
     return found
 
 
@@ -604,7 +602,7 @@ def test_naming_the_subgroup_gate_makes_the_family_gating():
         "(a result for a subgroup under `min_rows` is still descriptive)"
     )
     flags = [row["certified_size"] for row in found["hypotheses"]]
-    shipped = certified.subgroup_gate(run.subgroup_report).min_rows
+    shipped = certified.subgroup_gate(run.stratify).min_rows
     if shipped is None:
         assert flags == [True, True, False, False]
     else:
@@ -629,7 +627,7 @@ def test_leaving_the_subgroup_gate_out_keeps_the_family_descriptive():
 
 def test_the_minimum_rows_come_from_the_shipped_certificate():
     found = label((certified.SUBGROUP_GATE,))
-    shipped = certified.subgroup_gate(run.subgroup_report)
+    shipped = certified.subgroup_gate(run.stratify)
     assert found["gate"]["min_rows"] == shipped.min_rows
     unnamed = label(None)
     assert unnamed["gate"] == shipped.to_dict()
@@ -670,12 +668,12 @@ def test_sensitivity_of_a_single_treated_unit_is_the_placebo_note():
     adapter = stub_for(block())
     adapter.single_unit = True
     frame = strata_frame(a=3)
-    assert run.sensitivity_of(adapter, frame, 0.95) == {
+    assert run.fragility(adapter, frame, 0.95) == {
         "holds": None,
         "note": "single treated unit: inference is the placebo permutation",
     }
     adapter.single_unit = False
-    assert run.sensitivity_of(adapter, frame, 0.95) == {
+    assert run.fragility(adapter, frame, 0.95) == {
         "holds": None,
         "note": "no sensitivity analysis for this strategy",
     }
@@ -684,20 +682,18 @@ def test_sensitivity_of_a_single_treated_unit_is_the_placebo_note():
 def test_the_closing_notes_name_unsupported_exposures_then_the_unchecked_set():
     spec = block(
         negative_controls=(
-            causal.NegativeControl("exposure", "e1"),
-            causal.NegativeControl("outcome", "o1"),
-            causal.NegativeControl("exposure", "e2"),
+            causal.Control("exposure", "e1"),
+            causal.Control("outcome", "o1"),
+            causal.Control("exposure", "e2"),
         )
     )
-    assert run.closing_notes(spec, "did", checked=True) == [
+    assert run.caveats(spec, "did", checked=True) == [
         exposure_note("e1"),
         exposure_note("e2"),
     ]
-    assert run.closing_notes(spec, "backdoor_aipw", checked=True) == []
-    assert run.closing_notes(spec, "backdoor_aipw", checked=False) == [
-        UNCHECKED
-    ]
-    both = run.closing_notes(spec, "iv", checked=False)
+    assert run.caveats(spec, "backdoor_aipw", checked=True) == []
+    assert run.caveats(spec, "backdoor_aipw", checked=False) == [UNCHECKED]
+    both = run.caveats(spec, "iv", checked=False)
     assert len(both) == 3
     assert both[-1].startswith("the adjustment set is an unchecked")
 
@@ -718,13 +714,13 @@ def test_the_needed_assumptions_replace_unconfoundedness_by_the_charter_words():
             "unconfoundedness_given:c",
         )
     )
-    assert run.needed_assumptions("backdoor_aipw", spec) == (
+    assert run.prerequisites("backdoor_aipw", spec) == (
         COVARIATES,
         "unconfoundedness_given:c",
         "positivity",
         "no_interference",
     )
-    assert run.needed_assumptions("rd", spec) == (
+    assert run.prerequisites("rd", spec) == (
         "continuity_at_cutoff",
         "no_manipulation",
     )
@@ -741,8 +737,8 @@ def with_exposure(frame, seed):
 def backdoor_spec(**changes):
     values = {
         "negative_controls": (
-            causal.NegativeControl("outcome", "nco"),
-            causal.NegativeControl("exposure", "z"),
+            causal.Control("outcome", "nco"),
+            causal.Control("exposure", "z"),
         ),
         "sensitivity": causal.Confounding("strongest_observed", 1.0),
     }
@@ -753,7 +749,7 @@ def backdoor_spec(**changes):
 def prepared(spec=None, rows=1500, seed=1):
     spec = spec or backdoor_spec()
     x = with_exposure(observational(rows, seed), 50)
-    adapter = run.BackdoorEstimator(spec, x, 3, "linear", 0.01)
+    adapter = run.Backdoor(spec, x, 3, "linear", 0.01)
     adapter.prepare()
     return adapter, x
 
@@ -763,9 +759,7 @@ def confirm_rows():
 
 
 def test_the_backdoor_adapter_reads_its_covariates_and_starts_unfitted():
-    adapter = run.BackdoorEstimator(
-        block(), observational(100, 1), 0, "linear", 0.01
-    )
+    adapter = run.Backdoor(block(), observational(100, 1), 0, "linear", 0.01)
     assert adapter.name == "backdoor_aipw"
     assert adapter.covariates == ("a", "b")
     assert adapter.nuisances is None
@@ -777,29 +771,25 @@ def test_the_backdoor_adapter_reads_its_covariates_and_starts_unfitted():
         )
     )
     assert (
-        run.BackdoorEstimator(
-            none, observational(100, 1), 0, "linear", 0.01
-        ).covariates
+        run.Backdoor(none, observational(100, 1), 0, "linear", 0.01).covariates
         == ()
     )
     bare = block(assumptions=("positivity",))
     assert (
-        run.BackdoorEstimator(
-            bare, observational(100, 1), 0, "linear", 0.01
-        ).covariates
+        run.Backdoor(bare, observational(100, 1), 0, "linear", 0.01).covariates
         == ()
     )
 
 
 def test_preparing_records_overlap_digest_and_learner_from_x():
     adapter, x = prepared()
-    expected = aipw.fit_nuisances(x, ("a", "b"), "t", "y", 3, "linear")
+    expected = aipw.prefit(x, ("a", "b"), "t", "y", 3, "linear")
     assert set(adapter.design) == {"overlap_on_x", "nuisance_digest", "learner"}
     assert adapter.design["nuisance_digest"] == expected.digest
     assert adapter.design["learner"] == "linear"
     e = expected.predict(x)[0]
     matrix = expected.scaler.transform(expected.design.matrix(x))
-    report = aipw.overlap_report(e, aipw.binary(x["t"], "t"), matrix)
+    report = aipw.propensities(e, aipw.binary(x["t"], "t"), matrix)
     assert adapter.design["overlap_on_x"] == report
     assert adapter.refusal is None
     assert adapter.nuisances.digest == expected.digest
@@ -821,13 +811,13 @@ def overlap_failing(n, seed):
 
 def test_a_failed_overlap_refuses_unless_trimming_is_declared():
     x = overlap_failing(3000, 0)
-    strict = run.BackdoorEstimator(block(), x, 0, "linear", 0.01)
+    strict = run.Backdoor(block(), x, 0, "linear", 0.01)
     strict.prepare()
     assert strict.design["overlap_on_x"]["passed"] is False
     assert strict.refusal == (
         "the overlap gate failed on X and the charter declares no trimming rule"
     )
-    trimmed = run.BackdoorEstimator(block(trim=0.05), x, 0, "linear", 0.01)
+    trimmed = run.Backdoor(block(trim=0.05), x, 0, "linear", 0.01)
     trimmed.prepare()
     assert trimmed.design["overlap_on_x"]["passed"] is False
     assert trimmed.refusal is None
@@ -856,9 +846,7 @@ def test_the_backdoor_estimate_is_the_frozen_aipw_estimate_on_c():
 
 
 def test_the_backdoor_estimate_needs_a_prepared_adapter():
-    adapter = run.BackdoorEstimator(
-        block(), observational(100, 1), 0, "linear", 0.01
-    )
+    adapter = run.Backdoor(block(), observational(100, 1), 0, "linear", 0.01)
     with pytest.raises(ValueError, match=r"prepare\(\) must run first"):
         adapter.estimate(observational(100, 2), 0.95)
 
@@ -878,7 +866,7 @@ def test_the_backdoor_estimate_for_another_outcome_refits_on_x():
     )
     assert same.detail == {}
     other = adapter.estimate_for(c, 0.9, "nco")
-    fitted = aipw.fit_nuisances(x, ("a", "b"), "t", "nco", 3, "linear")
+    fitted = aipw.prefit(x, ("a", "b"), "t", "nco", 3, "linear")
     direct = aipw.estimate(
         fitted, c, "t", "nco", "ATE", 0.9, spec.trim, spec.min_share
     )
@@ -901,15 +889,15 @@ def test_the_backdoor_controls_test_each_negative_outcome_and_exposure():
         ("negative_exposure:z", "negative_exposure"),
     ]
     spec = adapter.spec
-    fitted = aipw.fit_nuisances(x, ("a", "b"), "z", "y", 3, "linear")
+    fitted = aipw.prefit(x, ("a", "b"), "z", "y", 3, "linear")
     found = aipw.estimate(
         fitted, c, "z", "y", "ATE", 0.95, spec.trim, spec.min_share
     )
-    assert tests[1] == battery.wald_test(
+    assert tests[1] == battery.wald(
         "negative_exposure:z", "negative_exposure", found.estimate, found.se
     )
     outcome = adapter.estimate_for(c, 0.95, "nco")
-    assert tests[0] == battery.wald_test(
+    assert tests[0] == battery.wald(
         "negative_outcome:nco", "negative_outcome", outcome.estimate, outcome.se
     )
     only = backdoor_spec(negative_controls=())
@@ -930,12 +918,12 @@ def test_the_backdoor_sensitivity_wording_when_it_cannot_run():
             "no_interference",
         )
     )
-    bare = run.BackdoorEstimator(none, observational(100, 1), 0, "linear", 0.01)
+    bare = run.Backdoor(none, observational(100, 1), 0, "linear", 0.01)
     assert bare.sensitivity(observational(100, 2), 0.95) == {
         "holds": None,
         "note": "benchmarking needs a covariate",
     }
-    unprepared = run.BackdoorEstimator(
+    unprepared = run.Backdoor(
         backdoor_spec(), observational(100, 1), 0, "linear", 0.01
     )
     with pytest.raises(ValueError, match=r"prepare\(\) must run first"):
@@ -973,8 +961,8 @@ def test_the_randomized_adapter_is_the_difference_in_means():
         estimand="ATE",
         strategies=("randomized_diff",),
         negative_controls=(
-            causal.NegativeControl("exposure", "z"),
-            causal.NegativeControl("outcome", "nco"),
+            causal.Control("exposure", "z"),
+            causal.Control("outcome", "nco"),
         ),
     )
     x = observational(300, 1)
@@ -996,7 +984,7 @@ def test_the_randomized_adapter_is_the_difference_in_means():
     assert adapter.estimate_for(c, 0.9).estimate == direct.estimate
     tests = adapter.controls(c, 0.9)
     assert tests == [
-        battery.wald_test(
+        battery.wald(
             "negative_outcome:nco", "negative_outcome", other.estimate, other.se
         )
     ]
@@ -1025,8 +1013,8 @@ def did_spec(**changes):
         ),
         "strategies": ("did",),
         "negative_controls": (
-            causal.NegativeControl("outcome", "nco"),
-            causal.NegativeControl("exposure", "z"),
+            causal.Control("outcome", "nco"),
+            causal.Control("exposure", "z"),
         ),
         "sensitivity": causal.Confounding(m_max=1.0),
     }
@@ -1040,13 +1028,11 @@ def early_adopters(frame):
 
 def test_the_did_adapter_needs_all_three_panel_columns():
     frame = did_frame(1, 100)
-    ok = run.DidEstimator(did_spec(), frame, 0, "linear", 0.01)
+    ok = run.DiD(did_spec(), frame, 0, "linear", 0.01)
     assert ok.name == "did"
     assert ok.columns() == ("id", "t", "g")
     for missing in ("unit", "time", "adoption"):
-        adapter = run.DidEstimator(
-            did_spec(**{missing: None}), frame, 0, "linear", 0.01
-        )
+        adapter = run.DiD(did_spec(**{missing: None}), frame, 0, "linear", 0.01)
         with pytest.raises(
             ValueError, match="did needs unit, time and adoption"
         ):
@@ -1055,7 +1041,7 @@ def test_the_did_adapter_needs_all_three_panel_columns():
 
 def test_the_did_design_is_read_from_x_at_the_default_level():
     frame = did_frame(1, 200)
-    adapter = run.DidEstimator(did_spec(), frame, 0, "linear", 0.01)
+    adapter = run.DiD(did_spec(), frame, 0, "linear", 0.01)
     adapter.prepare()
     fit = did.estimate(frame, "id", "t", "g", "y")
     assert adapter.design == {
@@ -1066,14 +1052,14 @@ def test_the_did_design_is_read_from_x_at_the_default_level():
         "pre_periods_support_sensitivity": True,
     }
     early = early_adopters(frame)
-    other = run.DidEstimator(did_spec(), early, 0, "linear", 0.01)
+    other = run.DiD(did_spec(), early, 0, "linear", 0.01)
     other.prepare()
     assert other.design["pre_periods_support_sensitivity"] is False
     assert other.design["pretrend_p_on_x"] is None
 
 
 def test_the_did_estimate_is_the_overall_att_with_its_event_study():
-    adapter = run.DidEstimator(did_spec(), did_frame(1, 200), 0, "linear", 0.01)
+    adapter = run.DiD(did_spec(), did_frame(1, 200), 0, "linear", 0.01)
     c = did_frame(2, 200)
     out = adapter.estimate(c, 0.9)
     fit = did.estimate(c, "id", "t", "g", "y", 0.9)
@@ -1102,14 +1088,14 @@ def test_the_did_estimate_is_the_overall_att_with_its_event_study():
 
 
 def test_the_did_controls_start_with_the_pretrend_wald_test():
-    adapter = run.DidEstimator(did_spec(), did_frame(1, 200), 0, "linear", 0.01)
+    adapter = run.DiD(did_spec(), did_frame(1, 200), 0, "linear", 0.01)
     c = did_frame(2, 200)
     tests = adapter.controls(c, 0.9)
     fit = did.estimate(c, "id", "t", "g", "y", 0.9)
     assert tests[0] == battery.Test("pretrend_wald", "placebo", fit.pretrend_p)
     direct = did.estimate(c, "id", "t", "g", "nco", 0.9)
     assert tests[1:] == [
-        battery.wald_test(
+        battery.wald(
             "negative_outcome:nco",
             "negative_outcome",
             direct.estimate,
@@ -1121,7 +1107,7 @@ def test_the_did_controls_start_with_the_pretrend_wald_test():
 
 
 def test_the_did_sensitivity_widens_the_interval_at_m_max():
-    adapter = run.DidEstimator(did_spec(), did_frame(1, 200), 0, "linear", 0.01)
+    adapter = run.DiD(did_spec(), did_frame(1, 200), 0, "linear", 0.01)
     c = did_frame(2, 200)
     out = adapter.sensitivity(c, 0.9)
     fit = did.estimate(c, "id", "t", "g", "y", 0.9)
@@ -1135,7 +1121,7 @@ def test_the_did_sensitivity_widens_the_interval_at_m_max():
         "max_pre_change": fit.max_pre_change,
         "note": "simplified relative-magnitudes bound, not HonestDiD",
     }
-    wide = run.DidEstimator(
+    wide = run.DiD(
         did_spec(sensitivity=causal.Confounding(m_max=50.0)),
         did_frame(1, 200),
         0,
@@ -1147,14 +1133,14 @@ def test_the_did_sensitivity_widens_the_interval_at_m_max():
 
 
 def test_the_did_sensitivity_says_when_it_cannot_run():
-    adapter = run.DidEstimator(
+    adapter = run.DiD(
         did_spec(sensitivity=None), did_frame(1, 100), 0, "linear", 0.01
     )
     assert adapter.sensitivity(did_frame(2, 100), 0.9) == {
         "holds": None,
         "note": "no sensitivity block in the charter",
     }
-    full = run.DidEstimator(did_spec(), did_frame(1, 100), 0, "linear", 0.01)
+    full = run.DiD(did_spec(), did_frame(1, 100), 0, "linear", 0.01)
     assert full.sensitivity(early_adopters(did_frame(2, 100)), 0.9) == {
         "holds": None,
         "note": "fewer than two pre-periods",
@@ -1189,8 +1175,8 @@ def iv_spec(**changes):
         ),
         "strategies": ("iv",),
         "negative_controls": (
-            causal.NegativeControl("exposure", "z"),
-            causal.NegativeControl("outcome", "nco"),
+            causal.Control("exposure", "z"),
+            causal.Control("outcome", "nco"),
         ),
     }
     values.update(changes)
@@ -1199,25 +1185,25 @@ def iv_spec(**changes):
 
 def test_the_iv_adapter_uses_the_declared_covariates_as_controls():
     frame = iv_world(100, 1)
-    adapter = run.IvEstimator(iv_spec(), frame, 0, "linear", 0.01)
+    adapter = run.Instrument(iv_spec(), frame, 0, "linear", 0.01)
     assert adapter.name == "iv"
     assert adapter.controls_columns() == ()
     spec = iv_spec(
         assumptions=(*iv_spec().assumptions, "unconfoundedness_given:nco")
     )
-    controlled = run.IvEstimator(spec, frame, 0, "linear", 0.01)
+    controlled = run.Instrument(spec, frame, 0, "linear", 0.01)
     assert controlled.controls_columns() == ("nco",)
 
 
 def test_the_iv_fit_needs_an_instrument_and_passes_controls_and_outcome():
     frame = iv_world(300, 1)
-    bare = run.IvEstimator(iv_spec(instrument=None), frame, 0, "linear", 0.01)
+    bare = run.Instrument(iv_spec(instrument=None), frame, 0, "linear", 0.01)
     with pytest.raises(ValueError, match="iv needs an instrument"):
         bare.fit(frame, 0.95)
     spec = iv_spec(
         assumptions=(*iv_spec().assumptions, "unconfoundedness_given:nco")
     )
-    adapter = run.IvEstimator(spec, frame, 0, "linear", 0.01)
+    adapter = run.Instrument(spec, frame, 0, "linear", 0.01)
     fit = adapter.fit(frame, 0.9)
     direct = iv.estimate(frame, "d", "y", "z", ("nco",), 0.9)
     assert (fit.estimate, fit.se, fit.f_stat) == (
@@ -1234,7 +1220,7 @@ def test_the_iv_fit_needs_an_instrument_and_passes_controls_and_outcome():
 
 def test_the_iv_design_records_the_first_stage_on_x():
     frame = iv_world(1500, 1)
-    adapter = run.IvEstimator(iv_spec(), frame, 0, "linear", 0.01)
+    adapter = run.Instrument(iv_spec(), frame, 0, "linear", 0.01)
     adapter.prepare()
     fit = iv.estimate(frame, "d", "y", "z", (), 0.95)
     assert adapter.weak is False
@@ -1244,7 +1230,7 @@ def test_the_iv_design_records_the_first_stage_on_x():
         "weak_on_x": False,
         "overidentification": "not applicable: one instrument, just identified",
     }
-    weak = run.IvEstimator(
+    weak = run.Instrument(
         iv_spec(), iv_world(1500, 2, strength=0.02), 0, "linear", 0.01
     )
     weak.prepare()
@@ -1255,7 +1241,7 @@ def test_the_iv_design_records_the_first_stage_on_x():
 def test_the_iv_estimate_marks_a_weak_confirmation_set_and_keeps_weakness():
     strong = iv_world(1500, 1)
     faint = iv_world(1500, 2, strength=0.02)
-    adapter = run.IvEstimator(iv_spec(), strong, 0, "linear", 0.01)
+    adapter = run.Instrument(iv_spec(), strong, 0, "linear", 0.01)
     adapter.prepare()
     out = adapter.estimate(strong, 0.9)
     fit = iv.estimate(strong, "d", "y", "z", (), 0.9)
@@ -1281,7 +1267,7 @@ def test_the_iv_estimate_marks_a_weak_confirmation_set_and_keeps_weakness():
 
 def test_the_iv_estimate_for_another_outcome_gives_the_two_stage_interval():
     frame = iv_world(1500, 1)
-    adapter = run.IvEstimator(iv_spec(), frame, 0, "linear", 0.01)
+    adapter = run.Instrument(iv_spec(), frame, 0, "linear", 0.01)
     out = adapter.estimate_for(frame, 0.9, "nco")
     fit = iv.estimate(frame, "d", "nco", "z", (), 0.9)
     assert (out.estimate, out.se, out.low, out.high, out.n) == (
@@ -1298,7 +1284,7 @@ def test_the_iv_estimate_for_another_outcome_gives_the_two_stage_interval():
     )
     tests = adapter.controls(frame, 0.9)
     assert tests == [
-        battery.wald_test(
+        battery.wald(
             "negative_outcome:nco", "negative_outcome", fit.estimate, fit.se
         )
     ]
@@ -1329,8 +1315,8 @@ def rd_spec(**changes):
         "assumptions": ("continuity_at_cutoff", "no_manipulation"),
         "strategies": ("rd",),
         "negative_controls": (
-            causal.NegativeControl("outcome", "cov"),
-            causal.NegativeControl("exposure", "z"),
+            causal.Control("outcome", "cov"),
+            causal.Control("exposure", "z"),
         ),
     }
     values.update(changes)
@@ -1341,11 +1327,11 @@ def test_the_rd_adapter_balances_on_the_negative_control_outcomes():
     adapter = run.RdEstimator(rd_spec(), rd_world(100, 1), 0, "linear", 0.01)
     assert adapter.name == "rd"
     assert adapter.bandwidth == 0.0
-    assert adapter.balance_columns() == ("cov",)
+    assert adapter.pretreatment() == ("cov",)
     none = run.RdEstimator(
         rd_spec(negative_controls=()), rd_world(100, 1), 0, "linear", 0.01
     )
-    assert none.balance_columns() == ()
+    assert none.pretreatment() == ()
 
 
 def test_the_rd_design_fixes_the_bandwidth_on_x():
@@ -1515,7 +1501,7 @@ def synth_spec(**changes):
 
 def test_the_synthetic_adapter_runs_on_x_and_marks_a_single_unit():
     panel = synthetic_panel()
-    adapter = run.SynthEstimator(synth_spec(), panel, 0, "linear", 0.01)
+    adapter = run.Synth(synth_spec(), panel, 0, "linear", 0.01)
     assert adapter.name == "synth"
     assert adapter.single_unit is True
     out = adapter.estimate(panel.iloc[:0], 0.95)
@@ -1536,7 +1522,7 @@ def test_the_synthetic_adapter_runs_on_x_and_marks_a_single_unit():
 
 def test_the_synthetic_adapter_checks_the_donor_count_at_one_minus_level():
     panel = synthetic_panel()
-    adapter = run.SynthEstimator(synth_spec(), panel, 0, "linear", 0.01)
+    adapter = run.Synth(synth_spec(), panel, 0, "linear", 0.01)
     adapter.estimate(panel, 0.95)
     with pytest.raises(ValueError, match="donors"):
         adapter.estimate(panel, 0.99)
@@ -1545,20 +1531,18 @@ def test_the_synthetic_adapter_checks_the_donor_count_at_one_minus_level():
 def test_the_synthetic_adapter_refuses_a_panel_it_cannot_use():
     panel = synthetic_panel()
     for change in ({"unit": None}, {"time": None}):
-        adapter = run.SynthEstimator(
-            synth_spec(**change), panel, 0, "linear", 0.01
-        )
+        adapter = run.Synth(synth_spec(**change), panel, 0, "linear", 0.01)
         with pytest.raises(ValueError, match="synth needs unit and time"):
             adapter.estimate(panel, 0.95)
     two = panel.copy()
     two.loc[(two.u == 1) & (two.t >= 12), "d"] = 1.0
-    adapter = run.SynthEstimator(synth_spec(), two, 0, "linear", 0.01)
+    adapter = run.Synth(synth_spec(), two, 0, "linear", 0.01)
     with pytest.raises(
         ValueError, match="synthetic control needs exactly one treated unit"
     ):
         adapter.estimate(two, 0.95)
     none = panel.assign(d=0.0)
-    adapter = run.SynthEstimator(synth_spec(), none, 0, "linear", 0.01)
+    adapter = run.Synth(synth_spec(), none, 0, "linear", 0.01)
     with pytest.raises(ValueError, match="exactly one treated unit"):
         adapter.estimate(none, 0.95)
     with pytest.raises(NotImplementedError):
@@ -1657,7 +1641,7 @@ def test_identify_runs_the_adapter_and_documents_every_step(monkeypatch):
     x, c = frames()
     spec = block(
         strata=("region",),
-        negative_controls=(causal.NegativeControl("outcome", "nco"),),
+        negative_controls=(causal.Control("outcome", "nco"),),
     )
     out = run.identify(
         spec,
@@ -1867,7 +1851,7 @@ def test_declared_subgroups_are_estimated_and_reported(monkeypatch):
 def test_unnamed_gates_come_from_the_shipped_certificate_sorted(monkeypatch):
     install(monkeypatch)
     monkeypatch.setattr(
-        certified, "certified_gates", lambda: {"zeta", "alpha", "mid"}
+        certified, "certificated", lambda: {"zeta", "alpha", "mid"}
     )
     decisions = record_decisions(monkeypatch)
     x, c = frames()
@@ -1876,7 +1860,7 @@ def test_unnamed_gates_come_from_the_shipped_certificate_sorted(monkeypatch):
     assert decisions[0].certified == ("alpha", "mid", "zeta")
     claims = out.documents["causal_claims.json"]
     assert claims["certified_gates_used"] == ["alpha", "mid", "zeta"]
-    shipped = certified.subgroup_gate(run.subgroup_report)
+    shipped = certified.subgroup_gate(run.stratify)
     group = out.documents["identification_report.json"]["subgroups"]
     assert group["gate"]["status"] == shipped.status
 
@@ -2056,9 +2040,9 @@ def test_the_declared_minimum_share_reaches_every_backdoor_estimate():
     spec = block(
         trim=0.2,
         min_share=0.99,
-        negative_controls=(causal.NegativeControl("exposure", "z"),),
+        negative_controls=(causal.Control("exposure", "z"),),
     )
-    adapter = run.BackdoorEstimator(spec, x, 0, "linear", 0.01)
+    adapter = run.Backdoor(spec, x, 0, "linear", 0.01)
     adapter.prepare()
     assert adapter.refusal is None
     with pytest.raises(ValueError, match=r"declared minimum share 0\.99"):
@@ -2070,9 +2054,9 @@ def test_the_declared_minimum_share_reaches_every_backdoor_estimate():
     lenient = block(
         trim=0.2,
         min_share=0.1,
-        negative_controls=(causal.NegativeControl("exposure", "z"),),
+        negative_controls=(causal.Control("exposure", "z"),),
     )
-    ok = run.BackdoorEstimator(lenient, x, 0, "linear", 0.01)
+    ok = run.Backdoor(lenient, x, 0, "linear", 0.01)
     ok.prepare()
     assert ok.estimate(c, 0.95).n < len(c)
     assert ok.estimate_for(c, 0.95).n < len(c)
@@ -2085,27 +2069,27 @@ def test_the_boosted_learner_and_seed_reach_every_nuisance_fit():
     spec = backdoor_spec(
         sensitivity=None,
         negative_controls=(
-            causal.NegativeControl("outcome", "nco"),
-            causal.NegativeControl("exposure", "z"),
+            causal.Control("outcome", "nco"),
+            causal.Control("exposure", "z"),
         ),
     )
-    adapter = run.BackdoorEstimator(spec, x, 5, "boosted", 0.01)
+    adapter = run.Backdoor(spec, x, 5, "boosted", 0.01)
     adapter.prepare()
-    direct = aipw.fit_nuisances(x, ("a", "b"), "t", "y", 5, "boosted")
+    direct = aipw.prefit(x, ("a", "b"), "t", "y", 5, "boosted")
     assert adapter.design["nuisance_digest"] == direct.digest
     assert adapter.design["learner"] == "boosted"
     assert (
         direct.digest
-        != aipw.fit_nuisances(x, ("a", "b"), "t", "y", 0, "boosted").digest
+        != aipw.prefit(x, ("a", "b"), "t", "y", 0, "boosted").digest
     )
-    other = aipw.fit_nuisances(x, ("a", "b"), "t", "nco", 5, "boosted")
+    other = aipw.prefit(x, ("a", "b"), "t", "nco", 5, "boosted")
     found = aipw.estimate(other, c, "t", "nco", "ATE", 0.9, 0.0, 0.5)
     got = adapter.estimate_for(c, 0.9, "nco")
     assert (got.estimate, got.se) == (found.estimate, found.se)
-    exposure = aipw.fit_nuisances(x, ("a", "b"), "z", "y", 5, "boosted")
+    exposure = aipw.prefit(x, ("a", "b"), "z", "y", 5, "boosted")
     expected = aipw.estimate(exposure, c, "z", "y", "ATE", 0.9, 0.0, 0.5)
     tests = adapter.controls(c, 0.9)
-    assert tests[1] == battery.wald_test(
+    assert tests[1] == battery.wald(
         "negative_exposure:z",
         "negative_exposure",
         expected.estimate,
@@ -2132,7 +2116,7 @@ def test_the_randomized_estimate_for_another_outcome_keeps_level_and_counts():
 
 
 def test_the_backdoor_adapter_names_the_missing_preparation_exactly():
-    adapter = run.BackdoorEstimator(
+    adapter = run.Backdoor(
         backdoor_spec(), observational(100, 1), 0, "linear", 0.01
     )
     with pytest.raises(ValueError, match=r"^prepare\(\) must run first$"):
@@ -2143,14 +2127,12 @@ def test_the_backdoor_adapter_names_the_missing_preparation_exactly():
 
 def test_the_adapters_name_their_missing_declarations_exactly():
     frame = did_frame(1, 50)
-    did_adapter = run.DidEstimator(
-        did_spec(unit=None), frame, 0, "linear", 0.01
-    )
+    did_adapter = run.DiD(did_spec(unit=None), frame, 0, "linear", 0.01)
     with pytest.raises(
         ValueError, match=r"^did needs unit, time and adoption$"
     ):
         did_adapter.columns()
-    iv_adapter = run.IvEstimator(
+    iv_adapter = run.Instrument(
         iv_spec(instrument=None), iv_world(50, 1), 0, "linear", 0.01
     )
     with pytest.raises(ValueError, match=r"^iv needs an instrument$"):
@@ -2164,14 +2146,12 @@ def test_the_adapters_name_their_missing_declarations_exactly():
     with pytest.raises(ValueError, match=message):
         rd_adapter.fit(rd_world(50, 1), 0.95)
     panel = synthetic_panel()
-    synth_adapter = run.SynthEstimator(
-        synth_spec(time=None), panel, 0, "linear", 0.01
-    )
+    synth_adapter = run.Synth(synth_spec(time=None), panel, 0, "linear", 0.01)
     with pytest.raises(ValueError, match=r"^synth needs unit and time$"):
         synth_adapter.estimate(panel, 0.95)
     two = panel.copy()
     two.loc[(two.u == 1) & (two.t >= 12), "d"] = 1.0
-    many = run.SynthEstimator(synth_spec(), two, 0, "linear", 0.01)
+    many = run.Synth(synth_spec(), two, 0, "linear", 0.01)
     with pytest.raises(
         ValueError, match=r"^synthetic control needs exactly one treated unit$"
     ):
@@ -2180,7 +2160,7 @@ def test_the_adapters_name_their_missing_declarations_exactly():
 
 def test_the_synthetic_interval_limits_are_not_a_number():
     panel = synthetic_panel()
-    adapter = run.SynthEstimator(synth_spec(), panel, 0, "linear", 0.01)
+    adapter = run.Synth(synth_spec(), panel, 0, "linear", 0.01)
     out = adapter.estimate(panel, 0.95)
     assert out.se != out.se
     assert out.low != out.low
@@ -2231,7 +2211,7 @@ def small_effect_panel(tau):
 
 def test_the_did_sensitivity_holds_only_when_the_widened_interval_avoids_zero():
     spec = did_spec(sensitivity=causal.Confounding(m_max=0.01))
-    adapter = run.DidEstimator(spec, did_frame(1, 100), 0, "linear", 0.01)
+    adapter = run.DiD(spec, did_frame(1, 100), 0, "linear", 0.01)
     positive = adapter.sensitivity(small_effect_panel(0.5), 0.95)
     assert 0 < positive["low"] < 1
     assert positive["holds"] is True
@@ -2284,7 +2264,7 @@ def test_the_replication_level_is_the_one_asked_for():
 def test_a_subgroup_of_exactly_the_minimum_rows_is_estimated():
     spec = block(subgroups=(causal.Subgroup("region", ("a", "b")),))
     adapter = stub_for(spec)
-    report = run.subgroup_report(
+    report = run.stratify(
         adapter, strata_frame(a=50, b=49), 0.93, spec.subgroups
     )
     first, second = report["hypotheses"]
@@ -2296,7 +2276,7 @@ def test_a_subgroup_of_exactly_the_minimum_rows_is_estimated():
 
 def test_the_subgroup_family_level_is_the_exact_complement_of_the_level():
     spec = block(subgroups=(causal.Subgroup("region", ("a",)),))
-    report = run.subgroup_report(
+    report = run.stratify(
         stub_for(spec), strata_frame(a=60), 0.9877, spec.subgroups
     )
     assert report["alpha"] == pytest.approx(0.0123, abs=1e-12)
@@ -2304,7 +2284,7 @@ def test_the_subgroup_family_level_is_the_exact_complement_of_the_level():
 
 def write_certificate(path, rows, passed=True):
     entry = {
-        "method_hash": certified.subgroup_method_hash(run.subgroup_report),
+        "method_hash": certified.fingerprint(run.stratify),
         "passed": passed,
         "min_certified_rows": rows,
     }
@@ -2318,7 +2298,7 @@ def test_the_certified_minimum_size_decides_which_subgroups_gate(
     write_certificate(store, 80)
     monkeypatch.setattr(certified, "SUBGROUP_STORE_PATH", store)
     found = {"hypotheses": [{"n": 100}, {"n": 80}, {"n": 79}, {"n": None}]}
-    run.label_subgroups(found, ("subgroup_holm",))
+    run.certify(found, ("subgroup_holm",))
     assert found["gate"]["status"] == "gating"
     assert found["gate"]["min_rows"] == 80
     assert [r["certified_size"] for r in found["hypotheses"]] == [
@@ -2328,7 +2308,7 @@ def test_the_certified_minimum_size_decides_which_subgroups_gate(
         False,
     ]
     unnamed = {"hypotheses": [{"n": 80}, {"n": 79}]}
-    run.label_subgroups(unnamed, None)
+    run.certify(unnamed, None)
     assert unnamed["gate"] == {
         "status": "gating",
         "reason": "family-wise error and power met their pre-registered floors",
@@ -2336,7 +2316,7 @@ def test_the_certified_minimum_size_decides_which_subgroups_gate(
     }
     assert [r["certified_size"] for r in unnamed["hypotheses"]] == [True, False]
     left_out = {"hypotheses": [{"n": 80}]}
-    run.label_subgroups(left_out, ("other",))
+    run.certify(left_out, ("other",))
     assert left_out["gate"]["status"] == "descriptive"
     assert left_out["gate"]["min_rows"] == 80
     assert left_out["hypotheses"][0]["certified_size"] is False
@@ -2355,7 +2335,7 @@ def test_an_exposure_control_is_only_a_note_for_other_strategies(monkeypatch):
     install(monkeypatch)
     x, c = frames()
     spec = block(
-        negative_controls=(causal.NegativeControl("exposure", "z"),),
+        negative_controls=(causal.Control("exposure", "z"),),
     )
     out = run.identify(spec, x, c, BUDGET, certified=())
     assert out.documents["identification_report.json"]["notes"] == [UNCHECKED]
@@ -2370,7 +2350,7 @@ def test_an_exposure_control_is_only_a_note_for_other_strategies(monkeypatch):
             "independence",
             "monotonicity",
         ),
-        negative_controls=(causal.NegativeControl("exposure", "z"),),
+        negative_controls=(causal.Control("exposure", "z"),),
     )
     other = run.identify(instrumental, x, c, BUDGET, certified=())
     assert other.documents["identification_report.json"]["notes"] == [
@@ -2405,7 +2385,7 @@ def test_design_only_asks_the_declared_dag_about_the_adjustment_set(
 
 def test_the_family_level_keeps_the_denominator_limit_of_a_billion():
     spec = block(subgroups=(causal.Subgroup("region", ("a",)),))
-    report = run.subgroup_report(
+    report = run.stratify(
         stub_for(spec), strata_frame(a=60), 0.9894368340493388, spec.subgroups
     )
     assert report["alpha"] == 0.0105631659506612

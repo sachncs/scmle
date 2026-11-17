@@ -11,14 +11,14 @@ import pytest
 
 from scmle.data.modalities.graph import Dataset
 from scmle.data.modalities.graph import Edge
-from scmle.data.modalities.graph import edges_from_records
+from scmle.data.modalities.graph import edgelist
 from scmle.data.modalities.graph import graph_identity
-from scmle.data.modalities.graph import GraphInputError
-from scmle.data.modalities.graph import GraphValidationError
-from scmle.data.modalities.graph import inductive_node_split
+from scmle.data.modalities.graph import induct
+from scmle.data.modalities.graph import link
 from scmle.data.modalities.graph import Node
+from scmle.data.modalities.graph import ParseError
 from scmle.data.modalities.graph import prepare_features
-from scmle.data.modalities.graph import read_edges
+from scmle.data.modalities.graph import ValidationError
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def malformed_jsonl(tmp_path: Path) -> Path:
 @pytest.fixture
 def shifted_graph() -> Dataset:
     """Returns a feature-shifted graph fixture."""
-    return Dataset.from_edges(
+    return Dataset.connect(
         [Edge("a", "b"), Edge("b", "c")],
         nodes=[
             Node("a", (10.0, 20.0)),
@@ -79,8 +79,8 @@ def shifted_graph() -> Dataset:
 
 def test_reads_csv_and_jsonl_edges(valid_csv: Path, valid_jsonl: Path) -> None:
     """CSV and JSONL ingestion create immutable weighted edges."""
-    csv_edges = read_edges(valid_csv)
-    jsonl_edges = read_edges(valid_jsonl)
+    csv_edges = edgelist(valid_csv)
+    jsonl_edges = edgelist(valid_jsonl)
 
     assert csv_edges[0] == Edge("a", "b", 1.5)
     assert jsonl_edges[1] == Edge("b", "c")
@@ -98,45 +98,43 @@ def test_empty_fixture_is_a_valid_empty_graph(empty_csv: Path) -> None:
 
 def test_malformed_fixture_fails_closed(malformed_jsonl: Path) -> None:
     """Malformed JSONL is reported as a bounded input error."""
-    with pytest.raises(GraphInputError, match="malformed JSONL"):
-        read_edges(malformed_jsonl)
+    with pytest.raises(ParseError, match="malformed JSONL"):
+        edgelist(malformed_jsonl)
 
 
 def test_invalid_weight_fails_closed() -> None:
     """Non-numeric and non-finite weights cannot enter the graph contract."""
-    with pytest.raises(GraphInputError, match="non-numeric"):
-        edges_from_records([{"source": "a", "target": "b", "weight": "bad"}])
-    with pytest.raises(GraphInputError, match="invalid weight"):
-        edges_from_records(
-            [{"source": "a", "target": "b", "weight": numpy.nan}]
-        )
+    with pytest.raises(ParseError, match="non-numeric"):
+        link([{"source": "a", "target": "b", "weight": "bad"}])
+    with pytest.raises(ParseError, match="invalid weight"):
+        link([{"source": "a", "target": "b", "weight": numpy.nan}])
     with pytest.raises(ValueError, match="finite"):
         Edge("a", "b", float("inf"))
 
 
 def test_duplicate_self_loop_and_missing_node_validation() -> None:
     """Validation reports every requested structural error class."""
-    duplicate = Dataset.from_edges(
+    duplicate = Dataset.connect(
         [Edge("a", "b"), Edge("a", "b")], nodes=["a", "b"]
     )
-    self_loop = Dataset.from_edges([Edge("a", "a")])
-    missing_node = Dataset.from_edges([Edge("a", "missing")], nodes=["a"])
+    self_loop = Dataset.connect([Edge("a", "a")])
+    missing_node = Dataset.connect([Edge("a", "missing")], nodes=["a"])
 
     assert "duplicate_edge" in duplicate.validate().error_codes
     assert "self_loop" in self_loop.validate().error_codes
     assert "missing_endpoint" in missing_node.validate().error_codes
-    with pytest.raises(GraphValidationError):
-        missing_node.require_valid()
+    with pytest.raises(ValidationError):
+        missing_node.ensure()
 
 
 def test_undirected_duplicate_detection_and_identity_are_canonical() -> None:
     """Undirected reversals are duplicates and ordering does not affect identity."""
-    first = Dataset.from_edges(
+    first = Dataset.connect(
         [Edge("a", "b"), Edge("b", "a")],
         nodes=["b", "a"],
         directed=False,
     )
-    second = Dataset.from_edges(
+    second = Dataset.connect(
         [Edge("b", "a"), Edge("a", "b")],
         nodes=["a", "b"],
         directed=False,
@@ -180,7 +178,7 @@ def test_graph_curation_records_structure_and_feature_policy(
 
 def test_graph_curation_reports_mixed_label_state():
     """Graph curation exposes mixed node labels before graph modelling."""
-    graph = Dataset.from_edges(
+    graph = Dataset.connect(
         [Edge("a", "b")],
         nodes=[Node("a", label="source"), Node("b")],
     )
@@ -198,7 +196,7 @@ def test_graph_curation_reports_mixed_label_state():
 
 def test_temporal_edges_are_normalized_and_curated() -> None:
     """Timestamped edges are normalized to UTC and curated."""
-    edges = edges_from_records(
+    edges = link(
         [
             {
                 "source": "a",
@@ -218,7 +216,7 @@ def test_temporal_edges_are_normalized_and_curated() -> None:
         ],
         time_column="event_time",
     )
-    graph = Dataset.from_edges(edges, nodes=["a", "b", "c"])
+    graph = Dataset.connect(edges, nodes=["a", "b", "c"])
 
     assert edges[0].event_time == datetime(2026, 1, 1, tzinfo=UTC)
     assert graph.curate().profile["temporal"]["status"] == "complete"
@@ -226,7 +224,7 @@ def test_temporal_edges_are_normalized_and_curated() -> None:
 
 def test_temporal_graphs_fail_closed_on_mixed_or_invalid_time_state() -> None:
     """Missing and malformed event times remain visible before splitting."""
-    mixed_graph = Dataset.from_edges(
+    mixed_graph = Dataset.connect(
         [
             Edge(
                 "a",
@@ -247,8 +245,8 @@ def test_temporal_graphs_fail_closed_on_mixed_or_invalid_time_state() -> None:
     }
     quality_ids = {finding.finding_id for finding in report.quality_findings}
     assert "quality.graph-mixed-temporal-state" in quality_ids
-    with pytest.raises(GraphInputError, match="invalid event time"):
-        edges_from_records(
+    with pytest.raises(ParseError, match="invalid event time"):
+        link(
             [{"source": "a", "target": "b", "event_time": "no-zone"}],
             time_column="event_time",
         )
@@ -256,7 +254,7 @@ def test_temporal_graphs_fail_closed_on_mixed_or_invalid_time_state() -> None:
 
 def test_temporal_edge_identity_preserves_parallel_events() -> None:
     """Events with distinct timestamps are not collapsed as duplicates."""
-    graph = Dataset.from_edges(
+    graph = Dataset.connect(
         [
             Edge(
                 "a",
@@ -280,8 +278,8 @@ def test_inductive_split_is_deterministic_and_withholds_cross_partition_edges(
     shifted_graph: Dataset,
 ) -> None:
     """Repeated seeded splits match and retain no crossing edges."""
-    first = inductive_node_split(shifted_graph, seed=41)
-    second = inductive_node_split(shifted_graph, seed=41)
+    first = induct(shifted_graph, seed=41)
+    second = induct(shifted_graph, seed=41)
 
     assert first == second
     assert set(first.train_nodes).isdisjoint(first.validation_nodes)
@@ -289,7 +287,7 @@ def test_inductive_split_is_deterministic_and_withholds_cross_partition_edges(
     assert set(first.validation_nodes).isdisjoint(first.test_nodes)
     partitions = {
         node_id: index
-        for index, nodes in enumerate(first.node_partitions)
+        for index, nodes in enumerate(first.divisions)
         for node_id in nodes
     }
     retained = first.train_edges + first.validation_edges + first.test_edges
@@ -310,7 +308,7 @@ def test_feature_preparation_is_bounded_and_shift_fixture_is_observable(
         max_features=3,
         standardize=True,
     )
-    unshifted = Dataset.from_edges(
+    unshifted = Dataset.connect(
         shifted_graph.edges,
         nodes=[
             Node("a", (0.0, 0.0)),

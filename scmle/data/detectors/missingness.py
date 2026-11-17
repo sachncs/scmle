@@ -153,7 +153,7 @@ class Missingness:
         return dataclasses.asdict(self)
 
 
-def numeric_columns(frame: pandas.DataFrame) -> list[Any]:
+def numerics(frame: pandas.DataFrame) -> list[Any]:
     """Finds the numeric, non-boolean columns that are not constant.
 
     Args:
@@ -175,7 +175,7 @@ def numeric_columns(frame: pandas.DataFrame) -> list[Any]:
     return names
 
 
-def em_normal(
+def em(
     values: numpy.ndarray,
     max_iter: int = EM_MAX_ITER,
     tolerance: float = EM_TOLERANCE,
@@ -382,7 +382,7 @@ def little_mcar_test(
         raise scmle.contracts.errors.InputError(
             "transform must be 'normal_scores' or 'none'"
         )
-    names = list(columns) if columns is not None else numeric_columns(frame)
+    names = list(columns) if columns is not None else numerics(frame)
     for name in names:
         if not pandas.api.types.is_numeric_dtype(frame[name]):
             raise scmle.contracts.errors.InputError(
@@ -395,7 +395,7 @@ def little_mcar_test(
         return None
     if transform == "normal_scores":
         values = normal_scores(values)
-    fit = em_normal(values)
+    fit = em(values)
     statistic, df = measure(values, fit)
     if df <= 0:
         return None
@@ -410,7 +410,7 @@ def little_mcar_test(
     )
 
 
-def auc_from_ranks(scores: numpy.ndarray, positive: numpy.ndarray) -> float:
+def ranksum(scores: numpy.ndarray, positive: numpy.ndarray) -> float:
     """Computes the area under the ROC curve via the rank-sum identity.
 
     Args:
@@ -484,7 +484,7 @@ def indicator_model_test(
             "need permutations >= 1 and folds >= 2"
         )
     flag = frame[column].isna().to_numpy()
-    others = [c for c in numeric_columns(frame) if c != column]
+    others = [c for c in numerics(frame) if c != column]
     missing = int(flag.sum())
     if not others or missing < MIN_MISSING or len(flag) - missing < MIN_ROWS:
         return None
@@ -498,7 +498,7 @@ def indicator_model_test(
     order = rng.permutation(len(flag))
     parts = [numpy.sort(part) for part in numpy.array_split(order, folds)]
     target = flag.astype(float)
-    observed = auc_from_ranks(crossfit(design, target, parts), flag)
+    observed = ranksum(crossfit(design, target, parts), flag)
     beaten = 0
     shuffles = list(
         map(
@@ -507,7 +507,7 @@ def indicator_model_test(
         )
     )
     for shuffled in shuffles:
-        null = auc_from_ranks(
+        null = ranksum(
             crossfit(design, shuffled.astype(float), parts), shuffled
         )
         beaten += int(null >= observed)
@@ -519,7 +519,7 @@ def indicator_model_test(
     )
 
 
-def assess_mechanism(
+def investigate(
     frame: pandas.DataFrame,
     seed: int = 0,
     alpha: float = ALPHA,
@@ -550,7 +550,7 @@ def assess_mechanism(
         keep = numpy.sort(rng.choice(input_rows, MAX_ROWS, replace=False))
         frame = frame.iloc[keep]
         skipped.append(f"rows sampled to {MAX_ROWS} of {input_rows}")
-    numeric = numeric_columns(frame)
+    numeric = numerics(frame)
     if len(numeric) > MAX_COLUMNS:
         skipped.append(
             f"skipped, over budget: {len(numeric)} numeric columns exceed "
@@ -682,7 +682,7 @@ def make_imputer(strategy: str) -> Any:
     )
 
 
-def fold_imputers(
+def imputers(
     values: numpy.ndarray, strategy: str, seed: int, folds: int = FOLDS
 ) -> list[tuple[numpy.ndarray, numpy.ndarray, Any]]:
     """Fits one imputer per fold on that fold's training rows only.
@@ -724,7 +724,7 @@ def fit_one(values: numpy.ndarray, strategy: str, train: numpy.ndarray) -> Any:
     return imputer
 
 
-def imputation_errors(
+def benchmark(
     values: numpy.ndarray,
     seed: int = 0,
     folds: int = FOLDS,
@@ -756,9 +756,7 @@ def imputation_errors(
     errors: dict[str, float] = {}
     for strategy in STRATEGIES:
         scores = []
-        for index, fold in enumerate(
-            fold_imputers(values, strategy, seed, folds)
-        ):
+        for index, fold in enumerate(imputers(values, strategy, seed, folds)):
             held, imputer = fold[1], fold[2]
             block = values[held].copy()
             # Hide each observed cell with probability `share`; the fold

@@ -165,14 +165,14 @@ class SignalThresholds:
 
 
 KIND_OF = {
-    "server_error_rate": observability.SignalKind.ERROR,
-    "availability": observability.SignalKind.ERROR,
-    "latency_p95_seconds": observability.SignalKind.LATENCY,
-    "invalid_request_rate": observability.SignalKind.DATA_QUALITY,
-    "feature_missing_increase": observability.SignalKind.DATA_QUALITY,
-    "unseen_category_rate": observability.SignalKind.DATA_QUALITY,
-    "feature_psi_max": observability.SignalKind.DRIFT,
-    "windowed_loss": observability.SignalKind.ERROR,
+    "server_error_rate": observability.Indicator.ERROR,
+    "availability": observability.Indicator.ERROR,
+    "latency_p95_seconds": observability.Indicator.LATENCY,
+    "invalid_request_rate": observability.Indicator.DATA_QUALITY,
+    "feature_missing_increase": observability.Indicator.DATA_QUALITY,
+    "unseen_category_rate": observability.Indicator.DATA_QUALITY,
+    "feature_psi_max": observability.Indicator.DRIFT,
+    "windowed_loss": observability.Indicator.ERROR,
 }
 
 
@@ -229,7 +229,7 @@ class SignalMonitor:
         self,
         policy: Window = Window(),  # noqa: B008
         thresholds: SignalThresholds = SignalThresholds(),  # noqa: B008
-        profile: scmle.monitoring.reference.ReferenceProfile | None = None,
+        profile: scmle.monitoring.reference.Baseline | None = None,
     ) -> None:
         """Creates a monitor.
 
@@ -346,12 +346,12 @@ class SignalMonitor:
             requests = [r for r in self.requests if r[0] <= now]
             frames = [f for at, f in self.features if at <= now]
             outcomes = [o for at, o in self.outcomes if at <= now]
-        found = self.service_signals(requests)
-        found += self.data_signals(frames, requests)
-        found += self.performance_signals(outcomes)
+        found = self.assess(requests)
+        found += self.gauge(frames, requests)
+        found += self.degradation(outcomes)
         return tuple(found)
 
-    def service_signals(
+    def assess(
         self, requests: list[tuple[float, str, int, float]]
     ) -> list[Signal]:
         """Judges server error rate, availability and p95 latency.
@@ -416,7 +416,7 @@ class SignalMonitor:
             ),
         ]
 
-    def data_signals(
+    def gauge(
         self,
         frames: list[pandas.DataFrame],
         requests: list[tuple[float, str, int, float]],
@@ -472,7 +472,7 @@ class SignalMonitor:
                 missing[name] = (
                     float(column.isna().mean()) - reference.missing_rate
                 )
-                drift[name] = reference.adjusted_psi(column)
+                drift[name] = reference.adjust(column)
                 unseen[name] = reference.unseen_rate(column)
         worst_missing = max(missing.values()) if missing else None
         worst_drift = max(drift.values()) if drift else None
@@ -520,9 +520,7 @@ class SignalMonitor:
         ]
         return found
 
-    def performance_signals(
-        self, outcomes: list[numpy.ndarray]
-    ) -> list[Signal]:
+    def degradation(self, outcomes: list[numpy.ndarray]) -> list[Signal]:
         """Judges the mean loss of cases whose outcome arrived.
 
         Args:
@@ -549,9 +547,7 @@ class SignalMonitor:
         ]
 
 
-def zero_one_losses(
-    predictions: Sequence[Any], labels: Sequence[Any]
-) -> numpy.ndarray:
+def misses(predictions: Sequence[Any], labels: Sequence[Any]) -> numpy.ndarray:
     """Loss 1 where a prediction differs from its label, else 0.
 
     Args:
@@ -578,8 +574,8 @@ def as_metric_samples(
     signals: Sequence[Signal],
     timestamp: str,
     labels: dict[str, str] | None = None,
-) -> list[observability.MetricSample]:
-    """Converts signals that have a value to `MetricSample` rows.
+) -> list[observability.Sample]:
+    """Converts signals that have a value to `Sample` rows.
 
     Args:
         signals: The evaluated signals.
@@ -595,7 +591,7 @@ def as_metric_samples(
         KeyError: If a signal's name has no metric kind.
     """
     return [
-        observability.MetricSample(
+        observability.Sample(
             name=signal.name,
             kind=KIND_OF[signal.name],
             value=float(signal.value),

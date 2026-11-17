@@ -29,7 +29,7 @@ from scmle.runners import roles
 DEFAULT_WORKLOAD = "scmle.runners.project:run_project"
 
 
-def open_store(uri: str) -> objectstore.ObjectStore:
+def mount(uri: str) -> objectstore.ObjectStore:
     """Opens a `file://` store.
 
     Args:
@@ -51,7 +51,7 @@ def open_store(uri: str) -> objectstore.ObjectStore:
     )
 
 
-def load_workload(name: str) -> Callable[[local.JobContext], None]:
+def resolve(name: str) -> Callable[[local.Context], None]:
     """Imports ``module:function``.
 
     An unimportable module raises ImportError and a missing function raises
@@ -70,11 +70,11 @@ def load_workload(name: str) -> Callable[[local.JobContext], None]:
     if not separator:
         raise errors.ConfigError("SCMLE_WORKLOAD must be module:function")
     found = getattr(importlib.import_module(module_name), function)
-    workload: Callable[[local.JobContext], None] = found
+    workload: Callable[[local.Context], None] = found
     return workload
 
 
-def spec_from_store(store: objectstore.ObjectStore, run_id: str) -> base.Job:
+def respec(store: objectstore.ObjectStore, run_id: str) -> base.Job:
     """Rebuilds the stored spec.
 
     Args:
@@ -137,17 +137,17 @@ def main(environ: Mapping[str, str], store: Any = None) -> int:
     try:
         run_id = environ["SCMLE_RUN_ID"]
         attempt = int(environ.get("SCMLE_ATTEMPT", "1"))
-        training_store = store or open_store(environ["SCMLE_STORE_URI"])
-        spec = spec_from_store(training_store, run_id)
+        training_store = store or mount(environ["SCMLE_STORE_URI"])
+        spec = respec(training_store, run_id)
         require_started_spec(spec, environ.get("SCMLE_SPEC_DIGEST"))
-        context = local.JobContext(
+        context = local.Context(
             roles.RoleStore(training_store, roles.TRAINING_ROLE),
             run_id,
             attempt,
             spec,
             checkpoint.CheckpointStore(training_store, run_id),
         )
-        load_workload(environ.get("SCMLE_WORKLOAD", DEFAULT_WORKLOAD))(context)
+        resolve(environ.get("SCMLE_WORKLOAD", DEFAULT_WORKLOAD))(context)
     except Exception as error:  # noqa: BLE001 -- process boundary
         # handled: the full traceback is written to stderr, exit code 1
         sys.stderr.write(errors.Failure.of(error).trace)

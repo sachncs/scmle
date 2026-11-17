@@ -96,7 +96,7 @@ class Usage:
                 )
 
     @classmethod
-    def from_allocation(
+    def allocate(
         cls,
         service: str,
         version: str,

@@ -37,7 +37,7 @@ FAST_EXCEPTIONS = frozenset(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class PlanningContext:
+class Situation:
     """Facts available to planning rules.
 
     Attributes:
@@ -49,10 +49,10 @@ class PlanningContext:
     """
 
     spec: tasks.Config
-    profile: data.DatasetProfile
+    profile: data.Portrait
     task: tasks.Task
     approved_models: tuple[str, ...] | None = None
-    history: tuple[experiments.HistoricalRun, ...] = ()
+    history: tuple[experiments.Precedent, ...] = ()
 
 
 class Refiner(abc.ABC):
@@ -61,7 +61,7 @@ class Refiner(abc.ABC):
     @abc.abstractmethod
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -90,7 +90,7 @@ class Memory(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -131,7 +131,7 @@ class GpuFilter(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -175,7 +175,7 @@ class Budget(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -191,9 +191,9 @@ class Budget(Refiner):
             All candidates if the budget is not tight; otherwise those with a
             cost below 3 or listed in `FAST_EXCEPTIONS`.
         """
-        if not context.spec.fast_budget:
+        if not context.spec.brief:
             return candidates
-        search = context.spec.effective_search()
+        search = context.spec.budgeted()
         decisions.append(
             experiments.Decision(
                 "reduce_search_complexity",
@@ -201,7 +201,7 @@ class Budget(Refiner):
                 f"time budget < {tasks.FAST_BUDGET_SECONDS}s: tune at most "
                 f"{search.top_models} model(s) with "
                 f"{search.configs_per_model} config(s) each and try strategies "
-                f"on at most {context.spec.effective_strategies().top_models} "
+                f"on at most {context.spec.effective().top_models} "
                 "model(s)",
             )
         )
@@ -227,7 +227,7 @@ class Streaming(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -281,7 +281,7 @@ class Persistence(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,  # noqa: ARG002 -- Refiner.apply interface
+        context: Situation,  # noqa: ARG002 -- Refiner.apply interface
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -320,7 +320,7 @@ class Cardinality(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -365,7 +365,7 @@ class Cardinality(Refiner):
                     "no compatible model handles categoricals natively",
                 )
             )
-        strategies_spec = context.spec.effective_strategies()
+        strategies_spec = context.spec.effective()
         enabled = (
             "target_encoding" in strategies_spec.names
             and strategies_spec.top_models > 0
@@ -392,7 +392,7 @@ class Exclusion(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -430,7 +430,7 @@ class MonotonicFilter(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -482,7 +482,7 @@ class Approval(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -531,7 +531,7 @@ class History(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -548,7 +548,7 @@ class History(Refiner):
             comparable history.
         """
         manifest = context.profile.manifest
-        learner = knowledge.MetaLearner(list(context.history))
+        learner = knowledge.Recommender(list(context.history))
         recommendations = learner.recommend(
             knowledge.fingerprint(context.profile, context.task),
             context.task,
@@ -589,7 +589,7 @@ class Strategy(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -603,7 +603,7 @@ class Strategy(Refiner):
         Returns:
             The candidates, unchanged.
         """
-        spec = context.spec.effective_strategies()
+        spec = context.spec.effective()
         for name in spec.names:
             strategy = strategies.lookup(name)
             reasons = {
@@ -651,7 +651,7 @@ class Tuning(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -665,7 +665,7 @@ class Tuning(Refiner):
         Returns:
             The candidates, unchanged.
         """
-        search = context.spec.effective_search()
+        search = context.spec.budgeted()
         tunable = [a.name for a in candidates if a.search_space is not None]
         if search.top_models == 0 or not tunable:
             decisions.append(
@@ -694,7 +694,7 @@ class Ensemble(Refiner):
 
     def apply(
         self,
-        context: PlanningContext,
+        context: Situation,
         candidates: list[models.Model],
         decisions: list[experiments.Decision],
     ) -> list[models.Model]:
@@ -766,7 +766,7 @@ class Planner:
     def __init__(
         self,
         registry: scmle.models.registry.Catalog,
-        catalog: metrics.MetricCatalog = metrics.CATALOG,
+        catalog: metrics.Repertoire = metrics.CATALOG,
         rules: tuple[Refiner, ...] | None = None,
     ) -> None:
         """Initializes the planner.
@@ -780,7 +780,7 @@ class Planner:
         self.catalog = catalog
         self.rules = rules if rules is not None else default_rules()
 
-    def plan(self, context: PlanningContext) -> experiments.Plan:
+    def plan(self, context: Situation) -> experiments.Plan:
         """Builds the experiment plan.
 
         Models the registry rejects are logged first, then each rule is applied
@@ -825,16 +825,16 @@ class Planner:
             )
             for a in candidates
         ]
-        if profile.screen_warning:
+        if profile.admonition:
             decisions.append(
                 experiments.Decision(
                     "leakage_screen",
                     experiments.DecisionAction.DEFER,
-                    profile.screen_warning,
+                    profile.admonition,
                 )
             )
         names = tuple(a.name for a in candidates)
-        strategy = splitters.resolve_strategy_name(spec, task)
+        strategy = splitters.scheme(spec, task)
         resolved = tasks.Config.model_validate(
             spec.model_dump()
             | {

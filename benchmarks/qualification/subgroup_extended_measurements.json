@@ -1,5 +1,5 @@
 {
-  "code_hash": "7f3528aa6cd6538328a559ca02cc92b07fa968d08a7b43e6de4c1f4a59a26bb7",
+  "code_hash": "294fd6da65e78ff62d037bb05d245fe2cfb116d1bb0325a73ed188a2b213bb41",
   "not_measured": [
     "strategies other than the randomized difference in means",
     "heteroscedastic or heavy-tailed outcomes",
@@ -33,7 +33,7 @@
     "rows": 800
   },
   "registered": "2026-11-07",
-  "seconds": 22.5,
+  "seconds": 21.3,
   "seeds": [
     0,
     2000

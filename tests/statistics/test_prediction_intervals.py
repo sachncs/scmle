@@ -3,7 +3,7 @@
 Each test simulates at least 1,000 datasets from a known generating process
 and checks the share of intervals that hold the truth:
 
-* split conformal (`finite_sample_quantile`, `ConformalCalibrator`): for a
+* split conformal (`cutoff`, `ConformalCalibrator`): for a
   continuous score the coverage is exactly `ceil((n + 1) c) / (n + 1)`, so
   that is the target, two-sided;
 * class-conditional sets: coverage inside each class, at least nominal;
@@ -43,7 +43,7 @@ def test_split_conformal_hits_the_exact_finite_sample_rate():
         hits = 0
         for ignored in range(runs):
             scores = numpy.abs(rng.normal(size=rows))
-            margin = conformal.finite_sample_quantile(scores, COVERAGE)
+            margin = conformal.cutoff(scores, COVERAGE)
             hits += abs(rng.normal()) <= margin
         support_statistics.assert_rate_near(
             hits / runs, exact_rate(rows), runs, f"split conformal n={rows}"
@@ -79,7 +79,7 @@ def test_class_conditional_sets_cover_inside_each_class():
         posterior = 1.0 / (1.0 + numpy.exp(-2.0 * x))
         label = (rng.random(rows + 1) < posterior).astype(int)
         probabilities = numpy.c_[1.0 - posterior, posterior]
-        calibrator = conformal.ConformalCalibrator.for_classification(
+        calibrator = conformal.ConformalCalibrator.classify(
             label[:rows].tolist(), probabilities[:rows], classes
         )
         chosen = calibrator.sets(
@@ -101,9 +101,9 @@ def test_one_row_per_entity_covers_a_new_entity_with_a_random_effect():
     for ignored in range(runs):
         effect = rng.normal(scale=2.0, size=entities)
         rows = effect[:, None] + rng.normal(size=(entities, per_entity))
-        chosen = conformal.one_row_per_entity(labels_of_rows, rng)
+        chosen = conformal.representatives(labels_of_rows, rng)
         scores = numpy.abs(rows.ravel()[chosen])
-        margin = conformal.finite_sample_quantile(scores, COVERAGE)
+        margin = conformal.cutoff(scores, COVERAGE)
         new = rng.normal(scale=2.0) + rng.normal()
         hits += abs(new) <= margin
     support_statistics.assert_rate_near(
@@ -154,7 +154,7 @@ def test_cv_plus_is_near_nominal_and_above_its_theoretical_bound():
             rest = design[:rows][~train]
             fit = beta[0] + rest @ beta[1:]
             residuals[~train] = numpy.abs(target[:rows][~train] - fit)
-        low, high = conformal.cv_plus_bounds(
+        low, high = conformal.cvplus(
             predictions[None, :], held_out, residuals, COVERAGE
         )
         hits += low[0] <= target[rows] <= high[0]
@@ -172,7 +172,7 @@ def test_bootstrap_difference_interval_covers_a_mean_difference():
     for ignored in range(SIMULATIONS):
         before = rng.exponential(size=60)
         after = rng.exponential(size=60) + 0.5
-        low, high = continuous.bootstrap_difference(
+        low, high = continuous.contrast(
             before, after, 0.05, 400, int(rng.integers(1 << 30))
         )
         hits += low <= 0.5 <= high
@@ -182,15 +182,15 @@ def test_bootstrap_difference_interval_covers_a_mean_difference():
 
 
 def cost_model():
-    return costs.DecisionCostModel(
+    return costs.Tariff(
         0.0,
         100.0,
         5.0,
         0.0,
         0.02,
         0.15,
-        (costs.CostSource.HUMAN,) * 4,
-        costs.CostSource.HUMAN,
+        (costs.Basis.HUMAN,) * 4,
+        costs.Basis.HUMAN,
     )
 
 
@@ -246,11 +246,11 @@ def test_off_policy_normal_interval_covers_with_and_without_clusters():
     plain = clustered = 0
     for ignored in range(runs):
         values = rng.normal(size=groups * per_group)
-        low, high = ope.mean_interval(values, None, 0.95)[1]
+        low, high = ope.wald(values, None, 0.95)[1]
         plain += low <= 0.0 <= high
         effect = numpy.repeat(rng.normal(size=groups), per_group)
         values = effect + rng.normal(size=groups * per_group)
-        low, high = ope.mean_interval(values, clusters, 0.95)[1]
+        low, high = ope.wald(values, clusters, 0.95)[1]
         clustered += low <= 0.0 <= high
     support_statistics.assert_rate_near(
         plain / runs, 0.95, runs, "ope interval, independent rows"
@@ -270,7 +270,7 @@ def test_delong_interval_covers_the_true_auc():
         scores = numpy.r_[
             rng.normal(gap, 1.0, positives), rng.normal(0.0, 1.0, negatives)
         ]
-        low, high = shift.auc_delong(scores, side)[1]
+        low, high = shift.delong(scores, side)[1]
         hits += low <= truth <= high
     support_statistics.assert_rate_near(
         hits / runs, 0.95, runs, "DeLong interval"
@@ -288,7 +288,7 @@ def test_prediction_powered_interval_covers_the_population_mean():
             0.0,
             1.0,
         )
-        low, high = labels.ppi_mean(
+        low, high = labels.ppi(
             predicted[:unlabeled],
             predicted[unlabeled:],
             truth[unlabeled:],

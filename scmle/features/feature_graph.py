@@ -36,11 +36,11 @@ Params = Mapping[str, Any]
 EPOCH = pandas.Timestamp("1970-01-01")
 
 
-class FeatureOp(abc.ABC):
+class Operation(abc.ABC):
     """One operation of the graph.
 
     Attributes:
-        name: Name used in `FeatureNode.op`.
+        name: Name used in `Node.op`.
         min_inputs: Minimum number of inputs.
         max_inputs: Maximum number of inputs.
         ordered: Whether the operation needs row order (time series).
@@ -54,7 +54,7 @@ class FeatureOp(abc.ABC):
     ordered: ClassVar[bool] = False
     defaults: ClassVar[Mapping[str, Any]] = {}
 
-    def validate(self, node: tasks.FeatureNode) -> None:
+    def validate(self, node: tasks.Node) -> None:
         """Checks the node's input count and parameter names.
 
         Args:
@@ -77,7 +77,7 @@ class FeatureOp(abc.ABC):
                 f"for {self.name}; allowed: {sorted(self.defaults)}"
             )
 
-    def resolved(self, node: tasks.FeatureNode) -> dict[str, Any]:
+    def resolved(self, node: tasks.Node) -> dict[str, Any]:
         """Applies the defaults to a node's parameters.
 
         Args:
@@ -88,7 +88,7 @@ class FeatureOp(abc.ABC):
         """
         return {**self.defaults, **node.params}
 
-    def fit(self, inputs: Inputs, params: Params) -> Any:  # noqa: ARG002 -- FeatureOp interface
+    def fit(self, inputs: Inputs, params: Params) -> Any:  # noqa: ARG002 -- Operation interface
         """Learns state from training data; the default is stateless.
 
         Args:
@@ -116,7 +116,7 @@ class FeatureOp(abc.ABC):
         """
 
 
-class Log1p(FeatureOp):
+class Log1p(Operation):
     """`log(1 + max(x, 0))`."""
 
     name = "log1p"
@@ -124,8 +124,8 @@ class Log1p(FeatureOp):
     def apply(
         self,
         inputs: Inputs,
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
-        state: Any,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- Operation interface
+        state: Any,  # noqa: ARG002 -- Operation interface
     ) -> pandas.Series:
         """Log-transform the input after clipping it at zero.
 
@@ -140,11 +140,11 @@ class Log1p(FeatureOp):
         # A ufunc on a Series returns a Series; the numpy stubs say ndarray.
         return cast(
             "pandas.Series",
-            numpy.log1p(columns.to_finite(inputs[0]).clip(lower=0)),
+            numpy.log1p(columns.scrub(inputs[0]).clip(lower=0)),
         )
 
 
-class Sqrt(FeatureOp):
+class Sqrt(Operation):
     """`sqrt(max(x, 0))`."""
 
     name = "sqrt"
@@ -152,8 +152,8 @@ class Sqrt(FeatureOp):
     def apply(
         self,
         inputs: Inputs,
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
-        state: Any,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- Operation interface
+        state: Any,  # noqa: ARG002 -- Operation interface
     ) -> pandas.Series:
         """Takes the square root of the input after clipping it at zero.
 
@@ -167,11 +167,11 @@ class Sqrt(FeatureOp):
         """
         return cast(
             "pandas.Series",
-            numpy.sqrt(columns.to_finite(inputs[0]).clip(lower=0)),
+            numpy.sqrt(columns.scrub(inputs[0]).clip(lower=0)),
         )
 
 
-class Square(FeatureOp):
+class Square(Operation):
     """`x ** 2`."""
 
     name = "square"
@@ -179,8 +179,8 @@ class Square(FeatureOp):
     def apply(
         self,
         inputs: Inputs,
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
-        state: Any,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- Operation interface
+        state: Any,  # noqa: ARG002 -- Operation interface
     ) -> pandas.Series:
         """Squares the input.
 
@@ -192,10 +192,10 @@ class Square(FeatureOp):
         Returns:
             `x ** 2` per row.
         """
-        return columns.to_finite(inputs[0]) ** 2
+        return columns.scrub(inputs[0]) ** 2
 
 
-class Absolute(FeatureOp):
+class Absolute(Operation):
     """`abs(x)`."""
 
     name = "abs"
@@ -203,8 +203,8 @@ class Absolute(FeatureOp):
     def apply(
         self,
         inputs: Inputs,
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
-        state: Any,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- Operation interface
+        state: Any,  # noqa: ARG002 -- Operation interface
     ) -> pandas.Series:
         """Takes the absolute value of the input.
 
@@ -216,10 +216,10 @@ class Absolute(FeatureOp):
         Returns:
             `abs(x)` per row.
         """
-        return columns.to_finite(inputs[0]).abs()
+        return columns.scrub(inputs[0]).abs()
 
 
-class Missingness(FeatureOp):
+class Missingness(Operation):
     """1 where the input is missing, else 0."""
 
     name = "is_missing"
@@ -227,8 +227,8 @@ class Missingness(FeatureOp):
     def apply(
         self,
         inputs: Inputs,
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
-        state: Any,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- Operation interface
+        state: Any,  # noqa: ARG002 -- Operation interface
     ) -> pandas.Series:
         """Flags missing values; works for any dtype.
 
@@ -243,7 +243,7 @@ class Missingness(FeatureOp):
         return inputs[0].isna().astype(float)
 
 
-class Sum(FeatureOp):
+class Sum(Operation):
     """Sum of two or more inputs."""
 
     name = "sum"
@@ -253,8 +253,8 @@ class Sum(FeatureOp):
     def apply(
         self,
         inputs: Inputs,
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
-        state: Any,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- Operation interface
+        state: Any,  # noqa: ARG002 -- Operation interface
     ) -> pandas.Series:
         """Adds the inputs.
 
@@ -266,12 +266,12 @@ class Sum(FeatureOp):
         Returns:
             The row-wise sum; NaN where any input is NaN.
         """
-        return sum(
-            columns.to_finite(s) for s in inputs[1:]
-        ) + columns.to_finite(inputs[0])
+        return sum(columns.scrub(s) for s in inputs[1:]) + columns.scrub(
+            inputs[0]
+        )
 
 
-class Difference(FeatureOp):
+class Difference(Operation):
     """`a - b`."""
 
     name = "difference"
@@ -281,8 +281,8 @@ class Difference(FeatureOp):
     def apply(
         self,
         inputs: Inputs,
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
-        state: Any,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- Operation interface
+        state: Any,  # noqa: ARG002 -- Operation interface
     ) -> pandas.Series:
         """Subtracts the second input from the first.
 
@@ -294,10 +294,10 @@ class Difference(FeatureOp):
         Returns:
             `a - b` per row.
         """
-        return columns.to_finite(inputs[0]) - columns.to_finite(inputs[1])
+        return columns.scrub(inputs[0]) - columns.scrub(inputs[1])
 
 
-class Product(FeatureOp):
+class Product(Operation):
     """Product of two or more inputs."""
 
     name = "product"
@@ -307,8 +307,8 @@ class Product(FeatureOp):
     def apply(
         self,
         inputs: Inputs,
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
-        state: Any,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- Operation interface
+        state: Any,  # noqa: ARG002 -- Operation interface
     ) -> pandas.Series:
         """Multiplies the inputs.
 
@@ -320,13 +320,13 @@ class Product(FeatureOp):
         Returns:
             The row-wise product; NaN where any input is NaN.
         """
-        result = columns.to_finite(inputs[0])
+        result = columns.scrub(inputs[0])
         for series in inputs[1:]:
-            result = result * columns.to_finite(series)
+            result = result * columns.scrub(series)
         return result
 
 
-class Ratio(FeatureOp):
+class Ratio(Operation):
     """`a / b`, NaN where b is zero."""
 
     name = "ratio"
@@ -336,8 +336,8 @@ class Ratio(FeatureOp):
     def apply(
         self,
         inputs: Inputs,
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
-        state: Any,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- Operation interface
+        state: Any,  # noqa: ARG002 -- Operation interface
     ) -> pandas.Series:
         """Divides the first input by the second.
 
@@ -349,11 +349,11 @@ class Ratio(FeatureOp):
         Returns:
             `a / b` per row, NaN where `b` is zero.
         """
-        denominator = columns.to_finite(inputs[1]).replace(0.0, numpy.nan)
-        return columns.to_finite(inputs[0]) / denominator
+        denominator = columns.scrub(inputs[1]).replace(0.0, numpy.nan)
+        return columns.scrub(inputs[0]) / denominator
 
 
-class Clip(FeatureOp):
+class Clip(Operation):
     """Winsorizes to quantiles learned on the training fold."""
 
     name = "clip"
@@ -370,7 +370,7 @@ class Clip(FeatureOp):
             The (low, high) quantile values, or (-inf, inf) when the column
             has no finite values.
         """
-        values = columns.to_finite(inputs[0]).dropna()
+        values = columns.scrub(inputs[0]).dropna()
         if values.empty:
             return (-numpy.inf, numpy.inf)
         low, high = numpy.quantile(values, [params["lower"], params["upper"]])
@@ -379,7 +379,7 @@ class Clip(FeatureOp):
     def apply(
         self,
         inputs: Inputs,
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- Operation interface
         state: Any,
     ) -> pandas.Series:
         """Clips to the learned bounds.
@@ -392,15 +392,15 @@ class Clip(FeatureOp):
         Returns:
             The column limited to the bounds.
         """
-        return columns.to_finite(inputs[0]).clip(lower=state[0], upper=state[1])
+        return columns.scrub(inputs[0]).clip(lower=state[0], upper=state[1])
 
 
-class Standardize(FeatureOp):
+class Standardize(Operation):
     """Z-score using the training fold's mean and standard deviation."""
 
     name = "standardize"
 
-    def fit(self, inputs: Inputs, params: Params) -> Any:  # noqa: ARG002 -- FeatureOp interface
+    def fit(self, inputs: Inputs, params: Params) -> Any:  # noqa: ARG002 -- Operation interface
         """Learns the mean and standard deviation from training data.
 
         Args:
@@ -411,14 +411,14 @@ class Standardize(FeatureOp):
             The (mean, std) pair; the std is 1.0 when it is zero or fewer than
             two values exist, and the mean is 0.0 for an empty column.
         """
-        values = columns.to_finite(inputs[0]).dropna()
+        values = columns.scrub(inputs[0]).dropna()
         spread = float(values.std()) if len(values) > 1 else 0.0
         return (float(values.mean()) if len(values) else 0.0, spread or 1.0)
 
     def apply(
         self,
         inputs: Inputs,
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- Operation interface
         state: Any,
     ) -> pandas.Series:
         """Standardizes with the learned statistics.
@@ -431,13 +431,11 @@ class Standardize(FeatureOp):
         Returns:
             The z-score per row.
         """
-        scores: pandas.Series = (
-            columns.to_finite(inputs[0]) - state[0]
-        ) / state[1]
+        scores: pandas.Series = (columns.scrub(inputs[0]) - state[0]) / state[1]
         return scores
 
 
-class Bin(FeatureOp):
+class Bin(Operation):
     """Quantile bins (ordinal codes) with edges learned on the training fold."""
 
     name = "bin"
@@ -454,7 +452,7 @@ class Bin(FeatureOp):
             The sorted unique interior edges as an array; empty when the
             column has no finite values.
         """
-        values = columns.to_finite(inputs[0]).dropna().to_numpy()
+        values = columns.scrub(inputs[0]).dropna().to_numpy()
         if values.size == 0:
             return numpy.array([])
         edges = numpy.quantile(
@@ -465,7 +463,7 @@ class Bin(FeatureOp):
     def apply(
         self,
         inputs: Inputs,
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
+        params: Params,  # noqa: ARG002 -- Operation interface
         state: Any,
     ) -> pandas.Series:
         """Assigns each value to its bin.
@@ -478,7 +476,7 @@ class Bin(FeatureOp):
         Returns:
             The ordinal bin code per row as a float; NaN stays NaN.
         """
-        values = columns.to_finite(inputs[0])
+        values = columns.scrub(inputs[0])
         codes = numpy.searchsorted(
             state, values.to_numpy(), side="right"
         ).astype(float)
@@ -487,7 +485,7 @@ class Bin(FeatureOp):
         )
 
 
-class Calendar(FeatureOp):
+class Calendar(Operation):
     """A component of a datetime column."""
 
     name = "datepart"
@@ -506,7 +504,7 @@ class Calendar(FeatureOp):
         }
     )
 
-    def validate(self, node: tasks.FeatureNode) -> None:
+    def validate(self, node: tasks.Node) -> None:
         """Checks arity, parameters and the requested datetime part.
 
         Args:
@@ -528,7 +526,7 @@ class Calendar(FeatureOp):
         self,
         inputs: Inputs,
         params: Params,
-        state: Any,  # noqa: ARG002 -- FeatureOp interface
+        state: Any,  # noqa: ARG002 -- Operation interface
     ) -> pandas.Series:
         """Extracts the requested part of the datetime.
 
@@ -549,20 +547,20 @@ class Calendar(FeatureOp):
         return part
 
 
-class OrderedOp(FeatureOp):
+class Sequential(Operation):
     """An operation over time-ordered values within a group."""
 
     ordered = True
 
     def apply(
         self,
-        inputs: Inputs,  # noqa: ARG002 -- FeatureOp interface
-        params: Params,  # noqa: ARG002 -- FeatureOp interface
-        state: Any,  # noqa: ARG002 -- FeatureOp interface
+        inputs: Inputs,  # noqa: ARG002 -- Operation interface
+        params: Params,  # noqa: ARG002 -- Operation interface
+        state: Any,  # noqa: ARG002 -- Operation interface
     ) -> pandas.Series:
         """Rejects row-wise application of an ordered operation.
 
-        Ordered operations run through `SeriesFeatureBuilder` only.
+        Ordered operations run through `Temporal` only.
 
         Args:
             inputs: Unused.
@@ -598,13 +596,13 @@ class OrderedOp(FeatureOp):
         """
 
 
-class Lag(OrderedOp):
+class Lag(Sequential):
     """The value `k` rows earlier within the group."""
 
     name = "lag"
     defaults = {"k": 1}
 
-    def validate(self, node: tasks.FeatureNode) -> None:
+    def validate(self, node: tasks.Node) -> None:
         """Checks arity, parameters and that the lag is positive.
 
         A positive lag ensures no future value can leak.
@@ -645,13 +643,13 @@ class Lag(OrderedOp):
         return int(params["k"])
 
 
-class Diff(OrderedOp):
+class Diff(Sequential):
     """Change versus `k` rows earlier within the group."""
 
     name = "diff"
     defaults = {"k": 1}
 
-    def validate(self, node: tasks.FeatureNode) -> None:
+    def validate(self, node: tasks.Node) -> None:
         """Checks arity, parameters and that the lag is positive.
 
         Args:
@@ -693,7 +691,7 @@ class Diff(OrderedOp):
         return int(params["k"])
 
 
-class RollingMean(OrderedOp):
+class Rolling(Sequential):
     """Mean of the last `window` rows (including the current one)."""
 
     name = "rolling_mean"
@@ -727,7 +725,7 @@ class RollingMean(OrderedOp):
         return int(params["window"])
 
 
-class Volatility(OrderedOp):
+class Volatility(Sequential):
     """Standard deviation of the last `window` rows."""
 
     name = "rolling_std"
@@ -762,12 +760,12 @@ class Volatility(OrderedOp):
         return int(params["window"])
 
 
-class ExpandingMean(OrderedOp):
+class ExpandingMean(Sequential):
     """Mean of all rows up to and including the current one."""
 
     name = "expanding_mean"
 
-    def compute(self, grouped: Any, params: Params) -> pandas.Series:  # noqa: ARG002 -- OrderedOp interface
+    def compute(self, grouped: Any, params: Params) -> pandas.Series:  # noqa: ARG002 -- Sequential interface
         """Computes the running mean.
 
         Args:
@@ -780,7 +778,7 @@ class ExpandingMean(OrderedOp):
         means: pandas.Series = grouped.transform(lambda s: s.expanding().mean())
         return means
 
-    def lookback(self, params: Params) -> int | None:  # noqa: ARG002 -- OrderedOp interface
+    def lookback(self, params: Params) -> int | None:  # noqa: ARG002 -- Sequential interface
         """Reports that every earlier row contributes.
 
         Args:
@@ -792,7 +790,7 @@ class ExpandingMean(OrderedOp):
         return None
 
 
-OPS: dict[str, FeatureOp] = {
+OPS: dict[str, Operation] = {
     op.name: op
     for op in (
         Log1p(),
@@ -810,18 +808,18 @@ OPS: dict[str, FeatureOp] = {
         Calendar(),
         Lag(),
         Diff(),
-        RollingMean(),
+        Rolling(),
         Volatility(),
         ExpandingMean(),
     )
 }
 
 
-def lookup(name: str) -> FeatureOp:
+def lookup(name: str) -> Operation:
     """Looks up a registered operation.
 
     Args:
-        name: The operation name, as used in `FeatureNode.op`.
+        name: The operation name, as used in `Node.op`.
 
     Returns:
         The registered operation.
@@ -836,9 +834,9 @@ def lookup(name: str) -> FeatureOp:
     return OPS[name]
 
 
-def split_nodes(
-    spec: tasks.FeatureGraph,
-) -> tuple[list[tasks.FeatureNode], list[tasks.FeatureNode]]:
+def segregate(
+    spec: tasks.Derivation,
+) -> tuple[list[tasks.Node], list[tasks.Node]]:
     """Separates ordered (series) nodes from row-wise nodes.
 
     Args:
@@ -854,7 +852,7 @@ def split_nodes(
 
 
 def validate_graph(
-    spec: tasks.FeatureGraph,
+    spec: tasks.Derivation,
     available: set[str],
     data: tasks.Dataset,
 ) -> None:
@@ -905,9 +903,7 @@ def validate_graph(
         known.add(node.name)
 
 
-def required_raw_inputs(
-    nodes: list[tasks.FeatureNode], derived: set[str]
-) -> list[str]:
+def roots(nodes: list[tasks.Node], derived: set[str]) -> list[str]:
     """Lists the raw columns that `nodes` read.
 
     Args:
@@ -925,7 +921,7 @@ def required_raw_inputs(
     return needed
 
 
-class SeriesFeatureBuilder:
+class Temporal:
     """Computes ordered (time-series) features on a frame.
 
     Features use only the current and earlier rows of the same group, ordered
@@ -934,7 +930,7 @@ class SeriesFeatureBuilder:
 
     def __init__(
         self,
-        nodes: list[tasks.FeatureNode],
+        nodes: list[tasks.Node],
         group_column: str | None,
         time_column: str | None,
         history: pandas.DataFrame | None = None,
@@ -945,7 +941,7 @@ class SeriesFeatureBuilder:
             nodes: Ordered nodes, in dependency order.
             group_column: Entity column (None = one series).
             time_column: Column ordering the rows.
-            history: Earlier rows per entity (see `build_history`), used to
+            history: Earlier rows per entity (see `retain`), used to
                 fill features of rows whose own batch lacks the past.
         """
         self.nodes = nodes
@@ -954,19 +950,19 @@ class SeriesFeatureBuilder:
         self.history = history
 
     @property
-    def history_columns(self) -> list[str]:
+    def historical(self) -> list[str]:
         """The columns a history frame holds.
 
         These are the group and time columns (when set) and the raw inputs of
         the nodes, without duplicates.
         """
         derived = {node.name for node in self.nodes}
-        raw = required_raw_inputs(self.nodes, derived)
+        raw = roots(self.nodes, derived)
         names = [self.group_column, self.time_column, *raw]
         return list(dict.fromkeys(c for c in names if c))
 
     @property
-    def history_rows(self) -> int | None:
+    def depth(self) -> int | None:
         """The number of earlier rows to keep per entity.
 
         This is the sum of the nodes' look-back distances, or None when any
@@ -978,7 +974,7 @@ class SeriesFeatureBuilder:
         total = 0
         for node in self.nodes:
             op = lookup(node.op)
-            if not isinstance(op, OrderedOp):
+            if not isinstance(op, Sequential):
                 raise errors.ConfigError(f"{node.op} is not an ordered op")
             needed = op.lookback(op.resolved(node))
             if needed is None:
@@ -999,7 +995,7 @@ class SeriesFeatureBuilder:
             return frame[self.group_column].astype(str).to_numpy()
         return numpy.zeros(len(frame), dtype=int)
 
-    def build_history(self, frame: pandas.DataFrame) -> pandas.DataFrame:
+    def retain(self, frame: pandas.DataFrame) -> pandas.DataFrame:
         """Keeps the rows later predictions can still need.
 
         Args:
@@ -1009,9 +1005,9 @@ class SeriesFeatureBuilder:
             The most recent rows per entity in time order, enough for every
             ordered node (all rows if some node looks back without limit).
             Rows with an unparseable time are dropped. A node that is not an
-            ordered operation makes `history_rows` raise `ConfigError`.
+            ordered operation makes `depth` raise `ConfigError`.
         """
-        columns = self.history_columns
+        columns = self.historical
         subset = frame[columns].copy()
         times = pandas.to_datetime(subset[self.time_column], errors="coerce")
         subset = subset[times.notna().to_numpy()]
@@ -1022,7 +1018,7 @@ class SeriesFeatureBuilder:
         )
         ordered = subset.iloc[order].reset_index(drop=True)
         ordered_keys = keys[order]
-        rows = self.history_rows
+        rows = self.depth
         if rows is None or ordered.empty:
             return ordered
         rank_from_end = (
@@ -1086,7 +1082,7 @@ class SeriesFeatureBuilder:
         limits = pandas.Series(self.identify(history)).map(earliest)
         keep = (past_times.to_numpy() < limits.to_numpy()) & limits.notna()
         past = history[numpy.asarray(keep)][
-            [c for c in self.history_columns if c in frame.columns]
+            [c for c in self.historical if c in frame.columns]
         ]
         combined = pandas.concat([past, frame], ignore_index=True)
         computed = self.compute(combined).iloc[len(past) :]
@@ -1130,10 +1126,10 @@ class SeriesFeatureBuilder:
         order = numpy.lexsort((position, times.to_numpy(), groups))
         sorted_groups = groups[order]
         for node in self.nodes:
-            values = columns.to_finite(result[node.inputs[0]]).to_numpy()[order]
+            values = columns.scrub(result[node.inputs[0]]).to_numpy()[order]
             grouped = pandas.Series(values).groupby(sorted_groups)
             op = lookup(node.op)
-            if not isinstance(op, OrderedOp):
+            if not isinstance(op, Sequential):
                 raise errors.ConfigError(f"{node.op} is not an ordered op")
             computed = op.compute(grouped, op.resolved(node))
             restored = numpy.empty(len(result))
@@ -1142,7 +1138,7 @@ class SeriesFeatureBuilder:
         return result
 
 
-class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Transformer(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Row-wise graph nodes as a fitted scikit-learn transformer.
 
     Statistics for `clip`, `bin` and `standardize` are learned in `fit`
@@ -1154,7 +1150,7 @@ class FeatureGraphTransformer(base.TransformerMixin, base.BaseEstimator):  # typ
         states_: Learned state per node name.
     """
 
-    def __init__(self, nodes: tuple[tasks.FeatureNode, ...] = ()) -> None:
+    def __init__(self, nodes: tuple[tasks.Node, ...] = ()) -> None:
         """Initializes the transformer.
 
         Args:

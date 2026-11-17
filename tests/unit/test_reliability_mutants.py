@@ -104,7 +104,7 @@ DECLARED = (
 
 
 def test_the_declared_fault_plan_is_exactly_the_reviewed_table():
-    plans = reliability.default_fault_injection_plans()
+    plans = reliability.drills()
 
     assert (
         tuple(
@@ -123,20 +123,20 @@ def test_the_declared_fault_plan_is_exactly_the_reviewed_table():
 
 def test_plan_enum_fields_are_type_checked_under_their_own_names():
     good = {
-        "scenario": reliability.FaultScenario.PROCESS_DEATH,
+        "scenario": reliability.Contingency.PROCESS_DEATH,
         "expected_safe_outcome": (
             reliability.SafeOutcome.RESUME_DURABLE_CHECKPOINT
         ),
         "recoverability": reliability.Recoverability.AUTOMATIC,
         "evidence_requirements": ("a",),
         "release_blocking": True,
-        "verification_status": reliability.VerificationStatus.PLANNED,
+        "verification_status": reliability.Verification.PLANNED,
     }
     for name, expected in (
-        ("scenario", "FaultScenario"),
+        ("scenario", "Contingency"),
         ("expected_safe_outcome", "SafeOutcome"),
         ("recoverability", "Recoverability"),
-        ("verification_status", "VerificationStatus"),
+        ("verification_status", "Verification"),
     ):
         with pytest.raises(TypeError, match=f"^{name} must be {expected}$"):
             reliability.Plan(**{**good, name: "wrong"})
@@ -146,28 +146,28 @@ def test_plan_enum_fields_are_type_checked_under_their_own_names():
 
 def test_blank_or_non_text_requirements_are_rejected_individually():
     with pytest.raises(ValueError, match="must contain text"):
-        reliability.check_evidence_requirements(("ok", " "))
+        reliability.require(("ok", " "))
     with pytest.raises(ValueError, match="must contain text"):
-        reliability.check_evidence_requirements(("ok", 3))
+        reliability.require(("ok", 3))
     with pytest.raises(ValueError, match="must be unique"):
-        reliability.check_evidence_requirements(("ok", "ok"))
+        reliability.require(("ok", "ok"))
     with pytest.raises(ValueError, match="must not be empty"):
-        reliability.check_evidence_requirements(())
-    reliability.check_evidence_requirements(("ok", "also"))
+        reliability.require(())
+    reliability.require(("ok", "also"))
 
 
 def test_plan_error_messages_name_the_gap():
     with pytest.raises(
         ValueError, match=r"^verification status requires execution evidence$"
     ):
-        make_plan(status=reliability.VerificationStatus.FAILED)
+        make_plan(status=reliability.Verification.FAILED)
     with pytest.raises(
         ValueError,
         match=r"^passed scenario is missing evidence requirements: "
         "checkpoint_resume$",
     ):
         make_plan(
-            status=reliability.VerificationStatus.PASSED,
+            status=reliability.Verification.PASSED,
             evidence=(make_evidence("process_termination"),),
         )
     with pytest.raises(
@@ -175,7 +175,7 @@ def test_plan_error_messages_name_the_gap():
         match=r"^passed scenario requires safe outcome evidence only$",
     ):
         make_plan(
-            status=reliability.VerificationStatus.PASSED,
+            status=reliability.Verification.PASSED,
             evidence=(
                 make_evidence("process_termination"),
                 make_evidence(
@@ -191,30 +191,26 @@ def test_plan_round_trip_keeps_status_and_evidence():
         make_evidence("process_termination"),
         make_evidence("checkpoint_resume"),
     )
-    plan = make_plan(
-        status=reliability.VerificationStatus.PASSED, evidence=evidence
-    )
+    plan = make_plan(status=reliability.Verification.PASSED, evidence=evidence)
 
     restored = reliability.Plan.from_dict(plan.to_dict())
 
     assert restored == plan
-    assert restored.verification_status is reliability.VerificationStatus.PASSED
+    assert restored.verification_status is reliability.Verification.PASSED
     assert restored.evidence == evidence
 
 
 def test_record_evidence_validates_its_input_with_specific_messages():
-    registry = reliability.Registry.production_beta()
-    scenario = reliability.FaultScenario.PROCESS_DEATH
+    registry = reliability.Registry.prerelease()
+    scenario = reliability.Contingency.PROCESS_DEATH
     with pytest.raises(
         ValueError, match=r"^evidence must be a non-empty tuple$"
     ):
-        registry.record_evidence(scenario, ())
+        registry.log(scenario, ())
     with pytest.raises(
         ValueError, match=r"^evidence must be a non-empty tuple$"
     ):
-        registry.record_evidence(
-            scenario, [make_evidence("process_termination")]
-        )
+        registry.log(scenario, [make_evidence("process_termination")])
     other = dataclasses.replace(
         make_evidence("checkpoint_resume"), execution_id="different"
     )
@@ -222,14 +218,12 @@ def test_record_evidence_validates_its_input_with_specific_messages():
         ValueError,
         match=r"^evidence for one scenario must share an execution_id$",
     ):
-        registry.record_evidence(
-            scenario, (make_evidence("process_termination"), other)
-        )
+        registry.log(scenario, (make_evidence("process_termination"), other))
     with pytest.raises(
         ValueError,
         match=r"^evidence has unexpected requirements: a_extra, b_extra$",
     ):
-        registry.record_evidence(
+        registry.log(
             scenario,
             (make_evidence("b_extra"), make_evidence("a_extra")),
         )
@@ -240,21 +234,21 @@ def test_incomplete_registry_names_missing_scenarios_in_value_order():
     registry.register(make_plan())
 
     with pytest.raises(ValueError) as info:
-        registry.validate_complete()
+        registry.insist()
 
     names = str(info.value).split(": ", 1)[1].split(", ")
     assert names == sorted(names)
     assert "process_death" not in names
-    assert len(names) == len(reliability.FaultScenario) - 1
+    assert len(names) == len(reliability.Contingency) - 1
 
 
 def test_to_json_escapes_non_ascii_evidence_text():
-    registry = reliability.Registry.production_beta()
-    scenario = reliability.FaultScenario.PROCESS_DEATH
+    registry = reliability.Registry.prerelease()
+    scenario = reliability.Contingency.PROCESS_DEATH
     evidence = dataclasses.replace(
         make_evidence("process_termination"), observation="résumé"
     )
-    registry.record_evidence(scenario, (evidence,))
+    registry.log(scenario, (evidence,))
 
     text = registry.to_json()
 
@@ -263,7 +257,7 @@ def test_to_json_escapes_non_ascii_evidence_text():
 
 
 def test_to_json_is_compact_sorted_ascii():
-    registry = reliability.Registry.production_beta()
+    registry = reliability.Registry.prerelease()
     text = registry.to_json()
 
     assert ", " not in text and ": " not in text

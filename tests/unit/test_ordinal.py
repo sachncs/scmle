@@ -44,9 +44,9 @@ def test_predictions_are_valid_ranks_and_beat_a_constant_guess():
 
     assert set(numpy.unique(guess)) <= {0, 1, 2, 3}
     constant = numpy.full_like(guess, numpy.median(ranks[:600]))
-    assert ordinal.mean_absolute_class_error(
-        ranks[600:], guess
-    ) < ordinal.mean_absolute_class_error(ranks[600:], constant)
+    assert ordinal.distance(ranks[600:], guess) < ordinal.distance(
+        ranks[600:], constant
+    )
 
 
 def test_a_missing_top_level_still_gives_a_full_probability_row():
@@ -72,6 +72,6 @@ def test_quadratic_kappa_punishes_far_misses_more_than_near_ones():
 
 
 def test_mean_absolute_class_error_counts_levels():
-    assert ordinal.mean_absolute_class_error(
+    assert ordinal.distance(
         numpy.array([0, 2, 3]), numpy.array([1, 2, 1])
     ) == pytest.approx(1.0)

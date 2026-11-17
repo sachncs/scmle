@@ -11,7 +11,7 @@ from scmle.models.sklearn import bagging
 
 @pytest.mark.parametrize("adapter_class", bagging.BAGGING_ADAPTERS)
 def test_bagging_adapters_pass_the_shared_conformance_suite(adapter_class):
-    conformance.check_conformance(adapter_class())
+    conformance.comply(adapter_class())
 
 
 def test_the_bagger_wraps_the_base_model_and_applies_both_parameter_sets():
@@ -32,7 +32,7 @@ def test_regression_uses_the_regression_bagger_and_trees_gain_from_bagging():
     rng = numpy.random.default_rng(0)
     features = rng.normal(size=(400, 3))
     target = features[:, 0] * 2 + rng.normal(0, 1.0, 400)
-    adapter = bagging.BaggedTree()
+    adapter = bagging.Bagger()
     single = adapter.base.build(tasks.Task.REGRESSION, 0).fit(
         features[:300], target[:300]
     )

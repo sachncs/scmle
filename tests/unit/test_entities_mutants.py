@@ -122,33 +122,33 @@ def test_jaro_looks_only_within_the_match_window():
 
 
 def test_jaro_winkler_rewards_a_common_prefix_of_up_to_four():
-    assert entities.jaro_winkler("dixon", "dicksonx") == pytest.approx(
+    assert entities.jarowinkler("dixon", "dicksonx") == pytest.approx(
         0.8133, abs=1e-4
     )
-    assert entities.jaro_winkler("dwayne", "duane") == pytest.approx(
+    assert entities.jarowinkler("dwayne", "duane") == pytest.approx(
         0.84, abs=1e-4
     )
-    assert entities.jaro_winkler("crate", "trace") == pytest.approx(
+    assert entities.jarowinkler("crate", "trace") == pytest.approx(
         0.7333, abs=1e-4
     )
-    assert entities.jaro_winkler("abcdef", "abcxyz") == pytest.approx(
+    assert entities.jarowinkler("abcdef", "abcxyz") == pytest.approx(
         0.7667, abs=1e-4
     )
-    assert entities.jaro_winkler("abcde", "abcdef") == pytest.approx(
+    assert entities.jarowinkler("abcde", "abcdef") == pytest.approx(
         0.9667, abs=1e-4
     )
-    assert entities.jaro_winkler("abcdxyz", "abcdxyw") == pytest.approx(
+    assert entities.jarowinkler("abcdxyz", "abcdxyw") == pytest.approx(
         entities.jaro("abcdxyz", "abcdxyw")
         + 4 * 0.1 * (1 - entities.jaro("abcdxyz", "abcdxyw"))
     )
 
 
 def test_jaro_winkler_of_strings_shorter_than_the_prefix_window():
-    assert entities.jaro_winkler("ab", "abc") == pytest.approx(
+    assert entities.jarowinkler("ab", "abc") == pytest.approx(
         entities.jaro("ab", "abc") + 2 * 0.1 * (1 - entities.jaro("ab", "abc"))
     )
-    assert entities.jaro_winkler("a", "") == 0.0
-    assert entities.jaro_winkler("", "") == 1.0
+    assert entities.jarowinkler("a", "") == 0.0
+    assert entities.jarowinkler("", "") == 1.0
 
 
 def test_soundex_known_codes():
@@ -190,11 +190,11 @@ def test_an_unknown_blocking_kind_is_refused():
 def test_blocks_at_the_limit_are_compared_and_larger_ones_are_skipped():
     frame = pandas.DataFrame({"k": ["a", "a", "a", "b", "b"]})
     rule = [entities.Pass("k")]
-    assert entities.candidate_pairs(frame, rule, max_block=3) == (
+    assert entities.pairing(frame, rule, max_block=3) == (
         [(0, 1), (0, 2), (1, 2), (3, 4)],
         0,
     )
-    assert entities.candidate_pairs(frame, rule, max_block=2) == (
+    assert entities.pairing(frame, rule, max_block=2) == (
         [(3, 4)],
         1,
     )
@@ -204,12 +204,10 @@ def test_every_skipped_block_is_counted_and_later_blocks_still_run():
     frame = pandas.DataFrame(
         {"k": ["a", "a", "a", "b", "b", "b", "c", "c"], "j": list("xxyyzzzz")}
     )
-    pairs, skipped = entities.candidate_pairs(
-        frame, [entities.Pass("k")], max_block=2
-    )
+    pairs, skipped = entities.pairing(frame, [entities.Pass("k")], max_block=2)
     assert pairs == [(6, 7)]
     assert skipped == 2
-    both = entities.candidate_pairs(
+    both = entities.pairing(
         frame, [entities.Pass("k"), entities.Pass("j")], max_block=2
     )
     assert both == ([(0, 1), (2, 3), (6, 7)], 3)
@@ -219,7 +217,7 @@ def test_blank_keys_are_not_blocked_and_pairs_are_not_repeated():
     frame = pandas.DataFrame(
         {"k": ["a", None, "a", "", "a"], "j": [1, 1, 1, 1, 2]}
     )
-    pairs, skipped = entities.candidate_pairs(
+    pairs, skipped = entities.pairing(
         frame, [entities.Pass("k"), entities.Pass("k", "prefix", 1)]
     )
     assert pairs == [(0, 2), (0, 4), (2, 4)]
@@ -228,13 +226,13 @@ def test_blank_keys_are_not_blocked_and_pairs_are_not_repeated():
 
 def test_candidate_pairs_default_block_limit_is_two_hundred():
     frame = pandas.DataFrame({"k": ["a"] * 201 + ["b"] * 200})
-    pairs, skipped = entities.candidate_pairs(frame, [entities.Pass("k")])
+    pairs, skipped = entities.pairing(frame, [entities.Pass("k")])
     assert skipped == 1
     assert len(pairs) == 200 * 199 // 2
 
 
 def test_compare_levels_for_each_field_and_pair():
-    pairs = entities.candidate_pairs(SMALL, SMALL_PASSES)[0]
+    pairs = entities.pairing(SMALL, SMALL_PASSES)[0]
     assert pairs == [(0, 1), (2, 3), (4, 5), (4, 6), (5, 6)]
     levels = entities.compare(SMALL, SMALL_FIELDS, pairs)
     assert levels.dtype == numpy.int8
@@ -272,13 +270,13 @@ def test_exact_fields_never_report_a_similar_level():
 def test_similarity_cut_is_inclusive_at_the_threshold(monkeypatch):
     frame = pandas.DataFrame({"a": ["xx", "yy"]})
     monkeypatch.setattr(
-        entities, "jaro_winkler", lambda left, right: entities.SIMILAR_AT
+        entities, "jarowinkler", lambda left, right: entities.SIMILAR_AT
     )
     assert entities.compare(
         frame, [entities.Field("a")], [(0, 1)]
     ).tolist() == [[1]]
     monkeypatch.setattr(
-        entities, "jaro_winkler", lambda left, right: entities.SIMILAR_AT - 1e-9
+        entities, "jarowinkler", lambda left, right: entities.SIMILAR_AT - 1e-9
     )
     assert entities.compare(
         frame, [entities.Field("a")], [(0, 1)]
@@ -286,7 +284,7 @@ def test_similarity_cut_is_inclusive_at_the_threshold(monkeypatch):
 
 
 def test_weights_add_zero_for_a_missing_field():
-    model = entities.fit_em(LEVELS)
+    model = entities.em(LEVELS)
     weights = model.weights(LEVELS)
     assert weights.round(4).tolist() == [
         42.4481,
@@ -313,7 +311,7 @@ def test_weights_add_zero_for_a_missing_field():
 
 
 def test_em_converges_to_a_known_fixed_point():
-    model = entities.fit_em(LEVELS)
+    model = entities.em(LEVELS)
     assert model.iterations == 6
     assert model.prior == pytest.approx(1 / 3, abs=1e-6)
     assert model.m.round(6).tolist() == [
@@ -329,12 +327,12 @@ def test_em_converges_to_a_known_fixed_point():
 
 
 def test_em_stops_at_the_iteration_cap_and_reports_it():
-    zero = entities.fit_em(LEVELS, iterations=0)
+    zero = entities.em(LEVELS, iterations=0)
     assert zero.iterations == 0
     assert zero.prior == 0.05
     assert zero.m.tolist() == [[0.05, 0.15, 0.8]] * 3
     assert zero.u.tolist() == [[0.9, 0.07, 0.03]] * 3
-    one = entities.fit_em(LEVELS, iterations=1)
+    one = entities.em(LEVELS, iterations=1)
     assert one.iterations == 1
     assert one.prior == pytest.approx(0.33040558, abs=1e-7)
     assert one.m.round(6).tolist() == [
@@ -347,7 +345,7 @@ def test_em_stops_at_the_iteration_cap_and_reports_it():
         [0.870569, 0.125943, 0.003488],
         [0.873893, 1e-06, 0.126107],
     ]
-    three = entities.fit_em(LEVELS, iterations=3)
+    three = entities.em(LEVELS, iterations=3)
     assert three.iterations == 3
     assert three.m.round(6).tolist() == [
         [1e-06, 1e-06, 1.0],
@@ -357,18 +355,18 @@ def test_em_stops_at_the_iteration_cap_and_reports_it():
 
 
 def test_a_loose_tolerance_stops_earlier():
-    assert entities.fit_em(LEVELS, tol=1e-3).iterations == 3
-    assert entities.fit_em(LEVELS, tol=1e-8).iterations == 6
-    assert entities.fit_em(LEVELS, iterations=400, tol=0.0).iterations == 400
+    assert entities.em(LEVELS, tol=1e-3).iterations == 3
+    assert entities.em(LEVELS, tol=1e-8).iterations == 6
+    assert entities.em(LEVELS, iterations=400, tol=0.0).iterations == 400
 
 
 def test_parameters_are_floored_and_the_prior_is_kept_inside_the_unit_interval():
-    agree = entities.fit_em(numpy.full((6, 2), 2, dtype=numpy.int8))
+    agree = entities.em(numpy.full((6, 2), 2, dtype=numpy.int8))
     assert agree.prior <= 1 - 1e-6
     assert agree.m.min() == 1e-6
     assert agree.u.min() == 1e-6
     assert agree.m.max() <= 1.0
-    disagree = entities.fit_em(numpy.zeros((6, 2), dtype=numpy.int8))
+    disagree = entities.em(numpy.zeros((6, 2), dtype=numpy.int8))
     assert disagree.prior >= 1e-6
     assert disagree.m.min() == 1e-6
     assert disagree.u.min() == 1e-6
@@ -377,14 +375,14 @@ def test_parameters_are_floored_and_the_prior_is_kept_inside_the_unit_interval()
 
 def test_a_column_that_is_always_missing_keeps_the_starting_rates():
     levels = numpy.array([[2, -1], [0, -1], [2, -1], [0, -1]], dtype=numpy.int8)
-    model = entities.fit_em(levels)
+    model = entities.em(levels)
     assert model.m[1].tolist() == pytest.approx([0.05, 0.15, 0.8])
     assert model.u[1].tolist() == pytest.approx([0.9, 0.07, 0.03])
 
 
 def test_rates_are_updated_from_even_a_single_seen_pair():
     levels = numpy.array([[2, -1], [0, -1], [2, -1], [0, 1]], dtype=numpy.int8)
-    model = entities.fit_em(levels)
+    model = entities.em(levels)
     assert model.iterations == 2
     assert model.prior == pytest.approx(0.29425633, abs=1e-6)
     assert model.m.round(6).tolist() == [
@@ -398,8 +396,8 @@ def test_rates_are_updated_from_even_a_single_seen_pair():
 
 
 def test_em_on_separated_classes_is_deterministic_and_pins_the_prior():
-    first = entities.fit_em(LEVELS)
-    second = entities.fit_em(LEVELS)
+    first = entities.em(LEVELS)
+    second = entities.em(LEVELS)
     assert first.prior == second.prior
     assert first.m.tolist() == second.m.tolist()
 
@@ -429,9 +427,7 @@ def test_components_use_the_smallest_index_as_the_group_id():
 
 def test_geometric_bands_thin_out_at_the_top():
     def sizes(total, bands):
-        return [
-            len(b) for b in entities.geometric_bands(numpy.arange(total), bands)
-        ]
+        return [len(b) for b in entities.stratify(numpy.arange(total), bands)]
 
     assert sizes(1024, 4) == [512, 256, 128, 128]
     assert sizes(100, 5) == [50, 25, 13, 6, 6]
@@ -445,13 +441,13 @@ def test_geometric_bands_thin_out_at_the_top():
 
 def test_geometric_bands_cover_the_order_without_overlap():
     order = numpy.arange(37)[::-1]
-    bands = entities.geometric_bands(order, 5)
+    bands = entities.stratify(order, 5)
     assert numpy.concatenate(bands).tolist() == order.tolist()
     assert bands[0][0] == order[0]
 
 
 def test_band_and_estimate_serialize_their_fields():
-    band = entities.BandEstimate(-1.0, 2.0, 10, 4, 3)
+    band = entities.Band(-1.0, 2.0, 10, 4, 3)
     assert band.to_dict() == {
         "low": -1.0,
         "high": 2.0,
@@ -618,54 +614,54 @@ def test_the_clerical_sample_depends_on_the_seed():
 
 def test_thresholds_scan_the_bands_from_the_top():
     bands = (
-        entities.BandEstimate(-5.0, -1.0, 100, 10, 0),
-        entities.BandEstimate(0.0, 2.0, 20, 10, 3),
-        entities.BandEstimate(3.0, 5.0, 10, 10, 6),
-        entities.BandEstimate(6.0, 9.0, 4, 4, 4),
+        entities.Band(-5.0, -1.0, 100, 10, 0),
+        entities.Band(0.0, 2.0, 20, 10, 3),
+        entities.Band(3.0, 5.0, 10, 10, 6),
+        entities.Band(6.0, 9.0, 4, 4, 4),
     )
-    assert entities.thresholds_from_bands(bands, 0.95) == (6.0, 3.0)
-    assert entities.thresholds_from_bands(bands, 0.8) == (6.0, 3.0)
-    assert entities.thresholds_from_bands(bands, 0.6) == (3.0, 3.0)
-    assert entities.thresholds_from_bands(bands, 0.0) == (-5.0, 3.0)
-    assert entities.thresholds_from_bands(bands, 1.0) == (6.0, 3.0)
+    assert entities.cutoffs(bands, 0.95) == (6.0, 3.0)
+    assert entities.cutoffs(bands, 0.8) == (6.0, 3.0)
+    assert entities.cutoffs(bands, 0.6) == (3.0, 3.0)
+    assert entities.cutoffs(bands, 0.0) == (-5.0, 3.0)
+    assert entities.cutoffs(bands, 1.0) == (6.0, 3.0)
 
 
 def test_cumulative_precision_is_counted_in_pairs_not_in_bands():
     bands = (
-        entities.BandEstimate(0.0, 1.0, 10, 10, 5),
-        entities.BandEstimate(2.0, 3.0, 2, 2, 2),
+        entities.Band(0.0, 1.0, 10, 10, 5),
+        entities.Band(2.0, 3.0, 2, 2, 2),
     )
-    assert entities.thresholds_from_bands(bands, 0.5) == (0.0, 0.0)
-    assert entities.thresholds_from_bands(bands, 0.6) == (2.0, 0.0)
-    assert entities.thresholds_from_bands(bands, 0.9) == (2.0, 0.0)
-    assert entities.thresholds_from_bands(bands, 1.0) == (2.0, 0.0)
+    assert entities.cutoffs(bands, 0.5) == (0.0, 0.0)
+    assert entities.cutoffs(bands, 0.6) == (2.0, 0.0)
+    assert entities.cutoffs(bands, 0.9) == (2.0, 0.0)
+    assert entities.cutoffs(bands, 1.0) == (2.0, 0.0)
 
 
 def test_a_band_with_no_sampled_pairs_has_a_zero_rate():
-    bands = (entities.BandEstimate(1.0, 2.0, 5, 0, 0),)
-    assert entities.thresholds_from_bands(bands, 0.5) == (math.inf, math.inf)
-    assert entities.thresholds_from_bands(bands, 0.0) == (1.0, math.inf)
-    assert entities.thresholds_from_bands((), 0.5) == (math.inf, math.inf)
+    bands = (entities.Band(1.0, 2.0, 5, 0, 0),)
+    assert entities.cutoffs(bands, 0.5) == (math.inf, math.inf)
+    assert entities.cutoffs(bands, 0.0) == (1.0, math.inf)
+    assert entities.cutoffs((), 0.5) == (math.inf, math.inf)
 
 
 def test_a_match_rate_of_exactly_one_half_makes_the_group_threshold():
-    bands = (entities.BandEstimate(4.0, 5.0, 8, 2, 1),)
-    assert entities.thresholds_from_bands(bands, 0.99) == (math.inf, 4.0)
-    below = (entities.BandEstimate(4.0, 5.0, 8, 3, 1),)
-    assert entities.thresholds_from_bands(below, 0.99) == (math.inf, math.inf)
+    bands = (entities.Band(4.0, 5.0, 8, 2, 1),)
+    assert entities.cutoffs(bands, 0.99) == (math.inf, 4.0)
+    below = (entities.Band(4.0, 5.0, 8, 3, 1),)
+    assert entities.cutoffs(below, 0.99) == (math.inf, math.inf)
 
 
 def test_precision_exactly_at_the_target_is_enough():
-    bands = (entities.BandEstimate(4.0, 5.0, 4, 4, 3),)
-    assert entities.thresholds_from_bands(bands, 0.75) == (4.0, 4.0)
-    assert entities.thresholds_from_bands(bands, 0.76) == (math.inf, 4.0)
+    bands = (entities.Band(4.0, 5.0, 4, 4, 3),)
+    assert entities.cutoffs(bands, 0.75) == (4.0, 4.0)
+    assert entities.cutoffs(bands, 0.76) == (math.inf, 4.0)
 
 
 def test_lowest_weight_of_nothing_is_infinite():
     weights = numpy.array([3.0, 1.0, 2.0])
-    assert entities.lowest_weight(weights, weights > 1.5) == 2.0
-    assert entities.lowest_weight(weights, weights > 5) == math.inf
-    assert entities.lowest_weight(weights, weights >= 1.0) == 1.0
+    assert entities.weakest(weights, weights > 1.5) == 2.0
+    assert entities.weakest(weights, weights > 5) == math.inf
+    assert entities.weakest(weights, weights >= 1.0) == 1.0
 
 
 def test_resolution_without_labels_on_a_tiny_table_is_pinned():
@@ -948,7 +944,7 @@ def test_measure_quality_counts_pairs_inside_entities_and_groups():
     )
     entity = ["a", "a", "b", "b", "b", "c"]
     pairs = [(0, 1), (2, 3), (3, 4), (0, 5)]
-    quality = entities.measure_quality(entity, resolution, pairs)
+    quality = entities.grade(entity, resolution, pairs)
     truth = {(0, 1), (2, 3), (2, 4), (3, 4)}
     assert quality.true_pairs == len(truth) == 4
     assert quality.grouped_pairs == 2
@@ -972,12 +968,10 @@ def test_measure_quality_of_three_member_groups_counts_every_pair():
         None,
         qualification.Tier.UNVERIFIED,
     )
-    quality = entities.measure_quality(["a", "b", "c", "d"], resolution, [])
+    quality = entities.grade(["a", "b", "c", "d"], resolution, [])
     assert quality.true_pairs == 0
     assert quality.false_group_pairs == 6
-    triple = entities.measure_quality(
-        ["a", "a", "a", "d"], resolution, [(0, 1)]
-    )
+    triple = entities.grade(["a", "a", "a", "d"], resolution, [(0, 1)])
     assert triple.true_pairs == 3
     assert triple.grouped_pairs == 3
     assert triple.false_group_pairs == 3
@@ -997,7 +991,7 @@ def test_measure_quality_without_true_matches_is_perfect_by_convention():
         None,
         qualification.Tier.UNVERIFIED,
     )
-    quality = entities.measure_quality(["a", "b", "c"], resolution, [])
+    quality = entities.grade(["a", "b", "c"], resolution, [])
     assert quality == entities.Quality(1.0, 1.0, (0.0, 1.0), 0, 0, 0)
 
 
@@ -1011,8 +1005,8 @@ def test_measure_quality_matches_the_resolution_of_a_labelled_run():
         per_band=2,
         seed=1,
     )
-    pairs = entities.candidate_pairs(SMALL, SMALL_PASSES)[0]
-    quality = entities.measure_quality(SMALL_ENTITY, result, pairs)
+    pairs = entities.pairing(SMALL, SMALL_PASSES)[0]
+    quality = entities.grade(SMALL_ENTITY, result, pairs)
     assert quality.pair_completeness == 1.0
     assert quality.link_recall == 1.0
     assert quality.true_pairs == 5
@@ -1024,9 +1018,9 @@ def test_measure_quality_matches_the_resolution_of_a_labelled_run():
 
 
 def test_the_prior_is_held_inside_the_floor_at_both_ends():
-    agree = entities.fit_em(numpy.full((6, 6), 2, dtype=numpy.int8))
+    agree = entities.em(numpy.full((6, 6), 2, dtype=numpy.int8))
     assert agree.prior == 1 - 1e-6
-    disagree = entities.fit_em(numpy.zeros((6, 5), dtype=numpy.int8))
+    disagree = entities.em(numpy.zeros((6, 5), dtype=numpy.int8))
     assert disagree.prior == pytest.approx(1e-6, rel=1e-6)
 
 
@@ -1078,5 +1072,5 @@ STOPPING_CASES = [
 def test_every_kind_of_parameter_movement_holds_the_fit_open(
     name, levels, tol, iterations
 ):
-    model = entities.fit_em(numpy.array(levels, dtype=numpy.int8), tol=tol)
+    model = entities.em(numpy.array(levels, dtype=numpy.int8), tol=tol)
     assert model.iterations == iterations

@@ -38,7 +38,7 @@ def test_sbom_rejects_empty_inventory_and_invalid_names():
 
 
 def test_every_dependency_ref_names_a_component_in_the_document():
-    document = sbom.build_service(
+    document = sbom.catalogue(
         {"pandas": "2.2.0"},
         model_name="m",
         model_version="1",

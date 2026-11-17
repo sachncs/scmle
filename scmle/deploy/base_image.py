@@ -45,7 +45,7 @@ IMAGE_PATTERN = re.compile(
 Fetcher = Callable[[str, str], str]
 
 
-def split_image(image: str) -> tuple[str, str, str]:
+def decompose(image: str) -> tuple[str, str, str]:
     """Splits `repo:tag` into (registry, repository, tag).
 
     Docker Hub is assumed when no registry is given, and official images get the
@@ -92,7 +92,7 @@ def query(image: str, timeout: float = 30.0) -> str:
         ArtifactError: If the registry answers with something other than a
             multi-architecture index.
     """
-    registry, repository, tag = split_image(image)
+    registry, repository, tag = decompose(image)
     token_request = urllib.request.Request(  # noqa: S310 -- AUTH_ENDPOINT is an https constant
         AUTH_ENDPOINT.format(
             repository=urllib.parse.quote(repository, safe="/")
@@ -136,7 +136,7 @@ def resolve(
             that is not a `sha256:` digest, or an image that is not
             `repository:tag`, is refused with the same error by the helpers.
     """
-    split_image(image)
+    decompose(image)
     digest = (fetch or query)(image)
     contract.require_digest(digest, "resolved digest")
     if digest == PLACEHOLDER:
@@ -148,7 +148,7 @@ def resolve(
     }
 
 
-def read_lock(path: str | pathlib.Path) -> dict[str, str]:
+def peruse(path: str | pathlib.Path) -> dict[str, str]:
     """Reads and validates a lock; refuses the placeholder.
 
     Args:
@@ -180,7 +180,7 @@ def read_lock(path: str | pathlib.Path) -> dict[str, str]:
             "the base image digest is still the placeholder: run "
             "`python -m scmle.deploy.base_image resolve` first"
         )
-    split_image(image)
+    decompose(image)
     return {"image": image, "digest": digest}
 
 
@@ -214,7 +214,7 @@ def main(arguments: list[str] | None = None) -> int:
             )
             print(f"{options.image} -> {record['digest']}")  # noqa: T201 -- command-line output
             return 0
-        lock = read_lock(options.lock)
+        lock = peruse(options.lock)
         if options.action == "argument":
             repository = lock["image"].rsplit(":", 1)[0]
             print(f"{repository}@{lock['digest']}")  # noqa: T201 -- command-line output

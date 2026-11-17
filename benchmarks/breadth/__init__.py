@@ -128,7 +128,7 @@ def section_problems(name: str, kind: str, section: Any) -> list[str]:
     return found
 
 
-def identity_problems(name: str, definition: dict[str, Any]) -> list[str]:
+def divergences(name: str, definition: dict[str, Any]) -> list[str]:
     """What is wrong with the identity fields of one slice definition.
 
     Args:
@@ -173,7 +173,7 @@ def problems(name: str, definition: dict[str, Any]) -> list[str]:
     ]
     if found:
         return found
-    found.extend(identity_problems(name, definition))
+    found.extend(divergences(name, definition))
     for kind in SECTIONS:
         found += section_problems(
             name, kind, definition["benchmarks"].get(kind)

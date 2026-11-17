@@ -33,7 +33,7 @@ def grouped_frame(groups=12, per_group=15, seed=0):
 
 def test_groups_never_straddle_inner_folds():
     frame, target = grouped_frame()
-    splitter = inner_cv.StructuredKFold(3, group_column="unit")
+    splitter = inner_cv.Splitter(3, group_column="unit")
     seen = set()
     for train, validation in splitter.split(frame, target):
         assert not set(frame.unit.iloc[train]) & set(
@@ -46,7 +46,7 @@ def test_groups_never_straddle_inner_folds():
 def test_time_folds_are_contiguous_periods():
     frame, target = grouped_frame()
     shuffled = frame.sample(frac=1, random_state=1).reset_index(drop=True)
-    splitter = inner_cv.StructuredKFold(3, time_column="day")
+    splitter = inner_cv.Splitter(3, time_column="day")
     spans = []
     for split in splitter.split(shuffled, target):
         days = shuffled.day.iloc[split[1]]
@@ -58,17 +58,17 @@ def test_time_folds_are_contiguous_periods():
 
 def test_unstructured_data_falls_back_to_stratified_folds():
     frame, target = grouped_frame()
-    splitter = inner_cv.StructuredKFold(3, classification=True, seed=1)
+    splitter = inner_cv.Splitter(3, classification=True, seed=1)
     for split in splitter.split(frame[["a", "b"]], target):
         assert 0.2 < target.iloc[split[1]].mean() < 0.8
 
 
 def plan(**kwargs):
-    return data.FeaturePlan(numeric=("a", "b"), categorical=(), **kwargs)
+    return data.Blueprint(numeric=("a", "b"), categorical=(), **kwargs)
 
 
 def test_calibration_strategy_uses_the_structured_splitter():
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     strategy = strategies.lookup("calibrated")
     candidate = strategy.build(
         plan(group_column="unit"),
@@ -76,7 +76,7 @@ def test_calibration_strategy_uses_the_structured_splitter():
         tasks.Task.BINARY,
         0,
     )
-    assert isinstance(candidate.cv, inner_cv.StructuredKFold)
+    assert isinstance(candidate.cv, inner_cv.Splitter)
     assert candidate.cv.group_column == "unit"
     frame, target = grouped_frame()
     candidate.fit(frame, target)
@@ -84,18 +84,18 @@ def test_calibration_strategy_uses_the_structured_splitter():
 
 
 def test_stack_members_are_full_pipelines_cross_fitted_by_group():
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     params = {"members": [{"model": "decision_tree"}, {"model": "extra_trees"}]}
     from scmle.data.curation import preprocessing
 
-    stack = preprocessing.build_pipeline(
+    stack = preprocessing.instantiate(
         plan(group_column="unit"),
         registry.get("stacking"),
         tasks.Task.BINARY,
         0,
         params,
     )
-    assert isinstance(stack.cv, inner_cv.StructuredKFold)
+    assert isinstance(stack.cv, inner_cv.Splitter)
     frame, target = grouped_frame()
     stack.fit(frame, target)
     assert stack.predict_proba(frame).shape == (len(frame), 2)

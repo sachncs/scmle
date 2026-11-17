@@ -423,7 +423,7 @@ def test_g5_matches_its_recorded_run():
 def test_g5b_matches_its_recorded_run():
     result = uncertainty_certify.gate_g5b(40, 10_000)
     expected = dict(GOLD["g5b"])
-    assert result.pop("method_hash") == coverage_slices.flag_method_hash()
+    assert result.pop("method_hash") == coverage_slices.fingerprint()
     close(result, expected)
 
 
@@ -773,7 +773,7 @@ def test_g5b_certifies_at_three_times_noise_and_counts_false_flags(
                 return {"flagged": [1] if len(calls) <= flagged_worlds else []}
             return {"flagged": ["0"]}
 
-        monkeypatch.setattr(uncertainty_certify.coverage, "slice_flag", fake)
+        monkeypatch.setattr(uncertainty_certify.coverage, "undercovered", fake)
         scripted_wilson(monkeypatch, [0.5, 0.5, 0.8, 0.9, 0.9])
         return uncertainty_certify.gate_g5b(4, 10_000)
 
@@ -794,7 +794,7 @@ def test_g5b_certifies_at_three_times_noise_and_counts_false_flags(
 def test_g5b_without_a_certified_size_does_not_pass(monkeypatch):
     monkeypatch.setattr(
         uncertainty_certify.coverage,
-        "slice_flag",
+        "undercovered",
         lambda covered, labels, nominal=0.9: {"flagged": []},
     )
     monkeypatch.setattr(uncertainty_certify, "wilson_lower", lambda h, r: 0.1)
@@ -880,9 +880,7 @@ def test_g11i_passes_when_only_the_covariate_estimate_is_unbiased(
             bias = cox_bias if len(calls) % 2 == 0 else marginal_bias
             return truth + bias + float(pattern[index])
 
-        monkeypatch.setattr(
-            uncertainty_certify.ipcw, "truncated_concordance", fake
-        )
+        monkeypatch.setattr(uncertainty_certify.ipcw, "uno", fake)
         return uncertainty_certify.gate_g11i(4, 10_000)["passed"]
 
     assert passed(0.0, 0.5) is True

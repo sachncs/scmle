@@ -16,7 +16,7 @@ def make_event(
     return incremental.Event(event_id, sequence, event_time, {"v": 1}, **kw)
 
 
-def make_source(events=(), policy=incremental.LateData.REJECT):
+def make_source(events=(), policy=incremental.Lateness.REJECT):
     return incremental.SequenceEventSource(URI, events, policy)
 
 
@@ -107,56 +107,56 @@ def test_checkpoint_validation_and_round_trip():
     with pytest.raises(
         ValueError, match=r"^source_identity must not be empty$"
     ):
-        incremental.EventCheckpoint("  ")
+        incremental.Checkpoint("  ")
     with pytest.raises(TypeError, match=r"^sequence must be an integer$"):
-        incremental.EventCheckpoint("s", True)
+        incremental.Checkpoint("s", True)
     with pytest.raises(TypeError, match=r"^sequence must be an integer$"):
-        incremental.EventCheckpoint("s", "1")
+        incremental.Checkpoint("s", "1")
     with pytest.raises(
         ValueError, match=r"^sequence must be a non-negative integer$"
     ):
-        incremental.EventCheckpoint("s", -1)
+        incremental.Checkpoint("s", -1)
     with pytest.raises(ValueError, match=r"^watermark must be ISO-8601$"):
-        incremental.EventCheckpoint("s", 0, "later")
-    assert incremental.EventCheckpoint("s", 0).sequence == 0
+        incremental.Checkpoint("s", 0, "later")
+    assert incremental.Checkpoint("s", 0).sequence == 0
 
-    point = incremental.EventCheckpoint("s", 4, "2026-01-01T00:00:00+00:00")
+    point = incremental.Checkpoint("s", 4, "2026-01-01T00:00:00+00:00")
     assert point.to_dict() == {
         "source_identity": "s",
         "sequence": 4,
         "watermark": "2026-01-01T00:00:00+00:00",
     }
-    assert incremental.EventCheckpoint.from_dict(point.to_dict()) == point
-    loose = incremental.EventCheckpoint.from_dict(
+    assert incremental.Checkpoint.from_dict(point.to_dict()) == point
+    loose = incremental.Checkpoint.from_dict(
         {"source_identity": 12, "sequence": "5"}
     )
-    assert loose == incremental.EventCheckpoint("12", 5, "")
+    assert loose == incremental.Checkpoint("12", 5, "")
     with pytest.raises(ValueError, match=r"different source"):
         point.bind("other")
     assert point.bind("s") is point
 
 
 def test_batch_validation_messages():
-    point = incremental.EventCheckpoint("s")
+    point = incremental.Checkpoint("s")
     with pytest.raises(ValueError, match=r"^batch and checkpoint source"):
-        incremental.EventBatch("other", (), point)
+        incremental.Batch("other", (), point)
     with pytest.raises(TypeError, match=r"^events must contain Event values$"):
-        incremental.EventBatch("s", ("x",), point)
+        incremental.Batch("s", ("x",), point)
     with pytest.raises(
         ValueError, match=r"^duplicate_event_ids must be sorted"
     ):
-        incremental.EventBatch("s", (), point, ("b", "a"))
+        incremental.Batch("s", (), point, ("b", "a"))
     with pytest.raises(ValueError, match=r"^late_event_ids must be sorted"):
-        incremental.EventBatch("s", (), point, (), ("b", "a"))
+        incremental.Batch("s", (), point, (), ("b", "a"))
     with pytest.raises(ValueError, match=r"^late_event_ids must be sorted"):
-        incremental.EventBatch("s", (), point, (), ("a", "a"))
-    batch = incremental.EventBatch("s", (make_event("z"),), point)
+        incremental.Batch("s", (), point, (), ("a", "a"))
+    batch = incremental.Batch("s", (make_event("z"),), point)
     assert batch.event_ids == ("z",)
 
 
 def test_receipt_to_dict_and_validation():
-    point = incremental.EventCheckpoint("s", 2)
-    receipt = incremental.EventCommitReceipt("s", ("a",), ("b",), point)
+    point = incremental.Checkpoint("s", 2)
+    receipt = incremental.Ack("s", ("a",), ("b",), point)
     assert receipt.to_dict() == {
         "schema_version": 1,
         "source_identity": "s",
@@ -167,25 +167,23 @@ def test_receipt_to_dict_and_validation():
     with pytest.raises(
         ValueError, match=r"^source_identity must not be empty$"
     ):
-        incremental.EventCommitReceipt(
-            " ", (), (), incremental.EventCheckpoint(" x")
-        )
+        incremental.Ack(" ", (), (), incremental.Checkpoint(" x"))
     with pytest.raises(ValueError, match=r"^receipt and checkpoint source"):
-        incremental.EventCommitReceipt("t", (), (), point)
+        incremental.Ack("t", (), (), point)
     with pytest.raises(
         ValueError, match=r"^accepted_event_ids must be sorted and unique$"
     ):
-        incremental.EventCommitReceipt("s", ("b", "a"), (), point)
+        incremental.Ack("s", ("b", "a"), (), point)
     with pytest.raises(
         ValueError, match=r"^duplicate_event_ids must be sorted and unique$"
     ):
-        incremental.EventCommitReceipt("s", (), ("b", "a"), point)
+        incremental.Ack("s", (), ("b", "a"), point)
     with pytest.raises(ValueError, match=r"^accepted and duplicate event IDs"):
-        incremental.EventCommitReceipt("s", ("a",), ("a",), point)
+        incremental.Ack("s", ("a",), ("a",), point)
 
 
 def test_acknowledgement_validation_and_round_trip():
-    point = incremental.EventCheckpoint("s", 1)
+    point = incremental.Checkpoint("s", 1)
     ack = incremental.EventAcknowledgement("s", "g", ("a", "b"), point)
     assert ack.to_dict() == {
         "schema_version": 1,
@@ -204,7 +202,7 @@ def test_acknowledgement_validation_and_round_trip():
         ValueError, match=r"^source_identity must not be empty$"
     ):
         incremental.EventAcknowledgement(
-            " ", "g", (), incremental.EventCheckpoint("x")
+            " ", "g", (), incremental.Checkpoint("x")
         )
     with pytest.raises(ValueError, match=r"^consumer_group must not be empty$"):
         incremental.EventAcknowledgement("s", " ", (), point)
@@ -214,13 +212,13 @@ def test_acknowledgement_validation_and_round_trip():
         incremental.EventAcknowledgement("s", "g", ("b", "a"), point)
     with pytest.raises(ValueError, match=r"^acknowledgement and checkpoint"):
         incremental.EventAcknowledgement(
-            "s", "g", (), incremental.EventCheckpoint("t")
+            "s", "g", (), incremental.Checkpoint("t")
         )
 
 
 def test_consumption_validation_and_dict():
-    point = incremental.EventCheckpoint("s", 1)
-    receipt = incremental.EventCommitReceipt("s", ("a",), (), point)
+    point = incremental.Checkpoint("s", 1)
+    receipt = incremental.Ack("s", ("a",), (), point)
     done = incremental.Consumption("s", "g", receipt, ("a",))
     assert done.to_dict() == {
         "schema_version": 1,
@@ -241,19 +239,19 @@ def test_consumption_validation_and_dict():
 
 def test_event_source_accepts_a_policy_string_and_rejects_unknown():
     source = incremental.SequenceEventSource(URI, (), "drop")
-    assert source.late_data_policy is incremental.LateData.DROP
-    explicit = make_source(policy=incremental.LateData.ACCEPT)
-    assert explicit.late_data_policy is incremental.LateData.ACCEPT
-    with pytest.raises(ValueError, match=r"not a valid LateData"):
+    assert source.late_data_policy is incremental.Lateness.DROP
+    explicit = make_source(policy=incremental.Lateness.ACCEPT)
+    assert explicit.late_data_policy is incremental.Lateness.ACCEPT
+    with pytest.raises(ValueError, match=r"not a valid Lateness"):
         incremental.SequenceEventSource(URI, (), "ignore")
     default = incremental.SequenceEventSource(URI, ())
-    assert default.late_data_policy is incremental.LateData.REJECT
+    assert default.late_data_policy is incremental.Lateness.REJECT
     assert default.source_uri == "kafka://broker/topic"
 
 
 def test_checkpoint_mismatch_reports_the_checkpoint():
     source = make_source()
-    foreign = incremental.EventCheckpoint("other", 3)
+    foreign = incremental.Checkpoint("other", 3)
     with pytest.raises(incremental.IncrementalError) as caught:
         source.validate_checkpoint(foreign)
     assert caught.value.code == "checkpoint_mismatch"
@@ -261,7 +259,7 @@ def test_checkpoint_mismatch_reports_the_checkpoint():
     assert caught.value.source_uri == source.source_uri
     assert str(caught.value) == "checkpoint belongs to a different source"
     fresh = source.validate_checkpoint(None)
-    assert fresh == incremental.EventCheckpoint(source.source_identity)
+    assert fresh == incremental.Checkpoint(source.source_identity)
 
 
 def test_select_events_orders_deduplicates_and_limits():
@@ -289,7 +287,7 @@ def test_select_events_orders_deduplicates_and_limits():
 
 
 def test_select_events_late_policies():
-    point = incremental.EventCheckpoint(
+    point = incremental.Checkpoint(
         make_source().source_identity, 5, "2026-02-01T00:00:00+00:00"
     )
     old = make_event("old", 3, "2026-01-01T00:00:00Z")
@@ -303,13 +301,13 @@ def test_select_events_late_policies():
     assert caught.value.details["event_sequence"] == 3
     assert caught.value.details["checkpoint_sequence"] == 5
 
-    dropped = make_source(policy=incremental.LateData.DROP).select_events(
+    dropped = make_source(policy=incremental.Lateness.DROP).select_events(
         [old, new], point
     )
     assert dropped.event_ids == ("new",)
     assert dropped.late_event_ids == ("old",)
 
-    kept = make_source(policy=incremental.LateData.ACCEPT).select_events(
+    kept = make_source(policy=incremental.Lateness.ACCEPT).select_events(
         [old, new], point
     )
     assert kept.event_ids == ("old", "new")
@@ -318,7 +316,7 @@ def test_select_events_late_policies():
 
 
 def test_select_events_keeps_the_checkpoint_when_nothing_is_selected():
-    point = incremental.EventCheckpoint(
+    point = incremental.Checkpoint(
         make_source().source_identity, 5, "2026-02-01T00:00:00Z"
     )
     batch = make_source().select_events([], point)
@@ -328,7 +326,7 @@ def test_select_events_keeps_the_checkpoint_when_nothing_is_selected():
     empty = make_source().select_events([])
     assert empty.next_checkpoint.sequence == 0
     assert empty.next_checkpoint.watermark == ""
-    earlier = make_source(policy=incremental.LateData.ACCEPT).select_events(
+    earlier = make_source(policy=incremental.Lateness.ACCEPT).select_events(
         [make_event("e", 2, "2026-01-01T00:00:00Z")], point
     )
     assert earlier.next_checkpoint.sequence == 5
@@ -350,18 +348,16 @@ def test_stream_source_validation_and_polling():
         seen.append((uri, checkpoint, limit))
         return [make_event("a", 1), make_event("b", 2)]
 
-    with pytest.raises(incremental.connectors.UnsupportedUriSchemeError):
-        incremental.EventStreamSource("http://x/y", reader)
+    with pytest.raises(incremental.connectors.SchemeError):
+        incremental.Stream("http://x/y", reader)
     with pytest.raises(TypeError, match=r"^event_reader must be callable$"):
-        incremental.EventStreamSource(URI, "nope")
-    stream = incremental.EventStreamSource("  KAFKA://broker/topic ", reader)
+        incremental.Stream(URI, "nope")
+    stream = incremental.Stream("  KAFKA://broker/topic ", reader)
     assert stream.source_uri == "kafka://broker/topic"
-    assert isinstance(stream.retry_budget, incremental.connectors.RetryBudget)
-    budget = incremental.connectors.RetryBudget()
+    assert isinstance(stream.retry_budget, incremental.connectors.Retries)
+    budget = incremental.connectors.Retries()
     assert (
-        incremental.EventStreamSource(
-            URI, reader, retry_budget=budget
-        ).retry_budget
+        incremental.Stream(URI, reader, retry_budget=budget).retry_budget
         is budget
     )
 
@@ -371,9 +367,9 @@ def test_stream_source_validation_and_polling():
     assert caught.value.source_uri == stream.source_uri
 
     with pytest.raises(ValueError, match=r"^limit must be positive$"):
-        stream.poll_events(incremental.EventCheckpoint("s"), 0)
+        stream.poll_events(incremental.Checkpoint("s"), 0)
     with pytest.raises(incremental.IncrementalError) as exceeded:
-        stream.poll_events(incremental.EventCheckpoint("s"), 1)
+        stream.poll_events(incremental.Checkpoint("s"), 1)
     assert exceeded.value.code == "batch_limit_exceeded"
     assert exceeded.value.details["limit"] == 1
     assert exceeded.value.details["received"] == 2
@@ -382,11 +378,11 @@ def test_stream_source_validation_and_polling():
     assert batch.event_ids == ("a", "b")
     assert seen[-1][0] == "kafka://broker/topic"
     assert seen[-1][2] == 5
-    assert seen[-1][1] == incremental.EventCheckpoint(stream.source_identity)
+    assert seen[-1][1] == incremental.Checkpoint(stream.source_identity)
 
 
 def test_committed_state_round_trip_and_validation():
-    point = incremental.EventCheckpoint("s", 2)
+    point = incremental.Checkpoint("s", 2)
     state = incremental.CommittedState(point, ("a", "b"))
     assert state.to_dict() == {
         "schema_version": 1,
@@ -405,9 +401,7 @@ def test_committed_state_round_trip_and_validation():
 
 def make_ledger(tmp_path, source=None):
     source = source or make_source()
-    ledger = incremental.IngestionLedger(
-        tmp_path / "state.json", source.source_identity
-    )
+    ledger = incremental.Ledger(tmp_path / "state.json", source.source_identity)
     return source, ledger
 
 
@@ -416,12 +410,12 @@ def test_ledger_paths_and_load_defaults(tmp_path):
     assert ledger.lock_path.name == "state.json.lock"
     assert ledger.pending_acknowledgement_path.name == "state.json.ack"
     assert ledger.load() == incremental.CommittedState(
-        incremental.EventCheckpoint(source.source_identity)
+        incremental.Checkpoint(source.source_identity)
     )
     ledger.path.write_text(
         json.dumps(
             incremental.CommittedState(
-                incremental.EventCheckpoint("other")
+                incremental.Checkpoint("other")
             ).to_dict()
         ),
         encoding="utf-8",
@@ -440,21 +434,19 @@ def test_ledger_source_and_batch_mismatches(tmp_path):
         ledger.read_batch(other)
     assert caught.value.code == "source_mismatch"
     assert caught.value.details["source_identity"] == other.source_identity
-    foreign = incremental.EventBatch(
-        "other", (), incremental.EventCheckpoint("other")
-    )
+    foreign = incremental.Batch("other", (), incremental.Checkpoint("other"))
     with pytest.raises(incremental.IncrementalError) as batch_error:
         ledger.commit(foreign)
     assert batch_error.value.code == "batch_source_mismatch"
     assert batch_error.value.details["batch_source_identity"] == "other"
     with pytest.raises(incremental.IncrementalError) as state_error:
         ledger.write_atomically(
-            incremental.CommittedState(incremental.EventCheckpoint("other"))
+            incremental.CommittedState(incremental.Checkpoint("other"))
         )
     assert state_error.value.code == "state_source_mismatch"
     assert not ledger.path.exists()
     ack = incremental.EventAcknowledgement(
-        "other", "g", (), incremental.EventCheckpoint("other")
+        "other", "g", (), incremental.Checkpoint("other")
     )
     with pytest.raises(incremental.IncrementalError) as ack_error:
         ledger.write_pending_acknowledgement(ack)
@@ -468,7 +460,7 @@ def test_ledger_source_and_batch_mismatches(tmp_path):
 def test_write_atomically_persists_sorted_json_and_cleans_up(tmp_path):
     source, ledger = make_ledger(tmp_path / "nested")
     state = incremental.CommittedState(
-        incremental.EventCheckpoint(source.source_identity, 1), ("a",)
+        incremental.Checkpoint(source.source_identity, 1), ("a",)
     )
     ledger.write_atomically(state)
     text = ledger.path.read_text(encoding="utf-8")
@@ -479,10 +471,10 @@ def test_write_atomically_persists_sorted_json_and_cleans_up(tmp_path):
 def test_commit_is_idempotent_and_rejects_regression(tmp_path):
     source, ledger = make_ledger(tmp_path)
     ident = source.source_identity
-    first = incremental.EventBatch(
+    first = incremental.Batch(
         ident,
         (make_event("a", 4),),
-        incremental.EventCheckpoint(ident, 4, "2026-01-01T00:00:00+00:00"),
+        incremental.Checkpoint(ident, 4, "2026-01-01T00:00:00+00:00"),
     )
     state = ledger.commit(first)
     assert state.seen_event_ids == ("a",)
@@ -491,10 +483,10 @@ def test_commit_is_idempotent_and_rejects_regression(tmp_path):
     assert ledger.commit(first) == state
     assert ledger.path.stat().st_mtime_ns == before
 
-    behind = incremental.EventBatch(
+    behind = incremental.Batch(
         ident,
         (make_event("b", 2),),
-        incremental.EventCheckpoint(ident, 2, "2026-01-01T00:00:00+00:00"),
+        incremental.Checkpoint(ident, 2, "2026-01-01T00:00:00+00:00"),
     )
     with pytest.raises(incremental.IncrementalError) as caught:
         ledger.commit(behind)
@@ -502,10 +494,10 @@ def test_commit_is_idempotent_and_rejects_regression(tmp_path):
     assert caught.value.details["current"]["sequence"] == 4
     assert caught.value.details["candidate"]["sequence"] == 2
 
-    same_point = incremental.EventBatch(
+    same_point = incremental.Batch(
         ident,
         (make_event("c", 3),),
-        incremental.EventCheckpoint(ident, 4, "2026-01-01T00:00:00+00:00"),
+        incremental.Checkpoint(ident, 4, "2026-01-01T00:00:00+00:00"),
     )
     assert ledger.commit(same_point).seen_event_ids == ("a", "c")
 
@@ -561,7 +553,7 @@ def test_commit_with_writer_stages_the_acknowledgement_at_the_checkpoint(
 ):
     source, ledger = make_ledger(tmp_path)
     ident = source.source_identity
-    stale = incremental.EventCheckpoint(ident, 0)
+    stale = incremental.Checkpoint(ident, 0)
     ack = incremental.EventAcknowledgement(ident, "g", ("a",), stale)
     ledger.commit_with_writer([make_event("a", 3)], lambda events: None, ack)
 
@@ -591,7 +583,7 @@ def test_pending_acknowledgement_loading_errors(tmp_path):
     assert bad.value.source_uri == source.source_identity
 
     foreign = incremental.EventAcknowledgement(
-        "other", "g", (), incremental.EventCheckpoint("other")
+        "other", "g", (), incremental.Checkpoint("other")
     )
     ledger.pending_acknowledgement_path.write_text(
         json.dumps(foreign.to_dict()), encoding="utf-8"
@@ -607,7 +599,7 @@ def make_consumer(tmp_path, events, acknowledge=None, group=" g "):
     source, ledger = make_ledger(tmp_path, source)
     sink = []
     delivered = []
-    consumer = incremental.EventConsumer(
+    consumer = incremental.Ingestor(
         source,
         ledger,
         group,
@@ -621,17 +613,17 @@ def test_consumer_validation(tmp_path):
     source = make_source()
     source, ledger = make_ledger(tmp_path, source)
     with pytest.raises(ValueError, match=r"^consumer_group must not be empty$"):
-        incremental.EventConsumer(source, ledger, " ", print, print)
-    other = incremental.IngestionLedger(tmp_path / "o.json", "other")
+        incremental.Ingestor(source, ledger, " ", print, print)
+    other = incremental.Ledger(tmp_path / "o.json", "other")
     with pytest.raises(incremental.IncrementalError) as caught:
-        incremental.EventConsumer(source, other, "g", print, print)
+        incremental.Ingestor(source, other, "g", print, print)
     assert caught.value.code == "source_mismatch"
     assert caught.value.source_uri == "other"
     assert caught.value.details["source_identity"] == source.source_identity
     with pytest.raises(TypeError, match=r"^writer must be callable$"):
-        incremental.EventConsumer(source, ledger, "g", None, print)
+        incremental.Ingestor(source, ledger, "g", None, print)
     with pytest.raises(TypeError, match=r"^acknowledge must be callable$"):
-        incremental.EventConsumer(source, ledger, "g", print, None)
+        incremental.Ingestor(source, ledger, "g", print, None)
 
 
 def test_consume_commits_and_acknowledges_everything_seen(tmp_path):
@@ -686,7 +678,7 @@ def test_a_pending_acknowledgement_of_another_group_is_refused(tmp_path):
         consumer.source.source_identity,
         "elsewhere",
         ("a",),
-        incremental.EventCheckpoint(consumer.source.source_identity, 1),
+        incremental.Checkpoint(consumer.source.source_identity, 1),
     )
     ledger.write_pending_acknowledgement(ack)
     with pytest.raises(incremental.IncrementalError) as caught:

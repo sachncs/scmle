@@ -43,7 +43,7 @@ DEFAULT_BLOCKS = 20
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GovernedRun:
+class Governance:
     """What a governed exploration and confirmation produced.
 
     Attributes:
@@ -138,7 +138,7 @@ class Explored:
     """A governed run after exploration, control and second stage.
 
     Everything here was computed from `X` alone. `C` is still sealed;
-    `confirm_explored` opens it.
+    `finalise` opens it.
 
     Attributes:
         ledger: The ledger, not yet sealed by a confirmation.
@@ -169,7 +169,7 @@ def run_governed(
     features: pandas.DataFrame,
     target: pandas.Series,
     classification: bool,
-    source: confirm.ConfirmationSource | None,
+    source: confirm.Source | None,
     run_dir: str | Path | None,
     exclude: tuple[str, ...] = (),
     strata: numpy.ndarray | None = None,
@@ -183,8 +183,8 @@ def run_governed(
         [Sequence[scmle.data.ledger.ledger.Hypothesis]], confirm.Withdrawal
     ]
     | None = None,
-    claim_runner: confirm.ClaimRunner | None = None,
-) -> GovernedRun:
+    claim_runner: confirm.Docket | None = None,
+) -> Governance:
     """Explores `X` under the ledger, runs the control and confirms on `C`.
 
     Args:
@@ -217,7 +217,7 @@ def run_governed(
         policy, a `LedgerError`, a `LeakageError` for a second confirmation)
         propagate.
     """
-    explored = explore_governed(
+    explored = scout(
         charter=charter,
         features=features,
         target=target,
@@ -230,7 +230,7 @@ def run_governed(
         diagnostics=diagnostics,
         second_stage=second_stage,
     )
-    return confirm_explored(
+    return finalise(
         explored,
         source=source,
         confirmation_rule=confirmation_rule,
@@ -239,7 +239,7 @@ def run_governed(
     )
 
 
-def explore_governed(
+def scout(
     *,
     charter: Any,
     features: pandas.DataFrame,
@@ -261,7 +261,7 @@ def explore_governed(
     The arguments are those of `run_governed` without the confirmation ones.
     A caller that needs something computed after exploration (a selected
     model) before the registered claims are fixed calls this first and
-    `confirm_explored` later; `C` is not touched in between.
+    `finalise` later; `C` is not touched in between.
 
     Args:
         charter: The governing `AnalysisCharter`.
@@ -283,7 +283,7 @@ def explore_governed(
     Returns:
         The exploration state: the ledger with its results and negative
         control recorded, the exploration plan, the control, the second-stage
-        withdrawal (None if there was none) and what `confirm_explored`
+        withdrawal (None if there was none) and what `finalise`
         needs to open `C`.
 
     Raises:
@@ -299,12 +299,12 @@ def explore_governed(
         if classification
         else None
     )
-    plan = explore.plan_exploration(features, kind, exclude)
+    plan = explore.hypothesize(features, kind, exclude)
     if run_dir is None:
         ledger = scmle.data.ledger.ledger.Ledger.create(
             None,
             charter_hash=charter.charter_hash,
-            config=online_fdr.RuleConfig(
+            config=online_fdr.Settings(
                 rule, charter.error_budget.exploration.initial
             ),
             alpha_confirm=charter.error_budget.confirmation.alpha_confirm,
@@ -324,9 +324,9 @@ def explore_governed(
     observed = sum(1 for r in results if r.rejected)
 
     def discoveries(frame: pandas.DataFrame, shuffled: pandas.Series) -> int:
-        return explore.count_discoveries(config, plan, frame, shuffled)
+        return explore.tally(config, plan, frame, shuffled)
 
-    control = controls.permuted_target_control(
+    control = controls.placebo(
         discoveries,
         features,
         codes,
@@ -335,7 +335,7 @@ def explore_governed(
         seed=charter.seed,
         strata=strata,
     )
-    ledger.record_control(control.to_dict())
+    ledger.negatives(control.to_dict())
     withdrawal = None
     if second_stage is not None:
         withdrawal = second_stage(ledger.survivors())
@@ -354,20 +354,20 @@ def explore_governed(
     )
 
 
-def confirm_explored(
+def finalise(
     explored: Explored,
     *,
-    source: confirm.ConfirmationSource | None,
+    source: confirm.Source | None,
     confirmation_rule: budget.Correction = (
         scmle.data.ledger.budget.Correction.BY
     ),
     policy: str = confirm.UNCONFIRMED,
-    claim_runner: confirm.ClaimRunner | None = None,
-) -> GovernedRun:
+    claim_runner: confirm.Docket | None = None,
+) -> Governance:
     """Freezes the survivors and tests once on `C` (see `run_governed`).
 
     Args:
-        explored: The state returned by `explore_governed`.
+        explored: The state returned by `scout`.
         source: The sealed confirmation set, or None if none was carved.
         confirmation_rule: Multiplicity rule for the confirmation.
         policy: Failure policy of the confirmation.
@@ -407,7 +407,7 @@ def confirm_explored(
             encoding="utf-8",
             newline="\n",
         )
-    return GovernedRun(
+    return Governance(
         ledger=explored.ledger,
         plan=explored.plan,
         control=explored.control,

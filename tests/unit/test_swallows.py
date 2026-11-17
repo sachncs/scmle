@@ -24,7 +24,7 @@ def arm(seed):
 
 def failing(monkeypatch, share):
     """Makes `share` of the resampled scorings raise like a missing class."""
-    real = abtest.score_arm
+    real = abtest.tally
     calls = {"n": 0}
 
     def score(chosen, rows, metric, task):
@@ -34,7 +34,7 @@ def failing(monkeypatch, share):
             raise ValueError("a resample missing a class")
         return real(chosen, rows, metric, task)
 
-    monkeypatch.setattr(abtest, "score_arm", score)
+    monkeypatch.setattr(abtest, "tally", score)
 
 
 def test_every_dropped_resample_is_counted(monkeypatch):
@@ -71,12 +71,12 @@ def test_an_unreadable_coverage_report_is_named_not_misreported(tmp_path):
 
 
 class Bundle:
-    """The parts of a bundle `log_predictions` reads."""
+    """The parts of a bundle `chronicle` reads."""
 
     schema = types.SimpleNamespace(task="regression")
     info = types.SimpleNamespace(model_version="v1")
 
-    def prepare_frame(self, data):
+    def prepare(self, data):
         return data
 
     def predict(self, data):
@@ -98,7 +98,7 @@ def test_a_fallback_fingerprint_names_its_scheme(tmp_path, monkeypatch):
     frame = pandas.DataFrame({"a": [1.0, 2.0]})
     log = events.PredictionLog(tmp_path / "log.jsonl")
     seen = fingerprints(log, monkeypatch)
-    log.log_predictions(Bundle(), frame, ["r1", "r2"])
+    log.chronicle(Bundle(), frame, ["r1", "r2"])
     assert seen and not seen[0].startswith("json:")
 
     def refuse(*args, **kwargs):
@@ -106,7 +106,7 @@ def test_a_fallback_fingerprint_names_its_scheme(tmp_path, monkeypatch):
 
     monkeypatch.setattr(pandas.util, "hash_pandas_object", refuse)
     seen.clear()
-    log.log_predictions(Bundle(), frame, ["r3", "r4"])
+    log.chronicle(Bundle(), frame, ["r3", "r4"])
     assert seen and all(f.startswith("json:") for f in seen)
 
 

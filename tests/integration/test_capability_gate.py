@@ -58,10 +58,10 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
     """The existing tabular plan succeeds through declared capabilities."""
     context = make_context()
 
-    plan = stages.build_plan(context)
+    plan = stages.devise(context)
 
     assert set(plan.candidate_models) == {"dummy", "logistic_regression"}
-    declarations = context.capability_registry.list_capabilities()
+    declarations = context.capability_registry.catalogue()
     assert declarations
     assert {declaration.key.modality for declaration in declarations} == {
         capabilities.Modality.TABULAR
@@ -79,7 +79,7 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
 
 def test_deep_learning_paths_declare_their_optional_extra():
     """Deep-learning capability declarations identify their installation gate."""
-    registry = scmle.core.context.tabular_beta_capability_registry()
+    registry = scmle.core.context.enrol()
 
     for task in (
         tasks.Task.BINARY,
@@ -106,14 +106,14 @@ def test_ft_transformer_uses_an_experimental_tabular_boundary():
     assert adapter.architecture == "ft_transformer"
     assert adapter.capability_family == "transformer"
 
-    registry = scmle.core.context.tabular_beta_capability_registry()
+    registry = scmle.core.context.enrol()
     declaration = registry.find("transformer")
     assert declaration is not None
     assert declaration.status is capabilities.Status.EXPERIMENTAL
     assert declaration.modalities == (capabilities.Modality.TABULAR,)
 
     context = make_context()
-    key = stages.capability_key(
+    key = stages.requisition(
         context, tasks.Task.BINARY, adapter.capability_family
     )
     diagnostics = registry.diagnose(key, row_count=120)
@@ -131,14 +131,14 @@ def test_experimental_transformer_requires_explicit_model_opt_in():
     adapter = networks.FT_TRANSFORMER
     registry = scmle.models.registry.Catalog((classical.Dummy(), adapter))
     default_context = make_context(model_registry=registry)
-    default_plan = stages.build_plan(default_context)
+    default_plan = stages.devise(default_context)
     assert adapter.name not in default_plan.candidate_models
 
     spec = default_context.spec.model_copy(
         update={"models": tasks.Candidates(experimental_models=[adapter.name])}
     )
     opted_in_context = make_context(model_registry=registry, spec=spec)
-    opted_in_plan = stages.build_plan(opted_in_context)
+    opted_in_plan = stages.devise(opted_in_context)
     assert adapter.name in opted_in_plan.candidate_models
 
 
@@ -158,26 +158,26 @@ def test_capability_family_is_used_before_training():
         )
     )
 
-    with pytest.raises(capabilities.UnsupportedCapabilityError):
-        stages.build_plan(context)
+    with pytest.raises(capabilities.UnsupportedError):
+        stages.devise(context)
 
 
 def test_extension_only_foundation_adapter_cannot_break_auto_planning(
     monkeypatch,
 ):
     """An installed extension-only model must not enter the beta plan."""
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     adapter = registry.get("tabpfn")
     monkeypatch.setattr(adapter, "is_available", lambda: True)
 
-    plan = stages.build_plan(make_context(model_registry=registry))
+    plan = stages.devise(make_context(model_registry=registry))
 
     assert "tabpfn" not in plan.candidate_models
 
 
 def test_unimplemented_contract_dimensions_are_not_promoted():
     """Missing modality, uncertainty, and explanation paths fail closed."""
-    registry = scmle.core.context.tabular_beta_capability_registry()
+    registry = scmle.core.context.enrol()
     key = capabilities.Coordinate(
         modality=capabilities.Modality.TABULAR,
         task=tasks.Task.BINARY,
@@ -199,7 +199,7 @@ def test_unimplemented_contract_dimensions_are_not_promoted():
             key, explainability=capabilities.Explainability.FULL
         ),
     ):
-        with pytest.raises(capabilities.UnsupportedCapabilityError):
+        with pytest.raises(capabilities.UnsupportedError):
             registry.require(unsupported)
 
 
@@ -209,10 +209,10 @@ def test_empty_override_fails_before_model_fitting():
     context.capability_registry = capabilities.Registry()
 
     with pytest.raises(
-        capabilities.UnsupportedCapabilityError,
+        capabilities.UnsupportedError,
         match="unsupported capability before training",
     ):
-        stages.build_plan(context)
+        stages.devise(context)
 
 
 def test_declared_non_tabular_modality_fails_closed_before_model_fitting():
@@ -226,10 +226,10 @@ def test_declared_non_tabular_modality_fails_closed_before_model_fitting():
     context = make_context(spec=spec)
 
     with pytest.raises(
-        capabilities.UnsupportedCapabilityError,
+        capabilities.UnsupportedError,
         match="unsupported capability",
     ) as failure:
-        stages.build_plan(context)
+        stages.devise(context)
 
     assert failure.value.details["key"]["modality"] == "image"
     assert context.manifest is not None
@@ -251,7 +251,7 @@ def test_file_backed_non_tabular_modality_fails_before_tabular_reader(
     project = orchestrator.Orchestrator(spec, None)
 
     with pytest.raises(
-        capabilities.UnsupportedCapabilityError,
+        capabilities.UnsupportedError,
         match="file-backed modality has no registered ingestion adapter",
     ) as failure:
         stages.IngestStage().execute(project.new_context())
@@ -277,8 +277,8 @@ def test_unlisted_model_family_fails_before_model_fitting():
     model_registry = scmle.models.registry.Catalog((UnlistedAdapter(),))
     context = make_context(model_registry=model_registry)
 
-    with pytest.raises(capabilities.UnsupportedCapabilityError):
-        stages.build_plan(context)
+    with pytest.raises(capabilities.UnsupportedError):
+        stages.devise(context)
 
 
 def test_group_thresholds_reject_non_binary_tasks_before_fitting():
@@ -306,7 +306,7 @@ def test_group_thresholds_reject_non_binary_tasks_before_fitting():
     stages.ProfileStage().execute(context)
 
     with pytest.raises(
-        capabilities.UnsupportedCapabilityError,
+        capabilities.UnsupportedError,
         match="group-threshold mitigation",
     ):
-        stages.build_plan(context)
+        stages.devise(context)

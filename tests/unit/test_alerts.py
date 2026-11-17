@@ -25,8 +25,8 @@ def make_alert(route: str = "on-call") -> alerts.Alert:
 def test_dispatch_is_idempotent_and_journaled(tmp_path: Path):
     """A successful alert is not sent twice after a replay."""
     sink_path = tmp_path / "sink.jsonl"
-    dispatcher = alerts.AlertDispatcher(
-        {"on-call": alerts.JsonlAlertSink(sink_path)},
+    dispatcher = alerts.Dispatcher(
+        {"on-call": alerts.Jsonl(sink_path)},
         tmp_path / "deliveries.jsonl",
     )
     alert = make_alert()
@@ -46,8 +46,8 @@ def test_dispatch_is_idempotent_and_journaled(tmp_path: Path):
 
 def test_missing_route_is_a_durable_failure(tmp_path: Path):
     """An unconfigured paging route cannot be reported as delivered."""
-    dispatcher = alerts.AlertDispatcher(
-        {"on-call": alerts.JsonlAlertSink(tmp_path / "sink.jsonl")},
+    dispatcher = alerts.Dispatcher(
+        {"on-call": alerts.Jsonl(tmp_path / "sink.jsonl")},
         tmp_path / "deliveries.jsonl",
     )
 
@@ -60,10 +60,8 @@ def test_missing_route_is_a_durable_failure(tmp_path: Path):
 def test_webhook_requires_https_except_for_explicit_local_test_mode():
     """Production webhook configuration rejects accidental plaintext URLs."""
     with pytest.raises(ValueError, match="HTTPS"):
-        alerts.WebhookAlertSink("http://example.test/alerts")
-    alerts.WebhookAlertSink(
-        "http://127.0.0.1:8123/alerts", allow_insecure_localhost=True
-    )
+        alerts.Pager("http://example.test/alerts")
+    alerts.Pager("http://127.0.0.1:8123/alerts", allow_insecure_localhost=True)
 
 
 def test_webhook_delivers_json_with_bounded_attempts():
@@ -86,7 +84,7 @@ def test_webhook_delivers_json_with_bounded_attempts():
     thread = threading.Thread(target=receiver.serve_forever, daemon=True)
     thread.start()
     try:
-        sink = alerts.WebhookAlertSink(
+        sink = alerts.Pager(
             f"http://127.0.0.1:{receiver.server_port}/alerts",
             token="test-token",
             timeout_seconds=1.0,

@@ -32,15 +32,12 @@ def case_conformal():
     probabilities = numpy.exp(logits) / numpy.exp(logits).sum(
         axis=1, keepdims=True
     )
-    classification = conformal.ConformalCalibrator.for_classification(
+    classification = conformal.ConformalCalibrator.classify(
         labels, probabilities, classes
     )
     new = numpy.linspace(-1, 1, 5)
     return {
-        "finite": [
-            conformal.finite_sample_quantile(observed, c)
-            for c in (0.5, 0.9, 0.999)
-        ],
+        "finite": [conformal.cutoff(observed, c) for c in (0.5, 0.9, 0.999)],
         "weighted": conformal.weighted_quantile(
             numpy.arange(1.0, 9.0),
             numpy.array([1, 2, 1, 2, 1, 2, 1, 2.0]),
@@ -53,13 +50,13 @@ def case_conformal():
             numpy.array([0.5, 1.5, 3.0]),
             0.7,
         ),
-        "cv_plus": conformal.cv_plus_bounds(
+        "cv_plus": conformal.cvplus(
             numpy.arange(12.0).reshape(3, 4),
             numpy.array([0, 1, 2, 3, 0, 1, 2, 3, 0, 1]),
             numpy.arange(1.0, 11.0),
             0.8,
         ),
-        "one": conformal.one_row_per_entity(
+        "one": conformal.representatives(
             ["a", "b", "a", "c", "b"], numpy.random.default_rng(1)
         ),
         "margin": [regression.margin(c) for c in (0.5, 0.9)],
@@ -68,7 +65,7 @@ def case_conformal():
             new, numpy.ones(300), numpy.array([1, 2, 1, 2, 1.0]), 0.8
         ),
         "class_margins": classification.class_margins(0.8),
-        "thin": classification.thin_classes(0.99),
+        "thin": classification.scarce(0.99),
         "sets": classification.sets(probabilities[:30], 0.8),
         "sets_mondrian": classification.sets(probabilities[:30], 0.8, "class"),
         "record": regression.to_dict() | {"scores": []},
@@ -82,16 +79,14 @@ def case_coverage():
     labels = rng.choice(["a", "b", "c"], 400)
     return {
         "cp": [coverage.clopper_pearson(c, 100, 0.9) for c in (0, 57, 100)],
-        "holm": coverage.holm_rejections([0.001, 0.02, 0.04, 0.5], 0.05),
-        "under": [
-            coverage.undercoverage_p_value(c, 100, 0.9) for c in (70, 85, 95)
-        ],
-        "summary": coverage.coverage_summary(covered, widths, 0.9),
+        "holm": coverage.stepdown([0.001, 0.02, 0.04, 0.5], 0.05),
+        "under": [coverage.deficit(c, 100, 0.9) for c in (70, 85, 95)],
+        "summary": coverage.summarise(covered, widths, 0.9),
         "slices": coverage.slice_coverage(covered, labels, 0.9),
-        "classes": coverage.class_coverage(covered, labels, 0.9),
+        "classes": coverage.classwise(covered, labels, 0.9),
         "tier": [
-            coverage.coverage_tier(
-                coverage.coverage_summary(covered, widths, 0.85), flag, clean
+            coverage.grade(
+                coverage.summarise(covered, widths, 0.85), flag, clean
             )
             for flag in (False, True)
             for clean in (False, True)
@@ -114,7 +109,7 @@ def case_scores():
         "pinball": [
             proper_scores.pinball_loss(truth, median, q) for q in levels
         ],
-        "interval": proper_scores.interval_score(truth, low, high, 0.2),
+        "interval": proper_scores.winkler(truth, low, high, 0.2),
         "wis": proper_scores.weighted_interval_score(
             truth, median, {0.2: (low, high), 0.5: (low - 1, high + 1)}
         ),
@@ -123,7 +118,7 @@ def case_scores():
             numpy.column_stack([median - 1, median, median + 1.5]),
             levels,
         ),
-        "scale": [proper_scores.insample_scale(history, s) for s in (1, 4)],
+        "scale": [proper_scores.naivescale(history, s) for s in (1, 4)],
         "mase": [proper_scores.mase(truth, median, history, s) for s in (1, 4)],
     }
 
@@ -137,15 +132,15 @@ def case_ipcw():
     event = (time <= censor).astype(float)
     observed = numpy.minimum(time, censor)
     risk = x[:, 0]
-    marginal = ipcw.censoring_weights(observed, event)
-    covariate = ipcw.censoring_weights(observed, event, x, floor=0.1)
+    marginal = ipcw.reweight(observed, event)
+    covariate = ipcw.reweight(observed, event, x, floor=0.1)
     return {
         "marginal": marginal.weights[:30],
         "floored": [marginal.floor, marginal.n_floored],
         "covariate": covariate.weights[:30],
         "flags": [covariate.covariate_dependent, marginal.covariate_dependent],
         "cindex": [
-            ipcw.truncated_concordance(observed, event, risk, tau, w)
+            ipcw.uno(observed, event, risk, tau, w)
             for tau in (0.5, 1.5)
             for w in (marginal, covariate)
         ],

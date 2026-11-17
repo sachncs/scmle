@@ -14,7 +14,7 @@ from scmle.models import ensembles
 COMBINERS = (ensembles.Stacking.name, ensembles.Blending.name)
 
 
-class EnsembleSearch:
+class Stacker:
     """Assembles and evaluates a stacking candidate.
 
     Attributes:
@@ -24,7 +24,7 @@ class EnsembleSearch:
     """
 
     def __init__(
-        self, context: scmle.core.context.Context, runner: trials.TrialRunner
+        self, context: scmle.core.context.Context, runner: trials.Runner
     ) -> None:
         """Initializes the search.
 
@@ -53,7 +53,7 @@ class EnsembleSearch:
         eligible = [
             t
             for t in evaluated
-            if t.status is experiments.TrialStatus.OK
+            if t.status is experiments.Termination.OK
             and t.strategy == experiments.DEFAULT_STRATEGY
             and t.model_name not in COMBINERS
             and self.context.registry.get(t.model_name).family != "baseline"
@@ -75,15 +75,14 @@ class EnsembleSearch:
             evaluated: All trials produced before the ensemble step.
         """
         size = self.context.spec.ensemble.size
-        if (
-            size < ensembles.MIN_MEMBERS
-            or self.context.resource_governor.skip_reason(first=False)
+        if size < ensembles.MIN_MEMBERS or self.context.regulator.skip_reason(
+            first=False
         ):
             return
         members = self.members(evaluated, size)
         if len(members) < ensembles.MIN_MEMBERS:
             for combiner in COMBINERS:
-                self.context.add_outcome(
+                self.context.enter(
                     combiner,
                     experiments.DecisionAction.REJECT,
                     "fewer than two eligible distinct models",
@@ -96,7 +95,7 @@ class EnsembleSearch:
             ]
         }
         for combiner in COMBINERS:
-            if self.context.resource_governor.skip_reason(first=False):
+            if self.context.regulator.skip_reason(first=False):
                 return
             self.context.check_cancelled()
             trial_id = self.context.allocate(1)[0]
@@ -127,8 +126,8 @@ class EnsembleSearch:
             outcome: The ensemble's trial result.
             names: Model names of the members, for the explanation.
         """
-        if outcome.status is not experiments.TrialStatus.OK:
-            self.context.add_outcome(
+        if outcome.status is not experiments.Termination.OK:
+            self.context.enter(
                 combiner,
                 experiments.DecisionAction.REJECT,
                 f"trial {outcome.status}: {outcome.error}",
@@ -136,7 +135,7 @@ class EnsembleSearch:
             return
         sign = 1 if self.metric.greater_is_better else -1
         gain = sign * (outcome.score_mean - leader.score_mean)
-        self.context.add_outcome(
+        self.context.enter(
             combiner,
             experiments.DecisionAction.INCLUDE
             if gain > 0

@@ -65,7 +65,7 @@ class Selector(abc.ABC):
         return self.rank(trials, metric, registry)[0]
 
 
-class MeanSelector(Selector):
+class Averager(Selector):
     """Best mean cross-validation score, with an explicit tie policy.
 
     Candidates whose score is indistinguishable from the best (within
@@ -114,7 +114,7 @@ class MeanSelector(Selector):
             "dummy baseline excluded when other models ran"
         )
 
-    def probably_equivalent(
+    def equivalent(
         self,
         best: experiments.Trial,
         other: experiments.Trial,
@@ -171,7 +171,7 @@ class MeanSelector(Selector):
         Raises:
             ScmleError: If no trial succeeded.
         """
-        ok = [t for t in trials if t.status is experiments.TrialStatus.OK]
+        ok = [t for t in trials if t.status is experiments.Termination.OK]
         if not ok:
             raise errors.ScmleError(
                 "all trials failed", {"errors": [t.error for t in trials]}
@@ -179,7 +179,7 @@ class MeanSelector(Selector):
         pool = [t for t in ok if t.model_name != BASELINE] or ok
         sign = 1 if metric.greater_is_better else -1
 
-        def by_score(trial: experiments.Trial) -> tuple[float, ...]:
+        def merit(trial: experiments.Trial) -> tuple[float, ...]:
             return (-sign * round(trial.score_mean, SCORE_PRECISION),)
 
         def tiebreak(trial: experiments.Trial) -> tuple[Any, ...]:
@@ -199,7 +199,7 @@ class MeanSelector(Selector):
                 trial.trial_id,
             )
 
-        ordered = sorted(pool, key=lambda t: (*by_score(t), *tiebreak(t)))
+        ordered = sorted(pool, key=lambda t: (*merit(t), *tiebreak(t)))
         best = ordered[0]
         folds = max(len(best.fold_scores), 1)
         tolerance = self.rule.tie_tolerance
@@ -209,7 +209,7 @@ class MeanSelector(Selector):
             t
             for t in ordered
             if sign * (best.score_mean - t.score_mean) <= tolerance + 1e-12
-            or self.probably_equivalent(best, t, sign)
+            or self.equivalent(best, t, sign)
         ]
         rest = [t for t in ordered if t not in tied]
         return sorted(tied, key=tiebreak) + rest

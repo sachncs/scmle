@@ -60,7 +60,7 @@ def stem(word: str) -> str:
     return word
 
 
-def name_tokens(name: str) -> tuple[str, ...]:
+def tokenize(name: str) -> tuple[str, ...]:
     """Splits an identifier into lower-case stemmed words.
 
     Args:
@@ -73,7 +73,7 @@ def name_tokens(name: str) -> tuple[str, ...]:
     return tuple(stem(w) for w in SPLIT.split(spaced) if w)
 
 
-def unit_components(unit: str) -> tuple[str, ...]:
+def grains(unit: str) -> tuple[str, ...]:
     """Extracts the grain words of a unit text.
 
     For example, `customer-month` gives two words. Stop words, joiners and
@@ -95,7 +95,7 @@ def unit_components(unit: str) -> tuple[str, ...]:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class KeyCandidate:
+class Candidate:
     """An approximate key and its measures.
 
     Attributes:
@@ -132,7 +132,7 @@ class KeyCandidate:
 
 
 @dataclasses.dataclass(slots=True)
-class KeyScan:
+class Scan:
     """Result of the lattice search over one table.
 
     Attributes:
@@ -148,7 +148,7 @@ class KeyScan:
 
     table: str
     rows: int
-    keys: list[KeyCandidate]
+    keys: list[Candidate]
     measured: dict[tuple[str, ...], tuple[float, float]]
     levels_done: int
     partial: bool
@@ -185,7 +185,7 @@ class KeyScan:
         }
 
 
-def is_key(g3: float, null_rate: float, scan: KeyScan) -> bool:
+def is_key(g3: float, null_rate: float, scan: Scan) -> bool:
     """Checks measures against the key tolerances of a scan.
 
     Args:
@@ -200,7 +200,7 @@ def is_key(g3: float, null_rate: float, scan: KeyScan) -> bool:
 
 
 def measure(
-    source: profile.SqlSource,
+    source: profile.Sql,
     table: str,
     columns: Sequence[str],
     rows: int,
@@ -219,7 +219,7 @@ def measure(
     Returns:
         The pair `(g3, null_rate)`; `(1.0, 0.0)` for an empty table.
     """
-    names = profile.quote_all(columns)
+    names = profile.quoting(columns)
     present = " AND ".join(f"{profile.quote(c)} IS NOT NULL" for c in columns)
     absent = " OR ".join(f"{profile.quote(c)} IS NULL" for c in columns)
     quoted = profile.quote(table)
@@ -241,8 +241,8 @@ def measure(
     return (rows - int(distinct or 0)) / rows, int(nulls or 0) / rows
 
 
-def bound_ok(
-    table: profile.TableProfile, columns: Sequence[str], eps_key: float
+def feasible(
+    table: profile.Census, columns: Sequence[str], eps_key: float
 ) -> bool:
     """Tests without a query whether `columns` could reach `g3 <= eps_key`.
 
@@ -269,8 +269,8 @@ def bound_ok(
     return capacity >= need and smallest >= need
 
 
-def scan_single_columns(
-    table: profile.TableProfile, usable: Sequence[str], scan: KeyScan
+def sweep(
+    table: profile.Census, usable: Sequence[str], scan: Scan
 ) -> set[tuple[str, ...]]:
     """Runs level 1 of the lattice from the profile counts, with no query.
 
@@ -291,20 +291,18 @@ def scan_single_columns(
         scan.measured[(name,)] = (g3, nulls)
         if is_key(g3, nulls, scan):
             scan.keys.append(
-                KeyCandidate(
-                    (name,), g3, nulls, column.distinct, n, n < SMALL_N
-                )
+                Candidate((name,), g3, nulls, column.distinct, n, n < SMALL_N)
             )
         elif nulls <= scan.eps_null:
             nonkey.add((name,))
     return nonkey
 
 
-def level_candidates(
+def layer(
     usable: Sequence[str],
     nonkey: set[tuple[str, ...]],
     size: int,
-    table: profile.TableProfile,
+    table: profile.Census,
     eps_key: float,
 ) -> tuple[list[tuple[str, ...]], list[tuple[str, ...]]]:
     """Builds the column sets of one lattice level.
@@ -336,16 +334,16 @@ def level_candidates(
         for cols in candidates
         if all(sub in nonkey for sub in itertools.combinations(cols, size - 1))
     ]
-    runnable = [c for c in candidates if bound_ok(table, c, eps_key)]
+    runnable = [c for c in candidates if feasible(table, c, eps_key)]
     return candidates, runnable
 
 
-def measure_level(
-    source: profile.SqlSource,
-    table: profile.TableProfile,
+def levels(
+    source: profile.Sql,
+    table: profile.Census,
     candidates: Sequence[tuple[str, ...]],
     runnable: Sequence[tuple[str, ...]],
-    scan: KeyScan,
+    scan: Scan,
 ) -> set[tuple[str, ...]]:
     """Queries the runnable sets of a level and records the keys.
 
@@ -369,7 +367,7 @@ def measure_level(
             if is_key(g3, nulls, scan):
                 distinct = n - round(g3 * n)
                 scan.keys.append(
-                    KeyCandidate(cols, g3, nulls, distinct, n, n < SMALL_N)
+                    Candidate(cols, g3, nulls, distinct, n, n < SMALL_N)
                 )
                 continue
             if nulls > scan.eps_null:
@@ -378,19 +376,19 @@ def measure_level(
     return found
 
 
-def infer_keys(
-    source: profile.SqlSource,
-    table: profile.TableProfile,
+def keysearch(
+    source: profile.Sql,
+    table: profile.Census,
     eps_key: float = 0.0,
     eps_null: float = 0.0,
     max_size: int = LEVELS,
     stage: str = "grain",
-) -> KeyScan:
+) -> Scan:
     """Searches the lattice for minimal approximate keys.
 
     Args:
         source: Read-only source.
-        table: Profile of the table (from `profile_table`).
+        table: Profile of the table (from `survey`).
         eps_key: Largest `g3` accepted as a key.
         eps_null: Largest null rate accepted in a key.
         max_size: Largest column set size, `L`.
@@ -410,7 +408,7 @@ def infer_keys(
             raise errors.InputError(f"{name} must be in [0, 1]")
     if max_size < 1:
         raise errors.InputError("max_size must be at least 1")
-    scan = KeyScan(
+    scan = Scan(
         table=table.name,
         rows=table.rows,
         keys=[],
@@ -423,12 +421,10 @@ def infer_keys(
     usable = [
         c.name for c in table.columns if c.distinct > 1 and c.non_null > 0
     ]
-    nonkey = scan_single_columns(table, usable, scan)
+    nonkey = sweep(table, usable, scan)
     scan.levels_done = 1
     for size in range(2, max_size + 1):
-        candidates, runnable = level_candidates(
-            usable, nonkey, size, table, eps_key
-        )
+        candidates, runnable = layer(usable, nonkey, size, table, eps_key)
         budget = source.meter
         if (
             runnable
@@ -442,11 +438,11 @@ def infer_keys(
         ):
             scan.partial = True
             break
-        nonkey = measure_level(source, table, candidates, runnable, scan)
+        nonkey = levels(source, table, candidates, runnable, scan)
         scan.levels_done = size
         if not nonkey:
             break
-    scan.keys.sort(key=KeyCandidate.rank)
+    scan.keys.sort(key=Candidate.rank)
     return scan
 
 
@@ -490,8 +486,8 @@ class UnitVerdict:
         }
 
 
-def match_columns(
-    unit: str, table: profile.TableProfile
+def align(
+    unit: str, table: profile.Census
 ) -> tuple[tuple[str, ...], list[str]]:
     """Matches each unit word to one column of the table.
 
@@ -510,13 +506,13 @@ def match_columns(
     """
     questions = []
     chosen: list[str] = []
-    components = unit_components(unit)
+    components = grains(unit)
     if not components:
         return (), ["the unit text has no grain words"]
     for word in components:
-        hits = [c.name for c in table.columns if word in name_tokens(c.name)]
+        hits = [c.name for c in table.columns if word in tokenize(c.name)]
         if len(hits) > 1:
-            ids = [h for h in hits if ID_WORDS & set(name_tokens(h))]
+            ids = [h for h in hits if ID_WORDS & set(tokenize(h))]
             hits = ids or hits
         if len(hits) != 1:
             kind = "no column" if not hits else f"columns {hits}"
@@ -529,17 +525,17 @@ def match_columns(
     return tuple(sorted(set(chosen), key=order.index)), []
 
 
-def subset_verdict(
+def shrink(
     unit: str,
     columns: tuple[str, ...],
-    key_like: Callable[[tuple[str, ...]], bool | None],
+    identifies: Callable[[tuple[str, ...]], bool | None],
 ) -> UnitVerdict | None:
     """Looks for a strict subset of the unit columns that is already a key.
 
     Args:
         unit: The charter unit text.
         columns: Columns the unit text was matched to.
-        key_like: Whether a column set is a key; None when the budget stops
+        identifies: Whether a column set is a key; None when the budget stops
             the check.
 
     Returns:
@@ -548,7 +544,7 @@ def subset_verdict(
     """
     for size in range(1, len(columns)):
         for subset in itertools.combinations(columns, size):
-            state = key_like(subset)
+            state = identifies(subset)
             if state is None:
                 return UnitVerdict(
                     UNKNOWN,
@@ -569,10 +565,10 @@ def subset_verdict(
 
 
 def unit_verdict(
-    source: profile.SqlSource,
-    table: profile.TableProfile,
+    source: profile.Sql,
+    table: profile.Census,
     unit: str,
-    scan: KeyScan,
+    scan: Scan,
 ) -> UnitVerdict:
     """Compares the unit text with the table's measured grain.
 
@@ -592,7 +588,7 @@ def unit_verdict(
     Returns:
         The verdict. It is `unknown` when the budget stops a check.
     """
-    columns, questions = match_columns(unit, table)
+    columns, questions = align(unit, table)
     if not columns:
         return UnitVerdict(
             UNKNOWN,
@@ -602,9 +598,9 @@ def unit_verdict(
             tuple(questions),
         )
 
-    def key_like(cols: tuple[str, ...]) -> bool | None:
+    def identifies(cols: tuple[str, ...]) -> bool | None:
         if cols not in scan.measured:
-            if not bound_ok(table, cols, scan.eps_key):
+            if not feasible(table, cols, scan.eps_key):
                 return False
             budget = source.meter
             if budget is not None and not budget.admit(
@@ -615,10 +611,10 @@ def unit_verdict(
         g3, nulls = scan.measured[cols]
         return is_key(g3, nulls, scan)
 
-    coarser = subset_verdict(unit, columns, key_like)
+    coarser = shrink(unit, columns, identifies)
     if coarser is not None:
         return coarser
-    state = key_like(columns)
+    state = identifies(columns)
     if state is None:
         return UnitVerdict(
             UNKNOWN,

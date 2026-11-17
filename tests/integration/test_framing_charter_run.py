@@ -4,14 +4,14 @@ import json
 import pathlib
 
 from tests.integration.test_charter_run import event
+from tests.integration.test_charter_run import inscribe
 from tests.integration.test_charter_run import run
-from tests.integration.test_charter_run import write_charter
 
 
 def test_a_charter_run_writes_a_descriptive_framing_link(
     binary_frame, tmp_path
 ):
-    result = run(binary_frame, tmp_path, write_charter(tmp_path))
+    result = run(binary_frame, tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
     link = json.loads((folder / "framing_link.json").read_text())

@@ -28,10 +28,7 @@ def cohort(rows=1000, event_rate=0.12, seed=0):
 
 
 def test_auto_picks_event_stratification_for_survival():
-    assert (
-        splitters.resolve_strategy_name(spec(), tasks.Task.SURVIVAL)
-        == "stratified_events"
-    )
+    assert splitters.scheme(spec(), tasks.Task.SURVIVAL) == "stratified_events"
 
 
 def test_the_event_rate_is_steady_across_test_and_folds():

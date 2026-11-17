@@ -30,10 +30,10 @@ def test_errors_carry_category_and_details():
 
 
 def test_feature_plan_helpers():
-    plan = data.FeaturePlan(("a",), ("b", "c"), {"d": "constant"})
+    plan = data.Blueprint(("a",), ("b", "c"), {"d": "constant"})
     assert plan.features == ("a", "b", "c")
-    assert plan.columns_for("categorical") == ("b", "c")
-    assert plan.columns_for("datetime") == ()
+    assert plan.pick("categorical") == ("b", "c")
+    assert plan.pick("datetime") == ()
     assert plan.to_dict()["dropped"] == {"d": "constant"}
 
 
@@ -50,7 +50,7 @@ def test_plan_summary_and_dict():
 
 def test_trial_result_serializes_status():
     trial = experiments.Trial(
-        "t1", "dummy", experiments.TrialStatus.FAILED, error="boom"
+        "t1", "dummy", experiments.Termination.FAILED, error="boom"
     )
     assert trial.to_dict()["status"] == "failed"
 

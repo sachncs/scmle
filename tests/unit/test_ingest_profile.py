@@ -15,7 +15,7 @@ def test_profile_counts_are_exact():
         "INSERT INTO t VALUES (?, ?)",
         [(1, "x"), (2, "x"), (2, None), (None, "y")],
     )
-    table = profile.profile_table(db.source(), "t")
+    table = profile.survey(db.source(), "t")
     assert table is not None
     assert table.rows == 4
     a = table.column("a")
@@ -61,7 +61,7 @@ def test_budget_stops_profile_at_a_table_boundary():
         db.execute(f"CREATE TABLE {name} (a INTEGER, b INTEGER)")
         db.execute(f"INSERT INTO {name} VALUES (?, ?)", [(1, 2), (3, 4)])
     meter = budget.BudgetMeter(budget.Budget(max_queries=5))
-    source = profile.SqlSource(db.factory, meter)
+    source = profile.Sql(db.factory, meter)
     catalog = profile.profile_catalog(source, ["t1", "t2"])
     assert catalog.partial
     assert [t.name for t in catalog.tables] == ["t1"]
@@ -72,7 +72,7 @@ def test_budget_stops_profile_at_a_table_boundary():
 
 def test_consistent_read_on_static_data_is_verified_and_complete():
     connector = ingest_worlds.torn_world(1, None)[0]
-    read = profile.consistent_read(connector, 5)
+    read = profile.untorn(connector, 5)
     assert read.verified
     assert read.attempts == 1
     assert read.frame["id"].tolist() == sorted(read.frame["id"].tolist())
@@ -82,13 +82,13 @@ def test_consistent_read_on_static_data_is_verified_and_complete():
 @pytest.mark.parametrize("kind", ingest_worlds.TORN_KINDS)
 def test_torn_read_is_detected(kind):
     connector = ingest_worlds.torn_world(2, kind)[0]
-    with pytest.raises(profile.TornReadError):
-        profile.consistent_read(connector, 5, attempts=1)
+    with pytest.raises(profile.TornError):
+        profile.untorn(connector, 5, attempts=1)
 
 
 def test_torn_read_recovers_on_retry_within_budget():
     connector, db = ingest_worlds.torn_world(3, "insert")
-    read = profile.consistent_read(connector, 5, attempts=2)
+    read = profile.untorn(connector, 5, attempts=2)
     assert read.attempts == 2
     assert len(read.frame) == db.frame("SELECT COUNT(*) AS n FROM t")["n"][0]
 
@@ -100,15 +100,15 @@ def test_unordered_query_is_refused():
         ingest_worlds.URI, "SELECT a FROM t", db.factory
     )
     with pytest.raises(connectors.ConnectorError) as caught:
-        profile.consistent_read(connector)
+        profile.untorn(connector)
     assert caught.value.code == "unordered_query"
-    assert profile.has_total_order("SELECT a FROM t ORDER BY a")
-    assert not profile.has_total_order("SELECT 'order by' FROM t")
+    assert profile.deterministic("SELECT a FROM t ORDER BY a")
+    assert not profile.deterministic("SELECT 'order by' FROM t")
 
 
 def test_read_without_a_token_is_marked_unverified():
-    schema = connectors.SourceSchema((connectors.SourceColumn("a", "int"),))
-    connector = connectors.WarehouseConnector(
+    schema = connectors.Columns((connectors.Field("a", "int"),))
+    connector = connectors.Lakehouse(
         "warehouse://x/t",
         "select a from t order by a",
         lambda query: schema,
@@ -118,7 +118,7 @@ def test_read_without_a_token_is_marked_unverified():
             offset + limit < 4,
         ),
     )
-    read = profile.consistent_read(connector, 2)
+    read = profile.untorn(connector, 2)
     assert not read.verified
     assert len(read.frame) == 4
 

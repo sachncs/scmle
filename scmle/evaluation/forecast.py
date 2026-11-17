@@ -24,7 +24,7 @@ from scmle.contracts import metrics
 SCALE_FLOOR = 1e-12
 
 
-def truth_matrix(
+def actuals(
     estimator: Any, features: pandas.DataFrame, primary: pandas.Series
 ) -> numpy.ndarray:
     """All future-value targets: the primary one plus the other columns.
@@ -119,7 +119,7 @@ class ForecastMetric(metrics.Metric):
         kind: `mase_same_rows` (alias `mase`), `mase_insample`, `mae` or
             `smape`.
         scale: In-sample naive mean absolute error for `mase_insample`
-            (see `proper_scores.insample_scale`).
+            (see `proper_scores.naivescale`).
     """
 
     kind: str = "mase"
@@ -160,7 +160,7 @@ class ForecastMetric(metrics.Metric):
             target: pandas.Series,
             sample_weight: Any = None,  # noqa: ARG001 -- scorer protocol passes sample_weight
         ) -> float:
-            truth = truth_matrix(estimator, features, target)
+            truth = actuals(estimator, features, target)
             guess = numpy.asarray(estimator.predict(features), dtype=float)
             if kind == "mae":
                 return sign * mean_absolute_error(truth, guess)

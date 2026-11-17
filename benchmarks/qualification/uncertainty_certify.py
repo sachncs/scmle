@@ -38,7 +38,7 @@ function named in brackets and is filed under the key in `GATES`:
 * Slice flag with a margin fixed in advance (`gate_g5b`; registered
   2026-11-06, before its first run; the redesign that the miss of the plain
   slice flag called for, which is neither changed nor re-run).
-  `coverage.slice_flag` tests, for each slice of at least 30 rows, the
+  `coverage.undercovered` tests, for each slice of at least 30 rows, the
   one-sided exact binomial hypothesis "coverage `>= nominal - 0.05`"
   (`SLICE_MARGIN = 0.05`, about 3.7 standard deviations of the
   calibration-conditional coverage at `n_cal = 500`, `Beta(451, 50)` sd
@@ -196,7 +196,7 @@ def gate_g1(replicates: int, base: int = 0) -> dict[str, Any]:
     for index in range(replicates):
         rng = numpy.random.default_rng(base + index)
         score = numpy.abs(rng.standard_normal(n_cal))
-        quantile_value = conformal.finite_sample_quantile(score, LEVEL)
+        quantile_value = conformal.cutoff(score, LEVEL)
         values[index] = 2 * stats.norm.cdf(quantile_value) - 1
     se = float(beta.std() / math.sqrt(replicates))
     mean = float(values.mean())
@@ -252,10 +252,10 @@ def cv_plus_replicate(
         models.append(model)
         residuals[held] = numpy.abs(y[held] - model.predict(x[held]))
     preds = numpy.column_stack([m.predict(xt) for m in models])
-    low, high = conformal.cv_plus_bounds(preds, fold_of, residuals, LEVEL)
+    low, high = conformal.cvplus(preds, fold_of, residuals, LEVEL)
     cv = float(numpy.mean((yt >= low) & (yt <= high)))
     refit = make().fit(x, y).predict(xt)
-    margin = conformal.finite_sample_quantile(residuals, LEVEL)
+    margin = conformal.cutoff(residuals, LEVEL)
     pooled = float(numpy.mean(numpy.abs(yt - refit) <= margin))
     return cv, pooled
 
@@ -337,7 +337,7 @@ def gate_g3(replicates: int, base: int = 0) -> dict[str, Any]:
             loss="quantile", alpha=quantile.UPPER_LEVEL, **kw
         ).fit(xf, yf)
         mean = ensemble.GradientBoostingRegressor(**kw).fit(xf, yf)
-        band = quantile.QuantileBand.calibrate(
+        band = quantile.Band.calibrate(
             yc.tolist(),
             numpy.minimum(lo.predict(xc), hi.predict(xc)),
             numpy.maximum(lo.predict(xc), hi.predict(xc)),
@@ -347,9 +347,7 @@ def gate_g3(replicates: int, base: int = 0) -> dict[str, Any]:
         cqr_in = (yt >= numpy.minimum(a, b) - margin) & (
             yt <= numpy.maximum(a, b) + margin
         )
-        resid = conformal.finite_sample_quantile(
-            numpy.abs(yc - mean.predict(xc)), LEVEL
-        )
+        resid = conformal.cutoff(numpy.abs(yc - mean.predict(xc)), LEVEL)
         const_in = numpy.abs(yt - mean.predict(xt)) <= resid
         top = sdt >= numpy.quantile(sdt, 0.9)
         rows.append(
@@ -416,7 +414,7 @@ def gate_g4(replicates: int, base: int = 0) -> dict[str, Any]:
         rng = numpy.random.default_rng(base + index)
         cl, cp = class_world(rng, 2500)
         tl, tp = class_world(rng, 5000)
-        calibrator = conformal.ConformalCalibrator.for_classification(
+        calibrator = conformal.ConformalCalibrator.classify(
             cl.tolist(), cp, list(range(5))
         )
         for mode, store in (("class", hit), (None, pooled)):
@@ -458,9 +456,7 @@ def gate_g5(replicates: int, base: int = 0) -> dict[str, Any]:
     flagged = 0
     for index in range(replicates):
         rng = numpy.random.default_rng(base + index)
-        q = conformal.finite_sample_quantile(
-            numpy.abs(rng.standard_normal(1000)), LEVEL
-        )
+        q = conformal.cutoff(numpy.abs(rng.standard_normal(1000)), LEVEL)
         err = numpy.abs(rng.standard_normal(8 * size))
         report = coverage.slice_coverage(
             err <= q, numpy.repeat(numpy.arange(8), size).tolist(), LEVEL
@@ -472,9 +468,7 @@ def gate_g5(replicates: int, base: int = 0) -> dict[str, Any]:
         hits = 0
         for index in range(replicates):
             rng = numpy.random.default_rng(base + index)
-            q = conformal.finite_sample_quantile(
-                numpy.abs(rng.standard_normal(1000)), LEVEL
-            )
+            q = conformal.cutoff(numpy.abs(rng.standard_normal(1000)), LEVEL)
             err = numpy.abs(rng.standard_normal(8 * rows))
             err[:rows] *= 3.0
             report = coverage.slice_coverage(
@@ -528,12 +522,10 @@ def gate_g5b(replicates: int, base: int = 0) -> dict[str, Any]:
             The names of the flagged slices.
         """
         rng = numpy.random.default_rng(base + index)
-        q = conformal.finite_sample_quantile(
-            numpy.abs(rng.standard_normal(calibration)), LEVEL
-        )
+        q = conformal.cutoff(numpy.abs(rng.standard_normal(calibration)), LEVEL)
         err = numpy.abs(rng.standard_normal(8 * rows))
         err[:rows] *= noise
-        report = coverage.slice_flag(
+        report = coverage.undercovered(
             err <= q, numpy.repeat(numpy.arange(8), rows).tolist(), LEVEL
         )
         return {str(name) for name in report["flagged"]}
@@ -567,7 +559,7 @@ def gate_g5b(replicates: int, base: int = 0) -> dict[str, Any]:
         "false_flag_bound": bound,
         "detection_by_slice_rows": detection,
         "min_certified_rows": min(certified) if certified else None,
-        "method_hash": coverage_slices.flag_method_hash(),
+        "method_hash": coverage_slices.fingerprint(),
         "passed": bool(false_flags / replicates <= bound and certified),
     }
 
@@ -632,10 +624,7 @@ def gate_g6(replicates: int, base: int = 0) -> dict[str, Any]:
             margins = conformal.weighted_margins(score, wc, wt, LEVEL)
             weighted.append(numpy.mean(numpy.abs(et) <= margins))
             plain.append(
-                numpy.mean(
-                    numpy.abs(et)
-                    <= conformal.finite_sample_quantile(score, LEVEL)
-                )
+                numpy.mean(numpy.abs(et) <= conformal.cutoff(score, LEVEL))
             )
         out = {
             "replicates": runs,
@@ -756,20 +745,18 @@ def gate_g11i(replicates: int, base: int = 0) -> dict[str, Any]:
     rng = numpy.random.default_rng(999_999)
     _, risk, full, _, _ = survival_world(rng, 6000, censor=False)
     tau = float(numpy.quantile(full, 0.7))
-    flat = ipcw.CensoringWeights(
+    flat = ipcw.Censoring(
         numpy.ones(len(full)), 0.05, 0, covariate_dependent=False
     )
-    truth = ipcw.truncated_concordance(
-        full, numpy.ones(len(full)), risk, tau, flat
-    )
+    truth = ipcw.uno(full, numpy.ones(len(full)), risk, tau, flat)
     cox, marginal, share = [], [], []
     for index in range(replicates):
         rng = numpy.random.default_rng(base + index)
         x, risk, _, time, event = survival_world(rng, 1500, censor=True)
-        wc = ipcw.censoring_weights(time, event, x)
-        wm = ipcw.censoring_weights(time, event, None)
-        cox.append(ipcw.truncated_concordance(time, event, risk, tau, wc))
-        marginal.append(ipcw.truncated_concordance(time, event, risk, tau, wm))
+        wc = ipcw.reweight(time, event, x)
+        wm = ipcw.reweight(time, event, None)
+        cox.append(ipcw.uno(time, event, risk, tau, wc))
+        marginal.append(ipcw.uno(time, event, risk, tau, wm))
         share.append(wc.n_floored / len(time))
     cox_a, marginal_a = numpy.array(cox), numpy.array(marginal)
     se_cox = float(cox_a.std(ddof=1) / math.sqrt(replicates))
@@ -807,9 +794,9 @@ def gate_g13(replicates: int, base: int = 0) -> dict[str, Any]:
         rng = numpy.random.default_rng(base + index)
         u = rng.standard_normal(entities)
         resid = numpy.abs(u[:, None] + rng.standard_normal((entities, per)))
-        row_margin = conformal.finite_sample_quantile(resid.ravel(), LEVEL)
+        row_margin = conformal.cutoff(resid.ravel(), LEVEL)
         pick = rng.integers(0, per, entities)
-        entity_margin = conformal.finite_sample_quantile(
+        entity_margin = conformal.cutoff(
             resid[numpy.arange(entities), pick], LEVEL
         )
         new = numpy.abs(rng.standard_normal() + rng.standard_normal(4000))
@@ -847,15 +834,15 @@ def sources() -> dict[str, list[Any]]:
         Mapping of gate key to the functions its certificate covers.
     """
     return {
-        "G1": [conformal.finite_sample_quantile, gate_g1],
-        "G2": [conformal.cv_plus_bounds, gate_g2, cv_plus_replicate],
-        "G3": [quantile.QuantileBand, gate_g3],
+        "G1": [conformal.cutoff, gate_g1],
+        "G2": [conformal.cvplus, gate_g2, cv_plus_replicate],
+        "G3": [quantile.Band, gate_g3],
         "G4": [conformal.ConformalCalibrator, gate_g4, class_world],
-        "G5": [coverage.slice_coverage, coverage.holm_rejections, gate_g5],
+        "G5": [coverage.slice_coverage, coverage.stepdown, gate_g5],
         "G5b": [
-            coverage.slice_flag,
-            coverage.holm_rejections,
-            coverage.undercoverage_p_value,
+            coverage.undercovered,
+            coverage.stepdown,
+            coverage.deficit,
             gate_g5b,
         ],
         "G6": [
@@ -865,8 +852,8 @@ def sources() -> dict[str, list[Any]]:
             gate_g6,
         ],
         "G9": [reconcile.mint, reconcile.shrunk_covariance, gate_g9],
-        "G11i": [ipcw.censoring_weights, ipcw.truncated_concordance, gate_g11i],
-        "G13": [conformal.finite_sample_quantile, gate_g13],
+        "G11i": [ipcw.reweight, ipcw.uno, gate_g11i],
+        "G13": [conformal.cutoff, gate_g13],
     }
 
 

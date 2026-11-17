@@ -46,7 +46,7 @@ TEN_PERCENT = Fraction(1, 10)
 
 
 def fresh(path=None, rule=online_fdr.ELOND, alpha=TEN_PERCENT):
-    config = online_fdr.RuleConfig(rule, alpha)
+    config = online_fdr.Settings(rule, alpha)
     return scmle.data.ledger.ledger.Ledger.create(
         path,
         charter_hash="c" * 64,
@@ -75,7 +75,7 @@ def test_a_registered_hypothesis_is_tested_and_recorded_with_wealth():
     assert result.level == Fraction(1, 10) * Fraction(1, 2)
     assert ledger.decision(h) is result
     check = result.check
-    assert check.set_id is qualification.SetId.EXPLORATION
+    assert check.set_id is qualification.Subset.EXPLORATION
     assert check.tier is qualification.Tier.UNVERIFIED
     assert check.decision is qualification.Decision.WARN
     assert check.p_value < 1e-10
@@ -137,7 +137,7 @@ def test_only_exploration_hypotheses_can_be_registered():
         statistic="spearman",
         null="n",
         column="a",
-        set_id=qualification.SetId.CONFIRMATION,
+        set_id=qualification.Subset.CONFIRMATION,
     )
     with pytest.raises(
         scmle.data.ledger.ledger.LedgerError, match="exploration"
@@ -336,20 +336,20 @@ def test_survivors_freeze_before_confirmation_and_block_new_hypotheses():
     features, target = data()
     ledger = fresh()
     explore(ledger, features, target)
-    ledger.record_control({"observed": 1})
+    ledger.negatives({"observed": 1})
     frozen = ledger.freeze()
     assert frozen.hypothesis_ids == ("h000001",)
     assert ledger.freeze() is frozen
     with pytest.raises(scmle.data.ledger.ledger.LedgerError, match="frozen"):
         ledger.register(spec("signal", name="late"))
     with pytest.raises(scmle.data.ledger.ledger.LedgerError, match="frozen"):
-        ledger.record_control({"observed": 2})
+        ledger.negatives({"observed": 2})
     ledger.seal({"outcome": "confirmed"})
     assert ledger.confirmation["survivors_sha256"] == frozen.sha256
     with pytest.raises(
         scmle.data.ledger.ledger.LedgerError, match="no row may follow"
     ):
-        ledger.freeze() and ledger.record_control({})
+        ledger.freeze() and ledger.negatives({})
     ledger.verify()
 
 
@@ -642,4 +642,4 @@ def test_the_ledger_reports_state_properties():
     with pytest.raises(
         scmle.data.ledger.ledger.LedgerError, match="no open row"
     ):
-        scmle.data.ledger.ledger.Ledger(None).require_rule()
+        scmle.data.ledger.ledger.Ledger(None).tester()

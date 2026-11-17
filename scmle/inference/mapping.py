@@ -8,7 +8,7 @@ from scmle.contracts import errors
 
 
 @dataclasses.dataclass(frozen=True)
-class ColumnMapping:
+class Mapper:
     """Explicit policy for reconciling incoming column names with a schema.
 
     Nothing is renamed implicitly: the default policy requires exact names.

@@ -150,7 +150,7 @@ def test_by_is_more_conservative_than_bh():
     by = multiplicity.adjust(p, budget.Correction.BY, Fraction(1, 20))
     assert sum(by.rejected) <= sum(bh.rejected)
     assert all(a >= x for a, x in zip(by.adjusted, bh.adjusted, strict=True))
-    assert multiplicity.harmonic_exact(3) == Fraction(11, 6)
+    assert multiplicity.harmonics(3) == Fraction(11, 6)
 
 
 def test_order_of_the_input_is_preserved_and_ties_agree():

@@ -83,15 +83,15 @@ def test_a_pickled_model_predicts_the_same_in_a_new_session():
 
 
 def test_the_adapter_passes_conformance_for_every_standard_task():
-    adapter = scmle.models.registry.Catalog.with_builtins().get("keras_mlp")
+    adapter = scmle.models.registry.Catalog.stock().get("keras_mlp")
 
-    conformance.check_conformance(adapter)
+    conformance.comply(adapter)
 
     assert adapter.capabilities.tasks == tasks.STANDARD_TASKS
 
 
 def test_no_standard_adapter_claims_survival_except_the_baseline_and_survival_models():
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
 
     claiming = {
         name

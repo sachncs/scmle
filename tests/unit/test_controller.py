@@ -102,7 +102,7 @@ def test_labels_that_never_arrive_open_one_escalation(world):
 def test_a_halted_loop_is_left_alone(world):
     world.deliver(0)
     controller = world.controller()
-    controller.loop.enter_halt("operator_halt", {"reason": "test"})
+    controller.loop.suspend("operator_halt", {"reason": "test"})
     controller.loop.save_state()
     result = world.controller().tick(world.inbox)
     assert result.status == scmle.operations.controller.HALTED

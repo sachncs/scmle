@@ -39,7 +39,7 @@ def read_events(run_dir):
 
 
 def project_with(adapter, frame, tmp_path, **kwargs):
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     registry.register(adapter)
     project = support.make_project(frame, "y", output_dir=tmp_path, **kwargs)
     project.orchestrator.registry = registry

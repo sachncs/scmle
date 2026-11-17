@@ -38,7 +38,7 @@ def test_the_framework_process_never_imports_torch():
         """
         import sys
         from scmle.data.curation import embedding
-        model = embedding.TextEmbedder().fit(["a car", "an apple"])
+        model = embedding.Embedder().fit(["a car", "an apple"])
         model.transform(["a truck"])
         assert model.mode_ == "embedding", model.mode_
         assert "torch" not in sys.modules
@@ -57,7 +57,7 @@ def test_the_framework_process_never_imports_torch():
 
 
 def test_identical_strings_are_encoded_once():
-    model = embedding.TextEmbedder().fit(["warm up", "the model"])
+    model = embedding.Embedder().fit(["warm up", "the model"])
     texts = ["a unique sentence about cats"] * 40 + ["another about dogs"] * 40
 
     first = model.transform(texts)
@@ -81,8 +81,8 @@ def test_embeddings_generalise_to_wording_tfidf_never_saw():
         scores = model.predict_proba(encoder.transform(test_texts))[:, 1]
         return metrics.roc_auc_score(test_labels, scores)
 
-    embedded = auc(embedding.TextEmbedder())
-    terms = auc(transformers.TextVectorizer())
+    embedded = auc(embedding.Embedder())
+    terms = auc(transformers.Vectorizer())
 
     assert embedded > 0.9
     assert embedded > terms + 0.2
@@ -92,7 +92,7 @@ def test_an_unavailable_model_falls_back_to_terms_and_says_so(caplog):
     caplog.set_level(logging.WARNING)
     texts = pandas.Series(["red apple pie", "blue car wash"] * 5)
 
-    model = embedding.TextEmbedder("no-such-org/no-such-model").fit(texts)
+    model = embedding.Embedder("no-such-org/no-such-model").fit(texts)
 
     assert model.mode_ == "tfidf"
     assert "falling back to TF-IDF" in caplog.text

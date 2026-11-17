@@ -13,10 +13,10 @@ def governor(**kwargs):
 def test_cpu_limit_caps_workers_and_splits_threads():
     assert governor(workers=8, cpu_limit=2).workers == 2
     assert governor(workers=2, cpu_limit=8).workers == 2
-    assert governor(workers=4, cpu_limit=8).thread_limit == 2
-    assert governor(workers=4).thread_limit == 1
-    assert governor(workers=1).thread_limit is None
-    assert governor(workers=1, cpu_limit=3).thread_limit == 3
+    assert governor(workers=4, cpu_limit=8).threadcap == 2
+    assert governor(workers=4).threadcap == 1
+    assert governor(workers=1).threadcap is None
+    assert governor(workers=1, cpu_limit=3).threadcap == 3
 
 
 def test_first_trial_always_runs_then_budget_and_memory_apply(monkeypatch):

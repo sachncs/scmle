@@ -12,7 +12,7 @@ import enum
 from scmle.contracts import qualification
 
 
-class FieldSource(enum.StrEnum):
+class Filling(enum.StrEnum):
     """How a charter field was filled."""
 
     TEMPLATE = "template"
@@ -23,7 +23,7 @@ class FieldSource(enum.StrEnum):
 
 def grade(
     ceiling: qualification.Tier,
-    sources: Iterable[FieldSource],
+    sources: Iterable[Filling],
     *,
     signed: bool,
     cost_from_data: bool = False,
@@ -42,6 +42,6 @@ def grade(
     """
     if cost_from_data:
         return qualification.Tier.UNVERIFIED
-    if not signed and FieldSource.LLM in set(sources):
+    if not signed and Filling.LLM in set(sources):
         return qualification.Tier.UNVERIFIED
     return ceiling

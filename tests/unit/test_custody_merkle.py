@@ -41,13 +41,13 @@ def test_an_integer_and_the_same_float_and_text_are_different_cells():
 
 
 def test_the_root_is_deterministic_and_a_sha256():
-    root = merkle.frame_root(table(), [0, 1, 2, 3, 4])
-    assert root == merkle.frame_root(table(), [0, 1, 2, 3, 4])
+    root = merkle.merkleize(table(), [0, 1, 2, 3, 4])
+    assert root == merkle.merkleize(table(), [0, 1, 2, 3, 4])
     assert len(root) == 64
 
 
 def test_a_changed_value_in_one_row_changes_the_root():
-    base = merkle.frame_root(table(), [0, 1, 2, 3, 4])
+    base = merkle.merkleize(table(), [0, 1, 2, 3, 4])
     for column, row, value in (
         ("a", 3, 4.2500001),
         ("b", 0, 99),
@@ -56,37 +56,37 @@ def test_a_changed_value_in_one_row_changes_the_root():
     ):
         changed = table()
         changed.loc[row, column] = value
-        assert merkle.frame_root(changed, [0, 1, 2, 3, 4]) != base, column
+        assert merkle.merkleize(changed, [0, 1, 2, 3, 4]) != base, column
 
 
 def test_a_missing_value_differs_from_a_present_one():
     changed = table()
     changed.loc[1, "a"] = 0.0
-    assert merkle.frame_root(changed, [1]) != merkle.frame_root(table(), [1])
+    assert merkle.merkleize(changed, [1]) != merkle.merkleize(table(), [1])
 
 
 def test_the_root_follows_ids_not_the_order_they_are_given_in():
-    assert merkle.frame_root(table(), [3, 0, 2]) == merkle.frame_root(
+    assert merkle.merkleize(table(), [3, 0, 2]) == merkle.merkleize(
         table(), [0, 2, 3]
     )
 
 
 def test_a_different_set_of_ids_gives_a_different_root():
-    assert merkle.frame_root(table(), [0, 1]) != merkle.frame_root(
+    assert merkle.merkleize(table(), [0, 1]) != merkle.merkleize(
         table(), [0, 2]
     )
-    assert merkle.frame_root(table(), [0, 1]) != merkle.frame_root(
+    assert merkle.merkleize(table(), [0, 1]) != merkle.merkleize(
         table(), [0, 1, 2]
     )
 
 
 def test_the_row_id_is_part_of_the_row():
     same = pandas.DataFrame({"a": [1.0, 1.0]})
-    assert merkle.frame_root(same, [0]) != merkle.frame_root(same, [1])
+    assert merkle.merkleize(same, [0]) != merkle.merkleize(same, [1])
 
 
 def test_the_empty_set_has_a_fixed_root():
-    assert merkle.frame_root(table(), []) == merkle.EMPTY_ROOT
+    assert merkle.merkleize(table(), []) == merkle.EMPTY_ROOT
     assert merkle.merkle_root([]) == merkle.EMPTY_ROOT
 
 
@@ -118,7 +118,7 @@ def test_the_row_hash_matches_its_stated_encoding():
 def test_a_fixed_table_has_a_pinned_root():
     # The same bytes on every platform: this constant is the cross-platform
     # check, because nothing in the encoding depends on the machine.
-    root = merkle.frame_root(table(), [0, 1, 2, 3, 4])
+    root = merkle.merkleize(table(), [0, 1, 2, 3, 4])
     assert root == PINNED_ROOT
 
 

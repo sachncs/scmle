@@ -33,10 +33,10 @@ def boosted(tmp_path_factory):
         {"a": rng.normal(size=400), "b": rng.normal(size=400)}
     )
     target = (frame.a + frame.b > 0).astype(int)
-    plan = data.FeaturePlan(("a", "b"), ())
-    fitted = preprocessing.build_pipeline(
+    plan = data.Blueprint(("a", "b"), ())
+    fitted = preprocessing.instantiate(
         plan,
-        registry.Catalog.with_builtins().get("hist_gradient_boosting"),
+        registry.Catalog.stock().get("hist_gradient_boosting"),
         tasks.Task.BINARY,
         0,
     ).fit(frame, target)
@@ -46,7 +46,7 @@ def boosted(tmp_path_factory):
     return bundle, frame, tmp_path_factory.mktemp("service")
 
 
-def free_port():
+def unused():
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
         return probe.getsockname()[1]
@@ -114,7 +114,7 @@ def test_onnx_refuses_the_boosted_model_and_points_to_the_service(boosted):
 def test_the_generated_server_scores_rows_like_the_bundle(boosted):
     bundle, frame, root = boosted
     folder = bundle.export_service(root / "running")
-    port = free_port()
+    port = unused()
     process = start(folder, port, {"SCMLE_TRUSTED": "1"})
     try:
         assert wait_for(port, process), process.stderr.read().decode()
@@ -161,7 +161,7 @@ def wait_for_state(port, process, phases):
 def test_the_generated_server_stays_unready_for_an_unsigned_bundle(boosted):
     bundle, root = boosted[0], boosted[2]
     folder = bundle.export_service(root / "untrusted")
-    port = free_port()
+    port = unused()
     process = start(folder, port, {})
     try:
         status, body = wait_for_state(port, process, {"failed"})
@@ -179,7 +179,7 @@ def test_production_serves_only_a_signed_verified_folder(boosted):
     key = "package-test-key"
     folder = bundle.export_service(root / "production", signing_key=key)
     production = {"SCMLE_ENV": "production", "SCMLE_SIGNING_KEY": key}
-    port = free_port()
+    port = unused()
     process = start(folder, port, production)
     try:
         status, body = wait_for_state(port, process, {"ready", "failed"})
@@ -192,7 +192,7 @@ def test_production_serves_only_a_signed_verified_folder(boosted):
         process.wait(timeout=10)
         process.stderr.close()
 
-    port = free_port()
+    port = unused()
     process = start(folder, port, {**production, "SCMLE_TRUSTED": "1"})
     try:
         status, body = wait_for_state(port, process, {"ready", "failed"})
@@ -205,7 +205,7 @@ def test_production_serves_only_a_signed_verified_folder(boosted):
     corrupted = bundle.export_service(root / "corrupted", signing_key=key)
     with (corrupted / "model" / "pipeline.joblib").open("ab") as handle:
         handle.write(b"x")
-    port = free_port()
+    port = unused()
     process = start(corrupted, port, production)
     try:
         status, body = wait_for_state(port, process, {"ready", "failed"})

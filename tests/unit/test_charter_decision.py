@@ -24,12 +24,12 @@ def plan(**overrides):
         ),
     }
     values.update(overrides)
-    return scmle.data.charter.decision.RolloutPlan(**values)
+    return scmle.data.charter.decision.Experiment(**values)
 
 
 def test_the_full_block_round_trips_through_its_record():
-    layer = scmle.data.charter.decision.DecisionLayer(
-        model=scmle.data.charter.decision.DecisionModel(
+    layer = scmle.data.charter.decision.Layer(
+        model=scmle.data.charter.decision.Policy(
             unit="EUR per case",
             treatment_cost=2.0,
             off_policy=scmle.data.charter.decision.Gates(
@@ -37,33 +37,27 @@ def test_the_full_block_round_trips_through_its_record():
             ),
         ),
         fairness=(
-            scmle.data.charter.decision.FairnessConstraint(
+            scmle.data.charter.decision.Constraint(
                 "sex", "equal_opportunity", 0.05, "group_thresholds", "legal"
             ),
         ),
         rollout=plan(),
     )
-    assert (
-        scmle.data.charter.decision.DecisionLayer.from_dict(layer.to_dict())
-        == layer
-    )
+    assert scmle.data.charter.decision.Layer.from_dict(layer.to_dict()) == layer
     assert "rollout" in layer.to_dict()
-    bare = scmle.data.charter.decision.DecisionLayer(
-        scmle.data.charter.decision.DecisionModel("EUR")
+    bare = scmle.data.charter.decision.Layer(
+        scmle.data.charter.decision.Policy("EUR")
     )
     assert "rollout" not in bare.to_dict()
-    assert (
-        scmle.data.charter.decision.DecisionLayer.from_dict(bare.to_dict())
-        == bare
-    )
+    assert scmle.data.charter.decision.Layer.from_dict(bare.to_dict()) == bare
 
 
 def test_group_thresholds_need_an_attestation():
     with pytest.raises(ValueError, match="attestation"):
-        scmle.data.charter.decision.FairnessConstraint(
+        scmle.data.charter.decision.Constraint(
             "sex", "equal_opportunity", 0.05, "group_thresholds"
         )
-    scmle.data.charter.decision.FairnessConstraint(
+    scmle.data.charter.decision.Constraint(
         "sex", "equal_opportunity", 0.05, "reweighing"
     )
 
@@ -71,27 +65,23 @@ def test_group_thresholds_need_an_attestation():
 @pytest.mark.parametrize(
     "build",
     [
-        lambda: scmle.data.charter.decision.FairnessConstraint(
+        lambda: scmle.data.charter.decision.Constraint(
             "s", "unknown", 0.1, "reweighing"
         ),
-        lambda: scmle.data.charter.decision.FairnessConstraint(
+        lambda: scmle.data.charter.decision.Constraint(
             "s", "equalized_odds", 0.0, "reweighing"
         ),
-        lambda: scmle.data.charter.decision.FairnessConstraint(
+        lambda: scmle.data.charter.decision.Constraint(
             "s", "equalized_odds", 0.1, "magic"
         ),
-        lambda: scmle.data.charter.decision.FairnessConstraint(
+        lambda: scmle.data.charter.decision.Constraint(
             "s", "equalized_odds", 0.1, "reweighing", min_group=1
         ),
-        lambda: scmle.data.charter.decision.DecisionModel(
+        lambda: scmle.data.charter.decision.Policy(
             "u", baselines=("treat_all", "treat_all")
         ),
-        lambda: scmle.data.charter.decision.DecisionModel(
-            "u", baselines=("best",)
-        ),
-        lambda: scmle.data.charter.decision.DecisionModel(
-            "u", calibration_level=1.0
-        ),
+        lambda: scmle.data.charter.decision.Policy("u", baselines=("best",)),
+        lambda: scmle.data.charter.decision.Policy("u", calibration_level=1.0),
         lambda: scmle.data.charter.decision.Gates(clip=0.5),
         lambda: scmle.data.charter.decision.Gates(min_propensity=0.0),
         lambda: scmle.data.charter.decision.Gates(penalty=-1.0),
@@ -122,9 +112,9 @@ def test_the_plan_builds_its_budget_and_rejects_unknown_fields():
     assert budget.alpha_promote == Fraction(1, 50) and budget.horizon == 5
     record = rollout.to_dict()
     with pytest.raises(ValueError, match="unexpected"):
-        scmle.data.charter.decision.RolloutPlan.from_dict({**record, "x": 1})
+        scmle.data.charter.decision.Experiment.from_dict({**record, "x": 1})
     with pytest.raises(ValueError, match="missing"):
-        scmle.data.charter.decision.RolloutPlan.from_dict(
+        scmle.data.charter.decision.Experiment.from_dict(
             {k: v for k, v in record.items() if k != "salt"}
         )
 
@@ -135,21 +125,21 @@ def test_the_plan_builds_its_budget_and_rejects_unknown_fields():
 def with_cost_model():
     from scmle.data.framing import costs
 
-    return costs.DecisionCostModel(
+    return costs.Tariff(
         0.0,
         100.0,
         5.0,
         0.0,
         0.02,
         0.15,
-        (costs.CostSource.HUMAN,) * 4,
-        costs.CostSource.HUMAN,
+        (costs.Basis.HUMAN,) * 4,
+        costs.Basis.HUMAN,
     )
 
 
 def layer():
-    return scmle.data.charter.decision.DecisionLayer(
-        scmle.data.charter.decision.DecisionModel("EUR per case"),
+    return scmle.data.charter.decision.Layer(
+        scmle.data.charter.decision.Policy("EUR per case"),
         rollout=plan(),
     )
 
@@ -179,8 +169,8 @@ def test_the_layer_changes_the_hash_round_trips_and_needs_format_five():
     assert contracts.AnalysisCharter.from_dict(record) == charter
     other = make_charter(
         cost_model=with_cost_model(),
-        decision=scmle.data.charter.decision.DecisionLayer(
-            scmle.data.charter.decision.DecisionModel(
+        decision=scmle.data.charter.decision.Layer(
+            scmle.data.charter.decision.Policy(
                 "EUR per case", calibration_level=0.05
             ),
             rollout=plan(),

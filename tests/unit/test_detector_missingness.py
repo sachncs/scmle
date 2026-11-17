@@ -64,7 +64,7 @@ def brute_force_mle(values):
 @pytest.mark.parametrize("seed", [0, 1, 2])
 def test_em_matches_brute_force_maximum_likelihood(seed):
     values = gaussian_with_gaps(seed)
-    fit = missingness.em_normal(values)
+    fit = missingness.em(values)
     mean, cov = brute_force_mle(values)
     assert fit.converged
     numpy.testing.assert_allclose(fit.mean, mean, atol=2e-3)
@@ -73,7 +73,7 @@ def test_em_matches_brute_force_maximum_likelihood(seed):
 
 def test_em_on_complete_data_is_sample_moments():
     values = numpy.random.default_rng(3).normal(size=(40, 3))
-    fit = missingness.em_normal(values)
+    fit = missingness.em(values)
     numpy.testing.assert_allclose(fit.mean, values.mean(axis=0), atol=1e-9)
     numpy.testing.assert_allclose(
         fit.covariance, numpy.cov(values.T, ddof=0), atol=1e-6
@@ -82,10 +82,10 @@ def test_em_on_complete_data_is_sample_moments():
 
 def test_em_rejects_bad_input():
     with pytest.raises(ValueError, match="two-dimensional"):
-        missingness.em_normal(numpy.zeros(5))
+        missingness.em(numpy.zeros(5))
     bad = numpy.array([[1.0, numpy.nan], [2.0, numpy.nan], [3.0, numpy.nan]])
     with pytest.raises(ValueError, match="at least one observed"):
-        missingness.em_normal(bad)
+        missingness.em(bad)
 
 
 def test_little_statistic_matches_naive_formula_at_brute_force_mle():
@@ -189,11 +189,11 @@ def test_auc_from_ranks_matches_sklearn():
     rng = numpy.random.default_rng(0)
     flag = rng.random(100) < 0.3
     score = rng.normal(size=100) + flag
-    assert missingness.auc_from_ranks(score, flag) == pytest.approx(
+    assert missingness.ranksum(score, flag) == pytest.approx(
         metrics.roc_auc_score(flag, score)
     )
     tied = numpy.zeros(100)
-    assert missingness.auc_from_ranks(tied, flag) == pytest.approx(0.5)
+    assert missingness.ranksum(tied, flag) == pytest.approx(0.5)
 
 
 def indicator_frame(dependent, n=200, seed=0):
@@ -260,36 +260,36 @@ def test_numeric_columns_skip_constants_text_and_booleans():
     frame = pandas.DataFrame(
         {"a": [1.0, 2.0], "c": [1.0, 1.0], "s": ["x", "y"], "b": [True, False]}
     )
-    assert missingness.numeric_columns(frame) == ["a"]
+    assert missingness.numerics(frame) == ["a"]
 
 
 def test_assess_mechanism_reports_and_rejects():
-    report = missingness.assess_mechanism(indicator_frame(True, n=300), seed=1)
+    report = missingness.investigate(indicator_frame(True, n=300), seed=1)
     assert report.mcar_rejected and report.tier == "unverified"
     assert report.rows_checked == report.input_rows == 300
     assert report.to_dict()["alpha"] == missingness.ALPHA
     clean = pandas.DataFrame(numpy.random.default_rng(0).normal(size=(60, 3)))
-    quiet = missingness.assess_mechanism(clean)
+    quiet = missingness.investigate(clean)
     assert not quiet.mcar_rejected and quiet.little is None
     with pytest.raises(ValueError, match="alpha"):
-        missingness.assess_mechanism(clean, alpha=1.0)
+        missingness.investigate(clean, alpha=1.0)
     with pytest.raises(ValueError, match="alpha"):
-        missingness.assess_mechanism(clean, alpha=0.0)
+        missingness.investigate(clean, alpha=0.0)
 
 
 def test_assess_mechanism_records_caps_instead_of_failing(monkeypatch):
     frame = indicator_frame(False, n=300)
     monkeypatch.setattr(missingness, "MAX_ROWS", 100)
-    report = missingness.assess_mechanism(frame, permutations=9)
+    report = missingness.investigate(frame, permutations=9)
     assert report.rows_checked == 100 and report.input_rows == 300
     assert any("sampled" in s for s in report.skipped)
     monkeypatch.setattr(missingness, "MAX_COLUMNS", 2)
-    report = missingness.assess_mechanism(frame, permutations=9)
+    report = missingness.investigate(frame, permutations=9)
     assert any("over budget" in s for s in report.skipped)
     assert report.little is None and report.indicators == ()
     monkeypatch.setattr(missingness, "MAX_COLUMNS", 40)
     monkeypatch.setattr(missingness, "MAX_INDICATOR_COLUMNS", 0)
-    report = missingness.assess_mechanism(frame, permutations=9)
+    report = missingness.investigate(frame, permutations=9)
     assert any("indicator models" in s for s in report.skipped)
 
 
@@ -334,7 +334,7 @@ def test_fold_imputer_state_ignores_held_out_rows(strategy):
     rng = numpy.random.default_rng(0)
     values = rng.normal(size=(60, 4))
     values[rng.random(values.shape) < 0.1] = numpy.nan
-    folds = missingness.fold_imputers(values, strategy, seed=2)
+    folds = missingness.imputers(values, strategy, seed=2)
     for train, held, fitted in folds:
         assert not set(train) & set(held)
         changed = values.copy()
@@ -353,10 +353,10 @@ def test_imputation_errors_are_measured_per_strategy():
         [base + 0.05 * rng.normal(size=(200, 1)) for col in range(4)]
     )
     values[rng.random(values.shape) < 0.1] = numpy.nan
-    errors = missingness.imputation_errors(values, seed=0)
+    errors = missingness.benchmark(values, seed=0)
     assert set(errors) == set(missingness.STRATEGIES)
     assert errors["knn"] < errors["mean"]
     with pytest.raises(ValueError, match="share"):
-        missingness.imputation_errors(values, share=1.0)
+        missingness.benchmark(values, share=1.0)
     with pytest.raises(ValueError, match="strategy"):
         missingness.make_imputer("magic")

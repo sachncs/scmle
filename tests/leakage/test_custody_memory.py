@@ -46,9 +46,9 @@ def custody(rows=2000, process=True):
     )
     task = tasks.Task.BINARY
     split = splitters.Splitter(spec, task).split(frame)
-    log = sealed.OpenLog()
+    log = sealed.Journal()
     vault = sealed.Vault(log, process=process)
-    outcome = pipeline.apply_custody(
+    outcome = pipeline.sequester(
         charter=make_charter(min_effect=0.3, k_max=5),
         split=split,
         frame=frame,

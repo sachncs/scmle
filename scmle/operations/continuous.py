@@ -194,7 +194,7 @@ class TrainingHistory:
         )
         return row
 
-    def of_kind(self, kind: str) -> list[dict[str, Any]]:
+    def select(self, kind: str) -> list[dict[str, Any]]:
         """Rows of one kind, oldest first.
 
         Args:
@@ -277,7 +277,7 @@ class RetrainDecision:
         return dataclasses.asdict(self)
 
 
-def judge_retraining(
+def decide(
     policy: RetrainPolicy,
     rows: Sequence[signals.Signal],
     alarm_since_last: bool,
@@ -378,7 +378,7 @@ class Indicator:
             raise errors.InputError("margin must be finite and not negative")
 
 
-def bootstrap_difference(
+def contrast(
     before: numpy.ndarray,
     after: numpy.ndarray,
     alpha: float,
@@ -473,7 +473,7 @@ def post_promotion_check(
                 }
             )
             continue
-        low, high = bootstrap_difference(old, new, adjusted, resamples, seed)
+        low, high = contrast(old, new, adjusted, resamples, seed)
         sign = 1.0 if spec.better == "higher" else -1.0
         good_low, good_high = sorted((sign * low, sign * high))
         if good_low > spec.margin:
@@ -522,7 +522,7 @@ def post_promotion_check(
     }
 
 
-def holdback_assignment(
+def reserve(
     unit_ids: Sequence[Any], fraction: float, salt: str
 ) -> numpy.ndarray:
     """Which units stay on the previous model: a keyed hash of the unit id.
@@ -574,7 +574,7 @@ def holdback_check(
     """Did the promoted model help, against units kept on the old model?
 
     The comparison is concurrent: units were assigned to the previous model
-    (`holdback`) or to the promoted one at random by `holdback_assignment`,
+    (`holdback`) or to the promoted one at random by `reserve`,
     so seasonality, traffic mix and other changes affect both sides alike and
     the difference is attributable to the model, to the extent that the
     assignment was random and the units do not influence each other.
@@ -722,7 +722,7 @@ class ContinuousEvaluation:
         self.seen_alarms = sum(
             1 for r in loop.ledger.rows if r["kind"] == deployment_ledger.ALARM
         )
-        proposals = self.history.of_kind("retrain_decision")
+        proposals = self.history.select("retrain_decision")
         self.last_proposal_batch: int | None = (
             proposals[-1]["facts"].get("batch") if proposals else None
         )
@@ -748,7 +748,7 @@ class ContinuousEvaluation:
         )
         durability.append_text(self.directory / LABELS_FILE, line + "\n")
 
-    def feed_labels(
+    def absorb(
         self,
         predictions: Mapping[str, Any],
         labels: Mapping[str, Any],
@@ -780,7 +780,7 @@ class ContinuousEvaluation:
         self.retain("labels", labels)
         return self.loop.mature(losses, challengers=paired or None)
 
-    def feed_outcomes(
+    def feed(
         self,
         outcomes: Mapping[str, float],
         cap: float,
@@ -871,7 +871,7 @@ class ContinuousEvaluation:
             if self.last_proposal_batch is None
             else batch - self.last_proposal_batch
         )
-        primary, support, held = judge_retraining(
+        primary, support, held = decide(
             self.policy, rows, fresh_alarm, age_days, since
         )
         gates = self.loop.policy.alarm_gates_retrain
@@ -944,7 +944,7 @@ class ContinuousEvaluation:
             },
         )
         if name not in self.loop.ledger.registered:
-            self.loop.register_challenger(name)
+            self.loop.enroll(name)
         return name
 
     def run_approved_retrain(self, escalation_id: str) -> str | None:
@@ -967,7 +967,7 @@ class ContinuousEvaluation:
             if (
                 row["kind"] == deployment_ledger.ATTESTATION
                 and body.get("escalation_id") == escalation_id
-                and deployment_ledger.ReplyDecision(body["decision"])
+                and deployment_ledger.Reply(body["decision"])
                 in never_list.ALLOWING
             ):
                 return self.train(("approved recommendation",))
@@ -1018,7 +1018,7 @@ class ContinuousEvaluation:
             preserved=preserve,
         )
 
-    def promotion_proposals(self) -> list[str]:
+    def nominations(self) -> list[str]:
         """Challengers the loop's e-process proposed, oldest first.
 
         Returns:
@@ -1072,7 +1072,7 @@ class ContinuousEvaluation:
             Whether the replacement was done and, if not, the reasons.
         """
         reasons = []
-        if challenger not in self.promotion_proposals():
+        if challenger not in self.nominations():
             reasons.append(
                 f"the loop has no promotion proposal for {challenger!r}"
             )
@@ -1107,7 +1107,7 @@ class ContinuousEvaluation:
         )
         return Replacement(outcome.done, outcome.reasons, outcome)
 
-    def check_after_promotion(
+    def followup(
         self,
         specs: Sequence[Indicator],
         before: Mapping[str, Sequence[float]],

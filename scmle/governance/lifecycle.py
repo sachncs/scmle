@@ -20,7 +20,7 @@ HOLDOUT_FRACTION = 0.3
 STATE_SUFFIX = ".lifecycle.json"
 
 
-def split_fresh(
+def bisect(
     fresh: pandas.DataFrame, schema: Any
 ) -> tuple[pandas.DataFrame, pandas.DataFrame]:
     """Splits fresh rows into training and holdout rows.
@@ -101,7 +101,7 @@ class Trigger:
 
 
 @dataclasses.dataclass(frozen=True)
-class RollbackOutcome:
+class Outcome:
     """What a rollback check concluded and did.
 
     Attributes:
@@ -180,10 +180,10 @@ class Maintainer:
         self.policy = policy or Cadence()
         self.rollout_decides = False
 
-    def defer_to_rollout(self) -> None:
+    def delegate(self) -> None:
         """Makes the bootstrap promotion and rollback rules descriptive.
 
-        Once a charter rollout is bound to this manager (`RolloutHook` calls
+        Once a charter rollout is bound to this manager (`Hook` calls
         this on construction), the e-processes of `scmle.decision.rollout`
         are the only deciders. `review` then stages the retrained challenger
         whatever its bootstrap comparison says, so the e-process can test
@@ -198,7 +198,7 @@ class Maintainer:
         """Where the manager remembers its last attempt."""
         return self.registry.root / f"{self.model}{STATE_SUFFIX}"
 
-    def read_state(self) -> dict[str, Any]:
+    def recall(self) -> dict[str, Any]:
         """Reads the last attempt's data digest and the rows seen since.
 
         Returns:
@@ -206,7 +206,7 @@ class Maintainer:
             retraining attempt (None if none), and `rows_since_attempt`;
             the saved content as it is when the state file exists.
         """
-        with durability.path_lock(self.state_path):
+        with durability.latch(self.state_path):
             if not self.state_path.exists():
                 return {"last_digest": None, "rows_since_attempt": 0}
             state: dict[str, Any] = json.loads(
@@ -214,11 +214,11 @@ class Maintainer:
             )
             return state
 
-    def write_state(self, state: dict[str, Any]) -> None:
+    def persist(self, state: dict[str, Any]) -> None:
         """Saves the state atomically.
 
         Args:
-            state: The state to save, as returned by `read_state`.
+            state: The state to save, as returned by `recall`.
         """
         durability.write_atomically(
             self.state_path, json.dumps(state).encode("utf-8")
@@ -230,7 +230,7 @@ class Maintainer:
         """Why a recommended retrain should not run now, if any reason holds.
 
         Args:
-            state: The saved state, as returned by `read_state`.
+            state: The saved state, as returned by `recall`.
             fresh: The fresh rows offered for retraining.
 
         Returns:
@@ -254,9 +254,9 @@ class Maintainer:
         self,
         result: results.Run,
         promote: bool = False,
-        approval: scmle.governance.registry.PromotionApproval | None = None,
+        approval: scmle.governance.registry.Sanction | None = None,
         signing_key: str | bytes | None = None,
-    ) -> scmle.governance.registry.VersionRecord:
+    ) -> scmle.governance.registry.Release:
         """Registers a finished run and optionally makes it the champion.
 
         The run's bundle is first exported to ``export`` in its run
@@ -300,15 +300,15 @@ class Maintainer:
             )
         return record
 
-    def promote_challenger(
+    def elevate(
         self,
-        approval: scmle.governance.registry.PromotionApproval,
+        approval: scmle.governance.registry.Sanction,
         signing_key: str | bytes | None = None,
-    ) -> scmle.governance.registry.VersionRecord:
+    ) -> scmle.governance.registry.Release:
         """Promotes the staged challenger after independent review.
 
-        With a guarded registry (`ModelRegistryStore.attach_guard`, e.g. via
-        `Loop.guard_registry`) it also needs a human attestation for the exact
+        With a guarded registry (`ModelRegistryStore.attach`, e.g. via
+        `Loop.intercept`) it also needs a human attestation for the exact
         model and version, else `AttestationRequired` is raised and nothing
         moves. An `ArtifactError` is raised if there is no staged challenger
         or the approval is invalid.
@@ -343,7 +343,7 @@ class Maintainer:
         fresh: pandas.DataFrame,
         target: str,
         retrain: bool = True,
-        project_options: dict[str, Any] | None = None,
+        configure: dict[str, Any] | None = None,
     ) -> LifecycleOutcome:
         """Monitors the champion on fresh labeled data and acts on advice.
 
@@ -351,10 +351,10 @@ class Maintainer:
         of the fresh data and compared with the champion on the held-out
         remainder. A challenger whose bootstrap comparison says `promote` is
         staged (the `challenger` alias), but champion promotion requires a
-        separate call to `promote_challenger`. A recommended retrain is
+        separate call to `elevate`. A recommended retrain is
         skipped, and noted in the outcome, when the rows were already acted
         on, are too few or arrive within the cooldown. When a charter
-        rollout is bound (`defer_to_rollout`) the challenger is staged
+        rollout is bound (`delegate`) the challenger is staged
         whatever the comparison says. The attempt is recorded in the state
         file and the audit trail.
 
@@ -363,20 +363,20 @@ class Maintainer:
             target: Name of the target column.
             retrain: Whether a recommended retrain may run; when False the
                 champion is only monitored.
-            project_options: Extra `Project` options for the challenger.
+            configure: Extra `Project` options for the challenger.
 
         Returns:
             The outcome.
         """
-        with durability.path_lock(self.state_path):  # One attempt at a time.
-            return self.review_locked(fresh, target, retrain, project_options)
+        with durability.latch(self.state_path):  # One attempt at a time.
+            return self.locked(fresh, target, retrain, configure)
 
-    def review_locked(
+    def locked(
         self,
         fresh: pandas.DataFrame,
         target: str,
         retrain: bool,
-        project_options: dict[str, Any] | None,
+        configure: dict[str, Any] | None,
     ) -> LifecycleOutcome:
         """Does the work of `review`; the caller holds the state lock.
 
@@ -384,7 +384,7 @@ class Maintainer:
             fresh: Fresh labelled rows, including the target.
             target: Name of the target column.
             retrain: Whether a recommended retrain may run.
-            project_options: Options for the retraining project.
+            configure: Options for the retraining project.
 
         Returns:
             The outcome: the monitoring report, whether a retrain ran, the
@@ -392,9 +392,9 @@ class Maintainer:
         """
         current = self.registry.load(self.model)
         features = fresh.drop(columns=[target])
-        report = monitor.ModelMonitor(current).assess(features, fresh[target])
+        report = monitor.Watcher(current).assess(features, fresh[target])
         notes = list(report.recommendation.reasons)
-        state = self.read_state()
+        state = self.recall()
         self.registry.audit(
             "lifecycle.review",
             model=self.model,
@@ -437,17 +437,17 @@ class Maintainer:
             data_digest=digest,
             reasons=notes,
         )
-        self.write_state({"last_digest": digest, "rows_since_attempt": 0})
-        train, holdout = split_fresh(fresh, current.schema)
-        options = dict(project_options or {})
+        self.persist({"last_digest": digest, "rows_since_attempt": 0})
+        train, holdout = bisect(fresh, current.schema)
+        options = dict(configure or {})
         options.setdefault("task", current.schema.task)
         options.setdefault("metric", current.info.metric)
         challenger_run = scmle.api.project.Project(
             train, target, output_dir=self.work_dir, **options
         ).run()
-        comparison = champion.ChampionChallenger(
-            current, challenger_run.bundle
-        ).compare(holdout.drop(columns=[target]), holdout[target])
+        comparison = champion.Referee(current, challenger_run.bundle).compare(
+            holdout.drop(columns=[target]), holdout[target]
+        )
         evidence = dataclasses.asdict(comparison)
         if self.rollout_decides:
             self.registry.audit(
@@ -505,12 +505,12 @@ class Maintainer:
         fresh: pandas.DataFrame,
         target: str,
         policy: Trigger | None = None,
-        approval: scmle.governance.registry.PromotionApproval | None = None,
+        approval: scmle.governance.registry.Sanction | None = None,
         signing_key: str | bytes | None = None,
-    ) -> RollbackOutcome:
+    ) -> Outcome:
         """Takes the previous champion back if the new one is clearly worse.
 
-        With a charter rollout bound (`defer_to_rollout`) this is a
+        With a charter rollout bound (`delegate`) this is a
         descriptive diagnostic: it audits the comparison and never moves the
         alias or asks for approval.
 
@@ -543,14 +543,14 @@ class Maintainer:
         aliases = self.registry.aliases(self.model)
         previous = aliases.get(scmle.governance.registry.PREVIOUS)
         if previous is None:
-            return RollbackOutcome(
+            return Outcome(
                 rolled_back=False,
                 comparison=None,
                 restored_version=None,
                 reason="no previous version",
             )
         if len(fresh) < rule.min_rows:
-            return RollbackOutcome(
+            return Outcome(
                 rolled_back=False,
                 comparison=None,
                 restored_version=None,
@@ -558,7 +558,7 @@ class Maintainer:
             )
         current = self.registry.load(self.model)
         old = self.registry.load(self.model, previous)
-        comparison = champion.ChampionChallenger(old, current).compare(
+        comparison = champion.Referee(old, current).compare(
             fresh.drop(columns=[target]), fresh[target]
         )
         worse = comparison.interval[1] < -rule.tolerance
@@ -574,7 +574,7 @@ class Maintainer:
                 decides=False,
                 **dataclasses.asdict(comparison),
             )
-            return RollbackOutcome(
+            return Outcome(
                 rolled_back=False,
                 comparison=comparison,
                 restored_version=None,
@@ -587,7 +587,7 @@ class Maintainer:
         restored = False
         try:
             if restore and approval is not None:
-                self.restore_previous(
+                self.revert(
                     approval,
                     signing_key,
                     aliases[scmle.governance.registry.CHAMPION],
@@ -605,7 +605,7 @@ class Maintainer:
                 **dataclasses.asdict(comparison),
             )
         if not worse:
-            return RollbackOutcome(
+            return Outcome(
                 rolled_back=False,
                 comparison=comparison,
                 restored_version=None,
@@ -618,13 +618,13 @@ class Maintainer:
                 version=previous,
                 reason="new champion is clearly worse",
             )
-            return RollbackOutcome(
+            return Outcome(
                 rolled_back=False,
                 comparison=comparison,
                 restored_version=None,
                 reason="rollback requires independent approval",
             )
-        return RollbackOutcome(
+        return Outcome(
             rolled_back=True,
             comparison=comparison,
             restored_version=previous,
@@ -633,9 +633,9 @@ class Maintainer:
             f"[{comparison.interval[0]:.4f}, {comparison.interval[1]:.4f}])",
         )
 
-    def restore_previous(
+    def revert(
         self,
-        approval: scmle.governance.registry.PromotionApproval,
+        approval: scmle.governance.registry.Sanction,
         signing_key: str | bytes | None = None,
         current: int | None = None,
         previous: int | None = None,
@@ -705,4 +705,4 @@ class Maintainer:
         ):
             return
         state["rows_since_attempt"] += len(fresh)
-        self.write_state(state)
+        self.persist(state)

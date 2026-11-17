@@ -139,7 +139,7 @@ def random_schema(seed: int, name: str = "ingest.check.schema") -> Schema:
     )
 
 
-def views(schema: Schema) -> tuple[synthesize.Source, asof_view.AsOfView]:
+def views(schema: Schema) -> tuple[synthesize.Source, asof_view.View]:
     """The order source and the item view of a schema.
 
     Args:
@@ -150,7 +150,7 @@ def views(schema: Schema) -> tuple[synthesize.Source, asof_view.AsOfView]:
         items.
     """
 
-    def rule(known: bool) -> asof_view.KnownTime:
+    def rule(known: bool) -> asof_view.Timing:
         """The time rule of a table.
 
         Args:
@@ -161,15 +161,13 @@ def views(schema: Schema) -> tuple[synthesize.Source, asof_view.AsOfView]:
             event-delay rule; both with the schema's delta.
         """
         if known:
-            return asof_view.KnownTime(
-                asof_view.TRANSACTION, "rec", schema.delta
-            )
-        return asof_view.KnownTime(asof_view.EVENT_DELAY, None, schema.delta)
+            return asof_view.Timing(asof_view.TRANSACTION, "rec", schema.delta)
+        return asof_view.Timing(asof_view.EVENT_DELAY, None, schema.delta)
 
-    orders = asof_view.AsOfView(
+    orders = asof_view.View(
         schema.orders, "cid", rule(schema.known), "ev", "orders"
     )
-    items = asof_view.AsOfView(
+    items = asof_view.View(
         schema.items, "oid", rule(schema.leaf_known), "ev", "items"
     )
     return synthesize.Source(orders, "cid"), items
@@ -363,10 +361,10 @@ def late_leaks(seed: int) -> Leaks:
             asof_view.CUTOFF_COLUMN: cutoff,
         }
     )
-    view = asof_view.AsOfView(
+    view = asof_view.View(
         world.child,
         "cid",
-        asof_view.KnownTime(asof_view.TRANSACTION, "recorded", 0.0),
+        asof_view.Timing(asof_view.TRANSACTION, "recorded", 0.0),
         "event_time",
         "events",
     )

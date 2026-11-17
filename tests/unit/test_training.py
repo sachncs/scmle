@@ -6,29 +6,26 @@ from scmle.models.deeplearning import training
 
 
 def test_auto_batch_size_scales_with_the_data_within_bounds():
-    sizes = [
-        training.resolve_batch_size("auto", n) for n in (100, 2000, 100000)
-    ]
+    sizes = [training.batching("auto", n) for n in (100, 2000, 100000)]
 
     assert sizes == [32, 64, 512]
-    assert training.resolve_batch_size("auto", 10) == 10
-    assert training.resolve_batch_size(256, 100) == 100
+    assert training.batching("auto", 10) == 10
+    assert training.batching(256, 100) == 100
     with pytest.raises(ValueError, match="batch size"):
-        training.resolve_batch_size(0, 100)
+        training.batching(0, 100)
 
 
 def test_cosine_schedule_warms_up_then_decays_to_zero():
     rates = [
-        training.learning_rate_at(s, 100, 0.1, 10, "cosine")
-        for s in (0, 9, 10, 55, 99)
+        training.anneal(s, 100, 0.1, 10, "cosine") for s in (0, 9, 10, 55, 99)
     ]
 
     assert rates[0] == pytest.approx(0.01) and rates[1] == pytest.approx(0.1)
     assert rates[2] == pytest.approx(0.1)
     assert 0.0 < rates[3] < 0.1 and rates[4] < 0.001
-    assert training.learning_rate_at(80, 100, 0.1, 0, "constant") == 0.1
+    assert training.anneal(80, 100, 0.1, 0, "constant") == 0.1
     with pytest.raises(ValueError, match="schedule"):
-        training.learning_rate_at(0, 10, 0.1, 0, "linear")
+        training.anneal(0, 10, 0.1, 0, "linear")
 
 
 def healthy(monitor):

@@ -79,7 +79,7 @@ def require_digest(value: object, field_name: str) -> str:
     return value
 
 
-def require_name(value: object, field_name: str) -> str:
+def simple(value: object, field_name: str) -> str:
     """Returns `value` if it is a plain identifier.
 
     Args:
@@ -148,7 +148,7 @@ class ImageRef:
                 not a valid `Architecture` value is rejected with a
                 `ValueError`.
         """
-        require_name(self.repository, "image.repository")
+        simple(self.repository, "image.repository")
         require_digest(self.digest, "image.digest")
         converted = tuple(Architecture(item) for item in self.architectures)
         object.__setattr__(self, "architectures", converted)
@@ -218,7 +218,7 @@ class BundleRef:
                 boolean; an invalid model name or digest is refused with the
                 same error.
         """
-        require_name(self.model, "bundle.model")
+        simple(self.model, "bundle.model")
         if VERSION_PATTERN.fullmatch(str(self.model_version)) is None:
             raise errors.ConfigError("bundle.model_version is not valid")
         require_digest(self.digest, "bundle.digest")
@@ -309,7 +309,7 @@ class SecretRef:
                 f"secret {self.name} file locator must be an absolute path"
             )
         if self.source is SecretSource.STORE:
-            require_name(text, f"secret {self.name} locator")
+            simple(text, f"secret {self.name} locator")
 
     def to_dict(self) -> dict[str, Any]:
         """Builds a JSON-compatible record.
@@ -499,7 +499,7 @@ def canonical_json(payload: Mapping[str, Any]) -> bytes:
     ).encode("utf-8")
 
 
-def check_config_entries(config: Mapping[str, str]) -> None:
+def nonsecret(config: Mapping[str, str]) -> None:
     """Checks that every config entry is a plain, non-secret variable.
 
     Args:
@@ -524,7 +524,7 @@ def check_config_entries(config: Mapping[str, str]) -> None:
             raise errors.ConfigError(f"config {key} holds key material")
 
 
-def check_production_rules(spec: "Deployment") -> None:
+def harden(spec: "Deployment") -> None:
     """Applies the production-only rules to a deployment.
 
     Args:
@@ -591,7 +591,7 @@ class Deployment:
         object.__setattr__(self, "secrets", tuple(self.secrets))
         if not (0 < self.port < PORT_LIMIT):
             raise errors.ConfigError("port must be between 1 and 65535")
-        check_config_entries(self.config)
+        nonsecret(self.config)
         names = [secret.name for secret in self.secrets]
         if len(set(names)) != len(names):
             raise errors.ConfigError("secret names must be unique")
@@ -600,7 +600,7 @@ class Deployment:
             raise errors.ConfigError(
                 f"names are both config and secret: {', '.join(clash)}"
             )
-        check_production_rules(self)
+        harden(self)
 
     def to_dict(self) -> dict[str, Any]:
         """Builds a deterministic JSON-compatible record.
@@ -702,7 +702,7 @@ class Runtime:
         require_digest(self.bundle_digest, "report.bundle_digest")
 
 
-def identity_problems(spec: Deployment, report: Runtime) -> list[str]:
+def divergences(spec: Deployment, report: Runtime) -> list[str]:
     """Lists the differences in what runs: spec, image, bundle and readiness.
 
     Args:
@@ -730,7 +730,7 @@ def identity_problems(spec: Deployment, report: Runtime) -> list[str]:
     return problems
 
 
-def secret_problems(spec: Deployment, report: Runtime) -> list[str]:
+def mounts(spec: Deployment, report: Runtime) -> list[str]:
     """Lists the differences in which secrets are mounted.
 
     Args:
@@ -751,7 +751,7 @@ def secret_problems(spec: Deployment, report: Runtime) -> list[str]:
     return problems
 
 
-def isolation_problems(spec: Deployment, report: Runtime) -> list[str]:
+def diff(spec: Deployment, report: Runtime) -> list[str]:
     """Lists the differences in filesystem, user and resource limits.
 
     Args:
@@ -793,9 +793,9 @@ def conformance_problems(spec: Deployment, report: Runtime) -> list[str]:
         One message per difference; empty if the runtime conforms.
     """
     return [
-        *identity_problems(spec, report),
-        *secret_problems(spec, report),
-        *isolation_problems(spec, report),
+        *divergences(spec, report),
+        *mounts(spec, report),
+        *diff(spec, report),
     ]
 
 

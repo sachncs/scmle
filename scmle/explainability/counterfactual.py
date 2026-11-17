@@ -43,12 +43,12 @@ class Counterfactual:
     prediction: Any
 
     @property
-    def n_changed(self) -> int:
+    def edits(self) -> int:
         """The number of columns changed."""
         return len(self.changed)
 
 
-class CounterfactualSearch:
+class Recourse:
     """Greedy search over actionable columns with a pruning pass."""
 
     def __init__(

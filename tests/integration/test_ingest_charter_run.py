@@ -104,7 +104,7 @@ def charter_file(tmp_path, block=True, entity=None, reconcile=None):
         reconcile=reconcile,
     )
     path = tmp_path / "charter.json"
-    sealing.write_charter(
+    sealing.inscribe(
         path,
         make_charter(min_effect=0.5, k_max=3, ingest=spec if block else None),
         signing_key=KEY,
@@ -212,8 +212,8 @@ def with_emails(frame):
 
 def entity_block():
     return ingest.Entity(
-        fields=(ingest.EntityField("email", False),),
-        passes=(ingest.EntityPass("email"),),
+        fields=(ingest.Attribute("email", False),),
+        passes=(ingest.Pass("email"),),
     )
 
 
@@ -273,9 +273,9 @@ def declared_totals(path, rows_off=0):
             ingest.TableTotals(
                 "orders",
                 rows=len(keys) + rows_off,
-                sums=(ingest.ColumnTotal("amount", float(keys.amount.sum())),),
+                sums=(ingest.Total("amount", float(keys.amount.sum())),),
                 checksum_column="order_id",
-                checksum=declared.key_checksum(keys.order_id),
+                checksum=declared.sha(keys.order_id),
             ),
         )
     )

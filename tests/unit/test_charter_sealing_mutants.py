@@ -108,5 +108,5 @@ def test_the_write_call_names_the_encoding_and_the_newline(
         return original(self, data, *args, **kwargs)
 
     monkeypatch.setattr(Path, "write_text", spy)
-    sealing.write_charter(tmp_path / "c.json", make_charter(), "k")
+    sealing.inscribe(tmp_path / "c.json", make_charter(), "k")
     assert seen == {"args": (), "encoding": "utf-8", "newline": "\n"}

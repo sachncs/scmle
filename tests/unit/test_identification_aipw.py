@@ -49,9 +49,7 @@ def planted(n: int, seed: int, tau: float = 2.0, confound: float = 1.0):
 
 @pytest.mark.parametrize("learner", aipw.LEARNERS)
 def test_a_planted_effect_is_recovered_with_a_covering_interval(learner):
-    nuis = aipw.fit_nuisances(
-        planted(2000, 1), ("a", "b", "c"), "t", "y", 0, learner
-    )
+    nuis = aipw.prefit(planted(2000, 1), ("a", "b", "c"), "t", "y", 0, learner)
     for estimand in ("ATE", "ATT"):
         out = aipw.estimate(nuis, planted(3000, 2), "t", "y", estimand)
         assert abs(out.estimate - 2.0) < 4 * out.se
@@ -63,7 +61,7 @@ def test_the_naive_difference_is_biased_and_aipw_is_not():
     frame = planted(4000, 3, confound=1.5)
     naive = aipw.difference_in_means(frame, "t", "y")
     assert naive.high < 2.0 or naive.low > 2.0
-    nuis = aipw.fit_nuisances(
+    nuis = aipw.prefit(
         planted(3000, 4, confound=1.5), ("a", "b", "c"), "t", "y"
     )
     out = aipw.estimate(nuis, frame, "t", "y")
@@ -71,17 +69,13 @@ def test_the_naive_difference_is_biased_and_aipw_is_not():
 
 
 def test_nuisances_are_deterministic():
-    one = aipw.fit_nuisances(
-        planted(500, 5), ("a", "b"), "t", "y", 3, "boosted"
-    )
-    two = aipw.fit_nuisances(
-        planted(500, 5), ("a", "b"), "t", "y", 3, "boosted"
-    )
+    one = aipw.prefit(planted(500, 5), ("a", "b"), "t", "y", 3, "boosted")
+    two = aipw.prefit(planted(500, 5), ("a", "b"), "t", "y", 3, "boosted")
     assert one.digest == two.digest
 
 
 def test_trimming_changes_the_estimand_and_can_refuse():
-    nuis = aipw.fit_nuisances(
+    nuis = aipw.prefit(
         planted(1500, 6, confound=2.5), ("a", "b", "c"), "t", "y"
     )
     frame = planted(2000, 7, confound=2.5)
@@ -97,8 +91,8 @@ def test_overlap_gate_flags_extreme_propensities_only():
     good = rng.uniform(0.2, 0.8, 1000)
     bad = numpy.concatenate([rng.uniform(0.001, 0.02, 300), good[:700]])
     t = (rng.uniform(size=1000) < 0.5).astype(float)
-    assert aipw.overlap_report(good, t)["passed"]
-    report = aipw.overlap_report(bad, t)
+    assert aipw.propensities(good, t)["passed"]
+    report = aipw.propensities(bad, t)
     assert not report["passed"] and report["share_outside"] >= 0.3
     assert report["ess_treated"] <= report["n"]
 
@@ -106,7 +100,7 @@ def test_overlap_gate_flags_extreme_propensities_only():
 def test_categorical_covariates_are_encoded_with_frozen_levels():
     frame = planted(400, 8)
     frame["g"] = numpy.where(frame["a"] > 0, "up", "down")
-    nuis = aipw.fit_nuisances(frame, ("a", "g"), "t", "y")
+    nuis = aipw.prefit(frame, ("a", "g"), "t", "y")
     fresh = frame.head(50).copy()
     fresh["g"] = "unseen"
     e, m0, m1 = nuis.predict(fresh)
@@ -116,13 +110,13 @@ def test_categorical_covariates_are_encoded_with_frozen_levels():
 def test_bad_inputs_are_refused():
     frame = planted(100, 9)
     with pytest.raises(ValueError, match="binary"):
-        aipw.fit_nuisances(frame.assign(t=frame["t"] * 2), ("a",), "t", "y")
+        aipw.prefit(frame.assign(t=frame["t"] * 2), ("a",), "t", "y")
     with pytest.raises(ValueError, match="missing"):
-        aipw.fit_nuisances(frame.assign(y=numpy.nan), ("a",), "t", "y")
+        aipw.prefit(frame.assign(y=numpy.nan), ("a",), "t", "y")
     with pytest.raises(ValueError, match="learner"):
-        aipw.fit_nuisances(frame, ("a",), "t", "y", learner="x")
+        aipw.prefit(frame, ("a",), "t", "y", learner="x")
     with pytest.raises(ValueError, match="at least"):
-        aipw.fit_nuisances(frame.assign(t=0.0), ("a",), "t", "y")
+        aipw.prefit(frame.assign(t=0.0), ("a",), "t", "y")
 
 
 def test_difference_in_means_matches_welch():

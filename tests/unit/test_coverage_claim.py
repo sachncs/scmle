@@ -77,7 +77,7 @@ def run_folder(tmp_path, order=("coverage_claim_registered",)):
     (tmp_path / "coverage_claim.json").write_text(json.dumps(claim))
     report = {"claim_sha256": ledger.digest(claim), "methods": {}}
     (tmp_path / "coverage_report.json").write_text(json.dumps(report))
-    log = sealed.OpenLog(tmp_path / claims_audit.CUSTODY_FILE, KEY)
+    log = sealed.Journal(tmp_path / claims_audit.CUSTODY_FILE, KEY)
     for event in order:
         log.append(
             "final_test",
@@ -93,7 +93,7 @@ STEP = "coverage claim: registered before the rows were read"
 
 def test_a_consistent_claim_verifies(tmp_path):
     run_folder(tmp_path)
-    found = claims_audit.check_coverage_claim(tmp_path, KEY)
+    found = claims_audit.corroborate(tmp_path, KEY)
     assert found.status == "pass"
 
 
@@ -101,7 +101,7 @@ def test_an_edited_claim_fails(tmp_path):
     run_folder(tmp_path)
     claim = make_claim(levels=(0.5, 0.6))
     (tmp_path / "coverage_claim.json").write_text(json.dumps(claim))
-    found = claims_audit.check_coverage_claim(tmp_path, KEY)
+    found = claims_audit.corroborate(tmp_path, KEY)
     assert found.status == "fail"
     assert (
         "coverage_claim.json: differs from the registered hash" in found.detail
@@ -113,23 +113,23 @@ def test_a_report_for_another_claim_fails(tmp_path):
     (tmp_path / "coverage_report.json").write_text(
         json.dumps({"claim_sha256": "0" * 64})
     )
-    found = claims_audit.check_coverage_claim(tmp_path, KEY)
+    found = claims_audit.corroborate(tmp_path, KEY)
     assert found.status == "fail"
     assert "coverage_report.json: names another claim" in found.detail
 
 
 def test_a_report_without_a_registration_fails(tmp_path):
     run_folder(tmp_path, order=("other",))
-    found = claims_audit.check_coverage_claim(tmp_path, KEY)
+    found = claims_audit.corroborate(tmp_path, KEY)
     assert found.status == "fail"
     assert "no registration" in found.detail
 
 
 def test_no_coverage_files_means_no_step(tmp_path):
-    assert claims_audit.check_coverage_claim(tmp_path, KEY) is None
+    assert claims_audit.corroborate(tmp_path, KEY) is None
 
 
 @pytest.mark.parametrize("extra", [1])
 def test_two_registrations_fail(tmp_path, extra):
     run_folder(tmp_path, order=("coverage_claim_registered",) * 2)
-    assert claims_audit.check_coverage_claim(tmp_path, KEY).status == "fail"
+    assert claims_audit.corroborate(tmp_path, KEY).status == "fail"

@@ -29,16 +29,16 @@ BAD_TOKEN = "not-a-token-zz"
 
 @pytest.fixture(scope="module")
 def reference():
-    golden = parity.load_golden(ROOT / "deploy" / "local" / "golden")
-    return parity.reference_bundle(golden.spec)
+    golden = parity.goldens(ROOT / "deploy" / "local" / "golden")
+    return parity.handwrite(golden.spec)
 
 
 def make_gateway(clock, **options):
     check = tokens.Verifier(
         tokens.KeySet(
             [
-                tokens.Key.from_jwk(support_identity.hs_jwk("hs-1")),
-                tokens.Key.from_jwk(support_identity.rsa_jwk("k1", "rs-1")),
+                tokens.Key.jwk(support_identity.hs_jwk("hs-1")),
+                tokens.Key.jwk(support_identity.rsa_jwk("k1", "rs-1")),
             ]
         ),
         support_identity.ISSUER,
@@ -204,7 +204,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
     path = tmp_path / "audit.jsonl"
     log = audit.Log.open(path, clock=clock)
     check = tokens.Verifier(
-        tokens.KeySet([tokens.Key.from_jwk(support_identity.hs_jwk("hs-1"))]),
+        tokens.KeySet([tokens.Key.jwk(support_identity.hs_jwk("hs-1"))]),
         support_identity.ISSUER,
         support_identity.AUDIENCE,
         clock=clock,
@@ -218,9 +218,7 @@ def test_audit_records_activation_access_and_admin_in_a_valid_chain(
     finally:
         adapter.stop()
     gateway.rotate(
-        tokens.KeySet(
-            [tokens.Key.from_jwk(support_identity.rsa_jwk("k1", "rs-2"))]
-        ),
+        tokens.KeySet([tokens.Key.jwk(support_identity.rsa_jwk("k1", "rs-2"))]),
         actor="ops",
         reason="scheduled",
     )
@@ -251,7 +249,7 @@ def test_an_edited_audit_row_breaks_the_chain(tmp_path):
     lines = (tmp_path / "a.jsonl").read_text().splitlines()
     lines[1] = lines[1].replace('"one"', '"uno"')
     (tmp_path / "a.jsonl").write_text("\n".join(lines) + "\n")
-    with pytest.raises(deployment_ledger.DeploymentLedgerError):
+    with pytest.raises(deployment_ledger.MisuseError):
         deployment_ledger.DeploymentLedger.load(tmp_path / "a.jsonl")
 
 
@@ -336,7 +334,7 @@ def test_a_tampered_artifact_never_loads_in_production(reference, tmp_path):
     folder = tmp_path / "svc"
     reference.export_service(folder, signing_key=KEY)
     environ = {"SCMLE_ENV": "production", "SCMLE_SIGNING_KEY": KEY}
-    assert verify.verify_service(folder, environ).bundle_signed
+    assert verify.inspect(folder, environ).bundle_signed
     for name in (
         "model/pipeline.joblib",
         "requirements.lock",
@@ -353,10 +351,10 @@ def test_a_tampered_artifact_never_loads_in_production(reference, tmp_path):
             with path.open("ab") as handle:
                 handle.write(b"\n ")
         with pytest.raises(errors.ArtifactError):
-            verify.verify_service(copy, environ)
+            verify.inspect(copy, environ)
     wrong = {**environ, "SCMLE_SIGNING_KEY": "another-key-entirely-0000"}
     with pytest.raises(errors.ArtifactError):
-        verify.verify_service(folder, wrong)
+        verify.inspect(folder, wrong)
 
 
 def test_the_modality_service_is_gated_the_same_way(tmp_path):
@@ -382,7 +380,7 @@ def test_the_modality_service_is_gated_the_same_way(tmp_path):
     service = modality_serving.ModalityHttpServing(
         predictor, test_modality_serving.DocumentDecoder()
     )
-    service.set_gateway(make_gateway(clock))
+    service.protect(make_gateway(clock))
     service.start()
     try:
         assert call(service.address, "/livez")[0] == 200

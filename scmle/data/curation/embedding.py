@@ -23,7 +23,7 @@ DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 FALLBACK_TERMS = 200
 
 
-class TextEmbedder(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
+class Embedder(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
     """Embeds a text column with a sentence-embedding model.
 
     Attributes:
@@ -106,7 +106,7 @@ class TextEmbedder(base.TransformerMixin, base.BaseEstimator):  # type: ignore[m
                 error,
             )
             self.mode_ = "tfidf"
-            self.fallback_ = transformers.TextVectorizer(
+            self.fallback_ = transformers.Vectorizer(
                 max_terms=self.fallback_terms
             ).fit(strings)
         return self

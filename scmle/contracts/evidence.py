@@ -239,7 +239,7 @@ class Index:
         Returns:
             The signature, which is also stored on the index.
         """
-        self.signature = signing.sign_payload(self.unsigned_dict(), signing_key)
+        self.signature = signing.mac(self.unsigned_dict(), signing_key)
         return self.signature
 
     def verify(self, signing_key: str | bytes) -> bool:
@@ -253,7 +253,7 @@ class Index:
         """
         if self.signature is None:
             return False
-        expected = signing.sign_payload(self.unsigned_dict(), signing_key)
+        expected = signing.mac(self.unsigned_dict(), signing_key)
         return hmac.compare_digest(self.signature, expected)
 
     def to_dict(self) -> dict[str, Any]:

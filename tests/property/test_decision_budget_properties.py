@@ -33,10 +33,8 @@ def test_assigned_levels_never_exceed_the_promotion_level(
     )
     for index in range(count):
         try:
-            budget, level = scmle.data.ledger.budget.assign_experiment(
-                budget, f"e{index}"
-            )
-        except scmle.data.ledger.budget.BudgetExhaustedError:
+            budget, level = scmle.data.ledger.budget.enroll(budget, f"e{index}")
+        except scmle.data.ledger.budget.ExhaustedError:
             break
         assert level > 0
         assert budget.spent <= alpha
@@ -48,9 +46,7 @@ def test_assigned_levels_never_exceed_the_promotion_level(
 def test_the_open_ended_discount_sums_to_a_closed_form(alpha, count):
     budget = scmle.data.ledger.budget.DecisionBudget(alpha, Fraction(1, 100))
     for index in range(count):
-        budget, ignored = scmle.data.ledger.budget.assign_experiment(
-            budget, f"e{index}"
-        )
+        budget, ignored = scmle.data.ledger.budget.enroll(budget, f"e{index}")
     assert budget.spent == alpha * Fraction(count, count + 1)
 
 
@@ -61,9 +57,7 @@ def test_a_round_trip_keeps_every_level_bit_for_bit(alpha, count):
         alpha, Fraction(1, 100), horizon=30
     )
     for index in range(count):
-        budget, ignored = scmle.data.ledger.budget.assign_experiment(
-            budget, f"e{index}"
-        )
+        budget, ignored = scmle.data.ledger.budget.enroll(budget, f"e{index}")
     budget, ignored = scmle.data.ledger.budget.start_rollback_monitor(
         budget, "champion"
     )
@@ -78,9 +72,7 @@ def test_a_horizon_budget_is_exhausted_after_horizon_experiments():
         Fraction(1, 50), Fraction(1, 100), horizon=3
     )
     for index in range(3):
-        budget, ignored = scmle.data.ledger.budget.assign_experiment(
-            budget, f"e{index}"
-        )
+        budget, ignored = scmle.data.ledger.budget.enroll(budget, f"e{index}")
     assert budget.spent == Fraction(1, 50)
-    with pytest.raises(scmle.data.ledger.budget.BudgetExhaustedError):
-        scmle.data.ledger.budget.assign_experiment(budget, "e3")
+    with pytest.raises(scmle.data.ledger.budget.ExhaustedError):
+        scmle.data.ledger.budget.enroll(budget, "e3")

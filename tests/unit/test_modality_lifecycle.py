@@ -40,7 +40,7 @@ def document_adapter() -> modality_lifecycle.DocumentPreparer:
     return modality_lifecycle.DocumentPreparer(document.Dataset(samples))
 
 
-def text_adapter() -> modality_lifecycle.TextPreparer:
+def text_adapter() -> modality_lifecycle.Plaintext:
     """Build a labelled text fixture with an explicit text modality."""
     samples = tuple(
         document.Sample(
@@ -51,25 +51,25 @@ def text_adapter() -> modality_lifecycle.TextPreparer:
         )
         for index in range(12)
     )
-    return modality_lifecycle.TextPreparer(document.Dataset(samples))
+    return modality_lifecycle.Plaintext(document.Dataset(samples))
 
 
-class GroundTruthTextAdapter(modality_lifecycle.TextPreparer):
+class GroundTruthTextAdapter(modality_lifecycle.Plaintext):
     """Synthetic adapter with a complete feature-ranking reference."""
 
     def explanation_ground_truth(
         self, sample: object, feature_names: Sequence[str]
-    ) -> quality.ExplanationGroundTruth:
+    ) -> quality.Truth:
         """Return an oracle covering every declared fixture feature."""
         del sample
-        return quality.ExplanationGroundTruth(
+        return quality.Truth(
             method="synthetic_feature_oracle",
             reference="fixture://text-feature-oracle-v1",
             expected_features=tuple(feature_names),
         )
 
 
-class FailingMonitorTextAdapter(modality_lifecycle.TextPreparer):
+class FailingMonitorTextAdapter(modality_lifecycle.Plaintext):
     """Synthetic adapter that simulates worker loss after packaging."""
 
     def monitor(
@@ -129,7 +129,7 @@ def audio_adapter() -> modality_lifecycle.AudioPreparer:
     return modality_lifecycle.AudioPreparer(audio.Dataset(samples))
 
 
-def video_adapter() -> modality_lifecycle.VideoPreparer:
+def video_adapter() -> modality_lifecycle.Footage:
     """Build a labelled probed-video fixture."""
     samples = tuple(
         video.Sample.from_bytes(
@@ -148,10 +148,10 @@ def video_adapter() -> modality_lifecycle.VideoPreparer:
         )
         for index in range(12)
     )
-    return modality_lifecycle.VideoPreparer(video.Dataset(samples))
+    return modality_lifecycle.Footage(video.Dataset(samples))
 
 
-def decoded_video_adapter() -> modality_lifecycle.VideoPreparer:
+def decoded_video_adapter() -> modality_lifecycle.Footage:
     """Build a video baseline with an explicit bounded frame decoder."""
     samples = tuple(
         video.Sample.from_bytes(
@@ -176,7 +176,7 @@ def decoded_video_adapter() -> modality_lifecycle.VideoPreparer:
             (2, 2, 3), payload[0] + frame_index, dtype=numpy.uint8
         )
 
-    return modality_lifecycle.VideoPreparer(
+    return modality_lifecycle.Footage(
         video.Dataset(samples), frame_decoder=decoder, max_frames=4
     )
 
@@ -205,7 +205,7 @@ def graph_adapter() -> modality_lifecycle.GraphPreparer:
 def geospatial_adapter() -> modality_lifecycle.GeospatialPreparer:
     """Build spatially separated labelled point features."""
     features = tuple(
-        geospatial.GeoFeature(
+        geospatial.Placemark(
             feature_id=f"feature-{index}",
             geometry={"type": "Point", "coordinates": [float(index), 0.0]},
             label="alpha" if index % 2 else "beta",
@@ -220,7 +220,7 @@ def geospatial_adapter() -> modality_lifecycle.GeospatialPreparer:
     return modality_lifecycle.GeospatialPreparer(dataset, block_size=1.0)
 
 
-def raster_adapter() -> modality_lifecycle.RasterPreparer:
+def raster_adapter() -> modality_lifecycle.Imagery:
     """Build a labelled raster metadata fixture with a sidecar."""
     samples = []
     labels = {}
@@ -228,7 +228,7 @@ def raster_adapter() -> modality_lifecycle.RasterPreparer:
         source = f"memory://raster-{index}"
         payload = bytes([index + 1]) * 32
         samples.append(
-            geospatial.RasterSample(
+            geospatial.Tile(
                 source=source,
                 encoded_bytes=payload,
                 file_hash=hashlib.sha256(payload).hexdigest(),
@@ -241,7 +241,7 @@ def raster_adapter() -> modality_lifecycle.RasterPreparer:
             )
         )
         labels[source] = "alpha" if index % 2 else "beta"
-    return modality_lifecycle.RasterPreparer(samples, labels)
+    return modality_lifecycle.Imagery(samples, labels)
 
 
 def test_raster_curation_records_declared_and_unknown_nodata_state():
@@ -251,7 +251,7 @@ def test_raster_curation_records_declared_and_unknown_nodata_state():
     measured_sample = dataclasses.replace(
         baseline.samples[0], nodata_value=-9999, nodata_fraction=0.25
     )
-    measured_adapter = modality_lifecycle.RasterPreparer(
+    measured_adapter = modality_lifecycle.Imagery(
         (measured_sample,),
         {measured_sample.source: "beta"},
     )
@@ -274,15 +274,13 @@ def test_raster_curation_records_declared_and_unknown_nodata_state():
 
 def test_raster_adapter_has_a_distinct_capability_identity():
     """Raster packages do not masquerade as vector geospatial packages."""
-    assert (
-        modality_lifecycle.RasterPreparer.modality is modalities.Modality.RASTER
-    )
+    assert modality_lifecycle.Imagery.modality is modalities.Modality.RASTER
 
 
 def test_raster_adapter_accepts_a_named_bounded_decoder():
     """Raster curation and features can use explicit decoded pixel evidence."""
     baseline = raster_adapter()
-    decoded = modality_lifecycle.RasterPreparer(
+    decoded = modality_lifecycle.Imagery(
         baseline.samples,
         {sample.source: baseline.label(sample) for sample in baseline.samples},
         decoder=lambda payload: numpy.full(
@@ -325,15 +323,10 @@ def test_raster_pixel_windows_preserve_affine_crs_bounds():
     """Raster windows expose reviewable source-CRS envelopes."""
     sample = raster_adapter().samples[0]
 
-    assert sample.pixel_window_bounds(0, 8, 0, 8) == (0.0, -8.0, 8.0, 0.0)
-    assert (
-        dataclasses.replace(sample, transform=()).pixel_window_bounds(
-            0, 8, 0, 8
-        )
-        is None
-    )
+    assert sample.extent(0, 8, 0, 8) == (0.0, -8.0, 8.0, 0.0)
+    assert dataclasses.replace(sample, transform=()).extent(0, 8, 0, 8) is None
     with pytest.raises(ValueError, match="pixel window"):
-        sample.pixel_window_bounds(0, 33, 0, 8)
+        sample.extent(0, 33, 0, 8)
 
 
 def test_decoded_raster_lifecycle_emits_pixel_occlusion_evidence(
@@ -341,7 +334,7 @@ def test_decoded_raster_lifecycle_emits_pixel_occlusion_evidence(
 ):
     """A named decoder enables bounded decoded-pixel explanations."""
     baseline = raster_adapter()
-    decoded = modality_lifecycle.RasterPreparer(
+    decoded = modality_lifecycle.Imagery(
         baseline.samples,
         {sample.source: baseline.label(sample) for sample in baseline.samples},
         decoder=lambda payload: numpy.full(
@@ -357,7 +350,7 @@ def test_decoded_raster_lifecycle_emits_pixel_occlusion_evidence(
     )
 
     evidence = {item.stage: item.evidence for item in report.stage_evidence}[
-        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+        modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
     assert local["status"] == "available"
@@ -434,29 +427,27 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     evidence_by_stage = {
         evidence.stage: evidence for evidence in report.stage_evidence
     }
-    assert evidence_by_stage[modalities.LifecycleStage.INGESTION].evidence == {
+    assert evidence_by_stage[modalities.Phase.INGESTION].evidence == {
         "dataset_hash": report.dataset_hash,
         "sample_count": len(adapter.samples),
     }
     assert isinstance(
-        evidence_by_stage[
-            modalities.LifecycleStage.MODEL_EXPLAINABILITY
-        ].evidence,
+        evidence_by_stage[modalities.Phase.MODEL_EXPLAINABILITY].evidence,
         dict,
     )
     model_quality = evidence_by_stage[
-        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+        modalities.Phase.MODEL_EXPLAINABILITY
     ].evidence["quality"]
     assert model_quality["passed"] is True
     assert model_quality["fidelity_score"] == pytest.approx(1.0)
     assert model_quality["stability_score"] >= 0.9
     perturbation = evidence_by_stage[
-        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+        modalities.Phase.MODEL_EXPLAINABILITY
     ].evidence["perturbation_stability"]
     assert perturbation["feature_space_only"] is True
     assert perturbation["report_count"] > 1
     repeated = evidence_by_stage[
-        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+        modalities.Phase.MODEL_EXPLAINABILITY
     ].evidence["repeated_perturbation"]
     assert repeated["evaluated_sample_count"] == min(
         repeated["sample_count"],
@@ -465,7 +456,7 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     assert repeated["score"] >= 0.9
     assert repeated["feature_space_only"] is True
     data_explanation = evidence_by_stage[
-        modalities.LifecycleStage.DATA_EXPLAINABILITY
+        modalities.Phase.DATA_EXPLAINABILITY
     ].evidence
     assert data_explanation["partition_counts"]["train"] > 0
     assert data_explanation["partition_counts"]["test"] > 0
@@ -572,7 +563,7 @@ def test_lifecycle_report_rejects_a_signed_incomplete_stage_record(
     unsigned.pop("signature")
     record["signature"] = {
         "algorithm": attestation.SIGNATURE_ALGORITHM,
-        "value": attestation.sign_payload(unsigned, "report-key"),
+        "value": attestation.mac(unsigned, "report-key"),
     }
     report_path.write_text(json.dumps(record), encoding="utf-8")
 
@@ -597,7 +588,7 @@ def test_lifecycle_report_rejects_a_stage_without_evidence_links(
     unsigned.pop("signature")
     record["signature"] = {
         "algorithm": attestation.SIGNATURE_ALGORITHM,
-        "value": attestation.sign_payload(unsigned, "report-key"),
+        "value": attestation.mac(unsigned, "report-key"),
     }
     report_path.write_text(json.dumps(record), encoding="utf-8")
 
@@ -657,7 +648,7 @@ def test_package_loader_rejects_a_signed_model_schema_mismatch(
     unsigned["feature_names"] = [*unsigned["feature_names"], "unfitted-extra"]
     unsigned["signature"] = {
         "algorithm": attestation.SIGNATURE_ALGORITHM,
-        "value": attestation.sign_payload(unsigned, "package-key"),
+        "value": attestation.mac(unsigned, "package-key"),
     }
     manifest_path.write_text(json.dumps(unsigned), encoding="utf-8")
 
@@ -726,7 +717,7 @@ def test_lifecycle_checkpoint_resumes_after_a_post_package_failure(
     )
 
     resumed = modality_lifecycle.Lifecycle().run(
-        modality_lifecycle.TextPreparer(dataset),
+        modality_lifecycle.Plaintext(dataset),
         package_path,
         signing_key="checkpoint-key",
         report_path=report_path,
@@ -762,7 +753,7 @@ def test_lifecycle_completed_checkpoint_resume_is_idempotent(tmp_path: Path):
     )
 
     second = lifecycle.run(
-        modality_lifecycle.TextPreparer(adapter.dataset),
+        modality_lifecycle.Plaintext(adapter.dataset),
         tmp_path / "package",
         signing_key="checkpoint-key",
         report_path=report_path,
@@ -793,7 +784,7 @@ def test_lifecycle_completed_resume_rejects_a_replaced_package(
         dataclasses.replace(sample, content=sample.content + " replacement")
         for sample in adapter.dataset.samples
     )
-    replacement_adapter = modality_lifecycle.TextPreparer(
+    replacement_adapter = modality_lifecycle.Plaintext(
         document.Dataset(replacement_samples)
     )
     replacement_path = tmp_path / "replacement-package"
@@ -878,7 +869,7 @@ def test_lifecycle_checkpoint_rejects_tampering_and_changed_identity(
     )
     with pytest.raises(ValueError, match="identity does not match"):
         lifecycle.run(
-            modality_lifecycle.TextPreparer(changed_dataset),
+            modality_lifecycle.Plaintext(changed_dataset),
             tmp_path / "package",
             signing_key="checkpoint-key",
             report_path=tmp_path / "report.json",
@@ -947,7 +938,7 @@ def test_image_lifecycle_emits_region_occlusion_evidence(tmp_path: Path):
     )
 
     evidence = {item.stage: item.evidence for item in report.stage_evidence}[
-        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+        modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
     assert local["status"] == "available"
@@ -982,7 +973,7 @@ def test_document_lifecycle_emits_span_provenance_evidence(tmp_path: Path):
     )
 
     evidence = {item.stage: item.evidence for item in report.stage_evidence}[
-        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+        modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
     assert local["status"] == "available"
@@ -1029,7 +1020,7 @@ def test_graph_lifecycle_emits_one_hop_context_evidence(tmp_path: Path):
     )
 
     evidence = {item.stage: item.evidence for item in report.stage_evidence}[
-        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+        modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
     assert local["status"] == "available"
@@ -1059,7 +1050,7 @@ def test_graph_subgraph_context_is_bounded_and_deterministic():
         graph.Dataset(nodes=(*nodes, graph.Node("center")), edges=edges)
     )
 
-    evidence = adapter.one_hop_subgraph("center", max_nodes=3, max_edges=1)
+    evidence = adapter.neighbourhood("center", max_nodes=3, max_edges=1)
 
     assert evidence["node_ids"] == ["center", "node-0", "node-1"]
     assert len(evidence["edges"]) == 1
@@ -1074,7 +1065,7 @@ def test_graph_subgraph_context_is_bounded_and_deterministic():
 def test_geospatial_lifecycle_emits_crs_bound_explanation(tmp_path: Path):
     """The geospatial adapter preserves CRS and geometry evidence."""
     features = tuple(
-        geospatial.GeoFeature(
+        geospatial.Placemark(
             feature_id=f"feature-{index}",
             geometry={
                 "type": "Point",
@@ -1095,7 +1086,7 @@ def test_geospatial_lifecycle_emits_crs_bound_explanation(tmp_path: Path):
     )
 
     evidence = {item.stage: item.evidence for item in report.stage_evidence}[
-        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+        modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
     assert local["status"] == "available"
@@ -1116,7 +1107,7 @@ def test_geospatial_curation_records_boundary_leakage_warning():
     adapter = modality_lifecycle.GeospatialPreparer(
         geospatial.Dataset(
             (
-                geospatial.GeoFeature(
+                geospatial.Placemark(
                     "line",
                     {
                         "type": "LineString",
@@ -1124,7 +1115,7 @@ def test_geospatial_curation_records_boundary_leakage_warning():
                     },
                     label="alpha",
                 ),
-                geospatial.GeoFeature(
+                geospatial.Placemark(
                     "point",
                     {"type": "Point", "coordinates": [0, 0]},
                     label="beta",
@@ -1154,7 +1145,7 @@ def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
     )
 
     evidence = {item.stage: item.evidence for item in report.stage_evidence}[
-        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+        modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
     assert local["status"] == "available"
@@ -1187,19 +1178,19 @@ def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
 def test_lifecycle_persists_supplied_modality_manifest(tmp_path: Path):
     """Lifecycle documentation carries caller-owned governance evidence."""
     adapter = document_adapter()
-    manifest = data.ModalityManifest(
+    manifest = data.Passport(
         dataset_id="document-dataset",
         snapshot_id="document-snapshot",
         modality="document",
         task="binary_classification",
         sample_count=len(adapter.samples),
         content_hash=adapter.dataset_hash,
-        source=data.SourceMetadata(
+        source=data.Origin(
             owner="records-team",
             acquisition_method="approved export",
             license="internal-use",
         ),
-        privacy=data.PrivacyMetadata(
+        privacy=data.Confidentiality(
             classification="restricted",
             contains_pii=True,
             consent_basis="employment-contract",
@@ -1234,7 +1225,7 @@ def test_lifecycle_evaluates_complete_independent_ground_truth_suite(
     )
 
     evidence = {item.stage: item.evidence for item in report.stage_evidence}[
-        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+        modalities.Phase.MODEL_EXPLAINABILITY
     ]
     ground_truth = evidence["independent_ground_truth"]
     assert ground_truth["status"] == "available"
@@ -1252,7 +1243,7 @@ def test_video_lifecycle_emits_temporal_frame_evidence(tmp_path: Path):
     )
 
     evidence = {item.stage: item.evidence for item in report.stage_evidence}[
-        modalities.LifecycleStage.MODEL_EXPLAINABILITY
+        modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
     assert local["status"] == "available"
@@ -1279,7 +1270,7 @@ def test_video_adapter_uses_explicit_temporal_cutoff_for_lifecycle_split():
         )
         for index in range(4)
     )
-    adapter = modality_lifecycle.VideoPreparer(
+    adapter = modality_lifecycle.Footage(
         video.Dataset(samples),
         temporal_cutoff="2026-01-02T00:00:00Z",
     )
@@ -1403,7 +1394,7 @@ def test_lifecycle_compares_against_a_repeated_performance_baseline(
 def test_blocking_geospatial_curation_stops_before_packaging(tmp_path: Path):
     """Missing CRS evidence blocks before a model or package is created."""
     features = tuple(
-        geospatial.GeoFeature(
+        geospatial.Placemark(
             feature_id=f"feature-{index}",
             geometry={"type": "Point", "coordinates": [float(index), 0.0]},
             label="alpha" if index % 2 else "beta",

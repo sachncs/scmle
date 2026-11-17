@@ -1,6 +1,6 @@
 """The decision block of the charter (format 5).
 
-Everything here is optional: a charter without a `DecisionLayer` runs as it
+Everything here is optional: a charter without a `Layer` runs as it
 always did and makes no decision claim. The costs of acting are not repeated
 here; they stay in the charter's `cost_model`, which a decision layer
 requires. What this block adds is how the cost model is used (baselines,
@@ -134,7 +134,7 @@ class Gates:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DecisionModel:
+class Policy:
     """How the chartered cost model is used to decide.
 
     Attributes:
@@ -162,7 +162,7 @@ class DecisionModel:
                 `calibration_level` is not strictly in (0, 1).
         """
         evidence.require_text(self.unit, "unit")
-        qualification.require_tuple(self.baselines, "baselines")
+        qualification.tupled(self.baselines, "baselines")
         if not self.baselines or len(set(self.baselines)) != len(
             self.baselines
         ):
@@ -213,7 +213,7 @@ class DecisionModel:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FairnessConstraint:
+class Constraint:
     """A fairness constraint on the frozen rule; explicit, never a default.
 
     Attributes:
@@ -343,7 +343,7 @@ class Guardrail:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class RolloutPlan:
+class Experiment:
     """The pre-registered design of an A/B test and its decisions.
 
     Attributes:
@@ -414,7 +414,7 @@ class RolloutPlan:
                 "delta_min must be smaller than the metric range"
             )
         open_unit(self.srm_level, "srm_level")
-        qualification.require_tuple(self.guardrails, "guardrails")
+        qualification.tupled(self.guardrails, "guardrails")
         names = [g.name for g in self.guardrails]
         if len(set(names)) != len(names) or self.primary in names:
             raise errors.InputError(
@@ -500,7 +500,7 @@ class RolloutPlan:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DecisionLayer:
+class Layer:
     """The optional decision block of an `AnalysisCharter`.
 
     Attributes:
@@ -510,17 +510,17 @@ class DecisionLayer:
             wanted.
     """
 
-    model: DecisionModel
-    fairness: tuple[FairnessConstraint, ...] = ()
-    rollout: RolloutPlan | None = None
+    model: Policy
+    fairness: tuple[Constraint, ...] = ()
+    rollout: Experiment | None = None
 
     def __post_init__(self) -> None:
         """Validates the block.
 
         A `fairness` that is not a tuple raises `ValueError` (from
-        `qualification.require_tuple`).
+        `qualification.tupled`).
         """
-        qualification.require_tuple(self.fairness, "fairness")
+        qualification.tupled(self.fairness, "fairness")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the block.
@@ -555,9 +555,7 @@ class DecisionLayer:
         qualification.require(cls, record)
         plan = record["rollout"]
         return cls(
-            model=DecisionModel.from_dict(record["model"]),
-            fairness=tuple(
-                FairnessConstraint.from_dict(f) for f in record["fairness"]
-            ),
-            rollout=None if plan is None else RolloutPlan.from_dict(plan),
+            model=Policy.from_dict(record["model"]),
+            fairness=tuple(Constraint.from_dict(f) for f in record["fairness"]),
+            rollout=None if plan is None else Experiment.from_dict(plan),
         )

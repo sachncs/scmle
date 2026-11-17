@@ -284,12 +284,12 @@ def survival_case(
     matrix = (matrix - matrix.iloc[train].mean()) / matrix.iloc[
         train
     ].std().replace(0, 1)
-    cox = estimators.CoxRegressor().fit(
+    cox = estimators.Hazards().fit(
         matrix.iloc[train].to_numpy(),
         frame[duration].iloc[train].to_numpy(),
         frame[event].iloc[train].to_numpy(),
     )
-    base = concordance.concordance_index(
+    base = concordance.harrell(
         frame[duration].iloc[test].to_numpy(),
         frame[event].iloc[test].to_numpy(),
         cox.predict(matrix.iloc[test].to_numpy()),
@@ -346,7 +346,7 @@ def ordinal_case(
         selected=result.selected_model,
         note=f"{len(order)} ordered levels; MAE in levels "
         f"{result.evaluation['test_metrics']['mace']:.3f} vs "
-        f"{ordinal.mean_absolute_class_error(ranks[test], guess):.3f}",
+        f"{ordinal.distance(ranks[test], guess):.3f}",
     )
 
 

@@ -32,13 +32,13 @@ def test_identical_distributions_are_indistinguishable():
         ),
     )
 
-    report = shift.AdversarialValidation().compute(data)
+    report = shift.Adversary().compute(data)
 
     assert report["auc"] < 0.6 and report["verdict"] == "no meaningful shift"
 
 
 def test_a_moved_feature_is_detected_and_named():
-    report = shift.AdversarialValidation().compute(shifted_inputs(2.0))
+    report = shift.Adversary().compute(shifted_inputs(2.0))
 
     assert report["auc"] > 0.75 and report["verdict"] == "strong shift"
     assert report["most_shifted"][0]["feature"] == "signal"
@@ -52,7 +52,7 @@ def test_category_frequency_changes_are_ranked_too():
         base, features=moved, reference_features=base.features
     )
 
-    report = shift.AdversarialValidation().compute(data)
+    report = shift.Adversary().compute(data)
 
     assert report["most_shifted"][0]["feature"] == "group"
     assert report["auc"] > 0.6
@@ -61,14 +61,14 @@ def test_category_frequency_changes_are_ranked_too():
 def test_without_reference_rows_the_report_says_so():
     base = test_diagnostics.make_inputs(tasks.Task.BINARY)
 
-    assert shift.AdversarialValidation().compute(base) == {
+    assert shift.Adversary().compute(base) == {
         "available": False,
         "reason": "no reference rows",
     }
 
 
 def test_the_report_gives_the_clipped_odds_the_weights_would_use():
-    report = shift.AdversarialValidation().compute(shifted_inputs(2.0))
+    report = shift.Adversary().compute(shifted_inputs(2.0))
 
     odds = report["odds"]
     assert odds["clip"] == 20.0
@@ -83,7 +83,7 @@ def test_the_report_gives_the_clipped_odds_the_weights_would_use():
 
 
 def test_a_strong_shift_leaves_too_few_effective_calibration_rows():
-    strong = shift.AdversarialValidation().compute(shifted_inputs(4.0))
+    strong = shift.Adversary().compute(shifted_inputs(4.0))
     none = no_shift()
 
     assert (
@@ -111,4 +111,4 @@ def no_shift():
             drop=True
         ),
     )
-    return shift.AdversarialValidation().compute(data)
+    return shift.Adversary().compute(data)

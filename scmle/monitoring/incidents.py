@@ -26,14 +26,14 @@ def serialized(method: Method) -> Method:
     that one step, so concurrent threads see one hash chain.
 
     Args:
-        method: A method of `IncidentWorkflow`.
+        method: A method of `Incidents`.
 
     Returns:
         The method wrapped so it holds the workflow's lock while it runs.
     """
 
     @functools.wraps(method)
-    def wrapper(self: "IncidentWorkflow", *args: Any, **kwargs: Any) -> Any:
+    def wrapper(self: "Incidents", *args: Any, **kwargs: Any) -> Any:
         """Call the method under the workflow's lock.
 
         Args:
@@ -50,7 +50,7 @@ def serialized(method: Method) -> Method:
     return wrapper  # type: ignore[return-value]
 
 
-class IncidentStatus(enum.StrEnum):
+class Phase(enum.StrEnum):
     """States an operator can record for an SLO incident.
 
     Attributes:
@@ -82,7 +82,7 @@ def require_text(value: object, field_name: str) -> str:
     return value.strip()
 
 
-def incident_id(target: slo.SLOTarget, observed_at: str) -> str:
+def incident_id(target: slo.Slo, observed_at: str) -> str:
     """Returns an idempotent identity for one target evaluation window.
 
     Args:
@@ -130,7 +130,7 @@ class Incident:
 
     incident_id: str
     target_name: str
-    status: IncidentStatus
+    status: Phase
     opened_at: str
     observed_at: str
     owner: str
@@ -168,8 +168,8 @@ class Incident:
         ):
             require_text(getattr(self, field_name), field_name)
         status: Any = self.status  # may be text from a persisted record
-        if not isinstance(status, IncidentStatus):
-            object.__setattr__(self, "status", IncidentStatus(status))
+        if not isinstance(status, Phase):
+            object.__setattr__(self, "status", Phase(status))
         slo.parse_timestamp(self.opened_at, "opened_at")
         slo.parse_timestamp(self.observed_at, "observed_at")
         if self.acknowledged_at is not None:
@@ -180,18 +180,15 @@ class Incident:
             require_text(self.resolved_by or "", "resolved_by")
             require_text(self.resolution or "", "resolution")
             require_text(self.evidence_digest or "", "evidence_digest")
-        if self.status is IncidentStatus.OPEN and self.acknowledged_at:
+        if self.status is Phase.OPEN and self.acknowledged_at:
             raise errors.InputError(
                 "open incidents must not have acknowledgement"
             )
-        if (
-            self.status is IncidentStatus.ACKNOWLEDGED
-            and not self.acknowledged_at
-        ):
+        if self.status is Phase.ACKNOWLEDGED and not self.acknowledged_at:
             raise errors.InputError(
                 "acknowledged incidents require acknowledgement"
             )
-        if self.status is IncidentStatus.RESOLVED and not self.resolved_at:
+        if self.status is Phase.RESOLVED and not self.resolved_at:
             raise errors.InputError("resolved incidents require resolution")
 
     def to_dict(self) -> dict[str, Any]:
@@ -233,7 +230,7 @@ class Incident:
         return cls(
             incident_id=str(record["incident_id"]),
             target_name=str(record["target_name"]),
-            status=IncidentStatus(record["status"]),
+            status=Phase(record["status"]),
             opened_at=str(record["opened_at"]),
             observed_at=str(record["observed_at"]),
             owner=str(record["owner"]),
@@ -267,7 +264,7 @@ def digest(event: Mapping[str, Any]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def check_transition(incident: Incident, previous: Incident) -> None:
+def proceed(incident: Incident, previous: Incident) -> None:
     """Checks that a journal event continues the previous state of an incident.
 
     Args:
@@ -283,12 +280,12 @@ def check_transition(incident: Incident, previous: Incident) -> None:
         raise errors.InputError("incident journal identity changed")
     transition_at = (
         incident.acknowledged_at
-        if incident.status is IncidentStatus.ACKNOWLEDGED
+        if incident.status is Phase.ACKNOWLEDGED
         else incident.resolved_at
     )
     previous_at = (
         previous.opened_at
-        if previous.status is IncidentStatus.OPEN
+        if previous.status is Phase.OPEN
         else previous.acknowledged_at
     )
     if transition_at is None or previous_at is None:
@@ -299,7 +296,7 @@ def check_transition(incident: Incident, previous: Incident) -> None:
         raise errors.InputError("incident journal timestamps are invalid")
 
 
-class IncidentWorkflow:
+class Incidents:
     """Append-only incident workflow with idempotent transitions.
 
     Attributes:
@@ -316,7 +313,7 @@ class IncidentWorkflow:
             path: The journal file.
         """
         self.path = pathlib.Path(path)
-        self.lock = durability.path_lock(self.path)
+        self.lock = durability.latch(self.path)
 
     @serialized
     def read_events(self) -> tuple[dict[str, Any], ...]:
@@ -335,7 +332,7 @@ class IncidentWorkflow:
             return ()
         events: list[dict[str, Any]] = []
         previous_digest = ""
-        statuses: dict[str, IncidentStatus] = {}
+        statuses: dict[str, Phase] = {}
         previous_records: dict[str, Incident] = {}
         for line in self.path.read_text(encoding="utf-8").splitlines():
             record = json.loads(line)
@@ -352,9 +349,9 @@ class IncidentWorkflow:
             incident = Incident.from_dict(record["incident"])
             event_type = str(record.get("event_type", ""))
             expected_status = {
-                "opened": IncidentStatus.OPEN,
-                "acknowledged": IncidentStatus.ACKNOWLEDGED,
-                "resolved": IncidentStatus.RESOLVED,
+                "opened": Phase.OPEN,
+                "acknowledged": Phase.ACKNOWLEDGED,
+                "resolved": Phase.RESOLVED,
             }.get(event_type)
             if (
                 expected_status is None
@@ -365,18 +362,16 @@ class IncidentWorkflow:
                 )
             previous_status = statuses.get(incident.incident_id)
             allowed_previous = {
-                IncidentStatus.OPEN: (None,),
-                IncidentStatus.ACKNOWLEDGED: (IncidentStatus.OPEN,),
-                IncidentStatus.RESOLVED: (IncidentStatus.ACKNOWLEDGED,),
+                Phase.OPEN: (None,),
+                Phase.ACKNOWLEDGED: (Phase.OPEN,),
+                Phase.RESOLVED: (Phase.ACKNOWLEDGED,),
             }[incident.status]
             if previous_status not in allowed_previous:
                 raise errors.InputError(
                     "incident journal transition is invalid"
                 )
             if previous_status is not None:
-                check_transition(
-                    incident, previous_records[incident.incident_id]
-                )
+                proceed(incident, previous_records[incident.incident_id])
             statuses[incident.incident_id] = incident.status
             previous_records[incident.incident_id] = incident
             events.append(record)
@@ -399,7 +394,7 @@ class IncidentWorkflow:
     @serialized
     def open(
         self,
-        evaluation: slo.SLOEvaluation,
+        evaluation: slo.Assessment,
         *,
         opened_at: str,
         run_id: str,
@@ -418,11 +413,11 @@ class IncidentWorkflow:
             already opened one.
 
         Raises:
-            TypeError: If `evaluation` is not an `SLOEvaluation`.
+            TypeError: If `evaluation` is not an `Assessment`.
             ValueError: If the SLO passed, so no incident is required.
         """
-        if not isinstance(evaluation, slo.SLOEvaluation):
-            raise errors.KindError("evaluation must be SLOEvaluation")
+        if not isinstance(evaluation, slo.Assessment):
+            raise errors.KindError("evaluation must be Assessment")
         if not evaluation.incident_required:
             raise errors.InputError("a passing SLO cannot open an incident")
         slo.parse_timestamp(opened_at, "opened_at")
@@ -435,7 +430,7 @@ class IncidentWorkflow:
         incident = Incident(
             incident_id=identity,
             target_name=evaluation.target.name,
-            status=IncidentStatus.OPEN,
+            status=Phase.OPEN,
             opened_at=opened_at,
             observed_at=evaluation.observed_at,
             owner=evaluation.target.owner,
@@ -445,7 +440,7 @@ class IncidentWorkflow:
             run_id=run_id,
             rollback_target=rollback_target,
         )
-        self.append_event("opened", incident)
+        self.log("opened", incident)
         return incident
 
     @serialized
@@ -471,9 +466,9 @@ class IncidentWorkflow:
                 precedes the opening.
         """
         incident = self.require(identity)
-        if incident.status is IncidentStatus.ACKNOWLEDGED:
+        if incident.status is Phase.ACKNOWLEDGED:
             return incident
-        if incident.status is not IncidentStatus.OPEN:
+        if incident.status is not Phase.OPEN:
             raise errors.InputError("only open incidents can be acknowledged")
         require_text(actor, "actor")
         timestamp = slo.parse_timestamp(acknowledged_at, "acknowledged_at")
@@ -481,11 +476,11 @@ class IncidentWorkflow:
             raise errors.InputError("acknowledgement cannot precede opening")
         updated = dataclasses.replace(
             incident,
-            status=IncidentStatus.ACKNOWLEDGED,
+            status=Phase.ACKNOWLEDGED,
             acknowledged_at=acknowledged_at,
             acknowledged_by=actor,
         )
-        self.append_event("acknowledged", updated)
+        self.log("acknowledged", updated)
         return updated
 
     @serialized
@@ -515,9 +510,9 @@ class IncidentWorkflow:
                 precedes the acknowledgement.
         """
         incident = self.require(identity)
-        if incident.status is IncidentStatus.RESOLVED:
+        if incident.status is Phase.RESOLVED:
             return incident
-        if incident.status is not IncidentStatus.ACKNOWLEDGED:
+        if incident.status is not Phase.ACKNOWLEDGED:
             raise errors.InputError(
                 "only acknowledged incidents can be resolved"
             )
@@ -531,13 +526,13 @@ class IncidentWorkflow:
             raise errors.InputError("resolution cannot precede acknowledgement")
         updated = dataclasses.replace(
             incident,
-            status=IncidentStatus.RESOLVED,
+            status=Phase.RESOLVED,
             resolved_at=resolved_at,
             resolved_by=actor,
             resolution=resolution,
             evidence_digest=evidence_digest,
         )
-        self.append_event("resolved", updated)
+        self.log("resolved", updated)
         return updated
 
     def require(self, identity: str) -> Incident:
@@ -561,7 +556,7 @@ class IncidentWorkflow:
         raise KeyError(f"unknown incident '{identity}'")
 
     @serialized
-    def append_event(self, event_type: str, incident: Incident) -> None:
+    def log(self, event_type: str, incident: Incident) -> None:
         """Appends one chained state snapshot durably.
 
         Args:
@@ -589,8 +584,8 @@ class IncidentWorkflow:
 
 __all__ = [
     "Incident",
-    "IncidentStatus",
-    "IncidentWorkflow",
+    "Incidents",
+    "Phase",
     "digest",
     "incident_id",
     "require_text",

@@ -20,7 +20,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
   <h2>2. Rollback</h2>
   <ol>
-    <li>Register a known-good bundle and promote it with a signed <code>PromotionApproval</code> bound to its content digest, review decision and evidence references. Pass the release verification key to the promotion call.</li>
+    <li>Register a known-good bundle and promote it with a signed <code>Sanction</code> bound to its content digest, review decision and evidence references. Pass the release verification key to the promotion call.</li>
     <li>Stage a challenger under the <code>challenger</code> alias. Do not move the serving alias as part of the training step.</li>
     <li>Score the same sufficiently large labelled batch with both versions.</li>
     <li>Run the rollback check with the declared tolerance and confirm a clearly worse champion remains in place while approval is pending.</li>

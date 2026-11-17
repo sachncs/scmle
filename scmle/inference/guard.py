@@ -2,7 +2,7 @@
 
 `Readiness` is the difference between "the process is up" (liveness) and "the
 process may take traffic" (readiness): it becomes true only after the bundle
-was verified, loaded and warmed up, in that order. `AdmissionControl` bounds
+was verified, loaded and warmed up, in that order. `Admission` bounds
 concurrent requests and the time one request may take, so an overloaded or
 stuck model answers quickly instead of queueing without limit; a call that
 timed out makes the replica not ready until it returns, and `STRIKES` of them
@@ -35,7 +35,7 @@ CURRENT = threading.local()
 def abandoned() -> bool:
     """Whether the caller of the work running on this thread gave up.
 
-    Work run by `AdmissionControl.run` checks this before it mutates state,
+    Work run by `Admission.run` checks this before it mutates state,
     so a request answered with a 504 changes nothing (SRV-2).
 
     Returns:
@@ -60,7 +60,7 @@ STEPS = (Phase.VERIFYING, Phase.LOADING, Phase.WARMING)
 STEP_COUNT = len(STEPS)
 
 
-class NotReadyError(errors.ScmleError):
+class UnreadyError(errors.ScmleError):
     """The service has not finished verify, load and warm-up (or failed)."""
 
     category = "not_ready"
@@ -175,7 +175,7 @@ class Readiness:
             }
 
 
-class AdmissionControl:
+class Admission:
     """Bounds concurrent requests and the time one request may take."""
 
     def __init__(
@@ -343,7 +343,7 @@ def is_valid_request_id(request_id: str) -> bool:
     return REQUEST_ID_PATTERN.fullmatch(request_id) is not None
 
 
-def new_request_id() -> str:
+def mint() -> str:
     """Returns an opaque server-side request id with no request data.
 
     Returns:

@@ -84,7 +84,7 @@ def specify() -> dict[str, Any]:
     Returns:
         The specification of the hand-written reference model.
     """
-    return parity.load_golden(GOLDEN).spec
+    return parity.goldens(GOLDEN).spec
 
 
 def invert() -> dict[str, Any]:
@@ -114,7 +114,7 @@ def export_service(
     Returns:
         `folder`.
     """
-    parity.reference_bundle(spec).export_service(folder, signing_key=key)
+    parity.handwrite(spec).export_service(folder, signing_key=key)
     return folder
 
 
@@ -146,7 +146,7 @@ class Fleet:
     def __init__(self) -> None:
         """Starts with nothing."""
         self.instances: list[Instance] = []
-        self.servers: list[mocks.MockServer] = []
+        self.servers: list[mocks.Stub] = []
         self.children: list[subprocess.Popen[str]] = []
 
     def start(
@@ -169,7 +169,7 @@ class Fleet:
         Returns:
             The running instance, which the fleet remembers.
         """
-        chosen = port or demo.free_port()
+        chosen = port or demo.unused()
         env = {
             **os.environ,
             "HOST": "127.0.0.1",
@@ -191,7 +191,7 @@ class Fleet:
         self.instances.append(instance)
         return instance
 
-    def serve(self, server: mocks.MockServer) -> mocks.MockServer:
+    def serve(self, server: mocks.Stub) -> mocks.Stub:
         """Starts an emulator and remembers it.
 
         Args:
@@ -288,12 +288,10 @@ def boot(instance: Instance, timeout: float | None = None) -> float | None:
         the timeout or the process exited first.
     """
     limit = recovery.scaled(READY_SECONDS) if timeout is None else timeout
-    return demo.wait_ready(instance.base, instance.process, limit)
+    return demo.settle(instance.base, instance.process, limit)
 
 
-def await_unready(
-    instance: Instance, timeout: float | None = None
-) -> dict[str, Any]:
+def failing(instance: Instance, timeout: float | None = None) -> dict[str, Any]:
     """Polls ``/readyz`` until the service reports phase ``failed``.
 
     Polling stops at the first ``failed`` phase or when the wait ends. The
@@ -315,7 +313,7 @@ def await_unready(
     seen: dict[str, Any] = {"readyz": 0, "phase": None, "reason": None}
     while time.monotonic() < deadline:
         try:
-            status, body = demo.get_json(f"{instance.base}/readyz", timeout=2.0)
+            status, body = demo.retrieve(f"{instance.base}/readyz", timeout=2.0)
         except OSError:
             # handled: expected while starting; retried until deadline
             time.sleep(0.2)
@@ -329,7 +327,7 @@ def await_unready(
             break
         time.sleep(0.2)
     try:
-        seen["livez"] = demo.get_json(f"{instance.base}/livez", timeout=2.0)[0]
+        seen["livez"] = demo.retrieve(f"{instance.base}/livez", timeout=2.0)[0]
     except OSError:
         # handled: recorded livez status 0
         seen["livez"] = 0
@@ -627,7 +625,7 @@ def restart() -> recovery.Outcome:
         client.start()
         time.sleep(0.5)
         bad = fleet.start(broken)
-        verdict = await_unready(bad)
+        verdict = failing(bad)
         admitted = verdict["readyz"] == http.HTTPStatus.OK
         bad.process.kill()
         started = time.monotonic()
@@ -704,7 +702,7 @@ def invalid_credentials() -> recovery.Outcome:
     try:
         service = export_service(base / "service", specify())
         wrong = fleet.start(service, key=WRONG_KEY)
-        verdict = await_unready(wrong)
+        verdict = failing(wrong)
         detected = time.monotonic()
         wrong.process.kill()
         wrong.process.wait(timeout=15)
@@ -743,7 +741,7 @@ def invalid_credentials() -> recovery.Outcome:
     return result
 
 
-def secret_rotation() -> recovery.Outcome:
+def rekey() -> recovery.Outcome:
     """A bundle re-signed under a rotated key is refused under the old key.
 
     The service is shown to run under the old key, the re-signed bundle to be
@@ -769,7 +767,7 @@ def secret_rotation() -> recovery.Outcome:
         first.process.wait(timeout=15)
         new_service = export_service(base / "new", specify(), ROTATED_KEY)
         stale = fleet.start(new_service, key=demo.DEMO_SIGNING_KEY)
-        verdict = await_unready(stale)
+        verdict = failing(stale)
         detected = time.monotonic()
         stale.process.kill()
         stale.process.wait(timeout=15)
@@ -825,13 +823,13 @@ def object_store_loss() -> recovery.Outcome:
     )
     try:
         service = export_service(base / "service", specify())
-        port = demo.free_port()
+        port = demo.unused()
         store = mocks.ObjectStore(base / "objects", port=port)
         fleet.serve(store)
         url = store.address
-        etags = demo.upload_folder(url, service, "models/m/v1")
+        etags = demo.sync(url, service, "models/m/v1")
         fetched = base / "fetched"
-        demo.download_folder(url, "models/m/v1", etags, fetched)
+        demo.download(url, "models/m/v1", etags, fetched)
         running = fleet.start(fetched)
         if boot(running) is None:
             raise errors.ScmleError("the service did not become ready")
@@ -852,7 +850,7 @@ def object_store_loss() -> recovery.Outcome:
         }
         lost = sum(not found for found in intact.values())
         second = base / "refetched"
-        demo.download_folder(url, "models/m/v1", etags, second)
+        demo.download(url, "models/m/v1", etags, second)
         same = provenance.bundle_digest(
             second / "model"
         ) == provenance.bundle_digest(service / "model")
@@ -893,7 +891,7 @@ def object_store_loss() -> recovery.Outcome:
     return result
 
 
-def metrics_destination_outage() -> recovery.Outcome:
+def blackout() -> recovery.Outcome:
     """The metrics sink is down; samples are spooled and drained later.
 
     Returns:
@@ -911,17 +909,17 @@ def metrics_destination_outage() -> recovery.Outcome:
         running = fleet.start(service)
         if boot(running) is None:
             raise errors.ScmleError("the service did not become ready")
-        port = demo.free_port()
+        port = demo.unused()
         url = f"http://127.0.0.1:{port}"
 
-        def send(samples: list[observability.MetricSample]) -> int:
-            return mocks.post_metrics(url, samples, timeout=2.0)
+        def send(samples: list[observability.Sample]) -> int:
+            return mocks.transmit(url, samples, timeout=2.0)
 
         stamp = "2026-11-05T10:00:00+00:00"
         samples = [
-            observability.MetricSample(
+            observability.Sample(
                 f"probe_{n}",
-                observability.SignalKind.THROUGHPUT,
+                observability.Indicator.THROUGHPUT,
                 float(n),
                 "count",
                 stamp,
@@ -933,7 +931,7 @@ def metrics_destination_outage() -> recovery.Outcome:
         down = first.flush()
         serving_during = (
             predict(running.base)[0] == http.HTTPStatus.OK
-            and demo.get_json(f"{running.base}/readyz")[0] == http.HTTPStatus.OK
+            and demo.retrieve(f"{running.base}/readyz")[0] == http.HTTPStatus.OK
         )
         restarted = spool.MetricsSpool(
             base / "spool.jsonl", send, batch_size=20
@@ -991,7 +989,7 @@ def corrupted_bundle() -> recovery.Outcome:
         shutil.copytree(service, pristine)
         tampered = corrupt(service, base / "tampered")
         broken = fleet.start(tampered)
-        verdict = await_unready(broken)
+        verdict = failing(broken)
         detected = time.monotonic()
         broken.process.kill()
         broken.process.wait(timeout=15)
@@ -1077,7 +1075,7 @@ def incompatible_schema() -> recovery.Outcome:
             statuses.append(code)
             watch.record_request(100.0 + step, "/predict", code, 0.01)
         verdict = classify.classify(watch.evaluate(140.0))
-        digest = demo.get_json(f"{running.base}/schema")[1]["schema_digest"]
+        digest = demo.retrieve(f"{running.base}/schema")[1]["schema_digest"]
         adapted = demo.post_json(
             url, {"records": records(1), "expected_schema_digest": digest}
         )[0]
@@ -1097,7 +1095,7 @@ def incompatible_schema() -> recovery.Outcome:
             ),
             "the caller recovers after reading /schema": adapted
             == http.HTTPStatus.OK,
-            "the service stayed ready": demo.get_json(f"{running.base}/readyz")[
+            "the service stayed ready": demo.retrieve(f"{running.base}/readyz")[
                 0
             ]
             == http.HTTPStatus.OK,
@@ -1128,7 +1126,7 @@ def incompatible_schema() -> recovery.Outcome:
 # ---- a control plane made of local processes ---------------------------
 
 
-class ProcessPlane(control.ControlPlane):
+class Processes(control.ControlPlane):
     """Revisions are local service processes; the interface is the same.
 
     ``deploy(digest)`` starts a revision of the folder registered for the
@@ -1172,7 +1170,7 @@ class ProcessPlane(control.ControlPlane):
         if boot(probe) is None:
             raise errors.ScmleError("the image does not start")
         digest = str(
-            demo.get_json(f"{probe.base}/health")[1]["artifact_digest"]
+            demo.retrieve(f"{probe.base}/health")[1]["artifact_digest"]
         )
         probe.process.kill()
         probe.process.wait(timeout=15)
@@ -1226,7 +1224,7 @@ class ProcessPlane(control.ControlPlane):
         """
         try:
             return (
-                demo.get_json(f"{self.revisions[revision].base}/readyz", 2.0)[0]
+                demo.retrieve(f"{self.revisions[revision].base}/readyz", 2.0)[0]
                 == http.HTTPStatus.OK
             )
         except OSError:
@@ -1277,7 +1275,7 @@ def register(
     spec: dict[str, Any],
     work: pathlib.Path,
     label: str,
-) -> registry.VersionRecord:
+) -> registry.Release:
     """Registers and approves one signed bundle.
 
     Args:
@@ -1290,9 +1288,7 @@ def register(
     Returns:
         The record of the registered version.
     """
-    exported = parity.reference_bundle(spec).save(
-        work / label, demo.DEMO_SIGNING_KEY
-    )
+    exported = parity.handwrite(spec).save(work / label, demo.DEMO_SIGNING_KEY)
     record = store.register(
         MODEL,
         exported,
@@ -1303,14 +1299,14 @@ def register(
     release.approve(
         MODEL,
         record.version,
-        demo.approval_for(record, f"recovery run {label}", "recovery-run"),
+        demo.sanction(record, f"recovery run {label}", "recovery-run"),
         demo.DEMO_SIGNING_KEY,
     )
     return record
 
 
-def detect_performance_loss(
-    plane: ProcessPlane,
+def degradation(
+    plane: Processes,
     watch: signals.SignalMonitor,
     rng: numpy.random.Generator,
     known_good: list[Any] | None,
@@ -1338,9 +1334,7 @@ def detect_performance_loss(
         truth = [
             p if rng.random() > LABEL_NOISE_RATE else 1 - p for p in known_good
         ]
-        watch.observe_outcomes(
-            float(step), signals.zero_one_losses(served, truth)
-        )
+        watch.observe_outcomes(float(step), signals.misses(served, truth))
         verdict = classify.classify(watch.evaluate(float(step)))
         if verdict.verdict is classify.Verdict.MODEL_PERFORMANCE:
             return (step + 1) * 3, time.monotonic()
@@ -1379,7 +1373,7 @@ def bad_release() -> recovery.Outcome:
         v1 = register(store, release, good_spec, base, "v1")
         v2 = register(store, release, invert(), base, "v2")
         v3 = register(store, release, third_spec, base, "v3")
-        plane = ProcessPlane(fleet)
+        plane = Processes(fleet)
         d1 = plane.enroll(export_service(base / "img1", good_spec))
         d2 = plane.enroll(export_service(base / "img2", invert()))
         d3 = plane.enroll(export_service(base / "img3", third_spec))
@@ -1407,9 +1401,7 @@ def bad_release() -> recovery.Outcome:
             signals.Window(window_seconds=1000.0, min_samples=30),
             signals.SignalThresholds(reference_loss=0.05, loss_tolerance=0.05),
         )
-        detected_after, detected_at = detect_performance_loss(
-            plane, watch, rng, known_good
-        )
+        detected_after, detected_at = degradation(plane, watch, rng, known_good)
         rolled = release.rollback(
             MODEL, ENVIRONMENT, plane, signing_key=demo.DEMO_SIGNING_KEY
         )
@@ -1465,7 +1457,7 @@ def bad_release() -> recovery.Outcome:
             "detected_after_labelled_cases": detected_after,
             "rollback": rolled.to_dict(),
             "unready_release": unready.to_dict(),
-            "control_plane": "ProcessPlane: revisions are local processes",
+            "control_plane": "Processes: revisions are local processes",
         }
     finally:
         result.detail["processes_still_alive_after_close"] = fleet.close()
@@ -1587,7 +1579,7 @@ def job_interruption() -> recovery.Outcome:
     return result
 
 
-def audit_continuity() -> recovery.Outcome:
+def resilience() -> recovery.Outcome:
     """Kills an audit-log writer five times and reopens each log.
 
     Each reopened log must verify, hold every acknowledged row, continue after
@@ -1616,7 +1608,7 @@ def audit_continuity() -> recovery.Outcome:
             started = time.monotonic()
             try:
                 reopened = audit.Log.open(path)
-            except deployment_ledger.DeploymentLedgerError:
+            except deployment_ledger.MisuseError:
                 # handled: counted as broken trial
                 broken += 1
                 continue
@@ -1659,13 +1651,13 @@ SCENARIOS: dict[str, Callable[[], recovery.Outcome]] = {
     "unhealthy_container_rolling_restart": restart,
     "invalid_credentials": invalid_credentials,
     "lost_object_store_access": object_store_loss,
-    "dependency_outage": metrics_destination_outage,
+    "dependency_outage": blackout,
     "corrupted_bundle": corrupted_bundle,
     "incompatible_schema": incompatible_schema,
     "bad_release": bad_release,
     "job_interruption": job_interruption,
-    "audit_log_continuity": audit_continuity,
-    "secret_rotation_recovery": secret_rotation,
+    "audit_log_continuity": resilience,
+    "secret_rotation_recovery": rekey,
 }
 
 

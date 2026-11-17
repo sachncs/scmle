@@ -40,14 +40,14 @@ class Findings:
 
     order: tuple[str, ...]
     results: Mapping[str, Any]
-    status: Mapping[str, Mapping[str, certificates.GateStatus]]
+    status: Mapping[str, Mapping[str, certificates.Authority]]
     recode_log: tuple[dict[str, Any], ...]
     skipped: Mapping[str, str]
 
 
 def gate_status(
     store: certificates.Store | None, detector_id: str
-) -> dict[str, certificates.GateStatus]:
+) -> dict[str, certificates.Authority]:
     """Looks up the gating status of each defect type of a detector.
 
     Args:
@@ -62,7 +62,7 @@ def gate_status(
     digest = spec.code_hash()
     return {
         defect: (
-            certificates.GateStatus.DESCRIPTIVE
+            certificates.Authority.DESCRIPTIVE
             if store is None
             else store.status(detector_id, digest, defect)
         )
@@ -95,15 +95,13 @@ def run(
     steps: dict[str, Callable[[pandas.DataFrame], Any]] = {}
     log: list[dict[str, Any]] = []
     working = frame
-    report = sentinels.find_sentinels(frame)
+    report = sentinels.hunt(frame)
     results["f5-sentinel"] = report
     order.append("f5-sentinel")
-    working, recoded = sentinels.recode_missing(frame, report)
+    working, recoded = sentinels.nullify(frame, report)
     log.extend(recoded)
-    steps["f5-duplicates"] = lambda f: duplicates.assess_duplicates(
-        f, target=target
-    )
-    steps["f5-missingness"] = lambda f: missingness.assess_mechanism(f, seed)
+    steps["f5-duplicates"] = lambda f: duplicates.assess(f, target=target)
+    steps["f5-missingness"] = lambda f: missingness.investigate(f, seed)
     steps["f5-outlier-triage"] = lambda f: outliers.triage(f, provenance)
     for detector_id in registry.EXECUTION_ORDER[1:]:
         order.append(detector_id)

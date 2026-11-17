@@ -80,7 +80,7 @@ class Comparison:
         return dataclasses.asdict(self)
 
 
-def score_arm(
+def tally(
     arm: Arm,
     rows: numpy.ndarray,
     metric: Any,
@@ -106,7 +106,7 @@ def score_arm(
             arm.classes,
         )
         if classification
-        else replay.RegressorPredictions(arm.predictions[rows])
+        else replay.Replayed(arm.predictions[rows])
     )
     positive = None
     if task is tasks.Task.BINARY and arm.classes is not None:
@@ -153,8 +153,8 @@ def compare_arms(
         "control": numpy.arange(len(control.outcomes)),
         "treatment": numpy.arange(len(treatment.outcomes)),
     }
-    control_score = score_arm(control, every["control"], metric, task)
-    treatment_score = score_arm(treatment, every["treatment"], metric, task)
+    control_score = tally(control, every["control"], metric, task)
+    treatment_score = tally(treatment, every["treatment"], metric, task)
     gains = []
     for draw in range(bootstraps):
         rng = numpy.random.default_rng([seed, draw])
@@ -166,8 +166,8 @@ def compare_arms(
             gains.append(
                 sign
                 * (
-                    score_arm(treatment, second, metric, task)
-                    - score_arm(control, first, metric, task)
+                    tally(treatment, second, metric, task)
+                    - tally(control, first, metric, task)
                 )
             )
         except (

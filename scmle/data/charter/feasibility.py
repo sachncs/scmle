@@ -91,7 +91,7 @@ def positive_delta(value: float, name: str) -> float:
     return float(value)
 
 
-def check_k(k_max: int) -> int:
+def countable(k_max: int) -> int:
     """Checks that the claim count is an integer of at least 1.
 
     Args:
@@ -118,7 +118,7 @@ def z_sum(alpha: float, k_max: int, power: float) -> float:
 
     Both quantiles are standard normal. `alpha` and `power` must lie
     strictly in (0, 1) and `k_max` must be an integer of at least 1;
-    otherwise the checks in `open_unit` and `check_k` raise `ValueError`.
+    otherwise the checks in `open_unit` and `countable` raise `ValueError`.
 
     Args:
         alpha: Family-wise level of the final claims.
@@ -130,7 +130,7 @@ def z_sum(alpha: float, k_max: int, power: float) -> float:
     """
     open_unit(alpha, "alpha")
     open_unit(power, "power")
-    check_k(k_max)
+    countable(k_max)
     return float(
         stats.norm.ppf(1 - alpha / (2 * k_max)) + stats.norm.ppf(power)
     )
@@ -179,7 +179,7 @@ def mde_mean(n: int, *, alpha: float, k_max: int, power: float) -> float:
     return z_sum(alpha, k_max, power) / math.sqrt(n)
 
 
-def power_mean(delta: float, n: int, *, alpha: float, k_max: int) -> float:
+def detectability(delta: float, n: int, *, alpha: float, k_max: int) -> float:
     """Computes the power to detect an effect at the Bonferroni level.
 
     The result is `Phi(delta * sqrt(max(n, 0)) - z_{1-alpha/(2K)})`. `delta`
@@ -198,7 +198,7 @@ def power_mean(delta: float, n: int, *, alpha: float, k_max: int) -> float:
     """
     positive_delta(delta, "delta")
     open_unit(alpha, "alpha")
-    check_k(k_max)
+    countable(k_max)
     critical = stats.norm.ppf(1 - alpha / (2 * k_max))
     return float(stats.norm.cdf(delta * math.sqrt(max(n, 0)) - critical))
 
@@ -225,7 +225,7 @@ def n_required_correlation(
     return math.ceil((z_sum(alpha, k_max, power) / math.atanh(abs(r))) ** 2 + 3)
 
 
-def mde_correlation(n: int, *, alpha: float, k_max: int, power: float) -> float:
+def resolution(n: int, *, alpha: float, k_max: int, power: float) -> float:
     """Computes the minimum detectable correlation.
 
     The result is `tanh(z_sum / sqrt(n - 3))` (see `z_sum`, whose checks
@@ -276,7 +276,7 @@ def n_required_two_proportions(
         raise errors.InputError("p1 and p2 must differ")
     open_unit(alpha, "alpha")
     open_unit(power, "power")
-    check_k(k_max)
+    countable(k_max)
     pooled = (p1 + p2) / 2
     root = stats.norm.ppf(1 - alpha / (2 * k_max)) * math.sqrt(
         2 * pooled * (1 - pooled)
@@ -284,7 +284,7 @@ def n_required_two_proportions(
     return math.ceil(float(root) ** 2 / (p1 - p2) ** 2)
 
 
-def wilson_half_width(
+def halfwidth(
     p: float, n: int, confidence: float = DEFAULT_CONFIDENCE
 ) -> float:
     """Computes the half-width of the Wilson interval for a proportion.
@@ -398,7 +398,9 @@ def assess(
         min_effect, alpha=alpha, k_max=k_max, power=power
     )
     mde = mde_mean(n_confirmation, alpha=alpha, k_max=k_max, power=power)
-    achieved = power_mean(min_effect, n_confirmation, alpha=alpha, k_max=k_max)
+    achieved = detectability(
+        min_effect, n_confirmation, alpha=alpha, k_max=k_max
+    )
     if n_confirmation < MIN_CONFIRMATION_ROWS:
         verdict, reason = (
             Verdict.INFEASIBLE,
@@ -420,13 +422,13 @@ def assess(
     elif (
         n_minority is not None
         and max_half_width is not None
-        and wilson_half_width(0.5, n_minority) > max_half_width
+        and halfwidth(0.5, n_minority) > max_half_width
     ):
         verdict, reason = (
             Verdict.DOWNGRADE,
             (
                 f"minority count {n_minority} gives a Wilson half-width of "
-                f"{wilson_half_width(0.5, n_minority):.3f} > {max_half_width}"
+                f"{halfwidth(0.5, n_minority):.3f} > {max_half_width}"
             ),
         )
     else:

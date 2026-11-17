@@ -51,7 +51,7 @@ DAG_ALPHA = 0.05
 
 
 @dataclasses.dataclass(frozen=True)
-class LoadedStore:
+class Shelf:
     """A certificate store and what to say when there is none.
 
     Attributes:
@@ -63,7 +63,7 @@ class LoadedStore:
     note: str = ""
 
 
-def load_store(name: str, directory: Path | None = None) -> LoadedStore:
+def load_store(name: str, directory: Path | None = None) -> Shelf:
     """Reads a certificate store, or says why it could not be read.
 
     Args:
@@ -72,20 +72,20 @@ def load_store(name: str, directory: Path | None = None) -> LoadedStore:
             the package.
 
     Returns:
-        A `LoadedStore` holding the store, or None and a note saying
+        A `Shelf` holding the store, or None and a note saying
         that the file is missing or unreadable (the detectors it covers are
         then descriptive).
     """
     path = (directory or scmle.certificates.DIRECTORY) / name
     if not path.is_file():
-        return LoadedStore(
+        return Shelf(
             None, f"{name} not found at {path}: detectors are descriptive"
         )
     try:
-        return LoadedStore(certificates.Store.load(path))
+        return Shelf(certificates.Store.load(path))
     except (ValueError, KeyError, OSError) as error:
-        # handled: returned LoadedStore carries unreadable reason
-        return LoadedStore(
+        # handled: returned Shelf carries unreadable reason
+        return Shelf(
             None, f"{name} unreadable ({error}): detectors are descriptive"
         )
 
@@ -119,14 +119,14 @@ class Qualification:
     dag: dict[str, object] | None = None
 
     @property
-    def leakage_gate(self) -> certificates.GateStatus:
+    def leakage_gate(self) -> certificates.Authority:
         """`GATING` when any screen mechanism has a passing certificate."""
         if self.leakage is not None and any(
-            g is certificates.GateStatus.GATING
+            g is certificates.Authority.GATING
             for g in self.leakage.gates.values()
         ):
-            return certificates.GateStatus.GATING
-        return certificates.GateStatus.DESCRIPTIVE
+            return certificates.Authority.GATING
+        return certificates.Authority.DESCRIPTIVE
 
     @property
     def suspects(self) -> dict[str, bool]:
@@ -152,7 +152,7 @@ class Qualification:
         return self.diagnostics
 
 
-def finding_check(
+def screened(
     finding: screen.Finding, rows: int, seed: int, index: int
 ) -> qualification.Check:
     """Builds the ledger record of one screen finding.
@@ -194,14 +194,14 @@ def finding_check(
         effect=statistic,
         n=rows,
         decision=decision,
-        set_id=qualification.SetId.EXPLORATION,
+        set_id=qualification.Subset.EXPLORATION,
         seed_path=(seed, "leakage.screen", index),
         tier=qualification.Tier.UNVERIFIED,
     )
 
 
-def attestation_check(
-    item: scmle.data.admissibility.attestations.LeakageAttestation,
+def waiver(
+    item: scmle.data.admissibility.attestations.Affidavit,
     findings: Sequence[screen.Finding],
     rows: int,
     seed: int,
@@ -245,7 +245,7 @@ def attestation_check(
         effect=statistic,
         n=rows,
         decision=qualification.Decision.WARN,
-        set_id=qualification.SetId.EXPLORATION,
+        set_id=qualification.Subset.EXPLORATION,
         seed_path=(seed, "leakage.attestation", index),
         tier=qualification.Tier.ATTESTED,
     )
@@ -264,7 +264,7 @@ def admit(
 ) -> Qualification:
     """Applies the graph rules to every candidate and tests the graph.
 
-    Each candidate gets `rules.decide_causal` (descendants of the treatment
+    Each candidate gets `rules.adjudicate` (descendants of the treatment
     and colliders are quarantined), the declared adjustment set is checked
     member by member, and the graph's implied independences are tested on
     `X` only. More candidates than `MAX_SEARCH_CANDIDATES` with no declared
@@ -293,7 +293,7 @@ def admit(
         falsification, if it ran.
     """
     records = provenance.Dictionary.covering([str(c) for c in candidates])
-    members = scmle.data.charter.causal.covariates_of(spec.assumptions) or ()
+    members = scmle.data.charter.causal.adjusters(spec.assumptions) or ()
     try:
         table: rules.Admissibility | None = rules.build_table(
             records,
@@ -377,7 +377,7 @@ def run(
     time_column: str | None = None,
     directory: Path | None = None,
     attestations: Sequence[
-        scmle.data.admissibility.attestations.LeakageAttestation
+        scmle.data.admissibility.attestations.Affidavit
     ] = (),
     scope: str = "",
     today: datetime.date | None = None,
@@ -416,7 +416,7 @@ def run(
         The results. A predictive estimand gets the leakage screen, the
         admissibility table and the ledger diagnostics. A causal estimand
         with a causal block and a declared graph gets the graph rules
-        (`rules.decide_causal`) on every candidate and the falsification of
+        (`rules.adjudicate`) on every candidate and the falsification of
         the graph on `X`; without both, its admissibility table and leakage
         report are None and `notes` says so.
     """
@@ -450,7 +450,7 @@ def run(
         time_column,
     )
     if not any(
-        g is certificates.GateStatus.GATING for g in report.gates.values()
+        g is certificates.Authority.GATING for g in report.gates.values()
     ):
         notes.append(
             "leakage suspicion is descriptive: the screen gave no gate"
@@ -485,7 +485,7 @@ def run(
             ),
         ],
     )
-    gates = {f.feature: certificates.GateStatus.GATING for f in report.blocking}
+    gates = {f.feature: certificates.Authority.GATING for f in report.blocking}
     table = rules.build_table(
         records,
         kind,
@@ -497,14 +497,14 @@ def run(
     diagnostics: list[tuple[str, qualification.Check]] = [
         (
             screen.DETECTOR_ID,
-            finding_check(f, report.rows, seed, index),
+            screened(f, report.rows, seed, index),
         )
         for index, f in enumerate(report.findings)
     ]
     diagnostics.extend(
         (
             ATTESTATION_SOURCE,
-            attestation_check(
+            waiver(
                 item,
                 [f for f in report.findings if f.feature == column],
                 report.rows,

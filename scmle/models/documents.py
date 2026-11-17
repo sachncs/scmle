@@ -538,7 +538,7 @@ class Classifier:
             citations=sample.citations(),
         )
 
-    def term_ablation_explanation(
+    def ablate(
         self,
         sample: document.Sample,
         top_k: int = 10,
@@ -693,7 +693,7 @@ class Classifier:
             )
             model_path = temporary_directory / "model.joblib"
             joblib.dump(self, model_path, compress=3)
-            durability.sync_file(model_path)
+            durability.sync(model_path)
             manifest = {
                 "schema_version": 1,
                 "model_path": "model.joblib",

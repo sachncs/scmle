@@ -33,7 +33,7 @@ SPARSE_THRESHOLD = 0.3
 
 
 def build_preprocessor(
-    plan: data.FeaturePlan,
+    plan: data.Blueprint,
     options: data.Preprocessing,
 ) -> compose.ColumnTransformer:
     """Builds the column transformer for a feature plan.
@@ -48,12 +48,12 @@ def build_preprocessor(
     parts = []
     special = isolate(plan, options)
     if special:
-        encoder = columns.CategoricalKind().high_cardinality_transformer(
+        encoder = columns.Categorical().high_cardinality_transformer(
             options.high_cardinality
         )
         parts.append(("high_cardinality", encoder, list(special)))
     for kind in columns.KINDS:
-        selected = [c for c in plan.columns_for(kind.name) if c not in special]
+        selected = [c for c in plan.pick(kind.name) if c not in special]
         if not selected:
             continue
         kind_options = options
@@ -71,7 +71,7 @@ def build_preprocessor(
         parts.append(
             (
                 "constructed",
-                columns.NumericKind().transformer(options),
+                columns.Quantitative().transformer(options),
                 compose.make_column_selector(pattern=f"^{selection.PREFIX}"),
             )
         )
@@ -84,7 +84,7 @@ def build_preprocessor(
 
 
 def partition(
-    plan: data.FeaturePlan, selected: list[str]
+    plan: data.Blueprint, selected: list[str]
 ) -> tuple[list[str], list[str]]:
     """Numeric columns whose gaps are informative, and the rest.
 
@@ -106,7 +106,7 @@ def partition(
     return flagged, [c for c in selected if c not in flagged]
 
 
-def monotonic_signs(plan: data.FeaturePlan, offset: int) -> tuple[int, ...]:
+def monotonicity(plan: data.Blueprint, offset: int) -> tuple[int, ...]:
     """Monotonic signs for the leading columns of the encoded matrix.
 
     The encoded matrix starts with the specially encoded high-cardinality
@@ -130,8 +130,8 @@ def monotonic_signs(plan: data.FeaturePlan, offset: int) -> tuple[int, ...]:
     )
 
 
-def monotonic_layout_problem(
-    plan: data.FeaturePlan, select: bool, missing: str
+def misalignment(
+    plan: data.Blueprint, select: bool, missing: str
 ) -> str | None:
     """Why the monotonic signs cannot follow the encoded numeric columns.
 
@@ -160,7 +160,7 @@ def monotonic_layout_problem(
 
 
 def isolate(
-    plan: data.FeaturePlan,
+    plan: data.Blueprint,
     options: data.Preprocessing,
 ) -> tuple[str, ...]:
     """Columns that get a special encoder instead of one-hot encoding.
@@ -182,8 +182,8 @@ def isolate(
     return tuple(c for c in plan.categorical if c in plan.high_cardinality)
 
 
-def build_front_end(
-    plan: data.FeaturePlan,
+def frontend(
+    plan: data.Blueprint,
     options: data.Preprocessing,
 ) -> Any:
     """Builds the preprocessing front end, with the feature graph if any.
@@ -201,14 +201,14 @@ def build_front_end(
         return preprocessor
     return pipeline.Pipeline(
         [
-            ("graph", feature_graph.FeatureGraphTransformer(plan.derived)),
+            ("graph", feature_graph.Transformer(plan.derived)),
             ("prep", preprocessor),
         ]
     )
 
 
 def default_options(
-    plan: data.FeaturePlan, adapter: models.Model
+    plan: data.Blueprint, adapter: models.Model
 ) -> data.Preprocessing:
     """Preprocessing switches implied by an adapter's capabilities.
 
@@ -241,7 +241,7 @@ def default_options(
     )
 
 
-def weigh(model: Any, plan: data.FeaturePlan, seed: int) -> Any:
+def weigh(model: Any, plan: data.Blueprint, seed: int) -> Any:
     """Wraps a model so that it reads the plan's weight column.
 
     Args:
@@ -258,8 +258,8 @@ def weigh(model: Any, plan: data.FeaturePlan, seed: int) -> Any:
     return model
 
 
-def preprocessing_steps(
-    plan: data.FeaturePlan,
+def preprocess(
+    plan: data.Blueprint,
     options: data.Preprocessing,
     task: tasks.Task,
     seed: int,
@@ -278,13 +278,9 @@ def preprocessing_steps(
     """
     steps: list[tuple[str, Any]] = []
     if plan.derived:
-        steps.append(
-            ("graph", feature_graph.FeatureGraphTransformer(plan.derived))
-        )
+        steps.append(("graph", feature_graph.Transformer(plan.derived)))
     if options.construct:
-        steps.append(
-            ("construct", selection.FeatureConstructor(tuple(plan.numeric)))
-        )
+        steps.append(("construct", selection.Constructor(tuple(plan.numeric))))
     steps.append(("prep", build_preprocessor(plan, options)))
     if options.select:
         steps.append(
@@ -298,7 +294,7 @@ def preprocessing_steps(
     return steps
 
 
-def wrap_estimator(built: Any, plan: data.FeaturePlan, task: tasks.Task) -> Any:
+def wrap(built: Any, plan: data.Blueprint, task: tasks.Task) -> Any:
     """Wraps a pipeline in the estimators the plan's columns call for.
 
     Args:
@@ -316,14 +312,14 @@ def wrap_estimator(built: Any, plan: data.FeaturePlan, task: tasks.Task) -> Any:
             built, plan.event_column
         )
     if task is tasks.Task.FORECAST:
-        built = estimators.ForecastEstimator(
+        built = estimators.Forecaster(
             built, plan.target_columns, plan.value_column or ""
         )
     elif plan.target_columns:
         kind = (
             scmle.models.multitarget.wrapper.MultiLabelEstimator
             if task is tasks.Task.MULTILABEL
-            else scmle.models.multitarget.wrapper.MultiOutputEstimator
+            else scmle.models.multitarget.wrapper.Multioutput
         )
         built = kind(built, plan.target_columns)
     if plan.treatment_column:
@@ -331,14 +327,12 @@ def wrap_estimator(built: Any, plan: data.FeaturePlan, task: tasks.Task) -> Any:
             built, plan.treatment_column
         )
     if plan.query_column:
-        built = scmle.models.ranking.wrapper.QueryAwareEstimator(
-            built, plan.query_column
-        )
+        built = scmle.models.ranking.wrapper.Ranker(built, plan.query_column)
     return built
 
 
-def build_pipeline(
-    plan: data.FeaturePlan,
+def instantiate(
+    plan: data.Blueprint,
     adapter: models.Model,
     task: tasks.Task,
     seed: int,
@@ -370,7 +364,7 @@ def build_pipeline(
     # forecast task is a last-value forecaster. None leaves it to this module.
     assembled: Any
     if task is tasks.Task.FORECAST and adapter.name == "dummy":
-        assembled = estimators.LastValueForecaster(
+        assembled = estimators.Naive(
             None, plan.target_columns, plan.value_column or ""
         )
     else:
@@ -383,9 +377,9 @@ def build_pipeline(
     special = isolate(plan, options)
     if options.high_cardinality == "ordinal" and special:
         params |= adapter.categorical_params(list(range(len(special))))
-    steps = preprocessing_steps(plan, options, task, seed)
+    steps = preprocess(plan, options, task, seed)
     estimator = adapter.build(task, seed, params)
-    problem = monotonic_layout_problem(plan, options.select, options.missing)
+    problem = misalignment(plan, options.select, options.missing)
     if problem:
         raise errors.ConfigError(
             f"monotonic constraints cannot apply: {problem}"
@@ -399,8 +393,8 @@ def build_pipeline(
         estimator = kind(
             cast("base.BaseEstimator", estimator),
             adapter.monotonic_param or "",
-            monotonic_signs(plan, len(special)),
+            monotonicity(plan, len(special)),
         )
     steps.append(("model", estimator))
-    built = wrap_estimator(pipeline.Pipeline(steps), plan, task)
+    built = wrap(pipeline.Pipeline(steps), plan, task)
     return weigh(built, plan, seed)

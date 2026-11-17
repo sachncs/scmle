@@ -50,7 +50,7 @@ def concrete_subclasses(base, *modules):
     ("base", "modules"),
     [
         (tabular.TableReader, [tabular]),
-        (columns.ColumnKind, [columns]),
+        (columns.Family, [columns]),
         (splitters.Partitioner, [splitters]),
         (strategies.Strategy, [strategies]),
         (diagnostics.Diagnostic, [diagnostics]),
@@ -59,14 +59,14 @@ def concrete_subclasses(base, *modules):
         (stages.Stage, [stages]),
         (policies.Reviewer, [policies]),
         (resampling.Resampler, [resampling]),
-        (resampling.IndexResampler, [resampling]),
-        (feature_graph.FeatureOp, [feature_graph]),
-        (synthesis.SyntheticGenerator, [synthesis]),
+        (resampling.Indexed, [resampling]),
+        (feature_graph.Operation, [feature_graph]),
+        (synthesis.Synthesizer, [synthesis]),
         (thresholds.Objective, [thresholds]),
         (monitor.Advisor, [monitor]),
         (scheduler.Executor, [scheduler]),
         (optimizers.Optimizer, [optimizers]),
-        (stores.ExperimentStore, [stores]),
+        (stores.Store, [stores]),
         (serving.Server, [serving]),
     ],
     ids=lambda value: getattr(value, "__name__", ""),
@@ -88,7 +88,7 @@ def test_every_concrete_component_implements_its_abstract_interface(
 
 
 def test_every_model_adapter_declares_complete_metadata():
-    adapters = registry.Catalog.with_builtins(include_user=False).adapters
+    adapters = registry.Catalog.stock(include_user=False).adapters
     assert len(adapters) >= 40
     names = set()
     for adapter in adapters.values():
@@ -114,12 +114,12 @@ def test_one_stage_per_lifecycle_state_in_order():
 def test_abstract_bases_cannot_be_instantiated():
     for base in (
         tabular.TableReader,
-        columns.ColumnKind,
+        columns.Family,
         splitters.Partitioner,
         strategies.Strategy,
-        resampling.IndexResampler,
+        resampling.Indexed,
         models.Model,
-        stores.ExperimentStore,
+        stores.Store,
     ):
         assert inspect.isabstract(base)
         assert isinstance(base, abc.ABCMeta)
@@ -144,7 +144,7 @@ def test_registering_and_planning_never_imports_optional_libraries():
         import scmle
         from scmle.contracts import tasks
         from scmle.models import registry
-        reg = registry.Catalog.with_builtins()
+        reg = registry.Catalog.stock()
         reg.candidates(tasks.Task.BINARY, 1000)
         heavy = ["lightgbm", "xgboost", "catboost", "optuna", "imblearn",
                  "mlflow", "ray", "torch", "tensorflow"]
@@ -162,7 +162,7 @@ def test_a_model_is_imported_only_when_it_is_built():
         import sys
         from scmle.contracts import tasks
         from scmle.models import registry
-        reg = registry.Catalog.with_builtins()
+        reg = registry.Catalog.stock()
         assert "lightgbm" not in sys.modules
         reg.get("lightgbm").build(tasks.Task.BINARY, 0)
         assert "lightgbm" in sys.modules

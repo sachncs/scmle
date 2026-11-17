@@ -9,7 +9,7 @@ depends on the confirmation set:
    charter's budget (`Plan`); a unit verdict of `coarser` or `unknown`
    stops the run with the questions a person must settle;
 2. read each table once through a consistent (snapshot-checked) read and wrap
-   it in an `AsOfView` with its declared time rule;
+   it in an `View` with its declared time rule;
 3. synthesize the feature family for the run table's rows, at the cutoff
    `moment - lag`, capped at `B_feat`; the declared family size is fixed here;
 4. return the feature columns, the manifest and the provenance table, which
@@ -41,7 +41,7 @@ development and test. With a `reconcile` block the extracted views are
 compared with the totals it declares and with the source database itself,
 which is queried for the row count, the declared column sums and the key
 checksum of each declared view (`declared.reconcile_source`, built on
-`reconcile.reconcile_extract`), before anything is synthesized; a mismatch
+`reconcile.crosscheck`), before anything is synthesized; a mismatch
 stops the run and names each quantity (`declared.require`).
 """
 
@@ -97,7 +97,7 @@ class Output:
     summary: dict[str, Any]
 
 
-def load_plan(path: str) -> dict[str, Any]:
+def recipe(path: str) -> dict[str, Any]:
     """Reads the ingest plan file.
 
     Args:
@@ -142,9 +142,7 @@ def identifier(value: Any, what: str) -> str:
     return value
 
 
-def rule_of(
-    record: dict[str, Any], spec: ingest.Ingestion
-) -> asof_view.KnownTime:
+def decode(record: dict[str, Any], spec: ingest.Ingestion) -> asof_view.Timing:
     """The time rule a view declares.
 
     Args:
@@ -158,7 +156,7 @@ def rule_of(
     """
     note = record.get("attestation")
     delay = record.get("delta_rec_days", spec.delta_rec)
-    return asof_view.KnownTime(
+    return asof_view.Timing(
         record["mode"],
         record.get("known_column"),
         None if record["mode"] == asof_view.NON_VERSIONED else float(delay),
@@ -170,7 +168,7 @@ def read_frame(entry: dict[str, Any], factory: Any) -> pandas.DataFrame:
     """One table, read once with a snapshot check.
 
     A read that sees the table change on every attempt fails with the
-    snapshot check's own `TornReadError`.
+    snapshot check's own `TornError`.
 
     Args:
         entry: The plan entry naming the `table` and its `order_by` clause.
@@ -189,7 +187,7 @@ def read_frame(entry: dict[str, Any], factory: Any) -> pandas.DataFrame:
         raise errors.ConfigError(f"ingest plan order_by {order!r} is invalid")
     query = f"SELECT * FROM {table} ORDER BY {order}"  # noqa: S608 -- identifier and ORDER-matched clause only # nosec B608
     connector = connectors.DbApiConnector("sqlite://ingest", query, factory)
-    return profile.consistent_read(connector, BATCH_ROWS).frame
+    return profile.untorn(connector, BATCH_ROWS).frame
 
 
 def load(
@@ -197,7 +195,7 @@ def load(
     factory: Any,
     spec: ingest.Ingestion,
     frame: pandas.DataFrame | None = None,
-) -> asof_view.AsOfView:
+) -> asof_view.View:
     """One table as an as-of view; `frame` is the extract if already read.
 
     Args:
@@ -213,10 +211,10 @@ def load(
     table = identifier(entry["table"], "table")
     if frame is None:
         frame = read_frame(entry, factory)
-    return asof_view.AsOfView(
+    return asof_view.View(
         frame,
         entry["key"],
-        rule_of(entry["rule"], spec),
+        decode(entry["rule"], spec),
         entry.get("event_time"),
         entry.get("name", table),
         bool(entry.get("permissive", False)),
@@ -254,7 +252,7 @@ def run(
     missing = [c for c in (key, moment) if c not in frame.columns]
     if missing:
         raise errors.ConfigError(f"ingest plan names columns {missing} absent")
-    factory = scmle.data.ingest.plan.sqlite_factory(plan_document["database"])
+    factory = scmle.data.ingest.plan.opener(plan_document["database"])
     settings = scmle.data.ingest.plan.Config(
         tables=tuple(plan_document["tables"]),
         unit=plan_document.get("unit"),
@@ -262,7 +260,7 @@ def run(
         eps_key=spec.eps_key,
         eps_null=spec.eps_null,
         eps_fk=spec.eps_fk,
-        declared=scmle.data.ingest.plan.declared_from_json(
+        declared=scmle.data.ingest.plan.declarations(
             plan_document.get("declared", [])
         ),
     )
@@ -349,7 +347,7 @@ def run(
         max_features=spec.feature_budget,
         strict=spec.strict,
     )
-    table = synthesize.feature_provenance(found, spec.lag, [*views, *leaves])
+    table = synthesize.lineage(found, spec.lag, [*views, *leaves])
     documents = {
         MANIFEST: found.to_dict(),
         PROVENANCE: table.to_dict(),

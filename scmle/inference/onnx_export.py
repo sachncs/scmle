@@ -31,7 +31,7 @@ ML_OPSET = 3
 DEFAULT_TOLERANCE = 1e-4
 INSTALL_HINT = "install the 'onnx' extra (skl2onnx, onnxruntime)"
 WRAPPERS = (
-    weighting.WeightedEstimator,
+    weighting.Reweighter,
     resampling.ResamplingClassifier,
     resampling.DensityWeightedRegressor,
 )
@@ -58,11 +58,11 @@ def load_converter() -> tuple[Any, Any]:
 
 
 MODEL_WRAPPERS = (
-    early_stopping.HoldoutEarlyStopping,
-    wrappers.LabelEncodedClassifier,
+    early_stopping.Holdout,
+    wrappers.Encoded,
     wrappers.FlatPredictionClassifier,
     wrappers.FitParamsClassifier,
-    wrappers.FitParamsRegressor,
+    wrappers.Curried,
     wrappers.MonotoneEstimator,
 )
 CODES_KEY = "label_codes"
@@ -171,7 +171,7 @@ def passthrough() -> Any:
     return preprocessing.FunctionTransformer().fit(numpy.zeros((1, 1)))
 
 
-def without_casts(model: Any) -> Any:
+def uncast(model: Any) -> Any:
     """Copies a model, replacing its type casts and text imputers by identities.
 
     Casting columns to float or string, and filling missing text with the
@@ -247,7 +247,7 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
             "calibrator; export before calibrating"
         )
     enrol()
-    fitted = without_casts(unwrap(bundle.pipeline))
+    fitted = uncast(unwrap(bundle.pipeline))
     model_step = fitted.steps[-1][1]
     encoded = False
     while isinstance(model_step, MODEL_WRAPPERS):
@@ -324,7 +324,7 @@ def feed(bundle: Any, frame: pandas.DataFrame) -> dict[str, numpy.ndarray]:
         NaN) and strings for categorical ones, with missing categories
         replaced by the missing token.
     """
-    prepared = bundle.prepare_frame(frame)
+    prepared = bundle.prepare(frame)
     schema = bundle.schema
     inputs = {
         c: pandas.to_numeric(prepared[c], errors="coerce")
@@ -370,7 +370,7 @@ def verify(
     runtime = load_converter()[1]
     session = runtime.InferenceSession(str(path))
     outputs = session.run(None, feed(bundle, frame))
-    prepared = bundle.prepare_frame(frame)
+    prepared = bundle.prepare(frame)
     if bundle.classes is not None:
         expected = numpy.asarray(bundle.pipeline.predict_proba(prepared))
         difference = float(

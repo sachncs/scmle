@@ -27,13 +27,13 @@ def frame(rows=400, seed=0, shift=0.0, missing=0.0, unseen=0.0):
 def profile(rows=2000, seed=99):
     base = frame(rows, seed)
     score = (base["age"] - 40.0) / 10.0
-    return reference.ReferenceProfile(
+    return reference.Baseline(
         features={
-            "age": reference.NumericReference.fit(base["age"]),
-            "balance": reference.NumericReference.fit(base["balance"]),
+            "age": reference.Deciles.fit(base["age"]),
+            "balance": reference.Deciles.fit(base["balance"]),
             "plan": reference.CategoricalReference.fit(base["plan"]),
         },
-        output=reference.NumericReference.fit(score),
+        output=reference.Deciles.fit(score),
         output_name="score",
         reference_metrics={},
     )

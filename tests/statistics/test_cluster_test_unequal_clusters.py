@@ -9,7 +9,7 @@ difference, a random effect shared inside each cluster) with uneven cluster
 sizes, the usual case for rows grouped by entity. The rejection rate at
 alpha = 0.05 over 20,000 simulated datasets is measured at 0.056 and 0.057, a
 little above alpha, which is a known property of this estimator with few,
-uneven clusters and is stated in the docstring of `cluster_test`. The tests pin
+uneven clusters and is stated in the docstring of `ttest`. The tests pin
 that measured limit: the rate must stay within 3.5 binomial standard errors of
 `KNOWN_LIMIT`, so a worse test is still caught.
 """
@@ -32,7 +32,7 @@ def rejection_rate(clusters, smallest, largest, seed):
         labels = numpy.repeat(numpy.arange(clusters), sizes)
         effect = numpy.repeat(rng.normal(size=clusters), sizes)
         values = effect + rng.normal(size=labels.size)
-        rejected += baseline.cluster_test(values, labels).p_value <= ALPHA
+        rejected += baseline.ttest(values, labels).p_value <= ALPHA
     return rejected / RUNS
 
 

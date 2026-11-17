@@ -2,7 +2,7 @@
 
 Uniqueness and inclusion are universal statements: a sample can refute them
 but cannot confirm them. So every statistic here is an aggregate query run in
-the source, and rows are pulled only by `consistent_read`, which needs a total
+the source, and rows are pulled only by `untorn`, which needs a total
 order and compares a snapshot token before and after the read. A read whose
 token or row count changed is rejected as torn.
 
@@ -47,7 +47,7 @@ def quote(name: str) -> str:
     return f'"{name}"'
 
 
-def quote_all(names: Sequence[str]) -> str:
+def quoting(names: Sequence[str]) -> str:
     """Quotes several SQL identifiers and joins them.
 
     An unsafe name makes `quote` raise `ValueError`, which propagates.
@@ -62,7 +62,7 @@ def quote_all(names: Sequence[str]) -> str:
 
 
 def statement(template: str, **parts: str) -> str:
-    """Fills a SQL template with identifiers quoted by `quote`/`quote_all`.
+    """Fills a SQL template with identifiers quoted by `quote`/`quoting`.
 
     Only identifiers and clauses built from them are ever interpolated,
     never values, so the string-built statement cannot be injected.
@@ -77,10 +77,10 @@ def statement(template: str, **parts: str) -> str:
     return template.format(**parts)  # nosec B608
 
 
-class SqlSource:
+class Sql:
     """Read-only SQL access that counts queries and charges a budget.
 
-    Every statement passes the connector allow-list (`refuse_writes`) and
+    Every statement passes the connector allow-list (`readonly`) and
     runs in a query-only session where the driver supports it.
     """
 
@@ -119,7 +119,7 @@ class SqlSource:
         """Runs one read-only query.
 
         A statement that is not a single read-only query is refused by
-        `connectors.refuse_writes`, whose `ConnectorError` propagates.
+        `connectors.readonly`, whose `ConnectorError` propagates.
 
         Args:
             sql: The statement.
@@ -131,7 +131,7 @@ class SqlSource:
             The rows as tuples, or None when the budget refused the step
             (the boundary is on the meter).
         """
-        connectors.refuse_writes(sql, self.connector.source_uri)
+        connectors.readonly(sql, self.connector.source_uri)
         if (
             self.meter is not None
             and stage
@@ -172,7 +172,7 @@ class SqlSource:
             refused the query.
         """
         sql = statement("SELECT * FROM {t} WHERE 1 = 0", t=quote(table))
-        connectors.refuse_writes(sql, self.connector.source_uri)
+        connectors.readonly(sql, self.connector.source_uri)
         if (
             self.meter is not None
             and stage
@@ -184,7 +184,7 @@ class SqlSource:
             return tuple(str(item[0]) for item in cursor.description)
 
 
-def value_kind(value: Any) -> str:
+def classify(value: Any) -> str:
     """Classifies the kind of a column from its minimum value.
 
     Args:
@@ -206,7 +206,7 @@ def value_kind(value: Any) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ColumnProfile:
+class Aggregates:
     """Exact aggregates of one column at the snapshot read.
 
     Attributes:
@@ -235,7 +235,7 @@ class ColumnProfile:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class TableProfile:
+class Census:
     """Row count and column profiles of one table.
 
     Attributes:
@@ -246,9 +246,9 @@ class TableProfile:
 
     name: str
     rows: int
-    columns: tuple[ColumnProfile, ...]
+    columns: tuple[Aggregates, ...]
 
-    def column(self, name: str) -> ColumnProfile:
+    def column(self, name: str) -> Aggregates:
         """Looks up the profile of one column.
 
         Args:
@@ -291,7 +291,7 @@ class Catalog:
             hash, so a change that preserves them is not seen.
     """
 
-    tables: tuple[TableProfile, ...]
+    tables: tuple[Census, ...]
     partial: bool = False
 
     @property
@@ -302,7 +302,7 @@ class Catalog:
         )
         return hashlib.sha256(document.encode("utf-8")).hexdigest()
 
-    def table(self, name: str) -> TableProfile:
+    def table(self, name: str) -> Census:
         """Looks up the profile of one table.
 
         Args:
@@ -333,9 +333,7 @@ class Catalog:
         }
 
 
-def profile_table(
-    source: SqlSource, table: str, stage: str = "profile"
-) -> TableProfile | None:
+def survey(source: Sql, table: str, stage: str = "profile") -> Census | None:
     """Profiles one table by aggregate queries.
 
     Args:
@@ -374,20 +372,20 @@ def profile_table(
             return None
         non_null, distinct, low, high = found[0]
         profiles.append(
-            ColumnProfile(
+            Aggregates(
                 name,
-                value_kind(low),
+                classify(low),
                 int(non_null),
                 int(distinct),
                 None if low is None else str(low),
                 None if high is None else str(high),
             )
         )
-    return TableProfile(table, rows, tuple(profiles))
+    return Census(table, rows, tuple(profiles))
 
 
 def profile_catalog(
-    source: SqlSource, tables: Sequence[str], stage: str = "profile"
+    source: Sql, tables: Sequence[str], stage: str = "profile"
 ) -> Catalog:
     """Profiles tables in the order given, stopping at a table boundary.
 
@@ -405,7 +403,7 @@ def profile_catalog(
     done = []
     partial = False
     for table in tables:
-        profile = profile_table(source, table, stage)
+        profile = survey(source, table, stage)
         if profile is None:
             partial = True
             break
@@ -413,7 +411,7 @@ def profile_catalog(
     return Catalog(tuple(done), partial)
 
 
-class TornReadError(connectors.ConnectorError):
+class TornError(connectors.ConnectorError):
     """The source changed while it was being read."""
 
     def __init__(self, source_uri: str, attempts: int, reason: str) -> None:
@@ -452,7 +450,7 @@ class Reading:
     attempts: int
 
 
-def has_total_order(query: str) -> bool:
+def deterministic(query: str) -> bool:
     """Checks for a total order in a query.
 
     Args:
@@ -465,9 +463,7 @@ def has_total_order(query: str) -> bool:
     return ORDER_BY.search(cleaned) is not None
 
 
-def read_once(
-    connector: connectors.SourceConnector, batch_rows: int
-) -> pandas.DataFrame:
+def slurp(connector: connectors.Adapter, batch_rows: int) -> pandas.DataFrame:
     """Reads every batch of a connector into one frame.
 
     Args:
@@ -490,8 +486,8 @@ def read_once(
     return pandas.DataFrame(rows, columns=names)
 
 
-def consistent_read(
-    connector: connectors.SourceConnector,
+def untorn(
+    connector: connectors.Adapter,
     batch_rows: int = 1_000,
     token: Callable[[], str] | None = None,
     attempts: int = 2,
@@ -516,12 +512,12 @@ def consistent_read(
 
     Raises:
         ConnectorError: `unordered_query` when the order is missing.
-        TornReadError: When every attempt saw a change.
+        TornError: When every attempt saw a change.
         CheckpointError: When the connector reports a checkpoint problem
             other than `source_changed`.
     """
     query = getattr(connector, "query", None)
-    if require_order and isinstance(query, str) and not has_total_order(query):
+    if require_order and isinstance(query, str) and not deterministic(query):
         raise connectors.ConnectorError(
             "unordered_query",
             "batched reads need an ORDER BY on a unique key",
@@ -533,7 +529,7 @@ def consistent_read(
     for attempt in range(1, max(attempts, 1) + 1):
         before = probe() if probe else None
         try:
-            frame = read_once(connector, batch_rows)
+            frame = slurp(connector, batch_rows)
         except connectors.CheckpointError as error:
             if error.code != "source_changed":
                 raise
@@ -544,4 +540,4 @@ def consistent_read(
             reason = "snapshot token changed"
             continue
         return Reading(frame, before, probe is not None, attempt)
-    raise TornReadError(connector.source_uri, attempts, reason)
+    raise TornError(connector.source_uri, attempts, reason)

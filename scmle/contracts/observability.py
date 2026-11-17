@@ -13,7 +13,7 @@ from typing import Self
 from scmle.contracts import errors
 
 
-class SignalKind(enum.StrEnum):
+class Indicator(enum.StrEnum):
     """Operational or statistical signal emitted by a run or model."""
 
     LATENCY = "latency"
@@ -73,30 +73,30 @@ def validate_timestamp(value: str, field_name: str) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class MetricSample:
+class Sample:
     """One numeric signal with bounded labels and an explicit timestamp."""
 
     name: str
-    kind: SignalKind
+    kind: Indicator
     value: float
     unit: str
     timestamp: str
     labels: Mapping[str, str] = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Validates a metric and coerces `kind` to a `SignalKind`.
+        """Validates a metric and coerces `kind` to a `Indicator`.
 
         Raises:
             ValueError: If the name, unit or timestamp is invalid, `kind` is
-                not a `SignalKind` value, the value is not finite, or a label
+                not a `Indicator` value, the value is not finite, or a label
                 key or value is blank.
         """
         require_text(self.name, "metric.name")
         require_text(self.unit, "metric.unit")
         validate_timestamp(self.timestamp, "metric.timestamp")
         kind: Any = self.kind  # may be a raw value at runtime
-        if not isinstance(kind, SignalKind):
-            object.__setattr__(self, "kind", SignalKind(kind))
+        if not isinstance(kind, Indicator):
+            object.__setattr__(self, "kind", Indicator(kind))
         if not math.isfinite(self.value):
             raise errors.InputError("metric.value must be finite")
         if any(
@@ -130,7 +130,7 @@ class MetricSample:
         """
         return cls(
             name=str(record["name"]),
-            kind=SignalKind(record["kind"]),
+            kind=Indicator(record["kind"]),
             value=float(record["value"]),
             unit=str(record["unit"]),
             timestamp=str(record["timestamp"]),
@@ -139,7 +139,7 @@ class MetricSample:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class InferenceEvent:
+class Inference:
     """Redacted metadata for one prediction request."""
 
     request_id: str
@@ -206,7 +206,7 @@ class Requirements:
     """Retention, redaction, and alert requirements for emitted signals."""
 
     retention_days: int
-    required_signals: tuple[SignalKind, ...]
+    required_signals: tuple[Indicator, ...]
     redacted_fields: tuple[str, ...]
     alert_thresholds: Mapping[str, float]
 
@@ -214,7 +214,7 @@ class Requirements:
         """Rejects policies that silently omit required operational signals.
 
         Raises:
-            TypeError: If a required signal is not a `SignalKind`.
+            TypeError: If a required signal is not a `Indicator`.
             ValueError: If retention is under one day, no signals are required,
                 signals repeat, a redacted field name is empty, or an alert
                 threshold is unnamed, not finite or negative.
@@ -224,11 +224,11 @@ class Requirements:
         if not self.required_signals:
             raise errors.InputError("required_signals must not be empty")
         if any(
-            not isinstance(signal, SignalKind)
+            not isinstance(signal, Indicator)
             for signal in self.required_signals
         ):
             raise errors.KindError(
-                "required_signals must contain SignalKind values"
+                "required_signals must contain Indicator values"
             )
         if len(self.required_signals) != len(set(self.required_signals)):
             raise errors.InputError("required_signals must be unique")
@@ -257,8 +257,8 @@ class Requirements:
 
 
 def canonical_json(
-    metrics: Sequence[MetricSample],
-    events: Sequence[InferenceEvent],
+    metrics: Sequence[Sample],
+    events: Sequence[Inference],
     policy: Requirements,
 ) -> str:
     """Returns deterministic redacted observability evidence.

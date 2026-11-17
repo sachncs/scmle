@@ -148,15 +148,15 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
             features = features.toarray()
         return numpy.asarray(features, dtype=numpy.float32)
 
-    def model_contract(self) -> contracts.ModelFamilyContract:
+    def model_contract(self) -> contracts.Boundary:
         """Returns the explicit model-family boundary for this estimator."""
-        return contracts.model_family_contract(self.architecture)
+        return contracts.resolve(self.architecture)
 
-    def inference_contract(self) -> contracts.InferenceContract:
+    def inference_contract(self) -> contracts.Contract:
         """Returns the input, output, and inference-method contract."""
         return self.model_contract().inference
 
-    def explanation_contract(self) -> contracts.ExplanationContract:
+    def explanation_contract(self) -> contracts.Explainability:
         """Returns the local feature-attribution contract.
 
         Raises:
@@ -210,7 +210,7 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
             if sample_weight is None
             else numpy.asarray(sample_weight, dtype=numpy.float32)
         )
-        matrix = self.model_contract().validate_features(features)
+        matrix = self.model_contract().validate(features)
         state = worker.client().request(
             "fit",
             (
@@ -254,7 +254,7 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
                 sent.
         """
         validation.check_is_fitted(self, attributes=["state_"])
-        matrix = self.model_contract().validate_features(
+        matrix = self.model_contract().validate(
             features, expected_width=self.state_["input_width_"]
         )
         client = worker.client()
@@ -267,7 +267,7 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
                 return numpy.asarray(reply)
         raise worker.WorkerError("the worker could not load the model state")
 
-    def explain(self, features: Any) -> contracts.FeatureExplanation:
+    def explain(self, features: Any) -> contracts.Contribution:
         """Returns local gradient-times-input feature attributions.
 
         The result explains the model output selected by the fitted worker:
@@ -279,11 +279,11 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
             features: Numeric matrix with the width seen at fit.
 
         Returns:
-            A `FeatureExplanation` with one signed attribution per row and input
+            A `Contribution` with one signed attribution per row and input
             feature.
         """
         values = self.call("explain", features)
-        return contracts.FeatureExplanation(
+        return contracts.Contribution(
             values=values,
             method=self.explanation_contract().method,
             target="predicted_output",

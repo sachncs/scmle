@@ -11,7 +11,7 @@ from typing import Self
 from scmle import durability
 
 
-class RunStore:
+class Workspace:
     """A run directory with helpers that write files inside it.
 
     `create` allocates a new uniquely named directory and `open` wraps an

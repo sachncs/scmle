@@ -225,7 +225,7 @@ class Selection:
         return (probability >= self.cut).astype(float)
 
 
-def freeze_rule(
+def solidify(
     features: pandas.DataFrame,
     outcome: Sequence[float],
     columns: Sequence[str],
@@ -292,7 +292,7 @@ def freeze_rule(
 def source_ceiling(
     draft_path: str | None,
     charter_hash: str,
-    model: costs.DecisionCostModel,
+    model: costs.Tariff,
     *,
     signed: bool,
 ) -> tuple[qualification.Tier, dict[str, Any]]:
@@ -325,7 +325,7 @@ def source_ceiling(
             draft = json.loads(Path(draft_path).read_text(encoding="utf-8"))
             fields = {str(k): str(v) for k, v in draft["fields"].items()}
             for value in fields.values():
-                provenance.FieldSource(value)
+                provenance.Filling(value)
         except (OSError, ValueError, KeyError, AttributeError) as error:
             raise errors.ConfigError(
                 f"cannot read framing draft {draft_path}: {error}"
@@ -335,8 +335,8 @@ def source_ceiling(
             if draft.get("charter_hash") == charter_hash
             else "the charter differs from the draft (edited after drafting)"
         )
-    sources = [provenance.FieldSource(v) for v in fields.values()]
-    from_data = bool(model.unverified_entries)
+    sources = [provenance.Filling(v) for v in fields.values()]
+    from_data = bool(model.unreviewed)
     tier = provenance.grade(
         qualification.Tier.CONFIRMED,
         sources,
@@ -347,11 +347,9 @@ def source_ceiling(
         "tier_ceiling": tier.value,
         "charter_signed": signed,
         "llm_fields": sorted(
-            k
-            for k, v in fields.items()
-            if v == provenance.FieldSource.LLM.value
+            k for k, v in fields.items() if v == provenance.Filling.LLM.value
         ),
-        "cost_entries_not_from_a_person": list(model.unverified_entries),
+        "cost_entries_not_from_a_person": list(model.unreviewed),
         "draft": note,
     }
 
@@ -375,7 +373,7 @@ def build_runner(
     *,
     rule: Rule,
     reference: Regression | None = None,
-    model: costs.DecisionCostModel,
+    model: costs.Tariff,
     alpha: float,
     baseline_column: str,
     group_column: str | None,
@@ -383,7 +381,7 @@ def build_runner(
     selection: Mapping[str, Any],
     ceiling: qualification.Tier,
     seed: int,
-) -> confirm.ClaimRunner:
+) -> confirm.Docket:
     """Registers the baseline claim and builds the function that tests it.
 
     Args:
@@ -411,7 +409,7 @@ def build_runner(
     description = rule.describe()
     registration = baseline.register(model, description, alpha)
     guard = baseline.Evaluator(registration)
-    claim = confirm.RegisteredClaim(
+    claim = confirm.Commitment(
         baseline.CLAIM_ID,
         KIND,
         "net benefit of the frozen rule exceeds net benefit of the current "
@@ -421,7 +419,7 @@ def build_runner(
 
     def run(
         features: pandas.DataFrame, target: pandas.Series
-    ) -> confirm.ClaimRun:
+    ) -> confirm.Output:
         """Tests the registered claim on the rows released for confirmation.
 
         Args:
@@ -465,11 +463,11 @@ def build_runner(
         document["selection_on_x"] = dict(selection)
         document["tier_ceiling"] = ceiling.value
         document = jsonable(document)
-        return confirm.ClaimRun(
+        return confirm.Output(
             {baseline.CLAIM_ID: str(document["status"])}, {DOCUMENT: document}
         )
 
-    return confirm.ClaimRunner((claim,), run)
+    return confirm.Docket((claim,), run)
 
 
 def refused(

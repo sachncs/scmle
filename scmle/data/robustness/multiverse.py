@@ -87,7 +87,7 @@ def declaration_sha256(choices: Sequence[contracts.Choice]) -> str:
     )
 
 
-def tier_after_declaration(
+def downgrade(
     declared_sha256: str, used_sha256: str, tier: qualification.Tier
 ) -> qualification.Tier:
     """Downgrades the tier when the grid used differs from the declared one.
@@ -132,7 +132,7 @@ class Grid:
         return self.specs[0]
 
 
-def enumerate_grid(
+def universe(
     choices: Sequence[contracts.Choice],
     seed: int,
     max_specs: int = DEFAULT_MAX_SPECS,
@@ -174,7 +174,7 @@ def enumerate_grid(
     )
 
 
-class ResultCache:
+class Memo:
     """Results keyed by ``(finding, specification hash, seed)``.
 
     The cache is a plain mapping that can be saved to JSON and loaded again,
@@ -253,7 +253,7 @@ class ResultCache:
         )
 
     @classmethod
-    def load(cls, path: Path) -> "ResultCache":
+    def load(cls, path: Path) -> "Memo":
         """Reads a cache written by `save`.
 
         Args:
@@ -291,7 +291,7 @@ def run_grid(
     *,
     finding: str,
     seed: int,
-    cache: ResultCache | None = None,
+    cache: Memo | None = None,
     budget_seconds: float | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> Sweep:

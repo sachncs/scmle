@@ -21,13 +21,11 @@ def case_threshold():
     weights = numpy.linspace(0.5, 2.0, 1500)
     small = streams.draw_calibration(40, 0.05, seed=4)
     return {
-        "plain": escalation.select_threshold(
-            data["score"], data["loss"], 0.05, 0.1
-        ),
-        "weighted": escalation.select_threshold(
+        "plain": escalation.select(data["score"], data["loss"], 0.05, 0.1),
+        "weighted": escalation.select(
             data["score"], data["loss"], 0.05, 0.1, weights
         ),
-        "grid": escalation.select_threshold(
+        "grid": escalation.select(
             data["score"],
             data["loss"],
             0.1,
@@ -35,9 +33,7 @@ def case_threshold():
             grid=[0.9, 0.7, 0.5, 0.3],
             minimum=5,
         ),
-        "small": escalation.select_threshold(
-            small["score"], small["loss"], 0.05, 0.1
-        ),
+        "small": escalation.select(small["score"], small["loss"], 0.05, 0.1),
         "p": [escalation.binomial_p_value(e, 50, 0.1) for e in (0, 3, 10)],
         "curve": escalation.risk_coverage(
             data["score"], data["loss"], points=11
@@ -52,7 +48,7 @@ def case_scores_and_routes():
     rng = numpy.random.default_rng(1)
     score = rng.random(40)
     return {
-        "score": escalation.set_size_score(
+        "score": escalation.ambiguity(
             [1, 2, 3, 0, 4, 1], [False, False, True, False, False, True]
         ),
         "route": [
@@ -62,7 +58,7 @@ def case_scores_and_routes():
             escalation.route(score, 0.5, 0.5, False, score < 0.8),
         ],
         "chow": [
-            escalation.chow_check(
+            escalation.adjudicate(
                 1 - score * 0.5, score, 0.5, review, 10.0, tol
             )
             for review, tol in ((1.0, 0.1), (4.0, 0.5))

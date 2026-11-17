@@ -16,7 +16,7 @@ LOW_QUANTILE = 0.05
 HIGH_QUANTILE = 0.95
 
 
-class PartialDependence(diagnostics.Diagnostic):
+class Dependence(diagnostics.Diagnostic):
     """Average prediction over a grid of one feature.
 
     Covers the numeric features most associated with the target (binary
@@ -36,10 +36,10 @@ class PartialDependence(diagnostics.Diagnostic):
             For each selected feature, the grid and the mean prediction (the
             positive-class probability for binary targets).
         """
-        columns = list(inputs.feature_plan.input_columns)
+        columns = list(inputs.feature_plan.sourced)
         numeric = [c for c in inputs.feature_plan.numeric if c in columns]
         sample = inputs.features[columns].head(MAX_ROWS)
-        outcome = self.numeric_target(inputs).head(MAX_ROWS)
+        outcome = self.numerify(inputs).head(MAX_ROWS)
         ranked = sorted(
             numeric,
             key=lambda c: -self.association(sample, c, outcome),
@@ -82,7 +82,7 @@ class PartialDependence(diagnostics.Diagnostic):
         return abs(values.corr(outcome, method="spearman") or 0.0)
 
     @staticmethod
-    def numeric_target(inputs: diagnostics.DiagnosticInput) -> pandas.Series:
+    def numerify(inputs: diagnostics.DiagnosticInput) -> pandas.Series:
         """Returns the target as numbers (1 for the positive class if binary).
 
         Args:

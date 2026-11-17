@@ -75,7 +75,7 @@ def test_mlflow_without_the_library_is_a_config_error(monkeypatch):
 
 def test_ray_backend_maps_in_order():
     pytest.importorskip("ray")
-    backend = scheduler.create_backend(2, "ray")
+    backend = scheduler.select(2, "ray")
     try:
         pairs = [[1, 3], [2, 4], [10, 20]]
         assert backend.map(statistics.fmean, pairs) == [2.0, 3.0, 15.0]
@@ -118,7 +118,7 @@ def test_ray_run_matches_sequential(binary_frame, tmp_path):
 
 def test_unknown_executor_is_rejected():
     with pytest.raises(errors.ConfigError, match="unknown executor"):
-        scheduler.create_backend(2, "spark")
+        scheduler.select(2, "spark")
 
 
 def test_mlflow_artifacts_stay_beside_the_sqlite_store(tmp_path, monkeypatch):

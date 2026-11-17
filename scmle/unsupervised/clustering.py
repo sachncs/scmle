@@ -7,7 +7,7 @@ better) indices, and by stability: the same method is refit on bootstrap
 resamples, every resample's labels are compared with the full-data labels on
 the rows both saw, and the mean adjusted Rand index says whether the same
 groups come back. Clusters that do not survive resampling are not findings.
-When true groups are known, `external_scores` gives the adjusted Rand index
+When true groups are known, `compare` gives the adjusted Rand index
 and normalized mutual information against them.
 """
 
@@ -164,7 +164,7 @@ def stability(
     return float(numpy.mean(scores))
 
 
-def score_candidate(
+def attempt(
     method: str,
     count: int,
     matrix: numpy.ndarray,
@@ -202,7 +202,7 @@ def score_candidate(
     )
 
 
-def find_clusters(
+def discover(
     features: pandas.DataFrame,
     counts: range | tuple[int, ...] = range(2, 9),
     methods: tuple[str, ...] = METHODS,
@@ -235,7 +235,7 @@ def find_clusters(
     numeric = features.select_dtypes("number").dropna()
     matrix = preprocessing.StandardScaler().fit_transform(numeric)
     scored = [
-        (score_candidate(method, count, matrix, rounds, seed), count)
+        (attempt(method, count, matrix, rounds, seed), count)
         for method in methods
         for count in counts
     ]
@@ -252,7 +252,7 @@ def find_clusters(
     return Clustering(candidates, best, bool(stable), labels, sizes, profile)
 
 
-def external_scores(truth: Any, labels: Any) -> dict[str, float]:
+def compare(truth: Any, labels: Any) -> dict[str, float]:
     """Compares labels with known groups.
 
     Args:

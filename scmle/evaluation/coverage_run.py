@@ -125,7 +125,7 @@ def declared_slices(
     return found
 
 
-def regression_reports(
+def regressions(
     bundle: Any,
     features: pandas.DataFrame,
     target: Any,
@@ -177,7 +177,7 @@ def regression_reports(
     return reports
 
 
-def classification_reports(
+def classwise(
     bundle: Any,
     features: pandas.DataFrame,
     target: Any,
@@ -257,9 +257,9 @@ def run_report(
         else ("regression")
     )
     body = (
-        regression_reports(bundle, features, target, levels, slices)
+        regressions(bundle, features, target, levels, slices)
         if kind == "regression"
-        else classification_reports(bundle, features, target, levels, slices)
+        else classwise(bundle, features, target, levels, slices)
     )
     return {
         "kind": kind,

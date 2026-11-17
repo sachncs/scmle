@@ -26,7 +26,7 @@ def make_plan(**overrides):
         ),
     }
     values.update(overrides)
-    return scmle.data.charter.decision.RolloutPlan(**values)
+    return scmle.data.charter.decision.Experiment(**values)
 
 
 def traffic(n, seed, lift=0.04, bounce_lift=0.0, base=0.10):
@@ -64,12 +64,12 @@ def test_the_fixed_horizon_size_uses_the_closed_form_and_the_design_effect():
 
 
 def test_the_exact_binomial_check_and_the_anytime_check_agree_on_a_bad_split():
-    assert design.srm_p_value(500, 1000, 0.5) == pytest.approx(1.0)
-    assert design.srm_p_value(560, 1000, 0.5) < 0.001
-    assert design.srm_rejects(5200, 10000, 0.5, 0.001) is False
-    assert design.srm_rejects(5600, 10000, 0.5, 0.001) is True
+    assert design.mismatch(500, 1000, 0.5) == pytest.approx(1.0)
+    assert design.mismatch(560, 1000, 0.5) < 0.001
+    assert design.srm(5200, 10000, 0.5, 0.001) is False
+    assert design.srm(5600, 10000, 0.5, 0.001) is True
     with pytest.raises(ValueError):
-        design.srm_p_value(11, 10, 0.5)
+        design.mismatch(11, 10, 0.5)
 
 
 def test_the_srm_bayes_factor_is_a_martingale_under_correct_assignment():
@@ -190,24 +190,22 @@ def test_a_worse_champion_is_rolled_back_and_a_fine_one_is_kept():
     rng = numpy.random.default_rng(6)
     arm = (rng.random(30000) < 0.5).astype(float)
     losing = (rng.random(30000) < 0.20 - 0.05 * arm).astype(float)
-    monitor = rollout.RollbackMonitor(0.01, 0.01)
+    monitor = rollout.Watchdog(0.01, 0.01)
     assert monitor.observe(arm, losing) == rollout.ROLLBACK
     assert monitor.done_at < 30000
     assert monitor.observe(arm, losing) == rollout.ROLLBACK
     fine = (rng.random(30000) < 0.20 + 0.0 * arm).astype(float)
-    assert (
-        rollout.RollbackMonitor(0.01, 0.01).observe(arm, fine) == rollout.HOLD
-    )
+    assert rollout.Watchdog(0.01, 0.01).observe(arm, fine) == rollout.HOLD
 
 
 def test_the_decision_log_chain_detects_edits_and_round_trips(tmp_path):
-    log = rollout.DecisionLog()
+    log = rollout.Journal()
     log.append("assign", {"experiment": "e1", "level": "1/100"})
     log.append("decision", {"status": "promote"})
     assert log.verify()
     path = tmp_path / "rollout_decisions.jsonl"
     log.write(path)
-    again = rollout.DecisionLog.read(path)
+    again = rollout.Journal.read(path)
     assert again.rows == log.rows and again.verify()
     again.rows[0]["body"]["level"] = "1/10"
     assert not again.verify()
@@ -215,8 +213,8 @@ def test_the_decision_log_chain_detects_edits_and_round_trips(tmp_path):
 
 def test_the_simulated_stopping_time_is_reported_with_its_crossed_share():
     plan = make_plan(guardrails=(), n_max=4000, delta_min=0.02)
-    found = design.simulate_stopping(plan, 0.10, 0.08, runs=200, seed=1)
+    found = design.simulate(plan, 0.10, 0.08, runs=200, seed=1)
     assert found["crossed_share"] > 0.9
     assert 0 < found["median_units"] < 4000
-    none = design.simulate_stopping(plan, 0.10, 0.0, runs=100, seed=1)
+    none = design.simulate(plan, 0.10, 0.0, runs=100, seed=1)
     assert none["crossed_share"] == 0.0 and none["mean_units"] is None

@@ -23,13 +23,11 @@ def message(call):
     return str(caught.value)
 
 
-HUMAN = (costs.CostSource.HUMAN,) * 4
+HUMAN = (costs.Basis.HUMAN,) * 4
 
 
 def cost_model():
-    return costs.DecisionCostModel(
-        0.0, 5.0, 1.0, 0.0, 0.05, 0.5, HUMAN, costs.CostSource.HUMAN
-    )
+    return costs.Tariff(0.0, 5.0, 1.0, 0.0, 0.05, 0.5, HUMAN, costs.Basis.HUMAN)
 
 
 ESTIMAND = {
@@ -37,7 +35,7 @@ ESTIMAND = {
     "population": "p",
     "target": "t",
     "prediction_moment": "m",
-    "intercurrent_events": (contracts.IntercurrentEvent("e", "s"),),
+    "intercurrent_events": (contracts.Event("e", "s"),),
     "summary_measure": "auc",
 }
 
@@ -45,7 +43,7 @@ ESTIMAND = {
 @pytest.mark.parametrize("field", ["event", "strategy"])
 def test_intercurrent_event_fields_are_named(field):
     values = {"event": "e", "strategy": "s", field: " "}
-    assert message(partial(contracts.IntercurrentEvent, **values)) == (
+    assert message(partial(contracts.Event, **values)) == (
         f"{field} must not be empty"
     )
 
@@ -89,7 +87,7 @@ def test_decision_row_fields_are_named(field):
         "action": contracts.DecisionAction.QUARANTINE_COLUMN,
         field: " ",
     }
-    assert message(partial(contracts.DecisionRow, **values)) == (
+    assert message(partial(contracts.Trigger, **values)) == (
         f"{field} must not be empty"
     )
 
@@ -224,17 +222,15 @@ def test_a_charter_with_and_without_a_cost_model_round_trips():
 def test_an_attestation_needs_a_column_and_a_finite_lead():
     good = attest().attestation
     assert (
-        message(partial(attestations.LeakageAttestation, "", good, 1.0))
+        message(partial(attestations.Affidavit, "", good, 1.0))
         == "column must be a non-empty string"
     )
     assert (
-        message(partial(attestations.LeakageAttestation, 3, good, 1.0))
+        message(partial(attestations.Affidavit, 3, good, 1.0))
         == "column must be a non-empty string"
     )
     assert (
-        message(
-            partial(attestations.LeakageAttestation, "c", good, float("inf"))
-        )
+        message(partial(attestations.Affidavit, "c", good, float("inf")))
         == "lead_seconds must be a finite number"
     )
 
@@ -245,11 +241,11 @@ def test_the_provenance_record_of_an_attestation_is_exact():
     assert field.name == "copy"
     assert field.origin is provenance.Origin.DERIVED
     assert field.writer == attestations.WRITER
-    assert field.written_at is provenance.WrittenAt.UNKNOWN
+    assert field.written_at is provenance.Stamp.UNKNOWN
     assert field.overwritten is provenance.Overwritten.UNKNOWN
     assert field.definition_history == ()
-    assert field.as_of == provenance.AsOf(provenance.AsOfKind.LAG, 3600.0)
-    assert field.as_of_source is provenance.AsOfSource.ATTESTED
+    assert field.as_of == provenance.Lead(provenance.Cutoff.LAG, 3600.0)
+    assert field.as_of_source is provenance.Provenance.ATTESTED
     assert field.available_at_serving is provenance.Availability.YES
     assert field.attestation == item.attestation
 
@@ -257,9 +253,9 @@ def test_the_provenance_record_of_an_attestation_is_exact():
 def test_a_missing_own_field_is_reported_by_name():
     record = attest().to_dict()
     del record["lead_seconds"]
-    assert message(
-        partial(attestations.LeakageAttestation.from_dict, record)
-    ) == ("missing field(s): ['lead_seconds']")
+    assert message(partial(attestations.Affidavit.from_dict, record)) == (
+        "missing field(s): ['lead_seconds']"
+    )
 
 
 def test_apply_returns_valid_ones_and_a_reason_for_each_rejected_one():

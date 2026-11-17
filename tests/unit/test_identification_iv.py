@@ -111,9 +111,7 @@ def test_the_ar_set_is_the_inverted_test():
 
 def test_an_invalid_instrument_biases_the_estimate_by_gamma_over_pi():
     out = iv.estimate(world(200000, 4, 1.0, direct=0.3), "d", "y", "z")
-    assert out.estimate - 2.0 == pytest.approx(
-        iv.exclusion_bound(out, 0.3), abs=0.03
-    )
+    assert out.estimate - 2.0 == pytest.approx(iv.exclude(out, 0.3), abs=0.03)
 
 
 def test_degenerate_inputs_are_refused():

@@ -68,9 +68,7 @@ class Duplicates:
         return dataclasses.asdict(self)
 
 
-def exact_flags(
-    frame: pandas.DataFrame, columns: Sequence[str]
-) -> numpy.ndarray:
+def verbatim(frame: pandas.DataFrame, columns: Sequence[str]) -> numpy.ndarray:
     """Flags every row after the first of its exact-duplicate group.
 
     Args:
@@ -104,7 +102,7 @@ def near_flags(
 
     Returns:
         A boolean per row. Rows that are exact copies are also flagged here
-        when within the cut; combine with `exact_flags` as needed.
+        when within the cut; combine with `verbatim` as needed.
 
     Raises:
         ValueError: If `cut` is not positive and finite.
@@ -165,7 +163,7 @@ def duplicate_flags(
         A boolean Series on the index of `frame`.
     """
     columns = list(frame.columns)
-    flags = exact_flags(frame, columns) | near_flags(frame, columns, cut)
+    flags = verbatim(frame, columns) | near_flags(frame, columns, cut)
     return pandas.Series(flags, index=frame.index)
 
 
@@ -186,7 +184,7 @@ def clopper_pearson(
     return float(result.low), float(result.high)
 
 
-def assess_duplicates(
+def assess(
     frame: pandas.DataFrame,
     columns: Sequence[str] | None = None,
     target: str | None = None,
@@ -205,7 +203,7 @@ def assess_duplicates(
         The report.
     """
     names = list(frame.columns) if columns is None else list(columns)
-    exact = exact_flags(frame, names)
+    exact = verbatim(frame, names)
     near = near_flags(frame, names, cut) & ~exact
     ids = scmle.data.splitting.duplicates.duplicate_groups(frame, names)
     members = ids[ids != scmle.data.splitting.duplicates.NOT_DUPLICATED]

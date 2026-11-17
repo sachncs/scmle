@@ -79,15 +79,15 @@ def test_many_columns_raise_the_bar_for_significance():
 
 def test_indicators_are_added_only_for_flagged_columns():
     frame, target = sample()
-    plan = data.FeaturePlan(
+    plan = data.Blueprint(
         ("informative", "random", "complete"),
         (),
         informative_missing=("informative",),
     )
-    adapter = registry.Catalog.with_builtins().get("logistic_regression")
+    adapter = registry.Catalog.stock().get("logistic_regression")
     options = data.Preprocessing(scale=True, impute=True, missing="indicator")
 
-    fitted = preprocessing.build_pipeline(
+    fitted = preprocessing.instantiate(
         plan, adapter, tasks.Task.BINARY, 0, options=options
     ).fit(frame, target)
 
@@ -97,21 +97,21 @@ def test_indicators_are_added_only_for_flagged_columns():
 
 
 def test_monotonic_signs_that_missing_indicators_would_misalign_are_refused():
-    plan = data.FeaturePlan(
+    plan = data.Blueprint(
         ("informative", "random", "complete"),
         (),
         informative_missing=("informative",),
         monotonic={"random": 1},
     )
-    adapter = registry.Catalog.with_builtins().get("hist_gradient_boosting")
+    adapter = registry.Catalog.stock().get("hist_gradient_boosting")
     options = data.Preprocessing(scale=False, impute=True, missing="indicator")
 
     with pytest.raises(errors.ConfigError, match="monotonic"):
-        preprocessing.build_pipeline(
+        preprocessing.instantiate(
             plan, adapter, tasks.Task.BINARY, 0, options=options
         )
     with pytest.raises(errors.ConfigError, match="monotonic"):
-        preprocessing.build_pipeline(
+        preprocessing.instantiate(
             plan,
             adapter,
             tasks.Task.BINARY,

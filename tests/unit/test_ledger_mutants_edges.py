@@ -15,8 +15,8 @@ def test_the_quantile_index_never_goes_below_the_smallest_count():
 
 
 def test_the_percentile_interval_reaches_the_ends_for_extreme_quantiles():
-    assert controls.percentile_interval((1, 2), q=0.99) == (2, 2)
-    assert controls.percentile_interval((1, 5), q=0.01) == (1, 1)
+    assert controls.bracket((1, 2), q=0.99) == (2, 2)
+    assert controls.bracket((1, 5), q=0.01) == (1, 1)
 
 
 def test_missing_labels_do_not_make_a_binary_target_multiclass():

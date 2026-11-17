@@ -35,21 +35,21 @@ def make_record(
 def make_policy(
     *,
     fairness: bool = False,
-    diagnostic_action: evaluation.DiagnosticAction = evaluation.DiagnosticAction.BLOCK,
+    diagnostic_action: evaluation.Remedy = evaluation.Remedy.BLOCK,
 ) -> evaluation.Criteria:
     """Build a binary policy with representative release gates."""
     fairness_policy = (
         evaluation.Fairness(
-            evaluation.FairnessMethod.GROUP_REPORT,
+            evaluation.Technique.GROUP_REPORT,
             sensitive_columns=("group",),
             metrics=("demographic_parity_difference",),
         )
         if fairness
-        else evaluation.Fairness(evaluation.FairnessMethod.NONE)
+        else evaluation.Fairness(evaluation.Technique.NONE)
     )
     fairness_gates = (
         (
-            evaluation.FairnessGate(
+            evaluation.Equity(
                 "demographic_parity_difference",
                 maximum=0.10,
                 required_evidence=("fairness.report",),
@@ -58,18 +58,18 @@ def make_policy(
         if fairness
         else ()
     )
-    diagnostic_gates: tuple[evaluation.DiagnosticGate, ...] = (
-        evaluation.DiagnosticGate(
+    diagnostic_gates: tuple[evaluation.Requirement, ...] = (
+        evaluation.Requirement(
             "metric_uncertainty",
             diagnostic_action,
             ("diagnostic.metric",),
         ),
     )
-    if diagnostic_action is evaluation.DiagnosticAction.WARN:
+    if diagnostic_action is evaluation.Remedy.WARN:
         diagnostic_gates += (
-            evaluation.DiagnosticGate(
+            evaluation.Requirement(
                 "robustness",
-                evaluation.DiagnosticAction.BLOCK,
+                evaluation.Remedy.BLOCK,
                 ("diagnostic.robustness",),
             ),
         )
@@ -77,21 +77,17 @@ def make_policy(
         task=tasks.Task.BINARY,
         primary_metric="roc_auc",
         metrics=(
-            evaluation.MetricDeclaration(
-                "roc_auc", evaluation.MetricDirection.MAXIMIZE
-            ),
+            evaluation.Declaration("roc_auc", evaluation.Orientation.MAXIMIZE),
         ),
         uncertainty=evaluation.Uncertainty(evaluation.UncertaintyMethod.NONE),
-        calibration=evaluation.Calibration(evaluation.CalibrationMethod.NONE),
+        calibration=evaluation.Calibration(evaluation.Procedure.NONE),
         fairness=fairness_policy,
-        small_groups=evaluation.SmallGroups(30, 10),
-        explanations=evaluation.Explanations(
-            evaluation.ExplanationAvailability.NONE
-        ),
+        small_groups=evaluation.Subgroups(30, 10),
+        explanations=evaluation.Explanations(evaluation.Explicability.NONE),
         release=evaluation.Gates(
             metric_gates=(
-                evaluation.MetricGate(
-                    "roc_auc", evaluation.MetricDirection.MAXIMIZE, 0.75
+                evaluation.Hurdle(
+                    "roc_auc", evaluation.Orientation.MAXIMIZE, 0.75
                 ),
             ),
             diagnostic_gates=diagnostic_gates,
@@ -111,7 +107,7 @@ def make_index(
     return evidence.Index(
         [
             make_record(reference, result, decision)
-            for reference in release.required_evidence_references(policy)
+            for reference in release.citations(policy)
         ]
     )
 
@@ -119,14 +115,14 @@ def make_index(
 def test_release_evaluation_passes_and_serializes_deterministically():
     """A complete set of accepted evidence produces a stable pass."""
     policy = make_policy()
-    first = release.evaluate_release(
+    first = release.assess(
         policy,
         {"roc_auc": 0.81},
         {"metric_uncertainty": {"estimate": 0.81}},
         {},
         make_index(policy),
     )
-    second = release.evaluate_release(
+    second = release.assess(
         policy,
         {"roc_auc": 0.81},
         {"metric_uncertainty": {"estimate": 0.81}},
@@ -144,7 +140,7 @@ def test_release_evaluation_passes_and_serializes_deterministically():
 def test_release_evidence_gate_requires_a_verified_signature():
     """A passing policy cannot bypass an unsigned evidence index."""
     policy = make_policy()
-    outcome = release.evaluate_release(
+    outcome = release.assess(
         policy,
         {"roc_auc": 0.81},
         {"metric_uncertainty": {"estimate": 0.81}},
@@ -152,7 +148,7 @@ def test_release_evidence_gate_requires_a_verified_signature():
         make_index(policy),
     )
     unsigned = make_index(policy)
-    blocked = release.apply_evidence_index_gate(outcome, unsigned, False)
+    blocked = release.countersign(outcome, unsigned, False)
     assert not blocked.passed
     assert any(
         finding.name == "release_evidence" for finding in blocked.findings
@@ -160,14 +156,14 @@ def test_release_evidence_gate_requires_a_verified_signature():
 
     signed = make_index(policy)
     signed.sign("evidence-key")
-    accepted = release.apply_evidence_index_gate(outcome, signed, True)
+    accepted = release.countersign(outcome, signed, True)
     assert accepted == outcome
 
 
 def test_metric_failure_and_missing_evidence_block_release():
     """A failed metric and an absent required record are blocking findings."""
     policy = make_policy()
-    result = release.evaluate_release(
+    result = release.assess(
         policy,
         {"roc_auc": 0.70},
         {"metric_uncertainty": {"estimate": 0.70}},
@@ -187,8 +183,8 @@ def test_metric_failure_and_missing_evidence_block_release():
 
 def test_warning_diagnostic_failure_is_visible_but_not_blocking():
     """A declared warning remains a failed finding without blocking release."""
-    policy = make_policy(diagnostic_action=evaluation.DiagnosticAction.WARN)
-    result = release.evaluate_release(
+    policy = make_policy(diagnostic_action=evaluation.Remedy.WARN)
+    result = release.assess(
         policy,
         {"roc_auc": 0.81},
         {
@@ -200,9 +196,7 @@ def test_warning_diagnostic_failure_is_visible_but_not_blocking():
     )
 
     diagnostic = next(
-        item
-        for item in result.findings
-        if item.kind is release.FindingKind.DIAGNOSTIC
+        item for item in result.findings if item.kind is release.Kind.DIAGNOSTIC
     )
     assert not diagnostic.passed
     assert not diagnostic.blocking
@@ -212,7 +206,7 @@ def test_warning_diagnostic_failure_is_visible_but_not_blocking():
 def test_fairness_gate_uses_worst_value_across_columns():
     """Fairness thresholds fail closed on the worst reported group metric."""
     policy = make_policy(fairness=True)
-    result = release.evaluate_release(
+    result = release.assess(
         policy,
         {"roc_auc": 0.81},
         {"metric_uncertainty": {"estimate": 0.81}},
@@ -229,9 +223,7 @@ def test_fairness_gate_uses_worst_value_across_columns():
     )
 
     fairness = next(
-        item
-        for item in result.findings
-        if item.kind is release.FindingKind.FAIRNESS
+        item for item in result.findings if item.kind is release.Kind.FAIRNESS
     )
     assert not fairness.passed
     assert fairness.observed == 0.12
@@ -241,7 +233,7 @@ def test_fairness_gate_uses_worst_value_across_columns():
 def test_unsupported_reports_and_unaccepted_evidence_block():
     """Unsupported report shapes and pending evidence cannot pass silently."""
     policy = make_policy()
-    result = release.evaluate_release(
+    result = release.assess(
         policy,
         {"roc_auc": 0.81},
         {"metric_uncertainty": []},
@@ -265,7 +257,7 @@ def test_explanation_quality_threshold_is_a_blocking_release_gate():
     policy = dataclasses.replace(
         make_policy(),
         explanations=evaluation.Explanations(
-            evaluation.ExplanationAvailability.GLOBAL,
+            evaluation.Explicability.GLOBAL,
             required_methods=("permutation_importance",),
             required_evidence=("explanation.json",),
             require_stability=True,
@@ -277,7 +269,7 @@ def test_explanation_quality_threshold_is_a_blocking_release_gate():
         "permutation_importance": {"quality": {"stability_score": 0.75}},
     }
 
-    result = release.evaluate_release(
+    result = release.assess(
         policy,
         {"roc_auc": 0.81},
         reports,
@@ -288,7 +280,7 @@ def test_explanation_quality_threshold_is_a_blocking_release_gate():
     finding = next(
         item
         for item in result.findings
-        if item.kind is release.FindingKind.EXPLANATION
+        if item.kind is release.Kind.EXPLANATION
     )
     assert finding.name == "permutation_importance.stability"
     assert finding.observed == 0.75
@@ -301,7 +293,7 @@ def test_explanation_quality_release_gate_passes_with_valid_evidence():
     policy = dataclasses.replace(
         make_policy(),
         explanations=evaluation.Explanations(
-            evaluation.ExplanationAvailability.GLOBAL,
+            evaluation.Explicability.GLOBAL,
             required_methods=("permutation_importance",),
             required_evidence=("explanation.json",),
             require_stability=True,
@@ -317,7 +309,7 @@ def test_explanation_quality_release_gate_passes_with_valid_evidence():
         },
     }
 
-    result = release.evaluate_release(
+    result = release.assess(
         policy,
         {"roc_auc": 0.81},
         reports,
@@ -330,7 +322,7 @@ def test_explanation_quality_release_gate_passes_with_valid_evidence():
 
 def test_release_is_blocked_when_fault_plan_is_unexecuted():
     """Statistical success does not override an unverified fault plan."""
-    outcome = release.evaluate_release(
+    outcome = release.assess(
         make_policy(),
         {"roc_auc": 0.81},
         {"metric_uncertainty": {"estimate": 0.81}},
@@ -338,7 +330,7 @@ def test_release_is_blocked_when_fault_plan_is_unexecuted():
         make_index(make_policy()),
     )
 
-    blocked = release.apply_reliability_gate(
+    blocked = release.faults(
         outcome,
         {
             "execution_status": "planned",
@@ -349,7 +341,7 @@ def test_release_is_blocked_when_fault_plan_is_unexecuted():
     finding = next(
         item
         for item in blocked.findings
-        if item.kind is release.FindingKind.RELIABILITY
+        if item.kind is release.Kind.RELIABILITY
     )
     assert not blocked.passed
     assert finding.observed == "planned"
@@ -357,7 +349,7 @@ def test_release_is_blocked_when_fault_plan_is_unexecuted():
 
 def test_release_reliability_gate_requires_explicit_completed_plan():
     """Only an explicit completed, unblocked plan can pass this gate."""
-    outcome = release.evaluate_release(
+    outcome = release.assess(
         make_policy(),
         {"roc_auc": 0.81},
         {"metric_uncertainty": {"estimate": 0.81}},
@@ -366,7 +358,7 @@ def test_release_reliability_gate_requires_explicit_completed_plan():
     )
 
     assert (
-        release.apply_reliability_gate(
+        release.faults(
             outcome,
             {"execution_status": "passed", "release_blocked": False},
         )
@@ -377,7 +369,7 @@ def test_release_reliability_gate_requires_explicit_completed_plan():
 def test_results_are_immutable_and_findings_are_sorted():
     """The public result cannot be mutated and serializes in stable order."""
     policy = make_policy()
-    result = release.evaluate_release(
+    result = release.assess(
         policy,
         {"roc_auc": 0.81, "unexpected": 1.0},
         {"metric_uncertainty": {"estimate": 0.81}},
@@ -395,8 +387,8 @@ def test_results_are_immutable_and_findings_are_sorted():
 
 def test_readiness_summary_counts_findings_and_serializes_deterministically():
     """A readiness summary exposes stable aggregate and per-kind counts."""
-    policy = make_policy(diagnostic_action=evaluation.DiagnosticAction.WARN)
-    result = release.evaluate_release(
+    policy = make_policy(diagnostic_action=evaluation.Remedy.WARN)
+    result = release.assess(
         policy,
         {"roc_auc": 0.81},
         {
@@ -407,32 +399,28 @@ def test_readiness_summary_counts_findings_and_serializes_deterministically():
         make_index(policy),
     )
 
-    summary = result.readiness_summary()
+    summary = result.tally()
 
-    assert summary.status is release.ReleaseStatus.READY
+    assert summary.status is release.Readiness.READY
     assert summary.total_findings == 6
     assert summary.passed_findings == 5
     assert summary.failed_findings == 1
     assert summary.blocking_findings == 5
     assert summary.blocking_failures == 0
     assert summary.non_blocking_failures == 1
-    assert summary.counts_by_kind["diagnostic"] == release.FindingCounts(
+    assert summary.counts_by_kind["diagnostic"] == release.Tally(
         total=2, passed=1, failed=1, blocking=1, blocking_failures=0
     )
-    assert set(summary.counts_by_kind) == {
-        kind.value for kind in release.FindingKind
-    }
+    assert set(summary.counts_by_kind) == {kind.value for kind in release.Kind}
     assert json.loads(summary.canonical_json()) == summary.to_dict()
-    assert (
-        summary.canonical_json() == result.readiness_summary().canonical_json()
-    )
+    assert summary.canonical_json() == result.tally().canonical_json()
     assert result.to_dict()["readiness"] == summary.to_dict()
 
 
 def test_blocked_readiness_summary_distinguishes_blocking_failures():
     """A failed blocking finding produces an explicit blocked status."""
     policy = make_policy()
-    result = release.evaluate_release(
+    result = release.assess(
         policy,
         {"roc_auc": 0.70},
         {"metric_uncertainty": {"estimate": 0.70}},
@@ -440,14 +428,14 @@ def test_blocked_readiness_summary_distinguishes_blocking_failures():
         make_index(policy),
     )
 
-    summary = result.readiness_summary()
+    summary = result.tally()
 
-    assert summary.status is release.ReleaseStatus.BLOCKED
+    assert summary.status is release.Readiness.BLOCKED
     assert summary.failed_findings == 1 + len(
         [
             item
             for item in result.findings
-            if item.kind is release.FindingKind.EVIDENCE and not item.passed
+            if item.kind is release.Kind.EVIDENCE and not item.passed
         ]
     )
     assert summary.blocking_failures == summary.failed_findings
@@ -457,7 +445,7 @@ def test_blocked_readiness_summary_distinguishes_blocking_failures():
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("status", release.ReleaseStatus.READY, "status"),
+        ("status", release.Readiness.READY, "status"),
         ("total_findings", 2, "total_findings"),
         ("counts_by_kind", {}, "counts_by_kind"),
     ],
@@ -469,7 +457,7 @@ def test_readiness_summary_rejects_inconsistent_values(
     values: dict[str, object] = {
         "task": "binary_classification",
         "policy_schema_version": 1,
-        "status": release.ReleaseStatus.BLOCKED,
+        "status": release.Readiness.BLOCKED,
         "total_findings": 1,
         "passed_findings": 0,
         "failed_findings": 1,
@@ -477,16 +465,14 @@ def test_readiness_summary_rejects_inconsistent_values(
         "blocking_failures": 1,
         "non_blocking_failures": 0,
         "counts_by_kind": {
-            kind.value: release.FindingCounts(
-                total=1 if kind is release.FindingKind.METRIC else 0,
+            kind.value: release.Tally(
+                total=1 if kind is release.Kind.METRIC else 0,
                 passed=0,
-                failed=1 if kind is release.FindingKind.METRIC else 0,
-                blocking=1 if kind is release.FindingKind.METRIC else 0,
-                blocking_failures=(
-                    1 if kind is release.FindingKind.METRIC else 0
-                ),
+                failed=1 if kind is release.Kind.METRIC else 0,
+                blocking=1 if kind is release.Kind.METRIC else 0,
+                blocking_failures=(1 if kind is release.Kind.METRIC else 0),
             )
-            for kind in release.FindingKind
+            for kind in release.Kind
         },
     }
     values[field] = value
@@ -497,7 +483,7 @@ def test_readiness_summary_rejects_inconsistent_values(
 
 def test_attestation_gate_requires_a_signed_release_record():
     """A release record without an HMAC signature fails closed."""
-    outcome = release.ReleaseEvaluation(
+    outcome = release.Verdict(
         task="classification",
         policy_schema_version=1,
         passed=True,
@@ -505,14 +491,14 @@ def test_attestation_gate_requires_a_signed_release_record():
         blocking_reasons=(),
     )
 
-    blocked = release.apply_attestation_gate(outcome, {}, True)
-    unchecked = release.apply_attestation_gate(
+    blocked = release.certify(outcome, {}, True)
+    unchecked = release.certify(
         outcome,
         {"signature": {"algorithm": "hmac-sha256", "value": "digest"}},
         verified=False,
     )
     assert not unchecked.passed
-    signed = release.apply_attestation_gate(
+    signed = release.certify(
         outcome,
         {
             "signature": {
@@ -524,13 +510,13 @@ def test_attestation_gate_requires_a_signed_release_record():
     )
 
     assert not blocked.passed
-    assert blocked.findings[-1].kind is release.FindingKind.SECURITY
+    assert blocked.findings[-1].kind is release.Kind.SECURITY
     assert signed is outcome
 
 
 def test_attestation_gate_rejects_a_tampered_signature():
     """A present signature is insufficient when verification fails."""
-    outcome = release.ReleaseEvaluation(
+    outcome = release.Verdict(
         task="classification",
         policy_schema_version=1,
         passed=True,
@@ -538,7 +524,7 @@ def test_attestation_gate_rejects_a_tampered_signature():
         blocking_reasons=(),
     )
 
-    blocked = release.apply_attestation_gate(
+    blocked = release.certify(
         outcome,
         {
             "signature": {

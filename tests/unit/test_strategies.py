@@ -12,12 +12,12 @@ from scmle.models import registry
 from scmle.sampling import resampling
 from scmle.sampling import strategies
 
-REGISTRY = registry.Catalog.with_builtins()
+REGISTRY = registry.Catalog.stock()
 
 
 def profile_of(frame, task=tasks.Task.BINARY):
     spec = tasks.Config(data=tasks.Dataset(uri="m", target="y"))
-    manifest = tabular.build_manifest(frame, "y")
+    manifest = tabular.manifested(frame, "y")
     return profiler.Profiler(spec).profile(frame, manifest, task)
 
 
@@ -250,9 +250,7 @@ def test_jitter_is_opt_in_and_only_perturbs_synthetic_numeric_rows():
         {"a": rng.normal(size=200), "c": rng.choice(["x", "y"], 200)}
     )
     target = pandas.Series([1] * 20 + [0] * 180)
-    sampled, labels = resampling.JitterOverSampler(0.1).resample(
-        features, target, 0
-    )
+    sampled, labels = resampling.Jittered(0.1).resample(features, target, 0)
     assert labels.value_counts().to_dict() == {0: 180, 1: 180}
     originals = set(features["a"].round(12))
     synthetic = ~sampled["a"].round(12).isin(originals)
@@ -320,7 +318,7 @@ def test_constructed_ratios_let_a_linear_model_learn_a_ratio_target():
     spec = tasks.Config(data=tasks.Dataset(uri="m", target="y"))
     profile = profiler.Profiler(spec).profile(
         frame,
-        tabular.build_manifest(frame, "y"),
+        tabular.manifested(frame, "y"),
         tasks.Task.REGRESSION,
     )
 
@@ -485,7 +483,7 @@ def test_target_transform_helps_a_linear_model_on_a_long_tailed_target():
     spec = tasks.Config(data=tasks.Dataset(uri="m", target="y"))
     profile = profiler.Profiler(spec).profile(
         frame,
-        tabular.build_manifest(frame, "y"),
+        tabular.manifested(frame, "y"),
         tasks.Task.REGRESSION,
     )
 

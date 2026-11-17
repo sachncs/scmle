@@ -12,7 +12,7 @@ from scmle.data.robustness import shift
 from scmle.data.robustness import stability
 
 
-def make_check(check_id, set_id=qualification.SetId.EXPLORATION):
+def make_check(check_id, set_id=qualification.Subset.EXPLORATION):
     return qualification.Check(
         check_id=check_id,
         null_hypothesis="h",
@@ -36,7 +36,7 @@ def make_finding(name, status, check=None, reason="why"):
 
 def make_found(
     findings=(),
-    gate=certificates.GateStatus.GATING,
+    gate=certificates.Authority.GATING,
     c2st=None,
     mmd=None,
     features=(),
@@ -69,7 +69,7 @@ def stage_with(found, requested, rows=40, seed=3):
         seen.append(columns)
         return found
 
-    return prefilter.StabilityStage(compute, requested, rows, seed), seen
+    return prefilter.Prefilter(compute, requested, rows, seed), seen
 
 
 def test_the_constants_are_exact():
@@ -83,7 +83,7 @@ def test_a_feature_check_records_the_row_and_the_context():
         column="age", statistic=2.5, p_value=0.125, effect=0.75, rejected=True
     )
 
-    (check,) = prefilter.feature_checks(
+    (check,) = prefilter.shifts(
         types.SimpleNamespace(features=(row,)), rows=33, seed=9
     )
 
@@ -113,7 +113,7 @@ def test_the_cap_keeps_the_first_rejected_columns():
         for i in range(300)
     )
 
-    checks = prefilter.feature_checks(
+    checks = prefilter.shifts(
         types.SimpleNamespace(features=rows), rows=1, seed=0
     )
 
@@ -126,7 +126,7 @@ def test_the_cap_keeps_the_first_rejected_columns():
 
 def test_diagnostics_are_ordered_and_keep_only_exploration_checks():
     first = make_check("s1")
-    outside = make_check("s2", qualification.SetId.CONFIRMATION)
+    outside = make_check("s2", qualification.Subset.CONFIRMATION)
     c2st = make_check("c2st")
     mmd = make_check("mmd")
     found = make_found(
@@ -148,7 +148,7 @@ def test_diagnostics_are_ordered_and_keep_only_exploration_checks():
         ),
     )
 
-    rows = prefilter.diagnostic_rows(found, rows=7, seed=2)
+    rows = prefilter.gather(found, rows=7, seed=2)
 
     assert [source for source, check in rows] == [
         stability.DETECTOR_ID,
@@ -166,7 +166,7 @@ def test_diagnostics_are_ordered_and_keep_only_exploration_checks():
 def test_diagnostics_skip_missing_shift_checks():
     found = make_found(mmd=make_check("mmd"))
 
-    rows = prefilter.diagnostic_rows(found, rows=1, seed=0)
+    rows = prefilter.gather(found, rows=1, seed=0)
 
     assert [source for source, check in rows] == [shift.MMD_ID]
 
@@ -174,7 +174,7 @@ def test_diagnostics_skip_missing_shift_checks():
 def test_an_unrequested_stage_only_describes():
     found = make_found(
         findings=(make_finding("o", stability.FRAGILE),),
-        gate=certificates.GateStatus.GATING,
+        gate=certificates.Authority.GATING,
     )
     stage, seen = stage_with(found, requested=False)
 
@@ -207,7 +207,7 @@ def test_a_requested_but_descriptive_stage_explains_itself(
 ):
     found = make_found(
         findings=(make_finding("o", stability.FRAGILE),),
-        gate=certificates.GateStatus.DESCRIPTIVE,
+        gate=certificates.Authority.DESCRIPTIVE,
         rule_note=rule_note,
         store_note=store_note,
     )
@@ -277,7 +277,7 @@ def test_a_gating_requested_stage_withdraws_the_fragile_survivors():
         "fragile": ["o", "p"],
         "note": stage.note,
     }
-    assert result.diagnostics == prefilter.diagnostic_rows(found, 12, 5)
+    assert result.diagnostics == prefilter.gather(found, 12, 5)
     assert len(result.diagnostics) == 2
     feature = result.diagnostics[1][1]
     assert feature.n == 12

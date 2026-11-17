@@ -89,7 +89,7 @@ def test_transformer_rejects_non_tabular_shape_before_worker_start():
 def test_jepa_runs_real_torch_embedding_explanation_and_checkpoint(tmp_path):
     """A real JEPA fit preserves its embedding and explanation contracts."""
     matrix = features()
-    model = jepa.JepaEstimator(
+    model = jepa.Embedder(
         hidden_size=12,
         embedding_size=6,
         epochs=2,
@@ -110,7 +110,7 @@ def test_jepa_runs_real_torch_embedding_explanation_and_checkpoint(tmp_path):
     assert explanation.target == "embedding_energy"
 
     checkpoint = model.save_checkpoint(tmp_path / "jepa.bin", KEY)
-    restored = jepa.JepaEstimator.load_checkpoint(checkpoint, KEY)
+    restored = jepa.Embedder.load_checkpoint(checkpoint, KEY)
 
     numpy.testing.assert_allclose(
         restored.transform(matrix[:5]), embedding, rtol=0.0, atol=0.0

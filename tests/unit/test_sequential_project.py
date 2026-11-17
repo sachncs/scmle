@@ -7,7 +7,7 @@ import pandas
 import pytest
 
 from scmle.api.sequential import Estimation
-from scmle.api.sequential import resolve_tabular_input
+from scmle.api.sequential import tabulate
 from scmle.evaluation.sequential import Config
 from scmle.evaluation.sequential import Estimand
 
@@ -96,13 +96,13 @@ def test_resolve_tabular_input_copies_frames_and_loads_supported_paths(
 ) -> None:
     """Input resolution owns in-memory data and delegates file formats."""
     frame = make_frame()
-    resolved = resolve_tabular_input(frame)
+    resolved = tabulate(frame)
     resolved.loc[0, "outcome"] = -999.0
     assert frame.loc[0, "outcome"] != -999.0
 
     path = tmp_path / "panel.csv"
     frame.to_csv(path, index=False)
-    loaded = resolve_tabular_input(path)
+    loaded = tabulate(path)
     assert loaded.shape == frame.shape
     assert list(loaded.columns) == list(frame.columns)
 

@@ -107,7 +107,7 @@ def make_registry(root, versions=(1, 2, 3), signed=True):
     root.mkdir(parents=True, exist_ok=True)
     entries = {}
     for number in versions:
-        record = registry.VersionRecord(
+        record = registry.Release(
             model="churn",
             version=number,
             registered_at=support_release.NOW,
@@ -126,7 +126,7 @@ def make_registry(root, versions=(1, 2, 3), signed=True):
     return registry.ModelRegistryStore(root)
 
 
-def approval_for(number, **changes):
+def sanction(number, **changes):
     return support_release.approval(
         version=number, content_id=str(number) * 64, **changes
     )

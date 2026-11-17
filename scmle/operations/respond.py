@@ -1,6 +1,6 @@
 """Detect, classify, notify, retain and record what the operator did.
 
-`ResponseDesk` ties the pieces of an incident together:
+`Desk` ties the pieces of an incident together:
 
 1. the signals of a window are classified (`scmle.operations.classify`);
 2. every window's signals are appended to a telemetry file, so the evidence
@@ -72,7 +72,7 @@ class Response:
         }
 
 
-class ResponseDesk:
+class Desk:
     """Classifies windows, notifies, retains telemetry and audits."""
 
     def __init__(
@@ -103,7 +103,7 @@ class ResponseDesk:
         self.clock = clock
 
     @property
-    def telemetry_path(self) -> pathlib.Path:
+    def archive(self) -> pathlib.Path:
         """The file of retained windows."""
         return self.directory / TELEMETRY_FILE
 
@@ -129,7 +129,7 @@ class ResponseDesk:
             },
             sort_keys=True,
         )
-        durability.append_text(self.telemetry_path, line + "\n")
+        durability.append_text(self.archive, line + "\n")
         return hashlib.sha256(line.encode()).hexdigest()
 
     def retained(self, since: float = 0.0) -> list[dict[str, Any]]:
@@ -142,13 +142,11 @@ class ResponseDesk:
             The retained windows as decoded, in the order they were
             appended; empty if there is no telemetry file.
         """
-        if not self.telemetry_path.exists():
+        if not self.archive.exists():
             return []
         rows = [
             json.loads(line)
-            for line in self.telemetry_path.read_text(
-                encoding="utf-8"
-            ).splitlines()
+            for line in self.archive.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
         return [row for row in rows if row["at"] >= since]
@@ -168,7 +166,7 @@ class ResponseDesk:
         rows = self.retained()
         keep = [row for row in rows if row["at"] >= older_than]
         text = "".join(json.dumps(r, sort_keys=True) + "\n" for r in keep)
-        durability.write_atomically(self.telemetry_path, text.encode())
+        durability.write_atomically(self.archive, text.encode())
         return len(rows) - len(keep)
 
     def handle(
@@ -194,7 +192,7 @@ class ResponseDesk:
             the deliveries and the hash of the new audit row.
         """
         now = self.clock()
-        trace = trace_id or logs.new_trace_id()
+        trace = trace_id or logs.traceid()
         digest = self.retain(now, signal_rows)
         found = classify.classify(signal_rows)
         if found.verdict is classify.Verdict.NONE:

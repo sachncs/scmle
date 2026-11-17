@@ -99,7 +99,7 @@ class Observation:
                 return digest
         return self.image_digest if revision == self.revision else None
 
-    def share_of(self, revision: str) -> int:
+    def portion(self, revision: str) -> int:
         """Sums the traffic a revision holds.
 
         Args:

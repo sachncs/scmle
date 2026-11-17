@@ -129,7 +129,7 @@ class Thresholds:
 DEFAULT_RULE = Thresholds()
 
 
-def applicable_choices(
+def actionable(
     choices: Sequence[contracts.Choice],
 ) -> tuple[tuple[contracts.Choice, ...], tuple[str, ...]]:
     """The declared choices this estimator can act on, and what was dropped.
@@ -230,7 +230,7 @@ def prepare(
     return values[ok], target[ok]
 
 
-def rank_effect(x: numpy.ndarray, y: numpy.ndarray) -> float:
+def rankcorr(x: numpy.ndarray, y: numpy.ndarray) -> float:
     """Computes Spearman's rank correlation of two arrays.
 
     Args:
@@ -276,7 +276,7 @@ def resample(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SpecEffect:
+class Variant:
     """One specification's estimate of a finding.
 
     Attributes:
@@ -345,7 +345,7 @@ def estimate(
     """
     rows = len(x)
     positions = numpy.arange(rows)
-    effect = rank_effect(*prepare(x, y, positions, rows, spec))
+    effect = rankcorr(*prepare(x, y, positions, rows, spec))
     out: dict[str, float] = {}
     if not math.isfinite(effect):
         return out
@@ -360,8 +360,7 @@ def estimate(
         )
     )
     values = [
-        rank_effect(*prepare(x[pick], y[pick], pick, rows, spec))
-        for pick in picks
+        rankcorr(*prepare(x[pick], y[pick], pick, rows, spec)) for pick in picks
     ]
     draws = [v for v in values if math.isfinite(v)]
     if len(draws) >= max(bootstrap // 2, 2):
@@ -372,7 +371,7 @@ def estimate(
 
 
 def verdict(
-    effects: Sequence[SpecEffect], headline: float | None, rule: Thresholds
+    effects: Sequence[Variant], headline: float | None, rule: Thresholds
 ) -> tuple[str, str, dict[str, float | None]]:
     """Applies the survival rule to per-specification effects.
 
@@ -450,7 +449,7 @@ def verdict(
 
 
 def attribution(
-    effects: Sequence[SpecEffect],
+    effects: Sequence[Variant],
 ) -> dict[str, dict[str, Any]]:
     """Attributes the spread of the estimates to the declared choices.
 
@@ -553,7 +552,7 @@ def summarize(
     return float(numpy.median(effects)), float(numpy.mean(flags))
 
 
-def curve_test(
+def specify(
     x: numpy.ndarray,
     y: numpy.ndarray,
     grid: multiverse.Grid,
@@ -630,7 +629,7 @@ class Stability:
     reason: str
     headline: float | None
     numbers: dict[str, float | None]
-    specs: tuple[SpecEffect, ...]
+    specs: tuple[Variant, ...]
     skipped: tuple[tuple[str, str], ...]
     attribution: dict[str, dict[str, Any]]
     curve: Curve | None
@@ -673,10 +672,10 @@ def assess_finding(
     bootstrap: int = BOOTSTRAP,
     strata: numpy.ndarray | None = None,
     curve_permutations: int = 0,
-    cache: multiverse.ResultCache | None = None,
+    cache: multiverse.Memo | None = None,
     budget_seconds: float | None = None,
     clock: Callable[[], float] | None = None,
-    gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
+    gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
 ) -> Stability:
     """Re-runs a finding over the grid and applies the survival rule.
 
@@ -720,7 +719,7 @@ def assess_finding(
         **options,
     )
     effects = tuple(
-        SpecEffect(
+        Variant(
             spec.sha256,
             spec.to_dict(),
             ran.results[spec.sha256].get("effect"),
@@ -737,7 +736,7 @@ def assess_finding(
     status, reason, numbers = verdict(effects, headline, rule)
     curve = None
     if curve_permutations > 0 and status != NOT_EVALUABLE:
-        curve = curve_test(
+        curve = specify(
             values,
             codes,
             grid,
@@ -767,7 +766,7 @@ def assess_finding(
                     qualification.Decision.QUARANTINE, gate
                 )
             ),
-            set_id=qualification.SetId.EXPLORATION,
+            set_id=qualification.Subset.EXPLORATION,
             seed_path=randomness.seed_path(seed, f"f6.stability.{name}", 0),
             tier=qualification.Tier.UNVERIFIED,
         )
@@ -800,7 +799,7 @@ def code_digest() -> str:
 
 def gate_status(
     store: certificates.Store | None,
-) -> certificates.GateStatus:
+) -> certificates.Authority:
     """Decides whether stability verdicts may act.
 
     Args:
@@ -812,11 +811,11 @@ def gate_status(
         when `store` is None.
     """
     if store is None:
-        return certificates.GateStatus.DESCRIPTIVE
+        return certificates.Authority.DESCRIPTIVE
     digest = code_digest()
     for defect in DEFECT_TYPES:
         if store.status(DETECTOR_ID, digest, defect) is not (
-            certificates.GateStatus.GATING
+            certificates.Authority.GATING
         ):
-            return certificates.GateStatus.DESCRIPTIVE
-    return certificates.GateStatus.GATING
+            return certificates.Authority.DESCRIPTIVE
+    return certificates.Authority.GATING

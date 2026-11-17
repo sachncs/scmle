@@ -27,7 +27,7 @@ STRONG_AUC = 0.75
 TOP_FEATURES = 5
 
 
-class AdversarialValidation(diagnostics.Diagnostic):
+class Adversary(diagnostics.Diagnostic):
     """Separability of development rows from evaluation rows."""
 
     name = "adversarial_validation"
@@ -50,7 +50,7 @@ class AdversarialValidation(diagnostics.Diagnostic):
         reference = inputs.reference_features
         if reference is None:
             return {"available": False, "reason": "no reference rows"}
-        columns = list(inputs.feature_plan.input_columns)
+        columns = list(inputs.feature_plan.sourced)
         rng = numpy.random.default_rng(inputs.seed)
         old = self.sample(reference[columns], rng)
         new = self.sample(inputs.features[columns], rng)
@@ -142,7 +142,7 @@ class AdversarialValidation(diagnostics.Diagnostic):
             "minimum_effective_size": shift_weights.MIN_EFFECTIVE_SIZE,
             "note": "odds of an out-of-fold discriminator, corrected for the "
             "sample sizes and clipped; descriptive, on the capped sample; "
-            "weights for a bundle are estimated by attach_shift_weights",
+            "weights for a bundle are estimated by tilt",
         }
 
     @staticmethod

@@ -8,11 +8,11 @@ carries (`gating` or `descriptive`) for `identification_report.json` and
 `causal_claims.json`. The subgroup family never changes the tier: the tier
 rule (`identification.tier.decide`) has no subgroup input and none is added.
 
-The method is `run.subgroup_report`: for each declared (column, level) the
+The method is `run.stratify`: for each declared (column, level) the
 strategy's estimator on the rows of `C` in the level, a Wald test of zero,
 Holm's step-down at the primary level `alpha = 0.05` over the whole declared
 family (a level that cannot be estimated stays in at p = 1). Its code hash
-(with `battery.wald_test` and `multiplicity.adjust`) is the certificate's
+(with `battery.wald` and `multiplicity.adjust`) is the certificate's
 `method_hash`.
 
 World. A randomized experiment (strategy `randomized_diff`, assignment
@@ -166,7 +166,7 @@ def rejected_levels(
     Returns:
         The level names whose hypothesis the subgroup report rejects.
     """
-    found = run.subgroup_report(
+    found = run.stratify(
         adapter, frame, LEVEL, (causal.Subgroup("g", names()),)
     )
     return {r["value"] for r in found["hypotheses"] if r["rejected"]}
@@ -281,9 +281,9 @@ def current_method_hash() -> str:
     """Hash of the package code the gate measures.
 
     Returns:
-        The method hash of `run.subgroup_report` and the code it depends on.
+        The method hash of `run.stratify` and the code it depends on.
     """
-    return certified.subgroup_method_hash(run.subgroup_report)
+    return certified.fingerprint(run.stratify)
 
 
 def certify_all(base: int = 0, scale: float = 1.0) -> dict[str, Any]:

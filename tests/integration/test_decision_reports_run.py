@@ -35,11 +35,11 @@ def frame():
 
 
 def charter_file(tmp_path, plan=True, uncertainty=None):
-    human = (costs.CostSource.HUMAN,) * 4
-    model = costs.DecisionCostModel(
-        0.0, 2.0, 1.0, 0.0, 0.05, 0.9, human, costs.CostSource.HUMAN
+    human = (costs.Basis.HUMAN,) * 4
+    model = costs.Tariff(
+        0.0, 2.0, 1.0, 0.0, 0.05, 0.9, human, costs.Basis.HUMAN
     )
-    rollout_plan = scmle.data.charter.decision.RolloutPlan(
+    rollout_plan = scmle.data.charter.decision.Experiment(
         unit="user",
         primary="conv",
         assignment_prob=0.5,
@@ -49,17 +49,17 @@ def charter_file(tmp_path, plan=True, uncertainty=None):
         alpha_promote=Fraction(1, 20),
         alpha_rollback=Fraction(1, 20),
     )
-    layer = scmle.data.charter.decision.DecisionLayer(
-        scmle.data.charter.decision.DecisionModel("EUR per case"),
+    layer = scmle.data.charter.decision.Layer(
+        scmle.data.charter.decision.Policy("EUR per case"),
         (
-            scmle.data.charter.decision.FairnessConstraint(
+            scmle.data.charter.decision.Constraint(
                 "grp", "demographic_parity", 0.4, "reweighing", min_group=20
             ),
         ),
         rollout_plan if plan else None,
     )
     path = tmp_path / "charter.json"
-    sealing.write_charter(
+    sealing.inscribe(
         path,
         make_charter(
             min_effect=0.5,
@@ -104,7 +104,7 @@ def test_the_decision_files_are_written_with_a_randomized_log(tmp_path):
     assert report["rollout"]["ran"] is False
     design = read(result, "rollout_design.json")
     assert design["plan_hash"] == report["rollout"]["plan_hash"]
-    log = rollout.DecisionLog.read(folder / "rollout_decisions.jsonl")
+    log = rollout.Journal.read(folder / "rollout_decisions.jsonl")
     assert log.verify() and len(log.rows) == 1
     profile = read(result, "dataset_profile.json")["feature_plan"]
     assert "prop" not in profile["numeric"] + profile["categorical"]

@@ -173,7 +173,7 @@ class Controller:
             system_keys=system_keys,
             today=today,
         )
-        self.envelopes = envelope.EnvelopeGuard(
+        self.envelopes = envelope.Guard(
             self.loop.ledger, today, verification_keys
         )
         self.envelopes.on_write = self.loop.save_state
@@ -192,11 +192,11 @@ class Controller:
         loop = self.loop
         try:
             used = self.envelopes.authorize(
-                envelope.EnvelopeAction.TRAIN_CHALLENGER,
+                envelope.Action.TRAIN_CHALLENGER,
                 loop.policy.scope,
                 {"batch": loop.batch - 1},
             )
-        except envelope.EnvelopeRefused as refused:
+        except envelope.RefusedError as refused:
             # handled: returned as failed finding/problem/refusal with error
             # text
             loop.escalate("retrain_not_authorized", {"reason": refused.reason})
@@ -474,7 +474,7 @@ class Controller:
             reason: Why the controller stops.
             name: The file involved.
         """
-        self.loop.enter_halt(reason, {"file": name})
+        self.loop.suspend(reason, {"file": name})
         self.loop.escalate(reason, {"file": name})
         self.loop.save_state()
 

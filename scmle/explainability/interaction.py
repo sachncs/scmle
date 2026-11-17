@@ -12,7 +12,7 @@ MAX_INTERACTION_ROWS = 200
 MIN_NUMERIC_FEATURES = 2
 
 
-class PairwiseInteraction(diagnostics.Diagnostic):
+class Pairwise(diagnostics.Diagnostic):
     """Measure model-output interaction between pairs of numeric features.
 
     The score is the mean absolute second-order difference after replacing
@@ -43,7 +43,7 @@ class PairwiseInteraction(diagnostics.Diagnostic):
             When fewer than two numeric features or no rows are available,
             `features` is empty and the limitations say so.
         """
-        columns = list(inputs.feature_plan.input_columns)
+        columns = list(inputs.feature_plan.sourced)
         numeric = [
             column
             for column in inputs.feature_plan.numeric
@@ -71,7 +71,7 @@ class PairwiseInteraction(diagnostics.Diagnostic):
         truncated = False
         for left_index, left in enumerate(numeric[:-1]):
             for right in numeric[left_index + 1 :]:
-                if inputs.out_of_time():
+                if inputs.expired():
                     truncated = True
                     break
                 both = sample.copy()

@@ -43,7 +43,7 @@ class Unknown:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class HumanQuestion:
+class Question:
     """A question raised for a named person.
 
     Attributes:
@@ -74,7 +74,7 @@ class HumanQuestion:
         return record
 
 
-def tipping_point(unknown: Unknown) -> HumanQuestion | None:
+def tipping_point(unknown: Unknown) -> Question | None:
     """Finds where the verdict changes as `unknown` varies over its range.
 
     The range is scanned on a grid of `GRID_POINTS` values and the first
@@ -99,7 +99,7 @@ def tipping_point(unknown: Unknown) -> HumanQuestion | None:
             low = middle
         else:
             high = middle
-    return HumanQuestion(
+    return Question(
         unknown.name,
         unknown.form,
         unknown.low,
@@ -111,7 +111,7 @@ def tipping_point(unknown: Unknown) -> HumanQuestion | None:
 
 def ask(
     unknowns: Sequence[Unknown], derivable: Collection[str] = ()
-) -> tuple[list[HumanQuestion], list[dict[str, Any]]]:
+) -> tuple[list[Question], list[dict[str, Any]]]:
     """Decides which unknowns need a question and which are robust.
 
     Args:
@@ -122,7 +122,7 @@ def ask(
         (questions, robust), where `robust` lists each unknown whose range
         leaves the verdict unchanged, with that verdict.
     """
-    questions: list[HumanQuestion] = []
+    questions: list[Question] = []
     robust: list[dict[str, Any]] = []
     for unknown in unknowns:
         if unknown.name in derivable:
@@ -142,9 +142,7 @@ def ask(
     return questions, robust
 
 
-def gain_sign_verdict(
-    y: ArrayLike, a: ArrayLike, b: ArrayLike
-) -> Callable[[float], str]:
+def judge(y: ArrayLike, a: ArrayLike, b: ArrayLike) -> Callable[[float], str]:
     """Builds a verdict function over the threshold `t`.
 
     Args:
@@ -167,7 +165,7 @@ def gain_sign_verdict(
         Returns:
             `model_better` or `baseline_better`.
         """
-        gain = float(numpy.mean(baseline.paired_difference(y, a, b, t)))
+        gain = float(numpy.mean(baseline.advantage(y, a, b, t)))
         return "model_better" if gain > 0 else "baseline_better"
 
     return verdict

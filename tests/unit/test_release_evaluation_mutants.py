@@ -16,14 +16,14 @@ from tests.unit.test_release_evaluation import make_record
 
 def make_finding(**changes):
     fields = {
-        "kind": release.FindingKind.METRIC,
+        "kind": release.Kind.METRIC,
         "name": "m",
         "passed": True,
         "blocking": True,
         "reason": "because",
     }
     fields.update(changes)
-    return release.ReleaseFinding(**fields)
+    return release.Finding(**fields)
 
 
 def make_counts(**changes):
@@ -35,7 +35,7 @@ def make_counts(**changes):
         "blocking_failures": 0,
     }
     fields.update(changes)
-    return release.FindingCounts(**fields)
+    return release.Tally(**fields)
 
 
 def make_outcome(findings=()):
@@ -45,12 +45,12 @@ def make_outcome(findings=()):
     reasons = tuple(
         item.reason for item in ordered if not item.passed and item.blocking
     )
-    return release.ReleaseEvaluation("binary", 3, not reasons, ordered, reasons)
+    return release.Verdict("binary", 3, not reasons, ordered, reasons)
 
 
 def passing_outcome():
     policy = make_policy()
-    return release.evaluate_release(
+    return release.assess(
         policy,
         {"roc_auc": 0.81},
         {"metric_uncertainty": {"estimate": 0.81}},
@@ -61,22 +61,22 @@ def passing_outcome():
 
 def sample_summary():
     findings = (
-        make_finding(kind=release.FindingKind.METRIC, name="a"),
+        make_finding(kind=release.Kind.METRIC, name="a"),
         make_finding(
-            kind=release.FindingKind.FAIRNESS,
+            kind=release.Kind.FAIRNESS,
             name="b",
             passed=False,
             reason="bad",
         ),
         make_finding(
-            kind=release.FindingKind.INPUT,
+            kind=release.Kind.INPUT,
             name="c",
             passed=False,
             blocking=False,
             reason="soft",
         ),
     )
-    return make_outcome(findings).readiness_summary()
+    return make_outcome(findings).tally()
 
 
 def test_finite_real_accepts_only_finite_real_numbers():
@@ -89,15 +89,15 @@ def test_finite_real_accepts_only_finite_real_numbers():
 
 
 def test_normalize_measure_names_the_field_in_errors():
-    assert release.normalize_measure("f", 3) == 3.0
-    assert release.normalize_measure("f", "text") == "text"
-    assert release.normalize_measure("f", None) is None
+    assert release.quantify("f", 3) == 3.0
+    assert release.quantify("f", "text") == "text"
+    assert release.quantify("f", None) is None
     with pytest.raises(TypeError, match=r"^f must not be bool$"):
-        release.normalize_measure("f", True)
+        release.quantify("f", True)
     with pytest.raises(ValueError, match=r"^f must be finite$"):
-        release.normalize_measure("f", float("nan"))
+        release.quantify("f", float("nan"))
     with pytest.raises(TypeError, match=r"^f must be numeric, text, or None$"):
-        release.normalize_measure("f", [1])
+        release.quantify("f", [1])
 
 
 def test_finding_rejects_blank_or_non_text_fields():
@@ -113,7 +113,7 @@ def test_finding_rejects_blank_or_non_text_fields():
         make_finding(evidence=("a", "a"))
     with pytest.raises(TypeError, match="evidence must be a tuple"):
         make_finding(evidence=["a"])
-    with pytest.raises(TypeError, match=r"^kind must be FindingKind$"):
+    with pytest.raises(TypeError, match=r"^kind must be Kind$"):
         make_finding(kind="metric")
     with pytest.raises(TypeError, match=r"^passed must be bool$"):
         make_finding(passed=1)
@@ -194,30 +194,30 @@ def test_counts_serialize_and_name_the_bad_field():
 
 
 def test_check_count_values_rejects_bools_non_integers_and_negatives():
-    release.check_count_values({"a": 0, "b": 3})
+    release.tallies({"a": 0, "b": 3})
     with pytest.raises(TypeError, match=r"^a must be a non-negative integer$"):
-        release.check_count_values({"a": True})
+        release.tallies({"a": True})
     with pytest.raises(TypeError, match=r"^a must be a non-negative integer$"):
-        release.check_count_values({"a": 1.5})
+        release.tallies({"a": 1.5})
     with pytest.raises(ValueError, match=r"^b must be a non-negative integer$"):
-        release.check_count_values({"a": 1, "b": -1})
+        release.tallies({"a": 1, "b": -1})
 
 
 def test_check_kind_coverage_requires_every_kind_with_counts():
-    full = {kind.value: make_counts() for kind in release.FindingKind}
-    release.check_kind_coverage(full)
+    full = {kind.value: make_counts() for kind in release.Kind}
+    release.exhaustive(full)
     with pytest.raises(TypeError, match=r"^counts_by_kind must be a mapping$"):
-        release.check_kind_coverage([])
+        release.exhaustive([])
     with pytest.raises(
         ValueError, match=r"^counts_by_kind must contain every finding kind$"
     ):
-        release.check_kind_coverage({"metric": make_counts()})
+        release.exhaustive({"metric": make_counts()})
     wrong = dict(full)
     wrong["metric"] = 5
     with pytest.raises(
-        TypeError, match=r"^counts_by_kind must map strings to FindingCounts$"
+        TypeError, match=r"^counts_by_kind must map strings to Tally$"
     ):
-        release.check_kind_coverage(wrong)
+        release.exhaustive(wrong)
 
 
 def test_summary_validation_messages():
@@ -236,7 +236,7 @@ def test_summary_validation_messages():
         ).policy_schema_version
         == 0
     )
-    with pytest.raises(TypeError, match=r"^status must be ReleaseStatus$"):
+    with pytest.raises(TypeError, match=r"^status must be Readiness$"):
         dataclasses.replace(summary, status="blocked")
     for name in (
         "total_findings",
@@ -259,19 +259,19 @@ def test_summary_validation_messages():
     with pytest.raises(
         ValueError, match=r"^status does not match blocking_failures$"
     ):
-        dataclasses.replace(summary, status=release.ReleaseStatus.READY)
+        dataclasses.replace(summary, status=release.Readiness.READY)
     with pytest.raises(
         ValueError, match=r"^aggregate counts do not match counts_by_kind$"
     ):
         dataclasses.replace(summary, blocking_findings=3)
-    assert summary.status is release.ReleaseStatus.BLOCKED
+    assert summary.status is release.Readiness.BLOCKED
 
 
 def test_summary_serializes_exactly():
     summary = sample_summary()
     expected_kinds = {
         kind.value: summary.counts_by_kind[kind.value].to_dict()
-        for kind in release.FindingKind
+        for kind in release.Kind
     }
     assert summary.to_dict() == {
         "task": "binary",
@@ -296,7 +296,7 @@ def test_summary_serializes_exactly():
 def test_evaluation_validation_and_exact_serialization():
     first = make_finding(name="naïve", observed=1.5)
     second = make_finding(
-        kind=release.FindingKind.INPUT, name="z", passed=False, reason="badé"
+        kind=release.Kind.INPUT, name="z", passed=False, reason="badé"
     )
     outcome = make_outcome((first, second))
     assert outcome.blocked is True
@@ -307,7 +307,7 @@ def test_evaluation_validation_and_exact_serialization():
         "blocked": True,
         "blocking_reasons": ["badé"],
         "findings": [item.to_dict() for item in outcome.findings],
-        "readiness": outcome.readiness_summary().to_dict(),
+        "readiness": outcome.tally().to_dict(),
     }
     text = outcome.canonical_json()
     assert text.startswith('{"blocked":true,"blocking_reasons":["bad\\u00e9"]')
@@ -319,33 +319,31 @@ def test_evaluation_validation_and_exact_serialization():
 
     for bad in ("  ", 5, None):
         with pytest.raises(ValueError, match=r"^task must not be empty$"):
-            release.ReleaseEvaluation(bad, 0, True, (), ())
+            release.Verdict(bad, 0, True, (), ())
     with pytest.raises(ValueError, match="must not be negative"):
-        release.ReleaseEvaluation("t", -1, True, (), ())
-    assert release.ReleaseEvaluation("t", 0, True, (), ()).blocked is False
+        release.Verdict("t", -1, True, (), ())
+    assert release.Verdict("t", 0, True, (), ()).blocked is False
 
 
 def test_reliability_gate_requires_both_status_and_unblocked_flag():
     outcome = passing_outcome()
     ok = {"execution_status": "passed", "release_blocked": False}
-    assert release.apply_reliability_gate(outcome, ok) is outcome
+    assert release.faults(outcome, ok) is outcome
     for plan in (
         {"execution_status": "passed", "release_blocked": True},
         {"execution_status": "failed", "release_blocked": False},
         {"execution_status": "passed"},
     ):
-        assert not release.apply_reliability_gate(outcome, plan).passed
-    with pytest.raises(TypeError, match=r"^outcome must be ReleaseEvaluation$"):
-        release.apply_reliability_gate("x", ok)
+        assert not release.faults(outcome, plan).passed
+    with pytest.raises(TypeError, match=r"^outcome must be Verdict$"):
+        release.faults("x", ok)
 
 
 def test_reliability_gate_finding_is_exact():
     outcome = make_outcome(
-        (make_finding(kind=release.FindingKind.SECURITY, name="zzz"),)
+        (make_finding(kind=release.Kind.SECURITY, name="zzz"),)
     )
-    blocked = release.apply_reliability_gate(
-        outcome, {"execution_status": "running"}
-    )
+    blocked = release.faults(outcome, {"execution_status": "running"})
     assert [item.name for item in blocked.findings] == [
         "fault_injection",
         "zzz",
@@ -366,13 +364,13 @@ def test_reliability_gate_finding_is_exact():
     assert blocked.task == "binary"
     assert blocked.policy_schema_version == 3
     for plan, observed in ((None, "missing"), ("x", "missing"), ({}, "None")):
-        finding = release.apply_reliability_gate(outcome, plan).findings[0]
+        finding = release.faults(outcome, plan).findings[0]
         assert finding.observed == observed
 
 
 def test_reliability_gate_keeps_passed_blocking_findings_out_of_reasons():
     outcome = passing_outcome()
-    blocked = release.apply_reliability_gate(outcome, None)
+    blocked = release.faults(outcome, None)
     assert len(blocked.blocking_reasons) == 1
     assert len(blocked.findings) == len(outcome.findings) + 1
 
@@ -386,10 +384,7 @@ def attestation_record(**signature):
 def test_attestation_gate_accepts_only_a_valid_signature_block():
     outcome = passing_outcome()
     # ERR-4: an unchecked signature used to pass; verification is required.
-    assert (
-        release.apply_attestation_gate(outcome, attestation_record(), True)
-        is outcome
-    )
+    assert release.certify(outcome, attestation_record(), True) is outcome
     for record in (
         attestation_record(algorithm="md5"),
         attestation_record(value="  "),
@@ -399,21 +394,17 @@ def test_attestation_gate_accepts_only_a_valid_signature_block():
         "text",
         None,
     ):
-        assert not release.apply_attestation_gate(outcome, record, True).passed
-    assert not release.apply_attestation_gate(
-        outcome, attestation_record(), False
-    ).passed
-    with pytest.raises(TypeError, match=r"^outcome must be ReleaseEvaluation$"):
-        release.apply_attestation_gate(None, attestation_record(), True)
+        assert not release.certify(outcome, record, True).passed
+    assert not release.certify(outcome, attestation_record(), False).passed
+    with pytest.raises(TypeError, match=r"^outcome must be Verdict$"):
+        release.certify(None, attestation_record(), True)
 
 
 def test_attestation_gate_finding_is_exact():
     outcome = make_outcome(
-        (make_finding(kind=release.FindingKind.SECURITY, name="zzz"),)
+        (make_finding(kind=release.Kind.SECURITY, name="zzz"),)
     )
-    blocked = release.apply_attestation_gate(
-        outcome, attestation_record(), False
-    )
+    blocked = release.certify(outcome, attestation_record(), False)
     assert [item.name for item in blocked.findings] == [
         "release_attestation",
         "zzz",
@@ -437,9 +428,7 @@ def test_attestation_gate_finding_is_exact():
         ("unsigned_false", {}, False),
         ("none_record", None, False),
     ):
-        finding = release.apply_attestation_gate(
-            outcome, record, verified
-        ).findings[0]
+        finding = release.certify(outcome, record, verified).findings[0]
         observed[label] = finding.observed
     assert observed == {
         "signed_false": "invalid",
@@ -448,14 +437,14 @@ def test_attestation_gate_finding_is_exact():
         "unsigned_false": "unsigned",
         "none_record": "unsigned",
     }
-    assert release.apply_attestation_gate(
-        passing_outcome(), None, True
-    ).blocking_reasons == (blocked.findings[0].reason,)
+    assert release.certify(passing_outcome(), None, True).blocking_reasons == (
+        blocked.findings[0].reason,
+    )
 
 
 def test_evidence_index_gate_observed_states_and_exact_finding():
     outcome = make_outcome(
-        (make_finding(kind=release.FindingKind.SECURITY, name="zzz"),)
+        (make_finding(kind=release.Kind.SECURITY, name="zzz"),)
     )
     signed = evidence.Index(signature="key")
     unsigned = evidence.Index()
@@ -468,10 +457,10 @@ def test_evidence_index_gate_observed_states_and_exact_finding():
         ("text", True, "unsigned"),
     )
     for index, verified, observed in cases:
-        blocked = release.apply_evidence_index_gate(outcome, index, verified)
+        blocked = release.countersign(outcome, index, verified)
         assert not blocked.passed
         assert blocked.findings[0].observed == observed
-    blocked = release.apply_evidence_index_gate(outcome, None, False)
+    blocked = release.countersign(outcome, None, False)
     assert [item.name for item in blocked.findings] == [
         "release_evidence",
         "zzz",
@@ -491,16 +480,16 @@ def test_evidence_index_gate_observed_states_and_exact_finding():
     }
     assert blocked.blocking_reasons == (blocked.findings[0].reason,)
     good = passing_outcome()
-    assert release.apply_evidence_index_gate(good, signed, True) is good
-    assert len(
-        release.apply_evidence_index_gate(good, None, True).findings
-    ) == (len(good.findings) + 1)
-    with pytest.raises(TypeError, match=r"^outcome must be ReleaseEvaluation$"):
-        release.apply_evidence_index_gate(1, signed, True)
+    assert release.countersign(good, signed, True) is good
+    assert len(release.countersign(good, None, True).findings) == (
+        len(good.findings) + 1
+    )
+    with pytest.raises(TypeError, match=r"^outcome must be Verdict$"):
+        release.countersign(1, signed, True)
 
 
 def test_blocked_input_finding_is_a_failed_blocking_input():
-    finding = release.blocked_input_finding("n", "why")
+    finding = release.unreadable("n", "why")
     assert finding.to_dict() == {
         "kind": "input",
         "name": "n",
@@ -521,15 +510,15 @@ def test_fairness_metric_values_filters_and_counts_shared_nodes_once():
         "d": {"m": {"m": 9.0}},
         "e": ({"m": 1},),
     }
-    assert release.fairness_metric_values(report, "m") == (
+    assert release.disparities(report, "m") == (
         0.25,
         0.5,
         0.75,
         1.0,
     )
     listed = [shared, shared]
-    assert release.fairness_metric_values(listed, "m") == (0.5,)
-    assert release.fairness_metric_values("text", "m") == ()
+    assert release.disparities(listed, "m") == (0.5,)
+    assert release.disparities("text", "m") == ()
 
 
 def test_explanation_quality_value_accepts_only_unit_interval_numbers():
@@ -537,27 +526,21 @@ def test_explanation_quality_value_accepts_only_unit_interval_numbers():
         return {"quality": {"score": value}}
 
     for value, expected in ((0, 0.0), (1, 1.0), (0.4, 0.4)):
-        assert release.explanation_quality_value(report(value), "score") == (
-            expected
-        )
+        assert release.grade(report(value), "score") == (expected)
     for value in (True, "0.5", None, 1.5, -0.5, float("nan"), float("inf")):
-        assert release.explanation_quality_value(report(value), "score") is None
-    assert release.explanation_quality_value([], "score") is None
-    assert release.explanation_quality_value({"quality": 1}, "score") is None
-    assert release.explanation_quality_value({"quality": {}}, "score") is None
+        assert release.grade(report(value), "score") is None
+    assert release.grade([], "score") is None
+    assert release.grade({"quality": 1}, "score") is None
+    assert release.grade({"quality": {}}, "score") is None
 
 
 def test_metric_gate_finding_outcomes():
-    maximize = evaluation.MetricGate(
-        "auc", evaluation.MetricDirection.MAXIMIZE, 0.5
-    )
-    minimize = evaluation.MetricGate(
-        "loss", evaluation.MetricDirection.MINIMIZE, 0.5
-    )
+    maximize = evaluation.Hurdle("auc", evaluation.Orientation.MAXIMIZE, 0.5)
+    minimize = evaluation.Hurdle("loss", evaluation.Orientation.MINIMIZE, 0.5)
     declared = {"auc", "loss"}
 
     def run(gate, value, names=declared):
-        return release.metric_gate_finding(gate, names, {gate.metric: value})
+        return release.judge(gate, names, {gate.metric: value})
 
     at_bound = run(maximize, 0.5).to_dict()
     assert at_bound == {
@@ -586,14 +569,14 @@ def test_metric_gate_finding_outcomes():
     assert run(maximize, 0.9, names={"other"}).reason == (
         "metric 'auc' is unsupported or undeclared"
     )
-    missing = release.metric_gate_finding(maximize, declared, {})
+    missing = release.judge(maximize, declared, {})
     assert missing.reason == "metric 'auc' is missing"
     assert missing.expected == 0.5
 
 
 def test_metric_gate_with_a_raw_direction_fails_closed():
     gate = types.SimpleNamespace(metric="auc", direction="max", threshold=0.5)
-    finding = release.metric_gate_finding(gate, {"auc"}, {"auc": 0.9})
+    finding = release.judge(gate, {"auc"}, {"auc": 0.9})
     assert finding.passed is False
     assert finding.reason == "metric 'auc' failed: 0.9 ? 0.5"
     assert finding.observed == 0.9
@@ -601,36 +584,34 @@ def test_metric_gate_with_a_raw_direction_fails_closed():
 
 
 def test_diagnostic_verdict_reads_the_first_verdict_key():
-    assert release.diagnostic_verdict({"passed": True}) is True
-    assert release.diagnostic_verdict({"passed": False}) is False
-    assert release.diagnostic_verdict({"pass": False}) is False
-    assert release.diagnostic_verdict({"ok": True}) is True
-    assert release.diagnostic_verdict({"failed": True}) is False
-    assert release.diagnostic_verdict({"failed": False}) is True
-    assert release.diagnostic_verdict({"pass": 1, "ok": 2}) == 1
-    assert release.diagnostic_verdict({"ok": 2, "failed": True}) == 2
-    assert release.diagnostic_verdict({"x": 1}) is None
+    assert release.ruling({"passed": True}) is True
+    assert release.ruling({"passed": False}) is False
+    assert release.ruling({"pass": False}) is False
+    assert release.ruling({"ok": True}) is True
+    assert release.ruling({"failed": True}) is False
+    assert release.ruling({"failed": False}) is True
+    assert release.ruling({"pass": 1, "ok": 2}) == 1
+    assert release.ruling({"ok": 2, "failed": True}) == 2
+    assert release.ruling({"x": 1}) is None
     for text in ("pass", "PASSED", "Ok", "success"):
-        assert release.diagnostic_verdict({"status": text}) is True
-    assert release.diagnostic_verdict({"status": "fail"}) is False
-    assert release.diagnostic_verdict({"status": 5}) == 5
-    assert (
-        release.diagnostic_verdict({"passed": True, "status": "fail"}) is True
-    )
-    assert release.diagnostic_verdict({"failed": False, "status": "x"}) is True
+        assert release.ruling({"status": text}) is True
+    assert release.ruling({"status": "fail"}) is False
+    assert release.ruling({"status": 5}) == 5
+    assert release.ruling({"passed": True, "status": "fail"}) is True
+    assert release.ruling({"failed": False, "status": "x"}) is True
 
 
-def make_gate(action=evaluation.DiagnosticAction.BLOCK):
-    return evaluation.DiagnosticGate("diag", action, ("e1",))
+def make_gate(action=evaluation.Remedy.BLOCK):
+    return evaluation.Requirement("diag", action, ("e1",))
 
 
-def diagnose(report, action=evaluation.DiagnosticAction.BLOCK):
+def diagnose(report, action=evaluation.Remedy.BLOCK):
     reports = {} if report is None else {"diag": report}
-    return release.diagnostic_gate_finding(make_gate(action), reports)
+    return release.adjudge(make_gate(action), reports)
 
 
 def test_diagnostic_gate_missing_and_unsupported_reports():
-    warn = evaluation.DiagnosticAction.WARN
+    warn = evaluation.Remedy.WARN
     missing = diagnose(None, warn)
     assert missing.to_dict() == {
         "kind": "diagnostic",
@@ -655,7 +636,7 @@ def test_diagnostic_gate_missing_and_unsupported_reports():
 
 
 def test_diagnostic_gate_judges_errors_availability_and_verdicts():
-    warn = evaluation.DiagnosticAction.WARN
+    warn = evaluation.Remedy.WARN
     present = diagnose({"note": 1}, warn)
     assert present.to_dict() == {
         "kind": "diagnostic",
@@ -775,13 +756,13 @@ def test_explanation_findings_need_a_threshold_for_each_requirement():
 
 
 def fairness_gate(**bounds):
-    return evaluation.FairnessGate("gap", required_evidence=("fe",), **bounds)
+    return evaluation.Equity("gap", required_evidence=("fe",), **bounds)
 
 
 def test_fairness_gate_maximum_uses_the_worst_value():
     gate = fairness_gate(maximum=0.5)
     reports = {"a": {"gap": 0.25}, "b": {"x": {"gap": 0.5}}}
-    finding = release.fairness_gate_finding(gate, reports)
+    finding = release.audit(gate, reports)
     assert finding.to_dict() == {
         "kind": "fairness",
         "name": "gap",
@@ -792,7 +773,7 @@ def test_fairness_gate_maximum_uses_the_worst_value():
         "observed": 0.5,
         "expected": 0.5,
     }
-    worse = release.fairness_gate_finding(gate, {"a": {"gap": 0.75}})
+    worse = release.audit(gate, {"a": {"gap": 0.75}})
     assert worse.passed is False
     assert worse.reason == (
         "fairness metric 'gap' failed: worst value 0.75 <= 0.5"
@@ -801,16 +782,14 @@ def test_fairness_gate_maximum_uses_the_worst_value():
 
 def test_fairness_gate_minimum_uses_the_lowest_value():
     gate = fairness_gate(minimum=0.5)
-    finding = release.fairness_gate_finding(
-        gate, {"a": {"gap": 0.5}, "b": {"gap": 0.75}}
-    )
+    finding = release.audit(gate, {"a": {"gap": 0.5}, "b": {"gap": 0.75}})
     assert finding.passed is True
     assert finding.reason == (
         "fairness metric 'gap' passed: worst value 0.5 >= 0.5"
     )
     assert finding.observed == 0.5
     assert finding.expected == 0.5
-    low = release.fairness_gate_finding(gate, {"a": {"gap": 0.25}})
+    low = release.audit(gate, {"a": {"gap": 0.25}})
     assert low.passed is False
     assert low.reason == "fairness metric 'gap' failed: worst value 0.25 >= 0.5"
 
@@ -818,16 +797,16 @@ def test_fairness_gate_minimum_uses_the_lowest_value():
 def test_fairness_gate_reads_a_direct_report_and_mixed_report_keys():
     gate = fairness_gate(maximum=0.5)
     direct = {"gap": 0.25, "other": {"x": 1.0}}
-    finding = release.fairness_gate_finding(gate, direct)
+    finding = release.audit(gate, direct)
     assert finding.observed == 0.25
     mixed = {1: {"gap": 0.25}, "z": {"gap": 0.5}}
-    assert release.fairness_gate_finding(gate, mixed).observed == 0.5
+    assert release.audit(gate, mixed).observed == 0.5
     nested = {"report": {"gap": 0.25}}
-    assert release.fairness_gate_finding(gate, nested).observed == 0.25
+    assert release.audit(gate, nested).observed == 0.25
 
 
 def test_fairness_gate_without_values_or_bound_fails_closed():
-    maximum = release.fairness_gate_finding(fairness_gate(maximum=0.5), {})
+    maximum = release.audit(fairness_gate(maximum=0.5), {})
     assert maximum.to_dict() == {
         "kind": "fairness",
         "name": "gap",
@@ -837,12 +816,12 @@ def test_fairness_gate_without_values_or_bound_fails_closed():
         "evidence": ["fe"],
         "expected": 0.5,
     }
-    minimum = release.fairness_gate_finding(fairness_gate(minimum=0.25), {})
+    minimum = release.audit(fairness_gate(minimum=0.25), {})
     assert minimum.expected == 0.25
     unbounded = types.SimpleNamespace(
         metric="gap", maximum=None, minimum=None, required_evidence=("fe",)
     )
-    finding = release.fairness_gate_finding(unbounded, {"a": {"gap": 1.0}})
+    finding = release.audit(unbounded, {"a": {"gap": 1.0}})
     assert finding.to_dict() == {
         "kind": "fairness",
         "name": "gap",
@@ -862,7 +841,7 @@ def test_evidence_reference_finding_states():
             make_record("waived", result=evidence.Outcome.WAIVED),
         ]
     )
-    good = release.evidence_reference_finding("good", index)
+    good = release.referenced("good", index)
     assert good.to_dict() == {
         "kind": "evidence",
         "name": "good",
@@ -873,20 +852,18 @@ def test_evidence_reference_finding_states():
         "observed": "pass:accepted",
         "expected": "pass:accepted",
     }
-    bad = release.evidence_reference_finding("bad", index)
+    bad = release.referenced("bad", index)
     assert bad.passed is False
     assert (
         bad.reason == "required evidence 'bad' is not accepted: fail:accepted"
     )
     assert bad.observed == "fail:accepted"
-    held = release.evidence_reference_finding("held", index)
+    held = release.referenced("held", index)
     assert held.passed is False
     assert held.observed == "pass:blocked"
-    assert release.evidence_reference_finding("waived", index).observed == (
-        "waived:accepted"
-    )
+    assert release.referenced("waived", index).observed == ("waived:accepted")
     for lookup in (index, None, "text"):
-        absent = release.evidence_reference_finding("nope", lookup)
+        absent = release.referenced("nope", lookup)
         assert absent.to_dict() == {
             "kind": "evidence",
             "name": "nope",
@@ -900,7 +877,7 @@ def test_evidence_reference_finding_states():
 
 def test_evaluate_release_names_foreign_metric_keys_as_text():
     policy = make_policy()
-    result = release.evaluate_release(
+    result = release.assess(
         policy,
         {1: 2.0, "roc_auc": 0.81, "zz": 1},
         {"metric_uncertainty": {"estimate": 0.81}},
@@ -911,9 +888,7 @@ def test_evaluate_release_names_foreign_metric_keys_as_text():
     assert "metric '1' is not declared by the evaluation policy" in reasons
     assert "metric 'zz' is not declared by the evaluation policy" in reasons
     names = [
-        item.name
-        for item in result.findings
-        if item.kind is release.FindingKind.INPUT
+        item.name for item in result.findings if item.kind is release.Kind.INPUT
     ]
     assert names == ["1", "zz"]
 
@@ -934,19 +909,17 @@ def test_finding_validation_messages_are_exact():
     with pytest.raises(
         ValueError, match=r"^policy_schema_version must not be negative$"
     ):
-        release.ReleaseEvaluation("t", -1, True, (), ())
+        release.Verdict("t", -1, True, (), ())
 
 
 def test_summary_canonical_json_escapes_non_ascii_text():
-    summary = make_outcome((make_finding(),)).readiness_summary()
+    summary = make_outcome((make_finding(),)).tally()
     named = dataclasses.replace(summary, task="naïve")
     assert '"task":"na\\u00efve"' in named.canonical_json()
 
 
 def test_gate_findings_for_unusable_metrics_are_failed_and_blocking():
-    gate = evaluation.MetricGate(
-        "auc", evaluation.MetricDirection.MAXIMIZE, 0.5
-    )
+    gate = evaluation.Hurdle("auc", evaluation.Orientation.MAXIMIZE, 0.5)
     expected = {
         "kind": "metric",
         "name": "auc",
@@ -955,18 +928,18 @@ def test_gate_findings_for_unusable_metrics_are_failed_and_blocking():
         "evidence": [],
         "expected": 0.5,
     }
-    undeclared = release.metric_gate_finding(gate, set(), {"auc": 1.0})
+    undeclared = release.judge(gate, set(), {"auc": 1.0})
     assert undeclared.to_dict() == dict(
         expected, reason="metric 'auc' is unsupported or undeclared"
     )
-    missing = release.metric_gate_finding(gate, {"auc"}, {})
+    missing = release.judge(gate, {"auc"}, {})
     assert missing.to_dict() == dict(expected, reason="metric 'auc' is missing")
-    odd = release.metric_gate_finding(gate, {"auc"}, {"auc": "x"})
+    odd = release.judge(gate, {"auc"}, {"auc": "x"})
     assert odd.to_dict() == dict(
         expected, reason="metric 'auc' has an unsupported value"
     )
     with pytest.raises(ValueError, match=r"^observed must be finite$"):
-        release.metric_gate_finding(gate, {"auc"}, {"auc": float("nan")})
+        release.judge(gate, {"auc"}, {"auc": float("nan")})
 
 
 def test_diagnostic_failures_are_not_passed():
@@ -977,8 +950,8 @@ def test_diagnostic_failures_are_not_passed():
         {"passed": 5},
     ):
         for action in (
-            evaluation.DiagnosticAction.BLOCK,
-            evaluation.DiagnosticAction.WARN,
+            evaluation.Remedy.BLOCK,
+            evaluation.Remedy.WARN,
         ):
             assert diagnose(report, action).passed is False
     assert diagnose({"passed": True}).passed is True
@@ -998,26 +971,22 @@ def test_every_missing_explanation_score_is_reported():
 
 def test_fairness_metric_values_reads_mappings_with_mixed_key_types():
     report = {1: {"m": 0.5}, "m": 0.25, "z": [{"m": 0.75}]}
-    assert release.fairness_metric_values(report, "m") == (0.25, 0.5, 0.75)
+    assert release.disparities(report, "m") == (0.25, 0.5, 0.75)
 
 
 def test_a_decisive_gate_fails_a_report_without_a_verdict():
     # ERR-5: a verdict-bearing diagnostic that drops its verdict used to pass.
-    decisive = evaluation.DiagnosticGate(
-        "diag", evaluation.DiagnosticAction.BLOCK, ("e1",), decisive=True
+    decisive = evaluation.Requirement(
+        "diag", evaluation.Remedy.BLOCK, ("e1",), decisive=True
     )
-    presence = evaluation.DiagnosticGate(
-        "diag", evaluation.DiagnosticAction.BLOCK, ("e1",)
-    )
+    presence = evaluation.Requirement("diag", evaluation.Remedy.BLOCK, ("e1",))
     report = {"diag": {"value": 1.0}}
-    failed = release.diagnostic_gate_finding(decisive, report)
+    failed = release.adjudge(decisive, report)
     assert not failed.passed and failed.blocking
     assert failed.reason == "diagnostic 'diag' reported no verdict"
-    assert release.diagnostic_gate_finding(presence, report).passed
-    assert release.diagnostic_gate_finding(
-        decisive, {"diag": {"passed": True}}
-    ).passed
+    assert release.adjudge(presence, report).passed
+    assert release.adjudge(decisive, {"diag": {"passed": True}}).passed
     with pytest.raises(TypeError, match="decisive must be bool"):
-        evaluation.DiagnosticGate(
-            "diag", evaluation.DiagnosticAction.BLOCK, ("e1",), decisive=1
+        evaluation.Requirement(
+            "diag", evaluation.Remedy.BLOCK, ("e1",), decisive=1
         )

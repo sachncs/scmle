@@ -14,8 +14,8 @@ from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.models import registry
 
-PLAN = data.FeaturePlan(("age", "income"), ("city",))
-REGISTRY = registry.Catalog.with_builtins()
+PLAN = data.Blueprint(("age", "income"), ("city",))
+REGISTRY = registry.Catalog.stock()
 
 
 def people(rows=800, seed=0):
@@ -38,7 +38,7 @@ def people(rows=800, seed=0):
 def classifier():
     frame = people()
     features = frame.drop(columns="approved")
-    fitted = preprocessing.build_pipeline(
+    fitted = preprocessing.instantiate(
         PLAN,
         REGISTRY.get("logistic_regression"),
         tasks.Task.BINARY,
@@ -72,7 +72,7 @@ def test_a_denied_applicant_gets_a_small_change_that_flips_the_decision(
     )
 
     assert found.found and found.prediction == "yes"
-    assert 1 <= found.n_changed <= 2
+    assert 1 <= found.edits <= 2
     assert found.distance > 0
     assert bundle.predict(pandas.DataFrame([found.row]))[0] == "yes"
 
@@ -136,7 +136,7 @@ def test_regression_aims_for_a_range():
     frame = people()
     features = frame.drop(columns="approved")
     target = features.income * 2 + (features.city == "north") * 10
-    fitted = preprocessing.build_pipeline(
+    fitted = preprocessing.instantiate(
         PLAN,
         REGISTRY.get("ridge")
         if "ridge" in REGISTRY.adapters

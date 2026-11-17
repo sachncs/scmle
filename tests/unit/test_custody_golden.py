@@ -43,10 +43,10 @@ def classification_frame(rows=1200):
     )
 
 
-def manifest_of(spec, task, frame):
+def inventory(spec, task, frame):
     split = splitters.Splitter(spec, task).split(frame)
-    vault = sealed.Vault(sealed.OpenLog(), process=False)
-    return pipeline.apply_custody(
+    vault = sealed.Vault(sealed.Journal(), process=False)
+    return pipeline.sequester(
         charter=make_charter(min_effect=0.3, k_max=5),
         split=split,
         frame=frame,
@@ -62,7 +62,7 @@ def grouped():
         data=tasks.Dataset(uri="m", target="y", group_column="g"),
         validation=tasks.Validation(strategy="group", seed=5),
     )
-    return manifest_of(spec, tasks.Task.BINARY, classification_frame())
+    return inventory(spec, tasks.Task.BINARY, classification_frame())
 
 
 def temporal():
@@ -70,7 +70,7 @@ def temporal():
         data=tasks.Dataset(uri="m", target="y", time_column="t"),
         validation=tasks.Validation(strategy="temporal", seed=5),
     )
-    return manifest_of(spec, tasks.Task.BINARY, classification_frame())
+    return inventory(spec, tasks.Task.BINARY, classification_frame())
 
 
 def test_the_grouped_manifest_has_its_pinned_hash():

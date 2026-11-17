@@ -123,13 +123,13 @@ def leak_detected(
         the permutation p-value of its skill.
     """
     cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=run_seed)
-    result = leakage.assess_feature(
+    result = leakage.assess(
         feature,
         pandas.DataFrame(index=feature.index),
         outcome,
         "classification",
         cfg,
-        gate=certificates.GateStatus.GATING,
+        gate=certificates.Authority.GATING,
     )
     return result.suspect, result.skill.p_value
 
@@ -328,7 +328,7 @@ def asof_detector(log: pandas.DataFrame) -> certify.Detector:
         Returns:
             A boolean Series with the index of `frame`.
         """
-        return asof.reconstruction_mismatch(
+        return asof.disagree(
             frame, log, "key", "moment", "stored", "written_at", "value"
         )
 
@@ -442,7 +442,7 @@ def gap_detector(frame: pandas.DataFrame) -> pandas.Series:
             f"q{k}", float(extract), float(source), "ledger", steps
         )
         flags.append(
-            reconciliation.reconcile_item(item).status
+            reconciliation.settle(item).status
             is reconciliation.Status.UNEXPLAINED
         )
     return pandas.Series(flags, index=frame.index, dtype=bool)

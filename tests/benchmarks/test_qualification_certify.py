@@ -159,7 +159,7 @@ def test_every_standin_is_certified_with_its_current_code_hash():
         assert store.state(name, digest) is certificates.Freshness.CURRENT
         assert (
             store.status(name, digest, standin.plan.defect_type)
-            is certificates.GateStatus.GATING
+            is certificates.Authority.GATING
         )
         assert standin.code_hash() == standin.code_hash()
 
@@ -169,8 +169,8 @@ def test_editing_a_standin_makes_its_certificate_stale():
     name = "standin-duplicate"
     changed = "f" * 64
     assert store.state(name, changed) is certificates.Freshness.STALE
-    with pytest.raises(certificates.StaleCertificateError):
-        store.mark_gating(name, changed, "duplicate_exact")
+    with pytest.raises(certificates.StaleError):
+        store.authorise(name, changed, "duplicate_exact")
 
 
 def test_the_committed_sample_is_current_for_the_standin_code():

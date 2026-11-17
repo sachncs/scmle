@@ -123,7 +123,7 @@ def test_replacement_waits_for_a_reader_holding_the_path_lock(
         durability.write_atomically(destination, b"new")
         finished.set()
 
-    with durability.path_lock(destination):
+    with durability.latch(destination):
         writer = threading.Thread(target=write)
         writer.start()
         assert not finished.wait(timeout=0.3)

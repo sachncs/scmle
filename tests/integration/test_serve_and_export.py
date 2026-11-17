@@ -227,7 +227,7 @@ def test_an_unsigned_bundle_is_not_served_unless_trusted(saved):
     root = saved[0]
 
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
-        cli.ServeCommand().execute(
+        cli.Serve().execute(
             cli.build_parser().parse_args(["serve", str(root / "bundle")])
         )
 
@@ -269,10 +269,10 @@ def exportable(tmp_path_factory):
         {"a": rng.normal(size=300), "b": rng.normal(size=300)}
     )
     target = (frame.a + frame.b > 0).astype(int)
-    plan = data.FeaturePlan(("a", "b"), ())
-    fitted = preprocessing.build_pipeline(
+    plan = data.Blueprint(("a", "b"), ())
+    fitted = preprocessing.instantiate(
         plan,
-        registry.Catalog.with_builtins().get("logistic_regression"),
+        registry.Catalog.stock().get("logistic_regression"),
         tasks.Task.BINARY,
         0,
     ).fit(frame, target)

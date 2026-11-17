@@ -85,7 +85,7 @@ class Tolerance:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class GoldenSet:
+class Goldens:
     """Reference model, records and declared tolerances.
 
     Attributes:
@@ -136,7 +136,7 @@ class Parity:
         }
 
 
-def load_golden(directory: str | pathlib.Path) -> GoldenSet:
+def goldens(directory: str | pathlib.Path) -> Goldens:
     """Loads the golden files from `directory`.
 
     Args:
@@ -150,7 +150,7 @@ def load_golden(directory: str | pathlib.Path) -> GoldenSet:
     """
     root = pathlib.Path(directory)
     tolerances = read_json(root / "tolerances.json")
-    return GoldenSet(
+    return Goldens(
         spec=read_json(root / "model_spec.json"),
         records=read_json(root / "records.json")["records"],
         same_process=Tolerance(**tolerances["same_process"]),
@@ -182,7 +182,7 @@ def to_object(frame: Any) -> Any:
     return pandas.DataFrame(frame).astype(object)
 
 
-def reference_bundle(spec: dict[str, Any]) -> bundle.Bundle:
+def handwrite(spec: dict[str, Any]) -> bundle.Bundle:
     """Builds the hand-written model as a bundle.
 
     The pipeline has the structure of a trained one (median imputation,
@@ -272,7 +272,7 @@ def reference_bundle(spec: dict[str, Any]) -> bundle.Bundle:
     model.coef_ = numpy.array([weights])
     model.intercept_ = numpy.array([spec["intercept"]])
     model.classes_ = numpy.array(spec["classes"])
-    plan = data.FeaturePlan(tuple(numeric), tuple(categorical))
+    plan = data.Blueprint(tuple(numeric), tuple(categorical))
     return bundle.Bundle.create(
         pipeline,
         plan,
@@ -285,7 +285,7 @@ def reference_bundle(spec: dict[str, Any]) -> bundle.Bundle:
     )
 
 
-def expected_outputs(
+def expect(
     spec: dict[str, Any], records: list[dict[str, Any]]
 ) -> dict[str, Any]:
     """Computes labels and probabilities in closed form with numpy only.
@@ -330,7 +330,7 @@ def compare(
     """Compares a serving path's outputs with the expected ones.
 
     Args:
-        expected: Output of `expected_outputs`.
+        expected: Output of `expect`.
         predictions: Labels returned by the serving path.
         probabilities: Class probabilities per record, with class 1 in
             column 1.
@@ -370,7 +370,7 @@ def compare(
     )
 
 
-def check_remote(
+def crosscheck(
     url: str,
     directory: str | pathlib.Path,
     level: str = "cross_environment",
@@ -403,7 +403,7 @@ def check_remote(
     if urllib.parse.urlsplit(url).scheme not in REMOTE_URL_SCHEMES:
         raise errors.InputError(f"url must use http or https, got {url!r}")
     root = pathlib.Path(directory)
-    golden = load_golden(root)
+    golden = goldens(root)
     expected = read_json(root / "expected.json")
     request = urllib.request.Request(  # noqa: S310 -- scheme checked above
         url.rstrip("/") + "/predict",

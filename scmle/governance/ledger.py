@@ -107,7 +107,7 @@ def compose(
         set(fit) | set(validate) <= positions
         for fit, validate in manifest.folds
     )
-    evaluated = [t for t in trials if t.status is experiments.TrialStatus.OK]
+    evaluated = [t for t in trials if t.status is experiments.Termination.OK]
     observed = observed_access(split, evaluated)
     return {
         "partitions": {

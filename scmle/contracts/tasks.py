@@ -85,7 +85,7 @@ can train a model.
 """
 
 
-def horizon_names(value: str, horizon: int) -> list[str]:
+def horizons(value: str, horizon: int) -> list[str]:
     """Returns the future-value target names `<value>__h1 .. <value>__h<H>`.
 
     Args:
@@ -154,7 +154,7 @@ class Schema(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra="forbid", frozen=True)
 
 
-class FeatureNode(Schema):
+class Node(Schema):
     """One derived feature: `name = op(inputs; params)`.
 
     Attributes:
@@ -171,7 +171,7 @@ class FeatureNode(Schema):
     params: dict[str, Any] = pydantic.Field(default_factory=dict)
 
 
-class FeatureGraph(Schema):
+class Derivation(Schema):
     """An ordered set of derived features.
 
     Nodes are listed in dependency order: a node may only use raw columns and
@@ -185,7 +185,7 @@ class FeatureGraph(Schema):
     """
 
     version: int = GRAPH_VERSION
-    nodes: list[FeatureNode] = pydantic.Field(default_factory=list)
+    nodes: list[Node] = pydantic.Field(default_factory=list)
 
     @pydantic.model_validator(mode="after")
     def verify(self) -> Self:
@@ -630,7 +630,7 @@ class Config(Schema):
     search: Search = pydantic.Field(default_factory=Search)
     strategies: Strategies = pydantic.Field(default_factory=Strategies)
     models: Candidates = pydantic.Field(default_factory=Candidates)
-    feature_graph: FeatureGraph = pydantic.Field(default_factory=FeatureGraph)
+    feature_graph: Derivation = pydantic.Field(default_factory=Derivation)
     ensemble: Stacking = pydantic.Field(default_factory=Stacking)
     selection: Selection = pydantic.Field(default_factory=Selection)
     decision: Threshold = pydantic.Field(default_factory=Threshold)
@@ -680,7 +680,7 @@ class Config(Schema):
         graph = values.get("feature_graph")
         graph_record = (
             graph.model_dump()
-            if isinstance(graph, FeatureGraph)
+            if isinstance(graph, Derivation)
             else dict(graph or {})
         )
         nodes = list(graph_record.get("nodes", []))
@@ -731,11 +731,11 @@ class Config(Schema):
         if record.get("value_column") or not record.get("horizon"):
             return values
         value, horizon = record["target"], int(record["horizon"])
-        names = horizon_names(value, horizon)
+        names = horizons(value, horizon)
         graph = values.get("feature_graph")
         graph_record = (
             graph.model_dump()
-            if isinstance(graph, FeatureGraph)
+            if isinstance(graph, Derivation)
             else dict(graph or {})
         )
         known = list(graph_record.get("nodes", []))
@@ -784,7 +784,7 @@ class Config(Schema):
                 "ranking tasks need data.query_column, and only ranking "
                 "tasks may set it"
             )
-        check_target_column_rules(self)
+        exclusive(self)
         wanted = self.selection.maximize
         if wanted and self.metric and wanted != self.metric:
             raise errors.InputError(
@@ -803,18 +803,18 @@ class Config(Schema):
         return self.metric or self.selection.maximize
 
     @property
-    def fast_budget(self) -> bool:
+    def brief(self) -> bool:
         """Whether the time budget is short enough to shrink the search."""
         return self.resources.time_budget_seconds < FAST_BUDGET_SECONDS
 
-    def effective_search(self) -> Search:
+    def budgeted(self) -> Search:
         """Returns the search settings in force, reduced under a short budget.
 
         Returns:
             The configured search settings; when the time budget is under 300
             seconds, `top_models` is capped at 1 and `configs_per_model` at 3.
         """
-        if not self.fast_budget:
+        if not self.brief:
             return self.search
         return self.search.model_copy(
             update={
@@ -825,14 +825,14 @@ class Config(Schema):
             }
         )
 
-    def effective_strategies(self) -> Strategies:
+    def effective(self) -> Strategies:
         """Returns the strategy settings in force, reduced under a short budget.
 
         Returns:
             The configured strategy settings; when the time budget is under
             300 seconds, `top_models` is capped at 1.
         """
-        if not self.fast_budget:
+        if not self.brief:
             return self.strategies
         return self.strategies.model_copy(
             update={
@@ -1029,7 +1029,7 @@ def check_multi_target_rules(config: Config) -> None:
             raise errors.InputError("data.targets must start with data.target")
 
 
-def check_target_column_rules(config: Config) -> None:
+def exclusive(config: Config) -> None:
     """Checks that the target column is not reused for another role.
 
     Args:

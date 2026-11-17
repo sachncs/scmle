@@ -8,7 +8,7 @@ fixed before exploration and every kept feature is registered in the ledger
 as a `synthesized` hypothesis, so the multiplicity the ledger corrects for
 is the multiplicity that exists.
 
-This module never touches a table. It receives `AsOfView` objects and asks
+This module never touches a table. It receives `View` objects and asks
 them for the rows visible at each target row's cutoff; `tests` hold it to
 that by checking its imports. Label-free filters (constant, mostly missing,
 duplicate of an earlier feature) run first; they use no labels, and nothing
@@ -79,7 +79,7 @@ class Source:
             lookup of the latest visible version).
     """
 
-    view: asof_view.AsOfView
+    view: asof_view.View
     target_key: str
     role: str = CHILD
 
@@ -104,7 +104,7 @@ class Nest:
     """
 
     mid: Source
-    leaf: asof_view.AsOfView
+    leaf: asof_view.View
     mid_id: str
 
 
@@ -147,7 +147,7 @@ class Feature:
         return f"{self.primitive}({self.value or '*'}) over {window}"
 
 
-def window_label(window: float | None) -> str:
+def caption(window: float | None) -> str:
     """Writes a window as text for feature names.
 
     Args:
@@ -193,7 +193,7 @@ def sift(source: Source) -> tuple[list[str], list[str]]:
     return numeric, other
 
 
-def aggregate_features(
+def roll(
     index: int,
     table: str,
     numeric: Sequence[str],
@@ -215,7 +215,7 @@ def aggregate_features(
     """
     specs: list[Feature] = []
     for window in windows:
-        label = window_label(window)
+        label = caption(window)
         specs.extend(
             Feature(
                 f"{table}__{primitive}__{label}",
@@ -276,7 +276,7 @@ def nested_features(
         numeric, others = sift(leaf)
         del others
         for window in windows:
-            label = window_label(window)
+            label = caption(window)
             for inner in NESTED_INNER:
                 for outer in NESTED_OUTER:
                     picks: list[str | None] = (
@@ -333,12 +333,12 @@ def propose(
                 for column in (*numeric, *other)
             )
             continue
-        specs.extend(aggregate_features(index, table, numeric, other, windows))
+        specs.extend(roll(index, table, numeric, other, windows))
     specs.extend(nested_features(sources, nests, windows))
     return specs
 
 
-def target_frame(
+def outcomes(
     targets: pandas.DataFrame, key: str, moment: str, lag_days: float, view: Any
 ) -> pandas.DataFrame:
     """Builds the target frame a view is asked about.
@@ -364,7 +364,7 @@ def target_frame(
     )
 
 
-def reduce_rows(
+def fold(
     rows: pandas.DataFrame,
     primitive: str,
     value: str | None,
@@ -517,12 +517,10 @@ def evaluate(
     source = sources[spec.source]
     view = source.view
     count = len(targets)
-    asked = target_frame(targets, source.target_key, moment, lag_days, view)
+    asked = outcomes(targets, source.target_key, moment, lag_days, view)
     rows = view.visible(asked)
     if spec.kind in ("aggregate", "lookup"):
-        return reduce_rows(
-            rows, spec.primitive, spec.value, spec.window_days, count
-        )
+        return fold(rows, spec.primitive, spec.value, spec.window_days, count)
     if spec.nest is None or spec.inner is None:
         raise errors.ScmleError("nested feature lacks nest or inner")
     nest = nests[spec.nest]
@@ -540,15 +538,13 @@ def evaluate(
         }
     )
     leaves = nest.leaf.visible(pair_targets)
-    inner = reduce_rows(
-        leaves, spec.inner, spec.value, spec.window_days, len(pairs)
-    )
+    inner = fold(leaves, spec.inner, spec.value, spec.window_days, len(pairs))
     outer_rows = pairs.assign(inner_value=inner.to_numpy())
-    return reduce_rows(outer_rows, spec.primitive, "inner_value", None, count)
+    return fold(outer_rows, spec.primitive, "inner_value", None, count)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FeatureSet:
+class Selection:
     """Kept features, the manifest, and the declared family size.
 
     Attributes:
@@ -612,7 +608,7 @@ def synthesize(
     max_features: int = 200,
     max_null_rate: float = 0.95,
     strict: bool = False,
-) -> FeatureSet:
+) -> Selection:
     """Builds the feature family for `targets` through the as-of views.
 
     Args:
@@ -689,13 +685,13 @@ def synthesize(
         record["kept"] = True
         columns[spec.name] = values
     frame = pandas.DataFrame(columns, index=targets.index)
-    return FeatureSet(frame, tuple(manifest), len(columns))
+    return Selection(frame, tuple(manifest), len(columns))
 
 
-def feature_provenance(
-    features: FeatureSet,
+def lineage(
+    features: Selection,
     lag_days: float,
-    views: Sequence[asof_view.AsOfView],
+    views: Sequence[asof_view.View],
     today: datetime.date | None = None,
 ) -> provenance.Dictionary:
     """Builds the provenance table of the kept features.
@@ -725,25 +721,23 @@ def feature_provenance(
         history = (f"{entry['expression']}; {entry['cutoff_rule']}",)
         attestation = rule.attestation
         if tier is qualification.Tier.CONFIRMED:
-            as_of = provenance.AsOf(
-                provenance.AsOfKind.TIMESTAMP, lag_days * 86_400.0
+            as_of = provenance.Lead(
+                provenance.Cutoff.TIMESTAMP, lag_days * 86_400.0
             )
-            source = provenance.AsOfSource.LOG
+            source = provenance.Provenance.LOG
         elif tier is qualification.Tier.ATTESTED:
-            as_of = provenance.AsOf(
-                provenance.AsOfKind.LAG, lag_days * 86_400.0
-            )
-            source = provenance.AsOfSource.ATTESTED
+            as_of = provenance.Lead(provenance.Cutoff.LAG, lag_days * 86_400.0)
+            source = provenance.Provenance.ATTESTED
         else:
-            as_of = provenance.AsOf.unknown()
-            source = provenance.AsOfSource.NONE
+            as_of = provenance.Lead.unknown()
+            source = provenance.Provenance.NONE
             attestation = None
         records.append(
             provenance.FieldProvenance(
                 name=entry["name"],
                 origin=provenance.Origin.DERIVED,
                 writer="scmle.data.ingest.synthesize",
-                written_at=provenance.WrittenAt.UNKNOWN,
+                written_at=provenance.Stamp.UNKNOWN,
                 overwritten=provenance.Overwritten.NEVER,
                 definition_history=history,
                 as_of=as_of,
@@ -758,8 +752,8 @@ def feature_provenance(
     return provenance.Dictionary(tuple(records))
 
 
-def register_family(
-    ledger: scmle.data.ledger.ledger.Ledger, features: FeatureSet
+def enlist(
+    ledger: scmle.data.ledger.ledger.Ledger, features: Selection
 ) -> list[scmle.data.ledger.ledger.Hypothesis]:
     """Registers every kept feature as a `synthesized` hypothesis.
 

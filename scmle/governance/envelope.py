@@ -7,14 +7,14 @@ step in between does: training a challenger, which spends compute and puts a
 new candidate in front of the promotion process. An *envelope* is how a person
 authorises that step ahead of time:
 
-    guard = EnvelopeGuard(ledger, verification_keys={key_id: key})
+    guard = Guard(ledger, verification_keys={key_id: key})
     guard.grant(Envelope.create(key, envelope_id="e1", limits={...}, ...))
-    guard.authorize(EnvelopeAction.TRAIN_CHALLENGER, scope, {"batch": 7})
+    guard.authorize(Action.TRAIN_CHALLENGER, scope, {"batch": 7})
     guard.revoke("e1", "model retired")
 
 What an envelope can and cannot do:
 
-* It can cover only the actions in `EnvelopeAction`. An action on the never
+* It can cover only the actions in `Action`. An action on the never
   list cannot be put in one; `Envelope` refuses it when it is built and the
   ledger refuses it when it is read. Promotion and rollback stay behind the
   registry's signed approval and the never-list guard, one person's approval
@@ -44,13 +44,13 @@ from scmle.governance import deployment_ledger
 from scmle.governance import never_list
 
 
-class EnvelopeAction(enum.StrEnum):
+class Action(enum.StrEnum):
     """The actions an envelope can authorise."""
 
     TRAIN_CHALLENGER = "train_challenger"
 
 
-class EnvelopeRefused(errors.ArtifactError):
+class RefusedError(errors.ArtifactError):
     """No envelope allows the requested action."""
 
     def __init__(self, action: str, reason: str) -> None:
@@ -65,7 +65,7 @@ class EnvelopeRefused(errors.ArtifactError):
         self.reason = reason
 
 
-class EnvelopeGuard:
+class Guard:
     """Grants, revokes and spends envelopes in the deployment ledger."""
 
     def __init__(
@@ -115,7 +115,7 @@ class EnvelopeGuard:
         """Writes a person's signed envelope to the ledger.
 
         The ledger refuses a taken identifier or a key the system holds (with
-        a `DeploymentLedgerError`).
+        a `MisuseError`).
 
         Args:
             envelope: The signed envelope.
@@ -124,12 +124,12 @@ class EnvelopeGuard:
             The ledger row that was written.
 
         Raises:
-            EnvelopeRefused: If verification keys were supplied and the
+            RefusedError: If verification keys were supplied and the
                 envelope's key id is not among them or its signature does not
                 verify.
         """
         if not self.verifies(envelope):
-            raise EnvelopeRefused(
+            raise RefusedError(
                 "grant", "the signature does not verify under a known key"
             )
         row = self.ledger.commit(deployment_ledger.ENVELOPE, envelope.to_dict())
@@ -140,7 +140,7 @@ class EnvelopeGuard:
         """Removes an envelope's authority.
 
         The ledger refuses an unknown or already revoked envelope (with a
-        `DeploymentLedgerError`); no signature is required.
+        `MisuseError`); no signature is required.
 
         Args:
             envelope_id: Identifier of the envelope.
@@ -225,7 +225,7 @@ class EnvelopeGuard:
 
     def authorize(
         self,
-        action: EnvelopeAction,
+        action: Action,
         scope: str,
         detail: Mapping[str, Any] | None = None,
     ) -> str:
@@ -243,11 +243,11 @@ class EnvelopeGuard:
             The id of the envelope that was used.
 
         Raises:
-            EnvelopeRefused: If the action is on the never list or no
+            RefusedError: If the action is on the never list or no
                 envelope allows it; nothing is written.
         """
-        if action.value in {item.value for item in never_list.NeverAction}:
-            raise EnvelopeRefused(action.value, "it is on the never list")
+        if action.value in {item.value for item in never_list.Forbidden}:
+            raise RefusedError(action.value, "it is on the never list")
         reasons = []
         for identity, grant in self.ledger.envelopes.items():
             reason = self.refusal(identity, grant, action.value, scope)
@@ -265,6 +265,6 @@ class EnvelopeGuard:
                 self.wrote()
                 return identity
             reasons.append(f"{identity}: {reason}")
-        raise EnvelopeRefused(
+        raise RefusedError(
             action.value, "; ".join(reasons) or "no envelope was granted"
         )

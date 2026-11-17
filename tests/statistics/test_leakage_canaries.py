@@ -90,7 +90,7 @@ def test_the_pipeline_blocks_a_target_copy_stored_as_text(
     result = support.make_project(
         leaky, "y", output_dir=tmp_path / "warn", leakage_policy="warn"
     ).run()
-    assert "label_text" in result.profile.blocking_leaks
+    assert "label_text" in result.profile.blockers
     with pytest.raises(errors.BlockedError, match="leakage") as raised:
         support.make_project(
             leaky, "y", output_dir=tmp_path / "block", leakage_policy="block"

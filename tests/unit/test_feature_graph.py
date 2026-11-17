@@ -13,9 +13,7 @@ from scmle.features import feature_graph
 
 
 def node(name, op, inputs, **params):
-    return tasks.FeatureNode(
-        name=name, op=op, inputs=list(inputs), params=params
-    )
+    return tasks.Node(name=name, op=op, inputs=list(inputs), params=params)
 
 
 def data_spec(**kwargs):
@@ -23,7 +21,7 @@ def data_spec(**kwargs):
 
 
 def transform(nodes, frame, fit_frame=None):
-    transformer = feature_graph.FeatureGraphTransformer(tuple(nodes))
+    transformer = feature_graph.Transformer(tuple(nodes))
     transformer.fit(frame if fit_frame is None else fit_frame)
     return transformer.transform(frame)
 
@@ -60,7 +58,7 @@ def test_rowwise_ops_compute_expected_values():
 def test_fitted_ops_learn_from_the_training_fold_only():
     train = pandas.DataFrame({"x": numpy.arange(100.0)})
     later = pandas.DataFrame({"x": [1000.0, -1000.0, 50.0]})
-    transformer = feature_graph.FeatureGraphTransformer(
+    transformer = feature_graph.Transformer(
         (
             node("clipped", "clip", ["x"], lower=0.1, upper=0.9),
             node("z", "standardize", ["x"]),
@@ -117,9 +115,7 @@ def test_nodes_can_depend_on_earlier_nodes():
 
 
 def test_transformer_is_a_well_behaved_estimator():
-    transformer = feature_graph.FeatureGraphTransformer(
-        (node("l", "log1p", ["a"]),)
-    )
+    transformer = feature_graph.Transformer((node("l", "log1p", ["a"]),))
     twin = base.clone(transformer)
     assert twin.nodes == transformer.nodes and not hasattr(twin, "states_")
     fitted = transformer.fit(pandas.DataFrame({"a": [1.0, 2.0]}))
@@ -143,7 +139,7 @@ def series_frame():
 
 
 def build_series(nodes, frame):
-    return feature_graph.SeriesFeatureBuilder(nodes, "grp", "t").apply(frame)
+    return feature_graph.Temporal(nodes, "grp", "t").apply(frame)
 
 
 def test_series_features_are_computed_per_group_in_time_order():
@@ -214,7 +210,7 @@ def test_series_without_groups_forms_one_series():
             "v": [1.0, 2.0, 4.0, 8.0],
         }
     )
-    result = feature_graph.SeriesFeatureBuilder(
+    result = feature_graph.Temporal(
         [node("prev", "lag", ["v"])], None, "t"
     ).apply(frame)
     assert numpy.isnan(result["prev"].iloc[0]) and result["prev"].tolist()[
@@ -242,7 +238,7 @@ def test_validation_rejects_bad_graphs():
 
     def check(nodes, **data):
         feature_graph.validate_graph(
-            tasks.FeatureGraph(nodes=nodes), available, data_spec(**data)
+            tasks.Derivation(nodes=nodes), available, data_spec(**data)
         )
 
     check([node("s", "sum", ["a", "b"])])
@@ -275,23 +271,23 @@ def test_validation_rejects_bad_graphs():
 
 def test_spec_rejects_cycles_duplicates_and_forward_references():
     with pytest.raises(ValueError, match="unique"):
-        tasks.FeatureGraph(
+        tasks.Derivation(
             nodes=[node("a", "abs", ["x"]), node("a", "abs", ["x"])]
         )
     with pytest.raises(ValueError, match="defined later"):
-        tasks.FeatureGraph(
+        tasks.Derivation(
             nodes=[node("a", "abs", ["b"]), node("b", "abs", ["x"])]
         )
     with pytest.raises(ValueError, match="itself"):
-        tasks.FeatureGraph(nodes=[node("a", "abs", ["a"])])
+        tasks.Derivation(nodes=[node("a", "abs", ["a"])])
     with pytest.raises(ValueError, match="no inputs"):
-        tasks.FeatureGraph(nodes=[node("a", "abs", [])])
+        tasks.Derivation(nodes=[node("a", "abs", [])])
 
 
 def test_graph_is_versioned_and_fingerprinted():
-    one = tasks.FeatureGraph(nodes=[node("a", "log1p", ["x"])])
-    same = tasks.FeatureGraph(nodes=[node("a", "log1p", ["x"])])
-    other = tasks.FeatureGraph(nodes=[node("a", "sqrt", ["x"])])
+    one = tasks.Derivation(nodes=[node("a", "log1p", ["x"])])
+    same = tasks.Derivation(nodes=[node("a", "log1p", ["x"])])
+    other = tasks.Derivation(nodes=[node("a", "sqrt", ["x"])])
     assert one.fingerprint() == same.fingerprint() != other.fingerprint()
     spec = tasks.Config(data=data_spec(), feature_graph=one)
     plain = tasks.Config(data=data_spec())

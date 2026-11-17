@@ -10,12 +10,12 @@ from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 import scmle.models.registry
 
-PLAN = data.FeaturePlan(("num", "flag"), ("cat",))
+PLAN = data.Blueprint(("num", "flag"), ("cat",))
 
 
 @pytest.fixture(scope="module")
 def registry():
-    return scmle.models.registry.Catalog.with_builtins()
+    return scmle.models.registry.Catalog.stock()
 
 
 def make_frame(rows=200, seed=0):
@@ -39,7 +39,7 @@ def make_frame(rows=200, seed=0):
 )
 def test_handles_missing_bool_and_categoricals(registry, name):
     features, target = make_frame()
-    pipe = preprocessing.build_pipeline(
+    pipe = preprocessing.instantiate(
         PLAN, registry.get(name), tasks.Task.BINARY, 0
     )
     pipe.fit(features, target)
@@ -48,7 +48,7 @@ def test_handles_missing_bool_and_categoricals(registry, name):
 
 def test_unknown_category_and_extra_columns_at_inference(registry):
     features, target = make_frame()
-    pipe = preprocessing.build_pipeline(
+    pipe = preprocessing.instantiate(
         PLAN, registry.get("logistic_regression"), tasks.Task.BINARY, 0
     ).fit(features, target)
     unseen = features.head(5).assign(cat="never_seen", junk="x")
@@ -57,7 +57,7 @@ def test_unknown_category_and_extra_columns_at_inference(registry):
 
 def test_statistics_come_from_training_rows_only(registry):
     features, target = make_frame()
-    pipe = preprocessing.build_pipeline(
+    pipe = preprocessing.instantiate(
         PLAN, registry.get("logistic_regression"), tasks.Task.BINARY, 0
     )
     pipe.fit(features.iloc[:100], target.iloc[:100])
@@ -72,10 +72,10 @@ def test_statistics_come_from_training_rows_only(registry):
 
 
 def test_scaling_follows_adapter_capability(registry):
-    linear = preprocessing.build_pipeline(
+    linear = preprocessing.instantiate(
         PLAN, registry.get("logistic_regression"), tasks.Task.BINARY, 0
     )
-    forest = preprocessing.build_pipeline(
+    forest = preprocessing.instantiate(
         PLAN, registry.get("random_forest"), tasks.Task.BINARY, 0
     )
     assert "scale" in linear.named_steps["prep"].transformers[0][1].named_steps
@@ -86,7 +86,7 @@ def test_scaling_follows_adapter_capability(registry):
 
 def test_clone_is_unfitted_and_refit_is_deterministic(registry):
     features, target = make_frame()
-    fitted = preprocessing.build_pipeline(
+    fitted = preprocessing.instantiate(
         PLAN, registry.get("random_forest"), tasks.Task.BINARY, 3
     ).fit(features, target)
     twin = base.clone(fitted)
@@ -98,9 +98,9 @@ def test_clone_is_unfitted_and_refit_is_deterministic(registry):
 
 
 def test_plan_without_numeric_columns(registry):
-    plan = data.FeaturePlan((), ("cat",))
+    plan = data.Blueprint((), ("cat",))
     features, target = make_frame()
-    pipe = preprocessing.build_pipeline(
+    pipe = preprocessing.instantiate(
         plan, registry.get("dummy"), tasks.Task.BINARY, 0
     )
     assert pipe.fit(features, target).predict(features).shape == (200,)

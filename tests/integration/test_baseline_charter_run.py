@@ -41,12 +41,12 @@ def frame(seed=0, rows=1100, groups=140, selective=False):
 
 
 def charter_file(tmp_path, sources=None):
-    kinds = sources or (costs.CostSource.HUMAN,) * 4
-    model = costs.DecisionCostModel(
-        0.0, 1.0, 1.0, 0.0, 0.35, 0.5, kinds, costs.CostSource.HUMAN
+    kinds = sources or (costs.Basis.HUMAN,) * 4
+    model = costs.Tariff(
+        0.0, 1.0, 1.0, 0.0, 0.35, 0.5, kinds, costs.Basis.HUMAN
     )
     path = tmp_path / "charter.json"
-    sealing.write_charter(
+    sealing.inscribe(
         path,
         make_charter(min_effect=0.5, k_max=3, cost_model=model),
         signing_key=KEY,
@@ -103,7 +103,7 @@ def test_the_current_decision_is_never_a_model_feature(tmp_path):
 
 
 def test_costs_from_data_cap_the_claim_at_unverified(tmp_path):
-    kinds = (costs.CostSource.DATA,) * 4
+    kinds = (costs.Basis.DATA,) * 4
     result = run(frame(), tmp_path, charter_file(tmp_path, kinds))
 
     report = read(result, "baseline_report.json")
@@ -129,7 +129,7 @@ def test_selective_labels_on_x_stop_the_comparison(tmp_path):
 
 def test_the_column_needs_a_cost_model(tmp_path):
     path = tmp_path / "charter.json"
-    sealing.write_charter(
+    sealing.inscribe(
         path, make_charter(min_effect=0.5, k_max=3), signing_key=KEY
     )
     with pytest.raises(errors.ConfigError, match="cost_model"):
@@ -154,7 +154,7 @@ def test_a_charter_run_without_the_column_is_unchanged(tmp_path):
 def test_claims_lists_and_verifies_the_registered_claim(tmp_path, capsys):
     result = run(frame(), tmp_path, charter_file(tmp_path))
 
-    rows = claims_audit.list_claims(result.run_dir)
+    rows = claims_audit.inventory(result.run_dir)
     registered = [r for r in rows if r.get("kind") == "baseline"]
     assert len(registered) == 1
     assert registered[0]["status"] in {"issued", "not_shown"}

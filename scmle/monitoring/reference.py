@@ -24,9 +24,7 @@ EPSILON = 1e-4
 NOISE_TAIL = 1.5
 
 
-def population_stability_index(
-    expected: numpy.ndarray, actual: numpy.ndarray
-) -> float:
+def divergence(expected: numpy.ndarray, actual: numpy.ndarray) -> float:
     """Computes PSI between two discrete distributions.
 
     Args:
@@ -93,9 +91,7 @@ class Reference(abc.ABC):
         Returns:
             The population stability index, without the noise floor removed.
         """
-        return population_stability_index(
-            self.expected(), self.proportions(values)
-        )
+        return divergence(self.expected(), self.proportions(values))
 
     def noise_floor(self, new_rows: int) -> float:
         """Estimates the PSI level that sampling noise alone produces.
@@ -117,7 +113,7 @@ class Reference(abc.ABC):
         bins = len(self.expected())
         return NOISE_TAIL * (bins - 1) * (1.0 / self.rows + 1.0 / new_rows)
 
-    def adjusted_psi(self, values: pandas.Series) -> float:
+    def adjust(self, values: pandas.Series) -> float:
         """Computes PSI minus its sampling-noise floor, never below zero.
 
         Args:
@@ -146,7 +142,7 @@ class Reference(abc.ABC):
 
 
 @dataclasses.dataclass(frozen=True)
-class NumericReference(Reference):
+class Deciles(Reference):
     """Decile-binned numeric distribution.
 
     Attributes:
@@ -169,7 +165,7 @@ class NumericReference(Reference):
             The reference, with the unique decile edges and the share of values
             in each bin.
         """
-        numeric = columns.to_finite(values)
+        numeric = columns.scrub(values)
         present = numeric.dropna().to_numpy(dtype=float)
         edges = (
             tuple(numpy.unique(numpy.quantile(present, DECILES)))
@@ -323,7 +319,7 @@ class CategoricalReference(Reference):
 
 
 REFERENCE_KINDS: dict[str, type[Reference]] = {
-    cls.kind: cls for cls in (NumericReference, CategoricalReference)
+    cls.kind: cls for cls in (Deciles, CategoricalReference)
 }
 
 
@@ -339,7 +335,7 @@ def rebuild(record: dict[str, Any]) -> Reference:
     """
     kind = record["kind"]
     if kind == "numeric":
-        return NumericReference(
+        return Deciles(
             record["missing_rate"],
             record["rows"],
             tuple(record["edges"]),
@@ -351,7 +347,7 @@ def rebuild(record: dict[str, Any]) -> Reference:
 
 
 @dataclasses.dataclass(frozen=True)
-class ReferenceProfile:
+class Baseline:
     """Reference distributions of every feature and of the model's output.
 
     Attributes:
@@ -370,7 +366,7 @@ class ReferenceProfile:
     def build(
         cls,
         features: pandas.DataFrame,
-        plan: data.FeaturePlan,
+        plan: data.Blueprint,
         output: pandas.Series,
         output_name: str,
         reference_metrics: dict[str, float],
@@ -393,13 +389,13 @@ class ReferenceProfile:
         references: dict[str, Reference] = {}
         for column in plan.numeric:
             if column in features.columns:
-                references[column] = NumericReference.fit(features[column])
+                references[column] = Deciles.fit(features[column])
         for column in plan.categorical:
             if column in features.columns:
                 references[column] = CategoricalReference.fit(features[column])
         numeric_output = pandas.api.types.is_numeric_dtype(output)
         output_reference = (
-            NumericReference.fit(output)
+            Deciles.fit(output)
             if numeric_output
             else CategoricalReference.fit(output)
         )

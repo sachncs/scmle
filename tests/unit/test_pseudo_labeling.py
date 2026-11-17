@@ -25,7 +25,7 @@ def test_only_confident_rows_receive_a_label():
     fitted = linear_model.LogisticRegression().fit(features, labels)
     unlabeled = blobs(400, 1)[0]
 
-    rows, given = pseudo_labeling.confident_rows(fitted, unlabeled, 0.95)
+    rows, given = pseudo_labeling.assured(fitted, unlabeled, 0.95)
 
     assert 0 < len(rows) < len(unlabeled)
     assert (fitted.predict_proba(rows).max(axis=1) >= 0.95).all()
@@ -37,7 +37,7 @@ def test_too_few_confident_rows_leave_the_model_unchanged():
     fitted = linear_model.LogisticRegression().fit(features, labels)
     unlabeled = blobs(5, 1)[0]
 
-    model, added = pseudo_labeling.augmented_fit(
+    model, added = pseudo_labeling.selftrain(
         fitted, features, labels, unlabeled, 0.9
     )
 

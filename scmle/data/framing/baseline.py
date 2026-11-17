@@ -58,7 +58,7 @@ class BaselineError(errors.ArtifactError):
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ClusterTest:
+class Clustered:
     """One-sided cluster-robust test of `mean(d) <= 0`.
 
     Attributes:
@@ -99,7 +99,7 @@ def vector(values: ArrayLike, name: str) -> NDArray[numpy.float64]:
     return array
 
 
-def paired_difference(
+def advantage(
     y: ArrayLike, a: ArrayLike, b: ArrayLike, t: float
 ) -> NDArray[numpy.float64]:
     """Computes the per-row gain `d_i(t)` of the model rule over the baseline.
@@ -115,18 +115,18 @@ def paired_difference(
 
     Raises:
         ValueError: If `y`, `a` and `b` differ in length. Values that
-            `costs.binary_vector` or `costs.odds` reject also raise it.
+            `costs.dichotomous` or `costs.odds` reject also raise it.
     """
-    outcomes = costs.binary_vector(y, "y")
-    model = costs.binary_vector(a, "a")
-    base = costs.binary_vector(b, "b")
+    outcomes = costs.dichotomous(y, "y")
+    model = costs.dichotomous(a, "a")
+    base = costs.dichotomous(b, "b")
     if not outcomes.shape == model.shape == base.shape:
         raise errors.InputError("y, a and b must have the same length")
     w = costs.odds(t)
     return (model - base) * (outcomes - (1.0 - outcomes) * w)
 
 
-def cluster_test(d: ArrayLike, clusters: ArrayLike) -> ClusterTest:
+def ttest(d: ArrayLike, clusters: ArrayLike) -> Clustered:
     """One-sided cluster-robust t test that the mean of `d` exceeds zero.
 
     Args:
@@ -165,7 +165,7 @@ def cluster_test(d: ArrayLike, clusters: ArrayLike) -> ClusterTest:
     else:
         statistic = mean / se
         p_value = float(stats.t.sf(statistic, g - 1))
-    return ClusterTest(mean, se, g - 1, statistic, p_value, n, g)
+    return Clustered(mean, se, g - 1, statistic, p_value, n, g)
 
 
 def factorize(clusters: ArrayLike) -> tuple[NDArray[numpy.intp], int]:
@@ -238,7 +238,7 @@ def selective_labels(observed: ArrayLike, b: ArrayLike) -> Selectivity:
             not a non-empty 1-d array of zeros and ones also raises it.
     """
     seen = numpy.asarray(observed).astype(bool)
-    base = costs.binary_vector(b, "b").astype(bool)
+    base = costs.dichotomous(b, "b").astype(bool)
     if seen.shape != base.shape:
         raise errors.InputError("observed and b must have the same length")
     n1, n0 = int(base.sum()), int((~base).sum())
@@ -265,10 +265,10 @@ def selective_labels(observed: ArrayLike, b: ArrayLike) -> Selectivity:
     )
 
 
-def profile_on_exploration(
+def gauge(
     y: ArrayLike,
     b: ArrayLike,
-    model: costs.DecisionCostModel,
+    model: costs.Tariff,
     observed: ArrayLike | None = None,
 ) -> dict[str, Any]:
     """Measures the baseline on `X`: its net benefit against the two defaults.
@@ -350,7 +350,7 @@ class Registration:
 
 
 def register(
-    model: costs.DecisionCostModel,
+    model: costs.Tariff,
     rule: Mapping[str, Any],
     alpha: float,
 ) -> Registration:
@@ -372,11 +372,11 @@ def register(
     if not 0.0 < level < 1.0:
         raise errors.InputError("alpha must be strictly between 0 and 1")
     return Registration(
-        model.model_hash, rule_digest(rule), level, model.t_lo, model.t_hi
+        model.model_hash, fingerprint(rule), level, model.t_lo, model.t_hi
     )
 
 
-def rule_digest(rule: Mapping[str, Any]) -> str:
+def fingerprint(rule: Mapping[str, Any]) -> str:
     """Hashes a rule description, for registering it and for re-checking it.
 
     `register` stores this digest and the evaluation recomputes it, so both
@@ -411,7 +411,7 @@ class Outcome:
     issued: bool
     status: str
     reasons: tuple[str, ...]
-    endpoints: tuple[ClusterTest, ...]
+    endpoints: tuple[Clustered, ...]
     p_value: float | None
     selectivity: Selectivity
     registration_hash: str
@@ -472,7 +472,7 @@ class Evaluator:
         clusters: ArrayLike,
         *,
         rule: Mapping[str, Any],
-        model: costs.DecisionCostModel,
+        model: costs.Tariff,
         observed: ArrayLike | None = None,
         input_tier: qualification.Tier = qualification.Tier.CONFIRMED,
         seed: int = 0,
@@ -505,7 +505,7 @@ class Evaluator:
                 "look at the confirmation set is not allowed"
             )
         if (
-            rule_digest(rule) != self.registration.rule_hash
+            fingerprint(rule) != self.registration.rule_hash
             or model.model_hash != self.registration.cost_model_hash
         ):
             raise BaselineError(
@@ -524,7 +524,7 @@ class Evaluator:
         observed: ArrayLike | None,
         input_tier: qualification.Tier,
         seed: int,
-        model: costs.DecisionCostModel,
+        model: costs.Tariff,
     ) -> Outcome:
         """Computes the report once the call has been authorised.
 
@@ -563,11 +563,11 @@ class Evaluator:
                 f"{n_clusters} clusters is below the measured minimum of "
                 f"{MIN_CLUSTERS} for a calibrated test"
             )
-        endpoints: tuple[ClusterTest, ...] = ()
+        endpoints: tuple[Clustered, ...] = ()
         if not reasons:
             endpoints = tuple(
-                cluster_test(
-                    paired_difference(
+                ttest(
+                    advantage(
                         outcomes[mask],
                         numpy.asarray(a)[mask],
                         numpy.asarray(b)[mask],
@@ -583,12 +583,12 @@ class Evaluator:
 
     def assemble(
         self,
-        endpoints: tuple[ClusterTest, ...],
+        endpoints: tuple[Clustered, ...],
         reasons: list[str],
         selectivity: Selectivity,
         input_tier: qualification.Tier,
         seed: int,
-        model: costs.DecisionCostModel,
+        model: costs.Tariff,
     ) -> Outcome:
         """Builds the checks, the claim and the report.
 
@@ -638,7 +638,7 @@ class Evaluator:
                     if e.p_value <= alpha
                     else qualification.Decision.PASS
                 ),
-                set_id=qualification.SetId.CONFIRMATION,
+                set_id=qualification.Subset.CONFIRMATION,
                 seed_path=(seed, "framing.baseline", index),
                 tier=tier,
             )

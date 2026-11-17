@@ -14,12 +14,12 @@ import scmle.models.registry
 @pytest.mark.parametrize("library", ["lightgbm", "xgboost"])
 def test_adapters_pass_conformance_when_installed(library):
     pytest.importorskip(library)
-    adapter = scmle.models.registry.Catalog.with_builtins().get(library)
-    conformance.check_conformance(adapter)
+    adapter = scmle.models.registry.Catalog.stock().get(library)
+    conformance.comply(adapter)
 
 
 def test_adapters_are_rejected_not_failing_when_library_missing(monkeypatch):
-    registry = scmle.models.registry.Catalog.with_builtins()
+    registry = scmle.models.registry.Catalog.stock()
     monkeypatch.setattr(boosters.XGBOOST, "requires", ("not_installed_pkg",))
     compatible, rejected = registry.candidates(tasks.Task.BINARY)
     assert "missing dependency" in rejected["xgboost"]
@@ -106,7 +106,7 @@ def test_label_encoded_classifier_roundtrips_string_labels():
     rng = numpy.random.default_rng(0)
     features = pandas.DataFrame({"a": rng.normal(size=60)})
     labels = numpy.where(features.a > 0, "pos", "neg")
-    model = wrappers.LabelEncodedClassifier(tree.DecisionTreeClassifier()).fit(
+    model = wrappers.Encoded(tree.DecisionTreeClassifier()).fit(
         features, labels
     )
     assert list(model.classes_) == ["neg", "pos"]
@@ -123,15 +123,15 @@ def test_wrapper_survives_pickling_and_cloning():
 
     from scmle.models import wrappers
 
-    model = wrappers.LabelEncodedClassifier(tree.DecisionTreeClassifier())
+    model = wrappers.Encoded(tree.DecisionTreeClassifier())
     assert base.clone(model).get_params()["estimator"] is not None
     assert pickle.loads(pickle.dumps(model)).estimator is not None
 
 
 def test_catboost_passes_conformance_when_installed():
     pytest.importorskip("catboost")
-    adapter = scmle.models.registry.Catalog.with_builtins().get("catboost")
-    conformance.check_conformance(adapter)
+    adapter = scmle.models.registry.Catalog.stock().get("catboost")
+    conformance.comply(adapter)
 
 
 def test_catboost_handles_string_labels_natively(multiclass_frame, tmp_path):
@@ -190,7 +190,7 @@ def test_catboost_multiclass_predictions_are_one_dimensional(multiclass_frame):
     pytest.importorskip("catboost")
     from scmle.contracts import tasks
 
-    adapter = scmle.models.registry.Catalog.with_builtins().get("catboost")
+    adapter = scmle.models.registry.Catalog.stock().get("catboost")
     estimator = adapter.build(tasks.Task.MULTICLASS, 0, {"iterations": 20})
     features = multiclass_frame.drop(columns="y")
     estimator.fit(features, multiclass_frame["y"])

@@ -41,12 +41,12 @@ class Outcome:
     """
 
     split: splitters.Split
-    view: sealed.ExplorationView
+    view: sealed.View
     manifest: scmle.data.custody.manifest.Manifest
     feasibility: feasibility.Feasibility
 
 
-def minority_rows(labels: numpy.ndarray | None, fraction: float) -> int | None:
+def scarce(labels: numpy.ndarray | None, fraction: float) -> int | None:
     """Estimates the minority-class rows in `C`.
 
     Args:
@@ -90,7 +90,7 @@ def assess(
     )
 
 
-def classes_complete(
+def complete(
     labels: numpy.ndarray | None, carved: carve.Carve, dev_ids: numpy.ndarray
 ) -> bool:
     """Checks that `C` holds every class that `X` holds.
@@ -137,7 +137,7 @@ def forgo(
     )
 
 
-def measured_embargo(
+def gap(
     frame: pandas.DataFrame,
     dev_ids: numpy.ndarray,
     data: tasks.Dataset,
@@ -170,10 +170,10 @@ def measured_embargo(
     ordered = values[numpy.argsort(times, kind="stable")]
     if numpy.isnan(ordered).any():
         return 0
-    return carve.acf_embargo(ordered)
+    return carve.acf(ordered)
 
 
-def apply_custody(
+def sequester(
     *,
     charter: contracts.AnalysisCharter,
     split: splitters.Split,
@@ -225,7 +225,7 @@ def apply_custody(
         else None
     )
     embargo_rows = charter.sets.embargo_rows
-    measured = measured_embargo(frame, dev_ids, data, times, task)
+    measured = gap(frame, dev_ids, data, times, task)
     acf_note = None
     if measured > embargo_rows:
         acf_note = (
@@ -239,13 +239,13 @@ def apply_custody(
     estimate = assess(
         charter,
         round(fraction * len(dev_ids)),
-        minority_rows(labels, fraction),
+        scarce(labels, fraction),
     )
     if estimate.verdict is feasibility.Verdict.INFEASIBLE:
         carved = forgo(dev_ids, folds, estimate.reason)
     else:
         try:
-            carved = carve.carve_confirmation(
+            carved = carve.divide(
                 dev_ids,
                 folds,
                 fraction=fraction,
@@ -267,7 +267,7 @@ def apply_custody(
             carved = forgo(
                 dev_ids, folds, f"confirmation set not carved: {refusal}"
             )
-        if len(carved.confirmation_ids) and not classes_complete(
+        if len(carved.confirmation_ids) and not complete(
             labels, carved, dev_ids
         ):
             carved = forgo(
@@ -276,9 +276,7 @@ def apply_custody(
     actual = assess(
         charter,
         len(carved.confirmation_ids),
-        minority_rows(labels, fraction)
-        if len(carved.confirmation_ids)
-        else None,
+        scarce(labels, fraction) if len(carved.confirmation_ids) else None,
     )
     if actual.verdict is feasibility.Verdict.INFEASIBLE and len(
         carved.confirmation_ids
@@ -383,7 +381,7 @@ def finish(
         scope=report.scope,
         notes=notes,
         row_roots=tuple(
-            (name, merkle.frame_root(frame, members))
+            (name, merkle.merkleize(frame, members))
             for name, members in (
                 ("exploration", exploration),
                 ("confirmation", confirmation),
@@ -397,7 +395,7 @@ def finish(
         split.dev_target.iloc[keep].reset_index(drop=True),
         split.locked_test,
     )
-    view = sealed.ExplorationView(
+    view = sealed.View(
         features=result.dev_features,
         target=result.dev_target,
         ids=exploration,

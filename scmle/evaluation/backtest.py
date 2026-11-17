@@ -87,7 +87,7 @@ def report(
         `model_mae`, `last_value_mae` and `seasonal_naive_mae` (None when
         `seasonal` is None).
     """
-    truth = forecast.truth_matrix(estimator, features, primary)
+    truth = forecast.actuals(estimator, features, primary)
     steps = truth.shape[1]
     model = score(
         truth, numpy.asarray(estimator.predict(features), dtype=float)

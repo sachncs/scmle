@@ -71,5 +71,5 @@ class ClassifierPredictions(base.ClassifierMixin, Replay):  # type: ignore[misc]
     """Stored predictions that scikit-learn treats as a classifier."""
 
 
-class RegressorPredictions(base.RegressorMixin, Replay):  # type: ignore[misc]  # scikit-learn is untyped
+class Replayed(base.RegressorMixin, Replay):  # type: ignore[misc]  # scikit-learn is untyped
     """Stored predictions that scikit-learn treats as a regressor."""

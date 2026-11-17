@@ -677,7 +677,7 @@ def main():
     bundle = scmle.artifacts.bundle.Bundle.load(
         "artifacts/titanic", signing_key="demo-key-change-me"
     )
-    watcher = monitor.ModelMonitor(bundle)
+    watcher = monitor.Watcher(bundle)
 
     batch = data.sample(300, random_state=0)
     report = watcher.assess(batch.drop(columns=["survived"]), batch["survived"])
@@ -795,13 +795,13 @@ from scmle.governance import registry
 KEY = "demo-key-change-me"
 
 
-def approval_for(record, why):
-    return registry.PromotionApproval(
+def sanction(record, why):
+    return registry.Sanction(
         model="titanic",
         version=record.version,
         content_id=record.content_id,
         reviewer="you@example.com",
-        decision=registry.PromotionDecision.APPROVED,
+        decision=registry.Verdict.APPROVED,
         reason=why,
         evidence=("runs/report.html",),
         approved_at="2026-11-05T00:00:00+00:00",
@@ -820,19 +820,19 @@ def main():
     store.promote(
         "titanic",
         1,
-        approval=approval_for(v1, "first release"),
+        approval=sanction(v1, "first release"),
         signing_key=KEY,
     )
     print("after promoting v1:", store.aliases("titanic"))
     store.promote(
         "titanic",
         2,
-        approval=approval_for(v2, "second release"),
+        approval=sanction(v2, "second release"),
         signing_key=KEY,
     )
     print("after promoting v2:", store.aliases("titanic"))
     previous = store.resolve("titanic", "previous")
-    note = approval_for(previous, "roll back: v2 is worse")
+    note = sanction(previous, "roll back: v2 is worse")
     store.promote("titanic", previous.version, approval=note, signing_key=KEY)
     print("after rolling back:", store.aliases("titanic"))
 

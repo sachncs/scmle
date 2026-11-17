@@ -12,7 +12,7 @@ Built once from the locked test set after the frozen rule exists, inside
   positive class. Without both columns the file says `not_assessable`; no
   propensity is ever estimated here.
 * the fairness satisfaction test for every declared constraint, once, on the
-  same rows (`satisfaction_test`, upper bound of the gap against `max_gap`).
+  same rows (`satisfy`, upper bound of the gap against `max_gap`).
 * `rollout_design.json`: the rollout plan, its hash, the fixed-horizon
   sample size for the planned improvement, the expected sample number of
   the anytime-valid test by simulation, and the level the decision budget
@@ -87,7 +87,7 @@ def file_digest(path: Path) -> str | None:
     return ledger.digest(body)
 
 
-def file_digests(folder: str | Path) -> dict[str, str | None]:
+def hashsums(folder: str | Path) -> dict[str, str | None]:
     """The hash of each of the four decision files, None where absent.
 
     Args:
@@ -101,7 +101,7 @@ def file_digests(folder: str | Path) -> dict[str, str | None]:
 
 
 def policy_value(
-    layer: scmle.data.charter.decision.DecisionLayer,
+    layer: scmle.data.charter.decision.Layer,
     actions: numpy.ndarray,
     outcome: numpy.ndarray,
     logged: numpy.ndarray | None,
@@ -146,14 +146,14 @@ def policy_value(
         }
     behaviour = numpy.column_stack([1.0 - p, p])
     target = numpy.column_stack([1.0 - actions, actions])
-    log = ope.LoggedBandit(
+    log = ope.Bandits(
         a.astype(numpy.intp),
         numpy.asarray(outcome, dtype=float),
         behaviour,
         target,
     )
     rules = layer.model.off_policy
-    found = ope.estimate_value(
+    found = ope.evaluate(
         log,
         ESTIMATOR,
         clip=rules.clip,
@@ -172,7 +172,7 @@ def policy_value(
 
 
 def fairness(
-    layer: scmle.data.charter.decision.DecisionLayer,
+    layer: scmle.data.charter.decision.Layer,
     features: pandas.DataFrame,
     outcome: numpy.ndarray,
     actions: numpy.ndarray,
@@ -202,7 +202,7 @@ def fairness(
                 }
             )
             continue
-        found = constraints.satisfaction_test(
+        found = constraints.satisfy(
             outcome, actions, features[item.attribute].to_numpy(), item, alpha
         )
         out.append({"attribute": item.attribute, **found.to_dict()})
@@ -211,7 +211,7 @@ def fairness(
 
 def rollout_design(
     charter: contracts.AnalysisCharter, base_rate: float
-) -> tuple[dict[str, Any], rollout.DecisionLog] | None:
+) -> tuple[dict[str, Any], rollout.Journal] | None:
     """The rollout plan's design record and its one-row decision log.
 
     Args:
@@ -248,7 +248,7 @@ def rollout_design(
             alpha=float(plan.alpha_promote),
             power=charter.power,
         )
-        record["expected_sample_number"] = design.simulate_stopping(
+        record["expected_sample_number"] = design.simulate(
             plan, base_rate, plan.delta_min, SIMULATION_RUNS, charter.seed
         )
     else:
@@ -258,7 +258,7 @@ def rollout_design(
             "; the base rate leaves no room for delta_min, so no sample size "
             "was computed"
         )
-    log = rollout.DecisionLog()
+    log = rollout.Journal()
     log.append(
         "registered",
         {"plan_hash": plan_hash, "charter_hash": charter.charter_hash},

@@ -18,7 +18,7 @@ PATH_LOCKS: dict[str, threading.RLock] = {}
 PATH_LOCKS_GUARD = threading.Lock()
 
 
-def path_lock(path: str | pathlib.Path) -> threading.RLock:
+def latch(path: str | pathlib.Path) -> threading.RLock:
     """Returns the process-wide re-entrant lock that guards one file.
 
     Every writer of a shared journal or index takes the lock for the same
@@ -48,13 +48,13 @@ def append_text(path: str | pathlib.Path, text: str) -> None:
         text: Complete text to add, including its trailing newline.
     """
     target = pathlib.Path(path)
-    with path_lock(target):
+    with latch(target):
         target.parent.mkdir(parents=True, exist_ok=True)
         with target.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(text)
 
 
-def sync_file(path: str | pathlib.Path) -> None:
+def sync(path: str | pathlib.Path) -> None:
     """Flushes an existing file's contents to stable storage.
 
     The file is opened for update because Windows rejects ``fsync`` on a
@@ -90,9 +90,7 @@ def sync_directory(directory: str | pathlib.Path) -> None:
         os.close(descriptor)
 
 
-def replace_file(
-    source: str | pathlib.Path, target: str | pathlib.Path
-) -> None:
+def swap(source: str | pathlib.Path, target: str | pathlib.Path) -> None:
     """Atomically move ``source`` over ``target``, tolerating Windows sharing.
 
     The replacement holds the target's path lock, so in-process readers that
@@ -109,7 +107,7 @@ def replace_file(
         PermissionError: If the replacement is still denied after the
             attempts, or at once on a platform other than Windows.
     """
-    with path_lock(target):
+    with latch(target):
         attempt = 1
         while True:
             try:
@@ -144,7 +142,7 @@ def write_atomically(path: str | pathlib.Path, content: bytes) -> None:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
-        replace_file(temporary_name, target)
+        swap(temporary_name, target)
         sync_directory(target.parent)
     except BaseException:
         with contextlib.suppress(FileNotFoundError):

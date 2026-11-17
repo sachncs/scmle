@@ -27,7 +27,7 @@ MISSING_LEVEL = "<missing>"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class LevelCoverage:
+class Cell:
     """Coverage of one level of one subgroup column.
 
     Attributes:
@@ -82,11 +82,11 @@ def shares(column: pandas.Series) -> dict[str, float]:
     }
 
 
-def subgroup_coverage(
+def represent(
     sample: pandas.Series,
     deployment: Mapping[str, float] | None,
     alpha: float = ALPHA,
-) -> tuple[LevelCoverage, ...]:
+) -> tuple[Cell, ...]:
     """Compares a column's level shares with the deployment shares.
 
     Args:
@@ -124,7 +124,7 @@ def subgroup_coverage(
         else:
             status = shift.Status.FAIL
         out.append(
-            LevelCoverage(
+            Cell(
                 str(sample.name),
                 str(level),
                 count,

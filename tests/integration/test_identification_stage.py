@@ -57,7 +57,7 @@ def charter_file(
         ),
     )
     path = tmp_path / "charter.json"
-    sealing.write_charter(
+    sealing.inscribe(
         path, make_charter(estimand=estimand, min_effect=0.5, k_max=3), KEY
     )
     return path

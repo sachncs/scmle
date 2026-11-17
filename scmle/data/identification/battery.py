@@ -61,7 +61,7 @@ class Test:
         return dataclasses.asdict(self)
 
 
-def wald_test(name: str, kind: str, estimate: float, se: float) -> Test:
+def wald(name: str, kind: str, estimate: float, se: float) -> Test:
     """Runs a two-sided Wald test of `estimate = 0`.
 
     Args:
@@ -133,9 +133,7 @@ def run_battery(tests: list[Test], alpha: float) -> Battery:
     if not 0 < alpha < 1:
         raise errors.InputError("alpha must be within (0, 1)")
     flags = (
-        coverage.holm_rejections([t.p_value for t in tests], alpha)
-        if tests
-        else []
+        coverage.stepdown([t.p_value for t in tests], alpha) if tests else []
     )
     rejected = tuple(t.name for t, f in zip(tests, flags, strict=True) if f)
     return Battery(

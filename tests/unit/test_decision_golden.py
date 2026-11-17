@@ -37,7 +37,7 @@ def plan(**overrides):
         "guardrails": (decision.Guardrail("bounce", margin=0.05),),
     }
     values.update(overrides)
-    return decision.RolloutPlan(**values)
+    return decision.Experiment(**values)
 
 
 def traffic(n, seed, lift=0.04, bounce_lift=0.0, base=0.10):
@@ -49,15 +49,15 @@ def traffic(n, seed, lift=0.04, bounce_lift=0.0, base=0.10):
 
 
 def cost_model():
-    return costs.DecisionCostModel(
+    return costs.Tariff(
         0.0,
         100.0,
         5.0,
         0.0,
         0.02,
         0.15,
-        (costs.CostSource.HUMAN,) * 4,
-        costs.CostSource.HUMAN,
+        (costs.Basis.HUMAN,) * 4,
+        costs.Basis.HUMAN,
     )
 
 
@@ -69,7 +69,7 @@ def score_world(n, seed):
 
 
 def fairness(criterion="equal_opportunity", gap=0.05):
-    return decision.FairnessConstraint(
+    return decision.Constraint(
         "sex", criterion, gap, "group_thresholds", "counsel"
     )
 
@@ -93,36 +93,34 @@ def bandit(n, seed):
     reward = (rng.random(n) < mean[numpy.arange(n), action]).astype(float)
     treat = (x[:, 0] > 0).astype(float)
     target = numpy.column_stack([1 - treat, treat])
-    log = ope.LoggedBandit(action, reward, behaviour, target, mean)
+    log = ope.Bandits(action, reward, behaviour, target, mean)
     return x, log
 
 
 def case_anytime():
     stream = anytime.Stream(0.0, 1.0, 0.4)
     values = numpy.random.default_rng(1).random(40) * 0.5 + 0.3
-    process = anytime.EProcess(stream)
+    process = anytime.Martingale(stream)
     process.update(values[:25])
     process.update(values[25:])
     arm = (numpy.arange(40) % 2).astype(float)
     return {
-        "grid": anytime.bet_grid(0.4, 5),
-        "wealth": anytime.log_wealth(values[:6], 0.4, 4),
+        "grid": anytime.bets(0.4, 5),
+        "wealth": anytime.grow(values[:6], 0.4, 4),
         "paths": anytime.log_wealth_paths(values[:8], stream, 4),
         "process": process.log_e,
         "max": process.max_log_e,
         "bound": anytime.confidence_bound(values, stream, 0.05, 6, 8),
         "pseudo": anytime.pseudo_outcomes(arm, values, 0.25),
         "pseudo_c": anytime.pseudo_outcomes(arm, values, 0.25, values * 0.9),
-        "center": anytime.running_center(values),
-        "positive": anytime.positive_level(0.05),
-        "centered": anytime.centered_paths(arm, values, 0.5, 0.0),
-        "centered_less": anytime.centered_paths(
-            arm, values, 0.5, 0.1, "less", -1.0
-        ),
+        "center": anytime.centers(values),
+        "positive": anytime.fractional(0.05),
+        "centered": anytime.recentre(arm, values, 0.5, 0.0),
+        "centered_less": anytime.recentre(arm, values, 0.5, 0.1, "less", -1.0),
         "streams": [
-            anytime.centered_stream(0.5, 0.0),
-            anytime.difference_stream(0.5, 0.1, "less"),
-            anytime.bound_stream(2.0, 0.5),
+            anytime.deviations(0.5, 0.0),
+            anytime.contrasts(0.5, 0.1, "less"),
+            anytime.clamped(2.0, 0.5),
         ],
     }
 
@@ -135,19 +133,15 @@ def case_design():
         "rows_de": design.fixed_horizon_rows(
             0.10, 0.02, alpha=0.05, power=0.9, design_effect=1.5
         ),
-        "srm_p": [
-            design.srm_p_value(k, 1000, 0.5) for k in (480, 500, 530, 560)
-        ],
+        "srm_p": [design.mismatch(k, 1000, 0.5) for k in (480, 500, 530, 560)],
         "srm_bf": design.srm_log_bayes_factor(
             [10, 60, 130], [20, 100, 200], 0.5
         ),
         "srm_rej": [
-            design.srm_rejects(5200, 10000, 0.5, 0.001),
-            design.srm_rejects(5600, 10000, 0.5, 0.001),
+            design.srm(5200, 10000, 0.5, 0.001),
+            design.srm(5600, 10000, 0.5, 0.001),
         ],
-        "stopping": design.simulate_stopping(
-            plan(n_max=3000), 0.10, 0.05, 6, 3
-        ),
+        "stopping": design.simulate(plan(n_max=3000), 0.10, 0.05, 6, 3),
     }
 
 
@@ -162,7 +156,7 @@ def case_rollout():
     ]
     arm2, primary2, guards2 = traffic(6000, 3, bounce_lift=0.08)
     harm = rollout.Rollout(plan(), "e2", 0.02).observe(arm2, primary2, guards2)
-    monitor = rollout.RollbackMonitor(0.01, 0.05)
+    monitor = rollout.Watchdog(0.01, 0.05)
     rng = numpy.random.default_rng(5)
     outcomes = [
         monitor.observe(
@@ -187,14 +181,14 @@ def case_threshold():
     p, y = score_world(2000, 0)
     model = cost_model()
     return {
-        "bayes": threshold.bayes_threshold(5, 100),
-        "pl": threshold.probabilities_and_labels([0.1, 0.9], [0, 1]),
-        "check": threshold.calibration_check(p, y),
-        "check_bins": threshold.calibration_check(p, y, 0.05, 5),
-        "recal": threshold.fit_recalibrator(p**0.6, y),
-        "cross": threshold.cross_fitted(p**0.6, y, 1)[:20],
-        "choice": threshold.choose_threshold(p, y, model, replicates=60),
-        "choice_skew": threshold.choose_threshold(
+        "bayes": threshold.breakeven(5, 100),
+        "pl": threshold.pair([0.1, 0.9], [0, 1]),
+        "check": threshold.hosmer(p, y),
+        "check_bins": threshold.hosmer(p, y, 0.05, 5),
+        "recal": threshold.calibrator(p**0.6, y),
+        "cross": threshold.crossfit(p**0.6, y, 1)[:20],
+        "choice": threshold.operate(p, y, model, replicates=60),
+        "choice_skew": threshold.operate(
             numpy.clip(p**0.5, 0, 1), y, model, replicates=60
         ),
     }
@@ -207,10 +201,8 @@ def case_constraints():
     for name in ("equal_opportunity", "demographic_parity"):
         constraint = fairness(name)
         result[name] = {
-            "test": constraints.satisfaction_test(y, acts, groups, constraint),
-            "fit": constraints.fit_group_thresholds(
-                score, y, groups, constraint, 0.05
-            ),
+            "test": constraints.satisfy(y, acts, groups, constraint),
+            "fit": constraints.equalize(score, y, groups, constraint, 0.05),
         }
     result["wilson"] = constraints.wilson(30, 100, 1.96)
     result["newcombe"] = constraints.newcombe(40, 100, 20, 100, 0.9)
@@ -218,7 +210,7 @@ def case_constraints():
     result["feasible"] = constraints.check_feasibility(
         [fairness(), fairness("demographic_parity")], y, groups
     )
-    result["price"] = constraints.price_of_constraint(
+    result["price"] = constraints.toll(
         y, acts, (score > 0.6).astype(float), 0.05, replicates=50, seed=2
     )
     return result
@@ -228,19 +220,19 @@ def case_ope():
     x, log = bandit(1500, 0)
     out = {}
     for name in ope.ESTIMATORS:
-        out[name] = ope.estimate_value(log, name)
-        out[name + "_clip"] = ope.estimate_value(log, name, clip=3.0)
+        out[name] = ope.evaluate(log, name)
+        out[name + "_clip"] = ope.evaluate(log, name, clip=3.0)
     baseline = numpy.column_stack([numpy.ones(1500), numpy.zeros(1500)])
-    out["diff"] = ope.difference_value(log, baseline)
+    out["diff"] = ope.contrast(log, baseline)
     out["weights"] = ope.weights(log, 2.0)
     out["terms"] = ope.terms(log, "dr", None)
-    out["support"] = ope.support_violations(log, 0.4)
-    out["mean"] = ope.mean_interval(numpy.arange(10.0), None, 0.9)
-    out["mean_c"] = ope.mean_interval(
+    out["support"] = ope.unsupported(log, 0.4)
+    out["mean"] = ope.wald(numpy.arange(10.0), None, 0.9)
+    out["mean_c"] = ope.wald(
         numpy.arange(12.0), numpy.repeat(numpy.arange(4), 3), 0.9
     )
-    out["policy"] = ope.fit_threshold_policy(log, x[:, 0], penalty=0.01)
-    model = ope.fit_outcome_model(x, log.actions, log.rewards, 2)
+    out["policy"] = ope.tune(log, x[:, 0], penalty=0.01)
+    model = ope.regress(x, log.actions, log.rewards, 2)
     out["model"] = repr(type(model).__name__)
     return out
 
@@ -250,10 +242,8 @@ def case_netbenefit():
     acts = (p > 0.1).astype(float)
     return {
         "hash": netbenefit.rule_hash("rule", 0.1),
-        "band": netbenefit.net_benefit_band(
-            y, acts, (0.02, 0.15), replicates=60
-        ),
-        "band_inc": netbenefit.net_benefit_band(
+        "band": netbenefit.lowerband(y, acts, (0.02, 0.15), replicates=60),
+        "band_inc": netbenefit.lowerband(
             y,
             acts,
             (0.02, 0.15),
@@ -261,7 +251,7 @@ def case_netbenefit():
             clusters=numpy.arange(1500) // 5,
             replicates=60,
         ),
-        "span": netbenefit.useful_span(
+        "span": netbenefit.stretch(
             numpy.array([0.1, 0.2, 0.3]), numpy.array([False, True, True])
         ),
         "factorize": netbenefit.factorize(["a", "b", "a"]),

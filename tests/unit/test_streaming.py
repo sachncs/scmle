@@ -50,16 +50,14 @@ def test_the_sample_does_not_depend_on_the_batch_size(tmp_path):
     path = tmp_path / "t.parquet"
     write_parquet(path, 30_000, chunk=7_000)
 
-    class Sized(streaming.ParquetChunks):
+    class Sized(streaming.Chunked):
         rows_per_batch = 4_000
 
         def batches(self, rows=streaming.BATCH_ROWS):
             return super().batches(self.rows_per_batch)
 
-    plain = streaming.sample_pass(
-        streaming.ParquetChunks(path), 3_000, 800, 0.2, 5
-    )[0]
-    small = streaming.sample_pass(Sized(path), 3_000, 800, 0.2, 5)[0]
+    plain = streaming.sweep(streaming.Chunked(path), 3_000, 800, 0.2, 5)[0]
+    small = streaming.sweep(Sized(path), 3_000, 800, 0.2, 5)[0]
 
     pandas.testing.assert_frame_equal(
         plain.sort_values("x0").reset_index(drop=True),
@@ -71,9 +69,7 @@ def test_locked_rows_never_enter_the_development_sample(tmp_path):
     path = tmp_path / "t.parquet"
     write_parquet(path, 20_000)
 
-    kept, totals = streaming.sample_pass(
-        streaming.ParquetChunks(path), 2_000, 500, 0.2, 1
-    )
+    kept, totals = streaming.sweep(streaming.Chunked(path), 2_000, 500, 0.2, 1)
 
     assert totals.rows == 20_000
     assert totals.locked == pytest.approx(4_000, rel=0.1)
@@ -99,11 +95,11 @@ def test_a_file_far_larger_than_the_budget_is_read_in_bounded_memory(tmp_path):
             import resource
             value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
             return value / (1024 * 1024) if sys.platform == "darwin" else value / 1024
-        source = streaming.ParquetChunks(__import__("pathlib").Path({str(path)!r}))
+        source = streaming.Chunked(__import__("pathlib").Path({str(path)!r}))
         for batch in source.batches(1000):
             break
         before = peak()
-        kept, totals = streaming.sample_pass(source, 20000, 5000, 0.2, 0)
+        kept, totals = streaming.sweep(source, 20000, 5000, 0.2, 0)
         print(json.dumps({{"before": before, "after": peak(),
                            "rows": totals.rows, "kept": len(kept)}}))
         """
@@ -127,16 +123,16 @@ def test_unsupported_formats_and_missing_files_are_refused(tmp_path):
     (tmp_path / "t.xlsx").write_text("x")
 
     with pytest.raises(errors.DataError, match="cannot stream"):
-        streaming.source_for(tmp_path / "t.xlsx")
+        streaming.locate(tmp_path / "t.xlsx")
     with pytest.raises(errors.DataError, match="not found"):
-        streaming.source_for(tmp_path / "missing.parquet")
+        streaming.locate(tmp_path / "missing.parquet")
 
 
 def test_json_lines_is_streamed_in_batches(tmp_path):
     frame = pandas.DataFrame({"a": range(12), "y": [0, 1] * 6})
     path = tmp_path / "data.jsonl"
     frame.to_json(path, orient="records", lines=True)
-    source = streaming.source_for(path)
+    source = streaming.locate(path)
     batches = list(source.batches(rows=5))
     assert [len(batch) for batch in batches] == [5, 5, 2]
     pandas.testing.assert_frame_equal(
@@ -145,8 +141,8 @@ def test_json_lines_is_streamed_in_batches(tmp_path):
 
 
 def test_sample_sizes_follow_the_memory_budget():
-    small = streaming.sample_caps(10, 0.01, 0.2)
-    large = streaming.sample_caps(10, 1.0, 0.2)
+    small = streaming.budgets(10, 0.01, 0.2)
+    large = streaming.budgets(10, 1.0, 0.2)
 
     assert large[0] > small[0] * 50 and small[0] >= streaming.MIN_SAMPLE_ROWS
 
@@ -169,20 +165,12 @@ def write_stream_csv(path):
 
 
 def test_transactional_streaming_contracts_are_public_reader_exports():
-    assert (
-        scmle.data.readers.streaming.TransactionalSink
-        is streaming.TransactionalSink
-    )
-    assert (
-        scmle.data.readers.streaming.SinkCommitReceipt
-        is streaming.SinkCommitReceipt
-    )
-    assert (
-        scmle.data.readers.streaming.CommitEvidence is streaming.CommitEvidence
-    )
+    assert scmle.data.readers.streaming.Sink is streaming.Sink
+    assert scmle.data.readers.streaming.Voucher is streaming.Voucher
+    assert scmle.data.readers.streaming.Commitment is streaming.Commitment
 
 
-class RecordingSink(streaming.TransactionalSink):
+class RecordingSink(streaming.Sink):
     """Test sink that exposes whether a duplicate called the transport."""
 
     def __init__(self, receipt):
@@ -197,7 +185,7 @@ class RecordingSink(streaming.TransactionalSink):
 def test_stream_checkpoint_binds_snapshot_offset_and_watermark(tmp_path):
     path = tmp_path / "events.csv"
     write_stream_csv(path)
-    source = streaming.CsvChunks(path)
+    source = streaming.Csv(path)
 
     first = source.read_batch(rows=2, watermark_column="event_time")
     second = source.read_batch(
@@ -233,7 +221,7 @@ def test_transactional_sink_binds_receipt_ack_and_checkpoint_durably(
 ):
     path = tmp_path / "events.csv"
     write_stream_csv(path)
-    source = streaming.CsvChunks(path)
+    source = streaming.Csv(path)
     ledger = streaming.CommitLedger(tmp_path / "state.json", source)
     batch = ledger.read_batch(rows=2, watermark_column="event_time")
     acknowledgement = streaming.Acknowledgement(
@@ -242,7 +230,7 @@ def test_transactional_sink_binds_receipt_ack_and_checkpoint_durably(
         batch.batch_id,
         batch.next_checkpoint,
     )
-    sink_receipt = streaming.SinkCommitReceipt(
+    sink_receipt = streaming.Voucher(
         batch.source_identity,
         batch.batch_id,
         batch.next_checkpoint,
@@ -283,7 +271,7 @@ def test_transactional_sink_rejects_receipts_not_bound_to_the_batch(
 ):
     path = tmp_path / "events.csv"
     write_stream_csv(path)
-    source = streaming.CsvChunks(path)
+    source = streaming.Csv(path)
     ledger = streaming.CommitLedger(tmp_path / "state.json", source)
     batch = ledger.read_batch(rows=2)
     acknowledgement = streaming.Acknowledgement(
@@ -293,7 +281,7 @@ def test_transactional_sink_rejects_receipts_not_bound_to_the_batch(
         batch.next_checkpoint,
     )
     if receipt_kind == "batch":
-        receipt = streaming.SinkCommitReceipt(
+        receipt = streaming.Voucher(
             batch.source_identity,
             "batch_" + "0" * 64,
             batch.next_checkpoint,
@@ -303,7 +291,7 @@ def test_transactional_sink_rejects_receipts_not_bound_to_the_batch(
         other_checkpoint = dataclasses.replace(
             batch.next_checkpoint, source_identity="other-events.csv"
         )
-        receipt = streaming.SinkCommitReceipt(
+        receipt = streaming.Voucher(
             "other-events.csv",
             batch.batch_id,
             other_checkpoint,
@@ -313,7 +301,7 @@ def test_transactional_sink_rejects_receipts_not_bound_to_the_batch(
         other_checkpoint = dataclasses.replace(
             batch.next_checkpoint, offset=batch.next_checkpoint.offset + 1
         )
-        receipt = streaming.SinkCommitReceipt(
+        receipt = streaming.Voucher(
             batch.source_identity,
             batch.batch_id,
             other_checkpoint,
@@ -332,7 +320,7 @@ def test_transactional_sink_rejects_receipts_not_bound_to_the_batch(
 def test_writer_commit_preserves_previous_transaction_evidence(tmp_path):
     path = tmp_path / "events.csv"
     write_stream_csv(path)
-    source = streaming.CsvChunks(path)
+    source = streaming.Csv(path)
     ledger = streaming.CommitLedger(tmp_path / "state.json", source)
     first_batch = ledger.read_batch(rows=2)
     acknowledgement = streaming.Acknowledgement(
@@ -341,7 +329,7 @@ def test_writer_commit_preserves_previous_transaction_evidence(tmp_path):
         first_batch.batch_id,
         first_batch.next_checkpoint,
     )
-    sink_receipt = streaming.SinkCommitReceipt(
+    sink_receipt = streaming.Voucher(
         first_batch.source_identity,
         first_batch.batch_id,
         first_batch.next_checkpoint,
@@ -371,7 +359,7 @@ def test_writer_commit_preserves_previous_transaction_evidence(tmp_path):
 def test_stream_ledger_commits_idempotently_and_persists_checkpoint(tmp_path):
     path = tmp_path / "events.csv"
     write_stream_csv(path)
-    source = streaming.CsvChunks(path)
+    source = streaming.Csv(path)
     ledger = streaming.CommitLedger(tmp_path / "state.json", source)
     batch = ledger.read_batch(rows=2, watermark_column="event_time")
     written = []
@@ -397,7 +385,7 @@ def test_stream_consumer_retries_ack_after_restart_without_replaying_writer(
 ):
     path = tmp_path / "events.csv"
     write_stream_csv(path)
-    source = streaming.CsvChunks(path)
+    source = streaming.Csv(path)
     ledger_path = tmp_path / "state.json"
     written = []
     acknowledgements = []
@@ -443,7 +431,7 @@ def test_stream_consumer_retries_ack_after_restart_without_replaying_writer(
 def test_stream_ledger_refuses_a_changed_source_snapshot(tmp_path):
     path = tmp_path / "events.csv"
     write_stream_csv(path)
-    source = streaming.CsvChunks(path)
+    source = streaming.Csv(path)
     ledger = streaming.CommitLedger(tmp_path / "state.json", source)
     batch = ledger.read_batch(rows=2)
     ledger.commit_with_writer(batch, lambda frame, key: None)

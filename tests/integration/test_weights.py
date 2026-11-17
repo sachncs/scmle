@@ -38,7 +38,7 @@ def test_weights_are_training_only_and_not_needed_to_predict(tmp_path):
 
     result = run(frame, tmp_path, weight_column="w", excluded_columns=["first"])
 
-    assert isinstance(result.bundle.pipeline, weighting.WeightedClassifier)
+    assert isinstance(result.bundle.pipeline, weighting.Classifier)
     assert result.bundle.pipeline.column == "w"
     assert "w" not in result.bundle.features
     assert len(result.bundle.predict(probe)) == 2

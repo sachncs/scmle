@@ -24,11 +24,11 @@ class ScriptedSource:
 
 
 def column(name, distinct, non_null, kind="number"):
-    return profile.ColumnProfile(name, kind, non_null, distinct, None, None)
+    return profile.Aggregates(name, kind, non_null, distinct, None, None)
 
 
 def table_of(rows, *columns):
-    return profile.TableProfile("t", rows, tuple(columns))
+    return profile.Census("t", rows, tuple(columns))
 
 
 def empty_scan(**changes):
@@ -43,11 +43,11 @@ def empty_scan(**changes):
         "eps_null": 0.0,
     }
     fields.update(changes)
-    return grain.KeyScan(**fields)
+    return grain.Scan(**fields)
 
 
 def candidate(columns, g3=0.0, nulls=0.0):
-    return grain.KeyCandidate(columns, g3, nulls, 5, 10, True)
+    return grain.Candidate(columns, g3, nulls, 5, 10, True)
 
 
 def test_stem_keeps_short_words_and_double_s():
@@ -109,36 +109,36 @@ def test_bound_ok_uses_the_distinct_product_and_the_smallest_count():
     table = table_of(
         100, column("a", 5, 100), column("b", 10, 100), column("c", 3, 40)
     )
-    assert grain.bound_ok(table, ("a", "b"), 0.5)
-    assert not grain.bound_ok(table, ("a", "b"), 0.4)
-    assert not grain.bound_ok(table, ("a", "c"), 0.0)
-    assert grain.bound_ok(table, ("a", "b"), 0.0) is False
+    assert grain.feasible(table, ("a", "b"), 0.5)
+    assert not grain.feasible(table, ("a", "b"), 0.4)
+    assert not grain.feasible(table, ("a", "c"), 0.0)
+    assert grain.feasible(table, ("a", "b"), 0.0) is False
     wide = table_of(100, column("a", 100, 100), column("c", 2, 40))
-    assert not grain.bound_ok(wide, ("a", "c"), 0.0)
-    assert grain.bound_ok(wide, ("a", "c"), 0.6)
+    assert not grain.feasible(wide, ("a", "c"), 0.0)
+    assert grain.feasible(wide, ("a", "c"), 0.6)
 
 
 def test_bound_ok_needs_a_row_budget_that_scales_with_the_tolerance():
     table = table_of(10, column("a", 6, 10), column("b", 2, 10))
-    assert grain.bound_ok(table, ("a", "b"), 0.0)
-    assert grain.bound_ok(table, ("a", "b"), 0.2)
-    assert grain.bound_ok(table, ("a",), 0.4)
-    assert not grain.bound_ok(table, ("a",), 0.3)
-    assert not grain.bound_ok(table, ("b",), 0.7)
-    assert grain.bound_ok(table, ("b",), 0.8)
+    assert grain.feasible(table, ("a", "b"), 0.0)
+    assert grain.feasible(table, ("a", "b"), 0.2)
+    assert grain.feasible(table, ("a",), 0.4)
+    assert not grain.feasible(table, ("a",), 0.3)
+    assert not grain.feasible(table, ("b",), 0.7)
+    assert grain.feasible(table, ("b",), 0.8)
 
 
 def test_bound_ok_counts_a_constant_column_as_one_value_not_two():
     table = table_of(2, column("c", 1, 2))
-    assert not grain.bound_ok(table, ("c",), 0.0)
+    assert not grain.feasible(table, ("c",), 0.0)
     nothing = table_of(2, column("z", 0, 0))
-    assert not grain.bound_ok(nothing, ("z",), 0.0)
+    assert not grain.feasible(nothing, ("z",), 0.0)
 
 
 def test_single_column_scan_of_an_empty_table():
     table = table_of(0, column("a", 0, 0))
     scan = empty_scan(rows=0)
-    nonkey = grain.scan_single_columns(table, ["a"], scan)
+    nonkey = grain.sweep(table, ["a"], scan)
     assert scan.measured == {("a",): (1.0, 0.0)}
     assert scan.keys == []
     assert nonkey == {("a",)}
@@ -147,25 +147,23 @@ def test_single_column_scan_of_an_empty_table():
 def test_single_column_keys_carry_every_measure():
     table = table_of(1000, column("k", 1000, 1000), column("w", 400, 1000))
     scan = empty_scan(rows=1000)
-    nonkey = grain.scan_single_columns(table, ["k", "w"], scan)
+    nonkey = grain.sweep(table, ["k", "w"], scan)
     key = scan.keys[0]
-    assert key == grain.KeyCandidate(("k",), 0.0, 0.0, 1000, 1000, False)
+    assert key == grain.Candidate(("k",), 0.0, 0.0, 1000, 1000, False)
     assert nonkey == {("w",)}
     small = empty_scan(rows=999)
-    grain.scan_single_columns(
-        table_of(999, column("k", 999, 999)), ["k"], small
-    )
-    assert small.keys == [grain.KeyCandidate(("k",), 0.0, 0.0, 999, 999, True)]
+    grain.sweep(table_of(999, column("k", 999, 999)), ["k"], small)
+    assert small.keys == [grain.Candidate(("k",), 0.0, 0.0, 999, 999, True)]
 
 
 def test_single_column_with_too_many_nulls_cannot_join_a_key():
     table = table_of(10, column("n", 5, 6), column("m", 5, 10))
     scan = empty_scan(rows=10, eps_null=0.3)
-    nonkey = grain.scan_single_columns(table, ["n", "m"], scan)
+    nonkey = grain.sweep(table, ["n", "m"], scan)
     assert scan.measured[("n",)] == (pytest.approx(0.5), pytest.approx(0.4))
     assert nonkey == {("m",)}
     looser = empty_scan(rows=10, eps_null=0.4)
-    assert grain.scan_single_columns(table, ["n", "m"], looser) == {
+    assert grain.sweep(table, ["n", "m"], looser) == {
         ("n",),
         ("m",),
     }
@@ -175,12 +173,12 @@ def test_level_candidates_follow_the_usable_column_order():
     names = ["z", "y", "x"]
     table = table_of(10, *(column(name, 9, 10) for name in names))
     nonkey = {("z",), ("y",), ("x",)}
-    candidates, runnable = grain.level_candidates(names, nonkey, 2, table, 0.0)
+    candidates, runnable = grain.layer(names, nonkey, 2, table, 0.0)
     assert candidates == [("z", "y"), ("z", "x"), ("y", "x")]
     assert runnable == candidates
     only = {("y",), ("x",)}
-    assert grain.level_candidates(names, only, 2, table, 0.0)[0] == [("y", "x")]
-    third = grain.level_candidates(
+    assert grain.layer(names, only, 2, table, 0.0)[0] == [("y", "x")]
+    third = grain.layer(
         names, {("z", "y"), ("z", "x"), ("y", "x")}, 3, table, 0.0
     )
     assert third[0] == [("z", "y", "x")]
@@ -190,7 +188,7 @@ def test_a_level_candidate_needs_every_smaller_subset_to_be_a_non_key():
     names = ["a", "b", "c"]
     table = table_of(10, *(column(name, 9, 10) for name in names))
     nonkey = {("a", "b"), ("a", "c")}
-    candidates, runnable = grain.level_candidates(names, nonkey, 3, table, 0.0)
+    candidates, runnable = grain.layer(names, nonkey, 3, table, 0.0)
     assert candidates == []
     assert runnable == []
 
@@ -205,7 +203,7 @@ def test_a_non_key_pair_that_was_queried_still_reaches_level_three():
         }
     )
     table, scan = scan_of(frame)[1:]
-    assert grain.bound_ok(table, ("a", "b"), 0.0)
+    assert grain.feasible(table, ("a", "b"), 0.0)
     assert [k.columns for k in scan.keys] == [("a", "b", "c")]
     assert scan.measured[("a", "b")] == (pytest.approx(0.5), 0.0)
     assert scan.levels_done == 3
@@ -277,35 +275,35 @@ def test_a_column_with_two_values_is_usable():
 def test_the_default_null_tolerance_is_zero():
     frame = pandas.DataFrame({"k": [1.0, 2.0, 3.0, None, 5.0]})
     source, table = scan_of(frame)[:2]
-    scan = grain.infer_keys(source, table, eps_key=0.5)
+    scan = grain.keysearch(source, table, eps_key=0.5)
     assert scan.keys == []
     assert scan.eps_null == 0.0
 
 
 def test_tolerances_may_be_exactly_one_and_the_size_exactly_one():
     source, table = scan_of(pandas.DataFrame({"a": [1, 2, 3]}))[:2]
-    scan = grain.infer_keys(source, table, 1.0, 1.0, 1)
+    scan = grain.keysearch(source, table, 1.0, 1.0, 1)
     assert scan.levels_done == 1
     assert [k.columns for k in scan.keys] == [("a",)]
-    assert grain.infer_keys(source, table, 0.0, 1.0).eps_null == 1.0
+    assert grain.keysearch(source, table, 0.0, 1.0).eps_null == 1.0
 
 
 def test_invalid_tolerance_messages_name_the_argument():
     source, table = scan_of(pandas.DataFrame({"a": [1, 2]}))[:2]
     with pytest.raises(ValueError, match=r"^eps_key must be in \[0, 1\]$"):
-        grain.infer_keys(source, table, eps_key=-0.1)
+        grain.keysearch(source, table, eps_key=-0.1)
     with pytest.raises(ValueError, match=r"^eps_null must be in \[0, 1\]$"):
-        grain.infer_keys(source, table, eps_null=1.1)
+        grain.keysearch(source, table, eps_null=1.1)
     with pytest.raises(ValueError, match=r"^max_size must be at least 1$"):
-        grain.infer_keys(source, table, max_size=0)
+        grain.keysearch(source, table, max_size=0)
 
 
 def build_budgeted(frame):
     meter = budget.BudgetMeter(budget.Budget(max_queries=1000))
     db = ingest_worlds.new_database("gm")
     ingest_worlds.load(db, "t", frame)
-    source = profile.SqlSource(db.factory, meter)
-    table = profile.profile_table(source, "t")
+    source = profile.Sql(db.factory, meter)
+    table = profile.survey(source, "t")
     return source, table, meter
 
 
@@ -320,7 +318,7 @@ def test_each_level_charges_two_queries_and_two_scans_per_runnable_set():
     )
     source, table, meter = build_budgeted(frame)
     queries_before, rows_before = meter.queries, meter.rows
-    grain.infer_keys(source, table)
+    grain.keysearch(source, table)
     assert meter.queries - queries_before == 4
     assert meter.rows - rows_before == 96
 
@@ -332,7 +330,7 @@ def test_a_stopped_level_names_the_stage_and_the_level():
     )
     source, table = build_budgeted(frame)[:2]
     source.meter = budget.BudgetMeter(budget.Budget(max_queries=0))
-    scan = grain.infer_keys(source, table)
+    scan = grain.keysearch(source, table)
     stop = source.meter.stops[0]
     assert (stop.stage, stop.unit, stop.reason) == (
         "grain",
@@ -342,7 +340,7 @@ def test_a_stopped_level_names_the_stage_and_the_level():
     assert scan.partial is True
     other = build_budgeted(frame)
     other[0].meter = budget.BudgetMeter(budget.Budget(max_queries=0))
-    grain.infer_keys(other[0], other[1], stage="custom")
+    grain.keysearch(other[0], other[1], stage="custom")
     assert other[0].meter.stops[0].stage == "custom"
 
 
@@ -354,7 +352,7 @@ def test_the_level_charge_is_two_queries_for_each_runnable_set():
     source, table = build_budgeted(frame)[:2]
     spend = budget.BudgetMeter(budget.Budget(max_queries=1000))
     source.meter = spend
-    scan = grain.infer_keys(source, table, max_size=2)
+    scan = grain.keysearch(source, table, max_size=2)
     runnable = [
         cols
         for cols in scan.measured
@@ -379,27 +377,27 @@ def customers_table():
 
 def test_a_word_with_several_columns_prefers_the_identifier():
     table = customers_table()[1]
-    columns, questions = grain.match_columns("customer", table)
+    columns, questions = grain.align("customer", table)
     assert columns == ("customer_id",)
     assert questions == []
 
 
 def test_match_columns_are_returned_in_table_order():
     table = customers_table()[1]
-    columns, questions = grain.match_columns("month-customer", table)
+    columns, questions = grain.align("month-customer", table)
     assert columns == ("customer_id", "month")
     assert questions == []
 
 
 def test_match_columns_ask_about_missing_and_ambiguous_words():
     table = customers_table()[1]
-    columns, questions = grain.match_columns("warehouse customer", table)
+    columns, questions = grain.align("warehouse customer", table)
     assert columns == ()
     assert questions == ["which column is 'warehouse'? found no column"]
-    names = profile.TableProfile(
+    names = profile.Census(
         "t", 4, (column("a_xy", 2, 4), column("b_xy", 2, 4), column("c", 4, 4))
     )
-    assert grain.match_columns("xy", names) == (
+    assert grain.align("xy", names) == (
         (),
         ["which column is 'xy'? found columns ['a_xy', 'b_xy']"],
     )
@@ -407,7 +405,7 @@ def test_match_columns_ask_about_missing_and_ambiguous_words():
 
 def test_match_columns_without_grain_words_say_so():
     table = customers_table()[1]
-    assert grain.match_columns("the one row", table) == (
+    assert grain.align("the one row", table) == (
         (),
         ["the unit text has no grain words"],
     )
@@ -480,7 +478,7 @@ def test_a_coarser_table_names_the_subset_that_is_a_key():
 
 
 def test_subset_verdict_stops_with_a_question_when_the_budget_does():
-    verdict = grain.subset_verdict("u", ("a", "b"), lambda cols: None)
+    verdict = grain.shrink("u", ("a", "b"), lambda cols: None)
     assert verdict == grain.UnitVerdict(
         grain.UNKNOWN,
         "u",
@@ -488,18 +486,18 @@ def test_subset_verdict_stops_with_a_question_when_the_budget_does():
         "budget stopped the unit check",
         ("raise the ingest budget",),
     )
-    assert grain.subset_verdict("u", ("a", "b"), lambda cols: False) is None
-    assert grain.subset_verdict("u", ("a",), lambda cols: True) is None
+    assert grain.shrink("u", ("a", "b"), lambda cols: False) is None
+    assert grain.shrink("u", ("a",), lambda cols: True) is None
 
 
 def test_subset_verdict_reports_the_first_subset_in_size_order():
     seen = []
 
-    def key_like(cols):
+    def identifies(cols):
         seen.append(cols)
         return cols == ("c",)
 
-    verdict = grain.subset_verdict("u", ("a", "b", "c"), key_like)
+    verdict = grain.shrink("u", ("a", "b", "c"), identifies)
     assert verdict.verdict == grain.COARSER
     assert verdict.unit == "u"
     assert verdict.unit_columns == ("a", "b", "c")
@@ -519,9 +517,9 @@ def test_the_unit_check_charges_the_unit_stage_and_stops_on_budget():
     )
     db = ingest_worlds.new_database("uv")
     ingest_worlds.load(db, "t", frame)
-    source = profile.SqlSource(db.factory)
-    table = profile.profile_table(source, "t")
-    scan = grain.infer_keys(source, table, max_size=1)
+    source = profile.Sql(db.factory)
+    table = profile.survey(source, "t")
+    scan = grain.keysearch(source, table, max_size=1)
     source.meter = budget.BudgetMeter(budget.Budget(max_queries=0))
     verdict = grain.unit_verdict(source, table, "customer month", scan)
     assert verdict.verdict == grain.UNKNOWN
@@ -543,9 +541,9 @@ def test_the_unit_check_measures_unseen_sets_once_and_charges_for_them():
     )
     db = ingest_worlds.new_database("uw")
     ingest_worlds.load(db, "t", frame)
-    source = profile.SqlSource(db.factory)
-    table = profile.profile_table(source, "t")
-    scan = grain.infer_keys(source, table, max_size=1)
+    source = profile.Sql(db.factory)
+    table = profile.survey(source, "t")
+    scan = grain.keysearch(source, table, max_size=1)
     spend = budget.BudgetMeter(budget.Budget(max_queries=100))
     source.meter = spend
     before = source.queries
@@ -563,9 +561,9 @@ def test_a_set_that_cannot_be_a_key_is_never_queried_by_the_unit_check():
     )
     db = ingest_worlds.new_database("ux")
     ingest_worlds.load(db, "t", frame)
-    source = profile.SqlSource(db.factory)
-    table = profile.profile_table(source, "t")
-    scan = grain.infer_keys(source, table, max_size=1)
+    source = profile.Sql(db.factory)
+    table = profile.survey(source, "t")
+    scan = grain.keysearch(source, table, max_size=1)
     before = source.queries
     verdict = grain.unit_verdict(source, table, "customer", scan)
     assert source.queries == before
@@ -573,10 +571,10 @@ def test_a_set_that_cannot_be_a_key_is_never_queried_by_the_unit_check():
 
 
 def test_match_columns_follow_the_table_order_not_the_alphabet():
-    table = profile.TableProfile(
+    table = profile.Census(
         "t", 4, (column("zone", 2, 4), column("alpha", 2, 4))
     )
-    assert grain.match_columns("alpha zone", table) == (("zone", "alpha"), [])
+    assert grain.align("alpha zone", table) == (("zone", "alpha"), [])
 
 
 def test_a_verdict_serializes_every_field_and_whether_it_blocks():

@@ -9,9 +9,9 @@ import pytest
 from test_decision_rollout import make_plan
 from test_decision_rollout import traffic
 import test_lifecycle_extras
-from test_lifecycle_extras import approval_for
 from test_lifecycle_extras import APPROVAL_KEY
 from test_lifecycle_extras import bundle_of
+from test_lifecycle_extras import sanction
 
 from scmle.contracts import errors
 from scmle.data.ledger import budget
@@ -33,7 +33,7 @@ def staged(tmp_path):
     store.promote(
         "m",
         first.version,
-        approval=approval_for(first),
+        approval=sanction(first),
         signing_key=APPROVAL_KEY,
     )
     second = store.register("m", other.save(tmp_path / "e2"), trusted=True)
@@ -50,7 +50,7 @@ def ledger_for():
 def hook_for(tmp_path, **plan):
     store, manager, challenger = staged(tmp_path)
     ledger = ledger_for()
-    hook = rollout_hook.RolloutHook(manager, make_plan(**plan), ledger)
+    hook = rollout_hook.Hook(manager, make_plan(**plan), ledger)
     return types.SimpleNamespace(
         store=store,
         manager=manager,
@@ -116,7 +116,7 @@ def test_an_assignment_for_an_unstarted_experiment_is_refused(tmp_path):
     env = hook_for(tmp_path)
     ledger = env.ledger
     hook = env.hook
-    with pytest.raises(deployment_ledger.DeploymentLedgerError):
+    with pytest.raises(deployment_ledger.MisuseError):
         ledger.commit(
             "rollout_assignment",
             {
@@ -148,7 +148,7 @@ def test_a_promotion_decision_goes_through_the_manager_and_needs_approval(
     kinds = [r["kind"] for r in ledger.rows]
     assert "promotion_proposal" in kinds
     assert store.resolve("m").version == 1  # a proposal moves nothing
-    record = hook.promote(approval_for(challenger), signing_key=APPROVAL_KEY)
+    record = hook.promote(sanction(challenger), signing_key=APPROVAL_KEY)
     assert record.version == challenger.version
     assert store.resolve("m").version == challenger.version
     assert hook.budget.monitored == (f"m:v{challenger.version}",)
@@ -165,7 +165,7 @@ def test_a_hold_cannot_be_promoted(tmp_path):
     hook.observe(arm, primary, guards)
 
     with pytest.raises(errors.ScmleError, match="promote"):
-        hook.promote(approval_for(challenger), signing_key=APPROVAL_KEY)
+        hook.promote(sanction(challenger), signing_key=APPROVAL_KEY)
 
 
 def test_a_rollback_decision_restores_the_previous_champion(tmp_path):
@@ -177,7 +177,7 @@ def test_a_rollback_decision_restores_the_previous_champion(tmp_path):
     hook.start("exp-1")
     arm, primary, guards = traffic(40000, 5, lift=0.05)
     hook.observe(arm, primary, guards)
-    hook.promote(approval_for(challenger), signing_key=APPROVAL_KEY)
+    hook.promote(sanction(challenger), signing_key=APPROVAL_KEY)
     rng = numpy.random.default_rng(6)
     n = 20000
     watch_arm = (rng.random(n) < 0.5).astype(float)
@@ -189,7 +189,7 @@ def test_a_rollback_decision_restores_the_previous_champion(tmp_path):
     assert "rollback_proposal" in [r["kind"] for r in ledger.rows]
     assert store.resolve("m").version == challenger.version
     restored = hook.roll_back(
-        approval_for(store.resolve("m", 1)), signing_key=APPROVAL_KEY
+        sanction(store.resolve("m", 1)), signing_key=APPROVAL_KEY
     )
     assert restored == 1
     assert store.resolve("m").version == 1
@@ -204,10 +204,10 @@ def test_no_rollback_without_a_rollback_decision(tmp_path):
     hook.start("exp-1")
     arm, primary, guards = traffic(40000, 5, lift=0.05)
     hook.observe(arm, primary, guards)
-    hook.promote(approval_for(challenger), signing_key=APPROVAL_KEY)
+    hook.promote(sanction(challenger), signing_key=APPROVAL_KEY)
 
     with pytest.raises(errors.ScmleError, match="rollback"):
-        hook.roll_back(approval_for(store.resolve("m", 1)), APPROVAL_KEY)
+        hook.roll_back(sanction(store.resolve("m", 1)), APPROVAL_KEY)
 
 
 def test_the_budget_survives_in_the_ledger_rows(tmp_path):
@@ -235,7 +235,7 @@ def broken_champion(tmp_path):
         store.promote(
             "m",
             record.version,
-            approval=approval_for(record),
+            approval=sanction(record),
             signing_key=APPROVAL_KEY,
         )
     return store, manager
@@ -250,7 +250,7 @@ def audit_rows(store, action):
 def test_binding_a_hook_makes_the_bootstrap_rules_descriptive(tmp_path):
     ignored, manager = broken_champion(tmp_path)
     assert manager.rollout_decides is False
-    rollout_hook.RolloutHook(manager, make_plan(), ledger_for())
+    rollout_hook.Hook(manager, make_plan(), ledger_for())
     assert manager.rollout_decides is True
 
 
@@ -259,12 +259,12 @@ def test_the_bootstrap_rollback_check_never_moves_the_alias_once_a_hook_is_bound
 ):
     store, manager = broken_champion(tmp_path)
     ledger = ledger_for()
-    hook = rollout_hook.RolloutHook(manager, make_plan(), ledger)
+    hook = rollout_hook.Hook(manager, make_plan(), ledger)
 
     outcome = hook.check_rollback(
         test_lifecycle_extras.traffic(1200, seed=20),
         "y",
-        approval=approval_for(store.resolve("m", 1)),
+        approval=sanction(store.resolve("m", 1)),
         signing_key=APPROVAL_KEY,
     )
 
@@ -291,26 +291,24 @@ def test_the_hook_is_the_only_decider_of_promotion_and_rollback(tmp_path):
     hook.start("exp-1")
     arm, primary, guards = traffic(40000, 5, lift=0.05)
     hook.observe(arm, primary, guards)
-    hook.promote(approval_for(challenger), signing_key=APPROVAL_KEY)
+    hook.promote(sanction(challenger), signing_key=APPROVAL_KEY)
     fresh = test_lifecycle_extras.traffic(1200, seed=20)
 
     bootstrap = manager.check_rollback(
         fresh,
         "y",
-        approval=approval_for(store.resolve("m", 1)),
+        approval=sanction(store.resolve("m", 1)),
         signing_key=APPROVAL_KEY,
     )
     assert bootstrap.rolled_back is False
     assert store.resolve("m").version == challenger.version
     with pytest.raises(errors.ScmleError, match="rollback"):
-        hook.roll_back(approval_for(store.resolve("m", 1)), APPROVAL_KEY)
+        hook.roll_back(sanction(store.resolve("m", 1)), APPROVAL_KEY)
 
     rng = numpy.random.default_rng(6)
     watch_arm = (rng.random(20000) < 0.5).astype(float)
     outcome = (rng.random(20000) < 0.30 - 0.15 * watch_arm).astype(float)
     assert hook.watch(watch_arm, outcome) == rollout.ROLLBACK
     assert store.resolve("m").version == challenger.version
-    hook.roll_back(
-        approval_for(store.resolve("m", 1)), signing_key=APPROVAL_KEY
-    )
+    hook.roll_back(sanction(store.resolve("m", 1)), signing_key=APPROVAL_KEY)
     assert store.resolve("m").version == 1

@@ -83,7 +83,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>Independent review is a separate proof</h2>
   <p><code>release_evidence.json</code> is itself versioned and HMAC-signed when <code>SCMLE_SIGNING_KEY</code> is configured. The release evaluator verifies that signature before accepting the evidence index, and the run lineage records its digest. This protects the evidence collection from being edited after the run; it does not replace signer custody, key rotation, or independent review.</p>
-  <p><code>IndependentReleaseReview</code> is the signed record for the final human or external review. It binds the reviewer to the exact source commit, clean-clone and environment digests, reproducible commands, artifact digests, and independently recomputed metric, fairness, and explanation claims. The reviewer must not appear in the implementer set, every claim must pass, and the decision must be approved. A valid record proves the review contract; it does not manufacture an external reviewer or turn a local rehearsal into production evidence.</p>
+  <p><code>Signoff</code> is the signed record for the final human or external review. It binds the reviewer to the exact source commit, clean-clone and environment digests, reproducible commands, artifact digests, and independently recomputed metric, fairness, and explanation claims. The reviewer must not appear in the implementer set, every claim must pass, and the decision must be approved. A valid record proves the review contract; it does not manufacture an external reviewer or turn a local rehearsal into production evidence.</p>
   <pre><code>{`review.accepted(
     source_commit="&lt;exact-release-sha&gt;",
     required_kinds=("metric", "fairness", "explanation"),

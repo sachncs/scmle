@@ -65,7 +65,7 @@ class Booster(models.Model):
         fixed_params: dict[str, Any] | None = None,
         fit_param_names: tuple[str, ...] | None = None,
         stopping_rounds: int | None = None,
-        search_space: search.SearchSpace | None = None,
+        search_space: search.Space | None = None,
         monotonic_param: str | None = None,
     ) -> None:
         """Sets the declared data on this instance.
@@ -159,11 +159,11 @@ class Booster(models.Model):
             wrapper = (
                 wrappers.FitParamsClassifier
                 if task.is_classification
-                else wrappers.FitParamsRegressor
+                else wrappers.Curried
             )
             estimator = wrapper(estimator, fit_params)
         if task.is_classification and self.needs_integer_labels:
-            return wrappers.LabelEncodedClassifier(estimator)
+            return wrappers.Encoded(estimator)
         if task.is_classification and self.flatten_predictions:
             return wrappers.FlatPredictionClassifier(estimator)
         return cast("models.Estimator", estimator)
@@ -204,15 +204,15 @@ LIGHTGBM = LightGbm(
         memory_factor=2.0,
     ),
     fixed_params={"verbose": -1, "subsample_freq": 1, "n_jobs": 1},
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.IntParameter("n_estimators", 50, 400),
-            search.FloatParameter("learning_rate", 0.01, 0.3, log=True),
-            search.IntParameter("num_leaves", 8, 64),
-            search.IntParameter("min_child_samples", 5, 60),
-            search.FloatParameter("subsample", 0.6, 1.0),
-            search.FloatParameter("colsample_bytree", 0.5, 1.0),
-            search.FloatParameter("reg_lambda", 1e-3, 10.0, log=True),
+            search.Integer("n_estimators", 50, 400),
+            search.Real("learning_rate", 0.01, 0.3, log=True),
+            search.Integer("num_leaves", 8, 64),
+            search.Integer("min_child_samples", 5, 60),
+            search.Real("subsample", 0.6, 1.0),
+            search.Real("colsample_bytree", 0.5, 1.0),
+            search.Real("reg_lambda", 1e-3, 10.0, log=True),
         )
     ),
 )
@@ -236,15 +236,15 @@ XGBOOST = Booster(
         memory_factor=2.5,
     ),
     fixed_params={"verbosity": 0, "n_jobs": 1},
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.IntParameter("n_estimators", 50, 400),
-            search.FloatParameter("learning_rate", 0.01, 0.3, log=True),
-            search.IntParameter("max_depth", 2, 10),
-            search.IntParameter("min_child_weight", 1, 10),
-            search.FloatParameter("subsample", 0.6, 1.0),
-            search.FloatParameter("colsample_bytree", 0.5, 1.0),
-            search.FloatParameter("reg_lambda", 1e-3, 10.0, log=True),
+            search.Integer("n_estimators", 50, 400),
+            search.Real("learning_rate", 0.01, 0.3, log=True),
+            search.Integer("max_depth", 2, 10),
+            search.Integer("min_child_weight", 1, 10),
+            search.Real("subsample", 0.6, 1.0),
+            search.Real("colsample_bytree", 0.5, 1.0),
+            search.Real("reg_lambda", 1e-3, 10.0, log=True),
         )
     ),
 )
@@ -272,12 +272,12 @@ CATBOOST = Booster(
         "allow_writing_files": False,
         "thread_count": 1,
     },
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.IntParameter("iterations", 100, 500),
-            search.IntParameter("depth", 3, 8),
-            search.FloatParameter("learning_rate", 0.02, 0.3, log=True),
-            search.FloatParameter("l2_leaf_reg", 1.0, 10.0, log=True),
+            search.Integer("iterations", 100, 500),
+            search.Integer("depth", 3, 8),
+            search.Real("learning_rate", 0.02, 0.3, log=True),
+            search.Real("l2_leaf_reg", 1.0, 10.0, log=True),
         )
     ),
 )

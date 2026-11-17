@@ -12,6 +12,22 @@ marked `Breaking:` and listed first in their group.
 
 ### Breaking changes
 
+* **Single-word names for 1,209 cross-module names.** Functions, methods
+  and classes used across modules are renamed to single words; every rename
+  is listed in [`docs/RENAMES.md`](docs/RENAMES.md). Names pinned in the
+  public API snapshot keep their names, but 17 of those classes changed
+  contract because a method or argument type they expose was renamed; the
+  snapshot is regenerated. Kept on purpose: protocol and framework hooks,
+  names dispatched by string or written to records, names listed in
+  `gates.toml`, classes pickled into bundles, and 46 names that installed
+  packages or the standard library also define as attributes (`to_bytes`,
+  `from_records`, `is_loopback` ...), where a word-level rename would also
+  rewrite the other library's attribute.
+* **Saved bundles from before these renames may not load.** A bundle
+  pickles its estimator classes by module and name; the file-local renames
+  (for example `EarlyStoppingClassifier` -> `Classifier`, `WeightedRegressor`
+  -> `Regressor`) change those names. Retrain to migrate; this is a beta
+  without released bundles.
 * **Single-word names for 564 file-local names.** Functions, methods and
   classes used only inside their own module are renamed to single words
   (for example `EarlyStoppingClassifier` is `Classifier`, `warm_up` is

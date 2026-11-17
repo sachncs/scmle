@@ -72,7 +72,7 @@ def texts(values: Iterable[Any], name: str) -> tuple[str, ...]:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class IntercurrentEvent:
+class Event:
     """An event after the start that affects the target, and its strategy.
 
     Attributes:
@@ -138,7 +138,7 @@ class AnalysisEstimand:
     population: str
     target: str
     prediction_moment: str
-    intercurrent_events: tuple[IntercurrentEvent, ...]
+    intercurrent_events: tuple[Event, ...]
     summary_measure: str
     causal: scmle.data.charter.causal.Question | None = None
 
@@ -157,9 +157,7 @@ class AnalysisEstimand:
         evidence.require_text(self.target, "target")
         evidence.require_text(self.prediction_moment, "prediction_moment")
         evidence.require_text(self.summary_measure, "summary_measure")
-        qualification.require_tuple(
-            self.intercurrent_events, "intercurrent_events"
-        )
+        qualification.tupled(self.intercurrent_events, "intercurrent_events")
         if not self.intercurrent_events:
             raise errors.InputError(
                 "intercurrent_events must not be empty: state a strategy "
@@ -212,8 +210,7 @@ class AnalysisEstimand:
             target=record["target"],
             prediction_moment=record["prediction_moment"],
             intercurrent_events=tuple(
-                IntercurrentEvent.from_dict(e)
-                for e in record["intercurrent_events"]
+                Event.from_dict(e) for e in record["intercurrent_events"]
             ),
             summary_measure=record["summary_measure"],
             causal=(
@@ -225,7 +222,7 @@ class AnalysisEstimand:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DecisionRow:
+class Trigger:
     """Binds one check to the action its outcome triggers.
 
     Attributes:
@@ -370,7 +367,7 @@ class Choice:
                 options.
         """
         evidence.require_text(self.name, "name")
-        qualification.require_tuple(self.options, "options")
+        qualification.tupled(self.options, "options")
         if not self.options or len(set(self.options)) != len(self.options):
             raise errors.InputError("options must be non-empty and distinct")
         if self.default not in self.options:
@@ -480,7 +477,7 @@ class AnalysisCharter:
     unit: str
     deployment_population: str
     gating_checks: tuple[str, ...]
-    decision_map: tuple[DecisionRow, ...]
+    decision_map: tuple[Trigger, ...]
     sets: SetSizes
     min_effect: float
     k_max: int
@@ -488,9 +485,9 @@ class AnalysisCharter:
     error_budget: budget.ErrorBudget
     multiverse: tuple[Choice, ...]
     seed: int
-    cost_model: costs.DecisionCostModel | None = None
+    cost_model: costs.Tariff | None = None
     rules: scmle.data.charter.rules.Procedure | None = None
-    decision: scmle.data.charter.decision.DecisionLayer | None = None
+    decision: scmle.data.charter.decision.Layer | None = None
     unit_of_prediction: str | None = None
     ingest: scmle.data.charter.ingest.Ingestion | None = None
     uncertainty: scmle.data.charter.uncertainty.Uncertainty | None = None
@@ -515,7 +512,7 @@ class AnalysisCharter:
             self.deployment_population, "deployment_population"
         )
         for name in ("gating_checks", "decision_map", "multiverse"):
-            qualification.require_tuple(getattr(self, name), name)
+            qualification.tupled(getattr(self, name), name)
         positive(self.min_effect, "min_effect")
         qualification.count(self.k_max, "k_max", minimum=1)
         power = qualification.finite(self.power, "power")
@@ -543,7 +540,7 @@ class AnalysisCharter:
             ValueError: If two rows name the same check, a gating check has
                 no row, or its row has a blank `certificate_id`.
         """
-        rows: dict[str, DecisionRow] = {}
+        rows: dict[str, Trigger] = {}
         for row in self.decision_map:
             if row.check_id in rows:
                 raise errors.InputError(
@@ -699,7 +696,7 @@ class AnalysisCharter:
             deployment_population=record["deployment_population"],
             gating_checks=tuple(record["gating_checks"]),
             decision_map=tuple(
-                DecisionRow.from_dict(r) for r in record["decision_map"]
+                Trigger.from_dict(r) for r in record["decision_map"]
             ),
             sets=SetSizes.from_dict(record["sets"]),
             min_effect=record["min_effect"],
@@ -708,11 +705,7 @@ class AnalysisCharter:
             error_budget=budget.ErrorBudget.from_dict(record["error_budget"]),
             multiverse=tuple(Choice.from_dict(c) for c in record["multiverse"]),
             seed=record["seed"],
-            cost_model=(
-                None
-                if cost is None
-                else costs.DecisionCostModel.from_dict(cost)
-            ),
+            cost_model=(None if cost is None else costs.Tariff.from_dict(cost)),
             rules=(
                 None
                 if chosen is None
@@ -721,7 +714,7 @@ class AnalysisCharter:
             decision=(
                 None
                 if layer is None
-                else scmle.data.charter.decision.DecisionLayer.from_dict(layer)
+                else scmle.data.charter.decision.Layer.from_dict(layer)
             ),
             unit_of_prediction=record["unit_of_prediction"],
             ingest=(
@@ -775,7 +768,7 @@ def template() -> dict[str, Any]:
     }
 
 
-def charter_from_record(record: Mapping[str, Any]) -> AnalysisCharter:
+def parse(record: Mapping[str, Any]) -> AnalysisCharter:
     """Builds a charter from a record, reporting problems as `ConfigError`.
 
     Args:
@@ -820,12 +813,12 @@ def load_json(path: str | Path) -> dict[str, Any]:
     return record
 
 
-def read_charter(path: str | Path) -> AnalysisCharter:
+def peek(path: str | Path) -> AnalysisCharter:
     """Reads a charter file without verifying its hash or signature.
 
     A file with a `charter` key is read as the signed wrapper and that
     entry is used; any other object is read as a bare charter. Problems
-    raise `ConfigError` (from `load_json` and `charter_from_record`).
+    raise `ConfigError` (from `load_json` and `parse`).
 
     Args:
         path: The charter file.
@@ -835,4 +828,4 @@ def read_charter(path: str | Path) -> AnalysisCharter:
     """
     record = load_json(path)
     inner = record.get("charter", record)
-    return charter_from_record(inner)
+    return parse(inner)

@@ -138,14 +138,14 @@ def test_a_denied_link_onto_a_taken_path_means_already_exists(tmp_path):
     taken = tmp_path / "taken"
     taken.write_bytes(b"x")
     denied = PermissionError(13, "Access is denied")
-    assert objectstore.refused_as_existing(denied, taken)
-    assert objectstore.refused_as_existing(FileExistsError(), taken)
+    assert objectstore.occupied(denied, taken)
+    assert objectstore.occupied(FileExistsError(), taken)
 
 
 def test_a_denied_link_onto_a_missing_path_is_a_real_error(tmp_path):
     denied = PermissionError(13, "Access is denied")
-    assert not objectstore.refused_as_existing(denied, tmp_path / "absent")
-    assert not objectstore.refused_as_existing(
+    assert not objectstore.occupied(denied, tmp_path / "absent")
+    assert not objectstore.occupied(
         OSError(28, "No space left"), tmp_path / "absent"
     )
 
@@ -161,12 +161,12 @@ def test_a_racer_that_dies_is_reported_with_its_error(tmp_path):
 
 def test_path_of_is_lexical_and_never_leaves_the_root(tmp_path):
     local = objectstore.LocalObjectStore(tmp_path / "root")
-    deep = local.path_of("a/b/c.json")
+    deep = local.locate("a/b/c.json")
     assert deep == local.root / "a" / "b" / "c.json"
     assert not deep.parent.exists()
     for bad in ("../x", "a/../../x", "/abs"):
         with pytest.raises(objectstore.StoreError):
-            local.path_of(bad)
+            local.locate(bad)
 
 
 def test_a_temp_file_that_cannot_be_removed_is_logged(
@@ -182,5 +182,5 @@ def test_a_temp_file_that_cannot_be_removed_is_logged(
     monkeypatch.setattr(type(held), "unlink", refuse)
     monkeypatch.setattr(objectstore.time, "sleep", lambda seconds: None)
     with caplog.at_level("WARNING", logger=objectstore.__name__):
-        objectstore.unlink_tolerantly(held)
+        objectstore.discard(held)
     assert any("left behind" in r.getMessage() for r in caplog.records)

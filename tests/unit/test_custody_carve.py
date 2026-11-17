@@ -17,7 +17,7 @@ def folds_for(n, k=4):
 
 def run(n=400, fraction=0.25, seed=1, dev_ids=None, **kwargs):
     ids = numpy.arange(n) if dev_ids is None else dev_ids
-    return carve.carve_confirmation(
+    return carve.divide(
         ids,
         folds_for(len(ids)),
         fraction=fraction,
@@ -54,7 +54,7 @@ def test_the_carve_is_a_pure_function_of_its_inputs():
     assert not numpy.array_equal(
         first.confirmation_ids, run(seed=2).confirmation_ids
     )
-    other_charter = carve.carve_confirmation(
+    other_charter = carve.divide(
         numpy.arange(400),
         folds_for(400),
         fraction=0.25,
@@ -150,7 +150,7 @@ def test_folds_are_restricted_to_exploration_rows():
 def test_restricting_folds_rejects_an_empty_validation_fold():
     folds = [(numpy.array([0, 1]), numpy.array([2, 3]))]
     with pytest.raises(errors.ConfigError, match="validation fold"):
-        carve.restrict_folds(folds, numpy.arange(4), numpy.array([0, 1]))
+        carve.restrict(folds, numpy.arange(4), numpy.array([0, 1]))
 
 
 def test_zero_fraction_is_refused_and_one_row_per_unit_is_not_required():
@@ -177,7 +177,7 @@ def test_regression_small_temporal_carve_refuses_explicitly():
         model_selection.KFold(3, shuffle=True, random_state=0).split(dev)
     )
     with pytest.raises(errors.ConfigError, match="validation fold"):
-        carve.carve_confirmation(
+        carve.divide(
             dev,
             folds,
             fraction=0.5,
@@ -210,12 +210,12 @@ def test_the_autocorrelation_matches_a_direct_computation():
 
 
 def test_white_noise_measures_no_embargo():
-    assert carve.acf_embargo(ar1(2000, 0.0, seed=1)) == 0
+    assert carve.acf(ar1(2000, 0.0, seed=1)) == 0
 
 
 def test_a_persistent_series_needs_a_longer_embargo_than_a_weak_one():
-    weak = carve.acf_embargo(ar1(4000, 0.3, seed=2))
-    strong = carve.acf_embargo(ar1(4000, 0.9, seed=2))
+    weak = carve.acf(ar1(4000, 0.3, seed=2))
+    strong = carve.acf(ar1(4000, 0.9, seed=2))
     assert 1 <= weak < strong
 
 
@@ -224,25 +224,25 @@ def test_an_ar1_embargo_is_near_the_lag_where_phi_k_meets_the_band():
     size, phi = 4000, 0.8
     band = 1.96 / numpy.sqrt(size)
     expected = numpy.log(band) / numpy.log(phi)
-    measured = carve.acf_embargo(ar1(size, phi, seed=3))
+    measured = carve.acf(ar1(size, phi, seed=3))
     assert abs(measured - expected) <= 8
 
 
 def test_short_and_constant_series_measure_zero():
-    assert carve.acf_embargo(numpy.arange(7.0)) == 0
-    assert carve.acf_embargo(numpy.ones(100)) == 0
+    assert carve.acf(numpy.arange(7.0)) == 0
+    assert carve.acf(numpy.ones(100)) == 0
 
 
 def test_a_trend_never_falls_inside_the_band_and_is_capped():
-    assert carve.acf_embargo(numpy.arange(400.0)) == 100
-    assert carve.acf_embargo(numpy.arange(400.0), max_lag=10) == 10
+    assert carve.acf(numpy.arange(400.0)) == 100
+    assert carve.acf(numpy.arange(400.0), max_lag=10) == 10
 
 
 def test_an_embargo_longer_than_half_the_series_still_masks_by_position():
     in_c = numpy.zeros(10, dtype=bool)
     in_c[0] = True
 
-    mask = carve.embargo_mask(in_c, numpy.arange(10), 7)
+    mask = carve.quarantine(in_c, numpy.arange(10), 7)
 
     assert mask.tolist() == [False] + [True] * 7 + [False] * 2
 
@@ -250,5 +250,5 @@ def test_an_embargo_longer_than_half_the_series_still_masks_by_position():
 def test_an_explicit_zero_max_lag_gives_a_zero_embargo():
     values = numpy.cumsum(numpy.random.default_rng(0).normal(size=400))
 
-    assert carve.acf_embargo(values) > 0
-    assert carve.acf_embargo(values, max_lag=0) == 0
+    assert carve.acf(values) > 0
+    assert carve.acf(values, max_lag=0) == 0

@@ -22,8 +22,8 @@ def test_backends_preserve_order_and_results():
 
 
 def test_backend_factory_and_validation():
-    assert isinstance(scheduler.create_backend(1), scheduler.Serial)
-    pool = scheduler.create_backend(3)
+    assert isinstance(scheduler.select(1), scheduler.Serial)
+    pool = scheduler.select(3)
     assert isinstance(pool, scheduler.Pool) and pool.workers == 3
     with pytest.raises(errors.ConfigError):
         scheduler.Pool(1)

@@ -40,7 +40,7 @@ class Noise:
         suggested: Label the model would give each suspect.
         confidence: Probability of the suggested label for each suspect.
         rate: Share of rows flagged.
-        class_thresholds: Mean own-label probabilities by class.
+        cutoffs: Mean own-label probabilities by class.
         folds: Number of out-of-fold partitions used.
     """
 
@@ -48,7 +48,7 @@ class Noise:
     suggested: tuple[Any, ...]
     confidence: tuple[float, ...]
     rate: float
-    class_thresholds: tuple[float, ...] = ()
+    cutoffs: tuple[float, ...] = ()
     folds: int = 0
 
     def to_dict(self) -> dict[str, Any]:
@@ -56,7 +56,7 @@ class Noise:
 
         Returns:
             A dict with the suspects, suggested labels, confidences and the
-            flagged rate. `class_thresholds` and `folds` are not included.
+            flagged rate. `cutoffs` and `folds` are not included.
         """
         return {
             "suspects": self.suspects,
@@ -92,7 +92,7 @@ class Noise:
                 "minimum_classes": 2,
                 "maximum_folds": FOLDS,
                 "minimum_finding_rate": NOTE_RATE,
-                "class_own_label_probability": list(self.class_thresholds),
+                "class_own_label_probability": list(self.cutoffs),
             },
             "sample_bounds": {
                 "input_rows": input_rows,
@@ -104,7 +104,7 @@ class Noise:
             "metrics": {
                 "suspect_rows": len(self.suspects),
                 "suspect_rate": self.rate,
-                "classes": len(self.class_thresholds),
+                "classes": len(self.cutoffs),
                 "folds": self.folds,
             },
             "limitations": [
@@ -117,7 +117,7 @@ class Noise:
         }
 
 
-def find_label_noise(
+def contradict(
     features: pandas.DataFrame, labels: pandas.Series, seed: int = 0
 ) -> Noise:
     """Flags rows whose label a model that never saw them contradicts.
@@ -178,14 +178,14 @@ def find_label_noise(
         suggested=tuple(classes[best[order]].tolist()),
         confidence=tuple(float(probabilities[i, best[i]]) for i in order),
         rate=float(flagged.mean()),
-        class_thresholds=tuple(float(value) for value in thresholds),
+        cutoffs=tuple(float(value) for value in thresholds),
         folds=folds,
     )
 
 
-def assess_label_noise(
+def inspect(
     features: pandas.DataFrame, labels: pandas.Series, seed: int = 0
-) -> data.QualityObservation:
+) -> data.Observation:
     """Runs bounded label-noise detection and retains its evidence.
 
     Args:
@@ -202,10 +202,10 @@ def assess_label_noise(
         features, labels = features.loc[rows], labels.loc[rows]
     rows_checked = len(features)
     try:
-        report = find_label_noise(features, labels, seed)
+        report = contradict(features, labels, seed)
     except ValueError as error:
         # handled: not_evaluated observation carrying the error message
-        return data.QualityObservation(
+        return data.Observation(
             note=None,
             evidence={
                 "observation": "label_noise",
@@ -241,7 +241,7 @@ def assess_label_noise(
             "confidently; review "
             "before trusting scores"
         )
-    return data.QualityObservation(
+    return data.Observation(
         note=note,
         evidence=report.quality_evidence(
             input_rows, rows_checked, seed, MAX_ROWS

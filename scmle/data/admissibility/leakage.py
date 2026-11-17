@@ -252,7 +252,7 @@ def permute_within(
     return out
 
 
-def make_splits(
+def carve(
     y: numpy.ndarray,
     task: str,
     folds: int,
@@ -337,7 +337,7 @@ def out_of_fold(
     return out
 
 
-def binary_auc(truth: numpy.ndarray, score: numpy.ndarray) -> float:
+def auc(truth: numpy.ndarray, score: numpy.ndarray) -> float:
     """Computes the ROC AUC by the rank-sum formula, with ties averaged.
 
     Args:
@@ -359,7 +359,7 @@ def binary_auc(truth: numpy.ndarray, score: numpy.ndarray) -> float:
     return float((ranks[positive].sum() - n1 * (n1 + 1) / 2.0) / (n1 * n0))
 
 
-def skill_of(pred: numpy.ndarray, y: numpy.ndarray, task: str) -> float:
+def predictiveness(pred: numpy.ndarray, y: numpy.ndarray, task: str) -> float:
     """Measures the skill of out-of-fold predictions: AUC or R^2.
 
     Args:
@@ -382,7 +382,7 @@ def skill_of(pred: numpy.ndarray, y: numpy.ndarray, task: str) -> float:
             raise errors.InputError("a constant target has no R^2")
         return 1.0 - float(((y - pred) ** 2).sum()) / total
     if pred.shape[1] == BINARY_CLASSES:
-        return binary_auc(y, pred[:, 1])
+        return auc(y, pred[:, 1])
     return float(
         roc_auc_score(
             y,
@@ -394,7 +394,7 @@ def skill_of(pred: numpy.ndarray, y: numpy.ndarray, task: str) -> float:
     )
 
 
-def cross_fit_skill(
+def crossfit(
     x: numpy.ndarray,
     y: numpy.ndarray,
     task: str,
@@ -418,12 +418,12 @@ def cross_fit_skill(
         A pair (skill, out-of-fold predictions), the predictions being the
         output of `out_of_fold`.
     """
-    splits = make_splits(y, task, cfg.folds, groups, block_size, seed)
+    splits = carve(y, task, cfg.folds, groups, block_size, seed)
     pred = out_of_fold(x, y, task, splits, cfg, seed)
-    return skill_of(pred, y, task), pred
+    return predictiveness(pred, y, task), pred
 
 
-def bootstrap_skill(
+def rescore(
     pred: numpy.ndarray,
     y: numpy.ndarray,
     task: str,
@@ -451,7 +451,7 @@ def bootstrap_skill(
     else:
         index = rng.integers(0, n, size=n)
     try:
-        return skill_of(pred[index], y[index], task)
+        return predictiveness(pred[index], y[index], task)
     except ValueError:
         # handled: uncomputable resample skill returned as None, documented
         return None
@@ -492,7 +492,7 @@ def lower_bound(
         map(
             operator.call,
             itertools.repeat(
-                lambda: bootstrap_skill(pred, y, task, members, rng),
+                lambda: rescore(pred, y, task, members, rng),
                 cfg.bootstrap,
             ),
         )
@@ -503,7 +503,7 @@ def lower_bound(
     return float(numpy.quantile(values, 1.0 - cfg.confidence))
 
 
-def permutation_p(observed: float, null: Sequence[float]) -> float:
+def significance(observed: float, null: Sequence[float]) -> float:
     """Computes `(1 + #{null >= observed}) / (B + 1)` (Phipson and Smyth, 2010).
 
     Args:
@@ -517,7 +517,7 @@ def permutation_p(observed: float, null: Sequence[float]) -> float:
     return (1.0 + exceed) / (len(null) + 1.0)
 
 
-def enough_rows(y: numpy.ndarray, task: str, cfg: Config) -> bool:
+def sufficient(y: numpy.ndarray, task: str, cfg: Config) -> bool:
     """Decides whether there are enough rows for the tests to have any power.
 
     Args:
@@ -566,7 +566,7 @@ class Skill:
 
 
 def decide(
-    suspect: bool, low_power: bool, gate: certificates.GateStatus
+    suspect: bool, low_power: bool, gate: certificates.Authority
 ) -> qualification.Decision:
     """Chooses the decision of a leakage test, demoted when not certified.
 
@@ -588,15 +588,15 @@ def decide(
     return certificates.demote(raw, gate)
 
 
-def skill_test(
+def probe(
     feature: pandas.Series,
     target: pandas.Series,
     task: str,
     cfg: Config,
     groups: pandas.Series | None = None,
     block_size: int | None = None,
-    gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
-    set_id: qualification.SetId = qualification.SetId.EXPLORATION,
+    gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
+    set_id: qualification.Subset = qualification.Subset.EXPLORATION,
 ) -> Skill:
     """Tests whether one feature predicts the target beyond chance.
 
@@ -614,7 +614,7 @@ def skill_test(
 
     Returns:
         The test, with a ledger `Check`. The feature is a suspect only when
-        there are enough rows (see `enough_rows`); with too few it is
+        there are enough rows (see `sufficient`); with too few it is
         `low_power` and never a suspect. The check's interval is None when
         the lower bound is -inf.
 
@@ -633,15 +633,13 @@ def skill_test(
     x = design(feature)
     path = f"{SKILL}.{name}"
     seed = randomness.derive_int_seed(cfg.run_seed, path, 0)
-    skill, pred = cross_fit_skill(
-        x, y, task, cfg, group_values, block_size, seed
-    )
+    skill, pred = crossfit(x, y, task, cfg, group_values, block_size, seed)
     rng = randomness.component_rng(cfg.run_seed, path, 1)
     null = list(
         map(
             operator.call,
             itertools.repeat(
-                lambda: cross_fit_skill(
+                lambda: crossfit(
                     x,
                     y[permute_within(y, rng, group_values, block_size)],
                     task,
@@ -654,7 +652,7 @@ def skill_test(
             ),
         )
     )
-    p_value = permutation_p(skill, null)
+    p_value = significance(skill, null)
     bound = lower_bound(
         pred,
         y,
@@ -663,7 +661,7 @@ def skill_test(
         group_values,
         randomness.component_rng(cfg.run_seed, path, 2),
     )
-    powered = enough_rows(y, task, cfg)
+    powered = sufficient(y, task, cfg)
     suspect = powered and p_value <= cfg.alpha and bound > cfg.skill_ceiling
     check = qualification.Check(
         check_id=path,
@@ -742,7 +740,7 @@ def strata_labels(
     return leaves
 
 
-def within_strata(
+def scramble(
     n: int, members: list[numpy.ndarray], rng: numpy.random.Generator
 ) -> numpy.ndarray:
     """Draws a row order that permutes rows within each stratum.
@@ -785,7 +783,7 @@ class Conditional:
     check: qualification.Check
 
 
-def conditional_test(
+def condition(
     feature: pandas.Series,
     others: pandas.DataFrame,
     target: pandas.Series,
@@ -793,7 +791,7 @@ def conditional_test(
     cfg: Config,
     groups: pandas.Series | None = None,
     block_size: int | None = None,
-    set_id: qualification.SetId = qualification.SetId.EXPLORATION,
+    set_id: qualification.Subset = qualification.Subset.EXPLORATION,
 ) -> Conditional:
     """Tests whether the feature keeps predictive value given the others.
 
@@ -822,7 +820,7 @@ def conditional_test(
     x = design(feature)
     path = f"{CONDITIONAL}.{name}"
     seed = randomness.derive_int_seed(cfg.run_seed, path, 0)
-    skill = cross_fit_skill(x, y, task, cfg, group_values, block_size, seed)[0]
+    skill = crossfit(x, y, task, cfg, group_values, block_size, seed)[0]
     labels = strata_labels(feature, others, cfg)
     members = [numpy.flatnonzero(labels == v) for v in numpy.unique(labels)]
     rng = randomness.component_rng(cfg.run_seed, path, 1)
@@ -830,8 +828,8 @@ def conditional_test(
         map(
             operator.call,
             itertools.repeat(
-                lambda: cross_fit_skill(
-                    x[within_strata(len(y), members, rng)],
+                lambda: crossfit(
+                    x[scramble(len(y), members, rng)],
                     y,
                     task,
                     cfg,
@@ -843,7 +841,7 @@ def conditional_test(
             ),
         )
     )
-    p_value = permutation_p(skill, null)
+    p_value = significance(skill, null)
     keeps = p_value <= cfg.alpha
     check = qualification.Check(
         check_id=path,
@@ -894,7 +892,7 @@ def cramers_v(table: numpy.ndarray) -> float:
     return math.sqrt(statistic / (total * smaller))
 
 
-def binned_target(target: pandas.Series, task: str) -> pandas.Series:
+def bucket(target: pandas.Series, task: str) -> pandas.Series:
     """Bins the target for the missingness test.
 
     Args:
@@ -941,8 +939,8 @@ def missingness_test(
     target: pandas.Series,
     task: str,
     cfg: Config,
-    gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
-    set_id: qualification.SetId = qualification.SetId.EXPLORATION,
+    gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
+    set_id: qualification.Subset = qualification.Subset.EXPLORATION,
 ) -> Missingness | None:
     """Tests whether recording a value depends on the outcome.
 
@@ -969,7 +967,7 @@ def missingness_test(
     missing = feature.isna().to_numpy()
     if missing.all() or not missing.any():
         return None
-    classes = binned_target(target, task)
+    classes = bucket(target, task)
     table = pandas.crosstab(missing, classes).to_numpy()
     if table.shape[1] < MIN_CLASSES:
         return None
@@ -1039,7 +1037,7 @@ class Assessment:
         return tuple(p.check for p in parts if p is not None)
 
 
-def assess_feature(
+def assess(
     feature: pandas.Series,
     others: pandas.DataFrame,
     target: pandas.Series,
@@ -1047,8 +1045,8 @@ def assess_feature(
     cfg: Config,
     groups: pandas.Series | None = None,
     block_size: int | None = None,
-    gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
-    set_id: qualification.SetId = qualification.SetId.EXPLORATION,
+    gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
+    set_id: qualification.Subset = qualification.Subset.EXPLORATION,
 ) -> Assessment:
     """Runs the skill, missingness and (for suspects) conditional tests.
 
@@ -1068,13 +1066,11 @@ def assess_feature(
         missingness test says so, and is escalated when the conditional
         test, run for suspects only, finds it keeps its signal.
     """
-    skill = skill_test(
-        feature, target, task, cfg, groups, block_size, gate, set_id
-    )
+    skill = probe(feature, target, task, cfg, groups, block_size, gate, set_id)
     gaps = missingness_test(feature, target, task, cfg, gate, set_id)
     suspect = skill.suspect or (gaps is not None and gaps.suspect)
     conditional = (
-        conditional_test(
+        condition(
             feature, others, target, task, cfg, groups, block_size, set_id
         )
         if suspect
@@ -1096,7 +1092,7 @@ class Assessments:
     """
 
     assessments: tuple[Assessment, ...]
-    gate: certificates.GateStatus
+    gate: certificates.Authority
 
     @property
     def suspects(self) -> dict[str, bool]:
@@ -1159,8 +1155,8 @@ def scan(
     features: Sequence[Hashable] | None = None,
     groups: pandas.Series | None = None,
     block_size: int | None = None,
-    gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
-    set_id: qualification.SetId = qualification.SetId.EXPLORATION,
+    gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
+    set_id: qualification.Subset = qualification.Subset.EXPLORATION,
 ) -> Assessments:
     """Tests every feature of the exploration set for leakage suspicion.
 
@@ -1191,7 +1187,7 @@ def scan(
         raise errors.InputError(f"not feature columns: {unknown}")
     outcomes = frame[target]
     assessments = tuple(
-        assess_feature(
+        assess(
             frame[name],
             frame[[c for c in chosen if c != name]],
             outcomes,
@@ -1215,7 +1211,7 @@ def gate_status(
     cfg: Config,
     task: str = "classification",
     n_classes: int = 2,
-) -> certificates.GateStatus:
+) -> certificates.Authority:
     """Decides whether the skill test may quarantine, from the certificates.
 
     Gating needs a current certificate whose every required leak type
@@ -1233,16 +1229,16 @@ def gate_status(
         `GATING` or `DESCRIPTIVE`.
     """
     if task != "classification" or n_classes != BINARY_CLASSES:
-        return certificates.GateStatus.DESCRIPTIVE
+        return certificates.Authority.DESCRIPTIVE
     if dataclasses.replace(cfg, run_seed=CERTIFIED.run_seed) != CERTIFIED:
-        return certificates.GateStatus.DESCRIPTIVE
+        return certificates.Authority.DESCRIPTIVE
     digest = code_digest()
     for defect in LEAK_DEFECTS:
         if store.status(DETECTOR_ID, digest, defect) is not (
-            certificates.GateStatus.GATING
+            certificates.Authority.GATING
         ):
-            return certificates.GateStatus.DESCRIPTIVE
-    return certificates.GateStatus.GATING
+            return certificates.Authority.DESCRIPTIVE
+    return certificates.Authority.GATING
 
 
 def code_digest() -> str:

@@ -118,7 +118,7 @@ class Command(abc.ABC):
         """
 
 
-def add_validation_arguments(parser: argparse.ArgumentParser) -> None:
+def validators(parser: argparse.ArgumentParser) -> None:
     """Adds the validation strategy, fold, test-split and window options.
 
     Args:
@@ -213,7 +213,7 @@ class ProjectCommand(Command):
             default="random",
         )
         parser.add_argument("--output-dir", default="runs")
-        add_validation_arguments(parser)
+        validators(parser)
         parser.add_argument(
             "--monotonic",
             nargs="*",
@@ -287,7 +287,7 @@ class ProjectCommand(Command):
             "(same fields as the specification classes)",
         )
 
-    def build_project(self, args: argparse.Namespace) -> project.Project:
+    def scaffold(self, args: argparse.Namespace) -> project.Project:
         """Creates the project described by the arguments.
 
         Args:
@@ -298,7 +298,7 @@ class ProjectCommand(Command):
             The project; search, model and strategy settings given on the
             command line are used unless the config file sets that section.
         """
-        sections = config.load_sections(args.config)
+        sections = config.overlay(args.config)
         sections.setdefault(
             "search",
             tasks.Search(
@@ -388,7 +388,7 @@ class Plan(ProjectCommand):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        LOGGER.info(self.build_project(args).plan().summary())
+        LOGGER.info(self.scaffold(args).plan().summary())
         return EXIT_OK
 
 
@@ -407,7 +407,7 @@ class Run(ProjectCommand):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        result = self.build_project(args).run()
+        result = self.scaffold(args).run()
         LOGGER.info("%s", result.summary())
         LOGGER.info("artifacts: %s", result.run_dir)
         return EXIT_OK
@@ -555,7 +555,7 @@ class Cataloging(Command):
                 "memory://stdin" if raw_location == "-" else raw_location
             )
         else:
-            loader = tabular.DatasetLoader()
+            loader = tabular.Loader()
             # Not None: the checks above reject neither input being given.
             tabular_input = cast("str", args.input)
             catalog_input = loader.load(tabular_input)
@@ -627,7 +627,7 @@ class Prediction(Command):
             The exit status, EXIT_OK (0).
         """
         model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
-        mapping = scmle.inference.mapping.ColumnMapping(
+        mapping = scmle.inference.mapping.Mapper(
             dict(pair.split("=", 1) for pair in args.rename),
             args.case_insensitive,
             args.strip_whitespace,
@@ -687,7 +687,7 @@ class Batch(Command):
             The exit status, EXIT_OK (0).
         """
         model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
-        adapter = serving.BatchServing(
+        adapter = serving.Batcher(
             model, on_null=args.on_null, on_unseen=args.on_unseen
         )
         rows = adapter.score_file(args.data, args.output, args.chunk_rows)
@@ -695,7 +695,7 @@ class Batch(Command):
         return EXIT_OK
 
 
-class ServeCommand(Command):
+class Serve(Command):
     """Serves a saved bundle over HTTP."""
 
     name = "serve"
@@ -855,9 +855,9 @@ class IngestCommand(Command):
         Raises:
             BlockedError: If the unit verdict is one that blocks the run.
         """
-        declared: tuple[joins.DeclaredKey, ...] = ()
+        declared: tuple[joins.Reference, ...] = ()
         if args.foreign_keys:
-            declared = scmle.data.ingest.plan.declared_from_json(
+            declared = scmle.data.ingest.plan.declarations(
                 json.loads(
                     pathlib.Path(args.foreign_keys).read_text(encoding="utf-8")
                 )
@@ -874,7 +874,7 @@ class IngestCommand(Command):
         )
         plan = scmle.data.ingest.plan.Plan(
             pathlib.Path(args.output),
-            scmle.data.ingest.plan.sqlite_factory(args.sqlite),
+            scmle.data.ingest.plan.opener(args.sqlite),
             settings,
             budget.Budget(
                 args.max_queries, args.max_rows_scanned, args.max_seconds
@@ -1006,12 +1006,12 @@ class Charter(Command):
             if args.key_file
             else None
         )
-        if signing.resolve_key(key) is None:
+        if signing.keying(key) is None:
             raise errors.ConfigError(
                 "no signing key: set SCMLE_SIGNING_KEY or pass --key-file"
             )
-        charter = contracts.read_charter(args.path)
-        output = sealing.write_charter(
+        charter = contracts.peek(args.path)
+        output = sealing.inscribe(
             args.output or args.path, charter, signing_key=key
         )
         LOGGER.info("signed %s", output)
@@ -1242,7 +1242,7 @@ class Loop(Command):
         path = pathlib.Path(args.deploy_dir) / deployment_ledger.FILE_NAME
         try:
             ledger = deployment_ledger.DeploymentLedger.load(path)
-        except deployment_ledger.DeploymentLedgerError as error:
+        except deployment_ledger.MisuseError as error:
             raise errors.ArtifactError(
                 f"ledger verification failed: {error}"
             ) from error
@@ -1337,7 +1337,7 @@ class Operation(Command):
             return scmle.operations.controller.Controller(
                 deploy_dir, verification_keys=keys
             )
-        except deployment_ledger.DeploymentLedgerError as error:
+        except deployment_ledger.MisuseError as error:
             raise errors.ArtifactError(
                 f"cannot open the deployment: {error}"
             ) from error
@@ -1394,13 +1394,13 @@ class Operation(Command):
             json.loads(pathlib.Path(args.envelope).read_text(encoding="utf-8"))
         )
         controller = cls.open(
-            args.deploy_dir, {deployment_ledger.key_fingerprint(key): key}
+            args.deploy_dir, {deployment_ledger.thumbprint(key): key}
         )
         try:
             controller.envelopes.grant(envelope)
         except (
-            scmle.governance.envelope.EnvelopeRefused,
-            deployment_ledger.DeploymentLedgerError,
+            scmle.governance.envelope.RefusedError,
+            deployment_ledger.MisuseError,
         ) as error:
             raise errors.ConfigError(f"envelope refused: {error}") from error
         print(json.dumps(controller.status()["envelopes"]))
@@ -1422,7 +1422,7 @@ class Operation(Command):
         controller = cls.open(args.deploy_dir)
         try:
             controller.envelopes.revoke(args.envelope_id, args.reason)
-        except deployment_ledger.DeploymentLedgerError as error:
+        except deployment_ledger.MisuseError as error:
             raise errors.ConfigError(f"revoke refused: {error}") from error
         print(json.dumps(controller.status()["envelopes"]))
         return EXIT_OK
@@ -1441,7 +1441,7 @@ class Operation(Command):
             The exit status, EXIT_OK (0).
         """
         controller = cls.open(args.deploy_dir)
-        controller.loop.enter_halt("operator_halt", {"reason": args.reason})
+        controller.loop.suspend("operator_halt", {"reason": args.reason})
         controller.loop.save_state()
         print(json.dumps(controller.status()))
         return EXIT_OK
@@ -1569,7 +1569,7 @@ class Deployment(Command):
             base_url=args.url,
             read_only_token=read_only,
         )
-        golden = parity.load_golden(args.golden)
+        golden = parity.goldens(args.golden)
         expected = parity.read_json(pathlib.Path(args.golden) / "expected.json")
         results = livetests.run_checks(
             livetests.http_fetch(args.url, args.timeout),
@@ -1600,7 +1600,7 @@ class Deployment(Command):
             EXIT_BLOCKED (2) if the gate refuses, else EXIT_OK (0).
         """
         key = Deployment.read(args.key_file)
-        candidate = release.load_candidate(args.manifest)
+        candidate = release.gather(args.manifest)
         if args.stage == "admit":
             decision = gate.admit(candidate, key)
         else:
@@ -1730,7 +1730,7 @@ class Claims(Command):
         Returns:
             The exit status, EXIT_OK (0).
         """
-        rows = claims_audit.list_claims(args.run_dir)
+        rows = claims_audit.inventory(args.run_dir)
         if args.tier:
             rows = [r for r in rows if r["tier"] == args.tier]
         if args.json:
@@ -1771,7 +1771,7 @@ class Claims(Command):
         """
         print(
             json.dumps(
-                claims_audit.show_claim(args.run_dir, args.claim_id),
+                claims_audit.inspect(args.run_dir, args.claim_id),
                 indent=2,
                 sort_keys=True,
             )
@@ -1859,16 +1859,12 @@ class Frame(Command):
         Returns:
             EXIT_BLOCKED (2) if the framing was refused, else EXIT_OK (0).
         """
-        source = draft.SourceDescription.from_dict(
-            contracts.load_json(args.source)
-        )
+        source = draft.Offer.from_dict(contracts.load_json(args.source))
         dates = [c for c in args.parse_dates.split(",") if c]
         frame = pandas.read_csv(args.data, parse_dates=dates)
         text = pathlib.Path(args.request).read_text(encoding="utf-8")
         model = (
-            costs.DecisionCostModel.from_dict(
-                contracts.load_json(args.cost_model)
-            )
+            costs.Tariff.from_dict(contracts.load_json(args.cost_model))
             if args.cost_model
             else None
         )
@@ -1876,7 +1872,7 @@ class Frame(Command):
         tau = None
         if args.replay:
             recorded = contracts.load_json(args.replay)
-            sampler = refusal.ReplaySampler(
+            sampler = refusal.Replayer(
                 str(recorded["model_id"]), recorded["samples"]
             )
             tau = recorded.get("tau")
@@ -1889,7 +1885,7 @@ class Frame(Command):
             tau=tau,
         )
         output = pathlib.Path(args.output)
-        written = draft.write_artifacts(result, output)
+        written = draft.emit(result, output)
         if result.charter is not None:
             (output / "charter.json").write_text(
                 json.dumps(result.charter.to_dict(), indent=2) + "\n",
@@ -1998,7 +1994,7 @@ class Trail(Command):
         if path:
             loaded = json.loads(pathlib.Path(path).read_text("utf-8"))
             return {str(k): str(v) for k, v in loaded.items()}
-        configured = signing.key_from_environment(os.environ)
+        configured = signing.lookup(os.environ)
         return {"analyst": configured}
 
 
@@ -2009,7 +2005,7 @@ COMMANDS: tuple[Command, ...] = (
     Cataloging(),
     Prediction(),
     Batch(),
-    ServeCommand(),
+    Serve(),
     Export(),
     Packaging(),
     IngestCommand(),

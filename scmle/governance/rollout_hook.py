@@ -11,17 +11,17 @@ registries. This hook is the one place that joins the two:
   probability that arm had (the propensity); each decision is written to the
   deployment ledger and to the hash-chained decision log;
 * a `promote` decision is a proposal row; the alias moves only through
-  `Maintainer.promote_challenger`, which still needs the registry's
+  `Maintainer.elevate`, which still needs the registry's
   independent signed approval (and the attestation of a guarded registry);
 * binding the hook makes the manager's bootstrap rules descriptive
-  (`Maintainer.defer_to_rollout`): `review` and `check_rollback` no
+  (`Maintainer.delegate`): `review` and `check_rollback` no
   longer decide promotion or rollback, and the hook's `review` and
   `check_rollback` write their results to the decision log as
   `bootstrap_diagnostic` rows with `descriptive: true` and `decides: false`;
 * a promoted champion gets its rollback monitor at the rollout plan's
   rollback level (once per champion); a rollback decision is a proposal
   row, and the alias moves back only through
-  `Maintainer.restore_previous`.
+  `Maintainer.revert`.
 
 The statistical guarantees are those of `scmle.decision.rollout`: a false
 promotion has probability at most the experiment's level, and the levels sum
@@ -45,22 +45,22 @@ from scmle.governance import lifecycle
 from scmle.governance import registry
 
 
-class RolloutHook:
+class Hook:
     """One model's rollouts under a plan, a budget and a deployment ledger."""
 
     def __init__(
         self,
         manager: lifecycle.Maintainer,
-        plan: scmle.data.charter.decision.RolloutPlan,
+        plan: scmle.data.charter.decision.Experiment,
         ledger: deployment_ledger.DeploymentLedger,
         *,
         budget: scmle.data.ledger.budget.DecisionBudget | None = None,
-        log: rollout.DecisionLog | None = None,
+        log: rollout.Journal | None = None,
     ) -> None:
         """Binds the hook to a manager, a plan and a deployment ledger.
 
         Also switches the manager to defer promotion and rollback decisions
-        to the rollout (`Maintainer.defer_to_rollout`).
+        to the rollout (`Maintainer.delegate`).
 
         Args:
             manager: The model's lifecycle manager.
@@ -71,16 +71,16 @@ class RolloutHook:
             log: The decision log to continue (a new one when omitted).
         """
         self.manager = manager
-        manager.defer_to_rollout()
+        manager.delegate()
         self.plan = plan
         self.ledger = ledger
         self.budget = budget if budget is not None else plan.budget()
-        self.log = log if log is not None else rollout.DecisionLog()
+        self.log = log if log is not None else rollout.Journal()
         self.experiment: rollout.Rollout | None = None
         self.experiment_id: str | None = None
         self.decision: rollout.Decision | None = None
-        self.challenger: registry.VersionRecord | None = None
-        self.monitor: rollout.RollbackMonitor | None = None
+        self.challenger: registry.Release | None = None
+        self.monitor: rollout.Watchdog | None = None
         self.champion_id: str | None = None
         self.units = 0
 
@@ -115,7 +115,7 @@ class RolloutHook:
         fresh: pandas.DataFrame,
         target: str,
         retrain: bool = True,
-        project_options: dict[str, Any] | None = None,
+        configure: dict[str, Any] | None = None,
     ) -> lifecycle.LifecycleOutcome:
         """Runs `Maintainer.review` and logs its comparison.
 
@@ -127,12 +127,12 @@ class RolloutHook:
             fresh: Fresh labelled rows.
             target: Name of the target column.
             retrain: Whether the manager may retrain a challenger.
-            project_options: Options for the retraining project.
+            configure: Options for the retraining project.
 
         Returns:
             The lifecycle manager's outcome.
         """
-        outcome = self.manager.review(fresh, target, retrain, project_options)
+        outcome = self.manager.review(fresh, target, retrain, configure)
         if outcome.comparison is not None:
             self.diagnose("review", outcome.comparison)
         return outcome
@@ -142,9 +142,9 @@ class RolloutHook:
         fresh: pandas.DataFrame,
         target: str,
         policy: lifecycle.Trigger | None = None,
-        approval: registry.PromotionApproval | None = None,
+        approval: registry.Sanction | None = None,
         signing_key: str | bytes | None = None,
-    ) -> lifecycle.RollbackOutcome:
+    ) -> lifecycle.Outcome:
         """Runs `Maintainer.check_rollback` as a logged diagnostic.
 
         Nothing moves, whatever the approval: only `watch` and `roll_back`
@@ -185,7 +185,7 @@ class RolloutHook:
 
         The level is assigned before any traffic and is spent now. A reused
         or blank id is refused (`ValueError`), an exhausted budget with
-        `BudgetExhaustedError`, and a missing staged challenger with
+        `ExhaustedError`, and a missing staged challenger with
         `ArtifactError`. Any previous decision and the unit count are reset,
         and the start is written to the deployment ledger and the decision
         log.
@@ -199,7 +199,7 @@ class RolloutHook:
         challenger = self.manager.registry.resolve(
             self.manager.model, registry.CHALLENGER
         )
-        budget, level = scmle.data.ledger.budget.assign_experiment(
+        budget, level = scmle.data.ledger.budget.enroll(
             self.budget, experiment_id
         )
         self.budget = budget
@@ -309,9 +309,9 @@ class RolloutHook:
 
     def promote(
         self,
-        approval: registry.PromotionApproval,
+        approval: registry.Sanction,
         signing_key: str | bytes | None = None,
-    ) -> registry.VersionRecord:
+    ) -> registry.Release:
         """Moves the champion alias after a `promote` decision, with approval.
 
         Without a valid independent approval the registry refuses with an
@@ -334,13 +334,13 @@ class RolloutHook:
             raise errors.ScmleError(
                 "the experiment has no promote decision; nothing to promote"
             )
-        record = self.manager.promote_challenger(approval, signing_key)
+        record = self.manager.elevate(approval, signing_key)
         self.champion_id = f"{self.manager.model}:v{record.version}"
         budget, level = scmle.data.ledger.budget.start_rollback_monitor(
             self.budget, self.champion_id
         )
         self.budget = budget
-        self.monitor = rollout.RollbackMonitor(
+        self.monitor = rollout.Watchdog(
             self.plan.tolerance,
             float(level),
             self.plan.assignment_prob,
@@ -401,7 +401,7 @@ class RolloutHook:
 
     def roll_back(
         self,
-        approval: registry.PromotionApproval,
+        approval: registry.Sanction,
         signing_key: str | bytes | None = None,
     ) -> int:
         """Restores the previous champion after a rollback decision.
@@ -423,6 +423,6 @@ class RolloutHook:
             raise errors.ScmleError(
                 "the monitor has no rollback decision; nothing to restore"
             )
-        version = self.manager.restore_previous(approval, signing_key)
+        version = self.manager.revert(approval, signing_key)
         self.log.append("rolled_back", {"restored_version": version})
         return version

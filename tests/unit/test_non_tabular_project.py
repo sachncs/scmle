@@ -18,7 +18,7 @@ from scmle.data.modalities import video
 from scmle.models import modality_lifecycle
 
 
-def text_adapter() -> modality_lifecycle.TextPreparer:
+def text_adapter() -> modality_lifecycle.Plaintext:
     """Build a small deterministic labelled text dataset."""
     samples = tuple(
         document.Sample(
@@ -29,10 +29,10 @@ def text_adapter() -> modality_lifecycle.TextPreparer:
         )
         for index in range(12)
     )
-    return modality_lifecycle.TextPreparer(document.Dataset(samples))
+    return modality_lifecycle.Plaintext(document.Dataset(samples))
 
 
-def metadata_video_adapter() -> modality_lifecycle.VideoPreparer:
+def metadata_video_adapter() -> modality_lifecycle.Footage:
     """Build a video adapter that uses its declared metadata representation."""
     samples = tuple(
         video.Sample.from_bytes(
@@ -51,7 +51,7 @@ def metadata_video_adapter() -> modality_lifecycle.VideoPreparer:
         )
         for index in range(12)
     )
-    return modality_lifecycle.VideoPreparer(video.Dataset(samples))
+    return modality_lifecycle.Footage(video.Dataset(samples))
 
 
 def image_adapter() -> modality_lifecycle.ImagePreparer:
@@ -95,7 +95,7 @@ def geospatial_adapter() -> modality_lifecycle.GeospatialPreparer:
     """Build one CRS-bound geometry representation."""
     dataset = geospatial.Dataset(
         features=(
-            geospatial.GeoFeature(
+            geospatial.Placemark(
                 feature_id="feature-1",
                 geometry={"type": "Point", "coordinates": [1.0, 2.0]},
                 label="alpha",
@@ -107,10 +107,10 @@ def geospatial_adapter() -> modality_lifecycle.GeospatialPreparer:
     return modality_lifecycle.GeospatialPreparer(dataset)
 
 
-def raster_adapter() -> modality_lifecycle.RasterPreparer:
+def raster_adapter() -> modality_lifecycle.Imagery:
     """Build one metadata-only raster representation."""
     payload = b"raster"
-    sample = geospatial.RasterSample(
+    sample = geospatial.Tile(
         source="memory://raster-1",
         encoded_bytes=payload,
         file_hash=hashlib.sha256(payload).hexdigest(),
@@ -121,9 +121,7 @@ def raster_adapter() -> modality_lifecycle.RasterPreparer:
         crs="EPSG:3857",
         transform=(1.0, 0.0, 0.0, 0.0, -1.0, 0.0),
     )
-    return modality_lifecycle.RasterPreparer(
-        (sample,), {sample.source: "alpha"}
-    )
+    return modality_lifecycle.Imagery((sample,), {sample.source: "alpha"})
 
 
 def test_project_requires_explicit_experimental_opt_in(tmp_path: Path):
@@ -165,7 +163,7 @@ def test_project_runs_and_reloads_verified_bounded_result(tmp_path: Path):
 def test_project_rejects_custom_adapter_subclasses(tmp_path: Path):
     """Caller-defined model semantics remain on the broader extension path."""
 
-    class CustomTextAdapter(modality_lifecycle.TextPreparer):
+    class CustomTextAdapter(modality_lifecycle.Plaintext):
         """Adapter subclass intentionally outside the exact allowlist."""
 
     adapter = CustomTextAdapter(text_adapter().dataset)
@@ -183,9 +181,7 @@ def test_project_rejects_custom_adapter_subclasses(tmp_path: Path):
 
 def test_capability_reports_existing_metadata_representation():
     """Metadata-only video is explicit and does not imply visual modelling."""
-    capability = scmle.api.non_tabular.capability_for_adapter(
-        metadata_video_adapter()
-    )
+    capability = scmle.api.non_tabular.entitle(metadata_video_adapter())
 
     assert capability.modality == "video"
     assert capability.representation == "bounded_container_metadata"
@@ -206,7 +202,7 @@ def test_capability_allowlist_uses_existing_feature_representations(
     factory, representation: str
 ):
     """Every admitted built-in branch names the representation it consumes."""
-    capability = scmle.api.non_tabular.capability_for_adapter(factory())
+    capability = scmle.api.non_tabular.entitle(factory())
 
     assert capability.representation == representation
     assert capability.status == "experimental"
@@ -215,7 +211,7 @@ def test_capability_allowlist_uses_existing_feature_representations(
 def test_capability_rejects_non_modelling_curation_adapter():
     """Curation-only extension adapters cannot cross the modelling boundary."""
     with pytest.raises(TypeError, match="Preparer"):
-        scmle.api.non_tabular.capability_for_adapter(  # type: ignore[arg-type]
+        scmle.api.non_tabular.entitle(  # type: ignore[arg-type]
             object()
         )
 
@@ -237,9 +233,7 @@ def test_project_rejects_mismatched_observed_representation(tmp_path: Path):
 
 def test_public_capability_record_is_json_native():
     """The representation claim can travel with release evidence."""
-    record = scmle.api.non_tabular.capability_for_adapter(
-        text_adapter()
-    ).to_dict()
+    record = scmle.api.non_tabular.entitle(text_adapter()).to_dict()
 
     assert record["status"] == "experimental"
     assert record["model_family"] == "regularized_linear_classifier"

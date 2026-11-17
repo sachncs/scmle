@@ -26,7 +26,7 @@ class BenchmarkDataset(abc.ABC):
         metric: Primary metric.
         max_rows: Stratification-free row cap for slow downloads (None = all).
         drop: Columns that are identifiers or free text, never features.
-        numeric_target: The target is stored as text (an OpenML category) but
+        numerify: The target is stored as text (an OpenML category) but
             is a number.
         time_column: Column ordering the rows, for chronological validation.
         time_as_feature: Whether the model may also use that column.
@@ -39,7 +39,7 @@ class BenchmarkDataset(abc.ABC):
     metric: str
     max_rows: int | None = None
     drop: tuple[str, ...] = ()
-    numeric_target: bool = False
+    numerify: bool = False
     time_column: str | None = None
     time_as_feature: bool = False
     online: ClassVar[bool] = False
@@ -56,14 +56,14 @@ class BenchmarkDataset(abc.ABC):
         """Loads the table, subsampling deterministically if capped.
 
         Drops the `drop` columns, converts the target to numbers when
-        `numeric_target` is set, and samples `max_rows` rows with a fixed seed
+        `numerify` is set, and samples `max_rows` rows with a fixed seed
         when the table is longer than that.
 
         Returns:
             The table with a fresh 0..n-1 index.
         """
         frame = self.fetch().drop(columns=list(self.drop))
-        if self.numeric_target:
+        if self.numerify:
             frame[self.target] = pandas.to_numeric(frame[self.target])
         if self.max_rows is not None and len(frame) > self.max_rows:
             frame = frame.sample(self.max_rows, random_state=0)
@@ -217,7 +217,7 @@ def open_ml(
     drop: tuple[str, ...] = (),
     time_column: str | None = None,
     time_as_feature: bool = False,
-    numeric_target: bool = False,
+    numerify: bool = False,
 ) -> OpenMlDataset:
     """Describes an OpenML dataset (shorthand for the extended suite).
 
@@ -232,7 +232,7 @@ def open_ml(
         drop: Columns that are identifiers or free text, never features.
         time_column: Column ordering the rows, for chronological validation.
         time_as_feature: Whether the model may also use that column.
-        numeric_target: The target is stored as text but is a number.
+        numerify: The target is stored as text but is a number.
 
     Returns:
         The dataset description; nothing is downloaded until `fetch`.
@@ -244,7 +244,7 @@ def open_ml(
         metric,
         max_rows=max_rows,
         drop=drop,
-        numeric_target=numeric_target,
+        numerify=numerify,
         time_column=time_column,
         time_as_feature=time_as_feature,
         openml_name=openml_name,
@@ -352,7 +352,7 @@ EXTENDED = (
         "Class_number_of_rings",
         "regression",
         "rmse",
-        numeric_target=True,
+        numerify=True,
     ),
     open_ml(
         "diamonds",

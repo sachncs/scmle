@@ -16,7 +16,7 @@ EFFECTS = {"g1": 2.0, "g2": 0.0, "g3": 0.0}
 
 def certificate(path, **entry):
     body = {
-        "method_hash": certified.subgroup_method_hash(run.subgroup_report),
+        "method_hash": certified.fingerprint(run.stratify),
         "passed": True,
         "min_certified_rows": 200,
     }
@@ -26,14 +26,14 @@ def certificate(path, **entry):
 
 
 def test_without_a_certificate_the_family_is_descriptive(tmp_path):
-    gate = certified.subgroup_gate(run.subgroup_report, tmp_path / "none.json")
+    gate = certified.subgroup_gate(run.stratify, tmp_path / "none.json")
     assert gate.status == certified.DESCRIPTIVE
     assert "no subgroup certificate" in gate.reason
 
 
 def test_a_passing_current_certificate_makes_the_family_gating(tmp_path):
     gate = certified.subgroup_gate(
-        run.subgroup_report, certificate(tmp_path / "c.json")
+        run.stratify, certificate(tmp_path / "c.json")
     )
     assert gate.status == certified.GATING and gate.min_rows == 200
 
@@ -42,10 +42,10 @@ def test_a_failed_or_stale_certificate_is_descriptive(tmp_path):
     missed = certificate(tmp_path / "m.json", passed=False)
     stale = certificate(tmp_path / "s.json", method_hash="0" * 64)
     assert (
-        certified.subgroup_gate(run.subgroup_report, missed).status
+        certified.subgroup_gate(run.stratify, missed).status
         == certified.DESCRIPTIVE
     )
-    gate = certified.subgroup_gate(run.subgroup_report, stale)
+    gate = certified.subgroup_gate(run.stratify, stale)
     assert gate.status == certified.DESCRIPTIVE and "stale" in gate.reason
 
 

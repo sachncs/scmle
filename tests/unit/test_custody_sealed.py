@@ -19,7 +19,7 @@ def resident(values=(1.0, 2.0, 3.0)):
 
 
 def test_log_chains_entries_and_verifies():
-    log = sealed.OpenLog()
+    log = sealed.Journal()
     first = log.append("C", "sealed", "orchestrator")
     second = log.append("C", "open", "confirmation")
     assert first["prev"] == sealed.GENESIS
@@ -29,7 +29,7 @@ def test_log_chains_entries_and_verifies():
 
 def test_log_detects_a_changed_entry(tmp_path):
     path = tmp_path / "custody_log.jsonl"
-    log = sealed.OpenLog(path)
+    log = sealed.Journal(path)
     log.append("C", "sealed", "orchestrator")
     log.append("C", "open", "confirmation")
     lines = path.read_text().splitlines()
@@ -38,33 +38,33 @@ def test_log_detects_a_changed_entry(tmp_path):
     lines[0] = json.dumps(record)
     path.write_text("\n".join(lines) + "\n")
     with pytest.raises(errors.ArtifactError, match="chain"):
-        sealed.OpenLog(path)
+        sealed.Journal(path)
 
 
 def test_log_detects_a_removed_entry(tmp_path):
     path = tmp_path / "custody_log.jsonl"
-    log = sealed.OpenLog(path)
+    log = sealed.Journal(path)
     for event in ("sealed", "token_issued", "open"):
         log.append("C", event, "orchestrator")
     lines = path.read_text().splitlines()
     del lines[1]
     path.write_text("\n".join(lines) + "\n")
     with pytest.raises(errors.ArtifactError, match="chain"):
-        sealed.OpenLog(path)
+        sealed.Journal(path)
 
 
 def test_log_reloads_and_continues_the_chain(tmp_path):
     path = tmp_path / "custody_log.jsonl"
-    sealed.OpenLog(path).append("C", "sealed", "orchestrator")
-    again = sealed.OpenLog(path)
+    sealed.Journal(path).append("C", "sealed", "orchestrator")
+    again = sealed.Journal(path)
     entry = again.append("C", "open", "confirmation")
     assert entry["seq"] == 1
-    sealed.OpenLog(path)
+    sealed.Journal(path)
 
 
 def test_a_set_opens_once_and_every_attempt_is_logged():
-    log = sealed.OpenLog()
-    held = sealed.SealedSet("C", resident(), log)
+    log = sealed.Journal()
+    held = sealed.Locker("C", resident(), log)
     held.commit("c", "l")
     token = held.issue_token()
     rows = held.open(token, "confirmation", claims_hash="c", ledger_hash="l")
@@ -78,8 +78,8 @@ def test_a_set_opens_once_and_every_attempt_is_logged():
 
 
 def test_a_wrong_token_is_denied_and_logged_without_opening():
-    log = sealed.OpenLog()
-    held = sealed.SealedSet("C", resident(), log)
+    log = sealed.Journal()
+    held = sealed.Locker("C", resident(), log)
     with pytest.raises(errors.LeakageError, match="invalid token"):
         held.open("guess", actor="exploration")
     assert held.opened is False
@@ -91,8 +91,8 @@ def test_a_wrong_token_is_denied_and_logged_without_opening():
 
 
 def test_the_log_never_contains_row_values():
-    log = sealed.OpenLog()
-    held = sealed.SealedSet("C", resident((123456.789, 2.0, 3.0)), log)
+    log = sealed.Journal()
+    held = sealed.Locker("C", resident((123456.789, 2.0, 3.0)), log)
     held.commit("c", "l")
     held.open(
         held.issue_token(), "confirmation", claims_hash="c", ledger_hash="l"
@@ -101,7 +101,7 @@ def test_the_log_never_contains_row_values():
 
 
 def test_the_vault_gives_each_set_its_own_token():
-    log = sealed.OpenLog()
+    log = sealed.Journal()
     vault = sealed.Vault(log)
     first = vault.adopt("C", resident())
     second = vault.adopt("final_test", resident())
@@ -112,7 +112,7 @@ def test_the_vault_gives_each_set_its_own_token():
 
 
 def test_the_vault_refuses_a_duplicate_set_name():
-    vault = sealed.Vault(sealed.OpenLog())
+    vault = sealed.Vault(sealed.Journal())
     vault.adopt("C", resident())
     with pytest.raises(ValueError, match="already"):
         vault.adopt("C", resident())
@@ -120,7 +120,7 @@ def test_the_vault_refuses_a_duplicate_set_name():
 
 
 def test_exploration_view_holds_no_reference_to_a_sealed_set():
-    view = sealed.ExplorationView(
+    view = sealed.View(
         features=pandas.DataFrame({"a": [1.0]}),
         target=pandas.Series([0]),
         ids=(0,),
@@ -138,8 +138,8 @@ def test_exploration_view_holds_no_reference_to_a_sealed_set():
 
 
 def committed(process_set):
-    log = sealed.OpenLog()
-    held = sealed.SealedSet("C", process_set, log)
+    log = sealed.Journal()
+    held = sealed.Locker("C", process_set, log)
     held.commit("claims-1", "ledger-1")
     return held, log
 
@@ -177,7 +177,7 @@ def test_a_set_commits_once_and_not_after_it_opened():
     held, ignored = committed(resident())
     with pytest.raises(errors.LeakageError, match="already bound"):
         held.commit("claims-2", "ledger-1")
-    other = sealed.SealedSet("F", resident(), sealed.OpenLog())
+    other = sealed.Locker("F", resident(), sealed.Journal())
     other.commit("claims-0", "ledger-0")
     other.open(
         other.issue_token(), claims_hash="claims-0", ledger_hash="ledger-0"
@@ -197,7 +197,7 @@ def test_the_binding_digest_depends_on_both_hashes():
 def test_an_unbound_set_is_refused():
     # GATE-3: a set that was never committed used to open with the token
     # alone; every release is now bound to what it is released for.
-    held = sealed.SealedSet("C", resident(), sealed.OpenLog())
+    held = sealed.Locker("C", resident(), sealed.Journal())
     assert held.committed is False
     with pytest.raises(errors.LeakageError, match="bind it"):
         held.open(held.issue_token())
@@ -212,23 +212,23 @@ def rechain(path, key=None):
     for index, record in enumerate(lines):
         body = {k: v for k, v in record.items() if k not in ("hash", "mac")}
         body["seq"], body["prev"] = index, previous
-        rewritten = {**body, "hash": sealed.entry_hash(body)}
+        rewritten = {**body, "hash": sealed.hashed(body)}
         previous = rewritten["hash"]
         out.append(json.dumps(rewritten))
     path.write_text("\n".join(out) + "\n")
 
 
 def test_a_keyed_log_carries_a_mac_on_every_entry(tmp_path):
-    log = sealed.OpenLog(tmp_path / "log.jsonl", signing_key="k1")
+    log = sealed.Journal(tmp_path / "log.jsonl", signing_key="k1")
     first = log.append("C", "sealed", "orchestrator")
-    assert first["mac"] == sealed.entry_mac(first["hash"], b"k1")
+    assert first["mac"] == sealed.authenticate(first["hash"], b"k1")
     assert len(first["mac"]) == 64
-    sealed.OpenLog(tmp_path / "log.jsonl", signing_key="k1")
+    sealed.Journal(tmp_path / "log.jsonl", signing_key="k1")
 
 
 def test_a_forger_who_recomputes_the_chain_fails_the_mac(tmp_path):
     path = tmp_path / "log.jsonl"
-    log = sealed.OpenLog(path, signing_key="k1")
+    log = sealed.Journal(path, signing_key="k1")
     log.append("C", "sealed", "orchestrator")
     log.append("C", "open", "confirmation")
     lines = path.read_text().splitlines()
@@ -237,33 +237,33 @@ def test_a_forger_who_recomputes_the_chain_fails_the_mac(tmp_path):
     lines[1] = json.dumps(record)
     path.write_text("\n".join(lines) + "\n")
     rechain(path)
-    assert len(sealed.OpenLog(path).entries) == 2  # a checksum is satisfied
+    assert len(sealed.Journal(path).entries) == 2  # a checksum is satisfied
     with pytest.raises(errors.ArtifactError, match="MAC"):
-        sealed.OpenLog(path, signing_key="k1")
+        sealed.Journal(path, signing_key="k1")
 
 
 def test_the_wrong_key_and_stripped_macs_are_refused(tmp_path):
     path = tmp_path / "log.jsonl"
-    sealed.OpenLog(path, signing_key="k1").append("C", "sealed", "o")
+    sealed.Journal(path, signing_key="k1").append("C", "sealed", "o")
     with pytest.raises(errors.ArtifactError, match="MAC"):
-        sealed.OpenLog(path, signing_key="k2")
+        sealed.Journal(path, signing_key="k2")
     record = json.loads(path.read_text())
     del record["mac"]
     path.write_text(json.dumps(record) + "\n")
     with pytest.raises(errors.ArtifactError, match="MAC"):
-        sealed.OpenLog(path, signing_key="k1")
+        sealed.Journal(path, signing_key="k1")
 
 
 def test_the_environment_key_signs_when_no_key_is_given(tmp_path, monkeypatch):
     monkeypatch.setenv("SCMLE_SIGNING_KEY", "from-env")
-    entry = sealed.OpenLog(tmp_path / "log.jsonl").append("C", "sealed", "o")
-    assert entry["mac"] == sealed.entry_mac(entry["hash"], b"from-env")
+    entry = sealed.Journal(tmp_path / "log.jsonl").append("C", "sealed", "o")
+    assert entry["mac"] == sealed.authenticate(entry["hash"], b"from-env")
     monkeypatch.delenv("SCMLE_SIGNING_KEY")
-    assert "mac" not in sealed.OpenLog().append("C", "sealed", "o")
+    assert "mac" not in sealed.Journal().append("C", "sealed", "o")
 
 
 def test_head_is_the_newest_hash_and_genesis_when_empty():
-    log = sealed.OpenLog()
+    log = sealed.Journal()
     assert log.head == sealed.GENESIS
     entry = log.append("C", "sealed", "o")
     assert log.head == entry["hash"]
@@ -271,14 +271,14 @@ def test_head_is_the_newest_hash_and_genesis_when_empty():
 
 def test_an_unsigned_log_says_so(caplog):
     with caplog.at_level("WARNING", logger=sealed.__name__):
-        sealed.OpenLog(signing_key=None)
+        sealed.Journal(signing_key=None)
     assert any("not signed" in r.getMessage() for r in caplog.records)
 
 
 def test_a_signed_log_cannot_be_verified_without_its_key(tmp_path):
     path = tmp_path / "log.jsonl"
-    signed = sealed.OpenLog(path, signing_key="k")
+    signed = sealed.Journal(path, signing_key="k")
     signed.append("C", "sealed", "orchestrator")
     with pytest.raises(errors.ArtifactError, match="cannot be verified"):
-        sealed.OpenLog(path, signing_key=None)
-    assert len(sealed.OpenLog(path, signing_key="k").entries) == 1
+        sealed.Journal(path, signing_key=None)
+    assert len(sealed.Journal(path, signing_key="k").entries) == 1

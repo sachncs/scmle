@@ -32,12 +32,12 @@ The 18 survivors were read one by one. Not killed and equivalent:
 
 | Mutant | Change | Why it cannot change behaviour |
 | --- | --- | --- |
-| `MixtureTest.update` `strict=` (3 mutants) | `zip(log_weights, inner, strict=True)` with `None`, no argument or `False` | The two lists always have the same length (a term and its weight are appended and dropped together). |
-| `MixtureTest.update` `axis=None` | `stacked.max(axis=None)` for `max(axis=0)` | Only a shift of the log-sum-exp, which does not change the value except by rounding (checked to 1e-12 on array nulls); the shift is there for underflow. |
-| `PairedEProcess.__init__` | `scale <= 0.0` to `scale < 0.0` | With `scale = 0` the second test `-scale < margin < scale` is already false, so the same error is raised. |
-| `estimate_batch` | `np.where(seen, losses, 1.0)` for `0.0` | The result is multiplied by `seen` on the next operation, so the value for unobserved cases is never used. |
-| `estimate_batch` | `min(mean / scale, 2.0)` for `1.0` | With at least one unobserved case (otherwise the batch is `complete`) and propensities at least `epsilon`, `mean / scale <= (n-1)/n`; the clip is a guard against rounding. |
-| `stream_mechanism` | `>` to `>=` | Replacing the weakest mechanism by an equal one changes nothing. |
+| `Mixture.update` `strict=` (3 mutants) | `zip(log_weights, inner, strict=True)` with `None`, no argument or `False` | The two lists always have the same length (a term and its weight are appended and dropped together). |
+| `Mixture.update` `axis=None` | `stacked.max(axis=None)` for `max(axis=0)` | Only a shift of the log-sum-exp, which does not change the value except by rounding (checked to 1e-12 on array nulls); the shift is there for underflow. |
+| `Comparison.__init__` | `scale <= 0.0` to `scale < 0.0` | With `scale = 0` the second test `-scale < margin < scale` is already false, so the same error is raised. |
+| `weigh` | `np.where(seen, losses, 1.0)` for `0.0` | The result is multiplied by `seen` on the next operation, so the value for unobserved cases is never used. |
+| `weigh` | `min(mean / scale, 2.0)` for `1.0` | With at least one unobserved case (otherwise the batch is `complete`) and propensities at least `epsilon`, `mean / scale <= (n-1)/n`; the clip is a guard against rounding. |
+| `worst` | `>` to `>=` | Replacing the weakest mechanism by an equal one changes nothing. |
 
 Left unclassified: 10 `dtype=` or `dtype` argument mutants of `np.asarray`
 for inputs the API documents as floats or booleans; the cases where the
@@ -74,9 +74,9 @@ was kept (it was stopped when they were added), so there is no before figure.
 
 The category columns are a mechanical classification of the mutant's diff
 (see `MUTANTS_decision.md`); it is a pointer for where to look, not a triage.
-Of the new wiring in `Loop` (`record_incident`, `check_feedback`,
-`guard_registry`) and in the registry only three mutants survived, all in
-`check_feedback`: the text of its error (now pinned by an exact-message test
+Of the new wiring in `Loop` (`record_incident`, `performativity`,
+`intercept`) and in the registry only three mutants survived, all in
+`performativity`: the text of its error (now pinned by an exact-message test
 added after this run, so not re-measured), and two that drop or null the
 `proposed_default` argument of `escalate`, which are equivalent because
 `escalate` substitutes `policy.safe_default` when the argument is falsy. The

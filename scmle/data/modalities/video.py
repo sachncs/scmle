@@ -14,23 +14,23 @@ import numpy
 
 from scmle.contracts import data
 from scmle.contracts import errors
-from scmle.data.modalities.curation import build_finding
-from scmle.data.modalities.curation import check_split_fractions
+from scmle.data.modalities.curation import allocate
 from scmle.data.modalities.curation import conflicting_label_groups
 from scmle.data.modalities.curation import Curation
+from scmle.data.modalities.curation import flaw
 from scmle.data.modalities.curation import label_counts
-from scmle.data.modalities.curation import partition_group_ids
+from scmle.data.modalities.curation import proportions
 
 SHA256_HEX_LENGTH = 64
 
 
-class VideoValidationError(errors.DataError):
+class VideoError(errors.DataError):
     """A video sample violates an ingestion or metadata invariant."""
 
     category = "video_validation"
 
 
-class VideoTemporalError(VideoValidationError):
+class VideoTemporalError(VideoError):
     """Temporal video evidence is incomplete or invalid."""
 
 
@@ -118,7 +118,7 @@ class Metadata:
         return self.frame_count / self.frames_per_second
 
     @property
-    def synchronization_status(self) -> str:
+    def synchrony(self) -> str:
         """The measured audio/video synchronization state.
 
         One of ``not_applicable`` (no audio track), ``unknown`` (audio
@@ -156,7 +156,7 @@ class Profile:
         audio_duration_seconds: Measured audio duration, if any.
         sync_offset_seconds: Measured audio/video offset, if any.
         sync_tolerance_seconds: Allowed absolute offset, if any.
-        synchronization_status: Synchronization state of the metadata.
+        synchrony: Synchronization state of the metadata.
         observation_time: UTC time the clip was observed, if known.
     """
 
@@ -173,7 +173,7 @@ class Profile:
     audio_duration_seconds: float | None = None
     sync_offset_seconds: float | None = None
     sync_tolerance_seconds: float | None = None
-    synchronization_status: str = "not_applicable"
+    synchrony: str = "not_applicable"
     observation_time: datetime | None = None
 
 
@@ -414,7 +414,7 @@ class Sample:
         Raises:
             ValueError: If source or group_id is blank, or file_hash is not
                 a lowercase SHA-256 hex digest of the payload.
-            VideoValidationError: If the payload is empty.
+            VideoError: If the payload is empty.
         """
         raw = bytes(self.encoded_bytes)
         object.__setattr__(self, "encoded_bytes", raw)
@@ -429,7 +429,7 @@ class Sample:
                 canonical_observation_time(self.observation_time),
             )
         if not raw:
-            raise VideoValidationError(
+            raise VideoError(
                 "video payload is empty", {"code": "empty_payload"}
             )
         if len(self.file_hash) != SHA256_HEX_LENGTH or any(
@@ -470,16 +470,16 @@ class Sample:
             The new sample.
 
         Raises:
-            VideoValidationError: If the payload is empty, or exceeds
+            VideoError: If the payload is empty, or exceeds
                 ``max_bytes`` (or ``max_bytes`` is below one).
         """
         raw = bytes(encoded_bytes)
         if not raw:
-            raise VideoValidationError(
+            raise VideoError(
                 "video payload is empty", {"code": "empty_payload"}
             )
         if max_bytes is not None and (max_bytes < 1 or len(raw) > max_bytes):
-            raise VideoValidationError(
+            raise VideoError(
                 "video payload exceeds the configured byte limit",
                 {
                     "code": "encoded_size_limit",
@@ -521,7 +521,7 @@ class Sample:
             audio_duration_seconds=self.metadata.audio_duration_seconds,
             sync_offset_seconds=self.metadata.sync_offset_seconds,
             sync_tolerance_seconds=self.metadata.sync_tolerance_seconds,
-            synchronization_status=self.metadata.synchronization_status,
+            synchrony=self.metadata.synchrony,
             observation_time=self.observation_time,
         )
 
@@ -543,18 +543,18 @@ class Dataset:
         """Rejects an empty or duplicate-source dataset and derives its hash.
 
         Raises:
-            VideoValidationError: If there are no samples or two samples
+            VideoError: If there are no samples or two samples
                 share a source.
         """
         normalized = tuple(self.samples)
         if not normalized:
-            raise VideoValidationError(
+            raise VideoError(
                 "video dataset must contain at least one sample",
                 {"code": "empty_dataset"},
             )
         sources = [sample.source for sample in normalized]
         if len(sources) != len(set(sources)):
-            raise VideoValidationError(
+            raise VideoError(
                 "video dataset contains duplicate sources",
                 {"code": "duplicate_source"},
             )
@@ -580,12 +580,12 @@ class Dataset:
         """
         return tuple(sample.profile() for sample in self.samples)
 
-    def prepare_metadata_features(self) -> Features:
+    def numerize(self) -> Features:
         """Prepares deterministic numeric features from probed metadata.
 
         This method never decodes or samples frames. Frame-based features
         need an explicit decoder, sampling policy and resource budget; see
-        `prepare_frame_features`.
+        `summarize`.
 
         Returns:
             One row of ten features per sample: duration in seconds, width,
@@ -593,7 +593,7 @@ class Dataset:
             audio track count, byte size and bytes per frame.
 
         Raises:
-            VideoValidationError: If a feature is not finite.
+            VideoError: If a feature is not finite.
         """
         feature_names = (
             "duration_seconds",
@@ -626,7 +626,7 @@ class Dataset:
             )
         values: numpy.ndarray = numpy.asarray(rows, dtype=numpy.float64)
         if not numpy.isfinite(values).all():
-            raise VideoValidationError(
+            raise VideoError(
                 "video metadata features must be finite",
                 {"code": "non_finite_features"},
             )
@@ -638,7 +638,7 @@ class Dataset:
             ),
         )
 
-    def prepare_frame_features(
+    def summarize(
         self,
         decoder: VideoFrameDecoder,
         max_frames: int = 8,
@@ -666,7 +666,7 @@ class Dataset:
             TypeError: If ``decoder`` is not callable.
             ValueError: If ``max_frames`` or ``max_frame_pixels`` is below
                 one.
-            VideoValidationError: If a decoded frame violates its metadata
+            VideoError: If a decoded frame violates its metadata
                 or cannot be converted to finite numeric values.
         """
         if not callable(decoder):
@@ -682,7 +682,7 @@ class Dataset:
         rows: list[tuple[float, ...]] = []
         sampled_indices: list[tuple[int, ...]] = []
         for sample in self.samples:
-            indices = self.frame_indices_for(sample, max_frames)
+            indices = self.stride(sample, max_frames)
             values = numpy.zeros(
                 max_frames * len(slot_names), dtype=numpy.float64
             )
@@ -692,7 +692,7 @@ class Dataset:
                         decoder(sample.encoded_bytes, frame_index)
                     )
                 except Exception as error:
-                    raise VideoValidationError(
+                    raise VideoError(
                         "video frame decoding failed",
                         {
                             "code": "frame_decode_failed",
@@ -701,7 +701,7 @@ class Dataset:
                         },
                     ) from error
                 if frame.ndim not in {2, 3}:
-                    raise VideoValidationError(
+                    raise VideoError(
                         "decoded video frames must be grayscale or "
                         "channel-last",
                         {
@@ -712,7 +712,7 @@ class Dataset:
                         },
                     )
                 if frame.size < 1 or frame.size > max_frame_pixels:
-                    raise VideoValidationError(
+                    raise VideoError(
                         "decoded video frame exceeds the configured pixel "
                         "limit",
                         {
@@ -727,7 +727,7 @@ class Dataset:
                     frame.shape[0] > sample.metadata.height
                     or frame.shape[1] > sample.metadata.width
                 ):
-                    raise VideoValidationError(
+                    raise VideoError(
                         "decoded video frame exceeds probed dimensions",
                         {
                             "code": "frame_dimension_mismatch",
@@ -742,7 +742,7 @@ class Dataset:
                     )
                 numeric = numpy.asarray(frame, dtype=numpy.float64)
                 if not numpy.isfinite(numeric).all():
-                    raise VideoValidationError(
+                    raise VideoError(
                         "decoded video frame contains non-finite values",
                         {
                             "code": "non_finite_frame",
@@ -768,7 +768,7 @@ class Dataset:
         )
 
     @staticmethod
-    def frame_indices_for(sample: Sample, max_frames: int) -> tuple[int, ...]:
+    def stride(sample: Sample, max_frames: int) -> tuple[int, ...]:
         """Returns deterministic, evenly spaced frame indices for a sample.
 
         Args:
@@ -821,13 +821,13 @@ class Dataset:
             ValueError: If a fraction is outside [0, 1) or the fractions sum
                 to 1 or more.
         """
-        check_split_fractions(validation_fraction, test_fraction)
+        proportions(validation_fraction, test_fraction)
         grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:
             grouped.setdefault(sample.group_id or sample.source, []).append(
                 sample
             )
-        validation_groups, test_groups = partition_group_ids(
+        validation_groups, test_groups = allocate(
             grouped, validation_fraction, test_fraction, seed
         )
 
@@ -920,21 +920,21 @@ class Dataset:
         )
         quality_findings = []
         synchronization_statuses = sorted(
-            {sample.metadata.synchronization_status for sample in self.samples}
+            {sample.metadata.synchrony for sample in self.samples}
         )
         out_of_tolerance = [
             sample.source
             for sample in self.samples
-            if sample.metadata.synchronization_status == "out_of_tolerance"
+            if sample.metadata.synchrony == "out_of_tolerance"
         ]
         unknown_synchronization = [
             sample.source
             for sample in self.samples
-            if sample.metadata.synchronization_status == "unknown"
+            if sample.metadata.synchrony == "unknown"
         ]
         if out_of_tolerance:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.video-audio-sync-out-of-tolerance",
                     data.FindingSeverity.ERROR,
                     {"sources": out_of_tolerance},
@@ -946,7 +946,7 @@ class Dataset:
             )
         if unknown_synchronization:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.video-audio-sync-unknown",
                     data.FindingSeverity.WARNING,
                     {"sources": unknown_synchronization},
@@ -958,7 +958,7 @@ class Dataset:
             )
         if len(formats) > 1 or len(codecs) > 1:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.video-encoding-drift",
                     data.FindingSeverity.WARNING,
                     {"sources": [profile.source for profile in profiles]},
@@ -970,7 +970,7 @@ class Dataset:
             )
         if len(dimensions) > 1:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.video-dimension-drift",
                     data.FindingSeverity.WARNING,
                     {"sources": [profile.source for profile in profiles]},
@@ -1017,7 +1017,7 @@ class Dataset:
         profile["temporal"] = temporal_evidence
         if temporal_evidence["status"] == "mixed":
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.video-mixed-temporal-state",
                     data.FindingSeverity.WARNING,
                     {"dataset": self.content_hash},
@@ -1029,7 +1029,7 @@ class Dataset:
             )
         if "unlabeled" in labels and len(labels) > 1:
             risk_findings.append(
-                build_finding(
+                flaw(
                     "risk.video-mixed-label-state",
                     data.FindingSeverity.WARNING,
                     {"dataset": self.content_hash},
@@ -1041,7 +1041,7 @@ class Dataset:
             )
         if conflicts:
             risk_findings.append(
-                build_finding(
+                flaw(
                     "risk.video-conflicting-duplicate-labels",
                     data.FindingSeverity.ERROR,
                     {"dataset": self.content_hash},
@@ -1069,10 +1069,10 @@ __all__ = [
     "Sample",
     "Split",
     "TemporalSplit",
+    "VideoError",
     "VideoFrameDecoder",
     "VideoProbe",
     "VideoTemporalError",
-    "VideoValidationError",
     "canonical_observation_time",
     "canonical_source",
 ]

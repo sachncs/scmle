@@ -39,7 +39,7 @@ CLIP = 1e-6
 PATHS = ("bayes", "recalibrated", "grid")
 
 
-def bayes_threshold(c_fp: float, c_fn: float) -> float:
+def breakeven(c_fp: float, c_fn: float) -> float:
     """Returns the Bayes threshold `t* = c_FP / (c_FP + c_FN)`.
 
     Args:
@@ -81,7 +81,7 @@ class Calibration:
     calibrated: bool
 
 
-def probabilities_and_labels(
+def pair(
     p: ArrayLike, y: ArrayLike
 ) -> tuple[NDArray[numpy.float64], NDArray[numpy.float64]]:
     """Validated probabilities and 0/1 labels of equal length.
@@ -97,10 +97,10 @@ def probabilities_and_labels(
         ValueError: If the shapes differ, or a probability is not finite or
             lies outside [0, 1]. Labels that are not a non-empty
             one-dimensional array of 0 and 1 are rejected by
-            `costs.binary_vector` with a `ValueError`.
+            `costs.dichotomous` with a `ValueError`.
     """
     risk = numpy.asarray(p, dtype=float)
-    labels = costs.binary_vector(y, "y")
+    labels = costs.dichotomous(y, "y")
     if risk.shape != labels.shape:
         raise errors.InputError("p and y must have the same length")
     if not numpy.isfinite(risk).all() or (risk < 0).any() or (risk > 1).any():
@@ -108,7 +108,7 @@ def probabilities_and_labels(
     return risk, labels
 
 
-def calibration_check(
+def hosmer(
     p: ArrayLike, y: ArrayLike, level: float = 0.01, bins: int = BINS
 ) -> Calibration:
     """Binned chi-square test that `E[y | p] = p`.
@@ -128,9 +128,9 @@ def calibration_check(
         ValueError: If `level` is not strictly between 0 and 1, or there
             are fewer than `5 * bins` rows. Invalid `p` or `y`, or `bins`
             below 2, are also rejected with a `ValueError` by the helpers
-            `probabilities_and_labels` and `qualification.count`.
+            `pair` and `qualification.count`.
     """
-    risk, labels = probabilities_and_labels(p, y)
+    risk, labels = pair(p, y)
     if not 0.0 < level < 1.0:
         raise errors.InputError("level must be strictly between 0 and 1")
     qualification.count(bins, "bins", minimum=2)
@@ -180,7 +180,7 @@ class Recalibrator:
         return result
 
 
-def fit_recalibrator(p: ArrayLike, y: ArrayLike) -> Recalibrator:
+def calibrator(p: ArrayLike, y: ArrayLike) -> Recalibrator:
     """Maximum-likelihood Platt scaling (two parameters, no penalty).
 
     Args:
@@ -191,9 +191,9 @@ def fit_recalibrator(p: ArrayLike, y: ArrayLike) -> Recalibrator:
         The fitted intercept and slope.
 
     Invalid `p` or `y` are rejected with a `ValueError` by
-    `probabilities_and_labels`.
+    `pair`.
     """
-    risk, labels = probabilities_and_labels(p, y)
+    risk, labels = pair(p, y)
     clipped = numpy.clip(risk, CLIP, 1.0 - CLIP)
     feature = numpy.log(clipped / (1.0 - clipped))
 
@@ -212,9 +212,7 @@ def fit_recalibrator(p: ArrayLike, y: ArrayLike) -> Recalibrator:
     return Recalibrator(float(fitted.x[0]), float(fitted.x[1]))
 
 
-def cross_fitted(
-    p: ArrayLike, y: ArrayLike, seed: int
-) -> NDArray[numpy.float64]:
+def crossfit(p: ArrayLike, y: ArrayLike, seed: int) -> NDArray[numpy.float64]:
     """Recalibrated probabilities where each row's map never saw its label.
 
     Rows are split at random into `FOLDS` folds; the map applied to a fold is
@@ -229,17 +227,15 @@ def cross_fitted(
         The cross-fitted probabilities, one per row, in input order.
 
     Invalid `p` or `y` are rejected with a `ValueError` by
-    `probabilities_and_labels`.
+    `pair`.
     """
-    risk, labels = probabilities_and_labels(p, y)
+    risk, labels = pair(p, y)
     rng = randomness.component_rng(seed, "decision.threshold.folds", 0)
     fold = rng.permutation(len(risk)) % FOLDS
     out = numpy.empty_like(risk)
     for k in range(FOLDS):
         held = fold == k
-        out[held] = fit_recalibrator(risk[~held], labels[~held]).apply(
-            risk[held]
-        )
+        out[held] = calibrator(risk[~held], labels[~held]).apply(risk[held])
     return out
 
 
@@ -273,7 +269,7 @@ class Threshold:
         return (risk >= self.threshold).astype(float)
 
     @property
-    def raw_threshold(self) -> float | None:
+    def uncalibrated(self) -> float | None:
         """The equivalent cut on the raw probability, or None.
 
         A Platt map with a positive slope is increasing, so acting when the
@@ -297,7 +293,7 @@ class Threshold:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ThresholdDecision:
+class Thresholding:
     """What the thresholding step produced on development data.
 
     Attributes:
@@ -352,7 +348,7 @@ class ThresholdDecision:
 def cost_interval(
     y: NDArray[numpy.float64],
     acts: NDArray[numpy.float64],
-    model: costs.DecisionCostModel,
+    model: costs.Tariff,
     clusters: ArrayLike | None,
     replicates: int,
     seed: int,
@@ -394,11 +390,11 @@ def cost_interval(
     )
 
 
-def stable_span(
+def span(
     p: NDArray[numpy.float64],
     y: NDArray[numpy.float64],
     rule: Threshold,
-    model: costs.DecisionCostModel,
+    model: costs.Tariff,
     points: int = 41,
 ) -> tuple[float, float] | None:
     """Span of `t` in the chartered range where the frozen rule beats both.
@@ -424,19 +420,19 @@ def stable_span(
             for t in grid
         ]
     )
-    return netbenefit.useful_span(grid, good)
+    return netbenefit.stretch(grid, good)
 
 
-def choose_threshold(
+def operate(
     p: ArrayLike,
     y: ArrayLike,
-    model: costs.DecisionCostModel,
+    model: costs.Tariff,
     *,
     level: float = 0.01,
     clusters: ArrayLike | None = None,
     replicates: int = 500,
     seed: int = 0,
-) -> ThresholdDecision:
+) -> Thresholding:
     """Chooses the operating threshold on development data only.
 
     If the probabilities pass a calibration check, the rule is the Bayes
@@ -461,33 +457,31 @@ def choose_threshold(
         cost interval and stable threshold range (None if there is none).
         Invalid inputs are rejected with a `ValueError` by the helpers.
     """
-    risk, labels = probabilities_and_labels(p, y)
-    first = calibration_check(risk, labels, level)
+    risk, labels = pair(p, y)
+    first = hosmer(risk, labels, level)
     recheck = None
-    target = bayes_threshold(model.c_fp, model.c_fn)
+    target = breakeven(model.c_fp, model.c_fn)
     if first.calibrated:
         rule = Threshold(target, "bayes")
     else:
-        recheck = calibration_check(
-            cross_fitted(risk, labels, seed), labels, level
-        )
-        platt = fit_recalibrator(risk, labels)
+        recheck = hosmer(crossfit(risk, labels, seed), labels, level)
+        platt = calibrator(risk, labels)
         if recheck.calibrated and platt.slope > 0:
             rule = Threshold(target, "recalibrated", platt)
         else:
-            cut = thresholds.optimize_threshold(
+            cut = thresholds.argmax(
                 risk,
                 labels.astype(bool),
-                thresholds.CostObjective(model.c_fp, model.c_fn),
+                thresholds.Costs(model.c_fp, model.c_fn),
             )[0]
             rule = Threshold(cut, "grid")
     acts = rule.act(risk)
     tier = (
         "attested"
-        if rule.path != "grid" and not model.unverified_entries
+        if rule.path != "grid" and not model.unreviewed
         else "unverified"
     )
-    return ThresholdDecision(
+    return Thresholding(
         rule=rule,
         tier=tier,
         check=first,
@@ -496,5 +490,5 @@ def choose_threshold(
         cost_interval=cost_interval(
             labels, acts, model, clusters, replicates, seed
         ),
-        stable_range=stable_span(risk, labels, rule, model),
+        stable_range=span(risk, labels, rule, model),
     )

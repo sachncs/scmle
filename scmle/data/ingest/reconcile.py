@@ -38,7 +38,7 @@ SOURCE_NAME = "source query at read time"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class JoinCheck:
+class Cardinality:
     """Row counts around one join.
 
     Attributes:
@@ -53,7 +53,7 @@ class JoinCheck:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FeatureTotal:
+class Sum:
     """An end-of-data total of a feature against a source query.
 
     Attributes:
@@ -100,15 +100,15 @@ class Report:
         }
 
 
-def reconcile_extract(
-    source: profile.SqlSource,
+def crosscheck(
+    source: profile.Sql,
     assembled: pandas.DataFrame,
     base_table: str,
     measures: Sequence[str] = (),
-    joins: Sequence[JoinCheck] = (),
-    feature_totals: Sequence[FeatureTotal] = (),
+    joins: Sequence[Cardinality] = (),
+    feature_totals: Sequence[Sum] = (),
     tolerance: float = 0.0,
-    gate: certificates.GateStatus = certificates.GateStatus.DESCRIPTIVE,
+    gate: certificates.Authority = certificates.Authority.DESCRIPTIVE,
 ) -> Report:
     """Compares an assembled table with the source it came from.
 

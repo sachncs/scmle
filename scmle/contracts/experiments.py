@@ -10,7 +10,7 @@ from typing import Self
 DEFAULT_STRATEGY = "default"
 
 
-class TrialStatus(enum.StrEnum):
+class Termination(enum.StrEnum):
     """Terminal status of a trial."""
 
     OK = "ok"
@@ -166,7 +166,7 @@ class Trial:
 
     trial_id: str
     model_name: str
-    status: TrialStatus
+    status: Termination
     metric: str = ""
     score_mean: float = float("nan")
     score_std: float = float("nan")
@@ -200,7 +200,7 @@ class Trial:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class HistoricalRun:
+class Precedent:
     """What is remembered about a past run, for meta-learning.
 
     Attributes:

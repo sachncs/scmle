@@ -42,10 +42,8 @@ class SkewedLogTransformer(base.TransformerMixin, base.BaseEstimator):  # type: 
         """
         frame = pandas.DataFrame(numpy.asarray(features, dtype=float))
         skew = frame.skew().fillna(0.0).to_numpy()
-        non_negative = (frame.min() >= 0).to_numpy()
-        self.columns_ = numpy.flatnonzero(
-            non_negative & (skew > self.threshold)
-        )
+        nonnegative = (frame.min() >= 0).to_numpy()
+        self.columns_ = numpy.flatnonzero(nonnegative & (skew > self.threshold))
         self.n_features_in_ = frame.shape[1]
         return self
 
@@ -80,7 +78,7 @@ class SkewedLogTransformer(base.TransformerMixin, base.BaseEstimator):  # type: 
         return numpy.asarray(input_features, dtype=object)
 
 
-class TextVectorizer(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
+class Vectorizer(base.TransformerMixin, base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information, so its base classes are Any
     """TF-IDF terms of a text column, with the vocabulary learned per fold.
 
     Attributes:

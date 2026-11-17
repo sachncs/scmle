@@ -39,9 +39,9 @@ def run_screen(frame, budget):
 
 
 def test_the_work_cap_is_derived_from_the_budget_alone():
-    assert screen.work_cap(None) is None
-    assert screen.work_cap(120) == 450_000
-    assert screen.work_cap(1800) == 6_750_000
+    assert screen.allowance(None) is None
+    assert screen.allowance(120) == 450_000
+    assert screen.allowance(1800) == 6_750_000
     assert screen.SCREEN_SHARE == 0.15
 
 
@@ -81,23 +81,23 @@ def profile_of(frame, budget):
     resolved = scmle.data.validation.target.TaskResolver(spec).resolve(
         frame["y"]
     )
-    manifest = tabular.build_manifest(frame, "y")
+    manifest = tabular.manifested(frame, "y")
     return profiler.Profiler(spec).profile(frame, manifest, resolved)
 
 
 def test_the_profiler_passes_the_projects_budget_and_warns_first():
     result = profile_of(wide(), SMALL_BUDGET)
-    assert result.unchecked_columns == tuple(f"x{i}" for i in range(10))
-    assert result.risk_findings[0] == result.screen_warning
-    assert result.leakage["warning"] == result.screen_warning
-    assert profile_of(wide(), LARGE_BUDGET).unchecked_columns == ()
+    assert result.untested == tuple(f"x{i}" for i in range(10))
+    assert result.risk_findings[0] == result.admonition
+    assert result.leakage["warning"] == result.admonition
+    assert profile_of(wide(), LARGE_BUDGET).untested == ()
 
 
 def test_an_incomplete_screen_is_in_summary_report_log_and_plan(tmp_path):
     result = support.make_project(
         wide(), "y", output_dir=tmp_path, time_budget=SMALL_BUDGET
     ).run()
-    warning = result.profile.screen_warning
+    warning = result.profile.admonition
     assert warning.startswith("leakage screen NOT RUN for 10 columns")
     summary = result.summary()
     assert "PROVISIONAL: leakage screen incomplete" in summary

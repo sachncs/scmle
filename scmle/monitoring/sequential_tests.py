@@ -89,7 +89,7 @@ def validate_unit(value: Any, name: str) -> numpy.ndarray:
     return array
 
 
-class BettingTest:
+class Betting:
     """Anytime-valid test of one or many means by betting.
 
     With ``direction="greater"`` the null is "mean <= null_mean" and the test
@@ -222,7 +222,7 @@ class BettingTest:
         }
 
     @classmethod
-    def from_dict(cls, record: Mapping[str, Any]) -> "BettingTest":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Betting":
         """Rebuilds a test from `to_dict`.
 
         Args:
@@ -245,13 +245,13 @@ class BettingTest:
         return test
 
 
-class MixtureTest:
+class Mixture:
     """A betting test restarted at fixed times and mixed over its starts.
 
-    A single `BettingTest` multiplies capital from the first observation, so
+    A single `Betting` multiplies capital from the first observation, so
     after a long quiet stretch the capital is far below one and a later change
     must first climb back; the delay of the alarm grows with the quiet time.
-    This test runs one `BettingTest` from each of a fixed set of start times
+    This test runs one `Betting` from each of a fixed set of start times
     (the first observation and then every `stride` observations) and sums
     their capitals with weights ``w_j = 1 / ((j + 1) (j + 2))``, which add up
     to one. Each term is a nonnegative supermartingale under the null that
@@ -276,7 +276,7 @@ class MixtureTest:
         """Creates the test and starts its first term.
 
         `null_mean`, `direction`, `alpha` and `cap` are validated by the
-        `BettingTest` built for that term, which raises ValueError for a value
+        `Betting` built for that term, which raises ValueError for a value
         outside the range given for it there.
 
         Args:
@@ -300,7 +300,7 @@ class MixtureTest:
         self.cap = cap
         self.count = 0
         self.started = 0
-        self.inner: list[BettingTest] = []
+        self.inner: list[Betting] = []
         self.log_weights: list[float] = []
         self.peak = numpy.zeros_like(self.null_mean)
         self.log_capital = numpy.zeros_like(self.null_mean)
@@ -312,7 +312,7 @@ class MixtureTest:
         The oldest term is dropped when more than `terms` are kept.
         """
         self.inner.append(
-            BettingTest(self.null_mean, self.direction, self.alpha, self.cap)
+            Betting(self.null_mean, self.direction, self.alpha, self.cap)
         )
         self.log_weights.append(
             -math.log((self.started + 1) * (self.started + 2))
@@ -397,7 +397,7 @@ class MixtureTest:
         }
 
     @classmethod
-    def from_dict(cls, record: Mapping[str, Any]) -> "MixtureTest":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Mixture":
         """Rebuilds a test from `to_dict`.
 
         Args:
@@ -417,13 +417,13 @@ class MixtureTest:
         test.count = int(record["count"])
         test.started = int(record["started"])
         test.log_weights = [float(w) for w in record["log_weights"]]
-        test.inner = [BettingTest.from_dict(t) for t in record["inner"]]
+        test.inner = [Betting.from_dict(t) for t in record["inner"]]
         test.log_capital = numpy.asarray(float(record["log_capital"]))
         test.peak = numpy.asarray(float(record["peak"]))
         return test
 
 
-class ConfidenceSequence:
+class Confidence:
     """Time-uniform confidence sequence for a bounded mean, on a grid.
 
     Two one-sided betting tests per grid point, each at ``alpha / 2``; a grid
@@ -453,8 +453,8 @@ class ConfidenceSequence:
             raise errors.InputError("points must be at least 3")
         self.alpha = alpha
         self.grid = (numpy.arange(points) + 1.0) / (points + 1.0)
-        self.upper_tests = BettingTest(self.grid, GREATER, alpha / 2.0)
-        self.lower_tests = BettingTest(self.grid, LESS, alpha / 2.0)
+        self.upper_tests = Betting(self.grid, GREATER, alpha / 2.0)
+        self.lower_tests = Betting(self.grid, LESS, alpha / 2.0)
         self.alive = numpy.ones(points, dtype=bool)
 
     def update(self, observation: Any) -> tuple[float, float]:
@@ -486,7 +486,7 @@ class ConfidenceSequence:
         return (low, high)
 
 
-class RiskAlarm:
+class Tripwire:
     """Alarm when the mean loss is evidenced to exceed ``r_ref + delta``.
 
     Observations are mean losses in ``[0, scale]`` (``scale`` is the
@@ -524,7 +524,7 @@ class RiskAlarm:
                 "reference_risk + tolerance must be in (0, scale)"
             )
         self.scale = scale
-        self.test = MixtureTest(null, GREATER, alpha)
+        self.test = Mixture(null, GREATER, alpha)
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready state.
@@ -535,7 +535,7 @@ class RiskAlarm:
         return {"scale": self.scale, "test": self.test.to_dict()}
 
     @classmethod
-    def from_dict(cls, record: Mapping[str, Any]) -> "RiskAlarm":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Tripwire":
         """Rebuilds an alarm from `to_dict`.
 
         Args:
@@ -551,7 +551,7 @@ class RiskAlarm:
             state["alpha"],
             record["scale"],
         )
-        alarm.test = MixtureTest.from_dict(state)
+        alarm.test = Mixture.from_dict(state)
         return alarm
 
     def update(self, mean_loss: float) -> bool:
@@ -568,7 +568,7 @@ class RiskAlarm:
         return bool(self.test.crossed)
 
 
-class PairedEProcess:
+class Comparison:
     """E-process on paired loss differences, for promotion and rollback.
 
     The first argument of `update` is the model in service, the second the one
@@ -582,7 +582,7 @@ class PairedEProcess:
 
     With propensity-weighted losses a batch difference lies in ``[-scale,
     scale]`` where ``scale = bound / epsilon``; pass it as `scale` and feed
-    `update_gap`.
+    `ingest`.
 
     Attributes:
         margin: The margin of the null, in loss units.
@@ -608,7 +608,7 @@ class PairedEProcess:
             )
         self.margin = margin
         self.scale = scale
-        self.test = MixtureTest((margin / scale + 1.0) / 2.0, GREATER, alpha)
+        self.test = Mixture((margin / scale + 1.0) / 2.0, GREATER, alpha)
 
     def update(self, champion_loss: Any, other_loss: Any) -> bool:
         """Feeds the mean paired losses of one matured batch.
@@ -631,9 +631,9 @@ class PairedEProcess:
             raise errors.InputError(
                 "paired losses must be non-empty and aligned"
             )
-        return self.update_gap(float(numpy.mean(first - second)))
+        return self.ingest(float(numpy.mean(first - second)))
 
-    def update_gap(self, gap: float) -> bool:
+    def ingest(self, gap: float) -> bool:
         """Feeds a batch's mean loss difference, in loss units.
 
         Args:
@@ -677,7 +677,7 @@ class PairedEProcess:
         }
 
     @classmethod
-    def from_dict(cls, record: Mapping[str, Any]) -> "PairedEProcess":
+    def from_dict(cls, record: Mapping[str, Any]) -> "Comparison":
         """Rebuilds a process from `to_dict`.
 
         Args:
@@ -688,7 +688,7 @@ class PairedEProcess:
         """
         state = record["test"]
         process = cls(record["margin"], state["alpha"], record["scale"])
-        process.test = MixtureTest.from_dict(state)
+        process.test = Mixture.from_dict(state)
         return process
 
 
@@ -715,7 +715,7 @@ class PromotionSequence:
         Args:
             alpha: The false-discovery rate level.
         """
-        config = online_fdr.RuleConfig(
+        config = online_fdr.Settings(
             rule=online_fdr.ELOND, alpha=Fraction(alpha).limit_denominator()
         )
         self.config = config

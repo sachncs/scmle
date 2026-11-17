@@ -49,7 +49,7 @@ def test_graph_is_deterministic_and_content_addressed():
     ):
         second.connect(edge)
 
-    assert first.path_exists("source", "bundle")
+    assert first.reachable("source", "bundle")
     assert first.topological_order() == (
         "source",
         "snapshot",

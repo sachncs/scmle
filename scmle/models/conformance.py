@@ -16,7 +16,7 @@ from scmle.contracts import tasks
 ROWS = 120
 
 
-def toy_problem(
+def toy(
     task: tasks.Task, seed: int = 0
 ) -> tuple[pandas.DataFrame, pandas.Series | pandas.DataFrame]:
     """Builds a small learnable problem for `task`.
@@ -69,7 +69,7 @@ def toy_problem(
     return features, target
 
 
-def check_declared_capabilities(
+def smoke(
     adapter: models.Model,
     task: tasks.Task,
     features: pandas.DataFrame,
@@ -85,8 +85,8 @@ def check_declared_capabilities(
     Args:
         adapter: Adapter under test.
         task: Task type to build the estimator for.
-        features: Toy features from `toy_problem`.
-        target: Toy target from `toy_problem`.
+        features: Toy features from `toy`.
+        target: Toy target from `toy`.
 
     Raises:
         ConfigError: If a declared capability is not honoured.
@@ -138,7 +138,7 @@ def check_declared_capabilities(
             )
 
 
-def check_search_space(
+def searchable(
     adapter: models.Model, task: tasks.Task, features: Any, target: Any
 ) -> None:
     """Verifies a sampled search point is applied by `build` and trains.
@@ -167,7 +167,7 @@ def check_search_space(
     tuned.fit(features, target)
 
 
-def check_conformance(adapter: models.Model) -> None:
+def comply(adapter: models.Model) -> None:
     """Verifies an adapter honours its declared capabilities.
 
     Args:
@@ -180,7 +180,7 @@ def check_conformance(adapter: models.Model) -> None:
     if not adapter.capabilities.tasks:
         raise errors.ConfigError(f"{name}: declares no supported tasks")
     for task in adapter.capabilities.tasks:
-        features, target = toy_problem(task)
+        features, target = toy(task)
         estimator: Any = adapter.build(task, 0, adapter.conformance_params)
         for method in ("fit", "predict", "get_params", "set_params"):
             if not hasattr(estimator, method):
@@ -198,8 +198,8 @@ def check_conformance(adapter: models.Model) -> None:
                 raise errors.ConfigError(
                     f"{name}: predict_proba rows must sum to 1"
                 )
-        check_search_space(adapter, task, features, target)
-        check_declared_capabilities(adapter, task, features, target)
+        searchable(adapter, task, features, target)
+        smoke(adapter, task, features, target)
         first = adapter.build(task, 7, adapter.conformance_params)
         second = adapter.build(task, 7, adapter.conformance_params)
         if first.get_params().keys() != second.get_params().keys():

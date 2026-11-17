@@ -48,7 +48,7 @@ def recorded_source(rows=None, meter=None, **options):
         rows if rows is not None else [(1, "x"), (2, "y"), (2, None)],
     )
     log = []
-    source = profile.SqlSource(
+    source = profile.Sql(
         lambda: RecordingConnection(db.factory(), log), meter, **options
     )
     return source, log, db
@@ -62,7 +62,7 @@ def test_quote_refuses_an_empty_name_and_a_lone_nul():
     with pytest.raises(ValueError, match=r"unsafe identifier: 'a\"b'"):
         profile.quote('a"b')
     assert profile.quote("a") == '"a"'
-    assert profile.quote_all(["a", "b c"]) == '"a", "b c"'
+    assert profile.quoting(["a", "b c"]) == '"a", "b c"'
 
 
 def test_statement_fills_each_placeholder():
@@ -73,13 +73,13 @@ def test_statement_fills_each_placeholder():
 
 def test_source_defaults_and_overrides_reach_the_connector():
     db = ingest_worlds.new_database("pd")
-    plain = profile.SqlSource(db.factory)
+    plain = profile.Sql(db.factory)
     assert plain.connector.source_uri == "sqlite://ingest"
     assert plain.connector.query == "SELECT 1"
     assert plain.connector.read_only_statement is None
     assert plain.meter is None
     assert plain.queries == 0
-    custom = profile.SqlSource(
+    custom = profile.Sql(
         db.factory,
         uri="sqlite://other",
         read_only_statement="SELECT 2",
@@ -184,18 +184,18 @@ def test_columns_refuses_an_unsafe_table_name():
 
 
 def test_value_kind_classifies_each_type():
-    assert profile.value_kind(None) == "empty"
-    assert profile.value_kind(True) == "other"
-    assert profile.value_kind(3) == "number"
-    assert profile.value_kind(2.5) == "number"
-    assert profile.value_kind("x") == "text"
-    assert profile.value_kind(b"x") == "other"
+    assert profile.classify(None) == "empty"
+    assert profile.classify(True) == "other"
+    assert profile.classify(3) == "number"
+    assert profile.classify(2.5) == "number"
+    assert profile.classify("x") == "text"
+    assert profile.classify(b"x") == "other"
 
 
 def test_the_profile_issues_these_exact_statements_and_charges():
     meter = budget.BudgetMeter(budget.Budget())
     source, log = recorded_source(meter=meter)[:2]
-    table = profile.profile_table(source, "t", "prof")
+    table = profile.survey(source, "t", "prof")
     assert log == [
         'SELECT COUNT(*) FROM "t"',
         'SELECT * FROM "t" WHERE 1 = 0',
@@ -230,24 +230,24 @@ def test_the_profile_issues_these_exact_statements_and_charges():
 def test_the_profile_names_the_table_and_the_column_when_it_stops():
     meter = budget.BudgetMeter(budget.Budget(max_queries=0))
     source = recorded_source(meter=meter)[0]
-    assert profile.profile_table(source, "t", "prof") is None
+    assert profile.survey(source, "t", "prof") is None
     assert (meter.stops[0].stage, meter.stops[0].unit) == ("prof", "t")
     columns = budget.BudgetMeter(budget.Budget(max_queries=2))
     other = recorded_source(meter=columns)[0]
-    assert profile.profile_table(other, "t", "prof") is None
+    assert profile.survey(other, "t", "prof") is None
     assert (columns.stops[0].stage, columns.stops[0].unit) == ("prof", "t.a")
 
 
 def test_the_default_profile_stage_is_profile():
     meter = budget.BudgetMeter(budget.Budget(max_queries=0))
     source = recorded_source(meter=meter)[0]
-    assert profile.profile_table(source, "t") is None
+    assert profile.survey(source, "t") is None
     assert meter.stops[0].stage == "profile"
 
 
 def test_an_all_null_column_has_no_extremes_and_kind_empty():
     source = recorded_source(rows=[(None, None), (None, None)])[0]
-    table = profile.profile_table(source, "t")
+    table = profile.survey(source, "t")
     only = table.column("a")
     assert (only.kind, only.non_null, only.distinct) == ("empty", 0, 0)
     assert (only.minimum, only.maximum) == (None, None)
@@ -264,7 +264,7 @@ def test_a_table_with_no_columns_profile_is_refused_as_none():
         def columns(self, table, stage=""):
             return ()
 
-    assert profile.profile_table(Bare(), "t") is None
+    assert profile.survey(Bare(), "t") is None
 
 
 def test_profile_table_passes_the_stage_to_each_source_call():
@@ -283,7 +283,7 @@ def test_profile_table_passes_the_stage_to_each_source_call():
             calls.append(("fetch", stage, unit, cost_rows))
             return [(5, 2, 1, 9)]
 
-    table = profile.profile_table(Spy(), "tbl", "stg")
+    table = profile.survey(Spy(), "tbl", "stg")
     assert calls == [
         ("scalar", "stg", "tbl"),
         ("columns", "stg", "tbl"),
@@ -294,7 +294,7 @@ def test_profile_table_passes_the_stage_to_each_source_call():
 
 
 def test_table_and_catalog_lookups_and_dicts():
-    first = profile.TableProfile("one", 2, ())
+    first = profile.Census("one", 2, ())
     catalog = profile.Catalog((first,))
     assert catalog.table("one") is first
     assert catalog.partial is False
@@ -323,8 +323,8 @@ def test_a_complete_catalog_is_not_partial_and_a_stopped_one_is():
 
 
 def test_the_catalog_fingerprint_is_the_digest_of_sorted_json():
-    first = profile.TableProfile(
-        "one", 2, (profile.ColumnProfile("c", "number", 2, 2, "1", "2"),)
+    first = profile.Census(
+        "one", 2, (profile.Aggregates("c", "number", 2, 2, "1", "2"),)
     )
     catalog = profile.Catalog((first,))
     expected = hashlib.sha256(
@@ -334,7 +334,7 @@ def test_the_catalog_fingerprint_is_the_digest_of_sorted_json():
 
 
 def test_torn_read_error_records_the_attempts_and_the_reason():
-    error = profile.TornReadError("sqlite://x", 3, "because")
+    error = profile.TornError("sqlite://x", 3, "because")
     assert error.code == "torn_read"
     assert error.source_uri == "sqlite://x"
     assert error.attempts == 3
@@ -351,10 +351,10 @@ def test_torn_read_error_records_the_attempts_and_the_reason():
 
 
 def test_has_total_order_ignores_comments_between_the_words():
-    assert profile.has_total_order("SELECT a FROM t ORDER/* x */BY a")
-    assert profile.has_total_order("select a from t order\n  by a")
-    assert not profile.has_total_order("SELECT a FROM t -- ORDER BY a")
-    assert not profile.has_total_order("SELECT a FROM t")
+    assert profile.deterministic("SELECT a FROM t ORDER/* x */BY a")
+    assert profile.deterministic("select a from t order\n  by a")
+    assert not profile.deterministic("SELECT a FROM t -- ORDER BY a")
+    assert not profile.deterministic("SELECT a FROM t")
 
 
 class Batch:
@@ -391,14 +391,14 @@ def test_read_once_starts_with_no_checkpoint_and_follows_the_batches():
     connector = Scripted(
         [[Batch([(1,)], "c1", True), Batch([(2,)], "c2", False)]]
     )
-    frame = profile.read_once(connector, 7)
+    frame = profile.slurp(connector, 7)
     assert frame["v"].tolist() == [1, 2]
     assert connector.seen == [(None, 7), ("c1", 7)]
 
 
 def test_consistent_read_works_for_a_connector_without_a_query():
     connector = Scripted([[Batch([(1,)], "c", False)]])
-    read = profile.consistent_read(connector, 4)
+    read = profile.untorn(connector, 4)
     assert read.verified is False
     assert read.token is None
     assert read.attempts == 1
@@ -412,7 +412,7 @@ def test_the_unordered_error_carries_the_message_and_uri():
         "sqlite://ordered", "SELECT a FROM t", db.factory
     )
     with pytest.raises(connectors.ConnectorError) as caught:
-        profile.consistent_read(connector)
+        profile.untorn(connector)
     assert caught.value.code == "unordered_query"
     assert caught.value.source_uri == "sqlite://ordered"
     assert caught.value.details == {
@@ -422,12 +422,12 @@ def test_the_unordered_error_carries_the_message_and_uri():
     assert caught.value.as_dict()["message"] == (
         "batched reads need an ORDER BY on a unique key"
     )
-    assert profile.consistent_read(connector, require_order=False).frame.empty
+    assert profile.untorn(connector, require_order=False).frame.empty
 
 
 def test_the_token_is_returned_with_the_read_and_flags_it_verified():
     connector = Scripted([[Batch([(1,)], "c", False)]])
-    read = profile.consistent_read(connector, 4, token=lambda: "snap")
+    read = profile.untorn(connector, 4, token=lambda: "snap")
     assert read.token == "snap"
     assert read.verified is True
 
@@ -441,10 +441,8 @@ def test_a_changing_token_gives_a_torn_read_with_the_reason_and_attempts():
             [Batch([(1,)], "c", False)],
         ]
     )
-    with pytest.raises(profile.TornReadError) as caught:
-        profile.consistent_read(
-            connector, 4, token=lambda: str(next(ticks)), attempts=3
-        )
+    with pytest.raises(profile.TornError) as caught:
+        profile.untorn(connector, 4, token=lambda: str(next(ticks)), attempts=3)
     assert caught.value.reason == "snapshot token changed"
     assert caught.value.attempts == 3
     assert caught.value.source_uri == "scripted://x"
@@ -458,20 +456,20 @@ def test_a_moved_batch_offset_is_retried_and_then_reported():
         "scripted://x", "source_changed", "moved", {}
     )
     connector = Scripted([[moved], [moved]])
-    with pytest.raises(profile.TornReadError) as caught:
-        profile.consistent_read(connector, 4, attempts=2)
+    with pytest.raises(profile.TornError) as caught:
+        profile.untorn(connector, 4, attempts=2)
     assert caught.value.reason == "rows before a batch offset changed"
     assert caught.value.attempts == 2
     other = connectors.CheckpointError(
         "scripted://x", "something_else", "bad", {}
     )
     with pytest.raises(connectors.CheckpointError):
-        profile.consistent_read(Scripted([[other]]), 4)
+        profile.untorn(Scripted([[other]]), 4)
 
 
 def test_at_least_one_attempt_is_made_whatever_the_count():
     connector = Scripted([[Batch([(1,)], "c", False)]])
-    read = profile.consistent_read(connector, 4, attempts=0)
+    read = profile.untorn(connector, 4, attempts=0)
     assert read.attempts == 1
     assert isinstance(read.frame, pandas.DataFrame)
 
@@ -481,6 +479,6 @@ def test_a_moved_batch_offset_on_the_first_attempt_is_retried():
         "scripted://x", "source_changed", "moved", {}
     )
     connector = Scripted([[moved], [Batch([(1,)], "c", False)]])
-    read = profile.consistent_read(connector, 4, attempts=2)
+    read = profile.untorn(connector, 4, attempts=2)
     assert read.attempts == 2
     assert read.frame["v"].tolist() == [1]

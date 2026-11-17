@@ -125,7 +125,7 @@ class Pool(Executor):
         return list(parallel(joblib.delayed(function)(item) for item in items))
 
 
-def create_backend(
+def select(
     workers: int, executor: str = "process", address: str | None = None
 ) -> Executor:
     """Chooses the backend for a worker count and executor.
@@ -145,7 +145,7 @@ def create_backend(
     if executor == "ray":
         from scmle.integrations import ray_backend  # noqa: PLC0415 -- optional dependency (the `distributed` extra)
 
-        return ray_backend.RayBackend(workers, address)
+        return ray_backend.Remote(workers, address)
     if executor != "process":
         raise errors.ConfigError(f"unknown executor '{executor}'")
     return Serial() if workers <= 1 else Pool(workers)

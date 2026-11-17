@@ -12,10 +12,8 @@ from scmle.contracts import signing
 from scmle.data.framing import baseline
 from scmle.data.framing import costs
 
-HUMAN = (costs.CostSource.HUMAN,) * 4
-MODEL = costs.DecisionCostModel(
-    0.0, 5.0, 1.0, 0.0, 0.1, 0.4, HUMAN, costs.CostSource.HUMAN
-)
+HUMAN = (costs.Basis.HUMAN,) * 4
+MODEL = costs.Tariff(0.0, 5.0, 1.0, 0.0, 0.1, 0.4, HUMAN, costs.Basis.HUMAN)
 RULE = {"column": "score", "threshold": 0.4}
 
 
@@ -46,26 +44,26 @@ def test_the_paired_difference_is_the_documented_gain_per_row():
     y = [1, 1, 0, 0, 1]
     a = [1, 0, 1, 0, 1]
     b = [0, 1, 0, 1, 1]
-    got = baseline.paired_difference(y, a, b, 0.25)
+    got = baseline.advantage(y, a, b, 0.25)
     w = 0.25 / 0.75
     assert got.tolist() == pytest.approx([1.0, -1.0, -w, w, 0.0])
 
 
 def test_the_paired_difference_checks_lengths_and_names_arguments():
     with pytest.raises(ValueError, match=r"^y, a and b must have the same"):
-        baseline.paired_difference([1, 0], [1, 0, 1], [1, 0], 0.2)
+        baseline.advantage([1, 0], [1, 0, 1], [1, 0], 0.2)
     with pytest.raises(ValueError, match=r"^y must"):
-        baseline.paired_difference([2, 0], [1, 0], [1, 0], 0.2)
+        baseline.advantage([2, 0], [1, 0], [1, 0], 0.2)
     with pytest.raises(ValueError, match=r"^a must"):
-        baseline.paired_difference([1, 0], [2, 0], [1, 0], 0.2)
+        baseline.advantage([1, 0], [2, 0], [1, 0], 0.2)
     with pytest.raises(ValueError, match=r"^b must"):
-        baseline.paired_difference([1, 0], [1, 0], [2, 0], 0.2)
+        baseline.advantage([1, 0], [1, 0], [2, 0], 0.2)
     with pytest.raises(ValueError, match="strictly between"):
-        baseline.paired_difference([1, 0], [1, 0], [1, 0], 1.0)
+        baseline.advantage([1, 0], [1, 0], [1, 0], 1.0)
 
 
 def test_cluster_test_returns_every_field_for_a_hand_worked_case():
-    got = baseline.cluster_test([1.0, 2.0, 3.0, 4.0], ["a", "a", "b", "b"])
+    got = baseline.ttest([1.0, 2.0, 3.0, 4.0], ["a", "a", "b", "b"])
     assert got.mean == 2.5
     assert got.se == pytest.approx(1.0)
     assert got.df == 1
@@ -77,7 +75,7 @@ def test_cluster_test_returns_every_field_for_a_hand_worked_case():
 
 def test_cluster_test_three_clusters_uses_the_small_sample_factor():
     d = [1.0, 0.0, 2.0, 3.0, 1.0, 5.0]
-    got = baseline.cluster_test(d, [0, 0, 1, 1, 2, 2])
+    got = baseline.ttest(d, [0, 0, 1, 1, 2, 2])
     mean = sum(d) / 6
     sums = [
         (1 - mean) + (0 - mean),
@@ -91,25 +89,25 @@ def test_cluster_test_three_clusters_uses_the_small_sample_factor():
 
 
 def test_cluster_test_with_no_spread_decides_by_the_sign_of_the_mean():
-    positive = baseline.cluster_test([1.0, 1.0, 1.0, 1.0], [0, 0, 1, 1])
+    positive = baseline.ttest([1.0, 1.0, 1.0, 1.0], [0, 0, 1, 1])
     assert positive.se == 0.0
     assert positive.statistic == math.inf and positive.p_value == 0.0
-    negative = baseline.cluster_test([-1.0, -1.0, -1.0, -1.0], [0, 0, 1, 1])
+    negative = baseline.ttest([-1.0, -1.0, -1.0, -1.0], [0, 0, 1, 1])
     assert negative.statistic == -math.inf and negative.p_value == 1.0
-    zero = baseline.cluster_test([0.0, 0.0, 0.0, 0.0], [0, 0, 1, 1])
+    zero = baseline.ttest([0.0, 0.0, 0.0, 0.0], [0, 0, 1, 1])
     assert zero.statistic == 0.0 and zero.p_value == 0.5
     assert zero.mean == 0.0
 
 
 def test_cluster_test_errors_say_what_is_wrong():
     with pytest.raises(ValueError, match=r"^at least two clusters are needed$"):
-        baseline.cluster_test([1.0, 2.0], [0, 0])
+        baseline.ttest([1.0, 2.0], [0, 0])
     with pytest.raises(
         ValueError, match=r"^d and clusters must have the same length$"
     ):
-        baseline.cluster_test([1.0, 2.0], [0, 1, 2])
+        baseline.ttest([1.0, 2.0], [0, 1, 2])
     with pytest.raises(ValueError, match=r"^d must be"):
-        baseline.cluster_test([], [])
+        baseline.ttest([], [])
 
 
 def test_factorize_codes_in_sorted_order_and_counts_clusters():
@@ -231,7 +229,7 @@ def profile_world():
 
 def test_the_exploration_profile_lists_thresholds_and_default_net_benefits():
     outcomes, decisions = profile_world()
-    got = baseline.profile_on_exploration(outcomes, decisions, MODEL)
+    got = baseline.gauge(outcomes, decisions, MODEL)
     grid = numpy.linspace(0.1, 0.4, 5)
     assert got["thresholds"] == pytest.approx(grid.tolist())
     assert got["net_benefit_none"] == [0.0] * 5
@@ -256,7 +254,7 @@ def test_the_exploration_profile_uses_only_the_observed_rows():
     outcomes, decisions = profile_world()
     hidden = outcomes.copy()
     hidden[[0, 7, 11, 20]] = numpy.nan
-    got = baseline.profile_on_exploration(hidden, decisions, MODEL)
+    got = baseline.gauge(hidden, decisions, MODEL)
     seen = ~numpy.isnan(hidden)
     assert got["net_benefit_baseline"] == pytest.approx(
         [
@@ -272,9 +270,7 @@ def test_the_exploration_profile_uses_only_the_observed_rows():
 def test_an_explicit_observation_mask_overrides_the_missing_values():
     outcomes, decisions = profile_world()
     mask = numpy.arange(40) % 3 != 0
-    got = baseline.profile_on_exploration(
-        outcomes, decisions, MODEL, observed=mask
-    )
+    got = baseline.gauge(outcomes, decisions, MODEL, observed=mask)
     assert got["net_benefit_baseline"] == pytest.approx(
         [
             costs.net_benefit(outcomes[mask], decisions[mask], t)
@@ -284,9 +280,7 @@ def test_an_explicit_observation_mask_overrides_the_missing_values():
     assert got["net_benefit_all"] == pytest.approx(
         [costs.net_benefit_all(outcomes[mask], t) for t in got["thresholds"]]
     )
-    ints = baseline.profile_on_exploration(
-        outcomes, decisions, MODEL, observed=mask.astype(int)
-    )
+    ints = baseline.gauge(outcomes, decisions, MODEL, observed=mask.astype(int))
     assert ints["net_benefit_baseline"] == got["net_benefit_baseline"]
 
 
@@ -294,7 +288,7 @@ def test_selective_labels_withhold_the_baseline_with_a_reason():
     outcomes, decisions = profile_world()
     biased = outcomes.copy()
     biased[decisions == 0] = numpy.nan
-    got = baseline.profile_on_exploration(biased, decisions, MODEL)
+    got = baseline.gauge(biased, decisions, MODEL)
     assert got["net_benefit_baseline"] == "not_computed"
     assert got["note"] == (
         "outcome observation depends on the baseline decision: its net "
@@ -306,9 +300,7 @@ def test_selective_labels_withhold_the_baseline_with_a_reason():
 
 def test_no_observed_outcome_withholds_the_baseline_and_the_treat_all_value():
     decisions = numpy.array([1.0, 0.0] * 20)
-    got = baseline.profile_on_exploration(
-        numpy.full(40, numpy.nan), decisions, MODEL
-    )
+    got = baseline.gauge(numpy.full(40, numpy.nan), decisions, MODEL)
     assert got["net_benefit_baseline"] == "not_computed"
     assert got["note"] == "no outcome is observed"
     assert "net_benefit_all" not in got
@@ -321,7 +313,7 @@ def test_registration_hash_covers_every_field_and_the_rule_digest_is_sha256():
     assert (registration.t_lo, registration.t_hi) == (0.1, 0.4)
     assert registration.cost_model_hash == MODEL.model_hash
     expected_rule = hashlib.sha256(signing.canonicalise(RULE)).hexdigest()
-    assert registration.rule_hash == expected_rule == baseline.rule_digest(RULE)
+    assert registration.rule_hash == expected_rule == baseline.fingerprint(RULE)
     payload = {
         "cost_model_hash": MODEL.model_hash,
         "rule_hash": expected_rule,
@@ -404,12 +396,8 @@ def test_an_issued_claim_carries_every_check_and_the_claim_fields():
     assert report.issued is True and report.status == "issued"
     assert report.reasons == ()
     assert len(report.endpoints) == 2
-    lo = baseline.cluster_test(
-        baseline.paired_difference(y, a, b, 0.1), cluster
-    )
-    hi = baseline.cluster_test(
-        baseline.paired_difference(y, a, b, 0.4), cluster
-    )
+    lo = baseline.ttest(baseline.advantage(y, a, b, 0.1), cluster)
+    hi = baseline.ttest(baseline.advantage(y, a, b, 0.4), cluster)
     assert report.endpoints == (lo, hi)
     assert report.p_value == max(lo.p_value, hi.p_value)
     first, second = report.checks
@@ -422,7 +410,7 @@ def test_an_issued_claim_carries_every_check_and_the_claim_fields():
     assert first.p_value == lo.p_value and first.effect == lo.mean
     assert first.n == lo.n == 120
     assert first.interval is None
-    assert first.set_id is qualification.SetId.CONFIRMATION
+    assert first.set_id is qualification.Subset.CONFIRMATION
     assert first.tier is qualification.Tier.CONFIRMED
     assert first.decision is qualification.Decision.WARN
     assert first.statistic == lo.statistic
@@ -492,8 +480,8 @@ def test_no_gain_is_not_shown_and_the_checks_pass():
 
 def test_the_p_value_equal_to_the_level_still_issues(monkeypatch):
     y, a, b, cluster = world(30)
-    exact = baseline.ClusterTest(0.1, 0.05, 29, 2.0, 0.05, 120, 30)
-    monkeypatch.setattr(baseline, "cluster_test", lambda d, c: exact)
+    exact = baseline.Clustered(0.1, 0.05, 29, 2.0, 0.05, 120, 30)
+    monkeypatch.setattr(baseline, "ttest", lambda d, c: exact)
     report = run(guard(0.05), y, a, b, cluster)
     assert report.issued is True and report.p_value == 0.05
     assert all(c.decision is qualification.Decision.WARN for c in report.checks)
@@ -574,8 +562,8 @@ def test_an_explicit_mask_selects_the_rows_that_are_tested():
     report = run(guard(), other, a, b, cluster, observed=mask)
     assert report.status == "issued"
     assert report.endpoints[0].n == int(mask.sum())
-    wanted = baseline.cluster_test(
-        baseline.paired_difference(y[mask], a[mask], b[mask], 0.1),
+    wanted = baseline.ttest(
+        baseline.advantage(y[mask], a[mask], b[mask], 0.1),
         cluster[mask],
     )
     assert report.endpoints[0] == wanted
@@ -618,7 +606,7 @@ def test_the_default_input_tier_is_confirmed():
 def test_object_outcomes_with_missing_entries_are_read_as_floats():
     outcomes, decisions = profile_world()
     as_objects = [None if i % 5 == 0 else v for i, v in enumerate(outcomes)]
-    got = baseline.profile_on_exploration(as_objects, decisions, MODEL)
+    got = baseline.gauge(as_objects, decisions, MODEL)
     seen = numpy.array([i % 5 != 0 for i in range(40)])
     assert got["net_benefit_all"] == pytest.approx(
         [costs.net_benefit_all(outcomes[seen], t) for t in got["thresholds"]]
@@ -649,8 +637,8 @@ def test_object_outcomes_with_missing_entries_are_evaluated():
     report = run(guard(), as_objects, a, b, cluster)
     keep = numpy.array([i % 9 != 0 for i in range(y.size)])
     assert report.endpoints[0].n == int(keep.sum())
-    assert report.endpoints[0] == baseline.cluster_test(
-        baseline.paired_difference(y[keep], a[keep], b[keep], 0.1),
+    assert report.endpoints[0] == baseline.ttest(
+        baseline.advantage(y[keep], a[keep], b[keep], 0.1),
         cluster[keep],
     )
 

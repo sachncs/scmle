@@ -30,7 +30,7 @@ class Tuner:
     """
 
     def __init__(
-        self, context: scmle.core.context.Context, runner: trials.TrialRunner
+        self, context: scmle.core.context.Context, runner: trials.Runner
     ) -> None:
         """Initializes the tuner.
 
@@ -40,7 +40,7 @@ class Tuner:
         """
         self.context = context
         self.runner = runner
-        self.search = context.spec.effective_search()
+        self.search = context.spec.budgeted()
         self.metric = scmle.core.context.require(context.metric, "metric")
 
     def shortlist(
@@ -61,7 +61,7 @@ class Tuner:
         ok = [
             t
             for t in screened
-            if t.status is experiments.TrialStatus.OK and not t.params
+            if t.status is experiments.Termination.OK and not t.params
         ]
         ranked = sorted(ok, key=lambda t: -sign * t.score_mean)
         registry = self.context.registry
@@ -96,7 +96,7 @@ class Tuner:
         space = scmle.core.context.require(
             context.registry.get(name).search_space, f"{name}.search_space"
         )
-        optimizer = optimizers.create_optimizer(
+        optimizer = optimizers.instantiate(
             search.optimizer,
             space,
             context.spec.validation.seed + index,
@@ -108,15 +108,14 @@ class Tuner:
         batch_size = max(MIN_BATCH, math.ceil(search.configs_per_model / 3))
         remaining = search.configs_per_model
         while (
-            remaining > 0
-            and context.resource_governor.skip_reason(first=False) is None
+            remaining > 0 and context.regulator.skip_reason(first=False) is None
         ):
             context.check_cancelled()
             size = min(batch_size, remaining)
             remaining -= size
             self.run_batch(name, strategy, optimizer, size)
 
-    def rung_schedule(self) -> list[list[int | None]]:
+    def ladder(self) -> list[list[int | None]]:
         """Computes the fold budgets of each Hyperband bracket, cheapest first.
 
         With `F` folds and reduction factor `eta`, rungs are the distinct fold
@@ -155,13 +154,13 @@ class Tuner:
             strategy: Data strategy the model is tuned under.
             optimizer: Source of configurations; told every score.
         """
-        brackets = self.rung_schedule()
+        brackets = self.ladder()
         weights = [len(brackets) - index for index in range(len(brackets))]
         total = sum(weights)
         remaining = self.search.configs_per_model
         for index, rungs in enumerate(brackets):
             if remaining <= 0 or (
-                self.context.resource_governor.skip_reason(first=False)
+                self.context.regulator.skip_reason(first=False)
             ):
                 return
             self.context.check_cancelled()
@@ -196,14 +195,14 @@ class Tuner:
         ids = self.context.allocate(len(proposals))
         current = self.runner.run_many(
             [
-                trials.TrialJob(trial_id, name, params, rungs[0], strategy)
+                trials.Job(trial_id, name, params, rungs[0], strategy)
                 for trial_id, params in zip(ids, proposals, strict=True)
             ]
         )
         sign = 1 if self.metric.greater_is_better else -1
         for rung in rungs[1:]:
             alive = [
-                t for t in current if t.status is experiments.TrialStatus.OK
+                t for t in current if t.status is experiments.Termination.OK
             ]
             keep = max(1, math.ceil(len(alive) / self.search.eta))
             winners = sorted(alive, key=lambda t: -sign * t.score_mean)[:keep]
@@ -211,7 +210,7 @@ class Tuner:
                 t.trial_id: t
                 for t in self.runner.run_many(
                     [
-                        trials.TrialJob(
+                        trials.Job(
                             t.trial_id, t.model_name, t.params, rung, t.strategy
                         )
                         for t in winners
@@ -220,17 +219,17 @@ class Tuner:
             }
             for trial in current:
                 if (
-                    trial.status is experiments.TrialStatus.OK
+                    trial.status is experiments.Termination.OK
                     and trial.trial_id not in finished
                 ):
-                    trial.status = experiments.TrialStatus.PRUNED
+                    trial.status = experiments.Termination.PRUNED
                     trial.error = f"pruned before the {rung or 'full'} rung"
                     self.complete(trial, optimizer)
             current = [
                 finished[t.trial_id] for t in winners if t.trial_id in finished
             ]
         for trial in current:
-            if trial.status is experiments.TrialStatus.OK:
+            if trial.status is experiments.Termination.OK:
                 self.complete(trial, optimizer)
             else:
                 self.context.record_trial(trial)
@@ -261,7 +260,7 @@ class Tuner:
         ids = self.context.allocate(len(proposals))
         first_rung = self.runner.run_many(
             [
-                trials.TrialJob(trial_id, name, params, rung_folds, strategy)
+                trials.Job(trial_id, name, params, rung_folds, strategy)
                 for trial_id, params in zip(ids, proposals, strict=True)
             ]
         )
@@ -273,7 +272,7 @@ class Tuner:
                 t.trial_id: t
                 for t in self.runner.run_many(
                     [
-                        trials.TrialJob(
+                        trials.Job(
                             t.trial_id, t.model_name, t.params, None, t.strategy
                         )
                         for t in winners
@@ -281,14 +280,14 @@ class Tuner:
                 )
             }
         for trial in first_rung:
-            if trial.status is not experiments.TrialStatus.OK:
+            if trial.status is not experiments.Termination.OK:
                 self.context.record_trial(trial)
             elif survivors is None:
                 self.complete(trial, optimizer)
             elif trial.trial_id in finished:
                 self.complete(finished[trial.trial_id], optimizer)
             else:
-                trial.status = experiments.TrialStatus.PRUNED
+                trial.status = experiments.Termination.PRUNED
                 trial.error = "pruned after the first rung"
                 self.complete(trial, optimizer)
 
@@ -302,7 +301,7 @@ class Tuner:
             The ids of the best successful trials, keeping at least one and
             dropping the configured prune fraction.
         """
-        ok = [t for t in first_rung if t.status is experiments.TrialStatus.OK]
+        ok = [t for t in first_rung if t.status is experiments.Termination.OK]
         keep = max(1, math.ceil(len(ok) * (1 - self.search.prune_fraction)))
         sign = 1 if self.metric.greater_is_better else -1
         ranked = sorted(ok, key=lambda t: -sign * t.score_mean)
@@ -320,8 +319,8 @@ class Tuner:
             optimizer: The optimizer that proposed the configuration.
         """
         if trial.status in (
-            experiments.TrialStatus.OK,
-            experiments.TrialStatus.PRUNED,
+            experiments.Termination.OK,
+            experiments.Termination.PRUNED,
         ):
             optimizer.tell(trial.params, trial.score_mean)
         self.context.record_trial(trial)

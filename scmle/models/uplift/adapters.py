@@ -21,7 +21,7 @@ class Uplift(models.Model):
         learner: The estimator class.
     """
 
-    learner: type = estimators.TwoModelLearner
+    learner: type = estimators.TLearner
     family = "causal"
 
     def __init__(
@@ -79,7 +79,7 @@ T_LEARNER = Uplift(
     capabilities=models.Capabilities(
         UPLIFT, handles_missing=True, cost=3, memory_factor=4.0
     ),
-    learner=estimators.TwoModelLearner,
+    learner=estimators.TLearner,
 )
 
 S_LEARNER = Uplift(

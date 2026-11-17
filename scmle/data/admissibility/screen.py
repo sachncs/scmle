@@ -142,7 +142,7 @@ MAX_CERTIFIED_CLASSES = 10
 # Cross-fitted fits needed by the permutation test: permutations x skill
 # columns x classes (one-vs-rest when there are more than two). The screen
 # runs inside the declared time budget by a deterministic cap, never by a
-# clock: work_cap = time_budget_seconds * SCREEN_SHARE * FITS_PER_SECOND.
+# clock: allowance = time_budget_seconds * SCREEN_SHARE * FITS_PER_SECOND.
 # Measured on the development machine (2026-11-06): a breast-cancer sized
 # table, 72,000 fits, takes 1.4 s, i.e. about 51,000 fits per second.
 # FITS_PER_SECOND is declared at about half of that so a slower machine still
@@ -221,7 +221,7 @@ def basis(series: pandas.Series, knots: int = KNOTS) -> numpy.ndarray:
     return pandas.get_dummies(pooled).to_numpy(dtype="float64")
 
 
-def strata_of(
+def stratify(
     n: int, groups: numpy.ndarray | None, block_size: int | None
 ) -> numpy.ndarray:
     """Assigns each row its permutation stratum: group, time block, or one.
@@ -244,7 +244,7 @@ def strata_of(
     return numpy.zeros(n, dtype="int64")
 
 
-def batch_permutations(
+def permute(
     strata: numpy.ndarray, count: int, rng: numpy.random.Generator
 ) -> numpy.ndarray:
     """Draws `count` permutations of the rows, each within its stratum.
@@ -270,7 +270,7 @@ def batch_permutations(
     return out
 
 
-def fold_splits(
+def crossfit(
     n: int,
     folds: int,
     groups: numpy.ndarray | None,
@@ -292,7 +292,7 @@ def fold_splits(
     Returns:
         A list of (train positions, test positions) pairs, one per fold.
     """
-    return leakage.make_splits(
+    return leakage.carve(
         numpy.zeros(n), "regression", folds, groups, block_size, seed
     )
 
@@ -338,7 +338,7 @@ def oof_fit(
     return out
 
 
-def fold_concordance(
+def concordance(
     score: numpy.ndarray,
     positive: numpy.ndarray,
     tests: Sequence[numpy.ndarray],
@@ -374,7 +374,7 @@ def fold_concordance(
     return wins, pairs
 
 
-def auc_rows(
+def aucs(
     score: numpy.ndarray,
     positive: numpy.ndarray,
     tests: Sequence[numpy.ndarray],
@@ -389,7 +389,7 @@ def auc_rows(
     Returns:
         A length-B array of AUC values; NaN where no fold has both classes.
     """
-    wins, pairs = fold_concordance(score, positive, tests)
+    wins, pairs = concordance(score, positive, tests)
     with numpy.errstate(invalid="ignore", divide="ignore"):
         auc: numpy.ndarray = wins / pairs
     return auc
@@ -443,15 +443,13 @@ def skill_statistic(problem: Problem, phi: numpy.ndarray) -> Statistic:
         for k in wanted:
             positive = labels == k
             pred = oof_fit(positive.astype("float64"), phi, problem.splits)
-            scores.append(auc_rows(pred, positive, tests))
+            scores.append(aucs(pred, positive, tests))
         return numpy.mean(scores, axis=0)  # type: ignore[no-any-return, unused-ignore]  # Any on older NumPy stubs; editing code would stale the shipped certificate
 
     return compute
 
 
-def observed_predictions(
-    problem: Problem, phi: numpy.ndarray
-) -> list[numpy.ndarray]:
+def predict(problem: Problem, phi: numpy.ndarray) -> list[numpy.ndarray]:
     """Out-of-fold predictions of the observed outcome.
 
     One array per scored target: the outcome for a regression, the indicator
@@ -476,7 +474,7 @@ def observed_predictions(
     ]
 
 
-def sample_skill(
+def replicate(
     problem: Problem,
     predictions: Sequence[numpy.ndarray],
     index: numpy.ndarray,
@@ -486,7 +484,7 @@ def sample_skill(
 
     Args:
         problem: The outcome, task and folds.
-        predictions: Output of `observed_predictions`.
+        predictions: Output of `predict`.
         index: Positions of the sampled rows, with repeats.
         fold_of: Fold number of each row.
 
@@ -508,7 +506,7 @@ def sample_skill(
     )
     scores = []
     for pred, k in zip(predictions, wanted, strict=True):
-        wins, pairs = fold_concordance(
+        wins, pairs = concordance(
             pred[index][None, :], (y == k)[None, :], tests
         )
         if pairs[0] == 0:
@@ -528,7 +526,7 @@ def skill_bound(
 
     Rows are resampled, or whole groups when `groups` is given, and the
     out-of-fold predictions stay attached to their rows and folds. Draws whose
-    skill cannot be computed (see `sample_skill`) are skipped; with none left
+    skill cannot be computed (see `replicate`) are skipped; with none left
     the bound is -inf.
 
     Args:
@@ -541,7 +539,7 @@ def skill_bound(
     Returns:
         The `1 - confidence` quantile of the bootstrap skills, or -inf.
     """
-    predictions = observed_predictions(problem, phi)
+    predictions = predict(problem, phi)
     fold_of = numpy.empty(len(problem.y), dtype="int64")
     for number, split in enumerate(problem.splits):
         fold_of[split[1]] = number
@@ -559,7 +557,7 @@ def skill_bound(
             index = numpy.concatenate([members[i] for i in picks])
         else:
             index = rng.integers(0, n, size=n)
-        value = sample_skill(problem, predictions, index, fold_of)
+        value = replicate(problem, predictions, index, fold_of)
         if value is not None:
             values.append(value)
     if not values:
@@ -567,7 +565,7 @@ def skill_bound(
     return float(numpy.quantile(values, 1.0 - cfg.confidence))
 
 
-def chi_square_rows(
+def chisquare(
     missing: numpy.ndarray, labels: numpy.ndarray, totals: numpy.ndarray
 ) -> numpy.ndarray:
     """Computes the Pearson chi-square of the 2 x K (missing by class) table.
@@ -598,9 +596,7 @@ def chi_square_rows(
     return chi
 
 
-def missingness_statistic(
-    missing: numpy.ndarray, totals: numpy.ndarray
-) -> Statistic:
+def cramer(missing: numpy.ndarray, totals: numpy.ndarray) -> Statistic:
     """Builds the Cramer's V statistic of missingness against the outcome.
 
     Args:
@@ -614,7 +610,7 @@ def missingness_statistic(
     n = len(missing)
 
     def compute(labels: numpy.ndarray) -> numpy.ndarray:
-        return numpy.sqrt(chi_square_rows(missing, labels, totals) / n)
+        return numpy.sqrt(chisquare(missing, labels, totals) / n)
 
     return compute
 
@@ -642,7 +638,7 @@ def purity_statistic(recorded: numpy.ndarray) -> Statistic:
     return compute
 
 
-def purity_bound(
+def dominance(
     recorded: numpy.ndarray,
     classes: numpy.ndarray,
     cfg: leakage.Config,
@@ -723,7 +719,7 @@ def resample(
         totals = numpy.bincount(labels, minlength=n_classes).astype("float64")
         if (totals == 0).any():
             continue
-        chi = chi_square_rows(sample, labels[None, :], totals)[0]
+        chi = chisquare(sample, labels[None, :], totals)[0]
         values.append(math.sqrt(chi / len(sample)))
     if not values:
         return -math.inf
@@ -758,7 +754,7 @@ class Pending:
     active: bool = True
 
 
-def required_permutations(family: int, alpha: Fraction) -> int:
+def resamples(family: int, alpha: Fraction) -> int:
     """Finds the smallest `B` with `1 / (B + 1) <= alpha / (family * H_family)`.
 
     Args:
@@ -770,7 +766,7 @@ def required_permutations(family: int, alpha: Fraction) -> int:
     """
     if family <= 0:
         return 0
-    need = family * multiplicity.harmonic_exact(family) / alpha
+    need = family * multiplicity.harmonics(family) / alpha
     return max(0, math.ceil(need) - 1)
 
 
@@ -800,14 +796,14 @@ def draw_permutations(
         seed: Run seed of the permutation streams.
     """
     family = len(pending)
-    ceiling = alpha / multiplicity.harmonic_exact(family)
+    ceiling = alpha / multiplicity.harmonics(family)
     live = [h for h in pending if h.statistic is not None]
     done = 0
     batch = 0
     while done < total and any(h.active for h in live):
         count = min(BATCH, total - done)
         rng = randomness.component_rng(seed, "leakage.screen.batch", batch)
-        index = batch_permutations(strata, count, rng)
+        index = permute(strata, count, rng)
         permuted = labels[index]
         permuted_bins = binned[index]
         for h in live:
@@ -856,12 +852,12 @@ class Finding:
     lower_bound: float | None
     suspect: bool
     complete: bool
-    gate: certificates.GateStatus
+    gate: certificates.Authority
 
     @property
     def blocking(self) -> bool:
         """Whether this suspicion may stop a run (certified mechanism)."""
-        return self.suspect and self.gate is certificates.GateStatus.GATING
+        return self.suspect and self.gate is certificates.Authority.GATING
 
     def describe(self, ceiling: float) -> str:
         """Writes one sentence for a profile: what was found, how to read it.
@@ -918,7 +914,7 @@ class Screen:
     family: int
     permutations: int
     alpha: float
-    gates: Mapping[str, certificates.GateStatus]
+    gates: Mapping[str, certificates.Authority]
     ceilings: Mapping[str, float]
     notes: tuple[str, ...] = ()
     unchecked: tuple[str, ...] = ()
@@ -1102,7 +1098,7 @@ def load_store(
 
 
 @functools.cache
-def shipped_store() -> certificates.Store | None:
+def bundled() -> certificates.Store | None:
     """Loads the certificates shipped with the package, once.
 
     Returns:
@@ -1112,7 +1108,7 @@ def shipped_store() -> certificates.Store | None:
     return load_store()
 
 
-def work_cap(time_budget_seconds: float | None) -> int | None:
+def allowance(time_budget_seconds: float | None) -> int | None:
     """Computes the most cross-fitted fits the screen may use in a budget.
 
     Deterministic: the budget alone decides, not the machine's speed.
@@ -1159,7 +1155,7 @@ def screen_table(
         time_column: Time column, or None. Ignored when it is not a column
             of `frame` or when `group_column` is used.
         time_budget_seconds: The project's declared time budget; it bounds
-            the screen's work by `work_cap`. None means no cap beyond
+            the screen's work by `allowance`. None means no cap beyond
             `MAX_PERMUTATIONS`.
 
     Returns:
@@ -1189,7 +1185,7 @@ def screen_table(
         features,
         grouping,
         block_size,
-        dict.fromkeys(MECHANISM_DEFECTS, certificates.GateStatus.GATING),
+        dict.fromkeys(MECHANISM_DEFECTS, certificates.Authority.GATING),
         time_budget_seconds,
     )
     found = probe(
@@ -1296,7 +1292,7 @@ def evidence(task: str, n_classes: int) -> str:
     kind = family(task, n_classes)
     if kind is None:
         return "no published certificate covers this kind of target"
-    store = shipped_store()
+    store = bundled()
     state = (
         "missing"
         if store is None
@@ -1320,7 +1316,7 @@ def code_digest() -> str:
     return trace.digest(screen, plants.plant, leakage.CERTIFIED)
 
 
-def ceilings_of(cfg: leakage.Config) -> dict[str, float]:
+def caps(cfg: leakage.Config) -> dict[str, float]:
     """Looks up the pre-registered ceiling of each mechanism's effect size.
 
     Args:
@@ -1339,7 +1335,7 @@ def ceilings_of(cfg: leakage.Config) -> dict[str, float]:
 
 def abstain(
     cfg: leakage.Config,
-    gates: Mapping[str, certificates.GateStatus],
+    gates: Mapping[str, certificates.Authority],
     rows: int,
     note: str,
     names: Sequence[Hashable] = (),
@@ -1367,7 +1363,7 @@ def abstain(
         0,
         cfg.alpha,
         gates,
-        ceilings_of(cfg),
+        caps(cfg),
         (note,),
         tuple(str(n) for n in names),
         note,
@@ -1399,7 +1395,7 @@ def encode(
             than two classes, or an unknown task).
     """
     y = leakage.encode_target(target, task)
-    folds = fold_splits(len(y), cfg.folds, groups, block_size, cfg.run_seed)
+    folds = crossfit(len(y), cfg.folds, groups, block_size, cfg.run_seed)
     total = float(((y - y.mean()) ** 2).sum()) if task == "regression" else 0.0
     if task == "regression" and total == 0.0:
         raise errors.InputError("a constant target has no R^2")
@@ -1407,7 +1403,7 @@ def encode(
     return Problem(y, task, classes, folds, total)
 
 
-def missingness_hypotheses(
+def hypothesize(
     name: str,
     series: pandas.Series,
     outcome: pandas.Series,
@@ -1451,7 +1447,7 @@ def missingness_hypotheses(
         )
     ]
     if structured:
-        stat = missingness_statistic(missing, totals)
+        stat = cramer(missing, totals)
         observed = float(stat(class_codes[None, :])[0])
         found.append(Pending(name, MISSING, observed, stat, uses_binned=True))
         return found
@@ -1473,7 +1469,7 @@ def missingness_hypotheses(
 
 def halt(
     cfg: leakage.Config,
-    gates: Mapping[str, certificates.GateStatus],
+    gates: Mapping[str, certificates.Authority],
     rows: int,
     family: int,
     note: str,
@@ -1502,7 +1498,7 @@ def halt(
         0,
         cfg.alpha,
         gates,
-        ceilings_of(cfg),
+        caps(cfg),
         (note,),
         declined,
         limit,
@@ -1540,12 +1536,12 @@ def floor(
         return skill_bound(problem, columns[h.feature], cfg, groups, rng)
     if h.mechanism == PURITY:
         recorded = frame[h.feature].notna().to_numpy()
-        return purity_bound(recorded, class_codes, cfg, groups)
+        return dominance(recorded, class_codes, cfg, groups)
     missing = frame[h.feature].isna().to_numpy()
     return resample(missing, class_codes, len(totals), cfg, groups, rng)
 
 
-def scan_frame(
+def scan(
     frame: pandas.DataFrame,
     target: str,
     task: str,
@@ -1553,7 +1549,7 @@ def scan_frame(
     names: Sequence[Hashable],
     groups: numpy.ndarray | None,
     block_size: int | None,
-    gates: Mapping[str, certificates.GateStatus],
+    gates: Mapping[str, certificates.Authority],
     time_budget_seconds: float | None = None,
 ) -> Screen:
     """Runs the screen on rows that are already chosen.
@@ -1583,14 +1579,14 @@ def scan_frame(
     except ValueError as error:
         # handled: returned as failed finding/problem/refusal with error text
         return abstain(cfg, gates, n, f"screen not run: {error}", names)
-    if not leakage.enough_rows(problem.y, task, cfg):
+    if not leakage.sufficient(problem.y, task, cfg):
         return abstain(
             cfg, gates, n, "screen not run: too few rows (low power)", names
         )
     alpha = budget.exact(cfg.alpha, "alpha")
-    strata = strata_of(n, groups, block_size)
+    strata = stratify(n, groups, block_size)
     structured = groups is not None or block_size is not None
-    classes = leakage.binned_target(frame[target], task)
+    classes = leakage.bucket(frame[target], task)
     class_codes = pandas.factorize(classes, sort=True)[0].astype("int64")
     totals = numpy.bincount(class_codes).astype("float64")
     pending: list[Pending] = []
@@ -1612,7 +1608,7 @@ def scan_frame(
                 )
             )
         pending.extend(
-            missingness_hypotheses(
+            hypothesize(
                 str(name),
                 series,
                 frame[target],
@@ -1624,12 +1620,12 @@ def scan_frame(
             )
         )
     family = len(pending)
-    ceilings = ceilings_of(cfg)
+    ceilings = caps(cfg)
     if family == 0:
         return abstain(
             cfg, gates, n, "screen not run: no column could be tested", names
         )
-    total = max(cfg.permutations, required_permutations(family, alpha))
+    total = max(cfg.permutations, resamples(family, alpha))
     declined = tuple(dict.fromkeys(h.feature for h in pending))
     if total > MAX_PERMUTATIONS:
         return halt(
@@ -1654,7 +1650,7 @@ def scan_frame(
         * skill_columns
         * (problem.classes if problem.classes > BINARY_CLASSES else 1)
     )
-    cap = work_cap(time_budget_seconds)
+    cap = allowance(time_budget_seconds)
     if cap is not None and work > cap:
         return halt(
             cfg,
@@ -1718,7 +1714,7 @@ def screen(
     features: Sequence[Hashable] | None = None,
     groups: pandas.Series | None = None,
     block_size: int | None = None,
-    gates: Mapping[str, certificates.GateStatus] | None = None,
+    gates: Mapping[str, certificates.Authority] | None = None,
     time_budget_seconds: float | None = None,
 ) -> Screen:
     """Screens the candidate columns of training data for leakage suspicion.
@@ -1737,7 +1733,7 @@ def screen(
         gates: Gate status per mechanism; None means every mechanism is
             descriptive. `screen_table` sets it from the probe.
         time_budget_seconds: Declared time budget; bounds the work through
-            `work_cap`. None means no cap beyond `MAX_PERMUTATIONS`.
+            `allowance`. None means no cap beyond `MAX_PERMUTATIONS`.
 
     Returns:
         The report. Nothing is raised for a degenerate target or too few
@@ -1758,14 +1754,14 @@ def screen(
     if unknown:
         raise errors.InputError(f"not feature columns: {unknown}")
     chosen_gates = dict.fromkeys(
-        MECHANISM_DEFECTS, certificates.GateStatus.DESCRIPTIVE
+        MECHANISM_DEFECTS, certificates.Authority.DESCRIPTIVE
     )
     chosen_gates.update(gates or {})
     group_values = None if groups is None else groups.to_numpy()
     rows, blocks = subsample(len(frame), group_values, block_size, cfg.run_seed)
     sample = frame.iloc[rows].reset_index(drop=True)
     sample_groups = None if group_values is None else group_values[rows]
-    return scan_frame(
+    return scan(
         sample,
         target,
         task,

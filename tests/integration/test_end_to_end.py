@@ -197,7 +197,7 @@ def test_diagnostics_are_written_and_exposed(binary_frame, tmp_path):
     } <= names
     for name in names:
         assert (result.run_dir / "diagnostics" / f"{name}.json").exists()
-    importance = result.feature_importance()
+    importance = result.salience()
     assert list(importance.columns) == ["feature", "importance", "std"]
     assert importance.iloc[0]["feature"] in {"a", "b", "c"}
     html = (result.run_dir / "report.html").read_text()
@@ -207,7 +207,7 @@ def test_diagnostics_are_written_and_exposed(binary_frame, tmp_path):
 def test_regression_diagnostics_include_residuals(regression_frame, tmp_path):
     result = run(regression_frame, tmp_path, task="regression")
     assert "residuals" in result.diagnostics
-    assert result.feature_importance().iloc[0]["feature"] in {"a", "b"}
+    assert result.salience().iloc[0]["feature"] in {"a", "b"}
 
 
 def test_exported_bundle_can_be_signed_and_loaded_without_trust(
@@ -587,14 +587,14 @@ def test_bundles_flag_rows_unlike_the_training_data_and_keep_the_detector(
     rows = binary_frame.drop(columns="y").head(5).copy()
     rows.loc[rows.index[0], "b"] = 500.0
 
-    flags = result.bundle.novelty_of(rows)["out_of_distribution"]
+    flags = result.bundle.atypical(rows)["out_of_distribution"]
     scored = result.bundle.score(rows)
     result.save(tmp_path / "net")
     reloaded = scmle.api.predict.load_model(tmp_path / "net", trusted=True)
 
     assert bool(flags.iloc[0]) is True
     assert scored["out_of_distribution"][0] is True
-    assert reloaded.novelty_of(rows)["out_of_distribution"].tolist() == (
+    assert reloaded.atypical(rows)["out_of_distribution"].tolist() == (
         flags.tolist()
     )
 

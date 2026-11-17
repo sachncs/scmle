@@ -6,7 +6,7 @@ from scmle.governance import model_card
 
 
 def test_model_card_requires_review_and_preserves_evaluation_context():
-    card = model_card.ModelCard(
+    card = model_card.Card(
         model_name="logistic_regression",
         model_version="run-1",
         model_fingerprint="sha256:model-manifest",
@@ -43,7 +43,7 @@ def build(evaluation):
         ),
         schema=types.SimpleNamespace(task="binary_classification"),
     )
-    return model_card.ModelCard.from_run(
+    return model_card.Card.from_run(
         manifest, profile, bundle, evaluation, "sha256:x"
     )
 

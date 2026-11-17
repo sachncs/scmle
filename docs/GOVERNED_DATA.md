@@ -37,7 +37,7 @@ age against the contract's `max_age_seconds` (`fresh`, `stale`, `unknown`)
 and the ids of the snapshots it derives from. `snapshot_id` hashes URI,
 content and schema, so the same bytes give the same id. `ReadLog.trace(id)`
 walks the lineage. `connector_reader(store)` plugs a store into the ingestion
-`ObjectStoreConnector`.
+`Bucket`.
 
 ## Quality gates
 
@@ -47,11 +47,11 @@ walks the lineage. `connector_reader(store)` plugs a store into the ingestion
 | Policy | Effect |
 | --- | --- |
 | `fail` | `QualityGateError` with the report; nothing continues |
-| `quarantine` | row-level rules remove the rows and write them with the report under `quarantine/<snapshot id>/`; dataset-level rules (`SchemaCheck`, `FreshnessCheck`, `MinRowsCheck`, `NullFractionCheck`) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until `release` |
+| `quarantine` | row-level rules remove the rows and write them with the report under `quarantine/<snapshot id>/`; dataset-level rules (`SchemaCheck`, `Freshness`, `MinRowsCheck`, `NullFractionCheck`) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until `release` |
 | `warn` | recorded in the report, data unchanged |
 
-Rules: `SchemaCheck`, `FreshnessCheck`, `MinRowsCheck`, `NullFractionCheck`,
-`NoNullsCheck`, `UniqueKeyCheck`, `RangeCheck`, `AllowedValuesCheck`, each
+Rules: `SchemaCheck`, `Freshness`, `MinRowsCheck`, `NullFractionCheck`,
+`Complete`, `UniqueKeyCheck`, `RangeCheck`, `Membership`, each
 limited to the stages it names. Every rule is evaluated before any action, and
 the report is written to `quality/` whatever the outcome.
 

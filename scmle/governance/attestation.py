@@ -9,12 +9,12 @@ from typing import Any
 from typing import Self
 
 from scmle.contracts import errors
-from scmle.contracts.signing import resolve_key
-from scmle.contracts.signing import sign_payload
+from scmle.contracts.signing import keying
+from scmle.contracts.signing import mac
 from scmle.contracts.signing import SIGNATURE_ALGORITHM
 
 
-def canonical_digest(record: Mapping[str, Any]) -> str:
+def checksum(record: Mapping[str, Any]) -> str:
     """Returns the SHA-256 digest of a JSON-native governance record.
 
     Args:
@@ -32,7 +32,7 @@ def canonical_digest(record: Mapping[str, Any]) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
-def required_text(record: Mapping[str, Any], path: str) -> str:
+def mandatory(record: Mapping[str, Any], path: str) -> str:
     """Returns a required string from a nested governance record.
 
     Args:
@@ -59,7 +59,7 @@ def required_text(record: Mapping[str, Any], path: str) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ReleaseAttestation:
+class Attestation:
     """Immutable digest binding for one packaged release candidate."""
 
     run_id: str
@@ -126,20 +126,20 @@ class ReleaseAttestation:
         ):
             raise errors.InputError("provenance.signature.present must be bool")
         record = cls(
-            run_id=required_text(provenance, "run_id"),
-            model_manifest_sha256=required_text(
+            run_id=mandatory(provenance, "run_id"),
+            model_manifest_sha256=mandatory(
                 provenance, "model.manifest_sha256"
             ),
-            provenance_sha256=canonical_digest(provenance),
-            sbom_sha256=canonical_digest(sbom),
+            provenance_sha256=checksum(provenance),
+            sbom_sha256=checksum(sbom),
             signature_present=signature["present"],
         )
-        key = resolve_key(signing_key)
+        key = keying(signing_key)
         if key is None:
             return record
         return dataclasses.replace(
             record,
-            attestation_signature=sign_payload(record.unsigned_dict(), key),
+            attestation_signature=mac(record.unsigned_dict(), key),
         )
 
     @classmethod
@@ -182,12 +182,10 @@ class ReleaseAttestation:
                 )
             signature_value = value
         return cls(
-            run_id=required_text(record, "run_id"),
-            model_manifest_sha256=required_text(
-                subjects, "model_manifest_sha256"
-            ),
-            provenance_sha256=required_text(subjects, "provenance_sha256"),
-            sbom_sha256=required_text(subjects, "sbom_sha256"),
+            run_id=mandatory(record, "run_id"),
+            model_manifest_sha256=mandatory(subjects, "model_manifest_sha256"),
+            provenance_sha256=mandatory(subjects, "provenance_sha256"),
+            sbom_sha256=mandatory(subjects, "sbom_sha256"),
             signature_present=record.get("signature_present", False),
             attestation_signature=signature_value,
         )

@@ -2,7 +2,7 @@
 
 `environment.lock` lists everything installed where the model was built,
 tests and linters included. A service image needs only what the model and the
-framework import. `runtime_closure` walks the declared requirements of the
+framework import. `transitive` walks the declared requirements of the
 roots through the installed metadata and returns just that set; the image
 installs exactly it with `--no-deps`, so pip resolves nothing at build time.
 """
@@ -30,7 +30,7 @@ def canonical(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def marker_applies(marker: str) -> bool:
+def applies(marker: str) -> bool:
     """Reports whether an environment marker holds here (extras never do).
 
     Args:
@@ -57,7 +57,7 @@ def marker_applies(marker: str) -> bool:
     return bool(markers.Marker(marker).evaluate({"extra": ""}))
 
 
-def runtime_closure(
+def transitive(
     roots: Iterable[str],
     versions: Mapping[str, str] | None = None,
     requires: Callable[[str], list[str]] | None = None,
@@ -119,7 +119,7 @@ def runtime_closure(
             if match is None:
                 raise errors.ArtifactError(f"cannot read requirement {line!r}")
             marker = parts[2].strip()
-            if not marker or marker_applies(marker):
+            if not marker or applies(marker):
                 pending.append(canonical(match.group(0)))
     return dict(sorted(closure.items()))
 

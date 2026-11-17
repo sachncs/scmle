@@ -17,8 +17,8 @@ class Cox(models.Model):
     name = "cox_ph"
     family = "linear"
     capabilities = models.Capabilities(SURVIVAL, needs_scaling=True, cost=2)
-    search_space = search.SearchSpace(
-        (search.FloatParameter("penalty", 1e-3, 100.0, log=True),)
+    search_space = search.Space(
+        (search.Real("penalty", 1e-3, 100.0, log=True),)
     )
 
     def build(
@@ -37,10 +37,10 @@ class Cox(models.Model):
         Returns:
             An unfitted penalised Cox regressor; `seed` is not used.
         """
-        return estimators.CoxRegressor(**dict(params or {}))
+        return estimators.Hazards(**dict(params or {}))
 
 
-class DiscreteTime(models.Model):
+class Hazard(models.Model):
     """Boosted trees on a discrete-time hazard."""
 
     name = "discrete_time_boosting"
@@ -48,10 +48,10 @@ class DiscreteTime(models.Model):
     capabilities = models.Capabilities(
         SURVIVAL, handles_missing=False, cost=4, memory_factor=4.0
     )
-    search_space = search.SearchSpace(
+    search_space = search.Space(
         (
-            search.FloatParameter("learning_rate", 0.02, 0.3, log=True),
-            search.IntParameter("max_leaf_nodes", 4, 32),
+            search.Real("learning_rate", 0.02, 0.3, log=True),
+            search.Integer("max_leaf_nodes", 4, 32),
         )
     )
 
@@ -78,5 +78,5 @@ class DiscreteTime(models.Model):
 
 SURVIVAL_ADAPTERS: tuple[type[models.Model], ...] = (
     Cox,
-    DiscreteTime,
+    Hazard,
 )

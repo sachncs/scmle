@@ -40,7 +40,7 @@ class Stressor(abc.ABC):
         """
 
 
-class MissingValues(Stressor):
+class Blanking(Stressor):
     """Blanks a share of the cells."""
 
     def __init__(self, rate: float) -> None:
@@ -72,7 +72,7 @@ class MissingValues(Stressor):
             probability `rate`.
         """
         damaged = features.copy()
-        for column in inputs.feature_plan.input_columns:
+        for column in inputs.feature_plan.sourced:
             mask = rng.random(len(damaged)) < self.rate
             damaged[column] = (
                 damaged[column].astype(object).where(~mask, numpy.nan)
@@ -82,7 +82,7 @@ class MissingValues(Stressor):
         return damaged
 
 
-class GaussianNoise(Stressor):
+class Noise(Stressor):
     """Adds noise proportional to each numeric column's spread."""
 
     def __init__(self, scale: float) -> None:
@@ -176,10 +176,10 @@ class Robustness(diagnostics.Diagnostic):
                 0.1 and 0.5 standard deviations, and 20% unseen categories).
         """
         self.stressors = stressors or (
-            MissingValues(0.10),
-            MissingValues(0.30),
-            GaussianNoise(0.10),
-            GaussianNoise(0.50),
+            Blanking(0.10),
+            Blanking(0.30),
+            Noise(0.10),
+            Noise(0.50),
             UnseenCategories(0.20),
         )
 

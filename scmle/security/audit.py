@@ -71,7 +71,7 @@ class Log:
             The log.
 
         Raises:
-            DeploymentLedgerError: If an existing file is broken (the
+            MisuseError: If an existing file is broken (the
                 ledger's loader raises it).
         """
         if path is not None and pathlib.Path(path).exists():
@@ -100,11 +100,11 @@ class Log:
             The chained row.
 
         Raises:
-            DeploymentLedgerError: If `event` is unknown or the ledger
+            MisuseError: If `event` is unknown or the ledger
                 refuses the row.
         """
         if event not in EVENTS:
-            raise deployment_ledger.DeploymentLedgerError(
+            raise deployment_ledger.MisuseError(
                 f"audit event must be one of {EVENTS}"
             )
         body = {"event": event, "at": round(self.clock(), 3), **fields}

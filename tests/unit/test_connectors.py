@@ -20,7 +20,7 @@ def frame() -> pandas.DataFrame:
 def test_source_connector_is_an_abstract_public_contract():
     """The contract cannot be used without schema and row behavior."""
     with pytest.raises(TypeError):
-        connectors.SourceConnector("file:///tmp/source.csv")
+        connectors.Adapter("file:///tmp/source.csv")
 
 
 def test_local_file_connector_returns_schema_rows_and_resume_checkpoint(
@@ -29,7 +29,7 @@ def test_local_file_connector_returns_schema_rows_and_resume_checkpoint(
     """Local reads return bounded rows and portable cursor checkpoints."""
     path = tmp_path / "source.csv"
     frame.to_csv(path, index=False)
-    connector = connectors.LocalFileConnector(path)
+    connector = connectors.Filesystem(path)
 
     schema = connector.schema()
     first = connector.read_rows(limit=2)
@@ -51,7 +51,7 @@ def test_local_file_checkpoint_rejects_changed_raw_snapshot(tmp_path, frame):
     """A local resume cannot silently mix two file snapshots."""
     path = tmp_path / "source.csv"
     frame.to_csv(path, index=False)
-    connector = connectors.LocalFileConnector(path)
+    connector = connectors.Filesystem(path)
     first = connector.read_rows(limit=2)
 
     frame.assign(label=["changed"] * len(frame)).to_csv(path, index=False)
@@ -72,8 +72,8 @@ def test_local_file_identity_is_deterministic_for_path_and_file_uri(tmp_path):
     path = tmp_path / "source.csv"
     path.write_text("id\n1\n")
 
-    first = connectors.LocalFileConnector(path)
-    second = connectors.LocalFileConnector(path.as_uri())
+    first = connectors.Filesystem(path)
+    second = connectors.Filesystem(path.as_uri())
 
     assert first.source_uri == second.source_uri
     assert first.source_identity == second.source_identity
@@ -81,8 +81,8 @@ def test_local_file_identity_is_deterministic_for_path_and_file_uri(tmp_path):
 
 def test_local_connector_rejects_object_store_uri_without_fake_support():
     """An object-store URI fails closed instead of pretending to be local."""
-    with pytest.raises(connectors.UnsupportedUriSchemeError) as raised:
-        connectors.LocalFileConnector("s3://bucket/source.csv")
+    with pytest.raises(connectors.SchemeError) as raised:
+        connectors.Filesystem("s3://bucket/source.csv")
 
     assert raised.value.code == "unsupported_uri_scheme"
     assert raised.value.details["scheme"] == "s3"
@@ -94,9 +94,7 @@ def test_object_store_connector_reads_bounded_tabular_objects_and_resumes(
 ):
     """Injected object transport supports schema and checkpointed batches."""
     payload = frame.to_csv(index=False).encode("utf-8")
-    connector = connectors.ObjectStoreConnector(
-        "s3://bucket/source.csv", lambda uri: payload
-    )
+    connector = connectors.Bucket("s3://bucket/source.csv", lambda uri: payload)
 
     first = connector.read_rows(limit=2)
     second = connector.read_rows(first.checkpoint, limit=2)
@@ -121,9 +119,7 @@ def test_object_store_checkpoint_rejects_changed_raw_snapshot(frame):
     def read_object(uri: str) -> bytes:
         return payloads.pop(0)
 
-    connector = connectors.ObjectStoreConnector(
-        "s3://bucket/source.csv", read_object
-    )
+    connector = connectors.Bucket("s3://bucket/source.csv", read_object)
     first = connector.read_rows(limit=2)
 
     with pytest.raises(
@@ -145,7 +141,7 @@ def test_object_store_connector_accepts_a_caller_owned_versioned_decoder():
         calls.append((uri, payload))
         return pandas.DataFrame({"payload_length": [len(payload)]})
 
-    connector = connectors.ObjectStoreConnector(
+    connector = connectors.Bucket(
         "s3://bucket/sample.custom",
         lambda uri: b"custom-format",
         decoder=decode,
@@ -165,7 +161,7 @@ def test_object_store_connector_accepts_a_caller_owned_versioned_decoder():
 def test_object_store_connector_requires_decoder_identity_for_custom_formats():
     """Custom decoding must be bound to a reproducible source identity."""
     with pytest.raises(ValueError, match="decoder_name"):
-        connectors.ObjectStoreConnector(
+        connectors.Bucket(
             "s3://bucket/sample.custom",
             lambda uri: b"custom-format",
             decoder=lambda uri, payload: pandas.DataFrame({"value": [1]}),
@@ -178,7 +174,7 @@ def test_object_store_connector_reports_decoder_contract_failures():
     def fail(uri: str, payload: bytes) -> pandas.DataFrame:
         raise RuntimeError("bad payload")
 
-    failing = connectors.ObjectStoreConnector(
+    failing = connectors.Bucket(
         "s3://bucket/sample.custom",
         lambda uri: b"custom-format",
         decoder=fail,
@@ -191,7 +187,7 @@ def test_object_store_connector_reports_decoder_contract_failures():
     assert raised.value.code == "decoder_failed"
     assert raised.value.details["decoder"] == "custom-v2"
 
-    invalid = connectors.ObjectStoreConnector(
+    invalid = connectors.Bucket(
         "s3://bucket/sample.custom",
         lambda uri: b"custom-format",
         decoder=lambda uri, payload: {"value": 1},
@@ -205,7 +201,7 @@ def test_object_store_connector_reports_decoder_contract_failures():
 def test_object_store_connector_rejects_large_payloads_and_bad_formats():
     """Bounded object support fails closed instead of hiding memory risk."""
     with pytest.raises(connectors.ConnectorError, match="max_bytes"):
-        connectors.ObjectStoreConnector(
+        connectors.Bucket(
             "gs://bucket/source.csv", lambda uri: b"id\n1\n", max_bytes=1
         ).schema()
 
@@ -278,7 +274,7 @@ def test_streaming_object_connector_rejects_oversized_records():
         connector.read_rows(limit=1)
 
     with pytest.raises(connectors.ConnectorError, match="unsupported"):
-        connectors.ObjectStoreConnector(
+        connectors.Bucket(
             "az://bucket/source.xls", lambda uri: b"data"
         ).schema()
 
@@ -289,8 +285,8 @@ def test_checkpoint_cannot_cross_source_boundaries(tmp_path):
     second_path = tmp_path / "second.csv"
     first_path.write_text("id\n1\n")
     second_path.write_text("id\n2\n")
-    first = connectors.LocalFileConnector(first_path)
-    second = connectors.LocalFileConnector(second_path)
+    first = connectors.Filesystem(first_path)
+    second = connectors.Filesystem(second_path)
 
     checkpoint = first.checkpoint(offset=1)
     with pytest.raises(connectors.CheckpointError) as raised:
@@ -332,7 +328,7 @@ def test_dbapi_connector_retrieves_schema_and_resumes_by_cursor(tmp_path):
 
 def test_dbapi_connector_rejects_unsupported_uri_scheme():
     """The generic DB-API adapter does not claim HTTP or object stores."""
-    with pytest.raises(connectors.UnsupportedUriSchemeError):
+    with pytest.raises(connectors.SchemeError):
         connectors.DbApiConnector(
             "s3://bucket/source",
             "SELECT 1",
@@ -344,7 +340,7 @@ def test_warehouse_connector_reads_bounded_batches_through_injected_engine(
     frame,
 ):
     """Warehouse reads preserve query identity and portable checkpoints."""
-    schema = connectors.SourceSchema.from_frame(frame)
+    schema = connectors.Columns.from_frame(frame)
 
     def read_schema(query):
         assert query == "select * from records"
@@ -356,7 +352,7 @@ def test_warehouse_connector_reads_bounded_batches_through_injected_engine(
         rows = tuple(selected.itertuples(index=False, name=None))
         return schema, rows, offset + len(rows) < len(frame)
 
-    connector = connectors.WarehouseConnector(
+    connector = connectors.Lakehouse(
         "warehouse://analytics/records",
         "select * from records",
         read_schema,
@@ -380,18 +376,18 @@ def test_warehouse_connector_retries_and_rejects_invalid_callback_rows(frame):
         attempts.append(query)
         if len(attempts) == 1:
             raise OSError("warehouse unavailable")
-        return connectors.SourceSchema.from_frame(frame)
+        return connectors.Columns.from_frame(frame)
 
-    connector = connectors.WarehouseConnector(
+    connector = connectors.Lakehouse(
         "lakehouse://bronze/records",
         "records",
         read_schema,
         lambda query, offset, limit: (
-            connectors.SourceSchema.from_frame(frame),
+            connectors.Columns.from_frame(frame),
             ((1,),),
             False,
         ),
-        connectors.RetryBudget(max_retries=1),
+        connectors.Retries(max_retries=1),
     )
 
     assert connector.schema().columns[0].name == "id"
@@ -422,7 +418,7 @@ def test_dbapi_connector_retries_transient_factory_failure(tmp_path):
         "sqlite://source",
         "SELECT id FROM records",
         flaky_factory,
-        connectors.RetryBudget(max_retries=2),
+        connectors.Retries(max_retries=2),
     )
 
     assert connector.schema().columns[0].name == "id"
@@ -442,7 +438,7 @@ def test_dbapi_connector_reports_structured_retry_exhaustion():
         "dbapi://warehouse/source",
         "SELECT 1",
         failing_factory,
-        connectors.RetryBudget(max_retries=1),
+        connectors.Retries(max_retries=1),
     )
 
     with pytest.raises(connectors.RetryExhaustedError) as raised:
@@ -458,19 +454,19 @@ def test_dbapi_connector_reports_structured_retry_exhaustion():
 def test_cursor_is_deterministic_and_round_trips():
     """Cursor tokens are stable and preserve source identity and offset."""
     identity = connectors.source_identity("dbapi://warehouse/source")
-    cursor = connectors.cursor_for(identity, 17)
+    cursor = connectors.bookmark(identity, 17)
 
-    assert connectors.cursor_for(identity, 17) == cursor
-    assert connectors.decode_cursor(cursor) == (identity, 17)
-    assert connectors.SourceCheckpoint(cursor=cursor).offset == 17
+    assert connectors.bookmark(identity, 17) == cursor
+    assert connectors.unwrap(cursor) == (identity, 17)
+    assert connectors.Bookmark(cursor=cursor).offset == 17
 
 
 def test_retry_budget_rejects_invalid_values():
     """Invalid retry policy cannot create an unbounded or unsafe connector."""
     with pytest.raises(ValueError, match="max_retries"):
-        connectors.RetryBudget(max_retries=-1)
+        connectors.Retries(max_retries=-1)
     with pytest.raises(ValueError, match="delay_seconds"):
-        connectors.RetryBudget(delay_seconds=-0.1)
+        connectors.Retries(delay_seconds=-0.1)
 
 
 def test_windows_drive_path_is_a_path_not_a_uri_scheme():
@@ -479,6 +475,6 @@ def test_windows_drive_path_is_a_path_not_a_uri_scheme():
     `urlsplit` reads the `C` as a URI scheme and leaves `\\data\\a.csv`,
     which Windows then resolves against the current drive (D:\\data\\a.csv).
     """
-    connector = connectors.LocalFileConnector("C:\\data\\a.csv")
+    connector = connectors.Filesystem("C:\\data\\a.csv")
 
     assert str(connector.path).endswith("C:\\data\\a.csv")

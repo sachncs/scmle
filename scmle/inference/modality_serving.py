@@ -87,7 +87,7 @@ class ModalityHttpServing:
 
         Marks the verify, load and warm-up steps complete at once. Sets the
         admission limits to 8 requests in flight and a 30 second scoring
-        time. Authentication is added with `set_gateway`, and `start`
+        time. Authentication is added with `protect`, and `start`
         refuses a non-loopback ``host`` without one.
 
         Args:
@@ -124,7 +124,7 @@ class ModalityHttpServing:
         self.max_samples = max_samples
         self.require_lifecycle_report = require_lifecycle_report
         self.lock = threading.Lock()
-        self.admission = guard.AdmissionControl(8, 30.0)
+        self.admission = guard.Admission(8, 30.0)
         self.readiness = guard.Readiness()
         for step in guard.STEPS[:2]:
             self.readiness.begin(step)
@@ -136,7 +136,7 @@ class ModalityHttpServing:
         self.httpd: server.ThreadingHTTPServer | None = None
         self.thread: threading.Thread | None = None
 
-    def set_gateway(self, gateway: access.Gateway | None) -> None:
+    def protect(self, gateway: access.Gateway | None) -> None:
         """Sets the gateway that guards every request except the probes.
 
         Args:

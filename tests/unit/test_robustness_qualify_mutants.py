@@ -66,7 +66,7 @@ def test_a_missing_store_gives_a_note_naming_the_file(tmp_path):
         f"f6_certificates.json not found at {tmp_path / 'f6_certificates.json'}"
         ": detectors are descriptive"
     )
-    assert found.mmd_gate is certificates.GateStatus.DESCRIPTIVE
+    assert found.mmd_gate is certificates.Authority.DESCRIPTIVE
 
 
 def test_an_unreadable_store_is_descriptive_with_the_reason(tmp_path):
@@ -75,7 +75,7 @@ def test_an_unreadable_store_is_descriptive_with_the_reason(tmp_path):
     found = run(frame, codes, tmp_path)
     assert found.store_note.startswith("f6_certificates.json unreadable (")
     assert found.store_note.endswith("): detectors are descriptive")
-    assert found.stability_gate is certificates.GateStatus.DESCRIPTIVE
+    assert found.stability_gate is certificates.Authority.DESCRIPTIVE
 
 
 def test_a_current_store_lets_every_check_gate(tmp_path):
@@ -83,9 +83,9 @@ def test_a_current_store_lets_every_check_gate(tmp_path):
     frame, codes = world()
     found = run(frame, codes, tmp_path)
     assert found.store_note == ""
-    assert found.stability_gate is certificates.GateStatus.GATING
-    assert found.c2st_gate is certificates.GateStatus.GATING
-    assert found.mmd_gate is certificates.GateStatus.GATING
+    assert found.stability_gate is certificates.Authority.GATING
+    assert found.c2st_gate is certificates.Authority.GATING
+    assert found.mmd_gate is certificates.Authority.GATING
     assert found.rule_note == "" and found.rule == stability.DEFAULT_RULE
 
 
@@ -93,14 +93,14 @@ def test_each_gate_follows_its_own_certificate(tmp_path):
     certified_store(tmp_path, stability_too=False)
     frame, codes = world()
     only_shift = run(frame, codes, tmp_path)
-    assert only_shift.stability_gate is certificates.GateStatus.DESCRIPTIVE
-    assert only_shift.c2st_gate is certificates.GateStatus.GATING
-    assert only_shift.mmd_gate is certificates.GateStatus.GATING
+    assert only_shift.stability_gate is certificates.Authority.DESCRIPTIVE
+    assert only_shift.c2st_gate is certificates.Authority.GATING
+    assert only_shift.mmd_gate is certificates.Authority.GATING
     certified_store(tmp_path, shift_too=False)
     only_stability = run(frame, codes, tmp_path)
-    assert only_stability.stability_gate is certificates.GateStatus.GATING
-    assert only_stability.c2st_gate is certificates.GateStatus.DESCRIPTIVE
-    assert only_stability.mmd_gate is certificates.GateStatus.DESCRIPTIVE
+    assert only_stability.stability_gate is certificates.Authority.GATING
+    assert only_stability.c2st_gate is certificates.Authority.DESCRIPTIVE
+    assert only_stability.mmd_gate is certificates.Authority.DESCRIPTIVE
 
 
 def test_another_rule_is_descriptive_and_says_so(tmp_path):
@@ -109,12 +109,12 @@ def test_another_rule_is_descriptive_and_says_so(tmp_path):
     rule = stability.Thresholds(0.7, 0.5, 0.8)
     found = run(frame, codes, tmp_path, rule=rule)
     assert found.rule == rule
-    assert found.stability_gate is certificates.GateStatus.DESCRIPTIVE
+    assert found.stability_gate is certificates.Authority.DESCRIPTIVE
     assert found.rule_note == (
         "the chartered stability thresholds differ from the certified rule: "
         "the verdicts are descriptive"
     )
-    assert found.c2st_gate is certificates.GateStatus.GATING
+    assert found.c2st_gate is certificates.Authority.GATING
 
 
 def test_the_reasons_stability_was_not_run_are_worded_exactly(tmp_path):
@@ -160,7 +160,7 @@ def test_exactly_the_minimum_number_of_specifications_is_enough(tmp_path):
 def test_the_applicable_choices_and_dropped_options_are_reported(tmp_path):
     frame, codes = world()
     found = run(frame, codes, tmp_path)
-    applicable, notes = stability.applicable_choices(RICH)
+    applicable, notes = stability.actionable(RICH)
     assert found.applicable == applicable and found.notes == notes
     assert isinstance(found.notes, tuple)
     assert found.grid.total == 18
@@ -208,7 +208,7 @@ def test_each_survivor_is_assessed_with_its_own_slice_and_the_shared_budget(
     assert kwargs["curve_permutations"] == 200
     assert kwargs["budget_seconds"] == 5.0
     assert kwargs["strata"] is strata
-    assert kwargs["gate"] is certificates.GateStatus.DESCRIPTIVE
+    assert kwargs["gate"] is certificates.Authority.DESCRIPTIVE
     assert kwargs["rule"] == stability.DEFAULT_RULE
     assert set(kwargs) == {
         "bootstrap",
@@ -315,8 +315,8 @@ def test_the_shift_check_gets_the_candidates_the_reference_and_the_gates(
     assert seed == 4
     assert options == {
         "permutations": 250,
-        "c2st_gate": certificates.GateStatus.GATING,
-        "mmd_gate": certificates.GateStatus.GATING,
+        "c2st_gate": certificates.Authority.GATING,
+        "mmd_gate": certificates.Authority.GATING,
     }
 
 
@@ -378,7 +378,7 @@ def test_subgroup_rows_are_reported_for_the_named_columns_only(tmp_path):
     frame, codes = world()
     found = run(frame, codes, tmp_path, sensitive=["missing", "g", "a"][:2])
     assert {row.level for row in found.coverage} == {"u", "v"}
-    assert found.coverage == tuple(coverage.subgroup_coverage(frame["g"], None))
+    assert found.coverage == tuple(coverage.represent(frame["g"], None))
     nothing = run(frame, codes, tmp_path)
     assert nothing.coverage == ()
 
@@ -393,7 +393,7 @@ def test_a_reference_without_the_column_leaves_the_deployment_share_unknown(
     full = frame.copy()
     full["g"] = "u"
     shares = coverage.shares(full["g"])
-    expected = coverage.subgroup_coverage(frame["g"], shares)
+    expected = coverage.represent(frame["g"], shares)
     found = run(frame, codes, tmp_path, sensitive=["g"], reference=full)
     assert found.coverage == tuple(expected)
 
@@ -407,7 +407,7 @@ def test_the_coverage_shares_come_from_the_whole_reference(
     reference["g"] = ["u"] * 50 + ["v"] * 50
     found = run(frame, codes, tmp_path, sensitive=["g"], reference=reference)
     assert found.coverage == tuple(
-        coverage.subgroup_coverage(frame["g"], coverage.shares(reference["g"]))
+        coverage.represent(frame["g"], coverage.shares(reference["g"]))
     )
 
 
@@ -452,9 +452,9 @@ def test_the_fragile_names_keep_the_order_of_the_findings():
         shift=None,
         coverage=(),
         forward=None,
-        stability_gate=certificates.GateStatus.DESCRIPTIVE,
-        c2st_gate=certificates.GateStatus.DESCRIPTIVE,
-        mmd_gate=certificates.GateStatus.DESCRIPTIVE,
+        stability_gate=certificates.Authority.DESCRIPTIVE,
+        c2st_gate=certificates.Authority.DESCRIPTIVE,
+        mmd_gate=certificates.Authority.DESCRIPTIVE,
         store_note="",
     )
     assert holder.fragile == ("x", "z")
@@ -463,11 +463,11 @@ def test_the_fragile_names_keep_the_order_of_the_findings():
 
 def test_the_charter_seed_orders_the_specification_subset(tmp_path):
     frame, codes = world()
-    applicable = stability.applicable_choices(RICH)[0]
+    applicable = stability.actionable(RICH)[0]
     first = run(frame, codes, tmp_path, seed=1)
     second = run(frame, codes, tmp_path, seed=2)
-    assert first.grid.specs == multiverse.enumerate_grid(applicable, 1).specs
-    assert second.grid.specs == multiverse.enumerate_grid(applicable, 2).specs
+    assert first.grid.specs == multiverse.universe(applicable, 1).specs
+    assert second.grid.specs == multiverse.universe(applicable, 2).specs
     assert first.grid.specs != second.grid.specs
 
 

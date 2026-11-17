@@ -22,7 +22,7 @@ HIGHEST_QUANTILE = 0.9
 MIN_CENSORING_PROBABILITY = 0.05
 
 
-def censoring_curve(
+def censor(
     duration: numpy.ndarray, event: numpy.ndarray
 ) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Computes the Kaplan-Meier curve of the censoring times.
@@ -41,13 +41,13 @@ def censoring_curve(
     return estimators.kaplan_meier(duration, 1 - numpy.asarray(event))
 
 
-def censoring_probability(
+def survivor(
     curve: tuple[numpy.ndarray, numpy.ndarray], times: numpy.ndarray
 ) -> numpy.ndarray:
     """Returns the chance of still being uncensored at each time, floored.
 
     Args:
-        curve: The censoring curve from `censoring_curve`.
+        curve: The censoring curve from `censor`.
         times: Times to look up.
 
     Returns:
@@ -55,12 +55,12 @@ def censoring_probability(
         at least `MIN_CENSORING_PROBABILITY`.
     """
     moments, values = curve
-    found = estimators.step_lookup(moments, values, times, 1.0)
+    found = estimators.stair(moments, values, times, 1.0)
     floored: numpy.ndarray = numpy.maximum(found, MIN_CENSORING_PROBABILITY)
     return floored
 
 
-def time_grid(duration: numpy.ndarray, event: numpy.ndarray) -> numpy.ndarray:
+def horizons(duration: numpy.ndarray, event: numpy.ndarray) -> numpy.ndarray:
     """Returns evaluation times between the 10th and 90th event-time percentile.
 
     Args:
@@ -99,9 +99,9 @@ def brier_scores(
         The Brier score at each time (lower is better).
     """
     seen = numpy.asarray(event, dtype=bool)
-    curve = censoring_curve(duration, event)
-    at_row = censoring_probability(curve, duration)
-    at_time = censoring_probability(curve, times)
+    curve = censor(duration, event)
+    at_row = survivor(curve, duration)
+    at_time = survivor(curve, times)
     scores = numpy.empty(len(times))
     for index, moment in enumerate(times):
         predicted = survival[:, index]
@@ -114,7 +114,7 @@ def brier_scores(
     return scores
 
 
-def integrated_brier(
+def brier(
     duration: numpy.ndarray,
     event: numpy.ndarray,
     survival: numpy.ndarray,
@@ -139,7 +139,7 @@ def integrated_brier(
     return float(area / (times[-1] - times[0]))
 
 
-def dynamic_auc(
+def auc(
     duration: numpy.ndarray,
     event: numpy.ndarray,
     risk: numpy.ndarray,
@@ -163,9 +163,7 @@ def dynamic_auc(
         NaN if there are none.
     """
     seen = numpy.asarray(event, dtype=bool)
-    weights = 1.0 / censoring_probability(
-        censoring_curve(duration, event), duration
-    )
+    weights = 1.0 / survivor(censor(duration, event), duration)
     values = []
     for moment in times:
         cases = (duration <= moment) & seen
@@ -186,7 +184,7 @@ def dynamic_auc(
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class SurvivalMetric(metrics.Metric):
+class Survival(metrics.Metric):
     """A time-dependent survival metric read off a survival estimator.
 
     Attributes:
@@ -228,13 +226,13 @@ class SurvivalMetric(metrics.Metric):
         ) -> float:
             duration = numpy.asarray(target, dtype=float)
             event = features[estimator.event_column].to_numpy(dtype=float)
-            times = time_grid(duration, event)
+            times = horizons(duration, event)
             if kind == "ibs":
                 survival = numpy.asarray(
                     estimator.predict_survival(features, times)
                 )
-                return -integrated_brier(duration, event, survival, times)
+                return -brier(duration, event, survival, times)
             risk = numpy.asarray(estimator.predict(features), dtype=float)
-            return dynamic_auc(duration, event, risk, times)
+            return auc(duration, event, risk, times)
 
         return score

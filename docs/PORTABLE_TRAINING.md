@@ -13,7 +13,7 @@ needs a stated `gpu_reason`: specialised compute only behind a declared need.
 `Runner.run(spec)` is the same on every runner:
 
 * the spec is stored at `runs/<id>/spec.json`; the same id with a different
-  spec is `RunConflictError`; a finished id returns its recorded manifest and
+  spec is `ConflictError`; a finished id returns its recorded manifest and
   starts nothing;
 * `runs/<id>/manifest.json` is rewritten atomically at every transition
   (attempts with state, seconds, cost and reason; checkpoint digests; result
@@ -48,7 +48,7 @@ runner. Releasing a bundle is a third act, with an approval, outside both.
 
 | Runner | Runs the attempt as | Identity | Interruption |
 | --- | --- | --- | --- |
-| `Runner` | the workload, in this process | the training role of `RoleStore` | injected, or `JobInterruptedError` |
+| `Runner` | the workload, in this process | the training role of `RoleStore` | injected, or `PreemptedError` |
 
 A runner for a container platform starts `python -m scmle.runners.entrypoint`
 in the image, which opens the `file://` store named by `SCMLE_STORE_URI`, loads

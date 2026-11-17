@@ -18,12 +18,12 @@ import numpy
 
 from scmle.contracts import data
 from scmle.contracts import errors
-from scmle.data.modalities.curation import build_finding
-from scmle.data.modalities.curation import check_split_fractions
+from scmle.data.modalities.curation import allocate
 from scmle.data.modalities.curation import conflicting_label_groups
 from scmle.data.modalities.curation import Curation
+from scmle.data.modalities.curation import flaw
 from scmle.data.modalities.curation import label_counts
-from scmle.data.modalities.curation import partition_group_ids
+from scmle.data.modalities.curation import proportions
 
 WIDTH_16_BIT = 2
 WIDTH_24_BIT = 3
@@ -34,13 +34,13 @@ MATRIX_DIMENSIONS = 2
 SHA256_HEX_LENGTH = 64
 
 
-class AudioValidationError(errors.DataError):
+class ValidationError(errors.DataError):
     """An audio sample violates an ingestion or metadata invariant."""
 
     category = "audio_validation"
 
 
-class AudioDependencyError(errors.DataError):
+class DecoderError(errors.DataError):
     """A non-WAV audio operation needs an explicitly supplied decoder."""
 
     category = "audio_dependency"
@@ -92,7 +92,7 @@ class Metadata:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class TranscriptSegment:
+class Segment:
     """One time-local transcript segment with provenance and confidence.
 
     Attributes:
@@ -153,7 +153,7 @@ class Transcript:
     provider: str
     provider_version: str
     language: str
-    segments: tuple[TranscriptSegment, ...] = ()
+    segments: tuple[Segment, ...] = ()
     confidence: float | None = None
 
     def __post_init__(self) -> None:
@@ -164,7 +164,7 @@ class Transcript:
                 not finite or outside [0, 1], or the segments are not
                 ordered by start time.
             TypeError: If segments is not a tuple of
-                TranscriptSegment.
+                Segment.
         """
         for field_name, value in (
             ("text", self.text),
@@ -185,9 +185,7 @@ class Transcript:
             raise errors.InputError("transcript confidence must be in [0, 1]")
         if not isinstance(self.segments, tuple):
             raise errors.KindError("segments must be a tuple")
-        if not all(
-            isinstance(segment, TranscriptSegment) for segment in self.segments
-        ):
+        if not all(isinstance(segment, Segment) for segment in self.segments):
             raise errors.KindError("segments must contain transcript segments")
         if any(
             current.start_seconds < previous.start_seconds
@@ -334,7 +332,7 @@ def parse(encoded_bytes: bytes) -> Metadata:
         sample width in bytes.
 
     Raises:
-        AudioValidationError: If the payload is not a readable WAV file.
+        ValidationError: If the payload is not a readable WAV file.
     """
     try:
         with wave.open(io.BytesIO(encoded_bytes), "rb") as opened:
@@ -346,7 +344,7 @@ def parse(encoded_bytes: bytes) -> Metadata:
                 sample_width=opened.getsampwidth(),
             )
     except (EOFError, wave.Error) as error:
-        raise AudioValidationError(
+        raise ValidationError(
             "audio payload is not a readable WAV file",
             {"code": "invalid_wav"},
         ) from error
@@ -378,7 +376,7 @@ def extract(
     Raises:
         ValueError: If ``max_frames`` is below one or ``start_frame`` is
             negative.
-        AudioValidationError: If the payload is not a readable WAV file,
+        ValidationError: If the payload is not a readable WAV file,
             ``start_frame`` is at or beyond the last frame, the window has
             no complete frame, the sample width is not 1, 2, 3 or 4 bytes,
             or a statistic is not finite.
@@ -393,7 +391,7 @@ def extract(
             channels = opened.getnchannels()
             sample_rate = opened.getframerate()
             if start_frame >= opened.getnframes():
-                raise AudioValidationError(
+                raise ValidationError(
                     "audio window starts beyond the available frames",
                     {
                         "code": "window_start_out_of_range",
@@ -407,7 +405,7 @@ def extract(
             )
             raw = opened.readframes(requested_frames)
     except (EOFError, wave.Error) as error:
-        raise AudioValidationError(
+        raise ValidationError(
             "audio payload is not a readable WAV file",
             {"code": "invalid_wav"},
         ) from error
@@ -416,7 +414,7 @@ def extract(
     complete_bytes = len(raw) - (len(raw) % frame_width)
     raw = raw[:complete_bytes]
     if not raw:
-        raise AudioValidationError(
+        raise ValidationError(
             "WAV payload contains no complete audio frames",
             {"code": "empty_audio_frames"},
         )
@@ -442,7 +440,7 @@ def extract(
         scale = float(2**23)
         samples /= scale
     else:
-        raise AudioValidationError(
+        raise ValidationError(
             "WAV sample width is unsupported",
             {"code": "unsupported_sample_width", "sample_width": sample_width},
         )
@@ -464,14 +462,14 @@ def extract(
         dtype=numpy.float64,
     )
     if not numpy.isfinite(frame_values).all():
-        raise AudioValidationError(
+        raise ValidationError(
             "WAV signal features must be finite",
             {"code": "non_finite_features"},
         )
     return tuple(float(value) for value in frame_values), frame_count
 
 
-def wav_pcm_values(
+def pcm(
     encoded_bytes: bytes,
 ) -> tuple[tuple[int, int, int, int, str, str], numpy.ndarray]:
     """Decodes WAV PCM values and retain the writer parameters.
@@ -490,7 +488,7 @@ def wav_pcm_values(
         ``(frames, channels)`` with values in [-1, 1].
 
     Raises:
-        AudioValidationError: If the payload is not a readable WAV file,
+        ValidationError: If the payload is not a readable WAV file,
             holds no complete frame, has an unsupported sample width, or
             decodes to non-finite values.
     """
@@ -506,7 +504,7 @@ def wav_pcm_values(
             )
             raw = opened.readframes(opened.getnframes())
     except (EOFError, wave.Error) as error:
-        raise AudioValidationError(
+        raise ValidationError(
             "audio payload is not a readable WAV file",
             {"code": "invalid_wav"},
         ) from error
@@ -516,7 +514,7 @@ def wav_pcm_values(
     complete_bytes = len(raw) - (len(raw) % frame_width)
     raw = raw[:complete_bytes]
     if not raw:
-        raise AudioValidationError(
+        raise ValidationError(
             "WAV payload contains no complete audio frames",
             {"code": "empty_audio_frames"},
         )
@@ -537,13 +535,13 @@ def wav_pcm_values(
         signed = unsigned - ((unsigned & 0x800000) << 1)
         samples = signed.astype(numpy.float64) / float(2**23)
     else:
-        raise AudioValidationError(
+        raise ValidationError(
             "WAV sample width is unsupported",
             {"code": "unsupported_sample_width", "sample_width": sample_width},
         )
     values = samples.reshape(-1, channels)
     if not numpy.isfinite(values).all():
-        raise AudioValidationError(
+        raise ValidationError(
             "WAV PCM values must be finite",
             {"code": "non_finite_pcm"},
         )
@@ -559,7 +557,7 @@ def wav_payload_from_pcm(
     ``parameters``.
 
     Args:
-        parameters: Writer parameters in the layout `wav_pcm_values`
+        parameters: Writer parameters in the layout `pcm`
             returns: channels, sample width in bytes, frame rate, frame
             count, compression type and compression name.
         values: Frame-by-channel matrix of normalized values.
@@ -569,7 +567,7 @@ def wav_payload_from_pcm(
 
     Raises:
         ValueError: If ``values`` is not a finite two-dimensional matrix.
-        AudioValidationError: If the sample width is not 1, 2, 3 or 4.
+        ValidationError: If the sample width is not 1, 2, 3 or 4.
     """
     matrix = numpy.asarray(values, dtype=numpy.float64)
     if matrix.ndim != MATRIX_DIMENSIONS or not numpy.isfinite(matrix).all():
@@ -592,7 +590,7 @@ def wav_payload_from_pcm(
     elif sample_width == WIDTH_32_BIT:
         encoded = numpy.rint(clipped * (2**31 - 1)).astype("<i4")
     else:
-        raise AudioValidationError(
+        raise ValidationError(
             "WAV sample width is unsupported",
             {"code": "unsupported_sample_width", "sample_width": sample_width},
         )
@@ -634,7 +632,7 @@ class Sample:
         Raises:
             ValueError: If source or group_id is blank, or file_hash is not
                 a lowercase SHA-256 hex digest of the payload.
-            AudioValidationError: If a transcript segment ends after the
+            ValidationError: If a transcript segment ends after the
                 audio does, or the payload is empty.
         """
         raw = bytes(self.encoded_bytes)
@@ -647,12 +645,12 @@ class Sample:
             segment.end_seconds > self.metadata.duration_seconds + 1e-9
             for segment in self.transcript.segments
         ):
-            raise AudioValidationError(
+            raise ValidationError(
                 "transcript segment exceeds audio duration",
                 {"code": "transcript_out_of_range", "source": self.source},
             )
         if not raw:
-            raise AudioValidationError(
+            raise ValidationError(
                 "audio payload is empty", {"code": "empty_payload"}
             )
         if len(self.file_hash) != SHA256_HEX_LENGTH or any(
@@ -694,19 +692,19 @@ class Sample:
             The new sample.
 
         Raises:
-            AudioValidationError: If the payload is empty, exceeds
+            ValidationError: If the payload is empty, exceeds
                 ``max_bytes`` (or ``max_bytes`` is below one), or the probe
                 raises it.
-            AudioDependencyError: If no probe is given for a payload that is
+            DecoderError: If no probe is given for a payload that is
                 not WAV, or the probe fails with any other exception.
         """
         raw = bytes(encoded_bytes)
         if not raw:
-            raise AudioValidationError(
+            raise ValidationError(
                 "audio payload is empty", {"code": "empty_payload"}
             )
         if max_bytes is not None and (max_bytes < 1 or len(raw) > max_bytes):
-            raise AudioValidationError(
+            raise ValidationError(
                 "audio payload exceeds the configured byte limit",
                 {
                     "code": "encoded_size_limit",
@@ -715,15 +713,15 @@ class Sample:
                 },
             )
         if probe is None and not (raw[:4] == b"RIFF" and raw[8:12] == b"WAVE"):
-            raise AudioDependencyError(
+            raise DecoderError(
                 "this audio container requires an explicit codec probe"
             )
         try:
             metadata = (probe or parse)(raw)
-        except AudioValidationError:
+        except ValidationError:
             raise
         except Exception as error:
-            raise AudioDependencyError(
+            raise DecoderError(
                 "the supplied audio probe could not decode the payload"
             ) from error
         stable_source = canonical_source(source)
@@ -775,18 +773,18 @@ class Dataset:
         """Rejects duplicate source identities and derive dataset identity.
 
         Raises:
-            AudioValidationError: If there are no samples or two samples
+            ValidationError: If there are no samples or two samples
                 share a source.
         """
         normalized = tuple(self.samples)
         if not normalized:
-            raise AudioValidationError(
+            raise ValidationError(
                 "audio dataset must contain at least one sample",
                 {"code": "empty_dataset"},
             )
         sources = [sample.source for sample in normalized]
         if len(sources) != len(set(sources)):
-            raise AudioValidationError(
+            raise ValidationError(
                 "audio dataset contains duplicate sources",
                 {"code": "duplicate_source"},
             )
@@ -831,7 +829,7 @@ class Dataset:
         Raises:
             ValueError: If ``max_frames`` is below one or ``start_frame`` is
                 negative.
-            AudioDependencyError: If a sample is not in WAV format.
+            DecoderError: If a sample is not in WAV format.
         """
         if max_frames < 1:
             raise errors.InputError("max_frames must be at least one")
@@ -857,7 +855,7 @@ class Dataset:
         frames_truncated = []
         for sample in self.samples:
             if sample.metadata.format.lower() != "wav":
-                raise AudioDependencyError(
+                raise DecoderError(
                     "audio signal features require a WAV decoder for "
                     f"'{sample.source}'"
                 )
@@ -909,13 +907,13 @@ class Dataset:
             ValueError: If a fraction is outside [0, 1) or the fractions sum
                 to 1 or more.
         """
-        check_split_fractions(validation_fraction, test_fraction)
+        proportions(validation_fraction, test_fraction)
         grouped: dict[str, list[Sample]] = {}
         for sample in self.samples:
             grouped.setdefault(sample.group_id or sample.source, []).append(
                 sample
             )
-        validation_groups, test_groups = partition_group_ids(
+        validation_groups, test_groups = allocate(
             grouped, validation_fraction, test_fraction, seed
         )
 
@@ -986,7 +984,7 @@ class Dataset:
         )
         if missing_transcript_confidence:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.audio-transcript-confidence-missing",
                     data.FindingSeverity.WARNING,
                     {
@@ -1005,7 +1003,7 @@ class Dataset:
             )
         if len(formats) > 1:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.audio-format-drift",
                     data.FindingSeverity.WARNING,
                     {"sources": [profile.source for profile in profiles]},
@@ -1017,7 +1015,7 @@ class Dataset:
             )
         if len(sample_rates) > 1 or len(channels) > 1:
             quality_findings.append(
-                build_finding(
+                flaw(
                     "quality.audio-shape-drift",
                     data.FindingSeverity.WARNING,
                     {"sources": [profile.source for profile in profiles]},
@@ -1033,7 +1031,7 @@ class Dataset:
         risk_findings = []
         if "unlabeled" in labels and len(labels) > 1:
             risk_findings.append(
-                build_finding(
+                flaw(
                     "risk.audio-mixed-label-state",
                     data.FindingSeverity.WARNING,
                     {"dataset": self.content_hash},
@@ -1045,7 +1043,7 @@ class Dataset:
             )
         if conflicts:
             risk_findings.append(
-                build_finding(
+                flaw(
                     "risk.audio-conflicting-duplicate-labels",
                     data.FindingSeverity.ERROR,
                     {"dataset": self.content_hash},
@@ -1099,17 +1097,17 @@ class Dataset:
 
 
 __all__ = [
-    "AudioDependencyError",
     "AudioProbe",
-    "AudioValidationError",
     "Dataset",
+    "DecoderError",
     "Features",
     "Metadata",
     "Profile",
     "Sample",
+    "Segment",
     "Split",
     "Transcript",
-    "TranscriptSegment",
+    "ValidationError",
     "canonical_source",
     "extract",
     "parse",

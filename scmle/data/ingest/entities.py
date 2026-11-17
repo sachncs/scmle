@@ -112,7 +112,7 @@ def jaro(a: str, b: str) -> float:
     return (m / len(a) + m / len(b) + (m - swaps) / m) / 3.0
 
 
-def jaro_winkler(a: str, b: str) -> float:
+def jarowinkler(a: str, b: str) -> float:
     """Computes the Jaro-Winkler similarity with the usual 0.1 prefix scale.
 
     Args:
@@ -209,7 +209,7 @@ class Pass:
         raise errors.InputError(f"unknown blocking kind: {self.kind}")
 
 
-def candidate_pairs(
+def pairing(
     records: pandas.DataFrame,
     passes: Sequence[Pass],
     max_block: int = MAX_BLOCK,
@@ -268,7 +268,7 @@ def compare(
                 continue
             if a == b:
                 out[row, col] = AGREE
-            elif field.fuzzy and jaro_winkler(a, b) >= SIMILAR_AT:
+            elif field.fuzzy and jarowinkler(a, b) >= SIMILAR_AT:
                 out[row, col] = SIMILAR
             else:
                 out[row, col] = DISAGREE
@@ -310,7 +310,7 @@ class Model:
         return total
 
 
-def fit_em(
+def em(
     levels: numpy.ndarray, iterations: int = 100, tol: float = 1e-8
 ) -> Model:
     """EM for the two-class conditional-independence model.
@@ -399,7 +399,7 @@ def components(count: int, links: Sequence[Pair]) -> list[int]:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class BandEstimate:
+class Band:
     """Clerical-sample result for one score band.
 
     Attributes:
@@ -440,7 +440,7 @@ class Estimate:
 
     precision: tuple[float, float, float]
     recall: tuple[float, float, float]
-    bands: tuple[BandEstimate, ...]
+    bands: tuple[Band, ...]
     reviewer: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -458,7 +458,7 @@ class Estimate:
         }
 
 
-def geometric_bands(order: numpy.ndarray, bands: int) -> list[numpy.ndarray]:
+def stratify(order: numpy.ndarray, bands: int) -> list[numpy.ndarray]:
     """Splits ascending-ordered pairs into bands that thin out at the top.
 
     The top band holds the highest `2^-(bands-1)` share of the pairs, the next
@@ -497,7 +497,7 @@ def stratified_estimate(
 ) -> Estimate:
     """Estimates precision and recall of `weight >= threshold` by sampling.
 
-    Pairs are cut into `bands` score bands (`geometric_bands`, thinning out
+    Pairs are cut into `bands` score bands (`stratify`, thinning out
     toward the top); `per_band` pairs are drawn in each (all, if fewer) and
     labelled by `labeler`. Each band's match rate gets a Beta posterior with
     the Jeffreys prior and the intervals come from `draws` seeded joint
@@ -520,7 +520,7 @@ def stratified_estimate(
     """
     rng = randomness.component_rng(seed, "ingest.entities.clerical", 0)
     order = numpy.argsort(weights, kind="stable")
-    cuts = geometric_bands(order, bands)
+    cuts = stratify(order, bands)
     sizes, hits, taken, above = [], [], [], []
     summary = []
     for members in cuts:
@@ -535,7 +535,7 @@ def stratified_estimate(
         taken.append(len(labelled))
         above.append(bool(weights[members].min() >= threshold))
         summary.append(
-            BandEstimate(
+            Band(
                 float(weights[members].min()),
                 float(weights[members].max()),
                 len(members),
@@ -665,7 +665,7 @@ def resolve(
     if labeler is not None and not reviewer.strip():
         raise errors.InputError("a labeler needs a named reviewer")
     count = len(records)
-    pairs, skipped = candidate_pairs(records, passes)
+    pairs, skipped = pairing(records, passes)
     total = count * (count - 1) / 2
     reduction = 1.0 - len(pairs) / total if total else 1.0
     if not pairs:
@@ -688,7 +688,7 @@ def resolve(
             qualification.Tier.UNVERIFIED,
         )
     levels = compare(records, fields, pairs)
-    model = fit_em(levels)
+    model = em(levels)
     weights = model.weights(levels)
     estimate = None
     tier = qualification.Tier.UNVERIFIED
@@ -696,9 +696,7 @@ def resolve(
         estimate_at = stratified_estimate(
             weights, pairs, -math.inf, labeler, reviewer, per_band, seed
         )
-        t_match, t_group = thresholds_from_bands(
-            estimate_at.bands, min_precision
-        )
+        t_match, t_group = cutoffs(estimate_at.bands, min_precision)
         estimate = stratified_estimate(
             weights, pairs, t_match, labeler, reviewer, per_band, seed
         )
@@ -710,8 +708,8 @@ def resolve(
             / (1.0 - model.prior)
         )
         posterior = posterior_odds / (1.0 + posterior_odds)
-        t_match = lowest_weight(weights, posterior >= min_precision)
-        t_group = lowest_weight(weights, posterior >= GROUP_PROBABILITY)
+        t_match = weakest(weights, posterior >= min_precision)
+        t_group = weakest(weights, posterior >= GROUP_PROBABILITY)
     t_group = min(t_group, t_match)
     links = tuple(
         p for p, w in zip(pairs, weights, strict=True) if w >= t_group
@@ -730,7 +728,7 @@ def resolve(
     )
 
 
-def lowest_weight(weights: numpy.ndarray, keep: numpy.ndarray) -> float:
+def weakest(weights: numpy.ndarray, keep: numpy.ndarray) -> float:
     """Finds the smallest weight among selected pairs.
 
     Args:
@@ -744,9 +742,7 @@ def lowest_weight(weights: numpy.ndarray, keep: numpy.ndarray) -> float:
     return float(chosen.min()) if len(chosen) else math.inf
 
 
-def thresholds_from_bands(
-    bands: Sequence[BandEstimate], min_precision: float
-) -> tuple[float, float]:
+def cutoffs(bands: Sequence[Band], min_precision: float) -> tuple[float, float]:
     """Derives the match and group thresholds from the labelled bands.
 
     Bands are scanned from the top. `t_match` is the lowest band edge such
@@ -797,7 +793,7 @@ class Quality:
     false_group_pairs: int
 
 
-def measure_quality(
+def grade(
     entity: Sequence[Any], resolution: Resolution, pairs: Sequence[Pair]
 ) -> Quality:
     """Compares groups with the true entity of each record.

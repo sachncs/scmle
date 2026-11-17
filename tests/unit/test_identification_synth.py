@@ -29,7 +29,7 @@ def test_weights_match_a_convex_program_reference():
     donors = rng.standard_normal((15, 6))
     true = numpy.array([0.5, 0.3, 0.2, 0, 0, 0])
     target = donors @ true + rng.normal(scale=0.01, size=15)
-    w = synth.fit_weights(target, donors)
+    w = synth.weigh(target, donors)
     assert w.sum() == pytest.approx(1.0)
     assert (w >= 0).all()
     reference = optimize.minimize(
@@ -68,7 +68,7 @@ def test_too_few_donors_refuse():
         synth.estimate(frame, "u", "t", "y", 0, pre)
     ok, pre = panel(2, donors=19)
     assert synth.estimate(ok, "u", "t", "y", 0, pre).donors == 19
-    assert synth.min_donors(0.05) == 19 and synth.min_donors(0.1) == 9
+    assert synth.quorum(0.05) == 19 and synth.quorum(0.1) == 9
 
 
 def test_bad_panels_are_refused():

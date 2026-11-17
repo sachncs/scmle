@@ -24,7 +24,7 @@ def correlated_frame(rows=1500, seed=0):
 
 def test_generator_preserves_marginals_dependence_and_categories():
     real = correlated_frame()
-    generator = synthesis.GaussianCopulaGenerator().fit(real)
+    generator = synthesis.Copula().fit(real)
     fake = generator.sample(4000, numpy.random.default_rng(1))
     assert list(fake.columns) == list(real.columns) and len(fake) == 4000
     numeric = ["income", "age", "noise"]
@@ -36,9 +36,7 @@ def test_generator_preserves_marginals_dependence_and_categories():
 def test_missingness_and_dtypes_are_reproduced():
     real = correlated_frame()
     fake = (
-        synthesis.GaussianCopulaGenerator()
-        .fit(real)
-        .sample(3000, numpy.random.default_rng(3))
+        synthesis.Copula().fit(real).sample(3000, numpy.random.default_rng(3))
     )
     assert fake["age"].isna().mean() == pytest.approx(
         real["age"].isna().mean(), abs=0.02
@@ -50,7 +48,7 @@ def test_missingness_and_dtypes_are_reproduced():
 
 def test_sampling_is_seeded():
     real = correlated_frame()
-    generator = synthesis.GaussianCopulaGenerator().fit(real)
+    generator = synthesis.Copula().fit(real)
     first = generator.sample(50, numpy.random.default_rng(7))
     second = generator.sample(50, numpy.random.default_rng(7))
     pandas.testing.assert_frame_equal(first, second)
@@ -76,7 +74,7 @@ def test_tiny_classes_are_left_alone():
 
 
 def test_generators_are_pluggable():
-    class Constant(synthesis.SyntheticGenerator):
+    class Constant(synthesis.Synthesizer):
         name = "constant"
 
         def fit(self, features):

@@ -15,7 +15,7 @@ SIGNING_KEY_FILE_ENV = "SCMLE_SIGNING_KEY_FILE"
 SIGNATURE_ALGORITHM = "hmac-sha256"
 
 
-def key_from_environment(environ: Mapping[str, str]) -> str | None:
+def lookup(environ: Mapping[str, str]) -> str | None:
     """Returns the configured key: `SCMLE_SIGNING_KEY`, else the file it names.
 
     The file form lets a secret manager mount the key (a Kubernetes secret, a
@@ -56,7 +56,7 @@ def key_from_environment(environ: Mapping[str, str]) -> str | None:
     return text
 
 
-def resolve_key(signing_key: str | bytes | None) -> bytes | None:
+def keying(signing_key: str | bytes | None) -> bytes | None:
     """Returns the explicit signing key or the configured environment key.
 
     Args:
@@ -71,13 +71,9 @@ def resolve_key(signing_key: str | bytes | None) -> bytes | None:
             publicly known secret, and treating it as "no key" left records
             unsigned silently (ERR-3).
         ConfigError: If the configured key is unusable (see
-            `key_from_environment`).
+            `lookup`).
     """
-    key = (
-        signing_key
-        if signing_key is not None
-        else key_from_environment(os.environ)
-    )
+    key = signing_key if signing_key is not None else lookup(os.environ)
     if key is None:
         return None
     resolved = key.encode() if isinstance(key, str) else key
@@ -103,7 +99,7 @@ def canonicalise(payload: Mapping[str, Any]) -> bytes:
     ).encode("utf-8")
 
 
-def sign_payload(payload: Mapping[str, Any], key: str | bytes) -> str:
+def mac(payload: Mapping[str, Any], key: str | bytes) -> str:
     """Returns an HMAC signature for a canonical contract payload.
 
     Args:
@@ -116,7 +112,7 @@ def sign_payload(payload: Mapping[str, Any], key: str | bytes) -> str:
     Raises:
         ValueError: If the key is empty, as text or as bytes.
     """
-    resolved = resolve_key(key)
+    resolved = keying(key)
     if resolved is None:
         raise errors.InputError("signing key must not be empty")
     return hmac.new(

@@ -14,7 +14,7 @@ from scmle.sampling import strategies
 
 @pytest.fixture
 def registry():
-    return scmle.models.registry.Catalog.with_builtins()
+    return scmle.models.registry.Catalog.stock()
 
 
 def long_tailed(rows=800, seed=0):
@@ -25,13 +25,13 @@ def long_tailed(rows=800, seed=0):
 
 
 def profile_with(skew):
-    return data.DatasetProfile(
+    return data.Portrait(
         manifest=None,
         column_statistics={},
         quality_findings=(),
         risk_findings=(),
         target_summary={"task": "regression", "skew": skew},
-        feature_plan=data.FeaturePlan(("x",), ()),
+        feature_plan=data.Blueprint(("x",), ()),
     )
 
 
@@ -75,7 +75,7 @@ def test_classification_resampling_strategies_never_touch_regression(registry):
 
 def test_weighted_pipeline_fits_and_predicts(registry):
     features, target = long_tailed()
-    plan = data.FeaturePlan(("x",), ())
+    plan = data.Blueprint(("x",), ())
     candidate = strategies.lookup("rare_target_weighting").build(
         plan, registry.get("random_forest"), tasks.Task.REGRESSION, 0
     )

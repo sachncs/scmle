@@ -26,7 +26,7 @@ FLOOR = 1e-9
 
 
 @dataclasses.dataclass(frozen=True)
-class ReplayVerdict:
+class Comparison:
     """Outcome of comparing two runs.
 
     Attributes:
@@ -48,7 +48,7 @@ class ReplayVerdict:
     notes: list[str]
 
 
-def load_run(directory: str | pathlib.Path) -> dict[str, Any]:
+def reread(directory: str | pathlib.Path) -> dict[str, Any]:
     """Reads the comparable facts of a finished run from its directory.
 
     Args:
@@ -122,7 +122,7 @@ def compare(
     """Compares what two runs must share before their scores are compared.
 
     Args:
-        first: Facts of the original run (see `load_run`).
+        first: Facts of the original run (see `reread`).
         second: Facts of the rerun.
 
     Returns:
@@ -149,15 +149,15 @@ def compare(
     return reasons, notes
 
 
-def compare_runs(
+def judge(
     first: dict[str, Any],
     second: dict[str, Any],
     tolerance_std: float = DEFAULT_TOLERANCE_STD,
-) -> ReplayVerdict:
+) -> Comparison:
     """Classifies a rerun against the original.
 
     Args:
-        first: Facts of the original run (see `load_run`).
+        first: Facts of the original run (see `reread`).
         second: Facts of the rerun.
         tolerance_std: Allowed difference between a trial's mean scores, in
             units of the larger of the two trials' score standard deviations
@@ -173,7 +173,7 @@ def compare_runs(
     reasons, notes = compare(first, second)
     a, b = first["trials"], second["trials"]
     if reasons:
-        return ReplayVerdict(DIFFERENT, reasons, float("nan"), 0, notes)
+        return Comparison(DIFFERENT, reasons, float("nan"), 0, notes)
 
     # The trials share their structure, so they pair up one to one; a changed
     # status is not comparable, and a changed fold score is compared by the
@@ -211,8 +211,8 @@ def compare_runs(
         comparable = False
         reasons.append("a different candidate was selected")
     if exact:
-        return ReplayVerdict(EXACT, [], 0.0, len(a), notes)
+        return Comparison(EXACT, [], 0.0, len(a), notes)
     if comparable:
         reasons.append("fold scores differ within tolerance")
-        return ReplayVerdict(COMPARABLE, reasons, largest, len(a), notes)
-    return ReplayVerdict(DIFFERENT, reasons, largest, len(a), notes)
+        return Comparison(COMPARABLE, reasons, largest, len(a), notes)
+    return Comparison(DIFFERENT, reasons, largest, len(a), notes)

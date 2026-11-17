@@ -13,7 +13,7 @@ are only as good as whoever owns the source system (a person's statement, tier
 `attested` at best).
 
 `reconcile_source` is the second, independent check: for every declared view
-it queries the source database itself (`reconcile.reconcile_extract`: row
+it queries the source database itself (`reconcile.crosscheck`: row
 count and column sums; plus the key checksum) and compares the answers with
 the frame that was extracted, so a short, duplicated or altered extract is
 caught even when the declared numbers are right or absent. The source's
@@ -38,7 +38,7 @@ LOGGER = logging.getLogger(__name__)
 FILE = "extract_reconciliation.json"
 
 
-def key_checksum(values: pandas.Series) -> str:
+def sha(values: pandas.Series) -> str:
     """SHA-256 of the sorted values as text, joined by newlines.
 
     The order of the rows does not matter; a changed, missing or repeated
@@ -155,9 +155,7 @@ def reconcile(
                 )
             )
         if table.checksum is not None and table.checksum_column is not None:
-            found_sum = key_checksum(
-                column_of(frame, table.view, table.checksum_column)
-            )
+            found_sum = sha(column_of(frame, table.view, table.checksum_column))
             checks.append(
                 check(
                     f"{table.view}.checksum.{table.checksum_column}",
@@ -180,16 +178,16 @@ def compare(
     frame: pandas.DataFrame,
     table: str,
     totals: ingest.TableTotals,
-    source: profile.SqlSource,
+    source: profile.Sql,
     tolerance: float,
 ) -> list[dict[str, Any]]:
     """Compares one extracted view with queries of its source table.
 
     The row count and the declared sum columns go through
-    `reconcile.reconcile_extract`; a quantity whose source total is zero (so
+    `reconcile.crosscheck`; a quantity whose source total is zero (so
     that function forms no ratio) is compared as an absolute gap instead of
     being skipped. The checksum is computed over the source's own column.
-    A quantity that `reconcile.reconcile_extract` does not return (including
+    A quantity that `reconcile.crosscheck` does not return (including
     when it raises `ValueError`) is compared against a source value of zero.
     A view that lacks a declared column makes `column_of` raise
     `ConfigError`, which propagates.
@@ -216,7 +214,7 @@ def compare(
     )
     found: dict[str, tuple[float, float]] = {}
     try:
-        outcome = scmle.data.ingest.reconcile.reconcile_extract(
+        outcome = scmle.data.ingest.reconcile.crosscheck(
             source, numeric, table, measures, tolerance=tolerance
         )
     except ValueError as error:
@@ -254,10 +252,8 @@ def compare(
                 t=profile.quote(table),
             )
         )
-        their_sum = key_checksum(
-            pandas.Series([row[0] for row in values or []])
-        )
-        my_sum = key_checksum(column)
+        their_sum = sha(pandas.Series([row[0] for row in values or []]))
+        my_sum = sha(column)
         checks.append(
             {
                 "name": f"{view}.checksum.{totals.checksum_column}",
@@ -293,7 +289,7 @@ def reconcile_source(
     Raises:
         ConfigError: If a declared view or column is not in the extract.
     """
-    source = profile.SqlSource(factory)
+    source = profile.Sql(factory)
     checks: list[dict[str, Any]] = []
     for totals in spec.tables:
         frame = frames.get(totals.view)

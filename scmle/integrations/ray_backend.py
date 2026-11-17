@@ -11,7 +11,7 @@ from scmle.core import scheduler
 DEFAULT_RETRIES = 1
 
 
-class RayBackend(scheduler.Executor):
+class Remote(scheduler.Executor):
     """Runs items as Ray tasks (`distributed` extra), local or cluster.
 
     A task whose worker process or node disappears is retried once; if it
@@ -44,7 +44,7 @@ class RayBackend(scheduler.Executor):
             import ray  # noqa: PLC0415 -- optional dependency  # pyright: ignore[reportMissingImports]  # optional extra, imported lazily and guarded; not installed in the type-check environment
         except ImportError as error:
             raise errors.ConfigError(
-                "RayBackend needs the 'distributed' extra (ray)"
+                "Remote needs the 'distributed' extra (ray)"
             ) from error
         self.ray = ray
         self.workers = max(workers, 1)

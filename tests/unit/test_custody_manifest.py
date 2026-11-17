@@ -60,14 +60,14 @@ def test_round_trip_through_json():
     manifest = make()
     record = json.loads(json.dumps(manifest.to_dict()))
     assert record["manifest_version"] == 2
-    assert scmle.data.custody.manifest.load_manifest(record) == manifest
+    assert scmle.data.custody.manifest.restore(record) == manifest
 
 
 def test_corrupting_any_id_fails_the_hash_check():
     record = make().to_dict()
     record["confirmation_ids"][0] = 99
     with pytest.raises(errors.ArtifactError, match="hash"):
-        scmle.data.custody.manifest.load_manifest(record)
+        scmle.data.custody.manifest.restore(record)
 
 
 def test_overlapping_sets_are_rejected():
@@ -83,14 +83,14 @@ def test_unknown_version_is_refused():
     record = make().to_dict()
     record["manifest_version"] = 3
     with pytest.raises(errors.ArtifactError, match="version"):
-        scmle.data.custody.manifest.load_manifest(record)
+        scmle.data.custody.manifest.restore(record)
 
 
 def test_unknown_field_is_refused():
     record = make().to_dict()
     record["extra"] = 1
     with pytest.raises((errors.ArtifactError, ValueError)):
-        scmle.data.custody.manifest.load_manifest(record)
+        scmle.data.custody.manifest.restore(record)
 
 
 def test_v1_manifest_is_still_readable_and_verified():
@@ -102,7 +102,7 @@ def test_v1_manifest_is_still_readable_and_verified():
         folds=(((0, 1), (2,)),),
         notes=("n",),
     )
-    loaded = scmle.data.custody.manifest.load_manifest(
+    loaded = scmle.data.custody.manifest.restore(
         json.loads(json.dumps(v1.to_dict()))
     )
     assert isinstance(loaded, splitters.Manifest)
@@ -115,7 +115,7 @@ def test_v1_manifest_with_a_bad_fingerprint_is_refused():
     record = v1.to_dict()
     record["fingerprint"] = "0" * 16
     with pytest.raises(errors.ArtifactError, match="fingerprint"):
-        scmle.data.custody.manifest.load_manifest(record)
+        scmle.data.custody.manifest.restore(record)
 
 
 def test_manifest_is_frozen():
@@ -138,8 +138,8 @@ def rooted(frame=None):
     frame = table() if frame is None else frame
     manifest = make()
     roots = tuple(
-        (name, merkle.frame_root(frame, members))
-        for name, members in manifest.set_ids().items()
+        (name, merkle.merkleize(frame, members))
+        for name, members in manifest.rowids().items()
     )
     return make(row_roots=roots)
 
@@ -153,10 +153,10 @@ def test_the_roots_are_hashed_and_round_trip():
     manifest = rooted()
     assert manifest.sha256 != make().sha256
     record = json.loads(json.dumps(manifest.to_dict()))
-    assert scmle.data.custody.manifest.load_manifest(record) == manifest
+    assert scmle.data.custody.manifest.restore(record) == manifest
     record["row_roots"][0][1] = "0" * 64
     with pytest.raises(errors.ArtifactError, match="hash"):
-        scmle.data.custody.manifest.load_manifest(record)
+        scmle.data.custody.manifest.restore(record)
 
 
 def test_verify_rows_passes_on_the_original_rows():
@@ -178,7 +178,7 @@ def test_a_changed_value_inside_a_row_is_caught_though_ids_are_equal(row, name):
 def test_a_change_in_the_embargo_rows_is_not_covered():
     # Embargo rows belong to no set and carry no root: stated limit.
     manifest = make(embargo_ids=(), confirmation_ids=(4, 5))
-    assert "embargo" not in manifest.set_ids()
+    assert "embargo" not in manifest.rowids()
 
 
 def test_verify_rows_refuses_a_manifest_with_no_roots():

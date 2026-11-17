@@ -39,8 +39,8 @@ class EvidenceInputs(TypedDict):
     model_fingerprint: str
     bundle_digest: str
     input_fingerprint: str
-    dataset_snapshot: explanations.DatasetSnapshot
-    feature_graph: explanations.FeatureGraphReference
+    dataset_snapshot: explanations.Snapshot
+    feature_graph: explanations.Lineage
     method_parameters: dict[str, Any]
     timestamp: datetime.datetime
     software_version: str
@@ -48,8 +48,8 @@ class EvidenceInputs(TypedDict):
     stability: dict[str, Any]
     limitations: tuple[str, ...]
     causal_warning: str
-    privacy_decision: explanations.PrivacyDecision
-    evidence_links: tuple[explanations.EvidenceLink, ...]
+    privacy_decision: explanations.Clearance
+    evidence_links: tuple[explanations.Link, ...]
 
 
 def build_inputs() -> EvidenceInputs:
@@ -58,12 +58,12 @@ def build_inputs() -> EvidenceInputs:
         "model_fingerprint": "model-123",
         "bundle_digest": "sha256:bundle-123",
         "input_fingerprint": "input-123",
-        "dataset_snapshot": explanations.DatasetSnapshot(
+        "dataset_snapshot": explanations.Snapshot(
             identifier="customer-risk",
             version="2026-10-20",
             digest="sha256:data-123",
         ),
-        "feature_graph": explanations.FeatureGraphReference(
+        "feature_graph": explanations.Lineage(
             version=1,
             fingerprint="graph-123",
         ),
@@ -76,12 +76,12 @@ def build_inputs() -> EvidenceInputs:
         "stability": {"method": "seed_repeat", "score": 0.98},
         "limitations": ("Associational attribution only.",),
         "causal_warning": "This explanation does not identify causal effects.",
-        "privacy_decision": explanations.PrivacyDecision(
+        "privacy_decision": explanations.Clearance(
             decision="allowed",
             reason="No direct identifiers are present.",
         ),
         "evidence_links": (
-            explanations.EvidenceLink(
+            explanations.Link(
                 relation="evaluation",
                 uri="artifact://run/evaluation.json",
             ),
@@ -89,13 +89,13 @@ def build_inputs() -> EvidenceInputs:
     }
 
 
-def build_evidence(
+def substantiate(
     result: dict[str, object] | None = None,
     **overrides: Any,
 ) -> explanations.Evidence:
     """Builds evidence using the test diagnostic and explicit identities."""
     values = cast("EvidenceInputs", {**build_inputs(), **overrides})
-    return suite.build_evidence(
+    return suite.substantiate(
         CustomExplanation(),
         result
         if result is not None
@@ -105,7 +105,7 @@ def build_evidence(
 
 
 def test_builder_accepts_any_diagnostic_subclass_and_binds_all_evidence():
-    evidence = build_evidence()
+    evidence = substantiate()
 
     assert evidence.method.name == "custom_explanation"
     assert evidence.method.parameters == {"repeats": 5, "seed": 7}
@@ -123,13 +123,13 @@ def test_builder_accepts_any_diagnostic_subclass_and_binds_all_evidence():
 
 
 def test_builder_output_has_deterministic_canonical_json():
-    first = build_evidence(
+    first = substantiate(
         result={"b": {"z": 2, "a": 1}, "a": 0},
         method_parameters={"z": 2, "a": 1},
         uncertainty={"z": 2, "a": 1},
         stability={"z": 2, "a": 1},
     )
-    second = build_evidence(
+    second = substantiate(
         result={"a": 0, "b": {"a": 1, "z": 2}},
         method_parameters={"a": 1, "z": 2},
         uncertainty={"a": 1, "z": 2},
@@ -141,20 +141,20 @@ def test_builder_output_has_deterministic_canonical_json():
 
 def test_builder_rejects_missing_top_level_identity():
     with pytest.raises(pydantic.ValidationError, match="model_fingerprint"):
-        build_evidence(model_fingerprint="")
+        substantiate(model_fingerprint="")
     with pytest.raises(pydantic.ValidationError, match="bundle_digest"):
-        build_evidence(bundle_digest="")
+        substantiate(bundle_digest="")
     with pytest.raises(pydantic.ValidationError, match="input_fingerprint"):
-        build_evidence(input_fingerprint="")
+        substantiate(input_fingerprint="")
     with pytest.raises(pydantic.ValidationError, match="dataset_snapshot"):
-        build_evidence(dataset_snapshot=None)
+        substantiate(dataset_snapshot=None)
     with pytest.raises(pydantic.ValidationError, match="feature_graph"):
-        build_evidence(feature_graph=None)
+        substantiate(feature_graph=None)
 
 
 def test_builder_does_not_invent_identity_from_diagnostic_output():
     with pytest.raises(pydantic.ValidationError, match="model_fingerprint"):
-        build_evidence(
+        substantiate(
             result={"model_fingerprint": "untrusted-result-value"},
             model_fingerprint="",
         )
@@ -162,7 +162,7 @@ def test_builder_does_not_invent_identity_from_diagnostic_output():
 
 def test_builder_rejects_unnamed_diagnostics():
     with pytest.raises(ValueError, match=r"diagnostic\.name"):
-        suite.build_evidence(
+        suite.substantiate(
             UnnamedExplanation(),
             {"value": 1},
             **build_inputs(),

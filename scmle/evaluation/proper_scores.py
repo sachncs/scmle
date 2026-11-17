@@ -49,7 +49,7 @@ def pinball_loss(
     return float(numpy.mean(numpy.maximum(level * gap, (level - 1.0) * gap)))
 
 
-def interval_score(
+def winkler(
     truth: numpy.ndarray,
     lower: numpy.ndarray,
     upper: numpy.ndarray,
@@ -102,7 +102,7 @@ def weighted_interval_score(
 
     Raises:
         ValueError: If `intervals` is empty, or if any `alpha` is not
-            strictly between 0 and 1 (rejected by `interval_score`).
+            strictly between 0 and 1 (rejected by `winkler`).
     """
     if not intervals:
         raise errors.InputError("need at least one interval")
@@ -111,7 +111,7 @@ def weighted_interval_score(
         numpy.mean(numpy.abs(y - numpy.asarray(median, dtype=float)))
     )
     for alpha, (lower, upper) in intervals.items():
-        total += alpha / 2.0 * interval_score(y, lower, upper, alpha)
+        total += alpha / 2.0 * winkler(y, lower, upper, alpha)
     return total / (len(intervals) + 0.5)
 
 
@@ -147,7 +147,7 @@ def crps_from_quantiles(
     )
 
 
-def insample_scale(history: numpy.ndarray, season: int = 1) -> float:
+def naivescale(history: numpy.ndarray, season: int = 1) -> float:
     """Mean absolute seasonal-naive error on the training history.
 
     Args:
@@ -184,9 +184,9 @@ def mase(
     Returns:
         The mean absolute error divided by the in-sample naive error, which
         is floored at `SCALE_FLOOR`. A history that is too short is rejected
-        by `insample_scale` with a `ValueError`.
+        by `naivescale` with a `ValueError`.
     """
-    scale = max(insample_scale(history, season), SCALE_FLOOR)
+    scale = max(naivescale(history, season), SCALE_FLOOR)
     gap = numpy.abs(
         numpy.asarray(truth, dtype=float) - numpy.asarray(forecast, float)
     )

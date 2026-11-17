@@ -51,7 +51,7 @@ class Carve:
     notes: tuple[str, ...]
 
 
-def derived_seed(charter_hash: str, data_hash: str, seed: int) -> int:
+def derive(charter_hash: str, data_hash: str, seed: int) -> int:
     """Derives the run seed from the data, the charter and the seed.
 
     Args:
@@ -68,9 +68,7 @@ def derived_seed(charter_hash: str, data_hash: str, seed: int) -> int:
     return int.from_bytes(digest[:4], "big")
 
 
-def link_equal_codes(
-    codes: numpy.ndarray, union: Callable[[int, int], None]
-) -> None:
+def link(codes: numpy.ndarray, union: Callable[[int, int], None]) -> None:
     """Merges every row with the first row that has the same key code.
 
     Args:
@@ -89,7 +87,7 @@ def link_equal_codes(
             first[code] = index
 
 
-def unit_labels(
+def unitize(
     size: int, groups: numpy.ndarray | None, duplicates: numpy.ndarray | None
 ) -> numpy.ndarray:
     """Labels each row with its unit: the smallest row index in its unit.
@@ -140,11 +138,11 @@ def unit_labels(
         codes = pandas.factorize(numpy.asarray(keys))[0]
         if none is not None:
             codes = numpy.where(numpy.asarray(keys) == none, -1, codes)
-        link_equal_codes(codes, union)
+        link(codes, union)
     return numpy.array([find(i) for i in range(size)])
 
 
-def pick_units(
+def pick(
     units: numpy.ndarray,
     strata: numpy.ndarray,
     fraction: float,
@@ -179,7 +177,7 @@ def pick_units(
     return chosen
 
 
-def pick_blocks(
+def choose(
     times: numpy.ndarray,
     fraction: float,
     embargo: int,
@@ -214,9 +212,7 @@ def pick_blocks(
     return in_c, order
 
 
-def close_over_units(
-    in_c: numpy.ndarray, units: numpy.ndarray
-) -> numpy.ndarray:
+def enclose(in_c: numpy.ndarray, units: numpy.ndarray) -> numpy.ndarray:
     """Moves any unit split between C and the rest wholly out of C.
 
     Args:
@@ -233,7 +229,7 @@ def close_over_units(
     return in_c
 
 
-def embargo_mask(
+def quarantine(
     in_c: numpy.ndarray, order: numpy.ndarray, rows: int
 ) -> numpy.ndarray:
     """Finds rows within `rows` places (in time order) of a `C` row.
@@ -281,7 +277,7 @@ def autocorrelation(values: numpy.ndarray, max_lag: int) -> numpy.ndarray:
     )
 
 
-def acf_embargo(values: numpy.ndarray, max_lag: int | None = None) -> int:
+def acf(values: numpy.ndarray, max_lag: int | None = None) -> int:
     """Embargo length from the measured serial dependence of a series.
 
     `values` must be in time order. The embargo is the number of leading
@@ -311,7 +307,7 @@ def acf_embargo(values: numpy.ndarray, max_lag: int | None = None) -> int:
     return int(numpy.argmax(inside)) if inside.any() else limit
 
 
-def restrict_folds(
+def restrict(
     folds: list[tuple[numpy.ndarray, numpy.ndarray]],
     dev_ids: numpy.ndarray,
     exploration_ids: numpy.ndarray,
@@ -346,7 +342,7 @@ def restrict_folds(
     return restricted
 
 
-def check_inputs(
+def validate(
     size: int,
     fraction: float,
     arrays: dict[str, numpy.ndarray | None],
@@ -371,7 +367,7 @@ def check_inputs(
             )
 
 
-def carve_confirmation(
+def divide(
     dev_ids: numpy.ndarray,
     folds: list[tuple[numpy.ndarray, numpy.ndarray]],
     *,
@@ -387,10 +383,10 @@ def carve_confirmation(
 ) -> Carve:
     """Divides the development rows into `X`, `C` and the embargo.
 
-    Errors raised by the helpers propagate. `check_inputs` raises ValueError
+    Errors raised by the helpers propagate. `validate` raises ValueError
     when `fraction` is outside (0, 0.5] or an array does not have one entry
-    per development row. `restrict_folds` raises ConfigError when the carve
-    would leave a validation fold empty; `apply_custody` turns that refusal
+    per development row. `restrict` raises ConfigError when the carve
+    would leave a validation fold empty; `sequester` turns that refusal
     into a run with no confirmation set.
 
     Args:
@@ -416,7 +412,7 @@ def carve_confirmation(
     """
     dev_ids = numpy.asarray(dev_ids)
     size = len(dev_ids)
-    check_inputs(
+    validate(
         size,
         fraction,
         {
@@ -427,17 +423,15 @@ def carve_confirmation(
         },
     )
     rng = randomness.component_rng(
-        derived_seed(charter_hash, data_hash, seed), COMPONENT
+        derive(charter_hash, data_hash, seed), COMPONENT
     )
-    units = unit_labels(size, groups, duplicates)
+    units = unitize(size, groups, duplicates)
     notes: list[str] = []
     order = numpy.arange(size)
     if times is not None:
-        in_c, order = pick_blocks(
-            numpy.asarray(times), fraction, embargo_rows, rng
-        )
-        in_c = close_over_units(in_c, units)
-        embargo = embargo_mask(in_c, order, embargo_rows)
+        in_c, order = choose(numpy.asarray(times), fraction, embargo_rows, rng)
+        in_c = enclose(in_c, units)
+        embargo = quarantine(in_c, order, embargo_rows)
         notes.append(
             f"confirmation drawn as time blocks with an embargo of "
             f"{embargo_rows} rows"
@@ -451,7 +445,7 @@ def carve_confirmation(
         first = (
             pandas.Series(strata).groupby(units).transform("first").to_numpy()
         )
-        in_c = pick_units(units, first, fraction, rng)
+        in_c = pick(units, first, fraction, rng)
         embargo = numpy.zeros(size, dtype=bool)
     if len(numpy.unique(units)) < MIN_UNITS or not in_c.any():
         notes.append("no confirmation set carved: too few units to separate")
@@ -463,6 +457,6 @@ def carve_confirmation(
         exploration_ids=explored,
         confirmation_ids=dev_ids[in_c],
         embargo_ids=dev_ids[embargo],
-        folds=restrict_folds(folds, dev_ids, explored),
+        folds=restrict(folds, dev_ids, explored),
         notes=tuple(notes),
     )

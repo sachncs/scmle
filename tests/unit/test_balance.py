@@ -22,7 +22,7 @@ def test_randomized_assignment_is_flagged_at_most_at_the_level():
     # within three standard errors of 0.05.
     worlds = 1000
     flagged = sum(
-        not balance.balance_test(*world(seed), seed=seed)["balanced"]
+        not balance.randomisation(*world(seed), seed=seed)["balanced"]
         for seed in range(worlds)
     )
     assert flagged / worlds <= 0.05 + 3 * numpy.sqrt(0.05 * 0.95 / worlds)
@@ -31,7 +31,7 @@ def test_randomized_assignment_is_flagged_at_most_at_the_level():
 def test_assignment_that_follows_a_covariate_is_flagged():
     # Pre-registered: at least 90 percent of 200 confounded worlds.
     found = sum(
-        not balance.balance_test(*world(seed, confound=1.0), seed=seed)[
+        not balance.randomisation(*world(seed, confound=1.0), seed=seed)[
             "balanced"
         ]
         for seed in range(200)
@@ -41,7 +41,7 @@ def test_assignment_that_follows_a_covariate_is_flagged():
 
 def test_the_result_carries_its_statistic_and_levels():
     features, arm = world(0)
-    found = balance.balance_test(features, arm, seed=0, permutations=99)
+    found = balance.randomisation(features, arm, seed=0, permutations=99)
     assert found["permutations"] == 99 and found["level"] == 0.05
     assert 1 / 100 <= found["p_value"] <= 1.0
     assert found["covariates"] == 4
@@ -52,8 +52,8 @@ def test_the_result_carries_its_statistic_and_levels():
 def test_same_seed_same_result_and_constant_columns_are_dropped():
     features, arm = world(1)
     features["flat"] = 3.0
-    first = balance.balance_test(features, arm, seed=5)
-    assert first == balance.balance_test(features, arm, seed=5)
+    first = balance.randomisation(features, arm, seed=5)
+    assert first == balance.randomisation(features, arm, seed=5)
     assert first["covariates"] == 4
 
 
@@ -61,24 +61,24 @@ def test_missing_values_and_text_columns_are_handled():
     features, arm = world(2)
     features.loc[::7, "x1"] = numpy.nan
     features["label"] = "a"
-    found = balance.balance_test(features, arm, seed=0)
+    found = balance.randomisation(features, arm, seed=0)
     assert found["covariates"] == 4
 
 
 def test_no_numeric_covariate_or_one_arm_cannot_be_tested():
     features = pandas.DataFrame({"label": ["a", "b", "a", "b"]})
-    none = balance.balance_test(features, numpy.array([0, 1, 0, 1]))
+    none = balance.randomisation(features, numpy.array([0, 1, 0, 1]))
     assert none["balanced"] is None and none["p_value"] is None
     features, arm = world(3)
-    single = balance.balance_test(features, numpy.zeros_like(arm))
+    single = balance.randomisation(features, numpy.zeros_like(arm))
     assert single["balanced"] is None
 
 
 def test_inputs_are_checked():
     features, arm = world(4)
     with pytest.raises(ValueError):
-        balance.balance_test(features, arm[:-1])
+        balance.randomisation(features, arm[:-1])
     with pytest.raises(ValueError):
-        balance.balance_test(features, arm, permutations=0)
+        balance.randomisation(features, arm, permutations=0)
     with pytest.raises(ValueError):
-        balance.balance_test(features, arm, level=1.5)
+        balance.randomisation(features, arm, level=1.5)

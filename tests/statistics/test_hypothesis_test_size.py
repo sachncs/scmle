@@ -95,15 +95,13 @@ def test_binomial_p_values_match_scipy_exact_tests():
         two = stats.binomtest(covered, rows, rate).pvalue
         found = {
             "escalation": escalation.binomial_p_value(covered, rows, rate),
-            "undercoverage": coverage.undercoverage_p_value(
-                covered, rows, rate
-            ),
+            "undercoverage": coverage.deficit(covered, rows, rate),
         }
         for name, value in found.items():
             assert abs(value - float(less)) <= AGREEMENT, name
-        floor = coverage_confirm.floor_p_value(covered, rows, rate)
+        floor = coverage_confirm.shortfall(covered, rows, rate)
         assert abs(floor - float(greater)) <= AGREEMENT
-        assert abs(design.srm_p_value(covered, rows, rate) - two) <= AGREEMENT
+        assert abs(design.mismatch(covered, rows, rate) - two) <= AGREEMENT
 
 
 def test_exact_binomial_tests_never_exceed_their_level_at_the_boundary():
@@ -111,12 +109,10 @@ def test_exact_binomial_tests_never_exceed_their_level_at_the_boundary():
     rows, rate = 400, 0.88
     counts = rng.binomial(rows, rate, RUNS)
     tests = {
-        "undercoverage": lambda c: coverage.undercoverage_p_value(
-            c, rows, rate
-        ),
+        "undercoverage": lambda c: coverage.deficit(c, rows, rate),
         "escalation": lambda c: escalation.binomial_p_value(c, rows, rate),
-        "floor": lambda c: coverage_confirm.floor_p_value(c, rows, rate),
-        "srm": lambda c: design.srm_p_value(c, rows, rate),
+        "floor": lambda c: coverage_confirm.shortfall(c, rows, rate),
+        "srm": lambda c: design.mismatch(c, rows, rate),
     }
     for name, test in tests.items():
         rejected = sum(test(int(c)) <= ALPHA for c in counts)
@@ -158,7 +154,7 @@ def test_permutation_p_values_match_scipy_on_the_same_null_draws():
         observed = -float(result.statistic)
         null = -numpy.asarray(result.null_distribution)
         expected = float(result.pvalue)
-        assert abs(leakage.permutation_p(observed, null) - expected) <= 1e-12
+        assert abs(leakage.significance(observed, null) - expected) <= 1e-12
         found = shift.permutation_p_value(observed, null)
         assert abs(found - expected) <= 1e-12
 
@@ -167,7 +163,7 @@ def test_permutation_p_values_are_valid_under_exchangeable_nulls():
     rng = numpy.random.default_rng(6)
     permutations = 99
     for name, function in {
-        "leakage": leakage.permutation_p,
+        "leakage": leakage.significance,
         "shift": shift.permutation_p_value,
     }.items():
         rejected = 0
@@ -207,7 +203,7 @@ def test_the_balance_test_has_the_nominal_size_under_random_assignment():
             rng.normal(size=(100, 3)), columns=["a", "b", "c"]
         )
         arm = rng.permutation(numpy.r_[numpy.ones(50), numpy.zeros(50)])
-        outcome = balance.balance_test(features, arm.astype(int), seed=run)
+        outcome = balance.randomisation(features, arm.astype(int), seed=run)
         rejected += outcome["p_value"] <= ALPHA
     support_statistics.assert_rate_at_most(
         rejected / runs, ALPHA, runs, "balance test"
@@ -232,7 +228,7 @@ def test_the_cluster_robust_t_test_is_a_t_test_on_cluster_means_when_equal():
     labels = numpy.repeat(numpy.arange(clusters), size)
     for shift_size in (0.0, 0.1, 0.4):
         values = rng.normal(size=clusters * size) + shift_size
-        found = baseline.cluster_test(values, labels)
+        found = baseline.ttest(values, labels)
         means = values.reshape(clusters, size).mean(axis=1)
         expected = stats.ttest_1samp(means, 0.0, alternative="greater")
         assert abs(found.p_value - float(expected.pvalue)) <= AGREEMENT
@@ -248,7 +244,7 @@ def test_the_cluster_robust_test_has_the_nominal_size_with_equal_clusters():
         for ignored in range(runs):
             effect = numpy.repeat(rng.normal(size=clusters), 5)
             values = effect + rng.normal(size=clusters * 5)
-            rejected += baseline.cluster_test(values, labels).p_value <= ALPHA
+            rejected += baseline.ttest(values, labels).p_value <= ALPHA
         support_statistics.assert_rate_at_most(
             rejected / runs, ALPHA, runs, f"cluster test, G={clusters}"
         )

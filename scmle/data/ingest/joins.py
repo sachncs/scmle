@@ -31,7 +31,7 @@ MIN_COMPETING_LINKS = 2
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class DeclaredKey:
+class Reference:
     """A foreign key the schema declares.
 
     Attributes:
@@ -138,7 +138,7 @@ class Step:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class JoinGraph:
+class Joins:
     """Measured links, as `join_graph.json`.
 
     Attributes:
@@ -184,7 +184,7 @@ class JoinGraph:
         }
 
 
-def name_supports(
+def corroborated(
     child_columns: Sequence[str],
     parent: str,
     parent_columns: Sequence[str],
@@ -205,8 +205,8 @@ def name_supports(
     """
     if len(child_columns) != 1:
         return list(child_columns) == list(parent_columns)
-    child_tokens = grain.name_tokens(child_columns[0])
-    parent_tokens = grain.name_tokens(parent_columns[0])
+    child_tokens = grain.tokenize(child_columns[0])
+    parent_tokens = grain.tokenize(parent_columns[0])
     id_like = bool(grain.ID_WORDS & set(child_tokens))
     if (
         child_tokens == parent_tokens
@@ -214,13 +214,13 @@ def name_supports(
         and set(child_tokens) - grain.ID_WORDS
     ):
         return True
-    table_tokens = grain.name_tokens(parent)
+    table_tokens = grain.tokenize(parent)
     named = bool(table_tokens) and all(t in child_tokens for t in table_tokens)
     return named and id_like
 
 
 def contained(
-    source: profile.SqlSource,
+    source: profile.Sql,
     child: str,
     child_columns: Sequence[str],
     parent: str,
@@ -260,7 +260,7 @@ def contained(
     return int(source.scalar(sql) or 0)
 
 
-def count(source: profile.SqlSource, table: str, columns: Sequence[str]) -> int:
+def count(source: profile.Sql, table: str, columns: Sequence[str]) -> int:
     """Counts the distinct non-null combinations of a column set.
 
     Args:
@@ -276,7 +276,7 @@ def count(source: profile.SqlSource, table: str, columns: Sequence[str]) -> int:
         source.scalar(
             profile.statement(
                 "SELECT COUNT(*) FROM (SELECT DISTINCT {n} FROM {t} WHERE {w})",
-                n=profile.quote_all(columns),
+                n=profile.quoting(columns),
                 t=profile.quote(table),
                 w=present,
             )
@@ -312,8 +312,8 @@ def match(
     return True
 
 
-def single_column_pairs(
-    catalog: profile.Catalog, scans: Mapping[str, grain.KeyScan]
+def couple(
+    catalog: profile.Catalog, scans: Mapping[str, grain.Scan]
 ) -> list[tuple[str, tuple[str, ...], str, tuple[str, ...]]]:
     """Pairs every column with every single-column key of another table.
 
@@ -340,19 +340,19 @@ def single_column_pairs(
 
 
 def discover(
-    source: profile.SqlSource,
+    source: profile.Sql,
     catalog: profile.Catalog,
-    scans: Mapping[str, grain.KeyScan],
-    declared: Sequence[DeclaredKey] = (),
+    scans: Mapping[str, grain.Scan],
+    declared: Sequence[Reference] = (),
     eps_fk: float = 0.0,
     stage: str = "joins",
-) -> JoinGraph:
+) -> Joins:
     """Measures candidate links and decides which may be joined.
 
     Args:
         source: Read-only source.
         catalog: Profiles of the tables.
-        scans: Key scan of each table (`grain.infer_keys`).
+        scans: Key scan of each table (`grain.keysearch`).
         declared: Foreign keys the schema declares.
         eps_fk: Largest share of child values allowed to lack a parent for a
             link to remain a candidate. Automatic acceptance needs 0.
@@ -366,7 +366,7 @@ def discover(
         (d.child, d.child_columns, d.parent, d.parent_columns): d
         for d in declared
     }
-    pairs = single_column_pairs(catalog, scans)
+    pairs = couple(catalog, scans)
     pairs.extend(declared_set)
     pairs = list(dict.fromkeys(pairs))
     measured: list[Link] = []
@@ -399,13 +399,13 @@ def discover(
             )
             if link is not None:
                 measured.append(link)
-    return JoinGraph(tuple(arbitrate(measured)), partial)
+    return Joins(tuple(arbitrate(measured)), partial)
 
 
 def measure(
-    source: profile.SqlSource,
+    source: profile.Sql,
     catalog: profile.Catalog,
-    scans: Mapping[str, grain.KeyScan],
+    scans: Mapping[str, grain.Scan],
     child: str,
     a: tuple[str, ...],
     parent: str,
@@ -441,7 +441,7 @@ def measure(
     containment = 1.0 - missing / distinct
     parent_key = b in {k.columns for k in scans[parent].keys}
     child_key = a in {k.columns for k in scans[child].keys}
-    support = name_supports(a, parent, b)
+    support = corroborated(a, parent, b)
     if not parent_key:
         return None
     if not is_declared and containment < 1.0 - eps_fk:
@@ -506,8 +506,8 @@ def arbitrate(links: Sequence[Link]) -> list[Link]:
         named = [
             item
             for item in group
-            if set(grain.name_tokens(item.parent))
-            <= set(grain.name_tokens(item.child_columns[0]))
+            if set(grain.tokenize(item.parent))
+            <= set(grain.tokenize(item.child_columns[0]))
         ]
         keep = named[0] if len(named) == 1 else None
         demote.update(item for item in group if item is not keep)
@@ -525,9 +525,9 @@ def arbitrate(links: Sequence[Link]) -> list[Link]:
 
 
 def many_to_many(
-    source: profile.SqlSource,
+    source: profile.Sql,
     catalog: profile.Catalog,
-    scans: Mapping[str, grain.KeyScan],
+    scans: Mapping[str, grain.Scan],
     eps_fk: float = 0.0,
 ) -> list[Link]:
     """Finds same-named non-key column pairs that overlap.
@@ -595,9 +595,7 @@ def many_to_many(
     return found
 
 
-def paths(
-    graph: JoinGraph, target: str, depth: int = 2
-) -> list[tuple[Step, ...]]:
+def paths(graph: Joins, target: str, depth: int = 2) -> list[tuple[Step, ...]]:
     """Paths from the target table of at most `depth` accepted hops.
 
     Hops go up (child to parent, many-to-one) or down (parent to children,

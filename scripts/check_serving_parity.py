@@ -27,10 +27,10 @@ def run(url: str, directory: Path, level: str, timeout: float) -> dict:
         timeout: Seconds to wait for the answer.
 
     Returns:
-        The report from `parity.check_remote`; its `passed` key says whether
+        The report from `parity.crosscheck`; its `passed` key says whether
         every label matched and every probability was within tolerance.
     """
-    return parity.check_remote(url, directory, level, timeout)
+    return parity.crosscheck(url, directory, level, timeout)
 
 
 def main(arguments: list[str] | None = None) -> int:

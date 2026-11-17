@@ -1,6 +1,6 @@
 """Coverage of the negative control's 95th-percentile interval.
 
-`controls.percentile_interval` builds a distribution-free interval for the
+`controls.bracket` builds a distribution-free interval for the
 0.95 quantile with nominal coverage 0.90. For a continuous distribution the
 largest of `B` draws lies above the 0.95 quantile with probability only
 `1 - 0.95 ** B`, which is 0.64 for `B = 20` and 0.78 for `B = 30`, so an
@@ -27,7 +27,7 @@ def coverage(reruns, seed):
     hits = 0
     for ignored in range(RUNS):
         counts = tuple(rng.normal(size=reruns).tolist())
-        low, high = controls.percentile_interval(counts)
+        low, high = controls.bracket(counts)
         hits += low <= truth <= high
     return hits / RUNS
 

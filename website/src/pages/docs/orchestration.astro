@@ -5,9 +5,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const executor = [
   ["Durable run id", "Derived from workflow name, version and the caller's trigger key (a schedule slot, a request id). The same trigger is the same run."],
   ["Idempotency key", "A hash of run id, step, parameters and upstream outputs. A step already succeeded with that key is not run again, and the key is passed to the handler for external deduplication."],
-  ["Duplicate invocation", "<code>start</code> with a finished trigger returns the record and runs nothing. A second executor on a run in flight gets <code>RunInFlightError</code> (lease)."],
+  ["Duplicate invocation", "<code>start</code> with a finished trigger returns the record and runs nothing. A second executor on a run in flight gets <code>BusyError</code> (lease)."],
   ["Partial failure", "The failing step is retried under its policy; dependents are <code>skipped</code>; independent steps finish. <code>resume</code> re-runs only what has not succeeded, and is an explicit act: <code>start</code> never retries a failed run."],
-  ["Interrupted job", "<code>StepInterruptedError</code> (or any <code>TransientError</code>) is retried with the same key and the declared backoff. The runner handler runs training through a <code>Runner</code>, whose own checkpoints make the retry a resume."],
+  ["Interrupted job", "<code>PreemptedError</code> (or any <code>TransientError</code>) is retried with the same key and the declared backoff. The runner handler runs training through a <code>Runner</code>, whose own checkpoints make the retry a resume."],
   ["Crashed executor", "Its lease expires (<code>lease_seconds</code>); another executor takes the run over and re-runs the step that was in flight."],
   ["Timeouts", "Cooperative: handlers call <code>context.check()</code>."],
   ["Cost", "<code>context.spend</code> raises past the step's or the run's budget. A run over budget stops its remaining steps (<code>budget_stopped</code>)."],

@@ -67,7 +67,7 @@ def test_changing_any_rule_changes_the_charter_hash(changes):
 
 def test_rules_round_trip_through_a_signed_file(tmp_path):
     charter = chartered(stability_filter=True, s_min=0.9)
-    path = sealing.write_charter(tmp_path / "c.json", charter, KEY)
+    path = sealing.inscribe(tmp_path / "c.json", charter, KEY)
     assert json.loads(path.read_text())["format"] == 3
     loaded = sealing.read_verified(path, signing_key=KEY)
     assert loaded.signed and loaded.charter == charter
@@ -75,7 +75,7 @@ def test_rules_round_trip_through_a_signed_file(tmp_path):
 
 
 def test_editing_a_rule_in_a_signed_file_is_detected(tmp_path):
-    path = sealing.write_charter(tmp_path / "c.json", chartered(), KEY)
+    path = sealing.inscribe(tmp_path / "c.json", chartered(), KEY)
     document = json.loads(path.read_text())
     document["charter"]["rules"]["stability_filter"] = True
     path.write_text(json.dumps(document))
@@ -84,7 +84,7 @@ def test_editing_a_rule_in_a_signed_file_is_detected(tmp_path):
 
 
 def test_a_wrapper_from_a_newer_format_is_refused(tmp_path):
-    path = sealing.write_charter(tmp_path / "c.json", chartered(), KEY)
+    path = sealing.inscribe(tmp_path / "c.json", chartered(), KEY)
     document = json.loads(path.read_text())
     document["format"] = contracts.FORMAT_VERSION + 1
     path.write_text(json.dumps(document))
@@ -93,7 +93,7 @@ def test_a_wrapper_from_a_newer_format_is_refused(tmp_path):
 
 
 def test_rules_in_an_older_format_are_refused(tmp_path):
-    path = sealing.write_charter(tmp_path / "c.json", chartered(), KEY)
+    path = sealing.inscribe(tmp_path / "c.json", chartered(), KEY)
     document = json.loads(path.read_text())
     document["format"] = 2
     path.write_text(json.dumps(document))

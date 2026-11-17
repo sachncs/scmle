@@ -46,9 +46,7 @@ def open_loop(tmp_path, policy=None, hooks=None, **kwargs):
         CHARTER,
         policy or make_policy(),
         hooks=hooks,
-        verification_keys={
-            deployment_ledger.key_fingerprint(HUMAN_KEY): HUMAN_KEY
-        },
+        verification_keys={deployment_ledger.thumbprint(HUMAN_KEY): HUMAN_KEY},
         system_keys=[SYSTEM_KEY],
         today=lambda: TODAY,
         **kwargs,
@@ -132,13 +130,11 @@ def test_open_creates_the_ledger_and_reopens_the_same_loop(tmp_path):
 def test_a_different_charter_or_policy_is_refused(tmp_path):
     open_loop(tmp_path)
     other = types.SimpleNamespace(charter_hash="b" * 64)
-    with pytest.raises(
-        deployment_ledger.DeploymentLedgerError, match="charter"
-    ):
+    with pytest.raises(deployment_ledger.MisuseError, match="charter"):
         scmle.governance.loop.Loop.open(
             tmp_path / "deploy", other, make_policy()
         )
-    with pytest.raises(deployment_ledger.DeploymentLedgerError, match="policy"):
+    with pytest.raises(deployment_ledger.MisuseError, match="policy"):
         open_loop(tmp_path, make_policy(r_star=0.04))
 
 
@@ -197,7 +193,7 @@ def test_everything_escalates_until_the_first_calibration(tmp_path):
     assert outcome.routing.coverage == 0.0
     data = streams.draw_calibration(3000, 0.05, seed=1)
     result = loop.calibrate(data["score"], data["loss"])
-    assert not result.everything_escalates
+    assert not result.saturated
     assert (
         tmp_path / "deploy" / scmle.governance.loop.RISK_COVERAGE_FILE
     ).exists()
@@ -375,8 +371,8 @@ def test_a_better_challenger_yields_a_promotion_proposal_in_order(tmp_path):
         ),
     )
     stream, sequence = paired([0.0, 0.12])
-    loop.register_challenger("null")
-    loop.register_challenger("better")
+    loop.enroll("null")
+    loop.enroll("better")
     feed(
         loop,
         stream,
@@ -414,7 +410,7 @@ def test_a_challenger_without_evidence_escalates_at_the_label_budget(tmp_path):
         ),
     )
     stream, sequence = paired([0.0])
-    loop.register_challenger("same")
+    loop.enroll("same")
     feed(loop, stream, challengers={"same": sequence.challengers[0]})
     assert not rows(loop, deployment_ledger.PROMOTION_PROPOSAL)
     assert any(
@@ -428,7 +424,7 @@ def test_a_worse_new_champion_creates_a_rollback_proposal_and_tightens_tau(
 ):
     loop = open_loop(tmp_path, make_policy(reference_risk=0.2, tolerance=0.3))
     stream, sequence = paired([0.12])
-    loop.watch_rollback("previous")
+    loop.surveil("previous")
     feed(loop, stream, challengers={"previous": sequence.challengers[0]})
     assert len(rows(loop, deployment_ledger.ROLLBACK_PROPOSAL)) == 1
     assert loop.tau == pytest.approx(0.55)
@@ -439,7 +435,7 @@ def test_two_consecutive_rollbacks_escalate(tmp_path):
     loop = open_loop(tmp_path, make_policy(reference_risk=0.2, tolerance=0.3))
     for seed in (1, 2):
         stream, sequence = paired([0.12], seed=seed)
-        loop.watch_rollback("previous")
+        loop.surveil("previous")
         loop.pending_batches = []
         loop.batch = 0
         feed(loop, stream, challengers={"previous": sequence.challengers[0]})
@@ -475,7 +471,7 @@ def test_halt_is_released_only_by_a_passing_recalibration(tmp_path):
     stream = streams.simulate(spec(base=0.3, batches=60, seed=8))
     feed(loop, stream)
     bad = streams.draw_calibration(30, 0.05, seed=1)
-    assert loop.calibrate(bad["score"], bad["loss"]).everything_escalates
+    assert loop.calibrate(bad["score"], bad["loss"]).saturated
     assert loop.ledger.halted
     good = streams.draw_calibration(3000, 0.05, seed=2)
     result = loop.calibrate(good["score"], good["loss"])
@@ -586,7 +582,7 @@ def test_signature_key_and_system_key_checks(tmp_path):
 def test_unanswered_escalations_time_out_with_the_safe_default(tmp_path):
     loop = open_loop(tmp_path, make_policy(reply_timeout=3))
     with pytest.raises(never_list.AttestationRequired):
-        loop.rewrite_ledger(lambda: None, {"op": "truncate"})
+        loop.rewrite(lambda: None, {"op": "truncate"})
     stream = streams.simulate(spec(batches=6, seed=1))
     feed(loop, stream, 0, 6)
     assert loop.pending_escalations() == []
@@ -630,7 +626,7 @@ NEVER_CASES = {
         2,
         None,
     ),
-    "rollback": lambda loop, calls: loop.execute_rollback(
+    "rollback": lambda loop, calls: loop.revert(
         lambda: calls.append("rb"), {"to": 1}
     ),
     "reopen_sealed": lambda loop, calls: loop.reopen_sealed(
@@ -639,14 +635,14 @@ NEVER_CASES = {
     "change_charter": lambda loop, calls: loop.amend_policy(
         safe_default="approve"
     ),
-    "rewrite_ledger": lambda loop, calls: loop.rewrite_ledger(
+    "rewrite_ledger": lambda loop, calls: loop.rewrite(
         lambda: calls.append("x"), {"op": "rm"}
     ),
     "relax_threshold": lambda loop, calls: loop.amend_policy(r_star=0.9),
     "act_on_unverified": lambda loop, calls: loop.act_on_unverified(
         "retrain", lambda: calls.append("r")
     ),
-    "silence_alert": lambda loop, calls: loop.silence_alert(
+    "silence_alert": lambda loop, calls: loop.silence(
         "slo", lambda: calls.append("s")
     ),
     "change_label_policy": lambda loop, calls: loop.change_label_policy(
@@ -682,7 +678,7 @@ def test_high_impact_answer_is_blocked_in_routing_and_guarded_as_an_action(
     loop = attested_loop(tmp_path)
     with pytest.raises(never_list.AttestationRequired):
         loop.perform(
-            never_list.NeverAction.ANSWER_HIGH_IMPACT,
+            never_list.Forbidden.ANSWER_HIGH_IMPACT,
             {"case": "c1"},
             lambda: "answered",
         )
@@ -742,9 +738,7 @@ def test_an_expired_attestation_no_longer_allows(tmp_path):
         tmp_path / "d",
         CHARTER,
         make_policy(),
-        verification_keys={
-            deployment_ledger.key_fingerprint(HUMAN_KEY): HUMAN_KEY
-        },
+        verification_keys={deployment_ledger.thumbprint(HUMAN_KEY): HUMAN_KEY},
         system_keys=[SYSTEM_KEY],
         today=lambda: clock["today"],
     )
@@ -764,9 +758,7 @@ def single_use_loop(tmp_path):
         tmp_path / "d",
         CHARTER,
         make_policy(),
-        verification_keys={
-            deployment_ledger.key_fingerprint(HUMAN_KEY): HUMAN_KEY
-        },
+        verification_keys={deployment_ledger.thumbprint(HUMAN_KEY): HUMAN_KEY},
         system_keys=[SYSTEM_KEY],
         today=lambda: TODAY,
         single_use_attestations=True,
@@ -814,7 +806,7 @@ def test_a_used_marker_survives_reopening_the_ledger(tmp_path):
 
 def test_a_used_marker_for_an_unanswered_escalation_is_refused(tmp_path):
     loop = single_use_loop(tmp_path)
-    with pytest.raises(deployment_ledger.DeploymentLedgerError):
+    with pytest.raises(deployment_ledger.MisuseError):
         loop.ledger.commit(
             deployment_ledger.ATTESTATION_USED, {"escalation_id": "esc-9"}
         )
@@ -849,5 +841,5 @@ def test_a_rollback_proposal_never_lowers_an_infinite_tau(tmp_path):
         "previous": "v1",
         "process": types.SimpleNamespace(crossed=True, e_value=50.0),
     }
-    loop.decide_rollback()
+    loop.propose()
     assert math.isinf(loop.tau)

@@ -70,7 +70,7 @@ def test_a_succeeded_handler_is_not_run_again_when_its_record_fails_once(
     recorder = test_workflow.Recorder(clock)
     flow = test_workflow.pipeline()
     executor = test_workflow.executor_for(store, flow, recorder, clock)
-    real = executor.save_step
+    real = executor.stash
     failed = {"done": False}
 
     def flaky(run_id, step, state, **fields):
@@ -80,7 +80,7 @@ def test_a_succeeded_handler_is_not_run_again_when_its_record_fails_once(
             raise objectstore.TransientStoreError("throttled")
         return real(run_id, step, state, **fields)
 
-    executor.save_step = flaky
+    executor.stash = flaky
     executor.start("req-1", "alice")
     assert failed["done"]
     assert recorder.names().count("ingest") == 1

@@ -159,7 +159,7 @@ environment the model was built in; `sbom.cdx.json` is the CycloneDX SBOM;
 """
 
 
-def write_service(
+def scaffold(
     bundle: Any,
     destination: str | pathlib.Path,
     scmle_pin: str | None = None,
@@ -216,7 +216,7 @@ def write_service(
     write_text(root / "requirements.txt", "\n".join(pins) + "\n")
 
     unresolved: list[str] = []
-    closure = lockfile.runtime_closure(
+    closure = lockfile.transitive(
         ["scmle", "scikit-learn", "pandas", *info.libraries],
         versions={
             **info.environment,
@@ -266,7 +266,7 @@ def write_service(
         json.dumps(vuln_gate.DEFAULT_POLICY, indent=2) + "\n",
     )
     digest = provenance.bundle_digest(root / "model")
-    service_sbom = sbom.build_service(
+    service_sbom = sbom.catalogue(
         closure,
         model_name=info.model_name,
         model_version=info.model_version,
@@ -277,7 +277,7 @@ def write_service(
     write_text(
         root / "sbom.cdx.json", json.dumps(service_sbom, indent=2) + "\n"
     )
-    attest.write_provenance(
+    attest.stamp(
         root,
         digest,
         builder=f"scmle package {info.scmle_version}",

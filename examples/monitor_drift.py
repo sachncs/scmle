@@ -36,7 +36,7 @@ def main() -> None:
     result = scmle.api.project.Project(
         make_dataset(800), "fault", metric="roc_auc", time_budget=60
     ).run()
-    watcher = monitor.ModelMonitor(result.bundle)
+    watcher = monitor.Watcher(result.bundle)
 
     for label, batch in (
         ("same distribution", make_dataset(300, seed=3)),

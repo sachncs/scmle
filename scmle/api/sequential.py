@@ -12,7 +12,7 @@ from scmle.evaluation import sequential
 SEQUENTIAL_ESTIMATION_ARTIFACT = "sequential_estimation.json"
 
 
-def resolve_tabular_input(
+def tabulate(
     data: pandas.DataFrame | str | pathlib.Path,
 ) -> pandas.DataFrame:
     """Resolves an in-memory frame or supported tabular file into a copy.
@@ -31,7 +31,7 @@ def resolve_tabular_input(
     if isinstance(data, pandas.DataFrame):
         return data.copy(deep=True)
     if isinstance(data, (str, pathlib.Path)):
-        return tabular.DatasetLoader().load(pathlib.Path(data))
+        return tabular.Loader().load(pathlib.Path(data))
     raise errors.KindError(
         "data must be a pandas DataFrame or a path to a supported tabular file"
     )
@@ -101,7 +101,7 @@ class Estimation:
             ValueError: If the persisted report's digest differs from the digest
                 of the report that was written.
         """
-        frame = resolve_tabular_input(self.data)
+        frame = tabulate(self.data)
         estimate = sequential.Estimator(self.estimand, self.policy).fit(frame)
         expected_digest = estimate.write(self.artifact_path)
         verified = sequential.Estimation.read(self.artifact_path)
@@ -126,7 +126,7 @@ class Estimation:
 
     def verify_replay(
         self, data: pandas.DataFrame | str | pathlib.Path | None = None
-    ) -> reproducibility.ReplayVerdict:
+    ) -> reproducibility.Comparison:
         """Replays the project and verifies input, policy, and result identity.
 
         The persisted report must exist (it is loaded first).
@@ -141,7 +141,7 @@ class Estimation:
         """
         persisted = self.load_result()
         replay_input = self.data if data is None else data
-        frame = resolve_tabular_input(replay_input)
+        frame = tabulate(replay_input)
         reasons: list[str] = []
         observed_fingerprint = sequential.fingerprint_frame(frame)
         if observed_fingerprint != persisted.raw_input_fingerprint:
@@ -158,14 +158,14 @@ class Estimation:
                 "replayed result digest differs from persisted evidence"
             )
         if reasons:
-            return reproducibility.ReplayVerdict(
+            return reproducibility.Comparison(
                 level=reproducibility.DIFFERENT,
                 reasons=reasons,
                 max_abs_difference=float("nan"),
                 trials_compared=1,
                 notes=[],
             )
-        return reproducibility.ReplayVerdict(
+        return reproducibility.Comparison(
             level=reproducibility.EXACT,
             reasons=[],
             max_abs_difference=0.0,

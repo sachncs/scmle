@@ -3,7 +3,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import DocTable from "../../components/DocTable.astro";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const surfaces = [
-  ["Qualification", "<code>scmle.contracts.qualification</code> (<code>Check</code>, <code>Claim</code>, <code>Certificate</code>, <code>Tier</code>, <code>Decision</code>, <code>SetId</code>), <code>scmle.data.ledger.budget</code>, <code>scmle.core.randomness</code>, <code>scmle.data.charter</code>, <code>scmle.data.custody</code>"],
+  ["Qualification", "<code>scmle.contracts.qualification</code> (<code>Check</code>, <code>Claim</code>, <code>Certificate</code>, <code>Tier</code>, <code>Decision</code>, <code>Subset</code>), <code>scmle.data.ledger.budget</code>, <code>scmle.core.randomness</code>, <code>scmle.data.charter</code>, <code>scmle.data.custody</code>"],
   ["Causal identification", "<code>scmle.data.identification</code> (<code>select</code>, <code>aipw</code>, <code>did</code>, <code>iv</code>, <code>rd</code>, <code>synth</code>, <code>sensitivity</code>, <code>battery</code>, <code>tier</code>, <code>run</code>, <code>certified</code>)"],
   ["Decision layer", "<code>scmle.decision</code>, <code>scmle.data.charter.decision</code>"],
   ["Closed loop", "<code>scmle.monitoring.sequential_tests</code>, <code>scmle.monitoring.labels</code>, <code>scmle.governance.escalation</code>, <code>deployment_ledger</code>, <code>never_list</code>, <code>loop</code>, and the <code>scmle loop</code> command"],
@@ -59,21 +59,21 @@ const surfaces = [
   </ul>
 
   <h2>The leakage screen</h2>
-  <p>The profiler's fixed leakage cutoffs are gone. <code>leakage_policy</code> keeps its values and its meaning at the top level, and the pinned <code>Project</code> signature is unchanged. What blocks is now a typed result, <code>DatasetProfile.blocking_leaks</code>, from a permutation screen. Behaviour you may notice:</p>
+  <p>The profiler's fixed leakage cutoffs are gone. <code>leakage_policy</code> keeps its values and its meaning at the top level, and the pinned <code>Project</code> signature is unchanged. What blocks is now a typed result, <code>Portrait.blockers</code>, from a permutation screen. Behaviour you may notice:</p>
   <ul>
     <li>Blocking needs a passing certificate for the mechanism, which exists for binary classification only. Regression and multiclass targets get warnings with p-values.</li>
     <li>The screen also reports a value recorded only for some outcomes when most rows are blank.</li>
-    <li><code>DatasetProfile</code> gained the optional field <code>leakage</code> (default empty). <code>target_association</code> is still computed as a descriptive statistic with no cutoff, and <code>risk.leakage_hypotheses</code> now counts screen suspects, so stored fingerprints of data that crossed a retired cutoff can differ in that one count.</li>
+    <li><code>Portrait</code> gained the optional field <code>leakage</code> (default empty). <code>target_association</code> is still computed as a descriptive statistic with no cutoff, and <code>risk.leakage_hypotheses</code> now counts screen suspects, so stored fingerprints of data that crossed a retired cutoff can differ in that one count.</li>
     <li>In a charter run the leakage test is the same screen, so a charter run and a run without one flag the same columns.</li>
   </ul>
 
   <h2>Other recorded behaviour changes</h2>
   <ul>
     <li><strong>Uncertainty.</strong> <code>Bundle.predict_set</code> gained the optional argument <code>conditional</code>. <code>conformal.json</code> gained <code>class_scores</code>: bundles saved earlier load and answer pooled queries, and <code>conditional="class"</code> raises for them. The metric named <code>mase</code> is the same-rows score (the model's error divided by the no-change error on the evaluation rows); it is not the usual MASE and is not comparable with published values. Use <code>proper_scores.mase</code> or <code>mase_insample</code> for that. The <code>interval_coverage</code> reliability check now requires coverage of at least 0.88 instead of 0.85.</li>
-    <li><strong>Closed loop.</strong> No pinned entry changed. <code>ModelMonitor.performance</code> gained optional <code>propensity</code> and <code>maturity</code> arguments. Retraining now holds fresh rows out by time or by whole groups when the champion's schema has them. A <code>Preregistration</code> does not let an alarm retrain unless <code>alarm_gates_retrain</code> is set, and it should be set only when the detection-delay gate H2 is listed as passed for the policy's settings; today it is descriptive.</li>
+    <li><strong>Closed loop.</strong> No pinned entry changed. <code>Watcher.performance</code> gained optional <code>propensity</code> and <code>maturity</code> arguments. Retraining now holds fresh rows out by time or by whole groups when the champion's schema has them. A <code>Preregistration</code> does not let an alarm retrain unless <code>alarm_gates_retrain</code> is set, and it should be set only when the detection-delay gate H2 is listed as passed for the policy's settings; today it is descriptive.</li>
     <li><strong>Causal identification.</strong> The estimand gained an optional <code>causal</code> block, omitted from the record when unset, so charters of format 1 to 3 keep their hash and signature. A charter that carries it is format 4. <code>DecisionAction</code> gained <code>refuse_claim</code>.</li>
     <li><strong>Decision layer.</strong> The charter gained an optional <code>decision</code> block (format 5). <code>choose_decision_threshold</code> takes the threshold from the charter's cost model when there is a decision block and the task is binary. <code>evaluation.json</code> gained <code>net_benefit</code> and, inside <code>decision</code>, <code>f11</code>.</li>
-    <li><strong>Serving.</strong> <code>HttpServing</code> gained the keyword-only <code>gateway</code> and refuses a non-loopback host without one; <code>ModalityHttpServing</code> gained <code>set_gateway</code>. The deployment ledger gained the row kind <code>audit</code> and, with the release work, <code>deployment</code>; existing ledgers and registries load unchanged.</li>
+    <li><strong>Serving.</strong> <code>HttpServing</code> gained the keyword-only <code>gateway</code> and refuses a non-loopback host without one; <code>ModalityHttpServing</code> gained <code>protect</code>. The deployment ledger gained the row kind <code>audit</code> and, with the release work, <code>deployment</code>; existing ledgers and registries load unchanged.</li>
   </ul>
 
   <h2>What is not promised</h2>

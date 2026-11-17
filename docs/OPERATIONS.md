@@ -19,7 +19,7 @@ locally.
 
 ## Telemetry
 
-`ServiceMetrics` counts requests by route and status and observes latency.
+`Instrumentation` counts requests by route and status and observes latency.
 *Availability* is the share of requests that were not 5xx or 429; a 4xx the
 caller caused is available. Latency quantiles are estimated from histogram
 buckets, as Prometheus does, so they are exact only at bucket edges.

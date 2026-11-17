@@ -14,7 +14,7 @@ def test_the_wealth_of_a_fair_bet_matches_a_hand_computed_value():
     stream = anytime.Stream(0.0, 1.0, 0.5)
     values = [1.0, 0.0, 1.0, 1.0]
     got = anytime.log_wealth_paths(values, stream)
-    grid = anytime.bet_grid(0.5)
+    grid = anytime.bets(0.5)
     expected = []
     for t in range(1, 5):
         wealth = [
@@ -65,9 +65,9 @@ def test_batches_and_single_updates_agree_and_track_the_running_maximum():
     stream = anytime.Stream(0.0, 1.0, 0.5)
     rng = numpy.random.default_rng(4)
     data = (rng.random(200) < 0.6).astype(float)
-    whole = anytime.EProcess(stream)
+    whole = anytime.Martingale(stream)
     whole.update(data)
-    pieces = anytime.EProcess(stream)
+    pieces = anytime.Martingale(stream)
     for chunk in numpy.array_split(data, 7):
         pieces.update(chunk)
     assert pieces.log_e == pytest.approx(whole.log_e, abs=1e-9)
@@ -81,7 +81,7 @@ def test_batches_and_single_updates_agree_and_track_the_running_maximum():
 
 def test_the_e_value_enters_the_ledger_as_evidence():
     stream = anytime.Stream(0.0, 1.0, 0.5)
-    process = anytime.EProcess(stream)
+    process = anytime.Martingale(stream)
     process.update([1.0] * 30)
     evidence = process.evidence()
     assert isinstance(evidence, online_fdr.Evidence)
@@ -123,8 +123,8 @@ def test_the_confidence_bound_covers_and_tightens_with_data():
         lambda: anytime.pseudo_outcomes([1.0], [2.0], 0.5),
         lambda: anytime.pseudo_outcomes([2.0], [1.0], 0.5),
         lambda: anytime.pseudo_outcomes([1.0], [1.0], 1.0),
-        lambda: anytime.bound_stream(-1.0),
-        lambda: anytime.EProcess(anytime.Stream(0.0, 1.0, 0.5)).crossed(1.0),
+        lambda: anytime.clamped(-1.0),
+        lambda: anytime.Martingale(anytime.Stream(0.0, 1.0, 0.5)).crossed(1.0),
     ],
 )
 def test_bad_inputs_are_refused(call):
@@ -137,14 +137,14 @@ def test_bad_inputs_are_refused(call):
 
 def test_the_running_centre_uses_only_earlier_outcomes():
     y = numpy.array([1.0, 0.0, 1.0, 1.0])
-    centres = anytime.running_center(y, prior=0.5, strength=2.0)
+    centres = anytime.centers(y, prior=0.5, strength=2.0)
     # (0.5 * 2 + sum so far) / (2 + units so far)
     assert centres.tolist() == pytest.approx([0.5, 2 / 3, 0.5, 0.6])
-    later = anytime.running_center(y[2:], carry=(1.0, 2))
+    later = anytime.centers(y[2:], carry=(1.0, 2))
     assert later.tolist() == pytest.approx(centres[2:].tolist())
     changed = y.copy()
     changed[3] = 0.0
-    assert anytime.running_center(changed)[:3].tolist() == pytest.approx(
+    assert anytime.centers(changed)[:3].tolist() == pytest.approx(
         centres[:3].tolist()
     )
 
@@ -159,7 +159,7 @@ def test_a_centred_pseudo_outcome_keeps_the_mean_difference_exactly():
     weight = (q ** arm.sum(1) * (1 - q) ** (length - arm.sum(1))) * (
         p_y ** y.sum(1) * (1 - p_y) ** (length - y.sum(1))
     )
-    z = anytime.pseudo_outcomes(arm, y, q, anytime.running_center(y))
+    z = anytime.pseudo_outcomes(arm, y, q, anytime.centers(y))
     # arm and outcome independent: the difference in means is zero
     assert float((weight * z[:, -1]).sum()) == pytest.approx(0.0, abs=1e-12)
     assert p_arm == q
@@ -178,7 +178,7 @@ def test_the_centred_e_process_has_mean_one_at_the_boundary_null():
     like = numpy.prod(numpy.where(y == 1, p_y, 1 - p_y), axis=1) * (
         q ** arm.sum(1) * (1 - q) ** (length - arm.sum(1))
     )
-    paths = anytime.centered_paths(arm, y, q, effect)
+    paths = anytime.recentre(arm, y, q, effect)
     assert float(like @ numpy.exp(paths[:, -1])) == pytest.approx(1.0, abs=1e-9)
 
 
@@ -194,9 +194,9 @@ def test_centring_shortens_the_time_to_find_an_effect_on_a_high_mean_metric():
     target = math.log(50)
     plain = anytime.log_wealth_paths(
         anytime.pseudo_outcomes(arm, y, 0.5),
-        anytime.difference_stream(0.5, 0.02),
+        anytime.contrasts(0.5, 0.02),
     )
-    centred = anytime.centered_paths(arm, y, 0.5, 0.02)
+    centred = anytime.recentre(arm, y, 0.5, 0.02)
     assert (centred.max(axis=1) >= target).mean() > (
         (plain.max(axis=1) >= target).mean() + 0.3
     )
@@ -205,4 +205,4 @@ def test_centring_shortens_the_time_to_find_an_effect_on_a_high_mean_metric():
 def test_the_difference_stream_refuses_an_assignment_probability_outside_0_1():
     for q in (0.0, 1.0, -0.2, float("nan")):
         with pytest.raises(ValueError, match="assignment_prob"):
-            anytime.difference_stream(q, 0.0)
+            anytime.contrasts(q, 0.0)

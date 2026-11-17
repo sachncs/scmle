@@ -9,9 +9,9 @@ from scmle.contracts import reliability
 import scmle.governance.reliability
 
 
-def artifact(evidence_type: str) -> scmle.governance.reliability.FaultArtifact:
+def artifact(evidence_type: str) -> scmle.governance.reliability.Emission:
     """Build a safe fixture artifact for one requirement."""
-    return scmle.governance.reliability.FaultArtifact(
+    return scmle.governance.reliability.Emission(
         evidence_type=evidence_type,
         content=f"observed:{evidence_type}".encode(),
         observed_outcome=reliability.EvidenceOutcome.SAFE_OUTCOME_OBSERVED,
@@ -21,8 +21,8 @@ def artifact(evidence_type: str) -> scmle.governance.reliability.FaultArtifact:
 
 def harness(tmp_path):
     """Build a complete plan and deterministic evidence writer."""
-    return scmle.governance.reliability.FaultInjectionHarness(
-        reliability.Registry.production_beta(),
+    return scmle.governance.reliability.Harness(
+        reliability.Registry.prerelease(),
         tmp_path,
         execution_id="fault-run-001",
         reviewer="reliability-reviewer",
@@ -32,14 +32,14 @@ def harness(tmp_path):
 
 def test_harness_persists_digest_bound_evidence_and_passes_scenario(tmp_path):
     runner = harness(tmp_path)
-    scenario = reliability.FaultScenario.PARTIAL_WRITE
+    scenario = reliability.Contingency.PARTIAL_WRITE
     requirements = runner.registry.plans[scenario].evidence_requirements
 
     plan = runner.run(
         scenario, lambda current_scenario: tuple(map(artifact, requirements))
     )
 
-    assert plan.verification_status is reliability.VerificationStatus.PASSED
+    assert plan.verification_status is reliability.Verification.PASSED
     for evidence in plan.evidence:
         path = tmp_path / evidence.artifact_uri.rsplit("/", 1)[-1]
         assert path.exists()
@@ -51,22 +51,20 @@ def test_harness_persists_digest_bound_evidence_and_passes_scenario(tmp_path):
 
 def test_harness_keeps_partial_executor_output_inconclusive(tmp_path):
     runner = harness(tmp_path)
-    scenario = reliability.FaultScenario.INVALID_SIGNATURE
+    scenario = reliability.Contingency.INVALID_SIGNATURE
 
     plan = runner.run(
         scenario,
         lambda current_scenario: (artifact("signature_tampering"),),
     )
 
-    assert (
-        plan.verification_status is reliability.VerificationStatus.INCONCLUSIVE
-    )
+    assert plan.verification_status is reliability.Verification.INCONCLUSIVE
 
 
 def test_harness_rejects_duplicate_evidence_before_writing(tmp_path):
     """Duplicate evidence cannot overwrite a previously emitted artifact."""
     runner = harness(tmp_path)
-    scenario = reliability.FaultScenario.INVALID_SIGNATURE
+    scenario = reliability.Contingency.INVALID_SIGNATURE
 
     with pytest.raises(ValueError, match="duplicate evidence types"):
         runner.run(
@@ -83,7 +81,7 @@ def test_harness_rejects_duplicate_evidence_before_writing(tmp_path):
 def test_harness_rejects_unexpected_evidence_before_writing(tmp_path):
     """Evidence names outside the scenario's expected set leave no artifacts."""
     runner = harness(tmp_path)
-    scenario = reliability.FaultScenario.INVALID_SIGNATURE
+    scenario = reliability.Contingency.INVALID_SIGNATURE
 
     with pytest.raises(ValueError, match="unexpected=unexpected"):
         runner.run(
@@ -102,18 +100,18 @@ def test_harness_rejects_unexpected_evidence_before_writing(tmp_path):
 def test_harness_wraps_executor_failure_without_claiming_evidence(tmp_path):
     runner = harness(tmp_path)
 
-    def fail(scenario: reliability.FaultScenario):
+    def fail(scenario: reliability.Contingency):
         del scenario
         raise OSError("worker disappeared")
 
     with pytest.raises(errors.ReliabilityError, match="before evidence"):
-        runner.run(reliability.FaultScenario.WORKER_LOSS, fail)
+        runner.run(reliability.Contingency.WORKER_LOSS, fail)
     assert not list(tmp_path.iterdir())
 
 
 def test_harness_rejects_path_injection_in_evidence_name(tmp_path):
     with pytest.raises(ValueError, match="path-safe"):
-        scmle.governance.reliability.FaultArtifact(
+        scmle.governance.reliability.Emission(
             evidence_type="../escape",
             content=b"evidence",
             observed_outcome=reliability.EvidenceOutcome.INCONCLUSIVE,

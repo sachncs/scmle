@@ -27,7 +27,7 @@ def binary_frame() -> pandas.DataFrame:
     )
 
 
-def capability(resources: capabilities.ResourceAssumptions):
+def capability(resources: capabilities.Resources):
     """Return the baseline binary capability used by the test gate."""
     return capabilities.Capability(
         key=capabilities.Coordinate(
@@ -91,7 +91,7 @@ def test_observation_captures_bounded_facts_and_unknowns(monkeypatch, tmp_path):
     """The probe serializes CPU, memory, disk, extras, and null unknowns."""
     monkeypatch.setattr(
         resource_observation,
-        "observe_cpu_cores",
+        "processors",
         lambda: (4, "test.cpu"),
     )
     monkeypatch.setattr(
@@ -101,12 +101,12 @@ def test_observation_captures_bounded_facts_and_unknowns(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         resource_observation,
-        "observe_disk_gb",
+        "freespace",
         lambda path: (12.0, f"test.disk:{path}"),
     )
     monkeypatch.setattr(
         resource_observation,
-        "observe_extras",
+        "optionals",
         lambda: (
             frozenset({"core", "deeplearning"}),
             {"core": True, "deeplearning": True},
@@ -131,7 +131,7 @@ def test_observation_captures_bounded_facts_and_unknowns(monkeypatch, tmp_path):
 def test_bound_observation_is_used_by_the_capability_gate(monkeypatch):
     """A context-bound observation is applied by the existing gate call."""
     record = capability(
-        capabilities.ResourceAssumptions(
+        capabilities.Resources(
             cpu_cores=2,
             memory_gb=4.0,
             disk_gb=1.0,
@@ -157,7 +157,7 @@ def test_bound_observation_is_used_by_the_capability_gate(monkeypatch):
     stages.IngestStage().execute(context)
     stages.ProfileStage().execute(context)
 
-    plan = stages.build_plan(context)
+    plan = stages.devise(context)
 
     assert plan.candidate_models == ("dummy",)
 
@@ -167,7 +167,7 @@ def test_unknown_declared_facts_fail_closed_and_are_persisted(
 ):
     """The planning gate rejects unknown facts after saving its evidence."""
     record = capability(
-        capabilities.ResourceAssumptions(
+        capabilities.Resources(
             cpu_cores=2,
             memory_gb=4.0,
             disk_gb=1.0,
@@ -190,7 +190,7 @@ def test_unknown_declared_facts_fail_closed_and_are_persisted(
         capability_registry=registry,
     )
 
-    with pytest.raises(capabilities.UnsupportedCapabilityError) as failure:
+    with pytest.raises(capabilities.UnsupportedError) as failure:
         project.run(tmp_path)
 
     diagnostics = failure.value.details["diagnostics"]

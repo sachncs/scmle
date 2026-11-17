@@ -9,7 +9,7 @@ from scmle.runners import base
 from scmle.workflow import executor
 
 
-def runner_handler(
+def delegate(
     runner: base.Runner,
     make_spec: Callable[[executor.StepContext], base.Job],
 ) -> executor.Handler:
@@ -27,7 +27,7 @@ def runner_handler(
     Returns:
         A handler. A job that succeeds returns its run id, manifest digest
         fields and cost; one that ended `retries_exhausted` raises a
-        retryable `StepInterruptedError`; any other final state raises
+        retryable `PreemptedError`; any other final state raises
         `ScmleError`.
     """
 
@@ -42,7 +42,7 @@ def runner_handler(
             succeeded job.
 
         Raises:
-            StepInterruptedError: If the job was interrupted on every attempt.
+            PreemptedError: If the job was interrupted on every attempt.
             ScmleError: If the job ended in any other final state.
         """
         manifest = runner.run(make_spec(context))
@@ -55,7 +55,7 @@ def runner_handler(
                 "cost": manifest.total_cost,
             }
         if manifest.state == base.RunState.RETRIES_EXHAUSTED:
-            raise executor.StepInterruptedError(
+            raise executor.PreemptedError(
                 f"job {manifest.run_id} was interrupted on every attempt"
             )
         raise errors.ScmleError(f"job {manifest.run_id} ended {manifest.state}")

@@ -89,7 +89,7 @@ TRACKED_LIBRARIES = (
 )
 
 
-def installed_distributions() -> dict[str, str]:
+def inventory() -> dict[str, str]:
     """Lists every installed distribution and its version (for the lock).
 
     Returns:
@@ -144,7 +144,7 @@ def brier(
     return float(numpy.mean(numpy.sum((probabilities - truth) ** 2, axis=1)))
 
 
-def file_sha256(path: pathlib.Path) -> str:
+def shasum(path: pathlib.Path) -> str:
     """Returns the SHA-256 of a file, streamed.
 
     Args:
@@ -209,7 +209,7 @@ def verify_signature(
             unsupported algorithm or does not verify.
     """
     signature_path = root / SIGNATURE_FILE
-    key = signing.resolve_key(signing_key)
+    key = signing.keying(signing_key)
     if not signature_path.exists() or key is None:
         return False
     try:
@@ -308,7 +308,7 @@ class Manifest:
         """
         return dataclasses.asdict(self)
 
-    def compatibility_problems(self) -> list[str]:
+    def incompatibilities(self) -> list[str]:
         """Lists dependency mismatches with the running environment.
 
         Returns:
@@ -336,9 +336,9 @@ class Manifest:
         return problems
 
 
-def read_manifest_and_schema(
+def unpack(
     root: pathlib.Path,
-) -> tuple[dict[str, Any], artifacts.BundleSchema]:
+) -> tuple[dict[str, Any], artifacts.Interface]:
     """Reads the manifest and the schema of a bundle directory.
 
     Args:
@@ -354,7 +354,7 @@ def read_manifest_and_schema(
         manifest = json.loads(
             (root / MANIFEST_FILE).read_text(encoding="utf-8")
         )
-        schema = artifacts.BundleSchema.from_dict(
+        schema = artifacts.Interface.from_dict(
             json.loads((root / SCHEMA_FILE).read_text(encoding="utf-8"))
         )
     except FileNotFoundError as error:
@@ -406,12 +406,12 @@ def authenticate(
     model_path = root / MODEL_FILE
     if not model_path.exists():
         raise errors.ArtifactError(f"missing {MODEL_FILE}")
-    if file_sha256(model_path) != info.files.get(MODEL_FILE):
+    if shasum(model_path) != info.files.get(MODEL_FILE):
         raise errors.ArtifactError(
             "checksum mismatch: model file was modified or corrupted"
         )
     schema_path = root / SCHEMA_FILE
-    if not legacy and file_sha256(schema_path) != info.files.get(SCHEMA_FILE):
+    if not legacy and shasum(schema_path) != info.files.get(SCHEMA_FILE):
         raise errors.ArtifactError(
             "checksum mismatch: schema file was modified or corrupted"
         )
@@ -437,12 +437,12 @@ def resolve(
     if name not in info.files:
         return None
     path = root / name
-    if not path.exists() or file_sha256(path) != info.files[name]:
+    if not path.exists() or shasum(path) != info.files[name]:
         raise errors.ArtifactError(f"checksum mismatch: {modified}")
     return path
 
 
-def load_monitoring_members(
+def hydrate(
     root: pathlib.Path, info: Manifest
 ) -> tuple[Any, Any, Any, Any, Any]:
     """Loads the verified reference, history, calibrator, conformal, novelty.
@@ -461,7 +461,7 @@ def load_monitoring_members(
     reference = None
     path = resolve(root, info, REFERENCE_FILE, "reference profile was modified")
     if path is not None:
-        reference = scmle.monitoring.reference.ReferenceProfile.from_dict(
+        reference = scmle.monitoring.reference.Baseline.from_dict(
             json.loads(path.read_text(encoding="utf-8"))
         )
     history = None
@@ -485,9 +485,7 @@ def load_monitoring_members(
     return reference, history, calibrator, calibrated, detector
 
 
-def load_interval_members(
-    root: pathlib.Path, info: Manifest
-) -> tuple[Any, Any, Any, Any]:
+def restore(root: pathlib.Path, info: Manifest) -> tuple[Any, Any, Any, Any]:
     """Loads the verified quantile, CV+, coverage and shift-weight members.
 
     Args:
@@ -545,13 +543,13 @@ class Bundle:
     def __init__(
         self,
         pipeline: Any,
-        schema: artifacts.BundleSchema,
+        schema: artifacts.Interface,
         info: Manifest,
-        reference: scmle.monitoring.reference.ReferenceProfile | None = None,
+        reference: scmle.monitoring.reference.Baseline | None = None,
         history: pandas.DataFrame | None = None,
         calibrator: Any = None,
         conformal: scmle.evaluation.conformal.ConformalCalibrator | None = None,
-        novelty: scmle.inference.novelty.NoveltyDetector | None = None,
+        novelty: scmle.inference.novelty.Strangeness | None = None,
         quantile: scmle.evaluation.quantile.QuantileIntervals | None = None,
     ) -> None:
         """Initializes the bundle.
@@ -584,7 +582,7 @@ class Bundle:
         # by the run or by `load`, kept out of the constructor signature.
         self.cv_plus: cv_plus.CvPlusEnsemble | None = None
         # Calibration weights for covariate shift, attached on demand by
-        # `attach_shift_weights`.
+        # `tilt`.
         self.shift_weights: shift_weights.StoredShiftWeights | None = None
         # Measured coverage of the stored intervals or sets on the final test
         # rows (`coverage_run.run_report`), set by the run.
@@ -596,7 +594,7 @@ class Bundle:
     def create(
         cls,
         pipeline: Any,
-        plan: scmle.contracts.data.FeaturePlan,
+        plan: scmle.contracts.data.Blueprint,
         dev_features: pandas.DataFrame,
         target: str,
         task: str,
@@ -606,7 +604,7 @@ class Bundle:
         model_params: dict[str, Any] | None = None,
         strategy: str = "default",
         decision_threshold: float | None = None,
-        reference: scmle.monitoring.reference.ReferenceProfile | None = None,
+        reference: scmle.monitoring.reference.Baseline | None = None,
         graph_fingerprint: str = "",
         group_column: str | None = None,
         time_column: str | None = None,
@@ -640,7 +638,7 @@ class Bundle:
         Returns:
             The bundle.
         """
-        computed = plan.derived_names
+        computed = plan.engineered
         series_names = {n.name for n in plan.series}
         numeric = tuple(c for c in plan.numeric if c not in computed)
         categorical = tuple(c for c in plan.categorical if c not in computed)
@@ -659,7 +657,7 @@ class Bundle:
             for column in categorical
         }
         classes = getattr(pipeline, "classes_", None)
-        schema = artifacts.BundleSchema(
+        schema = artifacts.Interface(
             target=target,
             task=task,
             numeric=numeric,
@@ -682,7 +680,7 @@ class Bundle:
             targets=tuple(getattr(pipeline, "target_columns", ())),
             optional_inputs=(
                 (pipeline.column,)
-                if isinstance(pipeline, thresholds.GroupClassifier)
+                if isinstance(pipeline, thresholds.Segmenter)
                 else ()
             ),
         )
@@ -693,17 +691,15 @@ class Bundle:
             model_params=model_params or {},
             strategy=strategy,
             decision_threshold=decision_threshold,
-            environment=installed_distributions(),
+            environment=inventory(),
             platform=platform.platform(),
         )
         bundle = cls(pipeline, schema, info, reference)
         if schema.series and history_source is not None:
-            bundle.history = bundle.series_builder().build_history(
-                history_source
-            )
+            bundle.history = bundle.assemble().retain(history_source)
         return bundle
 
-    def verify_round_trip(
+    def roundtrip(
         self,
         directory: str | pathlib.Path,
         sample: pandas.DataFrame,
@@ -761,7 +757,7 @@ class Bundle:
     def score(
         self,
         data: str | pathlib.Path | pandas.DataFrame,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
     ) -> dict[str, Any]:
         """Predicts and reports the schema diagnostics in one structured result.
 
@@ -796,15 +792,15 @@ class Bundle:
             result["classes"] = list(self.schema.classes)
             result["probabilities"] = self.predict_proba(frame).tolist()
         if self.novelty is not None:
-            result["out_of_distribution"] = self.novelty_of(frame)[
+            result["out_of_distribution"] = self.atypical(frame)[
                 "out_of_distribution"
             ].tolist()
         return result
 
-    def novelty_of(
+    def atypical(
         self,
         data: str | pathlib.Path | pandas.DataFrame,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
     ) -> pandas.DataFrame:
         """Flags rows that look unlike the training data.
 
@@ -821,7 +817,7 @@ class Bundle:
         """
         if self.novelty is None:
             raise errors.ArtifactError("this bundle has no novelty detector")
-        frame = self.prepare_frame(data, mapping)
+        frame = self.prepare(data, mapping)
         return self.novelty.score(frame)
 
     def calibrate(
@@ -871,7 +867,7 @@ class Bundle:
             raise errors.ConfigError(
                 "dirichlet calibration needs three or more classes"
             )
-        frame = self.prepare_frame(data)
+        frame = self.prepare(data)
         labels = numpy.asarray(target)
         before = self.pipeline.predict_proba(frame)
         if method == "dirichlet":
@@ -891,21 +887,19 @@ class Bundle:
         return {
             "brier_before": brier(before, labels, classes),
             "brier_after": brier(after, labels, classes),
-            "ece_before": reliability.top_label_curve(before, labels, classes)[
-                0
-            ],
-            "ece_after": reliability.top_label_curve(after, labels, classes)[0],
+            "ece_before": reliability.topclass(before, labels, classes)[0],
+            "ece_after": reliability.topclass(after, labels, classes)[0],
         }
 
-    def series_builder(self) -> feature_graph.SeriesFeatureBuilder:
+    def assemble(self) -> feature_graph.Temporal:
         """Builds the series feature builder for this model, with its history.
 
         Returns:
             A builder over the schema's series features, group and time columns
             and the stored history.
         """
-        return feature_graph.SeriesFeatureBuilder(
-            [tasks.FeatureNode(**node) for node in self.schema.series],
+        return feature_graph.Temporal(
+            [tasks.Node(**node) for node in self.schema.series],
             self.schema.group_column,
             self.schema.time_column,
             self.history,
@@ -925,9 +919,9 @@ class Bundle:
         if not self.schema.series:
             return
         with self.history_lock:  # Read-modify-write of `history`.
-            builder = self.series_builder()
+            builder = self.assemble()
             frame = self.read_frame(data)
-            columns = builder.history_columns
+            columns = builder.historical
             parts = [frame[columns]]
             if self.history is not None:
                 parts.insert(0, self.history)
@@ -938,11 +932,9 @@ class Bundle:
                 if c
             ]
             combined = combined.drop_duplicates(subset=key, keep="last")
-            self.history = builder.build_history(combined)
+            self.history = builder.retain(combined)
 
-    def write_monitoring_members(
-        self, root: pathlib.Path, files: dict[str, str]
-    ) -> None:
+    def persist(self, root: pathlib.Path, files: dict[str, str]) -> None:
         """Writes the reference, calibrator, conformal and novelty members.
 
         A stale calibrator file is deleted when the bundle has no calibrator.
@@ -959,11 +951,11 @@ class Bundle:
                 encoding="utf-8",
                 newline="\n",
             )
-            files[REFERENCE_FILE] = file_sha256(reference_path)
+            files[REFERENCE_FILE] = shasum(reference_path)
         if self.calibrator is not None:
             calibrator_path = root / CALIBRATOR_FILE
             joblib.dump(self.calibrator, calibrator_path)
-            files[CALIBRATOR_FILE] = file_sha256(calibrator_path)
+            files[CALIBRATOR_FILE] = shasum(calibrator_path)
         elif (root / CALIBRATOR_FILE).exists():
             (root / CALIBRATOR_FILE).unlink()
         if self.conformal is not None:
@@ -973,11 +965,11 @@ class Bundle:
                 encoding="utf-8",
                 newline="\n",
             )
-            files[CONFORMAL_FILE] = file_sha256(conformal_path)
+            files[CONFORMAL_FILE] = shasum(conformal_path)
         if self.novelty is not None:
             novelty_path = root / NOVELTY_FILE
             joblib.dump(self.novelty, novelty_path)
-            files[NOVELTY_FILE] = file_sha256(novelty_path)
+            files[NOVELTY_FILE] = shasum(novelty_path)
 
     def write_interval_members(
         self, root: pathlib.Path, files: dict[str, str]
@@ -994,11 +986,11 @@ class Bundle:
         if self.quantile is not None:
             quantile_path = root / QUANTILE_FILE
             joblib.dump(self.quantile, quantile_path)
-            files[QUANTILE_FILE] = file_sha256(quantile_path)
+            files[QUANTILE_FILE] = shasum(quantile_path)
         if self.cv_plus is not None:
             cv_plus_path = root / CV_PLUS_FILE
             joblib.dump(self.cv_plus, cv_plus_path)
-            files[CV_PLUS_FILE] = file_sha256(cv_plus_path)
+            files[CV_PLUS_FILE] = shasum(cv_plus_path)
         if self.coverage_report is not None:
             coverage_path = root / COVERAGE_FILE
             coverage_path.write_text(
@@ -1006,15 +998,15 @@ class Bundle:
                 encoding="utf-8",
                 newline="\n",
             )
-            files[COVERAGE_FILE] = file_sha256(coverage_path)
+            files[COVERAGE_FILE] = shasum(coverage_path)
         if self.shift_weights is not None:
             shift_path = root / SHIFT_WEIGHTS_FILE
             joblib.dump(self.shift_weights, shift_path)
-            files[SHIFT_WEIGHTS_FILE] = file_sha256(shift_path)
+            files[SHIFT_WEIGHTS_FILE] = shasum(shift_path)
         if self.history is not None:
             history_path = root / HISTORY_FILE
             self.history.to_parquet(history_path, index=False)
-            files[HISTORY_FILE] = file_sha256(history_path)
+            files[HISTORY_FILE] = shasum(history_path)
         elif (root / HISTORY_FILE).exists():
             (root / HISTORY_FILE).unlink()
 
@@ -1045,10 +1037,10 @@ class Bundle:
         )
         schema_path = root / SCHEMA_FILE
         files = {
-            MODEL_FILE: file_sha256(model_path),
-            SCHEMA_FILE: file_sha256(schema_path),
+            MODEL_FILE: shasum(model_path),
+            SCHEMA_FILE: shasum(schema_path),
         }
-        self.write_monitoring_members(root, files)
+        self.persist(root, files)
         self.write_interval_members(root, files)
         info = dataclasses.replace(self.info, format=BUNDLE_FORMAT, files=files)
         manifest_text = json.dumps(info.to_dict(), indent=2)
@@ -1056,7 +1048,7 @@ class Bundle:
             manifest_text, encoding="utf-8", newline="\n"
         )
         signature_path = root / SIGNATURE_FILE
-        key = signing.resolve_key(signing_key)
+        key = signing.keying(signing_key)
         if key is not None:
             signature = sign(manifest_text.encode(), key)
             signature_path.write_text(
@@ -1099,8 +1091,8 @@ class Bundle:
         """
         root = pathlib.Path(directory)
         try:
-            old = signing.resolve_key(current_key)
-            replacement = signing.resolve_key(new_key)
+            old = signing.keying(current_key)
+            replacement = signing.keying(new_key)
         except ValueError:
             # handled: invalid key becomes None, then ArtifactError raised just
             # below
@@ -1188,7 +1180,7 @@ class Bundle:
                 "the bundle and verify it with the signing key"
             )
         root = pathlib.Path(directory)
-        manifest, schema = read_manifest_and_schema(root)
+        manifest, schema = unpack(root)
         legacy = manifest.get("format") == 1
         if manifest.get("format") != BUNDLE_FORMAT and not (
             legacy and allow_legacy_format and trusted
@@ -1207,7 +1199,7 @@ class Bundle:
                 f"bundle format {BUNDLE_FORMAT}"
             )
         authenticate(root, info, legacy, trusted, signing_key)
-        problems = info.compatibility_problems()
+        problems = info.incompatibilities()
         if problems and not allow_version_mismatch:
             raise errors.ArtifactError(
                 "bundle was built with different dependencies: "
@@ -1217,11 +1209,11 @@ class Bundle:
                     "environment_lock": info.environment_lock(),
                 },
             )
-        reference, history, calibrator, calibrated, detector = (
-            load_monitoring_members(root, info)
+        reference, history, calibrator, calibrated, detector = hydrate(
+            root, info
         )
-        intervals, cv_plus_models, stored_coverage, stored_weights = (
-            load_interval_members(root, info)
+        intervals, cv_plus_models, stored_coverage, stored_weights = restore(
+            root, info
         )
         loaded = cls(
             joblib.load(root / MODEL_FILE),
@@ -1268,7 +1260,7 @@ class Bundle:
     def validate(
         self,
         data: str | pathlib.Path | pandas.DataFrame,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
     ) -> artifacts.Conformance:
         """Checks input against the schema without predicting.
 
@@ -1283,12 +1275,12 @@ class Bundle:
         frame = self.read_frame(data)
         if mapping is not None:
             frame = mapping.apply(frame, [*self.features, self.schema.target])
-        return validation.InputValidator(self.schema).report(frame)
+        return validation.Validator(self.schema).report(frame)
 
-    def prepare_frame(
+    def prepare(
         self,
         data: str | pathlib.Path | pandas.DataFrame,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
     ) -> pandas.DataFrame:
         """Validates input and returns the feature columns.
 
@@ -1306,15 +1298,15 @@ class Bundle:
         frame = self.read_frame(data)
         if mapping is not None:
             frame = mapping.apply(frame, [*self.features, self.schema.target])
-        validation.InputValidator(self.schema).check(frame)
+        validation.Validator(self.schema).check(frame)
         if self.schema.series:
-            frame = self.series_builder().apply(frame)
+            frame = self.assemble().apply(frame)
         wanted = [
-            *self.schema.pipeline_columns,
+            *self.schema.consumed,
             *(
                 c
                 for c in self.schema.optional_inputs
-                if c in frame.columns and c not in self.schema.pipeline_columns
+                if c in frame.columns and c not in self.schema.consumed
             ),
         ]
         return frame[wanted]
@@ -1322,7 +1314,7 @@ class Bundle:
     def predict(
         self,
         data: str | pathlib.Path | pandas.DataFrame,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
     ) -> numpy.ndarray:
         """Predicts labels or values through the full fitted pipeline.
 
@@ -1336,7 +1328,7 @@ class Bundle:
             per target for multi-target models).
         """
         predictions: numpy.ndarray = self.pipeline.predict(
-            self.prepare_frame(data, mapping)
+            self.prepare(data, mapping)
         )
         if self.schema.targets:
             return numpy.asarray(predictions)
@@ -1351,7 +1343,7 @@ class Bundle:
     def predict_proba(
         self,
         data: str | pathlib.Path | pandas.DataFrame,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
     ) -> numpy.ndarray:
         """Predicts class probabilities.
 
@@ -1374,7 +1366,7 @@ class Bundle:
             raise errors.ArtifactError(
                 "this model does not provide probabilities"
             )
-        frame = self.prepare_frame(data, mapping)
+        frame = self.prepare(data, mapping)
         probabilities: numpy.ndarray
         if self.calibrator is not None:
             probabilities = self.calibrator.predict_proba(frame)
@@ -1386,7 +1378,7 @@ class Bundle:
         self,
         data: str | pathlib.Path | pandas.DataFrame,
         background: str | pathlib.Path | pandas.DataFrame,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
         class_label: Any = None,
     ) -> pandas.DataFrame:
         """Explains individual predictions against a background sample.
@@ -1411,8 +1403,8 @@ class Bundle:
                 `class_label` is omitted. A `class_label` that is not a class
                 raises `ValueError` from the lookup.
         """
-        rows = self.prepare_frame(data, mapping)
-        reference = self.prepare_frame(background, mapping)
+        rows = self.prepare(data, mapping)
+        reference = self.prepare(background, mapping)
         if self.schema.task == "regression":
             score = self.pipeline.predict
         else:
@@ -1438,7 +1430,7 @@ class Bundle:
                 """
                 return numpy.asarray(estimator.predict_proba(frame))[:, column]
 
-        return local.OcclusionExplainer(score, self.schema.features).explain(
+        return local.Occlusion(score, self.schema.features).explain(
             rows, reference
         )
 
@@ -1446,7 +1438,7 @@ class Bundle:
         self,
         data: str | pathlib.Path | pandas.DataFrame,
         coverage: float = scmle.evaluation.conformal.DEFAULT_COVERAGE,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
         method: str = "residual",
         shift: bool = False,
     ) -> pandas.DataFrame:
@@ -1465,7 +1457,7 @@ class Bundle:
                 enough). `quantile` bounds are widened to include the point
                 prediction.
             shift: Use the weighted conformal interval for covariate shift
-                with the weights attached by `attach_shift_weights`
+                with the weights attached by `tilt`
                 (`residual` method only). The ratio is estimated, so the
                 coverage is approximate; a limit is infinite where the
                 calibration weight cannot reach `coverage`.
@@ -1486,7 +1478,7 @@ class Bundle:
                 raise errors.ArtifactError(
                     "this bundle has no quantile calibration"
                 )
-            frame = self.prepare_frame(data, mapping)
+            frame = self.prepare(data, mapping)
             lower, upper = self.quantile.interval(frame, coverage)
             predictions = numpy.asarray(
                 self.pipeline.predict(frame), dtype=float
@@ -1506,7 +1498,7 @@ class Bundle:
                     f"{cv_plus.MIN_ROWS_FOR_SPLIT} calibration rows "
                     "held out once each (see the cv_plus.skipped event)"
                 )
-            frame = self.prepare_frame(data, mapping)
+            frame = self.prepare(data, mapping)
             lower, upper = self.cv_plus.interval(frame, coverage)
             predictions = numpy.asarray(
                 self.pipeline.predict(frame), dtype=float
@@ -1519,7 +1511,7 @@ class Bundle:
                 f"unknown interval method '{method}'; use 'residual', "
                 "'quantile' or 'cv_plus'"
             )
-        calibrator = self.require_conformal("regression")
+        calibrator = self.require("regression")
         if shift:
             return self.reweight(calibrator, data, coverage, mapping)
         predictions = numpy.asarray(self.predict(data, mapping), dtype=float)
@@ -1528,7 +1520,7 @@ class Bundle:
             {"prediction": predictions, "lower": lower, "upper": upper}
         )
 
-    def attach_shift_weights(
+    def tilt(
         self,
         calibration_rows: pandas.DataFrame,
         target_rows: pandas.DataFrame,
@@ -1539,7 +1531,7 @@ class Bundle:
 
         A discriminator is fitted between the calibration rows and the target
         rows. An effective sample size that is too small refuses the weights
-        with `WeightRefusedError` (a `ValueError`, not an `ArtifactError`)
+        with `RefusedError` (a `ValueError`, not an `ArtifactError`)
         and none are stored.
 
         Args:
@@ -1559,7 +1551,7 @@ class Bundle:
                 count that differs from the stored scores, or on columns that
                 are not numeric features of the schema.
         """
-        calibrator = self.require_conformal("regression")
+        calibrator = self.require("regression")
         if len(calibration_rows) != len(calibrator.scores):
             raise errors.ArtifactError(
                 f"{len(calibration_rows)} calibration rows given but "
@@ -1595,7 +1587,7 @@ class Bundle:
         calibrator: scmle.evaluation.conformal.ConformalCalibrator,
         data: str | pathlib.Path | pandas.DataFrame,
         coverage: float,
-        mapping: scmle.inference.mapping.ColumnMapping | None,
+        mapping: scmle.inference.mapping.Mapper | None,
     ) -> pandas.DataFrame:
         """Computes weighted conformal intervals with the stored shift weights.
 
@@ -1613,9 +1605,9 @@ class Bundle:
         """
         if self.shift_weights is None:
             raise errors.ArtifactError(
-                "this bundle has no shift weights; call attach_shift_weights"
+                "this bundle has no shift weights; call tilt"
             )
-        frame = self.prepare_frame(data, mapping)
+        frame = self.prepare(data, mapping)
         predictions = numpy.asarray(self.pipeline.predict(frame), dtype=float)
         lower, upper = calibrator.weighted_interval(
             predictions,
@@ -1736,7 +1728,7 @@ class Bundle:
                 inside: numpy.ndarray = (values >= low) & (values <= high)
                 return inside
 
-        search = scmle.explainability.counterfactual.CounterfactualSearch(
+        search = scmle.explainability.counterfactual.Recourse(
             progress,
             reached,
             self.predict,
@@ -1784,7 +1776,7 @@ class Bundle:
         Returns:
             The folder.
         """
-        return packaging.write_service(self, destination, None, signing_key)
+        return packaging.scaffold(self, destination, None, signing_key)
 
     def export_onnx(
         self,
@@ -1817,7 +1809,7 @@ class Bundle:
         self,
         data: str | pathlib.Path | pandas.DataFrame,
         times: Any,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
     ) -> numpy.ndarray:
         """Returns the probability of no event yet at each time (survival).
 
@@ -1834,7 +1826,7 @@ class Bundle:
         """
         if self.schema.task != tasks.Task.SURVIVAL.value:
             raise errors.ArtifactError("this bundle is not a survival model")
-        frame = self.prepare_frame(data, mapping)
+        frame = self.prepare(data, mapping)
         return numpy.asarray(
             self.pipeline.predict_survival(
                 frame, numpy.asarray(times, dtype=float)
@@ -1845,7 +1837,7 @@ class Bundle:
         self,
         history: str | pathlib.Path | pandas.DataFrame,
         steps: int | None = None,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
     ) -> pandas.DataFrame:
         """Forecasts the next values of every series in `history`.
 
@@ -1884,7 +1876,7 @@ class Bundle:
             frame = mapping.apply(frame, self.features)
         clock, entity = self.schema.time_column, self.schema.group_column
         time_name = clock or "time"
-        prepared = self.prepare_frame(frame)
+        prepared = self.prepare(frame)
         stamps = pandas.to_datetime(frame[clock], errors="coerce")
         numeric_clock = stamps.isna().any()
         order = frame[clock].to_numpy() if numeric_clock else stamps.to_numpy()
@@ -1929,7 +1921,7 @@ class Bundle:
         self,
         data: str | pathlib.Path | pandas.DataFrame,
         query_column: str,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
     ) -> pandas.DataFrame:
         """Scores rows and orders them within each query (ranking tasks).
 
@@ -1964,11 +1956,11 @@ class Bundle:
             [query_column, "rank"], kind="stable"
         ).reset_index(drop=True)
 
-    def rank_for_labeling(
+    def prioritize(
         self,
         data: str | pathlib.Path | pandas.DataFrame,
         count: int = 10,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
     ) -> pandas.DataFrame:
         """Picks the unlabeled rows a person should label next.
 
@@ -1990,7 +1982,7 @@ class Bundle:
         Raises:
             ArtifactError: For a regression bundle without quantile models.
         """
-        frame = self.prepare_frame(data, mapping)
+        frame = self.prepare(data, mapping)
         if self.classes is not None:
             ordered = numpy.sort(
                 numpy.asarray(self.pipeline.predict_proba(frame)), axis=1
@@ -2003,7 +1995,7 @@ class Bundle:
                 raise errors.ArtifactError(
                     "this bundle has no quantile models to rank by"
                 )
-            lower, upper = self.quantile.raw_band(frame)
+            lower, upper = self.quantile.native(frame)
             uncertainty = upper - lower
         order = numpy.argsort(-uncertainty, kind="stable")[:count]
         return pandas.DataFrame(
@@ -2014,7 +2006,7 @@ class Bundle:
         self,
         data: str | pathlib.Path | pandas.DataFrame,
         coverage: float = scmle.evaluation.conformal.DEFAULT_COVERAGE,
-        mapping: scmle.inference.mapping.ColumnMapping | None = None,
+        mapping: scmle.inference.mapping.Mapper | None = None,
         conditional: str | None = None,
     ) -> list[list[Any]]:
         """Returns prediction sets with a stated coverage (classification).
@@ -2035,12 +2027,12 @@ class Bundle:
         Returns:
             For each row the labels that cannot be ruled out.
         """
-        calibrator = self.require_conformal("classification")
+        calibrator = self.require("classification")
         return calibrator.sets(
             self.predict_proba(data, mapping), coverage, conditional
         )
 
-    def require_conformal(
+    def require(
         self, kind: str
     ) -> scmle.evaluation.conformal.ConformalCalibrator:
         """Returns the calibrator of the right kind or explains its absence.

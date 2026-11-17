@@ -16,7 +16,7 @@ import scmle.core.context
 
 
 @dataclasses.dataclass(frozen=True)
-class GateReview:
+class Review:
     """What a reviewer is shown at a gate.
 
     Attributes:
@@ -57,7 +57,7 @@ class Reviewer(abc.ABC):
     )
 
     @abc.abstractmethod
-    def review(self, review: GateReview) -> Approval:
+    def review(self, review: Review) -> Approval:
         """Decides whether the run may continue past the gate.
 
         Args:
@@ -73,7 +73,7 @@ class Callback(Reviewer):
 
     def __init__(
         self,
-        decide: Callable[[GateReview], Approval | bool],
+        decide: Callable[[Review], Approval | bool],
         gates: frozenset[state.RunState] | None = None,
     ) -> None:
         """Initializes the checkpoint.
@@ -86,7 +86,7 @@ class Callback(Reviewer):
         if gates is not None:
             self.gates = gates
 
-    def review(self, review: GateReview) -> Approval:
+    def review(self, review: Review) -> Approval:
         """Calls the function and normalizes its answer.
 
         Args:
@@ -105,7 +105,7 @@ class Callback(Reviewer):
 
 def describe(
     gate: state.RunState, context: scmle.core.context.Context
-) -> GateReview:
+) -> Review:
     """Builds the review shown at `gate`.
 
     Args:
@@ -121,9 +121,9 @@ def describe(
     """
     if gate is state.RunState.PLANNING:
         plan = scmle.core.context.require(context.plan, "plan")
-        return GateReview(gate, plan.summary(), plan.to_dict())
+        return Review(gate, plan.summary(), plan.to_dict())
     selected = scmle.core.context.require(context.selected, "selected")
-    return GateReview(
+    return Review(
         gate,
         f"selected {selected.model_name}/{selected.strategy} "
         f"(cv {selected.score_mean:.4f}); the test set is still locked",

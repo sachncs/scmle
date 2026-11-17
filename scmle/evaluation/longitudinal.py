@@ -685,7 +685,7 @@ class Estimator:
             ValueError: If the time values cannot be sorted.  Invalid
                 panels and periods that fail the support, overlap, or
                 effective-sample-size checks raise `ValueError` from the
-                helper functions and `fit_period`.
+                helper functions and `wave`.
         """
         prepared, rows_dropped = prepare(frame, self.estimand, self.policy)
         fingerprint = fingerprint_frame(frame)
@@ -703,13 +703,13 @@ class Estimator:
             period_frame = prepared[
                 prepared[self.estimand.time_column] == value
             ]
-            fitted.append(self.fit_period(period_frame, value))
-        covariance = influence_covariance(fitted)
+            fitted.append(self.wave(period_frame, value))
+        covariance = sandwich(fitted)
         critical_value = float(
             stats.norm.ppf(0.5 + self.policy.confidence_level / 2.0)
         )
         periods = tuple(
-            build_period_result(item, covariance[index, index], critical_value)
+            periodise(item, covariance[index, index], critical_value)
             for index, item in enumerate(fitted)
         )
         reference = independent_reference(
@@ -783,7 +783,7 @@ class Estimator:
             raw_input_fingerprint=fingerprint,
         )
 
-    def fit_period(
+    def wave(
         self, period_frame: pandas.DataFrame, period_value: Any
     ) -> dict[str, Any]:
         """Fits one period and retains influence values for covariance.
@@ -1054,7 +1054,7 @@ def prepare(
     return prepared, rows_dropped
 
 
-def require_strictly_increasing(times: pandas.Series) -> None:
+def monotone(times: pandas.Series) -> None:
     """Requires one subject's time values to be strictly increasing.
 
     Args:
@@ -1094,7 +1094,7 @@ def validate_time_order(frame: pandas.DataFrame, estimand: Estimand) -> None:
         for subject_group in frame.groupby(
             subject_name, sort=False, dropna=False
         ):
-            require_strictly_increasing(subject_group[1][time_name])
+            monotone(subject_group[1][time_name])
     except (TypeError, ValueError) as error:
         if "strictly increasing" in str(error):
             raise
@@ -1197,11 +1197,11 @@ def effective_sample_size(weights: numpy.ndarray) -> float:
     return total**2 / squared
 
 
-def influence_covariance(fitted: Sequence[Mapping[str, Any]]) -> numpy.ndarray:
+def sandwich(fitted: Sequence[Mapping[str, Any]]) -> numpy.ndarray:
     """Estimates covariance from subject-aligned influence values.
 
     Args:
-        fitted: One `fit_period` record per period, in period order.
+        fitted: One `wave` record per period, in period order.
 
     Returns:
         A symmetric matrix with one row and column per period.  Each entry
@@ -1245,13 +1245,13 @@ def influence_covariance(fitted: Sequence[Mapping[str, Any]]) -> numpy.ndarray:
     return (covariance + covariance.T) / 2.0
 
 
-def build_period_result(
+def periodise(
     fitted: Mapping[str, Any], variance: float, critical_value: float
 ) -> PeriodATE:
     """Builds a serializable period result after covariance is available.
 
     Args:
-        fitted: The `fit_period` record of the period.
+        fitted: The `wave` record of the period.
         variance: Variance of the period estimate; negative values are
             treated as zero.
         critical_value: Normal quantile that scales the standard error into
@@ -1294,7 +1294,7 @@ def independent_reference(
     """Recalculates normalized weighted means through an independent path.
 
     Args:
-        fitted: One `fit_period` record per period.
+        fitted: One `wave` record per period.
         tolerance: Largest absolute difference counted as agreement.
 
     Returns:

@@ -42,7 +42,7 @@ def test_near_the_boundary_the_report_says_inconclusive():
     y, a, b, group = framing_certify.world(
         framing_certify.DEV_SEED_BASE, 60, 0.85, 0.12
     )
-    d = baseline.paired_difference(y, a, b, 0.1)
+    d = baseline.advantage(y, a, b, 0.1)
     report = feasibility.assess(
         d,
         group,

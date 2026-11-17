@@ -20,7 +20,7 @@ from tests.unit.test_framing_draft import table
 
 
 def source(columns=("a", "b"), **options):
-    return draft.SourceDescription("uri://x", tuple(columns), **options)
+    return draft.Offer("uri://x", tuple(columns), **options)
 
 
 def asked(text, columns, **options):
@@ -59,9 +59,9 @@ def test_the_causal_pattern_matches_whole_phrases_in_any_case():
 
 
 def test_a_source_description_reads_a_record_with_defaults():
-    plain = draft.SourceDescription.from_dict({"uri": 5, "columns": ["a", "b"]})
-    assert plain == draft.SourceDescription("5", ("a", "b"), (), None)
-    full = draft.SourceDescription.from_dict(
+    plain = draft.Offer.from_dict({"uri": 5, "columns": ["a", "b"]})
+    assert plain == draft.Offer("5", ("a", "b"), (), None)
+    full = draft.Offer.from_dict(
         {
             "uri": "u",
             "columns": ["a", "b"],
@@ -71,13 +71,13 @@ def test_a_source_description_reads_a_record_with_defaults():
     )
     assert full.primary_key == ("a",) and full.target_time_column == "b"
     with pytest.raises(KeyError):
-        draft.SourceDescription.from_dict({"columns": ["a"]})
+        draft.Offer.from_dict({"columns": ["a"]})
     with pytest.raises(KeyError):
-        draft.SourceDescription.from_dict({"uri": "u"})
+        draft.Offer.from_dict({"uri": "u"})
 
 
 def test_a_data_check_serialises_every_field():
-    check = draft.DataCheck("n", ok=True, blocking=False, detail="d")
+    check = draft.Probe("n", ok=True, blocking=False, detail="d")
     assert check.to_dict() == {
         "name": "n",
         "ok": True,
@@ -113,67 +113,57 @@ def test_a_target_is_taken_from_an_explicit_keyword():
         "outcome column region",
         "TARGET column: region",
     ):
-        slots = draft.deterministic_slots(
-            asked(text, columns), pandas.DataFrame()
-        )
+        slots = draft.prefill(asked(text, columns), pandas.DataFrame())
         assert slots["target"] == "region", text
 
 
 def test_a_target_falls_back_to_a_single_mention_or_a_conventional_name():
     frame = pandas.DataFrame()
-    one = draft.deterministic_slots(
+    one = draft.prefill(
         asked("Who is lost in region?", ["churn", "region"]), frame
     )
     assert one["target"] == "region"
-    two = draft.deterministic_slots(
+    two = draft.prefill(
         asked("churn and region", ["churn", "region", "y"]), frame
     )
     assert two["target"] == "y"
-    none = draft.deterministic_slots(
-        asked("churn and region", ["churn", "region"]), frame
-    )
+    none = draft.prefill(asked("churn and region", ["churn", "region"]), frame)
     assert "target" not in none
-    twice = draft.deterministic_slots(asked("hello", ["label", "y"]), frame)
+    twice = draft.prefill(asked("hello", ["label", "y"]), frame)
     assert "target" not in twice
-    unknown = draft.deterministic_slots(
-        asked("predict nothing", ["label"]), frame
-    )
+    unknown = draft.prefill(asked("predict nothing", ["label"]), frame)
     assert unknown["target"] == "label"
 
 
 def test_the_prediction_moment_is_the_only_datetime_column_apart_from_the_end():
     frame = table()
-    slots = draft.deterministic_slots(request(frame), frame)
+    slots = draft.prefill(request(frame), frame)
     assert slots["prediction_moment"] == "as_of"
     both = request(frame, target_time_column=None)
-    assert "prediction_moment" not in draft.deterministic_slots(both, frame)
-    none = draft.deterministic_slots(
-        request(frame), frame.drop(columns=["as_of"])
-    )
+    assert "prediction_moment" not in draft.prefill(both, frame)
+    none = draft.prefill(request(frame), frame.drop(columns=["as_of"]))
     assert "prediction_moment" not in none
     text = frame.assign(as_of=frame["as_of"].astype(str))
-    assert "prediction_moment" not in draft.deterministic_slots(
-        request(frame), text
-    )
+    assert "prediction_moment" not in draft.prefill(request(frame), text)
 
 
 def test_the_unit_is_the_declared_key_and_the_question_is_stripped():
     frame = table()
-    slots = draft.deterministic_slots(request(frame, "  Who leaves?  "), frame)
+    slots = draft.prefill(request(frame, "  Who leaves?  "), frame)
     assert slots["unit"] == ["customer_id"]
     assert slots["question"] == "Who leaves?"
-    keyless = draft.Request("q", draft.SourceDescription("u", ("a",)))
-    assert "unit" not in draft.deterministic_slots(keyless, pandas.DataFrame())
+    keyless = draft.Request("q", draft.Offer("u", ("a",)))
+    assert "unit" not in draft.prefill(keyless, pandas.DataFrame())
 
 
 def checks_of(frame, slots, **options):
-    return draft.check_draft(frame, slots, source(frame.columns, **options))
+    return draft.vet(frame, slots, source(frame.columns, **options))
 
 
 def test_a_missing_target_is_a_blocking_check_with_its_name():
     frame = pandas.DataFrame({"a": [1, 2]})
     (check,) = checks_of(frame, {"target": "zz"})
-    assert check == draft.DataCheck(
+    assert check == draft.Probe(
         "target_exists", ok=False, blocking=True, detail="zz missing"
     )
 
@@ -181,7 +171,7 @@ def test_a_missing_target_is_a_blocking_check_with_its_name():
 def test_target_completeness_has_exact_boundaries_and_detail():
     good = pandas.DataFrame({"y": [0, 1, 0, 1, 0, 1, 0, 1, None, None]})
     (check,) = checks_of(good, {"target": "y"})
-    assert check == draft.DataCheck(
+    assert check == draft.Probe(
         "target_complete",
         ok=True,
         blocking=False,
@@ -207,7 +197,7 @@ def test_target_completeness_has_exact_boundaries_and_detail():
 def test_the_moment_checks_say_what_is_wrong():
     frame = pandas.DataFrame({"a": [1, 2], "e": [3, 4]})
     (missing,) = checks_of(frame, {"prediction_moment": "m"})
-    assert missing == draft.DataCheck(
+    assert missing == draft.Probe(
         "moment_exists", ok=False, blocking=True, detail="m missing"
     )
     assert checks_of(frame, {"prediction_moment": "a"}) == ()
@@ -227,7 +217,7 @@ def test_a_moment_equal_to_the_target_time_counts_as_a_violation():
     (check,) = checks_of(
         frame, {"prediction_moment": "m"}, target_time_column="e"
     )
-    assert check == draft.DataCheck(
+    assert check == draft.Probe(
         "moment_before_target",
         ok=False,
         blocking=True,
@@ -256,13 +246,13 @@ def test_a_moment_equal_to_the_target_time_counts_as_a_violation():
 def test_the_unit_checks_name_the_keys_and_the_duplicate_share():
     frame = pandas.DataFrame({"k": list(range(100)), "v": [1] * 100})
     (missing,) = checks_of(frame, {"unit": ["k", "zz"]})
-    assert missing == draft.DataCheck(
+    assert missing == draft.Probe(
         "unit_exists", ok=False, blocking=True, detail="['k', 'zz'] missing"
     )
     (text,) = checks_of(frame, {"unit": "zz"})
     assert text.detail == "['zz'] missing"
     (unique,) = checks_of(frame, {"unit": "k"})
-    assert unique == draft.DataCheck(
+    assert unique == draft.Probe(
         "unit_unique", ok=True, blocking=False, detail="duplicate share 0.0000"
     )
     one = frame.assign(k=[0, *range(99)])
@@ -279,7 +269,7 @@ def test_the_unit_checks_name_the_keys_and_the_duplicate_share():
 def test_the_population_check_reports_the_selected_share():
     frame = pandas.DataFrame({"k": list(range(100))})
     (edge,) = checks_of(frame, {"population": "k < 1"})
-    assert edge == draft.DataCheck(
+    assert edge == draft.Probe(
         "population_coverage",
         ok=True,
         blocking=False,
@@ -296,7 +286,7 @@ def test_the_population_check_reports_the_selected_share():
     (half,) = checks_of(frame, {"population": "k < 50"})
     assert half.ok is True and half.detail == "selects 0.500 of the rows"
     (odd,) = checks_of(frame, {"population": "nonsense"})
-    assert odd == draft.DataCheck(
+    assert odd == draft.Probe(
         "population_coverage",
         ok=False,
         blocking=True,
@@ -408,7 +398,7 @@ def test_causal_words_set_the_kind_and_a_missing_required_slot_raises():
 
 
 def test_a_refused_draft_carries_the_reason_the_detail_and_the_context():
-    check = draft.DataCheck("c", ok=False, blocking=True, detail="d")
+    check = draft.Probe("c", ok=False, blocking=True, detail="d")
     result = draft.refused(
         "why", {"k": 1}, [check], {"model_id": "m"}, ["gone"]
     )
@@ -432,7 +422,7 @@ def test_a_refused_draft_carries_the_reason_the_detail_and_the_context():
 
 def test_column_refusals_name_the_missing_columns():
     frame = table()
-    unknown = draft.column_refusal(
+    unknown = draft.mismatch(
         request(frame, "use `nope` and `two words` and `customer_id`"), frame
     )
     assert unknown.refusal == {
@@ -440,23 +430,19 @@ def test_column_refusals_name_the_missing_columns():
         "missing_columns": ["nope"],
     }
     assert unknown.status == draft.REFUSED
-    lacking = draft.column_refusal(
-        request(frame), frame.drop(columns=["region"])
-    )
+    lacking = draft.mismatch(request(frame), frame.drop(columns=["region"]))
     assert lacking.refusal == {
         "reason": "the data sample lacks declared columns",
         "missing_columns": ["region"],
     }
-    assert draft.column_refusal(request(frame, "use `churn`"), frame) is None
+    assert draft.mismatch(request(frame, "use `churn`"), frame) is None
 
 
 def test_without_a_sampler_nothing_is_asked():
     frame = table()
     slots = {}
     sources = {}
-    got = draft.consult_sampler(
-        request(frame), frame, slots, sources, None, 0.1, 5
-    )
+    got = draft.consult(request(frame), frame, slots, sources, None, 0.1, 5)
     assert got == (None, [], None)
     assert slots == {} and sources == {}
 
@@ -467,10 +453,10 @@ def test_the_llm_record_holds_the_prompt_the_samples_and_the_scores():
     slots = {}
     sources = {}
     sampler = replay([SAMPLE] * 5, "model-x")
-    llm, discarded, stopped = draft.consult_sampler(
+    llm, discarded, stopped = draft.consult(
         plain, frame, slots, sources, sampler, 0.1, 3
     )
-    prompt = refusal.prompt_for("Who leaves?", plain.source.columns)
+    prompt = refusal.instruct("Who leaves?", plain.source.columns)
     samples = [SAMPLE] * 3
     assert stopped is None and discarded == []
     assert llm == {
@@ -489,14 +475,14 @@ def test_the_llm_record_holds_the_prompt_the_samples_and_the_scores():
         "tier": "unverified",
     }
     assert slots["target"] == "churn" and slots["unit"] == ["customer_id"]
-    assert set(sources.values()) == {provenance.FieldSource.LLM}
+    assert set(sources.values()) == {provenance.Filling.LLM}
     assert set(slots) == set(SAMPLE)
 
 
 def test_an_ambiguous_draft_is_refused_with_the_conflicts_and_the_record():
     frame = table()
     mixed = [SAMPLE] * 3 + [{**SAMPLE, "target": "region"}] * 1
-    llm, discarded, stopped = draft.consult_sampler(
+    llm, discarded, stopped = draft.consult(
         request(frame), frame, {}, {}, replay(mixed), 0.1, 4
     )
     assert discarded == []
@@ -508,25 +494,23 @@ def test_an_ambiguous_draft_is_refused_with_the_conflicts_and_the_record():
         "conflicts": ["target"],
     }
     assert stopped.llm == llm and stopped.charter is None
-    equal = draft.consult_sampler(
-        request(frame), frame, {}, {}, replay(mixed), 0.25, 4
-    )
+    equal = draft.consult(request(frame), frame, {}, {}, replay(mixed), 0.25, 4)
     assert equal[2] is None
 
 
 def test_an_llm_slot_never_overrides_a_template_slot_and_blanks_are_dropped():
     frame = table()
     slots = {"target": "region"}
-    sources = {"target": provenance.FieldSource.TEMPLATE}
+    sources = {"target": provenance.Filling.TEMPLATE}
     blanks = {**SAMPLE, "population": "", "deployment_population": None}
-    draft.consult_sampler(
+    draft.consult(
         request(frame), frame, slots, sources, replay([blanks] * 4), 0.1, 4
     )
     assert slots["target"] == "region"
-    assert sources["target"] is provenance.FieldSource.TEMPLATE
+    assert sources["target"] is provenance.Filling.TEMPLATE
     assert "population" not in slots and "deployment_population" not in slots
     assert slots["unit"] == ["customer_id"]
-    assert sources["unit"] is provenance.FieldSource.LLM
+    assert sources["unit"] is provenance.Filling.LLM
 
 
 def test_a_proposal_that_fails_a_blocking_check_is_discarded_whole():
@@ -534,7 +518,7 @@ def test_a_proposal_that_fails_a_blocking_check_is_discarded_whole():
     bad = {**SAMPLE, "unit": ["not_a_column"]}
     slots = {}
     sources = {}
-    llm, discarded, stopped = draft.consult_sampler(
+    llm, discarded, stopped = draft.consult(
         request(frame), frame, slots, sources, replay([bad] * 4), 0.1, 4
     )
     assert stopped is None and llm is not None
@@ -545,17 +529,15 @@ def test_a_proposal_that_fails_a_blocking_check_is_discarded_whole():
 def test_the_baseline_is_profiled_only_with_a_column_present_and_costs():
     frame = table()
     items = []
-    profile, asked_, robust = draft.baseline_and_questions(
+    profile, asked_, robust = draft.interview(
         frame, "churn", "current_rule", MODEL, None, items
     )
     assert profile is not None and len(profile["thresholds"]) == 5
     assert profile["thresholds"][0] == 0.05 and profile["thresholds"][-1] == 0.5
     assert asked_ == [] and robust == [] and items == []
-    missing = draft.baseline_and_questions(
-        frame, "churn", "absent", MODEL, None, items
-    )
+    missing = draft.interview(frame, "churn", "absent", MODEL, None, items)
     assert missing[0] is None and items == []
-    no_costs = draft.baseline_and_questions(
+    no_costs = draft.interview(
         frame, "churn", "current_rule", None, None, items
     )
     assert no_costs[0] is None and items == []
@@ -564,13 +546,13 @@ def test_the_baseline_is_profiled_only_with_a_column_present_and_costs():
 def test_no_baseline_column_is_an_open_item_only_when_none_is_named():
     frame = table()
     items = ["cost_model"]
-    profile, asked_, robust = draft.baseline_and_questions(
+    profile, asked_, robust = draft.interview(
         frame, "churn", None, MODEL, None, items
     )
     assert profile is None and asked_ == [] and robust == []
     assert items == ["cost_model", "baseline_decision_column"]
     named = ["x"]
-    draft.baseline_and_questions(frame, "churn", "absent", None, None, named)
+    draft.interview(frame, "churn", "absent", None, None, named)
     assert named == ["x"]
 
 
@@ -592,9 +574,7 @@ def test_the_cost_threshold_is_asked_only_when_the_verdict_can_change():
     )
     actions = [1] * 50 + [1] * 30 + [0] * 120
     items = ["cost_model"]
-    result = draft.baseline_and_questions(
-        frame, "churn", "rule", None, actions, items
-    )
+    result = draft.interview(frame, "churn", "rule", None, actions, items)
     questions, robust = result[1], result[2]
     assert result[0] is None and robust == []
     assert len(questions) == 1 and items == ["cost_model"]
@@ -609,9 +589,7 @@ def test_the_cost_threshold_is_asked_only_when_the_verdict_can_change():
 def test_a_robust_threshold_is_reported_and_closes_the_cost_item():
     frame, actions = pilot_world(better=True)
     items = ["cost_model"]
-    result = draft.baseline_and_questions(
-        frame, "churn", "rule", None, actions, items
-    )
+    result = draft.interview(frame, "churn", "rule", None, actions, items)
     questions, robust = result[1], result[2]
     assert questions == [] and items == []
     assert robust == [
@@ -629,9 +607,7 @@ def test_unobserved_outcomes_are_left_out_of_the_threshold_question():
     frame = frame.astype({"churn": float})
     frame.loc[::3, "churn"] = numpy.nan
     items = ["cost_model"]
-    result = draft.baseline_and_questions(
-        frame, "churn", "rule", None, actions, items
-    )
+    result = draft.interview(frame, "churn", "rule", None, actions, items)
     questions, robust = result[1], result[2]
     assert questions == [] and len(robust) == 1
 
@@ -639,9 +615,11 @@ def test_unobserved_outcomes_are_left_out_of_the_threshold_question():
 def test_no_pilot_actions_means_no_threshold_question():
     frame = pilot_world(better=True)[0]
     items = ["cost_model"]
-    assert draft.baseline_and_questions(
-        frame, "churn", "rule", None, None, items
-    ) == (None, [], [])
+    assert draft.interview(frame, "churn", "rule", None, None, items) == (
+        None,
+        [],
+        [],
+    )
     assert items == ["cost_model"]
 
 
@@ -668,13 +646,13 @@ def test_a_full_draft_records_sources_checks_and_the_baseline():
         "unit_unique",
     ]
     assert result.fields == {
-        "target": provenance.FieldSource.TEMPLATE,
-        "prediction_moment": provenance.FieldSource.TEMPLATE,
-        "unit": provenance.FieldSource.TEMPLATE,
-        "question": provenance.FieldSource.TEMPLATE,
-        "population": provenance.FieldSource.TEMPLATE,
-        "deployment_population": provenance.FieldSource.TEMPLATE,
-        "intercurrent_events": provenance.FieldSource.TEMPLATE,
+        "target": provenance.Filling.TEMPLATE,
+        "prediction_moment": provenance.Filling.TEMPLATE,
+        "unit": provenance.Filling.TEMPLATE,
+        "question": provenance.Filling.TEMPLATE,
+        "population": provenance.Filling.TEMPLATE,
+        "deployment_population": provenance.Filling.TEMPLATE,
+        "intercurrent_events": provenance.Filling.TEMPLATE,
     }
 
 
@@ -688,8 +666,8 @@ def test_human_slots_override_every_other_source():
     )
     assert result.charter.estimand.target == "region"
     assert result.charter.estimand.population == "region == 'n'"
-    assert result.fields["target"] is provenance.FieldSource.HUMAN
-    assert result.fields["population"] is provenance.FieldSource.HUMAN
+    assert result.fields["target"] is provenance.Filling.HUMAN
+    assert result.fields["population"] is provenance.Filling.HUMAN
     assert "population" not in result.open_items
     assert "population_coverage" in [c.name for c in result.checks]
 
@@ -831,7 +809,7 @@ def test_the_draft_hash_is_the_sha256_of_the_canonical_document():
     frame = table()
     result = draft.frame(request(frame), frame)
     assert (
-        result.draft_hash
+        result.sha
         == hashlib.sha256(signing.canonicalise(result.to_dict())).hexdigest()
     )
 
@@ -844,7 +822,7 @@ def test_the_artifacts_hold_the_documents_and_the_directory_is_created(
         request(frame), frame, cost_model=MODEL, baseline_column="current_rule"
     )
     target = tmp_path / "deep" / "er"
-    names = draft.write_artifacts(result, target)
+    names = draft.emit(result, target)
     assert names == sorted(
         [
             "framing_draft.json",
@@ -879,7 +857,7 @@ def test_the_artifacts_hold_the_documents_and_the_directory_is_created(
 def test_a_draft_without_costs_or_a_baseline_writes_only_the_basics(tmp_path):
     frame = table()
     result = draft.frame(request(frame), frame)
-    assert draft.write_artifacts(result, tmp_path) == [
+    assert draft.emit(result, tmp_path) == [
         "framing_draft.json",
         "framing_questions.json",
     ]
@@ -888,7 +866,7 @@ def test_a_draft_without_costs_or_a_baseline_writes_only_the_basics(tmp_path):
 def test_a_refusal_is_written_with_its_reason(tmp_path):
     frame = table()
     result = draft.frame(request(frame, "Predict `nope`."), frame)
-    names = draft.write_artifacts(result, tmp_path)
+    names = draft.emit(result, tmp_path)
     assert names == [
         "framing_draft.json",
         "framing_questions.json",
@@ -902,7 +880,7 @@ def test_the_link_report_matches_parts_of_each_field_to_columns():
     frame = table()
     result = draft.frame(request(frame), frame)
     columns = list(frame.columns)
-    link = draft.link_report(result.charter, columns)
+    link = draft.linkage(result.charter, columns)
     assert link == {
         "schema_version": 1,
         "fields": {
@@ -924,7 +902,7 @@ def test_the_link_report_matches_parts_of_each_field_to_columns():
         },
         "gating": False,
     }
-    partial = draft.link_report(result.charter, ["churn", "x"])
+    partial = draft.linkage(result.charter, ["churn", "x"])
     assert partial["fields"]["unit"] == {
         "text": "customer_id",
         "columns": [],
@@ -937,7 +915,7 @@ def test_the_link_report_splits_on_the_documented_separators():
     plain = request(frame)
     long = "customer_id, region + as_of & churn;resolved_at"
     charter = draft.assemble(slot_set(unit=long), plain, None)[0]
-    link = draft.link_report(charter, list(frame.columns))
+    link = draft.linkage(charter, list(frame.columns))
     assert link["fields"]["unit"]["columns"] == [
         "customer_id",
         "region",
@@ -946,11 +924,11 @@ def test_the_link_report_splits_on_the_documented_separators():
         "resolved_at",
     ]
     spaced = draft.assemble(slot_set(unit="region customer_id"), plain, None)[0]
-    assert draft.link_report(spaced, list(frame.columns))["fields"]["unit"][
+    assert draft.linkage(spaced, list(frame.columns))["fields"]["unit"][
         "columns"
     ] == ["region", "customer_id"]
     dashed = draft.assemble(slot_set(unit="as_of-churn"), plain, None)[0]
-    assert draft.link_report(dashed, list(frame.columns))["fields"]["unit"][
+    assert draft.linkage(dashed, list(frame.columns))["fields"]["unit"][
         "columns"
     ] == ["as_of", "churn"]
 
@@ -958,21 +936,21 @@ def test_the_link_report_splits_on_the_documented_separators():
 def test_a_charter_target_with_an_unnormalised_name_still_resolves():
     frame = table()
     charter = draft.assemble(slot_set(target="Churn"), request(frame), None)[0]
-    link = draft.link_report(charter, list(frame.columns))
+    link = draft.linkage(charter, list(frame.columns))
     assert link["fields"]["target"]["columns"] == ["churn"]
 
 
 def test_an_explicit_target_keyword_wins_over_an_ambiguous_mention():
     frame = pandas.DataFrame()
-    slots = draft.deterministic_slots(
+    slots = draft.prefill(
         asked("Predict churn from region", ["churn", "region"]), frame
     )
     assert slots["target"] == "churn"
-    upper = draft.deterministic_slots(
+    upper = draft.prefill(
         asked("TARGET churn with region", ["churn", "region"]), frame
     )
     assert upper["target"] == "churn"
-    lower = draft.deterministic_slots(
+    lower = draft.prefill(
         asked("predicting churn, region matters", ["churn", "region"]), frame
     )
     assert lower["target"] == "churn"
@@ -1015,8 +993,8 @@ def test_the_sampler_is_given_the_prompt_and_each_draw_index():
     frame = table()
     plain = request(frame, "Who leaves?")
     sampler = Prompts()
-    draft.consult_sampler(plain, frame, {}, {}, sampler, 0.1, 3)
-    prompt = refusal.prompt_for("Who leaves?", plain.source.columns)
+    draft.consult(plain, frame, {}, {}, sampler, 0.1, 3)
+    prompt = refusal.instruct("Who leaves?", plain.source.columns)
     assert sampler.prompts == [(prompt, 0), (prompt, 1), (prompt, 2)]
 
 
@@ -1038,9 +1016,7 @@ def test_non_numeric_outcomes_do_not_stop_the_threshold_question():
     frame = pilot_world(better=True)[0].astype(object)
     frame.loc[::7, "churn"] = "n/a"
     items = ["cost_model"]
-    result = draft.baseline_and_questions(
-        frame, "churn", "rule", None, [1, 0] * 100, items
-    )
+    result = draft.interview(frame, "churn", "rule", None, [1, 0] * 100, items)
     assert result[0] is None and len(result[1]) + len(result[2]) == 1
 
 
@@ -1049,7 +1025,7 @@ def test_a_refusal_after_discarding_keeps_what_was_discarded():
     bad = {**SAMPLE, "prediction_moment": "not_a_column"}
     discarded = ("llm draft failed a blocking data-side check",)
     keyless = draft.Request(
-        "Who leaves?", draft.SourceDescription("u", tuple(frame.columns))
+        "Who leaves?", draft.Offer("u", tuple(frame.columns))
     )
     unfilled = draft.frame(
         keyless, frame, sampler=replay([bad] * 3), tau=0.1, k=3
@@ -1083,7 +1059,7 @@ def test_artifacts_are_written_as_utf8_with_unix_newlines(
         )
 
     monkeypatch.setattr(pathlib.Path, "write_text", spy)
-    draft.write_artifacts(result, tmp_path)
+    draft.emit(result, tmp_path)
     assert seen and set(seen) == {("utf-8", "\n")}
 
 

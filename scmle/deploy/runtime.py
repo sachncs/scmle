@@ -1,7 +1,7 @@
 """The process a generated service runs: verify, load, warm up, serve.
 
 `serve.py` in a service folder calls `run`. The HTTP server starts first so
-`/livez` answers at once; `/readyz` turns true only after `verify_service`,
+`/livez` answers at once; `/readyz` turns true only after `inspect`,
 the bundle load and the warm-up finished. A folder that fails verification
 leaves the process alive and unready, with the reason at `/readyz`, so the
 orchestrator keeps it out of rotation and an operator can read why.
@@ -96,7 +96,7 @@ def settings(environ: Mapping[str, str]) -> dict[str, Any]:
     }
 
 
-def signal_settings(environ: Mapping[str, str]) -> dict[str, Any]:
+def cadence(environ: Mapping[str, str]) -> dict[str, Any]:
     """Reads where and how often the evaluated signals are written.
 
     Args:
@@ -113,7 +113,7 @@ def signal_settings(environ: Mapping[str, str]) -> dict[str, Any]:
     }
 
 
-def emit_signals(
+def emit(
     monitor: signals.SignalMonitor,
     now: float,
     path: pathlib.Path | str | None,
@@ -142,7 +142,7 @@ def emit_signals(
     return len(found)
 
 
-def signal_loop(
+def pulse(
     monitor: signals.SignalMonitor,
     stop: threading.Event,
     path: pathlib.Path | str | None,
@@ -161,14 +161,12 @@ def signal_loop(
     """
     while not stop.wait(interval):
         try:
-            emit_signals(monitor, time.time(), path)
+            emit(monitor, time.time(), path)
         except Exception:  # the loop must outlive one bad evaluation
             LOGGER.exception("could not write the signals")
 
 
-def make_loader(
-    folder: pathlib.Path, environ: Mapping[str, str]
-) -> serving.Loader:
+def prime(folder: pathlib.Path, environ: Mapping[str, str]) -> serving.Loader:
     """Builds the loader that drives the verify and load readiness steps.
 
     Args:
@@ -190,7 +188,7 @@ def make_loader(
             The loaded model bundle.
         """
         readiness.begin(guard.Phase.VERIFYING)
-        verified = verify.verify_service(folder, environ)
+        verified = verify.inspect(folder, environ)
         readiness.complete(
             guard.Phase.VERIFYING,
             f"bundle {verified.bundle_digest}; "
@@ -222,15 +220,15 @@ def run(folder: pathlib.Path, environ: Mapping[str, str]) -> None:
     logging.basicConfig(level=logging.INFO)
     monitor = signals.SignalMonitor()
     adapter = serving.HttpServing(
-        loader=make_loader(folder, environ),
+        loader=prime(folder, environ),
         monitor=monitor,
         **settings(environ),
     )
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *ignored: stop.set())
-    chosen = signal_settings(environ)
+    chosen = cadence(environ)
     threading.Thread(
-        target=signal_loop,
+        target=pulse,
         args=(monitor, stop, chosen["path"], chosen["interval"]),
         daemon=True,
     ).start()

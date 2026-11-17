@@ -66,13 +66,13 @@ def test_mde_correlation_is_the_inverse_of_the_sample_size(r):
         r, alpha=0.05, k_max=5, power=0.8
     )
     assert (
-        scmle.data.charter.feasibility.mde_correlation(
+        scmle.data.charter.feasibility.resolution(
             n, alpha=0.05, k_max=5, power=0.8
         )
         <= r + 1e-12
     )
     assert (
-        scmle.data.charter.feasibility.mde_correlation(
+        scmle.data.charter.feasibility.resolution(
             n - 1, alpha=0.05, k_max=5, power=0.8
         )
         > r
@@ -100,12 +100,12 @@ def test_power_at_the_required_size_meets_the_target():
     n = scmle.data.charter.feasibility.n_required_mean(
         0.4, alpha=0.05, k_max=4, power=0.8
     )
-    achieved = scmle.data.charter.feasibility.power_mean(
+    achieved = scmle.data.charter.feasibility.detectability(
         0.4, n, alpha=0.05, k_max=4
     )
     assert achieved >= 0.8
     assert (
-        scmle.data.charter.feasibility.power_mean(
+        scmle.data.charter.feasibility.detectability(
             0.4, n - 1, alpha=0.05, k_max=4
         )
         < 0.8 + 1e-3
@@ -144,8 +144,8 @@ def test_invalid_arguments_are_rejected(kwargs, match):
 
 
 def test_wilson_half_width_shrinks_with_the_minority_count():
-    small = scmle.data.charter.feasibility.wilson_half_width(0.5, 20)
-    large = scmle.data.charter.feasibility.wilson_half_width(0.5, 2000)
+    small = scmle.data.charter.feasibility.halfwidth(0.5, 20)
+    large = scmle.data.charter.feasibility.halfwidth(0.5, 2000)
     assert 0 < large < small < 0.5
 
 

@@ -43,8 +43,8 @@ centre `c_i` that is fixed before unit `i`'s outcome (for example the running
 mean of earlier outcomes) leaves the mean unchanged, because
 `E[a c / q - (1 - a) c / (1 - q)] = c - c = 0` when `a` is Bernoulli(`q`)
 independent of the past, and with `y` and `c` in `[0, 1]` the centred value
-lies in `[-M, M]`, `M = max(1/q, 1/(1 - q))`. `running_center` and
-`centered_stream` implement it; the uncentred pair stays for comparison.
+lies in `[-M, M]`, `M = max(1/q, 1/(1 - q))`. `centers` and
+`deviations` implement it; the uncentred pair stays for comparison.
 """
 
 import dataclasses
@@ -141,7 +141,7 @@ class Stream:
         return unit if self.direction == "greater" else 1.0 - unit
 
 
-def bet_grid(null_unit: float, size: int = GRID_SIZE) -> NDArray[numpy.float64]:
+def bets(null_unit: float, size: int = GRID_SIZE) -> NDArray[numpy.float64]:
     """Builds the fixed bet sizes `GRID_TOP / null_unit * 2 ** -k`, `k < size`.
 
     Args:
@@ -165,7 +165,7 @@ def bet_grid(null_unit: float, size: int = GRID_SIZE) -> NDArray[numpy.float64]:
     return grid
 
 
-def log_wealth(
+def grow(
     unit: NDArray[numpy.float64], null_unit: float, size: int = GRID_SIZE
 ) -> NDArray[numpy.float64]:
     """Computes the log of the mixture e-process after every observation.
@@ -178,13 +178,13 @@ def log_wealth(
 
     Returns:
         An array of the same shape as `unit`. A `null_unit` outside `(0, 1)`
-        or a `size` below 1 is rejected by `bet_grid` with a `ValueError`.
+        or a `size` below 1 is rejected by `bets` with a `ValueError`.
 
     Raises:
-        ScmleError: If the bet grid is empty, which `bet_grid` already
+        ScmleError: If the bet grid is empty, which `bets` already
             prevents.
     """
-    grid = bet_grid(null_unit, size)
+    grid = bets(null_unit, size)
     centred = unit - null_unit
     total: NDArray[numpy.float64] | None = None
     for lam in grid:
@@ -214,11 +214,11 @@ def log_wealth_paths(
     """
     array = numpy.asarray(values, dtype=float)
     flat = stream.rescale(array.reshape(-1)).reshape(array.shape)
-    return log_wealth(flat, stream.orient(), size)
+    return grow(flat, stream.orient(), size)
 
 
 @dataclasses.dataclass(slots=True)
-class EProcess:
+class Martingale:
     """A running mixture e-process.
 
     Attributes:
@@ -247,9 +247,9 @@ class EProcess:
 
         When no totals were supplied, the log wealth of each bet size is set
         to zero. A `size` below 1 is refused with a `ValueError` by
-        `bet_grid`.
+        `bets`.
         """
-        grid = bet_grid(self.stream.orient(), self.size)
+        grid = bets(self.stream.orient(), self.size)
         if self.totals is None:
             self.totals = numpy.zeros(len(grid))
 
@@ -277,7 +277,7 @@ class EProcess:
         if unit.size == 0:
             return self.log_e
         null_unit = self.stream.orient()
-        grid = bet_grid(null_unit, self.size)
+        grid = bets(null_unit, self.size)
         if self.totals is None:
             raise errors.ScmleError("bet totals are not initialised")
         steps = numpy.log1p(numpy.outer(unit - null_unit, grid))
@@ -299,7 +299,7 @@ class EProcess:
         Returns:
             True if the current e-value has reached `1 / level`.
         """
-        return self.log_e >= -math.log(positive_level(level))
+        return self.log_e >= -math.log(fractional(level))
 
     def ever_crossed(self, level: float) -> bool:
         """Checks whether the e-value was at least `1 / level` at any point.
@@ -311,7 +311,7 @@ class EProcess:
             True if the e-value reached `1 / level` at some observation or at
         the start (the starting value of one never does for a level below 1).
         """
-        return self.max_log_e >= -math.log(positive_level(level))
+        return self.max_log_e >= -math.log(fractional(level))
 
     def evidence(self) -> online_fdr.Evidence:
         """Returns the current e-value as ledger evidence.
@@ -325,7 +325,7 @@ class EProcess:
         return online_fdr.Evidence(e=math.exp(min(self.log_e, MAX_LOG)))
 
 
-def positive_level(level: float) -> float:
+def fractional(level: float) -> float:
     """Validates a level that must lie strictly between 0 and 1.
 
     Args:
@@ -405,7 +405,7 @@ def pseudo_outcomes(
     return result
 
 
-def running_center(
+def centers(
     outcome: ArrayLike,
     prior: float = 0.5,
     strength: float = 2.0,
@@ -439,7 +439,7 @@ def running_center(
     return result
 
 
-def centered_stream(
+def deviations(
     assignment_prob: float, null: float, direction: str = "greater"
 ) -> Stream:
     """Builds the stream of centred pseudo-outcomes, bounded in `[-M, M]`.
@@ -460,7 +460,7 @@ def centered_stream(
     return Stream(-bound, bound, null, direction)
 
 
-def centered_paths(
+def recentre(
     arm: ArrayLike,
     outcome: ArrayLike,
     assignment_prob: float,
@@ -471,7 +471,7 @@ def centered_paths(
     """Computes log e-process paths of the centred pseudo-outcomes.
 
     The result has shape `(T,)` or `(R, T)`, like `outcome`; the centre of
-    each unit is `running_center` of the outcomes before it.
+    each unit is `centers` of the outcomes before it.
 
     Args:
         arm: 1 for the challenger, 0 for the champion.
@@ -486,13 +486,11 @@ def centered_paths(
         `outcome`.
     """
     y = numpy.asarray(outcome, dtype=float)
-    z = sign * pseudo_outcomes(arm, y, assignment_prob, running_center(y))
-    return log_wealth_paths(
-        z, centered_stream(assignment_prob, null, direction)
-    )
+    z = sign * pseudo_outcomes(arm, y, assignment_prob, centers(y))
+    return log_wealth_paths(z, deviations(assignment_prob, null, direction))
 
 
-def difference_stream(
+def contrasts(
     assignment_prob: float, null: float, direction: str = "greater"
 ) -> Stream:
     """Builds the stream of pseudo-outcomes for an effect on a `[0, 1]` metric.
@@ -517,7 +515,7 @@ def difference_stream(
     return Stream(-1.0 / (1.0 - q), 1.0 / q, null, direction)
 
 
-def bound_stream(
+def clamped(
     bound: float, null: float = 0.0, direction: str = "greater"
 ) -> Stream:
     """Builds the stream of paired differences bounded in `[-bound, bound]`.
@@ -569,10 +567,10 @@ def confidence_bound(
         edge is tested at 1e-9 of the range inside it. Otherwise the bisection
         returns its conservative end (the lower end for `greater`, the upper
         end for `less`). An `alpha` outside `(0, 1)` is refused by
-        `positive_level` and values that are not finite or lie outside the
+        `fractional` and values that are not finite or lie outside the
         stream's range by `Stream.rescale`, both with a `ValueError`.
     """
-    level = positive_level(alpha)
+    level = fractional(alpha)
     array = numpy.asarray(values, dtype=float)
     target = -math.log(level)
     inside = (stream.low, stream.high)

@@ -11,7 +11,7 @@ from sklearn import base
 from sklearn import pipeline
 
 
-class WeightedEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Reweighter(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
     """Fits a pipeline so each training row counts by its weight.
 
     The weight column travels with the features, is read at fit time and
@@ -154,7 +154,7 @@ class WeightedEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lea
         return survival
 
 
-class WeightedClassifier(base.ClassifierMixin, WeightedEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Classifier(base.ClassifierMixin, Reweighter):  # type: ignore[misc]  # scikit-learn ships no type information
     """Weighted fitting for classifiers."""
 
     def fit(self, features: Any, target: Any) -> Self:
@@ -185,13 +185,13 @@ class WeightedClassifier(base.ClassifierMixin, WeightedEstimator):  # type: igno
         return probabilities
 
 
-class Regressor(base.RegressorMixin, WeightedEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
+class Regressor(base.RegressorMixin, Reweighter):  # type: ignore[misc]  # scikit-learn ships no type information
     """Weighted fitting for regressors."""
 
 
 def weighted(
     estimator: base.BaseEstimator, column: str, seed: int
-) -> WeightedEstimator:
+) -> Reweighter:
     """Wraps a candidate so rows are weighted by `column`.
 
     Args:
@@ -204,5 +204,5 @@ def weighted(
         A weighted classifier if `estimator` is a classifier, otherwise a
         weighted regressor.
     """
-    kind = WeightedClassifier if base.is_classifier(estimator) else Regressor
+    kind = Classifier if base.is_classifier(estimator) else Regressor
     return kind(estimator, column, seed)

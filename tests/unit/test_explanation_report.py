@@ -14,14 +14,12 @@ def evidence(
         model_fingerprint="model-123",
         bundle_digest="sha256:bundle-123",
         input_fingerprint="input-123",
-        dataset_snapshot=explanations.DatasetSnapshot(
+        dataset_snapshot=explanations.Snapshot(
             identifier="demo",
             version="v1",
             digest="sha256:data-123",
         ),
-        feature_graph=explanations.FeatureGraphReference(
-            version=1, fingerprint="graph-123"
-        ),
+        feature_graph=explanations.Lineage(version=1, fingerprint="graph-123"),
         method=explanations.Method(
             name="permutation_importance", parameters={"repeats": 5}
         ),
@@ -32,12 +30,12 @@ def evidence(
         stability={"status": "not_estimated"},
         limitations=("Associational evidence is not causal evidence.",),
         causal_warning="This explanation is associational.",
-        privacy_decision=explanations.PrivacyDecision(
+        privacy_decision=explanations.Clearance(
             decision=decision,
             reason="The output was reviewed for disclosure.",
         ),
         evidence_links=(
-            explanations.EvidenceLink(
+            explanations.Link(
                 relation="diagnostic-report",
                 uri="diagnostics/permutation_importance.json",
             ),

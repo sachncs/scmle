@@ -1,7 +1,7 @@
 """Request, latency, error, resource and availability metrics.
 
 A small registry with counters, gauges and histograms and a text exposition in
-the Prometheus format (version 0.0.4). `ServiceMetrics` records what a
+the Prometheus format (version 0.0.4). `Instrumentation` records what a
 serving process sees: requests by route and status, a latency histogram,
 resident memory and CPU time. Availability is defined here and nowhere else:
 a request is *unavailable* when the service answered 5xx or 429 (it could
@@ -102,7 +102,7 @@ def stringify(labels: Labels, extra: Labels = ()) -> str:
     return "{" + body + "}"
 
 
-def format_number(value: float) -> str:
+def spell(value: float) -> str:
     """Formats a sample value the way the exposition format spells it.
 
     Args:
@@ -176,7 +176,7 @@ class Histogram:
         return self.buckets[-1]
 
 
-class MetricsRegistry:
+class Registry:
     """Named counters, gauges and histograms with a text exposition."""
 
     def __init__(self, buckets: tuple[float, ...] = DEFAULT_BUCKETS) -> None:
@@ -413,9 +413,7 @@ class MetricsRegistry:
                     lines.extend(self.tabulate(name))
                     continue
                 for labels, value in sorted(self.values.get(name, {}).items()):
-                    lines.append(
-                        f"{name}{stringify(labels)} {format_number(value)}"
-                    )
+                    lines.append(f"{name}{stringify(labels)} {spell(value)}")
         return "\n".join(lines) + "\n"
 
     def tabulate(self, name: str) -> list[str]:
@@ -433,13 +431,11 @@ class MetricsRegistry:
         lines: list[str] = []
         for labels, hist in sorted(self.histograms.get(name, {}).items()):
             for bound, count in zip(hist.buckets, hist.counts, strict=True):
-                suffix = stringify(labels, (("le", format_number(bound)),))
+                suffix = stringify(labels, (("le", spell(bound)),))
                 lines.append(f"{name}_bucket{suffix} {count}")
             inf = stringify(labels, (("le", "+Inf"),))
             lines.append(f"{name}_bucket{inf} {hist.total}")
-            lines.append(
-                f"{name}_sum{stringify(labels)} {format_number(hist.sum)}"
-            )
+            lines.append(f"{name}_sum{stringify(labels)} {spell(hist.sum)}")
             lines.append(f"{name}_count{stringify(labels)} {hist.total}")
         return lines
 
@@ -459,7 +455,7 @@ def resident_bytes() -> int:
     return int(peak if sys.platform == "darwin" else peak * 1024)
 
 
-def cpu_seconds() -> float:
+def cpu() -> float:
     """User plus system CPU time of this process, in seconds.
 
     Returns:
@@ -472,7 +468,7 @@ def cpu_seconds() -> float:
     return float(usage.ru_utime + usage.ru_stime)
 
 
-class ServiceMetrics:
+class Instrumentation:
     """What a serving process records, attributed to a model version."""
 
     REQUESTS = "scmle_http_requests_total"
@@ -482,7 +478,7 @@ class ServiceMetrics:
 
     def __init__(
         self,
-        registry: MetricsRegistry,
+        registry: Registry,
         model_version: str,
         artifact_digest: str,
     ) -> None:
@@ -538,7 +534,7 @@ class ServiceMetrics:
             "Request duration in seconds.",
         )
 
-    def record_resources(self) -> None:
+    def poll(self) -> None:
         """Samples memory and CPU of this process into gauges."""
         labels = {"model_version": self.model_version}
         self.registry.set(
@@ -548,7 +544,7 @@ class ServiceMetrics:
             "Peak resident memory in bytes.",
         )
         self.registry.set(
-            self.CPU, cpu_seconds(), labels, "Process CPU time in seconds."
+            self.CPU, cpu(), labels, "Process CPU time in seconds."
         )
 
     def requests(self) -> float:

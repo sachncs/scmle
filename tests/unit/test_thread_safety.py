@@ -123,7 +123,7 @@ def test_concurrent_register_estimator_keeps_every_registration():
     names, failures = run_together(THREADS, work)
 
     assert not failures
-    built = scmle.models.registry.Catalog.with_builtins()
+    built = scmle.models.registry.Catalog.stock()
     assert set(names) <= set(built.adapters)
 
 
@@ -155,7 +155,7 @@ def test_builtin_name_check_does_not_hide_registered_estimators():
             return True
         missing = 0
         while not stop.is_set():
-            adapters = scmle.models.registry.Catalog.with_builtins().adapters
+            adapters = scmle.models.registry.Catalog.stock().adapters
             missing += "ts_persist" not in adapters
         return missing
 
@@ -172,7 +172,7 @@ def test_register_unregister_and_lookup_never_raise():
             scmle.models.custom.register_estimator(
                 name, classifier=naive_bayes.GaussianNB, replace=True
             )
-            scmle.models.registry.Catalog.with_builtins().get(name)
+            scmle.models.registry.Catalog.stock().get(name)
             scmle.models.custom.unregister_estimator(name)
 
     failures = failures_of(4, work)
@@ -401,7 +401,7 @@ def test_concurrent_store_writes_are_all_recorded(tmp_path):
                 experiments.Trial(
                     trial_id=f"t{number}",
                     model_name="m",
-                    status=experiments.TrialStatus.OK,
+                    status=experiments.Termination.OK,
                     metric="accuracy",
                     score_mean=0.5,
                 ),
@@ -490,26 +490,26 @@ def test_concurrent_lifecycle_state_writes(tmp_path):
 
     def work(index):
         for round_number in range(25):  # noqa: B007
-            manager.write_state(
+            manager.persist(
                 {"last_digest": str(index), "rows_since_attempt": index}
             )
-            manager.read_state()
+            manager.recall()
 
     failures = failures_of(THREADS, work)
 
     assert not failures
-    assert manager.read_state()["rows_since_attempt"] in range(THREADS)
+    assert manager.recall()["rows_since_attempt"] in range(THREADS)
 
 
 # --- monitoring journals --------------------------------------------------
 
 
-def breach() -> slo.SLOEvaluation:
+def breach() -> slo.Assessment:
     """A breached latency SLO evaluation."""
-    target = slo.SLOTarget(
+    target = slo.Slo(
         name="latency",
         metric_name="p95_latency_ms",
-        kind=observability.SignalKind.LATENCY,
+        kind=observability.Indicator.LATENCY,
         maximum=250.0,
         window_days=7,
         minimum_samples=1,
@@ -517,9 +517,9 @@ def breach() -> slo.SLOEvaluation:
         runbook="https://runbooks.example/latency",
         alert_route="on-call",
     )
-    sample = observability.MetricSample(
+    sample = observability.Sample(
         name="p95_latency_ms",
-        kind=observability.SignalKind.LATENCY,
+        kind=observability.Indicator.LATENCY,
         value=400.0,
         unit="ms",
         timestamp="2026-10-20T12:00:00+00:00",
@@ -530,7 +530,7 @@ def breach() -> slo.SLOEvaluation:
 
 
 def test_concurrent_incident_open_keeps_a_valid_chain(tmp_path):
-    workflow = incidents.IncidentWorkflow(tmp_path / "incidents.jsonl")
+    workflow = incidents.Incidents(tmp_path / "incidents.jsonl")
     evaluation = breach()
 
     def work(index):
@@ -549,7 +549,7 @@ def test_concurrent_incident_open_keeps_a_valid_chain(tmp_path):
 
 
 def test_concurrent_incident_transitions_keep_a_valid_chain(tmp_path):
-    workflow = incidents.IncidentWorkflow(tmp_path / "incidents.jsonl")
+    workflow = incidents.Incidents(tmp_path / "incidents.jsonl")
     evaluation = breach()
     first = workflow.open(
         evaluation,
@@ -576,8 +576,8 @@ def test_concurrent_incident_transitions_keep_a_valid_chain(tmp_path):
 
 def test_concurrent_alert_dispatch_delivers_once(tmp_path):
     sink_path = tmp_path / "sink.jsonl"
-    dispatcher = alerts.AlertDispatcher(
-        {"on-call": alerts.JsonlAlertSink(sink_path)},
+    dispatcher = alerts.Dispatcher(
+        {"on-call": alerts.Jsonl(sink_path)},
         tmp_path / "deliveries.jsonl",
     )
     alert = alerts.Alert.from_evidence(
@@ -619,7 +619,7 @@ def test_concurrent_prediction_log_appends_whole_lines(tmp_path):
 
 def test_shadow_evaluator_keeps_observations_aligned(trained):
     bundle = trained.bundle
-    evaluator = shadow.ShadowEvaluator(bundle, bundle)
+    evaluator = shadow.Understudy(bundle, bundle)
     batches = [frame(10 + index, seed=70 + index) for index in range(THREADS)]
 
     def work(index):
@@ -637,8 +637,8 @@ def test_shadow_evaluator_keeps_observations_aligned(trained):
 
 
 def test_key_registry_register_has_exactly_one_winner():
-    registry = keyring.SigningKeyRegistry()
-    record = keyring.SigningKeyRecord(
+    registry = keyring.Keyring()
+    record = keyring.Credential(
         key_id="k1", owner="release", created_at="2026-01-01T00:00:00+00:00"
     )
 
@@ -661,7 +661,7 @@ def test_forkserver_environment_restores_the_variable(monkeypatch):
     inside = threading.Barrier(THREADS)
 
     def work(index):
-        with limits.forkserver_environment():
+        with limits.preforked():
             inside.wait(timeout=30)
             time.sleep(0.001 * index)  # Stagger the exits only.
 
@@ -703,13 +703,13 @@ def test_bundle_remember_does_not_lose_rows():
     class Builder:
         """Keeps every remembered row as the history."""
 
-        history_columns = ["g", "t", "v"]
+        historical = ["g", "t", "v"]
 
-        def build_history(self, combined):
+        def retain(self, combined):
             return combined
 
     bundle.history = None
-    bundle.series_builder = Builder
+    bundle.assemble = Builder
     bundle.read_frame = lambda data: data
     bundle.history_lock = threading.RLock()
 

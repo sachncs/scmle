@@ -49,7 +49,7 @@ against the approved expectation.
   record that changes afterwards is reported.
 
 The charter is signed by the analyst, and the promotion is a
-`PromotionApproval` signed with the reviewer's key. The trail is signed by the
+`Sanction` signed with the reviewer's key. The trail is signed by the
 analyst over its head and the digest of every retained record. A signature
 proves possession of a key, not identity.
 

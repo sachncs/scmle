@@ -28,7 +28,7 @@ FENCE = 3.0
 
 
 @dataclasses.dataclass
-class NoveltyDetector:
+class Strangeness:
     """Scores how unlike the training data a row is.
 
     Attributes:
@@ -69,7 +69,7 @@ class NoveltyDetector:
         """
         if not (numeric or categorical):
             return None
-        plan = data.FeaturePlan(numeric, categorical)
+        plan = data.Blueprint(numeric, categorical)
         options = data.Preprocessing(scale=True)
         encoder = preprocessing.build_preprocessor(plan, options)
         model = pipeline.Pipeline(

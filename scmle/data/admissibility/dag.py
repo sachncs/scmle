@@ -42,7 +42,7 @@ EDGE_LENGTH = 2
 Edge = tuple[str, str]
 
 
-def children_map(edges: Iterable[Edge]) -> dict[str, set[str]]:
+def successors(edges: Iterable[Edge]) -> dict[str, set[str]]:
     """Maps each node to the set of its children.
 
     Args:
@@ -58,7 +58,7 @@ def children_map(edges: Iterable[Edge]) -> dict[str, set[str]]:
     return out
 
 
-def parents_map(edges: Iterable[Edge]) -> dict[str, set[str]]:
+def ancestry(edges: Iterable[Edge]) -> dict[str, set[str]]:
     """Maps each node to the set of its parents.
 
     Args:
@@ -126,7 +126,7 @@ def separated(
         raise errors.InputError("sets name nodes that are not in the graph")
     if (sets[0] & sets[1]) or (sets[0] & sets[2]) or (sets[1] & sets[2]):
         raise errors.InputError("the three sets must be disjoint")
-    parents = parents_map(edges)
+    parents = ancestry(edges)
     keep = set().union(*sets)
     keep |= reach(keep, parents)
     adjacent: dict[str, set[str]] = {n: set() for n in keep}
@@ -182,12 +182,12 @@ class Dag:
                 is empty.
         """
         for name, values in (("nodes", self.nodes), ("latent", self.latent)):
-            qualification.require_tuple(values, name)
+            qualification.tupled(values, name)
             for item in values:
                 evidence.require_text(item, name)
             if list(values) != sorted(set(values)):
                 raise errors.InputError(f"{name} must be sorted and unique")
-        qualification.require_tuple(self.edges, "edges")
+        qualification.tupled(self.edges, "edges")
         if list(self.edges) != sorted(set(self.edges)):
             raise errors.InputError("edges must be sorted and unique")
         names = set(self.nodes)
@@ -198,7 +198,7 @@ class Dag:
                 raise errors.InputError("self loops are not allowed")
         if not set(self.latent) <= names:
             raise errors.InputError("latent nodes must be nodes")
-        kids = children_map(self.edges)
+        kids = successors(self.edges)
         if any(node in reach([node], kids) for node in self.nodes):
             raise errors.InputError("the graph has a cycle")
         evidence.require_text(self.source, "source")
@@ -258,7 +258,7 @@ class Dag:
         Returns:
             The set of its parents; empty if it has none.
         """
-        return parents_map(self.edges).get(node, set())
+        return ancestry(self.edges).get(node, set())
 
     def children(self, node: str) -> set[str]:
         """Finds the direct effects of a node.
@@ -269,7 +269,7 @@ class Dag:
         Returns:
             The set of its children; empty if it has none.
         """
-        return children_map(self.edges).get(node, set())
+        return successors(self.edges).get(node, set())
 
     def ancestors(self, node: str) -> set[str]:
         """Finds the nodes with a directed path to a node.
@@ -280,7 +280,7 @@ class Dag:
         Returns:
             The set of its ancestors, not including `node`.
         """
-        return reach([node], parents_map(self.edges))
+        return reach([node], ancestry(self.edges))
 
     def descendants(self, node: str) -> set[str]:
         """Finds the nodes reachable from a node by a directed path.
@@ -291,9 +291,9 @@ class Dag:
         Returns:
             The set of its descendants, not including `node`.
         """
-        return reach([node], children_map(self.edges))
+        return reach([node], successors(self.edges))
 
-    def backdoor_valid(
+    def adjusts(
         self, treatment: str, outcome: str, adjustment: Collection[str]
     ) -> bool:
         """Tests whether `adjustment` satisfies the back-door criterion.
@@ -376,7 +376,7 @@ class Dag:
             )
         for size in range(len(pool) + 1):
             for subset in itertools.combinations(pool, size):
-                if self.backdoor_valid(treatment, outcome, subset):
+                if self.adjusts(treatment, outcome, subset):
                     return subset
         return None
 

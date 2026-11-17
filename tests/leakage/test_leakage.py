@@ -33,7 +33,7 @@ def test_leaked_feature_is_flagged_and_can_block(binary_frame, tmp_path):
         leaky, "y", output_dir=tmp_path, leakage_policy="warn"
     ).run()
     assert any("'leak'" in w for w in result.profile.risk_findings)
-    assert result.profile.blocking_leaks == ("leak",)
+    assert result.profile.blockers == ("leak",)
     with pytest.raises(errors.BlockedError, match="leakage") as raised:
         support.make_project(
             leaky, "y", output_dir=tmp_path, leakage_policy="block"
@@ -65,7 +65,7 @@ def test_strong_legitimate_signal_is_not_blocked(binary_frame, tmp_path):
     result = support.make_project(
         binary_frame, "y", output_dir=tmp_path, leakage_policy="block"
     ).run()
-    assert result.profile.blocking_leaks == ()
+    assert result.profile.blockers == ()
     assert not result.profile.risk_findings
 
 
@@ -103,7 +103,7 @@ def test_a_regression_leak_warns_under_warn(tmp_path):
         leakage_policy="warn",
     ).run()
     assert any("'leak'" in w for w in result.profile.risk_findings)
-    assert result.profile.blocking_leaks == ("leak",)
+    assert result.profile.blockers == ("leak",)
 
 
 def test_groups_never_straddle_the_test_boundary(binary_frame, tmp_path):

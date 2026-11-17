@@ -8,7 +8,7 @@ from scmle.data.ledger import online_fdr
 import scmle.data.ledger.ledger
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_ledger_governed import build
-from tests.unit.test_ledger_governed import source_for
+from tests.unit.test_ledger_governed import locate
 
 SHA = "a" * 64
 
@@ -18,12 +18,12 @@ def runner(calls, status="done", boom=False):
         calls.append((len(features), len(target)))
         if boom:
             raise ValueError("estimator failed")
-        return confirm.ClaimRun(
+        return confirm.Output(
             {"extra": status}, {"extra_report.json": {"n": len(features)}}
         )
 
-    return confirm.ClaimRunner(
-        (confirm.RegisteredClaim("extra", "baseline", "a claim", SHA),), run
+    return confirm.Docket(
+        (confirm.Commitment("extra", "baseline", "a claim", SHA),), run
     )
 
 
@@ -35,7 +35,7 @@ def go(claim_runner, effect=0.7, source=True, **kwargs):
         features=features,
         target=target,
         classification=False,
-        source=source_for(cfeatures, ctarget) if source else None,
+        source=locate(cfeatures, ctarget) if source else None,
         run_dir=None,
         claim_runner=claim_runner,
         **kwargs,
@@ -62,7 +62,7 @@ def test_the_runner_gets_the_one_opened_frame_and_is_sealed_in_the_ledger():
 def test_the_claim_is_bound_into_the_release_and_c_opens_once():
     features, target = build(rows=500, seed=0, effect=0.7)
     cfeatures, ctarget = build(rows=400, seed=9, effect=0.7)
-    source = source_for(cfeatures, ctarget)
+    source = locate(cfeatures, ctarget)
     calls = []
     governed.run_governed(
         charter=make_charter(),
@@ -118,7 +118,7 @@ def new_ledger():
     return scmle.data.ledger.ledger.Ledger.create(
         None,
         charter_hash=charter.charter_hash,
-        config=online_fdr.RuleConfig("e-lond", 0.1),
+        config=online_fdr.Settings("e-lond", 0.1),
         alpha_confirm=charter.error_budget.confirmation.alpha_confirm,
         seed=0,
     )
@@ -127,12 +127,12 @@ def new_ledger():
 def test_a_sealed_ledger_takes_no_new_claim():
     result = go(runner([]))
     with pytest.raises(scmle.data.ledger.ledger.LedgerError):
-        result.ledger.register_claim("late", "baseline", "x", SHA)
+        result.ledger.enroll("late", "baseline", "x", SHA)
 
 
 def test_the_seal_must_state_every_registered_claim():
     ledger = new_ledger()
-    ledger.register_claim("c1", "baseline", "s", SHA)
+    ledger.enroll("c1", "baseline", "s", SHA)
     ledger.freeze()
     with pytest.raises(
         scmle.data.ledger.ledger.LedgerError, match="registered claim"
@@ -142,10 +142,10 @@ def test_the_seal_must_state_every_registered_claim():
 
 def test_registering_twice_with_the_same_hash_is_idempotent():
     ledger = new_ledger()
-    first = ledger.register_claim("c1", "baseline", "s", SHA)
-    assert ledger.register_claim("c1", "baseline", "s", SHA) is first
+    first = ledger.enroll("c1", "baseline", "s", SHA)
+    assert ledger.enroll("c1", "baseline", "s", SHA) is first
     with pytest.raises(scmle.data.ledger.ledger.LedgerError):
-        ledger.register_claim("c1", "baseline", "s", "b" * 64)
+        ledger.enroll("c1", "baseline", "s", "b" * 64)
 
 
 def test_merged_runners_share_the_one_frame_and_fail_separately():
@@ -156,13 +156,13 @@ def test_merged_runners_share_the_one_frame_and_fail_separately():
             calls.append(name)
             if boom:
                 raise ValueError("no")
-            return confirm.ClaimRun({name: "ok"}, {f"{name}.json": {"k": 1}})
+            return confirm.Output({name: "ok"}, {f"{name}.json": {"k": 1}})
 
-        return confirm.ClaimRunner(
-            (confirm.RegisteredClaim(name, "baseline", name, SHA),), run
+        return confirm.Docket(
+            (confirm.Commitment(name, "baseline", name, SHA),), run
         )
 
-    merged = confirm.merge_runners(
+    merged = confirm.merge(
         None, second("a"), second("b", boom=True), second("c")
     )
     result = go(merged)
@@ -171,6 +171,6 @@ def test_merged_runners_share_the_one_frame_and_fail_separately():
     states = {k: v["status"] for k, v in result.confirmation.registered.items()}
     assert states == {"a": "ok", "b": confirm.FAILED, "c": "ok"}
     assert set(result.confirmation.documents) == {"a.json", "c.json"}
-    assert confirm.merge_runners(None, None) is None
+    assert confirm.merge(None, None) is None
     with pytest.raises(ValueError, match="unique"):
-        confirm.merge_runners(second("a"), second("a"))
+        confirm.merge(second("a"), second("a"))

@@ -58,7 +58,7 @@ def test_a_format_ten_charter_keeps_its_hash_and_signature():
 
 def test_the_block_in_an_older_format_is_refused(tmp_path):
     path = tmp_path / "charter.json"
-    sealing.write_charter(path, with_cap(), signing_key="k")
+    sealing.inscribe(path, with_cap(), signing_key="k")
     wrapper = json.loads(path.read_text())
     wrapper["format"] = 9
     path.write_text(json.dumps(wrapper))
@@ -88,14 +88,14 @@ def test_the_stage_reads_the_cap_from_the_charter(tmp_path):
     from scmle.evaluation import cv_plus
 
     path = tmp_path / "charter.json"
-    sealing.write_charter(path, with_cap(1234), signing_key="k")
+    sealing.inscribe(path, with_cap(1234), signing_key="k")
     plain = tmp_path / "plain.json"
-    sealing.write_charter(plain, make_charter(), signing_key="k")
+    sealing.inscribe(plain, make_charter(), signing_key="k")
     package = stages.PackageStage()
 
-    assert package.cv_plus_cap(stage_context(str(path))) == 1234
-    assert package.cv_plus_cap(stage_context(str(plain))) == cv_plus.MAX_BYTES
-    assert package.cv_plus_cap(stage_context(None)) == cv_plus.MAX_BYTES
+    assert package.allowance(stage_context(str(path))) == 1234
+    assert package.allowance(stage_context(str(plain))) == cv_plus.MAX_BYTES
+    assert package.allowance(stage_context(None)) == cv_plus.MAX_BYTES
 
 
 def test_slice_columns_round_trip_and_leave_a_cap_only_charter_alone():
@@ -139,7 +139,7 @@ def test_without_the_flag_a_format_ten_charter_keeps_its_hash():
 def test_the_flag_in_an_older_format_is_refused(tmp_path):
     path = tmp_path / "charter.json"
     on = make_charter(uncertainty=uncertainty.Uncertainty(None, (), True))
-    sealing.write_charter(path, on, signing_key="k")
+    sealing.inscribe(path, on, signing_key="k")
     wrapper = json.loads(path.read_text())
     wrapper["format"] = 10
     path.write_text(json.dumps(wrapper))

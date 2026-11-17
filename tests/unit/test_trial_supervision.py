@@ -40,25 +40,25 @@ def test_a_trial_within_limits_returns_its_value():
 def test_a_runaway_trial_is_killed_at_the_ceiling():
     started = time.monotonic()
     supervisor = limits.Supervisor(1.0, None)
-    with pytest.raises(limits.TrialLimitError, match="hard time ceiling"):
+    with pytest.raises(limits.TrialError, match="hard time ceiling"):
         supervisor.run(spin, 60)
     assert time.monotonic() - started < 15
 
 
 def test_a_memory_hog_is_killed_at_the_limit():
     supervisor = limits.Supervisor(60.0, 0.4)
-    with pytest.raises(limits.TrialLimitError, match="memory limit"):
+    with pytest.raises(limits.TrialError, match="memory limit"):
         supervisor.run(hog, 800)
 
 
 def test_an_exception_in_the_trial_is_reported_not_lost():
-    with pytest.raises(limits.TrialLimitError, match="ValueError: boom"):
+    with pytest.raises(limits.TrialError, match="ValueError: boom"):
         limits.Supervisor(30.0, None).run(explode, 1)
 
 
 def test_governor_modes_describe_their_enforcement():
     hard = limits.Governor(tasks.Resources(time_budget_seconds=100))
-    assert 100 <= hard.trial_ceiling_seconds() <= 110 and hard.hard
+    assert 100 <= hard.deadline() <= 110 and hard.hard
     assert "killed" in hard.report()["time_budget"]["enforcement"]
     assert "killed" in hard.report()["memory"]["enforcement"]
     soft = limits.Governor(tasks.Resources(enforcement="cooperative"))

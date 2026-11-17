@@ -147,11 +147,11 @@ ENTER = "enter"
 RELEASE = "release"
 
 
-class DeploymentLedgerError(ledger.LedgerError):
+class MisuseError(ledger.LedgerError):
     """The deployment ledger was misused or its contents are inconsistent."""
 
 
-class ReplyDecision(enum.StrEnum):
+class Reply(enum.StrEnum):
     """What a human reply decides."""
 
     APPROVE = "approve"
@@ -160,7 +160,7 @@ class ReplyDecision(enum.StrEnum):
     CANNOT_DECIDE = "cannot_decide"
 
 
-def require_object_body(body: Any) -> None:
+def mapped(body: Any) -> None:
     """Checks that a ledger row body is an object.
 
     Args:
@@ -173,7 +173,7 @@ def require_object_body(body: Any) -> None:
         raise errors.KindError("body must be an object")
 
 
-def key_fingerprint(key: str | bytes) -> str:
+def thumbprint(key: str | bytes) -> str:
     """A short public fingerprint of a signing key (never the key).
 
     Args:
@@ -199,13 +199,13 @@ def parse_date(value: str, name: str) -> datetime.date:
         The date.
 
     Raises:
-        DeploymentLedgerError: If `value` is not a string that
+        MisuseError: If `value` is not a string that
             `datetime.date.fromisoformat` accepts.
     """
     try:
         return datetime.date.fromisoformat(value)
     except (TypeError, ValueError) as error:
-        raise DeploymentLedgerError(f"{name} must be YYYY-MM-DD") from error
+        raise MisuseError(f"{name} must be YYYY-MM-DD") from error
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -236,7 +236,7 @@ class Attestation:
 
     escalation_id: str
     question_hash: str
-    decision: ReplyDecision
+    decision: Reply
     statement: str
     evidence: str
     role: str
@@ -251,8 +251,8 @@ class Attestation:
         """Validates the record's shape.
 
         Raises:
-            DeploymentLedgerError: If a required text field is blank, the
-                decision is not a `ReplyDecision`, a date is not
+            MisuseError: If a required text field is blank, the
+                decision is not a `Reply`, a date is not
                 ``YYYY-MM-DD``, or the expiry is before the date.
         """
         for name in (
@@ -266,12 +266,12 @@ class Attestation:
             "key_id",
         ):
             if not str(getattr(self, name)).strip():
-                raise DeploymentLedgerError(f"attestation {name} is required")
-        if not isinstance(self.decision, ReplyDecision):
-            raise DeploymentLedgerError("decision must be a ReplyDecision")
+                raise MisuseError(f"attestation {name} is required")
+        if not isinstance(self.decision, Reply):
+            raise MisuseError("decision must be a Reply")
         issued = parse_date(self.date, "date")
         if parse_date(self.expires, "expires") < issued:
-            raise DeploymentLedgerError("expires is before the date")
+            raise MisuseError("expires is before the date")
 
     def unsigned_dict(self) -> dict[str, Any]:
         """The signed content.
@@ -303,13 +303,13 @@ class Attestation:
                 `signature`; `decision` may be given as its text value.
 
         Returns:
-            The signed reply. A `decision` that is not a `ReplyDecision`
+            The signed reply. A `decision` that is not a `Reply`
             value fails with `ValueError`, a missing one with `KeyError`; the
             fields are otherwise validated as in construction.
         """
-        fields["decision"] = ReplyDecision(fields["decision"])
-        unsigned = cls(key_id=key_fingerprint(key), **fields)
-        signature = signing.sign_payload(unsigned.unsigned_dict(), key)
+        fields["decision"] = Reply(fields["decision"])
+        unsigned = cls(key_id=thumbprint(key), **fields)
+        signature = signing.mac(unsigned.unsigned_dict(), key)
         return dataclasses.replace(unsigned, signature=signature)
 
     @classmethod
@@ -323,15 +323,15 @@ class Attestation:
             The reply.
 
         Raises:
-            DeploymentLedgerError: If the fields differ from the reply's fields
+            MisuseError: If the fields differ from the reply's fields
                 or fail the checks of construction. A `decision` that is not
-                a `ReplyDecision` value fails with `ValueError`.
+                a `Reply` value fails with `ValueError`.
         """
         names = {f.name for f in dataclasses.fields(cls)}
         if set(record) != names:
-            raise DeploymentLedgerError("unexpected or missing reply fields")
+            raise MisuseError("unexpected or missing reply fields")
         values = dict(record)
-        values["decision"] = ReplyDecision(values["decision"])
+        values["decision"] = Reply(values["decision"])
         return cls(**values)
 
     def verify(self, key: str | bytes) -> bool:
@@ -344,9 +344,9 @@ class Attestation:
             True if the reply is signed, was made with a key of this
             fingerprint and the signature matches its content.
         """
-        if not self.signature or self.key_id != key_fingerprint(key):
+        if not self.signature or self.key_id != thumbprint(key):
             return False
-        expected = signing.sign_payload(self.unsigned_dict(), key)
+        expected = signing.mac(self.unsigned_dict(), key)
         return hmac.compare_digest(self.signature, expected)
 
 
@@ -390,7 +390,7 @@ class Envelope:
         """Validates the record's shape.
 
         Raises:
-            DeploymentLedgerError: If a required text field is blank, no action
+            MisuseError: If a required text field is blank, no action
                 is permitted, an action cannot be put in an envelope, a limit is
                 not a positive integer, a date is not ``YYYY-MM-DD``, or the
                 expiry is before the date.
@@ -404,15 +404,13 @@ class Envelope:
             "key_id",
         ):
             if not str(getattr(self, name)).strip():
-                raise DeploymentLedgerError(f"envelope {name} is required")
+                raise MisuseError(f"envelope {name} is required")
         if not self.limits:
-            raise DeploymentLedgerError(
-                "an envelope permits at least one action"
-            )
+            raise MisuseError("an envelope permits at least one action")
         for action, raw_limit in self.limits.items():
             limit: object = raw_limit  # may be any value from a record
             if action not in ENVELOPE_ACTIONS:
-                raise DeploymentLedgerError(
+                raise MisuseError(
                     f"{action!r} cannot be put in an envelope; only "
                     f"{list(ENVELOPE_ACTIONS)} can"
                 )
@@ -421,12 +419,12 @@ class Envelope:
                 or not isinstance(limit, int)
                 or limit < 1
             ):
-                raise DeploymentLedgerError(
+                raise MisuseError(
                     f"the limit for {action!r} must be a positive integer"
                 )
         issued = parse_date(self.date, "date")
         if parse_date(self.expires, "expires") < issued:
-            raise DeploymentLedgerError("expires is before the date")
+            raise MisuseError("expires is before the date")
 
     def unsigned_dict(self) -> dict[str, Any]:
         """The signed content.
@@ -459,8 +457,8 @@ class Envelope:
         Returns:
             The signed envelope.
         """
-        unsigned = cls(key_id=key_fingerprint(key), **fields)
-        signature = signing.sign_payload(unsigned.unsigned_dict(), key)
+        unsigned = cls(key_id=thumbprint(key), **fields)
+        signature = signing.mac(unsigned.unsigned_dict(), key)
         return dataclasses.replace(unsigned, signature=signature)
 
     @classmethod
@@ -474,12 +472,12 @@ class Envelope:
             The envelope.
 
         Raises:
-            DeploymentLedgerError: If the fields differ from the envelope's
+            MisuseError: If the fields differ from the envelope's
                 fields or fail the checks of construction.
         """
         names = {f.name for f in dataclasses.fields(cls)}
         if set(record) != names:
-            raise DeploymentLedgerError("unexpected or missing envelope fields")
+            raise MisuseError("unexpected or missing envelope fields")
         return cls(**dict(record))
 
     def verify(self, key: str | bytes) -> bool:
@@ -492,9 +490,9 @@ class Envelope:
             True if the envelope is signed, was made with a key of this
             fingerprint and the signature matches its content.
         """
-        if not self.signature or self.key_id != key_fingerprint(key):
+        if not self.signature or self.key_id != thumbprint(key):
             return False
-        expected = signing.sign_payload(self.unsigned_dict(), key)
+        expected = signing.mac(self.unsigned_dict(), key)
         return hmac.compare_digest(self.signature, expected)
 
 
@@ -552,11 +550,11 @@ class DeploymentLedger:
             The new ledger, holding its `open` row.
 
         Raises:
-            DeploymentLedgerError: If the file exists.
+            MisuseError: If the file exists.
         """
         target = Path(path) if path is not None else None
         if target is not None and target.exists():
-            raise DeploymentLedgerError(f"{target} exists; use load")
+            raise MisuseError(f"{target} exists; use load")
         created = cls(target)
         created.commit(
             OPEN,
@@ -584,14 +582,14 @@ class DeploymentLedger:
             The ledger with every row applied.
 
         Raises:
-            DeploymentLedgerError: On a missing file, a line that is not
+            MisuseError: On a missing file, a line that is not
                 JSON, a broken chain, an invalid row, a replay mismatch, a
                 file without rows, or a head that differs from
                 `expected_head`.
         """
         source = Path(path)
         if not source.exists():
-            raise DeploymentLedgerError(f"ledger {source} does not exist")
+            raise MisuseError(f"ledger {source} does not exist")
         loaded = cls(source)
         for index, line in enumerate(
             source.read_text(encoding="utf-8").splitlines()
@@ -601,14 +599,12 @@ class DeploymentLedger:
             try:
                 row = json.loads(line)
             except ValueError as error:
-                raise DeploymentLedgerError(
-                    f"ledger row {index} is not JSON"
-                ) from error
+                raise MisuseError(f"ledger row {index} is not JSON") from error
             loaded.ingest(row)
         if not loaded.rows:
-            raise DeploymentLedgerError("ledger is empty")
+            raise MisuseError("ledger is empty")
         if expected_head is not None and loaded.head != expected_head:
-            raise DeploymentLedgerError(
+            raise MisuseError(
                 "ledger head does not match the recorded head: rows were "
                 "removed from the end or the file was replaced"
             )
@@ -655,35 +651,31 @@ class DeploymentLedger:
             row: A row with `seq`, `kind`, `body`, `prev` and `hash`.
 
         Raises:
-            DeploymentLedgerError: If the row has the wrong fields, a wrong
+            MisuseError: If the row has the wrong fields, a wrong
                 sequence number, previous hash or hash, an unknown kind, an
                 `open` kind that is not first (or a second one), or a body
                 that is malformed or fails the kind's rules, including a
                 replay mismatch.
             TypeError: Raised internally for a body that is not an object; it
-                is turned into `DeploymentLedgerError` and never reaches the
+                is turned into `MisuseError` and never reaches the
                 caller.
         """
         if set(row) != {"seq", "kind", "body", "prev", "hash"}:
-            raise DeploymentLedgerError(
-                f"ledger row {len(self.rows)} has wrong fields"
-            )
+            raise MisuseError(f"ledger row {len(self.rows)} has wrong fields")
         content = {k: row[k] for k in ("seq", "kind", "body", "prev")}
         if (
             row["seq"] != len(self.rows)
             or row["prev"] != self.head
             or row["hash"] != ledger.digest(content)
         ):
-            raise DeploymentLedgerError(
-                f"ledger chain broken at row {len(self.rows)}"
-            )
+            raise MisuseError(f"ledger chain broken at row {len(self.rows)}")
         kind, body = row["kind"], row["body"]
         if kind not in KINDS:
-            raise DeploymentLedgerError(f"unknown ledger row kind {kind!r}")
+            raise MisuseError(f"unknown ledger row kind {kind!r}")
         if not self.rows and kind != OPEN:
-            raise DeploymentLedgerError("the first ledger row must be 'open'")
+            raise MisuseError("the first ledger row must be 'open'")
         if self.rows and kind == OPEN:
-            raise DeploymentLedgerError("a ledger has exactly one 'open' row")
+            raise MisuseError("a ledger has exactly one 'open' row")
         handlers: dict[str, Callable[[Mapping[str, Any]], None]] = {
             OPEN: self.apply_open,
             CHALLENGER_RESULT: self.replay,
@@ -700,12 +692,12 @@ class DeploymentLedger:
             CONTROLLER: self.journal,
         }
         try:
-            require_object_body(body)
+            mapped(body)
             handlers.get(kind, self.accept)(body)
-        except DeploymentLedgerError:
+        except MisuseError:
             raise
         except (KeyError, TypeError, ValueError, ZeroDivisionError) as error:
-            raise DeploymentLedgerError(
+            raise MisuseError(
                 f"malformed {kind} row {len(self.rows)}: {error!r}"
             ) from error
         self.rows.append(dict(row))
@@ -724,28 +716,28 @@ class DeploymentLedger:
             body: The `open` row content.
 
         Raises:
-            DeploymentLedgerError: If the ledger version is unsupported or the
+            MisuseError: If the ledger version is unsupported or the
                 policy does not match its hash.
         """
         if body["ledger_version"] != LEDGER_VERSION:
-            raise DeploymentLedgerError("unsupported ledger version")
+            raise MisuseError("unsupported ledger version")
         if body["policy_hash"] != ledger.digest(body["policy"]):
-            raise DeploymentLedgerError("policy does not match its hash")
+            raise MisuseError("policy does not match its hash")
         self.header = dict(body)
         self.system_keys = frozenset(body["system_keys"])
         self.promotion = sequential_tests.PromotionSequence(body["alpha_promo"])
 
-    def require_promotion(self) -> sequential_tests.PromotionSequence:
+    def elond(self) -> sequential_tests.PromotionSequence:
         """The e-LOND sequence, which exists once `open` is in.
 
         Returns:
             The e-LOND sequence.
 
         Raises:
-            DeploymentLedgerError: If there is no `open` row yet.
+            MisuseError: If there is no `open` row yet.
         """
         if self.promotion is None:
-            raise DeploymentLedgerError("ledger has no open row")
+            raise MisuseError("ledger has no open row")
         return self.promotion
 
     def replay(self, body: Mapping[str, Any]) -> None:
@@ -755,7 +747,7 @@ class DeploymentLedger:
             body: The challenger-result row content.
 
         Raises:
-            DeploymentLedgerError: If the challenger is registered twice, the
+            MisuseError: If the challenger is registered twice, the
                 phase is neither registered nor decided, a decision names an
                 unregistered challenger, one already decided or one that is
                 not next in registration order, or the e-value is invalid, or
@@ -763,27 +755,27 @@ class DeploymentLedger:
                 recorded.
         """
         name = str(body["name"])
-        sequence = self.require_promotion()
+        sequence = self.elond()
         if body["phase"] == REGISTERED:
             if name in self.registered:
-                raise DeploymentLedgerError(f"{name!r} is already registered")
+                raise MisuseError(f"{name!r} is already registered")
             sequence.register(name)
             self.registered.append(name)
             return
         if body["phase"] != DECIDED:
-            raise DeploymentLedgerError("phase must be registered or decided")
+            raise MisuseError("phase must be registered or decided")
         if name not in self.registered:
-            raise DeploymentLedgerError(
+            raise MisuseError(
                 f"{name!r} was not registered before it was scored"
             )
         try:
             step = sequence.decide(name, float(body["e_value"]))
         except ValueError as error:
-            raise DeploymentLedgerError(str(error)) from error
+            raise MisuseError(str(error)) from error
         recorded = (body["level"], body["rejected"], body["wealth_after"])
         replayed = (str(step.level), step.rejected, str(step.wealth_after))
         if recorded != replayed:
-            raise DeploymentLedgerError(
+            raise MisuseError(
                 f"replay of e-LOND differs for {name!r}: recorded "
                 f"{recorded}, replayed {replayed}"
             )
@@ -796,7 +788,7 @@ class DeploymentLedger:
             body: The escalation row content.
 
         Raises:
-            DeploymentLedgerError: If an opening row's question does not match
+            MisuseError: If an opening row's question does not match
                 its hash, its id is not ``esc-`` followed by its row number
                 or it lacks evidence or a proposed default, the phase is
                 neither open nor timeout, or a timeout names an escalation
@@ -806,21 +798,19 @@ class DeploymentLedger:
         if body["phase"] == PHASE_OPEN:
             question = body["question"]
             if body["question_hash"] != ledger.digest(question):
-                raise DeploymentLedgerError(
-                    "escalation question does not match its hash"
-                )
+                raise MisuseError("escalation question does not match its hash")
             if body["id"] != f"esc-{number}":
-                raise DeploymentLedgerError("escalation id is not its row")
+                raise MisuseError("escalation id is not its row")
             for name in ("evidence", "proposed_default"):
                 if name not in body:
-                    raise DeploymentLedgerError(f"escalation needs {name}")
+                    raise MisuseError(f"escalation needs {name}")
             self.escalations[body["id"]] = dict(body)
             return
         if body["phase"] != PHASE_TIMEOUT:
-            raise DeploymentLedgerError("phase must be open or timeout")
+            raise MisuseError("phase must be open or timeout")
         identity = body["id"]
         if identity not in self.escalations or identity in self.closed:
-            raise DeploymentLedgerError(f"{identity!r} is not pending")
+            raise MisuseError(f"{identity!r} is not pending")
         self.closed[identity] = PHASE_TIMEOUT
 
     def attest(self, body: Mapping[str, Any]) -> None:
@@ -830,7 +820,7 @@ class DeploymentLedger:
             body: The attestation row content.
 
         Raises:
-            DeploymentLedgerError: If the row is not a valid reply, it answers
+            MisuseError: If the row is not a valid reply, it answers
                 no escalation, the escalation is already closed, the reply is
                 bound to a different question, or it is signed with a key
                 the system holds. The signature and expiry are not checked.
@@ -838,15 +828,13 @@ class DeploymentLedger:
         reply = Attestation.from_dict(body)
         escalation = self.escalations.get(reply.escalation_id)
         if escalation is None:
-            raise DeploymentLedgerError("attestation answers no escalation")
+            raise MisuseError("attestation answers no escalation")
         if reply.escalation_id in self.closed:
-            raise DeploymentLedgerError("escalation is already closed")
+            raise MisuseError("escalation is already closed")
         if reply.question_hash != escalation["question_hash"]:
-            raise DeploymentLedgerError(
-                "attestation is bound to a different question"
-            )
+            raise MisuseError("attestation is bound to a different question")
         if reply.key_id in self.system_keys:
-            raise DeploymentLedgerError(
+            raise MisuseError(
                 "attestation is signed with a key the system holds"
             )
         self.closed[reply.escalation_id] = ATTESTATION
@@ -859,16 +847,16 @@ class DeploymentLedger:
             body: The attestation-used row content.
 
         Raises:
-            DeploymentLedgerError: If the attestation was not recorded or is
+            MisuseError: If the attestation was not recorded or is
                 already spent.
         """
         identity = str(body["escalation_id"])
         if identity not in self.attestations:
-            raise DeploymentLedgerError(
+            raise MisuseError(
                 "an attestation can only be spent after it was recorded"
             )
         if identity in self.used:
-            raise DeploymentLedgerError("the attestation is already spent")
+            raise MisuseError("the attestation is already spent")
         self.used[identity] = dict(body)
 
     def issue(self, body: Mapping[str, Any]) -> None:
@@ -878,19 +866,17 @@ class DeploymentLedger:
             body: The envelope row content.
 
         Raises:
-            DeploymentLedgerError: If the row is not a valid envelope, the
+            MisuseError: If the row is not a valid envelope, the
                 envelope was already granted, or it is signed with a key the
                 system holds. The signature and expiry are not checked.
         """
         grant = Envelope.from_dict(body)
         if grant.envelope_id in self.envelopes:
-            raise DeploymentLedgerError(
+            raise MisuseError(
                 f"envelope {grant.envelope_id!r} was already granted"
             )
         if grant.key_id in self.system_keys:
-            raise DeploymentLedgerError(
-                "envelope is signed with a key the system holds"
-            )
+            raise MisuseError("envelope is signed with a key the system holds")
         self.envelopes[grant.envelope_id] = grant.to_dict()
         self.envelope_uses[grant.envelope_id] = {}
 
@@ -903,26 +889,26 @@ class DeploymentLedger:
             body: The envelope-use row content.
 
         Raises:
-            DeploymentLedgerError: If the envelope is unknown or revoked, does
+            MisuseError: If the envelope is unknown or revoked, does
                 not cover the action, the scope differs or its uses are spent.
         """
         identity = str(body["envelope_id"])
         action = str(body["action"])
         grant = self.envelopes.get(identity)
         if grant is None:
-            raise DeploymentLedgerError(f"envelope {identity!r} is unknown")
+            raise MisuseError(f"envelope {identity!r} is unknown")
         if identity in self.envelope_revoked:
-            raise DeploymentLedgerError(f"envelope {identity!r} was revoked")
+            raise MisuseError(f"envelope {identity!r} was revoked")
         limit = grant["limits"].get(action)
         if limit is None:
-            raise DeploymentLedgerError(
+            raise MisuseError(
                 f"envelope {identity!r} does not cover {action!r}"
             )
         if body["scope"] != grant["scope"]:
-            raise DeploymentLedgerError("use is outside the envelope's scope")
+            raise MisuseError("use is outside the envelope's scope")
         used = self.envelope_uses[identity].get(action, 0)
         if used >= limit:
-            raise DeploymentLedgerError(
+            raise MisuseError(
                 f"envelope {identity!r} has spent its {limit} use(s) of "
                 f"{action!r}"
             )
@@ -935,14 +921,14 @@ class DeploymentLedger:
             body: The revocation row content.
 
         Raises:
-            DeploymentLedgerError: If the envelope is unknown or already
+            MisuseError: If the envelope is unknown or already
                 revoked.
         """
         identity = str(body["envelope_id"])
         if identity not in self.envelopes:
-            raise DeploymentLedgerError(f"envelope {identity!r} is unknown")
+            raise MisuseError(f"envelope {identity!r} is unknown")
         if identity in self.envelope_revoked:
-            raise DeploymentLedgerError(f"envelope {identity!r} is revoked")
+            raise MisuseError(f"envelope {identity!r} is revoked")
         self.envelope_revoked[identity] = dict(body)
 
     def journal(self, body: Mapping[str, Any]) -> None:
@@ -954,33 +940,31 @@ class DeploymentLedger:
             body: The controller row content.
 
         Raises:
-            DeploymentLedgerError: If the phase or input kind is not allowed,
+            MisuseError: If the phase or input kind is not allowed,
                 the input was already applied, an intent repeats, or an input is
                 applied without an intent.
         """
         phase = body["phase"]
         if phase not in CONTROLLER_PHASES:
-            raise DeploymentLedgerError(
+            raise MisuseError(
                 f"controller phase must be one of {list(CONTROLLER_PHASES)}"
             )
         if phase == TICK:
             return
         digest = str(body["digest"])
         if body["what"] not in CONTROLLER_INPUTS:
-            raise DeploymentLedgerError(
+            raise MisuseError(
                 f"controller input must be one of {list(CONTROLLER_INPUTS)}"
             )
         if digest in self.consumed:
-            raise DeploymentLedgerError(f"input {digest[:12]} was applied")
+            raise MisuseError(f"input {digest[:12]} was applied")
         if phase == INTENT:
             if digest in self.intents:
-                raise DeploymentLedgerError(
-                    f"input {digest[:12]} already has an intent"
-                )
+                raise MisuseError(f"input {digest[:12]} already has an intent")
             self.intents[digest] = dict(body)
         elif phase == APPLIED:
             if digest not in self.intents:
-                raise DeploymentLedgerError(
+                raise MisuseError(
                     f"input {digest[:12]} was applied without an intent"
                 )
             self.consumed[digest] = dict(body)
@@ -994,14 +978,14 @@ class DeploymentLedger:
             body: The experiment row content.
 
         Raises:
-            DeploymentLedgerError: If the experiment already started or its
+            MisuseError: If the experiment already started or its
                 level is not in (0, 1).
         """
         name = str(body["experiment_id"])
         if name in self.experiments:
-            raise DeploymentLedgerError(f"experiment {name!r} already started")
+            raise MisuseError(f"experiment {name!r} already started")
         if not 0 < float(Fraction(body["level"])) < 1:
-            raise DeploymentLedgerError("an experiment level lies in (0, 1)")
+            raise MisuseError("an experiment level lies in (0, 1)")
         self.experiments[name] = dict(body)
 
     def assign(self, body: Mapping[str, Any]) -> None:
@@ -1011,22 +995,20 @@ class DeploymentLedger:
             body: The assignment row content.
 
         Raises:
-            DeploymentLedgerError: If the experiment was not started, the lists
+            MisuseError: If the experiment was not started, the lists
                 differ in length, an arm is not 0 or 1, or a probability is not
                 strictly in (0, 1).
         """
         name = str(body["experiment_id"])
         if name not in self.experiments:
-            raise DeploymentLedgerError(
-                f"assignment for {name!r}, which was not started"
-            )
+            raise MisuseError(f"assignment for {name!r}, which was not started")
         units, arms, odds = body["units"], body["arm"], body["probability"]
         if not len(units) == len(arms) == len(odds):
-            raise DeploymentLedgerError("assignment lists differ in length")
+            raise MisuseError("assignment lists differ in length")
         if any(a not in (0, 1) for a in arms) or any(
             not 0 < float(p) < 1 for p in odds
         ):
-            raise DeploymentLedgerError(
+            raise MisuseError(
                 "arms are 0 or 1 and probabilities lie strictly in (0, 1)"
             )
 
@@ -1039,13 +1021,11 @@ class DeploymentLedger:
             body: The decision row content.
 
         Raises:
-            DeploymentLedgerError: If the experiment was not started.
+            MisuseError: If the experiment was not started.
         """
         name = str(body["experiment_id"])
         if name not in self.experiments:
-            raise DeploymentLedgerError(
-                f"decision for {name!r}, which was not started"
-            )
+            raise MisuseError(f"decision for {name!r}, which was not started")
 
     def halt(self, body: Mapping[str, Any]) -> None:
         """Enters or leaves the halted state.
@@ -1054,7 +1034,7 @@ class DeploymentLedger:
             body: The halt row content.
 
         Raises:
-            DeploymentLedgerError: If a release occurs without a halt or
+            MisuseError: If a release occurs without a halt or
                 without a recalibration entry in the row (its content is
                 not examined), or the phase is neither enter nor release.
         """
@@ -1062,14 +1042,14 @@ class DeploymentLedger:
             self.halted = True
         elif body["phase"] == RELEASE:
             if not self.halted:
-                raise DeploymentLedgerError("release without a halt")
+                raise MisuseError("release without a halt")
             if not body.get("recalibration"):
-                raise DeploymentLedgerError(
+                raise MisuseError(
                     "a halt is released only on a passing recalibration"
                 )
             self.halted = False
         else:
-            raise DeploymentLedgerError("phase must be enter or release")
+            raise MisuseError("phase must be enter or release")
 
     def pending(self) -> list[dict[str, Any]]:
         """Lists the escalations with no reply and no timeout, oldest first.
@@ -1090,7 +1070,7 @@ class DeploymentLedger:
         An in-memory ledger replays its rows into a fresh ledger instead.
 
         Raises:
-            DeploymentLedgerError: If the file cannot be loaded or differs
+            MisuseError: If the file cannot be loaded or differs
                 from this ledger, or the rows fail to replay.
         """
         if self.path is None:
@@ -1099,4 +1079,4 @@ class DeploymentLedger:
                 again.ingest(row)
             return
         if DeploymentLedger.load(self.path).rows != self.rows:
-            raise DeploymentLedgerError("ledger file differs from memory")
+            raise MisuseError("ledger file differs from memory")

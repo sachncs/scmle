@@ -168,7 +168,7 @@ def test_the_object_store_round_trips_and_checks_digests(tmp_path):
     store.start()
     try:
         data = b"model bytes"
-        etag = mocks.put_object(store.address, "models/a/b.bin", data)
+        etag = mocks.deposit(store.address, "models/a/b.bin", data)
         assert etag == provenance.sha256_digest(data)
         assert mocks.get_object(store.address, "models/a/b.bin", etag) == data
         with pytest.raises(errors.ArtifactError, match="does not match"):
@@ -206,25 +206,25 @@ def test_the_object_store_round_trips_and_checks_digests(tmp_path):
 
 
 def test_safe_keys_refuse_traversal():
-    assert str(mocks.safe_key("/bucket/a/b")) == "bucket/a/b"
+    assert str(mocks.sanitize("/bucket/a/b")) == "bucket/a/b"
     for bad in ("/bucket", "/bucket/../x", "/"):
         with pytest.raises(ValueError):
-            mocks.safe_key(bad)
+            mocks.sanitize(bad)
 
 
 def test_the_metrics_sink_stores_valid_samples_and_refuses_bad_ones(tmp_path):
     sink = mocks.MetricsSink(tmp_path / "m.jsonl")
     sink.start()
     try:
-        sample = observability.MetricSample(
+        sample = observability.Sample(
             "latency_p95",
-            observability.SignalKind.LATENCY,
+            observability.Indicator.LATENCY,
             12.5,
             "ms",
             "2026-11-05T00:00:00+00:00",
             {"model": "churn"},
         )
-        assert mocks.post_metrics(sink.address, [sample]) == 1
+        assert mocks.transmit(sink.address, [sample]) == 1
         stored = json.loads(
             urllib.request.urlopen(f"{sink.address}/metrics").read()
         )
@@ -263,8 +263,8 @@ def test_the_container_healthcheck_follows_readiness(tmp_path):
     from scmle.inference import parity
     from scmle.inference import serving
 
-    golden = parity.load_golden(ROOT / "deploy" / "local" / "golden")
-    folder = parity.reference_bundle(golden.spec).save(tmp_path / "bundle")
+    golden = parity.goldens(ROOT / "deploy" / "local" / "golden")
+    folder = parity.handwrite(golden.spec).save(tmp_path / "bundle")
     model = bundle.Bundle.load(folder, trusted=True)
     adapter = serving.HttpServing(model, port=0)
     adapter.start()
@@ -295,12 +295,12 @@ def test_a_folder_survives_the_object_store_round_trip(tmp_path):
     store = mocks.ObjectStore(tmp_path / "store")
     store.start()
     try:
-        etags = demo.upload_folder(store.address, source, "svc/v1")
+        etags = demo.sync(store.address, source, "svc/v1")
         target = tmp_path / "target"
-        demo.download_folder(store.address, "svc/v1", etags, target)
+        demo.download(store.address, "svc/v1", etags, target)
         assert (target / "model" / "a.bin").read_bytes() == b"abc"
         etags["serve.py"] = "sha256:" + "3" * 64
         with pytest.raises(errors.ArtifactError):
-            demo.download_folder(store.address, "svc/v1", etags, target)
+            demo.download(store.address, "svc/v1", etags, target)
     finally:
         store.stop()

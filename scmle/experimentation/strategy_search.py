@@ -12,7 +12,7 @@ from scmle.experimentation import trials
 from scmle.sampling import strategies
 
 
-class StrategySearch:
+class Strategist:
     """Evaluates data strategies for the most promising screened models.
 
     Attributes:
@@ -24,7 +24,7 @@ class StrategySearch:
     """
 
     def __init__(
-        self, context: scmle.core.context.Context, runner: trials.TrialRunner
+        self, context: scmle.core.context.Context, runner: trials.Runner
     ) -> None:
         """Initializes the search.
 
@@ -44,7 +44,7 @@ class StrategySearch:
         Args:
             screened: Default-configuration trials from the screening step.
         """
-        spec = self.context.spec.effective_strategies()
+        spec = self.context.spec.effective()
         if not spec.names or spec.top_models == 0:
             return
         registry = self.context.registry
@@ -57,7 +57,7 @@ class StrategySearch:
         default_trials = [
             t
             for t in screened
-            if t.status is experiments.TrialStatus.OK
+            if t.status is experiments.Termination.OK
             and not t.params
             and t.strategy == experiments.DEFAULT_STRATEGY
             and t.model_name not in baselines
@@ -66,7 +66,7 @@ class StrategySearch:
             : spec.top_models
         ]
         for leader in leaders:
-            if self.context.resource_governor.skip_reason(first=False):
+            if self.context.regulator.skip_reason(first=False):
                 break
             self.context.check_cancelled()
             self.tune(leader, spec.names)
@@ -89,14 +89,14 @@ class StrategySearch:
             if reason is None:
                 chosen.append(name)
             else:
-                self.context.add_outcome(
+                self.context.enter(
                     f"{name}@{leader.model_name}",
                     experiments.DecisionAction.REJECT,
                     f"not applicable: {reason}",
                 )
         ids = self.context.allocate(len(chosen))
         jobs = [
-            trials.TrialJob(trial_id, leader.model_name, {}, None, name)
+            trials.Job(trial_id, leader.model_name, {}, None, name)
             for trial_id, name in zip(ids, chosen, strict=True)
         ]
         for outcome in self.runner.run_many(jobs):
@@ -116,8 +116,8 @@ class StrategySearch:
             outcome: The strategy trial's result.
         """
         technique = f"{outcome.strategy}@{outcome.model_name}"
-        if outcome.status is not experiments.TrialStatus.OK:
-            self.context.add_outcome(
+        if outcome.status is not experiments.Termination.OK:
+            self.context.enter(
                 technique,
                 experiments.DecisionAction.REJECT,
                 f"trial {outcome.status}: {outcome.error}",
@@ -130,7 +130,7 @@ class StrategySearch:
             if gain > 0
             else experiments.DecisionAction.REJECT
         )
-        self.context.add_outcome(
+        self.context.enter(
             technique,
             verdict,
             f"cv {self.metric.name} {outcome.score_mean:.4f} vs default "

@@ -25,11 +25,11 @@ def build(directory: Path) -> str:
         The JSON text of the closed-form expected outputs, with a comment and
         a trailing newline.
     """
-    golden = parity.load_golden(directory)
+    golden = parity.goldens(directory)
     document = {
         "comment": "Closed-form outputs of model_spec.json on records.json. "
         "Regenerate with scripts/make_serving_golden.py; never edit by hand.",
-        **parity.expected_outputs(golden.spec, golden.records),
+        **parity.expect(golden.spec, golden.records),
     }
     return json.dumps(document, indent=2) + "\n"
 

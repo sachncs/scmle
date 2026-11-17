@@ -30,8 +30,8 @@ PLACEHOLDER = "sha256:" + "0" * 64
 
 @pytest.fixture(scope="module")
 def reference():
-    golden = parity.load_golden(ROOT / "deploy" / "local" / "golden")
-    return parity.reference_bundle(golden.spec)
+    golden = parity.goldens(ROOT / "deploy" / "local" / "golden")
+    return parity.handwrite(golden.spec)
 
 
 @pytest.fixture(scope="module")
@@ -136,14 +136,14 @@ def test_the_lock_follows_requirements_through_fake_metadata():
         "leaf": [],
     }
     versions = {"app": "1", "lib": "2", "leaf": "3"}
-    closure = lockfile.runtime_closure(
+    closure = lockfile.transitive(
         ["app"],
         requires=lambda name: graph[name],
         installed=lambda name: versions[name],
     )
     assert closure == {"app": "1", "leaf": "3", "lib": "2"}
     unresolved = []
-    closure = lockfile.runtime_closure(
+    closure = lockfile.transitive(
         ["app"],
         versions={"lib": "9"},
         requires=lambda name: graph[name],
@@ -158,7 +158,7 @@ def test_a_missing_distribution_is_an_error():
         raise lockfile.metadata.PackageNotFoundError(name)
 
     with pytest.raises(errors.ArtifactError, match="neither installed"):
-        lockfile.runtime_closure(["ghost"], installed=absent)
+        lockfile.transitive(["ghost"], installed=absent)
 
 
 def test_the_sbom_lists_libraries_the_model_and_the_base_image(signed_service):
@@ -187,11 +187,11 @@ def test_the_service_sbom_is_deterministic_for_one_timestamp():
         "software_version": "1",
         "observed_at": "2026-01-01T00:00:00+00:00",
     }
-    assert sbom.build_service(pins, **arguments) == sbom.build_service(
+    assert sbom.catalogue(pins, **arguments) == sbom.catalogue(
         pins, **arguments
     )
     with pytest.raises(ValueError, match="sha256"):
-        sbom.build_service(pins, **{**arguments, "bundle_digest": "abc"})
+        sbom.catalogue(pins, **{**arguments, "bundle_digest": "abc"})
 
 
 def test_source_date_epoch_fixes_the_sbom_time(monkeypatch):
@@ -202,8 +202,8 @@ def test_source_date_epoch_fixes_the_sbom_time(monkeypatch):
 
 
 def test_the_provenance_verifies_and_names_the_bundle(signed_service):
-    document = attest.read_document(signed_service / "provenance.json")
-    body, verified = attest.verify_document(document, KEY)
+    document = attest.parse(signed_service / "provenance.json")
+    body, verified = attest.authenticate(document, KEY)
     assert verified is True
     digest = provenance.bundle_digest(signed_service / "model")
     assert body["subject"][0]["digest"]["sha256"] == digest.removeprefix(
@@ -211,20 +211,18 @@ def test_the_provenance_verifies_and_names_the_bundle(signed_service):
     )
     names = {item["name"] for item in body["predicate"]["materials"]}
     assert {"Dockerfile", "requirements.lock", "sbom.cdx.json"} <= names
-    assert attest.material_problems(signed_service, body) == []
+    assert attest.discrepancies(signed_service, body) == []
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
-        attest.verify_document(document, "another-key")
+        attest.authenticate(document, "another-key")
     forged = json.loads(json.dumps(document))
     forged["statement"]["predicate"]["builder"] = "someone else"
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
-        attest.verify_document(forged, KEY)
-    assert (
-        attest.verify_document({**document, "signature": None}, KEY)[1] is False
-    )
+        attest.authenticate(forged, KEY)
+    assert attest.authenticate({**document, "signature": None}, KEY)[1] is False
 
 
 def test_production_verification_accepts_a_signed_service(signed_service):
-    verified = verify.verify_service(signed_service, production())
+    verified = verify.inspect(signed_service, production())
     assert verified.bundle_signed and verified.provenance_verified
     assert verified.production and not verified.trusted
     assert verified.bundle_digest == provenance.bundle_digest(
@@ -238,7 +236,7 @@ def test_trusted_is_refused_in_production_everywhere(
     with pytest.raises(
         errors.ArtifactError, match="SCMLE_TRUSTED=1 is refused"
     ):
-        verify.verify_service(signed_service, production(SCMLE_TRUSTED="1"))
+        verify.inspect(signed_service, production(SCMLE_TRUSTED="1"))
     folder = reference.save(tmp_path / "unsigned-bundle")
     monkeypatch.setenv("SCMLE_ENV", "production")
     with pytest.raises(
@@ -261,8 +259,8 @@ def test_verification_happens_before_anything_is_deserialized(
     with (corrupted / "model" / "pipeline.joblib").open("ab") as handle:
         handle.write(b"x")
     with pytest.raises(errors.ArtifactError, match="checksum mismatch"):
-        verify.verify_service(corrupted, production())
-    assert verify.verify_service(signed_service, production())
+        verify.inspect(corrupted, production())
+    assert verify.inspect(signed_service, production())
 
 
 def test_an_unsigned_bundle_never_verifies_in_production(
@@ -271,10 +269,10 @@ def test_an_unsigned_bundle_never_verifies_in_production(
     unsigned = copy_of(signed_service, tmp_path)
     (unsigned / "model" / "signature.json").unlink()
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
-        verify.verify_service(unsigned, production())
+        verify.inspect(unsigned, production())
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
-        verify.verify_service(unsigned, {"SCMLE_ENV": "staging"})
-    accepted = verify.verify_service(
+        verify.inspect(unsigned, {"SCMLE_ENV": "staging"})
+    accepted = verify.inspect(
         unsigned, {"SCMLE_ENV": "staging", "SCMLE_TRUSTED": "1"}
     )
     assert accepted.trusted and not accepted.bundle_signed
@@ -282,7 +280,7 @@ def test_an_unsigned_bundle_never_verifies_in_production(
 
 def test_a_wrong_key_is_refused(signed_service):
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
-        verify.verify_service(
+        verify.inspect(
             signed_service,
             {"SCMLE_ENV": "production", "SCMLE_SIGNING_KEY": "wrong"},
         )
@@ -292,8 +290,8 @@ def test_production_needs_verifiable_provenance(signed_service, tmp_path):
     missing = copy_of(signed_service, tmp_path)
     (missing / "provenance.json").unlink()
     with pytest.raises(errors.ArtifactError, match="provenance"):
-        verify.verify_service(missing, production())
-    assert verify.verify_service(
+        verify.inspect(missing, production())
+    assert verify.inspect(
         missing, {"SCMLE_ENV": "staging", "SCMLE_SIGNING_KEY": KEY}
     )
 
@@ -303,16 +301,16 @@ def test_changed_build_materials_are_refused(signed_service, tmp_path):
     with (changed / "requirements.lock").open("a") as handle:
         handle.write("evil-package==1.0\n")
     with pytest.raises(errors.ArtifactError, match="materials changed"):
-        verify.verify_service(changed, production())
+        verify.inspect(changed, production())
 
 
 def test_provenance_for_another_bundle_is_refused(signed_service, tmp_path):
     swapped = copy_of(signed_service, tmp_path)
-    attest.write_provenance(
+    attest.stamp(
         swapped, "sha256:" + "9" * 64, "someone", "python:3.12-slim", KEY
     )
     with pytest.raises(errors.ArtifactError, match="different bundle digest"):
-        verify.verify_service(swapped, production())
+        verify.inspect(swapped, production())
 
 
 def test_an_image_attestation_binds_image_to_provenance(
@@ -321,20 +319,20 @@ def test_an_image_attestation_binds_image_to_provenance(
     folder = copy_of(signed_service, tmp_path)
     image = "sha256:" + "d" * 64
     lock = {"image": "python:3.12-slim", "digest": "sha256:" + "a" * 64}
-    attest.write_image_attestation(folder, image, lock, KEY)
-    body = attest.verify_image(folder, image, KEY)
+    attest.bind(folder, image, lock, KEY)
+    body = attest.vouch(folder, image, KEY)
     assert body["predicate"]["base_image"] == lock
     with pytest.raises(errors.ArtifactError, match="different image"):
-        attest.verify_image(folder, "sha256:" + "e" * 64, KEY)
+        attest.vouch(folder, "sha256:" + "e" * 64, KEY)
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
-        attest.verify_image(folder, image, "other-key")
-    attest.write_image_attestation(folder, image, lock, None)
+        attest.vouch(folder, image, "other-key")
+    attest.bind(folder, image, lock, None)
     with pytest.raises(errors.ArtifactError, match="not verified"):
-        attest.verify_image(folder, image, KEY)
-    attest.write_image_attestation(folder, image, lock, KEY)
+        attest.vouch(folder, image, KEY)
+    attest.bind(folder, image, lock, KEY)
     (folder / "provenance.json").write_text("{}")
     with pytest.raises(errors.ArtifactError, match="provenance file differs"):
-        attest.verify_image(folder, image, KEY)
+        attest.vouch(folder, image, KEY)
 
 
 def test_the_build_context_holds_no_secret(signed_service):
@@ -384,20 +382,20 @@ def test_the_context_check_command(signed_service, tmp_path):
 
 
 def test_base_image_references_are_split_and_validated():
-    assert base_image.split_image("python:3.12-slim") == (
+    assert base_image.decompose("python:3.12-slim") == (
         "registry-1.docker.io",
         "library/python",
         "3.12-slim",
     )
-    assert base_image.split_image("ghcr.io/org/app:1.0") == (
+    assert base_image.decompose("ghcr.io/org/app:1.0") == (
         "ghcr.io",
         "org/app",
         "1.0",
     )
-    assert base_image.split_image("org/app:1.0")[1] == "org/app"
+    assert base_image.decompose("org/app:1.0")[1] == "org/app"
     for bad in ("python", "python@" + PLACEHOLDER, "python:3.12@sha256:ab"):
         with pytest.raises(errors.ConfigError):
-            base_image.split_image(bad)
+            base_image.decompose(bad)
 
 
 def test_resolving_uses_the_registry_digest_and_refuses_the_placeholder():
@@ -588,11 +586,11 @@ def test_a_lock_is_refused_rather_than_cut_short(monkeypatch):
         raise metadata.PackageNotFoundError(name)
 
     with pytest.raises(errors.ArtifactError, match="cannot be read"):
-        lockfile.runtime_closure(
+        lockfile.transitive(
             ["root"], versions={"root": "1.0"}, requires=unreadable
         )
     missed = []
-    closure = lockfile.runtime_closure(
+    closure = lockfile.transitive(
         ["root"],
         versions={"root": "1.0"},
         requires=unreadable,
@@ -601,4 +599,4 @@ def test_a_lock_is_refused_rather_than_cut_short(monkeypatch):
     assert closure == {"root": "1.0"} and missed == ["root"]
     monkeypatch.setitem(sys.modules, "packaging", None)
     with pytest.raises(errors.ArtifactError, match="install 'packaging'"):
-        lockfile.marker_applies('python_version >= "3.8"')
+        lockfile.applies('python_version >= "3.8"')

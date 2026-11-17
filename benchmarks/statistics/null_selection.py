@@ -97,7 +97,7 @@ def excluded_models() -> list[str]:
         The model names to exclude, so a run has three candidates and the
         constant baseline.
     """
-    names = scmle.models.registry.Catalog.with_builtins().adapters
+    names = scmle.models.registry.Catalog.stock().adapters
     return sorted(set(names) - set(CANDIDATES) - {"dummy"})
 
 
@@ -112,7 +112,7 @@ def candidate_count(run: Any) -> int:
         baseline.
     """
     return sum(
-        t.status is experiments.TrialStatus.OK and t.model_name != "dummy"
+        t.status is experiments.Termination.OK and t.model_name != "dummy"
         for t in run.trials
     )
 
@@ -128,7 +128,7 @@ def lead_exceeds_spread(run: Any) -> bool:
         larger of the two fold standard deviations. The runner-up may be the
         dummy baseline, as in the report.
     """
-    done = [t for t in run.trials if t.status is experiments.TrialStatus.OK]
+    done = [t for t in run.trials if t.status is experiments.Termination.OK]
     done.sort(key=lambda t: (-t.score_mean, t.trial_id))
     selected = run.evaluation["selected_trial_id"]
     chosen = next(t for t in done if t.trial_id == selected)
@@ -206,13 +206,13 @@ def one_run(
         "baseline_cv_score": evaluation["baseline_cv_score"],
         "test_interval": [test_low, test_high],
         "cv_interval": [cv_low, cv_high],
-        "fit_health": run.health_label(chosen),
+        "fit_health": run.diagnose(chosen),
         "test_interval_excludes_baseline": bool(test_low > TRUE_SKILL),
         "cv_interval_excludes_baseline": bool(
             cv_low > evaluation["baseline_cv_score"]
         ),
         "lead_exceeds_spread": lead_exceeds_spread(run),
-        "fit_health_healthy": run.health_label(chosen) == "healthy",
+        "fit_health_healthy": run.diagnose(chosen) == "healthy",
         "leakage_suspect": bool(run.profile.leakage.get("suspects")),
         "true_test_auc": truth,
         "test_interval_covers_truth": bool(test_low <= truth <= test_high),
@@ -222,7 +222,7 @@ def one_run(
         "trial_fold_scores": {
             t.trial_id: t.fold_scores
             for t in run.trials
-            if t.status is experiments.TrialStatus.OK
+            if t.status is experiments.Termination.OK
         },
         "seconds": time.monotonic() - started,
     }

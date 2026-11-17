@@ -14,7 +14,7 @@ from scmle.contracts import reliability
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class FaultArtifact:
+class Emission:
     """One artifact emitted by an injected reliability scenario.
 
     The harness does not inject process death, disk pressure, or worker loss
@@ -49,7 +49,7 @@ class FaultArtifact:
             raise errors.InputError("observation must not be empty")
 
 
-class FaultInjectionHarness:
+class Harness:
     """Persist executor output and update one reliability plan scenario."""
 
     def __init__(
@@ -97,10 +97,8 @@ class FaultInjectionHarness:
 
     def run(
         self,
-        scenario: reliability.FaultScenario,
-        executor: Callable[
-            [reliability.FaultScenario], tuple[FaultArtifact, ...]
-        ],
+        scenario: reliability.Contingency,
+        executor: Callable[[reliability.Contingency], tuple[Emission, ...]],
     ) -> reliability.Plan:
         """Runs an injected executor and records durable evidence.
 
@@ -125,13 +123,13 @@ class FaultInjectionHarness:
 
         Raises:
             ReliabilityError: If the executor fails.
-            TypeError: If `scenario` is not a `FaultScenario` or the executor
-                does not return a tuple of `FaultArtifact` values.
+            TypeError: If `scenario` is not a `Contingency` or the executor
+                does not return a tuple of `Emission` values.
             ValueError: If the executor returns duplicate evidence types or
                 types the scenario does not declare; nothing is published.
         """
-        if not isinstance(scenario, reliability.FaultScenario):
-            raise errors.KindError("scenario must be FaultScenario")
+        if not isinstance(scenario, reliability.Contingency):
+            raise errors.KindError("scenario must be Contingency")
         try:
             artifacts: object = executor(scenario)  # an injected callable
         except Exception as error:
@@ -140,9 +138,9 @@ class FaultInjectionHarness:
                 {"scenario": scenario.value, "execution_id": self.execution_id},
             ) from error
         if not isinstance(artifacts, tuple) or not all(
-            isinstance(item, FaultArtifact) for item in artifacts
+            isinstance(item, Emission) for item in artifacts
         ):
-            raise errors.KindError("executor must return FaultArtifact values")
+            raise errors.KindError("executor must return Emission values")
         requirements = self.registry.plans[scenario].evidence_requirements
         evidence_types = tuple(item.evidence_type for item in artifacts)
         if len(evidence_types) != len(set(evidence_types)):
@@ -176,7 +174,7 @@ class FaultInjectionHarness:
                     observation=artifact.observation,
                 )
             )
-        return self.registry.record_evidence(scenario, tuple(evidence))
+        return self.registry.log(scenario, tuple(evidence))
 
     @staticmethod
     def digest(path: str | pathlib.Path) -> str:

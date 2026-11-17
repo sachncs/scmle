@@ -49,7 +49,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
         <tr><th scope="row">Other PyTorch and Keras families</th><td>The same optional extra exposes MLP, residual, TabM-style ensemble, and RealMLP-style families, plus a Keras 3 MLP (<code>keras_mlp</code>) that runs on the PyTorch backend. They are explicit candidates, not silent dependencies.</td><td><span class="status status-experimental">Experimental</span></td></tr>
         <tr><th scope="row">Text embeddings</th><td>Install <code>scmle[embeddings]</code> for the sentence-transformers integration. The text transformer runs in the isolated worker; if unavailable, the documented fallback is TF-IDF.</td><td><span class="status status-experimental">Experimental</span></td></tr>
         <tr><th scope="row">TabPFN</th><td>The explicit adapter (<code>scmle[tabpfn]</code>, which is not part of <code>scmle[all]</code>) remains extension-only until the external package, model-weight license, token custody, and independent evidence are supplied. The engine refuses <code>sample_weight</code> rather than ignore it.</td><td><span class="status status-extension">Extension-only</span></td></tr>
-        <tr><th scope="row">Tabular JEPA</th><td>Install <code>scmle[deeplearning]</code> and explicitly opt in with <code>Candidates(experimental_models=["torch_jepa"])</code>. The project adapter composes the self-supervised <code>JepaEstimator</code> with a supervised head, so the same representation is evaluated, packaged, loaded, and used by <code>RunResult.predict</code>.</td><td><span class="status status-experimental">Experimental</span></td></tr>
+        <tr><th scope="row">Tabular JEPA</th><td>Install <code>scmle[deeplearning]</code> and explicitly opt in with <code>Candidates(experimental_models=["torch_jepa"])</code>. The project adapter composes the self-supervised <code>Embedder</code> with a supervised head, so the same representation is evaluated, packaged, loaded, and used by <code>RunResult.predict</code>.</td><td><span class="status status-experimental">Experimental</span></td></tr>
         <tr><th scope="row">Parameter estimation</th><td><code>estimate_parameters</code> supports declared linear, logistic, Bayesian Gaussian, binary and continuous-treatment IPW/AIPW paths, and grouped random-intercept or one-random-slope estimators, with explicit assumptions, uncertainty, sensitivity, and independent reference evidence. Clustered uncertainty names its sampling units and diagnostics. Reports are digest-bound and can be persisted with <code>Estimation.write</code>.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
         <tr><th scope="row">Longitudinal causal estimation</th><td><code>Estimator</code> accepts validated subject/time rows and estimates period-specific binary-treatment Hájek IPW effects with overlap, effective sample size, subject-aligned covariance, and digest-bound reports.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
         <tr><th scope="row">Sequential causal estimation</th><td><code>Estimator</code> estimates a static always-treated versus always-control contrast over two or more periods using stabilized treatment-history weights and declared pre-treatment time-varying covariates.</td><td><span class="status status-experimental">Bounded API</span></td></tr>
@@ -79,9 +79,9 @@ result.save("bundle", signing_key="load-this-from-your-secret-store")`}</code></
 
   <h2 id="jepa">Pretrain a tabular JEPA representation</h2>
   <p>JEPA is a transformer-adjacent self-supervised representation workflow, not a target-label model. The project integration accepts a tabular feature plan, masks the resulting finite numeric matrix, predicts an EMA target representation, and trains a small supervised head on the embeddings. The downstream benchmark, split, and model card remain your responsibility.</p>
-  <pre><code>{`from scmle.models.deeplearning import JepaEstimator
+  <pre><code>{`from scmle.models.deeplearning import Embedder
 
-encoder = JepaEstimator(
+encoder = Embedder(
     embedding_size=64,
     mask_probability=0.3,
     epochs=50,

@@ -150,7 +150,7 @@ class CheckpointStore:
         key = self.key(step)
         try:
             data = self.store.get(key)[0]
-        except objectstore.NotFoundError:
+        except objectstore.AbsentError:
             # handled: an absent checkpoint is None, as documented
             return None
         except objectstore.CorruptObjectError:

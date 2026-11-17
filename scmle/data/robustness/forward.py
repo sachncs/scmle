@@ -83,7 +83,7 @@ class Finding:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ForwardCheck:
+class Forward:
     """Outcome of the forward check.
 
     Attributes:
@@ -112,7 +112,7 @@ class ForwardCheck:
         }
 
 
-def skipped(reason: str) -> ForwardCheck:
+def skipped(reason: str) -> Forward:
     """Builds a result that says the check did not run, and why.
 
     Args:
@@ -121,12 +121,10 @@ def skipped(reason: str) -> ForwardCheck:
     Returns:
         A `skipped` result with `opened` False and no findings.
     """
-    return ForwardCheck(
-        status="skipped", reason=reason, opened=False, findings=()
-    )
+    return Forward(status="skipped", reason=reason, opened=False, findings=())
 
 
-def label_for(effect_x: float, low: float, high: float) -> str:
+def verdict(effect_x: float, low: float, high: float) -> str:
     """Labels a finding from its forward interval and its sign on `X`.
 
     Args:
@@ -173,7 +171,7 @@ def evaluate(
         the rank correlation is not defined on the forward rows, the effect
         and the `Check` are None and the label is `inconclusive`.
     """
-    effect = stability.rank_effect(values, target)
+    effect = stability.rankcorr(values, target)
     if not math.isfinite(effect):
         return Finding(name, effect_x, None, INCONCLUSIVE, None)
     rng = randomness.component_rng(seed, f"{CHECK_ID}.{name}", 0)
@@ -187,7 +185,7 @@ def evaluate(
         )
     )
     draws = numpy.array(
-        [stability.rank_effect(values[p], target[p]) for p in picks]
+        [stability.rankcorr(values[p], target[p]) for p in picks]
     )
     draws = draws[numpy.isfinite(draws)]
     tail = (1.0 - CONFIDENCE) / 2.0 * 100.0
@@ -197,7 +195,7 @@ def evaluate(
         else (effect, effect)
     )
     low, high = min(low, effect), max(high, effect)
-    label = label_for(effect_x, low, high)
+    label = verdict(effect_x, low, high)
     check = qualification.Check(
         check_id=f"{CHECK_ID}:{name}",
         null_hypothesis="the finding's effect on the forward set is zero",
@@ -211,7 +209,7 @@ def evaluate(
             if label == UNSTABLE
             else qualification.Decision.PASS
         ),
-        set_id=qualification.SetId.FORWARD,
+        set_id=qualification.Subset.FORWARD,
         seed_path=randomness.seed_path(seed, f"{CHECK_ID}.{name}", 0),
         tier=qualification.Tier.UNVERIFIED,
     )
@@ -219,14 +217,14 @@ def evaluate(
 
 
 def forward_check(
-    source: confirm.ConfirmationSource | None,
+    source: confirm.Source | None,
     effects: Mapping[str, float],
     encode: Callable[[pandas.Series], numpy.ndarray],
     *,
     temporal: bool,
     seed: int,
     bootstrap: int = BOOTSTRAP,
-) -> ForwardCheck:
+) -> Forward:
     """Opens `F` once and evaluates the surviving findings on it.
 
     Args:
@@ -277,7 +275,7 @@ def forward_check(
                 bootstrap,
             )
         )
-    return ForwardCheck(
+    return Forward(
         status="checked",
         reason="F was opened once and nothing was fitted on it",
         opened=True,

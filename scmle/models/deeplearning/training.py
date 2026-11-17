@@ -23,7 +23,7 @@ STALL_IMPROVEMENT = 0.01
 MIN_EPOCHS_FOR_TREND = 3
 
 
-def resolve_batch_size(setting: int | str, rows: int) -> int:
+def batching(setting: int | str, rows: int) -> int:
     """Turns a batch-size setting into a number of rows per step.
 
     `auto` aims for roughly `rows / 32` steps per epoch rounded to a power of
@@ -51,7 +51,7 @@ def resolve_batch_size(setting: int | str, rows: int) -> int:
     )
 
 
-def learning_rate_at(
+def anneal(
     step: int, total_steps: int, base: float, warmup_steps: int, kind: str
 ) -> float:
     """Learning rate for an optimisation step.

@@ -27,7 +27,7 @@ def table(rows=500, seed=0):
 
 
 def attest(column="copy", scope=SCOPE, date="2026-01-01", expires="2026-12-31"):
-    return attestations.LeakageAttestation(
+    return attestations.Affidavit(
         column,
         provenance.Attestation(
             "A. Owner",
@@ -148,7 +148,7 @@ def test_a_record_with_an_unknown_field_is_refused():
     record = {**attest().to_dict(), "extra": 1}
 
     with pytest.raises(ValueError):
-        attestations.LeakageAttestation.from_dict(record)
+        attestations.Affidavit.from_dict(record)
 
 
 def test_a_missing_file_is_a_value_error(tmp_path):
@@ -161,7 +161,7 @@ def test_a_lead_that_is_not_a_number_is_a_value_error(lead):
     record = {**attest().to_dict(), "lead_seconds": lead}
 
     with pytest.raises(ValueError, match="lead_seconds"):
-        attestations.LeakageAttestation.from_dict(record)
+        attestations.Affidavit.from_dict(record)
 
 
 def test_an_attestation_check_ignores_a_non_finite_statistic():
@@ -176,14 +176,12 @@ def test_an_attestation_check_ignores_a_non_finite_statistic():
             0.5,
             True,
             True,
-            certificates.GateStatus.GATING,
+            certificates.Authority.GATING,
         )
 
-    check = qualify.attestation_check(
+    check = qualify.waiver(
         attest(), [finding(float("nan")), finding(0.7)], 100, 0, 0
     )
     assert check.statistic == 0.7 and check.effect == 0.7
-    only_bad = qualify.attestation_check(
-        attest(), [finding(float("inf"))], 100, 0, 0
-    )
+    only_bad = qualify.waiver(attest(), [finding(float("inf"))], 100, 0, 0)
     assert only_bad.statistic == 0.0

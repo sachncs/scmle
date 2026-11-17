@@ -44,7 +44,7 @@ REFUSED = "refused"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class LoggedBandit:
+class Bandits:
     """A logged decision problem on `n` rows and `K` actions.
 
     Attributes:
@@ -53,7 +53,7 @@ class LoggedBandit:
         behaviour: `mu(a | x)` for every action, shape `(n, K)`; rows sum to
             one.
         target: `pi(a | x)` for every action, shape `(n, K)`.
-        outcome_model: `q(x, a)` for every action, shape `(n, K)`, from a
+        booster: `q(x, a)` for every action, shape `(n, K)`, from a
             model fitted on development data; None for IPW and SNIPS only.
         clusters: Cluster label per row, or None.
         randomized: Whether `behaviour` was recorded by a randomization
@@ -64,7 +64,7 @@ class LoggedBandit:
     rewards: NDArray[numpy.float64]
     behaviour: NDArray[numpy.float64]
     target: NDArray[numpy.float64]
-    outcome_model: NDArray[numpy.float64] | None = None
+    booster: NDArray[numpy.float64] | None = None
     clusters: NDArray[Any] | None = None
     randomized: bool = True
 
@@ -76,7 +76,7 @@ class LoggedBandit:
                 `actions`; if `behaviour` or `target` does not have shape
                 `(n, K)`, has a negative entry or has a row that does not sum
                 to one; if they differ in `K`; if an action index lies
-                outside `0 .. K-1`; or if `outcome_model` or `clusters` does
+                outside `0 .. K-1`; or if `booster` or `clusters` does
                 not align with the rows.
         """
         n = len(self.actions)
@@ -95,7 +95,7 @@ class LoggedBandit:
             raise errors.InputError("behaviour and target need the same K")
         if ((self.actions < 0) | (self.actions >= k)).any():
             raise errors.InputError("an action index is out of range")
-        if self.outcome_model is not None and self.outcome_model.shape != (
+        if self.booster is not None and self.booster.shape != (
             n,
             k,
         ):
@@ -162,7 +162,7 @@ class Estimate:
 
 
 def weights(
-    log: LoggedBandit, clip: float | None
+    log: Bandits, clip: float | None
 ) -> tuple[NDArray[numpy.float64], float]:
     """Importance weights at the logged actions and the clipped share.
 
@@ -181,7 +181,7 @@ def weights(
     return numpy.minimum(ratio, clip), float(numpy.mean(ratio > clip))
 
 
-def support_violations(log: LoggedBandit, min_propensity: float) -> int:
+def unsupported(log: Bandits, min_propensity: float) -> int:
     """Counts rows where the target puts mass on an action with `mu < eps`.
 
     Args:
@@ -197,7 +197,7 @@ def support_violations(log: LoggedBandit, min_propensity: float) -> int:
 
 
 def terms(
-    log: LoggedBandit, estimator: str, clip: float | None
+    log: Bandits, estimator: str, clip: float | None
 ) -> tuple[NDArray[numpy.float64], float]:
     """Per-row influence terms whose mean is the estimate.
 
@@ -220,14 +220,14 @@ def terms(
     if estimator == "snips":
         value = float(numpy.sum(w * log.rewards) / numpy.sum(w))
         return w * (log.rewards - value) / float(numpy.mean(w)) + value, share
-    if log.outcome_model is None:
+    if log.booster is None:
         raise errors.InputError("dr needs an outcome model")
-    direct = (log.target * log.outcome_model).sum(axis=1)
-    resid = log.rewards - log.taken(log.outcome_model)
+    direct = (log.target * log.booster).sum(axis=1)
+    resid = log.rewards - log.taken(log.booster)
     return direct + w * resid, share
 
 
-def mean_interval(
+def wald(
     values: NDArray[numpy.float64],
     clusters: NDArray[Any] | None,
     level: float,
@@ -260,8 +260,8 @@ def mean_interval(
     return centre, (centre - z * se, centre + z * se)
 
 
-def estimate_value(
-    log: LoggedBandit,
+def evaluate(
+    log: Bandits,
     estimator: str = "dr",
     *,
     clip: float | None = None,
@@ -303,7 +303,7 @@ def estimate_value(
     raw = weights(log, None)[0]
     ess = sequential.effective_sample_size(raw) / log.rows
     reasons = []
-    violations = support_violations(log, min_propensity)
+    violations = unsupported(log, min_propensity)
     if violations:
         reasons.append(
             f"support: {violations} rows put target mass where the logged "
@@ -326,7 +326,7 @@ def estimate_value(
             clip is not None,
         )
     row_terms, share = terms(log, estimator, clip)
-    centre, interval = mean_interval(row_terms, log.clusters, level)
+    centre, interval = wald(row_terms, log.clusters, level)
     notes = []
     if clip is not None:
         notes.append(f"weights clipped at {clip}: {share:.1%} of rows")
@@ -351,8 +351,8 @@ def estimate_value(
     )
 
 
-def difference_value(
-    log: LoggedBandit,
+def contrast(
+    log: Bandits,
     baseline: ArrayLike,
     estimator: str = "dr",
     *,
@@ -384,13 +384,13 @@ def difference_value(
         refused; otherwise the target's estimate with the value and interval
         of the difference and the smaller of the two effective sample size
         ratios. Invalid estimator, level or support floor are rejected with
-        a `ValueError` by `estimate_value`, and a `baseline` that is not an
-        `(n, K)` matrix of probabilities by `LoggedBandit`.
+        a `ValueError` by `evaluate`, and a `baseline` that is not an
+        `(n, K)` matrix of probabilities by `Bandits`.
     """
     other = dataclasses.replace(
         log, target=numpy.asarray(baseline, dtype=float)
     )
-    main = estimate_value(
+    main = evaluate(
         log,
         estimator,
         clip=clip,
@@ -399,7 +399,7 @@ def difference_value(
         level=level,
         eligible_strategy=eligible_strategy,
     )
-    base = estimate_value(
+    base = evaluate(
         other,
         estimator,
         clip=clip,
@@ -414,7 +414,7 @@ def difference_value(
         return base
     first = terms(log, estimator, clip)[0]
     second = terms(other, estimator, clip)[0]
-    centre, interval = mean_interval(first - second, log.clusters, level)
+    centre, interval = wald(first - second, log.clusters, level)
     return dataclasses.replace(
         main,
         value=centre,
@@ -423,7 +423,7 @@ def difference_value(
     )
 
 
-def fit_outcome_model(
+def regress(
     features: ArrayLike,
     actions: ArrayLike,
     rewards: ArrayLike,
@@ -518,8 +518,8 @@ class Cutoff:
         return numpy.column_stack([1.0 - treat, treat])
 
 
-def fit_threshold_policy(
-    log: LoggedBandit,
+def tune(
+    log: Bandits,
     tau: ArrayLike,
     *,
     penalty: float = 0.0,
@@ -548,17 +548,17 @@ def fit_threshold_policy(
         ScmleError: If there is no candidate cut.
     """
     effect = numpy.asarray(tau, dtype=float)
-    if log.outcome_model is None or log.behaviour.shape[1] != BINARY_ACTIONS:
+    if log.booster is None or log.behaviour.shape[1] != BINARY_ACTIONS:
         raise errors.InputError(
             "policy fitting needs a binary action and a q model"
         )
     ratio = 1.0 / log.taken(log.behaviour)
     if clip is not None:
         ratio = numpy.minimum(ratio, clip)
-    resid = log.rewards - log.taken(log.outcome_model)
-    gain = (
-        log.outcome_model[:, 1] - log.outcome_model[:, 0]
-    ) + ratio * resid * (2.0 * (log.actions == 1) - 1.0)
+    resid = log.rewards - log.taken(log.booster)
+    gain = (log.booster[:, 1] - log.booster[:, 0]) + ratio * resid * (
+        2.0 * (log.actions == 1) - 1.0
+    )
     best: Cutoff | None = None
     for cut in numpy.unique(numpy.quantile(effect, numpy.linspace(0, 1, 101))):
         treat = effect > cut

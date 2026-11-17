@@ -63,7 +63,7 @@ class Fit:
     n: int
 
 
-def local_fit(
+def polyfit(
     x: numpy.ndarray, y: numpy.ndarray, h: float, order: int
 ) -> Fit | None:
     """Fits a triangular-kernel polynomial and reads it at 0.
@@ -99,7 +99,7 @@ def local_fit(
     return Fit(float(coef[0]), variance, n)
 
 
-def cv_bandwidth(x: numpy.ndarray, y: numpy.ndarray) -> float:
+def crossvalidate(x: numpy.ndarray, y: numpy.ndarray) -> float:
     """Leave-out cross-validated bandwidth for one signed side of the cutoff.
 
     `x` holds distances from the cutoff, positive, nearest first after
@@ -130,7 +130,7 @@ def cv_bandwidth(x: numpy.ndarray, y: numpy.ndarray) -> float:
             near = far & (x - x[i] < h)
             if near.sum() < MIN_NEAR_ROWS:
                 continue
-            fit = local_fit(x[near] - x[i], y[near], h, 1)
+            fit = polyfit(x[near] - x[i], y[near], h, 1)
             if fit is not None:
                 errors.append((y[i] - fit.intercept) ** 2)
         if len(errors) >= MIN_CV_ERRORS and numpy.mean(errors) < best_error:
@@ -210,8 +210,8 @@ def discontinuity(
     left = x < cutoff
     pieces = {}
     for name, mask in (("left", left), ("right", ~left)):
-        linear = local_fit(x[mask] - cutoff, y[mask], h, 1)
-        quadratic = local_fit(x[mask] - cutoff, y[mask], h, 2)
+        linear = polyfit(x[mask] - cutoff, y[mask], h, 1)
+        quadratic = polyfit(x[mask] - cutoff, y[mask], h, 2)
         if linear is None or quadratic is None:
             return None
         pieces[name] = (linear, quadratic)
@@ -231,7 +231,7 @@ def discontinuity(
     }
 
 
-def chosen_bandwidth(
+def choose(
     x: numpy.ndarray,
     y: numpy.ndarray,
     left: numpy.ndarray,
@@ -253,8 +253,8 @@ def chosen_bandwidth(
     """
     if bandwidth is None:
         return max(
-            cv_bandwidth(cutoff - x[left], y[left]),
-            cv_bandwidth(x[~left] - cutoff, y[~left]),
+            crossvalidate(cutoff - x[left], y[left]),
+            crossvalidate(x[~left] - cutoff, y[~left]),
         )
     return float(bandwidth)
 
@@ -300,7 +300,7 @@ def estimate(
         raise scmle.contracts.errors.InputError(
             f"each side needs at least {MIN_SIDE} rows"
         )
-    h = chosen_bandwidth(x, y, left, cutoff, bandwidth)
+    h = choose(x, y, left, cutoff, bandwidth)
     main = discontinuity(x, y, cutoff, h, level)
     if main is None:
         raise scmle.contracts.errors.InputError(

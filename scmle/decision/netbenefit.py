@@ -39,7 +39,7 @@ NOT_USEFUL = "not_useful_in_range"
 BASELINE_NAMES = ("treat_none", "treat_all", "incumbent")
 
 
-class SecondEvaluationError(RuntimeError):
+class RepeatError(RuntimeError):
     """A frozen rule was evaluated on the final table a second time."""
 
 
@@ -111,7 +111,7 @@ def diffs(
     return numpy.stack(rows, axis=1)
 
 
-def resample_means(
+def redraw(
     stats: NDArray[numpy.float64],
     groups: NDArray[numpy.intp] | None,
     replicates: int,
@@ -218,7 +218,7 @@ class Benefit:
         return dataclasses.asdict(self)
 
 
-def useful_span(
+def stretch(
     grid: NDArray[numpy.float64], positive: NDArray[numpy.bool_]
 ) -> tuple[float, float] | None:
     """The longest run of grid points where every lower bound is positive.
@@ -246,7 +246,7 @@ def useful_span(
     return float(grid[best[0]]), float(grid[best[1] - 1])
 
 
-def net_benefit_band(
+def lowerband(
     y: ArrayLike,
     acts: ArrayLike,
     t_range: tuple[float, float],
@@ -280,11 +280,11 @@ def net_benefit_band(
             `y`, `t_range` does not satisfy `0 < t_lo <= t_hi < 1`, or
             `alpha` is not strictly between 0 and 1. Invalid outcomes,
             actions, incumbent or `replicates` below 20 are also rejected
-            with a `ValueError` by `costs.pair`, `costs.binary_vector`,
+            with a `ValueError` by `costs.pair`, `costs.dichotomous`,
             `qualification.count` and `factorize`.
     """
     outcomes, actions = costs.pair(y, acts)
-    base = None if incumbent is None else costs.binary_vector(incumbent, "b")
+    base = None if incumbent is None else costs.dichotomous(incumbent, "b")
     if base is not None and base.shape != outcomes.shape:
         raise errors.InputError("incumbent must have the length of y")
     low, high = t_range
@@ -304,7 +304,7 @@ def net_benefit_band(
         0
     ]
     boot = diffs(
-        resample_means(stats, groups, replicates, rng),
+        redraw(stats, groups, replicates, rng),
         weights,
         base is not None,
     )
@@ -337,7 +337,7 @@ def net_benefit_band(
         rows=len(outcomes),
         clusters=n_clusters,
         claim=claim,
-        useful_range=useful_span(grid, positive),
+        useful_range=stretch(grid, positive),
     )
 
 
@@ -383,23 +383,23 @@ class FinalNetBenefit:
             y: Outcomes on the final table, 0 or 1.
             acts: The frozen rule's actions on the final table.
             t_range: Chartered range of threshold probabilities.
-            **options: Further keyword arguments of `net_benefit_band`.
+            **options: Further keyword arguments of `lowerband`.
 
         Returns:
             The net benefit report of the one permitted evaluation.
 
         Raises:
-            SecondEvaluationError: If `frozen` differs from the registered
+            RepeatError: If `frozen` differs from the registered
                 hash, or the final table was already evaluated.
         """
         if frozen != self.frozen:
-            raise SecondEvaluationError(
+            raise RepeatError(
                 "the rule differs from the one registered before the final "
                 "table was read"
             )
         if self.used:
-            raise SecondEvaluationError(
+            raise RepeatError(
                 "the final table was already evaluated for this rule"
             )
         self.used = True
-        return net_benefit_band(y, acts, t_range, **options)
+        return lowerband(y, acts, t_range, **options)

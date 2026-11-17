@@ -11,14 +11,14 @@ from scmle.evaluation import coverage_slices
 def test_categorical_levels_are_the_labels_and_a_new_level_is_kept():
     reference = pandas.Series(["a", "b", "a", "b"])
     test = pandas.Series(["a", "c", "b"])
-    labels = coverage_slices.labels_for(test, reference)
+    labels = coverage_slices.bucket(test, reference)
     assert list(labels) == ["a", "c", "b"]
 
 
 def test_numeric_bands_come_from_the_reference_rows_only():
     reference = pandas.Series(numpy.arange(100.0))
     test = pandas.Series([0.0, 30.0, 60.0, 99.0, 500.0, -5.0])
-    labels = coverage_slices.labels_for(test, reference)
+    labels = coverage_slices.bucket(test, reference)
     assert list(labels) == [
         "band 1",
         "band 2",
@@ -31,7 +31,7 @@ def test_numeric_bands_come_from_the_reference_rows_only():
 
 def test_too_many_levels_is_not_assessable():
     reference = pandas.Series([f"u{i}" for i in range(50)])
-    assert coverage_slices.labels_for(reference, reference) is None
+    assert coverage_slices.bucket(reference, reference) is None
 
 
 def descriptive_gate():
@@ -102,7 +102,7 @@ def test_the_flag_gate_follows_the_stored_certificate(tmp_path):
     path = tmp_path / "c.json"
     assert coverage_slices.flag_gate(path).status == "descriptive"
     entry = {
-        "method_hash": coverage_slices.flag_method_hash(),
+        "method_hash": coverage_slices.fingerprint(),
         "passed": True,
         "min_certified_rows": 100,
     }

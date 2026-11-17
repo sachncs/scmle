@@ -179,7 +179,7 @@ class Ensemble(Architecture):
         """
         members = ENSEMBLE_MEMBERS
 
-        class EnsembleLinear(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
+        class Affine(torch.nn.Module):  # type: ignore[misc]  # torch is imported lazily and passed in as Any
             """Shared weight with per-member input/output scales and bias."""
 
             def __init__(self, width_in: int, width_out: int) -> None:
@@ -223,12 +223,12 @@ class Ensemble(Architecture):
                 width = inputs
                 for size in hidden_sizes:
                     layers += [
-                        EnsembleLinear(width, size),
+                        Affine(width, size),
                         torch.nn.ReLU(),
                         torch.nn.Dropout(dropout),
                     ]
                     width = size
-                layers.append(EnsembleLinear(width, outputs))
+                layers.append(Affine(width, outputs))
                 self.layers = torch.nn.Sequential(*layers)
 
             def forward(self, features: Any) -> Any:
@@ -327,7 +327,7 @@ class Transformer(Architecture):
         return Network()
 
 
-class RobustMlpArchitecture(Architecture):
+class Robust(Architecture):
     """An MLP with RealMLP-style numerics: learned scaling, smooth clipping.
 
     A learned per-feature scale feeds a smooth clip `x / sqrt(1 + (x/3)^2)`
@@ -411,6 +411,6 @@ ARCHITECTURES: dict[str, Architecture] = {
         Residual(),
         Ensemble(),
         Transformer(),
-        RobustMlpArchitecture(),
+        Robust(),
     )
 }

@@ -30,7 +30,7 @@ def brute_force_log_capital(values, null_mean, direction, alpha, cap=0.5):
 )
 def test_betting_test_matches_a_plain_loop(direction):
     values = numpy.random.default_rng(1).beta(2, 6, 60)
-    test = sequential_tests.BettingTest(0.3, direction, 0.05)
+    test = sequential_tests.Betting(0.3, direction, 0.05)
     for value in values:
         test.update(value)
     expected = brute_force_log_capital(values, 0.3, direction, 0.05)
@@ -40,11 +40,11 @@ def test_betting_test_matches_a_plain_loop(direction):
 def test_vector_test_equals_scalar_tests():
     rng = numpy.random.default_rng(2)
     data = rng.random((40, 3))
-    vector = sequential_tests.BettingTest(
+    vector = sequential_tests.Betting(
         numpy.full(3, 0.4), sequential_tests.GREATER, 0.05
     )
     scalars = [
-        sequential_tests.BettingTest(0.4, sequential_tests.GREATER, 0.05)
+        sequential_tests.Betting(0.4, sequential_tests.GREATER, 0.05)
         for ignored in range(3)
     ]
     for row in data:
@@ -58,7 +58,7 @@ def test_vector_test_equals_scalar_tests():
 
 def test_false_alarm_rate_is_below_the_level_at_every_look():
     rng = numpy.random.default_rng(3)
-    test = sequential_tests.BettingTest(
+    test = sequential_tests.Betting(
         numpy.full(1000, 0.15), sequential_tests.GREATER, 0.05
     )
     for ignored in range(1500):
@@ -68,14 +68,14 @@ def test_false_alarm_rate_is_below_the_level_at_every_look():
 
 def test_a_rise_is_detected():
     rng = numpy.random.default_rng(4)
-    alarm = sequential_tests.RiskAlarm(0.10, 0.05, 0.05)
+    alarm = sequential_tests.Tripwire(0.10, 0.05, 0.05)
     fired = [alarm.update(rng.binomial(50, 0.25) / 50) for ignored in range(60)]
     assert any(fired)
 
 
 def test_confidence_sequence_covers_and_tightens():
     rng = numpy.random.default_rng(5)
-    sequence = sequential_tests.ConfidenceSequence(0.05)
+    sequence = sequential_tests.Confidence(0.05)
     widths = []
     for ignored in range(200):
         low, high = sequence.update(rng.binomial(50, 0.3) / 50)
@@ -86,8 +86,8 @@ def test_confidence_sequence_covers_and_tightens():
 
 def test_paired_process_proposes_for_a_better_challenger_only():
     rng = numpy.random.default_rng(6)
-    better = sequential_tests.PairedEProcess(0.0, 0.05)
-    same = sequential_tests.PairedEProcess(0.0, 0.05)
+    better = sequential_tests.Comparison(0.0, 0.05)
+    same = sequential_tests.Comparison(0.0, 0.05)
     for ignored in range(80):
         latent = rng.random(200)
         champion = (latent < 0.2).astype(float)
@@ -100,7 +100,7 @@ def test_paired_process_proposes_for_a_better_challenger_only():
 
 def test_reverse_process_flags_a_worse_new_champion():
     rng = numpy.random.default_rng(7)
-    process = sequential_tests.PairedEProcess(0.0, 0.05)
+    process = sequential_tests.Comparison(0.0, 0.05)
     for ignored in range(80):
         latent = rng.random(200)
         process.update(
@@ -110,10 +110,10 @@ def test_reverse_process_flags_a_worse_new_champion():
 
 
 def test_state_round_trips():
-    test = sequential_tests.BettingTest(0.2, sequential_tests.LESS, 0.1)
+    test = sequential_tests.Betting(0.2, sequential_tests.LESS, 0.1)
     for value in (0.1, 0.4, 0.2):
         test.update(value)
-    again = sequential_tests.BettingTest.from_dict(test.to_dict())
+    again = sequential_tests.Betting.from_dict(test.to_dict())
     again.update(0.3)
     test.update(0.3)
     assert float(again.log_capital) == pytest.approx(float(test.log_capital))
@@ -143,29 +143,29 @@ def test_promotion_sequence_enforces_registration_order():
 )
 def test_invalid_arguments_are_refused(bad):
     with pytest.raises(ValueError):
-        sequential_tests.BettingTest(**bad)
+        sequential_tests.Betting(**bad)
 
 
 def test_observations_outside_the_unit_interval_are_refused():
     with pytest.raises(ValueError, match="within"):
-        sequential_tests.BettingTest(
-            0.5, sequential_tests.GREATER, 0.05
-        ).update(1.5)
+        sequential_tests.Betting(0.5, sequential_tests.GREATER, 0.05).update(
+            1.5
+        )
 
 
 def test_scaled_gaps_and_state_round_trip_for_processes_and_alarms():
-    process = sequential_tests.PairedEProcess(0.0, 0.05, scale=10.0)
+    process = sequential_tests.Comparison(0.0, 0.05, scale=10.0)
     for gap in (2.0, 3.0, -1.0):
-        process.update_gap(gap)
-    again = sequential_tests.PairedEProcess.from_dict(process.to_dict())
+        process.ingest(gap)
+    again = sequential_tests.Comparison.from_dict(process.to_dict())
     assert again.e_value == pytest.approx(process.e_value)
     with pytest.raises(ValueError, match="gap"):
-        process.update_gap(11.0)
+        process.ingest(11.0)
     with pytest.raises(ValueError, match="margin"):
-        sequential_tests.PairedEProcess(10.0, 0.05, scale=10.0)
-    alarm = sequential_tests.RiskAlarm(0.1, 0.05, 0.05, scale=2.0)
+        sequential_tests.Comparison(10.0, 0.05, scale=10.0)
+    alarm = sequential_tests.Tripwire(0.1, 0.05, 0.05, scale=2.0)
     alarm.update(0.5)
-    restored = sequential_tests.RiskAlarm.from_dict(alarm.to_dict())
+    restored = sequential_tests.Tripwire.from_dict(alarm.to_dict())
     assert restored.update(0.9) == alarm.update(0.9)
     assert float(restored.test.log_capital) == pytest.approx(
         float(alarm.test.log_capital)
@@ -174,7 +174,7 @@ def test_scaled_gaps_and_state_round_trip_for_processes_and_alarms():
 
 def test_mixture_false_alarm_rate_is_below_the_level():
     rng = numpy.random.default_rng(11)
-    test = sequential_tests.MixtureTest(
+    test = sequential_tests.Mixture(
         numpy.full(600, 0.15), sequential_tests.GREATER, 0.05, stride=10
     )
     for ignored in range(800):
@@ -184,10 +184,10 @@ def test_mixture_false_alarm_rate_is_below_the_level():
 
 def test_mixture_detects_a_change_after_a_long_quiet_stretch():
     rng = numpy.random.default_rng(12)
-    plain = sequential_tests.BettingTest(
+    plain = sequential_tests.Betting(
         numpy.full(100, 0.15), sequential_tests.GREATER, 0.05
     )
-    mixed = sequential_tests.MixtureTest(
+    mixed = sequential_tests.Mixture(
         numpy.full(100, 0.15), sequential_tests.GREATER, 0.05
     )
     for step in range(500):
@@ -200,29 +200,29 @@ def test_mixture_detects_a_change_after_a_long_quiet_stretch():
 
 
 def test_mixture_weights_add_to_at_most_one_and_old_terms_are_dropped():
-    test = sequential_tests.MixtureTest(
+    test = sequential_tests.Mixture(
         0.3, sequential_tests.GREATER, 0.05, stride=2, terms=3
     )
     for ignored in range(30):
         test.update(0.3)
     assert len(test.inner) == 3
     assert sum(math.exp(w) for w in test.log_weights) < 1.0
-    fresh = sequential_tests.MixtureTest(0.3, sequential_tests.GREATER, 0.05)
+    fresh = sequential_tests.Mixture(0.3, sequential_tests.GREATER, 0.05)
     assert math.exp(fresh.log_weights[0]) == pytest.approx(0.5)
 
 
 def test_mixture_state_round_trips():
-    test = sequential_tests.MixtureTest(
+    test = sequential_tests.Mixture(
         0.2, sequential_tests.LESS, 0.1, stride=3, terms=4
     )
     for value in (0.1, 0.4, 0.2, 0.3, 0.1, 0.0, 0.5):
         test.update(value)
-    again = sequential_tests.MixtureTest.from_dict(test.to_dict())
+    again = sequential_tests.Mixture.from_dict(test.to_dict())
     test.update(0.25)
     again.update(0.25)
     assert float(again.log_capital) == pytest.approx(float(test.log_capital))
     with pytest.raises(ValueError, match="positive"):
-        sequential_tests.MixtureTest(0.2, sequential_tests.LESS, 0.1, stride=0)
+        sequential_tests.Mixture(0.2, sequential_tests.LESS, 0.1, stride=0)
 
 
 def enumerate_paths(p, horizon, direction, alpha):
@@ -238,7 +238,7 @@ def enumerate_paths(p, horizon, direction, alpha):
     for code in range(2**horizon):
         bits = [(code >> k) & 1 for k in range(horizon)]
         probability = float(numpy.prod([p if bit else 1 - p for bit in bits]))
-        test = sequential_tests.BettingTest(p, direction, alpha)
+        test = sequential_tests.Betting(p, direction, alpha)
         for step, bit in enumerate(bits):
             test.update(float(bit))
             means[step] += probability * float(test.e_value)

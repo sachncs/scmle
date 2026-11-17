@@ -144,7 +144,7 @@ def verify_signature(
     )
 
 
-def urllib_transport(timeout_seconds: float = 5.0) -> Transport:
+def courier(timeout_seconds: float = 5.0) -> Transport:
     """A transport that POSTs over HTTPS with the standard library.
 
     Args:
@@ -221,7 +221,7 @@ class WebhookSender:
         self.kind = kind
         self.url = url
         self.secret = secret
-        self.transport = transport or urllib_transport()
+        self.transport = transport or courier()
         self.max_attempts = max_attempts
         self.backoff_seconds = backoff_seconds
         self.sleep = sleep

@@ -29,7 +29,7 @@ def test_feature_checks_put_rejected_columns_first_and_keep_their_seed_index():
         )
     )
 
-    checks = prefilter.feature_checks(shift_result, rows=40, seed=7)
+    checks = prefilter.shifts(shift_result, rows=40, seed=7)
 
     assert [c.check_id for c in checks] == [
         "f6-shift-feature:b",
@@ -47,14 +47,14 @@ def test_feature_checks_put_rejected_columns_first_and_keep_their_seed_index():
         randomness.seed_path(7, prefilter.FEATURE_SHIFT_ID, 2),
     ]
     assert all(
-        c.n == 40 and c.set_id is qualification.SetId.EXPLORATION
+        c.n == 40 and c.set_id is qualification.Subset.EXPLORATION
         for c in checks
     )
 
 
 def test_feature_checks_are_capped():
     rows = tuple(make_row(f"c{i}", False) for i in range(300))
-    checks = prefilter.feature_checks(
+    checks = prefilter.shifts(
         types.SimpleNamespace(features=rows), rows=1, seed=0
     )
     assert len(checks) == prefilter.MAX_FEATURE_ROWS
@@ -68,7 +68,7 @@ def test_the_applied_stage_records_every_field_and_the_fragile_reason():
     assert record["name"] == prefilter.FILTER_ID
     assert record["requested"] is True
     assert record["applied"] is True
-    assert record["gate"] == certificates.GateStatus.GATING.value
+    assert record["gate"] == certificates.Authority.GATING.value
     assert record["thresholds"] == stability.DEFAULT_RULE.to_dict()
     assert record["assessed"] == [f.name for f in found.findings]
     assert record["fragile"] == sorted(found.fragile) == ["o"]

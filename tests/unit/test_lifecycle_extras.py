@@ -15,8 +15,8 @@ import scmle.models.registry
 from scmle.monitoring import abtest
 from scmle.monitoring import shadow
 
-PLAN = data.FeaturePlan(("a", "b"), ())
-MODELS = scmle.models.registry.Catalog.with_builtins()
+PLAN = data.Blueprint(("a", "b"), ())
+MODELS = scmle.models.registry.Catalog.stock()
 APPROVAL_KEY = "promotion-review-key"
 
 
@@ -32,7 +32,7 @@ def traffic(rows=600, seed=0, flip=False):
 
 def bundle_of(name, frame):
     features = frame.drop(columns="y")
-    fitted = preprocessing.build_pipeline(
+    fitted = preprocessing.instantiate(
         PLAN, MODELS.get(name), tasks.Task.BINARY, 0
     ).fit(features, frame.y)
     return bundle.Bundle.create(
@@ -40,13 +40,13 @@ def bundle_of(name, frame):
     )
 
 
-def approval_for(record):
-    return scmle.governance.registry.PromotionApproval(
+def sanction(record):
+    return scmle.governance.registry.Sanction(
         model=record.model,
         version=record.version,
         content_id=record.content_id,
         reviewer="unit-reviewer",
-        decision=scmle.governance.registry.PromotionDecision.APPROVED,
+        decision=scmle.governance.registry.Verdict.APPROVED,
         reason="verified unit fixture",
         evidence=("unit-evidence.json",),
         approved_at="2026-10-20T00:00:00+00:00",
@@ -64,7 +64,7 @@ def weak():
 
 
 def test_shadow_serves_the_champion_and_measures_disagreement(good, weak):
-    evaluator = shadow.ShadowEvaluator(good, weak)
+    evaluator = shadow.Understudy(good, weak)
     rows = traffic(400, seed=2).drop(columns="y")
 
     served = evaluator.observe(rows)
@@ -76,7 +76,7 @@ def test_shadow_serves_the_champion_and_measures_disagreement(good, weak):
 
 
 def test_shadow_settles_with_the_known_outcomes(good, weak):
-    evaluator = shadow.ShadowEvaluator(good, weak)
+    evaluator = shadow.Understudy(good, weak)
     fresh = traffic(500, seed=3)
     evaluator.observe(fresh.drop(columns="y"))
 
@@ -88,7 +88,7 @@ def test_shadow_settles_with_the_known_outcomes(good, weak):
 
 def test_an_empty_shadow_has_nothing_to_report(good, weak):
     with pytest.raises(errors.ConfigError, match="nothing"):
-        shadow.ShadowEvaluator(good, weak).agreement()
+        shadow.Understudy(good, weak).agreement()
 
 
 def arm_of(model, frame):
@@ -154,7 +154,7 @@ def registry_with(tmp_path, first, second):
         store.promote(
             "m",
             record.version,
-            approval=approval_for(record),
+            approval=sanction(record),
             signing_key=APPROVAL_KEY,
         )
     return store, manager
@@ -168,7 +168,7 @@ def test_a_clearly_worse_new_champion_is_rolled_back(good, tmp_path):
     outcome = manager.check_rollback(
         fresh,
         "y",
-        approval=approval_for(store.resolve("m", 1)),
+        approval=sanction(store.resolve("m", 1)),
         signing_key=APPROVAL_KEY,
     )
 
@@ -216,7 +216,7 @@ def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
     store.promote(
         "m",
         record.version,
-        approval=approval_for(record),
+        approval=sanction(record),
         signing_key=APPROVAL_KEY,
     )
 
@@ -229,7 +229,7 @@ def test_nothing_to_roll_back_to_or_too_little_evidence(good, tmp_path):
     store.promote(
         "m",
         second.version,
-        approval=approval_for(second),
+        approval=sanction(second),
         signing_key=APPROVAL_KEY,
     )
     assert "fewer than" in manager.check_rollback(traffic(20), "y").reason
@@ -244,7 +244,7 @@ def test_a_rollback_that_is_refused_is_not_audited_as_rolled_back(
         manager.check_rollback(
             traffic(1200, seed=20),
             "y",
-            approval=approval_for(store.resolve("m", 1)),
+            approval=sanction(store.resolve("m", 1)),
             signing_key="wrong-key",
         )
     assert store.resolve("m").version == 2

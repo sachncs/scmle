@@ -40,7 +40,7 @@ class Multitarget(models.Model):
         capabilities: models.Capabilities | None = None,
         classifier: type | None = None,
         regressor: type | None = None,
-        search_space: search.SearchSpace | None = None,
+        search_space: search.Space | None = None,
     ) -> None:
         """Sets the declared data on this instance.
 
@@ -104,9 +104,7 @@ class Logistic(Multitarget):
     capabilities = models.Capabilities(
         frozenset({tasks.Task.MULTILABEL}), needs_scaling=True, cost=2
     )
-    search_space = search.SearchSpace(
-        (search.FloatParameter("C", 1e-3, 100.0, log=True),)
-    )
+    search_space = search.Space((search.Real("C", 1e-3, 100.0, log=True),))
 
     def build(
         self,
@@ -140,9 +138,7 @@ class MultioutputRidge(Multitarget):
     capabilities = models.Capabilities(
         REGRESSION_LIKE, needs_scaling=True, cost=1
     )
-    search_space = search.SearchSpace(
-        (search.FloatParameter("alpha", 1e-3, 100.0, log=True),)
-    )
+    search_space = search.Space((search.Real("alpha", 1e-3, 100.0, log=True),))
 
     def build(
         self,
@@ -173,10 +169,10 @@ MULTI_BOOSTING = Multitarget(
     ),
     classifier=ensemble.HistGradientBoostingClassifier,
     regressor=ensemble.HistGradientBoostingRegressor,
-    search_space=search.SearchSpace(
+    search_space=search.Space(
         (
-            search.FloatParameter("learning_rate", 0.02, 0.3, log=True),
-            search.IntParameter("max_leaf_nodes", 8, 64),
+            search.Real("learning_rate", 0.02, 0.3, log=True),
+            search.Integer("max_leaf_nodes", 8, 64),
         )
     ),
 )

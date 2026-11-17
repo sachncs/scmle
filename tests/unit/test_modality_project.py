@@ -16,7 +16,7 @@ from scmle.models import modality_lifecycle
 import scmle.models.modality_lifecycle
 
 
-def text_adapter() -> modality_lifecycle.TextPreparer:
+def text_adapter() -> modality_lifecycle.Plaintext:
     """Build a small labelled text corpus for the public API test."""
     samples = tuple(
         document.Sample(
@@ -27,13 +27,13 @@ def text_adapter() -> modality_lifecycle.TextPreparer:
         )
         for index in range(12)
     )
-    return modality_lifecycle.TextPreparer(document.Dataset(samples))
+    return modality_lifecycle.Plaintext(document.Dataset(samples))
 
 
-class ExtensionTextAdapter(modality_lifecycle.TextPreparer):
+class ExtensionTextAdapter(modality_lifecycle.Plaintext):
     """Test caller-owned adapter for a dataset family outside core enums."""
 
-    modality = modalities.ExtensionModality("acme/point-cloud")
+    modality = modalities.Bespoke("acme/point-cloud")
 
 
 def test_modality_project_runs_and_persists_all_stages(tmp_path):
@@ -158,7 +158,7 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
         )
         for index in range(3)
     )
-    adapter = modality_lifecycle.TextPreparer(document.Dataset(samples))
+    adapter = modality_lifecycle.Plaintext(document.Dataset(samples))
 
     result = scmle.api.project.Curator(
         adapter,
@@ -234,7 +234,7 @@ def test_modality_curation_project_rejects_identity_conflict_without_overwrite(
         content="different source content",
         label=samples[0].label,
     )
-    changed_adapter = modality_lifecycle.TextPreparer(
+    changed_adapter = modality_lifecycle.Plaintext(
         document.Dataset(tuple(samples))
     )
 
@@ -274,7 +274,7 @@ def test_extension_curation_adapter_accepts_arbitrary_records_without_model_hook
     tmp_path,
 ):
     """Curation-only extensions do not implement unused modelling methods."""
-    extension = modalities.ExtensionModality("acme/point-cloud")
+    extension = modalities.Bespoke("acme/point-cloud")
     records = ({"x": 1, "y": 2}, {"x": 3, "y": 4})
     dataset_hash = hashlib.sha256(b"point-cloud-snapshot-1").hexdigest()
     report = curation.Curation(
@@ -305,7 +305,7 @@ def test_extension_curation_adapter_accepts_arbitrary_records_without_model_hook
 
 def test_extension_curation_adapter_rejects_detached_report():
     """A curation callback cannot publish evidence for another snapshot."""
-    extension = modalities.ExtensionModality("acme/point-cloud")
+    extension = modalities.Bespoke("acme/point-cloud")
     report = curation.Curation(
         modality=extension.value,
         dataset_hash="different-snapshot",
@@ -326,7 +326,7 @@ def test_extension_curation_adapter_rejects_detached_report():
 
 def test_extension_curation_adapter_accepts_empty_raw_snapshot(tmp_path):
     """Empty snapshots remain valid curation evidence without modelling."""
-    extension = modalities.ExtensionModality("acme/empty-stream")
+    extension = modalities.Bespoke("acme/empty-stream")
     dataset_hash = hashlib.sha256(b"empty-snapshot").hexdigest()
     adapter = scmle.models.modality_lifecycle.ExtensionCurator(
         extension=extension,

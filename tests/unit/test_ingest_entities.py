@@ -22,10 +22,10 @@ PASSES = [
 
 def test_string_comparators_against_known_values():
     assert entities.jaro("martha", "marhta") == pytest.approx(0.9444, abs=1e-4)
-    assert entities.jaro_winkler("martha", "marhta") == pytest.approx(
+    assert entities.jarowinkler("martha", "marhta") == pytest.approx(
         0.9611, abs=1e-4
     )
-    assert entities.jaro_winkler("abc", "abc") == 1.0
+    assert entities.jarowinkler("abc", "abc") == 1.0
     assert entities.jaro("", "a") == 0.0
     assert entities.soundex("robert") == "R163"
     assert entities.soundex("rupert") == "R163"
@@ -35,10 +35,10 @@ def test_string_comparators_against_known_values():
 
 def test_blocking_passes_union_and_skip_oversized_blocks():
     frame = ingest_worlds.er_world(1, 40)
-    pairs, skipped = entities.candidate_pairs(frame, PASSES)
+    pairs, skipped = entities.pairing(frame, PASSES)
     assert pairs == sorted(set(pairs))
     assert skipped == 0
-    coarse = entities.candidate_pairs(
+    coarse = entities.pairing(
         frame, [entities.Pass("dob", "prefix", 1)], max_block=3
     )
     assert coarse[1] > 0
@@ -55,8 +55,8 @@ def test_resolution_with_labels_reports_pair_completeness_and_recall():
         reviewer="benchmark truth",
         seed=2,
     )
-    pairs = entities.candidate_pairs(frame, PASSES)[0]
-    quality = entities.measure_quality(truth, result, pairs)
+    pairs = entities.pairing(frame, PASSES)[0]
+    quality = entities.grade(truth, result, pairs)
     assert result.tier is qualification.Tier.ATTESTED
     assert quality.pair_completeness >= 0.95
     assert quality.link_recall >= 0.9
@@ -73,8 +73,8 @@ def test_unlabelled_resolution_is_unverified_and_groups_more_not_less():
     result = entities.resolve(frame, FIELDS, PASSES)
     assert result.tier is qualification.Tier.UNVERIFIED
     assert result.estimate is None
-    pairs = entities.candidate_pairs(frame, PASSES)[0]
-    assert entities.measure_quality(truth, result, pairs).link_recall >= 0.8
+    pairs = entities.pairing(frame, PASSES)[0]
+    assert entities.grade(truth, result, pairs).link_recall >= 0.8
 
 
 def test_resolution_is_deterministic():
@@ -107,7 +107,7 @@ def test_em_recovers_separated_classes():
         rng.choice([0, 1, 2], (4000, 3), p=[0.05, 0.15, 0.8]),
         rng.choice([0, 1, 2], (4000, 3), p=[0.9, 0.07, 0.03]),
     ).astype(numpy.int8)
-    model = entities.fit_em(levels)
+    model = entities.em(levels)
     weights = model.weights(levels)
     assert model.prior == pytest.approx(0.1, abs=0.03)
     assert weights[match].mean() > weights[~match].mean() + 5

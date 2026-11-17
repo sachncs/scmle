@@ -11,7 +11,7 @@ CONFIDENCE = 0.95
 MINIMUM_SEEDS = 2
 
 
-def mean_interval(
+def wald(
     values: Sequence[float], confidence: float = CONFIDENCE
 ) -> tuple[float, float, float]:
     """Mean and Student-t confidence interval of repeated measurements.

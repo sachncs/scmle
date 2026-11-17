@@ -55,7 +55,7 @@ PRELOAD_MODULES = ["numpy", "pandas", "sklearn"]
 ACCELERATE_THREADS = "VECLIB_MAXIMUM_THREADS"
 
 
-class TrialLimitError(errors.ScmleError):
+class TrialError(errors.ScmleError):
     """Raised when a supervised trial was stopped or lost."""
 
 
@@ -64,13 +64,13 @@ class TrialLimitError(errors.ScmleError):
 ON_MACOS = sys.platform == "darwin"
 ENVIRONMENT_LOCK = threading.Lock()
 ENVIRONMENT_USERS = [0]
-"""How many threads are inside `forkserver_environment` (one-item list)."""
+"""How many threads are inside `preforked` (one-item list)."""
 ENVIRONMENT_SAVED: list[str | None] = [None]
 """The variable's value before the first of them changed it."""
 
 
 @contextlib.contextmanager
-def forkserver_environment() -> Generator[None, None, None]:
+def preforked() -> Generator[None, None, None]:
     """Starts the forkserver with a fork-safe BLAS configuration.
 
     On macOS the Accelerate library parallelises large matrix products with
@@ -126,7 +126,7 @@ def peak_memory_gb() -> float:
     return peak
 
 
-def proc_table() -> dict[int, tuple[int, int]]:
+def tabulate() -> dict[int, tuple[int, int]]:
     """Process table from `/proc` (Linux), without needing `ps`.
 
     Returns:
@@ -189,7 +189,7 @@ def psutil_table() -> dict[int, tuple[int, int]]:
     return table
 
 
-def process_table() -> dict[int, tuple[int, int]]:
+def pids() -> dict[int, tuple[int, int]]:
     """Maps every live pid to its (parent pid, resident bytes).
 
     Returns:
@@ -199,11 +199,11 @@ def process_table() -> dict[int, tuple[int, int]]:
     if WINDOWS:
         return psutil_table()
     if pathlib.Path("/proc/self").is_dir():
-        return proc_table()
+        return tabulate()
     return ps_table()
 
 
-def process_tree(root: int) -> dict[int, int]:
+def footprint(root: int) -> dict[int, int]:
     """Resident bytes of a process and all its descendants, by pid.
 
     Args:
@@ -214,7 +214,7 @@ def process_tree(root: int) -> dict[int, int]:
         found in the process table; a root missing from the table is left
         out, so a vanished root yields an empty mapping.
     """
-    table = process_table()
+    table = pids()
     members = {root}
     grew = True
     while grew:
@@ -235,10 +235,10 @@ def resident_bytes(pid: int) -> int:
     Returns:
         The summed resident memory, in bytes.
     """
-    return sum(process_tree(pid).values())
+    return sum(footprint(pid).values())
 
 
-def child_main(
+def execute(
     channel: connection.Connection,
     function: Callable[[Any], Any],
     argument: Any,
@@ -290,7 +290,7 @@ class Supervisor:
             The value `function(argument)` returned in the child process.
 
         Raises:
-            TrialLimitError: If the child exceeded a limit, died without
+            TrialError: If the child exceeded a limit, died without
                 sending a result, or raised (the message is then
                 `ErrorType: message` of the child's exception).
         """
@@ -302,24 +302,24 @@ class Supervisor:
             context.set_forkserver_preload(PRELOAD_MODULES)
         receiver, sender = context.Pipe(duplex=False)
         process = context.Process(
-            target=child_main, args=(sender, function, argument)
+            target=execute, args=(sender, function, argument)
         )
         started = time.monotonic()
-        with forkserver_environment():
+        with preforked():
             process.start()
         sender.close()
         try:
             while not receiver.poll(POLL_SECONDS):
                 reason = self.violation(process, time.monotonic() - started)
                 if reason:
-                    raise TrialLimitError(reason)
+                    raise TrialError(reason)
                 if not process.is_alive() and not receiver.poll(0):
-                    raise TrialLimitError(
+                    raise TrialError(
                         f"trial process died (exit code {process.exitcode})"
                     )
             succeeded, value = receiver.recv()
         except EOFError as error:
-            raise TrialLimitError("trial process died unexpectedly") from error
+            raise TrialError("trial process died unexpectedly") from error
         finally:
             if process.is_alive():
                 if process.pid is not None:
@@ -329,11 +329,11 @@ class Supervisor:
             receiver.close()
         if not succeeded:
             if isinstance(value, Mapping):
-                raise TrialLimitError(
+                raise TrialError(
                     f"{value.get('kind')}: {value.get('message')}",
                     {"failure": dict(value)},
                 )
-            raise TrialLimitError(str(value))
+            raise TrialError(str(value))
         return value
 
     @staticmethod
@@ -343,7 +343,7 @@ class Supervisor:
         Args:
             root: Pid of the trial process; it is not itself signalled.
         """
-        for pid in process_tree(root):
+        for pid in footprint(root):
             if pid != root:
                 try:
                     os.kill(pid, KILL_SIGNAL)
@@ -406,7 +406,7 @@ class Governor:
         return min(self.spec.workers, cap) if cap else self.spec.workers
 
     @property
-    def thread_limit(self) -> int | None:
+    def threadcap(self) -> int | None:
         """Threads each worker's math libraries may use (None = default)."""
         cap = self.spec.cpu_limit
         if cap:
@@ -441,7 +441,7 @@ class Governor:
             return f"no trial starts past the limit; {hard_part}"
         return "cooperative: no trial starts past the limit"
 
-    def trial_ceiling_seconds(self) -> float:
+    def deadline(self) -> float:
         """Hard time ceiling for a trial dispatched now.
 
         Returns:
@@ -497,7 +497,7 @@ class Governor:
             "cpu": {
                 "limit": self.spec.cpu_limit,
                 "workers": self.workers,
-                "threads_per_worker": self.thread_limit,
+                "threads_per_worker": self.threadcap,
                 "enforcement": "worker count and library threads capped"
                 if self.spec.cpu_limit
                 else "no cap configured",

@@ -2,7 +2,7 @@
 
 Two detectors have certificates in `ingest_certificates.json`:
 
-* `ingest-torn-read` (`scmle.data.ingest.profile.consistent_read` with the
+* `ingest-torn-read` (`scmle.data.ingest.profile.untorn` with the
   `DbApiConnector` batch check): `NOISY` worlds mutate a table between
   batches (an update behind the read position, one ahead of it, an insert, a
   delete; each kind equally often); `QUIET` worlds are static. Policy:
@@ -152,13 +152,13 @@ def torn_detected(seed: int, noisy: bool) -> bool:
         noisy: Whether the table is mutated during the read.
 
     Returns:
-        True if `consistent_read` raised `TornReadError`.
+        True if `untorn` raised `TornError`.
     """
     kind = ingest_worlds.TORN_KINDS[seed % 4] if noisy else None
     connector = ingest_worlds.torn_world(seed, kind)[0]
     try:
-        profile.consistent_read(connector, 5, attempts=1)
-    except profile.TornReadError:
+        profile.untorn(connector, 5, attempts=1)
+    except profile.TornError:
         return True
     return False
 
@@ -171,11 +171,11 @@ def torn_code() -> str:
         check.
     """
     return certificates.code_hash(
-        profile.consistent_read,
-        profile.read_once,
-        profile.has_total_order,
+        profile.untorn,
+        profile.slurp,
+        profile.deterministic,
         connectors.DbApiConnector,
-        connectors.digest_rows,
+        connectors.feed,
     )
 
 
@@ -246,17 +246,17 @@ def reconcile_flagged(kind: str, seed: int) -> bool:
         True if the reconciliation report blocks.
     """
     extract = ingest_worlds.reconcile_world(seed, kind)
-    report = reconcile.reconcile_extract(
+    report = reconcile.crosscheck(
         extract.db.source(),
         extract.assembled,
         "orders",
         ["amount"],
         [
-            reconcile.JoinCheck(
+            reconcile.Cardinality(
                 "orders-customers", extract.left_rows, len(extract.assembled)
             )
         ],
-        gate=certificates.GateStatus.GATING,
+        gate=certificates.Authority.GATING,
     )
     return reconcile.blocks(report)
 
@@ -419,9 +419,9 @@ def unit_pair(seed: int) -> tuple[str, str, str, str]:
     unit, shape = combos[seed % len(combos)]
     db, table = ingest_worlds.grain_world(seed, shape)
     source = db.source()
-    profiled = profile.profile_table(source, table)
+    profiled = profile.survey(source, table)
     assert profiled is not None
-    scan = grain.infer_keys(source, profiled)
+    scan = grain.keysearch(source, profiled)
     verdict = grain.unit_verdict(source, profiled, unit, scan)
     return (
         unit,
@@ -447,9 +447,9 @@ def near_key_flips() -> dict[str, Any]:
         db = ingest_worlds.new_database("nk")
         ingest_worlds.load(db, "t", pandas.DataFrame({"k": values}))
         source = db.source()
-        table = profile.profile_table(source, "t")
+        table = profile.survey(source, "t")
         assert table is not None
-        scan = grain.infer_keys(source, table, eps_key=NEAR_KEY_EPS)
+        scan = grain.keysearch(source, table, eps_key=NEAR_KEY_EPS)
         flips[duplicates] = bool(scan.keys)
     exact = all(flips[d] == (d <= allowed) for d in flips)
     return {
@@ -508,7 +508,7 @@ def join_world(seed: int) -> tuple[int, int, int, int]:
     world = ingest_worlds.surrogate_world(seed)
     source = world.db.source()
     catalog = profile.profile_catalog(source, world.tables)
-    scans = {t.name: grain.infer_keys(source, t) for t in catalog.tables}
+    scans = {t.name: grain.keysearch(source, t) for t in catalog.tables}
     graph = joins.discover(source, catalog, scans)
     accepted = {
         (link.child, link.child_columns[0], link.parent)
@@ -593,8 +593,8 @@ def er_world(seed: int) -> dict[str, Any]:
         reviewer="benchmark truth",
         seed=seed,
     )
-    pairs = entities.candidate_pairs(frame, ER_PASSES)[0]
-    quality = entities.measure_quality(truth.tolist(), result, pairs)
+    pairs = entities.pairing(frame, ER_PASSES)[0]
+    quality = entities.grade(truth.tolist(), result, pairs)
     return {
         "true_pairs": quality.true_pairs,
         "compared_true": round(quality.pair_completeness * quality.true_pairs),
@@ -737,11 +737,11 @@ def multiplicity(offset: int) -> dict[str, Any]:
         ledger = scmle.data.ledger.ledger.Ledger.create(
             None,
             charter_hash="0" * 64,
-            config=online_fdr.RuleConfig("lord++", fractions.Fraction(1, 20)),
+            config=online_fdr.Settings("lord++", fractions.Fraction(1, 20)),
             alpha_confirm=fractions.Fraction(1, 20),
             seed=seed,
         )
-        synthesize.register_family(ledger, found)
+        synthesize.enlist(ledger, found)
         equal += (
             synthesize.check_multiplicity(found.declared_family_size, ledger)
             == found.declared_family_size

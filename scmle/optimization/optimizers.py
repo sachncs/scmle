@@ -31,7 +31,7 @@ class Optimizer(abc.ABC):
 
     def __init__(
         self,
-        space: search.SearchSpace,
+        space: search.Space,
         seed: int,
         greater_is_better: bool = True,
     ) -> None:
@@ -75,14 +75,14 @@ class Optimizer(abc.ABC):
         """
 
 
-class RandomOptimizer(Optimizer):
+class Uniform(Optimizer):
     """Seeded random search; dependency-free default."""
 
     name = "random"
 
     def __init__(
         self,
-        space: search.SearchSpace,
+        space: search.Space,
         seed: int,
         greater_is_better: bool = True,
     ) -> None:
@@ -138,7 +138,7 @@ def suggest(
 
 
 @suggest.register
-def suggest_float(parameter: search.FloatParameter, trial: Any) -> float:
+def suggest_float(parameter: search.Real, trial: Any) -> float:
     """Suggests a float.
 
     Args:
@@ -157,7 +157,7 @@ def suggest_float(parameter: search.FloatParameter, trial: Any) -> float:
 
 
 @suggest.register
-def suggest_int(parameter: search.IntParameter, trial: Any) -> int:
+def suggest_int(parameter: search.Integer, trial: Any) -> int:
     """Suggests an integer.
 
     Args:
@@ -176,7 +176,7 @@ def suggest_int(parameter: search.IntParameter, trial: Any) -> int:
 
 
 @suggest.register
-def choose(parameter: search.ChoiceParameter, trial: Any) -> Any:
+def choose(parameter: search.Choice, trial: Any) -> Any:
     """Suggests one of the choices.
 
     Args:
@@ -203,7 +203,7 @@ class Grid(Optimizer):
 
     def __init__(
         self,
-        space: search.SearchSpace,
+        space: search.Space,
         seed: int,
         greater_is_better: bool = True,
     ) -> None:
@@ -239,16 +239,16 @@ class Grid(Optimizer):
             high (geometric middle if logarithmic). For a float parameter, the
             list low, middle, high.
         """
-        if isinstance(parameter, search.ChoiceParameter):
+        if isinstance(parameter, search.Choice):
             return list(parameter.choices)[: cls.MAX_CHOICES]
-        if isinstance(parameter, search.IntParameter):
+        if isinstance(parameter, search.Integer):
             whole_low, whole_high = parameter.low, parameter.high
             if parameter.log:
                 whole_mid = round(math.sqrt(whole_low * whole_high))
             else:
                 whole_mid = (whole_low + whole_high) // 2
             return sorted({whole_low, whole_mid, whole_high})
-        assert isinstance(parameter, search.FloatParameter)  # nosec B101  # noqa: S101 -- narrows the type for the last branch
+        assert isinstance(parameter, search.Real)  # nosec B101  # noqa: S101 -- narrows the type for the last branch
         low, high = parameter.low, parameter.high
         middle = math.sqrt(low * high) if parameter.log else (low + high) / 2
         return [low, middle, high]
@@ -275,7 +275,7 @@ class Grid(Optimizer):
         """
 
 
-class OptunaOptimizer(Optimizer):
+class Parzen(Optimizer):
     """TPE search through Optuna (optional `optimization` extra)."""
 
     name = "optuna"
@@ -283,7 +283,7 @@ class OptunaOptimizer(Optimizer):
 
     def __init__(
         self,
-        space: search.SearchSpace,
+        space: search.Space,
         seed: int,
         greater_is_better: bool = True,
     ) -> None:
@@ -340,14 +340,13 @@ class OptunaOptimizer(Optimizer):
 
 
 OPTIMIZERS: dict[str, type[Optimizer]] = {
-    optimizer.name: optimizer
-    for optimizer in (RandomOptimizer, Grid, OptunaOptimizer)
+    optimizer.name: optimizer for optimizer in (Uniform, Grid, Parzen)
 }
 
 
-def create_optimizer(
+def instantiate(
     name: str,
-    space: search.SearchSpace,
+    space: search.Space,
     seed: int,
     greater_is_better: bool,
 ) -> Optimizer:

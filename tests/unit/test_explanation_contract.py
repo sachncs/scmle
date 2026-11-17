@@ -9,7 +9,7 @@ import pytest
 from scmle.contracts import explanations
 
 
-def build_evidence(**overrides: object) -> explanations.Evidence:
+def substantiate(**overrides: object) -> explanations.Evidence:
     """Builds a valid evidence record for contract tests."""
     record: dict[str, object] = {
         "model_fingerprint": "model-123",
@@ -47,7 +47,7 @@ def build_evidence(**overrides: object) -> explanations.Evidence:
 
 
 def test_evidence_contains_every_phase_four_binding():
-    evidence = build_evidence()
+    evidence = substantiate()
 
     record = evidence.to_dict()
 
@@ -69,8 +69,8 @@ def test_evidence_contains_every_phase_four_binding():
 
 
 def test_canonical_json_is_deterministic_and_html_safe():
-    first = build_evidence(output={"text": "<script>&"})
-    second = build_evidence(output={"text": "<script>&"})
+    first = substantiate(output={"text": "<script>&"})
+    second = substantiate(output={"text": "<script>&"})
 
     serialized = first.canonical_json()
 
@@ -82,7 +82,7 @@ def test_canonical_json_is_deterministic_and_html_safe():
 
 
 def test_timestamp_is_normalized_to_utc():
-    evidence = build_evidence(
+    evidence = substantiate(
         timestamp=datetime.datetime(
             2026,
             10,
@@ -114,12 +114,12 @@ def test_timestamp_is_normalized_to_utc():
 )
 def test_required_fields_cannot_be_silent_or_empty(field: str, value: object):
     with pytest.raises((pydantic.ValidationError, ValueError)):
-        build_evidence(**{field: value})
+        substantiate(**{field: value})
 
 
 def test_naive_timestamp_is_rejected():
     with pytest.raises(pydantic.ValidationError, match="timezone"):
-        build_evidence(
+        substantiate(
             timestamp=datetime.datetime(2026, 10, 20, 10, 30)  # noqa: DTZ001 -- the test needs a naive timestamp
         )
 
@@ -129,19 +129,19 @@ def test_naive_timestamp_is_rejected():
 )
 def test_unsafe_evidence_links_are_rejected(uri: str):
     with pytest.raises(pydantic.ValidationError, match="scheme"):
-        build_evidence(evidence_links=({"relation": "source", "uri": uri},))
+        substantiate(evidence_links=({"relation": "source", "uri": uri},))
 
 
 def test_non_json_output_is_rejected():
     with pytest.raises(pydantic.ValidationError, match="JSON-native"):
-        build_evidence(output={"importance": object()})
+        substantiate(output={"importance": object()})
 
 
 def test_non_finite_measurement_is_rejected():
     with pytest.raises(pydantic.ValidationError, match="non-finite"):
-        build_evidence(uncertainty={"confidence": float("nan")})
+        substantiate(uncertainty={"confidence": float("nan")})
 
 
 def test_unknown_fields_are_rejected():
     with pytest.raises(pydantic.ValidationError, match="extra"):
-        build_evidence(unexpected="not part of the contract")
+        substantiate(unexpected="not part of the contract")

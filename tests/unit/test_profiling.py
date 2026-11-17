@@ -21,7 +21,7 @@ def profile(frame, task="auto", **data_overrides):
     resolved = scmle.data.validation.target.TaskResolver(spec).resolve(
         frame["y"]
     )
-    manifest = tabular.build_manifest(frame, "y")
+    manifest = tabular.manifested(frame, "y")
     result = profiler.Profiler(spec).profile(frame, manifest, resolved)
     return resolved, result
 
@@ -120,7 +120,7 @@ def test_leaky_feature_flagged(classification_frame):
     (found,) = [f for f in screen["findings"] if f["suspect"]]
     assert found["adjusted_p"] <= screen["alpha"]
     assert found["lower_bound"] > screen["ceilings"]["skill"]
-    assert result.blocking_leaks == ("leak",)
+    assert result.blockers == ("leak",)
     assert "leakage" in result.to_dict()
 
 
@@ -128,7 +128,7 @@ def test_clean_table_has_an_empty_screen_result(classification_frame):
     result = profile(classification_frame)[1]
     assert result.leakage["suspects"] == []
     assert result.leakage["blocking"] == []
-    assert result.blocking_leaks == ()
+    assert result.blockers == ()
     assert not result.risk_findings
 
 
@@ -253,7 +253,7 @@ def test_datetime_columns_become_calendar_and_trend_features():
         }
     )
     spec = tasks.Config(data=tasks.Dataset(uri="m", target="y"))
-    manifest = tabular.build_manifest(frame, "y")
+    manifest = tabular.manifested(frame, "y")
 
     profile = profiler.Profiler(spec).profile(
         frame, manifest, tasks.Task.BINARY

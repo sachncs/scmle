@@ -130,7 +130,7 @@ def check_resume(root, references, label, phase, index, gated):
         assert data == reference.files[key], key
     assert store.exists(failpoints.LOCK_KEY) is lock_remains(label, phase)
     if lock_remains(label, phase):
-        with pytest.raises(processing.ConcurrentRunError):
+        with pytest.raises(processing.LockError):
             failpoints.processor(store, gated).run()
         failpoints.processor(store, gated).break_lock()
     committed = committed_before(label, phase, index)

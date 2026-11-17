@@ -30,7 +30,7 @@ def panel(entities=120, per=6, seed=0):
 def charter_file(tmp_path, **overrides):
     path = tmp_path / "charter.json"
     values = {"min_effect": 0.5, "k_max": 3, **overrides}
-    sealing.write_charter(path, make_charter(**values), signing_key=KEY)
+    sealing.inscribe(path, make_charter(**values), signing_key=KEY)
     return path
 
 

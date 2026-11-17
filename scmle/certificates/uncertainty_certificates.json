@@ -6,7 +6,7 @@
         0.8991025919818261,
         0.902893416002206
       ],
-      "code_hash": "ac8eed43e12009dad30f0c594e2b9a7e9a1e2a94ae9277acbfae374e7a333665",
+      "code_hash": "6909432ccfcb7160ad091f10f9a62cd8bea4b9273efdf224e7132c70acaf3fbb",
       "design": {
         "alpha": 0.1,
         "beta": [
@@ -24,7 +24,7 @@
       ]
     },
     "G11i": {
-      "code_hash": "22e8b61d375d169d2a262c4e3d02e6b023e7ecf51157448058bc6a26dc22df7a",
+      "code_hash": "534e67ecf1fadaab9ccdd063a9dd21beb74ec625340208c9a13eef7dc79add21",
       "covariate_censoring_bias": -0.002747989662342687,
       "marginal_km_bias": -0.017488983865733942,
       "mean_floored_share": 0.005306666666666667,
@@ -42,7 +42,7 @@
       "true_concordance": 0.7278883739673585
     },
     "G13": {
-      "code_hash": "6a51d5f231899a57ac944484de3854c2b10171d92fe372a6017e49068043a0ba",
+      "code_hash": "77bd9ea7ca6763203ac364da388852f4c3928e604a773a752a1c2fade61ba8d8",
       "entities": 30,
       "entity_wise": {
         "floor": 0.8916955966712079,
@@ -65,7 +65,7 @@
       ]
     },
     "G2": {
-      "code_hash": "1cf3b384e77200031d04abacb761846d558273edd3795d8e05e8a15481ca3b2e",
+      "code_hash": "221d3fe596bd1cecdd72cc4e19ffff7455c8704589f9ac999ae3fceefa0f4399",
       "passed": true,
       "replicates": 200,
       "seeds": [
@@ -112,7 +112,7 @@
       }
     },
     "G3": {
-      "code_hash": "0a31371270af941e514424476c8a4ce81d8491daa141349bfaa81b1b30e18d49",
+      "code_hash": "2737d2f3e55613b657e15e60a3a226653656790db7eaf596e46a52e75330d2e6",
       "constant_width_marginal": 0.9004366666666666,
       "constant_width_top_decile": 0.72125,
       "cqr_marginal": {
@@ -162,7 +162,7 @@
           "se": 0.002993726540942771
         }
       ],
-      "code_hash": "ddd05812ae94f32d5ab74caad187b77bcc95cffef93eeecb71c6454c474300ff",
+      "code_hash": "13349d0bc5cdfdfa881596481a503a36a0009b0a05723aa2476defdc97b0488d",
       "passed": true,
       "pooled_control": [
         {
@@ -203,7 +203,7 @@
       ]
     },
     "G5": {
-      "code_hash": "ccbd151f1af90a142254cba26eb63cd5c092c31664a4a86716a6f67637659661",
+      "code_hash": "45000e573bf45695e185238de62180b6a9d004262d42dd2c12bfeabe0cd1b4c6",
       "false_flag_bound": 0.059746794344808965,
       "familywise_false_flag": 0.0755,
       "min_certified_rows": 30,
@@ -238,7 +238,7 @@
     },
     "G5b": {
       "calibration_rows": 500,
-      "code_hash": "f29b83fdf91cf035b74c8812cb9617e7db1bc43488800b98d2838352c9257922",
+      "code_hash": "2b10af0109e7365ea6473a9d18f2fecd107a9122955baf814078842b848e2cd2",
       "detection_by_slice_rows": {
         "noise_1.25x": {
           "100": {
@@ -310,7 +310,7 @@
       "false_flag_bound": 0.059746794344808965,
       "familywise_false_flag": 0.0005,
       "margin": 0.05,
-      "method_hash": "7fbd99e747972d8e0ead775c5fe3c516c3a808b1f27832770a67a14784b14485",
+      "method_hash": "bcdbdb6f8561049045a6f1c1f88a4f00be64016332e85241f5493827e3e5c36b",
       "min_certified_rows": 30,
       "passed": true,
       "replicates": 2000,
@@ -320,7 +320,7 @@
       ]
     },
     "G6": {
-      "code_hash": "62c97f55d4dfb36aa187824b1930b9110763980d6225c50be73394c99a550b6e",
+      "code_hash": "461be703c03c7c74f7664b095bb340c985b27605a9fe09f74600cbc9fea05cf7",
       "estimated_passed": true,
       "estimated_ratio": {
         "effective_size_mean": 269.6513654196562,

@@ -183,7 +183,7 @@ Exit code 1. A setting is invalid. Common ones (From the code):
 * `data error: group column 'x' not found; columns: [...]`: same, for the group,
   time or weight column.
 
-### `all trials failed` / `TrialLimitError: trial exceeded its 6.0s hard time ceiling and was killed` (Seen)
+### `all trials failed` / `TrialError: trial exceeded its 6.0s hard time ceiling and was killed` (Seen)
 
 **What it means.** Each trial may run only until the end of the time budget plus
 a 10 percent grace. When the earlier steps (reading, splitting and checking
@@ -508,7 +508,7 @@ model that hangs on some rows.
 **What it means.** You tried to make a version the live one without a signed
 approval.
 **Why it exists.** One person must not push an unreviewed model into use.
-**What to do.** Have a reviewer create and sign a `PromotionApproval` bound to
+**What to do.** Have a reviewer create and sign a `Sanction` bound to
 that version's exact content (see [Start here](START_HERE.md) Step 11). Other
 refusals of the same family (From the code): `promotion approval does not match
 bundle identity`, `promotion was rejected by the reviewer`, `champion promotion
@@ -536,7 +536,7 @@ champion promotion`. Nothing is wrong; follow the approval step.
 
 ### Rollback did not happen (From the code)
 
-`RollbackOutcome.reason` tells you why:
+`Outcome.reason` tells you why:
 
 * `no previous version`: there is nothing to go back to.
 * `fewer than N labeled rows` (default 100): not enough fresh outcomes.

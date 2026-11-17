@@ -198,7 +198,7 @@ class Sink(abc.ABC):
         """
 
 
-class JsonlAlertSink(Sink):
+class Jsonl(Sink):
     """Append-only local sink for operator pickup and test evidence.
 
     Attributes:
@@ -229,7 +229,7 @@ class JsonlAlertSink(Sink):
             "alert": alert.to_dict(),
             "delivered_at": delivered_at,
         }
-        with durability.path_lock(self.path):
+        with durability.latch(self.path):
             with self.path.open("a", encoding="utf-8", newline="\n") as stream:
                 stream.write(json.dumps(record, sort_keys=True) + "\n")
                 stream.flush()
@@ -245,7 +245,7 @@ class JsonlAlertSink(Sink):
         )
 
 
-class WebhookAlertSink(Sink):
+class Pager(Sink):
     """Deliver JSON alerts to an HTTPS-compatible pager or incident gateway.
 
     Attributes:
@@ -356,7 +356,7 @@ class WebhookAlertSink(Sink):
         )
 
 
-class AlertDispatcher:
+class Dispatcher:
     """Routes alerts once and persists delivery outcomes for replay safety.
 
     Attributes:
@@ -381,7 +381,7 @@ class AlertDispatcher:
             raise errors.InputError("alert routes must not be empty")
         self.sinks = dict(sinks)
         self.journal = Path(journal)
-        self.lock = durability.path_lock(self.journal)
+        self.lock = durability.latch(self.journal)
 
     def dispatch(self, alert: Alert) -> Delivery:
         """Delivers an alert unless a successful delivery is already journaled.
@@ -400,9 +400,9 @@ class AlertDispatcher:
             outcome the sink returned.
         """
         with self.lock:
-            return self.dispatch_locked(alert)
+            return self.relay(alert)
 
-    def dispatch_locked(self, alert: Alert) -> Delivery:
+    def relay(self, alert: Alert) -> Delivery:
         """Dispatches one alert while the caller holds the journal lock.
 
         Args:
@@ -486,10 +486,10 @@ class AlertDispatcher:
 
 __all__ = [
     "Alert",
-    "AlertDispatcher",
     "Delivery",
     "DeliveryError",
-    "JsonlAlertSink",
+    "Dispatcher",
+    "Jsonl",
+    "Pager",
     "Sink",
-    "WebhookAlertSink",
 ]

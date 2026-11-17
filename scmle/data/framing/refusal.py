@@ -1,7 +1,7 @@
 """LLM slot-filling interface, ambiguity score and the refusal rule.
 
-No LLM client ships with the package. A `SlotSampler` is the interface a
-caller implements; `ReplaySampler` replays recorded responses so tests make
+No LLM client ships with the package. A `Sampler` is the interface a
+caller implements; `Replayer` replays recorded responses so tests make
 no network call. `k` drafts are drawn, each slot gets a canonical value, and
 the ambiguity score is
 
@@ -52,7 +52,7 @@ PREDICATE = re.compile(
 )
 
 
-class SlotSampler(Protocol):
+class Sampler(Protocol):
     """Draws slot proposals for a request (an LLM adapter)."""
 
     model_id: str
@@ -70,7 +70,7 @@ class SlotSampler(Protocol):
         ...
 
 
-def prompt_for(request_text: str, columns: Sequence[str]) -> str:
+def instruct(request_text: str, columns: Sequence[str]) -> str:
     """Builds the prompt text, hashed with the samples into the stored draft.
 
     Args:
@@ -90,7 +90,7 @@ def prompt_for(request_text: str, columns: Sequence[str]) -> str:
     )
 
 
-class ReplaySampler:
+class Replayer:
     """Replays recorded proposals; never touches the network."""
 
     def __init__(
@@ -105,7 +105,7 @@ class ReplaySampler:
         self.model_id = model_id
         self.recorded = [dict(r) for r in recorded]
 
-    def sample(self, prompt: str, index: int) -> Mapping[str, Any]:  # noqa: ARG002 -- implements the SlotSampler protocol
+    def sample(self, prompt: str, index: int) -> Mapping[str, Any]:  # noqa: ARG002 -- implements the Sampler protocol
         """Returns the recorded proposal for `index`.
 
         Args:
@@ -124,7 +124,7 @@ class ReplaySampler:
 
 
 def draw(
-    sampler: SlotSampler, prompt: str, k: int = DEFAULT_K
+    sampler: Sampler, prompt: str, k: int = DEFAULT_K
 ) -> list[dict[str, Any]]:
     """Draws `k` proposals and keeps only the known slot names in each.
 
@@ -159,9 +159,7 @@ def samples_hash(model_id: str, prompt: str, samples: Sequence[Any]) -> str:
     return hashlib.sha256(signing.canonicalise(body)).hexdigest()
 
 
-def population_ids(
-    frame: pandas.DataFrame, predicate: Any
-) -> frozenset[int] | None:
+def members(frame: pandas.DataFrame, predicate: Any) -> frozenset[int] | None:
     """Row positions a simple predicate selects, or None if it is invalid.
 
     The grammar is `column op literal` joined by `and`; anything else is
@@ -220,7 +218,7 @@ def canonical(frame: pandas.DataFrame, slot: str, value: Any) -> Any:
         keys = [value] if isinstance(value, str) else list(value or [])
         return tuple(sorted(str(k) for k in keys))
     if slot == "population":
-        return population_ids(frame, value)
+        return members(frame, value)
     return None if value is None else str(value)
 
 
@@ -313,9 +311,7 @@ def consensus(
     return Consensus(values, agreement, ambiguity, conflicts)
 
 
-def clopper_pearson_upper(
-    errors_count: int, n: int, level: float = 0.95
-) -> float:
+def ceiling(errors_count: int, n: int, level: float = 0.95) -> float:
     """Computes a one-sided upper Clopper-Pearson bound on an error rate.
 
     Args:

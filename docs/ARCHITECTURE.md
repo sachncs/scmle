@@ -26,7 +26,7 @@ tracking database.
    in-memory tables, and bounded streaming sources. It fingerprints the data
    and maps infinities to missing values (reported as findings).
 2. **Profile** resolves the task, splits the data (`Partitioner`) behind a
-   `LockedTestSet`, then classifies columns (`ColumnKind`) and raises leakage
+   `Lockbox`, then classifies columns (`Family`) and raises leakage
    *hypotheses* (value association, outcome-dependent recording) from the
    development rows only.
 3. **Plan** asks the `Planner` (a chain of `Refiner`s) for candidates,
@@ -67,9 +67,9 @@ tracking database.
 `scmle.data.ingest` sits before the single table that the run starts from.
 Statistics about tables (counts, distinct counts, keys, inclusion) are
 aggregate queries run in the source, because a sample cannot confirm a
-universal statement. Rows are pulled only by `profile.consistent_read`, which
+universal statement. Rows are pulled only by `profile.untorn`, which
 needs a total order and rejects a read whose snapshot token or rows changed.
-Another table is read only through `asof_view.AsOfView.visible`, which
+Another table is read only through `asof_view.View.visible`, which
 returns rows recorded at or before the target row's cutoff; `synthesize`
 imports no connector or reader and never sees a frame. What the view cannot
 know is whether the recorded time is true, so every feature carries the
@@ -78,13 +78,13 @@ statements about the snapshot read, with their measures; an unlabelled entity
 resolution is `unverified`. A charter run with an `ingest` block calls it
 (`scmle.core.ingest_stage`); when the block carries an `entity` sub-block the
 resolved entity becomes the split's group column.
-The charter run reads SQLite only (`ingest_plan.sqlite_factory`); another
+The charter run reads SQLite only (`ingest_plan.opener`); another
 SQL backend is open. DuckDB would run locally without a server, but it is not
 a dependency or a CI extra, so none was added.
 
 ## Leakage guarantees
 
-* The test partition is held by `LockedTestSet`; it opens once, with a token
+* The test partition is held by `Lockbox`; it opens once, with a token
   issued after selection.
 * Preprocessing, resampling, calibration and stacking are fitted *inside*
   each training fold because they are part of the candidate estimator.
@@ -142,10 +142,10 @@ decision boundary, not merely rename a function call.
 
 | To add | Subclass | Register |
 | --- | --- | --- |
-| a file format | `TableReader` | `DatasetLoader(readers=...)` |
-| a column family | `ColumnKind` | `columns.KINDS` |
-| a feature operation | `FeatureOp` | `feature_graph.OPS` |
-| a synthetic-data generator | `SyntheticGenerator` | `GeneratorOverSampler.generator_class` |
+| a file format | `TableReader` | `Loader(readers=...)` |
+| a column family | `Family` | `columns.KINDS` |
+| a feature operation | `Operation` | `feature_graph.OPS` |
+| a synthetic-data generator | `Synthesizer` | `GeneratorOverSampler.generator_class` |
 | a validation protocol | `Partitioner` | `splitting.STRATEGIES` |
 | a model family | `Model` | `Catalog.register` or the `scmle.models` entry point |
 | a data strategy | `Strategy` | `strategies.STRATEGIES` |
@@ -153,13 +153,13 @@ decision boundary, not merely rename a function call.
 | a search algorithm | `Optimizer` | `optimizers.OPTIMIZERS` |
 | a selection rule | `Selector` | `Orchestrator(policy=...)` |
 | a diagnostic | `Diagnostic` | `diagnostics.run_suite(suite=...)` |
-| an executor | `Executor` | `execution.create_backend` |
-| a tracker | `ExperimentStore` | `Orchestrator(tracker=...)` |
+| an executor | `Executor` | `execution.select` |
+| a tracker | `Store` | `Orchestrator(tracker=...)` |
 | a serving surface | `Server` | direct use |
 | a workflow stage | `Stage` | `Orchestrator(stages=...)` |
 
 Third-party model adapters must pass
-`scmle.models.conformance.check_conformance`.
+`scmle.models.conformance.comply`.
 
 ## Conventions
 
@@ -174,9 +174,9 @@ on the free-threaded build (`tests/unit/test_thread_safety.py`).
 
 * **Registries.** `register_estimator` / `unregister_estimator`
   (`models.registry.USER_ADAPTERS`) and `register_metric`
-  (`MetricCatalog`) check and change under a lock, so a duplicate name has
-  exactly one winner. Readers take a snapshot: `Catalog.with_builtins`
-  copies the user adapters once, and `MetricCatalog` replaces its tables
+  (`Repertoire`) check and change under a lock, so a duplicate name has
+  exactly one winner. Readers take a snapshot: `Catalog.stock`
+  copies the user adapters once, and `Repertoire` replaces its tables
   rather than editing them, so a run that is scoring never sees a metric
   vanish halfway. A registration made while a run is in flight may or may
   not be visible to that run; register before you start.
@@ -184,13 +184,13 @@ on the free-threaded build (`tests/unit/test_thread_safety.py`).
   with an atomic `mkdir`) and seeded random state, so parallel runs give the
   results a sequential run with the same seed gives. Runs that share an
   `output_dir` share one `experiments.sqlite`, whose connections are
-  per call. `limits.forkserver_environment` reference-counts its change to
+  per call. `limits.preforked` reference-counts its change to
   `VECLIB_MAXIMUM_THREADS` so overlapping trials restore the original value.
 * **Prediction.** `Bundle.predict`, `predict_proba` and `score` only
   read the bundle. `remember` (series history) is serialized by
   `history_lock`; `calibrate` and other methods that replace fitted parts are
   setup steps, not safe to run beside predictions.
-* **Files.** `durability.path_lock(path)` gives every writer of one file the
+* **Files.** `durability.latch(path)` gives every writer of one file the
   same re-entrant lock, and `durability.append_text` appends whole records.
   The model registry store, lifecycle state, incident journal, alert
   journal, prediction log and SQLite schema migration use them. Their
@@ -202,7 +202,7 @@ on the free-threaded build (`tests/unit/test_thread_safety.py`).
 Limits: locks are per process. Separate processes writing one registry,
 journal or run directory are not coordinated (SQLite and `os.replace` keep
 single files intact, but a read-modify-write can still lose an update).
-`ShadowEvaluator` and `SigningKeyRegistry` are thread safe; the
+`Understudy` and `Keyring` are thread safe; the
 `Embedder` cache and `optuna` verbosity live in worker or global state that
 only a single caller drives. One `Context` must not be used by two
 threads. Registry locks are never held while a user estimator runs, but a

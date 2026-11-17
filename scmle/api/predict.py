@@ -41,7 +41,7 @@ def predict(
     data: str | pathlib.Path | pandas.DataFrame,
     trusted: bool = False,
     signing_key: str | bytes | None = None,
-    mapping: scmle.inference.mapping.ColumnMapping | None = None,
+    mapping: scmle.inference.mapping.Mapper | None = None,
 ) -> numpy.ndarray:
     """Loads a bundle and predicts labels or values.
 
@@ -65,7 +65,7 @@ def score(
     data: str | pathlib.Path | pandas.DataFrame,
     trusted: bool = False,
     signing_key: str | bytes | None = None,
-    mapping: scmle.inference.mapping.ColumnMapping | None = None,
+    mapping: scmle.inference.mapping.Mapper | None = None,
 ) -> dict[str, Any]:
     """Loads a bundle and returns predictions with schema diagnostics.
 

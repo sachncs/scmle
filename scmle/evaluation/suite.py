@@ -8,7 +8,7 @@ from scmle.evaluation import slices
 from scmle.explainability import suite
 
 
-def full_suite() -> tuple[diagnostics.Diagnostic, ...]:
+def lineup() -> tuple[diagnostics.Diagnostic, ...]:
     """Returns every diagnostic run after the final evaluation.
 
     Performance reports, subgroup scores, stress tests, distribution shift
@@ -24,6 +24,6 @@ def full_suite() -> tuple[diagnostics.Diagnostic, ...]:
         slices.Slices(),
         fairness.Fairness(),
         robustness.Robustness(),
-        shift.AdversarialValidation(),
+        shift.Adversary(),
         *suite.default_suite(),
     )

@@ -27,7 +27,7 @@ DEFAULT_WINDOWS = (7.0, 30.0, 90.0)
 DEFAULT_FEATURE_BUDGET = 200
 
 
-def non_negative(value: Any, name: str) -> float:
+def nonnegative(value: Any, name: str) -> float:
     """Checks that a number is finite and not negative.
 
     Args:
@@ -48,7 +48,7 @@ def non_negative(value: Any, name: str) -> float:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EntityField:
+class Attribute:
     """A column of the run table compared to find duplicates of an entity.
 
     Attributes:
@@ -92,7 +92,7 @@ class EntityField:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class EntityPass:
+class Pass:
     """One blocking pass of the entity resolution.
 
     Attributes:
@@ -154,8 +154,8 @@ class Entity:
             development and test.
     """
 
-    fields: tuple[EntityField, ...]
-    passes: tuple[EntityPass, ...]
+    fields: tuple[Attribute, ...]
+    passes: tuple[Pass, ...]
     column: str = "entity_group"
 
     def __post_init__(self) -> None:
@@ -165,8 +165,8 @@ class Entity:
             ValueError: If `fields` or `passes` is not a tuple or is empty,
                 two fields share a name, or `column` is blank.
         """
-        qualification.require_tuple(self.fields, "fields")
-        qualification.require_tuple(self.passes, "passes")
+        qualification.tupled(self.fields, "fields")
+        qualification.tupled(self.passes, "passes")
         if not self.fields or not self.passes:
             raise errors.InputError("an entity block needs fields and passes")
         names = [f.name for f in self.fields]
@@ -202,14 +202,14 @@ class Entity:
         """
         qualification.require(cls, record)
         return cls(
-            tuple(EntityField.from_dict(f) for f in record["fields"]),
-            tuple(EntityPass.from_dict(p) for p in record["passes"]),
+            tuple(Attribute.from_dict(f) for f in record["fields"]),
+            tuple(Pass.from_dict(p) for p in record["passes"]),
             record["column"],
         )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ColumnTotal:
+class Total:
     """The total of one column that the source system owns.
 
     Attributes:
@@ -264,12 +264,12 @@ class TableTotals:
         sums: Column totals in the source.
         checksum_column: Column whose values are checksummed.
         checksum: SHA-256 of the sorted values of that column as text, joined
-            by newlines (`scmle.data.ingest.declared.key_checksum`).
+            by newlines (`scmle.data.ingest.declared.sha`).
     """
 
     view: str
     rows: int | None = None
-    sums: tuple[ColumnTotal, ...] = ()
+    sums: tuple[Total, ...] = ()
     checksum_column: str | None = None
     checksum: str | None = None
 
@@ -284,7 +284,7 @@ class TableTotals:
                 `checksum` is declared.
         """
         evidence.require_text(self.view, "view")
-        qualification.require_tuple(self.sums, "sums")
+        qualification.tupled(self.sums, "sums")
         if self.rows is not None:
             qualification.count(self.rows, "rows")
         if (self.checksum_column is None) != (self.checksum is None):
@@ -328,7 +328,7 @@ class TableTotals:
         return cls(
             record["view"],
             record["rows"],
-            tuple(ColumnTotal.from_dict(s) for s in record["sums"]),
+            tuple(Total.from_dict(s) for s in record["sums"]),
             record["checksum_column"],
             record["checksum"],
         )
@@ -352,7 +352,7 @@ class Expectation:
             ValueError: If `tables` is not a tuple or is empty, or two
                 records name the same view.
         """
-        qualification.require_tuple(self.tables, "tables")
+        qualification.tupled(self.tables, "tables")
         if not self.tables:
             raise errors.InputError(
                 "a reconcile block needs at least one table"
@@ -442,16 +442,16 @@ class Ingestion:
             if value is not None:
                 qualification.count(value, name)
         if self.max_seconds is not None:
-            non_negative(self.max_seconds, "max_seconds")
+            nonnegative(self.max_seconds, "max_seconds")
         qualification.count(self.feature_budget, "feature_budget", minimum=1)
-        qualification.require_tuple(self.windows, "windows")
+        qualification.tupled(self.windows, "windows")
         if not self.windows or len(set(self.windows)) != len(self.windows):
             raise errors.InputError("windows must be non-empty and distinct")
         for window in self.windows:
             if qualification.finite(window, "window") <= 0:
                 raise errors.InputError("windows must be positive")
         for name in ("lag", "delta_rec", "eps_key", "eps_null", "eps_fk"):
-            non_negative(getattr(self, name), name)
+            nonnegative(getattr(self, name), name)
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the block.

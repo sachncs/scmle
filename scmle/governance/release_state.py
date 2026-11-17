@@ -30,7 +30,7 @@ Rules this module enforces:
   a `rejected` event is recorded and the previous revision is restored.
 * ``rollback`` restores the previous known-good revision and changes the
   registry only after the platform confirms it.
-* ``deployed_version`` answers "what does the registry say is deployed" only
+* ``live`` answers "what does the registry say is deployed" only
   when an observation agrees; otherwise it raises `RuntimeDisagrees`, so an
   alias can never be read as "deployed" against the runtime.
 * ``reconcile`` lists every disagreement between the registry, the ledger
@@ -138,7 +138,7 @@ class Reconciliation:
         }
 
 
-def stop_rollout(percent: int, reasons: Sequence[str]) -> NoReturn:
+def halt(percent: int, reasons: Sequence[str]) -> NoReturn:
     """Stops a rollout because the health check objected.
 
     Args:
@@ -153,7 +153,7 @@ def stop_rollout(percent: int, reasons: Sequence[str]) -> NoReturn:
     )
 
 
-def require_previous(previous: dict[str, Any] | None) -> dict[str, Any]:
+def predecessor(previous: dict[str, Any] | None) -> dict[str, Any]:
     """Returns the previous revision a staged rollout splits traffic with.
 
     Args:
@@ -272,7 +272,7 @@ class ReleaseRegistry:
         )
         return entry
 
-    def state_of(self, model: str, version: int) -> ReleaseState:
+    def lookup(self, model: str, version: int) -> ReleaseState:
         """Returns the release state of a registered version.
 
         The version must be registered; the store refuses an unknown one with
@@ -304,7 +304,7 @@ class ReleaseRegistry:
             A mapping from version number to its release state.
         """
         return {
-            v.version: self.state_of(model, v.version)
+            v.version: self.lookup(model, v.version)
             for v in self.store.versions(model)
         }
 
@@ -354,7 +354,7 @@ class ReleaseRegistry:
             {
                 "from": current.value,
                 "to": target.value,
-                "at": events.utc_timestamp(),
+                "at": events.stamp(),
                 "reason": reason,
             }
         )
@@ -387,7 +387,7 @@ class ReleaseRegistry:
                 "promote or rollback"
             )
         with self.store.lock:
-            current = self.state_of(model, version)
+            current = self.lookup(model, version)
             if target not in ALLOWED[current]:
                 raise errors.ArtifactError(
                     f"{model} v{version}: {current.value} -> {target.value} "
@@ -410,7 +410,7 @@ class ReleaseRegistry:
         self,
         model: str,
         version: int,
-        approval: registry.PromotionApproval,
+        approval: registry.Sanction,
         signing_key: str | bytes | None = None,
     ) -> None:
         """Marks a version approved after checking its approval.
@@ -431,13 +431,11 @@ class ReleaseRegistry:
         if not record.signed:
             raise errors.ArtifactError("an unsigned bundle cannot be approved")
         try:
-            approval.validate_target(
-                model, version, record.content_id, signing_key
-            )
+            approval.validate(model, version, record.content_id, signing_key)
         except (TypeError, ValueError) as error:
             raise errors.ArtifactError(str(error)) from error
         with self.store.lock:
-            current = self.state_of(model, version)
+            current = self.lookup(model, version)
             if ReleaseState.APPROVED not in ALLOWED[current]:
                 raise errors.ArtifactError(
                     f"{model} v{version} is {current.value}"
@@ -552,7 +550,7 @@ class ReleaseRegistry:
             for percent in steps:
                 allocation = {revision: percent}
                 if percent < FULL_ROLLOUT:
-                    allocation[require_previous(previous)["revision"]] = (
+                    allocation[predecessor(previous)["revision"]] = (
                         FULL_ROLLOUT - percent
                     )
                 plane.set_traffic(allocation)
@@ -564,8 +562,8 @@ class ReleaseRegistry:
                 if health is not None:
                     stop = health(seen, percent)
                     if stop:
-                        stop_rollout(percent, stop)
-            self.commit_promotion(
+                        halt(percent, stop)
+            self.finalize(
                 model,
                 version,
                 environment,
@@ -635,7 +633,7 @@ class ReleaseRegistry:
         """
         record = self.store.resolve(model, version)
         reasons = []
-        current = self.state_of(model, version)
+        current = self.lookup(model, version)
         if current is not ReleaseState.APPROVED:
             reasons.append(
                 f"{model} v{version} is {current.value}, not approved"
@@ -653,7 +651,7 @@ class ReleaseRegistry:
             reasons.append("the version has no stored approval")
         else:
             try:
-                release.approval_from_dict(stored).validate_target(
+                release.revive(stored).validate(
                     model, version, record.content_id, signing_key
                 )
             except (errors.ArtifactError, TypeError, ValueError) as error:
@@ -764,7 +762,7 @@ class ReleaseRegistry:
             "restored": restored,
         }
 
-    def commit_promotion(
+    def finalize(
         self,
         model: str,
         version: int,
@@ -803,7 +801,7 @@ class ReleaseRegistry:
                     model,
                     version,
                     registry.CHAMPION,
-                    release.approval_from_dict(stored),
+                    release.revive(stored),
                     signing_key,
                 )
             known_good = list(
@@ -839,7 +837,7 @@ class ReleaseRegistry:
                 "version": version,
                 "revision": revision,
                 "image_digest": image_digest,
-                "confirmed_at": events.utc_timestamp(),
+                "confirmed_at": events.stamp(),
                 "known_good": known_good[-10:],
             }
             self.write(state)
@@ -916,9 +914,7 @@ class ReleaseRegistry:
             )
             return Outcome(done=False, reasons=(str(error),), restored=restored)
         try:
-            self.commit_rollback(
-                model, environment, current, target, signing_key
-            )
+            self.rewind(model, environment, current, target, signing_key)
         except errors.ScmleError as error:
             # handled: recorded event and restore; failure outcome
             restored = self.restore(plane, current)
@@ -956,7 +952,7 @@ class ReleaseRegistry:
             revision=target["revision"],
         )
 
-    def commit_rollback(
+    def rewind(
         self,
         model: str,
         environment: str,
@@ -993,7 +989,7 @@ class ReleaseRegistry:
                         model,
                         target["version"],
                         registry.CHAMPION,
-                        release.approval_from_dict(stored),
+                        release.revive(stored),
                         signing_key,
                         guard_detail={
                             "rollback": {
@@ -1021,7 +1017,7 @@ class ReleaseRegistry:
                 "version": target["version"],
                 "revision": target["revision"],
                 "image_digest": target["image_digest"],
-                "confirmed_at": events.utc_timestamp(),
+                "confirmed_at": events.stamp(),
                 "known_good": current["known_good"][:-1],
             }
             self.write(state)
@@ -1034,7 +1030,7 @@ class ReleaseRegistry:
 
     # -- the claim "deployed" ---------------------------------------------
 
-    def deployed_version(
+    def live(
         self,
         model: str,
         environment: str,
@@ -1125,7 +1121,7 @@ class ReleaseRegistry:
                     f"platform runs {seen.image_digest}",
                 )
             )
-        share = seen.share_of(recorded["revision"])
+        share = seen.portion(recorded["revision"])
         if share != FULL_ROLLOUT:
             findings.append(
                 Finding(

@@ -60,7 +60,7 @@ def check_properties(world, trainer=None, limit=0):
     assert len(uses) <= limit  # within the envelope
     if trainer is not None:
         assert trainer.calls == len(uses)  # trainings equal uses
-    assert world.controller().loop.verify_ledger()  # the ledger verifies
+    assert world.controller().loop.recheck()  # the ledger verifies
     return ledger
 
 

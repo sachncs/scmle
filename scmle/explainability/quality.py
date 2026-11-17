@@ -36,7 +36,7 @@ def validate(value: float, field_name: str) -> float:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class QualityThresholds:
+class Thresholds:
     """Declared release thresholds for explanation quality measures.
 
     Attributes:
@@ -101,7 +101,7 @@ class Evaluation:
     sample_count: int
     stability_score: float | None
     fidelity_score: float | None
-    thresholds: QualityThresholds
+    thresholds: Thresholds
     passed: bool
     findings: tuple[str, ...]
 
@@ -144,7 +144,7 @@ class Evaluation:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ExplanationGroundTruth:
+class Truth:
     """Independent reference ranking for one explanation contract.
 
     The reference is caller-owned evidence. This type deliberately stores a
@@ -401,8 +401,8 @@ def rank(report: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(ranking)
 
 
-def evaluate_ground_truth(
-    ground_truth: ExplanationGroundTruth,
+def truth(
+    ground_truth: Truth,
     report: Mapping[str, Any],
     sample_id: str,
 ) -> Comparison:
@@ -427,10 +427,10 @@ def evaluate_ground_truth(
     `ValueError`.
 
     Raises:
-        TypeError: If `ground_truth` is not an `ExplanationGroundTruth`.
+        TypeError: If `ground_truth` is not an `Truth`.
     """
-    if not isinstance(ground_truth, ExplanationGroundTruth):
-        raise errors.KindError("ground_truth must be ExplanationGroundTruth")
+    if not isinstance(ground_truth, Truth):
+        raise errors.KindError("ground_truth must be Truth")
     ranking = rank(report)
     observed = ranking[: len(ground_truth.expected_features)]
     expected = set(ground_truth.expected_features)
@@ -455,9 +455,9 @@ def evaluate_ground_truth(
     )
 
 
-def evaluate_ground_truth_suite(
+def referee(
     sample_count: int,
-    references: Sequence[tuple[ExplanationGroundTruth, Mapping[str, Any], str]],
+    references: Sequence[tuple[Truth, Mapping[str, Any], str]],
 ) -> Suite:
     """Evaluates independent references across a bounded held-out suite.
 
@@ -473,9 +473,9 @@ def evaluate_ground_truth_suite(
         The suite result. It passes only when every sample has a reference
         and every comparison passed.
 
-    A reference that is not an `ExplanationGroundTruth` is rejected with a
+    A reference that is not an `Truth` is rejected with a
     `TypeError`, and an invalid report or blank sample id with a
-    `ValueError`, by `evaluate_ground_truth`.
+    `ValueError`, by `truth`.
 
     Raises:
         ValueError: If `sample_count` is below 1 or there are more
@@ -486,7 +486,7 @@ def evaluate_ground_truth_suite(
     if len(references) > sample_count:
         raise errors.InputError("references cannot exceed sample_count")
     evaluations = tuple(
-        evaluate_ground_truth(ground_truth, report, sample_id)
+        truth(ground_truth, report, sample_id)
         for ground_truth, report, sample_id in references
     )
     if not evaluations:
@@ -510,7 +510,7 @@ def evaluate_ground_truth_suite(
     )
 
 
-def linear_contribution_report(
+def decompose(
     sample_id: str,
     feature_names: Sequence[str],
     values: Sequence[float],
@@ -574,7 +574,7 @@ def linear_contribution_report(
     }
 
 
-def ranking_stability(
+def topk(
     reports: Sequence[Mapping[str, Any]], top_k: int | None = None
 ) -> float:
     """Returns mean pairwise top-k overlap across repeated explanations.
@@ -670,7 +670,7 @@ def fidelity_score(
 def evaluate(
     method: str,
     sample_count: int,
-    thresholds: QualityThresholds,
+    thresholds: Thresholds,
     *,
     stability: float | None = None,
     fidelity: float | None = None,

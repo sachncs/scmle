@@ -521,7 +521,7 @@ SCMLE reports the gap (see `fairness.json` and `slice_performance.json`).
 
 **Meaning.** Comparing production data and outcomes with what the model saw in
 training.
-**Example.** `ModelMonitor.assess`.
+**Example.** `Watcher.assess`.
 **Why it matters.** Models fail quietly. Monitoring is how you hear about it.
 
 ### delayed labels
@@ -634,7 +634,7 @@ the champion label needs a signed approval.
 
 **Meaning.** Promotion makes a version the champion. An approval is a signed
 note by an independent reviewer bound to one exact model.
-**Example.** `PromotionApproval(...).sign(key)`.
+**Example.** `Sanction(...).sign(key)`.
 **Why it matters.** It stops one person pushing an unreviewed model into use.
 
 ### model card

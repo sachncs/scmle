@@ -35,7 +35,7 @@ def require_text(value: str, field_name: str) -> str:
     return stripped
 
 
-def validate_json_value(value: Any, field_name: str = "value") -> object:
+def sanitise(value: Any, field_name: str = "value") -> object:
     """Validates and normalizes a value accepted by the evidence contract.
 
     Only JSON-native values are accepted. In particular, non-finite floats,
@@ -63,7 +63,7 @@ def validate_json_value(value: Any, field_name: str = "value") -> object:
         return value
     if isinstance(value, (list, tuple)):
         return [
-            validate_json_value(item, f"{field_name}[{index}]")
+            sanitise(item, f"{field_name}[{index}]")
             for index, item in enumerate(value)
         ]
     if isinstance(value, Mapping):
@@ -73,7 +73,7 @@ def validate_json_value(value: Any, field_name: str = "value") -> object:
                 raise errors.KindError(
                     f"{field_name} has a non-string key: {key!r}"
                 )
-            normalized[key] = validate_json_value(item, f"{field_name}.{key}")
+            normalized[key] = sanitise(item, f"{field_name}.{key}")
         return normalized
     raise errors.KindError(
         f"{field_name} must contain only JSON-native values, got "
@@ -92,7 +92,7 @@ class Contract(pydantic.BaseModel):
     )
 
 
-class DatasetSnapshot(Contract):
+class Snapshot(Contract):
     """Identity of the dataset state used to produce an explanation."""
 
     identifier: str
@@ -115,7 +115,7 @@ class DatasetSnapshot(Contract):
         return require_text(value, f"dataset_snapshot.{info.field_name}")
 
 
-class FeatureGraphReference(Contract):
+class Lineage(Contract):
     """Version and fingerprint of the feature transformation graph."""
 
     version: int = pydantic.Field(ge=1)
@@ -169,7 +169,7 @@ class Method(Contract):
             ValueError: If the parameters are not JSON-native or not an object.
         """
         try:
-            normalized = validate_json_value(value, "method.parameters")
+            normalized = sanitise(value, "method.parameters")
         except (TypeError, ValueError) as error:
             raise errors.InputError(str(error)) from error
         if not isinstance(normalized, dict):
@@ -177,7 +177,7 @@ class Method(Contract):
         return normalized
 
 
-class PrivacyDecision(Contract):
+class Clearance(Contract):
     """Decision describing whether explanation content may be disclosed."""
 
     decision: PrivacyStatus
@@ -214,7 +214,7 @@ class PrivacyDecision(Contract):
         )
 
 
-class EvidenceLink(Contract):
+class Link(Contract):
     """Reference to supporting evidence for an explanation record."""
 
     relation: str
@@ -306,8 +306,8 @@ class Evidence(Contract):
     model_fingerprint: str
     bundle_digest: str
     input_fingerprint: str
-    dataset_snapshot: DatasetSnapshot
-    feature_graph: FeatureGraphReference
+    dataset_snapshot: Snapshot
+    feature_graph: Lineage
     method: Method
     output: Any
     timestamp: datetime.datetime
@@ -316,8 +316,8 @@ class Evidence(Contract):
     stability: dict[str, Any]
     limitations: tuple[str, ...]
     causal_warning: str
-    privacy_decision: PrivacyDecision
-    evidence_links: tuple[EvidenceLink, ...]
+    privacy_decision: Clearance
+    evidence_links: tuple[Link, ...]
 
     @pydantic.field_validator(
         "model_fingerprint",
@@ -357,7 +357,7 @@ class Evidence(Contract):
                 `TypeError` or `ValueError` of the JSON validation.
         """
         try:
-            return validate_json_value(value, info.field_name)
+            return sanitise(value, info.field_name)
         except (TypeError, ValueError) as error:
             raise errors.InputError(str(error)) from error
 
@@ -415,9 +415,7 @@ class Evidence(Contract):
 
     @pydantic.field_validator("evidence_links")
     @classmethod
-    def validate_evidence_links(
-        cls, value: tuple[EvidenceLink, ...]
-    ) -> tuple[EvidenceLink, ...]:
+    def linked(cls, value: tuple[Link, ...]) -> tuple[Link, ...]:
         """Requires at least one independently addressable evidence link.
 
         Args:
@@ -467,7 +465,7 @@ class Evidence(Contract):
                 mapping.
         """
         record = self.model_dump(mode="json")
-        normalized = validate_json_value(record, "evidence")
+        normalized = sanitise(record, "evidence")
         if not isinstance(normalized, dict):
             raise errors.KindError(
                 "serialized explanation evidence must be an object"

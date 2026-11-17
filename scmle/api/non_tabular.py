@@ -184,7 +184,7 @@ class Predictor:
         }
 
 
-def video_scope(adapter: modality_lifecycle.VideoPreparer) -> Scope:
+def video_scope(adapter: modality_lifecycle.Footage) -> Scope:
     """Returns the capability of a video adapter.
 
     Args:
@@ -220,7 +220,7 @@ def video_scope(adapter: modality_lifecycle.VideoPreparer) -> Scope:
     )
 
 
-def raster_scope(adapter: modality_lifecycle.RasterPreparer) -> Scope:
+def delimit(adapter: modality_lifecycle.Imagery) -> Scope:
     """Returns the capability of a raster adapter.
 
     Args:
@@ -256,7 +256,7 @@ def raster_scope(adapter: modality_lifecycle.RasterPreparer) -> Scope:
     )
 
 
-def fixed_scope(
+def invariant(
     adapter: modality_lifecycle.Preparer,
 ) -> Scope | None:
     """Returns the capability of an adapter whose scope never varies.
@@ -272,7 +272,7 @@ def fixed_scope(
     adapter_type = type(adapter)
     if adapter_type in {
         modality_lifecycle.DocumentPreparer,
-        modality_lifecycle.TextPreparer,
+        modality_lifecycle.Plaintext,
     }:
         return Scope(
             modality=modalities.serialise(adapter.modality),
@@ -341,7 +341,7 @@ def fixed_scope(
     return None
 
 
-def capability_for_adapter(
+def entitle(
     adapter: modality_lifecycle.Preparer,
 ) -> Scope:
     """Returns the explicit capability for one built-in adapter.
@@ -367,11 +367,11 @@ def capability_for_adapter(
     if not isinstance(adapter, modality_lifecycle.Preparer):
         raise errors.KindError("adapter must be a Preparer")
     adapter_type = type(adapter)
-    if adapter_type is modality_lifecycle.VideoPreparer:
-        return video_scope(cast("modality_lifecycle.VideoPreparer", adapter))
-    if adapter_type is modality_lifecycle.RasterPreparer:
-        return raster_scope(cast("modality_lifecycle.RasterPreparer", adapter))
-    scope = fixed_scope(adapter)
+    if adapter_type is modality_lifecycle.Footage:
+        return video_scope(cast("modality_lifecycle.Footage", adapter))
+    if adapter_type is modality_lifecycle.Imagery:
+        return delimit(cast("modality_lifecycle.Imagery", adapter))
+    scope = invariant(adapter)
     if scope is not None:
         return scope
     raise UnsupportedNonTabularModelError(
@@ -387,7 +387,7 @@ def capability_for_adapter(
     )
 
 
-def check_observed_adapter(
+def conform(
     adapter: modality_lifecycle.Preparer,
     observed_adapter: modality_lifecycle.Preparer,
     capability: Scope,
@@ -404,7 +404,7 @@ def check_observed_adapter(
             capability or, for video and raster adapters, another decoder
             object.
     """
-    observed_capability = capability_for_adapter(observed_adapter)
+    observed_capability = entitle(observed_adapter)
     if observed_capability != capability:
         raise UnsupportedNonTabularModelError(
             "observed adapter must use the same bounded capability",
@@ -413,10 +413,10 @@ def check_observed_adapter(
                 "observed": observed_capability.to_dict(),
             },
         )
-    if isinstance(adapter, modality_lifecycle.VideoPreparer) and (
+    if isinstance(adapter, modality_lifecycle.Footage) and (
         adapter.frame_decoder
         is not cast(
-            "modality_lifecycle.VideoPreparer", observed_adapter
+            "modality_lifecycle.Footage", observed_adapter
         ).frame_decoder
     ):
         raise UnsupportedNonTabularModelError(
@@ -424,11 +424,9 @@ def check_observed_adapter(
             "same frame decoder object",
             {"modality": capability.modality},
         )
-    if isinstance(adapter, modality_lifecycle.RasterPreparer) and (
+    if isinstance(adapter, modality_lifecycle.Imagery) and (
         adapter.decoder
-        is not cast(
-            "modality_lifecycle.RasterPreparer", observed_adapter
-        ).decoder
+        is not cast("modality_lifecycle.Imagery", observed_adapter).decoder
     ):
         raise UnsupportedNonTabularModelError(
             "reference and observed raster adapters must share the "
@@ -476,7 +474,7 @@ class Modeler:
         observed_adapter: modality_lifecycle.Preparer | None = None,
         performance_budget: performance.Budget | None = None,
         performance_baseline: performance.Baseline | None = None,
-        manifest: data.ModalityManifest | None = None,
+        manifest: data.Passport | None = None,
         require_independent_ground_truth: bool = False,
         cancellation: modality_lifecycle.Cancellation | None = None,
         checkpoint_path: str | Path | None = None,
@@ -512,7 +510,7 @@ class Modeler:
                 seed or the cancellation has the wrong type.
             ValueError: If the signing key is empty.
         """
-        self.capability = capability_for_adapter(adapter)
+        self.capability = entitle(adapter)
         if not isinstance(experimental_opt_in, bool):
             raise errors.KindError("experimental_opt_in must be bool")
         if not experimental_opt_in:
@@ -535,7 +533,7 @@ class Modeler:
         if not isinstance(resume, bool):
             raise errors.KindError("resume must be bool")
         if observed_adapter is not None:
-            check_observed_adapter(adapter, observed_adapter, self.capability)
+            conform(adapter, observed_adapter, self.capability)
         if cancellation is not None and not isinstance(
             cancellation, modality_lifecycle.Cancellation
         ):
@@ -651,5 +649,5 @@ __all__ = [
     "Predictor",
     "Scope",
     "UnsupportedNonTabularModelError",
-    "capability_for_adapter",
+    "entitle",
 ]

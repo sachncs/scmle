@@ -37,7 +37,7 @@ uses four kinds of evidence:
 - Every dataset or schema change requires reviewing the curation report before
   model comparisons are interpreted.
 - Every candidate promotion requires locked-data evaluation, monitoring
-  reference approval, an independent `PromotionApproval` bound to the exact
+  reference approval, an independent `Sanction` bound to the exact
   bundle digest, and a rollback decision.
 - Every release requires the declared release checks to be complete.
 

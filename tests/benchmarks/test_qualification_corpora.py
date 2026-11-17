@@ -51,7 +51,7 @@ def source_file(tmp_path, payload=PAYLOAD):
 
 
 def test_the_committed_manifest_is_valid_and_claims_nothing_unchecked():
-    manifest = corpora.load_manifest()
+    manifest = corpora.restore()
     ids = {c.id for c in manifest}
     assert {
         "titanic-boat-body",
@@ -69,7 +69,7 @@ def test_the_committed_manifest_is_valid_and_claims_nothing_unchecked():
 def test_the_tabarena_entry_points_at_the_task_list_in_the_repo():
     tasks = ROOT / "benchmarks" / "sota" / "tasks_tabarena_v0pt1.csv"
     assert tasks.is_file()
-    corpus = corpora.find(corpora.load_manifest(), "tabarena-v0pt1-tasks")
+    corpus = corpora.find(corpora.restore(), "tabarena-v0pt1-tasks")
     assert "tasks_tabarena_v0pt1.csv" in corpus.notes
 
 
@@ -120,7 +120,7 @@ def test_a_verified_corpus_is_fetched_and_its_hash_checked(tmp_path):
     root = tmp_path / "cache"
     path = corpora.fetch(item, root, offline=False)
     assert path.read_bytes() == PAYLOAD
-    assert corpora.sha256_of(path) == DIGEST
+    assert corpora.checksum(path) == DIGEST
     assert corpora.is_available(item, root)
     assert path == corpora.destination(item, root)
 
@@ -192,7 +192,7 @@ def test_the_corpus_root_follows_the_environment(tmp_path, monkeypatch):
 
 def corpus_or_skip(corpus_id):
     """Skips with the reason the skip manifest approves."""
-    item = corpora.find(corpora.load_manifest(), corpus_id)
+    item = corpora.find(corpora.restore(), corpus_id)
     if not corpora.is_available(item, corpora.corpus_root()):
         pytest.skip(f"corpus '{corpus_id}' is not available locally")
     return corpora.destination(item, corpora.corpus_root())

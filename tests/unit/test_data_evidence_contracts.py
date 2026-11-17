@@ -11,9 +11,9 @@ from scmle.contracts import data
 def make_finding(
     finding_id: str = "quality.missingness",
     severity: data.FindingSeverity = data.FindingSeverity.WARNING,
-) -> data.CurationFinding:
+) -> data.Finding:
     """Builds a representative structured curation finding."""
-    return data.CurationFinding(
+    return data.Finding(
         finding_id=finding_id,
         rule_version="missingness.v2",
         severity=severity,
@@ -23,7 +23,7 @@ def make_finding(
         remediation="Review the source collection and impute explicitly.",
         owner="data-platform",
         reviewer="ml-governance",
-        disposition=data.FindingDisposition.OPEN,
+        disposition=data.Disposition.OPEN,
         blocking=severity
         in {
             data.FindingSeverity.ERROR,
@@ -53,7 +53,7 @@ def test_curation_finding_has_stable_json_contract_and_round_trips():
         "timestamp",
     }
     assert json.loads(json.dumps(record)) == record
-    assert data.CurationFinding.from_dict(record) == finding
+    assert data.Finding.from_dict(record) == finding
 
 
 @pytest.mark.parametrize("confidence", [-0.01, 1.01, float("nan")])
@@ -69,16 +69,16 @@ def test_curation_finding_rejects_invalid_confidence(confidence):
             remediation="Investigate the source.",
             owner="data-platform",
             reviewer=None,
-            disposition=data.FindingDisposition.OPEN,
+            disposition=data.Disposition.OPEN,
             blocking=False,
         )
 
 
 def test_observation_conversion_has_deterministic_identity_and_evidence():
-    first = data.CurationFinding.from_observation(
+    first = data.Finding.from_observation(
         "column 'income' has missing values", "quality"
     )
-    second = data.CurationFinding.from_observation(
+    second = data.Finding.from_observation(
         "column 'income' has missing values", "quality"
     )
 
@@ -108,7 +108,7 @@ def test_dataset_manifest_carries_source_lineage_privacy_and_findings():
         modality="tabular",
         task="binary",
         schema_version=2,
-        source=data.SourceMetadata(
+        source=data.Origin(
             owner="analytics",
             acquisition_method="warehouse-export",
             captured_at="2026-10-20T09:00:00+00:00",
@@ -120,7 +120,7 @@ def test_dataset_manifest_carries_source_lineage_privacy_and_findings():
             license="internal",
             access_policy="restricted",
         ),
-        lineage=data.LineageMetadata(
+        lineage=data.Ancestry(
             source_snapshot="warehouse:events:2026-10-20",
             parent_datasets=("raw-events",),
             transformations=("deduplicate-events.v3",),
@@ -132,7 +132,7 @@ def test_dataset_manifest_carries_source_lineage_privacy_and_findings():
             object_hashes={"part-000": "abc123"},
             schema_evolution="compatible-additive",
         ),
-        privacy=data.PrivacyMetadata(
+        privacy=data.Confidentiality(
             classification="confidential",
             contains_pii=True,
             sensitive_fields=("email",),
@@ -158,13 +158,13 @@ def test_dataset_manifest_carries_source_lineage_privacy_and_findings():
 
 def test_dataset_profile_serializes_typed_quality_evidence():
     """Quality evidence is JSON-native without changing existing fields."""
-    profile = data.DatasetProfile(
+    profile = data.Portrait(
         manifest=data.DatasetManifest("ds_1", "schema", "data", 10, 2, "y"),
         column_statistics={},
         quality_findings=("label noise: review",),
         risk_findings=(),
         target_summary={"task": "binary"},
-        feature_plan=data.FeaturePlan(("x",), ()),
+        feature_plan=data.Blueprint(("x",), ()),
         quality_evidence=(
             {
                 "method": "out_of_fold_confident_disagreement",
@@ -187,13 +187,13 @@ def test_dataset_profile_serializes_typed_quality_evidence():
 def test_dataset_profile_rejects_non_json_quality_evidence():
     """Quality evidence must not silently stringify arbitrary objects."""
     with pytest.raises(TypeError, match="JSON-native"):
-        data.DatasetProfile(
+        data.Portrait(
             manifest=None,
             column_statistics={},
             quality_findings=(),
             risk_findings=(),
             target_summary={},
-            feature_plan=data.FeaturePlan(("x",), ()),
+            feature_plan=data.Blueprint(("x",), ()),
             quality_evidence=({"metrics": {"value": object()}},),
         )
 
@@ -306,9 +306,7 @@ def test_curation_report_accepts_explicit_safe_dispositions():
         cleaning_notes=(),
         quality_findings=(),
         risk_findings=(
-            dataclasses.replace(
-                risk, disposition=data.FindingDisposition.RESOLVED
-            ),
+            dataclasses.replace(risk, disposition=data.Disposition.RESOLVED),
         ),
         feature_columns={"numeric": ("amount",)},
         dropped_columns={},
@@ -329,7 +327,7 @@ def test_dataset_card_makes_intended_use_and_limits_explicit():
             "label",
             snapshot_id="snapshot-1",
             task="binary_classification",
-            source=data.SourceMetadata(owner="ml-platform"),
+            source=data.Origin(owner="ml-platform"),
         ),
         source_rows=12,
         profiled_rows=10,
@@ -342,7 +340,7 @@ def test_dataset_card_makes_intended_use_and_limits_explicit():
         dropped_columns={"email": "sensitive"},
     )
 
-    card = data.DatasetCard.from_curation(report)
+    card = data.DatasetCard.distill(report)
     record = card.to_dict()
 
     assert card.owner == "ml-platform"

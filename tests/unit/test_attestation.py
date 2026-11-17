@@ -27,19 +27,19 @@ def records() -> tuple[dict[str, object], dict[str, object]]:
 def test_attestation_binds_model_provenance_and_sbom_digests():
     provenance, sbom = records()
 
-    record = attestation.ReleaseAttestation.from_records(provenance, sbom)
+    record = attestation.Attestation.from_records(provenance, sbom)
 
     assert record.verify(provenance, sbom)
     assert record.to_dict()["subjects"] == {
         "model_manifest_sha256": "model-digest",
-        "provenance_sha256": attestation.canonical_digest(provenance),
-        "sbom_sha256": attestation.canonical_digest(sbom),
+        "provenance_sha256": attestation.checksum(provenance),
+        "sbom_sha256": attestation.checksum(sbom),
     }
 
 
 def test_attestation_fails_after_a_source_record_changes():
     provenance, sbom = records()
-    record = attestation.ReleaseAttestation.from_records(provenance, sbom)
+    record = attestation.Attestation.from_records(provenance, sbom)
     changed = dataclasses.replace(record, signature_present=False)
 
     assert not changed.verify(provenance, sbom)
@@ -52,64 +52,59 @@ def test_attestation_rejects_missing_or_ambiguous_signature_claim():
     del provenance["signature"]
 
     with pytest.raises(ValueError, match=r"signature\.present"):
-        attestation.ReleaseAttestation.from_records(provenance, sbom)
+        attestation.Attestation.from_records(provenance, sbom)
 
 
 def test_attestation_signature_binds_all_release_subjects():
     provenance, sbom = records()
 
-    record = attestation.ReleaseAttestation.from_records(
+    record = attestation.Attestation.from_records(
         provenance, sbom, signing_key="release-key"
     )
 
     assert record.attestation_signature
     assert record.verify(provenance, sbom, signing_key="release-key")
     assert not record.verify(provenance, sbom, signing_key="wrong-key")
-    assert attestation.ReleaseAttestation.from_dict(record.to_dict()) == record
+    assert attestation.Attestation.from_dict(record.to_dict()) == record
 
 
 def test_attestation_signature_rejects_tampered_persisted_record():
     provenance, sbom = records()
-    record = attestation.ReleaseAttestation.from_records(
+    record = attestation.Attestation.from_records(
         provenance, sbom, signing_key="release-key"
     )
     persisted = record.to_dict()
     persisted["subjects"]["sbom_sha256"] = "tampered"
 
-    loaded = attestation.ReleaseAttestation.from_dict(persisted)
+    loaded = attestation.Attestation.from_dict(persisted)
 
     assert not loaded.verify(provenance, sbom, signing_key="release-key")
 
 
 def test_an_empty_bytes_signing_key_is_rejected():
     with pytest.raises(ValueError, match="empty"):
-        signing.resolve_key(b"")
+        signing.keying(b"")
     with pytest.raises(ValueError, match="empty"):
-        signing.sign_payload({"a": 1}, b"")
+        signing.mac({"a": 1}, b"")
     # ERR-3: an empty string used to mean "no key" and left records unsigned.
     with pytest.raises(ValueError, match="empty"):
-        signing.resolve_key("")
-    assert signing.resolve_key(b"k") == b"k"
+        signing.keying("")
+    assert signing.keying(b"k") == b"k"
 
 
 def test_an_unusable_configured_key_is_refused_and_named(tmp_path):
     with pytest.raises(errors.ConfigError, match="set but empty"):
-        signing.key_from_environment({signing.SIGNING_KEY_ENV: ""})
+        signing.lookup({signing.SIGNING_KEY_ENV: ""})
     with pytest.raises(errors.ConfigError, match="set but empty"):
-        signing.key_from_environment({signing.SIGNING_KEY_FILE_ENV: ""})
+        signing.lookup({signing.SIGNING_KEY_FILE_ENV: ""})
     missing = tmp_path / "absent.key"
     with pytest.raises(errors.ConfigError, match="cannot read"):
-        signing.key_from_environment(
-            {signing.SIGNING_KEY_FILE_ENV: str(missing)}
-        )
+        signing.lookup({signing.SIGNING_KEY_FILE_ENV: str(missing)})
     empty = tmp_path / "empty.key"
     empty.write_text("  \n", encoding="utf-8")
     with pytest.raises(errors.ConfigError, match="is empty"):
-        signing.key_from_environment({signing.SIGNING_KEY_FILE_ENV: str(empty)})
+        signing.lookup({signing.SIGNING_KEY_FILE_ENV: str(empty)})
     good = tmp_path / "good.key"
     good.write_text("secret\n", encoding="utf-8")
-    assert (
-        signing.key_from_environment({signing.SIGNING_KEY_FILE_ENV: str(good)})
-        == "secret"
-    )
-    assert signing.key_from_environment({}) is None
+    assert signing.lookup({signing.SIGNING_KEY_FILE_ENV: str(good)}) == "secret"
+    assert signing.lookup({}) is None

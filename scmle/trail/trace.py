@@ -238,7 +238,7 @@ class Tracer:
                 else self.base / relative
             )
             if path.is_file():
-                held[relative] = records.sha256_file(path)
+                held[relative] = records.checksum(path)
         self.steps[kind] = {
             "kind": kind,
             "title": TITLES[kind],
@@ -300,7 +300,7 @@ class Tracer:
                 UNSIGNED, step, "no analyst key supplied to check the charter"
             )
         else:
-            expected = signing.sign_payload(charter, key)
+            expected = signing.mac(charter, key)
             if not hmac.compare_digest(str(signature), expected):
                 self.problem(
                     UNSIGNED, step, "the charter signature does not verify"
@@ -352,10 +352,10 @@ class Tracer:
     def stakeholder(self) -> None:
         """Derives the KPIs, acceptance criteria and approved expectation."""
         name = "stakeholder"
-        found = inputs.structure_problems(self.inputs)
+        found = inputs.lint(self.inputs)
         for detail in found:
             self.problem(MISSING_LINK, name, f"inputs.json: {detail}")
-        problem = inputs.signature_problem(
+        problem = inputs.diagnose(
             self.inputs, "stakeholder", self.keys.get("stakeholder")
         )
         if problem:
@@ -514,7 +514,7 @@ class Tracer:
     def quality(self) -> None:
         """Derives the domain thresholds, which the reviewer signs."""
         name = "quality"
-        problem = inputs.signature_problem(
+        problem = inputs.diagnose(
             self.inputs, "reviewer", self.keys.get("reviewer")
         )
         if problem:
@@ -536,7 +536,7 @@ class Tracer:
                 self.problem(
                     MISSING_LINK, name, f"reviewed record {relative} is absent"
                 )
-            elif records.sha256_file(path) != held:
+            elif records.checksum(path) != held:
                 self.problem(
                     TAMPERED,
                     name,
@@ -570,7 +570,7 @@ class Tracer:
         }
         self.run_id = str(evaluation.get("run_id", ""))
         if manifest is not None:
-            self.content_id = records.sha256_file(manifest)
+            self.content_id = records.checksum(manifest)
             facts["content_id"] = self.content_id
         run_dir = self.base / "run"
         if run_dir.is_dir():
@@ -707,7 +707,7 @@ class Tracer:
         record = dict(rows[-1]["approval_record"])
         key = self.keys.get("reviewer")
         try:
-            held = registry.PromotionApproval(
+            held = registry.Sanction(
                 model=record["model"],
                 version=record["version"],
                 content_id=record["content_id"],
@@ -730,7 +730,7 @@ class Tracer:
                 UNSIGNED, step, "the approval signature does not verify"
             )
         try:
-            held.validate_target(str(model), int(version), self.content_id, key)
+            held.validate(str(model), int(version), self.content_id, key)
         except (ValueError, TypeError) as error:
             # handled: recorded as trace problem
             self.problem(UNAPPROVED, step, str(error))
