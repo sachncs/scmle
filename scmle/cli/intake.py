@@ -330,12 +330,10 @@ class Charter(command.Command):
         )
         if args.rows is not None:
             report = feasibility.assess(
-                n_confirmation=int(
-                    args.rows * charter.sets.confirmation_fraction
-                ),
-                min_effect=charter.min_effect,
-                alpha=float(charter.error_budget.confirmation.alpha_confirm),
-                k_max=charter.k_max,
+                n_confirmation=int(args.rows * charter.sets.confirmation),
+                min_effect=charter.effect,
+                alpha=float(charter.budget.confirmation.alpha_confirm),
+                k_max=charter.quota,
                 power=charter.power,
             )
             LOGGER.info("feasibility: %s (%s)", report.verdict, report.reason)
@@ -390,7 +388,7 @@ class Frame(command.Command):
         parser.add_argument(
             "--source",
             required=True,
-            help="JSON: uri, columns, primary_key, target_time_column",
+            help="JSON: uri, columns, key, time",
         )
         parser.add_argument(
             "--data", required=True, help="exploration rows only (CSV)"

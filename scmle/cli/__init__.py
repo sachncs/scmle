@@ -30,6 +30,7 @@ from scmle.cli.intake import Cataloging
 from scmle.cli.intake import Charter
 from scmle.cli.intake import Frame
 from scmle.cli.intake import IngestCommand
+from scmle.cli.maintenance import Records
 from scmle.cli.rollout import Deployment
 from scmle.cli.rollout import Operation
 from scmle.cli.training import Plan
@@ -63,6 +64,7 @@ __all__ = [
     "Plan",
     "Prediction",
     "ProjectCommand",
+    "Records",
     "Resumption",
     "Run",
     "Serve",
@@ -94,6 +96,7 @@ COMMANDS: tuple[Command, ...] = (
     Operation(),
     Deployment(),
     Trail(),
+    Records(),
 )
 
 
