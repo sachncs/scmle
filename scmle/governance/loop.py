@@ -353,6 +353,37 @@ def jsonify(value: Any) -> Any:
     return value
 
 
+def amend(ledger: deployment_ledger.DeploymentLedger) -> Mapping[str, Any]:
+    """Returns the ledger's policy with every recorded amendment applied.
+
+    Only amendment rows carry `policy_amendment`; other observe summaries
+    have none and change nothing.
+
+    Args:
+        ledger: The verified deployment ledger.
+
+    Returns:
+        The header policy updated by each amendment in ledger order.
+
+    Raises:
+        ArtifactError: If an amendment is not a mapping. `dict.update`
+            applied a list of pairs as if it were one, so malformed rows
+            changed the policy without a word (ERR-23).
+    """
+    effective = dict(ledger.header["policy"])
+    for row in ledger.rows:
+        if row["kind"] != deployment_ledger.OBSERVE_SUMMARY:
+            continue
+        change = row["body"].get("policy_amendment", {})
+        if not isinstance(change, Mapping):
+            raise errors.ArtifactError(
+                f"ledger row {row['seq']} has a policy amendment that is not "
+                f"a mapping: {type(change).__name__}"
+            )
+        effective.update(change)
+    return effective
+
+
 class Loop:
     """One deployment's closed loop (see the module docstring)."""
 
@@ -469,12 +500,7 @@ class Loop:
                 raise deployment_ledger.MisuseError(
                     "ledger belongs to a different charter"
                 )
-            effective = dict(header["policy"])
-            for row in ledger.rows:
-                body = row["body"]
-                if row["kind"] == deployment_ledger.OBSERVE_SUMMARY:
-                    effective.update(body.get("policy_amendment", {}))
-            if effective != jsonify(policy.to_dict()):
+            if amend(ledger) != jsonify(policy.to_dict()):
                 raise deployment_ledger.MisuseError(
                     "ledger was opened with a different policy"
                 )
@@ -531,11 +557,7 @@ class Loop:
         """
         path = Path(deploy_dir) / deployment_ledger.FILE_NAME
         ledger = deployment_ledger.DeploymentLedger.load(path)
-        effective = dict(ledger.header["policy"])
-        for row in ledger.rows:
-            if row["kind"] == deployment_ledger.OBSERVE_SUMMARY:
-                effective.update(row["body"].get("policy_amendment", {}))
-        policy = Preregistration.from_dict(effective)
+        policy = Preregistration.from_dict(amend(ledger))
         charter = types.SimpleNamespace(
             charter_hash=ledger.header["charter_hash"]
         )

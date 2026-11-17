@@ -4240,8 +4240,15 @@ class PackageStage(Stage):
                 evaluation["sbom"],
                 signing_key=signing.keying(None),
             )
-        except (KeyError, TypeError, ValueError):
-            # handled: verification=False fed to attestation gate, which blocks
+        except (KeyError, TypeError, ValueError) as error:
+            # handled: verification=False fed to attestation gate, which
+            # blocks; the reason is logged, not discarded (ERR-4)
+            LOGGER.warning(
+                "release attestation could not be checked (%s: %s); the "
+                "release is blocked",
+                type(error).__name__,
+                error,
+            )
             verification = False
         outcome = release.certify(
             outcome, evaluation.get("release_attestation"), verification

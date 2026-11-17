@@ -148,3 +148,108 @@ def test_an_undefined_metric_says_why_it_is_nan(caplog):
     undefined = [name for name, value in scores.items() if numpy.isnan(value)]
     assert undefined
     assert any("is undefined here" in r.getMessage() for r in caplog.records)
+
+
+def test_champion_counts_every_dropped_resample(monkeypatch):
+    # ERR-13: champion resamples that failed were dropped uncounted, and when
+    # every one failed the percentile of nothing raised IndexError.
+    from scmle.evaluation import metrics
+    from scmle.monitoring import champion
+
+    calls = {"n": 0}
+
+    def score(model, features, target, positive):
+        calls["n"] += 1
+        if calls["n"] > 2:
+            raise ValueError("a resample missing a class")
+        return 0.5
+
+    metric = types.SimpleNamespace(
+        name="rmse", greater_is_better=False, score=score
+    )
+    monkeypatch.setattr(metrics.CATALOG, "resolve", lambda name, task: metric)
+    model = types.SimpleNamespace(
+        schema=types.SimpleNamespace(
+            task="regression", group_column=None, time_column=None
+        ),
+        info=types.SimpleNamespace(metric="rmse"),
+        pipeline=None,
+        prepare=lambda frame: frame,
+    )
+    rows = champion.MIN_ROWS + 10
+    frame = pandas.DataFrame({"x": numpy.arange(rows, dtype=float)})
+    outcome = champion.Referee(model, model, bootstraps=40).compare(
+        frame, pandas.Series(numpy.zeros(rows))
+    )
+    assert outcome.dropped == 40
+    assert numpy.isnan(outcome.interval[0])
+    assert outcome.decision == "keep"
+
+
+def test_a_failed_attestation_check_keeps_its_reason(monkeypatch, caplog):
+    # ERR-4: the reason a release attestation could not be checked was
+    # discarded; the gate blocked with no word on why.
+    from scmle.core import stages
+    from scmle.evaluation import policies
+    from scmle.evaluation import release
+
+    policy = types.SimpleNamespace(metrics=(), to_dict=dict)
+    index = types.SimpleNamespace(
+        sign=lambda key: None, verify=lambda key: False, to_dict=dict
+    )
+    monkeypatch.setattr(policies, "derive", lambda *args: policy)
+    monkeypatch.setattr(
+        stages.PackageStage, "evidence_index", lambda *args: index
+    )
+    verdict = types.SimpleNamespace(to_dict=dict)
+    monkeypatch.setattr(release, "assess", lambda *args: verdict)
+    monkeypatch.setattr(release, "faults", lambda outcome, plan: outcome)
+    monkeypatch.setattr(release, "certify", lambda outcome, *args: outcome)
+    monkeypatch.setattr(release, "countersign", lambda outcome, *args: outcome)
+    context = types.SimpleNamespace(
+        task=tasks.Task.REGRESSION,
+        metric=types.SimpleNamespace(name="rmse", greater_is_better=False),
+        spec=types.SimpleNamespace(
+            problem=types.SimpleNamespace(success_criteria={"rmse": 1.0})
+        ),
+        diagnostics={},
+    )
+    store = types.SimpleNamespace(write_json=lambda name, document: None)
+    evaluation = {"test_metrics": {}}
+    with caplog.at_level("WARNING", logger=stages.__name__):
+        stages.PackageStage().release_evaluation(context, store, evaluation)
+    assert any(
+        "release attestation" in r.getMessage()
+        and "release_attestation" in r.getMessage()
+        for r in caplog.records
+    )
+
+
+def test_a_malformed_policy_amendment_is_refused_not_applied(tmp_path):
+    # ERR-23: an amendment that was not a mapping was applied by
+    # `dict.update` (or failed with a raw error) instead of being refused.
+    import pytest
+
+    from scmle.contracts import errors
+    from scmle.governance import deployment_ledger
+    from scmle.governance import loop
+
+    policy = loop.Preregistration(
+        reference_risk=0.1,
+        tolerance=0.05,
+        r_star=0.6,
+        initial_tau=0.5,
+        min_matured=5,
+        outcome_window=0,
+        scope="m:s",
+    )
+    charter = types.SimpleNamespace(charter_hash="a" * 64)
+    opened = loop.Loop.open(tmp_path / "deploy", charter, policy)
+    opened.ledger.commit(
+        deployment_ledger.OBSERVE_SUMMARY,
+        {"policy_amendment": [["min_matured", 7]]},
+    )
+    with pytest.raises(errors.ArtifactError, match="policy amendment"):
+        loop.Loop.resume(tmp_path / "deploy")
+    with pytest.raises(errors.ArtifactError, match="policy amendment"):
+        loop.Loop.open(tmp_path / "deploy", charter, policy)
