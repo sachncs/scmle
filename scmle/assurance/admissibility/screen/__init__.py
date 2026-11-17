@@ -1,0 +1,699 @@
+"""Leakage screen with multiplicity control, for runs with or without a charter.
+
+This replaces the fixed-cutoff profiler heuristics (an association of 0.98 or
+a missingness score of 0.9, with no error control) by a test whose false-alarm
+behaviour is stated and measured. It reads the training rows it is given (a
+run without a charter has no custody, so those are the development rows; a
+charter run passes the exploration set `X`) and never the final test set.
+
+Procedure, for every candidate column `j` (the family has `m` members):
+
+1. Single-feature skill. A cross-fitted (out-of-fold) ridge smoother of the
+   outcome on one column (a piecewise-linear basis on `KNOTS` quantile knots
+   for a numeric column, a level per category, and an indicator for missing
+   values) gives a held-out ROC AUC (macro one-vs-rest for more than two
+   classes) or R^2. The p-value is `(b + 1) / (B + 1)`, `b` counting
+   permutations of the outcome whose skill is at least the observed one
+   (Phipson and Smyth, 2010, Stat. Appl. Genet. Mol. Biol. 9(1)). The outcome
+   is permuted within groups or within consecutive time blocks when they are
+   given. The folds do not depend on the outcome, so the observed statistic
+   and every permuted one are produced by the same procedure and the p-value
+   is exact under exchangeability within the permutation strata.
+2. Missingness, for a column with gaps, by two tests. (a) The missing-value
+   indicator against the outcome (quartile bins for a continuous outcome)
+   with Cramer's V. Without groups or time blocks the p-value is Fisher's
+   exact test (2x2 table with an expected count below 5) or Pearson's
+   chi-square; with them it is the permutation scheme above, because a
+   chi-square p-value ignores dependence between rows of one group.
+   (b) Record purity: the share of the commonest outcome class among the
+   rows where the value is recorded, against the same permutation null. This
+   sees a value captured only for some outcomes even when most rows are blank
+   (a Titanic body number is recorded for 9 percent of passengers, all of
+   whom died), which V, measured over all rows, cannot.
+2b. Echo (`forecast`): a column read as the target itself, with no fit:
+   the share of rows where it spells the class, or `1 - SSE / SST` for a
+   number. Formed only when the two marginals allow it to pass the ceiling,
+   so a legitimate predictor on its own scale raises no hypothesis; it finds
+   a field recorded after the outcome (the label with a tenth garbled, the
+   number plus noise) whose skill stays under the skill ceiling.
+3. Multiplicity. All `m` p-values (skill, echo and missingness tests) form one
+   family adjusted by Benjamini and Yekutieli (2001, Ann. Statist. 29:1165)
+   at level `alpha`, exactly (`scmle.assurance.ledger.multiplicity`).
+   The number of permutations is raised until the smallest reachable p-value
+   `1 / (B + 1)` can pass the rank-1 threshold `alpha / (m * H_m)`; if that
+   needs more than `MAX_PERMUTATIONS` the screen says so and flags nothing.
+   A column whose p-value can no longer fall below the largest threshold
+   `alpha / H_m` stops early; the step-up decisions are identical to those of
+   the full run, because such a p-value can never be rejected and sorts last.
+4. Suspect. A column is a *suspect* only when its test is rejected by step 3
+   AND the one-sided lower confidence bound of its effect size is above the
+   pre-registered ceiling (`skill_ceiling` or `association_ceiling`). The
+   bound is a bootstrap of the out-of-fold predictions (or of the rows for
+   V), clustered by group, and an exact Clopper-Pearson bound for the purity
+   share. Significance alone is not leakage: strong legitimate predictors are
+   significant.
+
+What is guaranteed
+------------------
+Conditional on the model and fold choices above, and on exchangeability of
+the outcome within the permutation strata, the Benjamini-Yekutieli step
+controls the false discovery rate of the *significant* list at `alpha` times
+the share of true nulls, under arbitrary dependence between columns. Under
+the global null (no column is associated with the outcome) this is the
+probability of at least one false alarm, at most `alpha`. The suspect list is
+a subset of the significant list, so its false discoveries cannot exceed those
+of the significant list, which is why a suspect may block a run without a
+certificate (the certificates, `screen_certificates.json` from
+`benchmarks.qualification.screen_certify`, are evidence about recall and
+false flags on real tables). Without gates (`screen` called directly) every
+suspect is reported as a warning with its p-values.
+
+What is not guaranteed
+----------------------
+The screen cannot distinguish a legitimate strong predictor from a leak
+without provenance: a suspect is a suspicion, never proof. Bootstrap bounds on
+cross-fitted scores are approximate (folds share training rows), so no exact
+coverage is claimed. Rows are subsampled to `MAX_ROWS`, which costs power for
+effects below the ceiling, not size. The Fisher and chi-square p-values used
+without groups or time blocks assume independent rows. Skill is measured one
+column at a time with a smooth basis (a date as days, free text by its
+commonest words), and jointly for each pair of two-level columns while
+there are no more pairs than columns, so a leak spread over more columns,
+or over two columns with more levels, is not seen. Wide tables pay in
+power: the more columns, the more permutations a rejection needs. A run
+without a charter has no custody, so the training rows are all the screen
+has; it says nothing about rows it never saw.
+
+In a run (`screen_table`) every suspect may block: a suspect is significant
+after the Benjamini-Yekutieli step over permutation p-values, whose
+false-alarm control holds for any rows that can be shuffled within their
+groups or time blocks, and its effect bound exceeds the pre-registered
+ceiling. What a clean result means is measured on the run's own rows: the
+probe screens a copy with one planted column per leak type (`plants`), with
+the same settings, structure and budget, and the report records which plants
+were found, so a run states the kinds of leak the screen would have missed
+there. The published certificates are evidence about the screen, reported in
+the notes; they decide nothing.
+"""
+
+from collections.abc import Hashable
+from collections.abc import Mapping
+from collections.abc import Sequence
+import dataclasses
+
+import numpy
+import pandas
+
+from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility import plants
+from scmle.assurance.admissibility.screen.association import chisquare
+from scmle.assurance.admissibility.screen.association import cramer
+from scmle.assurance.admissibility.screen.association import dominance
+from scmle.assurance.admissibility.screen.association import purity_statistic
+from scmle.assurance.admissibility.screen.association import resample
+from scmle.assurance.admissibility.screen.fitting import aucs
+from scmle.assurance.admissibility.screen.fitting import basis
+from scmle.assurance.admissibility.screen.fitting import concordance
+from scmle.assurance.admissibility.screen.fitting import crossfit
+from scmle.assurance.admissibility.screen.fitting import encode
+from scmle.assurance.admissibility.screen.fitting import oof_fit
+from scmle.assurance.admissibility.screen.fitting import pair
+from scmle.assurance.admissibility.screen.fitting import pairs
+from scmle.assurance.admissibility.screen.fitting import permute
+from scmle.assurance.admissibility.screen.fitting import predict
+from scmle.assurance.admissibility.screen.fitting import Problem
+from scmle.assurance.admissibility.screen.fitting import replicate
+from scmle.assurance.admissibility.screen.fitting import skill_bound
+from scmle.assurance.admissibility.screen.fitting import skill_statistic
+from scmle.assurance.admissibility.screen.fitting import stratify
+from scmle.assurance.admissibility.screen.fitting import words
+from scmle.assurance.admissibility.screen.hypotheses import caps
+from scmle.assurance.admissibility.screen.hypotheses import floor
+from scmle.assurance.admissibility.screen.hypotheses import forecast
+from scmle.assurance.admissibility.screen.hypotheses import gauge
+from scmle.assurance.admissibility.screen.hypotheses import hedge
+from scmle.assurance.admissibility.screen.hypotheses import hypothesize
+from scmle.assurance.admissibility.screen.hypotheses import Pending
+from scmle.assurance.admissibility.screen.hypotheses import propose
+from scmle.assurance.admissibility.screen.hypotheses import reflect
+from scmle.assurance.admissibility.screen.hypotheses import spell
+from scmle.assurance.admissibility.screen.hypotheses import tested
+from scmle.assurance.admissibility.screen.permutation import draw_permutations
+from scmle.assurance.admissibility.screen.permutation import resamples
+from scmle.assurance.admissibility.screen.planning import arrange
+from scmle.assurance.admissibility.screen.planning import bundled
+from scmle.assurance.admissibility.screen.planning import decline
+from scmle.assurance.admissibility.screen.planning import Demand
+from scmle.assurance.admissibility.screen.planning import disclose
+from scmle.assurance.admissibility.screen.planning import load_store
+from scmle.assurance.admissibility.screen.planning import subsample
+from scmle.assurance.admissibility.screen.report import abstain
+from scmle.assurance.admissibility.screen.report import conclude
+from scmle.assurance.admissibility.screen.report import exceed
+from scmle.assurance.admissibility.screen.report import Finding
+from scmle.assurance.admissibility.screen.report import halt
+from scmle.assurance.admissibility.screen.report import Screen
+from scmle.assurance.admissibility.screen.report import tally
+from scmle.assurance.admissibility.screen.report import throttle
+from scmle.assurance.admissibility.screen.settings import allowance
+from scmle.assurance.admissibility.screen.settings import BATCH
+from scmle.assurance.admissibility.screen.settings import BINARY_CLASSES
+from scmle.assurance.admissibility.screen.settings import cost
+from scmle.assurance.admissibility.screen.settings import DETECTOR_ID
+from scmle.assurance.admissibility.screen.settings import DETECTORS
+from scmle.assurance.admissibility.screen.settings import ECHO
+from scmle.assurance.admissibility.screen.settings import family
+from scmle.assurance.admissibility.screen.settings import FIT_SECONDS
+from scmle.assurance.admissibility.screen.settings import FITS_PER_SECOND
+from scmle.assurance.admissibility.screen.settings import HYPOTHESES
+from scmle.assurance.admissibility.screen.settings import KNOTS
+from scmle.assurance.admissibility.screen.settings import MAX_CERTIFIED_CLASSES
+from scmle.assurance.admissibility.screen.settings import MAX_ROWS
+from scmle.assurance.admissibility.screen.settings import MECHANISM_DEFECTS
+from scmle.assurance.admissibility.screen.settings import MIN_CLASSES
+from scmle.assurance.admissibility.screen.settings import MISSING
+from scmle.assurance.admissibility.screen.settings import PAIR_LEVELS
+from scmle.assurance.admissibility.screen.settings import PURITY
+from scmle.assurance.admissibility.screen.settings import RIDGE
+from scmle.assurance.admissibility.screen.settings import SCAN_SECONDS
+from scmle.assurance.admissibility.screen.settings import SCREEN_SHARE
+from scmle.assurance.admissibility.screen.settings import share
+from scmle.assurance.admissibility.screen.settings import SKILL
+from scmle.assurance.admissibility.screen.settings import Statistic
+from scmle.assurance.admissibility.screen.settings import STORE_PATH
+from scmle.assurance.admissibility.screen.settings import TIME_BLOCKS
+from scmle.assurance.admissibility.screen.settings import TOLERANCE
+from scmle.assurance.admissibility.screen.settings import WORD
+from scmle.assurance.admissibility.screen.settings import WORDS
+from scmle.assurance.detectors import certificates
+from scmle.assurance.detectors import trace
+from scmle.assurance.ledger import budget
+from scmle.contracts import errors
+
+__all__ = [
+    "BATCH",
+    "BINARY_CLASSES",
+    "DETECTORS",
+    "DETECTOR_ID",
+    "ECHO",
+    "FITS_PER_SECOND",
+    "FIT_SECONDS",
+    "HYPOTHESES",
+    "KNOTS",
+    "MAX_CERTIFIED_CLASSES",
+    "MAX_ROWS",
+    "MECHANISM_DEFECTS",
+    "MIN_CLASSES",
+    "MISSING",
+    "PAIR_LEVELS",
+    "PURITY",
+    "RIDGE",
+    "SCAN_SECONDS",
+    "SCREEN_SHARE",
+    "SKILL",
+    "STORE_PATH",
+    "TIME_BLOCKS",
+    "TOLERANCE",
+    "WORD",
+    "WORDS",
+    "Demand",
+    "Finding",
+    "Pending",
+    "Problem",
+    "Screen",
+    "Statistic",
+    "abstain",
+    "allowance",
+    "arrange",
+    "aucs",
+    "basis",
+    "bundled",
+    "caps",
+    "chisquare",
+    "conclude",
+    "concordance",
+    "cost",
+    "cramer",
+    "crossfit",
+    "decline",
+    "disclose",
+    "dominance",
+    "draw_permutations",
+    "encode",
+    "exceed",
+    "family",
+    "floor",
+    "forecast",
+    "gauge",
+    "halt",
+    "hedge",
+    "hypothesize",
+    "load_store",
+    "oof_fit",
+    "pair",
+    "pairs",
+    "permute",
+    "predict",
+    "propose",
+    "purity_statistic",
+    "reflect",
+    "replicate",
+    "resample",
+    "resamples",
+    "share",
+    "skill_bound",
+    "skill_statistic",
+    "spell",
+    "stratify",
+    "subsample",
+    "tally",
+    "tested",
+    "throttle",
+    "words",
+]
+
+
+MAX_PERMUTATIONS = 100_000
+
+
+def bound(rows: int, columns: int, classes: int) -> float:
+    """Bounds the seconds of the real scan and the probe before any data.
+
+    Every column is assumed to raise the most hypotheses a column can, so
+    the bound is not below what the scans ask for; in a run `share` caps it.
+
+    Args:
+        rows: Rows to be screened (before `subsample`).
+        columns: Candidate columns.
+        classes: Classes of the target; below two means regression.
+
+    Returns:
+        The predicted seconds of both scans, with no cap applied.
+    """
+    task = "classification" if classes >= MIN_CLASSES else "regression"
+    seen = min(rows, MAX_ROWS)
+    ways = classes if classes > BINARY_CLASSES else 1
+    alpha = budget.exact(leakage.CERTIFIED.alpha, "alpha")
+    total = 0.0
+    for width in (columns, columns + len(plants.DEFECTS)):
+        draws = max(
+            leakage.CERTIFIED.permutations,
+            resamples(HYPOTHESES * width, alpha),
+        )
+        work = min(draws, MAX_PERMUTATIONS) * width * ways
+        total += cost(task, seen, work)
+    return total
+
+
+def measure(
+    frame: pandas.DataFrame,
+    target: str,
+    task: str,
+    cfg: leakage.Config,
+    names: Sequence[Hashable],
+    groups: pandas.Series | None,
+    block_size: int | None,
+) -> Demand | None:
+    """Counts the work of `screen` on these rows without drawing any.
+
+    It chooses the rows as `screen` does and forms the same hypotheses
+    (without their statistics), so the count equals the scan's.
+
+    Args:
+        frame: Rows to screen, with the target.
+        target: Target column.
+        task: `classification` or `regression`.
+        cfg: Settings.
+        names: Candidate columns.
+        groups: Group label per row, or None.
+        block_size: Rows per time block, or None.
+
+    Returns:
+        The demand; None when the scan will stop before drawing (invalid
+        outcome, too few rows, nothing to test, or the permutation limit),
+        which costs no more than `SCAN_SECONDS`.
+    """
+    values = None if groups is None else groups.to_numpy()
+    rows, blocks = subsample(len(frame), values, block_size, cfg.run_seed)
+    sample = frame.iloc[rows].reset_index(drop=True)
+    grouping = None if values is None else values[rows]
+    # The scan abstains where `encode` fails: no folds (one group, or fewer
+    # rows than folds) or an invalid outcome (InputError).
+    single = grouping is not None and len(pandas.unique(grouping)) <= 1
+    if single or (grouping is None and len(sample) < cfg.folds):
+        return None
+    try:
+        problem = encode(sample[target], task, cfg, grouping, blocks)
+    except errors.InputError:
+        # handled: the scan abstains on the same error before drawing
+        return None
+    if not leakage.sufficient(problem.y, task, cfg):
+        return None
+    classes = leakage.bucket(sample[target], task)
+    codes = pandas.factorize(classes, sort=True)[0].astype("int64")
+    totals = numpy.bincount(codes).astype("float64")
+    structured = grouping is not None or blocks is not None
+    pending = propose(
+        sample,
+        target,
+        names,
+        problem,
+        cfg,
+        codes,
+        totals,
+        structured=structured,
+    )[0]
+    skill = sum(1 for h in pending if h.mechanism == SKILL)
+    family = len(pending)
+    columns = tested(pending, names)
+    alpha = budget.exact(cfg.alpha, "alpha")
+    total = max(cfg.permutations, resamples(family, alpha))
+    if family == 0 or total > MAX_PERMUTATIONS:
+        return None
+    ways = problem.classes if problem.classes > BINARY_CLASSES else 1
+    work = total * skill * ways
+    seconds = cost(task, len(sample), work)
+    return Demand(len(sample), family, total, skill, work, columns, seconds)
+
+
+def screen_table(
+    frame: pandas.DataFrame,
+    target: str,
+    task: str,
+    features: Sequence[Hashable],
+    seed: int,
+    group_column: str | None = None,
+    time_column: str | None = None,
+    time_budget_seconds: float | None = None,
+) -> Screen:
+    """Screens training data with the certified settings.
+
+    Groups and a time column structure the rows as `arrange` describes.
+    Every suspect may block; `probe` records what a clean result means on
+    these rows (see the module docstring).
+
+    Args:
+        frame: Training rows including the target and any structure columns.
+        target: Target column.
+        task: `classification` or `regression`.
+        features: Candidate columns.
+        seed: Run seed for every random stream.
+        group_column: Entity column, or None. Ignored when it is not a
+            column of `frame`.
+        time_column: Time column, or None. Ignored when it is not a column
+            of `frame` or when `group_column` is used.
+        time_budget_seconds: The project's declared time budget; the real
+            scan and the probe together may take `share` of it by `cost`,
+            and a scan predicted not to fit is declined. None means no cap
+            beyond `MAX_PERMUTATIONS`.
+
+    Returns:
+        The report, using `CERTIFIED` settings with `seed`. A screen that was
+        declined says so in `unchecked` and `warning`. A `features` entry
+        that is not a candidate column, or a missing `target`, raises as in
+        `screen`.
+    """
+    cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=seed)
+    rows, grouping, block_size = arrange(frame, group_column, time_column)
+    limit = share(time_budget_seconds)
+    demand = None
+    if limit is not None:
+        unknown = [c for c in features if c not in rows.columns or c == target]
+        if not unknown and target in rows.columns:
+            demand = measure(
+                rows, target, task, cfg, features, grouping, block_size
+            )
+    if (
+        demand is not None
+        and limit is not None
+        and time_budget_seconds is not None
+        and demand.seconds > limit
+    ):
+        report = decline(cfg, demand, limit, time_budget_seconds)
+        return dataclasses.replace(
+            report,
+            notes=(
+                *report.notes,
+                evidence(task, int(frame[target].nunique())),
+                "probe not run: the screen itself did not run",
+            ),
+        )
+    report = screen(
+        rows,
+        target,
+        task,
+        cfg,
+        features,
+        grouping,
+        block_size,
+        dict.fromkeys(MECHANISM_DEFECTS, certificates.Authority.GATING),
+    )
+    classes = int(frame[target].nunique()) if len(frame) else 0
+    left = None
+    if limit is not None:
+        left = limit - (SCAN_SECONDS if demand is None else demand.seconds)
+    found = probe(
+        rows, target, task, list(features), cfg, grouping, block_size, left
+    )
+    return disclose(report, found, evidence(task, classes), left, limit)
+
+
+def probe(
+    rows: pandas.DataFrame,
+    target: str,
+    task: str,
+    features: list[Hashable],
+    cfg: leakage.Config,
+    groups: pandas.Series | None,
+    block_size: int | None,
+    limit: float | None = None,
+) -> dict[str, bool]:
+    """Finds whether the screen catches each planted leak on these rows.
+
+    The planted copy is screened with the same settings and structure as
+    the real one, when its predicted seconds (`measure`) fit `limit`. Each
+    plant is found when it is a suspect by the mechanism its type belongs
+    to.
+
+    Args:
+        rows: The rows to screen, in screening order, with the target.
+        target: Target column.
+        task: `classification` or `regression`.
+        features: Candidate columns.
+        cfg: Settings of the real screen.
+        groups: Group label per row, or None.
+        block_size: Rows per time block, or None.
+        limit: Seconds left of the screen's share after the real scan, or
+            None for no cap.
+
+    Returns:
+        Leak type to whether its plant was found; empty when the planted
+        copy did not fit `limit` (nothing was drawn).
+    """
+    if limit is not None and limit < SCAN_SECONDS:
+        return {}
+    planted = plants.table(
+        rows[[*features, target]], target, cfg.run_seed, task == "regression"
+    )
+    names = [*features, *plants.DEFECTS]
+    if limit is not None:
+        demand = measure(planted, target, task, cfg, names, groups, block_size)
+        if demand is not None and demand.seconds > limit:
+            return {}
+    report = screen(planted, target, task, cfg, names, groups, block_size, None)
+    owner = {d: m for m, ds in MECHANISM_DEFECTS.items() for d in ds}
+    return {
+        defect: any(
+            f.suspect and f.feature == defect and f.mechanism == owner[defect]
+            for f in report.findings
+        )
+        for defect in plants.DEFECTS
+    }
+
+
+def evidence(task: str, n_classes: int) -> str:
+    """States the published certificate for this kind of target.
+
+    Args:
+        task: `classification` or `regression`.
+        n_classes: Number of classes of the target.
+
+    Returns:
+        One sentence naming the kind and whether its certificate is current,
+        stale or missing.
+    """
+    kind = family(task, n_classes)
+    if kind is None:
+        return "no published certificate covers this kind of target"
+    store = bundled()
+    state = (
+        "missing"
+        if store is None
+        else store.state(DETECTORS[kind], code_digest()).value
+    )
+    return f"published certificate for {kind} targets: {state}"
+
+
+def code_digest() -> str:
+    """Hash of the code the screen's decisions depend on.
+
+    The key of its certificate: `screen` and every function, class and
+    constant of the package it reaches, the plants it is measured on and the
+    certified settings (`trace.digest`). Run wiring the certificate
+    does not measure, such as `screen_table`, is outside the hash, so it can
+    change without staling the certificate.
+
+    Returns:
+        The traced hash.
+    """
+    return trace.digest(screen, plants.plant, leakage.CERTIFIED)
+
+
+def scan(
+    frame: pandas.DataFrame,
+    target: str,
+    task: str,
+    cfg: leakage.Config,
+    names: Sequence[Hashable],
+    groups: numpy.ndarray | None,
+    block_size: int | None,
+    gates: Mapping[str, certificates.Authority],
+    time_budget_seconds: float | None = None,
+) -> Screen:
+    """Runs the screen on rows that are already chosen.
+
+    Args:
+        frame: The chosen rows, including the target.
+        target: Target column.
+        task: `classification` or `regression`.
+        cfg: Settings.
+        names: Candidate columns.
+        groups: Group label per row, or None.
+        block_size: Consecutive rows per time block, or None.
+        gates: Gate status per mechanism.
+        time_budget_seconds: Declared time budget, or None for no cap
+            beyond `MAX_PERMUTATIONS`.
+
+    Returns:
+        The report. It has no findings, with the reason in its notes, when
+        the outcome is invalid, there are too few rows, no column could be
+        tested, or the permutations or work needed exceed the limits; in
+        every one of these cases the candidate columns are listed in
+        `unchecked`.
+    """
+    n = len(frame)
+    try:
+        problem = encode(frame[target], task, cfg, groups, block_size)
+    except ValueError as error:
+        # handled: returned as failed finding/problem/refusal with error text
+        return abstain(cfg, gates, n, f"screen not run: {error}", names)
+    if not leakage.sufficient(problem.y, task, cfg):
+        return abstain(
+            cfg, gates, n, "screen not run: too few rows (low power)", names
+        )
+    alpha = budget.exact(cfg.alpha, "alpha")
+    strata = stratify(n, groups, block_size)
+    class_codes, totals = tally(frame[target], task)
+    pending, notes = propose(
+        frame,
+        target,
+        names,
+        problem,
+        cfg,
+        class_codes,
+        totals,
+        structured=groups is not None or block_size is not None,
+    )
+    family = len(pending)
+    if family == 0:
+        return abstain(
+            cfg, gates, n, "screen not run: no column could be tested", names
+        )
+    total = max(cfg.permutations, resamples(family, alpha))
+    declined = tested(pending, names)
+    size = (n, family, total)
+    if total > MAX_PERMUTATIONS:
+        return exceed(cfg, gates, size, MAX_PERMUTATIONS, declined)
+    overrun = throttle(
+        cfg, gates, size, pending, problem, declined, time_budget_seconds
+    )
+    if overrun is not None:
+        return overrun
+    draw_permutations(
+        pending, problem.y, class_codes, strata, total, alpha, cfg.run_seed
+    )
+    labels = (class_codes, totals)
+    findings = conclude(
+        pending, (total, alpha), problem, frame, labels, cfg, groups, gates
+    )
+    return Screen(
+        tuple(findings), n, family, total, cfg.alpha, gates, caps(cfg), notes
+    )
+
+
+def screen(
+    frame: pandas.DataFrame,
+    target: str,
+    task: str,
+    cfg: leakage.Config,
+    features: Sequence[Hashable] | None = None,
+    groups: pandas.Series | None = None,
+    block_size: int | None = None,
+    gates: Mapping[str, certificates.Authority] | None = None,
+    time_budget_seconds: float | None = None,
+) -> Screen:
+    """Screens the candidate columns of training data for leakage suspicion.
+
+    Args:
+        frame: Training (or exploration) rows including the target. For time
+            blocks the rows must be in time order.
+        target: Name of the target column; it must be a column of `frame`.
+        task: `classification` or `regression`.
+        cfg: Settings; `alpha` is the Benjamini-Yekutieli level and the
+            ceilings are pre-registered, never tuned on this data.
+        features: Columns to test; defaults to all but the target.
+        groups: Group label per row; permutations and folds keep groups
+            whole.
+        block_size: Consecutive rows per time block; exclusive with `groups`.
+        gates: Gate status per mechanism; None means every mechanism is
+            descriptive. `screen_table` sets it from the probe.
+        time_budget_seconds: Declared time budget; bounds the work through
+            `allowance`. None means no cap beyond `MAX_PERMUTATIONS`.
+
+    Returns:
+        The report. Nothing is raised for a degenerate target or too few
+        rows: the report is empty and says why.
+
+    Raises:
+        ValueError: If both `groups` and `block_size` are given, `groups`
+            differs in length from `frame`, or `features` names a column
+            that is missing or is the target.
+    """
+    if groups is not None and block_size is not None:
+        raise errors.InputError("use groups or block_size, not both")
+    if groups is not None and len(groups) != len(frame):
+        raise errors.InputError("groups and frame must have the same length")
+    names = [c for c in frame.columns if c != target]
+    chosen = names if features is None else list(features)
+    unknown = [c for c in chosen if c not in names]
+    if unknown:
+        raise errors.InputError(f"not feature columns: {unknown}")
+    chosen_gates = dict.fromkeys(
+        MECHANISM_DEFECTS, certificates.Authority.DESCRIPTIVE
+    )
+    chosen_gates.update(gates or {})
+    group_values = None if groups is None else groups.to_numpy()
+    rows, blocks = subsample(len(frame), group_values, block_size, cfg.run_seed)
+    sample = frame.iloc[rows].reset_index(drop=True)
+    sample_groups = None if group_values is None else group_values[rows]
+    return scan(
+        sample,
+        target,
+        task,
+        cfg,
+        chosen,
+        sample_groups,
+        blocks,
+        chosen_gates,
+        time_budget_seconds,
+    )
