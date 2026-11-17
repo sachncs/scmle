@@ -13,8 +13,20 @@ def test_every_claim_has_one_row_in_order():
 
 def test_measured_rows_come_from_their_evidence():
     found = {r.claim.split()[0]: r for r in scorecard.rows()}
-    assert "gates registered" in found["C1"].value
-    assert "false alarms" in found["C2"].value
+    stems = {
+        "C1": "faults",
+        "C2": "leakage",
+        "C3": "coverage",
+        "C4": "quality",
+        "C5": "reading",
+        "C6": "reproducibility",
+        "C7": "budget",
+        "C12": "guarantees",
+        "C14": "refusal",
+    }
+    for claim, stem in stems.items():
+        assert found[claim].evidence == f"benchmarks/evidence/{stem}.json"
+    assert "injected faults" in found["C1"].value
     assert "functions over" in found["C10"].value
     assert found["C10"].verdict == "fail"
 

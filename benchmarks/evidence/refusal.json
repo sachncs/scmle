@@ -1,6 +1,6 @@
 {
   "claim": "C14",
-  "code_hash": "567fa645b162f01ee473d7eb93351fd84fbe8922f3aa56fb04e96371d4ad8b79",
+  "code_hash": "df9dd207d7fd29da2fc6581285b442b81d4951bae482bf1e0a849d9245eee9a7",
   "counts": {
     "planted": {
       "failures": 0,
@@ -27,11 +27,11 @@
       "rubric": "automated: justified when the task was planted and the refusing gate is one the task names; not validator-reviewed"
     },
     "real": {
-      "failures": 0,
+      "failures": 1,
       "gates": {},
-      "models": 24,
+      "models": 64,
       "refusals": 0,
-      "trials": 24,
+      "trials": 65,
       "unfinished": 0
     },
     "simulated": {
@@ -48,18 +48,7 @@
     "the sealed acceptance split and the validator's review of each refusal against a written rubric (plan section 6)",
     "budgets other than the short one used here"
   ],
-  "not_run": [
-    "churn",
-    "diamonds",
-    "adult",
-    "letter",
-    "bike_sharing",
-    "bank_marketing",
-    "magic_telescope",
-    "house_sales",
-    "mushroom",
-    "electricity"
-  ],
+  "not_run": [],
   "records": [
     {
       "group": "real",
@@ -68,16 +57,16 @@
       "name": "breast_cancer",
       "outcome": "model",
       "rows": 569,
-      "seconds": 44.7
+      "seconds": 39.4
     },
     {
       "group": "simulated",
       "kind": "binary",
-      "model": "logistic_regression",
+      "model": "blending",
       "name": "sim_binary_500_plain",
       "outcome": "model",
       "rows": 500,
-      "seconds": 42.3
+      "seconds": 22.0
     },
     {
       "error": "BlockedError",
@@ -88,7 +77,7 @@
       "name": "planted_constant_binary_400",
       "outcome": "refused",
       "rows": 400,
-      "seconds": 0.0,
+      "seconds": 0.1,
       "site": "scmle.data.validation.target:TaskResolver.resolve_classification"
     },
     {
@@ -98,7 +87,7 @@
       "name": "wine",
       "outcome": "model",
       "rows": 178,
-      "seconds": 39.4
+      "seconds": 26.9
     },
     {
       "group": "simulated",
@@ -107,7 +96,7 @@
       "name": "sim_regression_300_mixed",
       "outcome": "model",
       "rows": 300,
-      "seconds": 39.4
+      "seconds": 17.4
     },
     {
       "error": "BlockedError",
@@ -118,7 +107,7 @@
       "name": "planted_unlabeled_regression_400",
       "outcome": "refused",
       "rows": 400,
-      "seconds": 0.0,
+      "seconds": 0.1,
       "site": "scmle.core.stages:ProfileStage.set_aside_unlabeled"
     },
     {
@@ -128,16 +117,16 @@
       "name": "diabetes_progression",
       "outcome": "model",
       "rows": 442,
-      "seconds": 30.7
+      "seconds": 17.3
     },
     {
       "group": "simulated",
       "kind": "multiclass",
-      "model": "decision_tree",
+      "model": "bagged_logistic_regression",
       "name": "sim_multiclass_1500_plain",
       "outcome": "model",
       "rows": 1500,
-      "seconds": 86.0
+      "seconds": 36.0
     },
     {
       "error": "BlockedError",
@@ -148,17 +137,17 @@
       "name": "planted_identifier_multiclass_400",
       "outcome": "refused",
       "rows": 400,
-      "seconds": 0.0,
+      "seconds": 0.1,
       "site": "scmle.data.validation.target:TaskResolver.resolve_auto"
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "logistic_regression",
+      "model": "stacking",
       "name": "credit_g",
       "outcome": "model",
       "rows": 1000,
-      "seconds": 55.0
+      "seconds": 39.0
     },
     {
       "group": "simulated",
@@ -167,7 +156,7 @@
       "name": "sim_survival_800_plain",
       "outcome": "model",
       "rows": 800,
-      "seconds": 22.0
+      "seconds": 8.8
     },
     {
       "error": "BlockedError",
@@ -178,7 +167,7 @@
       "name": "planted_singleton_multiclass_400",
       "outcome": "refused",
       "rows": 400,
-      "seconds": 0.0,
+      "seconds": 0.1,
       "site": "scmle.data.splitting.splitters:StratifiedSplit.stratifier"
     },
     {
@@ -188,7 +177,7 @@
       "name": "pima_diabetes",
       "outcome": "model",
       "rows": 768,
-      "seconds": 47.3
+      "seconds": 24.3
     },
     {
       "group": "simulated",
@@ -197,7 +186,7 @@
       "name": "sim_ordinal_1200_mixed",
       "outcome": "model",
       "rows": 1200,
-      "seconds": 49.7
+      "seconds": 22.6
     },
     {
       "error": "BlockedError",
@@ -208,26 +197,26 @@
       "name": "planted_leak_binary_600",
       "outcome": "refused",
       "rows": 600,
-      "seconds": 7.5,
+      "seconds": 2.8,
       "site": "scmle.core.stages:ProfileStage.enforce_leakage_policy"
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "ridge",
+      "model": "stacking",
       "name": "abalone",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 54.3
+      "seconds": 31.6
     },
     {
       "group": "simulated",
       "kind": "ranking",
-      "model": "dummy",
+      "model": "pointwise_ranker",
       "name": "sim_ranking_1500_plain",
       "outcome": "model",
       "rows": 1500,
-      "seconds": 51.2
+      "seconds": 10.7
     },
     {
       "error": "BlockedError",
@@ -238,17 +227,17 @@
       "name": "planted_labels_multilabel_400",
       "outcome": "refused",
       "rows": 400,
-      "seconds": 0.0,
+      "seconds": 0.1,
       "site": "scmle.data.validation.target:check_targets"
     },
     {
       "group": "real",
       "kind": "multiclass",
-      "model": "decision_tree",
+      "model": "bagged_logistic_regression",
       "name": "vehicle",
       "outcome": "model",
       "rows": 846,
-      "seconds": 83.7
+      "seconds": 38.1
     },
     {
       "group": "simulated",
@@ -257,7 +246,7 @@
       "name": "sim_multilabel_1000_plain",
       "outcome": "model",
       "rows": 1000,
-      "seconds": 48.0
+      "seconds": 11.8
     },
     {
       "error": "BlockedError",
@@ -268,17 +257,17 @@
       "name": "planted_events_survival_400",
       "outcome": "refused",
       "rows": 400,
-      "seconds": 0.0,
+      "seconds": 0.1,
       "site": "scmle.data.validation.target:check_events"
     },
     {
       "group": "real",
       "kind": "multioutput",
-      "model": "multioutput_ridge",
+      "model": "multi_hist_gradient_boosting",
       "name": "energy_loads",
       "outcome": "model",
       "rows": 768,
-      "seconds": 45.4
+      "seconds": 15.6
     },
     {
       "group": "simulated",
@@ -287,7 +276,7 @@
       "name": "sim_multioutput_600_plain",
       "outcome": "model",
       "rows": 600,
-      "seconds": 42.2
+      "seconds": 11.8
     },
     {
       "error": "BlockedError",
@@ -298,17 +287,19 @@
       "name": "planted_arm_uplift_400",
       "outcome": "refused",
       "rows": 400,
-      "seconds": 0.0,
+      "seconds": 0.1,
       "site": "scmle.data.validation.target:check_treatment"
     },
     {
+      "category": "artifact",
+      "error": "ArtifactError",
       "group": "real",
       "kind": "ordinal",
-      "model": "ordinal_ridge",
+      "message": "this model does not provide probabilities",
       "name": "wine_red_quality",
-      "outcome": "model",
+      "outcome": "failed",
       "rows": 1599,
-      "seconds": 46.9
+      "seconds": 31.5
     },
     {
       "group": "simulated",
@@ -317,7 +308,7 @@
       "name": "sim_forecast_400_plain",
       "outcome": "model",
       "rows": 400,
-      "seconds": 33.7
+      "seconds": 14.4
     },
     {
       "error": "BlockedError",
@@ -328,26 +319,26 @@
       "name": "planted_queries_ranking_300",
       "outcome": "refused",
       "rows": 300,
-      "seconds": 0.0,
+      "seconds": 0.1,
       "site": "scmle.data.splitting.splitters:GroupSplit.partition"
     },
     {
       "group": "real",
       "kind": "multilabel",
-      "model": "multilabel_logistic",
+      "model": "multi_hist_gradient_boosting",
       "name": "emotions",
       "outcome": "model",
       "rows": 593,
-      "seconds": 46.3
+      "seconds": 33.3
     },
     {
       "group": "simulated",
       "kind": "uplift",
-      "model": "dummy",
+      "model": "uplift_t_learner",
       "name": "sim_uplift_3000_plain",
       "outcome": "model",
       "rows": 3000,
-      "seconds": 49.6
+      "seconds": 8.4
     },
     {
       "error": "BlockedError",
@@ -358,7 +349,7 @@
       "name": "planted_text_regression_400",
       "outcome": "refused",
       "rows": 400,
-      "seconds": 0.0,
+      "seconds": 0.1,
       "site": "scmle.data.validation.target:TaskResolver.resolve_regression"
     },
     {
@@ -368,16 +359,16 @@
       "name": "blood_transfusion",
       "outcome": "model",
       "rows": 748,
-      "seconds": 44.9
+      "seconds": 22.1
     },
     {
       "group": "simulated",
       "kind": "binary",
-      "model": "bagged_logistic_regression",
+      "model": "stacking",
       "name": "sim_binary_2000_wide",
       "outcome": "model",
       "rows": 2000,
-      "seconds": 57.6
+      "seconds": 48.5
     },
     {
       "error": "BlockedError",
@@ -388,26 +379,26 @@
       "name": "planted_binary_multiclass_400",
       "outcome": "refused",
       "rows": 400,
-      "seconds": 0.0,
+      "seconds": 0.1,
       "site": "scmle.data.validation.target:TaskResolver.resolve_classification"
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "knn",
+      "model": "stacking",
       "name": "kin8nm",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 45.3
+      "seconds": 30.9
     },
     {
       "group": "simulated",
       "kind": "regression",
-      "model": "ridge",
+      "model": "stacking",
       "name": "sim_regression_2000_wide",
       "outcome": "model",
       "rows": 2000,
-      "seconds": 47.4
+      "seconds": 38.2
     },
     {
       "error": "BlockedError",
@@ -418,7 +409,7 @@
       "name": "planted_singleton_multiclass_12",
       "outcome": "refused",
       "rows": 12,
-      "seconds": 0.0,
+      "seconds": 0.1,
       "site": "scmle.data.splitting.splitters:StratifiedSplit.stratifier"
     },
     {
@@ -428,7 +419,7 @@
       "name": "titanic",
       "outcome": "model",
       "rows": 1309,
-      "seconds": 39.3
+      "seconds": 38.7
     },
     {
       "group": "simulated",
@@ -437,16 +428,16 @@
       "name": "sim_multiclass_600_mixed",
       "outcome": "model",
       "rows": 600,
-      "seconds": 45.7
+      "seconds": 28.5
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "logistic_regression",
+      "model": "hist_gradient_boosting",
       "name": "credit_approval",
       "outcome": "model",
       "rows": 690,
-      "seconds": 45.9
+      "seconds": 33.3
     },
     {
       "group": "simulated",
@@ -455,16 +446,16 @@
       "name": "sim_survival_2000_mixed",
       "outcome": "model",
       "rows": 2000,
-      "seconds": 33.7
+      "seconds": 10.0
     },
     {
       "group": "real",
       "kind": "multiclass",
-      "model": "decision_tree",
+      "model": "hist_gradient_boosting",
       "name": "segment",
       "outcome": "model",
       "rows": 2310,
-      "seconds": 170.0
+      "seconds": 49.1
     },
     {
       "group": "simulated",
@@ -473,34 +464,34 @@
       "name": "sim_forecast_1000_plain",
       "outcome": "model",
       "rows": 1000,
-      "seconds": 33.6
+      "seconds": 13.7
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "bagged_decision_tree",
+      "model": "stacking",
       "name": "cpu_small",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 51.6
+      "seconds": 35.5
     },
     {
       "group": "simulated",
       "kind": "uplift",
-      "model": "dummy",
+      "model": "uplift_t_learner",
       "name": "sim_uplift_1500_mixed",
       "outcome": "model",
       "rows": 1500,
-      "seconds": 50.2
+      "seconds": 7.2
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "decision_tree",
+      "model": "bagged_logistic_regression",
       "name": "kc1_defects",
       "outcome": "model",
       "rows": 2109,
-      "seconds": 58.9
+      "seconds": 40.5
     },
     {
       "group": "simulated",
@@ -509,16 +500,16 @@
       "name": "sim_binary_1000_mixed",
       "outcome": "model",
       "rows": 1000,
-      "seconds": 49.5
+      "seconds": 23.3
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "bagged_decision_tree",
+      "model": "hist_gradient_boosting",
       "name": "car",
       "outcome": "model",
       "rows": 1728,
-      "seconds": 52.7
+      "seconds": 24.7
     },
     {
       "group": "simulated",
@@ -527,16 +518,16 @@
       "name": "sim_ordinal_400_plain",
       "outcome": "model",
       "rows": 400,
-      "seconds": 40.2
+      "seconds": 13.0
     },
     {
       "group": "real",
       "kind": "multiclass",
-      "model": "decision_tree",
+      "model": "hist_gradient_boosting",
       "name": "digits",
       "outcome": "model",
       "rows": 1797,
-      "seconds": 198.6
+      "seconds": 59.5
     },
     {
       "group": "simulated",
@@ -545,16 +536,16 @@
       "name": "sim_multilabel_2000_wide",
       "outcome": "model",
       "rows": 2000,
-      "seconds": 52.3
+      "seconds": 14.0
     },
     {
       "group": "real",
       "kind": "regression",
-      "model": "bagged_decision_tree",
+      "model": "hist_gradient_boosting",
       "name": "wine_quality",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 53.9
+      "seconds": 29.7
     },
     {
       "group": "simulated",
@@ -563,7 +554,7 @@
       "name": "sim_multioutput_2000_mixed",
       "outcome": "model",
       "rows": 2000,
-      "seconds": 51.4
+      "seconds": 11.8
     },
     {
       "group": "real",
@@ -572,7 +563,7 @@
       "name": "colic",
       "outcome": "model",
       "rows": 368,
-      "seconds": 65.0
+      "seconds": 25.1
     },
     {
       "group": "simulated",
@@ -581,16 +572,16 @@
       "name": "sim_ranking_600_mixed",
       "outcome": "model",
       "rows": 600,
-      "seconds": 48.4
+      "seconds": 8.0
     },
     {
       "group": "real",
       "kind": "binary",
-      "model": "decision_tree",
+      "model": "hist_gradient_boosting",
       "name": "phoneme",
       "outcome": "model",
       "rows": 4000,
-      "seconds": 51.6
+      "seconds": 30.3
     },
     {
       "group": "simulated",
@@ -599,35 +590,561 @@
       "name": "sim_regression_800_plain",
       "outcome": "model",
       "rows": 800,
-      "seconds": 44.4
+      "seconds": 13.9
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "stacking",
+      "name": "california_housing",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 31.3
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "spambase",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 45.1
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "churn",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 36.4
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "diamonds",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 31.8
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "logistic_regression",
+      "name": "adult",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 37.3
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "letter",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 66.2
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "stacking",
+      "name": "bike_sharing",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 31.4
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "bank_marketing",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 38.3
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "magic_telescope",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 41.1
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "house_sales",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 36.8
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "logistic_regression",
+      "name": "mushroom",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 35.2
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "stacking",
+      "name": "electricity",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 40.7
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "kr_vs_kp",
+      "outcome": "model",
+      "rows": 3196,
+      "seconds": 43.7
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "logistic_regression",
+      "name": "balance_scale",
+      "outcome": "model",
+      "rows": 625,
+      "seconds": 22.2
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "logistic_regression",
+      "name": "breast_w",
+      "outcome": "model",
+      "rows": 699,
+      "seconds": 20.1
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "logistic_regression",
+      "name": "cmc",
+      "outcome": "model",
+      "rows": 1473,
+      "seconds": 36.4
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "tic_tac_toe",
+      "outcome": "model",
+      "rows": 958,
+      "seconds": 21.3
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "bagged_logistic_regression",
+      "name": "heart_statlog",
+      "outcome": "model",
+      "rows": 270,
+      "seconds": 20.6
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "ionosphere",
+      "outcome": "model",
+      "rows": 351,
+      "seconds": 25.5
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "blending",
+      "name": "iris",
+      "outcome": "model",
+      "rows": 150,
+      "seconds": 17.4
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "bagged_logistic_regression",
+      "name": "eucalyptus",
+      "outcome": "model",
+      "rows": 736,
+      "seconds": 37.9
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "hist_gradient_boosting",
+      "name": "vowel",
+      "outcome": "model",
+      "rows": 990,
+      "seconds": 46.7
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "bagged_decision_tree",
+      "name": "monks_1",
+      "outcome": "model",
+      "rows": 556,
+      "seconds": 17.1
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "blending",
+      "name": "banknote",
+      "outcome": "model",
+      "rows": 1372,
+      "seconds": 22.4
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "bagged_logistic_regression",
+      "name": "ilpd",
+      "outcome": "model",
+      "rows": 583,
+      "seconds": 24.4
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "stacking",
+      "name": "qsar_biodeg",
+      "outcome": "model",
+      "rows": 1055,
+      "seconds": 32.6
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "pc4",
+      "outcome": "model",
+      "rows": 1458,
+      "seconds": 38.1
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "logistic_regression",
+      "name": "kc2",
+      "outcome": "model",
+      "rows": 522,
+      "seconds": 24.6
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "stacking",
+      "name": "pc1",
+      "outcome": "model",
+      "rows": 1109,
+      "seconds": 37.2
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "bagged_logistic_regression",
+      "name": "steel_plates",
+      "outcome": "model",
+      "rows": 1941,
+      "seconds": 46.5
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "wilt",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 30.3
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "bagged_logistic_regression",
+      "name": "climate_crashes",
+      "outcome": "model",
+      "rows": 540,
+      "seconds": 24.0
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "ozone",
+      "outcome": "model",
+      "rows": 2534,
+      "seconds": 40.7
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "cpu_act",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 36.0
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "blending",
+      "name": "elevators",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 32.4
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "stacking",
+      "name": "house_8l",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 31.5
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "hist_gradient_boosting",
+      "name": "space_ga",
+      "outcome": "model",
+      "rows": 3107,
+      "seconds": 28.1
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "blending",
+      "name": "wind",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 34.0
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "ridge",
+      "name": "auto_mpg",
+      "outcome": "model",
+      "rows": 398,
+      "seconds": 15.4
     },
     {
       "group": "real",
       "kind": "regression",
       "model": "bagged_decision_tree",
-      "name": "california_housing",
+      "name": "machine_cpu",
       "outcome": "model",
-      "rows": 4000,
+      "rows": 209,
+      "seconds": 15.7
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "bagged_decision_tree",
+      "name": "us_crime",
+      "outcome": "model",
+      "rows": 1994,
       "seconds": 48.9
     },
     {
       "group": "real",
-      "kind": "binary",
-      "model": "decision_tree",
-      "name": "spambase",
+      "kind": "regression",
+      "model": "stacking",
+      "name": "moneyball",
       "outcome": "model",
-      "rows": 4000,
-      "seconds": 50.9
+      "rows": 1232,
+      "seconds": 27.9
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "ridge",
+      "name": "bodyfat",
+      "outcome": "model",
+      "rows": 252,
+      "seconds": 13.8
     }
   ],
-  "seconds": 657.6,
+  "seconds": 1337.5,
   "settings": {
     "api": "scmle.api.project.Project(...).run(), defaults",
     "budget": 30,
     "network": "cut in each run (dead proxy); local caches only",
-    "parallel": 4,
-    "seconds": 600,
+    "parallel": 2,
+    "seconds": 4200.0,
     "timeout": 360
+  },
+  "sources": {
+    "1049": {
+      "licence": "Public",
+      "name": "pc4",
+      "version": 1
+    },
+    "1063": {
+      "licence": "Public",
+      "name": "kc2",
+      "version": 1
+    },
+    "1068": {
+      "licence": "Public",
+      "name": "pc1",
+      "version": 1
+    },
+    "11": {
+      "licence": "Public",
+      "name": "balance-scale",
+      "version": 1
+    },
+    "1462": {
+      "licence": "Public",
+      "name": "banknote-authentication",
+      "version": 1
+    },
+    "1480": {
+      "licence": "Public",
+      "name": "ilpd",
+      "version": 1
+    },
+    "1487": {
+      "licence": "Public",
+      "name": "ozone-level-8hr",
+      "version": 1
+    },
+    "1494": {
+      "licence": "Public",
+      "name": "qsar-biodeg",
+      "version": 1
+    },
+    "15": {
+      "licence": "Public",
+      "name": "breast-w",
+      "version": 1
+    },
+    "188": {
+      "licence": "Public",
+      "name": "eucalyptus",
+      "version": 1
+    },
+    "196": {
+      "licence": "Public",
+      "name": "autoMpg",
+      "version": 1
+    },
+    "197": {
+      "licence": "Public",
+      "name": "cpu_act",
+      "version": 1
+    },
+    "216": {
+      "licence": "Public",
+      "name": "elevators",
+      "version": 1
+    },
+    "218": {
+      "licence": "Public",
+      "name": "house_8L",
+      "version": 1
+    },
+    "23": {
+      "licence": "Public",
+      "name": "cmc",
+      "version": 1
+    },
+    "230": {
+      "licence": "Public",
+      "name": "machine_cpu",
+      "version": 1
+    },
+    "3": {
+      "licence": "Public",
+      "name": "kr-vs-kp",
+      "version": 1
+    },
+    "307": {
+      "licence": "Public",
+      "name": "vowel",
+      "version": 2
+    },
+    "315": {
+      "licence": "Public",
+      "name": "us_crime",
+      "version": 1
+    },
+    "333": {
+      "licence": "Public",
+      "name": "monks-problems-1",
+      "version": 1
+    },
+    "40982": {
+      "licence": "Public",
+      "name": "steel-plates-fault",
+      "version": 3
+    },
+    "40983": {
+      "licence": "Public",
+      "name": "wilt",
+      "version": 2
+    },
+    "40994": {
+      "licence": "Public",
+      "name": "climate-model-simulation-crashes",
+      "version": 4
+    },
+    "41021": {
+      "licence": "Public",
+      "name": "Moneyball",
+      "version": 2
+    },
+    "50": {
+      "licence": "Public",
+      "name": "tic-tac-toe",
+      "version": 1
+    },
+    "503": {
+      "licence": "Public",
+      "name": "wind",
+      "version": 1
+    },
+    "507": {
+      "licence": "Public",
+      "name": "space_ga",
+      "version": 1
+    },
+    "53": {
+      "licence": "Public",
+      "name": "heart-statlog",
+      "version": 1
+    },
+    "560": {
+      "licence": "Public",
+      "name": "bodyfat",
+      "version": 1
+    },
+    "59": {
+      "licence": "Public",
+      "name": "ionosphere",
+      "version": 1
+    },
+    "61": {
+      "licence": "Public",
+      "name": "iris",
+      "version": 1
+    }
   },
   "tasks": {
     "abalone": {
@@ -642,7 +1159,25 @@
       "group": "real",
       "kind": "binary"
     },
+    "auto_mpg": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "balance_scale": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
     "bank_marketing": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "banknote": {
       "cause": "",
       "expected": [],
       "group": "real",
@@ -660,7 +1195,19 @@
       "group": "real",
       "kind": "binary"
     },
+    "bodyfat": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
     "breast_cancer": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "breast_w": {
       "cause": "",
       "expected": [],
       "group": "real",
@@ -684,11 +1231,29 @@
       "group": "real",
       "kind": "binary"
     },
+    "climate_crashes": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "cmc": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
     "colic": {
       "cause": "",
       "expected": [],
       "group": "real",
       "kind": "binary"
+    },
+    "cpu_act": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
     },
     "cpu_small": {
       "cause": "",
@@ -732,6 +1297,12 @@
       "group": "real",
       "kind": "binary"
     },
+    "elevators": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
     "emotions": {
       "cause": "",
       "expected": [],
@@ -744,13 +1315,55 @@
       "group": "real",
       "kind": "multioutput"
     },
+    "eucalyptus": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "heart_statlog": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "house_8l": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
     "house_sales": {
       "cause": "",
       "expected": [],
       "group": "real",
       "kind": "regression"
     },
+    "ilpd": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "ionosphere": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "iris": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
     "kc1_defects": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "kc2": {
       "cause": "",
       "expected": [],
       "group": "real",
@@ -762,11 +1375,23 @@
       "group": "real",
       "kind": "regression"
     },
+    "kr_vs_kp": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
     "letter": {
       "cause": "",
       "expected": [],
       "group": "real",
       "kind": "multiclass"
+    },
+    "machine_cpu": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
     },
     "magic_telescope": {
       "cause": "",
@@ -774,7 +1399,37 @@
       "group": "real",
       "kind": "binary"
     },
+    "moneyball": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "monks_1": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
     "mushroom": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "ozone": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "pc1": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "pc4": {
       "cause": "",
       "expected": [],
       "group": "real",
@@ -893,6 +1548,12 @@
       ],
       "group": "planted",
       "kind": "regression"
+    },
+    "qsar_biodeg": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
     },
     "segment": {
       "cause": "",
@@ -1032,7 +1693,25 @@
       "group": "simulated",
       "kind": "uplift"
     },
+    "space_ga": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
     "spambase": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "steel_plates": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "tic_tac_toe": {
       "cause": "",
       "expected": [],
       "group": "real",
@@ -1044,11 +1723,35 @@
       "group": "real",
       "kind": "binary"
     },
+    "us_crime": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
     "vehicle": {
       "cause": "",
       "expected": [],
       "group": "real",
       "kind": "multiclass"
+    },
+    "vowel": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "wilt": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "wind": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
     },
     "wine": {
       "cause": "",

@@ -22,7 +22,8 @@ read. A run ends in one of three ways:
 The tasks are of three groups:
 
 * `real`: public tables already cached on this laptop (scikit-learn's
-  bundled sets and the OpenML cache), each with the task a practitioner would
+  bundled sets and the OpenML cache, extended by the `EXTRA` tables listed in
+  `data/refusal/README.md`), each with the task a practitioner would
   declare. No real survival, ranking, forecast or uplift table is cached, so
   those kinds are simulated only.
 * `simulated`: clean generated tasks of every kind, several sizes and shapes
@@ -558,6 +559,78 @@ def plant(
     return build
 
 
+# Further public OpenML tables fetched into scikit-learn's cache for C14:
+# id -> (task name, kind, target, declared task). Fetched once with network
+# by `fetch_openml(data_id=...)`; the runs then read the cache offline.
+EXTRA: dict[int, tuple[str, str, str, str]] = {
+    3: ("kr_vs_kp", "binary", "class", "classification"),
+    11: ("balance_scale", "multiclass", "class", "classification"),
+    15: ("breast_w", "binary", "Class", "classification"),
+    23: ("cmc", "multiclass", "Contraceptive_method_used", "classification"),
+    50: ("tic_tac_toe", "binary", "Class", "classification"),
+    53: ("heart_statlog", "binary", "class", "classification"),
+    59: ("ionosphere", "binary", "class", "classification"),
+    61: ("iris", "multiclass", "class", "classification"),
+    188: ("eucalyptus", "multiclass", "Utility", "classification"),
+    307: ("vowel", "multiclass", "Class", "classification"),
+    333: ("monks_1", "binary", "class", "classification"),
+    1462: ("banknote", "binary", "Class", "classification"),
+    1480: ("ilpd", "binary", "Class", "classification"),
+    1494: ("qsar_biodeg", "binary", "Class", "classification"),
+    1049: ("pc4", "binary", "c", "classification"),
+    1063: ("kc2", "binary", "problems", "classification"),
+    1068: ("pc1", "binary", "defects", "classification"),
+    40982: ("steel_plates", "multiclass", "target", "classification"),
+    40983: ("wilt", "binary", "class", "classification"),
+    40994: ("climate_crashes", "binary", "outcome", "classification"),
+    1487: ("ozone", "binary", "Class", "classification"),
+    197: ("cpu_act", "regression", "usr", "regression"),
+    216: ("elevators", "regression", "Goal", "regression"),
+    218: ("house_8l", "regression", "price", "regression"),
+    507: ("space_ga", "regression", "ln(VOTES/POP)", "regression"),
+    503: ("wind", "regression", "MAL", "regression"),
+    196: ("auto_mpg", "regression", "class", "regression"),
+    230: ("machine_cpu", "regression", "class", "regression"),
+    315: ("us_crime", "regression", "ViolentCrimesPerPop", "regression"),
+    41021: ("moneyball", "regression", "RS", "regression"),
+    560: ("bodyfat", "regression", "class", "regression"),
+}
+# OpenML name, version and licence of each `EXTRA` table, as fetched.
+SOURCES: dict[int, tuple[str, int, str]] = {
+    3: ("kr-vs-kp", 1, "Public"),
+    11: ("balance-scale", 1, "Public"),
+    15: ("breast-w", 1, "Public"),
+    23: ("cmc", 1, "Public"),
+    50: ("tic-tac-toe", 1, "Public"),
+    53: ("heart-statlog", 1, "Public"),
+    59: ("ionosphere", 1, "Public"),
+    61: ("iris", 1, "Public"),
+    188: ("eucalyptus", 1, "Public"),
+    307: ("vowel", 2, "Public"),
+    333: ("monks-problems-1", 1, "Public"),
+    1462: ("banknote-authentication", 1, "Public"),
+    1480: ("ilpd", 1, "Public"),
+    1494: ("qsar-biodeg", 1, "Public"),
+    1049: ("pc4", 1, "Public"),
+    1063: ("kc2", 1, "Public"),
+    1068: ("pc1", 1, "Public"),
+    40982: ("steel-plates-fault", 3, "Public"),
+    40983: ("wilt", 2, "Public"),
+    40994: ("climate-model-simulation-crashes", 4, "Public"),
+    1487: ("ozone-level-8hr", 1, "Public"),
+    197: ("cpu_act", 1, "Public"),
+    216: ("elevators", 1, "Public"),
+    218: ("house_8L", 1, "Public"),
+    507: ("space_ga", 1, "Public"),
+    503: ("wind", 1, "Public"),
+    196: ("autoMpg", 1, "Public"),
+    230: ("machine_cpu", 1, "Public"),
+    315: ("us_crime", 1, "Public"),
+    41021: ("Moneyball", 2, "Public"),
+    560: ("bodyfat", 1, "Public"),
+}
+
+
 def catalog() -> dict[str, Task]:
     """Every task, in the order they are run.
 
@@ -750,6 +823,10 @@ def catalog() -> dict[str, Task]:
             table(151, "class", "classification"),
         ),
     ]
+    real.extend(
+        Task(name, kind, "real", table(identifier, target, task))
+        for identifier, (name, kind, target, task) in EXTRA.items()
+    )
     layouts = (
         ("binary", 500, "plain"),
         ("regression", 300, "mixed"),
@@ -1173,6 +1250,10 @@ def measure(
                 "cause": t.cause,
             }
             for n, t in tasks.items()
+        },
+        "sources": {
+            str(i): {"name": n, "version": v, "licence": lic}
+            for i, (n, v, lic) in SOURCES.items()
         },
         "records": records,
         "counts": tally(records, tasks),

@@ -18,17 +18,19 @@ import sys
 import types
 
 from benchmarks import acceptance
-from benchmarks import registry
 from benchmarks.evidence import budget
 from benchmarks.evidence import coverage
+from benchmarks.evidence import faults
 from benchmarks.evidence import guarantees
+from benchmarks.evidence import leakage
+from benchmarks.evidence import quality
+from benchmarks.evidence import reading
 from benchmarks.evidence import refusal
 from benchmarks.evidence import reproducibility
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TARGET = ROOT / "plan" / "scorecard.md"
 STRUCTURE = ROOT / "scripts" / "structure.json"
-SCREEN = ROOT / "benchmarks" / "qualification" / "screen_measurements.json"
 UNMEASURED = "not measured"
 VARIABLES = acceptance.load()
 
@@ -55,54 +57,6 @@ class Row:
 def value(name: str) -> str:
     """A threshold's value from `acceptance.toml`, as short text."""
     return f"{VARIABLES[name].value:g}"
-
-
-def gates() -> Row:
-    """C1: every gate registered and the code agreeing with the registry."""
-    found = registry.load()
-    problems = registry.compare(found, registry.scan())
-    return Row(
-        "C1 No silent wrong outcome",
-        "every gate registered with pass, block and override paths; every "
-        "injected failure blocks or is a recorded override (share "
-        f"{value('gate_fault_block_min')})",
-        f"{len(found)} gates registered, {len(problems)} disagreements; "
-        "fault-injection suite not written",
-        "gates.toml, benchmarks/registry.py",
-        "fail" if problems else UNMEASURED,
-    )
-
-
-def leakage() -> Row:
-    """C2: the screen's recall and false blocks, so far on planted leaks."""
-    alpha = VARIABLES["alpha"].value
-    recall = VARIABLES["leak_recall_min"].rule
-    blocks = VARIABLES["false_block_max"].rule
-    measured = json.loads(SCREEN.read_text(encoding="utf-8"))
-    parts = []
-    for kind, data in measured.items():
-        worst = min(v["detected"] for v in data["recall"].values())
-        parts.append(
-            f"{kind}: {data['suspect_false_alarms']}/"
-            f"{data['null_replicates']} false alarms, worst type "
-            f"{worst}/{data['plant_replicates_per_type']}"
-        )
-    minimum = (
-        ""
-        if recall is None or blocks is None
-        else f" (at least {recall.minimum(alpha)} leaks and "
-        f"{blocks.minimum(alpha)} clean datasets)"
-    )
-    return Row(
-        "C2 Leakage caught, clean data not blocked",
-        f"recall lower bound >= {value('leak_recall_min')} on real leaks, "
-        f"false-block upper bound <= {value('false_block_max')} on clean real "
-        f"datasets{minimum}",
-        "planted leaks only: " + "; ".join(parts) + "; real leak corpus not "
-        "built",
-        "benchmarks/qualification/screen_measurements.json",
-        UNMEASURED,
-    )
 
 
 def structure() -> Row:
@@ -169,24 +123,38 @@ def pending(claim: str, name: str, criterion: str) -> Row:
 def rows() -> list[Row]:
     """Every claim, in the plan's order."""
     return [
-        gates(),
-        leakage(),
+        measured(
+            "C1 No silent wrong outcome",
+            "gate_fault_block_min",
+            "every gate registered with pass, block and override paths; every "
+            "injected failure blocks or is a recorded override (share {value})",
+            faults,
+        ),
+        measured(
+            "C2 Leakage caught, clean data not blocked",
+            "leak_recall_min",
+            "recall lower bound >= {value} on real leaks; false-block upper "
+            f"bound <= {value('false_block_max')} on clean real datasets",
+            leakage,
+        ),
         measured(
             "C3 Statistics correct and uncertainty honest",
             "interval_coverage_min",
             "interval coverage lower bound >= {value}",
             coverage,
         ),
-        pending(
+        measured(
             "C4 At least a competent practitioner's quality",
             "benchmark_median_gap_max",
             "median normalised gap <= {value} per data kind",
+            quality,
         ),
-        pending(
+        measured(
             "C5 Data read and joined correctly",
             "reference_rel_tol",
             "awkward files correct or refused; point-in-time features equal a "
             "naive reference (tolerance {value})",
+            reading,
         ),
         measured(
             "C6 Reproducible and traceable",

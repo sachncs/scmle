@@ -1,0 +1,497 @@
+{
+  "alpha": 0.05,
+  "claim": "C4",
+  "code": "d89674fb7853898d65bc97b8493186f83d5b3150df84a86a96f410ab7b0f2dce",
+  "data": {
+    "363612": "d98c8cf8b64d81cbd43aabd76222f4b54ae02f4cb2b67d4fb1c4ee9f309509d8",
+    "363621": "8e9fecb0a04af9e4c8d3c625c8cd1c173a15de655254ddaed480d77a9008d00a",
+    "363625": "c5853f3c8e7e10524d81878cd2b0d61d8129242467a814187f4d015b4895df21",
+    "363674": "e77e8942836e009170196386614de7e378cde967787bef2445e241aaaa98791e",
+    "363682": "3aaa17c39e531131573284fcdcf511c1a763d4593ff9d8b87f61536af912ddcf",
+    "363684": "e468d6379be297953dac8780594ccdd98af606a6c5bd7ee43408365a27a360a6",
+    "363685": "d9697e031fb0e3db02f3f62445ebbfdb15baff56c8cc2bc75520a4deaba83bc4",
+    "363686": "eb38dc11f87c375ca4a66222ce03cb7cd1d0e38084d9a91d4635f09900dfb898",
+    "363696": "864c269749defdf2e50e52fa631fa89d4ad8360f3bf82bcd47e2ceaf0f48773d",
+    "363698": "ccf8655ae2a13062a436cd7e95c7594710576d7655ef148c320da6266ef5626c",
+    "363699": "668a363a27266198aa6c0da81e338e52aa91d1ca0f06a3bfc487f041f392f042",
+    "363702": "7a6c5fae358d9e0eb0acc1defab3d9eb395e87da294396e40802caf4515c3dd4",
+    "363704": "37fb1767ab33ed77c316eae266e9f868f90d923af0ce68a4137e5e80b71c14ec",
+    "363708": "d34509cc5ecaca4dfe35ea0eb72211f20aed8b88b6f727ab4a5d4bf4943277ee",
+    "363711": "c11fbe1287697050d5bfb4b99bec749cb6ec59518feb86af573dedd55515cb30"
+  },
+  "design": {
+    "budget_seconds": 60,
+    "fixed": {
+      "categorical_features": "from_dtype",
+      "early_stopping": true,
+      "max_iter": 500,
+      "n_iter_no_change": 20,
+      "random_state": 0,
+      "validation_fraction": 0.1
+    },
+    "folds": 5,
+    "grid": [
+      {
+        "learning_rate": 0.1,
+        "max_leaf_nodes": 31
+      },
+      {
+        "learning_rate": 0.1,
+        "max_leaf_nodes": 15
+      },
+      {
+        "learning_rate": 0.1,
+        "max_leaf_nodes": 63
+      },
+      {
+        "learning_rate": 0.05,
+        "max_leaf_nodes": 15
+      },
+      {
+        "learning_rate": 0.05,
+        "max_leaf_nodes": 31
+      },
+      {
+        "learning_rate": 0.05,
+        "max_leaf_nodes": 63
+      }
+    ],
+    "scmle": "0.1.0b1",
+    "split": "OpenML repeat 0 fold 0"
+  },
+  "kinds": [
+    {
+      "failures": 0,
+      "gaps": [
+        -0.36326756407892336,
+        -0.014245135032009658,
+        0.0856242840778922,
+        0.06345970692910434,
+        0.016466346153845977
+      ],
+      "kind": "binary",
+      "median": 0.016466346153845977,
+      "passed": false,
+      "tasks": 5,
+      "upper": 0.0856242840778922
+    },
+    {
+      "failures": 0,
+      "gaps": [
+        0.4327863884880567,
+        -0.2759388212246177,
+        0.02635879454924597,
+        -0.0053198046498414125,
+        0.1000393648043015
+      ],
+      "kind": "multiclass",
+      "median": 0.02635879454924597,
+      "passed": false,
+      "tasks": 5,
+      "upper": 0.4327863884880567
+    },
+    {
+      "failures": 0,
+      "gaps": [
+        -0.04922934186974018,
+        0.026748490259413914,
+        0.032103430202115604,
+        0.026703972336575333,
+        -0.003987513602394488
+      ],
+      "kind": "regression",
+      "median": 0.026703972336575333,
+      "passed": false,
+      "tasks": 5,
+      "upper": 0.032103430202115604
+    }
+  ],
+  "median_max": 0.02,
+  "minimum_tasks": 5,
+  "not_measured": [
+    "data kinds other than tabular (text, document, image, audio, video, graph, geospatial, raster, related tables)",
+    "the sealed hold-out tasks",
+    "more than one split per task",
+    "the default 1800 s budget",
+    "AutoGluon-class reference systems"
+  ],
+  "seconds": 506.4,
+  "tasks": [
+    {
+      "gap": -0.36326756407892336,
+      "kind": "binary",
+      "metric": "roc_auc",
+      "name": "blood-transfusion-service-center",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.1,
+          "max_leaf_nodes": 31
+        },
+        "cv": 0.7049961861174675,
+        "score": 0.6514473684210527,
+        "seconds": 0.4,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 0.7378508771929826,
+        "seconds": 26.5
+      },
+      "task": 363621,
+      "test_rows": 250,
+      "train_rows": 498,
+      "trivial": 0.5
+    },
+    {
+      "gap": -0.014245135032009658,
+      "kind": "binary",
+      "metric": "roc_auc",
+      "name": "qsar-biodeg",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.1,
+          "max_leaf_nodes": 31
+        },
+        "cv": 0.9249292767774712,
+        "score": 0.9192844519782161,
+        "seconds": 2.2,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 0.9253435279691277,
+        "seconds": 61.1
+      },
+      "task": 363696,
+      "test_rows": 352,
+      "train_rows": 702,
+      "trivial": 0.5
+    },
+    {
+      "gap": 0.0856242840778922,
+      "kind": "binary",
+      "metric": "roc_auc",
+      "name": "Is-this-a-good-customer",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.05,
+          "max_leaf_nodes": 15
+        },
+        "cv": 0.7449858457972048,
+        "score": 0.7078942668333631,
+        "seconds": 1.6,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 0.6900934690718581,
+        "seconds": 39.2
+      },
+      "task": 363682,
+      "test_rows": 575,
+      "train_rows": 1148,
+      "trivial": 0.5
+    },
+    {
+      "gap": 0.06345970692910434,
+      "kind": "binary",
+      "metric": "roc_auc",
+      "name": "Marketing_Campaign",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.05,
+          "max_leaf_nodes": 15
+        },
+        "cv": 0.8886471009305655,
+        "score": 0.9238837894498271,
+        "seconds": 2.5,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 0.8969842483993429,
+        "seconds": 49.7
+      },
+      "task": 363684,
+      "test_rows": 747,
+      "train_rows": 1493,
+      "trivial": 0.5
+    },
+    {
+      "gap": 0.016466346153845977,
+      "kind": "binary",
+      "metric": "roc_auc",
+      "name": "hazelnut-spread-contaminant-detection",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.1,
+          "max_leaf_nodes": 31
+        },
+        "cv": 0.9723750000000001,
+        "score": 0.9679999999999999,
+        "seconds": 7.3,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 0.96029375,
+        "seconds": 66.9
+      },
+      "task": 363674,
+      "test_rows": 800,
+      "train_rows": 1600,
+      "trivial": 0.5
+    },
+    {
+      "gap": 0.4327863884880567,
+      "kind": "multiclass",
+      "metric": "log_loss",
+      "name": "maternal_health_risk",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.05,
+          "max_leaf_nodes": 31
+        },
+        "cv": -0.6142137520164684,
+        "score": 0.48546663635244175,
+        "seconds": 4.2,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 0.7447993986558477,
+        "seconds": 40.8
+      },
+      "task": 363685,
+      "test_rows": 338,
+      "train_rows": 676,
+      "trivial": 1.0846831764321503
+    },
+    {
+      "gap": -0.2759388212246177,
+      "kind": "multiclass",
+      "metric": "log_loss",
+      "name": "MIC",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.05,
+          "max_leaf_nodes": 63
+        },
+        "cv": -0.539943755367003,
+        "score": 0.5720854731110299,
+        "seconds": 26.5,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 0.5198075715508611,
+        "seconds": 129.5
+      },
+      "task": 363711,
+      "test_rows": 567,
+      "train_rows": 1132,
+      "trivial": 0.7092622533102424
+    },
+    {
+      "gap": 0.02635879454924597,
+      "kind": "multiclass",
+      "metric": "log_loss",
+      "name": "splice",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.05,
+          "max_leaf_nodes": 15
+        },
+        "cv": -0.1352703915148558,
+        "score": 0.10093897931994204,
+        "seconds": 15.8,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 0.1253220799273908,
+        "seconds": 79.2
+      },
+      "task": 363702,
+      "test_rows": 1064,
+      "train_rows": 2126,
+      "trivial": 1.0259850986291528
+    },
+    {
+      "gap": -0.0053198046498414125,
+      "kind": "multiclass",
+      "metric": "log_loss",
+      "name": "students_dropout_and_academic_success",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.05,
+          "max_leaf_nodes": 15
+        },
+        "cv": -0.5666573100526844,
+        "score": 0.5743308135422269,
+        "seconds": 9.5,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 0.5719503707926369,
+        "seconds": 75.8
+      },
+      "task": 363704,
+      "test_rows": 1475,
+      "train_rows": 2949,
+      "trivial": 1.019418446459852
+    },
+    {
+      "gap": 0.1000393648043015,
+      "kind": "multiclass",
+      "metric": "log_loss",
+      "name": "SDSS17",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.05,
+          "max_leaf_nodes": 31
+        },
+        "cv": -0.0770035584764098,
+        "score": 0.07610715418926961,
+        "seconds": 31.2,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 0.16231126755022168,
+        "seconds": 80.5
+      },
+      "task": 363699,
+      "test_rows": 26018,
+      "train_rows": 52035,
+      "trivial": 0.9378090805218272
+    },
+    {
+      "gap": -0.04922934186974018,
+      "kind": "regression",
+      "metric": "rmse",
+      "name": "QSAR_fish_toxicity",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.1,
+          "max_leaf_nodes": 15
+        },
+        "cv": -0.8978487142958906,
+        "score": 0.9357558317886667,
+        "seconds": 0.9,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 0.9064343858794519,
+        "seconds": 22.0
+      },
+      "task": 363698,
+      "test_rows": 303,
+      "train_rows": 604,
+      "trivial": 1.502043524567488
+    },
+    {
+      "gap": 0.026748490259413914,
+      "kind": "regression",
+      "metric": "rmse",
+      "name": "concrete_compressive_strength",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.05,
+          "max_leaf_nodes": 15
+        },
+        "cv": -4.663018066392686,
+        "score": 4.6274459191573,
+        "seconds": 3.7,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 4.957829813486843,
+        "seconds": 24.2
+      },
+      "task": 363625,
+      "test_rows": 344,
+      "train_rows": 686,
+      "trivial": 16.978942812080682
+    },
+    {
+      "gap": 0.032103430202115604,
+      "kind": "regression",
+      "metric": "rmse",
+      "name": "airfoil_self_noise",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.05,
+          "max_leaf_nodes": 31
+        },
+        "cv": -1.9820336329797725,
+        "score": 1.5941468508296328,
+        "seconds": 5.5,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 1.7661598780749972,
+        "seconds": 25.7
+      },
+      "task": 363612,
+      "test_rows": 501,
+      "train_rows": 1002,
+      "trivial": 6.952235571019688
+    },
+    {
+      "gap": 0.026703972336575333,
+      "kind": "regression",
+      "metric": "rmse",
+      "name": "wine_quality",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.1,
+          "max_leaf_nodes": 63
+        },
+        "cv": -0.6619192514665518,
+        "score": 0.6286624702421014,
+        "seconds": 6.2,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 0.6346562278008367,
+        "seconds": 43.5
+      },
+      "task": 363708,
+      "test_rows": 2166,
+      "train_rows": 4331,
+      "trivial": 0.8531143788641726
+    },
+    {
+      "gap": -0.003987513602394488,
+      "kind": "regression",
+      "metric": "rmse",
+      "name": "miami_housing",
+      "practitioner": {
+        "chosen": {
+          "learning_rate": 0.1,
+          "max_leaf_nodes": 31
+        },
+        "cv": -93460.86943069096,
+        "score": 94716.99489441738,
+        "seconds": 13.1,
+        "tried": 6
+      },
+      "product": {
+        "error": "",
+        "score": 93804.83621193806,
+        "seconds": 68.7
+      },
+      "task": 363686,
+      "test_rows": 4592,
+      "train_rows": 9184,
+      "trivial": 322558.5843951596
+    }
+  ],
+  "upper_max": 0.05
+}

@@ -138,5 +138,13 @@ def test_planted_tasks_name_registered_gates():
         assert bool(task.expected) == (task.group == "planted")
 
 
+def test_the_catalog_has_enough_sourced_real_tasks_for_the_rate():
+    variables = refusal.acceptance.load()
+    rule = variables["refusal_rate_max"].rule
+    real = [t for t in refusal.catalog().values() if t.group == "real"]
+    assert len(real) >= rule.minimum(variables["alpha"].value)
+    assert set(refusal.SOURCES) == set(refusal.EXTRA)
+
+
 def test_the_stored_measurements_are_for_the_current_code():
     assert refusal.problems() == []

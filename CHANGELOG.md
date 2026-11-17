@@ -118,6 +118,21 @@ marked `Breaking:` and listed first in their group.
 
 ### Added
 
+- Measured scorecard evidence for C1, C2, C4 and C5, and C14 decided on
+  65 real tables (stage A; no product change):
+  - C1 passes: all 43 registered gates block their injected fault and all
+    9 overrides leave a record (simulated inputs).
+  - C2 fails on 146 real tables: 11 of 68 leaks caught (64 planted on real
+    data, 4 documented real leaks) and 8 of 78 clean tables blocked.
+  - C4 fails on 15 real OpenML tasks against a pre-registered gradient
+    boosting baseline: median normalised gap 0.016 binary, 0.026
+    multiclass, 0.027 regression (limit 0.02); tabular only.
+  - C5 fails: 9 of 34 awkward files read silently wrong (`;` and `|`
+    delimiters, duplicate headers, leading zeros, big integers, short last
+    row); point-in-time features match the naive reference in 1000 of 1000
+    simulated worlds.
+  - C14: 0 of 65 real runs refused, so the rate passes; precision is not
+    yet decidable (too few justified refusals).
 - Measured scorecard evidence for C3, C6, C7, C12 and C14.
   `benchmarks/evidence/` holds one module per claim; each stores its raw
   results next to it, refuses to report a pass on fewer trials than the
