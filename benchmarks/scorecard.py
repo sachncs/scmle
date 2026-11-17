@@ -19,14 +19,16 @@ import types
 
 from benchmarks import acceptance
 from benchmarks.evidence import budget
+from benchmarks.evidence import bypass
 from benchmarks.evidence import coverage
 from benchmarks.evidence import faults
 from benchmarks.evidence import guarantees
 from benchmarks.evidence import leakage
+from benchmarks.evidence import mutation
+from benchmarks.evidence import platforms
 from benchmarks.evidence import quality
 from benchmarks.evidence import reading
 from benchmarks.evidence import refusal
-from benchmarks.evidence import reproducibility
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TARGET = ROOT / "plan" / "scorecard.md"
@@ -65,6 +67,7 @@ def structure() -> Row:
     over = sum(
         counts[k] for k in ("modules_over", "classes_over", "functions_over")
     )
+    score, verdict = mutation.summary()
     return Row(
         "C10 Can keep changing safely",
         f"no module, class or function over {value('module_lines_max')}/"
@@ -75,9 +78,9 @@ def structure() -> Row:
         f"and {counts['functions_over']} functions over; "
         f"{counts['compound_functions']} multi-word function and "
         f"{counts['compound_classes']} class names; {counts['bare_raises']} "
-        "bare raises",
-        "scripts/structure.json",
-        "fail" if over else "pass",
+        f"bare raises; mutation: {score}",
+        "scripts/structure.json, benchmarks/evidence/mutation.json",
+        "fail" if over or verdict == "fail" else verdict,
     )
 
 
@@ -160,7 +163,7 @@ def rows() -> list[Row]:
             "C6 Reproducible and traceable",
             "cross_platform_tol",
             "byte-identical bundle per platform; metrics within {value}",
-            reproducibility,
+            platforms,
         ),
         measured(
             "C7 Operates without loss or stall",
@@ -168,10 +171,11 @@ def rows() -> list[Row]:
             "share of runs within budget >= {value}; kill and resume pass",
             budget,
         ),
-        pending(
+        measured(
             "C8 Controls cannot be bypassed",
             "alpha",
             "zero bypasses in a red-team exercise",
+            bypass,
         ),
         pending(
             "C9 Secure, private, trustworthy supply chain",
