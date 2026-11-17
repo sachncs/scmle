@@ -435,7 +435,8 @@ class Orchestrator:
                 machine.transition(stage.state, stage.describe(context))
                 if stage.state is state.Progress.PLANNING:
                     context.observe()
-                stage.execute(context)
+                with context.regulator.cap():
+                    stage.execute(context)
                 self.consult_checkpoints(stage.state, context)
             machine.transition(
                 state.Progress.COMPLETED,

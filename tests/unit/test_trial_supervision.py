@@ -56,6 +56,38 @@ def test_an_exception_in_the_trial_is_reported_not_lost():
         limits.Supervisor(30.0, None).run(explode, 1)
 
 
+def test_the_first_trial_gets_a_whole_budget_after_a_long_preparation():
+    # Preparation used up the budget: the first trial, which always runs so
+    # a result exists, must not be killed at the one-second floor; later
+    # trials are (C7 defect: "all trials failed" under a small budget).
+    late = limits.Governor(
+        tasks.Resources(time_budget_seconds=10), time.monotonic() - 100
+    )
+    first = late.deadline()
+    assert first >= 10 * (1 + limits.GRACE_SHARE)
+    assert late.deadline() == limits.MIN_CEILING_SECONDS
+
+
+def test_the_cpu_limit_caps_math_threads_in_the_main_process():
+    # Profiling fits run in the main process; without the cap they used every
+    # core whatever `cpu_limit` said (C7 defect).
+    import sklearn.ensemble  # noqa: F401  # loads the OpenMP runtime
+    import threadpoolctl
+
+    before = {
+        p["filepath"]: p["num_threads"] for p in threadpoolctl.threadpool_info()
+    }
+    with limits.Governor(tasks.Resources(cpu_limit=1)).cap():
+        pools = threadpoolctl.threadpool_info()
+        assert pools and all(pool["num_threads"] == 1 for pool in pools)
+    with limits.Governor(tasks.Resources()).cap():
+        after = {
+            p["filepath"]: p["num_threads"]
+            for p in threadpoolctl.threadpool_info()
+        }
+        assert after == before
+
+
 def test_governor_modes_describe_their_enforcement():
     hard = limits.Governor(tasks.Resources(time_budget_seconds=100))
     assert 100 <= hard.deadline() <= 110 and hard.hard

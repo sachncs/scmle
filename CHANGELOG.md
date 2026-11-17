@@ -1110,6 +1110,18 @@ marked `Breaking:` and listed first in their group.
 
 ### Fixed
 
+- A small time budget no longer ends the run with "all trials failed". The
+  first trial always runs so that a result exists, but when preparation had
+  used up the budget it got the one-second minimum ceiling, too short to
+  start a worker, and was killed. It now gets a whole budget plus the grace
+  share, so a run whose preparation fills its budget can take up to about
+  twice the budget; later trials still get only what is left. A 2 s budget
+  on the quick project now finishes in about 6 s; a 1 s budget is still too
+  short to start a worker.
+- `cpu_limit` now also caps the math-library threads of the main process
+  while the stages run. Profiling, diagnostics and evaluation fits run
+  there and used every core whatever the limit said; only trial workers
+  were capped.
 - Every text file the package and its tests open now names its encoding
   (`utf-8`), and ruff enforces it (`PLW1514`). Windows defaults to a legacy
   code page, so reading a key, policy or attestation file with non-ASCII text

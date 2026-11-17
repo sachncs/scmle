@@ -7,8 +7,9 @@
   memory exceeds the limit is killed and recorded as failed. Resident memory
   (the trial and every process it started) is sampled while it runs, so a
   very fast allocation spike can overshoot by one sampling interval.
-* CPU: the worker count is capped at `cpu_limit` and each worker's math
-  libraries are limited to its share of the CPUs.
+* CPU: the worker count is capped at `cpu_limit`, each worker's math
+  libraries are limited to its share of the CPUs, and the main process's
+  math libraries to `cpu_limit` threads while the stages run.
 * GPU: no built-in model uses a GPU; `gpu="required"` blocks the run.
 
 Supervision applies when `Resources.enforcement` is `hard` (the default);
@@ -32,6 +33,9 @@ import sys
 import threading
 import time
 from typing import Any
+from typing import cast
+
+import threadpoolctl
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
@@ -387,17 +391,19 @@ class Supervisor:
         return None
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class Governor:
     """Applies and reports the configured resource limits.
 
     Attributes:
         spec: The resource specification.
         started_at: Monotonic start time of the run.
+        dispatched: Whether the first trial's ceiling was handed out.
     """
 
     spec: tasks.Resources
     started_at: float = dataclasses.field(default_factory=time.monotonic)
+    dispatched: bool = False
 
     @property
     def workers(self) -> int:
@@ -412,6 +418,22 @@ class Governor:
         if cap:
             return max(1, cap // max(self.workers, 1))
         return 1 if self.workers > 1 else None
+
+    def cap(self) -> contextlib.AbstractContextManager[object]:
+        """Limits this process's math-library threads to `cpu_limit`.
+
+        Trial workers get their share of the CPUs through `threadcap`;
+        everything else (profiling, diagnostics and evaluation fits) runs in
+        the main process and would otherwise use every core whatever the
+        limit says. With no `cpu_limit` nothing changes.
+
+        Returns:
+            A context manager that applies the limit while it is open.
+        """
+        return cast(
+            "contextlib.AbstractContextManager[object]",
+            threadpoolctl.threadpool_limits(limits=self.spec.cpu_limit),
+        )
 
     def exceeds(self) -> bool:
         """Whether peak memory is above the configured limit.
@@ -444,12 +466,23 @@ class Governor:
     def deadline(self) -> float:
         """Hard time ceiling for a trial dispatched now.
 
+        The first trial always runs so that a result exists (`skip_reason`),
+        so its ceiling is at least one whole budget: a preparation that used
+        up the budget would otherwise leave it the minimum ceiling, too short
+        to start a worker, and the run would end with every trial failed. A
+        run can therefore take up to about twice its budget when preparation
+        alone fills the budget; every later trial gets only what is left.
+
         Returns:
-            The time ceiling in seconds: the remaining budget plus a grace share
-            of the budget, never below the minimum ceiling.
+            The time ceiling in seconds: the remaining budget (the whole
+            budget for the first trial) plus a grace share of the budget,
+            never below the minimum ceiling.
         """
         budget = self.spec.time_budget_seconds
         remaining = max(budget - (time.monotonic() - self.started_at), 0.0)
+        if not self.dispatched:
+            self.dispatched = True
+            remaining = max(remaining, budget)
         return max(remaining + GRACE_SHARE * budget, MIN_CEILING_SECONDS)
 
     def skip_reason(self, first: bool) -> str | None:
