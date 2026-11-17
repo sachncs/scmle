@@ -409,10 +409,10 @@ def admissibility(attest: bool) -> str | None:
     Returns:
         The ledger check that records the attestation, or None.
     """
+    from scmle.assurance.admissibility import attestations
+    from scmle.assurance.admissibility import provenance
+    from scmle.assurance.admissibility import qualify
     from scmle.core import stages
-    from scmle.data.admissibility import attestations
-    from scmle.data.admissibility import provenance
-    from scmle.data.admissibility import qualify
 
     scope = "c" * 64
     rng = numpy.random.default_rng(SEED)

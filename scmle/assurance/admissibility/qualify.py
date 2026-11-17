@@ -31,18 +31,18 @@ from pathlib import Path
 
 import pandas
 
+from scmle.assurance.admissibility import independence
+from scmle.assurance.admissibility import provenance
+from scmle.assurance.admissibility import rules
+from scmle.assurance.admissibility import screen
+import scmle.assurance.admissibility.attestations
+import scmle.assurance.admissibility.dag
 import scmle.assurance.charter.causal
 from scmle.assurance.detectors import certificates
 from scmle.assurance.detectors import pipeline
 import scmle.certificates
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.admissibility import independence
-from scmle.data.admissibility import provenance
-from scmle.data.admissibility import rules
-from scmle.data.admissibility import screen
-import scmle.data.admissibility.attestations
-import scmle.data.admissibility.dag
 
 F5_STORE = "detector_certificates.json"
 ATTESTATION_SOURCE = "f4-leakage-attestation"
@@ -201,7 +201,7 @@ def screened(
 
 
 def waiver(
-    item: scmle.data.admissibility.attestations.Affidavit,
+    item: scmle.assurance.admissibility.attestations.Affidavit,
     findings: Sequence[screen.Finding],
     rows: int,
     seed: int,
@@ -255,7 +255,7 @@ def admit(
     frame: pandas.DataFrame,
     candidates: Sequence[str],
     spec: scmle.assurance.charter.causal.Question,
-    graph: scmle.data.admissibility.dag.Dag,
+    graph: scmle.assurance.admissibility.dag.Dag,
     seed: int,
     day: datetime.date,
     result: pipeline.Findings,
@@ -320,13 +320,14 @@ def admit(
         )
     if (
         not members
-        and len(candidates) > scmle.data.admissibility.dag.MAX_SEARCH_CANDIDATES
+        and len(candidates)
+        > scmle.assurance.admissibility.dag.MAX_SEARCH_CANDIDATES
     ):
         notes.append(
             "more than "
-            f"{scmle.data.admissibility.dag.MAX_SEARCH_CANDIDATES} candidate "
-            "covariates and no declared adjustment set: the charter must "
-            "supply the set, and the claim is attested at best"
+            f"{scmle.assurance.admissibility.dag.MAX_SEARCH_CANDIDATES} "
+            "candidate covariates and no declared adjustment set: the "
+            "charter must supply the set, and the claim is attested at best"
         )
     report: dict[str, object] = {
         "dag_hash": graph.digest(),
@@ -377,12 +378,12 @@ def run(
     time_column: str | None = None,
     directory: Path | None = None,
     attestations: Sequence[
-        scmle.data.admissibility.attestations.Affidavit
+        scmle.assurance.admissibility.attestations.Affidavit
     ] = (),
     scope: str = "",
     today: datetime.date | None = None,
     causal: scmle.assurance.charter.causal.Question | None = None,
-    dag: scmle.data.admissibility.dag.Dag | None = None,
+    dag: scmle.assurance.admissibility.dag.Dag | None = None,
     declared: Sequence[provenance.Pedigree] = (),
 ) -> Qualification:
     """Runs leakage, admissibility and the detector pipeline on `X`.
@@ -456,7 +457,7 @@ def run(
             "leakage suspicion is descriptive: the screen gave no gate"
         )
     notes.extend(report.notes)
-    applied = scmle.data.admissibility.attestations.apply(
+    applied = scmle.assurance.admissibility.attestations.apply(
         attestations, scope, day.isoformat()
     )
     for column, why in applied.rejected.items():

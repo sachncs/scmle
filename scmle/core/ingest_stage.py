@@ -54,9 +54,9 @@ from typing import Any
 
 import pandas
 
+from scmle.assurance.admissibility import provenance
 from scmle.assurance.charter import ingest
 from scmle.contracts import errors
-from scmle.data.admissibility import provenance
 from scmle.data.ingest import asof_view
 from scmle.data.ingest import budget
 from scmle.data.ingest import declared

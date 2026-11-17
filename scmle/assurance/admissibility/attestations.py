@@ -56,9 +56,9 @@ from pathlib import Path
 from typing import Any
 from typing import Self
 
+from scmle.assurance.admissibility import provenance
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.admissibility import provenance
 
 FORMAT_VERSION = 1
 WRITER = "attested legitimate predictor"

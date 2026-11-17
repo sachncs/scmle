@@ -9,9 +9,9 @@ import json
 
 import pytest
 
+from scmle.assurance.admissibility import attestations
+from scmle.assurance.admissibility import provenance
 from scmle.assurance.charter import contracts
-from scmle.data.admissibility import attestations
-from scmle.data.admissibility import provenance
 from scmle.data.framing import costs
 from tests.unit.test_admissibility_attestations import attest
 from tests.unit.test_charter_contracts import make_charter

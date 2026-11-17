@@ -8,8 +8,8 @@ import pandas
 
 from benchmarks.qualification import ingest_worlds
 from scmle import cli
+from scmle.assurance.admissibility import provenance
 from scmle.contracts import qualification
-from scmle.data.admissibility import provenance
 from scmle.data.ingest import asof_view
 from scmle.data.ingest import profile
 from scmle.data.ingest import reconcile

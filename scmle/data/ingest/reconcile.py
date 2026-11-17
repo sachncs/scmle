@@ -23,10 +23,10 @@ from typing import Any
 
 import pandas
 
+from scmle.assurance.admissibility import reconciliation
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.admissibility import reconciliation
 from scmle.data.ingest import profile
 
 DETECTOR_ID = "ingest-reconcile"

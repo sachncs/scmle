@@ -11,12 +11,12 @@ import pytest
 
 from benchmarks import reliability
 from scmle import cli
+from scmle.assurance.admissibility import provenance
+from scmle.assurance.admissibility import qualify
+from scmle.assurance.admissibility import rules
 from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.contracts import tasks
-from scmle.data.admissibility import provenance
-from scmle.data.admissibility import qualify
-from scmle.data.admissibility import rules
 from scmle.deploy import livetests
 from scmle.governance import deployment_ledger
 from scmle.governance import lifecycle

@@ -17,9 +17,9 @@ import hashlib
 import json
 import sys
 
+from scmle.assurance.admissibility import qualify
+from scmle.assurance.admissibility import screen
 import scmle.certificates
-from scmle.data.admissibility import qualify
-from scmle.data.admissibility import screen
 from scmle.data.identification import certified
 from scmle.evaluation import coverage_slices
 from scmle.evaluation import task_gate

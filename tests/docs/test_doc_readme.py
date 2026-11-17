@@ -8,11 +8,11 @@ import pandas
 from sklearn import naive_bayes
 
 from benchmarks import reliability
+from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility import screen
 from scmle.contracts import experiments
 from scmle.contracts import models
 from scmle.contracts import tasks
-from scmle.data.admissibility import leakage
-from scmle.data.admissibility import screen
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 import scmle.intelligence.planner

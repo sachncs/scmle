@@ -11,12 +11,12 @@ from scipy import stats
 from sklearn.metrics import r2_score
 from sklearn.metrics import roc_auc_score
 
+from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility import plants
+from scmle.assurance.admissibility import screen
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import multiplicity
 import scmle.assurance.ledger.budget
-from scmle.data.admissibility import leakage
-from scmle.data.admissibility import plants
-from scmle.data.admissibility import screen
 
 CLS = "classification"
 FAST = leakage.Config(
@@ -581,7 +581,7 @@ def test_a_wide_multiclass_table_is_declined_quickly_and_says_so():
     import numpy
     import pandas
 
-    from scmle.data.admissibility import screen
+    from scmle.assurance.admissibility import screen
 
     rng = numpy.random.default_rng(0)
     frame = pandas.DataFrame(

@@ -7,11 +7,11 @@ import pandas
 import pytest
 from scipy import stats
 
+from scmle.assurance.admissibility import dag
+from scmle.assurance.admissibility import independence
 from scmle.contracts.qualification import Decision
 from scmle.contracts.qualification import Subset
 from scmle.contracts.qualification import Tier
-from scmle.data.admissibility import dag
-from scmle.data.admissibility import independence
 
 
 def sem_frame(n, seed, extra_edge=False):

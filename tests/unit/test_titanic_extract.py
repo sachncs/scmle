@@ -8,8 +8,8 @@ import pandas
 import pytest
 
 from benchmarks.qualification import corpora
-from scmle.data.admissibility import leakage
-from scmle.data.admissibility import screen
+from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility import screen
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "titanic_extract.csv"
 ENTRY = "titanic-boat-body"

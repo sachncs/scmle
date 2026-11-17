@@ -649,7 +649,7 @@ class Config(Schema):
     confirmation_failure_policy: Literal["unconfirmed"] = "unconfirmed"
     # JSON file of per-column attestations that a strong predictor flagged by
     # the leakage screen is legitimate (charter runs only; see
-    # `scmle.data.admissibility.attestations`).
+    # `scmle.assurance.admissibility.attestations`).
     leakage_attestations: str | None = None
 
     @pydantic.model_validator(mode="before")

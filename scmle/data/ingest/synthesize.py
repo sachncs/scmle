@@ -24,10 +24,10 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.admissibility import provenance
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.admissibility import provenance
 from scmle.data.ingest import asof_view
 
 COUNT = "count"

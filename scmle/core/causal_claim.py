@@ -42,12 +42,12 @@ from typing import Any
 
 import pandas
 
+import scmle.assurance.admissibility.dag
 from scmle.assurance.charter import causal
 from scmle.assurance.ledger import budget
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import ledger
 from scmle.contracts import errors
-import scmle.data.admissibility.dag
 from scmle.data.identification import attest
 from scmle.data.identification import run
 from scmle.data.identification import select
@@ -57,7 +57,7 @@ CLAIM_ID = "causal_primary_theta_zero"
 CLAIM_FILE = "causal_claims.json"
 
 
-def unseal(path: str | None) -> scmle.data.admissibility.dag.Dag | None:
+def unseal(path: str | None) -> scmle.assurance.admissibility.dag.Dag | None:
     """Loads the DAG hypothesis a causal block declares, verifying its hash.
 
     Args:
@@ -75,7 +75,7 @@ def unseal(path: str | None) -> scmle.data.admissibility.dag.Dag | None:
         return None
     try:
         document = json.loads(Path(path).read_text(encoding="utf-8"))
-        return scmle.data.admissibility.dag.Dag.from_artifact(document)
+        return scmle.assurance.admissibility.dag.Dag.from_artifact(document)
     except (OSError, ValueError, TypeError) as error:
         raise errors.ConfigError(
             f"cannot load the declared DAG {path}: {error}"
@@ -85,7 +85,7 @@ def unseal(path: str | None) -> scmle.data.admissibility.dag.Dag | None:
 def registration(
     spec: causal.Question,
     plan: select.Plan,
-    dag: scmle.data.admissibility.dag.Dag | None,
+    dag: scmle.assurance.admissibility.dag.Dag | None,
     error_budget: budget.ErrorBudget,
     exploration_rows: int,
 ) -> confirm.Commitment:
@@ -187,7 +187,7 @@ def rig(
     target_name: str,
     error_budget: budget.ErrorBudget,
     *,
-    dag: scmle.data.admissibility.dag.Dag | None = None,
+    dag: scmle.assurance.admissibility.dag.Dag | None = None,
     attestors: Mapping[str, str] | None = None,
     seed: int = 0,
     dag_report: Mapping[str, Any] | None = None,

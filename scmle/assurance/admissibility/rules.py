@@ -30,11 +30,11 @@ import enum
 from typing import Any
 from typing import Self
 
+from scmle.assurance.admissibility import dag
+from scmle.assurance.admissibility import provenance
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.admissibility import dag
-from scmle.data.admissibility import provenance
 
 FORMAT_VERSION = 1
 KINDS = ("predictive", "causal")

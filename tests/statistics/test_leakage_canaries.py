@@ -18,9 +18,9 @@ import pytest
 from sklearn import tree
 import support
 
+from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility import screen
 from scmle.contracts import errors
-from scmle.data.admissibility import leakage
-from scmle.data.admissibility import screen
 
 SEEDS = range(12)
 CONFIG = leakage.Config(

@@ -10,10 +10,10 @@ import pytest
 from benchmarks.qualification import screen_certify
 from scmle import cli
 from scmle.api import project
+from scmle.assurance.admissibility import attestations
+from scmle.assurance.admissibility import plants
+from scmle.assurance.admissibility import screen
 from scmle.contracts import tasks
-from scmle.data.admissibility import attestations
-from scmle.data.admissibility import plants
-from scmle.data.admissibility import screen
 
 
 def table(rows=240, seed=0):

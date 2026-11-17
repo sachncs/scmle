@@ -7,13 +7,13 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.admissibility import attestations
+from scmle.assurance.admissibility import provenance
+from scmle.assurance.admissibility import qualify
+from scmle.assurance.admissibility import rules
+from scmle.assurance.admissibility import screen
 from scmle.assurance.detectors import certificates
 from scmle.contracts import qualification
-from scmle.data.admissibility import attestations
-from scmle.data.admissibility import provenance
-from scmle.data.admissibility import qualify
-from scmle.data.admissibility import rules
-from scmle.data.admissibility import screen
 
 SCOPE = "charter-hash-1"
 TODAY = datetime.date(2026, 6, 1)

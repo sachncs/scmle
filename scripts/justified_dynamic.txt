@@ -17,7 +17,7 @@ scmle/artifacts/bundle.py tilt documented: docs/SECURITY.md, docs/TUTORIAL.md, C
 scmle/artifacts/bundle.py prioritize documented: docs/SECURITY.md, docs/TUTORIAL.md, CHANGELOG.md (Bundle methods)
 scmle/contracts/qualification.py recall_lower_bound documented extension surface: docs/API_STABILITY.md (qualification types)
 scmle/core/policies.py Callback documented: docs/TUTORIAL.md, examples/approval_gate.py
-scmle/data/admissibility/asof.py disagree qualification module: docs/API_STABILITY.md (leakage screen)
+scmle/assurance/admissibility/asof.py disagree qualification module: docs/API_STABILITY.md (leakage screen)
 scmle/assurance/charter/contracts.py lint documented extension surface: docs/API_STABILITY.md (charter modules)
 scmle/assurance/charter/feasibility.py n_required_correlation documented extension surface: docs/API_STABILITY.md (charter modules)
 scmle/assurance/charter/feasibility.py resolution documented extension surface: docs/API_STABILITY.md (charter modules)

@@ -10,10 +10,10 @@ import pandas
 import pytest
 
 from benchmarks.qualification import ingest_checks
+from scmle.assurance.admissibility import provenance
 from scmle.assurance.ledger import online_fdr
 import scmle.assurance.ledger.ledger
 from scmle.contracts import qualification
-from scmle.data.admissibility import provenance
 from scmle.data.ingest import asof_view
 from scmle.data.ingest import synthesize
 

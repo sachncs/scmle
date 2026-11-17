@@ -11,7 +11,7 @@ PACKAGES = (
     "scmle.assurance.charter",
     "scmle.data.custody",
     "scmle.assurance.ledger",
-    "scmle.data.admissibility",
+    "scmle.assurance.admissibility",
     "scmle.assurance.detectors",
     "scmle.data.robustness",
 )

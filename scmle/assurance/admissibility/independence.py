@@ -36,9 +36,9 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.assurance.admissibility import dag
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.admissibility import dag
 from scmle.runtime import randomness
 
 MAX_DISCRETE_LEVELS = 10

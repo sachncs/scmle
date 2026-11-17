@@ -40,17 +40,17 @@ scmle/runtime/resource_observation.py project_extra_requirements single-use pars
 scmle/runtime/scheduler.py select single-use tests/integration/test_integrations.py (lines 78 and 121) and test_parallel.py call it directly
 scmle/core/stages/defaults.py default_stages single-use tests/unit/test_component_contracts.py (lines 110 and 178) call it directly
 scmle/core/stages/selecting.py frontier single-use the Pareto-dominance rule is non-obvious (three metrics, at least as good on all and better on one) and needs a nested def over points; inlined it would add 51 lines to the 69-line select_on_front method
-scmle/data/admissibility/asof.py agrees single-use tests/unit/test_admissibility_asof.py:207 calls it directly for the missing-equals-missing case
-scmle/data/admissibility/independence.py entail single-use tests/unit/test_admissibility_independence.py (lines 172 and 187) call it directly
-scmle/data/admissibility/leakage.py rescore single-use called from a lambda inside itertools.repeat and operator.call in lower_bound; its try/except and index construction are statements that cannot sit in the lambda
-scmle/data/admissibility/leakage.py out_of_fold single-use the docstrings of predictiveness (line 365) and rescore (line 418) refer to its output by name, and the helper is a 43-line classification/regression cross-fit loop
-scmle/data/admissibility/qualify.py waiver single-use tests/unit/test_admissibility_attestations.py (lines 182 and 186) call it directly
-scmle/data/admissibility/qualify.py screened single-use builds a 12-field Check with the certificates.demote branch; its call is the element of a list comprehension in the 164-line Qualification run, which cannot hold the branch, so inlining needs a loop and temporaries
-scmle/data/admissibility/rules.py adjudicate single-use tests/unit/test_admissibility_rules.py:167 calls it directly
-scmle/data/admissibility/screen.py aucs single-use tests/unit/test_leakage_screen.py (lines 71 and 76) call it directly
-scmle/data/admissibility/screen.py crossfit single-use tests/unit/test_leakage_screen.py:547 calls it directly
-scmle/data/admissibility/screen.py gate_statuses single-use tests/unit/test_leakage_screen.py (lines 455 to 466) call it directly and patch it by name
-scmle/data/admissibility/screen.py predict single-use replicate's docstring at screen.py:464 refers to its output by name, and skill_bound is already at complexity 6 with six branches
-scmle/data/admissibility/screen.py purity_statistic single-use one of three statistic factories (purity, skill, missingness) returning a Statistic closure; skill_statistic is tested directly and the set is kept parallel, so a nested def in hypothesize would break the pattern
-scmle/data/admissibility/screen.py resamples single-use tests/unit/test_leakage_screen.py (lines 153, 157, 232) call it directly; scan is already at complexity 10
-scmle/data/admissibility/screen.py skill_statistic single-use tests/unit/test_leakage_screen.py:552 calls it directly; scan is already at complexity 10 and 45 statements
+scmle/assurance/admissibility/asof.py agrees single-use tests/unit/test_admissibility_asof.py:207 calls it directly for the missing-equals-missing case
+scmle/assurance/admissibility/independence.py entail single-use tests/unit/test_admissibility_independence.py (lines 172 and 187) call it directly
+scmle/assurance/admissibility/leakage.py rescore single-use called from a lambda inside itertools.repeat and operator.call in lower_bound; its try/except and index construction are statements that cannot sit in the lambda
+scmle/assurance/admissibility/leakage.py out_of_fold single-use the docstrings of predictiveness (line 365) and rescore (line 418) refer to its output by name, and the helper is a 43-line classification/regression cross-fit loop
+scmle/assurance/admissibility/qualify.py waiver single-use tests/unit/test_admissibility_attestations.py (lines 182 and 186) call it directly
+scmle/assurance/admissibility/qualify.py screened single-use builds a 12-field Check with the certificates.demote branch; its call is the element of a list comprehension in the 164-line Qualification run, which cannot hold the branch, so inlining needs a loop and temporaries
+scmle/assurance/admissibility/rules.py adjudicate single-use tests/unit/test_admissibility_rules.py:167 calls it directly
+scmle/assurance/admissibility/screen.py aucs single-use tests/unit/test_leakage_screen.py (lines 71 and 76) call it directly
+scmle/assurance/admissibility/screen.py crossfit single-use tests/unit/test_leakage_screen.py:547 calls it directly
+scmle/assurance/admissibility/screen.py gate_statuses single-use tests/unit/test_leakage_screen.py (lines 455 to 466) call it directly and patch it by name
+scmle/assurance/admissibility/screen.py predict single-use replicate's docstring at screen.py:464 refers to its output by name, and skill_bound is already at complexity 6 with six branches
+scmle/assurance/admissibility/screen.py purity_statistic single-use one of three statistic factories (purity, skill, missingness) returning a Statistic closure; skill_statistic is tested directly and the set is kept parallel, so a nested def in hypothesize would break the pattern
+scmle/assurance/admissibility/screen.py resamples single-use tests/unit/test_leakage_screen.py (lines 153, 157, 232) call it directly; scan is already at complexity 10
+scmle/assurance/admissibility/screen.py skill_statistic single-use tests/unit/test_leakage_screen.py:552 calls it directly; scan is already at complexity 10 and 45 statements

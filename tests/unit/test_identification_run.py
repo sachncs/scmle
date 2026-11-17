@@ -110,9 +110,9 @@ def test_an_identified_run_without_a_dag_is_attested_with_a_reason():
 
 
 def test_with_a_checked_dag_and_certificates_the_claim_is_confirmed():
-    import scmle.data.admissibility.dag
+    import scmle.assurance.admissibility.dag
 
-    graph = scmle.data.admissibility.dag.Dag.build(
+    graph = scmle.assurance.admissibility.dag.Dag.build(
         source="test",
         edges=(
             ("a", "t"),

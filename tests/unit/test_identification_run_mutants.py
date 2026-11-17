@@ -7,10 +7,10 @@ import numpy
 import pandas
 import pytest
 
+import scmle.assurance.admissibility.dag
 from scmle.assurance.charter import causal
 from scmle.assurance.ledger import budget
 from scmle.contracts import qualification
-import scmle.data.admissibility.dag
 from scmle.data.identification import aipw
 from scmle.data.identification import battery
 from scmle.data.identification import certified
@@ -1896,7 +1896,9 @@ def test_a_declared_dag_checks_the_set_and_the_reports_carry_the_extras(
 
 
 def scmle_dag(*edges):
-    return scmle.data.admissibility.dag.Dag.build(source="test", edges=edges)
+    return scmle.assurance.admissibility.dag.Dag.build(
+        source="test", edges=edges
+    )
 
 
 def test_other_strategies_count_as_checked_and_use_their_own_gates(

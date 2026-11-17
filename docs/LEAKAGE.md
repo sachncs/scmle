@@ -41,7 +41,7 @@ well the error rates are measured and what is promised.
 
 ## What the screen tests
 
-The screen is `scmle.data.admissibility.screen`. For every candidate column:
+The screen is `scmle.assurance.admissibility.screen`. For every candidate column:
 
 1. **Skill.** Fit a small smoother of the answer on that one column, using
    cross-fitting (each row is predicted by a model that did not see it), and

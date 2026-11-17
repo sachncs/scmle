@@ -10,7 +10,7 @@ scmle/api/results.py predict_proba passthrough public API or scikit-learn estima
 scmle/api/results.py save passthrough public Run method pinned in tests/fixtures/public_api.json
 scmle/contracts/models.py Estimator lone-interface structural protocol every scikit-learn estimator and pipeline satisfies; 83 references
 scmle/core/policies.py Reviewer lone-interface documented extension point (README, docs/ARCHITECTURE.md, website)
-scmle/data/admissibility/screen.py decline single-use builds the refusal of a real scan predicted past its share of the time budget (the 14-line message naming hypotheses, fits, permutations and the limit); inlined it would put screen_table back over the 80-line function limit
+scmle/assurance/admissibility/screen.py decline single-use builds the refusal of a real scan predicted past its share of the time budget (the 14-line message naming hypotheses, fits, permutations and the limit); inlined it would put screen_table back over the 80-line function limit
 scmle/data/custody/journal.py bind passthrough Custodian implements the abstract Lockbox.bind (scmle/data/splitting/splitters.py) and forwards it to the test set it guards
 scmle/assurance/ledger/confirm.py Source lone-interface protocol satisfied by custody Locker and the vault, so the ledger layer does not import custody
 scmle/data/readers/streaming.py Sink lone-interface RecordingSink test double, an isinstance check in the code, and the website data docs
@@ -35,6 +35,6 @@ scmle/models/modality_lifecycle/curators.py remarks getter adapter hook document
 scmle/operations/faults.py run_all passthrough shown in docs/OPERATIONS.md and the website observability page
 scmle/runners/base.py Runner lone-interface local.Runner implements it; pinned in the public API
 scmle/preparation/synthesis.py Synthesizer lone-interface Copula and a test double; documented in docs/ARCHITECTURE.md
-scmle/data/admissibility/plants.py copy getter one of the five leak-type methods that plant() dispatches to by name (scmle/data/admissibility/plants.py plant); Numbers.copy overrides it, so it is polymorphic, not a getter
+scmle/assurance/admissibility/plants.py copy getter one of the five leak-type methods that plant() dispatches to by name (scmle/assurance/admissibility/plants.py plant); Numbers.copy overrides it, so it is polymorphic, not a getter
 scmle/artifacts/bundle.py pools single-use reads the loaded math-library thread pools and picks the BLAS implementation from threadpoolctl's records, an environment probe like detect and inventory beside it; tests/unit/test_bundle.py pins its output through the manifest, and inlined it would put a library probe inside the 120-line classmethod create
 scmle/runtime/logs.py degrade single-use the logging convention's one entry point for a reduced optional path (WARNING plus a Degraded warning); register task 2.1 rolls it out to data/, sampling/ and operations/, so its single caller today (limits.py) is the first of many

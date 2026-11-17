@@ -2,12 +2,12 @@
 
 Three admissibility checks may gate a run once certified:
 
-* `f4-leakage-skill` (`scmle.data.admissibility.leakage`): the single-feature
-  skill test. Defect types are leaks planted in the breast-cancer table that
-  ships with scikit-learn (a copy of the target, a noisy copy, a threshold
-  rule, a value recorded only for one class). The clean side is 1000 *null
-  worlds*: the real features with the outcome permuted, one feature tested per
-  world, so a "clean row" here means a null replicate. Strong legitimate
+* `f4-leakage-skill` (`scmle.assurance.admissibility.leakage`): the
+  single-feature skill test. Defect types are leaks planted in the breast-cancer
+  table that ships with scikit-learn (a copy of the target, a noisy copy, a
+  threshold rule, a value recorded only for one class). The clean side is 1000
+  *null worlds*: the real features with the outcome permuted, one feature tested
+  per world, so a "clean row" here means a null replicate. Strong legitimate
   predictors are not in the clean side; the test is expected to call those
   suspects and the certificate says nothing about them.
 * `f4-asof-reconstruction` (`...admissibility.asof`): rows whose stored value
@@ -40,12 +40,12 @@ from sklearn.datasets import load_breast_cancer
 from benchmarks.qualification import certify
 from benchmarks.qualification import inject
 from benchmarks.qualification import simulate
+from scmle.assurance.admissibility import asof
+from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility import reconciliation
 from scmle.assurance.detectors import certificates
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.data.admissibility import asof
-from scmle.data.admissibility import leakage
-from scmle.data.admissibility import reconciliation
 from scmle.runtime import randomness
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f4_certificates.json"

@@ -61,10 +61,10 @@ import pandas
 
 from benchmarks import acceptance
 from benchmarks.evidence import refusal
+from scmle.assurance.admissibility import screen
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
 from scmle.core import stages
-from scmle.data.admissibility import screen
 from scmle.data.profiling import profiler
 import scmle.evaluation.coverage
 

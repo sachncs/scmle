@@ -1,9 +1,9 @@
 """Measures what the leakage screen flags on shipped tables.
 
 For each table the script records which columns the certified screen
-(`scmle.data.admissibility.screen`, settings `leakage.CERTIFIED`, Benjamini-
-Yekutieli level 0.05) calls suspects, and compares them with a ground truth
-that is decided by provenance, not by the data:
+(`scmle.assurance.admissibility.screen`, settings `leakage.CERTIFIED`,
+Benjamini-Yekutieli level 0.05) calls suspects, and compares them with a ground
+truth that is decided by provenance, not by the data:
 
 * scikit-learn tables (breast cancer, wine, iris, digits): every column is a
   legitimate measurement, so every suspect is a false flag.
@@ -32,8 +32,8 @@ from sklearn import datasets
 
 from benchmarks.qualification import f4_certify
 from benchmarks.qualification import screen_certify
-from scmle.data.admissibility import leakage
-from scmle.data.admissibility import screen
+from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility import screen
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = Path(__file__).with_name("leakage_screen_measurements.json")

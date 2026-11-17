@@ -20,7 +20,7 @@ code, and each outcome that passed must still be accepted for gating. An
 outcome that did not pass is simply descriptive and does not fail the check.
 The robustness checks (`scmle.data.robustness`) are checked the same way
 against `f6_certificates.json`. The leakage screen
-(`scmle.data.admissibility.screen`, the test behind
+(`scmle.assurance.admissibility.screen`, the test behind
 `leakage_policy="block"`) ships its certificates inside the package
 (`screen_certificates.json`) and is checked the same way. The ingestion
 detectors (torn-read check, extract reconciliation) are checked against
@@ -75,8 +75,8 @@ from benchmarks.qualification import smoke
 from benchmarks.qualification import standins
 from benchmarks.qualification import subgroup_certify
 from benchmarks.qualification import uncertainty_certify
+import scmle.assurance.admissibility.screen
 from scmle.assurance.detectors import certificates
-import scmle.data.admissibility.screen
 
 # Detector id -> (current code hash, defect type it gates on).
 GATING: dict[str, tuple[str, str]] = {}
@@ -99,7 +99,7 @@ def check_certificates() -> int:
     f6_store = certificates.Store.load(f6_certify.STORE_PATH)
     f6_problems = f6_certify.problems(f6_store)
     screen_store = certificates.Store.load(
-        scmle.data.admissibility.screen.STORE_PATH
+        scmle.assurance.admissibility.screen.STORE_PATH
     )
     screen_problems = screen_certify.problems(screen_store)
     ingest_store = certificates.Store.load(ingest_certify.STORE_PATH)

@@ -7,9 +7,9 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility import screen
 from scmle.assurance.ledger import multiplicity
-from scmle.data.admissibility import leakage
-from scmle.data.admissibility import screen
 
 CLS = "classification"
 FAST = leakage.Config(

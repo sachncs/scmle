@@ -7,8 +7,8 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.admissibility import screen
 from scmle.contracts import data
-from scmle.data.admissibility import screen
 from scripts import check_api_compatibility
 
 SNAPSHOT = (

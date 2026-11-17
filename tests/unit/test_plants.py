@@ -4,7 +4,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.data.admissibility import plants
+from scmle.assurance.admissibility import plants
 
 
 def numbers(rows=400, seed=0):

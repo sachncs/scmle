@@ -5,8 +5,8 @@ import json
 
 import pytest
 
+from scmle.assurance.admissibility import provenance
 from scmle.contracts.qualification import Tier
-from scmle.data.admissibility import provenance
 
 DAY = datetime.date(2026, 6, 15)
 

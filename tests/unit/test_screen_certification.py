@@ -15,10 +15,10 @@ import pandas
 import pytest
 import support
 
+from scmle.assurance.admissibility import plants
+from scmle.assurance.admissibility import screen
 from scmle.contracts import errors
 from scmle.core import stages
-from scmle.data.admissibility import plants
-from scmle.data.admissibility import screen
 
 
 def table(rows=240, seed=0, leak=False):

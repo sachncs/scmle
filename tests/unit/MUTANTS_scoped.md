@@ -50,7 +50,7 @@ reached, and `rho >= 0` where `|rho| >= 1` already holds. Those in `ledger.py`,
 `confirm.py` and `governed.py` were not read; the files are being edited in
 another lane.
 
-## Admissibility (`scmle/data/admissibility/`, without `attestations.py`)
+## Admissibility (`scmle/assurance/admissibility/`, without `attestations.py`)
 
 Tests: `test_admissibility_{provenance,asof,rules,dag,independence,leakage,reconciliation}.py`
 and `test_leakage_screen.py`. Four `test_leakage_screen.py` tests that check a

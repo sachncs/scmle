@@ -3,8 +3,8 @@
 import importlib.util
 import pathlib
 
+from scmle.assurance.admissibility import screen
 import scmle.certificates
-from scmle.data.admissibility import screen
 from scmle.data.identification import certified
 from scmle.evaluation import coverage_slices
 

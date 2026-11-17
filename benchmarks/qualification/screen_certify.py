@@ -1,11 +1,11 @@
 """Certificate for the leakage screen with multiplicity control.
 
-The detector is `scmle.data.admissibility.screen`, the test that replaced the
-profiler's fixed cutoffs. It is measured once per kind of target, each on a
+The detector is `scmle.assurance.admissibility.screen`, the test that replaced
+the profiler's fixed cutoffs. It is measured once per kind of target, each on a
 real table that ships with scikit-learn: two classes on breast cancer (id
 `f4-leakage-screen`), ten classes on digits (`-multiclass`) and a continuous
-target on diabetes (`-regression`), with the settings `leakage.CERTIFIED`,
-fixed before measuring and not tuned.
+target on diabetes (`-regression`), with the settings `leakage.CERTIFIED`, fixed
+before measuring and not tuned.
 
 * Clean side: `NULL_REPLICATES` null worlds. Each keeps `TABLE_COLUMNS` real
   feature columns (a random subset), two of them with 20 percent of values
@@ -19,10 +19,10 @@ fixed before measuring and not tuned.
   `TABLE_COLUMNS - 1` real columns and one planted column. A plant counts as
   found when the column is a suspect by the mechanism that type belongs to
   (`screen.MECHANISM_DEFECTS`). The plants are the product's own
-  (`scmle.data.admissibility.plants`), the same every run probes for: a copy
-  of the target, a noisy copy, a field derived from the target with noise, a
-  value recorded only for part of the target's range, and a value recorded
-  for about 9 percent of the rows, all of one class or band.
+  (`scmle.assurance.admissibility.plants`), the same every run probes for: a
+  copy of the target, a noisy copy, a field derived from the target with noise,
+  a value recorded only for part of the target's range, and a value recorded for
+  about 9 percent of the rows, all of one class or band.
 * The old profiler rule (association at least 0.98, or a missingness score
   of at least 0.9) is scored on the same worlds and plants as a baseline.
 
@@ -47,12 +47,12 @@ from sklearn.datasets import load_digits
 from benchmarks.qualification import certify
 from benchmarks.qualification import f4_certify
 from benchmarks.qualification import simulate
+from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility import plants
+from scmle.assurance.admissibility import screen
 from scmle.assurance.detectors import certificates
 from scmle.contracts import qualification
 from scmle.contracts import tasks
-from scmle.data.admissibility import leakage
-from scmle.data.admissibility import plants
-from scmle.data.admissibility import screen
 from scmle.data.validation import columns
 from scmle.runtime import randomness
 
@@ -103,7 +103,7 @@ def plant_column(
 ) -> pandas.Series:
     """The planted leak column for one defect type.
 
-    The product's own plants (`scmle.data.admissibility.plants`), so the
+    The product's own plants (`scmle.assurance.admissibility.plants`), so the
     certificate measures the leaks every run probes for.
 
     Args:

@@ -2,10 +2,10 @@
 
 import pytest
 
+from scmle.assurance.admissibility import reconciliation
 from scmle.assurance.detectors import certificates
 from scmle.contracts.qualification import Decision
 from scmle.contracts.qualification import Tier
-from scmle.data.admissibility import reconciliation
 
 
 def item(extract, source=1000.0, explanations=(), name="rows"):

@@ -19,9 +19,9 @@ import enum
 import numpy
 import pandas
 
+from scmle.assurance.admissibility import provenance
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.admissibility import provenance
 
 DETECTOR_ID = "f4-asof-reconstruction"
 DEFECT_TYPE = "asof_overwrite"

@@ -48,7 +48,7 @@ the `leakage_findings` method and the `"leakage"` string match that drove
 meaning at the top level (`Project(...)` and the snapshot in
 `tests/fixtures/public_api.json` are unchanged); what blocks is now a typed
 result, `Portrait.blockers`, from the permutation screen in
-`scmle.data.admissibility.screen`. Behaviour changes that users may notice:
+`scmle.assurance.admissibility.screen`. Behaviour changes that users may notice:
 in a run every suspect may block, for binary, multiclass and regression
 targets alike, whatever the state of the certificates, which are evidence
 and decide nothing (an earlier version blocked only on a mechanism with a

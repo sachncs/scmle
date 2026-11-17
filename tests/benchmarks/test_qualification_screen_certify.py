@@ -6,23 +6,27 @@ import pytest
 
 from benchmarks.qualification import f4_certify
 from benchmarks.qualification import screen_certify
+from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility import screen
+import scmle.assurance.admissibility.screen
 from scmle.assurance.detectors import certificates
-from scmle.data.admissibility import leakage
-from scmle.data.admissibility import screen
-import scmle.data.admissibility.screen
 
 
 def stored():
-    return certificates.Store.load(scmle.data.admissibility.screen.STORE_PATH)
+    return certificates.Store.load(
+        scmle.assurance.admissibility.screen.STORE_PATH
+    )
 
 
 def test_the_shipped_store_is_inside_the_package():
-    assert scmle.data.admissibility.screen.STORE_PATH == screen.STORE_PATH
+    assert scmle.assurance.admissibility.screen.STORE_PATH == screen.STORE_PATH
     assert (
-        scmle.data.admissibility.screen.STORE_PATH.parent.name == "certificates"
+        scmle.assurance.admissibility.screen.STORE_PATH.parent.name
+        == "certificates"
     )
     assert (
-        scmle.data.admissibility.screen.STORE_PATH.parent.parent.name == "scmle"
+        scmle.assurance.admissibility.screen.STORE_PATH.parent.parent.name
+        == "scmle"
     )
 
 

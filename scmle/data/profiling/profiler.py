@@ -3,7 +3,7 @@
 Profiling never fits model state. Risk findings are hypotheses, not verdicts:
 a feature strongly associated with the target may be a good predictor or a
 leak, and statistics alone cannot tell which. Leakage suspicion comes from
-`scmle.data.admissibility.screen`, a permutation test with multiplicity
+`scmle.assurance.admissibility.screen`, a permutation test with multiplicity
 control, not from a fixed cutoff.
 """
 
@@ -15,10 +15,10 @@ import numpy
 import pandas
 import threadpoolctl
 
+from scmle.assurance.admissibility import screen
 from scmle.contracts import errors
 from scmle.contracts import tasks
 import scmle.contracts.data
-from scmle.data.admissibility import screen
 from scmle.data.profiling import label_noise
 from scmle.data.profiling import missingness
 from scmle.data.readers import streaming

@@ -107,7 +107,7 @@ present only in the test rows is not a profile finding.
 
 ### Leakage screen
 
-Leakage suspicion comes from `scmle.data.admissibility.screen`, not from a
+Leakage suspicion comes from `scmle.assurance.admissibility.screen`, not from a
 fixed cutoff, and it also runs when there is no charter (the development rows
 are then all it has). Per candidate column it computes a cross-fitted
 held-out skill (AUC, or R^2 for a continuous target) with an exact permutation
@@ -133,7 +133,7 @@ levels, is not seen.
 
 `leakage_policy="block"` (opt-in; the default is `warn`) blocks the run on any
 suspect, and on a screen that could not check its columns. The published
-certificates (`scmle/data/admissibility/screen_certificates.json`, produced by
+certificates (`scmle/assurance/admissibility/screen_certificates.json`, produced by
 `python -m benchmarks.qualification.screen_certify --write`) are evidence
 about the screen, reported in the notes; they decide nothing. Each run also
 screens a copy of its rows with one planted leak of each kind and records

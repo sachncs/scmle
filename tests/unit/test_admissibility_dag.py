@@ -6,7 +6,7 @@ import json
 import numpy
 import pytest
 
-from scmle.data.admissibility import dag
+from scmle.assurance.admissibility import dag
 
 
 def simple_paths(edges, nodes, start, end):

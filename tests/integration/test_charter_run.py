@@ -269,7 +269,7 @@ def test_a_stale_certificate_no_longer_keeps_a_suspect_field(
     # ERR-1: a stale certificate used to make the screen descriptive, so the
     # suspect field stayed in the features. Flags now act regardless; the
     # stale certificate is only reported.
-    from scmle.data.admissibility import screen
+    from scmle.assurance.admissibility import screen
 
     monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
     result = run(leaky_frame(binary_frame), tmp_path, inscribe(tmp_path))

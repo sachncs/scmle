@@ -8,11 +8,11 @@ import pandas
 import pytest
 import support
 
+from scmle.assurance.admissibility import leakage
+from scmle.assurance.admissibility import plants
+from scmle.assurance.admissibility import screen
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.admissibility import leakage
-from scmle.data.admissibility import plants
-from scmle.data.admissibility import screen
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 import scmle.data.validation.target

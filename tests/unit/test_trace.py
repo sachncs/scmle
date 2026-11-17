@@ -138,11 +138,11 @@ def test_entries_outside_the_package_are_refused():
 
 
 def test_the_screen_digest_reaches_the_procedure_and_not_its_wiring():
-    from scmle.data.admissibility import plants
-    from scmle.data.admissibility import screen
+    from scmle.assurance.admissibility import plants
+    from scmle.assurance.admissibility import screen
 
     reached = reach(screen.screen, plants.plant)
     wiring = {"screen_table", "probe", "disclose", "evidence", "bundled"}
     assert not {n.rsplit(".", 1)[1] for n in reached} & wiring
-    assert "scmle.data.admissibility.screen.scan" in reached
-    assert "scmle.data.admissibility.plants.Numbers" in reached
+    assert "scmle.assurance.admissibility.screen.scan" in reached
+    assert "scmle.assurance.admissibility.plants.Numbers" in reached

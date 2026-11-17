@@ -30,9 +30,9 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.admissibility import provenance
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.admissibility import provenance
 
 TRANSACTION = "transaction"
 EVENT_DELAY = "event_delay"

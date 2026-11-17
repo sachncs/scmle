@@ -122,7 +122,7 @@
     }
   },
   "claim": "C12",
-  "content_hash": "6c246e382dd4a73aea2dfc5f84ac0233e5376ddffb60040e030713b5d6db7a5c",
+  "content_hash": "f2060d40c263a25c49a78ac5b79f342b5f452170461091ec73ec8ec2da78f65b",
   "counts": {
     "guarantees": 245,
     "linked": 245,
@@ -425,7 +425,7 @@
         "tests/leakage/test_leakage.py::test_a_regression_leak_blocks_under_block",
         "tests/unit/test_screen_certification.py::test_block_stops_a_flagged_column_even_with_a_stale_certificate"
       ],
-      "text": "`leakage_policy` keeps its values and its meaning at the top level (`Project(...)` and the snapshot in `tests/fixtures/public_api.json` are unchanged); what blocks is now a typed result, `Portrait.blockers`, from the permutation screen in `scmle.data.admissibility.screen`.",
+      "text": "`leakage_policy` keeps its values and its meaning at the top level (`Project(...)` and the snapshot in `tests/fixtures/public_api.json` are unchanged); what blocks is now a typed result, `Portrait.blockers`, from the permutation screen in `scmle.assurance.admissibility.screen`.",
       "words": [
         "blocks"
       ]

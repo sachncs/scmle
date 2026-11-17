@@ -6,7 +6,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.data.admissibility import asof
+from scmle.assurance.admissibility import asof
 
 
 def brute_force(rows, log):

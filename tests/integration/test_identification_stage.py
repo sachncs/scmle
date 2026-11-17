@@ -11,11 +11,11 @@ import support
 
 from scmle import cli
 from scmle.artifacts import claims_audit
+import scmle.assurance.admissibility.dag
 from scmle.assurance.charter import causal
 from scmle.assurance.charter import sealing
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
-import scmle.data.admissibility.dag
 from scmle.data.identification import attest
 import scmle.data.identification.run
 from tests.unit.test_charter_contracts import make_charter
@@ -153,7 +153,7 @@ def test_a_declared_dag_is_loaded_checked_and_lifts_the_adjustment_cap(
     tmp_path,
 ):
     # Enforces docs/ARTIFACTS.md:41.
-    graph = scmle.data.admissibility.dag.Dag(
+    graph = scmle.assurance.admissibility.dag.Dag(
         ("t", "x1", "x2", "y"),
         (("t", "y"), ("x1", "t"), ("x1", "y"), ("x2", "y")),
         (),
@@ -182,7 +182,7 @@ def test_a_declared_dag_is_loaded_checked_and_lifts_the_adjustment_cap(
 def test_an_adjustment_member_that_is_a_descendant_makes_backdoor_ineligible(
     tmp_path,
 ):
-    graph = scmle.data.admissibility.dag.Dag(
+    graph = scmle.assurance.admissibility.dag.Dag(
         ("t", "x1", "x2", "y"),
         (("t", "x2"), ("t", "y"), ("x1", "t"), ("x1", "y")),
         (),

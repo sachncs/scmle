@@ -4,15 +4,15 @@ import numpy
 import pandas
 import pytest
 
+from scmle.assurance.admissibility import qualify
+from scmle.assurance.admissibility import screen
+import scmle.assurance.admissibility.dag
 import scmle.assurance.charter.causal
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import online_fdr
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.admissibility import qualify
-from scmle.data.admissibility import screen
-import scmle.data.admissibility.dag
 from tests.unit.test_charter_contracts import make_charter
 
 
@@ -177,7 +177,7 @@ def spec(assumptions):
 
 
 def graph():
-    return scmle.data.admissibility.dag.Dag(
+    return scmle.assurance.admissibility.dag.Dag(
         ("after", "t", "x1", "y"),
         (("t", "after"), ("t", "y"), ("x1", "t"), ("x1", "y")),
         (),
@@ -227,7 +227,7 @@ def test_a_refused_adjustment_member_is_reported_and_called_ineligible():
 
 def test_a_graph_that_names_missing_columns_cannot_be_tested_but_runs():
     features, target = causal_world()
-    wide = scmle.data.admissibility.dag.Dag(
+    wide = scmle.assurance.admissibility.dag.Dag(
         ("t", "u", "x1", "y"),
         (("t", "y"), ("u", "y"), ("x1", "t")),
         (),
@@ -265,7 +265,9 @@ def test_many_candidates_without_a_declared_set_say_the_claim_is_attested_at_bes
         classification=False,
         seed=0,
         causal=spec(("positivity",)),
-        dag=scmle.data.admissibility.dag.Dag(nodes, edges, (), "test", "none"),
+        dag=scmle.assurance.admissibility.dag.Dag(
+            nodes, edges, (), "test", "none"
+        ),
     )
 
     assert any("attested at best" in n for n in found.notes)

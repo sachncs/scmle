@@ -2,8 +2,8 @@
 
 import pytest
 
+import scmle.assurance.admissibility.dag
 from scmle.assurance.charter import causal
-import scmle.data.admissibility.dag
 from scmle.data.identification import select
 
 COVARIATES = "unconfoundedness_given:age"
@@ -23,7 +23,9 @@ def block(**changes) -> causal.Question:
 
 
 def graph(*edges):
-    return scmle.data.admissibility.dag.Dag.build(source="test", edges=edges)
+    return scmle.assurance.admissibility.dag.Dag.build(
+        source="test", edges=edges
+    )
 
 
 def test_the_registry_pins_what_every_strategy_needs():

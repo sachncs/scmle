@@ -28,13 +28,13 @@ from typing import cast
 import numpy
 import pandas
 
+import scmle.assurance.admissibility.dag
 from scmle.assurance.charter import causal
 from scmle.assurance.ledger import budget
 from scmle.assurance.ledger import multiplicity
 import scmle.assurance.ledger.budget
 from scmle.contracts import errors
 from scmle.contracts import qualification
-import scmle.data.admissibility.dag
 from scmle.data.identification import aipw
 from scmle.data.identification import battery
 from scmle.data.identification import did
@@ -1608,7 +1608,7 @@ def identify(
     c: pandas.DataFrame,
     error_budget: budget.ErrorBudget,
     attestors: Mapping[str, str] | None = None,
-    dag: scmle.data.admissibility.dag.Dag | None = None,
+    dag: scmle.assurance.admissibility.dag.Dag | None = None,
     seed: int = 0,
     learner: str = "linear",
     certified: tuple[str, ...] | None = None,
@@ -1770,7 +1770,7 @@ def design_only(
     spec: causal.Question,
     x: pandas.DataFrame,
     error_budget: budget.ErrorBudget,
-    dag: scmle.data.admissibility.dag.Dag | None = None,
+    dag: scmle.assurance.admissibility.dag.Dag | None = None,
     seed: int = 0,
     learner: str = "linear",
     dag_checks: Mapping[str, Any] | None = None,
