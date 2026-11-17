@@ -12,6 +12,15 @@ marked `Breaking:` and listed first in their group.
 
 ### Breaking changes
 
+* **Bundle format 4.** The package layering (register phase 3) moves
+  modules whose classes are pickled inside a bundle, so `BUNDLE_FORMAT` goes
+  from 3 to 4 and `Bundle.load` refuses a format 3 bundle with the existing
+  message: retrain and save it again. A bundle whose pickled members name a
+  module or class this build does not have (one written partway through the
+  moves) is now refused with `ArtifactError`, its cause attached, instead of
+  a raw `ModuleNotFoundError` or `AttributeError`. Deep-learning
+  checkpoints and modality, image and document packages pickle no moved
+  class and keep their versions.
 * **`Bundle.export_service` is removed.** It only passed through to
   `scmle.inference.packaging.scaffold`, which is now the one way to write a
   service folder: replace `bundle.export_service(folder, signing_key=key)`

@@ -59,8 +59,10 @@ import scmle.monitoring.reference
 
 # Format 2 signs and checksums the schema alongside every serialized model
 # component. Format 1 bundles did not authenticate schema.json and are refused
-# by the loader rather than silently weakening the trust boundary.
-BUNDLE_FORMAT = 3
+# by the loader rather than silently weakening the trust boundary. Formats 3
+# and 4 changed the module paths stored in the pickled members: 3 for the
+# class renames, 4 for the package layering (register phase 3, DES-13).
+BUNDLE_FORMAT = 4
 MODEL_FILE = "pipeline.joblib"
 SCHEMA_FILE = "schema.json"
 REFERENCE_FILE = "reference.json"
@@ -525,6 +527,29 @@ def resolve(
     return path
 
 
+def unpickle(path: pathlib.Path) -> Any:
+    """Loads one verified, pickled member of a bundle.
+
+    Args:
+        path: The member file, already checksummed.
+
+    Returns:
+        The stored object.
+
+    Raises:
+        ArtifactError: If the member names a module or class this build
+            does not have, as one written by another build does.
+    """
+    try:
+        return joblib.load(path)
+    except (ModuleNotFoundError, AttributeError) as error:
+        raise errors.ArtifactError(
+            f"{path.name} names a module or class this build does not have "
+            f"({error}); the bundle was written by another build, so retrain "
+            "and save it again"
+        ) from error
+
+
 def hydrate(
     root: pathlib.Path, info: Manifest
 ) -> tuple[Any, Any, Any, Any, Any]:
@@ -554,7 +579,7 @@ def hydrate(
     calibrator = None
     path = resolve(root, info, CALIBRATOR_FILE, "calibrator was modified")
     if path is not None:
-        calibrator = joblib.load(path)
+        calibrator = unpickle(path)
     calibrated = None
     path = resolve(root, info, CONFORMAL_FILE, "conformal scores were modified")
     if path is not None:
@@ -564,7 +589,7 @@ def hydrate(
     detector = None
     path = resolve(root, info, NOVELTY_FILE, "novelty detector was modified")
     if path is not None:
-        detector = joblib.load(path)
+        detector = unpickle(path)
     return reference, history, calibrator, calibrated, detector
 
 
@@ -585,11 +610,11 @@ def restore(root: pathlib.Path, info: Manifest) -> tuple[Any, Any, Any, Any]:
     intervals = None
     path = resolve(root, info, QUANTILE_FILE, "quantile models were modified")
     if path is not None:
-        intervals = joblib.load(path)
+        intervals = unpickle(path)
     cv_plus_models = None
     path = resolve(root, info, CV_PLUS_FILE, "CV+ fold models were modified")
     if path is not None:
-        cv_plus_models = joblib.load(path)
+        cv_plus_models = unpickle(path)
     stored_coverage = None
     path = resolve(root, info, COVERAGE_FILE, "coverage report was modified")
     if path is not None:
@@ -599,7 +624,7 @@ def restore(root: pathlib.Path, info: Manifest) -> tuple[Any, Any, Any, Any]:
         root, info, SHIFT_WEIGHTS_FILE, "shift weights were modified"
     )
     if path is not None:
-        stored_weights = joblib.load(path)
+        stored_weights = unpickle(path)
     return intervals, cv_plus_models, stored_coverage, stored_weights
 
 
@@ -1310,7 +1335,7 @@ class Bundle:
             root, info
         )
         loaded = cls(
-            joblib.load(root / MODEL_FILE),
+            unpickle(root / MODEL_FILE),
             schema,
             info,
             reference,

@@ -5,7 +5,7 @@
       "unlinked": 0
     },
     "docs/API_STABILITY.md": {
-      "guarantees": 17,
+      "guarantees": 18,
       "unlinked": 0
     },
     "docs/ARCHITECTURE.md": {
@@ -122,10 +122,10 @@
     }
   },
   "claim": "C12",
-  "content_hash": "c41e46f313c8a444e436d266b8e0dae1193800ad5871dbb5ec88c03ab013c341",
+  "content_hash": "052b686be0b0fa5625c53ae13433dc349d977cec12de2626b260cf6b541e73eb",
   "counts": {
-    "guarantees": 244,
-    "linked": 244,
+    "guarantees": 245,
+    "linked": 245,
     "unlinked": 0
   },
   "definition": {
@@ -668,18 +668,34 @@
     {
       "cited": [],
       "doc": "docs/API_STABILITY.md",
-      "end": 279,
+      "end": 280,
       "line": 276,
       "missing": [],
       "section": "bundle-migration",
       "tests": [
         "tests/unit/test_bundle.py::test_a_bundle_from_before_the_class_renames_is_refused_with_a_reason",
+        "tests/unit/test_bundle.py::test_a_member_naming_a_missing_module_is_refused",
         "tests/unit/test_bundle.py::test_legacy_bundle_requires_opt_in_and_can_be_migrated"
       ],
-      "text": "The class renames changed the module path and class name stored inside every bundle, so a bundle written by an earlier build (format 2 or 1) cannot be loaded or migrated: `Bundle.load` refuses it with an error that says to retrain and save again.",
+      "text": "The package layering (format 4) and the class renames before it (format 3) changed the module path and class name stored inside every bundle, so a bundle written by an earlier build (format 3, 2 or 1) cannot be loaded or migrated: `Bundle.load` refuses it with an error that says to retrain and save again.",
       "words": [
         "cannot",
         "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 282,
+      "line": 280,
+      "missing": [],
+      "section": "bundle-migration",
+      "tests": [
+        "tests/unit/test_bundle.py::test_a_member_naming_a_missing_module_is_refused"
+      ],
+      "text": "A bundle whose pickled members name a module or class this build does not have is refused the same way, with `ArtifactError`.",
+      "words": [
+        "refused"
       ]
     },
     {
@@ -4168,7 +4184,7 @@
       ]
     }
   ],
-  "seconds": 1.2,
-  "test_links": 443,
+  "seconds": 1.1,
+  "test_links": 444,
   "version": 1
 }

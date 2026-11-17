@@ -273,10 +273,13 @@ security, and operational evidence is complete.
 
 ## Bundle migration
 
-Bundle format 3 is the current format. The class renames changed the module
-path and class name stored inside every bundle, so a bundle written by an
-earlier build (format 2 or 1) cannot be loaded or migrated: `Bundle.load`
-refuses it with an error that says to retrain and save again. The
+Bundle format 4 is the current format. The package layering (format 4) and
+the class renames before it (format 3) changed the module path and class
+name stored inside every bundle, so a bundle written by an earlier build
+(format 3, 2 or 1) cannot be loaded or migrated: `Bundle.load` refuses it
+with an error that says to retrain and save again. A bundle whose pickled
+members name a module or class this build does not have is refused the same
+way, with `ArtifactError`. The
 `allow_legacy_format` option remains in the loader but can only read a format 1
 bundle whose stored objects still carry the current class names, which no real
 earlier bundle does; it is a candidate for removal.

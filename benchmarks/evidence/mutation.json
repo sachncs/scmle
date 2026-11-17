@@ -174,7 +174,7 @@
       "mutants": 430,
       "not_run": 0,
       "note": null,
-      "seconds": 7.0,
+      "seconds": 7.2,
       "stratum": "contracts",
       "survivors": [],
       "tests": [
@@ -242,12 +242,12 @@
     {
       "counts": {
         "crash": 0,
-        "killed": 0,
+        "killed": 28,
         "no tests": 1,
-        "survived": 0,
+        "survived": 1,
         "timeout": 0
       },
-      "decided": 1,
+      "decided": 30,
       "drawn": [
         "scmle.data.charter.feasibility.x_assess__mutmut_28",
         "scmle.data.charter.feasibility.x_assess__mutmut_30",
@@ -283,11 +283,13 @@
       "files": "41165bc905d3072fa84703617118fc25b792397901fd17c29300b280e8628f37",
       "module": "scmle/data/charter/feasibility.py",
       "mutants": 328,
-      "not_run": 29,
-      "note": "mutmut exited 1: /python3.14t/site-packages/mutmut/__main__.py\", line 1050, in _run\n    drain_one_result()\n    ~~~~~~~~~~~~~~~~^^\n  File \"/Users/sachin/Documents/Codex/github-repos/scmle/.venv/lib/python3.14t/site-packages/mutmut/__main__.py\", line 1007, in drain_one_result\n    result = runner.wait_for_result()\n  File \"/Users/sachin/Documents/Codex/github-repos/scmle/.venv/lib/python3.14t/site-packages/mutmut/workers/isolation.py\", line 889, in wait_for_result\n    worker = self._running.pop(pid)\nKeyError: 32779\n",
-      "seconds": 18.9,
+      "not_run": 0,
+      "note": null,
+      "seconds": 27.0,
       "stratum": "data",
-      "survivors": [],
+      "survivors": [
+        "scmle.data.charter.feasibility.x_assess__mutmut_30"
+      ],
       "tests": [
         "tests/unit/test_charter_feasibility.py",
         "tests/unit/test_charter_feasibility_mutants.py",
@@ -335,11 +337,11 @@
         "scmle.data.curation.preprocessing.x_wrap__mutmut_5",
         "scmle.data.curation.preprocessing.x_wrap__mutmut_8"
       ],
-      "files": "3d1578bd2ec64f3e3c55d585f9d9dd8bb4951de729e2b03e542b147202eb0eaf",
+      "files": "6619de93648a0203f276570e2f88b0f68a650810a3c170945f676d9e98164b06",
       "module": "scmle/data/curation/preprocessing.py",
       "mutants": 345,
       "not_run": 30,
-      "note": "mutmut exited 1: mat=3, scmle_version='0.1.0b1', python='3.14.7', sk...', split='ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss', commit='', threads={'openmp': 1}, blas='').commit\n=========================== short test summary info ============================\nFAILED tests/unit/test_bundle.py::test_the_manifest_traces_the_bundle_to_its_inputs\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed, 35 passed in 5.37s\nfailed to collect stats. runner returned 1\n\n",
+      "note": "mutmut exited 1: mat=4, scmle_version='0.1.0b1', python='3.14.7', sk...', split='ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss', commit='', threads={'openmp': 1}, blas='').commit\n=========================== short test summary info ============================\nFAILED tests/unit/test_bundle.py::test_the_manifest_traces_the_bundle_to_its_inputs\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed, 36 passed in 5.44s\nfailed to collect stats. runner returned 1\n\n",
       "seconds": 8.3,
       "stratum": "data",
       "survivors": [],
@@ -406,7 +408,7 @@
       "mutants": 99,
       "not_run": 0,
       "note": null,
-      "seconds": 16.9,
+      "seconds": 16.8,
       "stratum": "data",
       "survivors": [
         "scmle.data.custody.merkle.x_fingerprints__mutmut_15",
@@ -592,7 +594,7 @@
       "mutants": 284,
       "not_run": 0,
       "note": null,
-      "seconds": 238.7,
+      "seconds": 239.0,
       "stratum": "data",
       "survivors": [
         "scmle.data.readers.tabular.x_data_hash__mutmut_5",
@@ -660,7 +662,7 @@
       "mutants": 522,
       "not_run": 0,
       "note": null,
-      "seconds": 5.9,
+      "seconds": 5.8,
       "stratum": "decision",
       "survivors": [],
       "tests": [
@@ -822,7 +824,7 @@
       "mutants": 131,
       "not_run": 0,
       "note": null,
-      "seconds": 3.6,
+      "seconds": 3.7,
       "stratum": "evaluation",
       "survivors": [
         "scmle.evaluation.forecast.x\u01c1ForecastMetric\u01c1scorer__mutmut_15",
@@ -943,7 +945,7 @@
       "mutants": 651,
       "not_run": 0,
       "note": null,
-      "seconds": 71.3,
+      "seconds": 70.0,
       "stratum": "governance",
       "survivors": [
         "scmle.governance.lifecycle.x_bisect__mutmut_14",
@@ -1005,7 +1007,7 @@
       "mutants": 452,
       "not_run": 0,
       "note": null,
-      "seconds": 82.7,
+      "seconds": 82.3,
       "stratum": "inference",
       "survivors": [
         "scmle.inference.parity.x_compare__mutmut_8",
@@ -1260,16 +1262,16 @@
   "pooled": {
     "counts": {
       "crash": 0,
-      "killed": 395,
+      "killed": 423,
       "no tests": 64,
-      "survived": 50,
+      "survived": 51,
       "timeout": 2
     },
-    "decided": 511,
-    "killed": 395,
-    "lower": 0.7403961970243129,
-    "not_run": 59,
-    "score": 0.7729941291585127
+    "decided": 540,
+    "killed": 423,
+    "lower": 0.7521234746822528,
+    "not_run": 30,
+    "score": 0.7833333333333333
   },
   "power": 0.8,
   "sample": [
@@ -1293,7 +1295,7 @@
     "scmle/monitoring/monitor.py",
     "scmle/operations/spool.py"
   ],
-  "seconds": 767.1,
+  "seconds": 772.9,
   "untested": [
     "scmle/api/results.py",
     "scmle/artifacts/report.py",

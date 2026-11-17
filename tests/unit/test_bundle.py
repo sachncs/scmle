@@ -3,6 +3,8 @@
 import dataclasses
 import json
 import platform
+import sys
+import types
 
 import numpy
 import pandas
@@ -136,15 +138,36 @@ def test_a_bundle_from_before_the_class_renames_is_refused_with_a_reason(
     directory = trained[0].save(tmp_path / "earlier")
     path = directory / scmle.artifacts.bundle.MANIFEST_FILE
     manifest = json.loads(path.read_text())
-    manifest["format"] = scmle.artifacts.bundle.BUNDLE_FORMAT - 1
+    manifest["format"] = 3
     path.write_text(json.dumps(manifest))
 
     with pytest.raises(errors.ArtifactError) as raised:
         scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
 
     message = str(raised.value)
-    assert "unsupported bundle format 2" in message
+    assert "unsupported bundle format 3" in message
+    assert "module path" in message
     assert "retrain and save it again" in message
+
+
+def test_a_member_naming_a_missing_module_is_refused(tmp_path, trained):
+    # Enforces docs/API_STABILITY.md:280.
+    vanished = types.ModuleType("vanished")
+    vanished.Thing = type("Thing", (), {"__module__": "vanished"})
+    sys.modules["vanished"] = vanished
+    bundle = trained[0]
+    kept = bundle.calibrator
+    try:
+        bundle.calibrator = vanished.Thing()
+        directory = bundle.save(tmp_path / "moved")
+    finally:
+        bundle.calibrator = kept
+        del sys.modules["vanished"]
+
+    with pytest.raises(errors.ArtifactError, match="retrain") as raised:
+        scmle.artifacts.bundle.Bundle.load(directory, trusted=True)
+
+    assert isinstance(raised.value.__cause__, ModuleNotFoundError)
 
 
 def test_legacy_bundle_requires_opt_in_and_can_be_migrated(tmp_path, trained):
