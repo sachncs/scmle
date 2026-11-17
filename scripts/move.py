@@ -10,7 +10,8 @@ imports at any depth, dotted paths in code and strings, file paths, config
 appends the moves to `docs/RENAMES.md`.
 
 Data files (`*.json`, `*.jsonl`) are records their tools regenerate, and
-history (`CHANGELOG.md`, `docs/RENAMES.md`, `plan/`) is never rewritten.
+history (`CHANGELOG.md`, `docs/RENAMES.md`, `plan/`) and the map itself are
+never rewritten.
 
 `--verify` is the proof. For every changed Python file it applies the map
 to the committed file's syntax tree (import targets, the names imports
@@ -39,7 +40,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 MAP = pathlib.Path(__file__).with_name("layers.toml")
 RENAMES = "docs/RENAMES.md"
 HEADING = "## Module moves"
-HISTORY = ("CHANGELOG.md", RENAMES, "plan/", "tests/fixtures/public_api.json")
+HISTORY = (
+    "CHANGELOG.md",
+    RENAMES,
+    "plan/",
+    "tests/fixtures/public_api.json",
+    "scripts/layers.toml",
+)
 DATA = (".json", ".jsonl", ".pq", ".png", ".svg", ".csv", ".lock", ".typed")
 # Prose formats, where a package-relative dotted path such as `core.retry`
 # names a module; in code it may be an attribute chain, so code rewrites
@@ -434,7 +441,11 @@ def apply(
             ["format", "-q"],
             ["check", "-q", "--select", "I", "--fix"],
         ):
-            subprocess.run(["ruff", *command, *touched], cwd=root, check=False)
+            subprocess.run(
+                [sys.executable, "-m", "ruff", *command, *touched],
+                cwd=root,
+                check=False,
+            )
     return touched, refused
 
 
