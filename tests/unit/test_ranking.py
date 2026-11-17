@@ -7,7 +7,7 @@ from sklearn import metrics
 
 from scmle.evaluation import ranking
 from scmle.models.ranking import estimators
-from scmle.models.ranking import wrapper
+import scmle.preparation.ranking
 
 
 def corpus(queries=60, per_query=12, seed=0):
@@ -88,7 +88,9 @@ def test_the_wrapper_hands_the_ranker_contiguous_query_sizes():
             ("model", Spy()),
         ]
     )
-    model = wrapper.Ranker(steps, "query").fit(shuffled, labels)
+    model = scmle.preparation.ranking.Ranker(steps, "query").fit(
+        shuffled, labels
+    )
 
     assert sum(seen["group"]) == len(shuffled)
     assert sorted(seen["group"]) == [12] * 60

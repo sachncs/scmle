@@ -100,7 +100,7 @@ def test_label_encoded_classifier_roundtrips_string_labels():
     import pandas
     from sklearn import tree
 
-    from scmle.models import wrappers
+    from scmle.preparation import wrappers
 
     rng = numpy.random.default_rng(0)
     features = pandas.DataFrame({"a": rng.normal(size=60)})
@@ -120,7 +120,7 @@ def test_wrapper_survives_pickling_and_cloning():
     from sklearn import base
     from sklearn import tree
 
-    from scmle.models import wrappers
+    from scmle.preparation import wrappers
 
     model = wrappers.Encoded(tree.DecisionTreeClassifier())
     assert base.clone(model).get_params()["estimator"] is not None
@@ -166,7 +166,7 @@ def test_flat_prediction_wrapper_flattens_column_vectors():
     import pandas
     from sklearn import tree
 
-    from scmle.models import wrappers
+    from scmle.preparation import wrappers
 
     class ColumnVectorTree(tree.DecisionTreeClassifier):
         def predict(self, features):

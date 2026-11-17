@@ -7,7 +7,7 @@ import support
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.models import weighting
+from scmle.preparation import weighting
 
 
 def conflicting_frame(rows=800, seed=0):

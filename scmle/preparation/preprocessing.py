@@ -21,14 +21,14 @@ from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.data import feature_graph
 from scmle.data.validation import columns
-from scmle.models import weighting
-from scmle.models import wrappers
-from scmle.models.forecasting import estimators
-import scmle.models.multitarget.wrapper
-import scmle.models.ranking.wrapper
-import scmle.models.survival.wrapper
-import scmle.models.uplift.wrapper
+from scmle.preparation import forecasters
 from scmle.preparation import selection
+from scmle.preparation import weighting
+from scmle.preparation import wrappers
+import scmle.preparation.multitarget
+import scmle.preparation.ranking
+import scmle.preparation.survival
+import scmle.preparation.uplift
 
 SPARSE_THRESHOLD = 0.3
 # HistGradientBoosting bins a native categorical into at most `max_bins`
@@ -337,26 +337,26 @@ def wrap(built: Any, plan: data.Blueprint, task: tasks.Task) -> Any:
         them.
     """
     if plan.event_column:
-        built = scmle.models.survival.wrapper.EventAwareEstimator(
+        built = scmle.preparation.survival.EventAwareEstimator(
             built, plan.event_column
         )
     if task is tasks.Task.FORECAST:
-        built = estimators.Forecaster(
+        built = forecasters.Forecaster(
             built, plan.target_columns, plan.value_column or ""
         )
     elif plan.target_columns:
         kind = (
-            scmle.models.multitarget.wrapper.MultiLabelEstimator
+            scmle.preparation.multitarget.MultiLabelEstimator
             if task is tasks.Task.MULTILABEL
-            else scmle.models.multitarget.wrapper.Multioutput
+            else scmle.preparation.multitarget.Multioutput
         )
         built = kind(built, plan.target_columns)
     if plan.treatment_column:
-        built = scmle.models.uplift.wrapper.TreatmentAwareEstimator(
+        built = scmle.preparation.uplift.TreatmentAwareEstimator(
             built, plan.treatment_column
         )
     if plan.query_column:
-        built = scmle.models.ranking.wrapper.Ranker(built, plan.query_column)
+        built = scmle.preparation.ranking.Ranker(built, plan.query_column)
     return built
 
 
@@ -393,7 +393,7 @@ def instantiate(
     # forecast task is a last-value forecaster. None leaves it to this module.
     assembled: Any
     if task is tasks.Task.FORECAST and adapter.name == "dummy":
-        assembled = estimators.Naive(
+        assembled = forecasters.Naive(
             None, plan.target_columns, plan.value_column or ""
         )
     else:

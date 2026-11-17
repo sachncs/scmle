@@ -14,8 +14,8 @@ from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import search
 from scmle.contracts import tasks
-from scmle.models import wrappers
 from scmle.models.boosting import early_stopping
+from scmle.preparation import wrappers
 
 NO_PARAMS: dict[str, Any] = {}
 

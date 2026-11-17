@@ -6,7 +6,7 @@
   "modality": "tabular",
   "built": "tabular_beta_path",
   "evidence_in_repo": [
-    "scmle/models/forecasting/estimators.py",
+    "scmle/preparation/forecasters.py",
     "tests/integration/test_forecast_task.py",
     "benchmarks/real_tasks.py"
   ],

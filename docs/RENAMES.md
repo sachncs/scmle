@@ -2906,3 +2906,10 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.sampling.resampling` -> `scmle.preparation.resampling`
 - `scmle.sampling.strategies` -> `scmle.preparation.strategies`
 - `scmle.sampling.synthesis` -> `scmle.preparation.synthesis`
+- `scmle.models.weighting` -> `scmle.preparation.weighting`
+- `scmle.models.wrappers` -> `scmle.preparation.wrappers`
+- `scmle.models.forecasting.estimators` -> `scmle.preparation.forecasters`
+- `scmle.models.multitarget.wrapper` -> `scmle.preparation.multitarget`
+- `scmle.models.ranking.wrapper` -> `scmle.preparation.ranking`
+- `scmle.models.survival.wrapper` -> `scmle.preparation.survival`
+- `scmle.models.uplift.wrapper` -> `scmle.preparation.uplift`

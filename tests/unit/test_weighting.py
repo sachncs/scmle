@@ -7,7 +7,7 @@ from sklearn import linear_model
 from sklearn import pipeline
 from sklearn import preprocessing
 
-from scmle.models import weighting
+from scmle.preparation import weighting
 
 
 def frame_with_conflict(rows=400):

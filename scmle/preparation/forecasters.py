@@ -6,10 +6,10 @@ from typing import Self
 import numpy
 import pandas
 
-from scmle.models.multitarget import wrapper
+from scmle.preparation import multitarget
 
 
-class Forecaster(wrapper.Multioutput):
+class Forecaster(multitarget.Multioutput):
     """A multi-output pipeline that also knows which column is the series.
 
     Attributes:
@@ -34,7 +34,7 @@ class Forecaster(wrapper.Multioutput):
         self.value_column = value_column
 
 
-class Naive(wrapper.Multioutput):
+class Naive(multitarget.Multioutput):
     """The naive baseline: the next `horizon` values equal the current one.
 
     It reads the current value straight from the rows (no preprocessing), so

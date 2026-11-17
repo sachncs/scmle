@@ -21,10 +21,10 @@ from sklearn import preprocessing
 from scmle import durability
 from scmle.contracts import errors
 from scmle.data.validation import columns
-from scmle.models import weighting
-from scmle.models import wrappers
 from scmle.models.boosting import early_stopping
 from scmle.preparation import resampling
+from scmle.preparation import weighting
+from scmle.preparation import wrappers
 
 OPSET = 17
 ML_OPSET = 3
