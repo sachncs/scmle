@@ -15,9 +15,9 @@ from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
-import scmle.intelligence.planner
 from scmle.models import custom
 from scmle.models import registry
+import scmle.pipeline.planner
 
 TITANIC = (
     pathlib.Path(__file__).resolve().parents[1]
@@ -73,8 +73,8 @@ def test_the_plan_gives_a_reason_for_every_technique():
     profile = profiler.Profiler(spec).profile(
         frame, tabular.manifested(frame, "y"), tasks.Task.BINARY
     )
-    plan = scmle.intelligence.planner.Planner(registry.Catalog.stock()).plan(
-        scmle.intelligence.planner.Situation(spec, profile, tasks.Task.BINARY)
+    plan = scmle.pipeline.planner.Planner(registry.Catalog.stock()).plan(
+        scmle.pipeline.planner.Situation(spec, profile, tasks.Task.BINARY)
     )
     actions = {d.action for d in plan.decisions}
     assert actions <= set(experiments.Edict)

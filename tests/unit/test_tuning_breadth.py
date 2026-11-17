@@ -6,8 +6,8 @@ import pytest
 
 from scmle.contracts import search
 from scmle.contracts import tasks
-from scmle.experimentation import tuning
 from scmle.optimization import optimizers
+from scmle.pipeline import tuning
 
 SPACE = search.Space(
     (

@@ -113,7 +113,7 @@ def test_ensemble_can_be_disabled_and_is_planned(binary_frame, tmp_path):
 def test_stack_resumes_without_recomputation(
     binary_frame, tmp_path, monkeypatch
 ):
-    from scmle.experimentation import trials
+    from scmle.pipeline import trials
 
     directory = support.interrupt(
         support.make_project(

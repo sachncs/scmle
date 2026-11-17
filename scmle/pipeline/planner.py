@@ -17,8 +17,8 @@ from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.data.splitting import splitters
 from scmle.evaluation import metrics
-from scmle.intelligence import knowledge
 import scmle.models.registry
+from scmle.pipeline import knowledge
 from scmle.preparation import strategies
 
 EXPENSIVE_COST = 3

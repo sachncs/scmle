@@ -12,8 +12,8 @@ import scmle.api.project
 from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
-from scmle.experimentation import trials
 import scmle.models.registry
+from scmle.pipeline import trials
 import scmle.pipeline.orchestrator
 from scmle.storage import stores
 

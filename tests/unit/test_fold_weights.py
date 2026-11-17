@@ -8,7 +8,7 @@ from sklearn import metrics
 from scmle.contracts import data
 from scmle.contracts import tasks
 import scmle.contracts.metrics
-from scmle.experimentation import trials
+from scmle.pipeline import trials
 
 
 def payload(weighted):

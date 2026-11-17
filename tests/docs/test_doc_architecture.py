@@ -20,9 +20,9 @@ from scmle.data.readers import tabular
 from scmle.evaluation import metrics
 from scmle.governance import lifecycle
 import scmle.governance.registry
-from scmle.intelligence import planner
 from scmle.models import custom
 from scmle.models import registry
+from scmle.pipeline import planner
 
 
 def test_the_plan_records_included_rejected_and_deferred_techniques():

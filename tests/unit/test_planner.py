@@ -9,13 +9,13 @@ from scmle.contracts import experiments
 from scmle.contracts import tasks
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
-import scmle.intelligence.planner
 from scmle.models import registry
+import scmle.pipeline.planner
 
 
 @pytest.fixture(scope="module")
 def planner():
-    return scmle.intelligence.planner.Planner(registry.Catalog.stock())
+    return scmle.pipeline.planner.Planner(registry.Catalog.stock())
 
 
 def make_plan(
@@ -37,7 +37,7 @@ def make_plan(
     manifest = tabular.manifested(frame, "y")
     profile = profiler.Profiler(spec).profile(frame, manifest, task)
     return planner.plan(
-        scmle.intelligence.planner.Situation(spec, profile, task, approved)
+        scmle.pipeline.planner.Situation(spec, profile, task, approved)
     )
 
 
@@ -111,7 +111,7 @@ def test_strategy_search_can_be_disabled_in_the_plan(planner, frame):
         frame, manifest, tasks.Task.BINARY
     )
     plan = planner.plan(
-        scmle.intelligence.planner.Situation(spec, profile, tasks.Task.BINARY)
+        scmle.pipeline.planner.Situation(spec, profile, tasks.Task.BINARY)
     )
     assert not any(
         d.technique == "random_oversample"
@@ -131,9 +131,7 @@ def test_unknown_strategy_name_is_a_config_error(planner, frame):
     )
     with pytest.raises(errors.ConfigError, match="unknown strategy"):
         planner.plan(
-            scmle.intelligence.planner.Situation(
-                spec, profile, tasks.Task.BINARY
-            )
+            scmle.pipeline.planner.Situation(spec, profile, tasks.Task.BINARY)
         )
 
 
@@ -145,22 +143,22 @@ def test_approved_subset_and_invalid_approval(planner, frame):
 
 
 def test_custom_rule_chain_is_honoured(frame):
-    class KeepOnlyDummy(scmle.intelligence.planner.Refiner):
+    class KeepOnlyDummy(scmle.pipeline.planner.Refiner):
         def apply(self, context, candidates, decisions):
             return [a for a in candidates if a.name == "dummy"]
 
-    custom = scmle.intelligence.planner.Planner(
+    custom = scmle.pipeline.planner.Planner(
         registry.Catalog.stock(), rules=(KeepOnlyDummy(),)
     )
     assert make_plan(custom, frame).candidate_models == ("dummy",)
 
 
 def test_no_candidates_is_an_error(frame):
-    class DropAll(scmle.intelligence.planner.Refiner):
+    class DropAll(scmle.pipeline.planner.Refiner):
         def apply(self, context, candidates, decisions):
             return []
 
-    empty = scmle.intelligence.planner.Planner(
+    empty = scmle.pipeline.planner.Planner(
         registry.Catalog.stock(), rules=(DropAll(),)
     )
     with pytest.raises(errors.ConfigError, match="no candidate"):
@@ -184,7 +182,7 @@ def test_memory_characteristics_drive_rejection_under_a_tight_limit(planner):
         frame, manifest, tasks.Task.BINARY
     )
     plan = planner.plan(
-        scmle.intelligence.planner.Situation(spec, profile, tasks.Task.BINARY)
+        scmle.pipeline.planner.Situation(spec, profile, tasks.Task.BINARY)
     )
     assert "random_forest" not in plan.candidate_models
     assert "svm" not in plan.candidate_models

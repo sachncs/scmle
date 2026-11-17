@@ -8,9 +8,9 @@ from scmle.contracts import capabilities
 from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import tasks
-from scmle.intelligence import recommendations
-import scmle.intelligence.planner
+from scmle.pipeline import recommendations
 import scmle.pipeline.context
+import scmle.pipeline.planner
 from scmle.pipeline.stages import interface
 from scmle.pipeline.stages import profiling
 import scmle.runtime.state
@@ -43,11 +43,9 @@ def devise(
             mitigation is not implemented for the task.
     """
     approved = context.approved_plan
-    planner = scmle.intelligence.planner.Planner(
-        context.registry, context.catalog
-    )
+    planner = scmle.pipeline.planner.Planner(context.registry, context.catalog)
     plan = planner.plan(
-        scmle.intelligence.planner.Situation(
+        scmle.pipeline.planner.Situation(
             context.spec,
             scmle.pipeline.context.require(context.profile, "profile"),
             scmle.pipeline.context.require(context.task, "task"),

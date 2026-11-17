@@ -6,10 +6,10 @@ from typing import ClassVar
 from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.data.profiling import profiler
-from scmle.experimentation import ensemble_search
-from scmle.experimentation import strategy_search
-from scmle.experimentation import trials
-from scmle.experimentation import tuning
+from scmle.pipeline import ensemble_search
+from scmle.pipeline import strategy_search
+from scmle.pipeline import trials
+from scmle.pipeline import tuning
 import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import interface

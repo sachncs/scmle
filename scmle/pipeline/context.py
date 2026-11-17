@@ -26,8 +26,8 @@ from scmle.data.readers import streaming
 from scmle.data.splitting import splitters
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
-import scmle.intelligence.recommendations
 import scmle.models.registry
+import scmle.pipeline.recommendations
 from scmle.runtime import limits
 from scmle.runtime import resource_observation
 from scmle.runtime import scheduler
@@ -491,7 +491,7 @@ class Context:
     custody_vault: sealed.Vault | None = None
     plan: experiments.Plan | None = None
     recommendations: tuple[
-        scmle.intelligence.recommendations.Recommendation, ...
+        scmle.pipeline.recommendations.Recommendation, ...
     ] = ()
     metric: scmle.contracts.metrics.Metric | None = None
     trials: list[experiments.Trial] = dataclasses.field(default_factory=list)

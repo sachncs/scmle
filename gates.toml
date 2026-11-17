@@ -394,7 +394,7 @@ override = "none"
 variables = []
 
 [plan.gpu_required]
-site = "scmle.intelligence.planner:GpuFilter.apply"
+site = "scmle.pipeline.planner:GpuFilter.apply"
 error = "BlockedError"
 claim = "C1"
 passes = "resources.gpu is not required, or at least one candidate can use a GPU."
@@ -403,7 +403,7 @@ override = "Set resources.gpu to 'auto' (or install a GPU-capable adapter), as t
 variables = ["resources.gpu"]
 
 [plan.monotonic]
-site = "scmle.intelligence.planner:MonotonicFilter.apply"
+site = "scmle.pipeline.planner:MonotonicFilter.apply"
 error = "BlockedError"
 claim = "C1"
 passes = "No monotonic constraint is set, or the task is not multiclass and a candidate can enforce the constraints."

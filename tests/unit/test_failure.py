@@ -9,7 +9,7 @@ import json
 import pytest
 
 from scmle.contracts import errors
-from scmle.experimentation import trials
+from scmle.pipeline import trials
 from scmle.runtime import limits
 
 

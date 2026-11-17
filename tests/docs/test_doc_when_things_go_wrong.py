@@ -22,7 +22,7 @@ from scmle.governance import deployment_ledger
 from scmle.governance import lifecycle
 from scmle.governance import loop
 from scmle.governance import never_list
-from scmle.intelligence import planner
+from scmle.pipeline import planner
 from tests import support_release
 
 KEY = "person-key"

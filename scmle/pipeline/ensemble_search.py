@@ -7,8 +7,8 @@ beats its best member.
 """
 
 from scmle.contracts import experiments
-from scmle.experimentation import trials
 from scmle.models import ensembles
+from scmle.pipeline import trials
 import scmle.pipeline.context
 
 COMBINERS = (ensembles.Stacking.name, ensembles.Blending.name)

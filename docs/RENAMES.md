@@ -2930,3 +2930,11 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.core.decision_reports` -> `scmle.decision.reports`
 - `scmle.api.results` -> `scmle.artifacts.results`
 - `scmle.core` -> `scmle.pipeline`
+- `scmle.experimentation.trials` -> `scmle.pipeline.trials`
+- `scmle.experimentation.tuning` -> `scmle.pipeline.tuning`
+- `scmle.experimentation.ensemble_search` -> `scmle.pipeline.ensemble_search`
+- `scmle.experimentation.strategy_search` -> `scmle.pipeline.strategy_search`
+- `scmle.intelligence.fingerprint` -> `scmle.pipeline.fingerprint`
+- `scmle.intelligence.knowledge` -> `scmle.pipeline.knowledge`
+- `scmle.intelligence.planner` -> `scmle.pipeline.planner`
+- `scmle.intelligence.recommendations` -> `scmle.pipeline.recommendations`

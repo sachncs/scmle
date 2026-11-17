@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from scmle.contracts import experiments
 from scmle.contracts import tasks
-from scmle.experimentation import trials
+from scmle.pipeline import trials
 from scmle.runtime import limits
 
 
@@ -88,7 +88,7 @@ def test_each_job_gets_the_window_left_when_it_is_dispatched(monkeypatch):
 
 
 def test_a_strategy_search_the_window_cannot_hold_is_skipped_on_record():
-    from scmle.experimentation import strategy_search
+    from scmle.pipeline import strategy_search
 
     governor = limits.Governor(
         tasks.Resources(time_budget_seconds=10), started_at=0.0

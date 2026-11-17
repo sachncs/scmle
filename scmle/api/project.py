@@ -32,11 +32,11 @@ from scmle.data.readers import tabular
 from scmle.evaluation import parameter_estimation
 from scmle.governance import attestation
 from scmle.inference import evidence
-import scmle.intelligence.recommendations
 from scmle.models import modality_lifecycle
 from scmle.pipeline import policies
 import scmle.pipeline.context
 import scmle.pipeline.orchestrator
+import scmle.pipeline.recommendations
 
 ValidationStrategy = Literal[
     "auto",
@@ -927,7 +927,7 @@ class Project:
 
     def recommendations(
         self,
-    ) -> tuple[scmle.intelligence.recommendations.Recommendation, ...]:
+    ) -> tuple[scmle.pipeline.recommendations.Recommendation, ...]:
         """Advice about the data and specification, from the profile.
 
         Returns:

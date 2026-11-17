@@ -8,7 +8,7 @@ import pandas
 from scmle.contracts import tasks
 from scmle.data.splitting import splitters
 from scmle.evaluation import backtest
-from scmle.intelligence import knowledge
+from scmle.pipeline import knowledge
 import scmle.pipeline.context
 from scmle.pipeline.stages import impounding
 from scmle.pipeline.stages import ingestion

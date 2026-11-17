@@ -7,7 +7,7 @@ from scmle.contracts import tasks
 import scmle.contracts.data
 from scmle.data.profiling import profiler
 import scmle.data.validation.target
-from scmle.intelligence import recommendations
+from scmle.pipeline import recommendations
 
 
 def profile_of(frame, **spec_fields):

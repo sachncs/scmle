@@ -6,8 +6,8 @@ import pytest
 
 from scmle.contracts import tasks
 import scmle.contracts.data
-from scmle.intelligence import planner
 import scmle.models.registry
+from scmle.pipeline import planner
 from scmle.preparation import preprocessing
 from scmle.preparation import strategies
 

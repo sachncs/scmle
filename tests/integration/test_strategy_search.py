@@ -172,7 +172,7 @@ def test_tuning_runs_under_the_winning_strategy(imbalanced_frame, tmp_path):
 def test_strategy_run_resumes_without_recomputation(
     imbalanced_frame, tmp_path, monkeypatch
 ):
-    from scmle.experimentation import trials
+    from scmle.pipeline import trials
 
     search = tasks.Search(top_models=1, configs_per_model=2)
     original = run(imbalanced_frame, tmp_path, search=search)

@@ -23,7 +23,7 @@ from scmle.data.profiling import label_noise
 from scmle.data.profiling import missingness
 from scmle.data.readers import streaming
 from scmle.data.validation import columns
-from scmle.intelligence import fingerprint
+from scmle.pipeline import fingerprint
 
 HIGH_MISSING_DROP = 0.95
 HIGH_MISSING_WARN = 0.30

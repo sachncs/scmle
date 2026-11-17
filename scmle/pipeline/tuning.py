@@ -11,8 +11,8 @@ import math
 import operator
 
 from scmle.contracts import experiments
-from scmle.experimentation import trials
 from scmle.optimization import optimizers
+from scmle.pipeline import trials
 import scmle.pipeline.context
 
 MIN_BATCH = 2

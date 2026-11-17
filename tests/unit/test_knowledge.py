@@ -10,7 +10,7 @@ from scmle.contracts import experiments
 from scmle.contracts import tasks
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
-from scmle.intelligence import knowledge
+from scmle.pipeline import knowledge
 
 
 def profile_of(frame):

@@ -8,7 +8,7 @@ about every model, reader, or serving runtime.
 | Plane | Decides / does | Code |
 | --- | --- | --- |
 | Control | what to do, when and why | `scmle.pipeline` (orchestrator, stages, state machine), `scmle.intelligence` (planner, meta-learning) |
-| Execution | transformations, training, tuning, evaluation | `scmle.data`, `scmle.models`, `scmle.optimization`, `scmle.experimentation.trials`, `scmle.runtime.scheduler` |
+| Execution | transformations, training, tuning, evaluation | `scmle.data`, `scmle.models`, `scmle.optimization`, `scmle.pipeline.trials`, `scmle.runtime.scheduler` |
 | Evidence | artifacts, measurements, decisions, provenance | `scmle.artifacts`, `scmle.storage.stores`, `scmle.monitoring`, `scmle.governance`, `scmle.inference` |
 
 Modules interact only through the typed contracts in `scmle.contracts`.

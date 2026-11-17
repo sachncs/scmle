@@ -218,7 +218,7 @@ def test_l41_l43_no_mandatory_infrastructure_on_the_base_install():
 def test_l101_l105_three_planes_are_separate_packages():
     """Control, execution and evidence planes are separate code."""
     for plane in (
-        ("pipeline", "intelligence"),
+        ("pipeline", "runtime"),
         ("data", "models"),
         ("artifacts", "storage"),
     ):
@@ -231,7 +231,6 @@ def test_l113_l176_package_organization():
         "api",
         "contracts",
         "pipeline",
-        "intelligence",
         "data",
         "data/readers",
         "data/profiling",
@@ -242,7 +241,6 @@ def test_l113_l176_package_organization():
         "models/sklearn",
         "models/boosting",
         "optimization",
-        "experimentation",
         "evaluation",
         "explainability",
         "artifacts",
@@ -270,10 +268,10 @@ def test_l113_l176_package_organization():
         "runtime/scheduler.py",
         "runtime/state.py",
         "pipeline/policies.py",
-        "intelligence/fingerprint.py",
-        "intelligence/planner.py",
-        "intelligence/recommendations.py",
-        "intelligence/knowledge.py",
+        "pipeline/fingerprint.py",
+        "pipeline/planner.py",
+        "pipeline/recommendations.py",
+        "pipeline/knowledge.py",
         "models/registry.py",
     )
     for rel in modules:
@@ -360,7 +358,7 @@ def test_l198_l206_foundational_and_production_contracts(run):
     project, result = run
     assert result.bundle.schema.dtypes  # schema types
     assert dataclasses.fields(models.Capabilities)  # capability discovery
-    from scmle.experimentation import trials
+    from scmle.pipeline import trials
 
     assert {f.name for f in dataclasses.fields(trials.Payload)} >= {
         "job",
@@ -1052,9 +1050,9 @@ def test_l610_l629_backlog_priorities(run):
     from scmle.explainability import importance
     from scmle.governance import registry
     from scmle.inference import serving
-    from scmle.intelligence import knowledge
     from scmle.models import ensembles
     from scmle.monitoring import monitor
+    from scmle.pipeline import knowledge
     from scmle.preparation import synthesis
 
     result = run[1]
@@ -1204,11 +1202,11 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
 
     from scmle.data import feature_graph
     from scmle.data.splitting import splitters
-    from scmle.experimentation import trials
-    from scmle.intelligence import knowledge
     import scmle.models.registry
     import scmle.monitoring.events
+    from scmle.pipeline import knowledge
     from scmle.pipeline import policies
+    from scmle.pipeline import trials
     from scmle.preparation import resampling
     from scmle.preparation import synthesis
 

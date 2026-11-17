@@ -17,11 +17,11 @@ from scmle.data.validation import columns
 from scmle.evaluation import diagnostics
 from scmle.evaluation import selection
 from scmle.inference import serving
-from scmle.intelligence import planner
 from scmle.models import registry
 from scmle.models import thresholds
 from scmle.monitoring import monitor
 from scmle.optimization import optimizers
+from scmle.pipeline import planner
 from scmle.pipeline import policies
 from scmle.pipeline import stages
 from scmle.preparation import resampling
