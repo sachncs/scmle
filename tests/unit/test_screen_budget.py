@@ -183,7 +183,7 @@ def test_an_incomplete_screen_is_in_summary_report_log_and_plan(tmp_path):
 
 
 def test_block_refuses_an_unchecked_screen_and_warn_proceeds(tmp_path):
-    # Enforces docs/ARCHITECTURE.md:134.
+    # Enforces docs/ARCHITECTURE.md:159.
     # Enforces docs/LEAKAGE.md:194.
     with pytest.raises(errors.BlockedError, match="NOT RUN") as raised:
         support.make_project(

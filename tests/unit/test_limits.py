@@ -45,7 +45,7 @@ def test_peak_memory_is_positive_and_plausible():
 
 
 def test_report_states_enforcement_honestly(monkeypatch):
-    # Enforces docs/ARCHITECTURE.md:59.
+    # Enforces docs/ARCHITECTURE.md:84.
     # Enforces README.md:138.
     monkeypatch.setattr(limits, "peak_memory_gb", lambda: 1.5)
     report = governor(workers=4, cpu_limit=2, memory_limit_gb=1.0).report()

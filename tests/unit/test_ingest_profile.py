@@ -81,7 +81,7 @@ def test_consistent_read_on_static_data_is_verified_and_complete():
 
 @pytest.mark.parametrize("kind", ingest_worlds.TORN_KINDS)
 def test_torn_read_is_detected(kind):
-    # Enforces docs/ARCHITECTURE.md:72.
+    # Enforces docs/ARCHITECTURE.md:97.
     connector = ingest_worlds.torn_world(2, kind)[0]
     with pytest.raises(profile.TornError):
         profile.untorn(connector, 5, attempts=1)
@@ -95,7 +95,7 @@ def test_torn_read_recovers_on_retry_within_budget():
 
 
 def test_unordered_query_is_refused():
-    # Enforces docs/ARCHITECTURE.md:72.
+    # Enforces docs/ARCHITECTURE.md:97.
     db = ingest_worlds.new_database("ord")
     db.execute("CREATE TABLE t (a INTEGER)")
     connector = connectors.DbApiConnector(

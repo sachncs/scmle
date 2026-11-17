@@ -39,7 +39,7 @@ def build(tmp_path, policy, frame):
 def test_block_stops_a_flagged_column_even_with_a_stale_certificate(
     monkeypatch, tmp_path
 ):
-    # Enforces docs/ARCHITECTURE.md:134.
+    # Enforces docs/ARCHITECTURE.md:159.
     # Enforces docs/API_STABILITY.md:51 and docs/ARTIFACTS.md:26.
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:156.
     monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)

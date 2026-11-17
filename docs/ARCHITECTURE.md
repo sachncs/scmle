@@ -7,9 +7,34 @@ about every model, reader, or serving runtime.
 
 | Plane | Decides / does | Code |
 | --- | --- | --- |
-| Control | what to do, when and why | `scmle.pipeline` (orchestrator, stages, state machine), `scmle.intelligence` (planner, meta-learning) |
-| Execution | transformations, training, tuning, evaluation | `scmle.data`, `scmle.models`, `scmle.optimization`, `scmle.pipeline.trials`, `scmle.runtime.scheduler` |
-| Evidence | artifacts, measurements, decisions, provenance | `scmle.artifacts`, `scmle.storage.stores`, `scmle.monitoring`, `scmle.governance`, `scmle.inference` |
+| Control | what to do, when and why | `scmle.pipeline` (orchestrator, stages, state machine, planner, search) |
+| Execution | transformations, training, tuning, evaluation | `scmle.data`, `scmle.preparation`, `scmle.models`, `scmle.optimization`, `scmle.runtime` |
+| Evidence | artifacts, measurements, decisions, provenance | `scmle.artifacts`, `scmle.assurance`, `scmle.storage`, `scmle.monitoring`, `scmle.governance`, `scmle.inference` |
+
+Packages are layered: each imports only the layers below it, and packages on
+one row (siblings) do not import each other. The import-linter contract in
+`pyproject.toml` enforces the order with no exceptions, and a new package
+fails it until it is placed in a row.
+
+| Layer (top first) | Packages |
+| --- | --- |
+| 1 | `cli`, `rehearsal` (the demo and fault harnesses) |
+| 2 | `serving` (prediction servers, service runtime), `workflow` |
+| 3 | `operations`, `runners` |
+| 4 | `api` |
+| 5 | `deploy`, `pipeline` (the run), `security`, `trail` |
+| 6 | `governance` |
+| 7 | `monitoring` |
+| 8 | `artifacts` |
+| 9 | `causal`, `decision` |
+| 10 | `assurance` (ledger, charter, detectors, custody, coverage, ...), `explainability`, `inference` (scoring) |
+| 11 | `evaluation` |
+| 12 | `models` |
+| 13 | `preparation` (fold-local preprocessing, sampling, task wrappers) |
+| 14 | `data` |
+| 15 | `storage` (object and experiment stores) |
+| 16 | `envelope`, `optimization`, `runtime` (randomness, limits, budgets, workers), `unsupervised` |
+| 17 | `certificates`, `contracts`, `durability` |
 
 Modules interact only through the typed contracts in `scmle.contracts`.
 

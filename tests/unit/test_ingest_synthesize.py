@@ -46,7 +46,7 @@ def asked(cutoff, key=1):
 
 
 def test_late_arrival_is_excluded_by_recorded_time():
-    # Enforces docs/ARCHITECTURE.md:74.
+    # Enforces docs/ARCHITECTURE.md:99.
     seen = small_view().visible(asked(10.0))
     # event 5.0 is before the cutoff but was recorded at 20.0
     assert seen["val"].tolist() == [10.0, 30.0]
@@ -235,7 +235,7 @@ def attested_rule(kind=asof_view.EVENT_DELAY):
 
 
 def test_feature_tier_is_the_weakest_source_tier():
-    # Enforces docs/ARCHITECTURE.md:77.
+    # Enforces docs/ARCHITECTURE.md:102.
     targets = pandas.DataFrame({"cid": [1, 2, 1], "moment": [10.0, 10.0, 2.0]})
     strong = small_view(attested_rule(asof_view.TRANSACTION))
     weak = asof_view.View(
@@ -328,7 +328,7 @@ def imported_modules(path):
 
 
 def test_synthesize_has_no_raw_read_path():
-    # Enforces docs/ARCHITECTURE.md:74.
+    # Enforces docs/ARCHITECTURE.md:99.
     names = imported_modules(ROOT / "scmle/assurance/ingest/synthesize.py")
     forbidden = (
         "scmle.data.readers",

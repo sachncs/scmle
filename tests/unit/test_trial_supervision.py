@@ -97,7 +97,7 @@ def test_the_cpu_limit_caps_math_threads_in_the_main_process():
 
 
 def test_governor_modes_describe_their_enforcement():
-    # Enforces docs/ARCHITECTURE.md:59.
+    # Enforces docs/ARCHITECTURE.md:84.
     hard = limits.Governor(tasks.Resources(time_budget_seconds=100))
     assert 99 <= hard.deadline() <= 100 and hard.hard
     assert "killed" in hard.report()["time_budget"]["enforcement"]

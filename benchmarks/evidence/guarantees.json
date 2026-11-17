@@ -9,7 +9,7 @@
       "unlinked": 0
     },
     "docs/ARCHITECTURE.md": {
-      "guarantees": 15,
+      "guarantees": 16,
       "unlinked": 0
     },
     "docs/ARTIFACTS.md": {
@@ -122,10 +122,10 @@
     }
   },
   "claim": "C12",
-  "content_hash": "8dfafda8d52ce5783d7b36e24cd406dce47b365b524c0682a1efba2f84b04b91",
+  "content_hash": "3eb504345ab66eb89c06e55560b4016b1829ef085af091a92215358ef97e615c",
   "counts": {
-    "guarantees": 245,
-    "linked": 245,
+    "guarantees": 246,
+    "linked": 246,
     "unlinked": 0
   },
   "definition": {
@@ -701,8 +701,23 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 33,
-      "line": 32,
+      "end": 17,
+      "line": 15,
+      "missing": [],
+      "section": "scmle-architecture",
+      "tests": [
+        "tests/unit/test_layering.py::test_the_layers_contract_is_exhaustive_and_has_no_exceptions"
+      ],
+      "text": "The import-linter contract in `pyproject.toml` enforces the order with no exceptions, and a new package fails it until it is placed in a row.",
+      "words": [
+        "enforces"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 58,
+      "line": 57,
       "missing": [],
       "section": "the-run",
       "tests": [
@@ -716,8 +731,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 60,
-      "line": 59,
+      "end": 85,
+      "line": 84,
       "missing": [],
       "section": "governance",
       "tests": [
@@ -732,8 +747,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 72,
-      "line": 70,
+      "end": 97,
+      "line": 95,
       "missing": [],
       "section": "raw-data-ingestion",
       "tests": [
@@ -750,8 +765,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 73,
-      "line": 72,
+      "end": 98,
+      "line": 97,
       "missing": [],
       "section": "raw-data-ingestion",
       "tests": [
@@ -767,8 +782,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 77,
-      "line": 74,
+      "end": 102,
+      "line": 99,
       "missing": [],
       "section": "raw-data-ingestion",
       "tests": [
@@ -784,8 +799,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 78,
-      "line": 77,
+      "end": 103,
+      "line": 102,
       "missing": [],
       "section": "raw-data-ingestion",
       "tests": [
@@ -799,8 +814,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 83,
-      "line": 80,
+      "end": 108,
+      "line": 105,
       "missing": [],
       "section": "raw-data-ingestion",
       "tests": [
@@ -815,8 +830,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 98,
-      "line": 97,
+      "end": 123,
+      "line": 122,
       "missing": [],
       "section": "leakage-guarantees",
       "tests": [
@@ -832,8 +847,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 117,
-      "line": 112,
+      "end": 142,
+      "line": 137,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -852,8 +867,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 127,
-      "line": 124,
+      "end": 152,
+      "line": 149,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -868,8 +883,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 135,
-      "line": 134,
+      "end": 160,
+      "line": 159,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -884,8 +899,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 143,
-      "line": 141,
+      "end": 168,
+      "line": 166,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -899,8 +914,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 175,
-      "line": 173,
+      "end": 200,
+      "line": 198,
       "missing": [],
       "section": "extension-points-and-polymorphism",
       "tests": [
@@ -915,8 +930,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 195,
-      "line": 192,
+      "end": 220,
+      "line": 217,
       "missing": [],
       "section": "concurrency",
       "tests": [
@@ -930,8 +945,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 224,
-      "line": 222,
+      "end": 249,
+      "line": 247,
       "missing": [],
       "section": "concurrency",
       "tests": [
@@ -4185,6 +4200,6 @@
     }
   ],
   "seconds": 1.1,
-  "test_links": 444,
+  "test_links": 445,
   "version": 1
 }

@@ -15,8 +15,10 @@ below it is a ratchet the next `--write` records.
 `--simulate` applies a layer map (`scripts/layers.toml`: the layer order and
 the module moves) to the package's import graph, including function-level
 and `TYPE_CHECKING` imports, and prints every import that would break the
-order and the largest package cycle left. `layer_breaks` in the budget is
-the number of such imports for the recorded map (register phase 3, DES-13).
+order and the largest package cycle left. While a map is recorded there,
+`layer_breaks` counts such imports against the budget. Phase 3 (DES-13)
+ended with its map applied and deleted; import-linter's layers contract in
+`pyproject.toml` is now the gate, and a later phase records its own map.
 """
 
 import argparse

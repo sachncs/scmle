@@ -143,7 +143,7 @@ def read(result, name):
 
 
 def test_features_come_from_the_database_and_reach_the_ledger(tmp_path):
-    # Enforces docs/ARCHITECTURE.md:80.
+    # Enforces docs/ARCHITECTURE.md:105.
     # Enforces docs/ARTIFACTS.md:67.
     result = run(tmp_path)
     folder = pathlib.Path(result.run_dir)
@@ -258,7 +258,7 @@ def test_without_the_entity_block_duplicates_straddle_the_split(tmp_path):
 
 
 def test_the_resolved_entity_keeps_duplicates_on_one_side(tmp_path):
-    # Enforces docs/ARCHITECTURE.md:80.
+    # Enforces docs/ARCHITECTURE.md:105.
     result = run_with_emails(tmp_path, entity_block())
     document = read(result, "entity_resolution.json")
     assert document["group_column"] == "entity_group"

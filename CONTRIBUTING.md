@@ -39,8 +39,11 @@ Rules (all enforced by CI):
 
 ## Layout
 
-* `scmle/`: the package (`core` orchestration, `data`, `models`,
-  `evaluation`, `governance`, `inference`, ...); see `docs/ARCHITECTURE.md`.
+* `scmle/`: the package (`pipeline` orchestration, `data`, `models`,
+  `evaluation`, `governance`, `inference`, ...), in layers that import only
+  downward; see `docs/ARCHITECTURE.md`. A new package goes in one row of the
+  layers contract in `pyproject.toml` (the lowest row whose packages it
+  needs are all below it); until it is placed, `lint-imports` fails.
 * `tests/`: `unit`, `property`, `leakage`, `integration`, `spec`.
 * `benchmarks/`: accuracy benchmarks, the regression gate and reliability
   checks run in CI ([`benchmarks/README.md`](benchmarks/README.md)).
