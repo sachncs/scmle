@@ -79,7 +79,7 @@ def demands(frame):
 
 def test_measure_counts_the_work_the_scan_draws():
     frame = wide(classes=2, columns=6)
-    real, _ = demands(frame)
+    real = demands(frame)[0]
     report = run_screen(frame, None)
     assert real.permutations == report.permutations
     assert real.family == report.family
@@ -159,7 +159,7 @@ def test_the_profiler_passes_the_projects_budget_and_warns_first():
 
 
 def test_an_incomplete_screen_is_in_summary_report_log_and_plan(tmp_path):
-    # Enforces docs/LEAKAGE.md:172 and docs/LEAKAGE.md:178.
+    # Enforces docs/LEAKAGE.md:188 and docs/LEAKAGE.md:194.
     result = support.make_project(
         wide(columns=WIDE), "y", output_dir=tmp_path, time_budget=RUN_BUDGET
     ).run()
@@ -183,8 +183,8 @@ def test_an_incomplete_screen_is_in_summary_report_log_and_plan(tmp_path):
 
 
 def test_block_refuses_an_unchecked_screen_and_warn_proceeds(tmp_path):
-    # Enforces docs/ARCHITECTURE.md:131.
-    # Enforces docs/LEAKAGE.md:178.
+    # Enforces docs/ARCHITECTURE.md:134.
+    # Enforces docs/LEAKAGE.md:194.
     with pytest.raises(errors.BlockedError, match="NOT RUN") as raised:
         support.make_project(
             wide(columns=WIDE),

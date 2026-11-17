@@ -135,14 +135,14 @@ def test_ml_difficulty_skips_with_a_reason_when_nothing_fits():
 
 def test_the_profiler_gives_ml_difficulty_its_share_of_the_budget():
     frame = xor()
-    _, small = portrait(frame, budget=2)
+    small = portrait(frame, budget=2)[1]
     stats = small.dataset_statistics["ml_difficulty"]
     assert stats["available"] is False and stats["skipped"] is True
     assert any(
         note.startswith("ml_difficulty skipped")
         for note in small.quality_findings
     )
-    _, large = portrait(frame)
+    large = portrait(frame)[1]
     assert large.dataset_statistics["ml_difficulty"]["available"]
 
 

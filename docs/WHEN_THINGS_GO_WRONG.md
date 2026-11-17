@@ -102,7 +102,7 @@ says so on the first lines and on the last line, and withholds the word
 ### Leakage block (Seen)
 
 ```text
-blocked: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
+blocked: unresolved leakage risk (permutation screen, Benjamini-Yekutieli level 0.05): body, boat
 ```
 
 **What it means.** You chose `--leakage-policy block` (it is opt-in; the default

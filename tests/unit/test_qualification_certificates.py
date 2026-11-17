@@ -268,7 +268,7 @@ def test_add_replaces_the_entry_with_the_same_key():
 
 def test_descriptive_status_demotes_blocking_decisions():
     # Enforces docs/GLOSSARY.md:425-426.
-    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:144.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:146.
     descriptive = certificates.Authority.DESCRIPTIVE
     gating = certificates.Authority.GATING
     decision = qualification.Decision

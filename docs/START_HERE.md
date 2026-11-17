@@ -217,8 +217,8 @@ echo "exit code: $?"
 What you should see (last two lines):
 
 ```text
-[run_20261105_001] state.BLOCKED: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
-blocked: unresolved leakage risk (certified screen, Benjamini-Yekutieli level 0.05): body, boat, boat, boat
+[run_20261105_001] state.BLOCKED: unresolved leakage risk (permutation screen, Benjamini-Yekutieli level 0.05): body, boat
+blocked: unresolved leakage risk (permutation screen, Benjamini-Yekutieli level 0.05): body, boat
 ```
 
 and `exit code: 2`. `BLOCKED` is a safe stop, not a crash: no model was built.

@@ -131,7 +131,7 @@ def test_an_unplaced_package_breaks_the_order(monkeypatch, tmp_path):
     module = load()
     monkeypatch.setattr(module, "PACKAGE", plant(tmp_path, TREE))
     layout = module.load(write(tmp_path, ["top", "low"], []))
-    breaks, _ = module.simulate(layout)
+    breaks = module.simulate(layout)[0]
     assert (
         "scmle.side.tool -> scmle.other.thing (side -> other, unplaced)"
         in breaks
@@ -152,5 +152,5 @@ def test_the_longest_move_wins():
 def test_the_recorded_map_breaks_no_more_imports_than_its_budget():
     module = load()
     budget = json.loads(module.BUDGET.read_text(encoding="utf-8"))
-    breaks, _ = module.simulate(module.load(module.LAYERS))
+    breaks = module.simulate(module.load(module.LAYERS))[0]
     assert len(breaks) <= budget["layer_breaks"]

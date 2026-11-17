@@ -7,7 +7,7 @@ from scmle.core import retry
 from scmle.data.store import objectstore
 from scmle.workflow import definition
 import scmle.workflow.schedule
-from tests.unit import test_workflow as workflow
+from tests.unit import test_workflow
 
 
 @pytest.fixture
@@ -17,10 +17,10 @@ def store(tmp_path):
 
 def test_a_transient_failure_is_retried_and_dependents_are_skipped(store):
     """Enforces docs/ORCHESTRATION.md:31 (retries, skips, independents)."""
-    clock = workflow.Clock()
-    recorder = workflow.Recorder(clock)
-    executor = workflow.executor_for(
-        store, workflow.pipeline(), recorder, clock
+    clock = test_workflow.Clock()
+    recorder = test_workflow.Recorder(clock)
+    executor = test_workflow.executor_for(
+        store, test_workflow.pipeline(), recorder, clock
     )
 
     def flaky(context):
@@ -37,10 +37,10 @@ def test_a_transient_failure_is_retried_and_dependents_are_skipped(store):
 
 def test_start_never_retries_a_failed_run_and_resume_runs_the_rest(store):
     """Enforces docs/ORCHESTRATION.md:31 (start versus resume)."""
-    clock = workflow.Clock()
-    recorder = workflow.Recorder(clock)
-    executor = workflow.executor_for(
-        store, workflow.pipeline(), recorder, clock
+    clock = test_workflow.Clock()
+    recorder = test_workflow.Recorder(clock)
+    executor = test_workflow.executor_for(
+        store, test_workflow.pipeline(), recorder, clock
     )
     calls = {"evaluate": 0}
 
@@ -64,11 +64,11 @@ def test_start_never_retries_a_failed_run_and_resume_runs_the_rest(store):
 def test_a_deferred_slot_stays_due_and_runs_on_a_later_tick(store):
     """Enforces docs/ORCHESTRATION.md:43."""
     schedule = definition.Schedule(3600.0, 0.0, definition.CatchUp.LATEST_ONLY)
-    base = workflow.pipeline()
+    base = test_workflow.pipeline()
     flow = definition.Workflow(base.name, base.version, base.steps, schedule)
-    clock = workflow.Clock(3600.0 + 1.0)
-    recorder = workflow.Recorder(clock)
-    executor = workflow.executor_for(store, flow, recorder, clock)
+    clock = test_workflow.Clock(3600.0 + 1.0)
+    recorder = test_workflow.Recorder(clock)
+    executor = test_workflow.executor_for(store, flow, recorder, clock)
     scheduler = scmle.workflow.schedule.Scheduler(flow, store)
     scheduler.save(0.0, {})
     seen = []
@@ -81,7 +81,7 @@ def test_a_deferred_slot_stays_due_and_runs_on_a_later_tick(store):
     manual = executor.start("manual", "alice")
     recorder.behaviour.pop("ingest")
     assert seen[0].deferred == (3600.0,) and seen[0].ran == ()
-    workflow.approve(executor, manual)
+    test_workflow.approve(executor, manual)
     assert executor.resume(manual["run_id"])["state"] == "succeeded"
     later = scheduler.tick(executor)
     assert [slot for slot, ignored in later.ran] == [3600.0]

@@ -113,13 +113,17 @@ def test_ensemble_can_be_disabled_and_is_planned(binary_frame, tmp_path):
 def test_stack_resumes_without_recomputation(
     binary_frame, tmp_path, monkeypatch
 ):
-    import shutil
-
     from scmle.experimentation import trials
 
-    original = run(binary_frame, tmp_path)
-    (original.run_dir / "evaluation.json").unlink()
-    shutil.rmtree(original.run_dir / "model")
+    directory = support.interrupt(
+        support.make_project(
+            binary_frame,
+            "y",
+            time_budget=600,
+            output_dir=tmp_path,
+            ensemble=ENSEMBLE,
+        )
+    )
     calls = []
     real = trials.evaluate_payload
     monkeypatch.setattr(
@@ -127,7 +131,5 @@ def test_stack_resumes_without_recomputation(
         "evaluate_payload",
         lambda p: calls.append(p.job.trial_id) or real(p),
     )
-    resumed = scmle.api.project.Project.resume(
-        original.run_dir, data=binary_frame
-    )
+    resumed = scmle.api.project.Project.resume(directory, data=binary_frame)
     assert calls == [] and resumed.state == "COMPLETED"

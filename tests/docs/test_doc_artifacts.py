@@ -43,7 +43,7 @@ def folder(tmp_path_factory):
     """
     directory = tmp_path_factory.mktemp("artifacts")
     project = reliability.fast_project(
-        reliability.binary_data(200), "y", directory, time_budget=10
+        reliability.binary_data(200), "y", directory, time_budget=30
     )
     return pathlib.Path(project.run().run_dir)
 
@@ -83,7 +83,7 @@ def test_the_decision_log_holds_included_rejected_and_deferred_choices(folder):
 
 
 def test_without_criteria_the_release_evaluation_blocks(folder):
-    """Enforces docs/ARTIFACTS.md:118."""
+    """Enforces docs/ARTIFACTS.md:119."""
     record = read(folder / "release_evaluation.json")
     assert record["status"] == "policy_not_declared"
     assert record["blocked"] is True and record["passed"] is False
@@ -125,7 +125,7 @@ def test_the_custody_log_records_seal_issue_open_and_refusal():
 
 
 def test_build_sh_scans_resolves_builds_scans_and_attests_in_order(service):
-    """Enforces docs/ARTIFACTS.md:129."""
+    """Enforces docs/ARTIFACTS.md:130."""
     script = (service / "build.sh").read_text(encoding="utf-8")
     assert "set -euo pipefail" in script
     places = [script.index(step) for step in STEPS]
@@ -135,7 +135,7 @@ def test_build_sh_scans_resolves_builds_scans_and_attests_in_order(service):
 
 
 def test_the_shipped_gate_policy_blocks_high_with_one_dated_waiver(service):
-    """Enforces docs/ARTIFACTS.md:133."""
+    """Enforces docs/ARTIFACTS.md:134."""
     policy = read(service / "vuln-policy.json")
     assert policy == vuln_gate.DEFAULT_POLICY
     assert policy["fail_at_or_above"] == "HIGH"

@@ -446,8 +446,8 @@ def test_a_staging_record_signed_with_another_key_is_refused():
 
 
 def test_every_reason_is_reported_not_only_the_first():
-    # Enforces docs/CLI.md:152.
-    # Enforces docs/GLOSSARY.md:698.
+    # Enforces docs/CLI.md:155.
+    # Enforces docs/GLOSSARY.md:700.
     decision = gate.admit(
         support_release.candidate(
             "staging",

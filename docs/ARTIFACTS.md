@@ -100,7 +100,8 @@ No LLM client ships; `--replay` serves recorded drafts. Every LLM-filled field i
 ## The model
 
 `model/` is the checksummed bundle (signed when a signing key is
-configured; an unsigned bundle is refused unless trusted):
+configured; an unsigned bundle is refused unless trusted, and a signed one
+with no key to verify it is refused even when trusted):
 `pipeline.joblib` (fitted preprocessing and estimator), `schema.json`,
 `reference.json` (monitoring reference profile), `conformal.json` (pooled
 and per-class calibration scores),

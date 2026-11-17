@@ -49,7 +49,7 @@ def test_a_bad_command_line_exits_with_the_usage_code(capsys):
 
 
 def test_a_leak_exits_as_blocked(monkeypatch, caplog):
-    # Enforces docs/CLI.md:12.
+    # Enforces docs/CLI.md:15.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:22.
     failing(monkeypatch, errors.LeakageError("test set opened twice"))
     assert run([COMMAND.name], caplog) == cli.EXIT_BLOCKED
@@ -57,7 +57,7 @@ def test_a_leak_exits_as_blocked(monkeypatch, caplog):
 
 
 def test_a_defect_exits_as_internal_with_its_traceback(monkeypatch, caplog):
-    # Enforces docs/CLI.md:14.
+    # Enforces docs/CLI.md:17.
     failing(monkeypatch, RuntimeError("unexpected state"))
     assert run([COMMAND.name], caplog) == cli.EXIT_INTERNAL
     assert "internal error" in caplog.text
@@ -95,7 +95,7 @@ def test_without_debug_a_handled_failure_is_one_line(monkeypatch, caplog):
     ],
 )
 def test_an_input_error_exits_as_failed(monkeypatch, caplog, error):
-    # Enforces docs/CLI.md:11: bad data is a handled failure, not a defect.
+    # Enforces docs/CLI.md:14: bad data is a handled failure, not a defect.
     # Before ERR-20 the same raise was a bare ValueError and exited 70.
     failing(monkeypatch, error)
     assert run([COMMAND.name], caplog) == cli.EXIT_FAILED
@@ -104,7 +104,7 @@ def test_an_input_error_exits_as_failed(monkeypatch, caplog, error):
 
 
 def test_a_plain_value_error_still_exits_as_internal(monkeypatch, caplog):
-    # Enforces docs/CLI.md:14: a bare ValueError marks a defect (ERR-20).
+    # Enforces docs/CLI.md:17: a bare ValueError marks a defect (ERR-20).
     failing(monkeypatch, ValueError("unexpected value"))
     assert run([COMMAND.name], caplog) == cli.EXIT_INTERNAL
     assert "internal error" in caplog.text

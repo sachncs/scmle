@@ -14,9 +14,10 @@ metrics (`reproducibility.differ`), against `cross_platform_tol`
 trace verdict from `reproducibility.summary`.
 
 Verdict: "fail" when any platform fails on its own or any pair of platforms
-differs beyond the tolerance; "pass" only with at least `MINIMUM` platforms
-(the fewest that can be compared) whose metrics all agree; otherwise "not
-measured". Documents for other code or another tolerance are refused.
+differs beyond the tolerance; "pass" only with at least
+`reproducibility.PAIR` platforms (the fewest that can be compared) whose
+metrics all agree; otherwise "not measured". Documents for other code or
+another tolerance are refused.
 
     python -m benchmarks.evidence.platforms --write [RECORD ...]
         [--into MERGED] [--gate]
@@ -34,7 +35,6 @@ from scmle.contracts import errors
 
 PATH = pathlib.Path(__file__).with_suffix(".json")
 # platforms needed before two can be compared; the rule's minimum sample
-MINIMUM = reproducibility.PAIR
 
 
 def load(paths: list[pathlib.Path]) -> list[dict[str, Any]]:
@@ -138,7 +138,7 @@ def measure(paths: list[pathlib.Path]) -> dict[str, Any]:
         "claim": "C6",
         "code": merged.get("code"),
         "tolerance": merged.get("tolerance"),
-        "minimum": MINIMUM,
+        "minimum": reproducibility.PAIR,
         "sources": [path.as_posix() for path in paths],
         "pairs": gaps,
         "spread": max((g["relative"] for g in gaps), default=0.0),
@@ -194,8 +194,8 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
 
     Returns:
         Messages for a missing file, records for other code or another
-        tolerance (`stale`) and fewer than `MINIMUM` platforms; empty when
-        the document decides.
+        tolerance (`stale`) and fewer than `reproducibility.PAIR` platforms;
+        empty when the document decides.
     """
     found = read(document)
     if found is None:
@@ -204,10 +204,10 @@ def problems(document: dict[str, Any] | None = None) -> list[str]:
     if issues:
         return issues
     count = len(found["merged"]["platforms"])
-    if count < MINIMUM:
+    if count < reproducibility.PAIR:
         issues.append(
             f"platforms: {count} platform recorded; none can pass below "
-            f"{MINIMUM}"
+            f"{reproducibility.PAIR}"
         )
     return issues
 
@@ -220,8 +220,8 @@ def summary(document: dict[str, Any] | None = None) -> tuple[str, str]:
 
     Returns:
         The value text and "pass", "fail" or "not measured". A platform
-        failing on its own is "fail" even below `MINIMUM` platforms; stale or
-        missing records are "not measured".
+        failing on its own is "fail" even below `reproducibility.PAIR`
+        platforms; stale or missing records are "not measured".
     """
     found = read(document)
     if found is None or not isinstance(found.get("merged"), dict):
@@ -240,7 +240,7 @@ def summary(document: dict[str, Any] | None = None) -> tuple[str, str]:
         )
     if verdict == "fail" or beyond:
         return value, "fail"
-    if len(merged["platforms"]) < MINIMUM:
+    if len(merged["platforms"]) < reproducibility.PAIR:
         return value, "not measured"
     return value, verdict
 

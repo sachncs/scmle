@@ -499,7 +499,7 @@ def test_a_charter_without_rules_is_reported_as_not_chartered(
 
 
 def test_a_specification_that_contradicts_the_chartered_rule_is_refused():
-    # Enforces docs/CLI.md:76.
+    # Enforces docs/CLI.md:79.
     from scmle.core import stages
 
     assert stages.governing("x", "by", None, "by") == "by"

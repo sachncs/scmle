@@ -12,6 +12,13 @@ marked `Breaking:` and listed first in their group.
 
 ### Breaking changes
 
+* **A signed bundle that cannot be verified is refused, even with
+  `trusted=True`.** Loading a bundle that carries `signature.json` while no
+  signing key is set (`SCMLE_SIGNING_KEY` or `signing_key=`) now raises
+  `ArtifactError`: a signature that cannot be checked may be an invalid one.
+  `trusted=True` (and `--trusted`) only vouches for a bundle with no
+  signature at all. Anyone loading signed bundles without the key must now
+  supply it (C8).
 * **Single-word names for 19 more uniquely defined names.** Among them
   public classes `CorruptObjectError` -> `MismatchError`, `EvidenceOutcome`
   -> `Outcome`, `LifecycleOutcome` -> `Verdict`, `ReleaseReadinessSummary`
@@ -118,6 +125,39 @@ marked `Breaking:` and listed first in their group.
 
 ### Added
 
+- Leakage screen: dates (as day counts), free text (indicators for its 50
+  commonest words), pairs of two-level columns (a joint skill test, run
+  only while there are no more pairs than columns; otherwise the notes say
+  the pairs were not screened) and echoes of the target (a column read as
+  the target with no fitting: agreement with the label, or R^2 for a
+  number, held to the existing 0.9 association ceiling) are now screened.
+  Profiling passes date and text columns to the screen, each suspect is
+  listed once, and the permutation count is rounded down. C8 `leak_text`,
+  `leak_date` and `leak_xor` are caught; C2 post-outcome columns 6 of 16 ->
+  16 of 16 at screen level. Strong legitimate predictors still block.
+- Charter: a second run of the same signed charter on the same data is
+  refused before it reopens the confirmation set; the use is recorded in
+  `scmle/data/ledger/usage.py` (C8 `charter_rerun`). Not yet covered: a run
+  written to a different output directory, or a different split of the
+  same data.
+- Intervals: binary ROC AUC and RMSE get a studentized (bootstrap-t)
+  interval with a standard error clustered by unit (DeLong for ROC AUC,
+  the delta method for RMSE). Coverage of the 95 percent band: grouped ROC
+  AUC 816 -> 836 of 882, RMSE 818 -> 827 of 882 (C3).
+- Logging: `--log-json` and `SCMLE_LOG_JSON` (for the generated service)
+  write one JSON object per line; every record carries the run id and
+  request id. Under-sized oversampling classes, uncast synthetic columns and
+  a missing resource module now log `WARNING` and raise a `Degraded`
+  warning (2.1, ERR-22, ERR-24). Run as `python -m scmle.cli`, the CLI's
+  own messages (for example the charter hash from `charter check`) are kept:
+  the entry point runs the imported `scmle.cli`, whose logger is inside the
+  package the handler is installed on.
+- Tests: 18 new mutation-targeted test files. On the redrawn 19-module
+  sample, after packages were split, 423 of 540 mutants are killed (0.78);
+  the sample decided only 18 modules, so C10 mutation is not measured yet.
+- C8: the automated bypass search now finds 0 bypasses in 47 attempts (43
+  blocked, 4 through a documented override), down from 9. C8 stays not
+  measured: only a red-team exercise by people can pass it.
 - Measured scorecard evidence for C1, C2, C4 and C5, and C14 decided on
   65 real tables (stage A; no product change):
   - C1 passes: all 43 registered gates block their injected fault and all
@@ -933,6 +973,11 @@ marked `Breaking:` and listed first in their group.
 
 ### Changed
 
+- Restructure: `scmle.core.stages`, `scmle.models.modality_lifecycle`,
+  `scmle.evaluation.parameter_estimation`, the six `scmle.data.modalities`
+  modules (audio, document, geospatial, graph, image, video) and
+  `scmle.workflow.executor` are now packages at the same import paths; no
+  caller changes. Modules over 800 lines fell from 54 to about 44.
 - Wrong-kind inputs raise `errors.KindError` and calls made out of order
   (predicting before fitting, a stage before the stage it needs) raise
   `errors.OrderError` (ERR-20): 223 former `TypeError` and 27 former
@@ -1125,6 +1170,22 @@ marked `Breaking:` and listed first in their group.
 
 ### Fixed
 
+- Resume: a run whose test set was opened, or that has no intact custody
+  journal, cannot be resumed (`BlockedError`), and a gate a checkpoint
+  rejected stays rejected until a checkpoint passed to
+  `Project.resume(..., checkpoints=())` approves it. Start, checkpoint
+  verdicts and the test-set opening are recorded in a hash-chained custody
+  journal outside the run directory (`runs/custody/<run>.jsonl`), so
+  deleting or editing run files (`evaluation.json`, `config.json`,
+  `events.jsonl`) cannot erase them (C8).
+- Readers: CSV detects the encoding (BOM, UTF-8, cp1252) and delimiter,
+  and refuses duplicate headers, ragged rows, ambiguous decimal or
+  thousands commas and numbers that would not read exactly; zero-padded ids
+  stay text, and integers above 2**53 become exact `Int64` with gaps (C5: 0
+  of 34 awkward files read silently wrong, was 9).
+- Crashes: native-categorical codes are capped at 255 levels, rarer levels
+  pooled and recorded; calibration folds follow the rarest class instead of
+  crashing (OpenML 315, 363711).
 - Serving: a hung scoring call no longer blocks other requests. Tabular
   serving drops its global scoring lock for models without series features;
   modality serving answers 503 until a timed-out call returns and fails

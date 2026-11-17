@@ -21,7 +21,7 @@ file-write path, plus `bandit -r scmle` and `pip-audit` (both run in CI).
 
 | Risk | Control | Test |
 | --- | --- | --- |
-| Loading a malicious bundle | Loading is **refused unless authentic**: the manifest HMAC-SHA256 signature must verify (`$SCMLE_SIGNING_KEY` or `signing_key=`), or the caller vouches with `trusted=True` | `tests/unit/test_bundle.py` |
+| Loading a malicious bundle | Loading is **refused unless authentic**: the manifest HMAC-SHA256 signature must verify (`$SCMLE_SIGNING_KEY` or `signing_key=`), or, for an unsigned bundle only, the caller vouches with `trusted=True`; a signed bundle with no key set to verify it is refused even with `trusted=True` | `tests/unit/test_bundle.py` |
 | Tampered model file | SHA-256 per file is verified **before** unpickling; an invalid signature is an error even with `trusted=True` | tamper and swapped-model tests |
 | Malicious deep-learning checkpoint or document/image package | Checkpoints are an authenticated envelope (`scmle.envelope`): a JSON header with the payload digest and an HMAC is read and verified before any byte is unpickled. Package manifests, which record the payload digest, are signed the same way. Unsigned files, or signed files read with no key, are refused unless `trusted=True`; an invalid signature is an error even with `trusted=True` | `tests/unit/test_envelope.py` (a tripwire on `joblib.load`) |
 | Dependency drift | Bundle records Python and scikit-learn versions; mismatches are refused unless allowed | version-mismatch test |

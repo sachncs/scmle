@@ -4,13 +4,12 @@ import pytest
 
 import scmle.artifacts.bundle
 from scmle.contracts import errors
-from tests.unit import test_bundle
-
-trained = test_bundle.trained
+from tests.unit.test_bundle import trained  # noqa: F401 (pytest fixture)
 
 
 def test_rotation_rejects_the_old_key_and_leaves_no_temporary_file(
-    trained, tmp_path
+    trained,  # noqa: F811 (the imported pytest fixture)
+    tmp_path,
 ):
     """Enforces docs/OPERATIONS_REHEARSAL.md:64."""
     bundle, features = trained

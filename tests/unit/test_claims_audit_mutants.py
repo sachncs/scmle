@@ -716,7 +716,7 @@ def write_custody(folder, events, key=KEY):
 
 
 def test_custody_findings_are_exact_for_hand_made_logs(tmp_path):
-    # Enforces docs/CLI.md:102.
+    # Enforces docs/CLI.md:105.
     document = {"outcome": confirm.CONFIRMED, "survivors_sha256": "s"}
     assert claims_audit.custodial(tmp_path, document, KEY) == finding(
         CUSTODY, "skipped", "custody_log.jsonl is not in the run"

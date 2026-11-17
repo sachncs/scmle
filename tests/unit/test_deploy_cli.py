@@ -90,8 +90,8 @@ def gate(root, stage="certify", *extra):
 def test_a_complete_release_is_certified_and_the_record_verifies(
     release, capsys
 ):
-    # Enforces docs/CLI.md:152.
-    # Enforces docs/GLOSSARY.md:696.
+    # Enforces docs/CLI.md:155.
+    # Enforces docs/GLOSSARY.md:698.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:21.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:771.
     root, ignored, digest = release
@@ -133,8 +133,8 @@ def test_a_complete_release_is_certified_and_the_record_verifies(
 def test_evidence_that_is_not_supplied_blocks_the_release(
     release, capsys, drop
 ):
-    # Enforces docs/CLI.md:152.
-    # Enforces docs/GLOSSARY.md:696-698.
+    # Enforces docs/CLI.md:155.
+    # Enforces docs/GLOSSARY.md:698-698.
     root, manifest, ignored = release
     del manifest[drop]
     write_manifest(root, manifest)
@@ -145,7 +145,7 @@ def test_evidence_that_is_not_supplied_blocks_the_release(
 
 
 def test_an_unsigned_model_blocks_the_release(release):
-    # Enforces docs/GLOSSARY.md:698.
+    # Enforces docs/GLOSSARY.md:700.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:22.
     root = release[0]
     path = root / "registry" / "registry.json"

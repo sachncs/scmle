@@ -106,7 +106,7 @@ def test_a_retried_transient_failure_is_logged(caplog):
 
     with caplog.at_level(logging.WARNING, logger="scmle.core.retry"):
         result = retry.call(
-            operation, retry.Retries(max_attempts=2), sleep=lambda _: None
+            operation, retry.Retries(max_attempts=2), sleep=lambda seconds: None
         )
     assert result == "done"
     assert any("slow" in r.getMessage() for r in caplog.records)
@@ -127,7 +127,9 @@ def test_an_unreadable_disk_is_logged(caplog, tmp_path):
 
 
 def test_a_capability_downgrade_and_a_budget_skip_log_a_warning():
-    stages = (ROOT / "scmle/core/stages.py").read_text(encoding="utf-8")
+    stages = (ROOT / "scmle/core/stages/planning.py").read_text(
+        encoding="utf-8"
+    )
     context = (ROOT / "scmle/core/context.py").read_text(encoding="utf-8")
     assert "accepted as extension-only" in stages
     assert 'LOGGER.warning("%s skipped or reduced' in context

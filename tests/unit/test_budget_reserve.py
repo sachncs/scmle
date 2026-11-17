@@ -4,7 +4,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.api import project as projects
+import scmle.api.project
 from scmle.contracts import errors
 
 
@@ -17,7 +17,7 @@ def frame(rows=200, seed=0):
 
 
 def test_a_skip_is_recorded_in_the_events_and_the_report_list():
-    context = projects.Project(frame(), "y").orchestrator.new_context()
+    context = scmle.api.project.Project(frame(), "y").orchestrator.new_context()
     context.forgo("threshold", "needs 9.0 s but 1.0 s remain")
     assert context.skipped == [
         {"work": "threshold", "reason": "needs 9.0 s but 1.0 s remain"}
@@ -26,7 +26,9 @@ def test_a_skip_is_recorded_in_the_events_and_the_report_list():
 
 def test_a_budget_too_small_for_the_minimum_run_is_refused(tmp_path):
     with pytest.raises(errors.BlockedError, match="smallest budget") as caught:
-        projects.Project(frame(), "y", time_budget=1, output_dir=tmp_path).run()
+        scmle.api.project.Project(
+            frame(), "y", time_budget=1, output_dir=tmp_path
+        ).run()
     assert caught.value.details["smallest_budget_seconds"] > 1
 
 
@@ -83,10 +85,10 @@ def test_selection_falls_back_to_a_candidate_whose_refit_fits():
 def test_diagnostics_get_at_most_what_is_left_before_packaging():
     from scmle.core import stages
 
-    context, _ = timed(20)
+    context = timed(20)[0]
     context.regulator.reserve.parts = {"package": 5.0}
     assert stages.FinalEvaluationStage.ration(context) <= 15.0
-    late, _ = timed(1)
+    late = timed(1)[0]
     late.regulator.started_at -= 10
     assert stages.FinalEvaluationStage.ration(late) == 0.0
 
@@ -104,7 +106,7 @@ def test_a_package_fit_that_cannot_end_in_time_is_halted_on_record():
 def test_package_fits_leave_the_packaging_tail_its_time():
     from scmle.core import stages
 
-    context, _ = timed(10)
+    context = timed(10)[0]
     # A 9 s fold fit would end before the 10 s finish, but not before the
     # tail that saves the bundle and writes the report.
     assert stages.foldcost(trial("near", 30.0)) == pytest.approx(9.0)

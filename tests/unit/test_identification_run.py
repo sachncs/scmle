@@ -84,7 +84,7 @@ def go(spec, x, c, **kw):
 
 
 def test_no_eligible_strategy_prints_no_estimate():
-    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:125.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:127.
     spec = block(assumptions=("positivity",))
     out = go(spec, observational(500, 1), observational(500, 2))
     claims = out.documents["causal_claims.json"]
@@ -143,7 +143,7 @@ def test_uncertified_gates_keep_the_claim_at_attested():
 def test_the_held_out_estimate_alone_is_not_confirmed():
     # unobserved confounding, significant on C, no negative control, no strata
     # Enforces docs/GLOSSARY.md:409.
-    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:124.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:126.
     spec = block(negative_controls=(), strata=(), sensitivity=None)
     x, c = (
         observational(3000, 7, hidden=1.2),

@@ -62,7 +62,7 @@ def run(tmp_path, *extra):
 
 
 def test_frame_writes_artifacts_and_an_unsigned_charter(tmp_path):
-    # Enforces docs/CLI.md:29.
+    # Enforces docs/CLI.md:32.
     # Enforces docs/ARTIFACTS.md:63.
     inputs(tmp_path)
     assert run(tmp_path, "--cost-model", str(tmp_path / "cost.json")) == 0
@@ -82,7 +82,7 @@ def test_frame_writes_artifacts_and_an_unsigned_charter(tmp_path):
 
 
 def test_frame_refuses_a_request_naming_a_missing_column(tmp_path):
-    # Enforces docs/CLI.md:29.
+    # Enforces docs/CLI.md:32.
     # Enforces docs/ARTIFACTS.md:63.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:22.
     inputs(tmp_path)
@@ -97,7 +97,7 @@ def test_frame_refuses_a_request_naming_a_missing_column(tmp_path):
 
 def test_frame_replay_without_tau_is_refused(tmp_path):
     # Enforces docs/ARTIFACTS.md:76.
-    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:252.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:254.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:335.
     inputs(tmp_path)
     sample = {

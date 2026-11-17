@@ -1,13 +1,13 @@
 {
-  "modules_over": 54,
-  "classes_over": 55,
-  "functions_over": 183,
+  "modules_over": 44,
+  "classes_over": 37,
+  "functions_over": 128,
   "compound_functions": 1277,
   "compound_classes": 189,
   "private_names": 0,
-  "loose_dicts": 1156,
-  "largest_module": 6341,
+  "loose_dicts": 1154,
+  "largest_module": 2393,
   "bare_raises": 26,
-  "value_catches": 170,
+  "value_catches": 169,
   "layer_breaks": 2
 }

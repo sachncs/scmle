@@ -21,7 +21,7 @@ def options(parser):
     Yields:
         Each option string, such as `--key-file`.
     """
-    for action in parser._actions:
+    for action in vars(parser)["_actions"]:
         yield from action.option_strings
         for child in getattr(action, "choices", None) or {}:
             if isinstance(action.choices, dict):
@@ -29,10 +29,10 @@ def options(parser):
 
 
 def test_deploy_commands_take_keys_only_as_files():
-    """Enforces docs/CLI.md:154."""
+    """Enforces docs/CLI.md:157."""
     deploy = next(
         action.choices["deploy"]
-        for action in cli.build_parser()._actions
+        for action in vars(cli.build_parser())["_actions"]
         if isinstance(getattr(action, "choices", None), dict)
     )
     named = {option for option in options(deploy) if "key" in option}
@@ -50,7 +50,7 @@ class Interrupted:
 def test_serve_needs_authentication_beyond_loopback(
     tmp_path, monkeypatch, caplog
 ):
-    """Enforces docs/CLI.md:180."""
+    """Enforces docs/CLI.md:184."""
     for name in list(os.environ):
         if name.startswith("SCMLE_AUTH_"):
             monkeypatch.delenv(name)

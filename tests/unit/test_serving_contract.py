@@ -514,7 +514,7 @@ def test_a_failed_verification_keeps_the_service_alive_but_never_ready(
 ):
     # Enforces docs/SERVICE_SLO.md:15.
     # Enforces docs/SERVICE_SLO.md:14.
-    # Enforces docs/GLOSSARY.md:627.
+    # Enforces docs/GLOSSARY.md:629.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:484.
     def loader(readiness):
         readiness.begin(guard.Phase.VERIFYING)
@@ -627,7 +627,7 @@ def test_the_loader_and_bundle_arguments_are_exclusive(bundle):
 def test_the_batch_command_scores_a_file_and_writes_a_manifest(
     golden, expected, bundle, tmp_path
 ):
-    folder = bundle.save(tmp_path / "bundle", signing_key="batch-key")
+    folder = bundle.save(tmp_path / "bundle")
     source = tmp_path / "records.csv"
     pandas.DataFrame(golden.records).to_csv(source, index=False)
     output = tmp_path / "scored.csv"

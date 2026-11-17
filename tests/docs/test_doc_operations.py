@@ -6,8 +6,8 @@ from scmle.operations import classify
 from scmle.operations import continuous
 from scmle.operations import signals
 from tests import support_ops
-from tests.unit import test_continuous_evaluation as evaluation
-from tests.unit import test_operations_telemetry as telemetry
+from tests.unit import test_continuous_evaluation
+from tests.unit import test_operations_telemetry
 
 
 def test_only_feature_rows_are_sampled():
@@ -35,7 +35,9 @@ def test_only_feature_rows_are_sampled():
 )
 def test_each_data_signal_alone_is_a_data_quality_fault(name):
     """Enforces docs/OPERATIONS.md:39."""
-    verdict = classify.classify(telemetry.window(**{name: "breach"})).verdict
+    verdict = classify.classify(
+        test_operations_telemetry.window(**{name: "breach"})
+    ).verdict
     assert verdict is classify.Verdict.DATA_QUALITY
 
 
@@ -51,7 +53,9 @@ def test_every_answer_says_two_periods_cannot_separate_the_model(
     changes, overall
 ):
     """Enforces docs/OPERATIONS.md:95."""
-    before, after = evaluation.periods(**changes)
-    result = continuous.post_promotion_check(evaluation.SPECS, before, after)
+    before, after = test_continuous_evaluation.periods(**changes)
+    result = continuous.post_promotion_check(
+        test_continuous_evaluation.SPECS, before, after
+    )
     assert result["overall"] == overall
     assert "cannot separate the model" in result["statement"]

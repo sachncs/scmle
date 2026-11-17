@@ -1,7 +1,7 @@
 {
   "alpha": 0.05,
   "claim": "C3",
-  "code": "c0a302a4fa9a2242dce1856876ffaf82fce999817e5b50b4b46db948f9f91839",
+  "code": "f858816231260b51e8f55b29187867091c5a4c73ee532333c2872e82b7be9811",
   "design": {
     "fresh_rows": 100000,
     "group_rows": 5,
@@ -12,39 +12,39 @@
   },
   "families": [
     {
-      "above": 16,
-      "below": 18,
+      "above": 20,
+      "below": 17,
       "family": "binary_rows",
-      "hits": 848,
-      "lower": 0.9490078181618,
-      "mean_width": 0.0971933523485326,
+      "hits": 845,
+      "lower": 0.9451797003473325,
+      "mean_width": 0.09878060244223295,
       "no_interval": 0,
       "passed": true,
-      "rate": 0.9614512471655329,
+      "rate": 0.9580498866213152,
       "trials": 882
     },
     {
-      "above": 45,
-      "below": 19,
+      "above": 31,
+      "below": 24,
       "family": "regression_rows",
-      "hits": 818,
-      "lower": 0.9114110130594106,
-      "mean_width": 0.15900178352246636,
+      "hits": 827,
+      "lower": 0.922556978988157,
+      "mean_width": 0.16276779742793276,
       "no_interval": 0,
       "passed": false,
-      "rate": 0.927437641723356,
+      "rate": 0.937641723356009,
       "trials": 882
     },
     {
-      "above": 23,
-      "below": 43,
+      "above": 22,
+      "below": 24,
       "family": "binary_groups",
-      "hits": 816,
-      "lower": 0.9089457554946044,
-      "mean_width": 0.10424781205708253,
+      "hits": 836,
+      "lower": 0.9338036217244945,
+      "mean_width": 0.10869179412726535,
       "no_interval": 0,
-      "passed": false,
-      "rate": 0.9251700680272109,
+      "passed": true,
+      "rate": 0.9478458049886621,
       "trials": 882
     }
   ],
@@ -60,12 +60,12 @@
   ],
   "planned_trials": 882,
   "pooled": {
-    "hits": 2482,
-    "lower": 0.9297538184481006,
-    "rate": 0.9380196523053665,
+    "hits": 2508,
+    "lower": 0.940170564743724,
+    "rate": 0.9478458049886621,
     "trials": 2646
   },
   "power": 0.8,
-  "seconds": 742.8,
+  "seconds": 140.8,
   "variable": "interval_coverage_min"
 }

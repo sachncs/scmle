@@ -535,18 +535,14 @@ def test_l268_l276_states_blocked_and_transition_events(run):
 
 def test_l278_l288_orchestrator_support(frame, tmp_path):
     """Retries, cancellation, budget, checkpointing, restart, failures, ordering, parallelism, isolation."""
-    import shutil
-
     from scmle.core import orchestrator
 
     project = support.make_project(
         frame, "y", time_budget=300, output_dir=tmp_path
     )
     first = project.run()
-    (first.run_dir / "evaluation.json").unlink()
-    shutil.rmtree(first.run_dir / "model")
     resumed = scmle.api.project.Project.resume(
-        first.run_dir, data=frame
+        support.interrupt(project), data=frame
     )  # idempotent retry / restart
     assert [t.trial_id for t in resumed.trials] == [
         t.trial_id for t in first.trials

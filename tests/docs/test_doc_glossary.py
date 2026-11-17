@@ -34,10 +34,10 @@ def trained():
     return made, features
 
 
-def test_a_signed_bundle_without_the_key_is_refused_unless_trusted(
+def test_a_signed_bundle_without_the_key_is_refused_even_when_trusted(
     trained, tmp_path, monkeypatch
 ):
-    """Enforces docs/GLOSSARY.md:727."""
+    """Enforces docs/GLOSSARY.md:729."""
     monkeypatch.delenv(signing.SIGNING_KEY_ENV, raising=False)
     monkeypatch.delenv(signing.SIGNING_KEY_FILE_ENV, raising=False)
     monkeypatch.delenv("SCMLE_ENV", raising=False)
@@ -45,8 +45,8 @@ def test_a_signed_bundle_without_the_key_is_refused_unless_trusted(
     folder = made.save(tmp_path / "m", signing_key="glossary-key")
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
         bundle.Bundle.load(folder)
-    opened = bundle.Bundle.load(folder, trusted=True)
-    assert len(opened.predict(features)) == len(features)
+    with pytest.raises(errors.ArtifactError, match="no signing key set"):
+        bundle.Bundle.load(folder, trusted=True)
     key = tmp_path / "key"
     key.write_text("glossary-key", encoding="utf-8")
     monkeypatch.setenv(signing.SIGNING_KEY_FILE_ENV, str(key))
@@ -54,5 +54,5 @@ def test_a_signed_bundle_without_the_key_is_refused_unless_trusted(
 
 
 def test_a_blocked_release_exits_with_code_two():
-    """Enforces docs/GLOSSARY.md:698 (the code the gate's refusal uses)."""
+    """Enforces docs/GLOSSARY.md:700 (the code the gate's refusal uses)."""
     assert cli.EXIT_BLOCKED == 2

@@ -6,7 +6,7 @@ from scmle.governance import deployment_ledger
 from scmle.governance import envelope
 from scmle.governance import never_list
 import scmle.operations.controller
-import tests.simulation.world as simulated
+import tests.simulation.world
 
 
 class CrashError(Exception):
@@ -15,7 +15,9 @@ class CrashError(Exception):
 
 @pytest.fixture
 def world(tmp_path):
-    return simulated.World(tmp_path, simulated.make_stream(batches=20, size=20))
+    return tests.simulation.world.World(
+        tmp_path, tests.simulation.world.make_stream(batches=20, size=20)
+    )
 
 
 def pending(controller):
@@ -27,19 +29,19 @@ def pending(controller):
 def test_no_never_list_action_can_be_put_in_an_envelope(action):
     """Enforces docs/AUTONOMY.md:52 and docs/AUTONOMY.md:60."""
     with pytest.raises(deployment_ledger.MisuseError, match="cannot be put"):
-        simulated.envelope(limits={action.value: 1})
-    assert simulated.envelope().limits == {"train_challenger": 1}
+        tests.simulation.world.envelope(limits={action.value: 1})
+    assert tests.simulation.world.envelope().limits == {"train_challenger": 1}
 
 
 def test_an_envelope_never_authorizes_moving_the_champion(world):
     """Enforces docs/AUTONOMY.md:14 (neither does an envelope)."""
     controller = world.controller()
-    controller.envelopes.grant(simulated.envelope(limit=5))
+    controller.envelopes.grant(tests.simulation.world.envelope(limit=5))
     with pytest.raises(envelope.RefusedError, match="never list"):
         controller.envelopes.authorize(
-            never_list.Forbidden.MOVE_CHAMPION, simulated.SCOPE
+            never_list.Forbidden.MOVE_CHAMPION, tests.simulation.world.SCOPE
         )
-    assert not simulated.kinds(
+    assert not tests.simulation.world.kinds(
         controller.loop.ledger, deployment_ledger.ENVELOPE_USED
     )
 
@@ -53,12 +55,16 @@ def test_a_use_is_on_the_ledger_before_the_training_runs(world):
             world.deploy / deployment_ledger.FILE_NAME
         )
         seen.append(
-            len(simulated.kinds(ledger, deployment_ledger.ENVELOPE_USED))
+            len(
+                tests.simulation.world.kinds(
+                    ledger, deployment_ledger.ENVELOPE_USED
+                )
+            )
         )
         return "challenger-1"
 
     controller = world.controller(retrain=trainer)
-    controller.envelopes.grant(simulated.envelope(limit=1))
+    controller.envelopes.grant(tests.simulation.world.envelope(limit=1))
     assert controller.train() == "challenger-1"
     assert seen == [1]
 
@@ -67,16 +73,18 @@ def test_the_ledger_refuses_a_use_the_envelope_does_not_allow(world):
     """Enforces docs/AUTONOMY.md:72 (the ledger itself refuses)."""
     controller = world.controller()
     ledger = controller.loop.ledger
-    controller.envelopes.grant(simulated.envelope(limit=1))
-    controller.envelopes.grant(simulated.envelope(envelope_id="e2"))
+    controller.envelopes.grant(tests.simulation.world.envelope(limit=1))
+    controller.envelopes.grant(
+        tests.simulation.world.envelope(envelope_id="e2")
+    )
     controller.envelopes.revoke("e2", "retired")
 
     def use(**changes):
         body = {
             "envelope_id": "e1",
             "action": "train_challenger",
-            "scope": simulated.SCOPE,
-            "date": simulated.TODAY.isoformat(),
+            "scope": tests.simulation.world.SCOPE,
+            "date": tests.simulation.world.TODAY.isoformat(),
             "detail": {},
             **changes,
         }

@@ -7,7 +7,7 @@ import pytest
 from scmle.data.store import objectstore
 from scmle.data.store import processing
 from scmle.data.store import quality
-from tests.unit import test_governed_data as governed
+from tests.unit import test_governed_data
 
 
 @pytest.fixture
@@ -49,29 +49,35 @@ def failing(rule, frame):
 def test_a_dataset_rule_holds_the_snapshot_until_released(store, rule):
     """Enforces docs/GOVERNED_DATA.md:53 (dataset-level rules)."""
     hours = 9.0 if rule == "freshness" else 0.0
-    frame, record = governed.prepared(store, hours=hours)
+    frame, record = test_governed_data.prepared(store, hours=hours)
     check, bad = failing(rule, frame)
     with pytest.raises(quality.QualityGateError) as raised:
         quality.QualityGate([check], store).run(
-            bad, record, governed.CONTRACT, quality.Stage.TRAIN
+            bad, record, test_governed_data.CONTRACT, quality.Stage.TRAIN
         )
     assert raised.value.quarantined
     assert store.list_objects(f"quarantine/{record.snapshot_id}")
     permissive = quality.QualityGate([quality.MinRowsCheck(1)], store)
     with pytest.raises(quality.QualityGateError, match="is quarantined"):
-        permissive.run(frame, record, governed.CONTRACT, quality.Stage.TRAIN)
+        permissive.run(
+            frame, record, test_governed_data.CONTRACT, quality.Stage.TRAIN
+        )
     permissive.release(record.snapshot_id)
-    assert permissive.run(frame, record, governed.CONTRACT, quality.Stage.TRAIN)
+    assert permissive.run(
+        frame, record, test_governed_data.CONTRACT, quality.Stage.TRAIN
+    )
 
 
 def test_quarantined_rows_and_the_report_are_written_apart(store):
     """Enforces docs/GOVERNED_DATA.md:53 (row-level rules)."""
-    frame, record = governed.prepared(store, governed.CSV + "4,-5.0,north\n")
+    frame, record = test_governed_data.prepared(
+        store, test_governed_data.CSV + "4,-5.0,north\n"
+    )
     check = quality.RangeCheck(
         "amount", 0, 1000, policy=quality.Severity.QUARANTINE
     )
     result = quality.QualityGate([check], store).run(
-        frame, record, governed.CONTRACT, quality.Stage.TRAIN
+        frame, record, test_governed_data.CONTRACT, quality.Stage.TRAIN
     )
     assert list(result.quarantined["id"]) == [4]
     held = f"quarantine/{record.snapshot_id}/rows-train.csv"
@@ -81,12 +87,12 @@ def test_quarantined_rows_and_the_report_are_written_apart(store):
 
 def test_after_a_crash_the_transform_runs_again_on_that_object(store):
     """Enforces docs/GOVERNED_DATA.md:74."""
-    governed.seed(store)
+    test_governed_data.seed(store)
     seen = []
 
     def counted(frame):
         seen.append(tuple(frame["id"]))
-        return governed.upper(frame)
+        return test_governed_data.upper(frame)
 
     class Crash(BaseException):
         pass
@@ -98,7 +104,7 @@ def test_after_a_crash_the_transform_runs_again_on_that_object(store):
     def build(**options):
         return processing.IncrementalProcessor(
             store,
-            governed.CONTRACT,
+            test_governed_data.CONTRACT,
             counted,
             sleep=lambda seconds: None,
             **options,

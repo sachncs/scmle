@@ -46,7 +46,36 @@ def test_the_draw_is_stratified_seeded_and_stable():
     assert sample == mutation.draw(paths, 19)
     assert len(set(sample)) == 19
     assert len({mutation.stratum(p) for p in sample}) > 1
-    assert all(not p.endswith("__init__.py") for p in sample)
+
+
+def test_the_frame_drops_modules_that_cannot_decide(tmp_path):
+    package = tmp_path / "scmle" / "part"
+    package.mkdir(parents=True)
+    (tmp_path / "tests" / "unit").mkdir(parents=True)
+    body = "def f(x):\n    return x + 1\n"
+    (package / "__init__.py").write_text("from scmle.part.used import f\n")
+    (package / "__main__.py").write_text(body)
+    (package / "used.py").write_text(body)
+    (package / "lonely.py").write_text(body)
+    (package / "flat.py").write_text("X = 1\n")
+    (tmp_path / "tests" / "unit" / "test_used.py").write_text(
+        "from scmle.part import used\nimport scmle.part.flat\n"
+    )
+    paths = mutation.population(tmp_path)
+    kept, dropped = mutation.frame(paths, tmp_path)
+    assert kept == ["scmle/part/used.py"]
+    assert dropped == {
+        "entry point": ["scmle/part/__main__.py"],
+        "no mutants": ["scmle/part/__init__.py", "scmle/part/flat.py"],
+        "untested": ["scmle/part/lonely.py"],
+    }
+
+
+def test_a_package_init_takes_the_package_name():
+    assert (
+        mutation.dotted("scmle/core/stages/__init__.py") == "scmle.core.stages"
+    )
+    assert mutation.dotted("scmle/cli.py") == "scmle.cli"
 
 
 def test_allocation_is_proportional_by_largest_remainder():

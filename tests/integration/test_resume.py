@@ -3,7 +3,6 @@
 import dataclasses
 import json
 import pathlib
-import shutil
 
 import pytest
 from sklearn import dummy
@@ -118,9 +117,18 @@ def test_resume_of_tuned_run_recomputes_nothing(
     original = support.make_project(
         binary_frame, "y", time_budget=300, output_dir=tmp_path, search=search
     ).run()
-    # Simulate a crash after the last trial: drop everything after TRAINING.
-    (original.run_dir / "evaluation.json").unlink()
-    shutil.rmtree(original.run_dir / "model")
+    # A crash after the last trial, before the test set opens. Deleting a
+    # completed run's evaluation.json is no crash: its test set was opened
+    # and the custody journal refuses that resume.
+    directory = support.interrupt(
+        support.make_project(
+            binary_frame,
+            "y",
+            time_budget=300,
+            output_dir=tmp_path,
+            search=search,
+        )
+    )
     calls = []
     real = trials.evaluate_payload
     monkeypatch.setattr(
@@ -128,9 +136,7 @@ def test_resume_of_tuned_run_recomputes_nothing(
         "evaluate_payload",
         lambda *a, **k: calls.append(1) or real(*a, **k),
     )
-    resumed = scmle.api.project.Project.resume(
-        original.run_dir, data=binary_frame
-    )
+    resumed = scmle.api.project.Project.resume(directory, data=binary_frame)
     assert calls == [], "all trials were checkpointed, none may be recomputed"
     assert [(t.trial_id, t.status, t.params) for t in resumed.trials] == [
         (t.trial_id, t.status, t.params) for t in original.trials

@@ -167,7 +167,7 @@ def test_the_checks_are_exploration_checks_with_the_documented_fields():
 
 def test_a_descriptive_test_never_blocks_and_a_gating_one_does_what_asked():
     # Enforces docs/GLOSSARY.md:425-426.
-    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:144.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:146.
     left, right = frames(rows=200, shift_by=1.5)
     block = qualification.Decision.BLOCK
     quiet = shift.c2st(left, right, 0, permutations=49, on_shift=block)

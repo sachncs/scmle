@@ -41,7 +41,7 @@ override = "none; only checkpoints passed to Orchestrator(checkpoints=...) are c
 variables = ["checkpoints"]
 
 [robustness.assessment_present]
-site = "scmle.core.stages:ProfileStage.assess_robustness"
+site = "scmle.core.stages.qualification:Qualification.assess_robustness"
 error = "BlockedError"
 claim = "C1"
 passes = "The stability stage holds an assessment (stage.found is set)."
@@ -50,7 +50,7 @@ override = "none"
 variables = []
 
 [leakage.policy]
-site = "scmle.core.stages:ProfileStage.enforce_leakage_policy"
+site = "scmle.core.stages.screening:Screening.enforce_leakage_policy"
 error = "BlockedError"
 claim = "C2"
 passes = "leakage_policy is warn, or under block every screened column was checked and no column is a suspect (significant after Benjamini-Yekutieli over permutation p-values, effect bound above the ceiling); planted leaks the probe did not find on these rows are logged as a WARNING and recorded, not refused."
@@ -59,7 +59,7 @@ override = "Set leakage_policy to 'warn' (the default), which logs warnings inst
 variables = ["leakage_policy"]
 
 [admissibility.quarantine_all]
-site = "scmle.core.stages:ProfileStage.qualify_exploration"
+site = "scmle.core.stages.admission:Admission.qualify_exploration"
 error = "BlockedError"
 claim = "C2"
 passes = "At least one feature of the feature plan is not quarantined by admissibility."
@@ -70,7 +70,7 @@ certificate = "detector_certificates.json: F5 detectors (the leakage screen gate
 
 
 [data.unlabeled]
-site = "scmle.core.stages:ProfileStage.set_aside_unlabeled"
+site = "scmle.core.stages.labelling:Labelling.set_aside_unlabeled"
 error = "BlockedError"
 claim = "C5"
 passes = "data.unlabeled is ignore or pseudo_label, so rows with a missing target are set aside."
@@ -79,7 +79,7 @@ override = "Set data.unlabeled to 'ignore' or 'pseudo_label'."
 variables = ["data.unlabeled", "data.target"]
 
 [select.serving_limits]
-site = "scmle.core.stages:SelectStage.choose"
+site = "scmle.core.stages.selecting:SelectStage.choose"
 error = "BlockedError"
 claim = "C1"
 passes = "No serving limit is set and pareto is off, or one of the top max_candidates_checked trials, refit and measured, is within every limit."
@@ -88,7 +88,7 @@ override = "Relax selection.max_model_mb or selection.max_p95_latency_ms, or rai
 variables = ["selection.max_model_mb", "selection.max_p95_latency_ms", "selection.latency_safety_factor", "selection.max_candidates_checked", "selection.pareto"]
 
 [select.pareto_front]
-site = "scmle.core.stages:SelectStage.select_on_front"
+site = "scmle.core.stages.selecting:SelectStage.select_on_front"
 error = "BlockedError"
 claim = "C1"
 passes = "At least one checked candidate, refit and measured, meets the serving limits."
@@ -109,8 +109,8 @@ variables = ["reconcile", "delta_rec"]
 site = "scmle.data.ledger.confirm:confirm"
 error = "LeakageError"
 claim = "C2, C3"
-passes = "The ledger has no confirmation recorded yet."
-blocks = "ledger.confirmation is not None, so the confirmation was already performed; the attempt is logged as denied; a LeakageError from opening the set also propagates."
+passes = "The ledger has no confirmation recorded yet, and no other run in the registry spent this charter's confirmation set on this data."
+blocks = "ledger.confirmation is not None, so the confirmation was already performed; or the usage register (scmle/data/ledger/usage.py) records that another run of the same charter already spent the confirmation set on the same data; the attempt is logged as denied; a LeakageError from opening the set also propagates."
 override = "none"
 variables = []
 
@@ -192,6 +192,24 @@ error = "LeakageError"
 claim = "C2, C8"
 passes = "The token matches, the rows were not released before, and either no binding is set or the given binding equals it."
 blocks = "The token differs from the set's token; the rows were already released; a binding is set and the given binding differs."
+override = "none"
+variables = []
+
+[split.resident.reopen]
+site = "scmle.data.custody.journal:Journal.admit"
+error = "BlockedError"
+claim = "C2, C8"
+passes = "The run has a custody journal, its chain is intact, and it records no opening of the test set."
+blocks = "The run has no custody journal (copied, predates the journal, or deleted), or the journal records that the test set was already opened; the resumed run is refused."
+override = "none"
+variables = []
+
+[split.resident.journal]
+site = "scmle.data.custody.journal:Journal.read"
+error = "BlockedError"
+claim = "C2, C8"
+passes = "There is no journal, or every entry's previous digest and own digest match the hash chain."
+blocks = "An entry was edited, removed or reordered, so its digest or link to the previous entry no longer matches."
 override = "none"
 variables = []
 
@@ -403,7 +421,7 @@ override = "none; raise resources.time_budget_seconds (time_budget, --time-budge
 variables = ["resources.time_budget_seconds", "START_SECONDS", "CHEAPEST_RATE", "REFIT_SHARE", "EXPLAIN_SHARE", "PACKAGE_SHARE", "OTHER_DIAGNOSTIC_SECONDS"]
 
 [train.first_trial]
-site = "scmle.core.stages:TrainStage.execute"
+site = "scmle.core.stages.training:TrainStage.execute"
 error = "BlockedError"
 claim = "C7, C1"
 passes = "At least one trial of the first chunk of candidates starts: preparation left START_SECONDS or more of the trial window (the budget minus the reserve, counted from the run's start); the memory limit never holds back the first trial."

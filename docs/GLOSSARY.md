@@ -610,7 +610,9 @@ certificate.
 `--trusted` tells SCMLE "I made this myself; open it anyway".
 **Example.** `scmle predict ... --trusted`.
 **Why it matters.** Use `--trusted` only on a model you made yourself. It is
-refused outright when `SCMLE_ENV=production`.
+refused outright when `SCMLE_ENV=production`. It only covers a model with no
+signature at all: a signed model whose key you lack cannot be checked, so
+SCMLE refuses it even with `--trusted` (set `SCMLE_SIGNING_KEY`).
 
 ### SBOM (software bill of materials)
 

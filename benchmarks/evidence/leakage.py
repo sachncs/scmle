@@ -547,11 +547,14 @@ def digest() -> str:
     """Hash of the code measured and the code measuring it.
 
     Returns:
-        The `code_hash` of the product's screen and gate and this module's
-        corpus and trial.
+        The `code_hash` of the product's whole screen module (`code_hash`
+        hashes only the objects it is given, not what they call, so the
+        module is named whole: an edit to any check the screen runs makes
+        the stored result stale), the gate, and this module's corpus and
+        trial.
     """
     return certificates.code_hash(
-        screen.screen_table,
+        screen,
         profiler.Profiler.leakage_screen,
         stages.ProfileStage.enforce_leakage_policy,
         refusal.fetch,

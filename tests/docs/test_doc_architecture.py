@@ -128,7 +128,7 @@ class Entry:
 
 
 def test_a_plugin_that_fails_conformance_is_not_registered(monkeypatch):
-    """Enforces docs/ARCHITECTURE.md:170 (the entry-point half)."""
+    """Enforces docs/ARCHITECTURE.md:173 (the entry-point half)."""
     monkeypatch.setattr(
         registry.metadata, "entry_points", lambda group: [Entry()]
     )
@@ -144,7 +144,7 @@ def score(truth, predicted):
 
 
 def test_readers_keep_their_snapshot_while_registrations_change():
-    """Enforces docs/ARCHITECTURE.md:189."""
+    """Enforces docs/ARCHITECTURE.md:192."""
     custom.register_estimator("doc_snapshot", classifier=naive_bayes.GaussianNB)
     try:
         before = registry.Catalog.stock()
@@ -196,7 +196,7 @@ class Probing(naive_bayes.GaussianNB):
 
 
 def test_the_registry_lock_is_free_while_a_user_estimator_fits():
-    """Enforces docs/ARCHITECTURE.md:219 (the registry half)."""
+    """Enforces docs/ARCHITECTURE.md:222 (the registry half)."""
     SEEN.clear()
     try:
         custom.register_estimator("doc_probing", classifier=Probing)
@@ -206,7 +206,7 @@ def test_the_registry_lock_is_free_while_a_user_estimator_fits():
 
 
 def test_review_holds_the_state_lock_for_the_whole_retrain(tmp_path):
-    """Enforces docs/ARCHITECTURE.md:219 (the `Maintainer.review` half).
+    """Enforces docs/ARCHITECTURE.md:222 (the `Maintainer.review` half).
 
     The retrain runs inside `locked`; while it runs no other thread can take
     the state file's lock.

@@ -142,7 +142,7 @@ def test_the_open_log_and_manifest_hold_ids_but_never_values():
 
 def test_the_orchestrator_process_keeps_only_the_ids():
     # Enforces docs/GLOSSARY.md:304.
-    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:128.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:130.
     built = build()
     outcome, vault = built.outcome, built.vault
     held = vault.sets["C"]

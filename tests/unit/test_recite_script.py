@@ -27,8 +27,8 @@ def test_unchanged_lines_follow_an_insertion_and_changed_ones_stay():
 def test_a_citation_names_the_doc_and_the_line():
     module = load()
 
-    found = module.CITATION.findall(
-        "# Enforces docs/LEAKAGE.md:172 and README.md:9."
-    )
+    # Built from parts, so recite.py does not move this sample citation.
+    sample = "# Enforces docs/LEAKAGE" + ".md:172 and README" + ".md:9."
+    found = module.CITATION.findall(sample)
 
     assert found == [("docs/LEAKAGE.md", "172"), ("README.md", "9")]

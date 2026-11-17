@@ -4,24 +4,30 @@
 mutants the tests kill. This module measures it with mutmut 3 on a sample
 of the package drawn before anything is run, by a rule fixed here:
 
-1. Population: every `scmle/**/*.py` except `__init__.py`.
-2. Strata: the top-level package (`data`, `models`, ...); single-file
+1. Population: every `scmle/**/*.py`.
+2. Frame: the population less every module that cannot produce a
+   decision, removed before the draw and listed in the document with the
+   reason (`REASONS`), in this order: an entry point (`__main__.py`); no
+   mutants (mutmut finds none, as in a package `__init__.py` that only
+   re-exports); untested (no `tests/unit/test_*.py` imports it, step 6).
+   An untested module is a finding, stored under `untested`, not hidden.
+3. Strata: the top-level package (`data`, `models`, ...); single-file
    modules at the top of `scmle/` form the stratum `root`.
-3. Modules: `least` of them, the smallest number of trials the floor rule
+4. Modules: `least` of them, the smallest number of trials the floor rule
    can pass on at all (`Floor.minimum(alpha)`), so the pooled count rests
    on at least as many independent clusters as the rule needs units. They
    are allocated to strata in proportion to stratum size (largest
-   remainder) and drawn without replacement with `default_rng(SEED)`.
-4. Mutants: mutmut's mutants of each module (it mutates function and
+   remainder) and drawn from the frame without replacement with
+   `default_rng(SEED)`.
+5. Mutants: mutmut's mutants of each module (it mutates function and
    method bodies), of which `MARGIN * ceil(planned / modules)` are drawn
    with `default_rng([SEED, position])`. `planned` is the exact sample the
    floor needs for `power` when the true score is `ASSUMED`; `MARGIN`
    covers modules with fewer mutants and the correlation of mutants inside
    one module.
-5. Kill set: the files `tests/unit/test_*.py` that import the module by
-   name, and only those. A module none of them imports keeps every mutant
-   alive (counted as `no tests`).
-6. Run: in a copy of the repository, one mutmut run per module, at most
+6. Kill set: the files `tests/unit/test_*.py` that import the module by
+   name, and only those.
+7. Run: in a copy of the repository, one mutmut run per module, at most
    `WORKERS` workers, a CPU limit per mutant of
    `2 * MULTIPLIER * (baseline seconds + CONSTANT)`, a wall limit per
    module of `CAP` seconds and `BUDGET` seconds in all.
@@ -33,8 +39,9 @@ one-sided Clopper-Pearson lower bound of the pooled score at `alpha` is at
 least the floor, on at least `planned` mutants from at least `least`
 modules.
 
-NOT measured: tests outside `tests/unit`, modules not drawn, module-level
-code (mutmut mutates function bodies only), equivalent-mutant review.
+NOT measured: tests outside `tests/unit`, modules not drawn, modules out
+of the frame (untested ones are listed), module-level code (mutmut mutates
+function bodies only), equivalent-mutant review.
 
     python -m benchmarks.evidence.mutation --write
     python -m benchmarks.evidence.mutation --check
@@ -57,6 +64,7 @@ import tempfile
 import time
 from typing import Any
 
+from mutmut.mutation import file_mutation
 import numpy
 
 from benchmarks import acceptance
@@ -106,9 +114,12 @@ THREADS = (
     "NUMEXPR_NUM_THREADS",
 )
 STATUSES = ("killed", "survived", "no tests", "timeout", "crash")
+# Why a module is out of the frame, in the order the rules are applied.
+REASONS = ("entry point", "no mutants", "untested")
 NOT_MEASURED = (
     "tests outside tests/unit",
     "modules not drawn",
+    "modules out of the frame (untested ones are listed)",
     "module-level code (mutmut mutates function bodies only)",
     "equivalent-mutant review (survivors are all counted)",
 )
@@ -126,7 +137,7 @@ main.create_mutants(1)
 
 
 def population(root: Path = ROOT) -> list[str]:
-    """Every module of the package that can be drawn.
+    """Every module of the package.
 
     Args:
         root: Repository root.
@@ -138,8 +149,64 @@ def population(root: Path = ROOT) -> list[str]:
     return sorted(
         p.relative_to(root).as_posix()
         for p in found
-        if p.name != "__init__.py" and "__pycache__" not in p.parts
+        if "__pycache__" not in p.parts
     )
+
+
+def mutants(path: str, root: Path = ROOT) -> int:
+    """How many mutants mutmut makes of a module, without running any.
+
+    Args:
+        path: Module path.
+        root: Repository root.
+
+    Returns:
+        The number of mutant names mutmut's own generator gives it.
+    """
+    code = (root / path).read_text(encoding="utf-8")
+    return len(file_mutation.mutate_file_contents(path, code).mutant_names)
+
+
+def reason(path: str, root: Path = ROOT) -> str | None:
+    """Why a module cannot produce a decision.
+
+    Args:
+        path: Module path.
+        root: Repository root.
+
+    Returns:
+        The first of `REASONS` that applies, or None when it can.
+    """
+    if Path(path).name == "__main__.py":
+        return "entry point"
+    if not mutants(path, root):
+        return "no mutants"
+    if not suite(path, root):
+        return "untested"
+    return None
+
+
+def frame(
+    paths: list[str], root: Path = ROOT
+) -> tuple[list[str], dict[str, list[str]]]:
+    """The sampling frame: modules that can produce a decision.
+
+    Args:
+        paths: The population, sorted.
+        root: Repository root.
+
+    Returns:
+        The frame, sorted, and the excluded paths under each of `REASONS`.
+    """
+    kept = []
+    dropped: dict[str, list[str]] = {r: [] for r in REASONS}
+    for path in paths:
+        found = reason(path, root)
+        if found is None:
+            kept.append(path)
+        else:
+            dropped[found].append(path)
+    return kept, dropped
 
 
 def stratum(path: str) -> str:
@@ -218,7 +285,7 @@ def draw(paths: list[str], count: int) -> list[str]:
     """The stratified random sample of modules.
 
     Args:
-        paths: The population, sorted.
+        paths: The frame, sorted.
         count: Modules to draw.
 
     Returns:
@@ -244,9 +311,11 @@ def dotted(path: str) -> str:
         path: Module path such as `scmle/core/randomness.py`.
 
     Returns:
-        The dotted name, such as `scmle.core.randomness`.
+        The dotted name, such as `scmle.core.randomness`; a package's
+        `__init__.py` takes the package's name.
     """
-    return path.removesuffix(".py").replace("/", ".")
+    name = path.removesuffix(".py").removesuffix("/__init__")
+    return name.replace("/", ".")
 
 
 def imports(source: str) -> set[str]:
@@ -282,12 +351,28 @@ def suite(path: str, root: Path = ROOT) -> list[str]:
         Paths of `tests/unit/test_*.py` files that import the module, sorted.
     """
     name = dotted(path)
+    return [t for t, names in catalog(root) if name in names]
+
+
+@functools.cache
+def catalog(root: Path) -> tuple[tuple[str, frozenset[str]], ...]:
+    """The import names of every unit test file, read once per root.
+
+    Args:
+        root: Repository root.
+
+    Returns:
+        Pairs of a `tests/unit/test_*.py` path and its import names,
+        sorted by path.
+    """
     tests = sorted((root / "tests" / "unit").glob("test_*.py"))
-    return [
-        t.relative_to(root).as_posix()
+    return tuple(
+        (
+            t.relative_to(root).as_posix(),
+            frozenset(imports(t.read_text(encoding="utf-8"))),
+        )
         for t in tests
-        if name in imports(t.read_text(encoding="utf-8"))
-    ]
+    )
 
 
 def pick(names: list[str], position: int, count: int) -> list[str]:
@@ -597,13 +682,18 @@ def digest() -> str:
     """
     return certificates.code_hash(
         population,
+        mutants,
+        reason,
+        frame,
         stratum,
         required,
         design,
         allocate,
         draw,
+        dotted,
         imports,
         suite,
+        catalog,
         pick,
         classify,
         configure,
@@ -626,7 +716,8 @@ def measure() -> dict[str, Any]:
     least, planned = required()
     count, each = design()
     paths = population()
-    sample = draw(paths, count)
+    kept, dropped = frame(paths)
+    sample = draw(kept, count)
     modules = []
     with tempfile.TemporaryDirectory(prefix="mutation") as folder:
         work = Path(folder)
@@ -650,9 +741,14 @@ def measure() -> dict[str, Any]:
         "planned_mutants": planned,
         "design": {
             "population": len(paths),
+            "frame": len(kept),
+            "excluded": {r: len(dropped[r]) for r in REASONS},
+            "rule": "out of the frame before the draw: an entry point "
+            "(__main__.py), no mutmut mutants, or untested (no "
+            "tests/unit/test_*.py imports it)",
             "strata": {
-                s: sum(stratum(p) == s for p in paths)
-                for s in sorted({stratum(p) for p in paths})
+                s: sum(stratum(p) == s for p in kept)
+                for s in sorted({stratum(p) for p in kept})
             },
             "modules": count,
             "per_module": each,
@@ -666,6 +762,8 @@ def measure() -> dict[str, Any]:
             "cap_seconds": CAP,
             "budget_seconds": BUDGET,
         },
+        "excluded": {r: dropped[r] for r in REASONS if r != "untested"},
+        "untested": dropped["untested"],
         "sample": sample,
         "modules": modules,
         "pooled": pool(run),
@@ -692,6 +790,40 @@ def read(document: dict[str, Any] | None) -> dict[str, Any] | None:
     return loaded
 
 
+def stale(
+    document: dict[str, Any] | None = None, root: Path = ROOT
+) -> list[str]:
+    """Why the stored document is not for the current code (`--check`).
+
+    Args:
+        document: The document; read from `PATH` when None.
+        root: Repository root whose files are compared with the measured
+            ones.
+
+    Returns:
+        Messages for a missing file, code that changed, a threshold other
+        than acceptance.toml's, or a module or its tests changed since the
+        run; empty when the stored result is current. A sample too small
+        to decide is not staleness: `problems` adds it and `summary`
+        reports it as not measured.
+    """
+    found = read(document)
+    if found is None:
+        return [f"{PATH.name} is missing"]
+    issues = []
+    if found.get("code") != digest():
+        issues.append("mutation: measured with other code")
+    floor = acceptance.load()[VARIABLE].value
+    if found.get("floor") != floor:
+        issues.append(f"mutation: floor {found.get('floor')} is not {floor}")
+    run = [m for m in found.get("modules", []) if "counts" in m]
+    for module in run:
+        paths = [module["module"], *module["tests"]]
+        if fingerprint(paths, root) != module["files"]:
+            issues.append(f"mutation: {module['module']} changed since run")
+    return issues
+
+
 def problems(
     document: dict[str, Any] | None = None, root: Path = ROOT
 ) -> list[str]:
@@ -703,26 +835,16 @@ def problems(
             ones.
 
     Returns:
-        Messages for a missing file, code that changed, a threshold other
-        than acceptance.toml's, a module or its tests changed since the
-        run, fewer modules than the rule's minimum, or fewer decided
-        mutants than planned; empty when the document decides.
+        The `stale` messages, plus fewer modules decided than the rule's
+        minimum or fewer decided mutants than planned; empty when the
+        document decides.
     """
     found = read(document)
+    issues = stale(found, root)
     if found is None:
-        return [f"{PATH.name} is missing"]
-    issues = []
-    if found.get("code") != digest():
-        issues.append("mutation: measured with other code")
-    floor = acceptance.load()[VARIABLE].value
-    if found.get("floor") != floor:
-        issues.append(f"mutation: floor {found.get('floor')} is not {floor}")
+        return issues
     least, planned = required()
     run = [m for m in found.get("modules", []) if "counts" in m]
-    for module in run:
-        paths = [module["module"], *module["tests"]]
-        if fingerprint(paths, root) != module["files"]:
-            issues.append(f"mutation: {module['module']} changed since run")
     used = [m for m in run if m["decided"]]
     if len(used) < least:
         issues.append(
@@ -779,8 +901,8 @@ def main(arguments: list[str] | None = None) -> int:
         arguments: Command-line arguments; None reads `sys.argv`.
 
     Returns:
-        0 after `--write`; for `--check`, 0 when `problems` is empty and 1
-        otherwise.
+        0 after `--write`; for `--check`, 0 when `stale` is empty (the
+        stored result is for the current code) and 1 otherwise.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -795,7 +917,7 @@ def main(arguments: list[str] | None = None) -> int:
         )
         print(json.dumps(summary(document)))
         return 0
-    issues = problems()
+    issues = stale()
     print(json.dumps({"ok": not issues, "problems": issues}, indent=2))
     return 0 if not issues else 1
 

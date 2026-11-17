@@ -33,7 +33,7 @@
       "unlinked": 0
     },
     "docs/CLI.md": {
-      "guarantees": 9,
+      "guarantees": 11,
       "unlinked": 0
     },
     "docs/DECISIONS.md": {
@@ -45,7 +45,7 @@
       "unlinked": 0
     },
     "docs/GLOSSARY.md": {
-      "guarantees": 18,
+      "guarantees": 19,
       "unlinked": 0
     },
     "docs/GOVERNED_DATA.md": {
@@ -122,10 +122,10 @@
     }
   },
   "claim": "C12",
-  "content_hash": "6877a96e739aa0e594b32dfc1f562357d70a1de2c5de6b5927255053ae896a27",
+  "content_hash": "8e5232c1baa2c23df27bae5fe19b502500ebd273338ca7e8f600f94b881998e0",
   "counts": {
-    "guarantees": 241,
-    "linked": 241,
+    "guarantees": 244,
+    "linked": 244,
     "unlinked": 0
   },
   "definition": {
@@ -852,8 +852,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 132,
-      "line": 131,
+      "end": 135,
+      "line": 134,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -868,8 +868,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 140,
-      "line": 138,
+      "end": 143,
+      "line": 141,
       "missing": [],
       "section": "leakage-screen",
       "tests": [
@@ -883,8 +883,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 172,
-      "line": 170,
+      "end": 175,
+      "line": 173,
       "missing": [],
       "section": "extension-points-and-polymorphism",
       "tests": [
@@ -899,8 +899,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 192,
-      "line": 189,
+      "end": 195,
+      "line": 192,
       "missing": [],
       "section": "concurrency",
       "tests": [
@@ -914,8 +914,8 @@
     {
       "cited": [],
       "doc": "docs/ARCHITECTURE.md",
-      "end": 221,
-      "line": 219,
+      "end": 224,
+      "line": 222,
       "missing": [],
       "section": "concurrency",
       "tests": [
@@ -1232,7 +1232,7 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 107,
+      "end": 108,
       "line": 102,
       "missing": [],
       "section": "the-model",
@@ -1241,7 +1241,7 @@
         "tests/unit/test_bundle.py::test_signed_bundles_load_without_trust_and_detect_tampering",
         "tests/unit/test_bundle.py::test_unsigned_bundles_are_refused_unless_trusted"
       ],
-      "text": "`model/` is the checksummed bundle (signed when a signing key is configured; an unsigned bundle is refused unless trusted): `pipeline.joblib` (fitted preprocessing and estimator), `schema.json`, `reference.json` (monitoring reference profile), `conformal.json` (pooled and per-class calibration scores), `novelty.joblib` and `model_manifest.json` (checksums and signature).",
+      "text": "`model/` is the checksummed bundle (signed when a signing key is configured; an unsigned bundle is refused unless trusted, and a signed one with no key to verify it is refused even when trusted): `pipeline.joblib` (fitted preprocessing and estimator), `schema.json`, `reference.json` (monitoring reference profile), `conformal.json` (pooled and per-class calibration scores), `novelty.joblib` and `model_manifest.json` (checksums and signature).",
       "words": [
         "refused"
       ]
@@ -1249,8 +1249,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 118,
-      "line": 118,
+      "end": 119,
+      "line": 119,
       "missing": [],
       "section": "provenance-and-governance",
       "tests": [
@@ -1265,8 +1265,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 129,
-      "line": 129,
+      "end": 130,
+      "line": 130,
       "missing": [],
       "section": "the-service-folder-scmle-package",
       "tests": [
@@ -1283,8 +1283,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 133,
-      "line": 133,
+      "end": 134,
+      "line": 134,
       "missing": [],
       "section": "the-service-folder-scmle-package",
       "tests": [
@@ -1523,8 +1523,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 12,
-      "line": 12,
+      "end": 15,
+      "line": 15,
       "missing": [],
       "section": "command-line",
       "tests": [
@@ -1539,8 +1539,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 14,
-      "line": 14,
+      "end": 17,
+      "line": 17,
       "missing": [],
       "section": "command-line",
       "tests": [
@@ -1555,8 +1555,23 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 29,
-      "line": 29,
+      "end": 23,
+      "line": 23,
+      "missing": [],
+      "section": "command-line",
+      "tests": [
+        "tests/integration/test_custody_journal.py::test_deleting_the_evaluation_does_not_reopen_the_test_set"
+      ],
+      "text": "`scmle resume RUN_DIR` | Continue a cancelled, failed or crashed run, reusing finished trials. A run whose test set was opened, or whose custody journal (`runs/custody/<run>.jsonl`, outside the run directory) is missing or edited, is refused; deleting `evaluation.json` does not change that.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 32,
+      "line": 32,
       "missing": [],
       "section": "command-line",
       "tests": [
@@ -1571,8 +1586,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 77,
-      "line": 75,
+      "end": 80,
+      "line": 78,
       "missing": [],
       "section": "analysis-charter",
       "tests": [
@@ -1586,8 +1601,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 102,
-      "line": 101,
+      "end": 105,
+      "line": 104,
       "missing": [],
       "section": "claims-of-a-charter-run",
       "tests": [
@@ -1601,8 +1616,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 153,
-      "line": 151,
+      "end": 156,
+      "line": 154,
       "missing": [],
       "section": "release-evidence-and-the-runtime",
       "tests": [
@@ -1618,8 +1633,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 154,
-      "line": 154,
+      "end": 157,
+      "line": 157,
       "missing": [],
       "section": "release-evidence-and-the-runtime",
       "tests": [
@@ -1633,8 +1648,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 171,
-      "line": 170,
+      "end": 174,
+      "line": 173,
       "missing": [],
       "section": "bundles-signed-versus-trusted",
       "tests": [
@@ -1648,8 +1663,24 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 183,
+      "end": 181,
       "line": 180,
+      "missing": [],
+      "section": "bundles-signed-versus-trusted",
+      "tests": [
+        "tests/unit/test_bundle_unverifiable.py::test_trusted_load_refuses_a_signature_it_cannot_check"
+      ],
+      "text": "It never skips a signature: a signed bundle with no key set to verify it is refused even with `--trusted`.",
+      "words": [
+        "never",
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 187,
+      "line": 184,
       "missing": [],
       "section": "bundles-signed-versus-trusted",
       "tests": [
@@ -1949,6 +1980,7 @@
       "missing": [],
       "section": "pickle-trusted",
       "tests": [
+        "tests/unit/test_bundle_unverifiable.py::test_trusted_load_refuses_a_signature_it_cannot_check",
         "tests/unit/test_service_hardening.py::test_trusted_is_refused_in_production_everywhere"
       ],
       "text": "It is refused outright when `SCMLE_ENV=production`.",
@@ -1959,8 +1991,24 @@
     {
       "cited": [],
       "doc": "docs/GLOSSARY.md",
-      "end": 629,
-      "line": 627,
+      "end": 615,
+      "line": 613,
+      "missing": [],
+      "section": "pickle-trusted",
+      "tests": [
+        "tests/unit/test_bundle_unverifiable.py::test_trusted_load_refuses_a_signature_it_cannot_check"
+      ],
+      "text": "It only covers a model with no signature at all: a signed model whose key you lack cannot be checked, so SCMLE refuses it even with `--trusted` (set `SCMLE_SIGNING_KEY`).",
+      "words": [
+        "cannot",
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 631,
+      "line": 629,
       "missing": [],
       "section": "provenance",
       "tests": [
@@ -1977,8 +2025,8 @@
     {
       "cited": [],
       "doc": "docs/GLOSSARY.md",
-      "end": 696,
-      "line": 696,
+      "end": 698,
+      "line": 698,
       "missing": [],
       "section": "release-gate",
       "tests": [
@@ -1993,14 +2041,13 @@
     {
       "cited": [],
       "doc": "docs/GLOSSARY.md",
-      "end": 699,
-      "line": 698,
+      "end": 701,
+      "line": 700,
       "missing": [],
       "section": "release-gate",
       "tests": [
         "tests/docs/test_doc_glossary.py::test_a_blocked_release_exits_with_code_two",
         "tests/unit/test_deploy_cli.py::test_an_unsigned_model_blocks_the_release",
-        "tests/unit/test_deploy_cli.py::test_evidence_that_is_not_supplied_blocks_the_release",
         "tests/unit/test_release_gate.py::test_every_reason_is_reported_not_only_the_first"
       ],
       "text": "It refuses unsigned or unapproved models and lists every reason, and exits with code 2.",
@@ -2011,12 +2058,12 @@
     {
       "cited": [],
       "doc": "docs/GLOSSARY.md",
-      "end": 729,
-      "line": 727,
+      "end": 731,
+      "line": 729,
       "missing": [],
       "section": "scmle_signing_key",
       "tests": [
-        "tests/docs/test_doc_glossary.py::test_a_signed_bundle_without_the_key_is_refused_unless_trusted"
+        "tests/docs/test_doc_glossary.py::test_a_signed_bundle_without_the_key_is_refused_even_when_trusted"
       ],
       "text": "Without it (or a key file named by `SCMLE_SIGNING_KEY_FILE`) a signed bundle is refused unless you pass `--trusted`.",
       "words": [
@@ -2092,12 +2139,11 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 172,
-      "line": 172,
+      "end": 188,
+      "line": 188,
       "missing": [],
       "section": "the-screen-runs-inside-the-time-budget",
       "tests": [
-        "tests/unit/test_recite_script.py::test_a_citation_names_the_doc_and_the_line",
         "tests/unit/test_screen_budget.py::test_an_incomplete_screen_is_in_summary_report_log_and_plan"
       ],
       "text": "A screen that does not run is never a clean bill.",
@@ -2108,8 +2154,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 181,
-      "line": 178,
+      "end": 197,
+      "line": 194,
       "missing": [],
       "section": "the-screen-runs-inside-the-time-budget",
       "tests": [
@@ -2124,8 +2170,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 207,
-      "line": 207,
+      "end": 223,
+      "line": 223,
       "missing": [],
       "section": "what-the-product-does-about-it",
       "tests": [
@@ -2140,8 +2186,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 213,
-      "line": 212,
+      "end": 229,
+      "line": 228,
       "missing": [],
       "section": "what-the-product-does-about-it",
       "tests": [
@@ -2155,8 +2201,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 217,
-      "line": 215,
+      "end": 233,
+      "line": 231,
       "missing": [],
       "section": "what-the-product-does-about-it",
       "tests": [
@@ -2174,8 +2220,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 222,
-      "line": 217,
+      "end": 238,
+      "line": 233,
       "missing": [],
       "section": "what-the-product-does-about-it",
       "tests": [
@@ -2190,8 +2236,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 229,
-      "line": 228,
+      "end": 245,
+      "line": 244,
       "missing": [],
       "section": "what-the-product-does-about-it",
       "tests": [
@@ -2205,8 +2251,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 265,
-      "line": 264,
+      "end": 281,
+      "line": 280,
       "missing": [],
       "section": "breast-cancer-the-value-is-known-in-time",
       "tests": [
@@ -2221,8 +2267,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 287,
-      "line": 286,
+      "end": 303,
+      "line": 302,
       "missing": [],
       "section": "breast-cancer-the-value-is-known-in-time",
       "tests": [
@@ -2236,8 +2282,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 341,
-      "line": 341,
+      "end": 357,
+      "line": 357,
       "missing": [],
       "section": "summary",
       "tests": [
@@ -2659,7 +2705,7 @@
       "tests": [
         "tests/unit/test_bundle.py"
       ],
-      "text": "Loading a malicious bundle | Loading is **refused unless authentic**: the manifest HMAC-SHA256 signature must verify (`$SCMLE_SIGNING_KEY` or `signing_key=`), or the caller vouches with `trusted=True` | `tests/unit/test_bundle.py`",
+      "text": "Loading a malicious bundle | Loading is **refused unless authentic**: the manifest HMAC-SHA256 signature must verify (`$SCMLE_SIGNING_KEY` or `signing_key=`), or, for an unsigned bundle only, the caller vouches with `trusted=True`; a signed bundle with no key set to verify it is refused even with `trusted=True` | `tests/unit/test_bundle.py`",
       "words": [
         "must",
         "refused"
@@ -3381,8 +3427,8 @@
     {
       "cited": [],
       "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
-      "end": 62,
-      "line": 59,
+      "end": 64,
+      "line": 61,
       "missing": [],
       "section": "statistics-what-is-guaranteed-and-what-is-not",
       "tests": [
@@ -3397,8 +3443,8 @@
     {
       "cited": [],
       "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
-      "end": 124,
-      "line": 124,
+      "end": 126,
+      "line": 126,
       "missing": [],
       "section": "claims-confirmed-attested-unverified-and-what-each-is-worth",
       "tests": [
@@ -3413,8 +3459,8 @@
     {
       "cited": [],
       "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
-      "end": 127,
-      "line": 125,
+      "end": 129,
+      "line": 127,
       "missing": [],
       "section": "claims-confirmed-attested-unverified-and-what-each-is-worth",
       "tests": [
@@ -3428,8 +3474,8 @@
     {
       "cited": [],
       "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
-      "end": 129,
-      "line": 128,
+      "end": 131,
+      "line": 130,
       "missing": [],
       "section": "claims-confirmed-attested-unverified-and-what-each-is-worth",
       "tests": [
@@ -3443,8 +3489,8 @@
     {
       "cited": [],
       "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
-      "end": 145,
-      "line": 144,
+      "end": 147,
+      "line": 146,
       "missing": [],
       "section": "certified-versus-descriptive",
       "tests": [
@@ -3459,8 +3505,8 @@
     {
       "cited": [],
       "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
-      "end": 157,
-      "line": 154,
+      "end": 159,
+      "line": 156,
       "missing": [],
       "section": "certified-versus-descriptive",
       "tests": [
@@ -3476,8 +3522,8 @@
     {
       "cited": [],
       "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
-      "end": 170,
-      "line": 168,
+      "end": 172,
+      "line": 170,
       "missing": [],
       "section": "the-closed-loop-and-escalation",
       "tests": [
@@ -3491,8 +3537,8 @@
     {
       "cited": [],
       "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
-      "end": 173,
-      "line": 171,
+      "end": 175,
+      "line": 173,
       "missing": [],
       "section": "the-closed-loop-and-escalation",
       "tests": [
@@ -3506,8 +3552,8 @@
     {
       "cited": [],
       "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
-      "end": 183,
-      "line": 182,
+      "end": 185,
+      "line": 184,
       "missing": [],
       "section": "serving-and-security",
       "tests": [
@@ -3521,8 +3567,8 @@
     {
       "cited": [],
       "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
-      "end": 253,
-      "line": 252,
+      "end": 255,
+      "line": 254,
       "missing": [],
       "section": "scope-of-what-it-models",
       "tests": [
@@ -4123,6 +4169,6 @@
     }
   ],
   "seconds": 1.1,
-  "test_links": 442,
+  "test_links": 443,
   "version": 1
 }

@@ -172,17 +172,20 @@ def test_tuning_runs_under_the_winning_strategy(imbalanced_frame, tmp_path):
 def test_strategy_run_resumes_without_recomputation(
     imbalanced_frame, tmp_path, monkeypatch
 ):
-    import shutil
-
     from scmle.experimentation import trials
 
-    original = run(
-        imbalanced_frame,
-        tmp_path,
-        search=tasks.Search(top_models=1, configs_per_model=2),
+    search = tasks.Search(top_models=1, configs_per_model=2)
+    original = run(imbalanced_frame, tmp_path, search=search)
+    directory = support.interrupt(
+        support.make_project(
+            imbalanced_frame,
+            "y",
+            time_budget=600,
+            output_dir=tmp_path,
+            search=search,
+            strategies=STRATEGIES,
+        )
     )
-    (original.run_dir / "evaluation.json").unlink()
-    shutil.rmtree(original.run_dir / "model")
     calls = []
     real = trials.evaluate_payload
     monkeypatch.setattr(
@@ -190,9 +193,7 @@ def test_strategy_run_resumes_without_recomputation(
         "evaluate_payload",
         lambda p: calls.append(p.job.trial_id) or real(p),
     )
-    resumed = scmle.api.project.Project.resume(
-        original.run_dir, data=imbalanced_frame
-    )
+    resumed = scmle.api.project.Project.resume(directory, data=imbalanced_frame)
     assert calls == []
     assert (
         resumed.evaluation["selected_strategy"]

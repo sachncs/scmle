@@ -282,7 +282,7 @@ def test_a_failed_activation_is_audited(tmp_path):
 def test_no_unauthenticated_server_can_listen_beyond_loopback(reference):
     # Enforces docs/TENANT_ISOLATION.md:87.
     # Enforces docs/API_STABILITY.md:209.
-    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:182.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:184.
     # Enforces README.md:259.
     with pytest.raises(errors.ConfigError, match="without authentication"):
         serving.HttpServing(reference, host="0.0.0.0")  # nosec B104

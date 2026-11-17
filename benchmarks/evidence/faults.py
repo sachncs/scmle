@@ -779,9 +779,9 @@ def vault(fault: str) -> None:
     Args:
         fault: `bind` (bind twice), `open` (a wrong token) or `none`.
     """
-    from scmle.governance import vault as governance
+    import scmle.governance.vault
 
-    locked = governance.SealedTestSet(
+    locked = scmle.governance.vault.SealedTestSet(
         pandas.DataFrame({"a": [1.0, 2.0, 3.0]}),
         pandas.Series([0, 1, 0]),
         (10, 11, 12),
@@ -794,6 +794,30 @@ def vault(fault: str) -> None:
         locked.open(token, "selection")
     finally:
         locked.close()
+
+
+def custody(fault: str) -> None:
+    """Resumes a run against its custody journal once.
+
+    Args:
+        fault: `opened` (the test set was opened, then resumed), `edited`
+            (a verdict's reviewer was rewritten, then read) or `none`.
+    """
+    from scmle.data.custody import journal
+
+    folder = Path(tempfile.mkdtemp(prefix="faults-"))
+    record = journal.Journal(folder / "custody" / "run_x.jsonl", "run_x")
+    record.start("hash")
+    record.decide("PLANNING", False, "alice", "no")
+    if fault == "opened":
+        record.witness()
+    if fault == "edited":
+        lines = record.path.read_text(encoding="utf-8").splitlines()
+        lines[1] = lines[1].replace("alice", "bob")
+        record.path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        record.read()
+        return
+    record.admit()
 
 
 def rolling(horizon: int) -> str | None:
@@ -869,9 +893,10 @@ def resolve(
     Returns:
         The resolved task.
     """
-    from scmle.data.validation import target as validation
+    import scmle.data.validation.target
 
-    return validation.TaskResolver(spec(task, **fields)).resolve(target)
+    resolver = scmle.data.validation.target.TaskResolver(spec(task, **fields))
+    return resolver.resolve(target)
 
 
 def ambiguous(task: str) -> str | None:
@@ -1020,7 +1045,24 @@ def series(values: Any) -> pandas.Series:
 
 
 INTEGERS = series(numpy.arange(ROWS) % 4)
-bind = functools.partial
+
+
+def bind(
+    function: Callable[..., Any], *arguments: Any, **keywords: Any
+) -> functools.partial[Any]:
+    """Fixes the leading arguments of a fault or control call.
+
+    Args:
+        function: The call to fix.
+        *arguments: Its leading positional arguments.
+        **keywords: Its keyword arguments.
+
+    Returns:
+        The call with those arguments bound.
+    """
+    return functools.partial(function, *arguments, **keywords)
+
+
 INJECTIONS: dict[str, Injection] = {
     "ingest.cli.unit_verdict": Injection(
         "site",
@@ -1144,6 +1186,18 @@ INJECTIONS: dict[str, Injection] = {
         "in-process test set opened with a wrong token",
         bind(resident, "open"),
         bind(resident, "none"),
+    ),
+    "split.resident.reopen": Injection(
+        "site",
+        "run resumed after its journal recorded the test set opened",
+        bind(custody, "opened"),
+        bind(custody, "none"),
+    ),
+    "split.resident.journal": Injection(
+        "site",
+        "custody journal with a verdict's reviewer rewritten",
+        bind(custody, "edited"),
+        bind(custody, "none"),
     ),
     "split.rolling.partition": Injection(
         "run",
