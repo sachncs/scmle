@@ -7,7 +7,7 @@ from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.models.deeplearning import estimators
 from scmle.models.deeplearning import networks
-from scmle.models.deeplearning import worker
+from scmle.runtime import worker
 
 TOO_MANY = 10**9
 

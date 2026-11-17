@@ -3,8 +3,8 @@
 import pandas
 import pytest
 
-from scmle.core import ipc
 from scmle.governance import vault
+from scmle.runtime import ipc
 
 
 def test_vault_releases_rows_once_over_the_channel():

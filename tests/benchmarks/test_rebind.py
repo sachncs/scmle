@@ -38,7 +38,7 @@ def tree(tmp_path):
     files = {
         "scmle/__init__.py": '"""Package."""\n',
         "scmle/core/__init__.py": '"""Core."""\n',
-        "scmle/core/retry.py": "VALUE = 1\n",
+        "scmle/runtime/retry.py": "VALUE = 1\n",
         "scmle/certificates/store.json": json.dumps(
             {"code": OLD, "short": OLD[:16], "other": "c" * 64}
         ),
@@ -100,8 +100,8 @@ def test_apply_refuses_a_store_that_was_stale_before(tree):
 
 def test_apply_refuses_a_change_that_is_not_a_rename(tree):
     module = load()
-    (tree / "scmle/core/retry.py").write_text("VALUE = 2\n")
-    moves = {"scmle.core.retry": "scmle.low.retry"}
+    (tree / "scmle/runtime/retry.py").write_text("VALUE = 2\n")
+    moves = {"scmle.runtime.retry": "scmle.low.retry"}
     with pytest.raises(SystemExit, match="--verify fails"):
         module.apply(tree, recording(OLD), "step", moves, set())
     before = (tree / "scmle/certificates/store.json").read_text()

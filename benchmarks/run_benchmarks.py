@@ -21,7 +21,7 @@ from benchmarks import datasets
 from benchmarks import intervals
 from benchmarks import reference
 import scmle.api.project
-from scmle.core import limits
+from scmle.runtime import limits
 
 LOGGER = logging.getLogger(__name__)
 

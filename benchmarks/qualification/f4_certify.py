@@ -42,11 +42,11 @@ from benchmarks.qualification import inject
 from benchmarks.qualification import simulate
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.admissibility import asof
 from scmle.data.admissibility import leakage
 from scmle.data.admissibility import reconciliation
 from scmle.data.detectors import certificates
+from scmle.runtime import randomness
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f4_certificates.json"
 MEASUREMENTS_PATH = Path(__file__).with_name("f4_measurements.json")

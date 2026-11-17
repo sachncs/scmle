@@ -2,8 +2,8 @@
 
 import logging
 
-from scmle.core import logs
 from scmle.inference import serving
+from scmle.runtime import logs
 from tests.unit.test_serving_contract import bundle  # noqa: F401
 from tests.unit.test_serving_contract import call
 from tests.unit.test_serving_contract import golden  # noqa: F401

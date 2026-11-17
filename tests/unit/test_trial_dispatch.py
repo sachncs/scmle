@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 from scmle.contracts import experiments
 from scmle.contracts import tasks
-from scmle.core import limits
 from scmle.experimentation import trials
+from scmle.runtime import limits
 
 
 class Clock:

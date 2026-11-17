@@ -73,9 +73,9 @@ from sklearn.tree import DecisionTreeRegressor
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.detectors import certificates
 from scmle.data.ledger import budget
+from scmle.runtime import randomness
 
 DETECTOR_ID = "f4-leakage-skill"
 LEAK_DEFECTS = (

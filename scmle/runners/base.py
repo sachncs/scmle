@@ -34,10 +34,10 @@ import time
 from typing import Any
 
 from scmle.contracts import errors
-from scmle.core import retry
 from scmle.data.store import objectstore
 from scmle.runners import checkpoint
 from scmle.runners import roles
+from scmle.runtime import retry
 
 MANIFEST_FORMAT = 1
 MAX_RUN_ID_LENGTH = 64

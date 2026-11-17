@@ -12,9 +12,9 @@ from scmle.core.stages import exploration
 from scmle.core.stages import interface
 from scmle.core.stages import profiling
 from scmle.core.stages import training
-import scmle.core.state
 import scmle.data.framing.claim
 from scmle.evaluation import resources
+import scmle.runtime.state
 from scmle.sampling import strategies
 
 
@@ -22,8 +22,8 @@ class SelectStage(interface.Stage):
     """Applies the selection policy and the serving constraints."""
 
     requires: ClassVar[tuple[type, ...]] = (training.TrainStage,)
-    state: ClassVar[scmle.core.state.Progress] = (
-        scmle.core.state.Progress.SELECTING
+    state: ClassVar[scmle.runtime.state.Progress] = (
+        scmle.runtime.state.Progress.SELECTING
     )
 
     def describe(self, context: scmle.core.context.Context) -> str:

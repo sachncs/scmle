@@ -91,12 +91,12 @@ import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.ledger import bivariate
 from scmle.data.ledger import budget
 from scmle.data.ledger import multiplicity
 from scmle.data.ledger import usage
 import scmle.data.ledger.ledger
+from scmle.runtime import randomness
 
 LOGGER = logging.getLogger(__name__)
 

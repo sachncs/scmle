@@ -1,6 +1,6 @@
 {
   "claim": "C1",
-  "code": "1e35b8c86a1d021a97e0e474751985f852287533f45b2d3a29db4efbbae926d8",
+  "code": "ad15904646c0a8308ca2826647d9f64f431a698995f8d700eb91a9ac02abed0c",
   "data": "simulated tables and synthetic inputs only",
   "floor": 1.0,
   "gates": [
@@ -904,7 +904,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.04,
-      "site": "scmle.core.budget:Reserve.admit"
+      "site": "scmle.runtime.budget:Reserve.admit"
     },
     {
       "cause": "a 1 s time budget, below the estimated minimum run",

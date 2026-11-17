@@ -21,11 +21,11 @@ import urllib.request
 
 from scmle.artifacts import bundle
 from scmle.contracts import errors
-from scmle.core import logs
 from scmle.deploy import verify
 from scmle.inference import guard
 from scmle.inference import serving
 from scmle.operations import signals
+from scmle.runtime import logs
 from scmle.security import access
 
 LOGGER = logging.getLogger(__name__)

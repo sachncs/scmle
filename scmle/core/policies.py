@@ -11,8 +11,8 @@ from collections.abc import Callable
 import dataclasses
 from typing import Any
 
-from scmle.core import state
 import scmle.core.context
+from scmle.runtime import state
 
 
 @dataclasses.dataclass(frozen=True)

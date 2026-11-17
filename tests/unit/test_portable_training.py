@@ -5,7 +5,6 @@ import json
 import pytest
 
 from scmle.contracts import errors
-from scmle.core import retry
 from scmle.data.store import objectstore
 from scmle.runners import base
 from scmle.runners import checkpoint
@@ -13,6 +12,7 @@ from scmle.runners import entrypoint
 from scmle.runners import local
 from scmle.runners import reproducibility
 from scmle.runners import roles
+from scmle.runtime import retry
 from tests import support_runners
 
 TRAIN = "scmle-training"

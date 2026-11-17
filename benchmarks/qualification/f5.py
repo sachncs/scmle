@@ -41,7 +41,6 @@ from benchmarks.qualification import inject
 from benchmarks.qualification import standins
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.detectors import certificates
 from scmle.data.detectors import duplicates
 from scmle.data.detectors import labels
@@ -49,6 +48,7 @@ from scmle.data.detectors import missingness
 from scmle.data.detectors import outliers
 from scmle.data.detectors import registry
 from scmle.data.detectors import sentinels
+from scmle.runtime import randomness
 
 CERT_PATH = scmle.certificates.DIRECTORY / "detector_certificates.json"
 POLICY = certificates.Standard(

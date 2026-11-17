@@ -30,7 +30,6 @@ from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import observability
 from scmle.contracts import tasks
-from scmle.core import limits
 from scmle.evaluation import metrics
 import scmle.evaluation.metrics
 from scmle.experimentation import stores
@@ -38,13 +37,14 @@ from scmle.governance import keyring
 from scmle.governance import lifecycle
 import scmle.governance.registry
 import scmle.models.custom
-from scmle.models.deeplearning import worker
 import scmle.models.registry
 from scmle.monitoring import alerts
 from scmle.monitoring import events
 from scmle.monitoring import incidents
 from scmle.monitoring import shadow
 from scmle.monitoring import slo
+from scmle.runtime import limits
+from scmle.runtime import worker
 
 THREADS = 8
 APPROVAL_KEY = "thread-safety-key"

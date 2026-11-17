@@ -12,19 +12,19 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 import scmle.core.context
 from scmle.core.stages import interface
-import scmle.core.state
 from scmle.data.curation import forecasting
 from scmle.data.readers import streaming
 from scmle.data.readers import tabular
 import scmle.data.readers.registry
 from scmle.features import feature_graph
+import scmle.runtime.state
 
 
 class IngestStage(interface.Stage):
     """Reads the dataset and fingerprints it."""
 
-    state: ClassVar[scmle.core.state.Progress] = (
-        scmle.core.state.Progress.VALIDATING
+    state: ClassVar[scmle.runtime.state.Progress] = (
+        scmle.runtime.state.Progress.VALIDATING
     )
 
     def describe(

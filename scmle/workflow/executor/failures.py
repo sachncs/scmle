@@ -1,7 +1,7 @@
 """The errors a run raises: leases, limits, deadlines, budgets, approvals."""
 
 from scmle.contracts import errors
-from scmle.core import retry
+from scmle.runtime import retry
 
 
 class BusyError(errors.ScmleError):

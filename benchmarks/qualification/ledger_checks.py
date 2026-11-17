@@ -31,10 +31,10 @@ import pandas
 from scipy import stats
 from sklearn.datasets import load_diabetes
 
-from scmle.core import randomness
 from scmle.data.ledger import bivariate
 from scmle.data.ledger import controls
 from scmle.data.ledger import online_fdr
+from scmle.runtime import randomness
 
 ALPHA = 0.05
 FRACTION_ALPHA = online_fdr.rational(ALPHA, "alpha")

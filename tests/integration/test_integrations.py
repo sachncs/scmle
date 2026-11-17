@@ -8,7 +8,7 @@ import support
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.core import orchestrator
-from scmle.core import scheduler
+from scmle.runtime import scheduler
 
 
 def test_mlflow_store_records_runs_trials_and_lineage(binary_frame, tmp_path):

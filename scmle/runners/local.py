@@ -15,10 +15,10 @@ import logging
 from typing import Any
 
 from scmle.contracts import errors
-from scmle.core import retry
 from scmle.runners import base
 from scmle.runners import checkpoint
 from scmle.runners import roles
+from scmle.runtime import retry
 
 LOGGER = logging.getLogger(__name__)
 

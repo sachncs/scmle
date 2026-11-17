@@ -122,7 +122,7 @@
     }
   },
   "claim": "C12",
-  "content_hash": "052b686be0b0fa5625c53ae13433dc349d977cec12de2626b260cf6b541e73eb",
+  "content_hash": "a0d5b2c60a9166e3789d71de05b11a104f9fa58e4064a463f47c6b9f01c226d8",
   "counts": {
     "guarantees": 245,
     "linked": 245,
@@ -660,7 +660,7 @@
       "tests": [
         "tests/docs/test_doc_api_stability.py::test_the_governed_data_modules_are_pinned_in_the_snapshot"
       ],
-      "text": "`scmle.data.store` (`objectstore`, `snapshot`, `quality`, `processing`) and `scmle.core.retry` are extension surfaces pinned in the snapshot's `surfaces` block.",
+      "text": "`scmle.data.store` (`objectstore`, `snapshot`, `quality`, `processing`) and `scmle.runtime.retry` are extension surfaces pinned in the snapshot's `surfaces` block.",
       "words": [
         "block"
       ]

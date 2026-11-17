@@ -10,7 +10,7 @@ import numpy
 import pytest
 
 from scmle.contracts import qualification
-from scmle.core import randomness
+from scmle.runtime import randomness
 
 ROOT = Path(__file__).parents[2]
 
@@ -99,7 +99,7 @@ def test_invalid_keys_are_rejected(arguments):
 SCRIPT = """
 import json
 from scmle.contracts import qualification as q
-from scmle.core import randomness
+from scmle.runtime import randomness
 
 checks = []
 for index, name in enumerate(("alpha", "beta", "gamma")):

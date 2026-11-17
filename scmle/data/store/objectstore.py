@@ -38,7 +38,7 @@ else:
 
 from scmle import durability
 from scmle.contracts import errors
-from scmle.core import retry
+from scmle.runtime import retry
 
 LOGGER = logging.getLogger(__name__)
 

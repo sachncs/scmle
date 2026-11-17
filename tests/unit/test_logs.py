@@ -14,9 +14,9 @@ import warnings
 
 import pytest
 
-from scmle.core import logs
-from scmle.core import resource_observation
-from scmle.core import retry
+from scmle.runtime import logs
+from scmle.runtime import resource_observation
+from scmle.runtime import retry
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -104,7 +104,7 @@ def test_a_retried_transient_failure_is_logged(caplog):
             raise outcome
         return outcome
 
-    with caplog.at_level(logging.WARNING, logger="scmle.core.retry"):
+    with caplog.at_level(logging.WARNING, logger="scmle.runtime.retry"):
         result = retry.call(
             operation, retry.Retries(max_attempts=2), sleep=lambda seconds: None
         )

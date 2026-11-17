@@ -253,7 +253,7 @@ def test_a_leak_present_only_in_the_test_rows_is_not_a_profile_finding(
 def test_hard_enforcement_moves_the_test_rows_out_of_reach(
     tmp_path, monkeypatch
 ):
-    from scmle.core import limits
+    from scmle.runtime import limits
 
     rng = numpy.random.default_rng(21)
     frame = pandas.DataFrame(

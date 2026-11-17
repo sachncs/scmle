@@ -29,10 +29,10 @@ from numpy.typing import NDArray
 from scipy import stats
 
 from scmle.contracts import errors
-from scmle.core import randomness
 from scmle.data.charter import decision
 from scmle.data.framing import costs
 from scmle.decision import netbenefit
+from scmle.runtime import randomness
 
 SATISFIED = "satisfied"
 NOT_SATISFIED = "not_satisfied"

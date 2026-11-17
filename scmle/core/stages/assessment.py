@@ -12,11 +12,11 @@ from scmle.core.stages import cost
 from scmle.core.stages import reporting
 from scmle.core.stages import scoring
 from scmle.core.stages import selecting
-import scmle.core.state
 from scmle.evaluation import confidence
 from scmle.evaluation import criteria
 from scmle.evaluation import diagnostics
 from scmle.evaluation import suite
+import scmle.runtime.state
 from scmle.sampling import strategies
 
 BASELINE = "dummy"
@@ -26,8 +26,8 @@ class FinalEvaluationStage(reporting.Reporting):
     """Refits the frozen candidate and opens the locked test set once."""
 
     requires: ClassVar[tuple[type, ...]] = (selecting.SelectStage,)
-    state: ClassVar[scmle.core.state.Progress] = (
-        scmle.core.state.Progress.TESTING
+    state: ClassVar[scmle.runtime.state.Progress] = (
+        scmle.runtime.state.Progress.TESTING
     )
 
     def describe(self, context: scmle.core.context.Context) -> str:

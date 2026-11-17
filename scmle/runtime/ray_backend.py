@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from scmle.contracts import errors
-from scmle.core import scheduler
+from scmle.runtime import scheduler
 
 DEFAULT_RETRIES = 1
 

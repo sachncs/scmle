@@ -16,7 +16,7 @@ import numpy
 from sklearn import base
 
 from scmle.data.curation import transformers
-from scmle.models.deeplearning import worker
+from scmle.runtime import worker
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"

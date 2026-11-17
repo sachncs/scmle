@@ -4,7 +4,7 @@ import abc
 from typing import ClassVar
 
 import scmle.core.context
-import scmle.core.state
+import scmle.runtime.state
 
 
 class Stage(abc.ABC):
@@ -16,7 +16,7 @@ class Stage(abc.ABC):
             ordered by `compiler.assemble`).
     """
 
-    state: ClassVar[scmle.core.state.Progress]
+    state: ClassVar[scmle.runtime.state.Progress]
     requires: ClassVar[tuple[type, ...]] = ()
 
     @abc.abstractmethod

@@ -28,10 +28,10 @@ from scipy import stats
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.framing import costs
 from scmle.decision import netbenefit
 from scmle.models import thresholds
+from scmle.runtime import randomness
 
 BINS = 10
 FOLDS = 5

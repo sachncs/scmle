@@ -19,7 +19,7 @@ from scmle.contracts import tasks
 from scmle.models import conformance
 from scmle.models import registry
 from scmle.models.deeplearning import estimators
-from scmle.models.deeplearning import worker
+from scmle.runtime import worker
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("torch") is None, reason="torch is not installed"

@@ -12,6 +12,12 @@ marked `Breaking:` and listed first in their group.
 
 ### Breaking changes
 
+* **Modules moved by the package layering (DES-13).** Each package now
+  imports only the layers below it; the moves are listed, `old -> new`, under
+  "Module moves" in [`docs/RENAMES.md`](docs/RENAMES.md). Names inside a
+  module are unchanged; replace the module path to migrate. Pinned public
+  modules moved so far: `scmle.core.retry` -> `scmle.runtime.retry`. Logger
+  names follow the module path, so a log filter on an old path must change.
 * **Bundle format 4.** The package layering (register phase 3) moves
   modules whose classes are pickled inside a bundle, so `BUNDLE_FORMAT` goes
   from 3 to 4 and `Bundle.load` refuses a format 3 bundle with the existing

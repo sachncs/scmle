@@ -10,7 +10,7 @@ import types
 
 import pytest
 
-from scmle.core import resource_observation
+from scmle.runtime import resource_observation
 
 GIB = 1024**3
 

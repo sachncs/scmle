@@ -17,7 +17,7 @@ from typing import Any
 from typing import TYPE_CHECKING
 
 from scmle.contracts import errors
-from scmle.core import ipc
+from scmle.runtime import ipc
 
 if TYPE_CHECKING:
     import subprocess  # nosec B404

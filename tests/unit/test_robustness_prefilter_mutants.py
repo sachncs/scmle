@@ -3,10 +3,10 @@
 import types
 
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.detectors import certificates
 from scmle.data.robustness import prefilter
 from scmle.data.robustness import stability
+from scmle.runtime import randomness
 from tests.unit.test_robustness_prefilter import run
 
 

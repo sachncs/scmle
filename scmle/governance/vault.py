@@ -15,8 +15,8 @@ from typing import Any
 import pandas
 
 from scmle.contracts import errors
-from scmle.core import ipc
 from scmle.data.splitting import splitters
+from scmle.runtime import ipc
 
 OPEN = "open"
 HEADER_LENGTH = 2  # the operation and the presented token; extras follow

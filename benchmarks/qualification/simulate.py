@@ -27,8 +27,8 @@ import pandas
 from scipy import stats
 
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.detectors import certificates
+from scmle.runtime import randomness
 
 TASKS = ("regression", "binary")
 # Coefficients on standardized features, in units of the noise standard

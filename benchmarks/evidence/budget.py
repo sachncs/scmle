@@ -87,9 +87,9 @@ from benchmarks.evidence import refusal
 from benchmarks.sota import scmle_runner
 import scmle.api.project
 from scmle.contracts import errors
-from scmle.core import limits
 from scmle.core import stages
 from scmle.data.detectors import certificates
+from scmle.runtime import limits
 
 PATH = Path(__file__).with_suffix(".json")
 ROOT = Path(__file__).resolve().parents[2]

@@ -26,16 +26,16 @@ from scmle.contracts import events
 from scmle.contracts import experiments
 from scmle.contracts import models
 from scmle.contracts import tasks
-from scmle.core import scheduler
 from scmle.core import stages
-from scmle.core import state
 from scmle.data.validation import columns
 import scmle.data.validation.target
 from scmle.governance import lifecycle
 import scmle.inference.mapping
-from scmle.integrations import ray_backend
 from scmle.models import conformance
 import scmle.models.registry
+from scmle.runtime import ray_backend
+from scmle.runtime import scheduler
+from scmle.runtime import state
 import scmle.sampling.strategies
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -265,11 +265,11 @@ def test_l113_l176_package_organization():
         "contracts/metrics.py",
         "contracts/artifacts.py",
         "contracts/events.py",
-        "core/config.py",
+        "runtime/config.py",
         "core/orchestrator.py",
         "core/compiler.py",
-        "core/scheduler.py",
-        "core/state.py",
+        "runtime/scheduler.py",
+        "runtime/state.py",
         "core/policies.py",
         "intelligence/fingerprint.py",
         "intelligence/planner.py",

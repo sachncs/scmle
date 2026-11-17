@@ -5,7 +5,7 @@ import json
 import pytest
 
 from scmle.contracts import errors
-from scmle.core import config
+from scmle.runtime import config
 
 
 def test_sections_build_typed_specs_and_reject_unknown_names(tmp_path):

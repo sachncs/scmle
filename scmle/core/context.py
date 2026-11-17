@@ -20,9 +20,6 @@ from scmle.contracts import lineage
 from scmle.contracts import tasks
 import scmle.contracts.data
 import scmle.contracts.metrics
-from scmle.core import limits
-from scmle.core import resource_observation
-from scmle.core import scheduler
 from scmle.data.custody import pipeline
 from scmle.data.custody import sealed
 from scmle.data.readers import streaming
@@ -32,6 +29,9 @@ from scmle.evaluation import selection
 from scmle.experimentation import stores
 import scmle.intelligence.recommendations
 import scmle.models.registry
+from scmle.runtime import limits
+from scmle.runtime import resource_observation
+from scmle.runtime import scheduler
 
 LOGGER = logging.getLogger(__name__)
 T = TypeVar("T")

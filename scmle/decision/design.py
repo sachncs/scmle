@@ -23,10 +23,10 @@ from scipy import stats
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.charter import decision
 from scmle.data.charter import feasibility
 from scmle.decision import anytime
+from scmle.runtime import randomness
 
 HASH_BYTES = 8
 

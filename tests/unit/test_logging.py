@@ -16,8 +16,8 @@ import pandas
 import pytest
 
 from scmle import cli
-from scmle.core import logs
 from scmle.operations import metrics
+from scmle.runtime import logs
 from scmle.sampling import synthesis
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]

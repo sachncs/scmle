@@ -27,7 +27,7 @@ from numpy.typing import ArrayLike
 import pandas
 
 from scmle.contracts import errors
-from scmle.core import randomness
+from scmle.runtime import randomness
 
 LEVEL = 0.05
 PERMUTATIONS = 499

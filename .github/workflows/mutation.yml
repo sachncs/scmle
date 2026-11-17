@@ -32,7 +32,7 @@ jobs:
           - name: evaluation
             patterns: "scmle.evaluation.*"
           - name: rest
-            patterns: "scmle.contracts.* scmle.core.* scmle.artifacts.* scmle.governance.* scmle.inference.* scmle.monitoring.*"
+            patterns: "scmle.contracts.* scmle.core.* scmle.runtime.* scmle.artifacts.* scmle.governance.* scmle.inference.* scmle.monitoring.*"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5

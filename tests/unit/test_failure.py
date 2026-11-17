@@ -9,8 +9,8 @@ import json
 import pytest
 
 from scmle.contracts import errors
-from scmle.core import limits
 from scmle.experimentation import trials
+from scmle.runtime import limits
 
 
 def chained():

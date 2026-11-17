@@ -19,12 +19,12 @@ from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
 from scmle.contracts import errors
-from scmle.core import retry
 from scmle.data.store import objectstore
 from scmle.runners import base
 from scmle.runners import checkpoint
 from scmle.runners import local
 from scmle.runners import roles
+from scmle.runtime import retry
 
 DEFAULT_WORKLOAD = "scmle.runners.project:run_project"
 

@@ -18,7 +18,7 @@ import numpy
 import pandas
 from scipy import special
 
-from scmle.core import logs
+from scmle.runtime import logs
 from scmle.sampling import resampling
 
 LOGGER = logging.getLogger(__name__)

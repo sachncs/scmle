@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import scmle
-from scmle.core import retry
 from scmle.data.store import objectstore
 from scmle.data.store import processing
 from scmle.data.store import quality
@@ -34,6 +33,7 @@ from scmle.runners import checkpoint
 from scmle.runners import local
 from scmle.runners import reproducibility
 from scmle.runners import roles
+from scmle.runtime import retry
 from scmle.security import access
 from scmle.security import audit
 from scmle.security import tokens
@@ -133,7 +133,7 @@ EXTENSION_SURFACES = {
         ),
     ),
     "scmle.security.audit": (audit, ("Log",)),
-    "scmle.core.retry": (
+    "scmle.runtime.retry": (
         retry,
         (
             "Retries",

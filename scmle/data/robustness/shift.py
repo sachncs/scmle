@@ -47,9 +47,9 @@ from sklearn import metrics
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.detectors import certificates
 from scmle.data.ledger import controls
+from scmle.runtime import randomness
 
 C2ST_ID = "f6-shift-c2st"
 MMD_ID = "f6-shift-mmd"

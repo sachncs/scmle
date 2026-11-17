@@ -6,7 +6,7 @@ import support
 import scmle.api.project
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.core import scheduler
+from scmle.runtime import scheduler
 
 
 def square(value):

@@ -63,10 +63,10 @@ from scmle.contracts import errors
 from scmle.contracts import qualification
 from scmle.contracts import signing
 import scmle.contracts.evidence
-from scmle.core import randomness
 from scmle.data.ledger import bivariate
 from scmle.data.ledger import online_fdr
 import scmle.data.ledger.online_fdr
+from scmle.runtime import randomness
 
 GENESIS = "0" * 64
 LEDGER_VERSION = 1

@@ -37,7 +37,7 @@ SECURITY = {
     "scmle.security.audit": ("Log",),
 }
 GOVERNED = (
-    "scmle.core.retry",
+    "scmle.runtime.retry",
     "scmle.data.store.objectstore",
     "scmle.data.store.processing",
     "scmle.data.store.quality",

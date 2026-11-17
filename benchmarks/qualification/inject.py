@@ -7,7 +7,7 @@ The mask is built from the cells the injector chose, and each chosen cell is
 guaranteed to change, so `changed_cells(original, planted.frame)` reproduces
 it exactly; the tests compare the two cell by cell.
 
-Randomness comes only from keyed streams (`scmle.core.randomness`), so equal
+Randomness comes only from keyed streams (`scmle.runtime.randomness`), so equal
 inputs and seeds give equal output in any process. Plants are synthetic, so
 detection rates measured on them are optimistic.
 """
@@ -23,7 +23,7 @@ import numpy
 import pandas
 
 from scmle.contracts import qualification
-from scmle.core import randomness
+from scmle.runtime import randomness
 
 MECHANISMS = ("mcar", "mar", "mnar")
 LABEL_MODES = ("symmetric", "class_conditional")

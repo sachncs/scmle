@@ -27,10 +27,10 @@ from scmle import durability
 import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import serving
-from scmle.core import logs
 from scmle.deploy import provenance
 from scmle.inference import guard
 from scmle.inference import validation
+from scmle.runtime import logs
 from scmle.security import access
 from scmle.security import audit
 

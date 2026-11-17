@@ -2877,3 +2877,19 @@ renamed to the same word. The modules are listed after each entry.
 - `side_of` -> `allot` (`scmle.data.readers.streaming`)
 - `validate_sink_receipt` -> `attest` (`scmle.data.readers.streaming`)
 - `write_document` -> `persist` (`scmle.deploy.attest`)
+
+## Module moves
+
+Modules moved between packages by the layer map (`scripts/layers.toml`, register phase 3). Each entry is `old -> new`; the names inside a module are unchanged.
+- `scmle.core.randomness` -> `scmle.runtime.randomness`
+- `scmle.core.retry` -> `scmle.runtime.retry`
+- `scmle.core.limits` -> `scmle.runtime.limits`
+- `scmle.core.ipc` -> `scmle.runtime.ipc`
+- `scmle.core.resource_observation` -> `scmle.runtime.resource_observation`
+- `scmle.core.state` -> `scmle.runtime.state`
+- `scmle.core.config` -> `scmle.runtime.config`
+- `scmle.core.scheduler` -> `scmle.runtime.scheduler`
+- `scmle.core.budget` -> `scmle.runtime.budget`
+- `scmle.core.logs` -> `scmle.runtime.logs`
+- `scmle.integrations.ray_backend` -> `scmle.runtime.ray_backend`
+- `scmle.models.deeplearning.worker` -> `scmle.runtime.worker`

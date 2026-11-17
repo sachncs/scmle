@@ -3,7 +3,7 @@
 import pytest
 
 from scmle.contracts import events
-from scmle.core import state
+from scmle.runtime import state
 
 
 def test_happy_path_emits_event_per_transition():

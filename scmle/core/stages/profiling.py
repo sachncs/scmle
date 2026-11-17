@@ -9,10 +9,10 @@ from scmle.contracts import tasks
 import scmle.core.context
 from scmle.core.stages import impounding
 from scmle.core.stages import ingestion
-import scmle.core.state
 from scmle.data.splitting import splitters
 from scmle.evaluation import backtest
 from scmle.intelligence import knowledge
+import scmle.runtime.state
 
 
 class ProfileStage(impounding.Impounding):
@@ -27,8 +27,8 @@ class ProfileStage(impounding.Impounding):
     """
 
     requires: ClassVar[tuple[type, ...]] = (ingestion.IngestStage,)
-    state: ClassVar[scmle.core.state.Progress] = (
-        scmle.core.state.Progress.PROFILING
+    state: ClassVar[scmle.runtime.state.Progress] = (
+        scmle.runtime.state.Progress.PROFILING
     )
 
     def describe(

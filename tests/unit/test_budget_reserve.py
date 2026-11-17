@@ -36,7 +36,7 @@ def timed(budget, folds=5):
     from types import SimpleNamespace
 
     from scmle.contracts import tasks
-    from scmle.core import limits
+    from scmle.runtime import limits
 
     recorded = []
     context = SimpleNamespace(

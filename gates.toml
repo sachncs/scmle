@@ -412,7 +412,7 @@ override = "Relax data.monotonic_constraints or install the 'boosting' extra, as
 variables = ["data.monotonic_constraints", "task"]
 
 [budget.minimum_run]
-site = "scmle.core.budget:Reserve.admit"
+site = "scmle.runtime.budget:Reserve.admit"
 error = "BlockedError"
 claim = "C7, C1"
 passes = "Preparation (estimated from the table's rows, feature columns and classes), one cheapest trial and the reserve for the final refit, diagnostics and packaging fit in the time budget; checked right after ingestion, before any profiling or training."

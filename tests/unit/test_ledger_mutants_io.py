@@ -14,7 +14,6 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.custody import sealed
 from scmle.data.ledger import bivariate
 from scmle.data.ledger import budget
@@ -25,6 +24,7 @@ from scmle.data.ledger import governed
 from scmle.data.ledger import online_fdr
 import scmle.data.ledger.ledger
 from scmle.data.splitting import splitters
+from scmle.runtime import randomness
 from tests.unit.test_charter_contracts import make_charter
 
 TEN_PERCENT = Fraction(1, 10)

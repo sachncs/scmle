@@ -37,13 +37,13 @@ from collections.abc import Sequence
 import dataclasses
 
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.detectors import certificates
 from scmle.data.ledger import confirm
 from scmle.data.ledger import ledger
 from scmle.data.robustness import qualify
 from scmle.data.robustness import shift
 from scmle.data.robustness import stability
+from scmle.runtime import randomness
 
 FILTER_ID = "f6-stability-filter"
 FEATURE_SHIFT_ID = "f6-shift-feature"

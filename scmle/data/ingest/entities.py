@@ -40,8 +40,8 @@ import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.detectors import certificates
+from scmle.runtime import randomness
 
 LEVELS = 3
 MISSING = -1

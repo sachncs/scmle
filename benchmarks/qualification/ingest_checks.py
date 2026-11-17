@@ -21,9 +21,9 @@ import pandas
 
 from benchmarks.qualification import ingest_naive
 from benchmarks.qualification import ingest_worlds
-from scmle.core import randomness
 from scmle.data.ingest import asof_view
 from scmle.data.ingest import synthesize
+from scmle.runtime import randomness
 
 RTOL = 1e-9
 # share of feature values left missing

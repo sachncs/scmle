@@ -5,8 +5,8 @@ from pathlib import Path
 
 import scmle
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.ledger import budget
+from scmle.runtime import randomness
 from scripts import check_api_compatibility
 
 SNAPSHOT = Path(__file__).parents[1] / "fixtures" / "public_api.json"

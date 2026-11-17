@@ -23,8 +23,8 @@ import pandas
 
 from benchmarks.qualification import inject
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.detectors import certificates
+from scmle.runtime import randomness
 
 Detector = Callable[[pandas.DataFrame], pandas.Series]
 Planter = Callable[[pandas.DataFrame, int], inject.Injection]

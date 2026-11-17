@@ -10,12 +10,12 @@ from scmle.contracts import tasks
 import scmle.core.context
 from scmle.core.stages import assessment
 from scmle.core.stages import tracing
-import scmle.core.state
 from scmle.governance import attestation
 from scmle.governance import ledger
 from scmle.governance import model_card
 from scmle.inference import novelty
 import scmle.monitoring.reference
+import scmle.runtime.state
 
 PARITY_ROWS = 200
 
@@ -24,8 +24,8 @@ class PackageStage(tracing.Tracing):
     """Writes the model bundle, leaderboard and report."""
 
     requires: ClassVar[tuple[type, ...]] = (assessment.FinalEvaluationStage,)
-    state: ClassVar[scmle.core.state.Progress] = (
-        scmle.core.state.Progress.PACKAGING
+    state: ClassVar[scmle.runtime.state.Progress] = (
+        scmle.runtime.state.Progress.PACKAGING
     )
 
     def describe(
@@ -184,7 +184,7 @@ class PackageStage(tracing.Tracing):
         result = results.Run(
             run_id=store.run_id,
             run_dir=store.directory,
-            state=scmle.core.state.Progress.COMPLETED.value,
+            state=scmle.runtime.state.Progress.COMPLETED.value,
             plan=scmle.core.context.require(context.plan, "plan"),
             profile=profile,
             trials=context.trials,

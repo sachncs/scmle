@@ -16,8 +16,8 @@ import scmle.api.project
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.core import policies
-from scmle.core import state
 from scmle.data.custody import journal
+from scmle.runtime import state
 
 
 def completed(frame, folder):

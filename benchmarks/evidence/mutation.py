@@ -308,10 +308,10 @@ def dotted(path: str) -> str:
     """The import name of a module path.
 
     Args:
-        path: Module path such as `scmle/core/randomness.py`.
+        path: Module path such as `scmle/runtime/randomness.py`.
 
     Returns:
-        The dotted name, such as `scmle.core.randomness`; a package's
+        The dotted name, such as `scmle.runtime.randomness`; a package's
         `__init__.py` takes the package's name.
     """
     name = path.removesuffix(".py").removesuffix("/__init__")

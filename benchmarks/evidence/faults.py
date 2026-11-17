@@ -345,7 +345,7 @@ def checkpoint(approve: bool) -> Any:
         The completed run.
     """
     from scmle.core import policies
-    from scmle.core import state
+    from scmle.runtime import state
 
     def verdict(review: Any) -> Any:
         del review

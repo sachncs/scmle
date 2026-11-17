@@ -23,7 +23,7 @@ import json
 from typing import Any
 
 from scmle.contracts import errors
-from scmle.core import retry
+from scmle.runtime import retry
 
 NAME_CHARACTERS = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"

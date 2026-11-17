@@ -3,7 +3,7 @@
 import pytest
 
 from scmle.contracts import events
-from scmle.core import state
+from scmle.runtime import state
 
 
 def fields(event: events.Event) -> tuple:

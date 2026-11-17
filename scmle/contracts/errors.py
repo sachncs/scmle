@@ -149,9 +149,10 @@ class Failure:
         Returns:
             The failure, with the traceback and the chain of causes. An
             error that carries a failure from another process in
-            `details["failure"]` (as `scmle.core.limits` and the deep-learning
-            worker raise) gets that failure as its first cause and the remote
-            traceback appended, so the child's frames are not lost.
+            `details["failure"]` (as `scmle.runtime.limits` and the
+            deep-learning worker raise) gets that failure as its first cause
+            and the remote traceback appended, so the child's frames are not
+            lost.
         """
         causes: list[str] = []
         trace = "".join(traceback.format_exception(error))

@@ -23,7 +23,7 @@ from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import estimators
 from scmle.models.deeplearning import foundation
 from scmle.models.deeplearning import jepa
-from scmle.models.deeplearning import worker
+from scmle.runtime import worker
 
 MIN_JEPA_ROWS = 16
 COMMON_SPACE = (

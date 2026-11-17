@@ -53,12 +53,12 @@ from scipy import stats
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.ledger import bivariate
 from scmle.data.ledger import controls
 from scmle.data.robustness import multiverse
+from scmle.runtime import randomness
 
 DETECTOR_ID = "f6-stability"
 DEFECT_OUTLIER = "fragile_outlier_driven"

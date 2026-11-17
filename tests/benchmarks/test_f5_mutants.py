@@ -11,9 +11,9 @@ import pytest
 from benchmarks.qualification import f5
 from benchmarks.qualification import standins
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.detectors import certificates
 from scmle.data.detectors import registry
+from scmle.runtime import randomness
 
 
 @pytest.fixture(scope="module")

@@ -9,20 +9,20 @@ import scmle.core.context
 from scmle.core.stages import cost
 from scmle.core.stages import interface
 from scmle.core.stages import planning
-import scmle.core.state
 from scmle.data.profiling import profiler
 from scmle.experimentation import ensemble_search
 from scmle.experimentation import strategy_search
 from scmle.experimentation import trials
 from scmle.experimentation import tuning
+import scmle.runtime.state
 
 
 class TrainStage(interface.Stage):
     """Cross-validates every candidate within the time budget."""
 
     requires: ClassVar[tuple[type, ...]] = (planning.Planning,)
-    state: ClassVar[scmle.core.state.Progress] = (
-        scmle.core.state.Progress.TRAINING
+    state: ClassVar[scmle.runtime.state.Progress] = (
+        scmle.runtime.state.Progress.TRAINING
     )
 
     def describe(self, context: scmle.core.context.Context) -> str:

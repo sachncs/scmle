@@ -28,7 +28,7 @@ The data-qualification records and helpers live below the pinned top-level API
 and are extension surfaces until promoted: `scmle.contracts.qualification`
 (`Check`, `Claim`, `Certificate`, `Tier`, `Decision`, `Subset`),
 `scmle.data.ledger.budget` (`ErrorBudget` and the budget functions) and
-`scmle.core.randomness` (keyed random streams). Rule: new qualification names
+`scmle.runtime.randomness` (keyed random streams). Rule: new qualification names
 are added without touching any entry in `tests/fixtures/public_api.json`, and
 a name is pinned only deliberately, with a changelog
 entry and a regenerated snapshot (`scripts/check_api_compatibility.py
@@ -215,7 +215,7 @@ The deployment ledger gained the row kind `audit`.
 ## Governed-data surface
 
 `scmle.data.store` (`objectstore`, `snapshot`, `quality`,
-`processing`) and `scmle.core.retry` are extension surfaces pinned in the
+`processing`) and `scmle.runtime.retry` are extension surfaces pinned in the
 snapshot's `surfaces` block. Pinned
 signatures avoid function-valued defaults (a `None` default is resolved in the
 body), because a function's repr carries an address and would make the

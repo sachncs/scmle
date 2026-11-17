@@ -13,7 +13,7 @@ from scmle.contracts import data
 from scmle.contracts import events
 from scmle.contracts import modalities
 from scmle.contracts import performance
-from scmle.core import limits
+from scmle.runtime import limits
 
 if TYPE_CHECKING:
     from pathlib import Path

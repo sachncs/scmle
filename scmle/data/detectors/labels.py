@@ -40,8 +40,8 @@ from sklearn import ensemble
 from sklearn import model_selection
 
 from scmle.contracts import errors
-from scmle.core import randomness
 from scmle.data.detectors import certificates
+from scmle.runtime import randomness
 
 MIN_ROWS = 50
 FOLDS = 5

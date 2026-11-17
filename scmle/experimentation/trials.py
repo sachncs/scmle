@@ -26,9 +26,9 @@ from scmle.contracts import experiments
 from scmle.contracts import models
 from scmle.contracts import tasks
 import scmle.contracts.metrics
-from scmle.core import limits
 import scmle.core.context
 from scmle.evaluation import metrics
+from scmle.runtime import limits
 from scmle.sampling import strategies
 
 

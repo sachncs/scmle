@@ -104,6 +104,19 @@ def forms(
     for old in sorted(moves, key=len, reverse=True):
         new = moves[old]
         relative, target = old.split(".", 1)[1], new.split(".", 1)[1]
+        parent, base = old.rsplit(".", 1)
+        home, name = new.rsplit(".", 1)
+        if base == name:
+            # An import written as text (a script in a string, a code block
+            # in a doc); a real import statement was already rewritten. In
+            # an unparsed string the line break before it reads `\n`.
+            text = rf"from {re.escape(parent)} import {re.escape(base)}"
+            found.append(
+                (
+                    rf"(?:(?<![\w.])|(?<=\\n)){text}(?![\w,])",
+                    f"from {home} import {name}",
+                )
+            )
         found.append((rf"(?<![\w.]){re.escape(old)}(?!\w)", new))
         slash, moved = old.replace(".", "/"), new.replace(".", "/")
         found.append((rf"(?<![\w./]){re.escape(slash)}(?=\.py\b|/)", moved))

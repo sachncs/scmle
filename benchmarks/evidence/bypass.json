@@ -244,7 +244,7 @@
       "override": "",
       "registered": true,
       "seconds": 0.5,
-      "site": "scmle.core.budget:Reserve.admit",
+      "site": "scmle.runtime.budget:Reserve.admit",
       "stopped": "budget.minimum_run",
       "surface": "api",
       "vector": "time_budget=1"
@@ -284,7 +284,7 @@
       "override": "",
       "registered": true,
       "seconds": 0.5,
-      "site": "scmle.core.budget:Reserve.admit",
+      "site": "scmle.runtime.budget:Reserve.admit",
       "stopped": "budget.minimum_run",
       "surface": "api",
       "vector": "time_budget=True"
@@ -324,7 +324,7 @@
       "override": "",
       "registered": true,
       "seconds": 0.5,
-      "site": "scmle.core.budget:Reserve.admit",
+      "site": "scmle.runtime.budget:Reserve.admit",
       "stopped": "budget.minimum_run",
       "surface": "api",
       "vector": "resume the refused run unchanged"

@@ -20,9 +20,9 @@ from typing import Any
 import numpy
 import pandas
 
-from scmle.core import randomness
 from scmle.data.ingest import profile
 from scmle.data.readers import connectors
+from scmle.runtime import randomness
 
 DEV_SEED_BASE = 10_000
 URI = "sqlite://ingest/world"

@@ -59,7 +59,6 @@ from scipy import stats
 
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.charter import contracts
 import scmle.data.charter.feasibility
 from scmle.data.detectors import certificates
@@ -67,6 +66,7 @@ from scmle.data.framing import baseline
 from scmle.data.framing import costs
 from scmle.data.framing import draft
 from scmle.data.framing import feasibility
+from scmle.runtime import randomness
 
 STORE_PATH = scmle.certificates.DIRECTORY / "framing_certificates.json"
 MEASUREMENTS_PATH = Path(__file__).with_name("framing_measurements.json")

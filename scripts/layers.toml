@@ -31,7 +31,7 @@ layers = [
 ]
 
 [packages]
-runtime = "Process runtime: randomness, retries, limits, budgets, logging and workers."
+runtime = "Process runtime: randomness, retries, limits, budgets, logs, workers."
 storage = "Object stores, store conformance and experiment stores."
 preparation = "Fold-local preparation: preprocessing, selection, sampling and task wrappers."
 assurance = "Evidence that a run is sound: ledger, charter, detectors, admissibility, custody, framing, ingest, robustness and coverage."

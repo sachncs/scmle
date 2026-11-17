@@ -10,10 +10,10 @@ import pytest
 from scmle.contracts import capabilities
 from scmle.contracts import tasks
 from scmle.core import orchestrator
-from scmle.core import resource_observation
 from scmle.core import stages
 import scmle.models.registry
 from scmle.models.sklearn import classical
+from scmle.runtime import resource_observation
 
 
 def binary_frame() -> pandas.DataFrame:

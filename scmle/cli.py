@@ -28,8 +28,6 @@ from scmle.artifacts import claims_audit
 from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.contracts import tasks
-from scmle.core import config
-from scmle.core import logs
 from scmle.data.catalog import Catalog
 from scmle.data.charter import contracts
 from scmle.data.charter import feasibility
@@ -57,6 +55,8 @@ from scmle.inference import serving
 import scmle.inference.mapping
 import scmle.operations.controller
 from scmle.optimization import optimizers
+from scmle.runtime import config
+from scmle.runtime import logs
 from scmle.security import access
 from scmle.trail import builder
 from scmle.trail import chain

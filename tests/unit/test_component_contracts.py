@@ -11,7 +11,6 @@ import pytest
 from scmle.contracts import models
 import scmle.contracts.experiments
 from scmle.core import policies
-from scmle.core import scheduler
 from scmle.core import stages
 from scmle.data.readers import tabular
 from scmle.data.splitting import splitters
@@ -26,6 +25,7 @@ from scmle.models import registry
 from scmle.models import thresholds
 from scmle.monitoring import monitor
 from scmle.optimization import optimizers
+from scmle.runtime import scheduler
 from scmle.sampling import resampling
 from scmle.sampling import strategies
 from scmle.sampling import synthesis

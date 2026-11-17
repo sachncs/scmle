@@ -164,7 +164,6 @@ from scmle.artifacts import bundle
 import scmle.certificates
 from scmle.contracts import tasks
 import scmle.contracts.data
-from scmle.core import randomness
 from scmle.data.charter import feasibility
 import scmle.data.charter.decision
 from scmle.data.curation import preprocessing
@@ -184,6 +183,7 @@ from scmle.governance import rollout_hook
 import scmle.governance.registry
 import scmle.models.registry
 from scmle.monitoring import abtest
+from scmle.runtime import randomness
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f11_certificates.json"
 DEV_SEED_BASE = 10_000

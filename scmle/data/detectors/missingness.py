@@ -40,7 +40,7 @@ from sklearn import impute
 from sklearn import model_selection
 
 import scmle.contracts.errors
-from scmle.core import randomness
+from scmle.runtime import randomness
 
 MAX_ROWS = 5000
 MAX_COLUMNS = 40

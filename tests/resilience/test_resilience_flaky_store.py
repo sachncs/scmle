@@ -11,9 +11,9 @@ import faulty_store
 import pytest
 
 from scmle.contracts import errors
-from scmle.core import retry
 from scmle.data.store import objectstore
 from scmle.data.store import processing
+from scmle.runtime import retry
 
 POLICY = retry.Retries(max_attempts=4, base_delay_seconds=0.5, factor=2.0)
 KEYS = failpoints.input_keys()

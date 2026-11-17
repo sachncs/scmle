@@ -8,7 +8,7 @@ from benchmarks import acceptance
 from benchmarks.evidence import budget
 from benchmarks.sota import scmle_runner
 from scmle.contracts import errors
-from scmle.core import limits
+from scmle.runtime import limits
 
 
 def minimum() -> int:

@@ -13,13 +13,13 @@ import numpy
 import pytest
 
 from benchmarks.qualification import framing_certify
-from scmle.core import randomness
 from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.framing import baseline
 from scmle.data.framing import costs
 from scmle.data.framing import draft
 from scmle.data.framing import feasibility
+from scmle.runtime import randomness
 
 
 def test_the_size_bound_and_the_power_floor_are_two_standard_errors_off():

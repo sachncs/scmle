@@ -75,12 +75,12 @@ from sklearn.datasets import load_breast_cancer
 from benchmarks.qualification import certify
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.charter import contracts
 from scmle.data.detectors import certificates
 from scmle.data.robustness import multiverse
 from scmle.data.robustness import shift
 from scmle.data.robustness import stability
+from scmle.runtime import randomness
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f6_certificates.json"
 MEASUREMENTS_PATH = Path(__file__).with_name("f6_measurements.json")

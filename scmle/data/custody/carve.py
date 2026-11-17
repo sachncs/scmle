@@ -22,7 +22,7 @@ import numpy
 import pandas
 
 from scmle.contracts import errors
-from scmle.core import randomness
+from scmle.runtime import randomness
 
 MAX_FRACTION = 0.5
 BLOCKS = 20

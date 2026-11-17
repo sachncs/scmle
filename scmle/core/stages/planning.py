@@ -11,9 +11,9 @@ from scmle.contracts import tasks
 import scmle.core.context
 from scmle.core.stages import interface
 from scmle.core.stages import profiling
-import scmle.core.state
 from scmle.intelligence import recommendations
 import scmle.intelligence.planner
+import scmle.runtime.state
 
 LOGGER = logging.getLogger(__name__)
 
@@ -184,8 +184,8 @@ class Planning(interface.Stage):
     """Builds the experiment plan from the development-set profile."""
 
     requires: ClassVar[tuple[type, ...]] = (profiling.ProfileStage,)
-    state: ClassVar[scmle.core.state.Progress] = (
-        scmle.core.state.Progress.PLANNING
+    state: ClassVar[scmle.runtime.state.Progress] = (
+        scmle.runtime.state.Progress.PLANNING
     )
 
     def describe(

@@ -29,8 +29,8 @@ from numpy.typing import NDArray
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.framing import costs
+from scmle.runtime import randomness
 
 GRID_POINTS = 21
 MIN_SD = 1e-12

@@ -143,7 +143,7 @@ def select(
         ConfigError: For an unknown executor.
     """
     if executor == "ray":
-        from scmle.integrations import ray_backend  # noqa: PLC0415 -- optional dependency (the `distributed` extra)
+        from scmle.runtime import ray_backend  # noqa: PLC0415 -- optional dependency (the `distributed` extra)
 
         return ray_backend.Remote(workers, address)
     if executor != "process":

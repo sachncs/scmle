@@ -3,8 +3,8 @@
 import pytest
 
 from scmle.contracts import errors
-from scmle.core import retry
 from scmle.data.store import objectstore
+from scmle.runtime import retry
 from scmle.workflow import definition
 import scmle.workflow.schedule
 from tests.unit import test_workflow

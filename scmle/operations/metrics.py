@@ -24,7 +24,7 @@ import time
 from typing import Any
 
 from scmle.contracts import errors
-from scmle.core import logs
+from scmle.runtime import logs
 
 LOGGER = logging.getLogger(__name__)
 

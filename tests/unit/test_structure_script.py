@@ -140,13 +140,13 @@ def test_an_unplaced_package_breaks_the_order(monkeypatch, tmp_path):
 
 def test_the_longest_move_wins():
     moves = {
-        "scmle.core": "scmle.pipeline",
-        "scmle.core.retry": "scmle.runtime.retry",
+        "scmle.alpha": "scmle.beta",
+        "scmle.alpha.retry": "scmle.gamma.retry",
     }
     module = load()
-    assert module.rename("scmle.core.retry", moves) == "scmle.runtime.retry"
-    assert module.rename("scmle.core.stages", moves) == "scmle.pipeline.stages"
-    assert module.rename("scmle.corex", moves) == "scmle.corex"
+    assert module.rename("scmle.alpha.retry", moves) == "scmle.gamma.retry"
+    assert module.rename("scmle.alpha.stages", moves) == "scmle.beta.stages"
+    assert module.rename("scmle.alphax", moves) == "scmle.alphax"
 
 
 def test_the_recorded_map_breaks_no_more_imports_than_its_budget():

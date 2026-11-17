@@ -14,25 +14,28 @@ low = "The bottom layer."
 
 [[step]]
 name = "low"
-moves = [["scmle.core.retry", "scmle.low.retry"]]
+moves = [["scmle.alpha.retry", "scmle.low.retry"]]
 """
 FILES = {
     "scmle/__init__.py": '"""Package."""\n',
-    "scmle/core/__init__.py": '"""Core."""\n',
-    "scmle/core/retry.py": '"""Retries."""\n\n\ndef again():\n    return 1\n',
-    "scmle/core/user.py": (
+    "scmle/alpha/__init__.py": '"""Alpha."""\n',
+    "scmle/alpha/retry.py": '"""Retries."""\n\n\ndef again():\n    return 1\n',
+    "scmle/alpha/user.py": (
         '"""Uses retry in every form."""\n\n'
-        "import scmle.core.retry\n"
-        "from scmle.core import retry\n\n"
-        'SITE = "scmle.core.retry:again"\n'
-        'FILE = "scmle/core/retry.py"\n\n\n'
+        "import scmle.alpha.retry\n"
+        "from scmle.alpha import retry\n\n"
+        'SITE = "scmle.alpha.retry:again"\n'
+        'FILE = "scmle/alpha/retry.py"\n\n\n'
         "def run():\n"
-        "    from scmle.core.retry import again\n\n"
-        "    return retry.again() + scmle.core.retry.again() + again()\n"
+        "    from scmle.alpha.retry import again\n\n"
+        "    return retry.again() + scmle.alpha.retry.again() + again()\n"
     ),
-    "gates.toml": 'site = "scmle.core.retry:again"\n',
+    "gates.toml": 'site = "scmle.alpha.retry:again"\n',
     "docs/RENAMES.md": "# Renames\n",
-    "docs/GUIDE.md": "See `core.retry` and `scmle/core/retry.py`.\n",
+    "docs/GUIDE.md": (
+        "See `alpha.retry` and `scmle/alpha/retry.py`.\n"
+        "from scmle.alpha import retry\n"
+    ),
 }
 
 
@@ -91,24 +94,26 @@ def test_step_rewrites_every_reference_and_verifies(tree):
     module = load()
     assert run(module, tree) == 0
     assert (tree / "scmle/low/retry.py").exists()
-    assert not (tree / "scmle/core/retry.py").exists()
+    assert not (tree / "scmle/alpha/retry.py").exists()
     assert (tree / "scmle/low/__init__.py").read_text() == (
         '"""The bottom layer."""\n'
     )
-    user = (tree / "scmle/core/user.py").read_text()
+    user = (tree / "scmle/alpha/user.py").read_text()
     assert "import scmle.low.retry" in user
     assert "from scmle.low import retry" in user
     assert "from scmle.low.retry import again" in user
     assert '"scmle.low.retry:again"' in user
     assert '"scmle/low/retry.py"' in user
     assert "scmle.low.retry.again()" in user
-    assert "scmle.core.retry" not in user
+    assert "scmle.alpha.retry" not in user
     assert (
         tree / "gates.toml"
     ).read_text() == 'site = "scmle.low.retry:again"\n'
     guide = (tree / "docs/GUIDE.md").read_text()
-    assert guide == "See `low.retry` and `scmle/low/retry.py`.\n"
-    assert "`scmle.core.retry` -> `scmle.low.retry`" in (
+    assert guide == (
+        "See `low.retry` and `scmle/low/retry.py`.\nfrom scmle.low import retry\n"
+    )
+    assert "`scmle.alpha.retry` -> `scmle.low.retry`" in (
         (tree / "docs/RENAMES.md").read_text()
     )
     assert run(module, tree, "--verify") == 0
@@ -123,19 +128,19 @@ def test_the_map_itself_is_never_rewritten(tree):
 def test_verify_rejects_a_planted_edit(tree, capsys):
     module = load()
     run(module, tree)
-    path = tree / "scmle/core/user.py"
+    path = tree / "scmle/alpha/user.py"
     path.write_text(
         path.read_text().replace("return retry", "return 2 + retry")
     )
     assert run(module, tree, "--verify") == 1
-    assert "scmle/core/user.py: not a rename" in capsys.readouterr().out
-    assert run(module, tree, "--verify", "--hand", "scmle/core/user.py") == 0
+    assert "scmle/alpha/user.py: not a rename" in capsys.readouterr().out
+    assert run(module, tree, "--verify", "--hand", "scmle/alpha/user.py") == 0
 
 
 def test_verify_rejects_a_double_binding(tree, capsys):
     module = load()
     run(module, tree)
-    path = tree / "scmle/core/user.py"
+    path = tree / "scmle/alpha/user.py"
     text = path.read_text()
     path.write_text(
         text.replace('"""\n\n', '"""\n\nfrom scmle import retry\n', 1)
@@ -146,11 +151,11 @@ def test_verify_rejects_a_double_binding(tree, capsys):
 
 def test_a_rename_that_would_clash_is_refused():
     module = load()
-    moves = {"scmle.models.ranking.wrapper": "scmle.preparation.ranking"}
-    known = {"scmle.models.ranking", "scmle.models.ranking.wrapper"}
+    moves = {"scmle.alpha.ranking.wrapper": "scmle.beta.ranking"}
+    known = {"scmle.alpha.ranking", "scmle.alpha.ranking.wrapper"}
     text = (
-        "from scmle.models import ranking\n"
-        "from scmle.models.ranking import wrapper\n\n"
+        "from scmle.alpha import ranking\n"
+        "from scmle.alpha.ranking import wrapper\n\n"
         "VALUE = (ranking, wrapper)\n"
     )
     with pytest.raises(module.ConflictError):

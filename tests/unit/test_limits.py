@@ -6,9 +6,9 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.core import budget
-from scmle.core import limits
 from scmle.data.profiling import profiler
+from scmle.runtime import budget
+from scmle.runtime import limits
 
 
 def governor(**kwargs):

@@ -10,7 +10,6 @@ import scmle.artifacts.bundle
 from scmle.contracts import experiments
 from scmle.contracts import tasks
 import scmle.contracts.models
-from scmle.core import randomness
 import scmle.core.context
 from scmle.core.stages import cost
 from scmle.core.stages import documentation
@@ -18,6 +17,7 @@ from scmle.data.charter import contracts
 from scmle.data.charter import sealing
 from scmle.evaluation import conformal
 from scmle.evaluation import cv_plus
+from scmle.runtime import randomness
 from scmle.sampling import strategies
 
 

@@ -64,7 +64,6 @@ from benchmarks.qualification import ingest_checks
 from benchmarks.qualification import ingest_worlds
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.detectors import certificates
 from scmle.data.ingest import asof_view
 from scmle.data.ingest import budget
@@ -76,6 +75,7 @@ from scmle.data.ingest import reconcile
 from scmle.data.ingest import synthesize
 import scmle.data.ingest.plan
 from scmle.data.readers import connectors
+from scmle.runtime import randomness
 
 STORE_PATH = scmle.certificates.DIRECTORY / "ingest_certificates.json"
 MEASUREMENTS_PATH = Path(__file__).with_name("ingest_measurements.json")

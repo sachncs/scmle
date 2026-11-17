@@ -5,7 +5,7 @@ import functools
 from typing import Any
 
 from scmle.contracts import errors
-from scmle.core import retry
+from scmle.runtime import retry
 from scmle.workflow import definition
 from scmle.workflow.executor import context
 from scmle.workflow.executor import leases

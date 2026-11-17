@@ -45,8 +45,8 @@ import threadpoolctl
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.core import budget
-from scmle.core import logs
+from scmle.runtime import budget
+from scmle.runtime import logs
 
 LOGGER = logging.getLogger(__name__)
 

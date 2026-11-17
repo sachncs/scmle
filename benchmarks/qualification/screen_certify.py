@@ -49,12 +49,12 @@ from benchmarks.qualification import f4_certify
 from benchmarks.qualification import simulate
 from scmle.contracts import qualification
 from scmle.contracts import tasks
-from scmle.core import randomness
 from scmle.data.admissibility import leakage
 from scmle.data.admissibility import plants
 from scmle.data.admissibility import screen
 from scmle.data.detectors import certificates
 from scmle.data.validation import columns
+from scmle.runtime import randomness
 
 MEASUREMENTS_PATH = Path(__file__).with_name("screen_measurements.json")
 NULL_REPLICATES = 1000

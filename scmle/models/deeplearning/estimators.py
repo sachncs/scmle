@@ -21,7 +21,7 @@ from sklearn.utils import validation
 from scmle import envelope
 from scmle.contracts import errors
 from scmle.models.deeplearning import contracts
-from scmle.models.deeplearning import worker
+from scmle.runtime import worker
 
 
 class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information

@@ -16,7 +16,7 @@ from scmle.contracts import errors
 
 if TYPE_CHECKING:
     import scmle.core.context
-    import scmle.core.state
+    import scmle.runtime.state
 
 
 class Node(Protocol):
@@ -28,7 +28,7 @@ class Node(Protocol):
     without introducing an inheritance requirement into the extension point.
     """
 
-    state: ClassVar["scmle.core.state.Progress"]
+    state: ClassVar["scmle.runtime.state.Progress"]
     requires: ClassVar[tuple[type["Node"], ...]]
 
     def describe(self, context: "scmle.core.context.Context") -> str:

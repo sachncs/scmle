@@ -38,8 +38,8 @@ from scipy import stats
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.core import randomness
 from scmle.data.admissibility import dag
+from scmle.runtime import randomness
 
 MAX_DISCRETE_LEVELS = 10
 COMPONENT = "dag.ci"

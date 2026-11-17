@@ -21,7 +21,7 @@ from scmle.contracts import tasks
 from scmle.models import registry
 from scmle.models.deeplearning import estimators
 from scmle.models.deeplearning import foundation
-from scmle.models.deeplearning import worker
+from scmle.runtime import worker
 
 HERE = str(pathlib.Path(__file__).resolve().parent)
 

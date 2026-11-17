@@ -10,8 +10,8 @@ import sys
 import pytest
 import support
 
-from scmle.integrations import ray_backend
 import scmle.models.registry
+from scmle.runtime import ray_backend
 
 if importlib.util.find_spec("ray") is not None:
     import ray.cloudpickle

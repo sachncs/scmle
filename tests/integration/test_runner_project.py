@@ -9,11 +9,11 @@ import threading
 import numpy
 import pandas
 
-from scmle.core import retry
 from scmle.data.store import objectstore
 from scmle.runners import base
 from scmle.runners import local
 from scmle.runners import project
+from scmle.runtime import retry
 
 OPTIONS = {
     "time_budget": 20,
