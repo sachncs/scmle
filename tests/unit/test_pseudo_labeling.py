@@ -5,7 +5,7 @@ import pandas
 from sklearn import linear_model
 from sklearn import metrics
 
-from scmle.sampling import pseudo_labeling
+from scmle.preparation import pseudo_labeling
 
 
 def blobs(rows, seed):

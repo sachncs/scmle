@@ -17,8 +17,8 @@ from scmle.data.charter import contracts
 from scmle.data.charter import sealing
 from scmle.evaluation import conformal
 from scmle.evaluation import cv_plus
+from scmle.preparation import strategies
 from scmle.runtime import randomness
-from scmle.sampling import strategies
 
 
 class Calibration(documentation.Documentation):

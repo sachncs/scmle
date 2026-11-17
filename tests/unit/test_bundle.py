@@ -16,9 +16,9 @@ from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
 import scmle.contracts.signing
-from scmle.data.curation import preprocessing
 import scmle.inference.mapping
 import scmle.models.registry
+from scmle.preparation import preprocessing
 
 PLAN = data.Blueprint(("num",), ("cat",))
 

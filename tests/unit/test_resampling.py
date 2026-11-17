@@ -7,7 +7,7 @@ from sklearn import base
 from sklearn import linear_model
 from sklearn import model_selection
 
-from scmle.sampling import resampling
+from scmle.preparation import resampling
 
 
 def imbalanced(rows=400, minority=40, seed=0):

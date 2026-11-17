@@ -7,8 +7,8 @@ import scmle.core.context
 from scmle.core.stages import cost
 from scmle.core.stages import remedy
 import scmle.evaluation.metrics
-from scmle.sampling import pseudo_labeling
-from scmle.sampling import strategies
+from scmle.preparation import pseudo_labeling
+from scmle.preparation import strategies
 
 
 class Relabelling(remedy.Remedy):

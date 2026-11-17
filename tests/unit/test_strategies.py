@@ -9,8 +9,8 @@ from scmle.contracts import tasks
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 from scmle.models import registry
-from scmle.sampling import resampling
-from scmle.sampling import strategies
+from scmle.preparation import resampling
+from scmle.preparation import strategies
 
 REGISTRY = registry.Catalog.stock()
 

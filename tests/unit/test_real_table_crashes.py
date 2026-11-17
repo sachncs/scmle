@@ -13,9 +13,9 @@ import pytest
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.curation import preprocessing
 from scmle.data.splitting import inner_cv
 from scmle.models.sklearn import classical
+from scmle.preparation import preprocessing
 
 
 def wide_frame(rows=3000, levels=1200, seed=0):

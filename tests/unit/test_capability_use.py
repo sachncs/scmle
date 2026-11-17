@@ -6,10 +6,10 @@ import pytest
 
 from scmle.contracts import tasks
 import scmle.contracts.data
-from scmle.data.curation import preprocessing
 from scmle.intelligence import planner
 import scmle.models.registry
-from scmle.sampling import strategies
+from scmle.preparation import preprocessing
+from scmle.preparation import strategies
 
 
 @pytest.fixture

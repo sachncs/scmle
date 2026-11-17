@@ -11,8 +11,8 @@ import scmle.artifacts.bundle
 from scmle.contracts import data
 from scmle.contracts import signing
 from scmle.contracts import tasks
-from scmle.data.curation import preprocessing
 import scmle.models.registry
+from scmle.preparation import preprocessing
 
 PLAN = data.Blueprint(("num",), ("cat",))
 

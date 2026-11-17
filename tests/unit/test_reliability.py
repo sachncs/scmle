@@ -12,9 +12,9 @@ import scmle.artifacts.bundle
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.curation import preprocessing
 from scmle.evaluation import reliability
 from scmle.models import registry
+from scmle.preparation import preprocessing
 
 
 def test_a_perfectly_confident_correct_model_has_no_error():

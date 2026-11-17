@@ -17,8 +17,8 @@ import pytest
 
 from scmle import cli
 from scmle.operations import metrics
+from scmle.preparation import synthesis
 from scmle.runtime import logs
-from scmle.sampling import synthesis
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PACKAGES = (
@@ -85,7 +85,7 @@ def test_an_undersized_class_is_reported_as_degraded(caplog):
     target = pandas.Series(["a"] * 20 + ["b"] * 3)
     sampler = synthesis.CopulaOverSampler()
     with (
-        caplog.at_level(logging.WARNING, logger="scmle.sampling.synthesis"),
+        caplog.at_level(logging.WARNING, logger="scmle.preparation.synthesis"),
         pytest.warns(logs.Degraded, match="'b'"),
     ):
         sampler.resample(features, target, seed=0)

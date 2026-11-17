@@ -25,10 +25,10 @@ from scmle.contracts import experiments
 from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.data import transformers
-from scmle.data.curation import preprocessing
 from scmle.data.splitting import inner_cv
-from scmle.sampling import resampling
-from scmle.sampling import synthesis
+from scmle.preparation import preprocessing
+from scmle.preparation import resampling
+from scmle.preparation import synthesis
 
 MIN_IMBALANCE_RATIO = 3.0
 TARGET_SKEW_THRESHOLD = 1.0

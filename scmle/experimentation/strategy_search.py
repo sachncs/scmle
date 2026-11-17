@@ -9,7 +9,7 @@ same model's default pipeline; every verdict is written to the decision log.
 from scmle.contracts import experiments
 import scmle.core.context
 from scmle.experimentation import trials
-from scmle.sampling import strategies
+from scmle.preparation import strategies
 
 
 class Strategist:

@@ -9,7 +9,7 @@ from scmle.contracts import data
 from scmle.contracts import tasks
 from scmle.data.splitting import inner_cv
 import scmle.models.registry
-from scmle.sampling import strategies
+from scmle.preparation import strategies
 
 
 def grouped_frame(groups=12, per_group=15, seed=0):
@@ -86,7 +86,7 @@ def test_calibration_strategy_uses_the_structured_splitter():
 def test_stack_members_are_full_pipelines_cross_fitted_by_group():
     registry = scmle.models.registry.Catalog.stock()
     params = {"members": [{"model": "decision_tree"}, {"model": "extra_trees"}]}
-    from scmle.data.curation import preprocessing
+    from scmle.preparation import preprocessing
 
     stack = preprocessing.instantiate(
         plan(group_column="unit"),

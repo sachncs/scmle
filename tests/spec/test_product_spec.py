@@ -33,10 +33,10 @@ from scmle.governance import lifecycle
 import scmle.inference.mapping
 from scmle.models import conformance
 import scmle.models.registry
+import scmle.preparation.strategies
 from scmle.runtime import ray_backend
 from scmle.runtime import scheduler
 from scmle.runtime import state
-import scmle.sampling.strategies
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / "scmle"
@@ -236,9 +236,8 @@ def test_l113_l176_package_organization():
         "data/readers",
         "data/profiling",
         "data/validation",
-        "data/curation",
         "data/splitting",
-        "sampling",
+        "preparation",
         "models",
         "models/sklearn",
         "models/boosting",
@@ -486,7 +485,7 @@ def test_l234_to_l264_flow_with_locked_test_and_single_final_evaluation(run):
         d.technique
         for d in result.plan.decisions
         if d.action == "include"
-        and d.technique in scmle.sampling.strategies.STRATEGIES
+        and d.technique in scmle.preparation.strategies.STRATEGIES
     }
     attempted = {t.strategy for t in result.trials} - {"default"}
     assert attempted <= planned  # nothing outside the execution plan was tried
@@ -716,7 +715,7 @@ def test_l370_optimizer_library_is_not_the_architecture():
 
 def test_l374_l393_balancing_and_augmentation(frame):
     """The technique table and its policies."""
-    from scmle.sampling import strategies
+    from scmle.preparation import strategies
 
     for name in (
         "class_weight",
@@ -735,7 +734,7 @@ def test_l374_l393_balancing_and_augmentation(frame):
     import scmle.contracts.data
     from scmle.data.profiling import profiler
     from scmle.data.readers import tabular
-    from scmle.sampling import resampling
+    from scmle.preparation import resampling
 
     # Sampling happens inside the training fold (inside fit), never on the full dataset.
     assert "fit" in resampling.ResamplingClassifier.__dict__
@@ -1056,7 +1055,7 @@ def test_l610_l629_backlog_priorities(run):
     from scmle.intelligence import knowledge
     from scmle.models import ensembles
     from scmle.monitoring import monitor
-    from scmle.sampling import synthesis
+    from scmle.preparation import synthesis
 
     result = run[1]
     assert len(result.predict(make_frame().drop(columns="y"))) == len(
@@ -1210,8 +1209,8 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     from scmle.intelligence import knowledge
     import scmle.models.registry
     import scmle.monitoring.events
-    from scmle.sampling import resampling
-    from scmle.sampling import synthesis
+    from scmle.preparation import resampling
+    from scmle.preparation import synthesis
 
     registry = scmle.models.registry.Catalog.stock()
     neural = registry.get("neural_network")  # deep learning: a plugin family
@@ -1300,7 +1299,7 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
     frame,
 ):
     """A candidate is a complete, independently evaluable pipeline."""
-    from scmle.sampling import strategies
+    from scmle.preparation import strategies
 
     registry = scmle.models.registry.Catalog.stock()
     plan = scmle.api.project.Project(frame, "y").plan()

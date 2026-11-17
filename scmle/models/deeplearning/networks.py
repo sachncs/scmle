@@ -18,11 +18,11 @@ from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import search
 from scmle.contracts import tasks
-from scmle.data.curation import preprocessing
 from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import estimators
 from scmle.models.deeplearning import foundation
 from scmle.models.deeplearning import jepa
+from scmle.preparation import preprocessing
 from scmle.runtime import worker
 
 MIN_JEPA_ROWS = 16

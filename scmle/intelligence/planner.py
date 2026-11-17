@@ -19,7 +19,7 @@ from scmle.data.splitting import splitters
 from scmle.evaluation import metrics
 from scmle.intelligence import knowledge
 import scmle.models.registry
-from scmle.sampling import strategies
+from scmle.preparation import strategies
 
 EXPENSIVE_COST = 3
 MIN_ENSEMBLE_SIZE = 2

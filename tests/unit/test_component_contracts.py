@@ -24,10 +24,10 @@ from scmle.models import registry
 from scmle.models import thresholds
 from scmle.monitoring import monitor
 from scmle.optimization import optimizers
+from scmle.preparation import resampling
+from scmle.preparation import strategies
+from scmle.preparation import synthesis
 from scmle.runtime import scheduler
-from scmle.sampling import resampling
-from scmle.sampling import strategies
-from scmle.sampling import synthesis
 from scmle.storage import stores
 
 

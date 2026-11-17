@@ -18,7 +18,7 @@ from scmle.evaluation import learning_curve
 from scmle.evaluation import nested
 from scmle.evaluation import sensitivity
 import scmle.evaluation.metrics
-from scmle.sampling import strategies
+from scmle.preparation import strategies
 
 
 class Diagnosis(calibration.Calibration):

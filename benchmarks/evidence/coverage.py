@@ -51,13 +51,13 @@ from benchmarks import acceptance
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.curation import preprocessing
 from scmle.data.detectors import certificates
 from scmle.evaluation import bootstrap
 from scmle.evaluation import diagnostics
 from scmle.evaluation import metrics
 import scmle.evaluation.coverage
 from scmle.models import registry
+from scmle.preparation import preprocessing
 
 PATH = Path(__file__).with_suffix(".json")
 VARIABLE = "interval_coverage_min"

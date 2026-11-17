@@ -18,7 +18,7 @@ from scmle.decision import netbenefit
 import scmle.decision.threshold
 from scmle.evaluation import coverage_confirm
 from scmle.models import thresholds
-from scmle.sampling import strategies
+from scmle.preparation import strategies
 
 COVERAGE_LEVELS = (0.5, 0.8, 0.9, 0.95)
 

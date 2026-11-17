@@ -166,7 +166,6 @@ from scmle.contracts import tasks
 import scmle.contracts.data
 from scmle.data.charter import feasibility
 import scmle.data.charter.decision
-from scmle.data.curation import preprocessing
 from scmle.data.detectors import certificates
 from scmle.data.framing import costs
 import scmle.data.ledger.budget
@@ -183,6 +182,7 @@ from scmle.governance import rollout_hook
 import scmle.governance.registry
 import scmle.models.registry
 from scmle.monitoring import abtest
+from scmle.preparation import preprocessing
 from scmle.runtime import randomness
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f11_certificates.json"

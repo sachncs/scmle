@@ -19,7 +19,7 @@ from sklearn import ensemble
 from sklearn import pipeline
 
 from scmle.contracts import data
-from scmle.data.curation import preprocessing
+from scmle.preparation import preprocessing
 
 TRAIN_ROWS = 20000
 TREES = 100

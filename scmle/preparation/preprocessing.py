@@ -20,7 +20,6 @@ from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
 from scmle.data import feature_graph
-from scmle.data.curation import selection
 from scmle.data.validation import columns
 from scmle.models import weighting
 from scmle.models import wrappers
@@ -29,6 +28,7 @@ import scmle.models.multitarget.wrapper
 import scmle.models.ranking.wrapper
 import scmle.models.survival.wrapper
 import scmle.models.uplift.wrapper
+from scmle.preparation import selection
 
 SPARSE_THRESHOLD = 0.3
 # HistGradientBoosting bins a native categorical into at most `max_bins`

@@ -18,8 +18,8 @@ import numpy
 import pandas
 from scipy import special
 
+from scmle.preparation import resampling
 from scmle.runtime import logs
-from scmle.sampling import resampling
 
 LOGGER = logging.getLogger(__name__)
 MIN_FIT_ROWS = 5

@@ -21,8 +21,8 @@ from sklearn import pipeline
 from scmle.contracts import tasks
 import scmle.contracts.data
 from scmle.data import reference
-from scmle.data.curation import preprocessing
 from scmle.data.validation import columns
+from scmle.preparation import preprocessing
 
 BYTES_PER_MB = 1024 * 1024
 SAMPLE_ROWS = 5000

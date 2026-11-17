@@ -8,12 +8,12 @@ from scmle.artifacts import bundle
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.curation import preprocessing
 from scmle.governance import lifecycle
 import scmle.governance.registry
 import scmle.models.registry
 from scmle.monitoring import abtest
 from scmle.monitoring import shadow
+from scmle.preparation import preprocessing
 
 PLAN = data.Blueprint(("a", "b"), ())
 MODELS = scmle.models.registry.Catalog.stock()

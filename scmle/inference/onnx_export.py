@@ -24,7 +24,7 @@ from scmle.data.validation import columns
 from scmle.models import weighting
 from scmle.models import wrappers
 from scmle.models.boosting import early_stopping
-from scmle.sampling import resampling
+from scmle.preparation import resampling
 
 OPSET = 17
 ML_OPSET = 3

@@ -8,13 +8,13 @@ import pytest
 
 from scmle.contracts import data
 from scmle.contracts import tasks
-from scmle.data.curation import preprocessing
 from scmle.evaluation import bootstrap
 from scmle.evaluation import diagnostics
 from scmle.evaluation import metrics
 import scmle.evaluation.suite
 from scmle.explainability import importance
 from scmle.models import registry
+from scmle.preparation import preprocessing
 
 REGISTRY = registry.Catalog.stock()
 PLAN = data.Blueprint(("signal", "noise"), ("group",))

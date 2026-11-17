@@ -34,7 +34,7 @@ scmle/models/ensembles.py predict_proba passthrough public API or scikit-learn e
 scmle/models/modality_lifecycle/curators.py remarks getter adapter hook documented on the website extensions page
 scmle/operations/faults.py run_all passthrough shown in docs/OPERATIONS.md and the website observability page
 scmle/runners/base.py Runner lone-interface local.Runner implements it; pinned in the public API
-scmle/sampling/synthesis.py Synthesizer lone-interface Copula and a test double; documented in docs/ARCHITECTURE.md
+scmle/preparation/synthesis.py Synthesizer lone-interface Copula and a test double; documented in docs/ARCHITECTURE.md
 scmle/data/admissibility/plants.py copy getter one of the five leak-type methods that plant() dispatches to by name (scmle/data/admissibility/plants.py plant); Numbers.copy overrides it, so it is polymorphic, not a getter
 scmle/artifacts/bundle.py pools single-use reads the loaded math-library thread pools and picks the BLAS implementation from threadpoolctl's records, an environment probe like detect and inventory beside it; tests/unit/test_bundle.py pins its output through the manifest, and inlined it would put a library probe inside the 120-line classmethod create
 scmle/runtime/logs.py degrade single-use the logging convention's one entry point for a reduced optional path (WARNING plus a Degraded warning); register task 2.1 rolls it out to data/, sampling/ and operations/, so its single caller today (limits.py) is the first of many

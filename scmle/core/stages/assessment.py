@@ -16,8 +16,8 @@ from scmle.evaluation import confidence
 from scmle.evaluation import criteria
 from scmle.evaluation import diagnostics
 from scmle.evaluation import suite
+from scmle.preparation import strategies
 import scmle.runtime.state
-from scmle.sampling import strategies
 
 BASELINE = "dummy"
 

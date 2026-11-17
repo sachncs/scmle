@@ -4,7 +4,7 @@ import numpy
 import pandas
 from sklearn import linear_model
 
-from scmle.data.curation import selection
+from scmle.preparation import selection
 
 
 def test_a_constructor_without_a_target_builds_nothing() -> None:

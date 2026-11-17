@@ -7,11 +7,11 @@ import pandas
 
 from scmle.contracts import tasks
 import scmle.contracts.data
-from scmle.data.curation import preprocessing
 from scmle.evaluation import diagnostics
 from scmle.evaluation import metrics
 from scmle.evaluation import slices
 from scmle.models import registry
+from scmle.preparation import preprocessing
 
 REGISTRY = registry.Catalog.stock()
 PLAN = scmle.contracts.data.Blueprint(("signal",), ("region",))

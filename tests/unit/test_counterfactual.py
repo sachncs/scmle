@@ -11,8 +11,8 @@ import scmle.artifacts.bundle
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.curation import preprocessing
 from scmle.models import registry
+from scmle.preparation import preprocessing
 
 PLAN = data.Blueprint(("age", "income"), ("city",))
 REGISTRY = registry.Catalog.stock()

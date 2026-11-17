@@ -8,8 +8,8 @@ import pytest
 from scmle.contracts import data
 from scmle.contracts import tasks
 import scmle.models.registry
-from scmle.sampling import resampling
-from scmle.sampling import strategies
+from scmle.preparation import resampling
+from scmle.preparation import strategies
 
 
 @pytest.fixture

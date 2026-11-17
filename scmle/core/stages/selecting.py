@@ -14,8 +14,8 @@ from scmle.core.stages import profiling
 from scmle.core.stages import training
 import scmle.data.framing.claim
 from scmle.evaluation import resources
+from scmle.preparation import strategies
 import scmle.runtime.state
-from scmle.sampling import strategies
 
 
 class SelectStage(interface.Stage):

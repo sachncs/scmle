@@ -28,8 +28,8 @@ from scmle.contracts import tasks
 import scmle.contracts.metrics
 import scmle.core.context
 from scmle.evaluation import metrics
+from scmle.preparation import strategies
 from scmle.runtime import limits
-from scmle.sampling import strategies
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

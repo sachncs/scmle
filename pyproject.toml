@@ -299,7 +299,7 @@ forbidden_modules = [
     "scmle.explainability", "scmle.governance", "scmle.inference",
     "scmle.intelligence", "scmle.models", "scmle.monitoring",
     "scmle.operations", "scmle.optimization", "scmle.runners", "scmle.runtime",
-    "scmle.sampling", "scmle.security", "scmle.storage", "scmle.trail",
+    "scmle.preparation", "scmle.security", "scmle.storage", "scmle.trail",
     "scmle.workflow",
 ]
 allow_indirect_imports = true
@@ -331,7 +331,7 @@ source_modules = [
     "scmle.experimentation", "scmle.explainability",
     "scmle.governance", "scmle.inference", "scmle.intelligence",
     "scmle.models", "scmle.monitoring", "scmle.operations", "scmle.runtime",
-    "scmle.sampling", "scmle.security", "scmle.storage", "scmle.optimization",
+    "scmle.preparation", "scmle.security", "scmle.storage", "scmle.optimization",
 ]
 forbidden_modules = [
     "scmle.cli", "scmle.workflow", "scmle.runners", "scmle.trail",
@@ -348,7 +348,7 @@ forbidden_modules = [
     "scmle.experimentation", "scmle.explainability",
     "scmle.governance", "scmle.inference", "scmle.intelligence",
     "scmle.models", "scmle.monitoring", "scmle.operations", "scmle.runtime",
-    "scmle.sampling", "scmle.security", "scmle.storage", "scmle.durability",
+    "scmle.preparation", "scmle.security", "scmle.storage", "scmle.durability",
     "scmle.unsupervised",
 ]
 allow_indirect_imports = true

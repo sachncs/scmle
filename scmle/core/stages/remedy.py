@@ -11,7 +11,7 @@ from scmle.core.stages import examination
 from scmle.data.readers import streaming
 from scmle.evaluation import mitigation
 from scmle.models import thresholds
-from scmle.sampling import strategies
+from scmle.preparation import strategies
 
 
 class Remedy(examination.Examination):

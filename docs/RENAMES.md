@@ -2901,3 +2901,8 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.monitoring.reference` -> `scmle.data.reference`
 - `scmle.data.curation.transformers` -> `scmle.data.transformers`
 - `scmle.data.curation.embedding` -> `scmle.data.embedding`
+- `scmle.data.curation` -> `scmle.preparation`
+- `scmle.sampling.pseudo_labeling` -> `scmle.preparation.pseudo_labeling`
+- `scmle.sampling.resampling` -> `scmle.preparation.resampling`
+- `scmle.sampling.strategies` -> `scmle.preparation.strategies`
+- `scmle.sampling.synthesis` -> `scmle.preparation.synthesis`
