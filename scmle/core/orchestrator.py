@@ -33,6 +33,7 @@ from scmle.core import scheduler
 from scmle.core import state
 import scmle.core.context
 import scmle.core.stages
+from scmle.data.custody import journal
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
 from scmle.experimentation import stores
@@ -257,6 +258,7 @@ class Orchestrator:
         store.write_text("parameter_estimation_declaration.lock", f"{digest}\n")
         store.write_json("config.json", json.loads(self.spec.canonize()))
         store.write_text("environment.lock", environment_lock())
+        journal.Journal.locate(store.directory).start(self.spec.config_hash())
         with logs.bind(run=store.run_id):
             return self.execute(store, approved, {}, "run created")
 
@@ -277,6 +279,9 @@ class Orchestrator:
         Raises:
             ConfigError: If the run already completed or the saved
                 configuration differs from this orchestrator's.
+            BlockedError: If the run's custody journal (kept outside the run
+                directory) is missing or edited, or records that its test set
+                was opened (`Journal.admit`).
         """
         store = scmle.artifacts.store.Workspace.open(run_directory)
         saved = tasks.Config.model_validate_json(
@@ -292,6 +297,7 @@ class Orchestrator:
             )
         if store.path("evaluation.json").exists():
             raise errors.ConfigError("run already completed; nothing to resume")
+        journal.Journal.locate(store.directory).admit()
         plan_path = store.path("execution_plan.json")
         approved = (
             experiments.Plan.from_dict(
@@ -365,17 +371,32 @@ class Orchestrator:
             context: The run context, used to build each review and to record
                 the verdict.
 
+        A gate the run's custody journal records as rejected stays rejected
+        until a checkpoint of this orchestrator approves it, so resuming
+        without the checkpoint, or after deleting `events.jsonl`, does not
+        lift a rejection.
+
         Raises:
-            BlockedError: If any checkpoint rejects.
+            BlockedError: If any checkpoint rejects, or the gate was rejected
+                before and no checkpoint here reviews it.
         """
-        for checkpoint in self.checkpoints:
-            if gate not in checkpoint.gates:
-                continue
+        record = journal.Journal.locate(context.run_store.directory)
+        reviewers = [c for c in self.checkpoints if gate in c.gates]
+        earlier = record.rejected().get(gate.value)
+        if earlier is not None and not reviewers:
+            raise errors.BlockedError(
+                f"{gate.value} was rejected by {earlier}; resume with a "
+                "checkpoint that reviews it"
+            )
+        for checkpoint in reviewers:
             verdict = checkpoint.review(policies.describe(gate, context))
             context.emit(
                 f"policy.{'approved' if verdict.approved else 'rejected'}",
                 verdict.reason,
                 data={"gate": gate.value, "reviewer": verdict.reviewer},
+            )
+            record.decide(
+                gate.value, verdict.approved, verdict.reviewer, verdict.reason
             )
             if not verdict.approved:
                 raise errors.BlockedError(
@@ -409,6 +430,31 @@ class Orchestrator:
             data={"reserve_seconds": parts},
         )
         reserve.admit()
+
+    @staticmethod
+    def ready(
+        gate: state.Progress, context: scmle.core.context.Context
+    ) -> None:
+        """Prepares the context for the stage about to run.
+
+        Before planning, observes the runtime resources. Before testing,
+        wraps the locked test set so that opening it is first recorded in
+        the run's custody journal (`journal.Custodian`).
+
+        Args:
+            gate: The state of the stage about to run.
+            context: The run context.
+        """
+        if gate is state.Progress.PLANNING:
+            context.observe()
+        if gate is not state.Progress.TESTING:
+            return
+        split = scmle.core.context.require(context.split, "split")
+        if not isinstance(split.locked_test, journal.Custodian):
+            split.locked_test = journal.Custodian(
+                split.locked_test,
+                journal.Journal.locate(context.run_store.directory),
+            )
 
     def execute(
         self,
@@ -463,8 +509,7 @@ class Orchestrator:
             for stage in self.stages:
                 context.check_cancelled()
                 machine.transition(stage.state, stage.describe(context))
-                if stage.state is state.Progress.PLANNING:
-                    context.observe()
+                self.ready(stage.state, context)
                 with context.regulator.cap():
                     stage.execute(context)
                 if isinstance(stage, scmle.core.stages.IngestStage):

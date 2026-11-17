@@ -1003,25 +1003,32 @@ class Project:
         cls,
         run_directory: str | pathlib.Path,
         data: pandas.DataFrame | None = None,
+        checkpoints: tuple[policies.Reviewer, ...] = (),
     ) -> results.Run:
         """Continues an interrupted run from its saved configuration.
 
         Completed trials are reused; the rest are computed. The saved
         configuration and parameter-estimation declaration must be intact and
         match (`ArtifactError` or `ConfigError` otherwise), and a run that
-        already completed cannot be resumed.
+        already completed cannot be resumed. A run whose test set was opened,
+        or that has no intact custody journal beside its directory, is
+        refused (`BlockedError`) whatever its files say, and a gate a
+        checkpoint rejected stays rejected until one of `checkpoints`
+        approves it.
 
         Args:
             run_directory: Directory of a cancelled, failed or crashed run.
             data: The original in-memory data, required only if the project was
                 created from a DataFrame rather than a file.
+            checkpoints: Approval gates consulted after the stages in their
+                own `gates`, as for `Project`.
 
         Returns:
             The completed run.
         """
         run_path = pathlib.Path(run_directory)
         orchestrator = scmle.core.orchestrator.Orchestrator.reload(
-            run_path, frame=data
+            run_path, frame=data, checkpoints=checkpoints
         )
         estimand, policy = restore(
             run_path,
