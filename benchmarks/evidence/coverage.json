@@ -1,0 +1,71 @@
+{
+  "alpha": 0.05,
+  "claim": "C3",
+  "code": "34a87c92ee8dcdcda00c707455aba223af5172f9432c326105f47084405d0bda",
+  "design": {
+    "fresh_rows": 100000,
+    "group_rows": 5,
+    "groups": 60,
+    "seeds": "default_rng([trial, family index])",
+    "test_rows": 300,
+    "train_rows": 400
+  },
+  "families": [
+    {
+      "above": 16,
+      "below": 18,
+      "family": "binary_rows",
+      "hits": 848,
+      "lower": 0.9490078181618,
+      "mean_width": 0.0971933523485326,
+      "no_interval": 0,
+      "passed": true,
+      "rate": 0.9614512471655329,
+      "trials": 882
+    },
+    {
+      "above": 45,
+      "below": 19,
+      "family": "regression_rows",
+      "hits": 818,
+      "lower": 0.9114110130594106,
+      "mean_width": 0.15900178352246636,
+      "no_interval": 0,
+      "passed": false,
+      "rate": 0.927437641723356,
+      "trials": 882
+    },
+    {
+      "above": 23,
+      "below": 43,
+      "family": "binary_groups",
+      "hits": 816,
+      "lower": 0.9089457554946044,
+      "mean_width": 0.10424781205708253,
+      "no_interval": 0,
+      "passed": false,
+      "rate": 0.9251700680272109,
+      "trials": 882
+    }
+  ],
+  "floor": 0.93,
+  "level": 0.95,
+  "minimum_trials": 42,
+  "not_measured": [
+    "multiclass log loss",
+    "temporal (block) resampling",
+    "metrics other than each task's default",
+    "model families other than logistic regression and ridge",
+    "real datasets"
+  ],
+  "planned_trials": 882,
+  "pooled": {
+    "hits": 2482,
+    "lower": 0.9297538184481006,
+    "rate": 0.9380196523053665,
+    "trials": 2646
+  },
+  "power": 0.8,
+  "seconds": 799.4,
+  "variable": "interval_coverage_min"
+}

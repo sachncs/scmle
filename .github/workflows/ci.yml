@@ -59,6 +59,11 @@ jobs:
         run: uv run python -m benchmarks.registry > /dev/null
       - name: The scorecard is generated from its evidence
         run: uv run python -m benchmarks.scorecard > /dev/null
+      - name: The stored scorecard evidence is for the current code and docs
+        run: |
+          for module in coverage reproducibility budget guarantees refusal; do
+            uv run python -m "benchmarks.evidence.${module}" --check > /dev/null
+          done
       - run: uv run python scripts/check_api_compatibility.py tests/fixtures/public_api.json
       # Single-use helpers are a judgement call (plan.md 3a), so they are
       # reported but do not fail the build; every other shape does.

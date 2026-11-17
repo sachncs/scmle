@@ -15,9 +15,15 @@ import dataclasses
 import json
 import pathlib
 import sys
+import types
 
 from benchmarks import acceptance
 from benchmarks import registry
+from benchmarks.evidence import budget
+from benchmarks.evidence import coverage
+from benchmarks.evidence import guarantees
+from benchmarks.evidence import refusal
+from benchmarks.evidence import reproducibility
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TARGET = ROOT / "plan" / "scorecard.md"
@@ -121,6 +127,34 @@ def structure() -> Row:
     )
 
 
+def measured(
+    claim: str, name: str, criterion: str, module: types.ModuleType
+) -> Row:
+    """A claim decided by an evidence module's stored results.
+
+    Every module under `benchmarks.evidence` has the same `summary()`,
+    returning the value text and the verdict, so one row serves them all.
+
+    Args:
+        claim: The claim, for example `C3 Statistics correct`.
+        name: The `acceptance.toml` variable the criterion quotes.
+        criterion: What passing means, with `{value}` for the variable.
+        module: The evidence module that measured the claim.
+
+    Returns:
+        The row, citing the module's stored results.
+    """
+    text, verdict = module.summary()
+    stem = module.__name__.rsplit(".", 1)[-1]
+    return Row(
+        claim,
+        criterion.format(value=value(name)),
+        text,
+        f"benchmarks/evidence/{stem}.json",
+        verdict,
+    )
+
+
 def pending(claim: str, name: str, criterion: str) -> Row:
     """A claim whose evidence does not exist yet."""
     return Row(
@@ -137,10 +171,11 @@ def rows() -> list[Row]:
     return [
         gates(),
         leakage(),
-        pending(
+        measured(
             "C3 Statistics correct and uncertainty honest",
             "interval_coverage_min",
             "interval coverage lower bound >= {value}",
+            coverage,
         ),
         pending(
             "C4 At least a competent practitioner's quality",
@@ -153,15 +188,17 @@ def rows() -> list[Row]:
             "awkward files correct or refused; point-in-time features equal a "
             "naive reference (tolerance {value})",
         ),
-        pending(
+        measured(
             "C6 Reproducible and traceable",
             "cross_platform_tol",
             "byte-identical bundle per platform; metrics within {value}",
+            reproducibility,
         ),
-        pending(
+        measured(
             "C7 Operates without loss or stall",
             "budget_compliance_min",
             "share of runs within budget >= {value}; kill and resume pass",
+            budget,
         ),
         pending(
             "C8 Controls cannot be bypassed",
@@ -179,20 +216,22 @@ def rows() -> list[Row]:
             "user_task_minutes_max",
             "five non-specialists finish in <= {value} minutes",
         ),
-        pending(
+        measured(
             "C12 Docs tell the truth",
             "alpha",
             "every documented guarantee linked to an enforcing test",
+            guarantees,
         ),
         pending(
             "C13 Every stage on steroids",
             "speedup_min",
             "practitioner speed-up lower bound >= {value}",
         ),
-        pending(
+        measured(
             "C14 Refuses only when it should",
             "refusal_rate_max",
             "refusal-rate upper bound <= {value}",
+            refusal,
         ),
     ]
 

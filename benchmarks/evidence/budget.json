@@ -1,0 +1,270 @@
+{
+  "claim": "C7",
+  "code": "f707a70dcd71339ed5dc75429261f54562d58e01736fa84fc05a3ffc7e4ec020",
+  "compliance": {
+    "allowance_seconds": 22.0,
+    "hits": 2,
+    "runs": [
+      {
+        "completed": true,
+        "compliant": false,
+        "error": "",
+        "load": 65.2,
+        "process_seconds": 46.18,
+        "run_seconds": 44.6,
+        "seed": 0,
+        "timed_out": false
+      },
+      {
+        "completed": true,
+        "compliant": false,
+        "error": "",
+        "load": 70.8,
+        "process_seconds": 40.87,
+        "run_seconds": 39.31,
+        "seed": 1,
+        "timed_out": false
+      },
+      {
+        "completed": true,
+        "compliant": false,
+        "error": "",
+        "load": 67.2,
+        "process_seconds": 39.82,
+        "run_seconds": 38.31,
+        "seed": 2,
+        "timed_out": false
+      },
+      {
+        "completed": true,
+        "compliant": false,
+        "error": "",
+        "load": 61.2,
+        "process_seconds": 39.97,
+        "run_seconds": 38.48,
+        "seed": 3,
+        "timed_out": false
+      },
+      {
+        "completed": true,
+        "compliant": false,
+        "error": "",
+        "load": 62.4,
+        "process_seconds": 39.69,
+        "run_seconds": 38.2,
+        "seed": 4,
+        "timed_out": false
+      },
+      {
+        "completed": true,
+        "compliant": false,
+        "error": "",
+        "load": 64.2,
+        "process_seconds": 40.16,
+        "run_seconds": 38.66,
+        "seed": 5,
+        "timed_out": false
+      },
+      {
+        "completed": true,
+        "compliant": false,
+        "error": "",
+        "load": 64.3,
+        "process_seconds": 40.69,
+        "run_seconds": 39.2,
+        "seed": 6,
+        "timed_out": false
+      },
+      {
+        "completed": true,
+        "compliant": false,
+        "error": "",
+        "load": 65.3,
+        "process_seconds": 38.12,
+        "run_seconds": 36.58,
+        "seed": 7,
+        "timed_out": false
+      },
+      {
+        "completed": true,
+        "compliant": false,
+        "error": "",
+        "load": 59.4,
+        "process_seconds": 36.71,
+        "run_seconds": 35.21,
+        "seed": 8,
+        "timed_out": false
+      },
+      {
+        "completed": true,
+        "compliant": false,
+        "error": "",
+        "load": 51.5,
+        "process_seconds": 31.02,
+        "run_seconds": 29.43,
+        "seed": 9,
+        "timed_out": false
+      },
+      {
+        "completed": true,
+        "compliant": true,
+        "error": "",
+        "load": 44.1,
+        "process_seconds": 21.39,
+        "run_seconds": 19.92,
+        "seed": 10,
+        "timed_out": false
+      },
+      {
+        "completed": true,
+        "compliant": true,
+        "error": "",
+        "load": 36.8,
+        "process_seconds": 16.38,
+        "run_seconds": 14.96,
+        "seed": 11,
+        "timed_out": false
+      }
+    ],
+    "trials": 12,
+    "within_allowance_plus_diagnostics": 12
+  },
+  "not_measured": [
+    "the memory budget",
+    "budgets other than the one in settings",
+    "other tasks, data sizes and model families",
+    "kills outside the training stage",
+    "journal and lease operations"
+  ],
+  "resume": {
+    "cases": [
+      {
+        "checkpoints_at_kill": 1,
+        "created": [
+          "run created",
+          "run resumed"
+        ],
+        "differences": [],
+        "error": "",
+        "finished_before_kill": false,
+        "identical": true,
+        "point": 1
+      },
+      {
+        "checkpoints_at_kill": 2,
+        "created": [
+          "run created",
+          "run resumed"
+        ],
+        "differences": [],
+        "error": "",
+        "finished_before_kill": false,
+        "identical": true,
+        "point": 2
+      },
+      {
+        "checkpoints_at_kill": 3,
+        "created": [
+          "run created",
+          "run resumed"
+        ],
+        "differences": [],
+        "error": "",
+        "finished_before_kill": false,
+        "identical": true,
+        "point": 3
+      }
+    ],
+    "identical": 3,
+    "reference": {
+      "selected_cv_score": 0.9594559017112768,
+      "selected_model": "logistic_regression",
+      "selected_params": {},
+      "test_metrics": {
+        "accuracy": 0.9083333333333333,
+        "balanced_accuracy": 0.9065656565656566,
+        "f1": 0.9172932330827067,
+        "log_loss": 0.222866679066925,
+        "pr_auc": 0.9770755917658578,
+        "roc_auc": 0.9725028058361391
+      },
+      "trials": [
+        [
+          "trial_001",
+          "decision_tree",
+          "ok",
+          0.8184291355857833
+        ],
+        [
+          "trial_002",
+          "dummy",
+          "ok",
+          0.5
+        ],
+        [
+          "trial_003",
+          "logistic_regression",
+          "ok",
+          0.9594559017112768
+        ],
+        [
+          "trial_004",
+          "knn",
+          "ok",
+          0.9294427380430011
+        ],
+        [
+          "trial_005",
+          "extra_trees",
+          "ok",
+          0.927950855638438
+        ],
+        [
+          "trial_006",
+          "hist_gradient_boosting",
+          "ok",
+          0.938613426941641
+        ],
+        [
+          "trial_007",
+          "random_forest",
+          "ok",
+          0.936375603334796
+        ],
+        [
+          "trial_008",
+          "neural_network",
+          "ok",
+          0.9218078104431768
+        ],
+        [
+          "trial_009",
+          "svm",
+          "ok",
+          0.9546292233435718
+        ]
+      ]
+    },
+    "trials": 3
+  },
+  "seconds": 490.5,
+  "settings": {
+    "budget_seconds": 20,
+    "compliance_seconds": 420.0,
+    "diagnostic_allowance_seconds": 30.0,
+    "grace_seconds": 2.0,
+    "grace_share": 0.1,
+    "kill_points": [
+      1,
+      2,
+      3
+    ],
+    "min_ceiling_seconds": 1.0,
+    "resume_budget_seconds": 600,
+    "resume_seed": 0,
+    "runs_max": 400,
+    "timeout_factor": 3.0
+  },
+  "variable": "budget_compliance_min",
+  "version": 1
+}

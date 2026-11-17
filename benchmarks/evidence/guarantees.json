@@ -1,0 +1,4453 @@
+{
+  "by_doc": {
+    "README.md": {
+      "guarantees": 14,
+      "unlinked": 13
+    },
+    "docs/API_STABILITY.md": {
+      "guarantees": 17,
+      "unlinked": 15
+    },
+    "docs/ARCHITECTURE.md": {
+      "guarantees": 16,
+      "unlinked": 16
+    },
+    "docs/ARTIFACTS.md": {
+      "guarantees": 21,
+      "unlinked": 21
+    },
+    "docs/AUTONOMY.md": {
+      "guarantees": 8,
+      "unlinked": 8
+    },
+    "docs/BEGINNER_FINDINGS.md": {
+      "guarantees": 5,
+      "unlinked": 5
+    },
+    "docs/BENCHMARKS.md": {
+      "guarantees": 3,
+      "unlinked": 3
+    },
+    "docs/BREADTH.md": {
+      "guarantees": 5,
+      "unlinked": 4
+    },
+    "docs/CLI.md": {
+      "guarantees": 10,
+      "unlinked": 10
+    },
+    "docs/DECISIONS.md": {
+      "guarantees": 8,
+      "unlinked": 8
+    },
+    "docs/DEPENDENCIES.md": {
+      "guarantees": 4,
+      "unlinked": 4
+    },
+    "docs/GLOSSARY.md": {
+      "guarantees": 31,
+      "unlinked": 31
+    },
+    "docs/GOVERNED_DATA.md": {
+      "guarantees": 4,
+      "unlinked": 4
+    },
+    "docs/LEAKAGE.md": {
+      "guarantees": 15,
+      "unlinked": 15
+    },
+    "docs/LITERATURE_CHECK.md": {
+      "guarantees": 3,
+      "unlinked": 3
+    },
+    "docs/LOCAL.md": {
+      "guarantees": 2,
+      "unlinked": 2
+    },
+    "docs/OPERATING_LOOP.md": {
+      "guarantees": 1,
+      "unlinked": 1
+    },
+    "docs/OPERATIONS.md": {
+      "guarantees": 8,
+      "unlinked": 8
+    },
+    "docs/OPERATIONS_REHEARSAL.md": {
+      "guarantees": 1,
+      "unlinked": 1
+    },
+    "docs/ORCHESTRATION.md": {
+      "guarantees": 7,
+      "unlinked": 7
+    },
+    "docs/PORTABLE_TRAINING.md": {
+      "guarantees": 4,
+      "unlinked": 4
+    },
+    "docs/READING_RESULTS.md": {
+      "guarantees": 8,
+      "unlinked": 8
+    },
+    "docs/README.md": {
+      "guarantees": 1,
+      "unlinked": 1
+    },
+    "docs/RELEASING.md": {
+      "guarantees": 1,
+      "unlinked": 1
+    },
+    "docs/SECURITY.md": {
+      "guarantees": 16,
+      "unlinked": 6
+    },
+    "docs/SERVICE_SLO.md": {
+      "guarantees": 11,
+      "unlinked": 11
+    },
+    "docs/START_HERE.md": {
+      "guarantees": 15,
+      "unlinked": 15
+    },
+    "docs/TENANT_ISOLATION.md": {
+      "guarantees": 14,
+      "unlinked": 14
+    },
+    "docs/TRAIL.md": {
+      "guarantees": 1,
+      "unlinked": 1
+    },
+    "docs/TUTORIAL.md": {
+      "guarantees": 2,
+      "unlinked": 2
+    },
+    "docs/WHAT_SCMLE_CANNOT_DO.md": {
+      "guarantees": 19,
+      "unlinked": 19
+    },
+    "docs/WHEN_THINGS_GO_WRONG.md": {
+      "guarantees": 43,
+      "unlinked": 43
+    }
+  },
+  "claim": "C12",
+  "content_hash": "06488898e6cfc413ec526beebbd385318d93756c39710ba8a8dfd9aff84f1bfb",
+  "counts": {
+    "guarantees": 318,
+    "linked": 14,
+    "unlinked": 304
+  },
+  "definition": {
+    "docs": "README.md and docs/*.md",
+    "links": [
+      "the guarantee cites an existing path under tests/",
+      "a test file names the doc with :line, #Lline or #anchor",
+      "spec-test convention test_l<a>_l<b> in a file whose docstring cites the doc"
+    ],
+    "words": [
+      "always",
+      "never",
+      "must",
+      "cannot",
+      "can't",
+      "guarantee",
+      "guarantees",
+      "guaranteed",
+      "ensure",
+      "ensures",
+      "enforce",
+      "enforces",
+      "enforced",
+      "refuse",
+      "refuses",
+      "refused",
+      "refusal",
+      "refusals",
+      "block",
+      "blocks",
+      "blocked",
+      "blocking",
+      "reject",
+      "rejects",
+      "rejected",
+      "fails closed",
+      "fail closed"
+    ]
+  },
+  "docs": [
+    "README.md",
+    "docs/API_STABILITY.md",
+    "docs/ARCHITECTURE.md",
+    "docs/ARTIFACTS.md",
+    "docs/AUTONOMY.md",
+    "docs/BEGINNER_FINDINGS.md",
+    "docs/BENCHMARKS.md",
+    "docs/BREADTH.md",
+    "docs/CLI.md",
+    "docs/DECISIONS.md",
+    "docs/DEPENDENCIES.md",
+    "docs/GLOSSARY.md",
+    "docs/GOVERNED_DATA.md",
+    "docs/LEAKAGE.md",
+    "docs/LITERATURE_CHECK.md",
+    "docs/LOCAL.md",
+    "docs/OPERATING_LOOP.md",
+    "docs/OPERATIONS.md",
+    "docs/OPERATIONS_REHEARSAL.md",
+    "docs/ORACLES.md",
+    "docs/ORCHESTRATION.md",
+    "docs/PORTABLE_TRAINING.md",
+    "docs/READING_RESULTS.md",
+    "docs/README.md",
+    "docs/RELEASING.md",
+    "docs/RENAMES.md",
+    "docs/SECURITY.md",
+    "docs/SERVICE_SLO.md",
+    "docs/START_HERE.md",
+    "docs/TENANT_ISOLATION.md",
+    "docs/TRAIL.md",
+    "docs/TUTORIAL.md",
+    "docs/WHAT_SCMLE_CANNOT_DO.md",
+    "docs/WHEN_THINGS_GO_WRONG.md"
+  ],
+  "guarantees": [
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 68,
+      "line": 68,
+      "missing": [],
+      "section": "documentation-map",
+      "tests": [],
+      "text": "Understand a refusal, gate or alarm | [`docs/WHEN_THINGS_GO_WRONG.md`](docs/WHEN_THINGS_GO_WRONG.md)",
+      "words": [
+        "refusal"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 94,
+      "line": 93,
+      "missing": [],
+      "section": "what-it-does",
+      "tests": [],
+      "text": "A suspicion is not proof; only mechanisms with a passing certificate may block a run.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 106,
+      "line": 100,
+      "missing": [],
+      "section": "what-it-does",
+      "tests": [],
+      "text": "**Searches** the planned compatible model families (scikit-learn, LightGBM, XGBoost, CatBoost, SVM, kNN) within the configured time budget (the plan lists what it included, rejected and deferred), then evaluates data strategies on the original validation folds (class weighting, random and SMOTE-family resampling, copula augmentation, calibration, log / interaction features), tunes the winners with pruned search (random or Optuna), and assembles a cross-fitted stack that is adopted only if it beats its best member.",
+      "words": [
+        "rejected"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 132,
+      "line": 130,
+      "missing": [],
+      "section": "guarantees",
+      "tests": [],
+      "text": "Ambiguous targets, unparseable times, too few groups or minority examples, impossible constraints and rejected approvals put the run in `BLOCKED` instead of guessing.",
+      "words": [
+        "rejected"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 135,
+      "line": 133,
+      "missing": [],
+      "section": "guarantees",
+      "tests": [],
+      "text": "Bundles are pickle-based, so loading is refused unless the HMAC signature verifies or you pass `trusted=True`; checksums are verified before anything is unpickled ([`docs/SECURITY.md`](docs/SECURITY.md)).",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 139,
+      "line": 136,
+      "missing": [],
+      "section": "guarantees",
+      "tests": [],
+      "text": "CPU / time / memory limits are enforced (no trial starts past a limit; every trial runs in a supervised process that is killed at a hard time ceiling or when its resident memory exceeds the limit) and each run reports how every limit was applied and what was observed; reruns are classified `exact`, `comparable` or `different`.",
+      "words": [
+        "enforced"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 147,
+      "line": 143,
+      "missing": [],
+      "section": "does-it-keep-its-promises",
+      "tests": [],
+      "text": "`python -m benchmarks.reliability` checks nine properties on synthetic data with known answers: same seed gives the same result, replay agrees, noise labels never score well, a planted leak is found, signed bundles round-trip and reject tampering, 90% intervals cover, drift is flagged only when real, and one crashing candidate cannot sink a run.",
+      "words": [
+        "cannot",
+        "never",
+        "reject"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 179,
+      "line": 175,
+      "missing": [],
+      "section": "benchmarks-on-open-datasets",
+      "tests": [],
+      "text": "Titanic's near-perfect score comes from leaked columns (`boat`, `body`): the leakage screen flags both (`boat` by skill, missingness and record purity; `body` by record purity only, because it is recorded for 9% of passengers, all of whom died), and `leakage_policy=\"block\"` (opt-in; the default is `\"warn\"`) refuses to proceed.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 217,
+      "line": 215,
+      "missing": [],
+      "section": "layout",
+      "tests": [],
+      "text": "Third-party adapters can also register via the `scmle.models` entry-point group and must pass `scmle.models.conformance.comply`.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 222,
+      "line": 221,
+      "missing": [],
+      "section": "conventions",
+      "tests": [],
+      "text": "Google Python style (80 columns, Google docstrings, module imports), enforced by `ruff` and `mypy`.",
+      "words": [
+        "enforced"
+      ]
+    },
+    {
+      "cited": [
+        "tests/unit/test_conventions.py"
+      ],
+      "doc": "README.md",
+      "end": 223,
+      "line": 222,
+      "missing": [],
+      "section": "conventions",
+      "tests": [
+        "tests/unit/test_conventions.py"
+      ],
+      "text": "No underscore-prefixed names anywhere, enforced by `tests/unit/test_conventions.py`.",
+      "words": [
+        "enforced"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 256,
+      "line": 254,
+      "missing": [],
+      "section": "known-limits",
+      "tests": [],
+      "text": "* The HTTP serving adapter is a minimal reference server: it verifies bearer tokens when configured (and refuses a non-loopback bind without them) but has no TLS; terminate TLS at an ingress.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 262,
+      "line": 262,
+      "missing": [],
+      "section": "known-limits",
+      "tests": [],
+      "text": "* `gpu=\"required\"` blocks a run unless PyTorch can see a CUDA device.",
+      "words": [
+        "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "README.md",
+      "end": 265,
+      "line": 263,
+      "missing": [],
+      "section": "known-limits",
+      "tests": [],
+      "text": "It cannot stop a process from reading the original data file when a path was given, and a caller's own in-memory DataFrame still holds every row.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [
+        "tests/unit/test_qualification_api_rule.py"
+      ],
+      "doc": "docs/API_STABILITY.md",
+      "end": 35,
+      "line": 35,
+      "missing": [],
+      "section": "qualification-types",
+      "tests": [
+        "tests/unit/test_qualification_api_rule.py"
+      ],
+      "text": "`tests/unit/test_qualification_api_rule.py` enforces both halves.",
+      "words": [
+        "enforces"
+      ]
+    },
+    {
+      "cited": [
+        "tests/fixtures/public_api.json"
+      ],
+      "doc": "docs/API_STABILITY.md",
+      "end": 51,
+      "line": 47,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [
+        "tests/fixtures/public_api.json"
+      ],
+      "text": "`leakage_policy` keeps its values and its meaning at the top level (`Project(...)` and the snapshot in `tests/fixtures/public_api.json` are unchanged); what blocks is now a typed result, `Portrait.blockers`, from the permutation screen in `scmle.data.admissibility.screen`.",
+      "words": [
+        "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 56,
+      "line": 51,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "Behaviour changes that users may notice: blocking needs a passing certificate for the mechanism (binary classification only; regression and multiclass targets get warnings with p-values), the screen also reports a value recorded only for some outcomes when most rows are blank, and `Portrait` gained the optional field `leakage` (default empty) and its `to_dict` key.",
+      "words": [
+        "blocking"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 86,
+      "line": 83,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "Charter format 8 adds the optional `entity` and `reconcile` sub-blocks of `ingest` (`scmle.data.charter.ingest.Entity`, `Expectation`, extension surfaces); a format 7 ingest charter keeps its hash and signature.",
+      "words": [
+        "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 91,
+      "line": 87,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "Charter format 9 adds the optional `subgroups` field of the causal block (`scmle.data.charter.causal.Subgroup`, an extension surface) and the optional `attestors` and `attestations` fields (`scmle.data.charter.causal.Attestor`, `scmle.data.identification.attest`); a format 4 causal charter keeps its hash and signature.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 100,
+      "line": 97,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "Charter format 10 adds the optional `uncertainty` block (`scmle.data.charter.uncertainty.Uncertainty`, an extension surface; the snapshot is unchanged); a charter of format 9 or older keeps its hash and signature.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 105,
+      "line": 102,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "Charter format 11 adds the optional `coverage_on_confirmation` field of the `uncertainty` block (`scmle.data.charter.uncertainty.Uncertainty`, an extension surface; a format 10 charter keeps its hash and signature, both pinned).",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 135,
+      "line": 133,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "A charter run with a decision block now also writes `decision_report.json`, `policy_value.json` and, with a rollout plan, `rollout_design.json` and `rollout_decisions.jsonl`.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 173,
+      "line": 169,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "`scmle.data.charter.contracts.AnalysisEstimand` gained the optional field `causal` (`scmle.data.charter.causal.Question`, with `Control` and `Confounding`); it is omitted from the record when unset, so charters of format 1 to 3 keep their hash and signature, and a charter that carries it is format 4 (an older wrapper carrying it is refused).",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 185,
+      "line": 182,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "`choose_decision_threshold` takes the threshold from the charter's cost model when the charter has a decision block and the task is binary, even if `decision.threshold_objective` is `none`; without a block it behaves as before.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 186,
+      "line": 185,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "`evaluation.json` gained the keys `net_benefit` (null without a block) and, inside `decision`, `f11`.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 198,
+      "line": 196,
+      "missing": [],
+      "section": "deployment-contract",
+      "tests": [],
+      "text": "The snapshot's `surfaces` block pins the signature of each name above, and `scripts/check_api_compatibility.py` reports `surface added`, `surface removed` and `surface contract changed` for it.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 199,
+      "line": 198,
+      "missing": [],
+      "section": "deployment-contract",
+      "tests": [],
+      "text": "The spec format is versioned (`SPEC_FORMAT`); `from_dict` refuses any other format.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 207,
+      "line": 203,
+      "missing": [],
+      "section": "security-surface",
+      "tests": [],
+      "text": "`scmle.security.tokens`, `scmle.security.access` and `scmle.security.audit` are extension surfaces like `scmle.deploy.contract`: token verification (`Verifier`, `Keystore`, `Key`, `RevocationList`, `Principal`), the request gateway (`Gateway`, `RateLimiter`, `DeniedError`) and the audit log (`Log`) are pinned in the snapshot's `surfaces` block.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 210,
+      "line": 207,
+      "missing": [],
+      "section": "security-surface",
+      "tests": [],
+      "text": "Behaviour changes to existing classes: `HttpServing` gained the keyword-only `gateway` and refuses a non-loopback `host` without one; `ModalityHttpServing` kept its constructor, gained `protect`, and `start` refuses a non-loopback `host` without a gateway.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 217,
+      "line": 215,
+      "missing": [],
+      "section": "governed-data-surface",
+      "tests": [],
+      "text": "`scmle.data.store` (`objectstore`, `snapshot`, `quality`, `processing`) and `scmle.core.retry` are extension surfaces pinned in the snapshot's `surfaces` block.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/API_STABILITY.md",
+      "end": 277,
+      "line": 274,
+      "missing": [],
+      "section": "bundle-migration",
+      "tests": [],
+      "text": "The class renames changed the module path and class name stored inside every bundle, so a bundle written by an earlier build (format 2 or 1) cannot be loaded or migrated: `Bundle.load` refuses it with an error that says to retrain and save again.",
+      "words": [
+        "cannot",
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 33,
+      "line": 32,
+      "missing": [],
+      "section": "the-run",
+      "tests": [],
+      "text": "**Plan** asks the `Planner` (a chain of `Refiner`s) for candidates, recording every included, rejected and deferred technique.",
+      "words": [
+        "rejected"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 61,
+      "line": 59,
+      "missing": [],
+      "section": "governance",
+      "tests": [],
+      "text": "* **Resource governor** applies CPU / time / memory limits (every trial supervised in its own process, killed at a hard time ceiling or memory limit) and reports, per limit, how it was enforced and what was observed.",
+      "words": [
+        "enforced"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 70,
+      "line": 68,
+      "missing": [],
+      "section": "raw-data-ingestion",
+      "tests": [],
+      "text": "Statistics about tables (counts, distinct counts, keys, inclusion) are aggregate queries run in the source, because a sample cannot confirm a universal statement.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 71,
+      "line": 70,
+      "missing": [],
+      "section": "raw-data-ingestion",
+      "tests": [],
+      "text": "Rows are pulled only by `profile.untorn`, which needs a total order and rejects a read whose snapshot token or rows changed.",
+      "words": [
+        "rejects"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 74,
+      "line": 72,
+      "missing": [],
+      "section": "raw-data-ingestion",
+      "tests": [],
+      "text": "Another table is read only through `asof_view.View.visible`, which returns rows recorded at or before the target row's cutoff; `synthesize` imports no connector or reader and never sees a frame.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 76,
+      "line": 74,
+      "missing": [],
+      "section": "raw-data-ingestion",
+      "tests": [],
+      "text": "What the view cannot know is whether the recorded time is true, so every feature carries the weakest tier among the tables it reads.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 80,
+      "line": 78,
+      "missing": [],
+      "section": "raw-data-ingestion",
+      "tests": [],
+      "text": "A charter run with an `ingest` block calls it (`scmle.core.ingest_stage`); when the block carries an `entity` sub-block the resolved entity becomes the split's group column.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 95,
+      "line": 94,
+      "missing": [],
+      "section": "leakage-guarantees",
+      "tests": [],
+      "text": "* Confidence intervals on the test metric resample the independent units of observation (rows, whole groups, or contiguous time blocks).",
+      "words": [
+        "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 114,
+      "line": 109,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "Per candidate column it computes a cross-fitted held-out skill (AUC, or R^2 for a continuous target) with an exact permutation p-value, permuting within groups or time blocks when they are known; a missing-value test against the target (Fisher or chi-square with Cramer's V, or the permutation scheme with groups); and a record-purity test for a value captured only for some outcomes.",
+      "words": [
+        "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 124,
+      "line": 121,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "Guaranteed: under the null of no association, and conditional on the model and fold choices, the chance of any false alarm is at most `alpha`, and the false discovery rate of the significant list is at most `alpha` under arbitrary dependence between columns.",
+      "words": [
+        "guaranteed"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 126,
+      "line": 124,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "Not guaranteed: telling a legitimate strong predictor from a leak (that needs provenance), power below the ceiling, detection of leaks that need several columns together.",
+      "words": [
+        "guaranteed"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 131,
+      "line": 126,
+      "missing": [],
+      "section": "leakage-screen",
+      "tests": [],
+      "text": "`leakage_policy=\"block\"` (opt-in; the default is `warn`) blocks only suspects whose mechanism has a current, passing certificate (`scmle/data/admissibility/screen_certificates.json`, produced by `python -m benchmarks.qualification.screen_certify --write`); a regression or multiclass target, or any change of the settings, makes the screen descriptive: the suspect is reported with its p-values as a warning and nothing is blocked.",
+      "words": [
+        "blocked",
+        "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 162,
+      "line": 161,
+      "missing": [],
+      "section": "extension-points-and-polymorphism",
+      "tests": [],
+      "text": "Third-party model adapters must pass `scmle.models.conformance.comply`.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 181,
+      "line": 178,
+      "missing": [],
+      "section": "concurrency",
+      "tests": [],
+      "text": "Readers take a snapshot: `Catalog.stock` copies the user adapters once, and `Repertoire` replaces its tables rather than editing them, so a run that is scoring never sees a metric vanish halfway.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 208,
+      "line": 207,
+      "missing": [],
+      "section": "concurrency",
+      "tests": [],
+      "text": "One `Context` must not be used by two threads.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARCHITECTURE.md",
+      "end": 209,
+      "line": 208,
+      "missing": [],
+      "section": "concurrency",
+      "tests": [],
+      "text": "Registry locks are never held while a user estimator runs, but a `Maintainer.review` holds its state lock for the whole retrain.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 17,
+      "line": 17,
+      "missing": [],
+      "section": "read-first",
+      "tests": [],
+      "text": "`diagnostics/decision_log.json` | The evidence behind each choice (what was included, rejected, deferred).",
+      "words": [
+        "rejected"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 26,
+      "line": 26,
+      "missing": [],
+      "section": "configuration-and-inputs",
+      "tests": [],
+      "text": "`dataset_manifest.json`, `dataset_profile.json`, `dataset_card.json` | Row and column counts, hashes, resolved column kinds and findings. `dataset_profile.json` also holds `leakage`: the leakage screen's level, family size, suspects and the suspects that may block a run (only mechanisms with a passing certificate can).",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 32,
+      "line": 32,
+      "missing": [],
+      "section": "configuration-and-inputs",
+      "tests": [],
+      "text": "`custody_log.jsonl` | With `--charter`: a hash-chained record of every seal, token issue, open and refused attempt. It holds ids and counts, never row values.",
+      "words": [
+        "never",
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 37,
+      "line": 37,
+      "missing": [],
+      "section": "configuration-and-inputs",
+      "tests": [],
+      "text": "`shift_report.json` | With `--charter`: the exploration set against the deployment sample named by `reference`. Status is `pass` (no shift detected), `fail` or `unverifiable`; without a deployment sample it is `unverifiable`, never `pass`. Holds the classifier and kernel two-sample tests (permutation p-values), per-feature KS or chi-square under Benjamini-Hochberg, subgroup coverage for `sensitive_columns`, and the forward check, which a run reports as skipped because the final-test set is opened only by the final evaluation. Per-period drift is not implemented.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 39,
+      "line": 39,
+      "missing": [],
+      "section": "configuration-and-inputs",
+      "tests": [],
+      "text": "`evaluation.json` (decision keys) | With `--charter` whose charter has a decision block and a binary task: `decision` holds `objective` `chartered_cost`, the cut on the raw probability, the cost model hash and `f11` (calibration check, the path that ran: `bayes`, `recalibrated` or `grid`, rule hash, tier, expected cost with a bootstrap interval, the span of cost ratios on which the rule beats treat all and treat none on development data). `net_benefit` holds the simultaneous band on the locked test set, computed once, with the claim `useful` or `not_useful_in_range`. Costs are inputs: the tier is `attested` only if every cost came from a person.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 40,
+      "line": 40,
+      "missing": [],
+      "section": "configuration-and-inputs",
+      "tests": [],
+      "text": "`framing_link.json` | With `--charter`: whether the charter's target, prediction moment and unit name real columns (`resolved`) or not (`unresolved`). Names are matched to column names only; free text that matches nothing is reported, never rejected, and nothing is gated on it. Reads column names, never values.",
+      "words": [
+        "never",
+        "rejected"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 41,
+      "line": 41,
+      "missing": [],
+      "section": "configuration-and-inputs",
+      "tests": [],
+      "text": "`identification_plan.json`, `identification_report.json`, `falsification_report.json`, `sensitivity_report.json`, `causal_claims.json` | With `--charter` whose estimand carries a causal block (charter format 4): the strategy chosen from the charter alone (eligible and ineligible strategies with the missing assumptions or design fields), the design diagnostics computed on `X`, and the claim file with its tier, the five conditions for `confirmed`, the attestors and the hashes of the other four files. A charter no strategy identifies is `not_identified`: no estimate, `action` `refuse_claim`. The estimate, the falsification battery, replication, sensitivity and the tier are computed on the frame the confirmation releases, in the same opening as the bivariate family, and the five files are hashed into the ledger's confirmation row (`scmle claims verify` checks them). When no strategy identifies the charter, or no confirmation set exists, `estimate` is null and the claim is `unverified` or `not_identified`. With declared `attestors` and an `attestations` file (charter format 9), `causal_claims.json` has an `attestations` key (the accepted signed records, the reason each other assumption has none, and the run date they were checked on); the claim rises above `unverified` only if every assumption it needs has an accepted record, and `scmle claims verify` re-checks the signatures (given the key), scopes, dates and the charter's attestor list. With declared `subgroups` (charter format 9), `identification_report.json` has a `subgroups` key (one hypothesis per declared level with estimate, interval, p-value, Holm-adjusted p-value and decision; unestimable levels stay in the family at p = 1) and `causal_claims.json` a short summary; they never change the tier. The key also carries `gate`: `gating` when the Holm family has a current passing certificate in `scmle/certificates/subgroup_certificates.json` (a hypothesis then also has `certified_size`, true from the certified number of rows) and `descriptive` otherwise, with `statement_gate` saying which. With a declared `dag`, `identification_report.json` has a `dag` key (hash, falsification on `X`, refused adjustment members) and `admissibility_table.json` holds the graph rules. A gate counts toward `confirmed` only with a current passing certificate in `scmle/certificates/f10_certificates.json`.",
+      "words": [
+        "block",
+        "never",
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 54,
+      "line": 54,
+      "missing": [],
+      "section": "raw-data-ingestion-scmle-ingest",
+      "tests": [],
+      "text": "A charter run with a `reconcile` block writes `extract_reconciliation.json`: the totals the charter declared and, under `source_checks`, the same quantities queried from the source database, each compared with the extract.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 63,
+      "line": 63,
+      "missing": [],
+      "section": "problem-framing-scmle-frame",
+      "tests": [],
+      "text": "`charter.json` | The draft charter, unsigned, readable by `scmle charter check` and signable by `scmle charter sign`. Absent when the draft is refused.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 67,
+      "line": 67,
+      "missing": [],
+      "section": "problem-framing-scmle-frame",
+      "tests": [],
+      "text": "`feature_manifest.json`, `ingest_field_provenance.json` | With `--charter` having an `ingest` block and `--ingest-plan`: one record per proposed feature (expression, tables read, cutoff rule, as-of evidence, tier, and why it was dropped, if it was), the declared family size, and the provenance of the kept features that the admissibility stage reads. `ingest_catalog.json`, `grain_report.json`, `join_graph.json` and `ingest_budget.json` are written beside them.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 68,
+      "line": 68,
+      "missing": [],
+      "section": "problem-framing-scmle-frame",
+      "tests": [],
+      "text": "`decision_report.json`, `policy_value.json` | With `--charter` whose decision block is set, on a binary task: the cost-model hash, threshold and net benefit, the fairness satisfaction result per declared constraint (`satisfied`, `not_satisfied` or `not_assessable`), and the off-policy value of the frozen rule from a randomized log (`--logged-action-column`, `--propensity-column`; otherwise `not_assessable`). Computed once on the locked rows. Costs, margins and propensities are inputs.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 69,
+      "line": 69,
+      "missing": [],
+      "section": "problem-framing-scmle-frame",
+      "tests": [],
+      "text": "`decision_threshold.json`, `net_benefit.json` | With a decision block on a binary task: the frozen threshold rule and the net benefit of the rule on the locked rows, each its own file. With `policy_value.json` and `rollout_design.json` their hashes are registered in the custody log (`decision_files` event) and `scmle claims verify` checks them.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 70,
+      "line": 70,
+      "missing": [],
+      "section": "problem-framing-scmle-frame",
+      "tests": [],
+      "text": "`coverage_claim.json`, `coverage_report.json` | With intervals or sets on a regression or classification task: the claim (levels, methods, tolerance, rule) fixed and hashed before the final test rows are released, and the coverage measured on those rows once, with the claim's hash. In a charter run the hash is in the custody log and `scmle claims verify` checks it. A charter whose `uncertainty` block sets `coverage_on_confirmation` (format 11) also writes `coverage_confirmation.json`: the same claim for one served interval or set (`residual` for regression, pooled sets for classification, level 0.9, tolerance 0.02) tested once on the confirmation rows `C` after the model and its calibration are frozen. It holds the covered count, the exact one-sided binomial p-value, and a status `confirmed` (p at most 0.05) or `unverified`; the other methods and levels are described on the same rows without a status. Each declared slice in `coverage_report.json` carries `flag` (below nominal by more than 0.05, Holm over the slices), `flag_certified` and a `flag_gate` that is `gating` only while the stored G5b certificate is current and passing.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 71,
+      "line": 71,
+      "missing": [],
+      "section": "problem-framing-scmle-frame",
+      "tests": [],
+      "text": "`rollout_design.json`, `rollout_decisions.jsonl` | With a rollout plan in the decision block: the plan, its hash, the fixed-horizon sample size and the simulated expected sample number, and a hash-chained log holding the registration of the plan. No experiment ran, so there are no assignments or decisions in it.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 74,
+      "line": 74,
+      "missing": [],
+      "section": "problem-framing-scmle-frame",
+      "tests": [],
+      "text": "`framing_refusal.json` | When refused: the reason (a named column the source lacks, a blocking data check, an unfillable critical slot, or LLM ambiguity above `tau`).",
+      "words": [
+        "blocking",
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 76,
+      "line": 76,
+      "missing": [],
+      "section": "problem-framing-scmle-frame",
+      "tests": [],
+      "text": "Every LLM-filled field is `unverified` until a person signs the charter, and there is no calibrated `tau` or gold corpus yet, so a replayed LLM draft without `tau` is always refused.",
+      "words": [
+        "always",
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 84,
+      "line": 84,
+      "missing": [],
+      "section": "closed-loop-scmle-loop",
+      "tests": [],
+      "text": "`deployment_ledger.jsonl` | The hash-chained record of the deployment: the charter hash, the policy and its hash, the fingerprints of keys the system holds, then `observe_summary`, `alarm`, `retrain`, `challenger_result`, `promotion_proposal`, `rollback_proposal`, `escalation`, `attestation`, `halt` and `incident` rows (a halt opens one). A challenger is registered before it is scored and its e-LOND decision is replayed on load. An attestation row is bound to one escalation and the hash of its question, carries an expiry, and is refused if it was signed with a key the system holds. The chain shows edits, deletions in the middle and reordering; it cannot show that the newest rows were never removed (compare `scmle loop verify` output with a head kept elsewhere).",
+      "words": [
+        "cannot",
+        "never",
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 107,
+      "line": 102,
+      "missing": [],
+      "section": "the-model",
+      "tests": [],
+      "text": "`model/` is the checksummed bundle (signed when a signing key is configured; an unsigned bundle is refused unless trusted): `pipeline.joblib` (fitted preprocessing and estimator), `schema.json`, `reference.json` (monitoring reference profile), `conformal.json` (pooled and per-class calibration scores), `novelty.joblib` and `model_manifest.json` (checksums and signature).",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 118,
+      "line": 118,
+      "missing": [],
+      "section": "provenance-and-governance",
+      "tests": [],
+      "text": "`release_evaluation.json` | Whether declared success criteria were met. With none declared it reports `policy_not_declared` and blocks; thresholds are never invented from observed metrics.",
+      "words": [
+        "blocks",
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 129,
+      "line": 129,
+      "missing": [],
+      "section": "the-service-folder-scmle-package",
+      "tests": [],
+      "text": "`Dockerfile`, `.dockerignore`, `build.sh` | Base image pinned by a digest placeholder that the build refuses until `build.sh` resolves it; non-root user; locked install; credential files excluded; the script that scans the context, resolves the base, builds, scans and attests.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ARTIFACTS.md",
+      "end": 133,
+      "line": 133,
+      "missing": [],
+      "section": "the-service-folder-scmle-package",
+      "tests": [],
+      "text": "`vuln-policy.json` | The gate policy: block at HIGH and above, no exceptions.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/AUTONOMY.md",
+      "end": 15,
+      "line": 14,
+      "missing": [],
+      "section": "the-rule",
+      "tests": [],
+      "text": "The controller never moves the champion alias, and neither does an envelope.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/AUTONOMY.md",
+      "end": 35,
+      "line": 35,
+      "missing": [],
+      "section": "what-runs-by-itself",
+      "tests": [],
+      "text": "Bad input | An unreadable or malformed file is `rejected` once, escalated, and never retried. The rest of the inbox is still applied.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/AUTONOMY.md",
+      "end": 51,
+      "line": 47,
+      "missing": [],
+      "section": "what-needs-a-person",
+      "tests": [],
+      "text": "* **The other ten never-list actions**: reopening a sealed set, changing the charter, editing the ledger or registering late, relaxing a threshold, acting on an unverified stream, answering a flagged high-impact case, suppressing its own alert, changing the labelling policy, deleting or sending externally, and creating or signing an attestation.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/AUTONOMY.md",
+      "end": 52,
+      "line": 51,
+      "missing": [],
+      "section": "what-needs-a-person",
+      "tests": [],
+      "text": "They cannot be put in an envelope.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/AUTONOMY.md",
+      "end": 53,
+      "line": 53,
+      "missing": [],
+      "section": "what-needs-a-person",
+      "tests": [],
+      "text": "* **A halt, a rejected file, silence, or a failed training.",
+      "words": [
+        "rejected"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/AUTONOMY.md",
+      "end": 59,
+      "line": 58,
+      "missing": [],
+      "section": "envelopes",
+      "tests": [],
+      "text": "An envelope is authority a person signs in advance for an action that is not on the never list.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/AUTONOMY.md",
+      "end": 72,
+      "line": 70,
+      "missing": [],
+      "section": "envelopes",
+      "tests": [],
+      "text": "A use is chained in the ledger **before** the action runs, and the ledger itself refuses a use that is unknown, revoked, out of scope, not covered or over its limit.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/AUTONOMY.md",
+      "end": 89,
+      "line": 88,
+      "missing": [],
+      "section": "limits-you-must-know",
+      "tests": [],
+      "text": "Whoever can verify can also sign, so keep the verification key where the system cannot read it.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/BEGINNER_FINDINGS.md",
+      "end": 28,
+      "line": 28,
+      "missing": [],
+      "section": "documented-not-fixed-a-decision-is-needed",
+      "tests": [],
+      "text": "6 | **Fixed (loudly, not by refusing).** The run on the Titanic table finished with an exam ROC AUC of 0.988. The last line of output says nothing about the leakage suspects. They are in the plan warnings and, at the bottom, in the \"Findings\" part of `report.html`. | [Reading results](READING_RESULTS.md), [Start here](START_HERE.md) Step 4 | Done: the default stays `warn` because a flag cannot be a verdict ([Leakage](LEAKAGE.md)). The run now logs a warning line at the start, labels the score `PROVISIONAL: N flagged column(s) not attested`, and opens `report.html` with the summary and findings.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/BEGINNER_FINDINGS.md",
+      "end": 37,
+      "line": 37,
+      "missing": [],
+      "section": "documented-not-fixed-a-decision-is-needed",
+      "tests": [],
+      "text": "15 | The run's saved bundle is not signed. `scmle predict` on it refuses until you sign it by saving a copy with `signing_key=`. A beginner must write a small script for this. | Start here Step 8 | Sign during the run when `SCMLE_SIGNING_KEY` is set (the author did not test whether it already does), or add `scmle sign`.",
+      "words": [
+        "must",
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/BEGINNER_FINDINGS.md",
+      "end": 38,
+      "line": 38,
+      "missing": [],
+      "section": "documented-not-fixed-a-decision-is-needed",
+      "tests": [],
+      "text": "16 | The loop commands accept files only by hand-written CSV and JSON, and a reply to an escalation can only be created from Python (`Attestation.create`). Creating a reply is the one step a person must do. | When things go wrong, \"How to reply\" | Add a `scmle loop attest` command.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/BEGINNER_FINDINGS.md",
+      "end": 42,
+      "line": 42,
+      "missing": [],
+      "section": "documented-not-fixed-a-decision-is-needed",
+      "tests": [],
+      "text": "20 | The first `scmle run` on a new installation can be slow enough to hit the time ceiling in item 11. | When things go wrong | Warm up, or enforce a minimum.",
+      "words": [
+        "enforce"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/BEGINNER_FINDINGS.md",
+      "end": 53,
+      "line": 50,
+      "missing": [],
+      "section": "things-that-worked-on-the-first-try",
+      "tests": [],
+      "text": "* `plan`, the leakage block (exit 2), the real run, `predict`, signed bundle refusals, `serve` with its readiness endpoints, `package`, the registry approval and the rollback, the monitor and the loop commands all behaved as the code and docs say.",
+      "words": [
+        "block",
+        "refusals"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/BENCHMARKS.md",
+      "end": 16,
+      "line": 16,
+      "missing": [],
+      "section": "reliability-checks",
+      "tests": [],
+      "text": "`leak_detection` | A planted leaked column is found by the certified screen. | the only suspect is the planted column, it may block, and `leakage_policy=\"block\"` stops the run",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/BENCHMARKS.md",
+      "end": 18,
+      "line": 18,
+      "missing": [],
+      "section": "reliability-checks",
+      "tests": [],
+      "text": "`tamper_detection` | Wrong key or modified file is refused. | both raise `ArtifactError`",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/BENCHMARKS.md",
+      "end": 97,
+      "line": 97,
+      "missing": [],
+      "section": "reading-the-results",
+      "tests": [],
+      "text": "Models that key on absolute time must extrapolate, so it stays opt-in.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [
+        "tests/unit/test_breadth.py"
+      ],
+      "doc": "docs/BREADTH.md",
+      "end": 24,
+      "line": 22,
+      "missing": [],
+      "section": "the-rule",
+      "tests": [
+        "tests/unit/test_breadth.py"
+      ],
+      "text": "An unsupported algorithm is never added to the production registry; the guard tests in `tests/unit/test_breadth.py` fail if one is.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/BREADTH.md",
+      "end": 43,
+      "line": 43,
+      "missing": [],
+      "section": "status",
+      "tests": [],
+      "text": "`geospatial` | `experimental_lifecycle` | no | Vector and raster data contracts and adapters in the local lifecycle | Reprojection invariance, raster operations and spatial joins at scale, spatial-block evaluation as a gate, benchmarks, deployment",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/BREADTH.md",
+      "end": 53,
+      "line": 50,
+      "missing": [],
+      "section": "status",
+      "tests": [],
+      "text": "Their own reports say so and carry the limits quoted above; the declaration they produce has the status `experimental`, never `supported`, and only the contract module can name a supported modality (a guard test checks this).",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/BREADTH.md",
+      "end": 64,
+      "line": 60,
+      "missing": [],
+      "section": "streaming-and-delivery-semantics",
+      "tests": [],
+      "text": "Before any streaming slice, the owner must state the semantics the consumer needs, and the evidence must be a kill at every stage of the whole pipeline with the effects compared with a batch computation; per-stage guarantees do not add up to an end-to-end one.",
+      "words": [
+        "guarantees",
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/BREADTH.md",
+      "end": 72,
+      "line": 71,
+      "missing": [],
+      "section": "benchmark-definitions",
+      "tests": [],
+      "text": "Parameters are null: the owner fixes them before building, and never fits them to a result.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 12,
+      "line": 12,
+      "missing": [],
+      "section": "command-line",
+      "tests": [],
+      "text": "2 | Blocked: a gate refused the run (for example a leakage suspicion under `--leakage-policy block`, or a locked test set opened twice).",
+      "words": [
+        "blocked",
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 14,
+      "line": 14,
+      "missing": [],
+      "section": "command-line",
+      "tests": [],
+      "text": "70 | Internal: an unexpected error, which is a defect; the traceback is always logged.",
+      "words": [
+        "always"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 29,
+      "line": 29,
+      "missing": [],
+      "section": "command-line",
+      "tests": [],
+      "text": "`scmle frame REQUEST --source S --data X --output DIR` | Draft an unsigned charter, a cost-model record and the questions only a person can answer, from a plain request. Exit 2 when refused. See [ARTIFACTS](ARTIFACTS.md).",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 77,
+      "line": 75,
+      "missing": [],
+      "section": "analysis-charter",
+      "tests": [],
+      "text": "A run specification that names a different non-default rule than the charter is refused.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 102,
+      "line": 101,
+      "missing": [],
+      "section": "claims-of-a-charter-run",
+      "tests": [],
+      "text": "A step whose input is absent is reported `skipped`, never `pass`.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 153,
+      "line": 151,
+      "missing": [],
+      "section": "release-evidence-and-the-runtime",
+      "tests": [],
+      "text": "`gate` reads a release manifest and the evidence it names and exits 2 with every reason when the release is refused; `certify` writes the signed deployment record.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 153,
+      "line": 153,
+      "missing": [],
+      "section": "release-evidence-and-the-runtime",
+      "tests": [],
+      "text": "Keys are read from files, never from the command line.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 170,
+      "line": 169,
+      "missing": [],
+      "section": "bundles-signed-versus-trusted",
+      "tests": [],
+      "text": "When `SCMLE_ENV=production`, `--trusted` (and `SCMLE_TRUSTED=1`) is refused for every command; sign the bundle and supply `SCMLE_SIGNING_KEY` instead.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 176,
+      "line": 175,
+      "missing": [],
+      "section": "bundles-signed-versus-trusted",
+      "tests": [],
+      "text": "`--trusted` skips that for an unsigned bundle you produced yourself; never use it on a bundle from elsewhere.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/CLI.md",
+      "end": 182,
+      "line": 179,
+      "missing": [],
+      "section": "bundles-signed-versus-trusted",
+      "tests": [],
+      "text": "On loopback it needs no credentials; on any other address it refuses to start unless the `SCMLE_AUTH_*` variables of [`TENANT_ISOLATION.md`](TENANT_ISOLATION.md) configure token verification.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/DECISIONS.md",
+      "end": 31,
+      "line": 31,
+      "missing": [],
+      "section": "1-what-exactly-am-i-predicting-the-target",
+      "tests": [],
+      "text": "SCMLE cannot see this; only you can.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/DECISIONS.md",
+      "end": 54,
+      "line": 54,
+      "missing": [],
+      "section": "2-how-will-i-judge-a-prediction-the-metric",
+      "tests": [],
+      "text": "Accuracy on a rare event picks a model that always says \"no\".",
+      "words": [
+        "always"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/DECISIONS.md",
+      "end": 88,
+      "line": 86,
+      "missing": [],
+      "section": "3-which-columns-may-the-model-use-what-you-may-not-use",
+      "tests": [],
+      "text": "`--leakage-policy block` stops instead; choose it when you cannot attest where each value comes from, or in regulated work.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/DECISIONS.md",
+      "end": 118,
+      "line": 117,
+      "missing": [],
+      "section": "5-does-time-matter-time-order",
+      "tests": [],
+      "text": "If your rows have dates and you will always predict later rows, then yes.",
+      "words": [
+        "always"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/DECISIONS.md",
+      "end": 141,
+      "line": 140,
+      "missing": [],
+      "section": "6-what-do-the-two-kinds-of-mistakes-cost-the-cost-of-errors",
+      "tests": [],
+      "text": "If you truly cannot tell, say so, and see \"If you do not know the costs\" below.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/DECISIONS.md",
+      "end": 202,
+      "line": 201,
+      "missing": [],
+      "section": "9-who-is-allowed-to-approve-it-people-and-keys",
+      "tests": [],
+      "text": "The person who approves a promotion must not be the one who built the model.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/DECISIONS.md",
+      "end": 212,
+      "line": 211,
+      "missing": [],
+      "section": "10-what-will-make-me-stop",
+      "tests": [],
+      "text": "Write this before you see results, so that you cannot talk yourself out of it later.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/DECISIONS.md",
+      "end": 222,
+      "line": 220,
+      "missing": [],
+      "section": "10-what-will-make-me-stop",
+      "tests": [],
+      "text": "If you declare none, the release evaluation says `policy_not_declared` and blocks: the tool will not invent thresholds from the metrics it just saw.",
+      "words": [
+        "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/DEPENDENCIES.md",
+      "end": 8,
+      "line": 8,
+      "missing": [],
+      "section": "dependency-policy",
+      "tests": [],
+      "text": "* **Optional extras** are never imported unless used:",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/DEPENDENCIES.md",
+      "end": 12,
+      "line": 12,
+      "missing": [],
+      "section": "dependency-policy",
+      "tests": [],
+      "text": "`boosting` | LightGBM, XGBoost | adapters are rejected with a reason when absent",
+      "words": [
+        "rejected"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/DEPENDENCIES.md",
+      "end": 38,
+      "line": 34,
+      "missing": [],
+      "section": "dependency-policy",
+      "tests": [],
+      "text": "The cause is the multiple runtimes in one process, which neither scmle nor those libraries can fix. scmle avoids it by running every PyTorch computation in a worker process, so the framework process never imports torch.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/DEPENDENCIES.md",
+      "end": 58,
+      "line": 56,
+      "missing": [],
+      "section": "dependency-policy",
+      "tests": [],
+      "text": "Optional extras must be audited in the environment where they are enabled before a release claim includes them; review before adding any copyleft package to an extra.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 39,
+      "line": 38,
+      "missing": [],
+      "section": "row-column-table",
+      "tests": [],
+      "text": "The unit of a row (\"one passenger\", \"one customer-month\") decides how you must split the data.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 98,
+      "line": 97,
+      "missing": [],
+      "section": "accuracy",
+      "tests": [],
+      "text": "If 1 in 100 cases is fraud, a model that says \"never fraud\" is 99 percent accurate and useless.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 145,
+      "line": 144,
+      "missing": [],
+      "section": "calibration",
+      "tests": [],
+      "text": "If you act on the number (\"call everyone above 70 percent\") it must mean what it says.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 167,
+      "line": 166,
+      "missing": [],
+      "section": "training-data-practice-rows",
+      "tests": [],
+      "text": "The model will always look good on rows it has already seen.",
+      "words": [
+        "always"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 225,
+      "line": 224,
+      "missing": [],
+      "section": "false-flag",
+      "tests": [],
+      "text": "The screen cannot avoid them, because a strong honest predictor and a leak look alike in the data.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 238,
+      "line": 238,
+      "missing": [],
+      "section": "split",
+      "tests": [],
+      "text": "Related rows must stay on the same side (see \"group\" and \"time order\").",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 252,
+      "line": 251,
+      "missing": [],
+      "section": "time-order-temporal-split",
+      "tests": [],
+      "text": "A model for the future must be tested on the future.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 274,
+      "line": 273,
+      "missing": [],
+      "section": "charter-custody-and-claims",
+      "tests": [],
+      "text": "You need them when someone must be able to trust a finding, not just a model.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 292,
+      "line": 292,
+      "missing": [],
+      "section": "estimand",
+      "tests": [],
+      "text": "Vague questions give answers that cannot be checked.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 303,
+      "line": 303,
+      "missing": [],
+      "section": "custody-x-c-and-f",
+      "tests": [],
+      "text": "Testing it once on rows you never looked at is the only way to know.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 304,
+      "line": 303,
+      "missing": [],
+      "section": "custody-x-c-and-f",
+      "tests": [],
+      "text": "The seal is held in a separate helper program so ordinary code cannot read C.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 312,
+      "line": 311,
+      "missing": [],
+      "section": "final-test-set",
+      "tests": [],
+      "text": "It is separate from C, so a confirmed finding never shapes the model that is scored.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 358,
+      "line": 358,
+      "missing": [],
+      "section": "claim",
+      "tests": [],
+      "text": "Only claims, not hunches, carry the error guarantee.",
+      "words": [
+        "guarantee"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 366,
+      "line": 364,
+      "missing": [],
+      "section": "tier-confirmed-attested-unverified",
+      "tests": [],
+      "text": "`attested`: a named person vouched for a fact the data cannot show (for example, \"this column is known before the outcome\").",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 379,
+      "line": 378,
+      "missing": [],
+      "section": "attestation-attestor",
+      "tests": [],
+      "text": "A signed statement by a named person about something data cannot prove.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 383,
+      "line": 382,
+      "missing": [],
+      "section": "attestation-attestor",
+      "tests": [],
+      "text": "SCMLE refuses an attestation signed with a key the system itself holds.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 409,
+      "line": 408,
+      "missing": [],
+      "section": "causal-claim",
+      "tests": [],
+      "text": "A held-out set alone can never confirm a causal effect.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 424,
+      "line": 424,
+      "missing": [],
+      "section": "certificate",
+      "tests": [],
+      "text": "Only a check with a passing certificate may block a run.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 425,
+      "line": 424,
+      "missing": [],
+      "section": "certificate",
+      "tests": [],
+      "text": "Any other check is shown but never stops anything (\"descriptive\").",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 430,
+      "line": 430,
+      "missing": [],
+      "section": "gate",
+      "tests": [],
+      "text": "The leakage block.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 438,
+      "line": 438,
+      "missing": [],
+      "section": "descriptive-versus-certified",
+      "tests": [],
+      "text": "Do not treat descriptive output as a guarantee.",
+      "words": [
+        "guarantee"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 539,
+      "line": 538,
+      "missing": [],
+      "section": "champion-and-challenger",
+      "tests": [],
+      "text": "The challenger must beat the champion on the same fresh rows before it takes over.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 556,
+      "line": 555,
+      "missing": [],
+      "section": "escalation",
+      "tests": [],
+      "text": "Some moves (for example moving the champion) must not be automatic.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 584,
+      "line": 584,
+      "missing": [],
+      "section": "schema",
+      "tests": [],
+      "text": "Wrong columns are refused, not guessed.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 599,
+      "line": 598,
+      "missing": [],
+      "section": "signature-hmac",
+      "tests": [],
+      "text": "Bundles can run code when opened, so SCMLE refuses an unsigned one.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 607,
+      "line": 607,
+      "missing": [],
+      "section": "pickle-trusted",
+      "tests": [],
+      "text": "Never use `--trusted` on a model from someone else.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 608,
+      "line": 607,
+      "missing": [],
+      "section": "pickle-trusted",
+      "tests": [],
+      "text": "It is refused outright when `SCMLE_ENV=production`.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 623,
+      "line": 622,
+      "missing": [],
+      "section": "provenance",
+      "tests": [],
+      "text": "A package without a valid one never becomes ready.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 690,
+      "line": 690,
+      "missing": [],
+      "section": "release-gate",
+      "tests": [],
+      "text": "The check that allows or refuses a release from its evidence.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 693,
+      "line": 692,
+      "missing": [],
+      "section": "release-gate",
+      "tests": [],
+      "text": "It refuses unsigned or unapproved models and lists every reason, and exits with code 2.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GLOSSARY.md",
+      "end": 721,
+      "line": 721,
+      "missing": [],
+      "section": "scmle_signing_key",
+      "tests": [],
+      "text": "Without it signed bundles cannot be opened.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GOVERNED_DATA.md",
+      "end": 11,
+      "line": 9,
+      "missing": [],
+      "section": "object-stores",
+      "tests": [],
+      "text": "Metadata always carries a SHA-256 computed by this code, so a changed object raises `MismatchError`.",
+      "words": [
+        "always"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GOVERNED_DATA.md",
+      "end": 50,
+      "line": 50,
+      "missing": [],
+      "section": "quality-gates",
+      "tests": [],
+      "text": "`quarantine` | row-level rules remove the rows and write them with the report under `quarantine/<snapshot id>/`; dataset-level rules (`SchemaCheck`, `Freshness`, `MinRowsCheck`, `NullFractionCheck`) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until `release`",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GOVERNED_DATA.md",
+      "end": 65,
+      "line": 60,
+      "missing": [],
+      "section": "incremental-processing",
+      "tests": [],
+      "text": "`IncrementalProcessor` processes new objects under an input prefix in sorted key order, once each: dedup of repeated row keys and repeated uploads, a checkpoint with its own digest written after each object, transient errors retried under a `Retries` (reproducible backoff, no jitter), the output written before the checkpoint, a lock object so two runs cannot share a checkpoint.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/GOVERNED_DATA.md",
+      "end": 72,
+      "line": 71,
+      "missing": [],
+      "section": "incremental-processing",
+      "tests": [],
+      "text": "Exactly-once is not claimed: a transform with side effects beyond its output must be idempotent.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 169,
+      "line": 169,
+      "missing": [],
+      "section": "the-screen-runs-inside-the-time-budget",
+      "tests": [],
+      "text": "A screen that does not run is never a clean bill.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 178,
+      "line": 175,
+      "missing": [],
+      "section": "the-screen-runs-inside-the-time-budget",
+      "tests": [],
+      "text": "`--leakage-policy warn` trains on and says so; `--leakage-policy block` **refuses** to run, because `block` means do not train on unchecked suspicion (choose `warn`, or raise the budget, to proceed).",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 196,
+      "line": 195,
+      "missing": [],
+      "section": "what-the-product-does-about-it",
+      "tests": [],
+      "text": "The right design is a **qualification instrument**: it attaches evidence and a tier to every claim and never hands you a silent verdict.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 203,
+      "line": 203,
+      "missing": [],
+      "section": "what-the-product-does-about-it",
+      "tests": [],
+      "text": "* **It does not refuse by default.",
+      "words": [
+        "refuse"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 204,
+      "line": 203,
+      "missing": [],
+      "section": "what-the-product-does-about-it",
+      "tests": [],
+      "text": "A default refusal would stop honest analyses (it would stop breast cancer).",
+      "words": [
+        "refusal"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 209,
+      "line": 208,
+      "missing": [],
+      "section": "what-the-product-does-about-it",
+      "tests": [],
+      "text": "`--leakage-policy block` (opt-in) refuses a run that has a flagged column.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 213,
+      "line": 209,
+      "missing": [],
+      "section": "what-the-product-does-about-it",
+      "tests": [],
+      "text": "A flag is a column whose test is significant after the Benjamini-Yekutieli step over permutation p-values and whose effect bound is above the pre-registered ceiling; the false-alarm control holds by construction on any rows that can be shuffled within their groups or time blocks, so no certificate is needed to act on a flag.",
+      "words": [
+        "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 218,
+      "line": 213,
+      "missing": [],
+      "section": "what-the-product-does-about-it",
+      "tests": [],
+      "text": "What a clean result means is measured on each run's own rows: the screen also screens a copy with one planted leak of each type (a copy, a noisy copy, a field derived from the target, a value recorded for part of the target's range, a value recorded for a few rows of one class or band), with the same settings, groups, time blocks and budget.",
+      "words": [
+        "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 222,
+      "line": 220,
+      "missing": [],
+      "section": "what-the-product-does-about-it",
+      "tests": [],
+      "text": "Use `block` when you cannot attest where each value comes from, and in regulated settings where an unexplained column must not reach a model.",
+      "words": [
+        "cannot",
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 225,
+      "line": 224,
+      "missing": [],
+      "section": "what-the-product-does-about-it",
+      "tests": [],
+      "text": "With a valid attestation the column is kept and recorded at tier `attested`, never `confirmed`.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 261,
+      "line": 260,
+      "missing": [],
+      "section": "breast-cancer-the-value-is-known-in-time",
+      "tests": [],
+      "text": "The file (`att2.json`; `scope` must be the `charter_hash` of your signed charter, so an attestation cannot be reused for another analysis):",
+      "words": [
+        "cannot",
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 283,
+      "line": 282,
+      "missing": [],
+      "section": "breast-cancer-the-value-is-known-in-time",
+      "tests": [],
+      "text": "`expires` must not be before `date`.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 324,
+      "line": 324,
+      "missing": [],
+      "section": "when-to-use-block",
+      "tests": [],
+      "text": "* you cannot get a person to say when each value is known;",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 326,
+      "line": 325,
+      "missing": [],
+      "section": "when-to-use-block",
+      "tests": [],
+      "text": "* the work is regulated, and an unexplained strong column must not reach a model;",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LEAKAGE.md",
+      "end": 337,
+      "line": 337,
+      "missing": [],
+      "section": "summary",
+      "tests": [],
+      "text": "The screen almost never flags a world with no dependence | yes: 0 of 1000",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LITERATURE_CHECK.md",
+      "end": 15,
+      "line": 15,
+      "missing": [],
+      "section": "literature-check-of-cited-methods",
+      "tests": [],
+      "text": "Selective risk and coverage (`governance/escalation.py`) | Geifman and El-Yaniv, arXiv:1705.08500; El-Yaniv and Wiener, JMLR 11 (2010) | Definitions of coverage and selective risk; guarantee with probability `1 - delta` over an i.i.d. sample | None",
+      "words": [
+        "guarantee"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LITERATURE_CHECK.md",
+      "end": 16,
+      "line": 16,
+      "missing": [],
+      "section": "literature-check-of-cited-methods",
+      "tests": [],
+      "text": "Chow's rule (`governance/escalation.py`) | Chow 1957 and 1970 not retrieved; described in El-Yaniv and Wiener, Section 10 | Only that it is the Bayes-optimal reject rule under 0-1 loss with known distribution and can be suboptimal with estimated posteriors | The reading of the cut as `c_h / c_e` is this module's own, not checked against Chow. Docstring says so.",
+      "words": [
+        "reject"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LITERATURE_CHECK.md",
+      "end": 17,
+      "line": 17,
+      "missing": [],
+      "section": "literature-check-of-cited-methods",
+      "tests": [],
+      "text": "CV+ and weighted conformal (`evaluation/conformal.py`, `cv_plus.py`) | Barber, Candes, Ramdas, Tibshirani, arXiv:1905.02928, Theorem 4, eq. 11; Tibshirani, Barber, Candes, Ramdas, arXiv:1904.06019, Corollary 1 | Interval construction; CV+ guarantee `1 - 2 alpha - min(...) >= 1 - 2 alpha - sqrt(2/n)` for exchangeable data and a symmetric algorithm; weighted quantile with the test point at plus infinity needs the exact likelihood ratio | \"Coverage near `1 - alpha`\" is an empirical expectation in the paper, not a theorem; the docstring said the statements came from the abstracts. Corrected.",
+      "words": [
+        "guarantee"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LOCAL.md",
+      "end": 28,
+      "line": 27,
+      "missing": [],
+      "section": "one-command",
+      "tests": [],
+      "text": "**corrupted and unsigned copies never become ready** (`/livez` 200, `/readyz` 503, `/predict` 503);",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/LOCAL.md",
+      "end": 65,
+      "line": 64,
+      "missing": [],
+      "section": "in-containers",
+      "tests": [],
+      "text": "The Dockerfile's default is a placeholder digest that the build refuses, so an unresolved build cannot succeed by accident.",
+      "words": [
+        "cannot",
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/OPERATING_LOOP.md",
+      "end": 35,
+      "line": 34,
+      "missing": [],
+      "section": "review-cadence",
+      "tests": [],
+      "text": "- Every pull request runs the bounded contract tier and records its coverage artifact; the enforced floor is currently 75% (the bounded suite measured 79% without the optional extras installed; the nightly run enforces 85% on core contracts).",
+      "words": [
+        "enforced",
+        "enforces"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/OPERATIONS.md",
+      "end": 28,
+      "line": 27,
+      "missing": [],
+      "section": "telemetry",
+      "tests": [],
+      "text": "A window with too few samples is never reported healthy.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/OPERATIONS.md",
+      "end": 29,
+      "line": 28,
+      "missing": [],
+      "section": "telemetry",
+      "tests": [],
+      "text": "Feature rows are sampled at `sample_rate`; requests and outcomes are never sampled.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/OPERATIONS.md",
+      "end": 38,
+      "line": 38,
+      "missing": [],
+      "section": "classifying-a-fault",
+      "tests": [],
+      "text": "`data_quality` | Only rejected inputs, missing-rate increase, unseen categories or drift are breached.",
+      "words": [
+        "rejected"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/OPERATIONS.md",
+      "end": 56,
+      "line": 55,
+      "missing": [],
+      "section": "notifications",
+      "tests": [],
+      "text": "A failed page is returned and written to the audit row, never dropped.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/OPERATIONS.md",
+      "end": 78,
+      "line": 77,
+      "missing": [],
+      "section": "continuous-evaluation",
+      "tests": [],
+      "text": "Drift supports a reason and is never enough alone.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/OPERATIONS.md",
+      "end": 87,
+      "line": 83,
+      "missing": [],
+      "section": "continuous-evaluation",
+      "tests": [],
+      "text": "`ContinuousEvaluation.replace` then refuses unless the loop proposed the challenger, the promotion gate admits the build (signed bundle, independent approval, passed scan, approver other than the requester, a signed staging record for production), an offline comparison, if given, says promote, and the release registry confirms the runtime.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/OPERATIONS.md",
+      "end": 96,
+      "line": 94,
+      "missing": [],
+      "section": "continuous-evaluation",
+      "tests": [],
+      "text": "The answer is `helped`, `harmed` or `inconclusive`, and it always says that two periods cannot separate the model from seasonality or other changes.",
+      "words": [
+        "always",
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/OPERATIONS.md",
+      "end": 127,
+      "line": 125,
+      "missing": [],
+      "section": "recovery",
+      "tests": [],
+      "text": "The ledger and state files are shown to survive a killed process; no `fsync` guarantee against power loss is claimed.",
+      "words": [
+        "guarantee"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/OPERATIONS_REHEARSAL.md",
+      "end": 64,
+      "line": 64,
+      "missing": [],
+      "section": "3-signing-key-rotation",
+      "tests": [],
+      "text": "Confirm the old key is rejected and no temporary signature file remains.",
+      "words": [
+        "rejected"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ORCHESTRATION.md",
+      "end": 15,
+      "line": 14,
+      "missing": [],
+      "section": "the-definition",
+      "tests": [],
+      "text": "Dependency cycles, unknown dependencies and duplicate names are refused when the object is built.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ORCHESTRATION.md",
+      "end": 19,
+      "line": 17,
+      "missing": [],
+      "section": "the-definition",
+      "tests": [],
+      "text": "A step with `effect=\"approved\"` may only exist behind an `approval` step it depends on; the definition refuses otherwise.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ORCHESTRATION.md",
+      "end": 31,
+      "line": 31,
+      "missing": [],
+      "section": "the-local-executor",
+      "tests": [],
+      "text": "Partial failure | the failing step is retried under its policy; dependents are `skipped`; independent steps finish; `resume` re-runs only what has not succeeded (an explicit act; `start` never retries a failed run)",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ORCHESTRATION.md",
+      "end": 37,
+      "line": 37,
+      "missing": [],
+      "section": "the-local-executor",
+      "tests": [],
+      "text": "Approval | the approval step waits (`waiting_approval`); a decision is an HMAC-signed record from a listed approver who is not the requester; a rejection or an expiry ends the run and the approved step never runs",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ORCHESTRATION.md",
+      "end": 42,
+      "line": 41,
+      "missing": [],
+      "section": "the-local-executor",
+      "tests": [],
+      "text": "Run ids come from the slot, so a scheduler that lost its state cannot repeat a finished slot.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ORCHESTRATION.md",
+      "end": 44,
+      "line": 43,
+      "missing": [],
+      "section": "the-local-executor",
+      "tests": [],
+      "text": "A slot that cannot start because the workflow is busy is `deferred` and stays due.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/ORCHESTRATION.md",
+      "end": 50,
+      "line": 48,
+      "missing": [],
+      "section": "not-done-here",
+      "tests": [],
+      "text": "The package emits no definition for an external workflow engine; concurrency limits, cost budgets and groups are enforced by the local executor only.",
+      "words": [
+        "enforced"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/PORTABLE_TRAINING.md",
+      "end": 43,
+      "line": 41,
+      "missing": [],
+      "section": "roles",
+      "tests": [],
+      "text": "`check_separation` refuses overlapping write prefixes, a training role that can write `bundles/` and a serving role that can write `runs/`.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/PORTABLE_TRAINING.md",
+      "end": 44,
+      "line": 43,
+      "missing": [],
+      "section": "roles",
+      "tests": [],
+      "text": "Workloads receive a `RoleStore` that enforces the training role.",
+      "words": [
+        "enforces"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/PORTABLE_TRAINING.md",
+      "end": 45,
+      "line": 44,
+      "missing": [],
+      "section": "roles",
+      "tests": [],
+      "text": "A job spec naming the serving identity is refused by every runner.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/PORTABLE_TRAINING.md",
+      "end": 57,
+      "line": 53,
+      "missing": [],
+      "section": "runners",
+      "tests": [],
+      "text": "A runner for a container platform starts `python -m scmle.runners.entrypoint` in the image, which opens the `file://` store named by `SCMLE_STORE_URI`, loads the stored spec, refuses it if its digest is not the one the runner started, and runs the workload (`SCMLE_WORKLOAD`, default `scmle.runners.project:run_project`).",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/READING_RESULTS.md",
+      "end": 50,
+      "line": 49,
+      "missing": [],
+      "section": "the-two-scores-practice-and-exam",
+      "tests": [],
+      "text": "When the bands of two models overlap, you cannot say which is better.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/READING_RESULTS.md",
+      "end": 52,
+      "line": 51,
+      "missing": [],
+      "section": "the-two-scores-practice-and-exam",
+      "tests": [],
+      "text": "Always check that you beat it by a margin that matters to you.",
+      "words": [
+        "always"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/READING_RESULTS.md",
+      "end": 190,
+      "line": 189,
+      "missing": [],
+      "section": "the-leak-as-it-looked",
+      "tests": [],
+      "text": "Second, a flag is a suspicion and not a verdict: the data cannot say when a value is recorded.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/READING_RESULTS.md",
+      "end": 249,
+      "line": 247,
+      "missing": [],
+      "section": "a-second-mode-the-charter",
+      "tests": [],
+      "text": "(Edit the file *before* you sign it: `charter sign` wraps the plan inside a `charter` key next to the hash and signature, so later edits must go inside that key and break the signature anyway.)",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/READING_RESULTS.md",
+      "end": 314,
+      "line": 313,
+      "missing": [],
+      "section": "a-second-mode-the-charter",
+      "tests": [],
+      "text": "`SKIPPED` is never counted as `PASS`.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/READING_RESULTS.md",
+      "end": 321,
+      "line": 321,
+      "missing": [],
+      "section": "the-tiers-in-plain-words",
+      "tests": [],
+      "text": "`attested` | A named person vouched for a fact the data cannot show, such as \"this column is known before the outcome\". | none yet in this run",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/READING_RESULTS.md",
+      "end": 324,
+      "line": 324,
+      "missing": [],
+      "section": "the-tiers-in-plain-words",
+      "tests": [],
+      "text": "`unverified` is not a failure, and not a block.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/READING_RESULTS.md",
+      "end": 344,
+      "line": 344,
+      "missing": [],
+      "section": "other-charter-files-worth-a-glance",
+      "tests": [],
+      "text": "It never says `pass` without evidence.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/README.md",
+      "end": 16,
+      "line": 16,
+      "missing": [],
+      "section": "new-here-read-these-first",
+      "tests": [],
+      "text": "Every refusal, gate and alarm: what it means and what to do | [`WHEN_THINGS_GO_WRONG.md`](WHEN_THINGS_GO_WRONG.md)",
+      "words": [
+        "refusal"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/RELEASING.md",
+      "end": 4,
+      "line": 3,
+      "missing": [],
+      "section": "releasing",
+      "tests": [],
+      "text": "A release is a version bump, a tag, and a pipeline that refuses to publish unless the evidence holds.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [
+        "tests/unit/test_bundle.py"
+      ],
+      "doc": "docs/SECURITY.md",
+      "end": 24,
+      "line": 24,
+      "missing": [],
+      "section": "controls",
+      "tests": [
+        "tests/unit/test_bundle.py"
+      ],
+      "text": "Loading a malicious bundle | Loading is **refused unless authentic**: the manifest HMAC-SHA256 signature must verify (`$SCMLE_SIGNING_KEY` or `signing_key=`), or the caller vouches with `trusted=True` | `tests/unit/test_bundle.py`",
+      "words": [
+        "must",
+        "refused"
+      ]
+    },
+    {
+      "cited": [
+        "tests/unit/test_envelope.py"
+      ],
+      "doc": "docs/SECURITY.md",
+      "end": 26,
+      "line": 26,
+      "missing": [],
+      "section": "controls",
+      "tests": [
+        "tests/unit/test_envelope.py"
+      ],
+      "text": "Malicious deep-learning checkpoint or document/image package | Checkpoints are an authenticated envelope (`scmle.envelope`): a JSON header with the payload digest and an HMAC is read and verified before any byte is unpickled. Package manifests, which record the payload digest, are signed the same way. Unsigned files, or signed files read with no key, are refused unless `trusted=True`; an invalid signature is an error even with `trusted=True` | `tests/unit/test_envelope.py` (a tripwire on `joblib.load`)",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SECURITY.md",
+      "end": 27,
+      "line": 27,
+      "missing": [],
+      "section": "controls",
+      "tests": [],
+      "text": "Dependency drift | Bundle records Python and scikit-learn versions; mismatches are refused unless allowed | version-mismatch test",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [
+        "tests/integration/test_service_package.py",
+        "tests/unit/test_service_hardening.py"
+      ],
+      "doc": "docs/SECURITY.md",
+      "end": 34,
+      "line": 34,
+      "missing": [],
+      "section": "controls",
+      "tests": [
+        "tests/integration/test_service_package.py",
+        "tests/unit/test_service_hardening.py"
+      ],
+      "text": "Trusting an unsigned bundle in production | `trusted=True` and `SCMLE_TRUSTED=1` are refused when `SCMLE_ENV=production`; the generated service then needs a signed bundle and a verifying provenance statement | `tests/unit/test_service_hardening.py`, `tests/integration/test_service_package.py`",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SECURITY.md",
+      "end": 35,
+      "line": 35,
+      "missing": [],
+      "section": "controls",
+      "tests": [],
+      "text": "Serving a modified or unattested service folder | Before it deserializes anything, the service checks the bundle signature, the checksum of every listed file, the signed provenance statement (bundle digest and build materials); on failure it stays alive but never ready | same tests",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [
+        "tests/unit/test_service_hardening.py"
+      ],
+      "doc": "docs/SECURITY.md",
+      "end": 37,
+      "line": 37,
+      "missing": [],
+      "section": "controls",
+      "tests": [
+        "tests/unit/test_service_hardening.py"
+      ],
+      "text": "Vulnerable dependencies in the image | `scmle.deploy.vuln_gate` fails a build on a blocking finding, an empty scan, a finding without severity, an expired exception, or an SBOM component the scan did not cover. It does not scan; the scanner and its database date are the report's | `tests/unit/test_service_hardening.py`",
+      "words": [
+        "blocking"
+      ]
+    },
+    {
+      "cited": [
+        "tests/unit/test_security_service.py"
+      ],
+      "doc": "docs/SECURITY.md",
+      "end": 38,
+      "line": 38,
+      "missing": [],
+      "section": "controls",
+      "tests": [
+        "tests/unit/test_security_service.py"
+      ],
+      "text": "Unauthenticated access | `HttpServing` and `ModalityHttpServing` refuse to listen beyond loopback without a gateway; every path except `/livez` and `/readyz` needs a verified token with the route's scope; the compose file publishes no port and gives its services the demo identity settings | `tests/unit/test_security_service.py`",
+      "words": [
+        "refuse"
+      ]
+    },
+    {
+      "cited": [
+        "tests/unit/test_security_service.py",
+        "tests/unit/test_security_tokens.py"
+      ],
+      "doc": "docs/SECURITY.md",
+      "end": 39,
+      "line": 39,
+      "missing": [],
+      "section": "controls",
+      "tests": [
+        "tests/unit/test_security_service.py",
+        "tests/unit/test_security_tokens.py"
+      ],
+      "text": "Invalid, revoked, expired or foreign credentials | Signature, `alg` (never `none`, never confused with the key's), `kid`, key validity window, `iss`, `aud`, `exp`, `nbf`, revocation by token, subject or key; refusals say only 401, 403 or 429, never why | `tests/unit/test_security_tokens.py`, `tests/unit/test_security_service.py`",
+      "words": [
+        "never",
+        "refusals"
+      ]
+    },
+    {
+      "cited": [
+        "tests/unit/test_security_service.py"
+      ],
+      "doc": "docs/SECURITY.md",
+      "end": 40,
+      "line": 40,
+      "missing": [],
+      "section": "controls",
+      "tests": [
+        "tests/unit/test_security_service.py"
+      ],
+      "text": "Guessing credentials, request floods | Per-client limit on refused attempts and per-subject request limit (429 with `Retry-After`), on top of the size, record and concurrency limits | `tests/unit/test_security_service.py`",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [
+        "tests/leakage/test_custody_access.py"
+      ],
+      "doc": "docs/SECURITY.md",
+      "end": 43,
+      "line": 43,
+      "missing": [],
+      "section": "controls",
+      "tests": [
+        "tests/leakage/test_custody_access.py"
+      ],
+      "text": "Reading the confirmation set early | With a charter, the confirmation rows are sealed in a separate vault process (even under `enforcement=\"cooperative\"`); exploration code receives only an `View` with no reference to a vault, token or log; a second open is refused; every attempt is written to a hash-chained log | `tests/leakage/test_custody_access.py`",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SECURITY.md",
+      "end": 59,
+      "line": 59,
+      "missing": [],
+      "section": "limits-of-custody",
+      "tests": [],
+      "text": "The library cannot delete a DataFrame or file that its caller holds.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SECURITY.md",
+      "end": 61,
+      "line": 60,
+      "missing": [],
+      "section": "limits-of-custody",
+      "tests": [],
+      "text": "The option that would close it is a CLI that reads the file inside the orchestrator and never returns the full frame to the caller; it is not built.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [
+        "tests/leakage/test_custody_access.py",
+        "tests/unit/test_custody_sealed.py",
+        "tests/unit/test_vault.py"
+      ],
+      "doc": "docs/SECURITY.md",
+      "end": 70,
+      "line": 70,
+      "missing": [],
+      "section": "what-is-tested-about-custody-and-what-is-not",
+      "tests": [
+        "tests/leakage/test_custody_access.py",
+        "tests/unit/test_custody_sealed.py",
+        "tests/unit/test_vault.py"
+      ],
+      "text": "The one release can be bound to a claims hash and a ledger hash; the vault refuses a release for any other pair | `tests/unit/test_vault.py`, `tests/unit/test_custody_sealed.py`, `tests/leakage/test_custody_access.py` | Available as `Locker.commit` and `open(..., claims_hash, ledger_hash)`. The confirmation stage does not call `commit` yet, so charter runs are not bound; the vault enforces the binding only if someone sets it",
+      "words": [
+        "enforces",
+        "refuses"
+      ]
+    },
+    {
+      "cited": [
+        "tests/unit/test_custody_sealed.py"
+      ],
+      "doc": "docs/SECURITY.md",
+      "end": 71,
+      "line": 71,
+      "missing": [],
+      "section": "what-is-tested-about-custody-and-what-is-not",
+      "tests": [
+        "tests/unit/test_custody_sealed.py"
+      ],
+      "text": "Every custody log entry carries an HMAC of its hash when a signing key is available (explicit or `SCMLE_SIGNING_KEY`); a forger who recomputes the hash chain fails the MAC | `tests/unit/test_custody_sealed.py` | Without a key the log is a checksum only, and a WARNING says so when it is written. A signed log cannot be verified without its key: verification refuses rather than skipping the MACs. An empty, unreadable or blank key (explicit, `SCMLE_SIGNING_KEY` or `SCMLE_SIGNING_KEY_FILE`) is an error, never \"no key\". Removing the newest entries is not detected by the chain or the MACs; compare `Journal.head` with a copy kept elsewhere",
+      "words": [
+        "cannot",
+        "never",
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SECURITY.md",
+      "end": 87,
+      "line": 86,
+      "missing": [],
+      "section": "guidance-for-operators",
+      "tests": [],
+      "text": "Never pass `trusted=True` (or `scmle predict --trusted`) for a bundle you did not produce.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SECURITY.md",
+      "end": 95,
+      "line": 93,
+      "missing": [],
+      "section": "guidance-for-operators",
+      "tests": [],
+      "text": "A retired key cannot sign but may verify pre-retirement evidence only when a caller explicitly requests historical verification.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SERVICE_SLO.md",
+      "end": 14,
+      "line": 14,
+      "missing": [],
+      "section": "endpoints",
+      "tests": [],
+      "text": "`GET /livez` | 200 while the process runs. Never depends on the model.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SERVICE_SLO.md",
+      "end": 15,
+      "line": 15,
+      "missing": [],
+      "section": "endpoints",
+      "tests": [],
+      "text": "`GET /readyz` | 200 only after **verify, load and warm-up** finished, in that order. Otherwise 503 with the phase, the steps done and, after a failure, the reason. A bundle that is unsigned, tampered with or the wrong digest leaves the service alive and never ready.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SERVICE_SLO.md",
+      "end": 29,
+      "line": 29,
+      "missing": [],
+      "section": "authentication",
+      "tests": [],
+      "text": "The body is a fixed message and never says which check failed.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SERVICE_SLO.md",
+      "end": 37,
+      "line": 36,
+      "missing": [],
+      "section": "schema-version-1",
+      "tests": [],
+      "text": "Unknown fields are refused.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SERVICE_SLO.md",
+      "end": 38,
+      "line": 37,
+      "missing": [],
+      "section": "schema-version-1",
+      "tests": [],
+      "text": "Every record must carry every required feature; a feature that is unknown for a record is sent as `null`, never omitted.",
+      "words": [
+        "must",
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SERVICE_SLO.md",
+      "end": 49,
+      "line": 47,
+      "missing": [],
+      "section": "schema-version-1",
+      "tests": [],
+      "text": "A change that removes or retypes a field needs a new schema version; the service refuses a `schema_version` it does not serve with 409 `schema_change`.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SERVICE_SLO.md",
+      "end": 56,
+      "line": 56,
+      "missing": [],
+      "section": "nulls-unseen-categories-and-schema-changes",
+      "tests": [],
+      "text": "Category never seen in training | Default `report`: scored as the encoder treats unknown values and listed in `rows[i].unseen` and `diagnostics.unseen_categories`. Policy `reject`: 422 `data_policy`.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SERVICE_SLO.md",
+      "end": 71,
+      "line": 71,
+      "missing": [],
+      "section": "limits",
+      "tests": [],
+      "text": "Scoring time | 30 s | 504; the caller is answered, the computation itself cannot be cancelled and holds its worker until it returns. While it does, `/readyz` answers 503 (`reason` says how many timed-out calls are still running) and `/predict` answers 503, so traffic moves to other replicas; a request that would only queue behind busy workers gets 429 at once. A request answered with 504 does not change the series history. Three timeouts in a row with no success between them make `/livez` answer 503 (`status: wedged`), so the platform restarts the replica",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SERVICE_SLO.md",
+      "end": 125,
+      "line": 123,
+      "missing": [],
+      "section": "signing-key-and-scan-exceptions-are-yours-to-configure",
+      "tests": [],
+      "text": "Set `SCMLE_SIGNING_KEY`, or point `SCMLE_SIGNING_KEY_FILE` at a file a secret manager mounts (the key then never sits in an environment variable or an image).",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SERVICE_SLO.md",
+      "end": 128,
+      "line": 128,
+      "missing": [],
+      "section": "signing-key-and-scan-exceptions-are-yours-to-configure",
+      "tests": [],
+      "text": "With `SCMLE_ENV=production` the service refuses to start with it, unless `SCMLE_ALLOW_PUBLISHED_KEY=1`, which only the local demo files set.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/SERVICE_SLO.md",
+      "end": 137,
+      "line": 136,
+      "missing": [],
+      "section": "signing-key-and-scan-exceptions-are-yours-to-configure",
+      "tests": [],
+      "text": "The `scmle` entry exists only because the scanner cannot see an unpublished package; remove it once the package is on an index.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 8,
+      "line": 7,
+      "missing": [],
+      "section": "start-here-your-first-model-start-to-finish",
+      "tests": [],
+      "text": "Every command below was run by the author on a real dataset, and every \"What you should see\" block is the real output (trimmed where it says so).",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 99,
+      "line": 99,
+      "missing": [],
+      "section": "step-2-look-at-the-data-first",
+      "tests": [],
+      "text": "Never train on a table you have not looked at.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 122,
+      "line": 122,
+      "missing": [],
+      "section": "step-2-look-at-the-data-first",
+      "tests": [],
+      "text": "What you should see: a block of JSON.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 198,
+      "line": 196,
+      "missing": [],
+      "section": "step-4-your-first-run-finishes-and-it-warns",
+      "tests": [],
+      "text": "If it refused every flagged column, it would also refuse good analyses (it flags legitimate measurements on the breast-cancer table).",
+      "words": [
+        "refuse",
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 251,
+      "line": 251,
+      "missing": [],
+      "section": "step-5-plan-nothing-is-trained-yet-see-the-evidence",
+      "tests": [],
+      "text": "It is the floor every real model must beat.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 400,
+      "line": 398,
+      "missing": [],
+      "section": "step-7-read-the-result",
+      "tests": [],
+      "text": "What must hold on your machine: the exam score is clearly above 0.5, it is close to the practice score, and `fit health` says `healthy`.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 434,
+      "line": 433,
+      "missing": [],
+      "section": "step-8-save-the-model-and-predict",
+      "tests": [],
+      "text": "Bundles can run code when opened, so SCMLE refuses to open one that is not **signed**.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 486,
+      "line": 485,
+      "missing": [],
+      "section": "step-8-save-the-model-and-predict",
+      "tests": [],
+      "text": "Never use it on a folder from someone else.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 517,
+      "line": 517,
+      "missing": [],
+      "section": "step-8-save-the-model-and-predict",
+      "tests": [],
+      "text": "Now see two refusals on purpose:",
+      "words": [
+        "refusals"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 538,
+      "line": 537,
+      "missing": [],
+      "section": "step-8-save-the-model-and-predict",
+      "tests": [],
+      "text": "SCMLE never guesses at column names.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 548,
+      "line": 548,
+      "missing": [],
+      "section": "step-8-save-the-model-and-predict",
+      "tests": [],
+      "text": "Always keep the guard in scripts that call `run()`.",
+      "words": [
+        "always"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 614,
+      "line": 613,
+      "missing": [],
+      "section": "step-9-package-then-serve",
+      "tests": [],
+      "text": "Never put it on the internet as it is.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 730,
+      "line": 730,
+      "missing": [],
+      "section": "step-10-monitor",
+      "tests": [],
+      "text": "* A drift alarm is not always a real problem.",
+      "words": [
+        "always"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 745,
+      "line": 745,
+      "missing": [],
+      "section": "step-11-register-promote-and-roll-back",
+      "tests": [],
+      "text": "Promotion without it is refused, on purpose.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/START_HERE.md",
+      "end": 873,
+      "line": 873,
+      "missing": [],
+      "section": "step-12-where-to-go-next",
+      "tests": [],
+      "text": "* A refusal you do not understand: [When things go wrong](WHEN_THINGS_GO_WRONG.md).",
+      "words": [
+        "refusal"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 13,
+      "line": 12,
+      "missing": [],
+      "section": "model",
+      "tests": [],
+      "text": "Two tenants never share a process, a model bundle, a ledger file or a signing key.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 17,
+      "line": 17,
+      "missing": [],
+      "section": "model",
+      "tests": [],
+      "text": "* The tenant is never taken from the request path, query or body.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 18,
+      "line": 17,
+      "missing": [],
+      "section": "model",
+      "tests": [],
+      "text": "A caller cannot choose another tenant's model by naming it.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 25,
+      "line": 22,
+      "missing": [],
+      "section": "rules",
+      "tests": [],
+      "text": "A request without a valid token is refused with 401; the only public paths are `/livez` and `/readyz`, which disclose liveness and readiness (and the model version and digest once ready) and nothing else.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 29,
+      "line": 27,
+      "missing": [],
+      "section": "rules",
+      "tests": [],
+      "text": "If the deployment names a tenant, a token whose tenant is absent or different is refused with 403, whatever its scopes.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 43,
+      "line": 40,
+      "missing": [],
+      "section": "rules",
+      "tests": [],
+      "text": "Training and serving use different roles (`scmle.runners.roles`): serving can read bundles and write nothing but its own audit trail; training can write checkpoints and manifests and cannot load or activate a service.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 45,
+      "line": 44,
+      "missing": [],
+      "section": "rules",
+      "tests": [],
+      "text": "A refusal says only \"authentication required\", \"forbidden\" or \"too many requests\".",
+      "words": [
+        "refusal"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 46,
+      "line": 45,
+      "missing": [],
+      "section": "rules",
+      "tests": [],
+      "text": "It never says which check failed, which key id was tried, or whether a tenant exists.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 51,
+      "line": 48,
+      "missing": [],
+      "section": "rules",
+      "tests": [],
+      "text": "Every activation, access decision (allowed or denied) and administrative action (key rotation) is a hash-chained `audit` row of the deployment ledger: who, what, outcome, request id; never a credential or a request body.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 60,
+      "line": 58,
+      "missing": [],
+      "section": "what-this-does-not-give-you",
+      "tests": [],
+      "text": "Terminate TLS at the ingress; the token travels in a header and must not cross a network unencrypted.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 67,
+      "line": 65,
+      "missing": [],
+      "section": "what-this-does-not-give-you",
+      "tests": [],
+      "text": "A revoked token is refused from the next request if the revocation file is current; propagating that file to every replica is the deployment's job.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 70,
+      "line": 68,
+      "missing": [],
+      "section": "what-this-does-not-give-you",
+      "tests": [],
+      "text": "The chain shows that rows were not edited, removed from the middle or reordered, not that the newest rows were never removed.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 83,
+      "line": 83,
+      "missing": [],
+      "section": "configuration",
+      "tests": [],
+      "text": "`SCMLE_AUTH_REVOKED_FILE` | JSON `{\"tokens\": [], \"subjects\": [], \"key_ids\": []}`, re-read on every request; an unreadable file refuses every token.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TENANT_ISOLATION.md",
+      "end": 88,
+      "line": 86,
+      "missing": [],
+      "section": "configuration",
+      "tests": [],
+      "text": "A server that listens on anything but a loopback address without a key source refuses to start (`ConfigError`): no shipped configuration exposes an unauthenticated backend.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TRAIL.md",
+      "end": 66,
+      "line": 66,
+      "missing": [],
+      "section": "what-verify-detects",
+      "tests": [],
+      "text": "`unapproved_step` | No signed approval promoted this version, it was for another bundle, rejected, not independent, or made by the builder.",
+      "words": [
+        "rejected"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TUTORIAL.md",
+      "end": 94,
+      "line": 91,
+      "missing": [],
+      "section": "4-feature-graph",
+      "tests": [],
+      "text": "Ordered nodes (`lag`, `diff`, `rolling_*`, `expanding_mean`) are computed per group in time order from the current and earlier rows, never the target, and are recomputed on the batch you score, so that batch must carry each entity's history.",
+      "words": [
+        "must",
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/TUTORIAL.md",
+      "end": 288,
+      "line": 287,
+      "missing": [],
+      "section": "9-beyond-the-basics",
+      "tests": [],
+      "text": "Register any scikit-learn-compatible estimator in one call; the class must be defined at module level so trial processes can import it.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 10,
+      "line": 10,
+      "missing": [],
+      "section": "it-does-not-replace-your-judgement-about-the-problem",
+      "tests": [],
+      "text": "SCMLE cannot know:",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 14,
+      "line": 13,
+      "missing": [],
+      "section": "it-does-not-replace-your-judgement-about-the-problem",
+      "tests": [],
+      "text": "It can *suspect* a leak from the numbers, never *know*.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 49,
+      "line": 46,
+      "missing": [],
+      "section": "statistics-what-is-guaranteed-and-what-is-not",
+      "tests": [],
+      "text": "So the number of candidates did not make this band worse in these runs, which is what one expects: the exam rows are opened once, after the winner is frozen, so the choice cannot flatter them.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 94,
+      "line": 93,
+      "missing": [],
+      "section": "statistics-what-is-guaranteed-and-what-is-not",
+      "tests": [],
+      "text": "It is not a guarantee against a changed world.",
+      "words": [
+        "guarantee"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 101,
+      "line": 101,
+      "missing": [],
+      "section": "claims-confirmed-attested-unverified-and-what-each-is-worth",
+      "tests": [],
+      "text": "* **The guarantee depends on the charter being honest.",
+      "words": [
+        "guarantee"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 112,
+      "line": 111,
+      "missing": [],
+      "section": "claims-confirmed-attested-unverified-and-what-each-is-worth",
+      "tests": [],
+      "text": "A held-out set alone never confirms a causal effect, and `confirmed` does not say the assumptions are true.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 114,
+      "line": 112,
+      "missing": [],
+      "section": "claims-confirmed-attested-unverified-and-what-each-is-worth",
+      "tests": [],
+      "text": "If no identification strategy fits your charter, the claim is `not_identified` and SCMLE refuses to produce an estimate.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 116,
+      "line": 115,
+      "missing": [],
+      "section": "claims-confirmed-attested-unverified-and-what-each-is-worth",
+      "tests": [],
+      "text": "The sealed rows sit in a separate helper process, so ordinary code cannot read them.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 132,
+      "line": 131,
+      "missing": [],
+      "section": "certified-versus-descriptive",
+      "tests": [],
+      "text": "Everything else is **descriptive**: shown, never decisive.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 144,
+      "line": 141,
+      "missing": [],
+      "section": "certified-versus-descriptive",
+      "tests": [],
+      "text": "The leakage screen is the exception: its flags may always block, because its false-alarm control holds by construction, and its certificates are reported as evidence.",
+      "words": [
+        "always",
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 157,
+      "line": 155,
+      "missing": [],
+      "section": "the-closed-loop-and-escalation",
+      "tests": [],
+      "text": "* A feedback loop (where the model's own decisions shape the labels you see) cannot be detected without a randomly chosen slice of cases that bypass the model.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 159,
+      "line": 158,
+      "missing": [],
+      "section": "the-closed-loop-and-escalation",
+      "tests": [],
+      "text": "The command line cannot, for example, create a signed reply or release a halt.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 170,
+      "line": 168,
+      "missing": [],
+      "section": "serving-and-security",
+      "tests": [],
+      "text": "It refuses to listen beyond your machine unless token checking is configured, and you must terminate TLS elsewhere ([`SERVICE_SLO.md`](SERVICE_SLO.md)).",
+      "words": [
+        "must",
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 196,
+      "line": 195,
+      "missing": [],
+      "section": "memory",
+      "tests": [],
+      "text": "About half of that is the operating system's allocator keeping freed large blocks.",
+      "words": [
+        "blocks"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 209,
+      "line": 205,
+      "missing": [],
+      "section": "memory",
+      "tests": [],
+      "text": "* **Where it goes** (cache off, per added row): the caller's table and the project's copy 0.43 KB, the split and the profile 0.75 KB that stays for the whole run, and 0.7 KB of working memory in the step that peaks, a refit, of which 0.6 KB is scikit-learn's median imputer building masked copies of the numeric block.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 213,
+      "line": 211,
+      "missing": [],
+      "section": "memory",
+      "tests": [],
+      "text": "Tables with fewer or narrower columns have a larger multiple of their own size, because the numeric block is rebuilt as float64.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 219,
+      "line": 219,
+      "missing": [],
+      "section": "deployment-has-not-been-proven-end-to-end",
+      "tests": [],
+      "text": "* The package has **never been run against a hosted platform**.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 239,
+      "line": 238,
+      "missing": [],
+      "section": "scope-of-what-it-models",
+      "tests": [],
+      "text": "No language-model client ships; recorded drafts can be replayed, and a replayed draft with no calibrated threshold is refused.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHAT_SCMLE_CANNOT_DO.md",
+      "end": 256,
+      "line": 256,
+      "missing": [],
+      "section": "things-a-first-time-user-often-assumes-and-should-not",
+      "tests": [],
+      "text": "The tool will tell me my target is wrong | It cannot see what your target means",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 3,
+      "line": 3,
+      "missing": [],
+      "section": "when-things-go-wrong",
+      "tests": [],
+      "text": "SCMLE refuses, blocks and warns on purpose.",
+      "words": [
+        "blocks",
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 4,
+      "line": 3,
+      "missing": [],
+      "section": "when-things-go-wrong",
+      "tests": [],
+      "text": "A refusal is the tool doing its job.",
+      "words": [
+        "refusal"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 21,
+      "line": 21,
+      "missing": [],
+      "section": "first-the-exit-code",
+      "tests": [],
+      "text": "1 | something failed: a bad option, bad data, a bad file, a refused bundle, a failed check",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 22,
+      "line": 22,
+      "missing": [],
+      "section": "first-the-exit-code",
+      "tests": [],
+      "text": "2 | **blocked**: SCMLE stopped on purpose before doing harm; also `deploy gate` refusing a release and `frame` refusing a draft",
+      "words": [
+        "blocked"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 70,
+      "line": 69,
+      "missing": [],
+      "section": "a-run-is-blocked",
+      "tests": [],
+      "text": "A blocked run exits with code 2, writes `state.BLOCKED` in its event log, and leaves the sealed test rows unopened.",
+      "words": [
+        "blocked"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 87,
+      "line": 86,
+      "missing": [],
+      "section": "score-labelled-provisional-n-flagged-columns-not-attested-seen",
+      "tests": [],
+      "text": "The data alone cannot decide whether a flagged column is a leak or a legitimate strong predictor, so SCMLE does not refuse.",
+      "words": [
+        "cannot",
+        "refuse"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 98,
+      "line": 97,
+      "missing": [],
+      "section": "score-labelled-provisional-n-flagged-columns-not-attested-seen",
+      "tests": [],
+      "text": "* You cannot settle it: do not rely on the score, or use `--leakage-policy block`.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 113,
+      "line": 111,
+      "missing": [],
+      "section": "leakage-block-seen",
+      "tests": [],
+      "text": "It is not the default because the screen cannot tell a leak from a strong, legitimate column (see [Leakage](LEAKAGE.md)); it flags legitimate measurements too.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 115,
+      "line": 114,
+      "missing": [],
+      "section": "leakage-block-seen",
+      "tests": [],
+      "text": "Use `block` when you cannot attest where each value comes from, or in regulated work.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 116,
+      "line": 116,
+      "missing": [],
+      "section": "leakage-block-seen",
+      "tests": [],
+      "text": "Only checks with a measured error rate (a certificate) are allowed to block.",
+      "words": [
+        "block"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 144,
+      "line": 144,
+      "missing": [],
+      "section": "other-blocks-from-the-code",
+      "tests": [],
+      "text": "`time column '<c>' has unparseable/missing values: ordering ambiguous` | Dates that cannot be read | Fix the dates or change `--time-column`",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 147,
+      "line": 147,
+      "missing": [],
+      "section": "other-blocks-from-the-code",
+      "tests": [],
+      "text": "`monotonic constraints need numeric feature columns ...` / `... not multiclass` / `no available model can enforce the monotonic constraints; install the 'boosting' extra ...` | Your `--monotonic` rule cannot be met | Fix the rule, or `pip install \"scmle[boosting]\"`",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 150,
+      "line": 150,
+      "missing": [],
+      "section": "other-blocks-from-the-code",
+      "tests": [],
+      "text": "`unresolved blocking curation findings` | The data checks found a blocking issue | Read the finding ids in the run's events and fix the data",
+      "words": [
+        "blocking"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 163,
+      "line": 163,
+      "missing": [],
+      "section": "statefailed-or-cancelled-error-interrupted",
+      "tests": [],
+      "text": "Resume itself can refuse (From the code):",
+      "words": [
+        "refuse"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 194,
+      "line": 193,
+      "missing": [],
+      "section": "all-trials-failed--trialerror-trial-exceeded-its-60s-hard-time-ceiling-and-was-killed-seen",
+      "tests": [],
+      "text": "A limit that is not enforced is not a limit; a runaway model must not hold the computer.",
+      "words": [
+        "enforced",
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 225,
+      "line": 224,
+      "missing": [],
+      "section": "a-drift-or-shift-report-says-unverifiable-seen",
+      "tests": [],
+      "text": "SCMLE had no sample of the population you will deploy to, so it cannot say whether your data resembles it.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 226,
+      "line": 225,
+      "missing": [],
+      "section": "a-drift-or-shift-report-says-unverifiable-seen",
+      "tests": [],
+      "text": "It will never say `pass` without evidence.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 240,
+      "line": 240,
+      "missing": [],
+      "section": "unverified-what-to-do",
+      "tests": [],
+      "text": "It never blocks a run by itself.",
+      "words": [
+        "blocks",
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 256,
+      "line": 255,
+      "missing": [],
+      "section": "1-a-feature-is-unverified-seen",
+      "tests": [],
+      "text": "SCMLE cannot know from the numbers alone whether a column exists at prediction time.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 285,
+      "line": 284,
+      "missing": [],
+      "section": "1-a-feature-is-unverified-seen",
+      "tests": [],
+      "text": "`scope` must be your charter's hash, so one attestation cannot be reused for another analysis.",
+      "words": [
+        "cannot",
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 286,
+      "line": 285,
+      "missing": [],
+      "section": "1-a-feature-is-unverified-seen",
+      "tests": [],
+      "text": "`expires` must not be before `date`.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 287,
+      "line": 286,
+      "missing": [],
+      "section": "1-a-feature-is-unverified-seen",
+      "tests": [],
+      "text": "A valid one keeps the column, marks it `attested` (never `confirmed`), and writes a diagnostic row in the ledger.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 324,
+      "line": 324,
+      "missing": [],
+      "section": "4-a-drafted-field-is-unverified",
+      "tests": [],
+      "text": "A replayed draft with no calibrated `tau` is refused.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 336,
+      "line": 336,
+      "missing": [],
+      "section": "5-a-causal-claim-is-unverified-or-not_identified-from-the-code",
+      "tests": [],
+      "text": "A held-out set alone never confirms a causal effect.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 368,
+      "line": 367,
+      "missing": [],
+      "section": "artifact-error-charter-hash-mismatch-in-file-the-file-was-edited-seen",
+      "tests": [],
+      "text": "The whole point is that the plan cannot be quietly changed after seeing results.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 378,
+      "line": 377,
+      "missing": [],
+      "section": "other-charter-refusals-from-the-code",
+      "tests": [],
+      "text": "* `an amendment may only tighten the budget`: you may lower the error allowance, never raise it.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 427,
+      "line": 426,
+      "missing": [],
+      "section": "artifact-error-bundle-signature-is-invalid-the-bundle-was-modified-or-signed-with-a-different-key-seen",
+      "tests": [],
+      "text": "An invalid signature is refused even with `--trusted`.",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 431,
+      "line": 431,
+      "missing": [],
+      "section": "artifact-error-trusted-loading-is-refused-when-scmle_envproduction-seen",
+      "tests": [],
+      "text": "In production mode `--trusted` is never allowed.",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 442,
+      "line": 441,
+      "missing": [],
+      "section": "bundle-was-built-with-different-dependencies-scikit-learn-x-installed-y--from-the-code",
+      "tests": [],
+      "text": "Models can behave differently under a different library version, so SCMLE refuses.",
+      "words": [
+        "refuses"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 450,
+      "line": 450,
+      "missing": [],
+      "section": "schema-error-input-is-missing-required-columns--seen",
+      "tests": [],
+      "text": "Mapping is always explicit; SCMLE does not guess.",
+      "words": [
+        "always"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 474,
+      "line": 473,
+      "missing": [],
+      "section": "readyz-answers-503-or-ready-false",
+      "tests": [],
+      "text": "A service that failed verification must stay out of use but stay alive so you can read why.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 498,
+      "line": 498,
+      "missing": [],
+      "section": "request-errors-from-the-code-one-was-seen",
+      "tests": [],
+      "text": "422 `schema` | missing or non-numeric features (Seen: `records are missing required features: [...]`) | send every feature; send `null` for unknown, never omit",
+      "words": [
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 510,
+      "line": 510,
+      "missing": [],
+      "section": "champion-promotion-requires-independent-approval-seen",
+      "tests": [],
+      "text": "One person must not push an unreviewed model into use.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 515,
+      "line": 512,
+      "missing": [],
+      "section": "champion-promotion-requires-independent-approval-seen",
+      "tests": [],
+      "text": "Other refusals of the same family (From the code): `promotion approval does not match bundle identity`, `promotion was rejected by the reviewer`, `champion promotion requires independent review`, `champion promotion requires a valid signature`.",
+      "words": [
+        "refusals"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 544,
+      "line": 543,
+      "missing": [],
+      "section": "rollback-did-not-happen-from-the-code",
+      "tests": [],
+      "text": "* `the new champion holds up`: it is not clearly worse (the whole interval must be below minus the tolerance, 0.01 by default).",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 675,
+      "line": 674,
+      "missing": [],
+      "section": "how-to-reply",
+      "tests": [],
+      "text": "A second reply to the same escalation is refused (Seen):",
+      "words": [
+        "refused"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 685,
+      "line": 681,
+      "missing": [],
+      "section": "how-to-reply",
+      "tests": [],
+      "text": "Other reply refusals (From the code): `the reply answers a different escalation`, `the reply is bound to a different question`, `the reply names a different scope`, `the reply is signed with a key the system holds` (use your own key), `no verification key for the reply's key id`, `the reply's signature does not verify`, `the reply is expired or dated in the future`.",
+      "words": [
+        "refusals"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 694,
+      "line": 694,
+      "missing": [],
+      "section": "other-loop-events-from-the-code",
+      "tests": [],
+      "text": "`alarm_on_unverified_label_mechanism` halt | the loop cannot tell how labels were chosen (no logged propensity, no audit slice), so it will not retrain or promote | arrange labels that are complete, have logged propensities, or include a random audit slice",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 698,
+      "line": 698,
+      "missing": [],
+      "section": "other-loop-events-from-the-code",
+      "tests": [],
+      "text": "any never-list action | the 11 actions that always need a person (moving the champion, reopening a sealed set, changing the charter, relaxing a threshold, ...) | answer with an attestation",
+      "words": [
+        "always",
+        "never"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 703,
+      "line": 702,
+      "missing": [],
+      "section": "other-loop-events-from-the-code",
+      "tests": [],
+      "text": "It cannot show that the newest rows were removed; keep a copy of the head somewhere else.",
+      "words": [
+        "cannot"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 727,
+      "line": 726,
+      "missing": [],
+      "section": "scmle-deploy-gate-admitcertify-manifestjson---key-file-key-refuses-exit-2",
+      "tests": [],
+      "text": "* `the approver is the person who requested the release`: someone else must approve.",
+      "words": [
+        "must"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 747,
+      "line": 743,
+      "missing": [],
+      "section": "scmle-deploy-live-exits-1",
+      "tests": [],
+      "text": "The failure strings (From the code) include `/readyz answered N and is not ready`, `the answering model is not the released model`, `the service is not reached over HTTPS`, `/predict with no token answered N` (it should refuse), `the refusal leaks a traceback`, and `a read-only token reached /predict`.",
+      "words": [
+        "refuse"
+      ]
+    },
+    {
+      "cited": [],
+      "doc": "docs/WHEN_THINGS_GO_WRONG.md",
+      "end": 760,
+      "line": 759,
+      "missing": [],
+      "section": "scmle-deploy-verify-record-exits-1",
+      "tests": [],
+      "text": "The signature of the deployment record is not valid, or the file cannot be read.",
+      "words": [
+        "cannot"
+      ]
+    }
+  ],
+  "seconds": 0.1,
+  "test_links": 0,
+  "version": 1
+}

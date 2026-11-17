@@ -1,0 +1,1073 @@
+{
+  "claim": "C14",
+  "code_hash": "567fa645b162f01ee473d7eb93351fd84fbe8922f3aa56fb04e96371d4ad8b79",
+  "counts": {
+    "planted": {
+      "failures": 0,
+      "gates": {
+        "data.unlabeled": 1,
+        "leakage.policy": 1,
+        "split.group.partition": 1,
+        "split.stratified.stratify": 2,
+        "target.columns": 1,
+        "target.events": 1,
+        "target.treatment": 1,
+        "task.auto": 1,
+        "task.classification": 2,
+        "task.regression": 1
+      },
+      "models": 0,
+      "refusals": 12,
+      "trials": 12,
+      "unfinished": 0
+    },
+    "precision": {
+      "justified": 12,
+      "refusals": 12,
+      "rubric": "automated: justified when the task was planted and the refusing gate is one the task names; not validator-reviewed"
+    },
+    "real": {
+      "failures": 0,
+      "gates": {},
+      "models": 24,
+      "refusals": 0,
+      "trials": 24,
+      "unfinished": 0
+    },
+    "simulated": {
+      "failures": 0,
+      "gates": {},
+      "models": 22,
+      "refusals": 0,
+      "trials": 22,
+      "unfinished": 0
+    }
+  },
+  "not_measured": [
+    "real survival, ranking, forecast and uplift tables (none is cached offline; those kinds are simulated only)",
+    "the sealed acceptance split and the validator's review of each refusal against a written rubric (plan section 6)",
+    "budgets other than the short one used here"
+  ],
+  "not_run": [
+    "churn",
+    "diamonds",
+    "adult",
+    "letter",
+    "bike_sharing",
+    "bank_marketing",
+    "magic_telescope",
+    "house_sales",
+    "mushroom",
+    "electricity"
+  ],
+  "records": [
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "bagged_logistic_regression",
+      "name": "breast_cancer",
+      "outcome": "model",
+      "rows": 569,
+      "seconds": 44.7
+    },
+    {
+      "group": "simulated",
+      "kind": "binary",
+      "model": "logistic_regression",
+      "name": "sim_binary_500_plain",
+      "outcome": "model",
+      "rows": 500,
+      "seconds": 42.3
+    },
+    {
+      "error": "BlockedError",
+      "gate": "task.classification",
+      "group": "planted",
+      "kind": "binary",
+      "message": "classification needs >=2 classes; target has 1",
+      "name": "planted_constant_binary_400",
+      "outcome": "refused",
+      "rows": 400,
+      "seconds": 0.0,
+      "site": "scmle.data.validation.target:TaskResolver.resolve_classification"
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "logistic_regression",
+      "name": "wine",
+      "outcome": "model",
+      "rows": 178,
+      "seconds": 39.4
+    },
+    {
+      "group": "simulated",
+      "kind": "regression",
+      "model": "ridge",
+      "name": "sim_regression_300_mixed",
+      "outcome": "model",
+      "rows": 300,
+      "seconds": 39.4
+    },
+    {
+      "error": "BlockedError",
+      "gate": "data.unlabeled",
+      "group": "planted",
+      "kind": "regression",
+      "message": "target 'y' has 40 missing values; set data.unlabeled to 'ignore' or 'pseudo_label' to use the unlabeled rows",
+      "name": "planted_unlabeled_regression_400",
+      "outcome": "refused",
+      "rows": 400,
+      "seconds": 0.0,
+      "site": "scmle.core.stages:ProfileStage.set_aside_unlabeled"
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "elastic_net",
+      "name": "diabetes_progression",
+      "outcome": "model",
+      "rows": 442,
+      "seconds": 30.7
+    },
+    {
+      "group": "simulated",
+      "kind": "multiclass",
+      "model": "decision_tree",
+      "name": "sim_multiclass_1500_plain",
+      "outcome": "model",
+      "rows": 1500,
+      "seconds": 86.0
+    },
+    {
+      "error": "BlockedError",
+      "gate": "task.auto",
+      "group": "planted",
+      "kind": "multiclass",
+      "message": "target 'y' is non-numeric with 400 distinct values: it looks like an identifier or free text, not a class label; choose another target",
+      "name": "planted_identifier_multiclass_400",
+      "outcome": "refused",
+      "rows": 400,
+      "seconds": 0.0,
+      "site": "scmle.data.validation.target:TaskResolver.resolve_auto"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "logistic_regression",
+      "name": "credit_g",
+      "outcome": "model",
+      "rows": 1000,
+      "seconds": 55.0
+    },
+    {
+      "group": "simulated",
+      "kind": "survival",
+      "model": "cox_ph",
+      "name": "sim_survival_800_plain",
+      "outcome": "model",
+      "rows": 800,
+      "seconds": 22.0
+    },
+    {
+      "error": "BlockedError",
+      "gate": "split.stratified.stratify",
+      "group": "planted",
+      "kind": "multiclass",
+      "message": "a class has fewer than 2 examples: cannot stratify",
+      "name": "planted_singleton_multiclass_400",
+      "outcome": "refused",
+      "rows": 400,
+      "seconds": 0.0,
+      "site": "scmle.data.splitting.splitters:StratifiedSplit.stratifier"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "logistic_regression",
+      "name": "pima_diabetes",
+      "outcome": "model",
+      "rows": 768,
+      "seconds": 47.3
+    },
+    {
+      "group": "simulated",
+      "kind": "ordinal",
+      "model": "ordinal_ridge",
+      "name": "sim_ordinal_1200_mixed",
+      "outcome": "model",
+      "rows": 1200,
+      "seconds": 49.7
+    },
+    {
+      "error": "BlockedError",
+      "gate": "leakage.policy",
+      "group": "planted",
+      "kind": "binary",
+      "message": "unresolved leakage risk (permutation screen, Benjamini-Yekutieli level 0.05): leak",
+      "name": "planted_leak_binary_600",
+      "outcome": "refused",
+      "rows": 600,
+      "seconds": 7.5,
+      "site": "scmle.core.stages:ProfileStage.enforce_leakage_policy"
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "ridge",
+      "name": "abalone",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 54.3
+    },
+    {
+      "group": "simulated",
+      "kind": "ranking",
+      "model": "dummy",
+      "name": "sim_ranking_1500_plain",
+      "outcome": "model",
+      "rows": 1500,
+      "seconds": 51.2
+    },
+    {
+      "error": "BlockedError",
+      "gate": "target.columns",
+      "group": "planted",
+      "kind": "multilabel",
+      "message": "label column 'label0' must hold 0 or 1",
+      "name": "planted_labels_multilabel_400",
+      "outcome": "refused",
+      "rows": 400,
+      "seconds": 0.0,
+      "site": "scmle.data.validation.target:check_targets"
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "decision_tree",
+      "name": "vehicle",
+      "outcome": "model",
+      "rows": 846,
+      "seconds": 83.7
+    },
+    {
+      "group": "simulated",
+      "kind": "multilabel",
+      "model": "multilabel_logistic",
+      "name": "sim_multilabel_1000_plain",
+      "outcome": "model",
+      "rows": 1000,
+      "seconds": 48.0
+    },
+    {
+      "error": "BlockedError",
+      "gate": "target.events",
+      "group": "planted",
+      "kind": "survival",
+      "message": "event column 'event' must hold 0 (censored) or 1 (event) in every row",
+      "name": "planted_events_survival_400",
+      "outcome": "refused",
+      "rows": 400,
+      "seconds": 0.0,
+      "site": "scmle.data.validation.target:check_events"
+    },
+    {
+      "group": "real",
+      "kind": "multioutput",
+      "model": "multioutput_ridge",
+      "name": "energy_loads",
+      "outcome": "model",
+      "rows": 768,
+      "seconds": 45.4
+    },
+    {
+      "group": "simulated",
+      "kind": "multioutput",
+      "model": "multioutput_ridge",
+      "name": "sim_multioutput_600_plain",
+      "outcome": "model",
+      "rows": 600,
+      "seconds": 42.2
+    },
+    {
+      "error": "BlockedError",
+      "gate": "target.treatment",
+      "group": "planted",
+      "kind": "uplift",
+      "message": "each arm needs at least 20 rows",
+      "name": "planted_arm_uplift_400",
+      "outcome": "refused",
+      "rows": 400,
+      "seconds": 0.0,
+      "site": "scmle.data.validation.target:check_treatment"
+    },
+    {
+      "group": "real",
+      "kind": "ordinal",
+      "model": "ordinal_ridge",
+      "name": "wine_red_quality",
+      "outcome": "model",
+      "rows": 1599,
+      "seconds": 46.9
+    },
+    {
+      "group": "simulated",
+      "kind": "forecast",
+      "model": "multioutput_ridge",
+      "name": "sim_forecast_400_plain",
+      "outcome": "model",
+      "rows": 400,
+      "seconds": 33.7
+    },
+    {
+      "error": "BlockedError",
+      "gate": "split.group.partition",
+      "group": "planted",
+      "kind": "ranking",
+      "message": "need at least 7 groups for group validation",
+      "name": "planted_queries_ranking_300",
+      "outcome": "refused",
+      "rows": 300,
+      "seconds": 0.0,
+      "site": "scmle.data.splitting.splitters:GroupSplit.partition"
+    },
+    {
+      "group": "real",
+      "kind": "multilabel",
+      "model": "multilabel_logistic",
+      "name": "emotions",
+      "outcome": "model",
+      "rows": 593,
+      "seconds": 46.3
+    },
+    {
+      "group": "simulated",
+      "kind": "uplift",
+      "model": "dummy",
+      "name": "sim_uplift_3000_plain",
+      "outcome": "model",
+      "rows": 3000,
+      "seconds": 49.6
+    },
+    {
+      "error": "BlockedError",
+      "gate": "task.regression",
+      "group": "planted",
+      "kind": "regression",
+      "message": "regression requested but the target is not numeric",
+      "name": "planted_text_regression_400",
+      "outcome": "refused",
+      "rows": 400,
+      "seconds": 0.0,
+      "site": "scmle.data.validation.target:TaskResolver.resolve_regression"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "bagged_logistic_regression",
+      "name": "blood_transfusion",
+      "outcome": "model",
+      "rows": 748,
+      "seconds": 44.9
+    },
+    {
+      "group": "simulated",
+      "kind": "binary",
+      "model": "bagged_logistic_regression",
+      "name": "sim_binary_2000_wide",
+      "outcome": "model",
+      "rows": 2000,
+      "seconds": 57.6
+    },
+    {
+      "error": "BlockedError",
+      "gate": "task.classification",
+      "group": "planted",
+      "kind": "multiclass",
+      "message": "binary_classification requested but target has 3 classes",
+      "name": "planted_binary_multiclass_400",
+      "outcome": "refused",
+      "rows": 400,
+      "seconds": 0.0,
+      "site": "scmle.data.validation.target:TaskResolver.resolve_classification"
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "knn",
+      "name": "kin8nm",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 45.3
+    },
+    {
+      "group": "simulated",
+      "kind": "regression",
+      "model": "ridge",
+      "name": "sim_regression_2000_wide",
+      "outcome": "model",
+      "rows": 2000,
+      "seconds": 47.4
+    },
+    {
+      "error": "BlockedError",
+      "gate": "split.stratified.stratify",
+      "group": "planted",
+      "kind": "multiclass",
+      "message": "a class has fewer than 2 examples: cannot stratify",
+      "name": "planted_singleton_multiclass_12",
+      "outcome": "refused",
+      "rows": 12,
+      "seconds": 0.0,
+      "site": "scmle.data.splitting.splitters:StratifiedSplit.stratifier"
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "bagged_logistic_regression",
+      "name": "titanic",
+      "outcome": "model",
+      "rows": 1309,
+      "seconds": 39.3
+    },
+    {
+      "group": "simulated",
+      "kind": "multiclass",
+      "model": "bagged_logistic_regression",
+      "name": "sim_multiclass_600_mixed",
+      "outcome": "model",
+      "rows": 600,
+      "seconds": 45.7
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "logistic_regression",
+      "name": "credit_approval",
+      "outcome": "model",
+      "rows": 690,
+      "seconds": 45.9
+    },
+    {
+      "group": "simulated",
+      "kind": "survival",
+      "model": "cox_ph",
+      "name": "sim_survival_2000_mixed",
+      "outcome": "model",
+      "rows": 2000,
+      "seconds": 33.7
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "decision_tree",
+      "name": "segment",
+      "outcome": "model",
+      "rows": 2310,
+      "seconds": 170.0
+    },
+    {
+      "group": "simulated",
+      "kind": "forecast",
+      "model": "multioutput_ridge",
+      "name": "sim_forecast_1000_plain",
+      "outcome": "model",
+      "rows": 1000,
+      "seconds": 33.6
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "bagged_decision_tree",
+      "name": "cpu_small",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 51.6
+    },
+    {
+      "group": "simulated",
+      "kind": "uplift",
+      "model": "dummy",
+      "name": "sim_uplift_1500_mixed",
+      "outcome": "model",
+      "rows": 1500,
+      "seconds": 50.2
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "decision_tree",
+      "name": "kc1_defects",
+      "outcome": "model",
+      "rows": 2109,
+      "seconds": 58.9
+    },
+    {
+      "group": "simulated",
+      "kind": "binary",
+      "model": "bagged_logistic_regression",
+      "name": "sim_binary_1000_mixed",
+      "outcome": "model",
+      "rows": 1000,
+      "seconds": 49.5
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "bagged_decision_tree",
+      "name": "car",
+      "outcome": "model",
+      "rows": 1728,
+      "seconds": 52.7
+    },
+    {
+      "group": "simulated",
+      "kind": "ordinal",
+      "model": "ordinal_ridge",
+      "name": "sim_ordinal_400_plain",
+      "outcome": "model",
+      "rows": 400,
+      "seconds": 40.2
+    },
+    {
+      "group": "real",
+      "kind": "multiclass",
+      "model": "decision_tree",
+      "name": "digits",
+      "outcome": "model",
+      "rows": 1797,
+      "seconds": 198.6
+    },
+    {
+      "group": "simulated",
+      "kind": "multilabel",
+      "model": "multilabel_logistic",
+      "name": "sim_multilabel_2000_wide",
+      "outcome": "model",
+      "rows": 2000,
+      "seconds": 52.3
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "bagged_decision_tree",
+      "name": "wine_quality",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 53.9
+    },
+    {
+      "group": "simulated",
+      "kind": "multioutput",
+      "model": "multioutput_ridge",
+      "name": "sim_multioutput_2000_mixed",
+      "outcome": "model",
+      "rows": 2000,
+      "seconds": 51.4
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "hist_gradient_boosting",
+      "name": "colic",
+      "outcome": "model",
+      "rows": 368,
+      "seconds": 65.0
+    },
+    {
+      "group": "simulated",
+      "kind": "ranking",
+      "model": "pointwise_ranker",
+      "name": "sim_ranking_600_mixed",
+      "outcome": "model",
+      "rows": 600,
+      "seconds": 48.4
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "decision_tree",
+      "name": "phoneme",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 51.6
+    },
+    {
+      "group": "simulated",
+      "kind": "regression",
+      "model": "ridge",
+      "name": "sim_regression_800_plain",
+      "outcome": "model",
+      "rows": 800,
+      "seconds": 44.4
+    },
+    {
+      "group": "real",
+      "kind": "regression",
+      "model": "bagged_decision_tree",
+      "name": "california_housing",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 48.9
+    },
+    {
+      "group": "real",
+      "kind": "binary",
+      "model": "decision_tree",
+      "name": "spambase",
+      "outcome": "model",
+      "rows": 4000,
+      "seconds": 50.9
+    }
+  ],
+  "seconds": 657.6,
+  "settings": {
+    "api": "scmle.api.project.Project(...).run(), defaults",
+    "budget": 30,
+    "network": "cut in each run (dead proxy); local caches only",
+    "parallel": 4,
+    "seconds": 600,
+    "timeout": 360
+  },
+  "tasks": {
+    "abalone": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "adult": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "bank_marketing": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "bike_sharing": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "blood_transfusion": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "breast_cancer": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "california_housing": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "car": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "churn": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "colic": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "cpu_small": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "credit_approval": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "credit_g": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "diabetes_progression": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "diamonds": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "digits": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "electricity": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "emotions": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multilabel"
+    },
+    "energy_loads": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multioutput"
+    },
+    "house_sales": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "kc1_defects": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "kin8nm": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "letter": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "magic_telescope": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "mushroom": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "phoneme": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "pima_diabetes": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "planted_arm_uplift_400": {
+      "cause": "every row treated",
+      "expected": [
+        "target.treatment"
+      ],
+      "group": "planted",
+      "kind": "uplift"
+    },
+    "planted_binary_multiclass_400": {
+      "cause": "binary declared on three classes",
+      "expected": [
+        "task.classification"
+      ],
+      "group": "planted",
+      "kind": "multiclass"
+    },
+    "planted_constant_binary_400": {
+      "cause": "constant target",
+      "expected": [
+        "task.classification",
+        "task.auto"
+      ],
+      "group": "planted",
+      "kind": "binary"
+    },
+    "planted_events_survival_400": {
+      "cause": "event column not 0/1",
+      "expected": [
+        "target.events"
+      ],
+      "group": "planted",
+      "kind": "survival"
+    },
+    "planted_identifier_multiclass_400": {
+      "cause": "target is a row identifier",
+      "expected": [
+        "task.auto",
+        "task.resolve"
+      ],
+      "group": "planted",
+      "kind": "multiclass"
+    },
+    "planted_labels_multilabel_400": {
+      "cause": "a multi-label column that is not 0/1",
+      "expected": [
+        "target.columns"
+      ],
+      "group": "planted",
+      "kind": "multilabel"
+    },
+    "planted_leak_binary_600": {
+      "cause": "copy of the target under leakage_policy block",
+      "expected": [
+        "leakage.policy"
+      ],
+      "group": "planted",
+      "kind": "binary"
+    },
+    "planted_queries_ranking_300": {
+      "cause": "only three queries",
+      "expected": [
+        "split.group.partition"
+      ],
+      "group": "planted",
+      "kind": "ranking"
+    },
+    "planted_singleton_multiclass_12": {
+      "cause": "twelve rows, one class of one row",
+      "expected": [
+        "split.stratified.stratify",
+        "split.stratified.folds"
+      ],
+      "group": "planted",
+      "kind": "multiclass"
+    },
+    "planted_singleton_multiclass_400": {
+      "cause": "one class has a single row",
+      "expected": [
+        "split.stratified.stratify",
+        "split.stratified.folds"
+      ],
+      "group": "planted",
+      "kind": "multiclass"
+    },
+    "planted_text_regression_400": {
+      "cause": "regression declared on a text target",
+      "expected": [
+        "task.regression"
+      ],
+      "group": "planted",
+      "kind": "regression"
+    },
+    "planted_unlabeled_regression_400": {
+      "cause": "a tenth of the target missing",
+      "expected": [
+        "data.unlabeled",
+        "profile.target_and_features",
+        "task.resolve"
+      ],
+      "group": "planted",
+      "kind": "regression"
+    },
+    "segment": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "sim_binary_1000_mixed": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "binary"
+    },
+    "sim_binary_2000_wide": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "binary"
+    },
+    "sim_binary_500_plain": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "binary"
+    },
+    "sim_forecast_1000_plain": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "forecast"
+    },
+    "sim_forecast_400_plain": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "forecast"
+    },
+    "sim_multiclass_1500_plain": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "multiclass"
+    },
+    "sim_multiclass_600_mixed": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "multiclass"
+    },
+    "sim_multilabel_1000_plain": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "multilabel"
+    },
+    "sim_multilabel_2000_wide": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "multilabel"
+    },
+    "sim_multioutput_2000_mixed": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "multioutput"
+    },
+    "sim_multioutput_600_plain": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "multioutput"
+    },
+    "sim_ordinal_1200_mixed": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "ordinal"
+    },
+    "sim_ordinal_400_plain": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "ordinal"
+    },
+    "sim_ranking_1500_plain": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "ranking"
+    },
+    "sim_ranking_600_mixed": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "ranking"
+    },
+    "sim_regression_2000_wide": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "regression"
+    },
+    "sim_regression_300_mixed": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "regression"
+    },
+    "sim_regression_800_plain": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "regression"
+    },
+    "sim_survival_2000_mixed": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "survival"
+    },
+    "sim_survival_800_plain": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "survival"
+    },
+    "sim_uplift_1500_mixed": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "uplift"
+    },
+    "sim_uplift_3000_plain": {
+      "cause": "",
+      "expected": [],
+      "group": "simulated",
+      "kind": "uplift"
+    },
+    "spambase": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "titanic": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "binary"
+    },
+    "vehicle": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "wine": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "multiclass"
+    },
+    "wine_quality": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "regression"
+    },
+    "wine_red_quality": {
+      "cause": "",
+      "expected": [],
+      "group": "real",
+      "kind": "ordinal"
+    }
+  },
+  "version": 1
+}
