@@ -1125,6 +1125,21 @@ marked `Breaking:` and listed first in their group.
 
 ### Fixed
 
+- Serving: a hung scoring call no longer blocks other requests. Tabular
+  serving drops its global scoring lock for models without series features;
+  modality serving answers 503 until a timed-out call returns and fails
+  liveness after 3 consecutive timeouts (SRV-1, SRV-2).
+- Workflow leases: every record written under a leased run carries its
+  fencing token and is written by compare-and-swap, so a writer that lost
+  its lease gets `EvictionError`; step timeouts use a monotonic timer and a
+  renewal never moves the expiry earlier (CON-1, CON-20).
+- Security: deep-learning checkpoints and document and image packages
+  refuse `trusted=True` under `SCMLE_ENV=production`, as bundles do
+  (SEC-1, SEC-2).
+- A release attestation that cannot be checked is logged with its reason
+  (the release still blocks), and a deployment-ledger amendment that is not
+  a mapping is refused instead of silently changing the policy (ERR-4,
+  ERR-23).
 - A run no longer exceeds its time budget. Seven of fifteen real tasks
   overran a 60 s budget (up to 129.5 s) because only trials were bounded:
   preparation ran unclocked (the leakage screen's cap assumed 25,000 fits
