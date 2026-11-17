@@ -7,6 +7,7 @@ executes itself, so adding a command never touches the dispatcher.
 import abc
 import argparse
 from collections.abc import Sequence
+import importlib
 import json
 import logging
 import os
@@ -28,6 +29,7 @@ from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.contracts import tasks
 from scmle.core import config
+from scmle.core import logs
 from scmle.data.catalog import Catalog
 from scmle.data.charter import contracts
 from scmle.data.charter import feasibility
@@ -68,7 +70,6 @@ EXIT_FAILED = 1
 EXIT_BLOCKED = 2
 EXIT_USAGE = 64
 EXIT_INTERNAL = 70
-LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 
 
 class Parser(argparse.ArgumentParser):
@@ -2033,6 +2034,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="verbosity of the log written to standard error",
     )
     parser.add_argument(
+        "--log-json",
+        action="store_true",
+        help="write the log as one JSON object per line, with run and "
+        "request ids",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="on failure, show the traceback, the cause chain and details",
@@ -2062,7 +2069,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     args = build_parser().parse_args(argv)
     level = logging.DEBUG if args.debug else args.log_level
-    logging.basicConfig(level=level, format=LOG_FORMAT)
+    logs.configure(level, structured=args.log_json)
     command = next(c for c in COMMANDS if c.name == args.command)
     try:
         return command.execute(args)
@@ -2108,4 +2115,7 @@ def report(label: str, error: BaseException, *, debug: bool) -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # Run as `python -m scmle.cli`, this copy is named "__main__" and its
+    # logger falls outside the `scmle` package, whose handler
+    # `logs.configure` installs; the imported module is named `scmle.cli`.
+    sys.exit(importlib.import_module("scmle.cli").main())

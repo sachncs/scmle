@@ -21,13 +21,16 @@ import urllib.request
 
 from scmle.artifacts import bundle
 from scmle.contracts import errors
+from scmle.core import logs
 from scmle.deploy import verify
 from scmle.inference import guard
 from scmle.inference import serving
 from scmle.operations import signals
 from scmle.security import access
 
-LOGGER = logging.getLogger("service")
+LOGGER = logging.getLogger(__name__)
+# Set (to any non-empty value) for JSON-lines logs, as `scmle --log-json`.
+LOG_JSON = "SCMLE_LOG_JSON"
 DEFAULT_HOST = "0.0.0.0"  # noqa: S104 -- a container service binds all interfaces  # nosec B104
 
 
@@ -215,9 +218,10 @@ def run(folder: pathlib.Path, environ: Mapping[str, str]) -> None:
 
     Args:
         folder: Service folder.
-        environ: The environment (settings, signing key and access settings).
+        environ: The environment (settings, signing key, access settings
+            and `SCMLE_LOG_JSON`).
     """
-    logging.basicConfig(level=logging.INFO)
+    logs.configure(logging.INFO, structured=bool(environ.get(LOG_JSON)))
     monitor = signals.SignalMonitor()
     adapter = serving.HttpServing(
         loader=prime(folder, environ),

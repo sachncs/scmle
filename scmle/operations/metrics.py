@@ -12,8 +12,10 @@ for alerting are computed from events by `scmle.operations.signals`.
 """
 
 from collections.abc import Mapping
+import functools
 import http
 import importlib
+import logging
 import math
 import re
 import sys
@@ -22,6 +24,9 @@ import time
 from typing import Any
 
 from scmle.contracts import errors
+from scmle.core import logs
+
+LOGGER = logging.getLogger(__name__)
 
 resource: Any  # the `resource` module, or None where it is missing
 try:
@@ -440,6 +445,20 @@ class Registry:
         return lines
 
 
+@functools.cache
+def forgo() -> None:
+    """Reports, once per process, that the `resource` module is missing.
+
+    Without it (Windows) peak memory reads 0 and CPU time is the process
+    time (ERR-22); the reduction is logged and warned once, not per request.
+    """
+    logs.degrade(
+        LOGGER,
+        "the resource module is missing; peak memory reads 0 and CPU time "
+        "is the process time",
+    )
+
+
 def residency() -> int:
     """Peak resident memory of this process in bytes (0 if unknown).
 
@@ -450,6 +469,7 @@ def residency() -> int:
         The peak resident memory in bytes; 0 if it cannot be read.
     """
     if resource is None:
+        forgo()
         return 0
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     return int(peak if sys.platform == "darwin" else peak * 1024)
@@ -463,6 +483,7 @@ def cpu() -> float:
         not available.
     """
     if resource is None:
+        forgo()
         return time.process_time()
     usage = resource.getrusage(resource.RUSAGE_SELF)
     return float(usage.ru_utime + usage.ru_stime)

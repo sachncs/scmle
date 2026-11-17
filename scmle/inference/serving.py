@@ -27,6 +27,7 @@ from scmle import durability
 import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import serving
+from scmle.core import logs
 from scmle.deploy import provenance
 from scmle.inference import guard
 from scmle.inference import validation
@@ -844,6 +845,11 @@ class Responder(server.BaseHTTPRequestHandler):
         """Serves the probes, health and schema endpoints."""
         if not self.identify() or not self.authorize("GET"):
             return
+        with logs.bind(request=self.request_id):
+            self.probe()
+
+    def probe(self) -> None:
+        """Answers a GET for the probes, health and schema endpoints."""
         adapter = self.adapter
         readiness = adapter.health()
         if self.path == "/livez":
@@ -940,6 +946,11 @@ class Responder(server.BaseHTTPRequestHandler):
         """Scores a prediction request under the admission limit."""
         if not self.identify() or not self.authorize("POST"):
             return
+        with logs.bind(request=self.request_id):
+            self.accept()
+
+    def accept(self) -> None:
+        """Routes a POST to scoring under the admission limit."""
         adapter = self.adapter
         if self.path not in serving.PREDICT_PATHS:
             self.fail(404, "not found", "request")

@@ -9,6 +9,7 @@ validation distribution.
 """
 
 import abc
+import logging
 from typing import Any
 from typing import ClassVar
 from typing import Self
@@ -17,8 +18,10 @@ import numpy
 import pandas
 from scipy import special
 
+from scmle.core import logs
 from scmle.sampling import resampling
 
+LOGGER = logging.getLogger(__name__)
 MIN_FIT_ROWS = 5
 RIDGE = 1e-6
 
@@ -200,7 +203,8 @@ class GeneratorOverSampler(resampling.Resampler):
     ) -> tuple[pandas.DataFrame, pandas.Series]:
         """Adds synthetic rows until every class matches the largest.
 
-        Classes with fewer than `MIN_FIT_ROWS` rows are left as they are.
+        Classes with fewer than `MIN_FIT_ROWS` rows are left as they are,
+        with a WARNING and a `Degraded` warning (ERR-22).
 
         Args:
             features: Training features.
@@ -219,12 +223,33 @@ class GeneratorOverSampler(resampling.Resampler):
             label = key
             missing = goal - int(count)
             members = features[(target == label).to_numpy()]
-            if missing <= 0 or len(members) < MIN_FIT_ROWS:
+            if missing <= 0:
+                continue
+            if len(members) < MIN_FIT_ROWS:
+                logs.degrade(
+                    LOGGER,
+                    "class %r has %d rows, fewer than %d; not oversampled",
+                    label,
+                    len(members),
+                    MIN_FIT_ROWS,
+                )
                 continue
             synthetic = self.generator_class().fit(members).sample(missing, rng)
-            parts.append(
-                synthetic.astype(features.dtypes.to_dict(), errors="ignore")
-            )
+            cast = synthetic.astype(features.dtypes.to_dict(), errors="ignore")
+            kept = [
+                column
+                for column in features.columns
+                if cast[column].dtype != features[column].dtype
+            ]
+            if kept:
+                logs.degrade(
+                    LOGGER,
+                    "synthetic columns %s of class %r kept their sampled "
+                    "types; the original types did not fit",
+                    kept,
+                    label,
+                )
+            parts.append(cast)
             labels.append(pandas.Series([label] * missing))
         combined = pandas.concat(parts, ignore_index=True)
         combined_target = pandas.concat(labels, ignore_index=True)

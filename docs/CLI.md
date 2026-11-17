@@ -1,9 +1,12 @@
 # Command line
 
 The `scmle` command mirrors the Python API. Global options (before the
-sub-command): `--log-level {DEBUG,INFO,WARNING,ERROR}`, and `--debug`, which
-logs every failure with its traceback, its chain of causes and its details.
-Log lines carry the time, the level and the logger.
+sub-command): `--log-level {DEBUG,INFO,WARNING,ERROR}`, `--log-json`, which
+writes the log as one JSON object per line, and `--debug`, which logs every
+failure with its traceback, its chain of causes and its details. Log lines
+carry the time, the level, the logger and the ids in scope as
+`[run=... request=...]` (the run id during a run, the request id in the
+server; the generated service writes JSON when `SCMLE_LOG_JSON` is set).
 
 | Exit code | Meaning |
 | --- | --- |
@@ -17,7 +20,7 @@ Log lines carry the time, the level and the logger.
 | --- | --- |
 | `scmle plan DATA --target COL` | Profile and print the proposed plan. Trains nothing. |
 | `scmle run DATA --target COL` | Execute the full workflow and write `runs/run_*`. |
-| `scmle resume RUN_DIR` | Continue a cancelled, failed or crashed run, reusing finished trials. |
+| `scmle resume RUN_DIR` | Continue a cancelled, failed or crashed run, reusing finished trials. A run whose test set was opened, or whose custody journal (`runs/custody/<run>.jsonl`, outside the run directory) is missing or edited, is refused; deleting `evaluation.json` does not change that. |
 | `scmle catalog INPUT` | Catalog a local table (or raw bytes) into a JSON artifact. |
 | `scmle predict BUNDLE DATA` | Score a file with a saved bundle. |
 | `scmle batch BUNDLE DATA` | Score a file through the same code path as the online service; writes `--output` and `<output>.manifest.json` (model version, artifact digest, row counts). `--on-null` and `--on-unseen` accept `reject`. |
@@ -174,7 +177,8 @@ for every command; sign the bundle and supply `SCMLE_SIGNING_KEY` instead.
 `predict`, `serve`, `export-onnx` and `package` load a bundle. Bundles are
 pickle-based, so loading requires a valid signature (set `SCMLE_SIGNING_KEY`).
 `--trusted` skips that for an unsigned bundle you produced yourself; do not use
-it on a bundle from elsewhere. `predict` also takes `--rename INCOMING=EXPECTED`,
+it on a bundle from elsewhere. It never skips a signature: a signed bundle with
+no key set to verify it is refused even with `--trusted`. `predict` also takes `--rename INCOMING=EXPECTED`,
 `--case-insensitive` and `--strip-whitespace` for explicit column mapping.
 
 `serve` is a minimal reference server without TLS. On loopback it needs no
