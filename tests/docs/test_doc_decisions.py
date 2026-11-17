@@ -3,7 +3,7 @@
 import types
 
 from scmle.contracts import tasks
-from scmle.core import stages
+from scmle.pipeline import stages
 
 
 class Store:

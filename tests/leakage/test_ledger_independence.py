@@ -16,7 +16,7 @@ FORBIDDEN = (
     "scmle.assurance.custody",
     "scmle.assurance.custody.vault",
     "scmle.data.splitting",
-    "scmle.core.stages",
+    "scmle.pipeline.stages",
 )
 ROOT = pathlib.Path(scmle.assurance.ledger.__file__).parent
 

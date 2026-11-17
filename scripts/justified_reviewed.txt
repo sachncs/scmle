@@ -9,7 +9,7 @@ scmle/artifacts/results.py predict passthrough public API: Run and Predictor met
 scmle/artifacts/results.py predict_proba passthrough public API or scikit-learn estimator interface
 scmle/artifacts/results.py save passthrough public Run method pinned in tests/fixtures/public_api.json
 scmle/contracts/models.py Estimator lone-interface structural protocol every scikit-learn estimator and pipeline satisfies; 83 references
-scmle/core/policies.py Reviewer lone-interface documented extension point (README, docs/ARCHITECTURE.md, website)
+scmle/pipeline/policies.py Reviewer lone-interface documented extension point (README, docs/ARCHITECTURE.md, website)
 scmle/assurance/admissibility/screen.py decline single-use builds the refusal of a real scan predicted past its share of the time budget (the 14-line message naming hypotheses, fits, permutations and the limit); inlined it would put screen_table back over the 80-line function limit
 scmle/assurance/custody/journal.py bind passthrough Custodian implements the abstract Lockbox.bind (scmle/data/splitting/splitters.py) and forwards it to the test set it guards
 scmle/assurance/ledger/confirm.py Source lone-interface protocol satisfied by custody Locker and the vault, so the ledger layer does not import custody

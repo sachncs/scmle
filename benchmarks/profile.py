@@ -25,16 +25,16 @@ import pandas
 
 import scmle.api.project
 from scmle.contracts import tasks
-import scmle.core.stages
+import scmle.pipeline.stages
 
 STAGES = (
-    scmle.core.stages.IngestStage,
-    scmle.core.stages.ProfileStage,
-    scmle.core.stages.Planning,
-    scmle.core.stages.TrainStage,
-    scmle.core.stages.SelectStage,
-    scmle.core.stages.FinalEvaluationStage,
-    scmle.core.stages.PackageStage,
+    scmle.pipeline.stages.IngestStage,
+    scmle.pipeline.stages.ProfileStage,
+    scmle.pipeline.stages.Planning,
+    scmle.pipeline.stages.TrainStage,
+    scmle.pipeline.stages.SelectStage,
+    scmle.pipeline.stages.FinalEvaluationStage,
+    scmle.pipeline.stages.PackageStage,
 )
 # macOS reports peak resident memory in bytes, Linux in kilobytes.
 SCALE = 1 if sys.platform == "darwin" else 1024

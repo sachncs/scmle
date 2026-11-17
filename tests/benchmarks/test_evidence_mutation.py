@@ -73,7 +73,8 @@ def test_the_frame_drops_modules_that_cannot_decide(tmp_path):
 
 def test_a_package_init_takes_the_package_name():
     assert (
-        mutation.dotted("scmle/core/stages/__init__.py") == "scmle.core.stages"
+        mutation.dotted("scmle/pipeline/stages/__init__.py")
+        == "scmle.pipeline.stages"
     )
     assert mutation.dotted("scmle/cli.py") == "scmle.cli"
 
@@ -85,7 +86,7 @@ def test_allocation_is_proportional_by_largest_remainder():
 
 
 def test_strata_are_top_level_packages():
-    assert mutation.stratum("scmle/assurance/ledger/budget.py") == "data"
+    assert mutation.stratum("scmle/assurance/ledger/budget.py") == "assurance"
     assert mutation.stratum("scmle/cli.py") == "root"
 
 

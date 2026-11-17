@@ -26,13 +26,13 @@ from scmle.contracts import events
 from scmle.contracts import experiments
 from scmle.contracts import models
 from scmle.contracts import tasks
-from scmle.core import stages
 from scmle.data.validation import columns
 import scmle.data.validation.target
 from scmle.governance import lifecycle
 import scmle.inference.mapping
 from scmle.models import conformance
 import scmle.models.registry
+from scmle.pipeline import stages
 import scmle.preparation.strategies
 from scmle.runtime import ray_backend
 from scmle.runtime import scheduler
@@ -218,7 +218,7 @@ def test_l41_l43_no_mandatory_infrastructure_on_the_base_install():
 def test_l101_l105_three_planes_are_separate_packages():
     """Control, execution and evidence planes are separate code."""
     for plane in (
-        ("core", "intelligence"),
+        ("pipeline", "intelligence"),
         ("data", "models"),
         ("artifacts", "storage"),
     ):
@@ -230,7 +230,7 @@ def test_l113_l176_package_organization():
     packages = (
         "api",
         "contracts",
-        "core",
+        "pipeline",
         "intelligence",
         "data",
         "data/readers",
@@ -265,11 +265,11 @@ def test_l113_l176_package_organization():
         "contracts/artifacts.py",
         "contracts/events.py",
         "runtime/config.py",
-        "core/orchestrator.py",
-        "core/compiler.py",
+        "pipeline/orchestrator.py",
+        "pipeline/compiler.py",
         "runtime/scheduler.py",
         "runtime/state.py",
-        "core/policies.py",
+        "pipeline/policies.py",
         "intelligence/fingerprint.py",
         "intelligence/planner.py",
         "intelligence/recommendations.py",
@@ -534,7 +534,7 @@ def test_l268_l276_states_blocked_and_transition_events(run):
 
 def test_l278_l288_orchestrator_support(frame, tmp_path):
     """Retries, cancellation, budget, checkpointing, restart, failures, ordering, parallelism, isolation."""
-    from scmle.core import orchestrator
+    from scmle.pipeline import orchestrator
 
     project = support.make_project(
         frame, "y", time_budget=300, output_dir=tmp_path
@@ -1202,13 +1202,13 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     """Each architectural commitment works, not merely exists."""
     import pickle
 
-    from scmle.core import policies
     from scmle.data import feature_graph
     from scmle.data.splitting import splitters
     from scmle.experimentation import trials
     from scmle.intelligence import knowledge
     import scmle.models.registry
     import scmle.monitoring.events
+    from scmle.pipeline import policies
     from scmle.preparation import resampling
     from scmle.preparation import synthesis
 

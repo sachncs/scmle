@@ -296,7 +296,7 @@ source_modules = ["scmle.contracts", "scmle.durability", "scmle.unsupervised"]
 forbidden_modules = [
     "scmle.api", "scmle.artifacts", "scmle.assurance", "scmle.causal",
     "scmle.cli",
-    "scmle.core", "scmle.data",
+    "scmle.pipeline", "scmle.data",
     "scmle.decision", "scmle.deploy", "scmle.evaluation", "scmle.experimentation",
     "scmle.explainability", "scmle.governance", "scmle.inference",
     "scmle.intelligence", "scmle.models", "scmle.monitoring",
@@ -329,7 +329,7 @@ name = "The mutually dependent packages do not import the top of the stack"
 type = "forbidden"
 source_modules = [
     "scmle.api", "scmle.artifacts", "scmle.assurance", "scmle.causal",
-    "scmle.core", "scmle.data",
+    "scmle.pipeline", "scmle.data",
     "scmle.decision", "scmle.deploy", "scmle.evaluation",
     "scmle.experimentation", "scmle.explainability",
     "scmle.governance", "scmle.inference", "scmle.intelligence",
@@ -347,7 +347,7 @@ type = "forbidden"
 source_modules = ["scmle.optimization"]
 forbidden_modules = [
     "scmle.api", "scmle.artifacts", "scmle.assurance", "scmle.causal",
-    "scmle.core", "scmle.data",
+    "scmle.pipeline", "scmle.data",
     "scmle.decision", "scmle.deploy", "scmle.evaluation",
     "scmle.experimentation", "scmle.explainability",
     "scmle.governance", "scmle.inference", "scmle.intelligence",

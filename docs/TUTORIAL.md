@@ -102,7 +102,7 @@ validation gaps.
 ## 5. Approval gates, audit trail and replay
 
 ```python
-from scmle.core import policies
+from scmle.pipeline import policies
 
 
 def reviewer(review):  # review.gate is PLANNING or SELECTING

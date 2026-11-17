@@ -10,8 +10,6 @@ import pytest
 
 from scmle.contracts import models
 import scmle.contracts.experiments
-from scmle.core import policies
-from scmle.core import stages
 from scmle.data import feature_graph
 from scmle.data.readers import tabular
 from scmle.data.splitting import splitters
@@ -24,6 +22,8 @@ from scmle.models import registry
 from scmle.models import thresholds
 from scmle.monitoring import monitor
 from scmle.optimization import optimizers
+from scmle.pipeline import policies
+from scmle.pipeline import stages
 from scmle.preparation import resampling
 from scmle.preparation import strategies
 from scmle.preparation import synthesis
@@ -178,7 +178,7 @@ def test_a_model_is_imported_only_when_it_is_built():
 
 def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
     from scmle.contracts import errors
-    from scmle.core import compiler
+    from scmle.pipeline import compiler
 
     default = stages.default_stages()
     kinds = [type(s) for s in default]
@@ -202,7 +202,7 @@ def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
 
 
 def test_a_replacement_stage_subclass_satisfies_dependencies():
-    from scmle.core import compiler
+    from scmle.pipeline import compiler
 
     class Custom(stages.TrainStage):
         pass

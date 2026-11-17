@@ -15,14 +15,14 @@ import pytest
 import support
 
 from scmle.contracts import errors
-from scmle.core import orchestrator
-import scmle.core.stages
+from scmle.pipeline import orchestrator
+import scmle.pipeline.stages
 
 
 def failing(frame, tmp_path, error):
     """Runs the stock stages with a first stage that raises `error`."""
 
-    first, *rest = scmle.core.stages.default_stages()
+    first, *rest = scmle.pipeline.stages.default_stages()
 
     class Failing(type(first)):
         def execute(self, context):

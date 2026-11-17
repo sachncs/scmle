@@ -642,7 +642,7 @@ def rejecter() -> Any:
     Returns:
         The checkpoint.
     """
-    from scmle.core import policies
+    from scmle.pipeline import policies
 
     return policies.Callback(deny)
 

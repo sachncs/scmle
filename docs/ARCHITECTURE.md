@@ -7,7 +7,7 @@ about every model, reader, or serving runtime.
 
 | Plane | Decides / does | Code |
 | --- | --- | --- |
-| Control | what to do, when and why | `scmle.core` (orchestrator, stages, state machine), `scmle.intelligence` (planner, meta-learning) |
+| Control | what to do, when and why | `scmle.pipeline` (orchestrator, stages, state machine), `scmle.intelligence` (planner, meta-learning) |
 | Execution | transformations, training, tuning, evaluation | `scmle.data`, `scmle.models`, `scmle.optimization`, `scmle.experimentation.trials`, `scmle.runtime.scheduler` |
 | Evidence | artifacts, measurements, decisions, provenance | `scmle.artifacts`, `scmle.storage.stores`, `scmle.monitoring`, `scmle.governance`, `scmle.inference` |
 
@@ -78,7 +78,7 @@ view. What the view cannot know is whether the recorded time is true, so
 every feature carries the weakest tier among the tables it reads. Keys,
 links and entity matches are statements about the snapshot read, with their
 measures; an unlabelled entity resolution is `unverified`. A charter run with
-an `ingest` block calls it (`scmle.core.ingest_stage`); when the block
+an `ingest` block calls it (`scmle.pipeline.ingest_stage`); when the block
 carries an `entity` sub-block the resolved entity becomes the split's group
 column.
 The charter run reads SQLite only (`ingest_plan.opener`); another

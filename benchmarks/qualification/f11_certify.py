@@ -2055,8 +2055,7 @@ def forbidden_imports() -> list[str]:
                 if any(
                     part in name
                     for part in (
-                        "data.custody",
-                        "governance.vault",
+                        "assurance.custody",
                         "ledger.ledger",
                         "ledger.confirm",
                     )

@@ -2929,3 +2929,4 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.core.causal_claim` -> `scmle.causal.claim`
 - `scmle.core.decision_reports` -> `scmle.decision.reports`
 - `scmle.api.results` -> `scmle.artifacts.results`
+- `scmle.core` -> `scmle.pipeline`

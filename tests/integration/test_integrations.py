@@ -7,7 +7,7 @@ import support
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.core import orchestrator
+from scmle.pipeline import orchestrator
 from scmle.runtime import scheduler
 
 

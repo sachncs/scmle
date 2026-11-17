@@ -17,7 +17,7 @@ The pinned names, by module, are:
 under its module with the digest of its signature, and
 `scripts/check_api_compatibility.py` and `tests/unit/test_api_surface.py` check
 it. Removing or changing a pinned name requires a changelog entry, a migration
-note, and a deliberate versioning decision. Other names in `scmle.core`,
+note, and a deliberate versioning decision. Other names in `scmle.pipeline`,
 `scmle.data`, `scmle.models` and the other packages are extension surfaces for
 advanced users, but their concrete internals are not stable until they are
 pinned or documented as a contract.

@@ -7,9 +7,9 @@ beats its best member.
 """
 
 from scmle.contracts import experiments
-import scmle.core.context
 from scmle.experimentation import trials
 from scmle.models import ensembles
+import scmle.pipeline.context
 
 COMBINERS = (ensembles.Stacking.name, ensembles.Blending.name)
 
@@ -24,7 +24,7 @@ class Stacker:
     """
 
     def __init__(
-        self, context: scmle.core.context.Context, runner: trials.Runner
+        self, context: scmle.pipeline.context.Context, runner: trials.Runner
     ) -> None:
         """Initializes the search.
 
@@ -34,7 +34,7 @@ class Stacker:
         """
         self.context = context
         self.runner = runner
-        self.metric = scmle.core.context.require(context.metric, "metric")
+        self.metric = scmle.pipeline.context.require(context.metric, "metric")
 
     def members(
         self, evaluated: list[experiments.Trial], size: int

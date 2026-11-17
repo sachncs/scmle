@@ -447,7 +447,7 @@
       ]
     },
     "B10": {
-      "code_hash": "725ca48043c8b26f906e85344a4ffbf1a915c03d5b591149d70592b70a0eeea5",
+      "code_hash": "962bbfbef0f94d375bf059ce25dd7ab159869bc4501383636718c95164fe6b98",
       "digest": "bc035de9a4a818426c06d342b36196663d37798a8e15e611d2fe6e3fb1b0c289",
       "forbidden_imports": [],
       "interpreters_measured": [

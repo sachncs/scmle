@@ -37,7 +37,7 @@ def tree(tmp_path):
     """A committed toy checkout with one store."""
     files = {
         "scmle/__init__.py": '"""Package."""\n',
-        "scmle/core/__init__.py": '"""Core."""\n',
+        "scmle/pipeline/__init__.py": '"""Core."""\n',
         "scmle/runtime/retry.py": "VALUE = 1\n",
         "scmle/certificates/store.json": json.dumps(
             {"code": OLD, "short": OLD[:16], "other": "c" * 64}

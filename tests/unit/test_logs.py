@@ -121,15 +121,15 @@ def test_degrade_is_not_silenced_by_the_package_filter():
 
 def test_an_unreadable_disk_is_logged(caplog, tmp_path):
     missing = tmp_path / "absent"
-    with caplog.at_level(logging.WARNING, logger="scmle.core"):
+    with caplog.at_level(logging.WARNING, logger="scmle.pipeline"):
         assert resource_observation.freespace(missing) == (None, "unknown")
     assert any("absent" in r.getMessage() for r in caplog.records)
 
 
 def test_a_capability_downgrade_and_a_budget_skip_log_a_warning():
-    stages = (ROOT / "scmle/core/stages/planning.py").read_text(
+    stages = (ROOT / "scmle/pipeline/stages/planning.py").read_text(
         encoding="utf-8"
     )
-    context = (ROOT / "scmle/core/context.py").read_text(encoding="utf-8")
+    context = (ROOT / "scmle/pipeline/context.py").read_text(encoding="utf-8")
     assert "accepted as extension-only" in stages
     assert 'LOGGER.warning("%s skipped or reduced' in context

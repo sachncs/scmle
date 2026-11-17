@@ -88,7 +88,7 @@ from benchmarks.sota import scmle_runner
 import scmle.api.project
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
-from scmle.core import stages
+from scmle.pipeline import stages
 from scmle.runtime import limits
 
 PATH = Path(__file__).with_suffix(".json")

@@ -13,8 +13,8 @@ import support
 from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
-from scmle.core import orchestrator
 import scmle.models.registry
+from scmle.pipeline import orchestrator
 from scmle.runtime import limits
 
 

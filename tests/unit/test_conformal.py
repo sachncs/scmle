@@ -103,7 +103,7 @@ class RecordingContext:
 
 
 def test_a_skipped_calibration_is_recorded_as_an_event():
-    from scmle.core import stages
+    from scmle.pipeline import stages
 
     context = RecordingContext()
 
@@ -131,7 +131,7 @@ def test_sensitivity_below_the_minimum_rows_is_skipped_not_raised():
     from types import SimpleNamespace
 
     from scmle.contracts import tasks
-    from scmle.core import stages
+    from scmle.pipeline import stages
 
     context = SimpleNamespace(
         spec=SimpleNamespace(selection=SimpleNamespace(sensitivity_repeats=3)),

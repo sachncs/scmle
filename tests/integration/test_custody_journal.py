@@ -16,7 +16,7 @@ import scmle.api.project
 from scmle.assurance.custody import journal
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.core import policies
+from scmle.pipeline import policies
 from scmle.runtime import state
 
 

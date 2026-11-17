@@ -12,9 +12,9 @@ import scmle.api.project
 from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
-import scmle.core.orchestrator
 from scmle.experimentation import trials
 import scmle.models.registry
+import scmle.pipeline.orchestrator
 from scmle.storage import stores
 
 BINARY = frozenset({tasks.Task.BINARY})
@@ -86,7 +86,7 @@ def test_cancelled_run_resumes_and_reuses_completed_trials(
     assert saved == ["trial_001.json", "trial_002.json"]
 
     canceller.armed = False
-    resumed = scmle.core.orchestrator.Orchestrator.reload(
+    resumed = scmle.pipeline.orchestrator.Orchestrator.reload(
         run_dir, frame=binary_frame, registry=registry
     ).resume(run_dir)
     assert resumed.state == "COMPLETED"
@@ -207,7 +207,7 @@ def test_custom_tracker_is_honoured(binary_frame, tmp_path):
 
     recorder = Recording()
     spec = support.make_project(binary_frame, "y").spec
-    orchestrator = scmle.core.orchestrator.Orchestrator(
+    orchestrator = scmle.pipeline.orchestrator.Orchestrator(
         spec, binary_frame, tracker=recorder
     )
     result = orchestrator.run(tmp_path)
@@ -236,7 +236,7 @@ def test_resume_refuses_checkpoints_computed_on_different_data(
     canceller.armed = False
     changed = binary_frame.copy()
     changed.iloc[1, 1] = changed.iloc[1, 1] + 1000.0
-    orchestrator = scmle.core.orchestrator.Orchestrator.reload(
+    orchestrator = scmle.pipeline.orchestrator.Orchestrator.reload(
         run_dir, frame=changed, registry=registry
     )
     with pytest.raises(errors.ConfigError, match="data changed"):

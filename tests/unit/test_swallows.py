@@ -189,9 +189,9 @@ def test_champion_counts_every_dropped_resample(monkeypatch):
 def test_a_failed_attestation_check_keeps_its_reason(monkeypatch, caplog):
     # ERR-4: the reason a release attestation could not be checked was
     # discarded; the gate blocked with no word on why.
-    from scmle.core import stages
     from scmle.evaluation import policies
     from scmle.evaluation import release
+    from scmle.pipeline import stages
 
     policy = types.SimpleNamespace(metrics=(), to_dict=dict)
     index = types.SimpleNamespace(

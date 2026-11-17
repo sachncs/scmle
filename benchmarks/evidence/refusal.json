@@ -108,7 +108,7 @@
       "outcome": "refused",
       "rows": 400,
       "seconds": 0.1,
-      "site": "scmle.core.stages:ProfileStage.set_aside_unlabeled"
+      "site": "scmle.pipeline.stages:ProfileStage.set_aside_unlabeled"
     },
     {
       "group": "real",
@@ -198,7 +198,7 @@
       "outcome": "refused",
       "rows": 600,
       "seconds": 2.8,
-      "site": "scmle.core.stages:ProfileStage.enforce_leakage_policy"
+      "site": "scmle.pipeline.stages:ProfileStage.enforce_leakage_policy"
     },
     {
       "group": "real",

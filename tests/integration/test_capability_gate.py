@@ -9,12 +9,12 @@ import pytest
 
 from scmle.contracts import capabilities
 from scmle.contracts import tasks
-from scmle.core import orchestrator
-from scmle.core import stages
-import scmle.core.context
 from scmle.models.deeplearning import networks
 import scmle.models.registry
 from scmle.models.sklearn import classical
+from scmle.pipeline import orchestrator
+from scmle.pipeline import stages
+import scmle.pipeline.context
 
 
 def binary_frame() -> pandas.DataFrame:
@@ -31,7 +31,7 @@ def binary_frame() -> pandas.DataFrame:
 def make_context(
     model_registry: scmle.models.registry.Catalog | None = None,
     spec: tasks.Config | None = None,
-) -> scmle.core.context.Context:
+) -> scmle.pipeline.context.Context:
     """Builds a profiled context without entering model fitting."""
     project_spec = spec or tasks.Config(
         data=tasks.Dataset(uri="<in-memory>", target="y"),
@@ -79,7 +79,7 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
 
 def test_deep_learning_paths_declare_their_optional_extra():
     """Deep-learning capability declarations identify their installation gate."""
-    registry = scmle.core.context.enrol()
+    registry = scmle.pipeline.context.enrol()
 
     for task in (
         tasks.Task.BINARY,
@@ -106,7 +106,7 @@ def test_ft_transformer_uses_an_experimental_tabular_boundary():
     assert adapter.architecture == "ft_transformer"
     assert adapter.capability_family == "transformer"
 
-    registry = scmle.core.context.enrol()
+    registry = scmle.pipeline.context.enrol()
     declaration = registry.find("transformer")
     assert declaration is not None
     assert declaration.status is capabilities.Status.EXPERIMENTAL
@@ -177,7 +177,7 @@ def test_extension_only_foundation_adapter_cannot_break_auto_planning(
 
 def test_unimplemented_contract_dimensions_are_not_promoted():
     """Missing modality, uncertainty, and explanation paths fail closed."""
-    registry = scmle.core.context.enrol()
+    registry = scmle.pipeline.context.enrol()
     key = capabilities.Coordinate(
         modality=capabilities.Modality.TABULAR,
         task=tasks.Task.BINARY,

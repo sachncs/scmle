@@ -24,9 +24,6 @@ from scmle.contracts import performance
 from scmle.contracts import signing
 from scmle.contracts import tasks
 import scmle.contracts.data
-from scmle.core import policies
-import scmle.core.context
-import scmle.core.orchestrator
 from scmle.data.modalities import curation
 from scmle.data.modalities import document
 from scmle.data.readers import connectors
@@ -37,6 +34,9 @@ from scmle.governance import attestation
 from scmle.inference import evidence
 import scmle.intelligence.recommendations
 from scmle.models import modality_lifecycle
+from scmle.pipeline import policies
+import scmle.pipeline.context
+import scmle.pipeline.orchestrator
 
 ValidationStrategy = Literal[
     "auto",
@@ -440,7 +440,7 @@ def persist(
 
 
 def locate(
-    orchestrator: scmle.core.orchestrator.Orchestrator,
+    orchestrator: scmle.pipeline.orchestrator.Orchestrator,
     estimand: parameter_estimation.Estimand,
     policy: parameter_estimation.Config,
 ) -> str:
@@ -478,7 +478,7 @@ def locate(
 
 
 def estimate(
-    orchestrator: scmle.core.orchestrator.Orchestrator,
+    orchestrator: scmle.pipeline.orchestrator.Orchestrator,
     estimand: parameter_estimation.Estimand,
     policy: parameter_estimation.Config,
     artifact_directory: str | pathlib.Path | None = None,
@@ -905,7 +905,7 @@ class Project:
             )
         self.estimand = estimand
         self.estimation_policy = estimation_policy
-        self.orchestrator = scmle.core.orchestrator.Orchestrator(
+        self.orchestrator = scmle.pipeline.orchestrator.Orchestrator(
             self.spec, frame, checkpoints=checkpoints
         )
         self.orchestrator.tracking_path = self.output_dir / "experiments.sqlite"
@@ -921,7 +921,7 @@ class Project:
         context = self.orchestrator.prepare()
         try:
             self.profile = context.profile
-            return scmle.core.context.require(context.plan, "plan")
+            return scmle.pipeline.context.require(context.plan, "plan")
         finally:
             context.close()
 
@@ -1027,7 +1027,7 @@ class Project:
             The completed run.
         """
         run_path = pathlib.Path(run_directory)
-        orchestrator = scmle.core.orchestrator.Orchestrator.reload(
+        orchestrator = scmle.pipeline.orchestrator.Orchestrator.reload(
             run_path, frame=data, checkpoints=checkpoints
         )
         estimand, policy = restore(
@@ -1061,7 +1061,7 @@ class Project:
             A verdict whose level is `exact`, `comparable` or `different`.
         """
         original = pathlib.Path(run_directory)
-        orchestrator = scmle.core.orchestrator.Orchestrator.reload(
+        orchestrator = scmle.pipeline.orchestrator.Orchestrator.reload(
             original, frame=data
         )
         estimand, policy = restore(

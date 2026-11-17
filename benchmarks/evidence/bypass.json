@@ -1,7 +1,7 @@
 {
   "allowed": 0,
   "claim": "C8",
-  "code": "ef12c44a2b709ee3d1c0d3a84ac6e0a80b4be4adfc336a385010f76b318e1edb",
+  "code": "e3f6c233ca696618191f1ec6d05079170578485e97ac68bc4c53b25469607a1a",
   "counts": {
     "attempts": 47,
     "blocked": 43,
@@ -70,7 +70,7 @@
       "override": "",
       "registered": true,
       "seconds": 1.5,
-      "site": "scmle.core.stages.screening:Screening.enforce_leakage_policy",
+      "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy",
       "stopped": "leakage.policy",
       "surface": "api",
       "vector": "column `leak` equal to the target"
@@ -84,7 +84,7 @@
       "override": "",
       "registered": true,
       "seconds": 1.5,
-      "site": "scmle.core.stages.screening:Screening.enforce_leakage_policy",
+      "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy",
       "stopped": "leakage.policy",
       "surface": "api",
       "vector": "target copy named `tenure_months`"
@@ -98,7 +98,7 @@
       "override": "",
       "registered": true,
       "seconds": 1.5,
-      "site": "scmle.core.stages.screening:Screening.enforce_leakage_policy",
+      "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy",
       "stopped": "leakage.policy",
       "surface": "api",
       "vector": "target as the strings active / churned"
@@ -112,7 +112,7 @@
       "override": "",
       "registered": true,
       "seconds": 1.4,
-      "site": "scmle.core.stages.screening:Screening.enforce_leakage_policy",
+      "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy",
       "stopped": "leakage.policy",
       "surface": "api",
       "vector": "3 * target + 7 plus tiny noise"
@@ -126,7 +126,7 @@
       "override": "",
       "registered": true,
       "seconds": 1.8,
-      "site": "scmle.core.stages.screening:Screening.enforce_leakage_policy",
+      "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy",
       "stopped": "leakage.policy",
       "surface": "api",
       "vector": "target split into two columns, p XOR q (each column alone independent of it)"
@@ -140,7 +140,7 @@
       "override": "",
       "registered": true,
       "seconds": 1.3,
-      "site": "scmle.core.stages.screening:Screening.enforce_leakage_policy",
+      "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy",
       "stopped": "leakage.policy",
       "surface": "api",
       "vector": "target written into a free-text note per row"
@@ -154,7 +154,7 @@
       "override": "",
       "registered": true,
       "seconds": 1.4,
-      "site": "scmle.core.stages.screening:Screening.enforce_leakage_policy",
+      "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy",
       "stopped": "leakage.policy",
       "surface": "api",
       "vector": "target encoded as the year of a date column"
@@ -207,7 +207,7 @@
       "override": "",
       "registered": true,
       "seconds": 2.5,
-      "site": "scmle.core.stages.screening:Screening.enforce_leakage_policy",
+      "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy",
       "stopped": "leakage.policy",
       "surface": "api",
       "vector": "resume the refused run unchanged"
@@ -338,7 +338,7 @@
       "override": "",
       "registered": true,
       "seconds": 0.5,
-      "site": "scmle.core.stages.labelling:Labelling.set_aside_unlabeled",
+      "site": "scmle.pipeline.stages.labelling:Labelling.set_aside_unlabeled",
       "stopped": "data.unlabeled",
       "surface": "api",
       "vector": "20 target values NaN"
@@ -352,7 +352,7 @@
       "override": "",
       "registered": true,
       "seconds": 0.5,
-      "site": "scmle.core.stages.labelling:Labelling.set_aside_unlabeled",
+      "site": "scmle.pipeline.stages.labelling:Labelling.set_aside_unlabeled",
       "stopped": "data.unlabeled",
       "surface": "api",
       "vector": "20 target values None in an object column"
@@ -379,7 +379,7 @@
       "override": "",
       "registered": true,
       "seconds": 1.3,
-      "site": "scmle.core.orchestrator:Orchestrator.consult_checkpoints",
+      "site": "scmle.pipeline.orchestrator:Orchestrator.consult_checkpoints",
       "stopped": "policy.checkpoints",
       "surface": "api",
       "vector": "a checkpoint rejects the plan"
@@ -393,7 +393,7 @@
       "override": "",
       "registered": true,
       "seconds": 2.0,
-      "site": "scmle.core.orchestrator:Orchestrator.consult_checkpoints",
+      "site": "scmle.pipeline.orchestrator:Orchestrator.consult_checkpoints",
       "stopped": "policy.checkpoints",
       "surface": "api",
       "vector": "resume the rejected run (Project.resume takes no checkpoints)"

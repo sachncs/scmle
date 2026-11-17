@@ -316,7 +316,7 @@ def test_a_total_the_extract_does_not_reproduce_stops_the_run(tmp_path):
 
 
 def run_with_corrupted_extract(tmp_path, monkeypatch, damage):
-    from scmle.core import ingest_stage
+    from scmle.pipeline import ingest_stage
 
     real = ingest_stage.read_frame
 

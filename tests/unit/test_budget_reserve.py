@@ -68,7 +68,7 @@ def trial(name, seconds):
 
 
 def test_selection_falls_back_to_a_candidate_whose_refit_fits():
-    from scmle.core import stages
+    from scmle.pipeline import stages
 
     context, recorded = timed(10)
     slow, quick = trial("slow", 100.0), trial("quick", 1.0)
@@ -83,7 +83,7 @@ def test_selection_falls_back_to_a_candidate_whose_refit_fits():
 
 
 def test_diagnostics_get_at_most_what_is_left_before_packaging():
-    from scmle.core import stages
+    from scmle.pipeline import stages
 
     context = timed(20)[0]
     context.regulator.reserve.parts = {"package": 5.0}
@@ -94,7 +94,7 @@ def test_diagnostics_get_at_most_what_is_left_before_packaging():
 
 
 def test_a_package_fit_that_cannot_end_in_time_is_halted_on_record():
-    from scmle.core import stages
+    from scmle.pipeline import stages
 
     context, recorded = timed(10)
     assert stages.halt(context, trial("quick", 1.0), "learning curve") is None
@@ -104,7 +104,7 @@ def test_a_package_fit_that_cannot_end_in_time_is_halted_on_record():
 
 
 def test_package_fits_leave_the_packaging_tail_its_time():
-    from scmle.core import stages
+    from scmle.pipeline import stages
 
     context = timed(10)[0]
     # A 9 s fold fit would end before the 10 s finish, but not before the

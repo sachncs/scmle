@@ -47,7 +47,6 @@ import pandas
 
 from scmle.assurance.charter import contracts
 import scmle.assurance.charter.decision
-from scmle.assurance.ledger import ledger
 from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.decision import constraints
@@ -68,7 +67,10 @@ REGISTRATION_EVENT = "decision_files"
 
 
 def file_digest(path: Path) -> str | None:
-    """Hash of a JSON file's content (`ledger.digest`), None if absent.
+    """Hash of a JSON file's canonical content, None if absent.
+
+    The same SHA-256 of the canonical JSON as the claim ledger's `digest`;
+    the decision package does not import the ledger (f11 gate B10).
 
     Args:
         path: The JSON file.
@@ -84,7 +86,7 @@ def file_digest(path: Path) -> str | None:
     body = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(body, dict):
         raise errors.InputError(f"{path.name} is not a JSON object")
-    return ledger.digest(body)
+    return hashlib.sha256(signing.canonicalise(body)).hexdigest()
 
 
 def hashsums(folder: str | Path) -> dict[str, str | None]:

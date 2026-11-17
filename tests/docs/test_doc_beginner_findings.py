@@ -4,7 +4,7 @@ import logging
 import types
 
 from scmle.contracts import tasks
-from scmle.core import stages
+from scmle.pipeline import stages
 
 
 def test_a_warn_run_logs_its_unsettled_suspects_while_profiling(caplog):

@@ -87,8 +87,8 @@ def stage_context(path):
 
 
 def test_the_stage_reads_the_cap_from_the_charter(tmp_path):
-    from scmle.core import stages
     from scmle.evaluation import cv_plus
+    from scmle.pipeline import stages
 
     path = tmp_path / "charter.json"
     sealing.inscribe(path, with_cap(1234), signing_key="k")

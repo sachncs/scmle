@@ -1,6 +1,6 @@
 {
   "claim": "C1",
-  "code": "dc517744276d937f820117bc42d2f351a3c32916766a34bbab0dfb6715cb2a7f",
+  "code": "d0c6eba268f24fa2c60c279a72726dbbf88e5b43283614b519013157a2f58b18",
   "data": "simulated tables and synthetic inputs only",
   "floor": 1.0,
   "gates": [
@@ -87,7 +87,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.0,
-      "site": "scmle.core.ingest_stage:plurality"
+      "site": "scmle.pipeline.ingest_stage:plurality"
     },
     {
       "cause": "declared family size 3, two synthesized columns",
@@ -107,7 +107,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.01,
-      "site": "scmle.core.ingest_stage:run"
+      "site": "scmle.pipeline.ingest_stage:run"
     },
     {
       "cause": "ingest stage with unit customer-month on a customer table",
@@ -147,7 +147,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.88,
-      "site": "scmle.core.orchestrator:Orchestrator.consult_checkpoints"
+      "site": "scmle.pipeline.orchestrator:Orchestrator.consult_checkpoints"
     },
     {
       "cause": "a reviewer rejects the plan",
@@ -167,7 +167,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.0,
-      "site": "scmle.core.stages.qualification:Qualification.assess_robustness"
+      "site": "scmle.pipeline.stages.qualification:Qualification.assess_robustness"
     },
     {
       "by": "leakage.policy",
@@ -179,7 +179,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 1.15,
-      "site": "scmle.core.stages.screening:Screening.enforce_leakage_policy"
+      "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy"
     },
     {
       "cause": "a noisy copy of the target under leakage_policy block",
@@ -200,7 +200,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.73,
-      "site": "scmle.core.stages.admission:Admission.qualify_exploration"
+      "site": "scmle.pipeline.stages.admission:Admission.qualify_exploration"
     },
     {
       "cause": "the only exploration feature is a copy of the target",
@@ -221,7 +221,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.04,
-      "site": "scmle.core.stages.labelling:Labelling.set_aside_unlabeled"
+      "site": "scmle.pipeline.stages.labelling:Labelling.set_aside_unlabeled"
     },
     {
       "cause": "a tenth of the regression target missing, unlabeled block",
@@ -242,7 +242,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 1.26,
-      "site": "scmle.core.stages.selecting:SelectStage.choose"
+      "site": "scmle.pipeline.stages.selecting:SelectStage.choose"
     },
     {
       "cause": "max_model_mb 1e-6, three candidates checked",
@@ -263,7 +263,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 1.26,
-      "site": "scmle.core.stages.selecting:SelectStage.select_on_front"
+      "site": "scmle.pipeline.stages.selecting:SelectStage.select_on_front"
     },
     {
       "cause": "Pareto selection with max_model_mb 1e-6",
@@ -924,7 +924,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.85,
-      "site": "scmle.core.stages.training:TrainStage.execute"
+      "site": "scmle.pipeline.stages.training:TrainStage.execute"
     },
     {
       "cause": "training starts after preparation used up the trial window",

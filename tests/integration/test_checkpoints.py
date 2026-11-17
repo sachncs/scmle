@@ -8,7 +8,7 @@ import support
 
 import scmle.api.project
 from scmle.contracts import errors
-from scmle.core import policies
+from scmle.pipeline import policies
 from scmle.runtime import state
 import scmle.runtime.state
 

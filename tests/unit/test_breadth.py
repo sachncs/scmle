@@ -16,8 +16,8 @@ from benchmarks import breadth
 from scmle.contracts import capabilities
 from scmle.contracts import modalities
 from scmle.contracts import tasks
-from scmle.core import context
 from scmle.models import registry
+from scmle.pipeline import context
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 DOCUMENT = ROOT / "docs" / "BREADTH.md"

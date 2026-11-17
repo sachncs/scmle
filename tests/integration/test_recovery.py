@@ -10,9 +10,9 @@ import support
 from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
-from scmle.core import orchestrator
-import scmle.core.stages
 import scmle.models.registry
+from scmle.pipeline import orchestrator
+import scmle.pipeline.stages
 
 BINARY = frozenset({tasks.Task.BINARY})
 
@@ -112,14 +112,14 @@ def test_a_budget_below_the_minimum_run_is_refused_before_work(
 
 
 def test_custom_stage_sequence_is_polymorphic(binary_frame, tmp_path):
-    class Recording(scmle.core.stages.PackageStage):
+    class Recording(scmle.pipeline.stages.PackageStage):
         calls = []
 
         def execute(self, context):
             Recording.calls.append(context.selected.model_name)
             super().execute(context)
 
-    stages = (*scmle.core.stages.default_stages()[:-1], Recording())
+    stages = (*scmle.pipeline.stages.default_stages()[:-1], Recording())
     spec = support.make_project(binary_frame, "y").spec
     result = orchestrator.Orchestrator(spec, binary_frame, stages=stages).run(
         tmp_path

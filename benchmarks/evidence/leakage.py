@@ -64,9 +64,9 @@ from benchmarks.evidence import refusal
 from scmle.assurance.admissibility import screen
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
-from scmle.core import stages
 from scmle.data.profiling import profiler
 import scmle.evaluation.coverage
+from scmle.pipeline import stages
 
 PATH = Path(__file__).with_suffix(".json")
 RECALL = "leak_recall_min"

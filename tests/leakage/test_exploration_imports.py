@@ -20,7 +20,7 @@ FORBIDDEN = (
     "scmle.assurance.custody",
     "scmle.assurance.custody.vault",
     "scmle.data.splitting.splitters",
-    "scmle.core.stages",
+    "scmle.pipeline.stages",
 )
 PACKAGES = (
     "scmle.assurance.detectors",

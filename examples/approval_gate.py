@@ -7,7 +7,7 @@ import pandas
 
 import scmle.api.project
 from scmle.contracts import errors
-from scmle.core import policies
+from scmle.pipeline import policies
 from scmle.runtime import state
 
 LOGGER = logging.getLogger(__name__)

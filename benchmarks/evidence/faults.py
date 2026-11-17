@@ -306,7 +306,7 @@ def stage(unit: str) -> Any:
         The stage output.
     """
     from scmle.assurance.charter import ingest
-    from scmle.core import ingest_stage
+    from scmle.pipeline import ingest_stage
 
     with tempfile.TemporaryDirectory() as folder:
         document = {
@@ -330,7 +330,7 @@ def plurality(declared: int) -> None:
     Args:
         declared: The declared family size; 2 passes.
     """
-    from scmle.core import ingest_stage
+    from scmle.pipeline import ingest_stage
 
     ingest_stage.plurality(declared, ("a", "b"), {"a", "b"}, set())
 
@@ -344,7 +344,7 @@ def checkpoint(approve: bool) -> Any:
     Returns:
         The completed run.
     """
-    from scmle.core import policies
+    from scmle.pipeline import policies
     from scmle.runtime import state
 
     def verdict(review: Any) -> Any:
@@ -361,7 +361,7 @@ def checkpoint(approve: bool) -> Any:
 
 def robustness() -> None:
     """Calls the robustness report with a stability stage that never ran."""
-    from scmle.core import stages
+    from scmle.pipeline import stages
 
     context: Any = types.SimpleNamespace()
     stage: Any = types.SimpleNamespace(found=None)
@@ -412,7 +412,7 @@ def admissibility(attest: bool) -> str | None:
     from scmle.assurance.admissibility import attestations
     from scmle.assurance.admissibility import provenance
     from scmle.assurance.admissibility import qualify
-    from scmle.core import stages
+    from scmle.pipeline import stages
 
     scope = "c" * 64
     rng = numpy.random.default_rng(SEED)
@@ -637,7 +637,7 @@ def overrun(spent: bool) -> Any:
         The completed run.
     """
     import scmle.api.project
-    from scmle.core import stages
+    from scmle.pipeline import stages
 
     class Late(stages.TrainStage):
         """Training that first spends the whole budget when `spent`."""

@@ -7,8 +7,8 @@ same model's default pipeline; every verdict is written to the decision log.
 """
 
 from scmle.contracts import experiments
-import scmle.core.context
 from scmle.experimentation import trials
+import scmle.pipeline.context
 from scmle.preparation import strategies
 
 
@@ -24,7 +24,7 @@ class Strategist:
     """
 
     def __init__(
-        self, context: scmle.core.context.Context, runner: trials.Runner
+        self, context: scmle.pipeline.context.Context, runner: trials.Runner
     ) -> None:
         """Initializes the search.
 
@@ -34,9 +34,11 @@ class Strategist:
         """
         self.context = context
         self.runner = runner
-        self.metric = scmle.core.context.require(context.metric, "metric")
-        self.task = scmle.core.context.require(context.task, "task")
-        self.profile = scmle.core.context.require(context.profile, "profile")
+        self.metric = scmle.pipeline.context.require(context.metric, "metric")
+        self.task = scmle.pipeline.context.require(context.task, "task")
+        self.profile = scmle.pipeline.context.require(
+            context.profile, "profile"
+        )
 
     def search(self, screened: list[experiments.Trial]) -> None:
         """Runs the search; results and verdicts go to the context.

@@ -46,7 +46,7 @@ scmle/causal/identification/run.py caveats single-use tested directly in test_id
 scmle/causal/identification/run.py subgroup_results single-use tested directly in test_identification_run_mutants (five references), which pin that adapter.weak is restored
 scmle/causal/identification/tier.py evidence_shortfalls single-use inlined into decide it gives complexity 14 and 13 branches against limits of 10 and 12 (checked with ruff)
 scmle/causal/identification/tier.py assess single-use its five keys are the CONDITIONS tuple that decide and Assignment report, so the name documents the tier rule; inlined it fits ruff but puts a twenty line boolean table into decide
-scmle/assurance/ingest/declared.py reconcile_source single-use named in the ingest stage and declared.py module docstrings and tested directly in test_ingest_declared; its caller is core/ingest_stage
+scmle/assurance/ingest/declared.py reconcile_source single-use named in the ingest stage and declared.py module docstrings and tested directly in test_ingest_declared; its caller is pipeline/ingest_stage
 scmle/assurance/ingest/entities.py pairing single-use tested by five references in test_ingest_entities and used by benchmarks/qualification/ingest_certify.py, which read the skipped-block count
 scmle/assurance/ingest/entities.py jarowinkler single-use tested against the standard value in test_ingest_entities
 scmle/assurance/ingest/entities.py cutoffs single-use the cumulative-precision scan for t_match and the half-rate scan for t_group is non-obvious, and resolve calls it in the labelled branch opposite the weakest calculation of the unlabelled branch

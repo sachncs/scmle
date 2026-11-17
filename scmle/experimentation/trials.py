@@ -26,8 +26,8 @@ from scmle.contracts import experiments
 from scmle.contracts import models
 from scmle.contracts import tasks
 import scmle.contracts.metrics
-import scmle.core.context
 from scmle.evaluation import metrics
+import scmle.pipeline.context
 from scmle.preparation import strategies
 from scmle.runtime import limits
 
@@ -307,17 +307,17 @@ class Runner:
         folds: Cross-validation folds as lists of positions.
     """
 
-    def __init__(self, context: scmle.core.context.Context) -> None:
+    def __init__(self, context: scmle.pipeline.context.Context) -> None:
         """Initializes the runner from a context holding a split and plan.
 
         Args:
             context: Run context with `split`, `profile`, `task` and `metric`.
         """
         self.context = context
-        self.split = scmle.core.context.require(context.split, "split")
-        self.task = scmle.core.context.require(context.task, "task")
-        self.metric = scmle.core.context.require(context.metric, "metric")
-        self.feature_plan = scmle.core.context.require(
+        self.split = scmle.pipeline.context.require(context.split, "split")
+        self.task = scmle.pipeline.context.require(context.task, "task")
+        self.metric = scmle.pipeline.context.require(context.metric, "metric")
+        self.feature_plan = scmle.pipeline.context.require(
             context.profile, "profile"
         ).feature_plan
         self.folds = [

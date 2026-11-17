@@ -11,9 +11,9 @@ import math
 import operator
 
 from scmle.contracts import experiments
-import scmle.core.context
 from scmle.experimentation import trials
 from scmle.optimization import optimizers
+import scmle.pipeline.context
 
 MIN_BATCH = 2
 MIN_FOLDS = 2
@@ -30,7 +30,7 @@ class Tuner:
     """
 
     def __init__(
-        self, context: scmle.core.context.Context, runner: trials.Runner
+        self, context: scmle.pipeline.context.Context, runner: trials.Runner
     ) -> None:
         """Initializes the tuner.
 
@@ -41,7 +41,7 @@ class Tuner:
         self.context = context
         self.runner = runner
         self.search = context.spec.budgeted()
-        self.metric = scmle.core.context.require(context.metric, "metric")
+        self.metric = scmle.pipeline.context.require(context.metric, "metric")
 
     def shortlist(
         self, screened: list[experiments.Trial]
@@ -93,7 +93,7 @@ class Tuner:
                 optimizer seed.
         """
         context, search = self.context, self.search
-        space = scmle.core.context.require(
+        space = scmle.pipeline.context.require(
             context.registry.get(name).search_space, f"{name}.search_space"
         )
         optimizer = optimizers.instantiate(

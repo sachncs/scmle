@@ -203,7 +203,7 @@ wide data). The full tables, and where it is behind, are in
 | `scmle.intelligence` | Dataset fingerprint, `Planner` and `Refiner`s, recommendations, meta-learning from run history |
 | `scmle.evaluation` | Metric catalog, selection policies, diagnostics, resource measurement |
 | `scmle.explainability` | Permutation importance, partial dependence, per-prediction occlusion |
-| `scmle.core` | State machine, workflow compiler, `Stage` hierarchy, policy checkpoints, limits, execution backends, configuration files, orchestrator |
+| `scmle.pipeline` | State machine, workflow compiler, `Stage` hierarchy, policy checkpoints, limits, execution backends, configuration files, orchestrator |
 | `scmle.artifacts` | Signed model bundle, run store, report, replay verification |
 | `scmle.inference` | Column mapping, input validation, batch / HTTP serving |
 | `scmle.monitoring` | Reference profiles, drift, delayed-label performance, champion-challenger |
