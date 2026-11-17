@@ -8,6 +8,7 @@ and caches them. Pickling therefore stores only numpy data.
 
 import io
 import json
+import os
 import pathlib
 from typing import Any
 import uuid
@@ -22,6 +23,27 @@ from scmle import envelope
 from scmle.contracts import errors
 from scmle.models.deeplearning import contracts
 from scmle.models.deeplearning import worker
+
+
+def vouch(trusted: bool) -> None:
+    """Refuses `trusted=True` in production, as `Bundle.load` does (SEC-1).
+
+    Vouching skips authentication, and unpickling executes code, so
+    production accepts only signed checkpoints and packages.
+
+    Args:
+        trusted: Whether the caller vouches for an unauthenticated file.
+
+    Raises:
+        ArtifactError: If `trusted` is true and `$SCMLE_ENV` is `production`.
+    """
+    if trusted and os.environ.get("SCMLE_ENV", "").strip().lower() == (
+        "production"
+    ):
+        raise errors.ArtifactError(
+            "trusted loading is refused when SCMLE_ENV=production: sign the "
+            "file and verify it with the signing key"
+        )
 
 
 class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-learn ships no type information
@@ -341,8 +363,10 @@ class NetworkEstimator(base.BaseEstimator):  # type: ignore[misc]  # scikit-lear
                 its digest, or does not hold a fitted estimator of this class
                 that matches the metadata.
             ArtifactError: If the checkpoint is unsigned (or no key is set)
-                and `trusted` is false, or its signature does not verify.
+                and `trusted` is false, its signature does not verify, or
+                `trusted` is true and `$SCMLE_ENV` is `production`.
         """
+        vouch(trusted)
         try:
             meta, payload = envelope.read(path, signing_key, trusted)
         except OSError as error:

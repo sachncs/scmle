@@ -221,8 +221,10 @@ class Embedder(base.TransformerMixin, estimators.NetworkEstimator):  # type: ign
                 its digest, or does not hold a matching fitted
                 `Embedder`.
             ArtifactError: If the checkpoint is unsigned (or no key is set)
-                and `trusted` is false, or its signature does not verify.
+                and `trusted` is false, its signature does not verify, or
+                `trusted` is true and `$SCMLE_ENV` is `production`.
         """
+        estimators.vouch(trusted)
         try:
             meta, payload = envelope.read(path, signing_key, trusted)
         except OSError as error:

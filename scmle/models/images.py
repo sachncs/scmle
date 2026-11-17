@@ -692,12 +692,20 @@ class Classifier:
 
         Raises:
             ArtifactError: If the manifest's signature does not verify, or
-                it is unsigned (or no key is set) and `trusted` is false.
+                it is unsigned (or no key is set) and `trusted` is false,
+                or `trusted` is true and `$SCMLE_ENV` is `production`.
             FileNotFoundError: If `path` is not a directory.
             ValueError: If the manifest or payload is missing, the version
                 is unsupported, or a digest does not match.
             TypeError: If the payload is not an `Classifier`.
         """
+        if trusted and os.environ.get("SCMLE_ENV", "").strip().lower() == (
+            "production"
+        ):
+            raise errors.ArtifactError(
+                "trusted loading is refused when SCMLE_ENV=production: sign "
+                "the package and verify it with the signing key"
+            )
         target = pathlib.Path(path).expanduser()
         if not target.is_dir():
             raise FileNotFoundError(target)
