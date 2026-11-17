@@ -1,0 +1,6 @@
+{
+  "bundle_format": 4,
+  "modules": [
+    "scmle.data.validation.columns"
+  ]
+}
