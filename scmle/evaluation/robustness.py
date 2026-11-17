@@ -163,9 +163,21 @@ class UnseenCategories(Stressor):
 
 
 class Robustness(diagnostics.Diagnostic):
-    """Score under degraded input, relative to the clean score."""
+    """Score under degraded input, relative to the clean score.
+
+    Cost model (31 runs, see `diagnostics.MARGIN`): 0.003 s plus 7.0
+    predictions plus 13 microseconds per row for the five standard
+    scenarios; the smallest useful report is the clean score and one
+    scenario.
+    """
 
     name = "robustness"
+    fixed = 0.003
+    passes = 7.0
+    rowcost = 1.3e-5
+    # The smallest useful report is the clean score and one scenario: a
+    # third of the full estimate (two of six scores, rounded up).
+    units = 3
 
     def __init__(self, stressors: tuple[Stressor, ...] | None = None) -> None:
         """Chooses the scenarios (the standard ones by default).
@@ -195,18 +207,33 @@ class Robustness(diagnostics.Diagnostic):
             `score`, `loss` in the metric's own units (positive means worse)
             and `relative_loss` (loss over the absolute clean score; 0 when
             the clean score is 0). `fragile_under` lists, sorted, the
-            scenarios whose relative loss exceeds `FRAGILE_DROP`.
+            scenarios whose relative loss exceeds `FRAGILE_DROP`, and
+            `skipped_for_time` the scenarios not run because the longest
+            score so far would end past the deadline (then `truncated` and
+            a `reason` are added). When even the clean score does not fit,
+            the report is `skipped`.
         """
         metric = inputs.metric
+        if not inputs.affords(diagnostics.MARGIN * (inputs.pace or 0.0)):
+            return diagnostics.skipped(
+                "the deadline leaves no time for the clean score"
+            )
+        began = diagnostics.clock()
         clean = metric.score(
             inputs.estimator,
             inputs.features,
             inputs.target,
             inputs.positive_label,
         )
+        longest = diagnostics.clock() - began
         rng = numpy.random.default_rng(inputs.seed)
         scenarios = {}
+        late = []
         for stressor in self.stressors:
+            if not inputs.affords(diagnostics.MARGIN * longest):
+                late.append(stressor.name)
+                continue
+            began = diagnostics.clock()
             stressed = stressor.corrupt(inputs.features, inputs, rng)
             score = metric.score(
                 inputs.estimator,
@@ -222,14 +249,23 @@ class Robustness(diagnostics.Diagnostic):
                 "loss": float(loss),
                 "relative_loss": float(loss / abs(clean)) if clean else 0.0,
             }
+            longest = max(longest, diagnostics.clock() - began)
         fragile = sorted(
             name
             for name, record in scenarios.items()
             if record["relative_loss"] > FRAGILE_DROP
         )
-        return {
+        report = {
             "metric": metric.name,
             "clean_score": float(clean),
             "scenarios": scenarios,
             "fragile_under": fragile,
+            "skipped_for_time": late,
         }
+        if late:
+            report["truncated"] = True
+            report["reason"] = (
+                f"{len(late)} scenarios not run: each takes up to "
+                f"{longest:.3f} s and the deadline came first"
+            )
+        return report

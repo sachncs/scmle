@@ -1,8 +1,13 @@
 """Resource limits: enforced by supervising each trial in its own process.
 
-* Time budget: no new trial starts after the budget, and a running trial that
-  passes its hard ceiling (the remaining budget plus a grace share) is
-  killed and recorded as failed, whatever code it is executing.
+* Time budget: the run ends at its start plus the budget. Before training,
+  the post-training work (final refit, diagnostics, packaging) is estimated
+  from measured cost models and held back as a reserve, so trials run in a
+  window that closes `reserve` seconds before the end (`Governor.until`).
+  No trial starts after the window, and a running trial still going when it
+  closes is killed and recorded as failed, whatever code it is executing.
+  A run whose minimum (preparation, one cheapest trial and the reserve)
+  cannot fit is refused before any work (`budget.Reserve.admit`).
 * Memory: no new trial starts above the limit, and a trial whose resident
   memory exceeds the limit is killed and recorded as failed. Resident memory
   (the trial and every process it started) is sampled while it runs, so a
@@ -39,6 +44,7 @@ import threadpoolctl
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
+from scmle.core import budget
 
 resource: Any  # the `resource` module, or None where it is missing
 try:
@@ -51,9 +57,15 @@ WINDOWS = sys.platform == "win32"
 KILL_SIGNAL = signal.SIGTERM if WINDOWS else signal.SIGKILL  # type: ignore[attr-defined,unused-ignore]
 BYTES_PER_GB = 1024**3
 KILOBYTES = 1024
-GRACE_SHARE = 0.1
-MIN_CEILING_SECONDS = 1.0
 POLL_SECONDS = 0.1
+# Enforcement slack: a trial past its ceiling is noticed at the next poll
+# (at most POLL_SECONDS later) and then killed and joined. Kill plus join
+# measured 0.028-0.032 s over 12 kills of a spinning trial (macOS arm64,
+# 2026-11-17, `scratchpad/train/killtime.py`); KILL_SECONDS is about three
+# times the largest, for the `ps` scan of descendants under load.
+KILL_SECONDS = 0.1
+SLACK_SECONDS = POLL_SECONDS + KILL_SECONDS
+PHASES = ("trials", "finish")
 PS_FIELDS = 3
 PRELOAD_MODULES = ["numpy", "pandas", "sklearn"]
 ACCELERATE_THREADS = "VECLIB_MAXIMUM_THREADS"
@@ -398,12 +410,70 @@ class Governor:
     Attributes:
         spec: The resource specification.
         started_at: Monotonic start time of the run.
-        dispatched: Whether the first trial's ceiling was handed out.
+        reserve: Seconds of the budget held back for post-training work
+            (`budget.Reserve`); empty until its `provision`.
     """
 
     spec: tasks.Resources
     started_at: float = dataclasses.field(default_factory=time.monotonic)
-    dispatched: bool = False
+    reserve: budget.Reserve = dataclasses.field(init=False)
+
+    def __post_init__(self) -> None:
+        """Starts an empty reserve for the configured time budget."""
+        self.reserve = budget.Reserve(self.spec.time_budget_seconds)
+
+    def until(self, phase: str) -> float:
+        """Returns the monotonic time by which a phase must end.
+
+        Args:
+            phase: `finish` (the whole run: start plus the budget) or
+                `trials` (every trial, including strategy search, tuning and
+                ensembles: the finish minus the reserve).
+
+        Returns:
+            The monotonic time.
+
+        Raises:
+            InputError: If the phase is not one of `PHASES`.
+        """
+        if phase not in PHASES:
+            raise errors.InputError(
+                f"unknown phase {phase!r}; expected one of {PHASES}"
+            )
+        finish = self.started_at + self.spec.time_budget_seconds
+        return finish - self.reserve.total if phase == "trials" else finish
+
+    def left(self, phase: str) -> float:
+        """Returns the seconds until a phase must end (negative when late).
+
+        Args:
+            phase: `trials` or `finish` (see `until`).
+
+        Returns:
+            The seconds left.
+        """
+        return self.until(phase) - time.monotonic()
+
+    def overdue(self, seconds: float, keep: float = 0.0) -> str | None:
+        """Why post-training work of a given length must not start, or None.
+
+        Args:
+            seconds: Estimated length of the work.
+            keep: Seconds to leave before the finish for later work.
+
+        Returns:
+            A message when the work would not end `keep` seconds before
+            the run's end or memory is above the limit, else None.
+        """
+        left = self.left("finish") - keep
+        if seconds > left:
+            return (
+                f"needs about {seconds:.1f} s but {max(left, 0.0):.1f} s "
+                "remain before the run's end"
+            )
+        if self.exceeds():
+            return "memory limit reached"
+        return None
 
     @property
     def workers(self) -> int:
@@ -466,42 +536,36 @@ class Governor:
     def deadline(self) -> float:
         """Hard time ceiling for a trial dispatched now.
 
-        The first trial always runs so that a result exists (`skip_reason`),
-        so its ceiling is at least one whole budget: a preparation that used
-        up the budget would otherwise leave it the minimum ceiling, too short
-        to start a worker, and the run would end with every trial failed. A
-        run can therefore take up to about twice its budget when preparation
-        alone fills the budget; every later trial gets only what is left.
+        The trial window closes at `until("trials")`; there is no grace past
+        it, so a trial is killed when the window closes (plus the
+        enforcement slack, `SLACK_SECONDS`).
 
         Returns:
-            The time ceiling in seconds: the remaining budget (the whole
-            budget for the first trial) plus a grace share of the budget,
-            never below the minimum ceiling.
+            The seconds until the trial window closes, never below zero.
         """
-        budget = self.spec.time_budget_seconds
-        remaining = max(budget - (time.monotonic() - self.started_at), 0.0)
-        if not self.dispatched:
-            self.dispatched = True
-            remaining = max(remaining, budget)
-        return max(remaining + GRACE_SHARE * budget, MIN_CEILING_SECONDS)
+        return max(self.left("trials"), 0.0)
 
     def skip_reason(self, first: bool) -> str | None:
         """Why the next trial must not start, or None.
 
         Args:
-            first: True for the first trial, which always runs so that a
-                result exists even under a tiny budget.
+            first: True for the first trial, which runs above the memory
+                limit so that a result exists. Time applies to it too: the
+                run was admitted only if one trial fits.
 
         Returns:
-            A message saying why the next trial must not start (time budget
-            exhausted or memory limit reached), or None if it may start. Always
-            None for the first trial.
+            A message saying why the next trial must not start (the trial
+            window is too short to start one, or the memory limit is
+            reached), or None if it may start.
         """
-        if first:
-            return None
-        if time.monotonic() - self.started_at >= self.spec.time_budget_seconds:
-            return "time budget exhausted before this trial started"
-        if self.exceeds():
+        left = self.left("trials")
+        if left < budget.START_SECONDS:
+            return (
+                f"trial window closed: {max(left, 0.0):.1f} s left before "
+                f"the {self.reserve.total:.1f} s reserved for the final "
+                "refit, diagnostics and packaging"
+            )
+        if not first and self.exceeds():
             return "memory limit reached before this trial started"
         return None
 
@@ -522,9 +586,11 @@ class Governor:
                 "limit_seconds": self.spec.time_budget_seconds,
                 "elapsed_seconds": elapsed,
                 "enforcement": self.explain(
-                    "running trials are killed at the hard ceiling "
-                    f"(remaining budget + {GRACE_SHARE:.0%} grace)"
+                    "running trials are killed at the hard ceiling, the "
+                    "end of the trial window (budget minus the reserve; "
+                    f"enforcement slack {SLACK_SECONDS:.1f} s)"
                 ),
+                "reserve_seconds": dict(self.reserve.parts),
                 "within_limit": elapsed <= self.spec.time_budget_seconds,
             },
             "cpu": {

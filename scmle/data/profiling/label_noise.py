@@ -16,6 +16,7 @@ import numpy
 import pandas
 from sklearn import ensemble
 from sklearn import model_selection
+import threadpoolctl
 
 from scmle.contracts import data
 from scmle.contracts import errors
@@ -28,6 +29,23 @@ ESTIMATOR_MAX_ITER = 50
 ESTIMATOR_MAX_LEAF_NODES = 31
 MAX_ROWS = 5000
 NOTE_RATE = 0.05
+BINARY_CLASSES = 2
+# Cost model of `contradict` (seconds, one thread), fitted 2026-11-17 on the
+# evidence tables (OMP_NUM_THREADS=1, two runs at a time):
+#   seconds = BASE + CLASS x C' + CELL x rows x columns,
+# C' the classes above two, else 1. The largest measured to predicted ratio
+# was 1.99 (a 1600-row, 30-column binary table, 0.36 s against 0.18 s), so
+# MARGIN = 2.0 makes the prediction an upper bound on every measured table.
+# A larger thread cap only finishes sooner.
+BASE_SECONDS = 0.05
+CLASS_SECONDS = 0.12
+CELL_SECONDS = 1.5e-7
+MARGIN = 2.0
+# Share of the time budget the check may take. The costliest measured table
+# (1132 rows, 111 columns, 8 classes: 1.16 s) is predicted at 2.06 s, inside
+# the 3 s this share gives a 60 s budget, so every measured table is checked
+# on all its rows at B = 60 and a shorter budget checks a subsample.
+SHARE = 0.05
 
 
 @dataclasses.dataclass(frozen=True)
@@ -42,6 +60,7 @@ class Noise:
         rate: Share of rows flagged.
         cutoffs: Mean own-label probabilities by class.
         folds: Number of out-of-fold partitions used.
+        rows: Rows checked (fewer than given when an allowance subsampled).
     """
 
     suspects: tuple[int, ...]
@@ -50,6 +69,7 @@ class Noise:
     rate: float
     cutoffs: tuple[float, ...] = ()
     folds: int = 0
+    rows: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
@@ -117,10 +137,64 @@ class Noise:
         }
 
 
+def ways(classes: int) -> int:
+    """Counts the one-vs-rest problems the cost model charges for.
+
+    Args:
+        classes: Classes of the target.
+
+    Returns:
+        `classes` above two, else 1.
+    """
+    return classes if classes > BINARY_CLASSES else 1
+
+
+def cost(rows: int, columns: int, classes: int) -> float:
+    """Predicts an upper bound on the seconds of `contradict`.
+
+    Args:
+        rows: Rows checked.
+        columns: Feature columns.
+        classes: Classes of the target.
+
+    Returns:
+        `MARGIN x (BASE + CLASS x C' + CELL x rows x columns)`.
+    """
+    return MARGIN * (
+        BASE_SECONDS
+        + CLASS_SECONDS * ways(classes)
+        + CELL_SECONDS * rows * columns
+    )
+
+
+def affordable(columns: int, classes: int, allowance: float) -> int:
+    """Finds the most rows whose predicted `cost` fits an allowance.
+
+    Args:
+        columns: Feature columns.
+        classes: Classes of the target.
+        allowance: Seconds the check may take.
+
+    Returns:
+        The rows, 0 when not even the fixed cost fits.
+    """
+    spare = allowance / MARGIN - BASE_SECONDS - CLASS_SECONDS * ways(classes)
+    if spare <= 0:
+        return 0
+    # The relative nudge keeps an allowance computed by `cost` for some rows
+    # from losing one row to rounding.
+    return int(spare / (CELL_SECONDS * max(columns, 1)) * (1 + 1e-9))
+
+
 def contradict(
-    features: pandas.DataFrame, labels: pandas.Series, seed: int = 0
+    features: pandas.DataFrame,
+    labels: pandas.Series,
+    seed: int = 0,
 ) -> Noise:
     """Flags rows whose label a model that never saw them contradicts.
+
+    Fitting the time budget is `inspect`'s job: it samples the rows down to
+    what its allowance affords, or skips the check on record.
 
     Args:
         features: Numeric feature frame.
@@ -128,10 +202,10 @@ def contradict(
         seed: Seed for folds and the model.
 
     Returns:
-        The suspects, most confident first.
+        The suspects, most confident first, as positions in `features`.
 
     Raises:
-        ValueError: With fewer than `MIN_ROWS` rows or a single class.
+        InputError: With fewer than `MIN_ROWS` rows or a single class.
     """
     values = numpy.asarray(labels)
     classes, encoded = numpy.unique(values, return_inverse=True)
@@ -180,11 +254,64 @@ def contradict(
         rate=float(flagged.mean()),
         cutoffs=tuple(float(value) for value in thresholds),
         folds=folds,
+        rows=len(encoded),
+    )
+
+
+def unevaluated(
+    note: str | None,
+    status: str,
+    reason: str,
+    why: str,
+    seed: int,
+    rows: tuple[int, int, int],
+) -> data.Observation:
+    """Builds the observation of a check that did not run.
+
+    Args:
+        note: The finding text, or None.
+        status: `not_evaluated` or `skipped`.
+        reason: The error or skip reason.
+        why: The limitation sentence.
+        seed: Seed of the check.
+        rows: Rows given, rows used and the most rows the check could use.
+
+    Returns:
+        The observation, with JSON-native quality evidence.
+    """
+    given, checked, limit = rows
+    key = "reason" if status == "skipped" else "error"
+    return data.Observation(
+        note=note,
+        evidence={
+            "observation": "label_noise",
+            "status": status,
+            "method": "out_of_fold_confident_disagreement",
+            "thresholds": {
+                "minimum_rows": MIN_ROWS,
+                "minimum_classes": 2,
+                "maximum_folds": FOLDS,
+                "minimum_finding_rate": NOTE_RATE,
+            },
+            "sample_bounds": {
+                "input_rows": given,
+                "rows_checked": checked,
+                "maximum_rows": limit,
+                "sampled": given > checked,
+            },
+            "seed": seed,
+            "metrics": {key: reason},
+            "limitations": [why],
+        },
     )
 
 
 def inspect(
-    features: pandas.DataFrame, labels: pandas.Series, seed: int = 0
+    features: pandas.DataFrame,
+    labels: pandas.Series,
+    seed: int = 0,
+    allowance: float | None = None,
+    threads: int | None = None,
 ) -> data.Observation:
     """Runs bounded label-noise detection and retains its evidence.
 
@@ -192,46 +319,55 @@ def inspect(
         features: Numeric feature frame.
         labels: Class labels aligned with the features.
         seed: Seed for bounded sampling, folds, and the model.
+        allowance: Seconds the check may take by `cost`; the rows are
+            sampled down to what fits, and the check is skipped, with the
+            reason in its evidence and note, when `MIN_ROWS` rows do not
+            fit. None bounds the rows by `MAX_ROWS` only.
+        threads: Math-library threads the model may use (the run's
+            `cpu_limit`); None leaves the libraries' default.
 
     Returns:
         A quality observation even when the check cannot be evaluated.
     """
     input_rows = len(features)
-    if input_rows > MAX_ROWS:
-        rows = features.sample(MAX_ROWS, random_state=seed).index
+    limit = MAX_ROWS
+    if allowance is not None:
+        width = features.shape[1]
+        classes = int(labels.nunique())
+        fits = affordable(width, classes, allowance)
+        if fits < MIN_ROWS:
+            reason = (
+                f"{MIN_ROWS} rows need about "
+                f"{cost(MIN_ROWS, width, classes):.2f} s; the allowance is "
+                f"{allowance:.2f} s ({SHARE:.0%} of the time budget)"
+            )
+            return unevaluated(
+                f"label noise not checked: {reason}",
+                "skipped",
+                reason,
+                "The check was skipped because it did not fit its share of "
+                "the time budget.",
+                seed,
+                (input_rows, 0, fits),
+            )
+        limit = min(MAX_ROWS, fits)
+    if input_rows > limit:
+        rows = features.sample(limit, random_state=seed).index
         features, labels = features.loc[rows], labels.loc[rows]
     rows_checked = len(features)
     try:
-        report = contradict(features, labels, seed)
+        with threadpoolctl.threadpool_limits(limits=threads):
+            report = contradict(features, labels, seed)
     except ValueError as error:
         # handled: not_evaluated observation carrying the error message
-        return data.Observation(
-            note=None,
-            evidence={
-                "observation": "label_noise",
-                "status": "not_evaluated",
-                "method": "out_of_fold_confident_disagreement",
-                "thresholds": {
-                    "minimum_rows": MIN_ROWS,
-                    "minimum_classes": 2,
-                    "maximum_folds": FOLDS,
-                    "minimum_finding_rate": NOTE_RATE,
-                },
-                "sample_bounds": {
-                    "input_rows": input_rows,
-                    "rows_checked": rows_checked,
-                    "maximum_rows": MAX_ROWS,
-                    "sampled": input_rows > rows_checked,
-                },
-                "seed": seed,
-                "metrics": {"error": str(error)},
-                "limitations": [
-                    (
-                        "The check was not evaluated because its data contract "
-                        "was not met."
-                    ),
-                ],
-            },
+        return unevaluated(
+            None,
+            "not_evaluated",
+            str(error),
+            "The check was not evaluated because its data contract was not "
+            "met.",
+            seed,
+            (input_rows, rows_checked, limit),
         )
     note = None
     if report.rate >= NOTE_RATE:
@@ -243,7 +379,5 @@ def inspect(
         )
     return data.Observation(
         note=note,
-        evidence=report.quality_evidence(
-            input_rows, rows_checked, seed, MAX_ROWS
-        ),
+        evidence=report.quality_evidence(input_rows, rows_checked, seed, limit),
     )

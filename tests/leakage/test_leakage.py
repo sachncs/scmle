@@ -29,7 +29,7 @@ def test_pure_noise_is_not_inflated_by_the_pipeline(tmp_path):
 
 def test_leaked_feature_is_flagged_and_can_block(binary_frame, tmp_path):
     # Enforces README.md:93 and README.md:180.
-    # Enforces docs/BENCHMARKS.md:16 and docs/LEAKAGE.md:209.
+    # Enforces docs/BENCHMARKS.md:16 and docs/LEAKAGE.md:212.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:89.
     leaky = binary_frame.assign(leak=binary_frame.y * 3.0 + 1)
     result = support.make_project(
@@ -100,7 +100,7 @@ def test_a_regression_leak_blocks_under_block(tmp_path):
 
 
 def test_a_regression_leak_warns_under_warn(tmp_path):
-    # Enforces docs/LEAKAGE.md:204.
+    # Enforces docs/LEAKAGE.md:207.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:89.
     result = support.make_project(
         regression_leak(),

@@ -3,9 +3,11 @@
 import dataclasses
 
 import numpy
+import pandas
 import test_diagnostics
 
 from scmle.contracts import tasks
+from scmle.evaluation import diagnostics
 from scmle.evaluation import shift
 
 
@@ -112,3 +114,49 @@ def no_shift():
         ),
     )
     return shift.Adversary().compute(data)
+
+
+def test_adversary_is_skipped_once_its_deadline_has_passed():
+    data = dataclasses.replace(
+        shifted_inputs(0.0), deadline=diagnostics.clock() - 1.0
+    )
+
+    report = shift.Adversary().compute(data)
+
+    assert report["skipped"] and report["available"] is False
+
+
+def test_adversary_stops_between_folds_when_time_runs_out(monkeypatch):
+    clock = test_diagnostics.Clock()
+    monkeypatch.setattr(diagnostics, "clock", clock)
+    fits = []
+    original = shift.Adversary.fold
+
+    def counted(self, *args):
+        fits.append(1)
+        clock.now += 100.0
+        return original(self, *args)
+
+    monkeypatch.setattr(shift.Adversary, "fold", counted)
+    data = dataclasses.replace(shifted_inputs(1.0), deadline=clock.now + 150)
+
+    report = shift.Adversary().compute(data)
+
+    assert len(fits) == 1
+    assert report["skipped"] and "fold" in report["reason"]
+
+
+def test_adversary_cost_grows_with_rows_and_columns():
+    small = shifted_inputs(0.0)
+    adversary = shift.Adversary()
+    more = dataclasses.replace(
+        small,
+        reference_features=pandas.concat([small.reference_features] * 2),
+    )
+    narrow = dataclasses.replace(
+        small,
+        feature_plan=dataclasses.replace(small.feature_plan, categorical=()),
+    )
+
+    assert adversary.estimate(more) > adversary.estimate(small)
+    assert adversary.estimate(small) > adversary.estimate(narrow) > 0

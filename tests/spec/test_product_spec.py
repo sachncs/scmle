@@ -562,10 +562,10 @@ def test_l278_l288_orchestrator_support(frame, tmp_path):
         "recoverable_trials" in caught.value.details
         and caught.value.details["run_dir"]
     )  # consistent failure reporting
-    budget = support.make_project(
-        frame, "y", time_budget=1, output_dir=tmp_path / "b"
-    ).run()
-    assert budget.state == "COMPLETED"  # budget exhaustion handled
+    with pytest.raises(errors.BlockedError, match="smallest budget"):
+        support.make_project(
+            frame, "y", time_budget=1, output_dir=tmp_path / "b"
+        ).run()  # budget exhaustion handled: refused before any work
     assert scheduler.Pool(2).map(abs, [-1, -2]) == [
         1,
         2,

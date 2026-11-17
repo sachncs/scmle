@@ -1125,6 +1125,38 @@ marked `Breaking:` and listed first in their group.
 
 ### Fixed
 
+- A run no longer exceeds its time budget. Seven of fifteen real tasks
+  overran a 60 s budget (up to 129.5 s) because only trials were bounded:
+  preparation ran unclocked (the leakage screen's cap assumed 25,000 fits
+  per second whatever the rows, and applied it twice), the strategy-search
+  batch fixed every job's ceiling at its start, trials could run 10 percent
+  past the budget, and diagnostics took their own 30 s after it. Now:
+  - before training, the run reserves time for the final refit,
+    diagnostics and packaging from fitted cost models
+    (`Governor.until("trials")`, `until("finish")`); trials, strategy
+    search and tuning end by the trial deadline, with no grace past it;
+  - preparation runs inside a stated share of the budget: the screen's
+    cost scales with rows, the real scan and the planted probe share one
+    15 percent cap, and the difficulty and label-noise checks subsample or
+    skip to fit 5 percent each;
+  - diagnostics get only the time left; the metric bootstrap sizes its
+    resamples to fit and skips (with no interval) below its minimum;
+  - work that does not fit is reduced or skipped and recorded in
+    `evaluation.skipped_for_time` and a `budget.skipped` event, never run
+    late;
+  - a budget too small for even the minimum run is refused before any work
+    with the estimate and the smallest budget that fits. This replaces the
+    earlier rule that gave the first trial a whole budget, which allowed an
+    overrun. The only remaining excess is `limits.SLACK_SECONDS` (poll
+    interval plus kill time).
+  The seven tasks now finish in 40.8 to 58.6 s, and 0 of 167 runs on 46
+  real tables overran (5 crashed for other reasons: a categorical column
+  with over 255 values, and 3-fold CV on a class with fewer than 3 rows).
+  Trade-off: the screen's cost is the one-thread worst case, so large
+  multi-class tables are screened less often (digits now needs
+  `--time-budget 2800`). Under `block` a screen that does not run blocks,
+  so C2's false blocks rose from 8 to 12 of 78 clean real tables (digits,
+  OpenML 14, 16 and 28); leak recall is unchanged at 11 of 68.
 - The move to `InputError`, `KindError` and `OrderError` (ERR-20) changed
   what some handlers did, because a handler for `ScmleError` now also
   caught input problems that used to pass it as plain `ValueError`,

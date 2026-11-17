@@ -127,6 +127,18 @@ from scmle.sampling import strategies
 COVERAGE_LEVELS = (0.5, 0.8, 0.9, 0.95)
 DIAGNOSTIC_BUDGET_SHARE = 0.25
 DIAGNOSTIC_MIN_SECONDS = 30.0
+# A fold fit of the selected model in the main process, estimated from its
+# trial, whose `fit_seconds` covers fitting and scoring every fold in a
+# worker. Measured on the seven overrun tasks at a 60 s budget (2026-11-17,
+# two runs at a time): where the refit dominates the final evaluation
+# (stacking, 9,184 rows) it took 3.47 s against 3.30 s predicted unmargined,
+# and the rest of the final evaluation took at most 0.9 s; the margin covers
+# that ratio, the main process sharing the machine, and run-to-run spread.
+FIT_MARGIN = 1.5
+# Packaging after its last fit (bundle measurement, saving, model card,
+# report) took 0.25-0.6 s on the same runs; held at 1 s so every fit of the
+# packaging stage leaves it room before the run's end.
+TAIL_SECONDS = 1.0
 BASELINE = "dummy"
 
 
@@ -1771,6 +1783,9 @@ class ProfileStage(Stage):
                 development[columns],
                 development[spec.data.target],
                 spec.validation.seed,
+                allowance=spec.resources.time_budget_seconds
+                * label_noise.SHARE,
+                threads=spec.resources.cpu_limit,
             )
             if observation.note:
                 notes.append(observation.note)
@@ -2072,6 +2087,171 @@ class ProfileStage(Stage):
             },
         )
         return split
+
+
+def foldcost(trial: experiments.Trial) -> float:
+    """Estimates one fold fit (and its scoring) of a trial's pipeline.
+
+    Args:
+        trial: The trial, whose `fit_seconds` covered its folds.
+
+    Returns:
+        The trial's seconds per fold times `FIT_MARGIN`.
+    """
+    folds = max(len(trial.fold_scores), 1)
+    return FIT_MARGIN * trial.fit_seconds / folds
+
+
+def refitcost(
+    context: scmle.core.context.Context, trial: experiments.Trial
+) -> float:
+    """Estimates refitting a trial's pipeline on all development rows.
+
+    A fold trains on (k - 1) / k of the development rows, so the refit is a
+    fold fit scaled by k / (k - 1).
+
+    Args:
+        context: The run context, holding the split.
+        trial: The trial to refit.
+
+    Returns:
+        The estimated seconds.
+    """
+    split = scmle.core.context.require(context.split, "split")
+    folds = len(split.manifest.folds)
+    scale = folds / (folds - 1) if folds > 1 else 1.0
+    return foldcost(trial) * scale
+
+
+def affordable(
+    context: scmle.core.context.Context, ranked: list[experiments.Trial]
+) -> experiments.Trial:
+    """Returns the best-ranked trial whose refit ends before the run's end.
+
+    Each better trial passed over is recorded with the reason. When none
+    fits, the one with the cheapest refit is taken, also on record.
+
+    Args:
+        context: The run context, holding the governor.
+        ranked: Trials in policy order, best first.
+
+    Returns:
+        The trial to select.
+    """
+    governor = context.regulator
+    for trial in ranked:
+        reason = governor.overdue(refitcost(context, trial))
+        if reason is None:
+            return trial
+        context.forgo(
+            f"selecting {trial.model_name}/{trial.strategy}",
+            f"its refit {reason}",
+        )
+    cheapest = min(ranked, key=lambda t: refitcost(context, t))
+    context.forgo(
+        f"selecting {cheapest.model_name}/{cheapest.strategy}",
+        "no refit fits before the run's end; the cheapest refit is taken",
+    )
+    return cheapest
+
+
+def late(context: scmle.core.context.Context, trial: experiments.Trial) -> bool:
+    """Whether a candidate's refit and measurement cannot end in time.
+
+    A late candidate is rejected on record, unmeasured.
+
+    Args:
+        context: The run context, holding the governor.
+        trial: The candidate.
+
+    Returns:
+        True if its refit would not end before the run's end.
+    """
+    reason = context.regulator.overdue(refitcost(context, trial))
+    if reason is None:
+        return False
+    label = f"{trial.model_name}/{trial.strategy}"
+    context.enter(label, experiments.Edict.REJECT, f"refit {reason}")
+    context.forgo(f"measuring {label}", f"its refit {reason}")
+    return True
+
+
+def halt(
+    context: scmle.core.context.Context,
+    selected: experiments.Trial,
+    work: str,
+) -> str | None:
+    """Why the next fit of the selected pipeline must not start, or None.
+
+    Args:
+        context: The run context, holding the governor.
+        selected: The selected trial, whose fold fits are timed.
+        work: What the fit is for, named in the record.
+
+    Returns:
+        The reason (also recorded with `forgo`), or None if a fold fit ends
+        `TAIL_SECONDS` before the run's end.
+    """
+    reason = context.regulator.overdue(foldcost(selected), TAIL_SECONDS)
+    if reason is not None:
+        context.forgo(work, reason)
+    return reason
+
+
+def meter(
+    context: scmle.core.context.Context,
+    pipeline: Any,
+    features: pandas.DataFrame,
+) -> resources.Usage:
+    """Measures the final pipeline, timing fewer rows if time is short.
+
+    One prediction is timed first; the number of timed rows is reduced (on
+    record) so the measurement ends before the packaging reserve.
+
+    Args:
+        context: The run context, holding the governor.
+        pipeline: The fitted final pipeline.
+        features: Rows to time predictions on.
+
+    Returns:
+        The measured usage.
+    """
+    governor = context.regulator
+    started = time.monotonic()
+    pipeline.predict(features.head(1))
+    single = FIT_MARGIN * (time.monotonic() - started)
+    left = governor.left("finish") - governor.reserve.parts.get("package", 0.0)
+    rows = resources.LATENCY_ROWS
+    if single * rows > left:
+        rows = max(int(left / single), 1) if single > 0 else rows
+        context.forgo(
+            "serving measurement",
+            f"timed {rows} of {resources.LATENCY_ROWS} rows: one prediction "
+            f"takes about {single:.2f} s and {max(left, 0.0):.1f} s remain",
+        )
+    return resources.measure(pipeline, features, rows)
+
+
+def dimensions(context: scmle.core.context.Context) -> tuple[int, int, int]:
+    """Returns the table shape the time reserve is estimated from.
+
+    Args:
+        context: The run context, holding the ingested frame.
+
+    Returns:
+        Labelled rows, feature columns (every column but the targets) and
+        target classes (0 when the task is not classification).
+    """
+    frame = scmle.core.context.require(context.frame, "frame")
+    data = context.spec.data
+    target = frame[data.target].dropna()
+    named = {data.target, *data.targets}
+    columns = sum(1 for column in frame.columns if column not in named)
+    task = context.task or scmle.data.validation.target.TaskResolver(
+        context.spec
+    ).resolve(target)
+    classes = int(target.nunique()) if task.is_classification else 0
+    return len(target), columns, classes
 
 
 def governing(
@@ -2387,15 +2567,22 @@ class TrainStage(Stage):
     def execute(self, context: scmle.core.context.Context) -> None:
         """Runs every candidate, then searches strategies, tunes and ensembles.
 
-        Candidates run in chunks of `backend.workers`. The time and memory
-        limits are checked before every chunk but the first, and a chunk that
+        Candidates run in chunks of `backend.workers`. The trial window and
+        the memory limit are checked before every chunk, and a chunk that
         must not start is recorded as skipped. Results are recorded in
         candidate order regardless of the backend.
 
         Args:
             context: The run context, holding the execution plan; receives the
                 trials.
+
+        Raises:
+            BlockedError: If preparation left no trial window for the first
+                trial; the message names the smallest budget that fits.
         """
+        governor = context.regulator
+        if governor.reserve.shape is None:
+            governor.reserve.provision(*dimensions(context))
         runner = trials.Runner(context)
         plan = scmle.core.context.require(context.plan, "plan")
         names = plan.candidate_models
@@ -2403,18 +2590,25 @@ class TrainStage(Stage):
             context.check_cancelled()
             chunk = names[start : start + runner.workers]
             ids = context.allocate(len(chunk))
-            reason = context.regulator.skip_reason(first=start == 0)
-            if reason is not None:
-                outcomes = [
-                    runner.skip(trial_id, name, reason)
-                    for trial_id, name in zip(ids, chunk, strict=True)
-                ]
-            else:
-                jobs = [
-                    trials.Job(trial_id, name)
-                    for trial_id, name in zip(ids, chunk, strict=True)
-                ]
-                outcomes = runner.run_many(jobs)
+            jobs = [
+                trials.Job(trial_id, name)
+                for trial_id, name in zip(ids, chunk, strict=True)
+            ]
+            outcomes = runner.run_many(jobs, first=start == 0)
+            if start == 0 and all(
+                o.status is experiments.Termination.SKIPPED for o in outcomes
+            ):
+                prepared = time.monotonic() - context.started_at
+                smallest = governor.reserve.smallest(prepared)
+                raise errors.BlockedError(
+                    f"preparation took {prepared:.1f} s and left no time "
+                    f"for a first trial ({outcomes[0].error}); the smallest "
+                    f"budget that fits is about {smallest} s",
+                    {
+                        "prepared_seconds": round(prepared, 2),
+                        "smallest_budget_seconds": smallest,
+                    },
+                )
             for outcome in outcomes:
                 context.transcribe(outcome)
         strategy_search.Strategist(context, runner).search(list(context.trials))
@@ -2506,6 +2700,8 @@ class SelectStage(Stage):
         sign = 1.0 if metric.greater_is_better else -1.0
         rows = []
         for trial in checked:
+            if late(context, trial):
+                continue
             candidate = strategies.lookup(trial.strategy).build(
                 plan,
                 context.registry.get(trial.model_name),
@@ -2518,6 +2714,10 @@ class SelectStage(Stage):
             rows.append(
                 Candidate(trial, candidate, usage, limits.violations(usage))
             )
+        if not rows:
+            context.selected = affordable(context, checked)
+            self.announce(context)
+            return
         feasible = [r for r in rows if not r.broken]
         if not feasible:
             raise errors.BlockedError(
@@ -2632,10 +2832,13 @@ class SelectStage(Stage):
         """Chooses the best trial that satisfies the serving constraints.
 
         Without serving limits and without the Pareto option the top-ranked
-        trial is taken unmeasured. With the Pareto option the choice is made
-        on the front (`select_on_front`). Otherwise candidates are walked in
-        policy order, up to `max_candidates_checked`; each is refit and
-        measured on this machine, and the first one within every limit wins.
+        trial whose refit ends before the run's end is taken unmeasured
+        (`affordable`). Candidates whose refit cannot end in time are not
+        measured; if none can, the choice falls back to `affordable`. With
+        the Pareto option the choice is made on the front
+        (`select_on_front`). Otherwise candidates are walked in policy order,
+        up to `max_candidates_checked`; each is refit and measured on this
+        machine, and the first one within every limit wins.
 
         Args:
             context: The run context; receives the selected trial.
@@ -2651,7 +2854,7 @@ class SelectStage(Stage):
         limits = self.limits(context)
         spec = context.spec.selection
         if not limits.active and not spec.pareto:
-            context.selected = ranked[0]
+            context.selected = affordable(context, ranked)
             self.announce(context)
             return
         split = scmle.core.context.require(context.split, "split")
@@ -2663,7 +2866,11 @@ class SelectStage(Stage):
         if spec.pareto:
             self.select_on_front(context, checked, limits)
             return
+        measured = 0
         for trial in checked:
+            if late(context, trial):
+                continue
+            measured += 1
             candidate = strategies.lookup(trial.strategy).build(
                 plan,
                 context.registry.get(trial.model_name),
@@ -2688,6 +2895,10 @@ class SelectStage(Stage):
             )
             context.refits[trial.trial_id] = candidate
             context.selected = trial
+            self.announce(context)
+            return
+        if not measured:
+            context.selected = affordable(context, checked)
             self.announce(context)
             return
         raise errors.BlockedError(
@@ -3017,8 +3228,10 @@ def choose_decision_threshold(
         The estimator to evaluate (wrapped with the threshold when one was
         optimized) and a description of the decision. For a task other than
         binary, or with no objective and no chartered decision layer, the
-        estimator is returned unchanged with None. A charter's cost model takes
-        precedence over the specification's objective.
+        estimator is returned unchanged with None, as it is (on record) when
+        the out-of-fold fits would not end before the packaging reserve. A
+        charter's cost model takes precedence over the specification's
+        objective and is always applied.
     """
     decision = context.spec.decision
     task = scmle.core.context.require(context.task, "task")
@@ -3029,6 +3242,15 @@ def choose_decision_threshold(
         return fitted, None
     split = scmle.core.context.require(context.split, "split")
     selected = scmle.core.context.require(context.selected, "selected")
+    if chartered is None:
+        governor = context.regulator
+        reason = governor.overdue(
+            foldcost(selected) * len(split.manifest.folds),
+            governor.reserve.parts.get("package", 0.0),
+        )
+        if reason is not None:
+            context.forgo("decision threshold", reason)
+            return fitted, None
     strategy = strategies.lookup(selected.strategy)
     adapter = context.registry.get(selected.model_name)
     plan = scmle.core.context.require(context.profile, "profile").feature_plan
@@ -3087,17 +3309,24 @@ class FinalEvaluationStage(Stage):
 
         A share (`DIAGNOSTIC_BUDGET_SHARE`) of the time budget, never less than
         `DIAGNOSTIC_MIN_SECONDS`, so wide datasets cannot turn explanation into
-        the slowest step of the run.
+        the slowest step of the run; and never more than what is left before
+        the run's end once the packaging reserve is kept.
 
         Args:
             context: The run context, supplying the time budget.
 
         Returns:
             The total seconds the diagnostics may use: a fixed share of the time
-            budget, but never less than the minimum.
+            budget (never less than the minimum), capped by the time left.
         """
         budget = context.spec.resources.time_budget_seconds
-        return max(DIAGNOSTIC_MIN_SECONDS, DIAGNOSTIC_BUDGET_SHARE * budget)
+        share = DIAGNOSTIC_BUDGET_SHARE * budget
+        allowance = max(DIAGNOSTIC_MIN_SECONDS, share)
+        governor = context.regulator
+        left = governor.left("finish") - governor.reserve.parts.get(
+            "package", 0.0
+        )
+        return max(min(allowance, left), 0.0)
 
     def diagnose(
         self,
@@ -3452,7 +3681,12 @@ class FinalEvaluationStage(Stage):
                 scmle.evaluation.metrics.positive_label(split.dev_target, task)
             ),
             data.pseudo_label_confidence,
-            lambda: bool(context.regulator.skip_reason(first=False)),
+            lambda: bool(
+                context.regulator.overdue(
+                    foldcost(selected),
+                    context.regulator.reserve.parts.get("package", 0.0),
+                )
+            ),
         )
         record: dict[str, Any] = {
             "unlabeled_rows": len(unlabeled),
@@ -3706,7 +3940,7 @@ class FinalEvaluationStage(Stage):
             None,
         )
         context.final_pipeline = pipeline
-        usage = resources.measure(pipeline, split.dev_features)
+        usage = meter(context, pipeline, split.dev_features)
         test_metrics = context.catalog.evaluate(
             pipeline, test_features, test_target, task
         )
@@ -3732,7 +3966,7 @@ class FinalEvaluationStage(Stage):
         context.reference_scores = reference_scores(
             pipeline, test_features, task
         )
-        context.diagnostics = diagnostics.run_suite(
+        context.diagnostics = suite.run_suite(
             diagnostics.DiagnosticInput(
                 pipeline,
                 test_features,
@@ -3758,9 +3992,20 @@ class FinalEvaluationStage(Stage):
             ),
             suite.lineup(),
             self.ration(context),
+            context.regulator.until("finish")
+            - context.regulator.reserve.parts.get("package", 0.0),
         )
         for name, report_body in context.diagnostics.items():
             context.write_json(f"diagnostics/{name}.json", report_body)
+            if report_body.get("skipped") is True:
+                context.forgo(
+                    f"diagnostic {name}", report_body.get("reason", "")
+                )
+            elif report_body.get("truncated"):
+                context.forgo(
+                    f"diagnostic {name} (cut short)",
+                    str(report_body.get("reason", "")),
+                )
         net_benefit = appraise(
             context, pipeline, test_features, test_target, decision
         )
@@ -3829,6 +4074,7 @@ class FinalEvaluationStage(Stage):
             "net_benefit": net_benefit,
             "resources": usage.to_dict(),
             "resource_limits": context.regulator.report(),
+            "skipped_for_time": context.skipped,
             "test_set_opened": locked.opened,
             "diagnostics": sorted(context.diagnostics),
             "elapsed_seconds": time.monotonic() - context.started_at,
@@ -4054,7 +4300,11 @@ class PackageStage(Stage):
         evidence: dict[str, dict[str, Any]] = {}
         for name, diagnostic in diagnostics_by_name.items():
             result = context.diagnostics.get(name)
-            if result is None or "error" in result:
+            if (
+                result is None
+                or "error" in result
+                or result.get("available") is False
+            ):
                 continue
             report_path = store.path(f"diagnostics/{name}.json")
             if not report_path.exists():
@@ -4256,7 +4506,7 @@ class PackageStage(Stage):
             The curve as a record, or None when the budget is spent, the
             fold has too few training rows or too few usable points result.
         """
-        if context.regulator.skip_reason(first=False):
+        if halt(context, selected, "learning curve"):
             return None
         split = scmle.core.context.require(context.split, "split")
         template = strategies.lookup(selected.strategy).build(
@@ -4281,7 +4531,7 @@ class PackageStage(Stage):
                 )
             ),
             metric.greater_is_better,
-            lambda: bool(context.regulator.skip_reason(first=False)),
+            lambda: bool(halt(context, selected, "learning curve")),
         )
         return None if curve is None else curve.to_dict()
 
@@ -4333,7 +4583,7 @@ class PackageStage(Stage):
             tasks.Task.UPLIFT,
         ):
             return None  # Conformal margins need point predictions or labels.
-        reason = context.regulator.skip_reason(first=False)
+        reason = halt(context, selected, "conformal calibration")
         if reason:
             self.waive(context, reason)
             return None
@@ -4352,7 +4602,7 @@ class PackageStage(Stage):
         classes = list(bundle.classes or ())
         entity_column = self.grouping(context)
         for fit_positions, evaluate_positions in split.manifest.folds:
-            reason = context.regulator.skip_reason(first=False)
+            reason = halt(context, selected, "conformal calibration")
             if reason:
                 self.waive(context, reason)
                 return None
@@ -4563,7 +4813,8 @@ class PackageStage(Stage):
         task = scmle.core.context.require(context.task, "task")
         if task is not tasks.Task.REGRESSION:
             return None
-        if context.regulator.skip_reason(first=False):
+        selected = scmle.core.context.require(context.selected, "selected")
+        if halt(context, selected, "quantile intervals"):
             return None
         split = scmle.core.context.require(context.split, "split")
         plan = scmle.core.context.require(
@@ -4585,7 +4836,7 @@ class PackageStage(Stage):
         lows: list[float] = []
         highs: list[float] = []
         for fit_positions, evaluate_positions in split.manifest.folds:
-            if context.regulator.skip_reason(first=False):
+            if halt(context, selected, "quantile intervals"):
                 return None
             fit = numpy.asarray(fit_positions)
             evaluate = numpy.asarray(evaluate_positions)
@@ -4651,7 +4902,7 @@ class PackageStage(Stage):
             task.is_classification,
             replicates,
             seed,
-            lambda: bool(context.regulator.skip_reason(first=False)),
+            lambda: bool(halt(context, selected, "bias-variance estimate")),
         )
         if found is None:
             return {"skipped": "time budget spent or too few predictions"}
@@ -4687,7 +4938,7 @@ class PackageStage(Stage):
             tasks.Task.REGRESSION,
         ):
             return {"skipped": f"not defined for {task.value}"}
-        if context.regulator.skip_reason(first=False):
+        if halt(context, selected, "sensitivity analysis"):
             return {"skipped": "time budget spent"}
         split = scmle.core.context.require(context.split, "split")
         if len(split.dev_target) < sensitivity.MIN_ROWS:
@@ -4738,7 +4989,7 @@ class PackageStage(Stage):
                 "skipped": f"not defined for {split.manifest.strategy} "
                 "validation"
             }
-        if context.regulator.skip_reason(first=False):
+        if halt(context, selected, "nested validation"):
             return {"skipped": "time budget spent"}
         task = scmle.core.context.require(context.task, "task")
         adapter = context.registry.get(selected.model_name)
@@ -4761,7 +5012,7 @@ class PackageStage(Stage):
             task.is_classification,
             seed,
             should_stop=lambda: bool(
-                context.regulator.skip_reason(first=False)
+                halt(context, selected, "nested validation")
             ),
         )
         if result is None:
@@ -4792,7 +5043,7 @@ class PackageStage(Stage):
             opened), the per-origin `origins` and the `seasonal_period`, or
             None when the time budget is spent.
         """
-        if context.regulator.skip_reason(first=False):
+        if halt(context, selected, "forecast backtest"):
             return None
         split = scmle.core.context.require(context.split, "split")
         data = context.spec.data
@@ -4805,7 +5056,7 @@ class PackageStage(Stage):
         )
         fitted = []
         for fit_positions, evaluate_positions in split.manifest.folds:
-            if context.regulator.skip_reason(first=False):
+            if halt(context, selected, "forecast backtest"):
                 return None
             fit = numpy.asarray(fit_positions)
             held = numpy.asarray(evaluate_positions)

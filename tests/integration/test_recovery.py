@@ -93,13 +93,22 @@ def test_cancellation_keeps_completed_trials(binary_frame, tmp_path):
     assert read_events(run_dir)[-1]["kind"] == "state.CANCELLED"
 
 
-def test_budget_exhaustion_skips_later_trials(binary_frame, tmp_path):
+def test_a_budget_below_the_minimum_run_is_refused_before_work(
+    binary_frame, tmp_path
+):
+    # The first trial no longer runs past a spent budget: a run whose
+    # minimum cannot fit is refused, naming the smallest budget that fits.
+    with pytest.raises(errors.BlockedError, match="smallest budget") as caught:
+        support.make_project(
+            binary_frame, "y", time_budget=1, output_dir=tmp_path
+        ).run()
+    smallest = caught.value.details["smallest_budget_seconds"]
     result = support.make_project(
-        binary_frame, "y", time_budget=1, output_dir=tmp_path
+        binary_frame, "y", time_budget=smallest, output_dir=tmp_path / "b"
     ).run()
     assert result.trials[0].status == "ok" and result.state == "COMPLETED"
     skipped = [t for t in result.trials if t.status == "skipped"]
-    assert all("budget" in t.error for t in skipped)
+    assert all("trial window" in t.error for t in skipped)
 
 
 def test_custom_stage_sequence_is_polymorphic(binary_frame, tmp_path):

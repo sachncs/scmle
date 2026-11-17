@@ -10,6 +10,7 @@ scmle/api/results.py predict_proba passthrough public API or scikit-learn estima
 scmle/api/results.py save passthrough public Run method pinned in tests/fixtures/public_api.json
 scmle/contracts/models.py Estimator lone-interface structural protocol every scikit-learn estimator and pipeline satisfies; 83 references
 scmle/core/policies.py Reviewer lone-interface documented extension point (README, docs/ARCHITECTURE.md, website)
+scmle/data/admissibility/screen.py decline single-use builds the refusal of a real scan predicted past its share of the time budget (the 14-line message naming hypotheses, fits, permutations and the limit); inlined it would put screen_table back over the 80-line function limit
 scmle/data/ledger/confirm.py Source lone-interface protocol satisfied by custody Locker and the vault, so the ledger layer does not import custody
 scmle/data/readers/streaming.py Sink lone-interface RecordingSink test double, an isinstance check in the code, and the website data docs
 scmle/data/readers/tabular.py load passthrough required TableReader hook called through the reader classes

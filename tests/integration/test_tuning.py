@@ -88,7 +88,7 @@ def test_plan_documents_the_search(binary_frame):
 
 def test_search_stops_when_budget_is_exhausted(binary_frame, tmp_path):
     result = support.make_project(
-        binary_frame, "y", time_budget=1, output_dir=tmp_path, search=SEARCH
+        binary_frame, "y", time_budget=12, output_dir=tmp_path, search=SEARCH
     ).run()
     assert result.state == "COMPLETED"
     assert sum(1 for t in result.trials if t.params) <= 6

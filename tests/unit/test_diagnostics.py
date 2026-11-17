@@ -1,5 +1,7 @@
 """Tests for post-selection diagnostics."""
 
+import dataclasses
+
 import numpy
 import pandas
 import pytest
@@ -7,6 +9,7 @@ import pytest
 from scmle.contracts import data
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
+from scmle.evaluation import bootstrap
 from scmle.evaluation import diagnostics
 from scmle.evaluation import metrics
 import scmle.evaluation.suite
@@ -120,7 +123,9 @@ def test_error_analysis_ranks_regression_residuals():
 
 def test_suite_selects_by_task_and_isolates_failures():
     suite = scmle.evaluation.suite.lineup()
-    binary = diagnostics.run_suite(make_inputs(tasks.Task.BINARY), suite)
+    binary = scmle.evaluation.suite.run_suite(
+        make_inputs(tasks.Task.BINARY), suite
+    )
     assert set(binary) == {
         "classification_report",
         "calibration",
@@ -135,7 +140,7 @@ def test_suite_selects_by_task_and_isolates_failures():
         "robustness",
         "adversarial_validation",
     }
-    regression = diagnostics.run_suite(
+    regression = scmle.evaluation.suite.run_suite(
         make_inputs(tasks.Task.REGRESSION), suite
     )
     assert set(regression) == {
@@ -157,7 +162,7 @@ def test_suite_selects_by_task_and_isolates_failures():
         def compute(self, inputs):
             raise RuntimeError("boom")
 
-    reports = diagnostics.run_suite(
+    reports = scmle.evaluation.suite.run_suite(
         make_inputs(tasks.Task.BINARY),
         (Broken(), diagnostics.Calibration()),
     )
@@ -213,7 +218,7 @@ def make_clustered_inputs(clusters=40, per_cluster=15, seed=0, grouped=True):
 
 def test_uncertainty_reports_an_interval_around_the_estimate():
     # Enforces docs/ARCHITECTURE.md:97.
-    report = diagnostics.Uncertainty().compute(make_inputs(tasks.Task.BINARY))
+    report = bootstrap.Uncertainty().compute(make_inputs(tasks.Task.BINARY))
     low, high = report["ci_95"]
     assert low <= report["estimate"] <= high and high - low < 0.2
     assert report["resampling_unit"] == "rows" and report["resamples"] > 150
@@ -222,8 +227,8 @@ def test_uncertainty_reports_an_interval_around_the_estimate():
 
 def test_group_bootstrap_is_wider_than_a_naive_row_bootstrap():
     # Enforces docs/ARCHITECTURE.md:97.
-    clustered = diagnostics.Uncertainty().compute(make_clustered_inputs())
-    naive = diagnostics.Uncertainty().compute(
+    clustered = bootstrap.Uncertainty().compute(make_clustered_inputs())
+    naive = bootstrap.Uncertainty().compute(
         make_clustered_inputs(grouped=False)
     )
     width = lambda r: r["ci_95"][1] - r["ci_95"][0]  # noqa: E731
@@ -248,13 +253,13 @@ def test_temporal_inputs_use_contiguous_blocks():
         0,
         temporal=True,
     )
-    report = diagnostics.Uncertainty().compute(temporal)
+    report = bootstrap.Uncertainty().compute(temporal)
     assert report["resampling_unit"] == "blocks"
 
 
 def test_block_resamples_are_contiguous_runs():
     rng = numpy.random.default_rng(0)
-    rows = diagnostics.redraw(100, None, True, rng)
+    rows = bootstrap.redraw(100, None, True, rng)
     assert len(rows) == 100
     steps = numpy.diff(rows)
     assert (steps == 1).mean() > 0.7  # mostly consecutive within blocks
@@ -263,15 +268,13 @@ def test_block_resamples_are_contiguous_runs():
 def test_group_resamples_keep_whole_groups_together():
     rng = numpy.random.default_rng(1)
     groups = pandas.Series(numpy.repeat(numpy.arange(10), 5))
-    rows = diagnostics.redraw(50, groups, False, rng)
+    rows = bootstrap.redraw(50, groups, False, rng)
     counts = groups.iloc[rows].value_counts()
     assert set(counts) <= {5, 10, 15, 20, 25}  # multiples of the group size
 
 
 def test_regression_uncertainty_works():
-    report = diagnostics.Uncertainty().compute(
-        make_inputs(tasks.Task.REGRESSION)
-    )
+    report = bootstrap.Uncertainty().compute(make_inputs(tasks.Task.REGRESSION))
     assert (
         report["metric"] == "rmse" and report["ci_95"][0] <= report["ci_95"][1]
     )
@@ -279,7 +282,7 @@ def test_regression_uncertainty_works():
 
 def test_cached_predictions_match_the_model():
     inputs = make_inputs(tasks.Task.BINARY)
-    replay = diagnostics.Replay(inputs.estimator, inputs.features)
+    replay = bootstrap.Replay(inputs.estimator, inputs.features)
     subset = inputs.features.iloc[[3, 1, 2]]
     numpy.testing.assert_array_equal(
         replay.predict(subset), inputs.estimator.predict(subset)
@@ -287,7 +290,7 @@ def test_cached_predictions_match_the_model():
     numpy.testing.assert_allclose(
         replay.predict_proba(subset), inputs.estimator.predict_proba(subset)
     )
-    bare = diagnostics.Cache(
+    bare = bootstrap.Cache(
         make_inputs(tasks.Task.REGRESSION).estimator,
         make_inputs(tasks.Task.REGRESSION).features,
     )
@@ -298,7 +301,7 @@ def test_cached_predictions_match_the_model():
 def test_block_resamples_can_start_at_the_last_possible_position():
     rng = numpy.random.default_rng(0)
     firsts = {
-        int(diagnostics.redraw(10, None, True, rng)[0]) for draw in range(300)
+        int(bootstrap.redraw(10, None, True, rng)[0]) for draw in range(300)
     }
     assert 5 in firsts  # blocks of 5 rows may start at row 5 of 10
 
@@ -324,15 +327,153 @@ def test_uncertainty_is_unavailable_when_every_resample_fails():
         inputs.feature_plan,
         0,
     )
-    report = diagnostics.Uncertainty().compute(inputs)
+    report = bootstrap.Uncertainty().compute(inputs)
     assert report["ci_95"] is None and report["resamples"] == 0
     assert report["estimate"] == 0.5
 
 
 def test_small_evaluation_sets_get_more_resamples_than_large_ones():
-    diagnostic = diagnostics.Uncertainty()
+    diagnostic = bootstrap.Uncertainty()
 
     assert diagnostic.replicates(200) == diagnostic.resamples
     assert diagnostic.replicates(100_000) == diagnostic.minimum_resamples
     assert diagnostic.replicates(10**9) == diagnostic.minimum_resamples
     assert diagnostic.replicates(4000) == 1000
+
+
+class Clock:
+    """A monotonic clock the test moves by hand."""
+
+    def __init__(self, now=1000.0):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
+def test_run_suite_ends_by_the_run_deadline_not_its_own_allowance():
+    seen = []
+
+    class Probe(diagnostics.Diagnostic):
+        name = "probe"
+
+        def compute(self, inputs):
+            seen.append(inputs.deadline)
+            return {}
+
+    finish = diagnostics.clock() + 5.0
+    scmle.evaluation.suite.run_suite(
+        make_inputs(tasks.Task.BINARY), (Probe(),), 100.0, deadline=finish
+    )
+
+    assert seen and seen[0] <= finish
+
+
+def test_run_suite_records_every_diagnostic_skipped_after_the_deadline():
+    reports = scmle.evaluation.suite.run_suite(
+        make_inputs(tasks.Task.BINARY),
+        scmle.evaluation.suite.lineup(),
+        deadline=diagnostics.clock() - 1.0,
+    )
+
+    assert reports and all(
+        body["skipped"] and body["available"] is False and body["reason"]
+        for body in reports.values()
+    )
+
+
+def test_run_suite_skips_what_cannot_fit_and_runs_what_can():
+    class Slow(diagnostics.Diagnostic):
+        name = "slow"
+        fixed = 1000.0
+
+        def compute(self, inputs):
+            raise AssertionError("must not start")
+
+    reports = scmle.evaluation.suite.run_suite(
+        make_inputs(tasks.Task.BINARY),
+        (Slow(), diagnostics.Calibration()),
+        deadline=diagnostics.clock() + 30.0,
+    )
+
+    assert reports["slow"]["skipped"]
+    assert "needs" in reports["slow"]["reason"]
+    assert "brier_score" in reports["calibration"]
+
+
+def test_uncertainty_sizes_its_resamples_to_the_time_left(monkeypatch):
+    clock = Clock()
+    monkeypatch.setattr(diagnostics, "clock", clock)
+    base = make_inputs(tasks.Task.BINARY)
+    diagnostic = bootstrap.Uncertainty()
+    each = diagnostic.cost(base)
+    inputs = dataclasses.replace(base, deadline=clock.now + 500.5 * each)
+
+    report = diagnostic.compute(inputs)
+
+    assert report["planned"] == 500
+    assert report["resamples"] + report["dropped"] == 500
+    assert report["ci_95"] is not None
+
+
+def test_uncertainty_skips_rather_than_report_too_few_resamples(monkeypatch):
+    clock = Clock()
+    monkeypatch.setattr(diagnostics, "clock", clock)
+    base = make_inputs(tasks.Task.BINARY)
+    diagnostic = bootstrap.Uncertainty()
+    room = (diagnostic.minimum_resamples - 1) * diagnostic.cost(base)
+    inputs = dataclasses.replace(base, deadline=clock.now + room)
+
+    report = diagnostic.compute(inputs)
+
+    assert report["available"] is False and report["skipped"]
+    assert report["ci_95"] is None and "minimum" in report["reason"]
+    assert report["estimate"] > 0.5
+
+
+def test_uncertainty_stops_at_the_deadline_mid_loop(monkeypatch):
+    clock = Clock()
+    monkeypatch.setattr(diagnostics, "clock", clock)
+    base = make_inputs(tasks.Task.BINARY)
+    calls = []
+    score = base.metric.score
+
+    class Ticking:
+        name = base.metric.name
+
+        def score(self, *args):
+            calls.append(1)
+            if len(calls) > 50:
+                clock.now += 1e6
+            return score(*args)
+
+    inputs = dataclasses.replace(
+        base, metric=Ticking(), deadline=clock.now + 1e5
+    )
+
+    report = bootstrap.Uncertainty().compute(inputs)
+
+    assert report["skipped"] and report["ci_95"] is None
+    assert report["resamples"] < bootstrap.Uncertainty.minimum_resamples
+
+
+def test_uncertainty_cost_grows_with_rows_and_classes():
+    diagnostic = bootstrap.Uncertainty()
+    small = make_inputs(tasks.Task.BINARY, rows=200)
+    large = make_inputs(tasks.Task.BINARY, rows=4000)
+    many = make_inputs(tasks.Task.MULTICLASS, rows=4000)
+    rows = make_inputs(tasks.Task.REGRESSION, rows=4000)
+
+    assert diagnostic.cost(small) < diagnostic.cost(large)
+    assert diagnostic.cost(large) < diagnostic.cost(many)
+    assert diagnostic.cost(rows) < diagnostic.cost(large)
+
+
+def test_calibration_is_skipped_once_its_deadline_has_passed():
+    inputs = dataclasses.replace(
+        make_inputs(tasks.Task.BINARY), deadline=diagnostics.clock() - 1.0
+    )
+
+    for diagnostic in (diagnostics.Calibration(), diagnostics.Reliability()):
+        report = diagnostic.compute(inputs)
+        assert report["skipped"] and report["reason"]

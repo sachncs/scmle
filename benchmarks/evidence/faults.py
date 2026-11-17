@@ -604,6 +604,69 @@ def featureless() -> Any:
     return launch(frame, target, **options)
 
 
+def starved(seconds: float) -> Any:
+    """Runs a binary task under a time budget.
+
+    Args:
+        seconds: The budget; 1 s cannot fit the minimum run (the fault),
+            `BUDGET` can.
+
+    Returns:
+        The completed run.
+    """
+    frame, target, options = clean("binary")
+
+    def adjust(config: tasks.Config) -> tasks.Config:
+        resources = config.resources.model_copy(
+            update={"time_budget_seconds": seconds}
+        )
+        return config.model_copy(update={"resources": resources})
+
+    return launch(frame, target, adjust=adjust, **options)
+
+
+def overrun(spent: bool) -> Any:
+    """Runs a binary task whose preparation may have closed the trial window.
+
+    Args:
+        spent: Whether training starts with the run's start moved back by
+            the whole budget, as after a preparation far longer than its
+            estimate (the fault).
+
+    Returns:
+        The completed run.
+    """
+    import scmle.api.project
+    from scmle.core import stages
+
+    class Late(stages.TrainStage):
+        """Training that first spends the whole budget when `spent`."""
+
+        def execute(self, context: Any) -> None:
+            """Moves the run's start back, then trains.
+
+            Args:
+                context: The run context.
+            """
+            if spent:
+                context.regulator.started_at -= BUDGET
+            super().execute(context)
+
+    frame, target, options = clean("binary")
+    project = scmle.api.project.Project(
+        frame,
+        target,
+        time_budget=BUDGET,
+        output_dir=tempfile.mkdtemp(prefix="faults-"),
+        **{**FAST, **options},
+    )
+    project.orchestrator.stages = tuple(
+        Late() if isinstance(stage, stages.TrainStage) else stage
+        for stage in project.orchestrator.stages
+    )
+    return project.run()
+
+
 def survival(censored: int | None) -> Any:
     """Runs a survival task with a set number of censored rows.
 
@@ -1207,6 +1270,18 @@ INJECTIONS: dict[str, Injection] = {
         "monotonic constraints on a multiclass task",
         bind(multiclass, {"x1": 1}),
         override=bind(multiclass, {}),
+    ),
+    "budget.minimum_run": Injection(
+        "run",
+        "a 1 s time budget, below the estimated minimum run",
+        bind(starved, 1),
+        bind(starved, BUDGET),
+    ),
+    "train.first_trial": Injection(
+        "run",
+        "training starts after preparation used up the trial window",
+        bind(overrun, spent=True),
+        bind(overrun, spent=False),
     ),
 }
 

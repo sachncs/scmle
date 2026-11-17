@@ -7,16 +7,19 @@ leak, and statistics alone cannot tell which. Leakage suspicion comes from
 control, not from a fixed cutoff.
 """
 
+from collections.abc import Mapping
 import dataclasses
 from typing import Any
 
 import numpy
 import pandas
+import threadpoolctl
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
 import scmle.contracts.data
 from scmle.data.admissibility import screen
+from scmle.data.profiling import label_noise
 from scmle.data.profiling import missingness
 from scmle.data.readers import streaming
 from scmle.data.validation import columns
@@ -112,6 +115,72 @@ def summarize(
 
 MIN_BALANCE_ROWS = 100
 MIN_BALANCE_CLASSES = 2
+# Profiling outside the leakage screen, the baselines and the label-noise
+# check (ingest, statistics, missingness, fingerprint), fitted 2026-11-17 on
+# the 15 evidence tables (OMP_NUM_THREADS=1, two runs at a time):
+# seconds = REST_BASE + REST_ROW x rows. The largest measured to predicted
+# ratio was 1.30 (1.34 s against 1.03 s on a 1132-row, 111-column table);
+# REST_MARGIN = 1.5 keeps a fifth more headroom than that, because the model
+# has no column term.
+REST_BASE = 1.0
+REST_ROW = 3e-5
+REST_MARGIN = 1.5
+
+
+def rest(rows: int) -> float:
+    """Predicts an upper bound on the seconds of the uncapped profiling.
+
+    Args:
+        rows: Rows profiled.
+
+    Returns:
+        `REST_MARGIN x (REST_BASE + REST_ROW x rows)`.
+    """
+    return REST_MARGIN * (REST_BASE + REST_ROW * rows)
+
+
+def estimate(rows: int, columns: int, classes: int, budget: float) -> float:
+    """Predicts an upper bound on the seconds of data preparation.
+
+    Preparation is reading and profiling the development rows: the leakage
+    screen and its probe, the difficulty baselines and, for classification,
+    the label-noise check. Each of the three is capped at its share of the
+    budget (`screen.SCREEN_SHARE`, `fingerprint.SHARE`, `label_noise.SHARE`)
+    and reduced or skipped to fit it, so its part is the smaller of its
+    predicted cost and its share; the rest is `rest`. Every cost model is
+    an upper bound on the measured single-thread seconds.
+
+    Args:
+        rows: Development rows to be profiled.
+        columns: Feature columns.
+        classes: Classes of the target; below two means regression.
+        budget: The run's time budget in seconds.
+
+    Returns:
+        The predicted seconds.
+
+    Raises:
+        InputError: If a count is negative or the budget is not positive.
+    """
+    if min(rows, columns, classes) < 0 or budget <= 0:
+        raise errors.InputError(
+            "estimate needs non-negative rows, columns and classes and a "
+            f"positive budget, got {rows}, {columns}, {classes}, {budget}"
+        )
+    total = rest(rows)
+    total += min(
+        screen.bound(rows, columns, classes), budget * screen.SCREEN_SHARE
+    )
+    total += min(
+        fingerprint.cost(rows, columns, classes), budget * fingerprint.SHARE
+    )
+    if classes >= MIN_BALANCE_CLASSES:
+        noisy = min(rows, label_noise.MAX_ROWS)
+        total += min(
+            label_noise.cost(noisy, columns, classes),
+            budget * label_noise.SHARE,
+        )
+    return total
 
 
 class Profiler:
@@ -475,6 +544,130 @@ class Profiler:
                 feature remains, or a monotonic constraint names a column
                 that is not a numeric feature.
         """
+        with threadpoolctl.threadpool_limits(
+            limits=self.spec.resources.cpu_limit
+        ):
+            return self.portray(frame, manifest, task, read_seconds, total_rows)
+
+    def draft(
+        self,
+        target: pandas.Series,
+        features: dict[str, list[str]],
+        statistics: Mapping[str, Mapping[str, Any]],
+        dropped: dict[str, str],
+    ) -> scmle.contracts.data.Blueprint:
+        """Builds the feature plan before derived features are added.
+
+        Args:
+            target: The target column.
+            features: Usable columns by kind (`numeric`, `categorical`,
+                `datetime`, `text`).
+            statistics: Column statistics by column.
+            dropped: Excluded columns and the reason for each.
+
+        Returns:
+            The plan of the usable columns and the configured roles.
+
+        Raises:
+            BlockedError: If a monotonic constraint names a column that is
+                not a numeric feature (`monotonic_features`).
+        """
+        data = self.spec.data
+        return scmle.contracts.data.Blueprint(
+            numeric=tuple(features["numeric"]),
+            categorical=tuple(features["categorical"]),
+            text=tuple(features["text"]),
+            monotonic=self.monotonic_features(features["numeric"]),
+            dropped=dropped,
+            group_column=data.group_column,
+            time_column=data.time_column,
+            weight_column=data.weight_column,
+            event_column=data.event_column,
+            query_column=data.query_column,
+            target_columns=tuple(data.targets),
+            value_column=data.value_column,
+            treatment_column=data.treatment_column,
+            binary_outcome=bool(set(pandas.unique(target.dropna())) <= {0, 1}),
+            text_encoding=data.text_encoding,
+            embedding_model=data.embedding_model,
+            ordinal_levels=len(data.ordinal_order) or None,
+            high_cardinality=tuple(
+                c
+                for c in features["categorical"]
+                if statistics[c]["n_unique"]
+                >= scmle.contracts.data.HIGH_CARDINALITY_LEVELS
+            ),
+        )
+
+    @staticmethod
+    def associate(
+        frame: pandas.DataFrame,
+        usable: list[str],
+        target: pandas.Series,
+        task: tasks.Task,
+    ) -> tuple[list[missingness.Finding], list[str]]:
+        """Tests whether each column's missingness is tied to the target.
+
+        Args:
+            frame: The rows to profile.
+            usable: Numeric and categorical feature columns.
+            target: The target column.
+            task: Resolved task type.
+
+        Returns:
+            Every finding, and a quality note for each informative one.
+        """
+        found = missingness.assess(
+            frame, usable, target, task.is_classification
+        )
+        return found, [
+            f"missingness of '{f.column}' is associated with the target "
+            f"({f.test}, effect {f.effect:.2f}, p={f.p_value:.1e})"
+            for f in found
+            if f.informative
+        ]
+
+    @staticmethod
+    def expose(report: screen.Screen | None) -> tuple[list[str], list[str]]:
+        """Turns a leakage screen report into risk findings and notes.
+
+        Args:
+            report: The screen report, or None when no screen ran.
+
+        Returns:
+            The risk findings (the warning first, if any) and the quality
+            notes of the screen.
+        """
+        if report is None:
+            return [], []
+        risks = list(report.sentences())
+        if report.warning:
+            risks.insert(0, report.warning)
+        return risks, [f"leakage screen: {note}" for note in report.notes]
+
+    def portray(
+        self,
+        frame: pandas.DataFrame,
+        manifest: scmle.contracts.data.DatasetManifest,
+        task: tasks.Task,
+        read_seconds: float,
+        total_rows: int | None,
+    ) -> scmle.contracts.data.Portrait:
+        """Profiles the dataset under the thread cap `profile` applies.
+
+        Args:
+            frame: The rows to profile.
+            manifest: Identity of the whole dataset.
+            task: Resolved task type.
+            read_seconds: Time spent reading the data.
+            total_rows: Rows in the whole dataset when `frame` is a subset.
+
+        Returns:
+            The profile, as `profile` describes.
+
+        Raises:
+            BlockedError: As `profile` describes.
+        """
         target = frame[self.spec.data.target]
         if target.isna().any():
             raise errors.BlockedError(
@@ -490,49 +683,15 @@ class Profiler:
             )
         stamps = tuple(features["datetime"])
         derived = tuple(self.derive(frame, stamps))
-        quality += self.dupes(frame, usable, task)
-        quality += self.balance(target, task)
-        gaps = missingness.assess(frame, usable, target, task.is_classification)
-        informative = tuple(f.column for f in gaps if f.informative)
-        quality += [
-            f"missingness of '{f.column}' is associated with the target "
-            f"({f.test}, effect {f.effect:.2f}, p={f.p_value:.1e})"
-            for f in gaps
-            if f.informative
-        ]
+        quality += self.dupes(frame, usable, task) + self.balance(target, task)
+        gaps, notes = self.associate(frame, usable, target, task)
+        quality += notes
         self.describe(frame, statistics, usable, task)
         report = self.leakage_screen(frame, usable, task)
-        risks = [] if report is None else list(report.sentences())
-        if report is not None and report.warning:
-            risks.insert(0, report.warning)
-        if report is not None:
-            quality += [f"leakage screen: {note}" for note in report.notes]
+        risks, notes = self.expose(report)
+        quality += notes
         target_summary, target_risks = summarize(target, task)
-        base_plan = scmle.contracts.data.Blueprint(
-            numeric=tuple(features["numeric"]),
-            categorical=tuple(features["categorical"]),
-            text=tuple(features["text"]),
-            monotonic=self.monotonic_features(features["numeric"]),
-            dropped=dropped,
-            group_column=self.spec.data.group_column,
-            time_column=self.spec.data.time_column,
-            weight_column=self.spec.data.weight_column,
-            event_column=self.spec.data.event_column,
-            query_column=self.spec.data.query_column,
-            target_columns=tuple(self.spec.data.targets),
-            value_column=self.spec.data.value_column,
-            treatment_column=self.spec.data.treatment_column,
-            binary_outcome=bool(set(pandas.unique(target.dropna())) <= {0, 1}),
-            text_encoding=self.spec.data.text_encoding,
-            embedding_model=self.spec.data.embedding_model,
-            ordinal_levels=len(self.spec.data.ordinal_order) or None,
-            high_cardinality=tuple(
-                c
-                for c in features["categorical"]
-                if statistics[c]["n_unique"]
-                >= scmle.contracts.data.HIGH_CARDINALITY_LEVELS
-            ),
-        )
+        base_plan = self.draft(target, features, statistics, dropped)
         dataset_statistics = fingerprint.imprint(
             frame,
             self.spec,
@@ -543,13 +702,17 @@ class Profiler:
             read_seconds,
             len(risks),
             total_rows,
+            self.spec.resources.time_budget_seconds * fingerprint.SHARE,
         )
+        difficulty = dataset_statistics["ml_difficulty"]
+        if difficulty.get("skipped"):
+            quality.append(f"ml_difficulty skipped: {difficulty['reason']}")
         feature_plan = dataclasses.replace(
             base_plan,
             numeric=base_plan.numeric + tuple(n.name for n in derived),
             derived=derived,
             extra_inputs=tuple(c for c in stamps if derived) + base_plan.text,
-            informative_missing=informative,
+            informative_missing=tuple(f.column for f in gaps if f.informative),
         )
         return scmle.contracts.data.Portrait(
             manifest=manifest,

@@ -66,8 +66,12 @@ class Strategist:
             : spec.top_models
         ]
         for leader in leaders:
-            if self.context.regulator.skip_reason(first=False):
-                break
+            reason = self.context.regulator.skip_reason(first=False)
+            if reason:
+                self.context.forgo(
+                    f"strategy search for {leader.model_name}", reason
+                )
+                continue
             self.context.check_cancelled()
             self.tune(leader, spec.names)
 
@@ -75,7 +79,9 @@ class Strategist:
         """Tries every applicable strategy for one model.
 
         Inapplicable strategies are rejected with the reason; the others are
-        evaluated as trials and judged against the leader.
+        evaluated as trials and judged against the leader. Each trial gets
+        its ceiling when it is dispatched, and one that must not start is
+        recorded as skipped (`trials.Runner.run_many`).
 
         Args:
             leader: The model's default-pipeline trial.

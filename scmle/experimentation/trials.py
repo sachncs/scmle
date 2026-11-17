@@ -386,33 +386,48 @@ class Runner:
         job = Job(trial_id, model_name, dict(params or {}), fold_count)
         return self.run_many([job])[0]
 
-    def run_many(self, jobs: Sequence[Job]) -> list[experiments.Trial]:
+    def run_many(
+        self, jobs: Sequence[Job], first: bool = False
+    ) -> list[experiments.Trial]:
         """Evaluates independent jobs, concurrently if the backend allows.
 
         Checkpointed results from an interrupted run are reused; only the
-        remaining jobs are dispatched.
+        remaining jobs are dispatched, `workers` at a time. Each group's
+        payloads are built when it is dispatched, so its hard ceiling is the
+        trial window left then, and a group that must not start (the window
+        is closed or memory is full) is recorded as skipped with the reason.
 
         Args:
             jobs: Independent jobs.
+            first: True when the first group holds the run's first trial,
+                which runs above the memory limit (`Governor.skip_reason`).
 
         Returns:
             Results in the order of `jobs`.
         """
         results: list[experiments.Trial | None] = [None] * len(jobs)
-        slots: list[int] = []
-        payloads: list[Payload] = []
+        pending: list[int] = []
         for index, job in enumerate(jobs):
             cached = self.reuse(job)
             if cached is not None:
                 results[index] = cached
             else:
-                slots.append(index)
-                payloads.append(self.payload(job))
+                pending.append(index)
         governor = self.context.regulator
         function = supervise if governor.hard else evaluate_payload
-        outputs = self.context.backend.map(function, payloads, lose)
-        for index, output in zip(slots, outputs, strict=True):
-            results[index] = output
+        size = max(self.workers, 1)
+        for start in range(0, len(pending), size):
+            slots = pending[start : start + size]
+            reason = governor.skip_reason(first=first and start == 0)
+            if reason is not None:
+                for index in slots:
+                    results[index] = self.forgo(jobs[index], reason)
+                continue
+            self.context.check_cancelled()
+            payloads = [self.payload(jobs[index]) for index in slots]
+            outputs = self.context.backend.map(function, payloads, lose)
+            for index, output in zip(slots, outputs, strict=True):
+                results[index] = output
         return [r for r in results if r is not None]
 
     def reuse(self, job: Job) -> experiments.Trial | None:
@@ -481,5 +496,26 @@ class Runner:
             model_name,
             experiments.Termination.SKIPPED,
             self.metric.name,
+            error=reason,
+        )
+
+    def forgo(self, job: Job, reason: str) -> experiments.Trial:
+        """Creates a `SKIPPED` result for a job that must not start.
+
+        Args:
+            job: The job that was not evaluated.
+            reason: Why it was skipped.
+
+        Returns:
+            The result, keeping the job's parameters and strategy, with the
+            reason as its error text.
+        """
+        return experiments.Trial(
+            job.trial_id,
+            job.model_name,
+            experiments.Termination.SKIPPED,
+            self.metric.name,
+            params=dict(job.params),
+            strategy=job.strategy,
             error=reason,
         )

@@ -1,5 +1,6 @@
 """The leakage screen is bounded by the declared time budget and loud."""
 
+import dataclasses
 import json
 
 import numpy
@@ -9,6 +10,8 @@ import support
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
+from scmle.data.admissibility import leakage
+from scmle.data.admissibility import plants
 from scmle.data.admissibility import screen
 from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
@@ -16,6 +19,11 @@ import scmle.data.validation.target
 
 SMALL_BUDGET = 2
 LARGE_BUDGET = 900
+# A whole run needs more than a 2 s budget, so the run-level tests use a
+# table whose screen (about 11 s predicted for 40 columns, 3 classes, 300
+# rows) does not fit the 3 s share of a 20 s budget that a run fits in.
+WIDE = 40
+RUN_BUDGET = 20
 
 
 def wide(seed=0, rows=300, columns=10, classes=3):
@@ -38,11 +46,68 @@ def run_screen(frame, budget):
     )
 
 
-def test_the_work_cap_is_derived_from_the_budget_alone():
-    assert screen.allowance(None) is None
-    assert screen.allowance(120) == 450_000
-    assert screen.allowance(1800) == 6_750_000
+def test_the_share_is_a_fraction_of_the_budget_in_seconds():
+    assert screen.share(None) is None
+    assert screen.share(120) == pytest.approx(120 * screen.SCREEN_SHARE)
     assert screen.SCREEN_SHARE == 0.15
+
+
+def test_the_cost_of_a_scan_grows_with_its_rows():
+    small = screen.cost("classification", 1000, 50_000)
+    large = screen.cost("classification", 2000, 50_000)
+    assert large - screen.SCAN_SECONDS == pytest.approx(
+        2 * (small - screen.SCAN_SECONDS)
+    )
+    assert screen.cost("regression", 2000, 50_000) < large
+    # The old cap let 0.15 B x 25,000 fits through whatever the rows; at
+    # 2000 rows that work is predicted to take longer than the share.
+    fits = int(60 * screen.SCREEN_SHARE * screen.FITS_PER_SECOND)
+    assert screen.cost("classification", 2000, fits) > 60 * 0.15
+
+
+def demands(frame):
+    cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=7)
+    features = [c for c in frame.columns if c != "y"]
+    real = screen.measure(
+        frame, "y", "classification", cfg, features, None, None
+    )
+    copy = plants.table(frame, "y", 7, continuous=False)
+    names = [*features, *plants.DEFECTS]
+    probe = screen.measure(copy, "y", "classification", cfg, names, None, None)
+    return real, probe
+
+
+def test_measure_counts_the_work_the_scan_draws():
+    frame = wide(classes=2, columns=6)
+    real, _ = demands(frame)
+    report = run_screen(frame, None)
+    assert real.permutations == report.permutations
+    assert real.family == report.family
+    assert real.rows == report.rows
+
+
+def test_the_real_and_probe_scans_share_one_allowance():
+    frame = wide(classes=2, columns=6)
+    real, probe = demands(frame)
+    total = real.seconds + probe.seconds
+    assert total <= screen.share(LARGE_BUDGET)
+    assert run_screen(frame, LARGE_BUDGET).probe
+    squeezed = (real.seconds + probe.seconds / 2) / screen.SCREEN_SHARE
+    partial = run_screen(frame, squeezed)
+    assert partial.unchecked == () and partial.probe == {}
+    assert any(note.startswith("probe not run") for note in partial.notes)
+    alone = run_screen(frame, None)
+    assert [(f.feature, f.p_value) for f in partial.findings] == [
+        (f.feature, f.p_value) for f in alone.findings
+    ]
+    short = (real.seconds / 2) / screen.SCREEN_SHARE
+    assert run_screen(frame, short).unchecked
+
+
+def test_a_declined_screen_runs_no_probe():
+    declined = run_screen(wide(), SMALL_BUDGET)
+    assert declined.probe == {}
+    assert not any("did not find the planted" in n for n in declined.notes)
 
 
 def test_a_wide_multiclass_table_is_declined_small_and_screened_large():
@@ -94,12 +159,12 @@ def test_the_profiler_passes_the_projects_budget_and_warns_first():
 
 
 def test_an_incomplete_screen_is_in_summary_report_log_and_plan(tmp_path):
-    # Enforces docs/LEAKAGE.md:169 and docs/LEAKAGE.md:175.
+    # Enforces docs/LEAKAGE.md:172 and docs/LEAKAGE.md:178.
     result = support.make_project(
-        wide(), "y", output_dir=tmp_path, time_budget=SMALL_BUDGET
+        wide(columns=WIDE), "y", output_dir=tmp_path, time_budget=RUN_BUDGET
     ).run()
     warning = result.profile.admonition
-    assert warning.startswith("leakage screen NOT RUN for 10 columns")
+    assert warning.startswith("leakage screen NOT RUN for 40 columns")
     summary = result.summary()
     assert "PROVISIONAL: leakage screen incomplete" in summary
     assert summary.endswith("WARNING " + warning)
@@ -119,13 +184,13 @@ def test_an_incomplete_screen_is_in_summary_report_log_and_plan(tmp_path):
 
 def test_block_refuses_an_unchecked_screen_and_warn_proceeds(tmp_path):
     # Enforces docs/ARCHITECTURE.md:131.
-    # Enforces docs/LEAKAGE.md:175.
+    # Enforces docs/LEAKAGE.md:178.
     with pytest.raises(errors.BlockedError, match="NOT RUN") as raised:
         support.make_project(
-            wide(),
+            wide(columns=WIDE),
             "y",
             output_dir=tmp_path,
-            time_budget=SMALL_BUDGET,
+            time_budget=RUN_BUDGET,
             leakage_policy="block",
         ).run()
     assert raised.value.details["leakage"]["unchecked"]

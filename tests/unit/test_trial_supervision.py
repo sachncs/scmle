@@ -8,6 +8,7 @@ import numpy
 import pytest
 
 from scmle.contracts import tasks
+from scmle.core import budget
 from scmle.core import limits
 
 
@@ -57,16 +58,22 @@ def test_an_exception_in_the_trial_is_reported_not_lost():
         limits.Supervisor(30.0, None).run(explode, 1)
 
 
-def test_the_first_trial_gets_a_whole_budget_after_a_long_preparation():
-    # Preparation used up the budget: the first trial, which always runs so
-    # a result exists, must not be killed at the one-second floor; later
-    # trials are (C7 defect: "all trials failed" under a small budget).
+def test_no_trial_gets_more_than_the_trial_window():
+    # The first-trial whole-budget rule let a run take twice its budget;
+    # every trial now ends when the trial window closes, with no grace.
     late = limits.Governor(
         tasks.Resources(time_budget_seconds=10), time.monotonic() - 100
     )
-    first = late.deadline()
-    assert first >= 10 * (1 + limits.GRACE_SHARE)
-    assert late.deadline() == limits.MIN_CEILING_SECONDS
+    assert late.deadline() == 0.0
+    assert late.skip_reason(first=True) is not None
+
+
+def test_a_trial_is_killed_within_the_slack_of_its_ceiling():
+    started = time.monotonic()
+    with pytest.raises(limits.TrialError, match="hard time ceiling"):
+        limits.Supervisor(1.0, None).run(spin, 30)
+    elapsed = time.monotonic() - started
+    assert elapsed <= 1.0 + budget.START_SECONDS + limits.SLACK_SECONDS
 
 
 def test_the_cpu_limit_caps_math_threads_in_the_main_process():
@@ -92,7 +99,7 @@ def test_the_cpu_limit_caps_math_threads_in_the_main_process():
 def test_governor_modes_describe_their_enforcement():
     # Enforces docs/ARCHITECTURE.md:59.
     hard = limits.Governor(tasks.Resources(time_budget_seconds=100))
-    assert 100 <= hard.deadline() <= 110 and hard.hard
+    assert 99 <= hard.deadline() <= 100 and hard.hard
     assert "killed" in hard.report()["time_budget"]["enforcement"]
     assert "killed" in hard.report()["memory"]["enforcement"]
     soft = limits.Governor(tasks.Resources(enforcement="cooperative"))

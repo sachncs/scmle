@@ -111,7 +111,7 @@ def test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues(
     project = support.make_project(
         binary_frame,
         "y",
-        time_budget=6,
+        time_budget=12,
         enforcement="hard",
         output_dir=tmp_path,
     )
@@ -121,7 +121,9 @@ def test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues(
     )
     started = time.monotonic()
     result = project.run(plan)
-    assert time.monotonic() - started < 100
+    # No grace past the budget: the sleeper is killed when the trial window
+    # closes, and the post-training work fits the reserve.
+    assert time.monotonic() - started <= 12 + limits.SLACK_SECONDS
     assert result.state == "COMPLETED"
     sleepy = [t for t in result.trials if t.model_name == "sleepy"]
     assert sleepy and sleepy[0].status == "failed"

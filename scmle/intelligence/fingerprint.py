@@ -6,6 +6,7 @@ uncertainty: they describe the data and raise hypotheses, never verdicts.
 """
 
 import itertools
+import math
 import time
 from typing import Any
 
@@ -35,6 +36,26 @@ CO_MISSING = 0.8
 TEXT_MEAN_LENGTH = 40
 DIFFICULTY_ROWS = 2000
 DIFFICULTY_FOLDS = 3
+BINARY_CLASSES = 2
+# Cost model of `ml_difficulty` (seconds, one thread), fitted 2026-11-17 on
+# the 15 evidence tables (OMP_NUM_THREADS=1, two runs at a time):
+#   seconds = BASE + CELL x rows x columns x C'^CLASS_POWER,
+# rows capped at DIFFICULTY_ROWS, C' the classes above two, else 1. The
+# largest measured to predicted ratio was 1.56 (a 60-column text table
+# subsampled to 1535 rows, re-measured two runs at a time: 3.12 s against
+# 2.00 s), so MARGIN = 1.75 keeps about a tenth of headroom above every
+# measured table. A larger thread cap only finishes sooner.
+BASE_SECONDS = 0.11
+CELL_SECONDS = 9.0e-6
+CLASS_POWER = 0.75
+MARGIN = 1.75
+# Share of the time budget the baselines may take. At B = 60 it gives 3 s,
+# which covers 13 of the 15 measured tables on all DIFFICULTY_ROWS rows; the
+# two widest multiclass tables (predicted 7.7 s and 3.9 s) are subsampled.
+SHARE = 0.05
+# Fewest rows the baselines run on: DIFFICULTY_FOLDS folds of 50 rows, the
+# smallest table the label-noise check accepts (`label_noise.MIN_ROWS`).
+MIN_DIFFICULTY_ROWS = 150
 
 
 def redundant(
@@ -176,11 +197,61 @@ def magnitudes(frame: pandas.DataFrame, numeric: tuple[str, ...]) -> float:
     return float(numpy.log10(max(spreads) / min(spreads)))
 
 
+def ways(classes: int) -> int:
+    """Counts the one-vs-rest problems the cost model charges for.
+
+    Args:
+        classes: Classes of the target (below two for regression).
+
+    Returns:
+        `classes` above two, else 1.
+    """
+    return classes if classes > BINARY_CLASSES else 1
+
+
+def cost(rows: int, columns: int, classes: int) -> float:
+    """Predicts an upper bound on the seconds of `ml_difficulty`.
+
+    Args:
+        rows: Rows available; at most `DIFFICULTY_ROWS` are used.
+        columns: Feature columns.
+        classes: Classes of the target (below two for regression).
+
+    Returns:
+        `MARGIN x (BASE + CELL x rows x columns x C'^CLASS_POWER)`.
+    """
+    used = min(rows, DIFFICULTY_ROWS)
+    weight = math.pow(ways(classes), CLASS_POWER)
+    return MARGIN * (BASE_SECONDS + CELL_SECONDS * used * columns * weight)
+
+
+def affordable(columns: int, classes: int, allowance: float) -> int:
+    """Finds the most rows whose predicted `cost` fits an allowance.
+
+    Args:
+        columns: Feature columns.
+        classes: Classes of the target (below two for regression).
+        allowance: Seconds the baselines may take.
+
+    Returns:
+        The rows, at most `DIFFICULTY_ROWS`; 0 when not even the fixed cost
+        fits.
+    """
+    spare = allowance / MARGIN - BASE_SECONDS
+    if spare <= 0:
+        return 0
+    per = CELL_SECONDS * max(columns, 1) * math.pow(ways(classes), CLASS_POWER)
+    # The relative nudge keeps an allowance computed by `cost` for some rows
+    # from losing one row to rounding.
+    return min(DIFFICULTY_ROWS, int(spare / per * (1 + 1e-9)))
+
+
 def ml_difficulty(
     frame: pandas.DataFrame,
     spec: tasks.Config,
     task: tasks.Task,
     plan: scmle.contracts.data.Blueprint,
+    allowance: float | None = None,
 ) -> dict[str, Any]:
     """Runs cheap baselines that show how hard the problem looks.
 
@@ -195,17 +266,39 @@ def ml_difficulty(
         spec: Project specification.
         task: Resolved task type.
         plan: Feature plan.
+        allowance: Seconds the baselines may take by `cost`; the rows are
+            sampled down to what fits. None uses `DIFFICULTY_ROWS` rows.
 
     Returns:
         A mapping with `available` False and a `reason` if a baseline cannot be
-        scored. Otherwise `available` True, the scoring metric, the rows used,
-        the three baseline scores, the nonlinearity gain, the headroom over the
-        constant baseline, the separability (the linear score for
-        classification, else None) and the seconds taken.
+        scored, and also `skipped` True when `MIN_DIFFICULTY_ROWS` rows do not
+        fit `allowance`. Otherwise `available` True, the scoring metric, the
+        rows used, the three baseline scores, the nonlinearity gain, the
+        headroom over the constant baseline, the separability (the linear
+        score for classification, else None) and the seconds taken.
     """
+    limit = DIFFICULTY_ROWS
+    if allowance is not None:
+        classes = (
+            int(frame[spec.data.target].nunique())
+            if task.is_classification
+            else 1
+        )
+        width = len(plan.features)
+        limit = affordable(width, classes, allowance)
+        if limit < min(MIN_DIFFICULTY_ROWS, len(frame)):
+            need = cost(MIN_DIFFICULTY_ROWS, width, classes)
+            return {
+                "available": False,
+                "skipped": True,
+                "reason": (
+                    f"{MIN_DIFFICULTY_ROWS} rows need about {need:.2f} s; "
+                    f"the allowance is {allowance:.2f} s"
+                ),
+            }
     sample = frame
-    if len(sample) > DIFFICULTY_ROWS:
-        sample = sample.sample(DIFFICULTY_ROWS, random_state=0)
+    if len(sample) > limit:
+        sample = sample.sample(limit, random_state=0)
     features = sample[list(plan.features)]
     target = sample[spec.data.target]
     if task.is_classification:
@@ -313,6 +406,7 @@ def imprint(
     read_seconds: float,
     leakage_flags: int,
     total_rows: int | None = None,
+    allowance: float | None = None,
 ) -> dict[str, Any]:
     """Assembles the dataset-level fingerprint.
 
@@ -327,6 +421,7 @@ def imprint(
         leakage_flags: Number of leakage hypotheses raised.
         total_rows: Rows in the whole dataset when `frame` is only the
             development partition.
+        allowance: Seconds `ml_difficulty` may take, or None for no cap.
 
     Returns:
         A JSON-serializable mapping grouped by fingerprint dimension.
@@ -421,7 +516,7 @@ def imprint(
                 default=0.0,
             ),
         },
-        "ml_difficulty": ml_difficulty(frame, spec, task, plan),
+        "ml_difficulty": ml_difficulty(frame, spec, task, plan, allowance),
         "structure": structure(frame, spec),
         "quality": {
             "duplicate_rows": duplicate_rows,

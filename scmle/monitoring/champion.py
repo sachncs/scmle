@@ -11,7 +11,7 @@ import pandas
 import scmle.artifacts.bundle
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.evaluation import diagnostics
+from scmle.evaluation import bootstrap
 from scmle.evaluation import metrics
 
 BOOTSTRAPS = 300
@@ -177,7 +177,7 @@ class Referee:
             map(
                 operator.call,
                 itertools.repeat(
-                    lambda: diagnostics.redraw(
+                    lambda: bootstrap.redraw(
                         len(target), groups, temporal, rng
                     ),
                     self.bootstraps,

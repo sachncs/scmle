@@ -139,18 +139,37 @@ DETECTORS: Mapping[str, str] = {
     "regression": f"{DETECTOR_ID}-regression",
 }
 MAX_CERTIFIED_CLASSES = 10
-# Cross-fitted fits needed by the permutation test: permutations x skill
-# columns x classes (one-vs-rest when there are more than two). The screen
-# runs inside the declared time budget by a deterministic cap, never by a
-# clock: allowance = time_budget_seconds * SCREEN_SHARE * FITS_PER_SECOND.
-# Measured on the development machine (2026-11-06): a breast-cancer sized
-# table, 72,000 fits, takes 1.4 s, i.e. about 51,000 fits per second.
-# FITS_PER_SECOND is declared at about half of that so a slower machine still
-# finishes inside the share. A cap from the clock would make the flags differ
-# between machines; this one does not. The default budget of 1800 s allows
-# 6.75 million fits, the 120 s budget of the CI benchmark 450,000.
+# Cross-fitted fits needed by the permutation test: work = permutations x
+# skill columns x classes (one-vs-rest when there are more than two). In a
+# run (`screen_table`) the screen fits the declared time budget by a
+# deterministic cap, never by a clock: a scan is predicted to take
+# SCAN_SECONDS plus FIT_SECONDS of its task per row per fit (`cost`), and
+# the real scan and the planted probe together may take at most
+# SCREEN_SHARE of the budget (`share`): the real scan first, the probe from
+# what is left. A fit's cost grows with its rows, so a fixed rate of fits
+# per second let a 2000-row screen take 0.63 B instead of 0.15 B.
+# Measured 2026-11-17 with OMP_NUM_THREADS=1, two runs at a time, on 11
+# evidence tables (every real scan and planted probe of `screen_table`
+# timed against `measure`): no scan's fixed work exceeded 0.94 s
+# (SCAN_SECONDS = 1.0), and the seconds above that per row per fit were at
+# most 6.9e-8 for classification (2000 rows x 13,743 fits in 2.91 s; the
+# median per fit is 3.1e-8), so FIT_SECONDS is 8.0e-8 with about 15 percent
+# headroom, and at most 1.04e-8 for regression even with no fixed work
+# (1.2e-8). One thread is the slowest case, so a larger thread cap only
+# finishes sooner. The cap is arithmetic on rows, work and budget, so the
+# same table gets the same flags on every machine.
+# `allowance` and FITS_PER_SECOND are the older fits-per-second cap, kept
+# because the certified `scan` still applies it when `screen` is called
+# directly with a budget; `screen_table` no longer passes one.
 SCREEN_SHARE = 0.15
 FITS_PER_SECOND = 25_000
+SCAN_SECONDS = 1.0
+FIT_SECONDS: Mapping[str, float] = {
+    "classification": 8.0e-8,
+    "regression": 1.2e-8,
+}
+# Most hypotheses one column can raise: skill, record purity, missingness.
+HYPOTHESES = 3
 BATCH = 200
 TIME_BLOCKS = 20
 RIDGE = 1e-3
@@ -1125,6 +1144,233 @@ def allowance(time_budget_seconds: float | None) -> int | None:
     return int(time_budget_seconds * SCREEN_SHARE * FITS_PER_SECOND)
 
 
+def share(time_budget_seconds: float | None) -> float | None:
+    """Computes the seconds the real scan and the probe may take together.
+
+    Args:
+        time_budget_seconds: The declared budget, or None for no cap.
+
+    Returns:
+        `SCREEN_SHARE` of the budget, or None for no cap.
+    """
+    if time_budget_seconds is None:
+        return None
+    return time_budget_seconds * SCREEN_SHARE
+
+
+def cost(task: str, rows: int, work: int) -> float:
+    """Predicts an upper bound on the seconds of one scan.
+
+    Args:
+        task: `classification` or `regression`.
+        rows: Rows the scan sees (after `subsample`).
+        work: Cross-fitted fits: permutations x skill columns x classes
+            (one-vs-rest above two classes).
+
+    Returns:
+        `SCAN_SECONDS + FIT_SECONDS[task] x rows x work`.
+    """
+    return SCAN_SECONDS + FIT_SECONDS[task] * rows * work
+
+
+def bound(rows: int, columns: int, classes: int) -> float:
+    """Bounds the seconds of the real scan and the probe before any data.
+
+    Every column is assumed to raise the most hypotheses a column can, so
+    the bound is not below what the scans ask for; in a run `share` caps it.
+
+    Args:
+        rows: Rows to be screened (before `subsample`).
+        columns: Candidate columns.
+        classes: Classes of the target; below two means regression.
+
+    Returns:
+        The predicted seconds of both scans, with no cap applied.
+    """
+    task = "classification" if classes >= MIN_CLASSES else "regression"
+    seen = min(rows, MAX_ROWS)
+    ways = classes if classes > BINARY_CLASSES else 1
+    alpha = budget.exact(leakage.CERTIFIED.alpha, "alpha")
+    total = 0.0
+    for width in (columns, columns + len(plants.DEFECTS)):
+        draws = max(
+            leakage.CERTIFIED.permutations,
+            resamples(HYPOTHESES * width, alpha),
+        )
+        work = min(draws, MAX_PERMUTATIONS) * width * ways
+        total += cost(task, seen, work)
+    return total
+
+
+@dataclasses.dataclass(frozen=True)
+class Demand:
+    """What one scan will ask for, counted before any permutation.
+
+    Attributes:
+        rows: Rows the scan sees.
+        family: Hypotheses adjusted together.
+        permutations: Permutations it will draw.
+        skill: Columns with a skill hypothesis.
+        work: Cross-fitted fits.
+        columns: Columns with a hypothesis, in order (`unchecked` if the
+            scan is declined).
+        seconds: Predicted seconds (`cost`).
+    """
+
+    rows: int
+    family: int
+    permutations: int
+    skill: int
+    work: int
+    columns: tuple[str, ...]
+    seconds: float
+
+
+def measure(
+    frame: pandas.DataFrame,
+    target: str,
+    task: str,
+    cfg: leakage.Config,
+    names: Sequence[Hashable],
+    groups: pandas.Series | None,
+    block_size: int | None,
+) -> Demand | None:
+    """Counts the work of `screen` on these rows without drawing any.
+
+    It chooses the rows as `screen` does and forms the same hypotheses
+    (without their statistics), so the count equals the scan's.
+
+    Args:
+        frame: Rows to screen, with the target.
+        target: Target column.
+        task: `classification` or `regression`.
+        cfg: Settings.
+        names: Candidate columns.
+        groups: Group label per row, or None.
+        block_size: Rows per time block, or None.
+
+    Returns:
+        The demand; None when the scan will stop before drawing (invalid
+        outcome, too few rows, nothing to test, or the permutation limit),
+        which costs no more than `SCAN_SECONDS`.
+    """
+    values = None if groups is None else groups.to_numpy()
+    rows, blocks = subsample(len(frame), values, block_size, cfg.run_seed)
+    sample = frame.iloc[rows].reset_index(drop=True)
+    grouping = None if values is None else values[rows]
+    # The scan abstains where `encode` fails: no folds (one group, or fewer
+    # rows than folds) or an invalid outcome (InputError).
+    single = grouping is not None and len(pandas.unique(grouping)) <= 1
+    if single or (grouping is None and len(sample) < cfg.folds):
+        return None
+    try:
+        problem = encode(sample[target], task, cfg, grouping, blocks)
+    except errors.InputError:
+        # handled: the scan abstains on the same error before drawing
+        return None
+    if not leakage.sufficient(problem.y, task, cfg):
+        return None
+    classes = leakage.bucket(sample[target], task)
+    codes = pandas.factorize(classes, sort=True)[0].astype("int64")
+    totals = numpy.bincount(codes).astype("float64")
+    structured = grouping is not None or blocks is not None
+    skill = 0
+    family = 0
+    columns: list[str] = []
+    for name in names:
+        series = sample[name]
+        tested = basis(series).shape[1] > 1
+        found = hypothesize(
+            str(name),
+            series,
+            sample[target],
+            task,
+            cfg,
+            codes,
+            totals,
+            structured=structured,
+        )
+        skill += tested
+        family += tested + len(found)
+        if tested or found:
+            columns.append(str(name))
+    alpha = budget.exact(cfg.alpha, "alpha")
+    total = max(cfg.permutations, resamples(family, alpha))
+    if family == 0 or total > MAX_PERMUTATIONS:
+        return None
+    ways = problem.classes if problem.classes > BINARY_CLASSES else 1
+    work = total * skill * ways
+    seconds = cost(task, len(sample), work)
+    return Demand(
+        len(sample), family, total, skill, work, tuple(columns), seconds
+    )
+
+
+def decline(
+    cfg: leakage.Config, demand: Demand, limit: float, budget_seconds: float
+) -> Screen:
+    """Builds the report of a real scan that does not fit its share.
+
+    Args:
+        cfg: Settings.
+        demand: What the scan would ask for.
+        limit: Seconds it may take.
+        budget_seconds: The declared time budget.
+
+    Returns:
+        A report listing every tested column as unchecked.
+    """
+    return halt(
+        cfg,
+        dict.fromkeys(MECHANISM_DEFECTS, certificates.Authority.GATING),
+        demand.rows,
+        demand.family,
+        (
+            f"{demand.family} hypotheses need about {demand.work} "
+            f"cross-fitted fits ({demand.permutations} permutations for "
+            f"{demand.skill} columns on {demand.rows} rows), predicted "
+            f"{demand.seconds:.1f} s; the limit is {limit:.1f} s. Nothing "
+            "was flagged (power, not size, is lost): screen fewer columns"
+        ),
+        demand.columns,
+        f"work limit for a {budget_seconds:g} s time budget",
+    )
+
+
+def arrange(
+    frame: pandas.DataFrame, group_column: str | None, time_column: str | None
+) -> tuple[pandas.DataFrame, pandas.Series | None, int | None]:
+    """Orders the rows for screening and fixes their structure.
+
+    Groups keep entities whole. A time column orders the rows (stable sort)
+    and defines consecutive blocks of `len(frame) // TIME_BLOCKS` rows, at
+    least 2; groups win when both are given.
+
+    Args:
+        frame: Training rows including any structure columns.
+        group_column: Entity column, or None. Ignored when it is not a
+            column of `frame`.
+        time_column: Time column, or None. Ignored when it is not a column
+            of `frame` or when `group_column` is used.
+
+    Returns:
+        The rows in screening order, their group labels (or None) and the
+        rows per time block (or None).
+    """
+    groups = (
+        frame[group_column].astype(str)
+        if group_column and group_column in frame.columns
+        else None
+    )
+    block_size = None
+    order: numpy.ndarray = numpy.arange(len(frame))
+    if groups is None and time_column and time_column in frame.columns:
+        order = frame[time_column].argsort(kind="stable").to_numpy()
+        block_size = max(2, len(frame) // TIME_BLOCKS)
+    grouping = None if groups is None else groups.iloc[order]
+    return frame.iloc[order], grouping, block_size
+
+
 def screen_table(
     frame: pandas.DataFrame,
     target: str,
@@ -1137,10 +1383,7 @@ def screen_table(
 ) -> Screen:
     """Screens training data with the certified settings.
 
-    Groups keep entities whole. A time column orders the rows (stable sort)
-    and defines consecutive blocks of `len(frame) // TIME_BLOCKS` rows, at
-    least 2; groups win when both are given.
-
+    Groups and a time column structure the rows as `arrange` describes.
     Every suspect may block; `probe` records what a clean result means on
     these rows (see the module docstring).
 
@@ -1154,9 +1397,10 @@ def screen_table(
             column of `frame`.
         time_column: Time column, or None. Ignored when it is not a column
             of `frame` or when `group_column` is used.
-        time_budget_seconds: The project's declared time budget; it bounds
-            the screen's work by `allowance`. None means no cap beyond
-            `MAX_PERMUTATIONS`.
+        time_budget_seconds: The project's declared time budget; the real
+            scan and the probe together may take `share` of it by `cost`,
+            and a scan predicted not to fit is declined. None means no cap
+            beyond `MAX_PERMUTATIONS`.
 
     Returns:
         The report, using `CERTIFIED` settings with `seed`. A screen that was
@@ -1165,18 +1409,30 @@ def screen_table(
         `screen`.
     """
     cfg = dataclasses.replace(leakage.CERTIFIED, run_seed=seed)
-    groups = (
-        frame[group_column].astype(str)
-        if group_column and group_column in frame.columns
-        else None
-    )
-    block_size = None
-    order: numpy.ndarray = numpy.arange(len(frame))
-    if groups is None and time_column and time_column in frame.columns:
-        order = frame[time_column].argsort(kind="stable").to_numpy()
-        block_size = max(2, len(frame) // TIME_BLOCKS)
-    rows = frame.iloc[order]
-    grouping = None if groups is None else groups.iloc[order]
+    rows, grouping, block_size = arrange(frame, group_column, time_column)
+    limit = share(time_budget_seconds)
+    demand = None
+    if limit is not None:
+        unknown = [c for c in features if c not in rows.columns or c == target]
+        if not unknown and target in rows.columns:
+            demand = measure(
+                rows, target, task, cfg, features, grouping, block_size
+            )
+    if (
+        demand is not None
+        and limit is not None
+        and time_budget_seconds is not None
+        and demand.seconds > limit
+    ):
+        report = decline(cfg, demand, limit, time_budget_seconds)
+        return dataclasses.replace(
+            report,
+            notes=(
+                *report.notes,
+                evidence(task, int(frame[target].nunique())),
+                "probe not run: the screen itself did not run",
+            ),
+        )
     report = screen(
         rows,
         target,
@@ -1186,34 +1442,50 @@ def screen_table(
         grouping,
         block_size,
         dict.fromkeys(MECHANISM_DEFECTS, certificates.Authority.GATING),
-        time_budget_seconds,
-    )
-    found = probe(
-        rows,
-        target,
-        task,
-        list(features),
-        cfg,
-        grouping,
-        block_size,
-        time_budget_seconds,
     )
     classes = int(frame[target].nunique()) if len(frame) else 0
-    return disclose(report, found, evidence(task, classes))
+    left = None
+    if limit is not None:
+        left = limit - (SCAN_SECONDS if demand is None else demand.seconds)
+    found = probe(
+        rows, target, task, list(features), cfg, grouping, block_size, left
+    )
+    return disclose(report, found, evidence(task, classes), left, limit)
 
 
-def disclose(report: Screen, found: dict[str, bool], published: str) -> Screen:
+def disclose(
+    report: Screen,
+    found: dict[str, bool],
+    published: str,
+    left: float | None = None,
+    limit: float | None = None,
+) -> Screen:
     """Attaches what the probe found and the published evidence to a report.
 
     Args:
         report: The real screen's report.
-        found: Leak type to whether its plant was found, from `probe`.
+        found: Leak type to whether its plant was found, from `probe`;
+            empty when the planted copy did not fit the time left.
         published: The sentence from `evidence`.
+        left: Seconds that were left of the screen's share for the probe,
+            or None for no cap.
+        limit: The screen's share of the time budget, or None for no cap.
 
     Returns:
         The report with `probe` set and two notes added: the published
-        evidence, and the planted leaks that were not found, if any.
+        evidence, and the planted leaks that were not found, if any. When
+        the probe did not run, `probe` is not set and the second note says
+        why.
     """
+    if not found:
+        reason = (
+            "probe not run: the planted copy did not fit the "
+            f"{max(left or 0.0, 0.0):.1f} s left of the screen's "
+            f"{limit or 0.0:.1f} s share of the time budget"
+        )
+        return dataclasses.replace(
+            report, notes=(*report.notes, published, reason)
+        )
     missed = [d for d, hit in found.items() if not hit]
     notes = [*report.notes, published]
     if missed:
@@ -1233,13 +1505,14 @@ def probe(
     cfg: leakage.Config,
     groups: pandas.Series | None,
     block_size: int | None,
-    time_budget_seconds: float | None = None,
+    limit: float | None = None,
 ) -> dict[str, bool]:
     """Finds whether the screen catches each planted leak on these rows.
 
-    The planted copy is screened with the same settings, structure and
-    budget as the real one. Each plant is found when it is a suspect by the
-    mechanism its type belongs to.
+    The planted copy is screened with the same settings and structure as
+    the real one, when its predicted seconds (`measure`) fit `limit`. Each
+    plant is found when it is a suspect by the mechanism its type belongs
+    to.
 
     Args:
         rows: The rows to screen, in screening order, with the target.
@@ -1249,25 +1522,24 @@ def probe(
         cfg: Settings of the real screen.
         groups: Group label per row, or None.
         block_size: Rows per time block, or None.
-        time_budget_seconds: The declared budget, as for the real screen.
+        limit: Seconds left of the screen's share after the real scan, or
+            None for no cap.
 
     Returns:
-        Leak type to whether its plant was found.
+        Leak type to whether its plant was found; empty when the planted
+        copy did not fit `limit` (nothing was drawn).
     """
+    if limit is not None and limit < SCAN_SECONDS:
+        return {}
     planted = plants.table(
         rows[[*features, target]], target, cfg.run_seed, task == "regression"
     )
-    report = screen(
-        planted,
-        target,
-        task,
-        cfg,
-        [*features, *plants.DEFECTS],
-        groups,
-        block_size,
-        None,
-        time_budget_seconds,
-    )
+    names = [*features, *plants.DEFECTS]
+    if limit is not None:
+        demand = measure(planted, target, task, cfg, names, groups, block_size)
+        if demand is not None and demand.seconds > limit:
+            return {}
+    report = screen(planted, target, task, cfg, names, groups, block_size, None)
     owner = {d: m for m, ds in MECHANISM_DEFECTS.items() for d in ds}
     return {
         defect: any(

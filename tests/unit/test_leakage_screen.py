@@ -125,7 +125,7 @@ def test_constant_column_has_a_single_basis_column():
 
 
 def test_permutations_stay_inside_their_strata():
-    # Enforces docs/LEAKAGE.md:212.
+    # Enforces docs/LEAKAGE.md:215.
     strata = numpy.repeat([0, 1, 2], [5, 7, 3])
     rng = numpy.random.default_rng(0)
     index = screen.permute(strata, 50, rng)
@@ -434,7 +434,7 @@ def test_subsample_keeps_groups_whole_and_time_order():
 
 def test_the_global_null_is_flagged_no_more_often_than_alpha():
     # Enforces docs/ARCHITECTURE.md:124.
-    # Enforces docs/LEAKAGE.md:212.
+    # Enforces docs/LEAKAGE.md:215.
     significant = 0
     worlds = 60
     for seed in range(worlds):
@@ -468,7 +468,7 @@ def test_the_shipped_certificates_are_current_for_every_kind():
 
 
 def test_a_table_where_every_plant_is_found_gates_every_mechanism():
-    # Enforces docs/LEAKAGE.md:214.
+    # Enforces docs/LEAKAGE.md:217.
     report = probed(world(20))
     assert report.probe == dict.fromkeys(plants.DEFECTS, True)
     assert set(report.gates) == set(screen.MECHANISM_DEFECTS)
@@ -491,7 +491,7 @@ def test_a_missed_plant_is_reported_and_a_suspect_still_blocks(monkeypatch):
 
 
 def test_a_stale_certificate_is_reported_and_does_not_decide(monkeypatch):
-    # Enforces docs/LEAKAGE.md:212.
+    # Enforces docs/LEAKAGE.md:215.
     monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
     report = probed(world(20))
     assert "published certificate for binary targets: stale" in report.notes

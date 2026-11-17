@@ -232,16 +232,16 @@ def test_comparison_resamples_whole_groups_and_time_blocks(
     import copy
     import dataclasses
 
-    from scmle.evaluation import diagnostics
+    from scmle.evaluation import bootstrap
 
     seen = []
-    real = diagnostics.redraw
+    real = bootstrap.redraw
 
     def spy(rows, groups, temporal, rng):
         seen.append((groups is not None, temporal))
         return real(rows, groups, temporal, rng)
 
-    monkeypatch.setattr(diagnostics, "redraw", spy)
+    monkeypatch.setattr(bootstrap, "redraw", spy)
     holdout = make_frame(300, 12)
     holdout["entity"] = numpy.arange(300) % 20
     holdout["when"] = pandas.date_range("2024-01-01", periods=300, freq="D")

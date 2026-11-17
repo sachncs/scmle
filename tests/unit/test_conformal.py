@@ -136,10 +136,11 @@ def test_sensitivity_below_the_minimum_rows_is_skipped_not_raised():
     context = SimpleNamespace(
         spec=SimpleNamespace(selection=SimpleNamespace(sensitivity_repeats=3)),
         task=tasks.Task.REGRESSION,
-        regulator=SimpleNamespace(skip_reason=lambda first: None),
+        regulator=SimpleNamespace(overdue=lambda seconds, keep=0.0: None),
         split=SimpleNamespace(dev_target=numpy.arange(10.0)),
     )
+    selected = SimpleNamespace(fit_seconds=0.0, fold_scores=[])
 
-    record = stages.PackageStage().sensitivity(context, None)
+    record = stages.PackageStage().sensitivity(context, selected)
 
     assert "skipped" in record

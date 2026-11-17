@@ -23,9 +23,28 @@ RANKING_METRICS = frozenset({"roc_auc", "roc_auc_ovr", "pr_auc"})
 
 
 class Slices(diagnostics.Diagnostic):
-    """Metric per slice, with the worst slices surfaced."""
+    """Metric per slice, with the worst slices surfaced.
+
+    Cost model (31 runs, see `diagnostics.MARGIN`): 0.038 s plus 5.9
+    predictions plus 21 microseconds per row for every slice; the smallest
+    useful report is the overall score, one prediction.
+    """
 
     name = "slice_performance"
+    fixed = 0.038
+    passes = 5.9
+    rowcost = 2.1e-5
+
+    def least(self, inputs: diagnostics.DiagnosticInput) -> float:
+        """Predicts the seconds of the overall score alone.
+
+        Args:
+            inputs: The evaluation data, with `pace` when it was timed.
+
+        Returns:
+            One prediction over the evaluation rows, with the margin.
+        """
+        return diagnostics.MARGIN * (inputs.pace or 0.0)
 
     def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
         """Scores the model inside each slice.
@@ -35,25 +54,41 @@ class Slices(diagnostics.Diagnostic):
 
         Returns:
             A mapping with `metric` (name), the `overall` score, `slices`,
-            `worst` and `skipped_for_support`. `slices` lists every scored
-            slice (`feature`, `slice`, `rows`, `score`, `gap`), largest gap
-            first, where the gap to the overall score is positive when the
-            slice is worse. `worst` is the first `WORST` of them, and
-            `skipped_for_support` counts slices that could not be scored.
+            `worst`, `skipped_for_support` and `skipped_for_time`. `slices`
+            lists every scored slice (`feature`, `slice`, `rows`, `score`,
+            `gap`), largest gap first, where the gap to the overall score is
+            positive when the slice is worse. `worst` is the first `WORST`
+            of them, `skipped_for_support` counts slices that could not be
+            scored and `skipped_for_time` those not scored because the
+            longest score so far would end past the deadline (then
+            `truncated` and a `reason` are added). When even the overall
+            score does not fit, the report is `skipped`.
         """
         metric = inputs.metric
+        if not inputs.affords(self.least(inputs)):
+            return diagnostics.skipped(
+                "the deadline leaves no time for the overall score"
+            )
+        began = diagnostics.clock()
         overall = metric.score(
             inputs.estimator,
             inputs.features,
             inputs.target,
             inputs.positive_label,
         )
+        longest = diagnostics.clock() - began
         scored: list[dict[str, Any]] = []
         skipped = 0
+        late = 0
         for feature, labels in self.assignments(inputs):
             for level in labels.dropna().unique():
+                if not inputs.affords(diagnostics.MARGIN * longest):
+                    late += 1
+                    continue
                 rows = (labels == level).to_numpy()
+                began = diagnostics.clock()
                 score = self.grade(inputs, rows)
+                longest = max(longest, diagnostics.clock() - began)
                 if score is None:
                     skipped += 1
                     continue
@@ -72,13 +107,21 @@ class Slices(diagnostics.Diagnostic):
                     }
                 )
         scored.sort(key=lambda item: -item["gap"])
-        return {
+        report = {
             "metric": metric.name,
             "overall": float(overall),
             "slices": scored,
             "worst": scored[:WORST],
             "skipped_for_support": skipped,
+            "skipped_for_time": late,
         }
+        if late:
+            report["truncated"] = True
+            report["reason"] = (
+                f"{late} slices not scored: each takes up to "
+                f"{longest:.3f} s and the deadline came first"
+            )
+        return report
 
     def assignments(
         self, inputs: diagnostics.DiagnosticInput

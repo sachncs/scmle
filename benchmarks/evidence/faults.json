@@ -1,10 +1,11 @@
 {
   "claim": "C1",
-  "code": "619505046ac3adc9c70d147a3cb0a4a6d9dc9e36832ad3bf3fa4b491402a86f3",
+  "code": "5d1daa01dd82f5be9ebc95c6ee6e552549e3b5c3f18280df685febdb43309fa4",
   "data": "simulated tables and synthetic inputs only",
   "floor": 1.0,
   "gates": [
     "admissibility.quarantine_all",
+    "budget.minimum_run",
     "confirm.single_use",
     "data.unlabeled",
     "ingest.cli.unit_verdict",
@@ -45,6 +46,7 @@
     "task.resolve",
     "task.survival",
     "task.uplift",
+    "train.first_trial",
     "vault.bind",
     "vault.open"
   ],
@@ -62,7 +64,7 @@
       "message": "unit verdict coarser: ['customer_id'] is already a key, so rows are coarser than the unit",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.46,
+      "seconds": 0.61,
       "site": "scmle.cli:IngestCommand.execute"
     },
     {
@@ -71,7 +73,7 @@
       "level": "site",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.43
+      "seconds": 0.59
     },
     {
       "by": "ingest.multiplicity",
@@ -142,7 +144,7 @@
       "message": "PLANNING not approved by reviewer: fault",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.8,
+      "seconds": 2.55,
       "site": "scmle.core.orchestrator:Orchestrator.consult_checkpoints"
     },
     {
@@ -151,7 +153,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 3.44
+      "seconds": 8.58
     },
     {
       "by": "robustness.assessment_present",
@@ -174,7 +176,7 @@
       "message": "unresolved leakage risk (permutation screen, Benjamini-Yekutieli level 0.05): leak",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.02,
+      "seconds": 2.53,
       "site": "scmle.core.stages:ProfileStage.enforce_leakage_policy"
     },
     {
@@ -184,7 +186,7 @@
       "outcome": "override",
       "path": "override",
       "record": "leakage suspect(s) leak stay in the features; the test score is provisional until a person settles them (declare the column unavailable at prediction, or attest it)",
-      "seconds": 3.7
+      "seconds": 8.95
     },
     {
       "by": "admissibility.quarantine_all",
@@ -195,7 +197,7 @@
       "message": "admissibility quarantined every feature",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.5,
+      "seconds": 1.12,
       "site": "scmle.core.stages:ProfileStage.qualify_exploration"
     },
     {
@@ -205,7 +207,7 @@
       "outcome": "override",
       "path": "override",
       "record": "ledger check leakage.attestation:copy, tier attested",
-      "seconds": 0.5
+      "seconds": 1.09
     },
     {
       "by": "data.unlabeled",
@@ -216,7 +218,7 @@
       "message": "target 'y' has 40 missing values; set data.unlabeled to 'ignore' or 'pseudo_label' to use the unlabeled rows",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.09,
       "site": "scmle.core.stages:ProfileStage.set_aside_unlabeled"
     },
     {
@@ -226,7 +228,7 @@
       "outcome": "override",
       "path": "override",
       "record": "curation_report.json: rows set aside (policy ignore)",
-      "seconds": 2.01
+      "seconds": 4.79
     },
     {
       "by": "select.serving_limits",
@@ -237,7 +239,7 @@
       "message": "none of the top 3 candidates satisfies the serving constraints; relax the limits or allow more candidates",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.17,
+      "seconds": 3.6,
       "site": "scmle.core.stages:SelectStage.choose"
     },
     {
@@ -247,7 +249,7 @@
       "outcome": "override",
       "path": "override",
       "record": "decision_log.json: within serving limits (max_model_mb 1000.0)",
-      "seconds": 3.45
+      "seconds": 8.36
     },
     {
       "by": "select.pareto_front",
@@ -258,7 +260,7 @@
       "message": "none of the top 3 candidates satisfies the serving constraints; relax the limits or allow more candidates",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.17,
+      "seconds": 3.07,
       "site": "scmle.core.stages:SelectStage.select_on_front"
     },
     {
@@ -268,7 +270,7 @@
       "outcome": "override",
       "path": "override",
       "record": "decision_log.json: fastest within (max_model_mb 1000.0)",
-      "seconds": 3.55
+      "seconds": 8.56
     },
     {
       "by": "confirm.single_use",
@@ -288,7 +290,7 @@
       "level": "site",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.0
+      "seconds": 0.01
     },
     {
       "by": "profile.monotonic_columns",
@@ -299,7 +301,7 @@
       "message": "monotonic constraints need numeric feature columns: ['region'] are missing, excluded or not numeric",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.68,
+      "seconds": 2.94,
       "site": "scmle.data.profiling.profiler:Profiler.monotonic_features"
     },
     {
@@ -308,7 +310,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 3.91
+      "seconds": 9.77
     },
     {
       "by": "profile.target_and_features",
@@ -319,8 +321,8 @@
       "message": "no usable feature columns remain after exclusions",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.05,
-      "site": "scmle.data.profiling.profiler:Profiler.profile"
+      "seconds": 0.08,
+      "site": "scmle.data.profiling.profiler:Profiler.portray"
     },
     {
       "by": "split.event.folds",
@@ -351,7 +353,7 @@
       "message": "events or censored rows number fewer than 2: cannot stratify",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.08,
       "site": "scmle.data.splitting.splitters:EventStratifiedSplit.stratifier"
     },
     {
@@ -360,7 +362,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.61
+      "seconds": 1.28
     },
     {
       "by": "split.group.class_complete_folds",
@@ -371,7 +373,7 @@
       "message": "no group-disjoint split keeps every class in every fold; the classes are concentrated in too few groups",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.1,
       "site": "scmle.data.splitting.splitters:GroupSplit.class_complete_folds"
     },
     {
@@ -380,7 +382,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 3.57
+      "seconds": 8.94
     },
     {
       "by": "split.group.partition",
@@ -391,7 +393,7 @@
       "message": "need at least 7 groups for group validation",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.08,
       "site": "scmle.data.splitting.splitters:GroupSplit.partition"
     },
     {
@@ -403,7 +405,7 @@
       "message": "stratified_events validation does not support binary_classification",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.07,
       "site": "scmle.data.splitting.splitters:Partitioner.check_task"
     },
     {
@@ -412,7 +414,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 3.5
+      "seconds": 8.64
     },
     {
       "by": "split.resident.bind",
@@ -463,7 +465,7 @@
       "message": "only 0 rolling window(s) fit; shorten horizon_rows, window_rows or embargo_rows, or add data",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.07,
       "site": "scmle.data.splitting.splitters:RollingSplit.partition"
     },
     {
@@ -473,7 +475,7 @@
       "outcome": "override",
       "path": "override",
       "record": "config.json: validation.horizon_rows 10",
-      "seconds": 1.02
+      "seconds": 2.69
     },
     {
       "by": "split.stratified.folds",
@@ -504,7 +506,7 @@
       "message": "a class has fewer than 2 examples: cannot stratify",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.09,
       "site": "scmle.data.splitting.splitters:StratifiedSplit.stratifier"
     },
     {
@@ -556,7 +558,7 @@
       "message": "too few rows in a treatment / outcome combination",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.0,
+      "seconds": 0.01,
       "site": "scmle.data.splitting.splitters:TreatmentStratifiedSplit.cross_validation_folds"
     },
     {
@@ -576,7 +578,7 @@
       "message": "a treatment / outcome combination has fewer than 2 rows",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.05,
       "site": "scmle.data.splitting.splitters:TreatmentStratifiedSplit.stratifier"
     },
     {
@@ -585,7 +587,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.93
+      "seconds": 1.87
     },
     {
       "by": "task.resolve",
@@ -616,7 +618,7 @@
       "message": "target 'y' looks like a small-cardinality integer (5 values): classification vs regression is ambiguous; set task= explicitly",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.11,
       "site": "scmle.data.validation.target:TaskResolver.resolve_auto"
     },
     {
@@ -626,7 +628,7 @@
       "outcome": "override",
       "path": "override",
       "record": "config.json: task regression",
-      "seconds": 1.98
+      "seconds": 5.3
     },
     {
       "by": "task.classification",
@@ -637,7 +639,7 @@
       "message": "binary_classification requested but target has 3 classes",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.07,
       "site": "scmle.data.validation.target:TaskResolver.resolve_classification"
     },
     {
@@ -649,7 +651,7 @@
       "message": "ordinal_order omits label(s) present in the data: ['extreme']",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.07,
       "site": "scmle.data.validation.target:TaskResolver.resolve_ordinal"
     },
     {
@@ -658,7 +660,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 2.21
+      "seconds": 5.74
     },
     {
       "by": "task.ranking",
@@ -669,7 +671,7 @@
       "message": "ranking needs a relevance target of non-negative whole numbers (0 = not relevant)",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.11,
       "site": "scmle.data.validation.target:TaskResolver.resolve_ranking"
     },
     {
@@ -678,7 +680,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.87
+      "seconds": 2.31
     },
     {
       "by": "task.regression",
@@ -689,7 +691,7 @@
       "message": "regression requested but the target is not numeric",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.1,
       "site": "scmle.data.validation.target:TaskResolver.resolve_regression"
     },
     {
@@ -701,7 +703,7 @@
       "message": "survival needs a numeric duration target greater than zero",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.1,
       "site": "scmle.data.validation.target:TaskResolver.resolve_survival"
     },
     {
@@ -710,7 +712,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.66
+      "seconds": 1.61
     },
     {
       "by": "task.uplift",
@@ -721,7 +723,7 @@
       "message": "uplift needs a numeric outcome",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.08,
       "site": "scmle.data.validation.target:TaskResolver.resolve_uplift"
     },
     {
@@ -730,7 +732,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.85
+      "seconds": 2.05
     },
     {
       "by": "target.events",
@@ -741,7 +743,7 @@
       "message": "event column 'event' must hold 0 (censored) or 1 (event) in every row",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.08,
       "site": "scmle.data.validation.target:check_events"
     },
     {
@@ -753,7 +755,7 @@
       "message": "label column 'label0' must hold 0 or 1",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.08,
       "site": "scmle.data.validation.target:check_targets"
     },
     {
@@ -765,7 +767,7 @@
       "message": "each arm needs at least 20 rows",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.04,
+      "seconds": 0.09,
       "site": "scmle.data.validation.target:check_treatment"
     },
     {
@@ -777,7 +779,7 @@
       "message": "test set is locked: already bound or released",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.1,
+      "seconds": 2.08,
       "site": "scmle.governance.vault:SealedTestSet.bind"
     },
     {
@@ -786,7 +788,7 @@
       "level": "site",
       "outcome": "passed",
       "path": "control",
-      "seconds": 1.1
+      "seconds": 2.38
     },
     {
       "by": "vault.open",
@@ -797,7 +799,7 @@
       "message": "test set is locked: invalid token",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.12,
+      "seconds": 2.42,
       "site": "scmle.governance.vault:SealedTestSet.open"
     },
     {
@@ -806,7 +808,7 @@
       "level": "site",
       "outcome": "passed",
       "path": "control",
-      "seconds": 1.11
+      "seconds": 2.34
     },
     {
       "by": "plan.gpu_required",
@@ -817,7 +819,7 @@
       "message": "resources.gpu='required' but no compatible model can use a GPU; set gpu='auto' or install a GPU-capable adapter",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.76,
+      "seconds": 1.68,
       "site": "scmle.intelligence.planner:GpuFilter.apply"
     },
     {
@@ -827,7 +829,7 @@
       "outcome": "override",
       "path": "override",
       "record": "config.json: resources.gpu auto",
-      "seconds": 3.56
+      "seconds": 9.37
     },
     {
       "by": "plan.monotonic",
@@ -838,7 +840,7 @@
       "message": "monotonic constraints are supported for binary classification and regression, not multiclass",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 2.3,
+      "seconds": 5.49,
       "site": "scmle.intelligence.planner:MonotonicFilter.apply"
     },
     {
@@ -848,20 +850,60 @@
       "outcome": "override",
       "path": "override",
       "record": "config.json: data.monotonic_constraints {}",
-      "seconds": 5.75
+      "seconds": 13.99
+    },
+    {
+      "by": "budget.minimum_run",
+      "cause": "a 1 s time budget, below the estimated minimum run",
+      "error": "BlockedError",
+      "gate": "budget.minimum_run",
+      "level": "run",
+      "message": "the 1 s time budget cannot fit the minimum run (preparation, one cheapest trial and 3.8 s reserved for the final refit, diagnostics and packaging), estimated at 6.5 s; the smallest budget that fits is about 11 s",
+      "outcome": "blocked",
+      "path": "fault",
+      "seconds": 0.1,
+      "site": "scmle.core.budget:Reserve.admit"
+    },
+    {
+      "cause": "a 1 s time budget, below the estimated minimum run",
+      "gate": "budget.minimum_run",
+      "level": "run",
+      "outcome": "passed",
+      "path": "control",
+      "seconds": 8.84
+    },
+    {
+      "by": "train.first_trial",
+      "cause": "training starts after preparation used up the trial window",
+      "error": "BlockedError",
+      "gate": "train.first_trial",
+      "level": "run",
+      "message": "preparation took 1.9 s and left no time for a first trial (trial window closed: 0.0 s left before the 18.5 s reserved for the final refit, diagnostics and packaging); the smallest budget that fits is about 9 s",
+      "outcome": "blocked",
+      "path": "fault",
+      "seconds": 1.94,
+      "site": "scmle.core.stages:TrainStage.execute"
+    },
+    {
+      "cause": "training starts after preparation used up the trial window",
+      "gate": "train.first_trial",
+      "level": "run",
+      "outcome": "passed",
+      "path": "control",
+      "seconds": 8.17
     }
   ],
-  "seconds": 34.4,
+  "seconds": 90.2,
   "tally": {
     "controls": {
       "not_passed": [],
-      "passed": 25,
-      "run": 25
+      "passed": 27,
+      "run": 27
     },
     "elsewhere": [],
-    "faults": 43,
+    "faults": 45,
     "outcomes": {
-      "blocked": 43,
+      "blocked": 45,
       "failed": 0,
       "not injected": 0,
       "override": 9,
@@ -869,9 +911,9 @@
     },
     "override_blocked": [],
     "overrides": 9,
-    "satisfied": 52,
+    "satisfied": 54,
     "share": 1.0,
-    "units": 52,
+    "units": 54,
     "unsatisfied": []
   },
   "variable": "gate_fault_block_min"

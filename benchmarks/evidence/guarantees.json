@@ -122,7 +122,7 @@
     }
   },
   "claim": "C12",
-  "content_hash": "8d1ee353a4c25ad0a8d9c699f6e16124ec12120e9266733d5046f223028d4f91",
+  "content_hash": "7b55d98091ec6189f8c6360620b9f8b8f27754db16de8719bd678dce69e742fd",
   "counts": {
     "guarantees": 241,
     "linked": 241,
@@ -282,8 +282,8 @@
         "tests/integration/test_resource_limits.py::test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues",
         "tests/integration/test_resource_limits.py::test_every_run_reports_how_limits_were_applied",
         "tests/integration/test_resource_limits.py::test_memory_of_subprocesses_a_trial_starts_counts_and_is_cleaned_up",
-        "tests/unit/test_limits.py::test_first_trial_always_runs_then_budget_and_memory_apply",
         "tests/unit/test_limits.py::test_report_states_enforcement_honestly",
+        "tests/unit/test_limits.py::test_the_trial_window_and_memory_gate_trials",
         "tests/unit/test_reproducibility_verdict.py::test_identical_runs_are_exact",
         "tests/unit/test_reproducibility_verdict.py::test_large_score_drift_is_different",
         "tests/unit/test_reproducibility_verdict.py::test_small_score_drift_is_comparable"
@@ -2092,11 +2092,12 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 169,
-      "line": 169,
+      "end": 172,
+      "line": 172,
       "missing": [],
       "section": "the-screen-runs-inside-the-time-budget",
       "tests": [
+        "tests/unit/test_recite_script.py::test_a_citation_names_the_doc_and_the_line",
         "tests/unit/test_screen_budget.py::test_an_incomplete_screen_is_in_summary_report_log_and_plan"
       ],
       "text": "A screen that does not run is never a clean bill.",
@@ -2107,8 +2108,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 178,
-      "line": 175,
+      "end": 181,
+      "line": 178,
       "missing": [],
       "section": "the-screen-runs-inside-the-time-budget",
       "tests": [
@@ -2123,8 +2124,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 204,
-      "line": 204,
+      "end": 207,
+      "line": 207,
       "missing": [],
       "section": "what-the-product-does-about-it",
       "tests": [
@@ -2139,8 +2140,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 210,
-      "line": 209,
+      "end": 213,
+      "line": 212,
       "missing": [],
       "section": "what-the-product-does-about-it",
       "tests": [
@@ -2154,8 +2155,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 214,
-      "line": 212,
+      "end": 217,
+      "line": 215,
       "missing": [],
       "section": "what-the-product-does-about-it",
       "tests": [
@@ -2173,8 +2174,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 219,
-      "line": 214,
+      "end": 222,
+      "line": 217,
       "missing": [],
       "section": "what-the-product-does-about-it",
       "tests": [
@@ -2189,8 +2190,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 226,
-      "line": 225,
+      "end": 229,
+      "line": 228,
       "missing": [],
       "section": "what-the-product-does-about-it",
       "tests": [
@@ -2204,8 +2205,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 262,
-      "line": 261,
+      "end": 265,
+      "line": 264,
       "missing": [],
       "section": "breast-cancer-the-value-is-known-in-time",
       "tests": [
@@ -2220,8 +2221,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 284,
-      "line": 283,
+      "end": 287,
+      "line": 286,
       "missing": [],
       "section": "breast-cancer-the-value-is-known-in-time",
       "tests": [
@@ -2235,8 +2236,8 @@
     {
       "cited": [],
       "doc": "docs/LEAKAGE.md",
-      "end": 338,
-      "line": 338,
+      "end": 341,
+      "line": 341,
       "missing": [],
       "section": "summary",
       "tests": [
@@ -4122,6 +4123,6 @@
     }
   ],
   "seconds": 1.1,
-  "test_links": 440,
+  "test_links": 442,
   "version": 1
 }

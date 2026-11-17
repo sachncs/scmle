@@ -1,9 +1,12 @@
 """Tests for the stress-test diagnostic."""
 
+import dataclasses
+
 import numpy
 import test_diagnostics
 
 from scmle.contracts import tasks
+from scmle.evaluation import diagnostics
 from scmle.evaluation import robustness
 
 
@@ -53,3 +56,30 @@ def test_gaussian_noise_leaves_a_column_with_undefined_spread_unchanged():
     one = data.features.iloc[:1].copy()
     out = robustness.Noise(0.5).corrupt(one, data, numpy.random.default_rng(0))
     assert numpy.isfinite(out["signal"]).all()
+
+
+def test_scenarios_that_cannot_fit_are_recorded_not_run(monkeypatch):
+    clock = test_diagnostics.Clock()
+    monkeypatch.setattr(diagnostics, "clock", clock)
+
+    class Late(robustness.Noise):
+        def corrupt(self, features, inputs, rng):
+            clock.now += 1e6
+            return super().corrupt(features, inputs, rng)
+
+    data = dataclasses.replace(inputs(), deadline=clock.now + 10.0)
+    report = robustness.Robustness(
+        (Late(0.1), robustness.Blanking(0.1), robustness.Noise(0.5))
+    ).compute(data)
+
+    assert set(report["scenarios"]) == {"noise_0.1sd"}
+    assert report["skipped_for_time"] == ["missing_10pct", "noise_0.5sd"]
+    assert report["truncated"] and report["reason"]
+
+
+def test_robustness_is_skipped_once_its_deadline_has_passed():
+    data = dataclasses.replace(inputs(), deadline=diagnostics.clock() - 1.0)
+
+    report = robustness.Robustness().compute(data)
+
+    assert report["skipped"] and report["available"] is False

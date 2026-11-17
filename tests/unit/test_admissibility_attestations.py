@@ -61,7 +61,7 @@ def test_without_an_attestation_the_certified_suspect_is_blocked():
 
 
 def test_a_valid_attestation_keeps_the_column_flagged_and_attested():
-    # Enforces docs/LEAKAGE.md:225.
+    # Enforces docs/LEAKAGE.md:228.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:297.
     found = run_with([attest()])
 
@@ -96,7 +96,7 @@ def test_an_expired_attestation_does_not_count():
 
 
 def test_an_attestation_for_another_charter_does_not_count():
-    # Enforces docs/LEAKAGE.md:261.
+    # Enforces docs/LEAKAGE.md:264.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:293.
     found = run_with([attest(scope="other-charter")])
 

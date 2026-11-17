@@ -1,7 +1,7 @@
 """Claim C3: the 95 percent metric intervals cover fresh-data metrics.
 
 The product reports, for the primary test metric, a 95 percent bootstrap
-percentile interval (`scmle.evaluation.diagnostics.Uncertainty`, the
+percentile interval (`scmle.evaluation.bootstrap.Uncertainty`, the
 `metric_uncertainty` report). This module checks that interval against
 known truth on simulated tasks. One trial:
 
@@ -53,6 +53,7 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
 from scmle.data.detectors import certificates
+from scmle.evaluation import bootstrap
 from scmle.evaluation import diagnostics
 from scmle.evaluation import metrics
 import scmle.evaluation.coverage
@@ -160,8 +161,8 @@ def run(family: str, trial: int) -> dict[str, Any]:
     inputs = diagnostics.DiagnosticInput(
         model, features, target, task, metric, PLAN, trial, groups=entities
     )
-    report = diagnostics.Uncertainty().compute(inputs)
-    interval = report[f"ci_{diagnostics.Uncertainty.confidence}"]
+    report = bootstrap.Uncertainty().compute(inputs)
+    interval = report[f"ci_{bootstrap.Uncertainty.confidence}"]
     fresh, truth, _ = simulate(family, rng, FRESH_ROWS)
     value = float(metric.score(model, fresh, truth, inputs.positive_label))
     hit = interval is not None and interval[0] <= value <= interval[1]
@@ -260,9 +261,9 @@ def digest() -> str:
         The `code_hash` of the product's interval and this module's trial.
     """
     return certificates.code_hash(
-        diagnostics.Uncertainty,
-        diagnostics.redraw,
-        diagnostics.Cache,
+        bootstrap.Uncertainty,
+        bootstrap.redraw,
+        bootstrap.Cache,
         scmle.evaluation.coverage.clopper_pearson,
         simulate,
         run,
@@ -313,7 +314,7 @@ def measure(trials: int = TRIALS, workers: int | None = None) -> dict[str, Any]:
         "floor": variables[VARIABLE].value,
         "alpha": alpha,
         "power": variables["power"].value,
-        "level": diagnostics.Uncertainty.confidence / 100,
+        "level": bootstrap.Uncertainty.confidence / 100,
         "minimum_trials": least,
         "planned_trials": planned,
         "design": {

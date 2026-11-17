@@ -7,10 +7,10 @@ most so the cause can be inspected.
 """
 
 from typing import Any
-from typing import cast
 
 import numpy
 import pandas
+from sklearn import base
 from sklearn import ensemble
 from sklearn import metrics
 from sklearn import model_selection
@@ -25,12 +25,60 @@ MAX_ROWS = 4000
 MODERATE_AUC = 0.60
 STRONG_AUC = 0.75
 TOP_FEATURES = 5
+# Cost model, fitted by non-negative least squares on the 31 runs described
+# at `diagnostics.MARGIN`: `ADVERSARY_SECONDS + ADVERSARY_CELL_SECONDS * m *
+# p` for m sampled rows (both sets) and p columns; measured over fitted
+# 0.60..1.46.
+ADVERSARY_SECONDS = 0.18
+ADVERSARY_CELL_SECONDS = 2.93e-6
 
 
 class Adversary(diagnostics.Diagnostic):
     """Separability of development rows from evaluation rows."""
 
     name = "adversarial_validation"
+
+    def estimate(self, inputs: diagnostics.DiagnosticInput) -> float:
+        """Predicts the seconds of the cross-validated separability.
+
+        Args:
+            inputs: Evaluation data, with the reference rows attached.
+
+        Returns:
+            The fitted cost on the capped sample, times the margin.
+        """
+        reference = inputs.reference_features
+        rows = min(len(inputs.features), MAX_ROWS) + (
+            0 if reference is None else min(len(reference), MAX_ROWS)
+        )
+        columns = len(inputs.feature_plan.sourced)
+        return diagnostics.MARGIN * (
+            ADVERSARY_SECONDS + ADVERSARY_CELL_SECONDS * rows * columns
+        )
+
+    def fold(
+        self,
+        model: Any,
+        encoded: pandas.DataFrame,
+        labels: numpy.ndarray,
+        train: numpy.ndarray,
+        test: numpy.ndarray,
+    ) -> numpy.ndarray:
+        """Fits on one fold's training rows and scores its held-out rows.
+
+        Args:
+            model: Unfitted classifier, cloned before fitting.
+            encoded: Numeric features of both sets.
+            labels: 1 for evaluation rows, 0 for reference rows.
+            train: Positions to fit on.
+            test: Positions to score.
+
+        Returns:
+            The probability that each held-out row is an evaluation row.
+        """
+        fitted: Any = base.clone(model)
+        fitted.fit(encoded.iloc[train], labels[train])
+        return numpy.asarray(fitted.predict_proba(encoded.iloc[test]))[:, 1]
 
     def compute(self, inputs: diagnostics.DiagnosticInput) -> dict[str, Any]:
         """Cross-validates a classifier that predicts which set a row is from.
@@ -45,11 +93,17 @@ class Adversary(diagnostics.Diagnostic):
             `available` true, the out-of-fold separability `auc` (0.5 means
             indistinguishable), its `verdict`, the `odds` summary, the
             `rank` features and the sampled `rows` counts for the
-            reference and evaluation sets.
+            reference and evaluation sets. `skipped` when the deadline
+            leaves no time for the next fold (folds are checked one by one,
+            each predicted to take as long as the longest so far).
         """
         reference = inputs.reference_features
         if reference is None:
             return {"available": False, "reason": "no reference rows"}
+        if not inputs.affords(self.estimate(inputs) / FOLDS):
+            return diagnostics.skipped(
+                "the deadline leaves no time for the first fold"
+            )
         columns = list(inputs.feature_plan.sourced)
         rng = numpy.random.default_rng(inputs.seed)
         old = self.sample(reference[columns], rng)
@@ -57,20 +111,24 @@ class Adversary(diagnostics.Diagnostic):
         frame = pandas.concat([old, new], ignore_index=True)
         labels = numpy.r_[numpy.zeros(len(old)), numpy.ones(len(new))]
         encoded = self.encode(frame, inputs)
-        scores = cast(
-            "numpy.ndarray",
-            model_selection.cross_val_predict(
-                ensemble.HistGradientBoostingClassifier(
-                    max_iter=60, random_state=inputs.seed
-                ),
-                encoded,
-                labels,
-                cv=model_selection.StratifiedKFold(
-                    FOLDS, shuffle=True, random_state=inputs.seed
-                ),
-                method="predict_proba",
-            ),
-        )[:, 1]
+        model = ensemble.HistGradientBoostingClassifier(
+            max_iter=60, random_state=inputs.seed
+        )
+        splitter = model_selection.StratifiedKFold(
+            FOLDS, shuffle=True, random_state=inputs.seed
+        )
+        scores = numpy.zeros(len(labels))
+        longest = self.estimate(inputs) / FOLDS
+        for done, (train, test) in enumerate(splitter.split(encoded, labels)):
+            if done and not inputs.affords(diagnostics.MARGIN * longest):
+                return diagnostics.skipped(
+                    f"{done} of {FOLDS} folds ran; the next takes up to "
+                    f"{longest:.2f} s and the deadline came first"
+                )
+            began = diagnostics.clock()
+            scores[test] = self.fold(model, encoded, labels, train, test)
+            took = diagnostics.clock() - began
+            longest = took if done == 0 else max(longest, took)
         auc = float(metrics.roc_auc_score(labels, scores))
         return {
             "available": True,

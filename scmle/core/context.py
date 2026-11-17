@@ -445,6 +445,9 @@ class Context:
         result: Final run result.
         started_at: Monotonic time at which the context was created; the
             time budget (and the `deadline` property) counts from it.
+        skipped: Work reduced or skipped to keep the time budget, each as
+            `{"work": ..., "reason": ...}`; also in the events and the
+            evaluation.
     """
 
     spec: tasks.Config
@@ -518,6 +521,7 @@ class Context:
     bundle: scmle.artifacts.bundle.Bundle | None = None
     result: results.Run | None = None
     started_at: float = dataclasses.field(default_factory=time.monotonic)
+    skipped: list[dict[str, str]] = dataclasses.field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Binds the captured facts to the registry used by planning."""
@@ -623,6 +627,20 @@ class Context:
                     data or {},
                 )
             )
+
+    def forgo(self, work: str, reason: str) -> None:
+        """Records work reduced or skipped to keep the time budget.
+
+        Args:
+            work: What was reduced or skipped.
+            reason: Why, with the estimate and the time left.
+        """
+        self.skipped.append({"work": work, "reason": reason})
+        self.emit(
+            "budget.skipped",
+            f"{work} skipped or reduced: {reason}",
+            data={"work": work, "reason": reason},
+        )
 
     def allocate(self, count: int) -> list[str]:
         """Hands out the next `count` sequential trial identifiers.

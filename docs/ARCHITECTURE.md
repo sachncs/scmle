@@ -161,7 +161,7 @@ decision boundary, not merely rename a function call.
 | a planning policy | `Refiner` | `Planner(rules=...)` |
 | a search algorithm | `Optimizer` | `optimizers.OPTIMIZERS` |
 | a selection rule | `Selector` | `Orchestrator(policy=...)` |
-| a diagnostic | `Diagnostic` | `diagnostics.run_suite(suite=...)` |
+| a diagnostic | `Diagnostic` | `suite.run_suite(suite=...)` |
 | an executor | `Executor` | `execution.select` |
 | a tracker | `Store` | `Orchestrator(tracker=...)` |
 | a serving surface | `Server` | direct use |

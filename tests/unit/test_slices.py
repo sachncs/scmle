@@ -77,3 +77,44 @@ def test_small_slices_are_skipped_not_scored():
 
     assert report["skipped_for_support"] > 0
     assert all(item["rows"] >= slices.MIN_SUPPORT for item in report["slices"])
+
+
+class Clock:
+    def __init__(self):
+        self.now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+def test_slices_that_cannot_fit_are_counted_not_scored(monkeypatch):
+    clock = Clock()
+    monkeypatch.setattr(diagnostics, "clock", clock)
+    data = make_inputs()
+    score = data.metric.score
+
+    class Ticking:
+        name = data.metric.name
+        greater_is_better = True
+
+        def score(self, *args):
+            clock.now += 10.0
+            return score(*args)
+
+    report = slices.Slices().compute(
+        dataclasses.replace(data, metric=Ticking(), deadline=clock.now + 25)
+    )
+
+    assert len(report["slices"]) == 1
+    assert report["skipped_for_time"] == 2
+    assert report["truncated"] and report["reason"]
+
+
+def test_slices_are_skipped_once_the_deadline_has_passed():
+    data = dataclasses.replace(
+        make_inputs(), deadline=diagnostics.clock() - 1.0
+    )
+
+    report = slices.Slices().compute(data)
+
+    assert report["skipped"] and report["available"] is False

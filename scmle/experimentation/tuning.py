@@ -107,9 +107,13 @@ class Tuner:
             return
         batch_size = max(MIN_BATCH, math.ceil(search.configs_per_model / 3))
         remaining = search.configs_per_model
-        while (
-            remaining > 0 and context.regulator.skip_reason(first=False) is None
-        ):
+        while remaining > 0:
+            reason = context.regulator.skip_reason(first=False)
+            if reason:
+                context.forgo(
+                    f"tuning {name}: {remaining} configurations", reason
+                )
+                return
             context.check_cancelled()
             size = min(batch_size, remaining)
             remaining -= size
@@ -159,9 +163,13 @@ class Tuner:
         total = sum(weights)
         remaining = self.search.configs_per_model
         for index, rungs in enumerate(brackets):
-            if remaining <= 0 or (
-                self.context.regulator.skip_reason(first=False)
-            ):
+            if remaining <= 0:
+                return
+            reason = self.context.regulator.skip_reason(first=False)
+            if reason:
+                self.context.forgo(
+                    f"tuning {name}: {remaining} configurations", reason
+                )
                 return
             self.context.check_cancelled()
             share = max(

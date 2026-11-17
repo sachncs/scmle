@@ -8,7 +8,6 @@ import pandas
 import test_diagnostics
 
 from scmle.contracts import tasks
-from scmle.evaluation import diagnostics
 from scmle.evaluation import suite
 from scmle.explainability import dependence
 from scmle.explainability import importance
@@ -107,6 +106,7 @@ def test_importance_is_deterministic_and_ranks_the_signal_first():
 def test_a_suite_shares_its_time_allowance_among_diagnostics():
     inputs = test_diagnostics.make_inputs(tasks.Task.BINARY)
 
-    reports = diagnostics.run_suite(inputs, suite.lineup(), total_seconds=0.0)
+    reports = suite.run_suite(inputs, suite.lineup(), total_seconds=0.0)
 
-    assert reports["permutation_importance"]["truncated"] is True
+    # No time at all: the diagnostic is not started and says why.
+    assert reports["permutation_importance"]["skipped"] is True

@@ -156,15 +156,18 @@ Read this carefully:
 The screen is part of the run, so it is bounded by the project's
 `--time-budget` (default 1800 seconds) and not by the clock. Its work is the
 number of cross-fitted fits: permutations x skill columns x classes (one
-versus rest above two classes). The cap is
-`time_budget_seconds * 0.15 * 25,000`: 15 percent of the budget at a declared
-25,000 fits per second. That rate is about half of what was measured here (a
-breast-cancer sized table, 72,000 fits, took 1.4 s, about 51,000 fits per
-second), so a slower machine still finishes inside its share. The cap is
-arithmetic on the budget, so the same table gets the same flags on every
-machine. The default budget allows 6.75 million fits; a 120 second budget
-allows 450,000. Digits (64 columns, 10 classes) needs about 3.6 million: it is
-screened under the default budget and **not run** under `--time-budget 120`.
+versus rest above two classes). Each scan is predicted to take 1 second plus
+8.0e-8 seconds per row per fit for classification (1.2e-8 for regression),
+measured on one thread, the slowest case. The real scan and the planted
+probe together may take 15 percent of the budget: the real scan first, the
+probe from what is left (a probe that does not fit is recorded as "probe not
+run"). The cap is arithmetic on rows, work and budget, so the same table
+gets the same flags on every machine. A breast-cancer sized table (455 rows,
+72,000 fits) is predicted at 3.6 s and is screened under any budget from
+120 s. Digits (64 columns, 10 classes, about 3.6 million fits on 1,437 rows)
+is predicted at about 415 s, more than the 270 s that 15 percent of the
+default 1800 s budget allows, so it is **not run** under the default budget;
+it needs `--time-budget 2800` or more.
 
 A screen that does not run is never a clean bill. The run says so in the last
 line of its summary, for example `WARNING leakage screen NOT RUN for 64 columns

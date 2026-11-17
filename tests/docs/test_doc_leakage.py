@@ -34,7 +34,7 @@ def table(rows=240, seed=0):
 
 
 def test_every_entry_point_defaults_to_the_warn_policy():
-    """Enforces docs/LEAKAGE.md:204.
+    """Enforces docs/LEAKAGE.md:207.
 
     What `warn` does with a flagged column (it trains and labels the score)
     is enforced by tests/leakage/test_leakage.py, which runs it end to end.
@@ -54,7 +54,7 @@ def test_every_entry_point_defaults_to_the_warn_policy():
 def test_the_probe_screens_plants_with_the_real_screens_settings(
     monkeypatch, structure
 ):
-    """Enforces docs/LEAKAGE.md:214."""
+    """Enforces docs/LEAKAGE.md:217."""
     calls = []
     original = screen.screen
     signature = inspect.signature(original)
@@ -86,7 +86,10 @@ def test_the_probe_screens_plants_with_the_real_screens_settings(
     assert list(planted["features"]) == [*features, *plants.DEFECTS]
     assert planted["cfg"] == real["cfg"]
     assert planted["block_size"] == real["block_size"]
-    assert planted["time_budget_seconds"] == real["time_budget_seconds"] == 60
+    # One share of the budget covers both scans; `screen_table` applies it
+    # before each one, so neither is handed a budget of its own.
+    budget = "time_budget_seconds"
+    assert planted.get(budget) is real.get(budget) is None
     if "group_column" in structure:
         assert planted["groups"].equals(real["groups"])
     else:
@@ -96,7 +99,7 @@ def test_the_probe_screens_plants_with_the_real_screens_settings(
 
 
 def test_an_attestation_that_expires_before_its_date_is_refused(tmp_path):
-    """Enforces docs/LEAKAGE.md:283."""
+    """Enforces docs/LEAKAGE.md:286."""
     record = {
         "column": "worst area",
         "name_or_id": "A. Pathologist",
@@ -130,7 +133,7 @@ def test_an_attestation_that_expires_before_its_date_is_refused(tmp_path):
 
 @pytest.mark.parametrize("kind", screen_certify.KINDS)
 def test_no_null_world_of_the_certification_was_flagged(kind):
-    """Enforces docs/LEAKAGE.md:338 (0 of 1000 null worlds flagged)."""
+    """Enforces docs/LEAKAGE.md:341 (0 of 1000 null worlds flagged)."""
     document = json.loads(
         screen_certify.MEASUREMENTS_PATH.read_text(encoding="utf-8")
     )[kind]

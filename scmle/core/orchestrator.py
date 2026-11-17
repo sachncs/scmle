@@ -380,6 +380,33 @@ class Orchestrator:
                     f"{verdict.reason or 'no reason given'}"
                 )
 
+    @staticmethod
+    def admit(context: scmle.core.context.Context) -> None:
+        """Holds the post-training reserve and refuses a run that cannot fit.
+
+        Runs right after ingestion, before any profiling or training: the
+        reserve for the final refit, diagnostics and packaging is estimated
+        from the table's shape and held back from the trial window
+        (`Governor.until`).
+
+        Args:
+            context: The run context, holding the ingested frame.
+
+        Raises:
+            BlockedError: If preparation, one cheapest trial and the reserve
+                cannot fit in the time budget (`budget.Reserve.admit`).
+        """
+        reserve = context.regulator.reserve
+        parts = reserve.provision(*scmle.core.stages.dimensions(context))
+        context.emit(
+            "budget.reserved",
+            f"{reserve.total:.1f} s of the "
+            f"{context.spec.resources.time_budget_seconds} s budget held for "
+            "the final refit, diagnostics and packaging",
+            data={"reserve_seconds": parts},
+        )
+        reserve.admit()
+
     def execute(
         self,
         store: scmle.artifacts.store.Workspace,
@@ -437,6 +464,8 @@ class Orchestrator:
                     context.observe()
                 with context.regulator.cap():
                     stage.execute(context)
+                if isinstance(stage, scmle.core.stages.IngestStage):
+                    self.admit(context)
                 self.consult_checkpoints(stage.state, context)
             machine.transition(
                 state.Progress.COMPLETED,

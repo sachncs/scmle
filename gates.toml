@@ -124,7 +124,7 @@ override = "none"
 variables = ["data.monotonic_constraints"]
 
 [profile.target_and_features]
-site = "scmle.data.profiling.profiler:Profiler.profile"
+site = "scmle.data.profiling.profiler:Profiler.portray"
 error = "BlockedError"
 claim = "C5"
 passes = "The target has no missing values, a usable numeric, categorical, datetime or text feature remains, and the monotonic constraints name numeric features."
@@ -392,3 +392,21 @@ passes = "No monotonic constraint is set, or the task is not multiclass and a ca
 blocks = "Monotonic constraints are set and the task is multiclass; no remaining candidate has a monotonic parameter."
 override = "Relax data.monotonic_constraints or install the 'boosting' extra, as the error message says."
 variables = ["data.monotonic_constraints", "task"]
+
+[budget.minimum_run]
+site = "scmle.core.budget:Reserve.admit"
+error = "BlockedError"
+claim = "C7, C1"
+passes = "Preparation (estimated from the table's rows, feature columns and classes), one cheapest trial and the reserve for the final refit, diagnostics and packaging fit in the time budget; checked right after ingestion, before any profiling or training."
+blocks = "That minimum run is estimated above resources.time_budget_seconds; the message and details give the estimate, the reserve by part and the smallest budget that fits."
+override = "none; raise resources.time_budget_seconds (time_budget, --time-budget) to at least the smallest budget the refusal names."
+variables = ["resources.time_budget_seconds", "START_SECONDS", "CHEAPEST_RATE", "REFIT_SHARE", "EXPLAIN_SHARE", "PACKAGE_SHARE", "OTHER_DIAGNOSTIC_SECONDS"]
+
+[train.first_trial]
+site = "scmle.core.stages:TrainStage.execute"
+error = "BlockedError"
+claim = "C7, C1"
+passes = "At least one trial of the first chunk of candidates starts: preparation left START_SECONDS or more of the trial window (the budget minus the reserve, counted from the run's start); the memory limit never holds back the first trial."
+blocks = "Every trial of the first chunk was skipped because preparation, longer than its estimate, closed the trial window; the message and details give the preparation seconds and the smallest budget that fits."
+override = "none; raise resources.time_budget_seconds (time_budget, --time-budget) to at least the smallest budget the refusal names."
+variables = ["resources.time_budget_seconds", "START_SECONDS"]
