@@ -25,4 +25,4 @@ COPY scmle ./scmle
 COPY scripts ./scripts
 COPY deploy/local ./deploy/local
 USER 10001:10001
-CMD ["python", "-m", "scmle.deploy.demo", "--help"]
+CMD ["python", "-m", "scmle.rehearsal.demo", "--help"]

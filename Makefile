@@ -8,7 +8,7 @@ WORKDIR ?= runs/local-demo
 
 # Train, evaluate, package, serve, predict, monitor and roll back, natively.
 demo:
-	$(PYTHON) -m scmle.deploy.demo run --workdir $(WORKDIR)
+	$(PYTHON) -m scmle.rehearsal.demo run --workdir $(WORKDIR)
 
 # The same lifecycle in containers (needs Docker Compose v2).
 demo-compose: image

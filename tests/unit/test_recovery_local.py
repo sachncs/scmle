@@ -10,9 +10,9 @@ import sys
 
 import pytest
 
-import scmle.deploy.demo
-from scmle.operations import faults
 from scmle.operations import recovery
+from scmle.rehearsal import faults
+import scmle.rehearsal.demo
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -54,5 +54,5 @@ def test_the_wrong_key_is_never_printed_by_the_scenario_report():
     text = str(result.to_dict())
     assert (
         faults.WRONG_KEY not in text
-        and scmle.deploy.demo.DEMO_SIGNING_KEY not in text
+        and scmle.rehearsal.demo.DEMO_SIGNING_KEY not in text
     )

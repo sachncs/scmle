@@ -54,7 +54,7 @@ services:
   # Trains, evaluates, registers and packages onto the shared volume, then exits.
   builder:
     <<: *image
-    command: ["python", "-m", "scmle.deploy.demo", "prepare",
+    command: ["python", "-m", "scmle.rehearsal.demo", "prepare",
               "--workdir", "/work"]
     volumes: ["work:/work"]
     tmpfs: ["/tmp:size=512m"]
@@ -100,7 +100,7 @@ services:
   test-runner:
     <<: *image
     profiles: ["test"]
-    command: ["python", "-m", "scmle.deploy.demo", "verify",
+    command: ["python", "-m", "scmle.rehearsal.demo", "verify",
               "--workdir", "/work", "--api-url", "http://api:8000",
               "--golden-api-url", "http://golden-api:8001",
               "--metrics-url", "http://metrics-sink:9100"]

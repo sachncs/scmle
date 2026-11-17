@@ -1,7 +1,7 @@
 """The local demo: train, evaluate, package, predict, monitor, roll back.
 
-One command (`make demo`, or `python -m scmle.deploy.demo run`) runs the whole
-lifecycle on the explicit files in `deploy/local/`, with no cloud account:
+One command (`make demo`, or `python -m scmle.rehearsal.demo run`) runs the
+whole lifecycle on the explicit files in `deploy/local/`, with no cloud account:
 
 1. train a good model and a bad release from two datasets, and evaluate them;
 2. package the good model as a hardened service folder, store it in the mock

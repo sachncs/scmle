@@ -169,7 +169,7 @@
         "scmle.contracts.reliability.x\u01c1Registry\u01c1register__mutmut_2",
         "scmle.contracts.reliability.x\u01c1Registry\u01c1register__mutmut_3"
       ],
-      "files": "0192696f68a712b857f2be2da16fe7cfd8bc11882e595b8cd1d4d3c27d7b3ecb",
+      "files": "3339b6fa75ab9a2910e0a71c0d97063052657cda3c54a9ea5ec3ce8542980e18",
       "module": "scmle/contracts/reliability.py",
       "mutants": 430,
       "not_run": 0,
@@ -1002,7 +1002,7 @@
         "scmle.deploy.parity.x\u01c1Parity\u01c1to_dict__mutmut_5",
         "scmle.deploy.parity.x\u01c1Tolerance\u01c1__post_init____mutmut_14"
       ],
-      "files": "1d18de907cd859565443c7612f33294ec731b6a18f9a4debf1ec757b5817a7bc",
+      "files": "cfdbcfd8275788a5a70af336c0395c246c5ba6cbf5f0b673cc53f90de0230495",
       "module": "scmle/deploy/parity.py",
       "mutants": 452,
       "not_run": 0,

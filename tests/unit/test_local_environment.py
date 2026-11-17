@@ -14,9 +14,9 @@ import yaml
 
 from scmle.contracts import errors
 from scmle.contracts import observability
-from scmle.deploy import demo
 from scmle.deploy import mocks
 from scmle.deploy import provenance
+from scmle.rehearsal import demo
 from scmle.serving import runtime
 from scripts import make_demo_data
 

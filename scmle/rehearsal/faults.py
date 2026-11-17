@@ -1,7 +1,7 @@
 """Local scenarios for the fault catalogue.
 
 Each scenario starts the real local service (the generated ``serve.py`` in a
-subprocess, as ``scmle.deploy.demo`` does), the local object-store and
+subprocess, as ``scmle.rehearsal.demo`` does), the local object-store and
 metrics emulators, a real ledger or a real workflow executor, breaks it the
 way the fault says and measures recovery with a monotonic clock. Everything
 the scenarios start is owned by a `Fleet`, which stops it in ``close`` and
@@ -36,7 +36,6 @@ from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.contracts import observability
 from scmle.deploy import control
-from scmle.deploy import demo
 from scmle.deploy import mocks
 from scmle.deploy import observation
 from scmle.deploy import packaging
@@ -49,6 +48,7 @@ from scmle.operations import classify
 from scmle.operations import recovery
 from scmle.operations import signals
 from scmle.operations import spool
+from scmle.rehearsal import demo
 from scmle.runtime import limits
 from scmle.security import audit
 from scmle.storage import objectstore

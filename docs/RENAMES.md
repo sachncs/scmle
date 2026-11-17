@@ -2949,3 +2949,6 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.governance.release_state` -> `scmle.deploy.release_state`
 - `scmle.governance.lifecycle` -> `scmle.operations.lifecycle`
 - `scmle.governance.rollout_hook` -> `scmle.operations.rollout_hook`
+- `scmle.deploy.demo` -> `scmle.rehearsal.demo`
+- `scmle.operations.faults` -> `scmle.rehearsal.faults`
+- `scmle.governance.local_faults` -> `scmle.rehearsal.local_faults`

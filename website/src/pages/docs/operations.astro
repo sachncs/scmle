@@ -129,7 +129,7 @@ only a verified, digest-bound state may move forward`}</code></pre>
   <pre><code>{`from pathlib import Path
 
 from scmle.contracts import reliability
-from scmle.governance.local_faults import Executor
+from scmle.rehearsal.local_faults import Executor
 
 executor = Executor(Path("rehearsal/faults"))
 for scenario in reliability.Contingency:

@@ -2,7 +2,7 @@
 
 import json
 
-from scmle.deploy import demo
+from scmle.rehearsal import demo
 
 
 def test_the_native_demo_passes_every_step(tmp_path, capsys):

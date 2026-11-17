@@ -32,7 +32,7 @@ scmle/serving/server.py Observer lone-interface test doubles in test_service_sig
 scmle/models/deeplearning/jepa_engine.py load_state_dict passthrough mirrors the torch module interface the engines call
 scmle/models/ensembles.py predict_proba passthrough public API or scikit-learn estimator interface
 scmle/pipeline/modality_lifecycle/curators.py remarks getter adapter hook documented on the website extensions page
-scmle/operations/faults.py run_all passthrough shown in docs/OPERATIONS.md and the website observability page
+scmle/rehearsal/faults.py run_all passthrough shown in docs/OPERATIONS.md and the website observability page
 scmle/runners/base.py Runner lone-interface local.Runner implements it; pinned in the public API
 scmle/preparation/synthesis.py Synthesizer lone-interface Copula and a test double; documented in docs/ARCHITECTURE.md
 scmle/assurance/admissibility/plants.py copy getter one of the five leak-type methods that plant() dispatches to by name (scmle/assurance/admissibility/plants.py plant); Numbers.copy overrides it, so it is polymorphic, not a getter

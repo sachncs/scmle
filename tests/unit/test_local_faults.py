@@ -7,8 +7,8 @@ from urllib.request import url2pathname
 import pytest
 
 from scmle.contracts import reliability
-from scmle.governance import local_faults
 import scmle.governance.reliability
+from scmle.rehearsal import local_faults
 
 
 def test_local_executor_passes_every_declared_scenario(tmp_path):

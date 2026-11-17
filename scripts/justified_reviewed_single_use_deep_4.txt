@@ -26,11 +26,11 @@ scmle/monitoring/labels.py is_matured single-use tests/unit/test_label_mechanism
 scmle/monitoring/labels.py circularity single-use tests call it with permutations and alpha defaults and benchmarks/qualification/loop_certify.py calls it and lists it among the H7 source functions
 scmle/monitoring/labels.py assessment single-use tests/unit/test_monitoring_mutants.py pins its 0.05 boundary and benchmarks/qualification/loop_certify.py calls it and lists it among the H7 source functions
 scmle/data/reference.py divergence single-use tests (test_reference.py, property test_invariants.py) and benchmarks/qualification/loop_certify.py call it directly; Reference.psi only forwards expected and observed proportions
-scmle/operations/faults.py rekey single-use one of 11 SCENARIOS table entries ("secret_rotation_recovery") that Runner dispatches by fault id; 60 lines of subprocess fleet setup that cannot be merged into the table
-scmle/operations/faults.py object_store_loss single-use one of 11 SCENARIOS table entries ("lost_object_store_access") that Runner dispatches by fault id; 80 lines of store emulator steps
-scmle/operations/faults.py blackout single-use one of 11 SCENARIOS table entries ("dependency_outage") that Runner dispatches by fault id; 70 lines of spool and sink steps
-scmle/operations/faults.py degradation single-use 25-line polling loop with a continue for short or failed responses and a return of (labelled count, monotonic time); inlined into the 110-line bad_release it would need break flags to replace the returns
-scmle/operations/faults.py resilience single-use one of 11 SCENARIOS table entries ("audit_log_continuity") that Runner dispatches by fault id; 60 lines of kill and reopen trials
+scmle/rehearsal/faults.py rekey single-use one of 11 SCENARIOS table entries ("secret_rotation_recovery") that Runner dispatches by fault id; 60 lines of subprocess fleet setup that cannot be merged into the table
+scmle/rehearsal/faults.py object_store_loss single-use one of 11 SCENARIOS table entries ("lost_object_store_access") that Runner dispatches by fault id; 80 lines of store emulator steps
+scmle/rehearsal/faults.py blackout single-use one of 11 SCENARIOS table entries ("dependency_outage") that Runner dispatches by fault id; 70 lines of spool and sink steps
+scmle/rehearsal/faults.py degradation single-use 25-line polling loop with a continue for short or failed responses and a return of (labelled count, monotonic time); inlined into the 110-line bad_release it would need break flags to replace the returns
+scmle/rehearsal/faults.py resilience single-use one of 11 SCENARIOS table entries ("audit_log_continuity") that Runner dispatches by fault id; 60 lines of kill and reopen trials
 scmle/operations/logs.py extract single-use tests/unit/test_operations_telemetry.py asserts it directly for valid and malformed W3C headers
 scmle/operations/metrics.py cpu single-use falls back to time.process_time when the resource module is missing (Windows) and otherwise sums ru_utime and ru_stime; called as an argument beside the residency sibling in poll
 scmle/operations/notify.py courier single-use tests/unit/test_operations_telemetry.py builds it directly; it is the default transport whose HTTPS-only check and status-code mapping are part of the docstring contract
