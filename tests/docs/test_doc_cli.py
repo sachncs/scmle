@@ -56,7 +56,7 @@ def test_serve_needs_authentication_beyond_loopback(
             monkeypatch.delenv(name)
     monkeypatch.delenv("SCMLE_ENV", raising=False)
     monkeypatch.setattr(
-        cli, "threading", types.SimpleNamespace(Event=Interrupted)
+        cli.delivery, "threading", types.SimpleNamespace(Event=Interrupted)
     )
     folder = tmp_path / "bundle"
     parity.handwrite(parity.goldens(GOLDEN).spec).save(folder)

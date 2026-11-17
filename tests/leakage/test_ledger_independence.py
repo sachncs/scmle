@@ -35,7 +35,7 @@ def imported_modules(path):
 
 
 def test_no_ledger_module_imports_custody_or_the_vault():
-    modules = sorted(ROOT.glob("*.py"))
+    modules = sorted(ROOT.rglob("*.py"))
     assert len(modules) >= 8
     for path in modules:
         for name in imported_modules(path):

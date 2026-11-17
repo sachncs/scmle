@@ -71,7 +71,15 @@ from scmle.assurance.ingest import joins
 from scmle.assurance.ingest import profile
 from scmle.assurance.ingest import reconcile
 from scmle.assurance.ingest import synthesize
+import scmle.assurance.ingest.entities.blocking
+import scmle.assurance.ingest.entities.fitting
+import scmle.assurance.ingest.entities.resolution
+import scmle.assurance.ingest.entities.sampling
+import scmle.assurance.ingest.entities.similarity
 import scmle.assurance.ingest.plan
+import scmle.assurance.ingest.synthesize.evaluation
+import scmle.assurance.ingest.synthesize.grammar
+import scmle.assurance.ingest.synthesize.selection
 import scmle.certificates
 from scmle.contracts import qualification
 from scmle.data.readers import connectors
@@ -768,10 +776,23 @@ def code_hashes() -> dict[str, str]:
     return {
         "torn_read": torn_code(),
         "reconcile": reconcile.code_digest(),
-        "point_in_time": certificates.code_hash(asof_view, synthesize),
+        "point_in_time": certificates.code_hash(
+            asof_view,
+            synthesize,
+            scmle.assurance.ingest.synthesize.grammar,
+            scmle.assurance.ingest.synthesize.evaluation,
+            scmle.assurance.ingest.synthesize.selection,
+        ),
         "grain": certificates.code_hash(grain),
         "joins": certificates.code_hash(joins),
-        "entities": certificates.code_hash(entities),
+        "entities": certificates.code_hash(
+            entities,
+            scmle.assurance.ingest.entities.similarity,
+            scmle.assurance.ingest.entities.blocking,
+            scmle.assurance.ingest.entities.fitting,
+            scmle.assurance.ingest.entities.sampling,
+            scmle.assurance.ingest.entities.resolution,
+        ),
         "budget": certificates.code_hash(budget, scmle.assurance.ingest.plan),
     }
 

@@ -49,7 +49,7 @@ def substantiate(**overrides: object) -> explanations.Evidence:
 def test_evidence_contains_every_phase_four_binding():
     evidence = substantiate()
 
-    record = evidence.to_dict()
+    record = evidence.model_dump(mode="json")
 
     assert record["model_fingerprint"] == "model-123"
     assert record["bundle_digest"] == "sha256:bundle-123"

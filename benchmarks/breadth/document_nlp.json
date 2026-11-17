@@ -8,7 +8,7 @@
   "evidence_in_repo": [
     "scmle/pipeline/modality_lifecycle/preparers/document.py",
     "scmle/data/modalities/document",
-    "scmle/models/documents.py",
+    "scmle/models/documents/",
     "tests/unit/test_modality_lifecycle.py"
   ],
   "deployment_requirement": {

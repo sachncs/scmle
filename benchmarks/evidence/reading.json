@@ -1,6 +1,6 @@
 {
   "claim": "C5",
-  "code": "51416321bffd19911d0cb98f0b71aa0257f788a449681fa3851b6fc4d1ace266",
+  "code": "60e9b2d0a009b70ba58817d2ed848184f7391cfd2ac737cf7665a3a050299c5a",
   "corpus": {
     "cases": 34,
     "correct": 24,
@@ -266,7 +266,7 @@
     "worlds": 1000
   },
   "real_datasets": 0,
-  "seconds": 10.2,
+  "seconds": 4.7,
   "tolerance": 1e-08,
   "variable": "reference_rel_tol"
 }

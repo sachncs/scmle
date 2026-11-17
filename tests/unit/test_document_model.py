@@ -2,6 +2,7 @@
 
 import json
 import math
+import os
 
 import pytest
 
@@ -9,7 +10,6 @@ from scmle.contracts import errors
 from scmle.data.modalities.document import Dataset
 from scmle.data.modalities.document import Reader
 from scmle.data.modalities.document import Sample
-from scmle.models import documents
 from scmle.models.documents import Classifier
 from scmle.models.documents import Config
 from scmle.models.documents import Monitor
@@ -179,7 +179,7 @@ def test_document_classifier_cleans_failed_atomic_replacement(
     """A failed package replacement leaves no misleading partial artifact."""
     classifier = make_classifier().fit(training_samples)
     target = tmp_path / "document-model"
-    real_replace = documents.os.replace
+    real_replace = os.replace
 
     def fail_replace(source, destination):
         """Inject a failure at the atomic directory replacement boundary."""
@@ -187,7 +187,7 @@ def test_document_classifier_cleans_failed_atomic_replacement(
             raise OSError("injected replacement failure")
         real_replace(source, destination)
 
-    monkeypatch.setattr(documents.os, "replace", fail_replace)
+    monkeypatch.setattr(os, "replace", fail_replace)
 
     with pytest.raises(OSError, match="injected replacement failure"):
         classifier.save(target)

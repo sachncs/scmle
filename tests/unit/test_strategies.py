@@ -1,5 +1,7 @@
 """Tests for data strategies."""
 
+import importlib.util
+
 import numpy
 import pandas
 import pytest
@@ -220,9 +222,7 @@ def test_smote_family_needs_the_sampling_extra_numeric_features_and_imbalance(
 
 def test_smote_without_the_extra_explains_itself(monkeypatch):
     profile = smote_profile()[1]
-    monkeypatch.setattr(
-        strategies.importlib.util, "find_spec", lambda name: None
-    )
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: None)
     assert "sampling" in reason("smote", profile, "random_forest")
 
 

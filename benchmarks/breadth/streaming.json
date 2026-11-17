@@ -6,7 +6,7 @@
   "modality": "tabular",
   "built": "none",
   "evidence_in_repo": [
-    "scmle/data/readers/streaming.py",
+    "scmle/data/readers/streaming/",
     "scmle/operations/spool.py",
     "tests/unit/test_streaming.py"
   ],

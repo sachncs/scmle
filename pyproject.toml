@@ -249,8 +249,8 @@ order-by-type = false
 # inside functions to test lazy imports.
 "tests/**" = ["S", "PLR", "D", "DOC", "ANN", "INP001", "PLC0415", "ARG", "FBT", "PT011", "PT018", "E501", "SLF", "T201", "C901", "TRY", "EM", "PD901"]
 # The command line tool and the demo print: printing is their output.
-"scmle/cli.py" = ["T201"]
-"scmle/rehearsal/demo.py" = ["T201"]
+"scmle/cli/**" = ["T201"]
+"scmle/rehearsal/demo/**" = ["T201"]
 # Command-line tools and benchmark scripts print and are not packages.
 "scripts/**" = ["T201", "INP001", "S", "PLC0415"]
 "benchmarks/**" = ["T201", "INP001", "S", "PLC0415"]

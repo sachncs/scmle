@@ -63,6 +63,9 @@ from benchmarks.qualification import ingest_naive
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ingest import asof_view
 from scmle.assurance.ingest import synthesize
+import scmle.assurance.ingest.synthesize.evaluation
+import scmle.assurance.ingest.synthesize.grammar
+import scmle.assurance.ingest.synthesize.selection
 from scmle.contracts import errors
 from scmle.data.readers import tabular
 
@@ -544,6 +547,9 @@ def digest() -> str:
     code = certificates.code_hash(
         tabular,
         synthesize,
+        scmle.assurance.ingest.synthesize.evaluation,
+        scmle.assurance.ingest.synthesize.grammar,
+        scmle.assurance.ingest.synthesize.selection,
         asof_view,
         ingest_naive,
         ingest_checks,

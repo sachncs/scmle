@@ -6,7 +6,7 @@
   "modality": "multimodal",
   "built": "none",
   "evidence_in_repo": [
-    "scmle/contracts/capabilities.py",
+    "scmle/contracts/capabilities/__init__.py",
     "scmle/pipeline/context.py"
   ],
   "deployment_requirement": {

@@ -329,14 +329,16 @@ def imported_modules(path):
 
 def test_synthesize_has_no_raw_read_path():
     # Enforces docs/ARCHITECTURE.md:99.
-    names = imported_modules(ROOT / "scmle/assurance/ingest/synthesize.py")
+    files = sorted((ROOT / "scmle/assurance/ingest/synthesize").glob("*.py"))
+    assert files
+    names = set().union(*(imported_modules(path) for path in files))
     forbidden = (
         "scmle.data.readers",
         "scmle.assurance.ingest.profile",
         "sqlite3",
     )
     assert not [n for n in names if n.startswith(forbidden)]
-    source = (ROOT / "scmle/assurance/ingest/synthesize.py").read_text()
+    source = "\n".join(path.read_text() for path in files)
     assert "read_csv" not in source and "read_sql" not in source
     assert "scmle.data.readers" in "\n".join(
         imported_modules(ROOT / "scmle/assurance/ingest/profile.py")

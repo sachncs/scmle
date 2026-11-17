@@ -62,6 +62,13 @@ import pandas
 from benchmarks import acceptance
 from benchmarks.evidence import refusal
 from scmle.assurance.admissibility import screen
+import scmle.assurance.admissibility.screen.association
+import scmle.assurance.admissibility.screen.fitting
+import scmle.assurance.admissibility.screen.hypotheses
+import scmle.assurance.admissibility.screen.permutation
+import scmle.assurance.admissibility.screen.planning
+import scmle.assurance.admissibility.screen.report
+import scmle.assurance.admissibility.screen.settings
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
 import scmle.evaluation.coverage
@@ -547,14 +554,21 @@ def digest() -> str:
     """Hash of the code measured and the code measuring it.
 
     Returns:
-        The `code_hash` of the product's whole screen module (`code_hash`
-        hashes only the objects it is given, not what they call, so the
-        module is named whole: an edit to any check the screen runs makes
-        the stored result stale), the gate, and this module's corpus and
+        The `code_hash` of the product's whole screen package (`code_hash`
+        hashes only the objects it is given, not what they call, so every
+        module of the package is named: an edit to any check the screen runs
+        makes the stored result stale), the gate, and this module's corpus and
         trial.
     """
     return certificates.code_hash(
         screen,
+        scmle.assurance.admissibility.screen.association,
+        scmle.assurance.admissibility.screen.fitting,
+        scmle.assurance.admissibility.screen.hypotheses,
+        scmle.assurance.admissibility.screen.permutation,
+        scmle.assurance.admissibility.screen.planning,
+        scmle.assurance.admissibility.screen.report,
+        scmle.assurance.admissibility.screen.settings,
         profiler.Profiler.leakage_screen,
         stages.ProfileStage.enforce_leakage_policy,
         refusal.fetch,

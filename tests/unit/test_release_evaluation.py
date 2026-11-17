@@ -40,17 +40,17 @@ def make_policy(
     """Build a binary policy with representative release gates."""
     fairness_policy = (
         evaluation.Fairness(
-            evaluation.Technique.GROUP_REPORT,
+            method=evaluation.Technique.GROUP_REPORT,
             sensitive_columns=("group",),
             metrics=("demographic_parity_difference",),
         )
         if fairness
-        else evaluation.Fairness(evaluation.Technique.NONE)
+        else evaluation.Fairness(method=evaluation.Technique.NONE)
     )
     fairness_gates = (
         (
             evaluation.Equity(
-                "demographic_parity_difference",
+                metric="demographic_parity_difference",
                 maximum=0.10,
                 required_evidence=("fairness.report",),
             ),
@@ -60,34 +60,44 @@ def make_policy(
     )
     diagnostic_gates: tuple[evaluation.Requirement, ...] = (
         evaluation.Requirement(
-            "metric_uncertainty",
-            diagnostic_action,
-            ("diagnostic.metric",),
+            name="metric_uncertainty",
+            action=diagnostic_action,
+            required_evidence=("diagnostic.metric",),
         ),
     )
     if diagnostic_action is evaluation.Remedy.WARN:
         diagnostic_gates += (
             evaluation.Requirement(
-                "robustness",
-                evaluation.Remedy.BLOCK,
-                ("diagnostic.robustness",),
+                name="robustness",
+                action=evaluation.Remedy.BLOCK,
+                required_evidence=("diagnostic.robustness",),
             ),
         )
     return evaluation.Criteria(
         task=tasks.Task.BINARY,
         primary_metric="roc_auc",
         metrics=(
-            evaluation.Declaration("roc_auc", evaluation.Orientation.MAXIMIZE),
+            evaluation.Declaration(
+                name="roc_auc", direction=evaluation.Orientation.MAXIMIZE
+            ),
         ),
-        uncertainty=evaluation.Uncertainty(evaluation.UncertaintyMethod.NONE),
-        calibration=evaluation.Calibration(evaluation.Procedure.NONE),
+        uncertainty=evaluation.Uncertainty(
+            method=evaluation.UncertaintyMethod.NONE
+        ),
+        calibration=evaluation.Calibration(method=evaluation.Procedure.NONE),
         fairness=fairness_policy,
-        small_groups=evaluation.Subgroups(30, 10),
-        explanations=evaluation.Explanations(evaluation.Explicability.NONE),
+        small_groups=evaluation.Subgroups(
+            warning_threshold=30, blocking_threshold=10
+        ),
+        explanations=evaluation.Explanations(
+            availability=evaluation.Explicability.NONE
+        ),
         release=evaluation.Gates(
             metric_gates=(
                 evaluation.Hurdle(
-                    "roc_auc", evaluation.Orientation.MAXIMIZE, 0.75
+                    metric="roc_auc",
+                    direction=evaluation.Orientation.MAXIMIZE,
+                    threshold=0.75,
                 ),
             ),
             diagnostic_gates=diagnostic_gates,
@@ -254,15 +264,17 @@ def test_unsupported_reports_and_unaccepted_evidence_block():
 
 def test_explanation_quality_threshold_is_a_blocking_release_gate():
     """A declared quality threshold must be present and pass."""
-    policy = dataclasses.replace(
-        make_policy(),
-        explanations=evaluation.Explanations(
-            evaluation.Explicability.GLOBAL,
-            required_methods=("permutation_importance",),
-            required_evidence=("explanation.json",),
-            require_stability=True,
-            stability_threshold=0.8,
-        ),
+    policy = evaluation.Criteria.model_validate(
+        {
+            **dict(make_policy()),
+            "explanations": evaluation.Explanations(
+                availability=evaluation.Explicability.GLOBAL,
+                required_methods=("permutation_importance",),
+                required_evidence=("explanation.json",),
+                require_stability=True,
+                stability_threshold=0.8,
+            ),
+        }
     )
     reports = {
         "metric_uncertainty": {"estimate": 0.81},
@@ -290,17 +302,19 @@ def test_explanation_quality_threshold_is_a_blocking_release_gate():
 
 def test_explanation_quality_release_gate_passes_with_valid_evidence():
     """A quality report above its declared threshold permits this gate."""
-    policy = dataclasses.replace(
-        make_policy(),
-        explanations=evaluation.Explanations(
-            evaluation.Explicability.GLOBAL,
-            required_methods=("permutation_importance",),
-            required_evidence=("explanation.json",),
-            require_stability=True,
-            require_fidelity=True,
-            stability_threshold=0.8,
-            fidelity_threshold=0.9,
-        ),
+    policy = evaluation.Criteria.model_validate(
+        {
+            **dict(make_policy()),
+            "explanations": evaluation.Explanations(
+                availability=evaluation.Explicability.GLOBAL,
+                required_methods=("permutation_importance",),
+                required_evidence=("explanation.json",),
+                require_stability=True,
+                require_fidelity=True,
+                stability_threshold=0.8,
+                fidelity_threshold=0.9,
+            ),
+        }
     )
     reports = {
         "metric_uncertainty": {"estimate": 0.81},

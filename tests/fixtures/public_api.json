@@ -23,7 +23,7 @@
     "scmle.api.predict": {
       "load_model": {
         "kind": "callable",
-        "signature_sha256": "114f13e6bfcc5076c4844532d7c5e11ec4dee236f2a73241d4208bfc72213f07"
+        "signature_sha256": "41df291eff5553e4f546b718bc09f303d7967d935eebdadbdacba89e1f1420fa"
       },
       "predict": {
         "kind": "callable",
@@ -33,15 +33,15 @@
     "scmle.api.project": {
       "Curator": {
         "kind": "class",
-        "signature_sha256": "fc5d51960bd0109361ad288e68686177bb92eae4f5b2c49e0f00575e50fb2227"
+        "signature_sha256": "f7f4dbbc72cc57930504843cab72f7c90c0a5ab29e36fcb41ae1aec126bfc9f0"
       },
       "ModalityProject": {
         "kind": "class",
-        "signature_sha256": "cb28c77250cc6eac4eb49e4500dcf7630eac80620ec2ecf029ba6b025749572d"
+        "signature_sha256": "2c94af38453fc29f60a15f5ae2753c1b1dd218acf17aea63781d97c63ea4b6d4"
       },
       "Project": {
         "kind": "class",
-        "signature_sha256": "94236014b9a4a169a9d5731f8df47fa1d6fc2140cf9043327b50c6a5a1e05f25"
+        "signature_sha256": "02eeb48d0c87b1eaeba960694696e240e9d59808aac71e3e442bd126c4df7942"
       }
     },
     "scmle.api.sequential": {
@@ -53,13 +53,13 @@
     "scmle.artifacts.bundle": {
       "Bundle": {
         "kind": "class",
-        "signature_sha256": "146136aedec3af2ecb7602d39b87aed731fb7125ae81a5ffb4acf34deada7cec"
+        "signature_sha256": "db252bb4a07bade7e111780b0423add08e49eea49124e0c2694c3f12e98a6c55"
       }
     },
     "scmle.artifacts.results": {
       "Run": {
         "kind": "class",
-        "signature_sha256": "b7a7c17e972263a9d337ef8fa2e4ddc7d50ff1b8a517ea2998701ae8409dc9fb"
+        "signature_sha256": "248512be50363b50d4dbcff740ecb3167e95cd013c74dcfaf3a5b3465c4bb300"
       }
     },
     "scmle.data.catalog": {
@@ -325,7 +325,7 @@
     "scmle.evaluation.metrics": {
       "register_metric": {
         "kind": "callable",
-        "signature_sha256": "c6c4c0fc9616ad136e13277e9415ea155ce1fb9b47f0a22c3cf8ff2e44af865b"
+        "signature_sha256": "96564cb3b0e8249e2f4102cefdd27c3d50a32b9f65b13255c1cd816282fa596d"
       }
     },
     "scmle.evaluation.parameter_estimation": {
@@ -735,7 +735,7 @@
     "scmle.trail.chain": {
       "Verification": {
         "kind": "class",
-        "signature_sha256": "2e2bc0d3d0450b162162e731b3fcd4f02f5040562b2c7a17748c9bddd9eb5e61"
+        "signature_sha256": "641d3c8e0826a90be1265e43d75553e943d63f261808cbfbcc086f3a1be8d20e"
       },
       "seal": {
         "kind": "callable",

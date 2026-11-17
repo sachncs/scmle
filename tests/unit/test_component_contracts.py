@@ -27,6 +27,7 @@ from scmle.preparation import resampling
 from scmle.preparation import strategies
 from scmle.preparation import synthesis
 from scmle.runtime import scheduler
+from scmle.runtime import state
 from scmle.serving import server
 from scmle.storage import stores
 
@@ -109,9 +110,10 @@ def test_strategy_registry_entries_are_self_describing():
     } == set(strategies.STRATEGIES)
 
 
-def test_one_stage_per_lifecycle_state_in_order():
+def test_the_stages_cover_the_lifecycle_states_in_order():
     states = [stage.state for stage in stages.default_stages()]
-    assert len(states) == len(set(states)) == 7
+    assert len(set(states)) == 7
+    assert states == sorted(states, key=list(state.Progress).index)
 
 
 def test_abstract_bases_cannot_be_instantiated():
@@ -178,17 +180,17 @@ def test_a_model_is_imported_only_when_it_is_built():
 
 def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
     from scmle.contracts import errors
-    from scmle.pipeline import compiler
+    from scmle.pipeline import engine
 
     default = stages.default_stages()
     kinds = [type(s) for s in default]
     assert kinds[0] is stages.IngestStage and kinds[-1] is stages.PackageStage
     shuffled = list(reversed(default))
-    assert [type(s) for s in compiler.assemble(shuffled)] == kinds
+    assert [type(s) for s in engine.order(shuffled)] == kinds
     with pytest.raises(errors.ConfigError, match="requires"):
-        compiler.assemble(default[1:])
+        engine.order(default[1:])
     with pytest.raises(errors.ConfigError, match="more than once"):
-        compiler.assemble([*default, default[0]])
+        engine.order([*default, default[0]])
 
     class Left:
         requires = ()
@@ -198,11 +200,11 @@ def test_the_workflow_is_a_compiled_dag_of_declared_dependencies():
 
     Left.requires = (Right,)
     with pytest.raises(errors.ConfigError, match="cycle"):
-        compiler.assemble([Left(), Right()])
+        engine.order([Left(), Right()])
 
 
 def test_a_replacement_stage_subclass_satisfies_dependencies():
-    from scmle.pipeline import compiler
+    from scmle.pipeline import engine
 
     class Custom(stages.TrainStage):
         pass
@@ -211,5 +213,5 @@ def test_a_replacement_stage_subclass_satisfies_dependencies():
         Custom() if isinstance(s, stages.TrainStage) else s
         for s in stages.default_stages()
     ]
-    ordered = compiler.assemble(swapped)
+    ordered = engine.order(swapped)
     assert [type(s) for s in ordered].count(Custom) == 1

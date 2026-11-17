@@ -4,6 +4,7 @@ import dataclasses
 from fractions import Fraction
 import types
 
+import pydantic
 import pytest
 
 from scmle.contracts import evaluation
@@ -535,8 +536,12 @@ def test_explanation_quality_value_accepts_only_unit_interval_numbers():
 
 
 def test_metric_gate_finding_outcomes():
-    maximize = evaluation.Hurdle("auc", evaluation.Orientation.MAXIMIZE, 0.5)
-    minimize = evaluation.Hurdle("loss", evaluation.Orientation.MINIMIZE, 0.5)
+    maximize = evaluation.Hurdle(
+        metric="auc", direction=evaluation.Orientation.MAXIMIZE, threshold=0.5
+    )
+    minimize = evaluation.Hurdle(
+        metric="loss", direction=evaluation.Orientation.MINIMIZE, threshold=0.5
+    )
     declared = {"auc", "loss"}
 
     def run(gate, value, names=declared):
@@ -602,7 +607,9 @@ def test_diagnostic_verdict_reads_the_first_verdict_key():
 
 
 def make_gate(action=evaluation.Remedy.BLOCK):
-    return evaluation.Requirement("diag", action, ("e1",))
+    return evaluation.Requirement(
+        name="diag", action=action, required_evidence=("e1",)
+    )
 
 
 def diagnose(report, action=evaluation.Remedy.BLOCK):
@@ -756,7 +763,7 @@ def test_explanation_findings_need_a_threshold_for_each_requirement():
 
 
 def fairness_gate(**bounds):
-    return evaluation.Equity("gap", required_evidence=("fe",), **bounds)
+    return evaluation.Equity(metric="gap", required_evidence=("fe",), **bounds)
 
 
 def test_fairness_gate_maximum_uses_the_worst_value():
@@ -919,7 +926,9 @@ def test_summary_canonical_json_escapes_non_ascii_text():
 
 
 def test_gate_findings_for_unusable_metrics_are_failed_and_blocking():
-    gate = evaluation.Hurdle("auc", evaluation.Orientation.MAXIMIZE, 0.5)
+    gate = evaluation.Hurdle(
+        metric="auc", direction=evaluation.Orientation.MAXIMIZE, threshold=0.5
+    )
     expected = {
         "kind": "metric",
         "name": "auc",
@@ -977,16 +986,24 @@ def test_fairness_metric_values_reads_mappings_with_mixed_key_types():
 def test_a_decisive_gate_fails_a_report_without_a_verdict():
     # ERR-5: a verdict-bearing diagnostic that drops its verdict used to pass.
     decisive = evaluation.Requirement(
-        "diag", evaluation.Remedy.BLOCK, ("e1",), decisive=True
+        name="diag",
+        action=evaluation.Remedy.BLOCK,
+        required_evidence=("e1",),
+        decisive=True,
     )
-    presence = evaluation.Requirement("diag", evaluation.Remedy.BLOCK, ("e1",))
+    presence = evaluation.Requirement(
+        name="diag", action=evaluation.Remedy.BLOCK, required_evidence=("e1",)
+    )
     report = {"diag": {"value": 1.0}}
     failed = release.adjudge(decisive, report)
     assert not failed.passed and failed.blocking
     assert failed.reason == "diagnostic 'diag' reported no verdict"
     assert release.adjudge(presence, report).passed
     assert release.adjudge(decisive, {"diag": {"passed": True}}).passed
-    with pytest.raises(TypeError, match="decisive must be bool"):
+    with pytest.raises(pydantic.ValidationError, match="decisive"):
         evaluation.Requirement(
-            "diag", evaluation.Remedy.BLOCK, ("e1",), decisive=1
+            name="diag",
+            action=evaluation.Remedy.BLOCK,
+            required_evidence=("e1",),
+            decisive=1,
         )

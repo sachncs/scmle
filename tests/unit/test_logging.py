@@ -22,10 +22,10 @@ from scmle.runtime import logs
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PACKAGES = (
-    "scmle/cli.py",
+    "scmle/cli",
     "scmle/preparation/pseudo_labeling.py",
     "scmle/preparation/resampling.py",
-    "scmle/preparation/strategies.py",
+    "scmle/preparation/strategies",
     "scmle/preparation/synthesis.py",
     "scmle/operations",
     "scmle/monitoring",

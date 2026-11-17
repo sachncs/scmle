@@ -193,7 +193,7 @@ def test_a_failed_attestation_check_keeps_its_reason(monkeypatch, caplog):
     from scmle.evaluation import release
     from scmle.pipeline import stages
 
-    policy = types.SimpleNamespace(metrics=(), to_dict=dict)
+    policy = types.SimpleNamespace(metrics=(), model_dump=lambda mode: {})
     index = types.SimpleNamespace(
         sign=lambda key: None, verify=lambda key: False, to_dict=dict
     )

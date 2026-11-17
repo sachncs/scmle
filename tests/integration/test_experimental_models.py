@@ -18,8 +18,8 @@ from scmle.models.deeplearning import networks
 import scmle.models.registry
 from scmle.models.sklearn import classical
 from scmle.pipeline import orchestrator
+from scmle.pipeline import roster
 from scmle.pipeline import stages
-import scmle.pipeline.context
 
 
 def test_unknown_experimental_model_fails_closed():
@@ -108,7 +108,7 @@ def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
 
 def test_jepa_has_a_complete_experimental_tabular_capability():
     """The public JEPA path has a task-level capability declaration."""
-    registry = scmle.pipeline.context.enrol()
+    registry = roster.enrol()
 
     key = capabilities.Coordinate(
         modality=capabilities.Modality.TABULAR,

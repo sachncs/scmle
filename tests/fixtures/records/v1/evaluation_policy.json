@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "task": "binary_classification",
+  "primary_metric": "roc_auc",
+  "metrics": [
+    {
+      "name": "roc_auc",
+      "direction": "maximize",
+      "required": true,
+      "custom": false,
+      "evidence": []
+    },
+    {
+      "name": "log_loss",
+      "direction": "minimize",
+      "required": false,
+      "custom": false,
+      "evidence": []
+    },
+    {
+      "name": "business_cost",
+      "direction": "minimize",
+      "required": false,
+      "custom": true,
+      "evidence": [
+        "cost-model.json"
+      ]
+    }
+  ],
+  "uncertainty": {
+    "method": "conformal",
+    "required": true,
+    "confidence_level": 0.95,
+    "coverage_target": 0.9,
+    "minimum_rows": 100
+  },
+  "calibration": {
+    "method": "reliability_curve",
+    "required": true,
+    "maximum_error": 0.05
+  },
+  "fairness": {
+    "method": "group_report",
+    "sensitive_columns": [
+      "sex"
+    ],
+    "metrics": [
+      "demographic_parity_difference"
+    ]
+  },
+  "small_groups": {
+    "warning_threshold": 30,
+    "blocking_threshold": 10
+  },
+  "explanations": {
+    "availability": "global",
+    "required_methods": [
+      "permutation_importance"
+    ],
+    "required_evidence": [
+      "explanation.json"
+    ],
+    "require_stability": true,
+    "require_fidelity": false,
+    "stability_threshold": 0.8,
+    "fidelity_threshold": null
+  },
+  "release": {
+    "metric_gates": [
+      {
+        "metric": "roc_auc",
+        "direction": "maximize",
+        "threshold": 0.75
+      }
+    ],
+    "diagnostic_gates": [
+      {
+        "name": "metric_uncertainty",
+        "action": "block",
+        "required_evidence": [
+          "bootstrap-ci.json"
+        ],
+        "decisive": true
+      },
+      {
+        "name": "robustness",
+        "action": "warn",
+        "required_evidence": [
+          "robustness.json"
+        ],
+        "decisive": false
+      }
+    ],
+    "fairness_gates": [
+      {
+        "metric": "demographic_parity_difference",
+        "maximum": 0.1,
+        "minimum": null,
+        "required_evidence": [
+          "fairness.json"
+        ]
+      }
+    ],
+    "required_evidence": [
+      "run-manifest.json",
+      "test-metrics.json"
+    ]
+  }
+}

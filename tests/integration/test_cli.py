@@ -180,7 +180,7 @@ def test_catalog_command_reads_raw_bytes_from_standard_input(
     """The '-' input gives a pipe-friendly raw-byte catalog path."""
     payload = b"streamed bytes"
     monkeypatch.setattr(
-        cli.sys,
+        cli.intake.sys,
         "stdin",
         io.TextIOWrapper(io.BytesIO(payload), encoding="utf-8"),
     )
@@ -235,13 +235,15 @@ def test_predict_with_explicit_renames(binary_frame, tmp_path, monkeypatch):
     ]
     assert cli.main(base) == cli.EXIT_FAILED  # exact names required by default
     writes = []
-    real_write = cli.durability.write_atomically
+    real_write = cli.delivery.durability.write_atomically
 
     def record_write(path, content):
         writes.append((path, content))
         return real_write(path, content)
 
-    monkeypatch.setattr(cli.durability, "write_atomically", record_write)
+    monkeypatch.setattr(
+        cli.delivery.durability, "write_atomically", record_write
+    )
     code = cli.main([*base, "--rename", "A_value=a", "--case-insensitive"])
     assert code == 0 and len(pandas.read_csv(output)) == len(binary_frame)
     assert writes and writes[0][0] == output

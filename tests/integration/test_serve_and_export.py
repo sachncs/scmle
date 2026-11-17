@@ -284,8 +284,10 @@ def test_the_serve_command_starts_a_server_for_a_trusted_bundle(
         adapters.append(real(*args, **kwargs))
         return adapters[-1]
 
-    monkeypatch.setattr(cli.server, "HttpServing", build)
-    monkeypatch.setattr(cli, "threading", types.SimpleNamespace(Event=Recorder))
+    monkeypatch.setattr(cli.delivery.server, "HttpServing", build)
+    monkeypatch.setattr(
+        cli.delivery, "threading", types.SimpleNamespace(Event=Recorder)
+    )
 
     code = cli.main(["serve", str(root / "bundle"), "--trusted", "--port", "0"])
 

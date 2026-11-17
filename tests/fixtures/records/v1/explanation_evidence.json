@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "model_fingerprint": "model-123",
+  "bundle_digest": "sha256:bundle-123",
+  "input_fingerprint": "input-123",
+  "dataset_snapshot": {
+    "identifier": "dataset",
+    "version": "v1",
+    "digest": "sha256:data-123"
+  },
+  "feature_graph": {
+    "version": 1,
+    "fingerprint": "graph-123"
+  },
+  "method": {
+    "name": "permutation_importance",
+    "parameters": {
+      "repeats": 5,
+      "seed": 7
+    }
+  },
+  "output": {
+    "features": [
+      {
+        "name": "age",
+        "importance": 0.4
+      }
+    ]
+  },
+  "timestamp": "2026-01-02T03:04:05Z",
+  "software_version": "0.1.0",
+  "uncertainty": {
+    "method": "repeats",
+    "standard_error": 0.02
+  },
+  "stability": {
+    "rank_correlation": 0.9
+  },
+  "limitations": [
+    "associational only"
+  ],
+  "causal_warning": "Associations, not causes.",
+  "privacy_decision": {
+    "decision": "redacted",
+    "reason": "aggregate only",
+    "redacted_fields": [
+      "rows"
+    ]
+  },
+  "evidence_links": [
+    {
+      "relation": "evaluation",
+      "uri": "artifact://run/evaluation.json",
+      "digest": "sha256:eval"
+    }
+  ]
+}

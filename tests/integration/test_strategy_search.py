@@ -1,5 +1,6 @@
 """Imbalance and feature strategies, evaluated on evidence."""
 
+import importlib.util
 import json
 
 import numpy
@@ -249,13 +250,7 @@ def test_smote_variants_are_evaluated_on_the_original_folds_when_installed(
 
 
 def test_missing_sampling_extra_is_explained_in_the_plan(monkeypatch):
-    import scmle.preparation.strategies
-
-    monkeypatch.setattr(
-        scmle.preparation.strategies.importlib.util,
-        "find_spec",
-        lambda name: None,
-    )
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: None)
     plan = scmle.api.project.Project(
         numeric_imbalanced(),
         "y",

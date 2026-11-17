@@ -57,6 +57,16 @@ from benchmarks import reliability
 import scmle
 import scmle.api.project
 from scmle.artifacts import bundle
+import scmle.artifacts.bundle.archive
+import scmle.artifacts.bundle.core
+import scmle.artifacts.bundle.environment
+import scmle.artifacts.bundle.explanation
+import scmle.artifacts.bundle.intervals
+import scmle.artifacts.bundle.layout
+import scmle.artifacts.bundle.model
+import scmle.artifacts.bundle.outputs
+import scmle.artifacts.bundle.provenance
+import scmle.artifacts.bundle.seal
 import scmle.artifacts.results
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
@@ -343,12 +353,22 @@ def fingerprint() -> str:
     """Hash of the code whose behaviour the measurement depends on.
 
     Returns:
-        The `certificates.code_hash` of the bundle, project and results
-        modules, the quick project and data builders of
+        The `certificates.code_hash` of every bundle module, the project
+        and results modules, the quick project and data builders of
         `benchmarks.reliability` and the measuring functions here.
     """
     return certificates.code_hash(
         bundle,
+        scmle.artifacts.bundle.archive,
+        scmle.artifacts.bundle.core,
+        scmle.artifacts.bundle.environment,
+        scmle.artifacts.bundle.explanation,
+        scmle.artifacts.bundle.intervals,
+        scmle.artifacts.bundle.layout,
+        scmle.artifacts.bundle.model,
+        scmle.artifacts.bundle.outputs,
+        scmle.artifacts.bundle.provenance,
+        scmle.artifacts.bundle.seal,
         scmle.api.project,
         scmle.artifacts.results,
         reliability.fast_project,

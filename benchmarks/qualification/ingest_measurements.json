@@ -12,12 +12,12 @@
   },
   "code_hashes": {
     "budget": "22b837f73b91fefb61c91b520274914263827d1395f030cec9d26b9d939a912f",
-    "entities": "6242cb91d8cd57cb68d7340864899f29374ef908235e649b6a20d5f483a6b81f",
+    "entities": "eff54ba3b8f273b9eeb758211f1b5e4b0fa56f3f143a636a89dc11f2e6127c11",
     "grain": "03e9597c2583688c376b47ec45948ca45e3761f48241c90a93c75119f969beb7",
     "joins": "9c2b367194dd6cc6d4fb6c6cad12f37920dc064326d9e748d9545650daf4a856",
-    "point_in_time": "598fba7a578d4e0dadcade85e1fa67353430fced4e491dd61b1da2140ac499a7",
+    "point_in_time": "ad5d4bdefa6e3bf85cc2ff92dd8106b7b8d6ca992b46de5492b945e4aea2155e",
     "reconcile": "185c5910138f03dc7a6bb93898664b8246df2ed3442924c5d3d699d39f909991",
-    "torn_read": "c6af5c9710fb56fb5d5031016ad193934769b275b409e8143f18dd0916376d9f"
+    "torn_read": "ef91ec6b6d84c4dc7a1c886451ca0a2011a2af933dc6e3a1bbb9a108873cb9ab"
   },
   "development_seed_base": 10000,
   "entities": {
@@ -105,7 +105,7 @@
     "seed_offset": 0,
     "tolerance": 0.0
   },
-  "seconds": 20.0,
+  "seconds": 71.7,
   "torn_read": {
     "batch_rows": 5,
     "detected": 500,

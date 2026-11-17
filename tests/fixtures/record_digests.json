@@ -1,0 +1,14 @@
+{
+  "evaluation_policy": {
+    "kind": "scmle.contracts.evaluation.policy.Criteria",
+    "digest": "canonize",
+    "class": "identity",
+    "sha256": "1d18669fa48756b8c6c88f741d093f263139c86d65b546b9da088080cb8d6f47"
+  },
+  "explanation_evidence": {
+    "kind": "scmle.contracts.explanations.Evidence",
+    "digest": "canonize",
+    "class": "identity",
+    "sha256": "bf22db283e2dc940b8c9470eb9c87e95d0fdc2f49fe0a86d7e7ca116ef384d04"
+  }
+}

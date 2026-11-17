@@ -34,7 +34,7 @@ class Renderer:
             the canonical record, is replaced by a withheld notice with the
             reason.
         """
-        record = evidence.to_dict()
+        record = evidence.model_dump(mode="json")
         privacy = cast("dict[str, Any]", record["privacy_decision"])
         output: Any = record["output"]
         if privacy["decision"] == "denied":
