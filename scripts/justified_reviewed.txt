@@ -4,10 +4,10 @@
 scmle/api/non_tabular.py predict passthrough public API: Run and Predictor methods pinned in tests/fixtures/public_api.json and shown in the README; scikit-learn estimator interface elsewhere
 scmle/api/non_tabular.py predict_proba passthrough public API or scikit-learn estimator interface
 scmle/api/predict.py load_model passthrough documented in the README and docs/API_STABILITY.md
-scmle/api/results.py explain passthrough public Run method pinned in tests/fixtures/public_api.json
-scmle/api/results.py predict passthrough public API: Run and Predictor methods pinned in tests/fixtures/public_api.json and shown in the README; scikit-learn estimator interface elsewhere
-scmle/api/results.py predict_proba passthrough public API or scikit-learn estimator interface
-scmle/api/results.py save passthrough public Run method pinned in tests/fixtures/public_api.json
+scmle/artifacts/results.py explain passthrough public Run method pinned in tests/fixtures/public_api.json
+scmle/artifacts/results.py predict passthrough public API: Run and Predictor methods pinned in tests/fixtures/public_api.json and shown in the README; scikit-learn estimator interface elsewhere
+scmle/artifacts/results.py predict_proba passthrough public API or scikit-learn estimator interface
+scmle/artifacts/results.py save passthrough public Run method pinned in tests/fixtures/public_api.json
 scmle/contracts/models.py Estimator lone-interface structural protocol every scikit-learn estimator and pipeline satisfies; 83 references
 scmle/core/policies.py Reviewer lone-interface documented extension point (README, docs/ARCHITECTURE.md, website)
 scmle/assurance/admissibility/screen.py decline single-use builds the refusal of a real scan predicted past its share of the time budget (the 14-line message naming hypotheses, fits, permutations and the limit); inlined it would put screen_table back over the 80-line function limit

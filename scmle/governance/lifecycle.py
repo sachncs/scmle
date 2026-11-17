@@ -9,8 +9,8 @@ from typing import Any
 import pandas
 
 from scmle import durability
-from scmle.api import results
 import scmle.api.project
+from scmle.artifacts import results
 from scmle.contracts import errors
 import scmle.governance.registry
 from scmle.monitoring import champion

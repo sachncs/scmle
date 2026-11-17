@@ -2,8 +2,8 @@
 
 from typing import ClassVar
 
-from scmle.api import results
 from scmle.artifacts import report
+from scmle.artifacts import results
 import scmle.artifacts.bundle
 from scmle.contracts import signing
 from scmle.contracts import tasks

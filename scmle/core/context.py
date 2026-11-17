@@ -9,7 +9,7 @@ from typing import TypeVar
 
 import pandas
 
-from scmle.api import results
+from scmle.artifacts import results
 import scmle.artifacts.bundle
 import scmle.artifacts.store
 from scmle.assurance.custody import pipeline

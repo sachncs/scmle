@@ -4,7 +4,7 @@ import html
 
 import pandas
 
-from scmle.api import results
+from scmle.artifacts import results
 
 
 class Renderer:

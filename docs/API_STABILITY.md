@@ -7,7 +7,7 @@ for each thing.
 
 The pinned names, by module, are:
 
-* `scmle.api.project.Project`, `scmle.api.results.Run` and
+* `scmle.api.project.Project`, `scmle.artifacts.results.Run` and
   `scmle.artifacts.bundle.Bundle` for lifecycle and artifacts;
 * `scmle.api.predict.load_model` and `scmle.api.predict.predict` for inference;
 * `register_estimator`, `unregister_estimator` and `register_metric` in the

@@ -940,7 +940,7 @@
         "scmle.governance.lifecycle.x\u01c1Maintainer\u01c1revertible__mutmut_96",
         "scmle.governance.lifecycle.x\u01c1Maintainer\u01c1tally__mutmut_10"
       ],
-      "files": "48cb112339bd2bbf28157677f25b02bb512234c7780c03760f86c336dca14bad",
+      "files": "b12a92fc746d5df8f3354ef7bafa55462d006fe8bc92618b8bcf72e061df7b5c",
       "module": "scmle/governance/lifecycle.py",
       "mutants": 651,
       "not_run": 0,
@@ -1297,7 +1297,7 @@
   ],
   "seconds": 772.9,
   "untested": [
-    "scmle/api/results.py",
+    "scmle/artifacts/results.py",
     "scmle/artifacts/report.py",
     "scmle/contracts/artifacts.py",
     "scmle/causal/claim.py",

@@ -17,7 +17,7 @@ from typing import Self
 
 import pandas
 
-from scmle.api import results
+from scmle.artifacts import results
 import scmle.artifacts.store
 from scmle.assurance.custody import journal
 from scmle.contracts import capabilities

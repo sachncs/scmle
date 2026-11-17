@@ -41,8 +41,8 @@ import urllib.request
 import pandas
 
 import scmle.api.project
-import scmle.api.results
 from scmle.artifacts import bundle
+import scmle.artifacts.results
 from scmle.contracts import errors
 from scmle.contracts import observability
 from scmle.contracts import tasks
@@ -156,7 +156,7 @@ def now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
 
 
-def train(name: str, data: pathlib.Path) -> scmle.api.results.Run:
+def train(name: str, data: pathlib.Path) -> scmle.artifacts.results.Run:
     """Trains one model on a CSV with the demo's fixed, fast options.
 
     Args:

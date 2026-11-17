@@ -256,7 +256,7 @@ def test_l113_l176_package_organization():
         assert (PACKAGE / package / "__init__.py").exists(), package
     modules = (
         "api/project.py",
-        "api/results.py",
+        "artifacts/results.py",
         "api/predict.py",
         "contracts/data.py",
         "contracts/tasks.py",

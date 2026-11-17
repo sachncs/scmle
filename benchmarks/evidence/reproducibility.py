@@ -56,8 +56,8 @@ from benchmarks import acceptance
 from benchmarks import reliability
 import scmle
 import scmle.api.project
-import scmle.api.results
 from scmle.artifacts import bundle
+import scmle.artifacts.results
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
 
@@ -350,7 +350,7 @@ def fingerprint() -> str:
     return certificates.code_hash(
         bundle,
         scmle.api.project,
-        scmle.api.results,
+        scmle.artifacts.results,
         reliability.fast_project,
         reliability.binary_data,
         reliability.regression_data,

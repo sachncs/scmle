@@ -30,7 +30,7 @@ from sklearn import ensemble
 from sklearn import multioutput
 
 import scmle.api.project
-import scmle.api.results
+import scmle.artifacts.results
 from scmle.evaluation import concordance
 from scmle.evaluation import multitarget
 from scmle.evaluation import ordinal
@@ -140,7 +140,7 @@ def openml(name: str, version: int | str = "active") -> pandas.DataFrame:
 
 
 def split_ids(
-    result: scmle.api.results.Run,
+    result: scmle.artifacts.results.Run,
 ) -> tuple[numpy.ndarray, numpy.ndarray]:
     """Development and locked row positions of a finished run.
 

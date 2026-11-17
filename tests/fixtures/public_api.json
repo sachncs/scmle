@@ -44,12 +44,6 @@
         "signature_sha256": "dcafe58b10ac85a2bc6abc22d41dbe4b7cdb7fdad6e93eb3880adcf009cee001"
       }
     },
-    "scmle.api.results": {
-      "Run": {
-        "kind": "class",
-        "signature_sha256": "b7a7c17e972263a9d337ef8fa2e4ddc7d50ff1b8a517ea2998701ae8409dc9fb"
-      }
-    },
     "scmle.api.sequential": {
       "Estimation": {
         "kind": "class",
@@ -60,6 +54,12 @@
       "Bundle": {
         "kind": "class",
         "signature_sha256": "146136aedec3af2ecb7602d39b87aed731fb7125ae81a5ffb4acf34deada7cec"
+      }
+    },
+    "scmle.artifacts.results": {
+      "Run": {
+        "kind": "class",
+        "signature_sha256": "b7a7c17e972263a9d337ef8fa2e4ddc7d50ff1b8a517ea2998701ae8409dc9fb"
       }
     },
     "scmle.data.catalog": {

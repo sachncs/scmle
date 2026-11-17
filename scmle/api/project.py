@@ -13,9 +13,9 @@ from typing import Literal
 import pandas
 
 from scmle import durability
-from scmle.api import results
 from scmle.artifacts import bundle
 from scmle.artifacts import reproducibility
+from scmle.artifacts import results
 from scmle.contracts import errors
 from scmle.contracts import experiments
 from scmle.contracts import lineage

@@ -283,7 +283,7 @@ ROOT_SURFACES = {
         "ModalityProject",
         "Project",
     ),
-    "scmle.api.results": ("Run",),
+    "scmle.artifacts.results": ("Run",),
     "scmle.api.sequential": ("Estimation",),
     "scmle.artifacts.bundle": ("Bundle",),
     "scmle.data.catalog": ("Catalog",),
