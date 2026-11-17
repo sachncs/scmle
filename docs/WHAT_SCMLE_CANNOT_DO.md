@@ -28,6 +28,19 @@ benchmarks, which are not a head-to-head with people.
 * **A held-out score is an estimate with a band, not a promise.** With 216
   exam rows, our ROC AUC of 0.885 had a 95 percent band of 0.841 to 0.927. The
   band assumes new data looks like the data you tested on.
+* **The 95 percent exam band covers less than 95 percent in two of three
+  measured settings.** `benchmarks/evidence/coverage.py` fits a model on 400
+  simulated rows, asks for the band on a fresh exam set, and checks it
+  against the same model's score on 100,000 fresh rows, 882 times per
+  setting. ROC AUC on 300 independent rows: 848 of 882 (96.1 percent).
+  RMSE on 300 rows: 818 of 882 (92.7 percent). ROC AUC on 60 groups of 5
+  rows, resampled by group: 816 of 882 (92.5 percent). The grouped band is
+  about 11 percent narrower than the real spread of the error, and the RMSE
+  band runs low. Bias-corrected and accelerated (BCa) intervals were tried
+  on the same draws and did not close the gap: RMSE 92.7 to 93.5 percent
+  over 882 runs, grouped ROC AUC 88.3 to 89.3 percent over 300 runs, so
+  they were not adopted. Treat a band from few groups, or a regression
+  error band, as somewhat too narrow.
 * **Choosing the best of many models is slightly optimistic.** The more models
   tried, the more the winner's practice score flatters it. The exam score is
   the one to trust ([`README.md`](../README.md) says the same).
