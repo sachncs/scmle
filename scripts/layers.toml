@@ -1,0 +1,212 @@
+# The package layer map (register phase 3, DES-13).
+#
+# `layers` lists the packages from the top of the stack to the bottom; `|`
+# separates siblings, which may not import each other. A package imports only
+# the layers below it. `step` lists the module moves that get there, in the
+# order they land, one target package per commit. Each move maps an old dotted
+# path (a module or a whole package) to its new one; `scripts/move.py` applies
+# a step and `scripts/structure.py --simulate` applies the whole map to the
+# current import graph and prints every import that still breaks the order.
+#
+# `packages` gives the docstring of each package a step creates.
+
+layers = [
+    "cli | rehearsal",
+    "serving | workflow",
+    "operations | runners",
+    "api",
+    "deploy | pipeline | security | trail",
+    "governance",
+    "monitoring",
+    "artifacts",
+    "causal | decision",
+    "assurance | explainability | inference",
+    "evaluation",
+    "models",
+    "preparation",
+    "data",
+    "storage",
+    "envelope | optimization | runtime | unsupervised",
+    "certificates | contracts | durability",
+]
+
+[packages]
+runtime = "Process runtime: randomness, retries, limits, budgets, logging and workers."
+storage = "Object stores, store conformance and experiment stores."
+preparation = "Fold-local preparation: preprocessing, selection, sampling and task wrappers."
+assurance = "Evidence that a run is sound: ledger, charter, detectors, admissibility, custody, framing, ingest, robustness and coverage."
+causal = "Causal identification and causal claims."
+pipeline = "The run pipeline: context, stages, orchestrator, search, planning and profiling."
+serving = "The prediction servers and the service runtime."
+rehearsal = "Operations rehearsals: the demo and the fault harnesses."
+
+[[step]]
+name = "runtime"
+moves = [
+    ["scmle.core.randomness", "scmle.runtime.randomness"],
+    ["scmle.core.retry", "scmle.runtime.retry"],
+    ["scmle.core.limits", "scmle.runtime.limits"],
+    ["scmle.core.ipc", "scmle.runtime.ipc"],
+    ["scmle.core.resource_observation", "scmle.runtime.resource_observation"],
+    ["scmle.core.state", "scmle.runtime.state"],
+    ["scmle.core.config", "scmle.runtime.config"],
+    ["scmle.core.scheduler", "scmle.runtime.scheduler"],
+    ["scmle.core.budget", "scmle.runtime.budget"],
+    ["scmle.core.logs", "scmle.runtime.logs"],
+    ["scmle.integrations.ray_backend", "scmle.runtime.ray_backend"],
+    ["scmle.models.deeplearning.worker", "scmle.runtime.worker"],
+]
+
+[[step]]
+name = "storage"
+moves = [
+    ["scmle.data.store.objectstore", "scmle.storage.objectstore"],
+    ["scmle.data.store.conformance", "scmle.storage.conformance"],
+    ["scmle.experimentation.stores", "scmle.storage.stores"],
+    ["scmle.integrations.mlflow_store", "scmle.storage.mlflow_store"],
+]
+
+[[step]]
+name = "data"
+moves = [
+    ["scmle.features.feature_graph", "scmle.data.feature_graph"],
+    ["scmle.monitoring.reference", "scmle.data.reference"],
+    ["scmle.data.curation.transformers", "scmle.data.transformers"],
+    ["scmle.data.curation.embedding", "scmle.data.embedding"],
+]
+
+[[step]]
+name = "preparation-1"
+moves = [
+    ["scmle.data.curation", "scmle.preparation"],
+    ["scmle.sampling.pseudo_labeling", "scmle.preparation.pseudo_labeling"],
+    ["scmle.sampling.resampling", "scmle.preparation.resampling"],
+    ["scmle.sampling.strategies", "scmle.preparation.strategies"],
+    ["scmle.sampling.synthesis", "scmle.preparation.synthesis"],
+]
+
+[[step]]
+name = "preparation-2"
+moves = [
+    ["scmle.models.weighting", "scmle.preparation.weighting"],
+    ["scmle.models.wrappers", "scmle.preparation.wrappers"],
+    ["scmle.models.forecasting.estimators", "scmle.preparation.forecasters"],
+    ["scmle.models.multitarget.wrapper", "scmle.preparation.multitarget"],
+    ["scmle.models.ranking.wrapper", "scmle.preparation.ranking"],
+    ["scmle.models.survival.wrapper", "scmle.preparation.survival"],
+    ["scmle.models.uplift.wrapper", "scmle.preparation.uplift"],
+]
+
+[[step]]
+name = "assurance-ledger"
+moves = [["scmle.data.ledger", "scmle.assurance.ledger"]]
+
+[[step]]
+name = "assurance-charter"
+moves = [["scmle.data.charter", "scmle.assurance.charter"]]
+
+[[step]]
+name = "assurance-detectors"
+moves = [["scmle.data.detectors", "scmle.assurance.detectors"]]
+
+[[step]]
+name = "assurance-admissibility"
+moves = [["scmle.data.admissibility", "scmle.assurance.admissibility"]]
+
+[[step]]
+name = "assurance-custody"
+moves = [
+    ["scmle.data.custody", "scmle.assurance.custody"],
+    ["scmle.governance.vault", "scmle.assurance.custody.vault"],
+]
+
+[[step]]
+name = "assurance-framing"
+moves = [["scmle.data.framing", "scmle.assurance.framing"]]
+
+[[step]]
+name = "assurance-ingest"
+moves = [["scmle.data.ingest", "scmle.assurance.ingest"]]
+
+[[step]]
+name = "assurance-robustness"
+moves = [["scmle.data.robustness", "scmle.assurance.robustness"]]
+
+[[step]]
+name = "assurance-coverage"
+moves = [
+    ["scmle.evaluation.coverage_run", "scmle.assurance.coverage_run"],
+    ["scmle.evaluation.coverage_slices", "scmle.assurance.coverage_slices"],
+    ["scmle.evaluation.coverage_confirm", "scmle.assurance.coverage_confirm"],
+]
+
+[[step]]
+name = "causal"
+moves = [
+    ["scmle.data.identification", "scmle.causal.identification"],
+    ["scmle.core.causal_claim", "scmle.causal.claim"],
+]
+
+[[step]]
+name = "decision"
+moves = [["scmle.core.decision_reports", "scmle.decision.reports"]]
+
+[[step]]
+name = "artifacts"
+moves = [["scmle.api.results", "scmle.artifacts.results"]]
+
+[[step]]
+name = "pipeline-1"
+moves = [["scmle.core", "scmle.pipeline"]]
+
+[[step]]
+name = "pipeline-2"
+moves = [
+    ["scmle.experimentation.trials", "scmle.pipeline.trials"],
+    ["scmle.experimentation.tuning", "scmle.pipeline.tuning"],
+    ["scmle.experimentation.ensemble_search", "scmle.pipeline.ensemble_search"],
+    ["scmle.experimentation.strategy_search", "scmle.pipeline.strategy_search"],
+    ["scmle.intelligence.fingerprint", "scmle.pipeline.fingerprint"],
+    ["scmle.intelligence.knowledge", "scmle.pipeline.knowledge"],
+    ["scmle.intelligence.planner", "scmle.pipeline.planner"],
+    ["scmle.intelligence.recommendations", "scmle.pipeline.recommendations"],
+]
+
+[[step]]
+name = "pipeline-3"
+moves = [
+    ["scmle.data.profiling.profiler", "scmle.pipeline.profiler"],
+    ["scmle.evaluation.suite", "scmle.pipeline.suite"],
+    ["scmle.models.modality_lifecycle", "scmle.pipeline.modality_lifecycle"],
+]
+
+[[step]]
+name = "serving"
+moves = [
+    ["scmle.inference.serving", "scmle.serving.server"],
+    ["scmle.inference.modality_serving", "scmle.serving.modality"],
+    ["scmle.deploy.runtime", "scmle.serving.runtime"],
+]
+
+[[step]]
+name = "deploy"
+moves = [
+    ["scmle.inference.packaging", "scmle.deploy.packaging"],
+    ["scmle.inference.parity", "scmle.deploy.parity"],
+    ["scmle.governance.release_state", "scmle.deploy.release_state"],
+]
+
+[[step]]
+name = "operations"
+moves = [
+    ["scmle.governance.lifecycle", "scmle.operations.lifecycle"],
+    ["scmle.governance.rollout_hook", "scmle.operations.rollout_hook"],
+]
+
+[[step]]
+name = "rehearsal"
+moves = [
+    ["scmle.deploy.demo", "scmle.rehearsal.demo"],
+    ["scmle.operations.faults", "scmle.rehearsal.faults"],
+    ["scmle.governance.local_faults", "scmle.rehearsal.local_faults"],
+]

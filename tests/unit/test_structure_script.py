@@ -64,3 +64,93 @@ def test_a_planted_long_function_is_counted(monkeypatch, tmp_path):
     assert found["functions_over"] == 1
     assert found["compound_functions"] == 1
     assert found["compound_classes"] == 0
+
+
+def plant(root, files):
+    """Writes a synthetic package tree under `root/scmle`."""
+    package = root / "scmle"
+    for relative, text in files.items():
+        path = package / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    return package
+
+
+def write(root, layers, moves):
+    """Writes a layer map with one step holding every move."""
+    rows = ", ".join(f'"{row}"' for row in layers)
+    pairs = ", ".join(f'["{old}", "{new}"]' for old, new in moves)
+    path = root / "layers.toml"
+    path.write_text(
+        f'layers = [{rows}]\n\n[[step]]\nname = "one"\nmoves = [{pairs}]\n',
+        encoding="utf-8",
+    )
+    return path
+
+
+TREE = {
+    "__init__.py": "",
+    "top/__init__.py": "",
+    "top/run.py": "from scmle.low import base\n",
+    "low/__init__.py": "",
+    "low/base.py": "def build():\n    from scmle.top import run\n",
+    "low/plain.py": "",
+    "side/__init__.py": "",
+    "side/tool.py": (
+        "from typing import TYPE_CHECKING\n"
+        "if TYPE_CHECKING:\n    from scmle.other import thing\n"
+    ),
+    "other/__init__.py": "",
+    "other/thing.py": "",
+}
+
+
+def test_simulate_finds_a_cycle_and_a_move_removes_it(monkeypatch, tmp_path):
+    module = load()
+    monkeypatch.setattr(module, "PACKAGE", plant(tmp_path, TREE))
+    layout = module.load(write(tmp_path, ["top", "low", "side | other"], []))
+    breaks, largest = module.simulate(layout)
+    assert breaks == [
+        "scmle.low.base -> scmle.top.run (low -> top, upward)",
+        "scmle.side.tool -> scmle.other.thing (side -> other, sibling)",
+    ]
+    assert largest == 2
+    moves = [
+        ("scmle.low.base", "scmle.top.base"),
+        ("scmle.other", "scmle.low.other"),
+    ]
+    layout = module.load(write(tmp_path, ["top", "low", "side"], moves))
+    breaks, largest = module.simulate(layout)
+    assert breaks == [
+        "scmle.side.tool -> scmle.other.thing (side -> low, upward)"
+    ]
+    assert largest == 1
+
+
+def test_an_unplaced_package_breaks_the_order(monkeypatch, tmp_path):
+    module = load()
+    monkeypatch.setattr(module, "PACKAGE", plant(tmp_path, TREE))
+    layout = module.load(write(tmp_path, ["top", "low"], []))
+    breaks, _ = module.simulate(layout)
+    assert (
+        "scmle.side.tool -> scmle.other.thing (side -> other, unplaced)"
+        in breaks
+    )
+
+
+def test_the_longest_move_wins():
+    moves = {
+        "scmle.core": "scmle.pipeline",
+        "scmle.core.retry": "scmle.runtime.retry",
+    }
+    module = load()
+    assert module.rename("scmle.core.retry", moves) == "scmle.runtime.retry"
+    assert module.rename("scmle.core.stages", moves) == "scmle.pipeline.stages"
+    assert module.rename("scmle.corex", moves) == "scmle.corex"
+
+
+def test_the_recorded_map_breaks_no_more_imports_than_its_budget():
+    module = load()
+    budget = json.loads(module.BUDGET.read_text(encoding="utf-8"))
+    breaks, _ = module.simulate(module.load(module.LAYERS))
+    assert len(breaks) <= budget["layer_breaks"]

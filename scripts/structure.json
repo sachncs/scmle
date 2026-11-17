@@ -8,5 +8,6 @@
   "loose_dicts": 1156,
   "largest_module": 6341,
   "bare_raises": 26,
-  "value_catches": 170
+  "value_catches": 170,
+  "layer_breaks": 2
 }
