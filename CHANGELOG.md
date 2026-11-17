@@ -118,6 +118,26 @@ marked `Breaking:` and listed first in their group.
 
 ### Added
 
+- Measured scorecard evidence for C3, C6, C7, C12 and C14.
+  `benchmarks/evidence/` holds one module per claim; each stores its raw
+  results next to it, refuses to report a pass on fewer trials than the
+  `acceptance.toml` rule supports, and goes stale when the code it measured
+  changes (CI checks this). The scorecard reads them:
+  - C3 fails: the 95% bootstrap metric interval covers 818/882 for RMSE and
+    816/882 for grouped ROC AUC, lower bounds 0.911 and 0.909 against 0.93.
+  - C6 fails: bundles are byte-identical and metrics equal on this
+    platform, but the manifest records no commit, configuration or data
+    hash (ML-10); cross-platform is not measured.
+  - C7 is not measured: 3 of 3 kill-and-resume runs match an uninterrupted
+    run, but only 12 of the 299 budget runs the rule needs fit in the time.
+    Two defects were found: profiling (`label_noise.contradict`,
+    `fingerprint.ml_difficulty`) runs outside the time budget and thread
+    cap, and a small budget leaves the first trial a 1 s ceiling so the
+    whole run fails.
+  - C12 fails: 14 of 318 documented guarantees are linked to a test.
+  - C14 is not measured: 0 of 24 real and 0 of 22 simulated tasks were
+    refused and 12 of 12 planted ones were, but 59 real tasks are needed
+    and only 34 are cached offline.
 - Unattended operation, tested on simulated streams only
   ([`docs/AUTONOMY.md`](docs/AUTONOMY.md)). An envelope
   (`scmle.governance.envelope`) is authority a person signs in advance for
