@@ -48,7 +48,7 @@
       },
       "leak_noisy_copy": {
         "detected": 197,
-        "detected_any_mechanism": 197,
+        "detected_any_mechanism": 200,
         "old_rule_detected": 3,
         "old_rule_wilson_95": [
           0.00511423779325831,
@@ -121,7 +121,9 @@
     ],
     "classes": 10,
     "family_sizes": [
-      14
+      14,
+      15,
+      17
     ],
     "grouped_null_replicates": 200,
     "grouped_significant_worlds": 5,
@@ -216,7 +218,7 @@
       "run_seed": 0,
       "skill_ceiling": 0.95
     },
-    "significant_rate": 0.017,
+    "significant_rate": 0.016,
     "significant_rate_within_alpha": true,
     "suspect_false_alarm_wilson_95": [
       0.0,
@@ -225,7 +227,7 @@
     "suspect_false_alarms": 0,
     "table": "digits",
     "table_columns": 10,
-    "worlds_with_a_significant_column": 17
+    "worlds_with_a_significant_column": 16
   },
   "regression": {
     "alpha": 0.05,

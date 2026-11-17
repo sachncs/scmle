@@ -46,18 +46,34 @@ The screen is `scmle.data.admissibility.screen`. For every candidate column:
 1. **Skill.** Fit a small smoother of the answer on that one column, using
    cross-fitting (each row is predicted by a model that did not see it), and
    compute the held-out ROC AUC. Compare it with the same procedure on many
-   shuffled copies of the answer to get a permutation p-value.
-2. **Missingness.** Test whether *being recorded* depends on the answer (a
+   shuffled copies of the answer to get a permutation p-value. A date is
+   read as a count of days; free text is read by its 50 commonest words
+   (one yes/no mark per word), so an answer written into a sentence
+   ("customer closed the account") is seen.
+2. **Pairs.** Two yes/no columns can hide the answer between them (the
+   answer is "the two differ") while each alone says nothing. Each pair of
+   two-level columns gets the same skill test, jointly. Pairs are tested
+   only while there are no more pairs than columns; on a wider table the
+   notes say the pairs were not screened.
+3. **Echo.** A field written after the outcome is often the answer copied
+   again with errors. The column is read as the answer itself, with no
+   fitting: the share of rows where it spells the class, or for a number
+   `1 - (squared error / spread of the answer)` (an R^2 with no fit). It is
+   tested only when the column could pass the 0.9 association ceiling at
+   all, so a strong predictor on its own scale is not asked.
+4. **Missingness.** Test whether *being recorded* depends on the answer (a
    value present only for some outcomes), and whether the recorded values are
    nearly all one class ("record purity").
-3. **Multiplicity.** All the p-values form one family, adjusted with the
+5. **Multiplicity.** All the p-values (skill, pairs, echo, missingness) form one family, adjusted with the
    Benjamini-Yekutieli procedure at level 0.05. This controls the **false
    discovery rate**: among the columns declared significant, the expected share
    that are truly null is at most 0.05 times the share of null columns, under
    any dependence between columns.
-4. **Ceiling.** A column becomes a **suspect** only if it is significant *and*
+6. **Ceiling.** A column becomes a **suspect** only if it is significant *and*
    the lower end of a 95 percent bootstrap interval for its skill is above a
-   ceiling fixed in advance (AUC 0.95; for missingness, Cramer's V 0.9).
+   ceiling fixed in advance (AUC 0.95; for missingness, Cramer's V 0.9; for
+   an echo, agreement or unfitted R^2 0.9). Each suspect is listed once,
+   however many of its tests fired.
    Significance alone is not enough, because honest strong predictors are
    significant too.
 
@@ -341,5 +357,5 @@ be flagged, and a person settles them with an attestation.
 | The screen almost never flags a world with no dependence | yes: 0 of 1000 |
 | A flag means leakage | no: a flag is a suspicion |
 | The screen flags legitimate strong predictors | yes: 2 of 30 on breast cancer |
-| No flag means no leak | no: leaks needing several columns together are not seen |
+| No flag means no leak | no: a leak spread over three or more columns, or over two columns with more than two levels, is not seen; pairs of two-level columns are tested only while there are no more pairs than columns |
 | A person can settle a flag | yes, by provenance: declare it unavailable or attest it |

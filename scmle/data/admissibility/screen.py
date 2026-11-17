@@ -30,7 +30,13 @@ Procedure, for every candidate column `j` (the family has `m` members):
    sees a value captured only for some outcomes even when most rows are blank
    (a Titanic body number is recorded for 9 percent of passengers, all of
    whom died), which V, measured over all rows, cannot.
-3. Multiplicity. All `m` p-values (skill tests and missingness tests) form one
+2b. Echo (`forecast`): a column read as the target itself, with no fit:
+   the share of rows where it spells the class, or `1 - SSE / SST` for a
+   number. Formed only when the two marginals allow it to pass the ceiling,
+   so a legitimate predictor on its own scale raises no hypothesis; it finds
+   a field recorded after the outcome (the label with a tenth garbled, the
+   number plus noise) whose skill stays under the skill ceiling.
+3. Multiplicity. All `m` p-values (skill, echo and missingness tests) form one
    family adjusted by Benjamini and Yekutieli (2001, Ann. Statist. 29:1165)
    at level `alpha`, in exact arithmetic (`scmle.data.ledger.multiplicity`).
    The number of permutations is raised until the smallest reachable p-value
@@ -70,11 +76,13 @@ cross-fitted scores are approximate (folds share training rows), so no exact
 coverage is claimed. Rows are subsampled to `MAX_ROWS`, which costs power for
 effects below the ceiling, not size. The Fisher and chi-square p-values used
 without groups or time blocks assume independent rows. Skill is measured one
-column at a time with a smooth basis, so a leak that needs several columns
-together is not seen. Candidate columns of kind datetime or text are not
-screened. Wide tables pay in power: the more columns, the more permutations a
-rejection needs. A run without a charter has no custody, so the training
-rows are all the screen has; it says nothing about rows it never saw.
+column at a time with a smooth basis (a date as days, free text by its
+commonest words), and jointly for each pair of two-level columns while
+there are no more pairs than columns, so a leak spread over more columns,
+or over two columns with more levels, is not seen. Wide tables pay in
+power: the more columns, the more permutations a rejection needs. A run
+without a charter has no custody, so the training rows are all the screen
+has; it says nothing about rows it never saw.
 
 In a run (`screen_table`) every suspect may block: a suspect is significant
 after the Benjamini-Yekutieli step over permutation p-values, whose
@@ -88,6 +96,7 @@ there. The published certificates are evidence about the screen, reported in
 the notes; they decide nothing.
 """
 
+import collections
 from collections.abc import Callable
 from collections.abc import Hashable
 from collections.abc import Mapping
@@ -95,8 +104,10 @@ from collections.abc import Sequence
 import dataclasses
 from fractions import Fraction
 import functools
+import itertools
 import math
 from pathlib import Path
+import re
 from typing import Any
 
 import numpy
@@ -118,11 +129,22 @@ DETECTOR_ID = "f4-leakage-screen"
 SKILL = "skill"
 MISSING = "missingness"
 PURITY = "record_purity"
+ECHO = "echo"
 MECHANISM_DEFECTS: Mapping[str, tuple[str, ...]] = {
     SKILL: ("leak_copy", "leak_noisy_copy", "leak_threshold"),
     MISSING: ("leak_missing_for_class",),
     PURITY: ("leak_rare_record",),
+    ECHO: (),
 }
+# A word of free text: a run of letters or digits.
+WORD = re.compile(r"[^\W_]+")
+# Columns paired for the joint skill test: the smallest split of a target
+# over two columns that hides it from each alone is a parity of two binary
+# columns (p XOR q), so pairs are formed of two-level columns. Pairs are
+# screened only while there are no more of them than candidate columns, so
+# they at most double the skill hypotheses (and the fits `measure` counts);
+# beyond that the notes say the pairs were not screened.
+PAIR_LEVELS = 2
 STORE_PATH = scmle.certificates.DIRECTORY / "screen_certificates.json"
 KNOTS = 10
 MAX_ROWS = 2000
@@ -168,8 +190,10 @@ FIT_SECONDS: Mapping[str, float] = {
     "classification": 8.0e-8,
     "regression": 1.2e-8,
 }
-# Most hypotheses one column can raise: skill, record purity, missingness.
-HYPOTHESES = 3
+# Most hypotheses one column can raise: skill, record purity, missingness,
+# echo, and one pair's skill on average (pairs are capped at the number of
+# candidate columns).
+HYPOTHESES = 5
 BATCH = 200
 TIME_BLOCKS = 20
 RIDGE = 1e-3
@@ -179,6 +203,7 @@ WORDS = {
     SKILL: "cross-fitted skill",
     MISSING: "association of being recorded with the target (Cramer's V)",
     PURITY: "share of one target class among the recorded values",
+    ECHO: "the column read as the target itself (agreement, or R^2 unfitted)",
 }
 Statistic = Callable[[numpy.ndarray], numpy.ndarray]
 
@@ -205,6 +230,8 @@ def basis(series: pandas.Series, knots: int = KNOTS) -> numpy.ndarray:
         A float64 array with one row per entry of `series` and one column
         per retained basis function or indicator.
     """
+    if pandas.api.types.is_datetime64_any_dtype(series):
+        series = (series - series.min()) / pandas.Timedelta(days=1)
     numeric = pandas.api.types.is_numeric_dtype(
         series
     ) and not pandas.api.types.is_bool_dtype(series)
@@ -237,7 +264,32 @@ def basis(series: pandas.Series, knots: int = KNOTS) -> numpy.ndarray:
     labels = labels.where(labels.notna(), "<missing>").astype(str)
     top = labels.value_counts().index[: leakage.MAX_LEVELS]
     pooled = labels.where(labels.isin(top), "<other>")
-    return pandas.get_dummies(pooled).to_numpy(dtype="float64")
+    levels = pandas.get_dummies(pooled).to_numpy(dtype="float64")
+    if labels.nunique() <= leakage.MAX_LEVELS:
+        return levels
+    return numpy.hstack([levels, words(labels)])
+
+
+def words(labels: pandas.Series) -> numpy.ndarray:
+    """Marks the commonest words of free text, one indicator per word.
+
+    Text with more distinct values than `leakage.MAX_LEVELS` pools most
+    rows into one level, so a target written into a sentence ("customer
+    closed the account") is invisible to level indicators; the words carry
+    it.
+
+    Args:
+        labels: The column as strings.
+
+    Returns:
+        A float64 array with one row per entry and one column for each of
+        the `leakage.MAX_LEVELS` words found in the most rows (case folded),
+        1.0 where the row holds the word.
+    """
+    held = [set(WORD.findall(text.lower())) for text in labels]
+    counts = collections.Counter(w for row in held for w in row)
+    top = [pair[0] for pair in counts.most_common(leakage.MAX_LEVELS)]
+    return numpy.array([[w in row for w in top] for row in held], "float64")
 
 
 def stratify(
@@ -760,6 +812,9 @@ class Pending:
         exceed: Permutations with a statistic at least the observed one.
         drawn: Permutations drawn for it.
         active: Whether it still draws permutations.
+        data: What the effect bound reads: the column's basis for a skill
+            hypothesis, the column as the target (`forecast`) for an echo;
+            None otherwise.
     """
 
     feature: str
@@ -771,10 +826,299 @@ class Pending:
     exceed: int = 0
     drawn: int = 0
     active: bool = True
+    data: numpy.ndarray | None = None
+
+
+def spell(values: pandas.Series) -> pandas.Series:
+    """Writes values as text, a whole number without its decimals.
+
+    Args:
+        values: A column or the target.
+
+    Returns:
+        One string per value, so the label 1 and the value 1.0 read alike.
+    """
+
+    def write(value: Any) -> str:
+        if (
+            isinstance(value, float | numpy.floating)
+            and float(value).is_integer()
+        ):
+            return str(int(value))
+        return str(value)
+
+    return values.map(write)
+
+
+def forecast(
+    series: pandas.Series,
+    outcome: pandas.Series,
+    problem: Problem,
+    ceiling: float,
+) -> numpy.ndarray | None:
+    """Reads a column as the target itself, when it could echo it.
+
+    A field recorded after the outcome often is the outcome, written again
+    with errors: the label with some entries garbled, or the number plus
+    noise. Read as a prediction without any fitting, it agrees with the
+    target almost everywhere, which a legitimate predictor, however strong,
+    does not: it is on its own scale. The column is returned only when it
+    can reach `ceiling`, decided on its marginal and the target's alone, so
+    the choice does not depend on how the two are paired and the
+    permutation p-value stays exact.
+
+    For classes, agreement is at most `sum_k min(x_k, y_k) / n`, `x_k` and
+    `y_k` counting the rows where the column and the target hold class `k`,
+    so that must exceed `ceiling`; a column spelling fewer than two classes
+    agrees equally under every pairing and has no test. For a number, the
+    unfitted
+    R^2 is `1 - mean((y - x)^2) / var(y)`, and `mean((y - x)^2)` is at least
+    both `(mean(y) - mean(x))^2` and `(sd(y) - sd(x))^2`; with
+    `slack = sqrt(1 - ceiling)` the means and the standard deviations must
+    each lie within `slack * sd(y)` of the target's.
+
+    Args:
+        series: The column.
+        outcome: The target column.
+        problem: The encoded target.
+        ceiling: The echo ceiling.
+
+    Returns:
+        For classes, the class code each value spells (-1 for no class);
+        for a number with no missing values, the values; None when the
+        column cannot echo the target above `ceiling`.
+    """
+    if problem.task == "classification":
+        labels = pandas.Series(pandas.factorize(outcome, sort=True)[1])
+        lookup = {text: code for code, text in enumerate(spell(labels))}
+        codes = spell(series).map(lookup).fillna(-1).to_numpy("int64")
+        spelled = numpy.bincount(codes[codes >= 0], minlength=len(labels))
+        held = numpy.bincount(problem.y, minlength=len(labels))
+        reach = float(numpy.minimum(spelled, held).sum()) / len(codes)
+        if numpy.count_nonzero(spelled) < MIN_CLASSES or reach <= ceiling:
+            return None
+        return codes
+    numeric = pandas.api.types.is_numeric_dtype(
+        series
+    ) and not pandas.api.types.is_bool_dtype(series)
+    if not numeric or series.isna().any():
+        return None
+    values = series.to_numpy(dtype="float64")
+    spread = float(problem.y.std())
+    slack = math.sqrt(1.0 - ceiling) * spread
+    if abs(float(values.mean() - problem.y.mean())) > slack:
+        return None
+    if abs(float(values.std()) - spread) > slack:
+        return None
+    return values
+
+
+def reflect(problem: Problem, data: numpy.ndarray) -> Statistic:
+    """Builds the echo statistic of a column read as the target.
+
+    Args:
+        problem: The encoded target.
+        data: The column as the target, from `forecast`.
+
+    Returns:
+        A function mapping an array of shape (B, n) of target versions to
+        a length-B array: the share of rows where the column spells the
+        class, or `1 - sum((y - x)^2) / sum((y - mean(y))^2)` for a number.
+    """
+
+    def compute(labels: numpy.ndarray) -> numpy.ndarray:
+        if problem.task == "classification":
+            share: numpy.ndarray = (labels == data[None, :]).mean(axis=1)
+            return share
+        squares = ((labels - data[None, :]) ** 2).sum(axis=1)
+        efficiency: numpy.ndarray = 1.0 - squares / problem.total_squares
+        return efficiency
+
+    return compute
+
+
+def hedge(
+    problem: Problem,
+    data: numpy.ndarray,
+    cfg: leakage.Config,
+    groups: numpy.ndarray | None,
+    rng: numpy.random.Generator,
+) -> float:
+    """One-sided lower confidence bound of the echo statistic by bootstrap.
+
+    Rows are resampled, or whole groups when `groups` is given; a draw with
+    a constant numeric target is skipped, and with none left the bound is
+    -inf.
+
+    Args:
+        problem: The encoded target.
+        data: The column as the target, from `forecast`.
+        cfg: Settings (`bootstrap`, `confidence`).
+        groups: Group label per row, or None.
+        rng: Random generator.
+
+    Returns:
+        The `1 - confidence` quantile of the bootstrap values, or -inf.
+    """
+    members = (
+        [numpy.flatnonzero(groups == g) for g in pandas.unique(groups)]
+        if groups is not None
+        else None
+    )
+    n = len(problem.y)
+    values = []
+    for draw in range(cfg.bootstrap):
+        del draw
+        if members is not None:
+            picks = rng.integers(0, len(members), size=len(members))
+            index = numpy.concatenate([members[i] for i in picks])
+        else:
+            index = rng.integers(0, n, size=n)
+        y = problem.y[index]
+        if problem.task == "classification":
+            values.append(float((y == data[index]).mean()))
+            continue
+        total = float(((y - y.mean()) ** 2).sum())
+        if total > 0.0:
+            values.append(1.0 - float(((y - data[index]) ** 2).sum()) / total)
+    if not values:
+        return -math.inf
+    return float(numpy.quantile(values, 1.0 - cfg.confidence))
+
+
+def pair(first: str, second: str) -> str:
+    """Names the joint hypothesis of two columns.
+
+    Args:
+        first: One column.
+        second: The other.
+
+    Returns:
+        The name findings of the pair carry.
+    """
+    return f"{first} & {second}"
+
+
+def pairs(
+    frame: pandas.DataFrame, names: Sequence[Hashable]
+) -> list[tuple[Hashable, Hashable]]:
+    """Lists the pairs of candidate columns tested jointly.
+
+    The choice reads the columns alone, never the target.
+
+    Args:
+        frame: The chosen rows.
+        names: Candidate columns.
+
+    Returns:
+        Every pair of columns with `PAIR_LEVELS` recorded values, in
+        candidate order.
+    """
+    low = [n for n in names if frame[n].nunique() == PAIR_LEVELS]
+    return list(itertools.combinations(low, 2))
+
+
+def gauge(name: str, phi: numpy.ndarray, problem: Problem) -> list[Pending]:
+    """Builds the skill hypothesis of one design, when it can carry any.
+
+    Args:
+        name: Column or pair name.
+        phi: The design.
+        problem: The encoded target.
+
+    Returns:
+        The hypothesis with its observed skill, or nothing for a design of
+        one column.
+    """
+    if phi.shape[1] <= 1:
+        return []
+    statistic = skill_statistic(problem, phi)
+    observed = float(statistic(problem.y[None, :])[0])
+    return [
+        Pending(name, SKILL, observed, statistic, uses_binned=False, data=phi)
+    ]
+
+
+def propose(
+    frame: pandas.DataFrame,
+    target: str,
+    names: Sequence[Hashable],
+    problem: Problem,
+    cfg: leakage.Config,
+    class_codes: numpy.ndarray,
+    totals: numpy.ndarray,
+    *,
+    structured: bool,
+) -> tuple[list[Pending], tuple[str, ...]]:
+    """Forms every hypothesis of the family, so the scan and `measure` agree.
+
+    Per column: skill, record purity and missingness (`hypothesize`) and
+    echo (`forecast`); then the joint skill of each pair of two-level
+    columns, while there are no more pairs than candidate columns.
+
+    Args:
+        frame: The chosen rows, including the target.
+        target: Target column.
+        names: Candidate columns.
+        problem: The encoded target with its folds.
+        cfg: Settings.
+        class_codes: Class code of the binned outcome per row.
+        totals: Rows per class.
+        structured: Whether rows are grouped or in time blocks.
+
+    Returns:
+        The hypotheses with their observed statistics, and a note when the
+        pairs were too many to screen.
+    """
+    ceiling = caps(cfg)[ECHO]
+    pending: list[Pending] = []
+    for name in names:
+        series = frame[name]
+        pending.extend(gauge(str(name), basis(series), problem))
+        pending.extend(
+            hypothesize(
+                str(name),
+                series,
+                frame[target],
+                problem.task,
+                cfg,
+                class_codes,
+                totals,
+                structured=structured,
+            )
+        )
+        data = forecast(series, frame[target], problem, ceiling)
+        if data is not None:
+            statistic = reflect(problem, data)
+            observed = float(statistic(problem.y[None, :])[0])
+            pending.append(
+                Pending(
+                    str(name),
+                    ECHO,
+                    observed,
+                    statistic,
+                    uses_binned=False,
+                    data=data,
+                )
+            )
+    found = pairs(frame, names)
+    if len(found) > len(names):
+        note = (
+            f"{len(found)} pairs of two-level columns, more than the "
+            f"{len(names)} candidate columns, were not screened jointly: a "
+            "target split over two columns may remain undetected"
+        )
+        return pending, (note,)
+    for first, second in found:
+        joint = frame[first].astype(str) + " & " + frame[second].astype(str)
+        pending.extend(
+            gauge(pair(str(first), str(second)), basis(joint), problem)
+        )
+    return pending, ()
 
 
 def resamples(family: int, alpha: Fraction) -> int:
-    """Finds the smallest `B` with `1 / (B + 1) <= alpha / (family * H_family)`.
+    """Finds the smallest `B` with `1 / (B + 1) < alpha / (family * H_family)`.
 
     Args:
         family: Number of hypotheses adjusted together.
@@ -786,7 +1130,12 @@ def resamples(family: int, alpha: Fraction) -> int:
     if family <= 0:
         return 0
     need = family * multiplicity.harmonics(family) / alpha
-    return max(0, math.ceil(need) - 1)
+    # floor, not ceil - 1: when `need` is a whole number (7 hypotheses at
+    # 0.05 need 363) ceil - 1 puts 1 / (B + 1) exactly on the threshold, and
+    # the float p-value the step reads rounds to just above it. One more
+    # permutation makes the inequality strict by 1 / (need * (need + 1)),
+    # far above any float rounding.
+    return max(0, math.floor(need))
 
 
 def draw_permutations(
@@ -988,7 +1337,8 @@ class Screen:
         Returns:
             A dict with a note, the rule, level, rows, family size,
             permutations, gates, ceilings, notes, unchecked columns,
-            warning, suspect and blocking column names, and the findings
+            warning, suspect and blocking column names (each once, though
+            a column may be suspect by several mechanisms), and the findings
             that are significant or suspect (an infinite lower bound is
             written as None).
         """
@@ -1005,8 +1355,8 @@ class Screen:
             "notes": list(self.notes),
             "unchecked": list(self.unchecked),
             "warning": self.warning,
-            "suspects": [f.feature for f in self.suspects],
-            "blocking": [f.feature for f in self.blocking],
+            "suspects": list(dict.fromkeys(f.feature for f in self.suspects)),
+            "blocking": list(dict.fromkeys(f.feature for f in self.blocking)),
             "findings": [
                 {
                     "feature": f.feature,
@@ -1274,26 +1624,19 @@ def measure(
     codes = pandas.factorize(classes, sort=True)[0].astype("int64")
     totals = numpy.bincount(codes).astype("float64")
     structured = grouping is not None or blocks is not None
-    skill = 0
-    family = 0
-    columns: list[str] = []
-    for name in names:
-        series = sample[name]
-        tested = basis(series).shape[1] > 1
-        found = hypothesize(
-            str(name),
-            series,
-            sample[target],
-            task,
-            cfg,
-            codes,
-            totals,
-            structured=structured,
-        )
-        skill += tested
-        family += tested + len(found)
-        if tested or found:
-            columns.append(str(name))
+    pending = propose(
+        sample,
+        target,
+        names,
+        problem,
+        cfg,
+        codes,
+        totals,
+        structured=structured,
+    )[0]
+    skill = sum(1 for h in pending if h.mechanism == SKILL)
+    family = len(pending)
+    columns = tested(pending, names)
     alpha = budget.exact(cfg.alpha, "alpha")
     total = max(cfg.permutations, resamples(family, alpha))
     if family == 0 or total > MAX_PERMUTATIONS:
@@ -1301,8 +1644,27 @@ def measure(
     ways = problem.classes if problem.classes > BINARY_CLASSES else 1
     work = total * skill * ways
     seconds = cost(task, len(sample), work)
-    return Demand(
-        len(sample), family, total, skill, work, tuple(columns), seconds
+    return Demand(len(sample), family, total, skill, work, columns, seconds)
+
+
+def tested(
+    pending: Sequence[Pending], names: Sequence[Hashable]
+) -> tuple[str, ...]:
+    """Lists the candidate columns that have a hypothesis, in order.
+
+    A pair's members have hypotheses of their own (a two-level column has a
+    skill test), so pair names are left out.
+
+    Args:
+        pending: The hypotheses of the family.
+        names: Candidate columns.
+
+    Returns:
+        The column names, each once.
+    """
+    listed = {str(n) for n in names}
+    return tuple(
+        dict.fromkeys(h.feature for h in pending if h.feature in listed)
     )
 
 
@@ -1598,10 +1960,14 @@ def caps(cfg: leakage.Config) -> dict[str, float]:
         A dict from mechanism to ceiling; missingness and record purity
         share the association ceiling.
     """
+    # Echo is an association of the column with the target read without any
+    # fit (agreement, or unfitted R^2), so it shares the association
+    # ceiling: no new threshold.
     return {
         SKILL: cfg.skill_ceiling,
         MISSING: cfg.association_ceiling,
         PURITY: cfg.association_ceiling,
+        ECHO: cfg.association_ceiling,
     }
 
 
@@ -1780,7 +2146,6 @@ def halt(
 def floor(
     h: Pending,
     problem: Problem,
-    columns: Mapping[str, numpy.ndarray],
     frame: pandas.DataFrame,
     class_codes: numpy.ndarray,
     totals: numpy.ndarray,
@@ -1790,9 +2155,9 @@ def floor(
     """Bounds the effect of one significant hypothesis from below.
 
     Args:
-        h: The significant hypothesis.
+        h: The significant hypothesis; a skill or echo hypothesis carries
+            its `data`.
         problem: The encoded outcome with its folds.
-        columns: Basis of each column with a skill hypothesis.
         frame: The chosen rows.
         class_codes: Class code of the binned outcome per row.
         totals: Rows per class.
@@ -1804,8 +2169,10 @@ def floor(
     """
     path = f"leakage.screen.{h.mechanism}.{h.feature}"
     rng = randomness.component_rng(cfg.run_seed, path, 0)
-    if h.mechanism == SKILL:
-        return skill_bound(problem, columns[h.feature], cfg, groups, rng)
+    if h.mechanism == SKILL and h.data is not None:
+        return skill_bound(problem, h.data, cfg, groups, rng)
+    if h.mechanism == ECHO and h.data is not None:
+        return hedge(problem, h.data, cfg, groups, rng)
     if h.mechanism == PURITY:
         recorded = frame[h.feature].notna().to_numpy()
         return dominance(recorded, class_codes, cfg, groups)
@@ -1861,36 +2228,16 @@ def scan(
     classes = leakage.bucket(frame[target], task)
     class_codes = pandas.factorize(classes, sort=True)[0].astype("int64")
     totals = numpy.bincount(class_codes).astype("float64")
-    pending: list[Pending] = []
-    columns: dict[str, numpy.ndarray] = {}
-    for name in names:
-        series = frame[name]
-        phi = basis(series)
-        if phi.shape[1] > 1:
-            columns[str(name)] = phi
-            statistic = skill_statistic(problem, phi)
-            observed = float(statistic(problem.y[None, :])[0])
-            pending.append(
-                Pending(
-                    str(name),
-                    SKILL,
-                    observed,
-                    statistic,
-                    uses_binned=False,
-                )
-            )
-        pending.extend(
-            hypothesize(
-                str(name),
-                series,
-                frame[target],
-                task,
-                cfg,
-                class_codes,
-                totals,
-                structured=structured,
-            )
-        )
+    pending, notes = propose(
+        frame,
+        target,
+        names,
+        problem,
+        cfg,
+        class_codes,
+        totals,
+        structured=structured,
+    )
     family = len(pending)
     ceilings = caps(cfg)
     if family == 0:
@@ -1898,7 +2245,7 @@ def scan(
             cfg, gates, n, "screen not run: no column could be tested", names
         )
     total = max(cfg.permutations, resamples(family, alpha))
-    declined = tuple(dict.fromkeys(h.feature for h in pending))
+    declined = tested(pending, names)
     if total > MAX_PERMUTATIONS:
         return halt(
             cfg,
@@ -1957,9 +2304,7 @@ def scan(
         bound: float | None = None
         suspect = False
         if significant:
-            bound = floor(
-                h, problem, columns, frame, class_codes, totals, cfg, groups
-            )
+            bound = floor(h, problem, frame, class_codes, totals, cfg, groups)
             suspect = bound > ceilings[h.mechanism]
         findings.append(
             Finding(
@@ -1975,7 +2320,9 @@ def scan(
                 gates[h.mechanism],
             )
         )
-    return Screen(tuple(findings), n, family, total, cfg.alpha, gates, ceilings)
+    return Screen(
+        tuple(findings), n, family, total, cfg.alpha, gates, ceilings, notes
+    )
 
 
 def screen(

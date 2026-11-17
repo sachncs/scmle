@@ -126,7 +126,10 @@ fold choices, the chance of any false alarm is at most `alpha`, and the false
 discovery rate of the significant list is at most `alpha` under arbitrary
 dependence between columns. The screen does not tell a legitimate strong
 predictor from a leak (that needs provenance), has little power below the
-ceiling, and does not see a leak that needs several columns together.
+ceiling, and sees a leak spread over several columns only for pairs of
+two-level columns, tested jointly while there are no more pairs than
+columns; a leak over three or more columns, or over two columns with more
+levels, is not seen.
 
 `leakage_policy="block"` (opt-in; the default is `warn`) blocks the run on any
 suspect, and on a screen that could not check its columns. The published

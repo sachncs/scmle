@@ -687,7 +687,9 @@ class Profiler:
         gaps, notes = self.associate(frame, usable, target, task)
         quality += notes
         self.describe(frame, statistics, usable, task)
-        report = self.leakage_screen(frame, usable, task)
+        report = self.leakage_screen(
+            frame, usable + features["datetime"] + features["text"], task
+        )
         risks, notes = self.expose(report)
         quality += notes
         target_summary, target_risks = summarize(target, task)

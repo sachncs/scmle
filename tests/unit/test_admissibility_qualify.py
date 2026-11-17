@@ -124,7 +124,7 @@ def test_a_suspect_without_a_gate_only_warns():
     report = screen.screen(
         frame, "y", "classification", screen.leakage.CERTIFIED
     )
-    (finding,) = [f for f in report.suspects if f.feature == "copy"]
+    finding = next(f for f in report.suspects if f.feature == "copy")
     assert finding.gate is certificates.Authority.DESCRIPTIVE
     check = qualify.screened(finding, report.rows, 0, 0)
     assert check.decision is qualification.Decision.WARN

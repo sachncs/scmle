@@ -999,6 +999,7 @@
      "alpha": "float",
      "blocking": [],
      "ceilings": {
+      "echo": "float",
       "missingness": "float",
       "record_purity": "float",
       "skill": "float"
@@ -1018,6 +1019,7 @@
       }
      ],
      "gates": {
+      "echo": "str",
       "missingness": "str",
       "record_purity": "str",
       "skill": "str"
@@ -4365,6 +4367,7 @@
      "alpha": "float",
      "blocking": [],
      "ceilings": {
+      "echo": "float",
       "missingness": "float",
       "record_purity": "float",
       "skill": "float"
@@ -4384,6 +4387,7 @@
       }
      ],
      "gates": {
+      "echo": "str",
       "missingness": "str",
       "record_purity": "str",
       "skill": "str"
@@ -7422,6 +7426,7 @@
      "alpha": "float",
      "blocking": [],
      "ceilings": {
+      "echo": "float",
       "missingness": "float",
       "record_purity": "float",
       "skill": "float"
@@ -7441,6 +7446,7 @@
       }
      ],
      "gates": {
+      "echo": "str",
       "missingness": "str",
       "record_purity": "str",
       "skill": "str"

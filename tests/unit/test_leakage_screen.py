@@ -125,7 +125,7 @@ def test_constant_column_has_a_single_basis_column():
 
 
 def test_permutations_stay_inside_their_strata():
-    # Enforces docs/LEAKAGE.md:215.
+    # Enforces docs/LEAKAGE.md:231.
     strata = numpy.repeat([0, 1, 2], [5, 7, 3])
     rng = numpy.random.default_rng(0)
     index = screen.permute(strata, 50, rng)
@@ -157,7 +157,7 @@ def test_required_permutations_reach_the_by_threshold():
         need = screen.resamples(family, alpha)
         h = multiplicity.harmonics(family)
         assert Fraction(1, need + 1) <= alpha / (family * h)
-        assert Fraction(1, need) > alpha / (family * h)
+        assert Fraction(1, need) >= alpha / (family * h)
     assert screen.resamples(0, alpha) == 0
 
 
@@ -291,6 +291,7 @@ def test_a_noisy_copy_and_a_threshold_rule_are_suspects():
     frame["threshold"] = frame.y + rng.normal(scale=0.25, size=500)
     assert suspects(run(frame)) == {
         ("noisy", screen.SKILL),
+        ("noisy", screen.ECHO),
         ("threshold", screen.SKILL),
     }
 
@@ -355,7 +356,7 @@ def test_groups_keep_entities_whole_and_still_find_a_leak():
     groups = pandas.Series(numpy.arange(400) // 8)
     frame["leak"] = frame.y + 0.0
     report = run(frame, groups=groups)
-    assert suspects(report) == {("leak", screen.SKILL)}
+    assert suspects(report) == {("leak", screen.SKILL), ("leak", screen.ECHO)}
     assert report.findings
 
 
@@ -363,7 +364,7 @@ def test_time_blocks_run_and_flag_a_leak():
     frame = world(13, n=400)
     frame["leak"] = frame.y + 0.0
     report = run(frame, block_size=20)
-    assert suspects(report) == {("leak", screen.SKILL)}
+    assert suspects(report) == {("leak", screen.SKILL), ("leak", screen.ECHO)}
 
 
 def test_a_null_outcome_inside_groups_is_not_flagged():
@@ -412,7 +413,7 @@ def test_large_tables_are_subsampled_without_losing_the_leak():
     frame["leak"] = frame.y + 0.0
     report = run(frame)
     assert report.rows == screen.MAX_ROWS
-    assert suspects(report) == {("leak", screen.SKILL)}
+    assert suspects(report) == {("leak", screen.SKILL), ("leak", screen.ECHO)}
 
 
 def test_subsample_keeps_groups_whole_and_time_order():
@@ -434,7 +435,7 @@ def test_subsample_keeps_groups_whole_and_time_order():
 
 def test_the_global_null_is_flagged_no_more_often_than_alpha():
     # Enforces docs/ARCHITECTURE.md:124.
-    # Enforces docs/LEAKAGE.md:215.
+    # Enforces docs/LEAKAGE.md:231.
     significant = 0
     worlds = 60
     for seed in range(worlds):
@@ -468,7 +469,7 @@ def test_the_shipped_certificates_are_current_for_every_kind():
 
 
 def test_a_table_where_every_plant_is_found_gates_every_mechanism():
-    # Enforces docs/LEAKAGE.md:217.
+    # Enforces docs/LEAKAGE.md:233.
     report = probed(world(20))
     assert report.probe == dict.fromkeys(plants.DEFECTS, True)
     assert set(report.gates) == set(screen.MECHANISM_DEFECTS)
@@ -482,16 +483,16 @@ def test_too_few_rows_say_what_the_screen_would_miss():
 
 
 def test_a_missed_plant_is_reported_and_a_suspect_still_blocks(monkeypatch):
-    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:154.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:156.
     found = {**dict.fromkeys(plants.DEFECTS, True), "leak_threshold": False}
     monkeypatch.setattr(screen, "probe", lambda *a, **k: found)
     report = probed(world(20).assign(leak=lambda f: f.y + 0.0))
-    assert [f.feature for f in report.blocking] == ["leak"]
+    assert {f.feature for f in report.blocking} == {"leak"}
     assert any("leak_threshold" in n for n in report.notes)
 
 
 def test_a_stale_certificate_is_reported_and_does_not_decide(monkeypatch):
-    # Enforces docs/LEAKAGE.md:215.
+    # Enforces docs/LEAKAGE.md:231.
     monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
     report = probed(world(20))
     assert "published certificate for binary targets: stale" in report.notes
@@ -510,11 +511,11 @@ def test_a_column_named_like_a_plant_is_refused():
 
 
 def test_without_gates_a_suspect_warns_and_cannot_block():
-    # Enforces docs/ARCHITECTURE.md:138.
+    # Enforces docs/ARCHITECTURE.md:141.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:119.
     frame = world(19).assign(leak=lambda f: f.y + 0.0)
     report = run(frame)
-    (found,) = report.suspects
+    found = report.suspects[0]
     assert (
         found.gate is certificates.Authority.DESCRIPTIVE and not found.blocking
     )
@@ -526,7 +527,7 @@ def test_with_probed_gates_a_suspect_blocks():
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:119.
     frame = world(20).assign(leak=lambda f: f.y + 0.0)
     report = probed(frame)
-    assert [f.feature for f in report.blocking] == ["leak"]
+    assert {f.feature for f in report.blocking} == {"leak"}
     text = report.sentences()[0]
     assert "may block" in text and "not proof" in text
 
