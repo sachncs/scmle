@@ -261,7 +261,7 @@ def test_runtime_settings_read_the_environment_and_reject_garbage():
 
 def test_the_container_healthcheck_follows_readiness(tmp_path):
     from scmle.artifacts import bundle
-    from scmle.inference import parity
+    from scmle.deploy import parity
     from scmle.serving import server
 
     golden = parity.goldens(ROOT / "deploy" / "local" / "golden")

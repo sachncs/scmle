@@ -259,7 +259,7 @@ project = scmle.api.project.Project(
 # Deployment. Any model: a hardened service folder (Dockerfile pinned by
 # digest at build time, locked requirements, SBOM, signed provenance). Sign
 # with signing_key= or $SCMLE_SIGNING_KEY; production refuses unsigned folders.
-scmle.inference.packaging.scaffold(result.bundle, "service", signing_key=key)
+scmle.deploy.packaging.scaffold(result.bundle, "service", signing_key=key)
 # ONNX where the model allows it (forests, linear, SVM, LightGBM, XGBoost;
 # HistGradientBoosting is not expressible and goes through the service).
 result.bundle.export_onnx("model.onnx", check=sample_rows)

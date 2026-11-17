@@ -42,15 +42,15 @@ from scmle.data.catalog import Catalog
 from scmle.data.readers import tabular
 from scmle.deploy import gate
 from scmle.deploy import livetests
+from scmle.deploy import packaging
+from scmle.deploy import parity
 from scmle.deploy import release
+from scmle.deploy import release_state
 import scmle.deploy.record
 from scmle.governance import deployment_ledger
 from scmle.governance import registry
-from scmle.governance import release_state
 import scmle.governance.envelope
 import scmle.governance.loop
-from scmle.inference import packaging
-from scmle.inference import parity
 import scmle.inference.mapping
 import scmle.operations.controller
 from scmle.optimization import optimizers

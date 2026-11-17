@@ -7,8 +7,8 @@ import pathlib
 from scmle.deploy import gate
 from scmle.deploy import livetests
 from scmle.deploy import observation
+from scmle.deploy import parity
 from scmle.governance import registry
-from scmle.inference import parity
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 GOLDEN = ROOT / "deploy" / "local" / "golden"

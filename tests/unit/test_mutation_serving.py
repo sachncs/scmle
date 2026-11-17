@@ -12,8 +12,8 @@ import pytest
 import scmle.artifacts.bundle
 from scmle.contracts import errors
 import scmle.contracts.serving
+from scmle.deploy import parity
 from scmle.inference import guard
-from scmle.inference import parity
 from scmle.serving import server
 
 GOLDEN = pathlib.Path(__file__).resolve().parents[2] / "deploy" / "local"

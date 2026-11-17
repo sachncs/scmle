@@ -9,7 +9,7 @@ import sklearn
 
 from scmle.artifacts import bundle
 from scmle.contracts import errors
-from scmle.inference import parity
+from scmle.deploy import parity
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 

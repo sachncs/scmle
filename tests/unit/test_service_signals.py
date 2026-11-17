@@ -7,7 +7,7 @@ import urllib.request
 
 import pytest
 
-from scmle.inference import parity
+from scmle.deploy import parity
 from scmle.operations import signals
 from scmle.serving import runtime
 from scmle.serving import server

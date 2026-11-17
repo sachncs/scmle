@@ -14,9 +14,9 @@ from scmle import cli
 import scmle.artifacts.bundle
 from scmle.contracts import errors
 import scmle.contracts.serving
+from scmle.deploy import parity
 from scmle.deploy import provenance
 from scmle.inference import guard
-from scmle.inference import parity
 import scmle.serving.server
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]

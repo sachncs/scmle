@@ -52,7 +52,7 @@ def load_converter() -> tuple[Any, Any]:
     except ImportError as error:
         raise errors.ArtifactError(
             f"ONNX export: {INSTALL_HINT}; "
-            "scmle.inference.packaging.scaffold(bundle, directory) packages "
+            "scmle.deploy.packaging.scaffold(bundle, directory) packages "
             "any model as a ready-to-run service without it"
         ) from error
     return convert, runtime
@@ -141,7 +141,7 @@ def unwrap(fitted: Any) -> pipeline.Pipeline:
     if not isinstance(current, pipeline.Pipeline):
         raise errors.ArtifactError(
             f"ONNX export is not supported for {type(current).__name__}; "
-            "scmle.inference.packaging.scaffold(bundle, directory) packages "
+            "scmle.deploy.packaging.scaffold(bundle, directory) packages "
             "any model as a ready-to-run service instead"
         )
     return current
@@ -280,7 +280,7 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
         raise errors.ArtifactError(
             f"ONNX export is not supported for model "
             f"'{bundle.info.model_name}': {error}. "
-            "scmle.inference.packaging.scaffold(bundle, directory) packages "
+            "scmle.deploy.packaging.scaffold(bundle, directory) packages "
             "any model as a ready-to-run service instead"
         ) from error
     if encoded:

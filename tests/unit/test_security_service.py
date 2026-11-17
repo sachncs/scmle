@@ -10,10 +10,10 @@ import urllib.request
 import pytest
 
 from scmle.contracts import errors
+from scmle.deploy import packaging
+from scmle.deploy import parity
 from scmle.deploy import verify
 from scmle.governance import deployment_ledger
-from scmle.inference import packaging
-from scmle.inference import parity
 from scmle.security import access
 from scmle.security import audit
 from scmle.security import tokens

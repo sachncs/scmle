@@ -21,7 +21,7 @@ import scmle.artifacts.bundle
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.inference import packaging
+from scmle.deploy import packaging
 from scmle.models import registry
 from scmle.preparation import preprocessing
 

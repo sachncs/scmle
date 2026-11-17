@@ -9,8 +9,8 @@ import urllib.request
 import pytest
 
 from scmle.contracts import errors
+from scmle.deploy import parity
 from scmle.governance import deployment_ledger
-from scmle.inference import parity
 from scmle.runners import roles
 from scmle.security import access
 from scmle.security import audit

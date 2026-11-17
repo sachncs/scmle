@@ -239,7 +239,7 @@ extension surfaces pinned like the others.
 `model_digest_of`), `record` (`Record`), `livetests` (`run_checks`,
 `Target`, `CheckResult`, `Response`, `http_fetch`), `observation`
 (`Observation`, `Traffic`), `control` (`ControlPlane`, `confirm`,
-`expecting`, `Polling`) and `scmle.governance.release_state` (`ReleaseRegistry`, `ReleaseState`,
+`expecting`, `Polling`) and `scmle.deploy.release_state` (`ReleaseRegistry`, `ReleaseState`,
 `Outcome`, `Reconciliation`, `Finding`, `RuntimeDisagrees`) are extension
 surfaces pinned like the others. The release manifest loader (`release`) is
 not pinned. The `deployment` row kind of the

@@ -12,18 +12,21 @@ marked `Breaking:` and listed first in their group.
 
 ### Breaking changes
 
-* **Modules moved by the package layering (DES-13).** Each package now
-  imports only the layers below it; the moves are listed, `old -> new`, under
-  "Module moves" in [`docs/RENAMES.md`](docs/RENAMES.md). Names inside a
-  module are unchanged; replace the module path to migrate. Pinned public
-  modules moved so far: `scmle.core.retry` -> `scmle.runtime.retry`,
+* **Modules moved by the package layering (DES-13).** Each package now imports
+  only the layers below it; the moves are listed, `old -> new`, under "Module
+  moves" in [`docs/RENAMES.md`](docs/RENAMES.md). Names inside a module are
+  unchanged; replace the module path to migrate. Pinned public modules moved so
+  far: `scmle.core.retry` -> `scmle.runtime.retry`,
   `scmle.data.store.objectstore` -> `scmle.storage.objectstore`,
   `scmle.api.results` -> `scmle.artifacts.results`,
   `scmle.models.modality_lifecycle` -> `scmle.pipeline.modality_lifecycle`,
-  `scmle.inference.modality_serving` -> `scmle.serving.modality`. A service
-  folder generated from now on runs `python -m scmle.serving.runtime`;
-  folders generated earlier pin the scmle version that built them. Logger
-  names follow the module path, so a log filter on an old path must change.
+  `scmle.inference.modality_serving` -> `scmle.serving.modality`,
+  `scmle.governance.release_state` -> `scmle.deploy.release_state`, and
+  `scmle.inference.packaging` -> `scmle.deploy.packaging` (the module that
+  writes a service folder, `scaffold`). A service folder generated from now on
+  runs `python -m scmle.serving.runtime`; folders generated earlier pin the
+  scmle version that built them. Logger names follow the module path, so a log
+  filter on an old path must change.
 * **Bundle format 4.** The package layering (register phase 3) moves
   modules whose classes are pickled inside a bundle, so `BUNDLE_FORMAT` goes
   from 3 to 4 and `Bundle.load` refuses a format 3 bundle with the existing

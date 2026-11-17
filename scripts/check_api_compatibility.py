@@ -20,7 +20,7 @@ from scmle.deploy import gate
 from scmle.deploy import livetests
 from scmle.deploy import observation
 from scmle.deploy import record
-from scmle.governance import release_state
+from scmle.deploy import release_state
 from scmle.operations import classify
 from scmle.operations import continuous
 from scmle.operations import notify
@@ -76,7 +76,7 @@ EXTENSION_SURFACES = {
             "expecting",
         ),
     ),
-    "scmle.governance.release_state": (
+    "scmle.deploy.release_state": (
         release_state,
         (
             "Finding",

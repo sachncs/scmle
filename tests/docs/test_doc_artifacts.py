@@ -12,9 +12,9 @@ from scmle.artifacts import bundle
 from scmle.assurance.custody import sealed
 from scmle.contracts import errors
 from scmle.data.splitting import splitters
+from scmle.deploy import packaging
+from scmle.deploy import parity
 from scmle.deploy import vuln_gate
-from scmle.inference import packaging
-from scmle.inference import parity
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MODEL_FILES = (

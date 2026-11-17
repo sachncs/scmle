@@ -11,8 +11,8 @@ import pytest
 
 import scmle.artifacts.bundle
 from scmle.contracts import errors
+from scmle.deploy import parity
 from scmle.deploy import verify
-from scmle.inference import parity
 from scmle.serving import server
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]

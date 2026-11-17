@@ -43,9 +43,9 @@ from scmle import durability
 from scmle.contracts import errors
 from scmle.deploy import control
 from scmle.deploy import gate
+from scmle.deploy import release_state
 from scmle.governance import deployment_ledger
 from scmle.governance import never_list
-from scmle.governance import release_state
 import scmle.governance.loop
 import scmle.monitoring.champion
 from scmle.operations import signals

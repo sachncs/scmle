@@ -2944,3 +2944,6 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.inference.serving` -> `scmle.serving.server`
 - `scmle.inference.modality_serving` -> `scmle.serving.modality`
 - `scmle.deploy.runtime` -> `scmle.serving.runtime`
+- `scmle.inference.packaging` -> `scmle.deploy.packaging`
+- `scmle.inference.parity` -> `scmle.deploy.parity`
+- `scmle.governance.release_state` -> `scmle.deploy.release_state`

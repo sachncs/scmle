@@ -6,8 +6,8 @@ import types
 import numpy
 import pandas
 
+from scmle.deploy import release_state
 from scmle.governance import deployment_ledger
-from scmle.governance import release_state
 import scmle.governance.loop
 from scmle.operations import continuous
 from scmle.operations import signals

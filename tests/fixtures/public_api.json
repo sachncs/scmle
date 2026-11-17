@@ -247,7 +247,7 @@
       },
       "run_checks": {
         "kind": "callable",
-        "signature_sha256": "92f6e6b28780130727a36d2eefde4373a5d8183e1f0886b2a641c4d164130112"
+        "signature_sha256": "6f6cf12c408eafd90ef785593d60b3705363568b81a934b312b3c87a780b7b08"
       }
     },
     "scmle.deploy.observation": {
@@ -272,6 +272,32 @@
       "write_record": {
         "kind": "callable",
         "signature_sha256": "bdb1e760c281a4b2ab750927aeb30d5a038dc1fa1475b7930fa93e86ed2dc0b2"
+      }
+    },
+    "scmle.deploy.release_state": {
+      "Finding": {
+        "kind": "class",
+        "signature_sha256": "14b37209d24d102d435c1ceb4de5fb6e025c3e68b9085f2878cb60cc0b6d0128"
+      },
+      "Outcome": {
+        "kind": "class",
+        "signature_sha256": "6a8c7b404d661bb6460a2d4f5f70706698501cb179a259966aa6ac8937c805f7"
+      },
+      "Reconciliation": {
+        "kind": "class",
+        "signature_sha256": "10dfe989d3d6a0e54042019dbbb814587f055fed2251a96e86beabd718a6bc73"
+      },
+      "ReleaseRegistry": {
+        "kind": "class",
+        "signature_sha256": "86794533f87df244cbc69ed6871eb15086681da4de9e8ff5ac54c5e18d6207ff"
+      },
+      "ReleaseState": {
+        "kind": "class",
+        "signature_sha256": "3716db0c6985a91a0fa3a66c9adb6fb1248008b064ed61ce456af396ae9423d7"
+      },
+      "RuntimeDisagrees": {
+        "kind": "class",
+        "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
       }
     },
     "scmle.evaluation.longitudinal": {
@@ -354,32 +380,6 @@
         "signature_sha256": "b8f09ca8501c73d609c1370f4ff185ebd781e11a657af920427679c2402179f8"
       }
     },
-    "scmle.governance.release_state": {
-      "Finding": {
-        "kind": "class",
-        "signature_sha256": "14b37209d24d102d435c1ceb4de5fb6e025c3e68b9085f2878cb60cc0b6d0128"
-      },
-      "Outcome": {
-        "kind": "class",
-        "signature_sha256": "6a8c7b404d661bb6460a2d4f5f70706698501cb179a259966aa6ac8937c805f7"
-      },
-      "Reconciliation": {
-        "kind": "class",
-        "signature_sha256": "deb4d773b03f42749ab39f0001ee864eb95cc541d96f6700a54ede310f6fc0e2"
-      },
-      "ReleaseRegistry": {
-        "kind": "class",
-        "signature_sha256": "86794533f87df244cbc69ed6871eb15086681da4de9e8ff5ac54c5e18d6207ff"
-      },
-      "ReleaseState": {
-        "kind": "class",
-        "signature_sha256": "3716db0c6985a91a0fa3a66c9adb6fb1248008b064ed61ce456af396ae9423d7"
-      },
-      "RuntimeDisagrees": {
-        "kind": "class",
-        "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
-      }
-    },
     "scmle.models.custom": {
       "register_estimator": {
         "kind": "callable",
@@ -415,7 +415,7 @@
       },
       "Replacement": {
         "kind": "class",
-        "signature_sha256": "144f5f3c3435aeb49ae1381c16fa4a05ab87e9390b0ae28927df775ef8d7dc51"
+        "signature_sha256": "92b6b425add459156a197bcbaefc91b1050fce917ec62c4653199c50fcb21088"
       },
       "RetrainDecision": {
         "kind": "class",

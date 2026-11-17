@@ -17,12 +17,12 @@ from scmle.deploy import attest
 from scmle.deploy import base_image
 from scmle.deploy import context
 from scmle.deploy import lockfile
+from scmle.deploy import packaging
+from scmle.deploy import parity
 from scmle.deploy import provenance
 from scmle.deploy import verify
 from scmle.deploy import vuln_gate
 from scmle.governance import sbom
-from scmle.inference import packaging
-from scmle.inference import parity
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 KEY = "hardening-test-signing-key-8f3a"

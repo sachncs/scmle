@@ -47,11 +47,11 @@ from scmle.contracts import errors
 from scmle.contracts import observability
 from scmle.contracts import tasks
 from scmle.deploy import mocks
+from scmle.deploy import packaging
+from scmle.deploy import parity
 from scmle.deploy import provenance
 from scmle.governance import lifecycle
 import scmle.governance.registry
-from scmle.inference import packaging
-from scmle.inference import parity
 from scmle.monitoring import monitor
 from scmle.security import tokens
 from scmle.serving import server

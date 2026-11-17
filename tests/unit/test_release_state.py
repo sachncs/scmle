@@ -13,9 +13,9 @@ from scmle import cli
 from scmle.contracts import errors
 from scmle.deploy import control
 from scmle.deploy import observation
+from scmle.deploy import release_state
 from scmle.governance import deployment_ledger
 from scmle.governance import registry
-from scmle.governance import release_state
 from tests import support_release
 from tests import support_runtime
 

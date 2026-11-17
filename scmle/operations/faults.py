@@ -39,12 +39,12 @@ from scmle.deploy import control
 from scmle.deploy import demo
 from scmle.deploy import mocks
 from scmle.deploy import observation
+from scmle.deploy import packaging
+from scmle.deploy import parity
 from scmle.deploy import provenance
+from scmle.deploy import release_state
 from scmle.governance import deployment_ledger
 from scmle.governance import registry
-from scmle.governance import release_state
-from scmle.inference import packaging
-from scmle.inference import parity
 from scmle.operations import classify
 from scmle.operations import recovery
 from scmle.operations import signals

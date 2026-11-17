@@ -25,7 +25,7 @@ import urllib.request
 
 from scmle.contracts import errors
 from scmle.contracts import serving
-from scmle.inference import parity
+from scmle.deploy import parity
 
 CHECK_NAMES = ("health", "schema", "inference", "security")
 LOOPBACK = ("localhost", "127.0.0.1", "::1")

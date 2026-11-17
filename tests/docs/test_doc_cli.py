@@ -6,7 +6,7 @@ import pathlib
 import types
 
 from scmle import cli
-from scmle.inference import parity
+from scmle.deploy import parity
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 GOLDEN = ROOT / "deploy" / "local" / "golden"

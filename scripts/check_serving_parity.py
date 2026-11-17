@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 import sys
 
-from scmle.inference import parity
+from scmle.deploy import parity
 
 DEFAULT_DIRECTORY = Path("deploy/local/golden")
 
