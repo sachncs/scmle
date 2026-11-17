@@ -7,10 +7,10 @@ import threading
 import pytest
 
 from scmle.contracts import errors
-from scmle.data.store import objectstore
 from scmle.runners import base
 from scmle.runners import local
 from scmle.runtime import retry
+from scmle.storage import objectstore
 from scmle.workflow import definition
 from scmle.workflow import handlers
 import scmle.workflow.executor

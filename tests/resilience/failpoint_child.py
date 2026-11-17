@@ -15,8 +15,8 @@ import time
 
 import failpoints
 
-from scmle.data.store import objectstore
 from scmle.data.store import processing
+from scmle.storage import objectstore
 
 HOLD_SECONDS = 120
 

@@ -5,7 +5,7 @@ from collections.abc import Mapping
 import dataclasses
 from typing import Any
 
-from scmle.data.store import objectstore
+from scmle.storage import objectstore
 from scmle.workflow import definition
 from scmle.workflow.executor import failures
 

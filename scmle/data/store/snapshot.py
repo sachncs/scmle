@@ -31,7 +31,7 @@ import pandas
 from scmle import durability
 from scmle.contracts import errors
 from scmle.data.readers import connectors
-from scmle.data.store import objectstore
+from scmle.storage import objectstore
 
 FRESH = "fresh"
 STALE = "stale"

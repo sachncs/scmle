@@ -13,10 +13,10 @@ import os
 import signal
 import time
 
-from scmle.data.store import objectstore
 from scmle.data.store import processing
 from scmle.data.store import quality
 from scmle.data.store import snapshot
+from scmle.storage import objectstore
 
 LOCK_KEY = "state/lock"
 STATE_KEY = "state/checkpoint.json"

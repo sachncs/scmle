@@ -4,9 +4,9 @@ import hashlib
 
 import pytest
 
-from scmle.data.store import objectstore
 from scmle.data.store import processing
 from scmle.data.store import quality
+from scmle.storage import objectstore
 from tests.unit import test_governed_data
 
 

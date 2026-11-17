@@ -297,9 +297,10 @@ forbidden_modules = [
     "scmle.api", "scmle.artifacts", "scmle.cli", "scmle.core", "scmle.data",
     "scmle.decision", "scmle.deploy", "scmle.evaluation", "scmle.experimentation",
     "scmle.explainability", "scmle.features", "scmle.governance", "scmle.inference",
-    "scmle.integrations", "scmle.intelligence", "scmle.models", "scmle.monitoring",
-    "scmle.operations", "scmle.optimization", "scmle.runners", "scmle.sampling",
-    "scmle.security", "scmle.trail", "scmle.workflow",
+    "scmle.intelligence", "scmle.models", "scmle.monitoring",
+    "scmle.operations", "scmle.optimization", "scmle.runners", "scmle.runtime",
+    "scmle.sampling", "scmle.security", "scmle.storage", "scmle.trail",
+    "scmle.workflow",
 ]
 allow_indirect_imports = true
 
@@ -312,9 +313,10 @@ allow_indirect_imports = true
 
 # 19 packages import each other in one cycle at package level (api, artifacts,
 # core, data, decision, deploy, evaluation, experimentation, explainability,
-# features, governance, inference, integrations, intelligence, models,
-# monitoring, operations, sampling, security), so no layering exists among
-# them. The contracts below pin the layers around that cycle.
+# features, governance, inference, intelligence, models, monitoring,
+# operations, sampling, security), so no layering exists among them; the
+# layer map (scripts/layers.toml, register phase 3) is untangling it. The
+# contracts below pin the layers around that cycle.
 [[tool.importlinter.contracts]]
 name = "Top of the stack: cli above workflow above runners and trail"
 type = "layers"
@@ -327,10 +329,9 @@ source_modules = [
     "scmle.api", "scmle.artifacts", "scmle.core", "scmle.data",
     "scmle.decision", "scmle.deploy", "scmle.evaluation",
     "scmle.experimentation", "scmle.explainability", "scmle.features",
-    "scmle.governance", "scmle.inference", "scmle.integrations",
-    "scmle.intelligence", "scmle.models", "scmle.monitoring",
-    "scmle.operations", "scmle.sampling", "scmle.security",
-    "scmle.optimization",
+    "scmle.governance", "scmle.inference", "scmle.intelligence",
+    "scmle.models", "scmle.monitoring", "scmle.operations", "scmle.runtime",
+    "scmle.sampling", "scmle.security", "scmle.storage", "scmle.optimization",
 ]
 forbidden_modules = [
     "scmle.cli", "scmle.workflow", "scmle.runners", "scmle.trail",
@@ -345,9 +346,9 @@ forbidden_modules = [
     "scmle.api", "scmle.artifacts", "scmle.core", "scmle.data",
     "scmle.decision", "scmle.deploy", "scmle.evaluation",
     "scmle.experimentation", "scmle.explainability", "scmle.features",
-    "scmle.governance", "scmle.inference", "scmle.integrations",
-    "scmle.intelligence", "scmle.models", "scmle.monitoring",
-    "scmle.operations", "scmle.sampling", "scmle.security",
-    "scmle.durability", "scmle.unsupervised",
+    "scmle.governance", "scmle.inference", "scmle.intelligence",
+    "scmle.models", "scmle.monitoring", "scmle.operations", "scmle.runtime",
+    "scmle.sampling", "scmle.security", "scmle.storage", "scmle.durability",
+    "scmle.unsupervised",
 ]
 allow_indirect_imports = true

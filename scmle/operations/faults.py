@@ -35,7 +35,6 @@ import numpy
 from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.contracts import observability
-from scmle.data.store import objectstore
 from scmle.deploy import control
 from scmle.deploy import demo
 from scmle.deploy import mocks
@@ -52,6 +51,7 @@ from scmle.operations import signals
 from scmle.operations import spool
 from scmle.runtime import limits
 from scmle.security import audit
+from scmle.storage import objectstore
 
 ROTATED_KEY = "scmle-rotated-signing-key-local-recovery-run"
 WRONG_KEY = "scmle-wrong-signing-key-local-recovery-run"
@@ -1477,7 +1477,7 @@ KILLED_RETURN_CODE = (
 JOB_CHILD = """
 import json, os, sys, time
 from scmle.runtime import limits
-from scmle.data.store import objectstore
+from scmle.storage import objectstore
 from scmle.workflow import definition as wd
 from scmle.workflow import executor as ex
 

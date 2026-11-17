@@ -43,10 +43,10 @@ from typing import Any
 import pandas
 
 from scmle.contracts import errors
-from scmle.data.store import objectstore
 from scmle.data.store import quality
 from scmle.data.store import snapshot
 from scmle.runtime import retry
+from scmle.storage import objectstore
 
 LOGGER = logging.getLogger(__name__)
 

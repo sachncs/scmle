@@ -2893,3 +2893,7 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.core.logs` -> `scmle.runtime.logs`
 - `scmle.integrations.ray_backend` -> `scmle.runtime.ray_backend`
 - `scmle.models.deeplearning.worker` -> `scmle.runtime.worker`
+- `scmle.data.store.objectstore` -> `scmle.storage.objectstore`
+- `scmle.data.store.conformance` -> `scmle.storage.conformance`
+- `scmle.experimentation.stores` -> `scmle.storage.stores`
+- `scmle.integrations.mlflow_store` -> `scmle.storage.mlflow_store`

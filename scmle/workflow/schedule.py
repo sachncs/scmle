@@ -27,7 +27,7 @@ import json
 from typing import Any
 
 from scmle.contracts import errors
-from scmle.data.store import objectstore
+from scmle.storage import objectstore
 from scmle.workflow import definition
 import scmle.workflow.executor
 

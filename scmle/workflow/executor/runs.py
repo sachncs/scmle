@@ -7,7 +7,7 @@ import time
 from typing import Any
 
 from scmle.contracts import errors
-from scmle.data.store import objectstore
+from scmle.storage import objectstore
 from scmle.workflow import definition
 from scmle.workflow.executor import context
 from scmle.workflow.executor import failures

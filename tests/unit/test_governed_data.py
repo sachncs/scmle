@@ -7,11 +7,11 @@ import pandas
 import pytest
 
 from scmle.contracts import errors
-from scmle.data.store import objectstore
 from scmle.data.store import processing
 from scmle.data.store import quality
 from scmle.data.store import snapshot
 from scmle.runtime import retry
+from scmle.storage import objectstore
 
 CONTRACT = snapshot.DataContract(
     "orders",

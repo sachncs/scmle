@@ -32,13 +32,13 @@ from scmle.data.custody import journal
 from scmle.data.profiling import profiler
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
-from scmle.experimentation import stores
 import scmle.models.registry
 from scmle.runtime import limits
 from scmle.runtime import logs
 from scmle.runtime import resource_observation
 from scmle.runtime import scheduler
 from scmle.runtime import state
+from scmle.storage import stores
 
 
 def environment_lock() -> str:

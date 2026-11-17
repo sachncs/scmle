@@ -13,7 +13,7 @@ from typing import cast
 
 from scmle.contracts import errors
 from scmle.contracts import experiments
-from scmle.experimentation import stores
+from scmle.storage import stores
 
 RUN_TAG = "scmle.run_id"
 LINEAGE_ARTIFACTS = frozenset({"config_json", "artifacts"})

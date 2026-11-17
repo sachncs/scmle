@@ -26,12 +26,12 @@ from scmle.data.readers import streaming
 from scmle.data.splitting import splitters
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
-from scmle.experimentation import stores
 import scmle.intelligence.recommendations
 import scmle.models.registry
 from scmle.runtime import limits
 from scmle.runtime import resource_observation
 from scmle.runtime import scheduler
+from scmle.storage import stores
 
 LOGGER = logging.getLogger(__name__)
 T = TypeVar("T")

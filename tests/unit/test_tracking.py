@@ -4,7 +4,7 @@ import pytest
 
 from scmle.contracts import events
 from scmle.contracts import experiments
-from scmle.experimentation import stores
+from scmle.storage import stores
 
 
 def make_trial(
@@ -123,7 +123,7 @@ def test_store_connections_wait_for_a_busy_database(tmp_path):
     SQLite's default wait is 5 s, which Windows runners exceed when several
     threads commit (each commit fsyncs) to one file.
     """
-    from scmle.experimentation import stores
+    from scmle.storage import stores
 
     store = stores.SqliteExperimentStore(tmp_path / "tracking.sqlite")
     connection = store.connect()

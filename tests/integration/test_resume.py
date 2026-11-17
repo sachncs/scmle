@@ -13,9 +13,9 @@ from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
 import scmle.core.orchestrator
-from scmle.experimentation import stores
 from scmle.experimentation import trials
 import scmle.models.registry
+from scmle.storage import stores
 
 BINARY = frozenset({tasks.Task.BINARY})
 

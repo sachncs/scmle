@@ -16,7 +16,7 @@ run a job with the serving identity).
 import dataclasses
 
 from scmle.contracts import errors
-from scmle.data.store import objectstore
+from scmle.storage import objectstore
 
 
 class RoleDeniedError(errors.ScmleError):

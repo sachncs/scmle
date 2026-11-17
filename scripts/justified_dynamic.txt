@@ -4,7 +4,7 @@
 scmle/cli.py run_* subcommand dispatch getattr(self, f"run_{...}") at cli.py:906,1047,1285,1491,1686
 scmle/data/splitting/inner_cv.py get_n_splits scikit-learn calls a cross-validator's get_n_splits by name
 scmle/deploy/demo.py http_request urllib finds a handler's http_request method by name
-scmle/data/store/objectstore.py MismatchError named by the Depot.get contract for backends that record a hash; the shipped local backend cannot raise it
+scmle/storage/objectstore.py MismatchError named by the Depot.get contract for backends that record a hash; the shipped local backend cannot raise it
 scmle/deploy/mocks.py do_PUT http.server calls do_<METHOD> on a request handler by name
 scmle/deploy/mocks.py do_HEAD http.server calls do_<METHOD> on a request handler by name
 scmle/inference/serving.py version_string http.server reads version_string on a request handler by name
@@ -58,9 +58,9 @@ scmle/data/readers/streaming.py commit_transaction documented: website/src/pages
 scmle/data/readers/streaming.py Consumer documented: website/src/pages/docs/data.astro (readers, connectors, streaming)
 scmle/data/robustness/forward.py forward_check qualification module: docs/API_STABILITY.md ("like the other qualification modules")
 scmle/data/robustness/multiverse.py downgrade qualification module: docs/API_STABILITY.md ("like the other qualification modules")
-scmle/data/store/conformance.py run_conformance documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
-scmle/data/store/objectstore.py TransientStoreError documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
-scmle/data/store/objectstore.py RetryingStore documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/storage/conformance.py run_conformance documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/storage/objectstore.py TransientStoreError documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
+scmle/storage/objectstore.py RetryingStore documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
 scmle/data/store/processing.py IncrementalProcessor documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
 scmle/data/store/processing.py break_lock documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
 scmle/data/store/quality.py SchemaCheck documented extension surface: docs/API_STABILITY.md and docs/GOVERNED_DATA.md (governed data)
@@ -117,7 +117,7 @@ scmle/governance/rollout_hook.py rewind documented extension surface: docs/API_S
 scmle/governance/uncertainty_feed.py UncertaintyFeed documented extension surface: docs/API_STABILITY.md (UncertaintyFeed)
 scmle/inference/modality_serving.py protect documented: docs/API_STABILITY.md (security surface, protect)
 scmle/inference/parity.py expect used by scripts/make_serving_golden.py (stored golden generator)
-scmle/integrations/mlflow_store.py MlflowExperimentStore documented: docs/DEPENDENCIES.md (tracking extra)
+scmle/storage/mlflow_store.py MlflowExperimentStore documented: docs/DEPENDENCIES.md (tracking extra)
 scmle/models/custom.py register_estimator public API: pinned in tests/fixtures/public_api.json, docs/API_STABILITY.md
 scmle/models/custom.py unregister_estimator public API: pinned in tests/fixtures/public_api.json, docs/API_STABILITY.md
 scmle/models/documents.py overview kept in doubt: sibling of the documented spotlight (website/src/pages/docs/api.astro)

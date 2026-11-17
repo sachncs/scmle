@@ -9,7 +9,6 @@ import urllib.request
 import pytest
 
 from scmle.contracts import errors
-from scmle.data.store import objectstore
 from scmle.governance import deployment_ledger
 from scmle.inference import parity
 from scmle.inference import serving
@@ -17,6 +16,7 @@ from scmle.runners import roles
 from scmle.security import access
 from scmle.security import audit
 from scmle.security import tokens
+from scmle.storage import objectstore
 from tests import support_identity
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]

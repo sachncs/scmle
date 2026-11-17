@@ -38,7 +38,7 @@ SECURITY = {
 }
 GOVERNED = (
     "scmle.runtime.retry",
-    "scmle.data.store.objectstore",
+    "scmle.storage.objectstore",
     "scmle.data.store.processing",
     "scmle.data.store.quality",
     "scmle.data.store.snapshot",

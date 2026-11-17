@@ -10,8 +10,8 @@ import urllib.error
 
 import pytest
 
-from scmle.data.store import objectstore
 from scmle.runtime import retry
+from scmle.storage import objectstore
 
 
 def http(code):

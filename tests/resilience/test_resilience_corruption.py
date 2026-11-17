@@ -17,8 +17,8 @@ import time
 import failpoints
 import pytest
 
-from scmle.data.store import objectstore
 from scmle.data.store import processing
+from scmle.storage import objectstore
 
 CHILD = pathlib.Path(__file__).with_name("failpoint_child.py")
 ROOT = pathlib.Path(__file__).resolve().parents[2]

@@ -20,8 +20,8 @@ from hypothesis.stateful import RuleBasedStateMachine
 from hypothesis.stateful import run_state_machine_as_test
 import pytest
 
-from scmle.data.store import objectstore
 from scmle.data.store import processing
+from scmle.storage import objectstore
 
 LABELS = ("lock_acquire", "output_write", "checkpoint_write", "lock_release")
 MUTATIONS = ("truncate", "empty", "garbage", "flip_digest", "drop_tail")

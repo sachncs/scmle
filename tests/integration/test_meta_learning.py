@@ -5,7 +5,7 @@ import pandas
 import support
 
 import scmle.api.project
-from scmle.experimentation import stores
+from scmle.storage import stores
 
 
 def make_frame(rows, seed):

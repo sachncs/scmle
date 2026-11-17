@@ -31,8 +31,8 @@ from typing import Any
 import scmle.api.project
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.store import objectstore
 from scmle.runners import local
+from scmle.storage import objectstore
 
 LOGGER = logging.getLogger(__name__)
 

@@ -16,7 +16,8 @@ marked `Breaking:` and listed first in their group.
   imports only the layers below it; the moves are listed, `old -> new`, under
   "Module moves" in [`docs/RENAMES.md`](docs/RENAMES.md). Names inside a
   module are unchanged; replace the module path to migrate. Pinned public
-  modules moved so far: `scmle.core.retry` -> `scmle.runtime.retry`. Logger
+  modules moved so far: `scmle.core.retry` -> `scmle.runtime.retry`,
+  `scmle.data.store.objectstore` -> `scmle.storage.objectstore`. Logger
   names follow the module path, so a log filter on an old path must change.
 * **Bundle format 4.** The package layering (register phase 3) moves
   modules whose classes are pickled inside a bundle, so `BUNDLE_FORMAT` goes

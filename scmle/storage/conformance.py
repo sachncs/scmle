@@ -17,7 +17,7 @@ from typing import Any
 import uuid
 
 from scmle.contracts import errors
-from scmle.data.store import objectstore
+from scmle.storage import objectstore
 
 BINARY = bytes(range(256)) * 4
 LARGE_BYTES = 1024 * 1024

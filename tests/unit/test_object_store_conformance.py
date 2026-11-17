@@ -3,9 +3,9 @@
 import pytest
 
 from scmle.contracts import errors
-from scmle.data.store import conformance
-from scmle.data.store import objectstore
 from scmle.runtime import retry
+from scmle.storage import conformance
+from scmle.storage import objectstore
 
 
 def make_local(tmp_path):

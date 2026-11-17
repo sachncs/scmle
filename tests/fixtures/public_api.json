@@ -68,28 +68,6 @@
         "signature_sha256": "2b8c4750ec45dc99eaa3c2eb8e387dbbb9d304c2acf1ead56e0976867855bbec"
       }
     },
-    "scmle.data.store.objectstore": {
-      "Depot": {
-        "kind": "class",
-        "signature_sha256": "5bd8bcbedd1160de89a0a507583d6e95e8b000cb0b9ea49dface5f1761bae1ea"
-      },
-      "LocalObjectStore": {
-        "kind": "class",
-        "signature_sha256": "c75bccf3cd28e6237ca1713ba812b199bf64f30b23149c0710b80f6584494c36"
-      },
-      "ObjectMeta": {
-        "kind": "class",
-        "signature_sha256": "43590b0fa2c37d37e2ad952ca6d26d4634ccf5c514489ca72fcec4f24982b2ce"
-      },
-      "RetryingStore": {
-        "kind": "class",
-        "signature_sha256": "6227d4990c092c104a58639753ca846544e11667e6a5438713b6b7c16c0c9eca"
-      },
-      "StoreError": {
-        "kind": "class",
-        "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
-      }
-    },
     "scmle.data.store.processing": {
       "Checkpoint": {
         "kind": "class",
@@ -97,7 +75,7 @@
       },
       "IncrementalProcessor": {
         "kind": "class",
-        "signature_sha256": "e2f5e8a62e0a072e8681eea9e7fab4bf830e587e7933a9213c7f0d99fe01c4d7"
+        "signature_sha256": "04e113a5b8cc3e64a746b2478eea409f3301162ec0bf3e4dfae258f7e37a0a6a"
       },
       "Processing": {
         "kind": "class",
@@ -115,7 +93,7 @@
       },
       "QualityGate": {
         "kind": "class",
-        "signature_sha256": "760c25b855525e6da4e79cab21c9039cb2794dd0741fd1642fe3efc4cfa378ed"
+        "signature_sha256": "260a1d5359d41d06255af5d9477c078b18f882504cc7abc28d6d92d9474f9b51"
       },
       "QualityGateError": {
         "kind": "class",
@@ -141,7 +119,7 @@
       },
       "SnapshotReader": {
         "kind": "class",
-        "signature_sha256": "820195575a8d7f0bd37d5f1ef5c6ff608196841083e94a7e7ae62cede819692a"
+        "signature_sha256": "0394d4182b1c35e8ea1eb186aba3052940e5079a4e1b72eef0b1b5ab28c44b6d"
       },
       "SnapshotRecord": {
         "kind": "class",
@@ -607,13 +585,13 @@
       },
       "Runner": {
         "kind": "class",
-        "signature_sha256": "1cc9f7a6941124241528748f59e21340459ee679b2bd15450a69afaac154f84f"
+        "signature_sha256": "aeedfeeaf7dfaf6db5b28d577ee9dca3a6ad95a9c107ff1fc8d546f53142b20e"
       }
     },
     "scmle.runners.checkpoint": {
       "CheckpointStore": {
         "kind": "class",
-        "signature_sha256": "bd1da8a6bc625323d45fa5717ededd370a98cf6a704999b544ef7caa21d0402a"
+        "signature_sha256": "3875671d73a2171befa0e0626e2c3e1d703dfe2e3f7f1bafe327aa4f0983b8ea"
       }
     },
     "scmle.runners.local": {
@@ -639,7 +617,7 @@
       },
       "RoleStore": {
         "kind": "class",
-        "signature_sha256": "4e34b929be705619f53424d9506b3755c82f2c48d27eb27abef27bc3c7c037cb"
+        "signature_sha256": "db53630f2b113ff03d600d637f05762b0942a677c8dcf94cc1cb5f9e22c2d24f"
       },
       "check_distinct": {
         "kind": "callable",
@@ -726,6 +704,28 @@
         "signature_sha256": "a2595b470c83be98251c6957c3531977742fb0bf4d0d4247b3fed996757cdb54"
       }
     },
+    "scmle.storage.objectstore": {
+      "Depot": {
+        "kind": "class",
+        "signature_sha256": "5bd8bcbedd1160de89a0a507583d6e95e8b000cb0b9ea49dface5f1761bae1ea"
+      },
+      "LocalObjectStore": {
+        "kind": "class",
+        "signature_sha256": "c75bccf3cd28e6237ca1713ba812b199bf64f30b23149c0710b80f6584494c36"
+      },
+      "ObjectMeta": {
+        "kind": "class",
+        "signature_sha256": "43590b0fa2c37d37e2ad952ca6d26d4634ccf5c514489ca72fcec4f24982b2ce"
+      },
+      "RetryingStore": {
+        "kind": "class",
+        "signature_sha256": "f9bd251eace518112e75a42dc50bbbe822d0a2101e065e14ec0b19f1c53cf11d"
+      },
+      "StoreError": {
+        "kind": "class",
+        "signature_sha256": "ac48ce8e419a9558b2d5a642ab88618a1e3c2e24d2e203a5aabe0c868a664234"
+      }
+    },
     "scmle.trail.builder": {
       "build": {
         "kind": "callable",
@@ -791,7 +791,7 @@
       },
       "Executor": {
         "kind": "class",
-        "signature_sha256": "cd4d42d6b64bb6eb41e541af9888ebe242d3525d29a3877e55e9c8172e49ad77"
+        "signature_sha256": "e0dce54caeb477e9412de55c9a4055939400938ad2daba0f1ca5ff86d3b35d36"
       },
       "Progress": {
         "kind": "class",
@@ -799,13 +799,13 @@
       },
       "StepContext": {
         "kind": "class",
-        "signature_sha256": "54b68f514b4d58a4c67ff6e54e7faec41b18a96ec168a5290a9314782afadddd"
+        "signature_sha256": "a523292ed29fd712bb7dfb594e919afe3068416cdf703f485f050b6cf7117f5e"
       }
     },
     "scmle.workflow.schedule": {
       "Scheduler": {
         "kind": "class",
-        "signature_sha256": "228fd9d49a1387a2f35832d3079baffac485deb32e8b382e4d1d3b2f4ba24c18"
+        "signature_sha256": "4472862d1d9af77c61d7da3851c613b02d476d7395f25dd265866e60d2df5a5e"
       },
       "Tick": {
         "kind": "class",

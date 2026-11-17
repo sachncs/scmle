@@ -8,7 +8,7 @@ import logging
 import threading
 from typing import Any
 
-from scmle.data.store import objectstore
+from scmle.storage import objectstore
 from scmle.workflow.executor import failures
 from scmle.workflow.executor import records
 

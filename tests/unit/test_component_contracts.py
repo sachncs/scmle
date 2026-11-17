@@ -17,7 +17,6 @@ from scmle.data.splitting import splitters
 from scmle.data.validation import columns
 from scmle.evaluation import diagnostics
 from scmle.evaluation import selection
-from scmle.experimentation import stores
 from scmle.features import feature_graph
 from scmle.inference import serving
 from scmle.intelligence import planner
@@ -29,6 +28,7 @@ from scmle.runtime import scheduler
 from scmle.sampling import resampling
 from scmle.sampling import strategies
 from scmle.sampling import synthesis
+from scmle.storage import stores
 
 
 def concrete_subclasses(base, *modules):

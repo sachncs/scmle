@@ -32,8 +32,8 @@ from typing import Any
 import pandas
 
 from scmle.contracts import errors
-from scmle.data.store import objectstore
 from scmle.data.store import snapshot
+from scmle.storage import objectstore
 
 QUARANTINE_PREFIX = "quarantine"
 QUALITY_PREFIX = "quality"

@@ -5,9 +5,9 @@ import json
 import pytest
 
 from scmle.contracts import observability
-from scmle.data.store import objectstore
 from scmle.operations import recovery
 from scmle.operations import spool
+from scmle.storage import objectstore
 
 
 @pytest.fixture(autouse=True)

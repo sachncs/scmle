@@ -1,6 +1,6 @@
 """A store wrapper that fails the calls it is told to, then behaves."""
 
-from scmle.data.store import objectstore
+from scmle.storage import objectstore
 
 
 def throttled():

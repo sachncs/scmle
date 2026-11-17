@@ -24,7 +24,7 @@ import logging
 from typing import Any
 
 from scmle.contracts import errors
-from scmle.data.store import objectstore
+from scmle.storage import objectstore
 
 LOGGER = logging.getLogger(__name__)
 
