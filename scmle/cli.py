@@ -51,6 +51,7 @@ from scmle.governance import registry
 from scmle.governance import release_state
 import scmle.governance.envelope
 import scmle.governance.loop
+from scmle.inference import packaging
 from scmle.inference import parity
 from scmle.inference import serving
 import scmle.inference.mapping
@@ -805,7 +806,7 @@ class Packaging(Command):
             The exit status, EXIT_OK (0).
         """
         model = bundle.Bundle.load(args.bundle, trusted=args.trusted)
-        folder = model.export_service(args.output)
+        folder = packaging.scaffold(model, args.output)
         LOGGER.info("wrote service folder %s", folder)
         return EXIT_OK
 

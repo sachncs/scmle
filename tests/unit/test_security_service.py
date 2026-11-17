@@ -13,6 +13,7 @@ from scmle.contracts import errors
 from scmle.deploy import runtime
 from scmle.deploy import verify
 from scmle.governance import deployment_ledger
+from scmle.inference import packaging
 from scmle.inference import parity
 from scmle.inference import serving
 from scmle.security import access
@@ -340,7 +341,7 @@ def test_the_generated_image_does_not_turn_authentication_off(
 ):
     # Enforces docs/TENANT_ISOLATION.md:87.
     folder = tmp_path / "svc"
-    reference.export_service(folder, signing_key=KEY)
+    packaging.scaffold(reference, folder, signing_key=KEY)
     for name in ("Dockerfile", "serve.py", "README.md"):
         text = (folder / name).read_text(encoding="utf-8").lower()
         assert "auth_disabled" not in text and "no-auth" not in text
@@ -348,7 +349,7 @@ def test_the_generated_image_does_not_turn_authentication_off(
 
 def test_a_tampered_artifact_never_loads_in_production(reference, tmp_path):
     folder = tmp_path / "svc"
-    reference.export_service(folder, signing_key=KEY)
+    packaging.scaffold(reference, folder, signing_key=KEY)
     environ = {"SCMLE_ENV": "production", "SCMLE_SIGNING_KEY": KEY}
     assert verify.inspect(folder, environ).bundle_signed
     for name in (

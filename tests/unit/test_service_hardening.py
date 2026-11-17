@@ -21,6 +21,7 @@ from scmle.deploy import provenance
 from scmle.deploy import verify
 from scmle.deploy import vuln_gate
 from scmle.governance import sbom
+from scmle.inference import packaging
 from scmle.inference import parity
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -37,7 +38,7 @@ def reference():
 @pytest.fixture(scope="module")
 def signed_service(reference, tmp_path_factory):
     folder = tmp_path_factory.mktemp("hardening") / "service"
-    reference.export_service(folder, signing_key=KEY)
+    packaging.scaffold(reference, folder, signing_key=KEY)
     return folder
 
 

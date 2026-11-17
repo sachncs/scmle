@@ -51,8 +51,9 @@ def load_converter() -> tuple[Any, Any]:
         runtime = importlib.import_module("onnxruntime")
     except ImportError as error:
         raise errors.ArtifactError(
-            f"ONNX export: {INSTALL_HINT}; bundle.export_service(directory) "
-            "packages any model as a ready-to-run service without it"
+            f"ONNX export: {INSTALL_HINT}; "
+            "scmle.inference.packaging.scaffold(bundle, directory) packages "
+            "any model as a ready-to-run service without it"
         ) from error
     return convert, runtime
 
@@ -140,8 +141,8 @@ def unwrap(fitted: Any) -> pipeline.Pipeline:
     if not isinstance(current, pipeline.Pipeline):
         raise errors.ArtifactError(
             f"ONNX export is not supported for {type(current).__name__}; "
-            "bundle.export_service(directory) packages any model as a "
-            "ready-to-run service instead"
+            "scmle.inference.packaging.scaffold(bundle, directory) packages "
+            "any model as a ready-to-run service instead"
         )
     return current
 
@@ -279,8 +280,8 @@ def export(bundle: Any, path: str | pathlib.Path) -> pathlib.Path:
         raise errors.ArtifactError(
             f"ONNX export is not supported for model "
             f"'{bundle.info.model_name}': {error}. "
-            "bundle.export_service(directory) packages any model as a "
-            "ready-to-run service instead"
+            "scmle.inference.packaging.scaffold(bundle, directory) packages "
+            "any model as a ready-to-run service instead"
         ) from error
     if encoded:
         entry = model.metadata_props.add()

@@ -61,6 +61,7 @@ names in the public API snapshot are also listed in the changelog.
 - `load_interval_members` -> `restore`
 - `rank_for_labeling` -> `prioritize`
 - `compatibility_problems` -> `incompatibilities`
+- `Bundle.export_service(destination, signing_key)` -> `scmle.inference.packaging.scaffold(bundle, destination, signing_key=signing_key)` (the method was a pass-through and is removed)
 
 ## `scmle.artifacts.claims_audit`
 

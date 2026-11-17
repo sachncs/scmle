@@ -51,7 +51,6 @@ from scmle.explainability import local
 import scmle.explainability.counterfactual
 from scmle.features import feature_graph
 from scmle.inference import onnx_export
-from scmle.inference import packaging
 from scmle.inference import validation
 import scmle.inference.mapping
 import scmle.inference.novelty
@@ -1848,30 +1847,6 @@ class Bundle:
         if path is not None:
             pathlib.Path(path).write_text(text, encoding="utf-8", newline="\n")
         return text
-
-    def export_service(
-        self,
-        destination: str | pathlib.Path,
-        signing_key: str | bytes | None = None,
-    ) -> pathlib.Path:
-        """Writes a deployable service folder (works for every model).
-
-        The folder holds this bundle, the locked runtime requirements, the
-        full build environment, a server script, a Dockerfile and build
-        script, a vulnerability policy, an SBOM, a provenance statement and a
-        README. It refuses (`ArtifactError`) if `destination` already holds a
-        service.
-
-        Args:
-            destination: Folder to create.
-            signing_key: HMAC key that signs the bundle and the provenance;
-                defaults to `$SCMLE_SIGNING_KEY`. An unsigned folder cannot
-                be served in production.
-
-        Returns:
-            The folder.
-        """
-        return packaging.scaffold(self, destination, None, signing_key)
 
     def export_onnx(
         self,

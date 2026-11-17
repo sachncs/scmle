@@ -45,6 +45,7 @@ from scmle.deploy import provenance
 from scmle.governance import deployment_ledger
 from scmle.governance import registry
 from scmle.governance import release_state
+from scmle.inference import packaging
 from scmle.inference import parity
 from scmle.operations import classify
 from scmle.operations import recovery
@@ -114,7 +115,7 @@ def export_service(
     Returns:
         `folder`.
     """
-    parity.handwrite(spec).export_service(folder, signing_key=key)
+    packaging.scaffold(parity.handwrite(spec), folder, signing_key=key)
     return folder
 
 

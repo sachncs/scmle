@@ -12,6 +12,12 @@ marked `Breaking:` and listed first in their group.
 
 ### Breaking changes
 
+* **`Bundle.export_service` is removed.** It only passed through to
+  `scmle.inference.packaging.scaffold`, which is now the one way to write a
+  service folder: replace `bundle.export_service(folder, signing_key=key)`
+  with `scmle.inference.packaging.scaffold(bundle, folder, signing_key=key)`.
+  `scmle package` is unchanged. This removes the import that put
+  `artifacts` above `inference` (DES-13, layering task 3.3).
 * **A signed bundle that cannot be verified is refused, even with
   `trusted=True`.** Loading a bundle that carries `signature.json` while no
   signing key is set (`SCMLE_SIGNING_KEY` or `signing_key=`) now raises

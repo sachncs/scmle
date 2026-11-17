@@ -20,6 +20,7 @@ from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.curation import preprocessing
+from scmle.inference import packaging
 from scmle.models import registry
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -85,7 +86,7 @@ def wait_for(port, process):
 def test_the_folder_holds_everything_needed_to_run_and_rebuild(boosted):
     bundle, root = boosted[0], boosted[2]
 
-    folder = bundle.export_service(root / "complete")
+    folder = packaging.scaffold(bundle, root / "complete")
 
     for name in (
         "model",
@@ -101,19 +102,19 @@ def test_the_folder_holds_everything_needed_to_run_and_rebuild(boosted):
     assert f"scikit-learn=={bundle.info.sklearn}" in pins
     assert "python:" in (folder / "Dockerfile").read_text()
     with pytest.raises(errors.ArtifactError, match="already holds"):
-        bundle.export_service(folder)
+        packaging.scaffold(bundle, folder)
 
 
 def test_onnx_refuses_the_boosted_model_and_points_to_the_service(boosted):
     bundle, root = boosted[0], boosted[2]
 
-    with pytest.raises(errors.ArtifactError, match="export_service"):
+    with pytest.raises(errors.ArtifactError, match="scaffold"):
         bundle.export_onnx(root / "m.onnx")
 
 
 def test_the_generated_server_scores_rows_like_the_bundle(boosted):
     bundle, frame, root = boosted
-    folder = bundle.export_service(root / "running")
+    folder = packaging.scaffold(bundle, root / "running")
     port = unused()
     process = start(folder, port, {"SCMLE_TRUSTED": "1"})
     try:
@@ -162,7 +163,7 @@ def test_the_generated_server_stays_unready_for_an_unsigned_bundle(boosted):
     # Enforces docs/SECURITY.md:35.
     # Enforces docs/SERVICE_SLO.md:15.
     bundle, root = boosted[0], boosted[2]
-    folder = bundle.export_service(root / "untrusted")
+    folder = packaging.scaffold(bundle, root / "untrusted")
     port = unused()
     process = start(folder, port, {})
     try:
@@ -180,7 +181,7 @@ def test_production_serves_only_a_signed_verified_folder(boosted):
     # Enforces docs/SECURITY.md:35.
     bundle, root = boosted[0], boosted[2]
     key = "package-test-key"
-    folder = bundle.export_service(root / "production", signing_key=key)
+    folder = packaging.scaffold(bundle, root / "production", signing_key=key)
     production = {"SCMLE_ENV": "production", "SCMLE_SIGNING_KEY": key}
     port = unused()
     process = start(folder, port, production)
@@ -205,7 +206,7 @@ def test_production_serves_only_a_signed_verified_folder(boosted):
         process.wait(timeout=10)
         process.stderr.close()
 
-    corrupted = bundle.export_service(root / "corrupted", signing_key=key)
+    corrupted = packaging.scaffold(bundle, root / "corrupted", signing_key=key)
     with (corrupted / "model" / "pipeline.joblib").open("ab") as handle:
         handle.write(b"x")
     port = unused()

@@ -171,7 +171,7 @@ def test_a_refusal_points_to_the_service_package(tmp_path):
     bundle = make_bundle("random_forest", tasks.Task.BINARY)[0]
     bundle.pipeline = object()
 
-    with pytest.raises(errors.ArtifactError, match="export_service"):
+    with pytest.raises(errors.ArtifactError, match="scaffold"):
         bundle.export_onnx(tmp_path / "m.onnx")
 
 

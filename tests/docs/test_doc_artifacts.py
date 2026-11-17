@@ -13,6 +13,7 @@ from scmle.contracts import errors
 from scmle.data.custody import sealed
 from scmle.data.splitting import splitters
 from scmle.deploy import vuln_gate
+from scmle.inference import packaging
 from scmle.inference import parity
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -57,8 +58,10 @@ def service(tmp_path_factory):
     """
     golden = parity.goldens(ROOT / "deploy" / "local" / "golden")
     target = tmp_path_factory.mktemp("service") / "service"
-    parity.handwrite(golden.spec).export_service(
-        target, signing_key="artifacts-doc-signing-key"
+    packaging.scaffold(
+        parity.handwrite(golden.spec),
+        target,
+        signing_key="artifacts-doc-signing-key",
     )
     return target
 

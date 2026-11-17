@@ -50,6 +50,7 @@ from scmle.deploy import mocks
 from scmle.deploy import provenance
 from scmle.governance import lifecycle
 import scmle.governance.registry
+from scmle.inference import packaging
 from scmle.inference import parity
 from scmle.inference import serving
 from scmle.monitoring import monitor
@@ -524,12 +525,14 @@ def prepare(
         approval=sanction(records[0], "initial release", "evaluation.json"),
         signing_key=DEMO_SIGNING_KEY,
     )
-    service = good.bundle.export_service(
-        workdir / "service", signing_key=DEMO_SIGNING_KEY
+    service = packaging.scaffold(
+        good.bundle, workdir / "service", signing_key=DEMO_SIGNING_KEY
     )
     golden = parity.goldens(GOLDEN_DIRECTORY)
-    golden_service = parity.handwrite(golden.spec).export_service(
-        workdir / "golden-service", signing_key=DEMO_SIGNING_KEY
+    golden_service = packaging.scaffold(
+        parity.handwrite(golden.spec),
+        workdir / "golden-service",
+        signing_key=DEMO_SIGNING_KEY,
     )
     log.record(
         "register and package",
