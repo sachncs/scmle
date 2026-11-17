@@ -95,9 +95,9 @@ def disclaim(
         spec = ledger.hypotheses[hypothesis_id].spec
         claims.append(
             qualification.Claim(
-                claim_id=hypothesis_id,
+                identifier=hypothesis_id,
                 statement=statement(spec),
-                check_ids=(f"{hypothesis_id}:X",),
+                checks=(f"{hypothesis_id}:X",),
                 adjusted_p_value=None,
                 effect=result.check.effect if result.check else 0.0,
                 tier=qualification.Tier.UNVERIFIED,
@@ -130,9 +130,9 @@ def withdraw(
         result = ledger.results[hypothesis_id]
         spec = ledger.hypotheses[hypothesis_id].spec
         claims[hypothesis_id] = qualification.Claim(
-            claim_id=hypothesis_id,
+            identifier=hypothesis_id,
             statement=statement(spec),
-            check_ids=(f"{hypothesis_id}:X",),
+            checks=(f"{hypothesis_id}:X",),
             adjusted_p_value=None,
             effect=result.check.effect if result.check else 0.0,
             tier=qualification.Tier.UNVERIFIED,
@@ -236,9 +236,9 @@ def verify(
         checks.append(check)
         claims.append(
             qualification.Claim(
-                claim_id=hypothesis_id,
+                identifier=hypothesis_id,
                 statement=statement(spec),
-                check_ids=(f"{hypothesis_id}:X", f"{hypothesis_id}:C"),
+                checks=(f"{hypothesis_id}:X", f"{hypothesis_id}:C"),
                 adjusted_p_value=adjustment.adjusted[index],
                 effect=outcome.effect,
                 tier=check.tier,
@@ -246,7 +246,7 @@ def verify(
             )
         )
     if withdrawn:
-        by_id = {c.claim_id: c for c in claims}
+        by_id = {c.identifier: c for c in claims}
         by_id.update(withdraw(ledger, withdrawn))
         claims = [by_id[i] for i in survivors.hypothesis_ids]
     return tuple(claims), tuple(checks)
@@ -306,8 +306,8 @@ def examine(
     """
     spec = ledger.hypotheses[hypothesis_id].spec
     return qualification.Check(
-        check_id=f"{hypothesis_id}:C",
-        null_hypothesis=spec.null,
+        identifier=f"{hypothesis_id}:C",
+        null=spec.null,
         statistic=outcome.statistic,
         p_value=outcome.p,
         interval=None,
@@ -318,8 +318,8 @@ def examine(
             if passed
             else qualification.Decision.PASS
         ),
-        set_id=qualification.Subset.CONFIRMATION,
-        seed_path=randomness.seed_path(
+        subset=qualification.Subset.CONFIRMATION,
+        seeds=randomness.seed_path(
             ledger.seed, f"confirm.{spec.statistic}", index
         ),
         tier=(

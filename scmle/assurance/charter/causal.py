@@ -19,11 +19,13 @@ from collections.abc import Iterable
 from collections.abc import Mapping
 import dataclasses
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
+from scmle.contracts import records
 
 CAUSAL_ESTIMANDS = ("ATE", "ATT", "LATE", "ATT_DID", "ATT_SC", "LATE_RD")
 UNCONFOUNDEDNESS_PREFIX = "unconfoundedness_given:"
@@ -109,6 +111,8 @@ class Control:
         variable: The column.
     """
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = ()
+
     kind: str
     variable: str
 
@@ -163,6 +167,8 @@ class Subgroup:
         values: The levels, as text, fixed before any data is read.
     """
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = ()
+
     column: str
     values: tuple[str, ...]
 
@@ -216,6 +222,8 @@ class Attestor:
         role: Their role (for example "study statistician").
         assumptions: The assumptions of the causal block they may attest.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = ()
 
     name: str
     role: str
@@ -279,13 +287,17 @@ class Confounding:
             `fixed` gives the partial R-squared of the confounder with the
             treatment and with the outcome directly (`strength`).
         strength: The multiplier, or the partial R-squared in (0, 1).
-        m_max: For difference in differences, the largest multiple `M` of the
-            biggest pre-period change that the claim must survive.
+        multiple: For difference in differences, the largest multiple `M` of
+            the biggest pre-period change that the claim must survive.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"m_max": "multiple"}),
+    )
 
     benchmark: str = "strongest_observed"
     strength: float = 1.0
-    m_max: float = 1.0
+    multiple: float = 1.0
 
     def __post_init__(self) -> None:
         """Validates the record.
@@ -293,7 +305,8 @@ class Confounding:
         Raises:
             ValueError: If `benchmark` is not in `BENCHMARKS`, `strength` is
                 not a finite positive number (or is at least 1 for the
-                `fixed` benchmark), or `m_max` is not finite or is negative.
+                `fixed` benchmark), or `multiple` is not finite or is
+                negative.
         """
         if self.benchmark not in BENCHMARKS:
             raise errors.InputError(f"benchmark must be one of {BENCHMARKS}")
@@ -302,8 +315,8 @@ class Confounding:
             raise errors.InputError("strength must be positive")
         if self.benchmark == "fixed" and value >= 1:
             raise errors.InputError("a fixed strength is a partial R2 below 1")
-        if qualification.finite(self.m_max, "m_max") < 0:
-            raise errors.InputError("m_max must not be negative")
+        if qualification.finite(self.multiple, "multiple") < 0:
+            raise errors.InputError("multiple must not be negative")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.
@@ -326,8 +339,7 @@ class Confounding:
         Returns:
             The rebuilt record.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        return cls(**qualification.require(cls, record))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -349,13 +361,13 @@ class Question:
             selector; the back-door check needs the graph object).
         assumptions: Attested assumptions, a closed vocabulary.
         strategies: Strategy names in priority order, fixed here.
-        negative_controls: Pre-registered falsification controls.
+        controls: Pre-registered negative (falsification) controls.
         strata: Replication strata columns.
         sensitivity: Unmeasured-confounding benchmark, if declared.
         trim: Propensity trimming bound `eps` in [0, 0.5): units with an
             estimated propensity outside `[eps, 1 - eps]` are dropped and the
             report names the changed estimand. Zero means no trimming.
-        min_share: Smallest share of units that may remain after trimming.
+        retained: Smallest share of units that may remain after trimming.
         subgroups: Subgroup hypotheses (format 9), registered with the
             primary claim before `C` is opened; the effect in each declared
             subgroup is tested and the family is adjusted by Holm's
@@ -367,6 +379,13 @@ class Question:
         attestations: Path of the JSON file of signed attestations (see
             `scmle.causal.identification.attest`); required with attestors.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={"negative_controls": "controls", "min_share": "retained"},
+            parts={"sensitivity": Confounding.migrations[0]},
+        ),
+    )
 
     treatment: str
     outcome: str
@@ -380,11 +399,11 @@ class Question:
     dag: str | None = None
     assumptions: tuple[str, ...] = ()
     strategies: tuple[str, ...] = ()
-    negative_controls: tuple[Control, ...] = ()
+    controls: tuple[Control, ...] = ()
     strata: tuple[str, ...] = ()
     sensitivity: Confounding | None = None
     trim: float = 0.0
-    min_share: float = 0.5
+    retained: float = 0.5
     subgroups: tuple[Subgroup, ...] = ()
     attestors: tuple[Attestor, ...] = ()
     attestations: str | None = None
@@ -400,7 +419,7 @@ class Question:
                 `reconcile`); two subgroups share a column or a
                 subgroup column is the treatment or the outcome; `cutoff`
                 is not finite; `trim` is not finite or outside [0, 0.5);
-                or `min_share` is not finite or outside (0, 1].
+                or `retained` is not finite or outside (0, 1].
         """
         evidence.require_text(self.treatment, "treatment")
         evidence.require_text(self.outcome, "outcome")
@@ -411,7 +430,7 @@ class Question:
         for name in (
             "assumptions",
             "strategies",
-            "negative_controls",
+            "controls",
             "strata",
             "subgroups",
             "attestors",
@@ -433,9 +452,9 @@ class Question:
         trim = qualification.finite(self.trim, "trim")
         if not 0.0 <= trim < MAX_TRIM_EXCLUSIVE:
             raise errors.InputError("trim must be within [0, 0.5)")
-        share = qualification.finite(self.min_share, "min_share")
+        share = qualification.finite(self.retained, "retained")
         if not 0.0 < share <= 1.0:
-            raise errors.InputError("min_share must be within (0, 1]")
+            raise errors.InputError("retained must be within (0, 1]")
 
     def check_repeats(self) -> None:
         """Checks that no assumption or strategy is repeated.
@@ -485,9 +504,7 @@ class Question:
             A JSON-ready dict of the block.
         """
         record = dataclasses.asdict(self)
-        record["negative_controls"] = [
-            c.to_dict() for c in self.negative_controls
-        ]
+        record["controls"] = [c.to_dict() for c in self.controls]
         record["sensitivity"] = (
             None if self.sensitivity is None else self.sensitivity.to_dict()
         )
@@ -521,8 +538,10 @@ class Question:
             for f in dataclasses.fields(cls)
             if f.default is not dataclasses.MISSING
         }
-        record = {**defaults, **record}
-        qualification.require(cls, record)
+        record = qualification.require(
+            cls,
+            {**defaults, **records.load(cls.__name__, cls.migrations, record)},
+        )
         sensitivity = record["sensitivity"]
         return cls(
             treatment=record["treatment"],
@@ -537,9 +556,7 @@ class Question:
             dag=record["dag"],
             assumptions=tuple(record["assumptions"]),
             strategies=tuple(record["strategies"]),
-            negative_controls=tuple(
-                Control.from_dict(c) for c in record["negative_controls"]
-            ),
+            controls=tuple(Control.from_dict(c) for c in record["controls"]),
             strata=tuple(record["strata"]),
             sensitivity=(
                 None
@@ -547,7 +564,7 @@ class Question:
                 else Confounding.from_dict(sensitivity)
             ),
             trim=record["trim"],
-            min_share=record["min_share"],
+            retained=record["retained"],
             subgroups=tuple(Subgroup.from_dict(g) for g in record["subgroups"]),
             attestors=tuple(Attestor.from_dict(a) for a in record["attestors"]),
             attestations=record["attestations"],

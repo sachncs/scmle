@@ -1,0 +1,223 @@
+{
+  "algorithm": "hmac-sha256",
+  "charter": {
+    "cost_model": {
+      "c_00": 0.0,
+      "c_01": 5.0,
+      "c_10": 1.0,
+      "c_11": 0.0,
+      "range_source": "human",
+      "sources": [
+        "human",
+        "human",
+        "human",
+        "human"
+      ],
+      "t_hi": 0.5,
+      "t_lo": 0.05
+    },
+    "decision": {
+      "fairness": [
+        {
+          "attestation": null,
+          "attribute": "region",
+          "criterion": "demographic_parity",
+          "max_gap": 0.1,
+          "mechanism": "reweighing",
+          "min_group": 40
+        }
+      ],
+      "model": {
+        "baselines": [
+          "treat_none",
+          "treat_all",
+          "incumbent"
+        ],
+        "calibration_level": 0.02,
+        "off_policy": {
+          "clip": 10.0,
+          "ess_floor": 0.3,
+          "min_propensity": 0.02,
+          "penalty": 0.1
+        },
+        "treatment_cost": 1.5,
+        "unit": "EUR per case"
+      },
+      "rollout": {
+        "alpha_promote": "1/20",
+        "alpha_rollback": "1/100",
+        "assignment_prob": 0.5,
+        "delta_min": 0.02,
+        "guardrails": [
+          {
+            "high": 1.0,
+            "higher_is_worse": false,
+            "low": 0.0,
+            "margin": 0.1,
+            "name": "latency"
+          },
+          {
+            "high": 1.0,
+            "higher_is_worse": true,
+            "low": 0.0,
+            "margin": 0.05,
+            "name": "errors"
+          }
+        ],
+        "high": 1.0,
+        "horizon": 4,
+        "low": 0.0,
+        "n_max": 5000,
+        "primary": "conversion",
+        "salt": "scmle",
+        "srm_level": 0.002,
+        "tolerance": 0.01,
+        "unit": "customer"
+      }
+    },
+    "decision_map": [
+      {
+        "action": "block_run",
+        "certificate_id": "cert-1",
+        "check_id": "leakage",
+        "trigger": "p < level"
+      }
+    ],
+    "deployment_population": "all active customers",
+    "error_budget": {
+      "confirmation": {
+        "alpha_confirm": "1/20"
+      },
+      "detector_tolerances": [
+        {
+          "detector_id": "leakage",
+          "max_false_alarm_rate": 0.05,
+          "min_recall_lower_bound": 0.8
+        }
+      ],
+      "exploration": {
+        "initial": "1/10",
+        "wealth": "1/10"
+      },
+      "permutations_b": 30
+    },
+    "estimand": {
+      "causal": {
+        "adoption": null,
+        "assumptions": [
+          "positivity"
+        ],
+        "cutoff": null,
+        "dag": null,
+        "estimand": "ATE",
+        "instrument": null,
+        "min_share": 0.7,
+        "negative_controls": [
+          {
+            "kind": "outcome",
+            "variable": "placebo"
+          }
+        ],
+        "outcome": "outcome",
+        "running_variable": null,
+        "sensitivity": {
+          "benchmark": "strongest_observed",
+          "m_max": 2.5,
+          "strength": 1.0
+        },
+        "strata": [],
+        "strategies": [],
+        "time": null,
+        "treatment": "treated",
+        "trim": 0.05,
+        "unit": null
+      },
+      "intercurrent_events": [
+        {
+          "event": "none",
+          "strategy": "not applicable"
+        }
+      ],
+      "kind": "causal",
+      "population": "all customers",
+      "prediction_moment": "month start",
+      "summary_measure": "average treatment effect",
+      "target": "churn in 90 days"
+    },
+    "gating_checks": [
+      "leakage"
+    ],
+    "ingest": {
+      "delta_rec": 0.01,
+      "eps_fk": 0.05,
+      "eps_key": 0.001,
+      "eps_null": 0.002,
+      "feature_budget": 150,
+      "lag": 1.0,
+      "max_queries": 50,
+      "max_rows_scanned": 1000000,
+      "max_seconds": 120.0,
+      "reconcile": {
+        "tables": [
+          {
+            "checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "checksum_column": "order_id",
+            "rows": 100,
+            "sums": [
+              {
+                "column": "amount",
+                "total": 12.5
+              }
+            ],
+            "view": "orders"
+          }
+        ]
+      },
+      "strict": true,
+      "windows": [
+        7.0,
+        30.0
+      ]
+    },
+    "k_max": 8,
+    "min_effect": 0.15,
+    "multiverse": [
+      {
+        "default": "mean",
+        "name": "imputation",
+        "options": [
+          "mean",
+          "median"
+        ]
+      }
+    ],
+    "power": 0.85,
+    "question": "Does the offer reduce churn?",
+    "rules": {
+      "band": 0.4,
+      "confirmation_rule": "bh",
+      "failure_policy": "unconfirmed",
+      "ledger_rule": "e-lond",
+      "q_min": 0.85,
+      "s_min": 0.75,
+      "stability_filter": true
+    },
+    "seed": 7,
+    "sets": {
+      "confirmation_fraction": 0.3,
+      "embargo_rows": 5
+    },
+    "uncertainty": {
+      "coverage_on_confirmation": true,
+      "cv_plus_max_bytes": 1000000,
+      "slice_columns": [
+        "region"
+      ]
+    },
+    "unit": "customer-month",
+    "unit_of_prediction": "new_entity"
+  },
+  "charter_hash": "1e53a524421525f69eb268425289dccd29f5e2fdcf90d3bac59e65c871362bb4",
+  "format": 11,
+  "signature": "95b52e49b9262de9922b6fd8f2956ac867d33ea99fd27f757a965f948c5f6ab0"
+}

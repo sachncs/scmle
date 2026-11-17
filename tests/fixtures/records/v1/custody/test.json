@@ -1,0 +1,10 @@
+{
+  "code_hash": "b21779b8d1abd488f8f34d5609e1ad26f2d30dfb5c4911a1f0357f2e58bcb84f",
+  "column": "age",
+  "direction": "two-sided",
+  "family": "bivariate",
+  "name": "age vs target",
+  "null": "no association",
+  "set": "X",
+  "statistic": "kruskal"
+}

@@ -82,9 +82,9 @@ def assess(
     """
     return feasibility.assess(
         n_confirmation=n_rows,
-        min_effect=charter.min_effect,
-        alpha=float(charter.error_budget.confirmation.alpha_confirm),
-        k_max=charter.k_max,
+        min_effect=charter.effect,
+        alpha=float(charter.budget.confirmation.alpha_confirm),
+        k_max=charter.quota,
         power=charter.power,
         n_minority=minority,
     )
@@ -211,7 +211,7 @@ def sequester(
         if task.is_classification
         else None
     )
-    known_entity = charter.unit_of_prediction == contracts.KNOWN_ENTITY_FUTURE
+    known_entity = charter.purpose == contracts.KNOWN_ENTITY_FUTURE
     # A known entity is not a unit: its rows may sit in X and in C, so the
     # carve (time blocks, with an embargo) does not tie them together.
     groups = (
@@ -224,7 +224,7 @@ def sequester(
         if old.strategy in TEMPORAL and data.time_column
         else None
     )
-    embargo_rows = charter.sets.embargo_rows
+    embargo_rows = charter.sets.embargo
     measured = gap(frame, dev_ids, data, times, task)
     acf_note = None
     if measured > embargo_rows:
@@ -235,7 +235,7 @@ def sequester(
         embargo_rows = measured
     columns = splitters.Splitter(spec, task).feature_columns(frame)
     copies = duplicates.duplicate_groups(frame, columns)[dev_ids]
-    fraction = charter.sets.confirmation_fraction
+    fraction = charter.sets.confirmation
     estimate = assess(
         charter,
         round(fraction * len(dev_ids)),
@@ -290,7 +290,7 @@ def sequester(
             "unconfirmed: %s",
             "; ".join(carved.notes) or actual.reason,
         )
-        embargo_rows = charter.sets.embargo_rows
+        embargo_rows = charter.sets.embargo
     elif acf_note:
         carved = dataclasses.replace(carved, notes=(*carved.notes, acf_note))
     return finish(
@@ -369,18 +369,21 @@ def finish(
     manifest = scmle.assurance.custody.manifest.Manifest(
         strategy=old.strategy,
         seed=charter.seed,
-        embargo_rows=embargo_rows,
-        charter_hash=charter.charter_hash,
-        data_hash=data_hash,
-        exploration_ids=exploration,
-        confirmation_ids=confirmation,
-        embargo_ids=tuple(int(i) for i in carved.embargo_ids),
-        final_test_ids=tuple(old.test_ids),
+        embargo=embargo_rows,
+        digests=scmle.assurance.custody.manifest.Digests(
+            charter=charter.charter_hash, data=data_hash
+        ),
+        sets=scmle.assurance.custody.manifest.Sets(
+            exploration=exploration,
+            confirmation=confirmation,
+            embargo=tuple(int(i) for i in carved.embargo_ids),
+            final=tuple(old.test_ids),
+        ),
         folds=folds,
         isolation=tuple(isolation),
         scope=report.scope,
         notes=notes,
-        row_roots=tuple(
+        roots=tuple(
             (name, merkle.merkleize(frame, members))
             for name, members in (
                 ("exploration", exploration),

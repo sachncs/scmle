@@ -5,12 +5,14 @@ from collections.abc import Mapping
 import dataclasses
 import enum
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 import scmle.assurance.charter.causal
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
+from scmle.contracts import records
 
 FORMAT_VERSION = 11
 OLDEST_READABLE_FORMAT = 1
@@ -59,6 +61,8 @@ class Event:
         strategy: How it is handled (censor, exclude, treat as outcome, ...).
     """
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = ()
+
     event: str
     strategy: str
 
@@ -92,8 +96,7 @@ class Event:
         Returns:
             The rebuilt event.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        return cls(**qualification.require(cls, record))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -104,21 +107,35 @@ class AnalysisEstimand:
         kind: `predictive` or `causal`; selects the admissibility rule.
         population: Who or what the claim is about.
         target: The variable, with its measurement window.
-        prediction_moment: When a prediction is issued (the as-of rule).
-        intercurrent_events: Events and the strategy for each (at least one;
-            declare "none" with strategy "not applicable" if there are none).
-        summary_measure: How the target is summarised (for example "ROC AUC").
+        moment: When a prediction is issued (the as-of rule).
+        intercurrent: Intercurrent events and the strategy for each (at least
+            one; declare "none" with strategy "not applicable" if there are
+            none).
+        summary: How the target is summarised (for example "ROC AUC").
         causal: The causal block (format 4); None for a predictive estimand
             and for every charter written before format 4, which serialise
             and hash as they did.
     """
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "prediction_moment": "moment",
+                "intercurrent_events": "intercurrent",
+                "summary_measure": "summary",
+            },
+            parts={
+                "causal": scmle.assurance.charter.causal.Question.migrations[0]
+            },
+        ),
+    )
+
     kind: str
     population: str
     target: str
-    prediction_moment: str
-    intercurrent_events: tuple[Event, ...]
-    summary_measure: str
+    moment: str
+    intercurrent: tuple[Event, ...]
+    summary: str
     causal: scmle.assurance.charter.causal.Question | None = None
 
     def __post_init__(self) -> None:
@@ -126,20 +143,20 @@ class AnalysisEstimand:
 
         Raises:
             ValueError: If `kind` is not in `ESTIMAND_KINDS`, `population`,
-                `target`, `prediction_moment` or `summary_measure` is
-                blank, `intercurrent_events` is not a tuple or is empty, or
-                a causal block is given and `kind` is not `causal`.
+                `target`, `moment` or `summary` is blank, `intercurrent` is
+                not a tuple or is empty, or a causal block is given and
+                `kind` is not `causal`.
         """
         if self.kind not in ESTIMAND_KINDS:
             raise errors.InputError(f"kind must be one of {ESTIMAND_KINDS}")
         evidence.require_text(self.population, "population")
         evidence.require_text(self.target, "target")
-        evidence.require_text(self.prediction_moment, "prediction_moment")
-        evidence.require_text(self.summary_measure, "summary_measure")
-        qualification.tupled(self.intercurrent_events, "intercurrent_events")
-        if not self.intercurrent_events:
+        evidence.require_text(self.moment, "moment")
+        evidence.require_text(self.summary, "summary")
+        qualification.tupled(self.intercurrent, "intercurrent")
+        if not self.intercurrent:
             raise errors.InputError(
-                "intercurrent_events must not be empty: state a strategy "
+                "intercurrent must not be empty: state a strategy "
                 "for each event, or declare 'none' as not applicable"
             )
         if self.causal is not None and self.kind != "causal":
@@ -149,18 +166,16 @@ class AnalysisEstimand:
         """Serializes the estimand.
 
         Returns:
-            A JSON-ready dict of the fields, with `intercurrent_events` as a
-            list of dicts. `causal` is included, as a dict, only when set.
+            A JSON-ready dict of the fields, with `intercurrent` as a list of
+            dicts. `causal` is included, as a dict, only when set.
         """
         record: dict[str, Any] = {
             "kind": self.kind,
             "population": self.population,
             "target": self.target,
-            "prediction_moment": self.prediction_moment,
-            "intercurrent_events": [
-                e.to_dict() for e in self.intercurrent_events
-            ],
-            "summary_measure": self.summary_measure,
+            "moment": self.moment,
+            "intercurrent": [e.to_dict() for e in self.intercurrent],
+            "summary": self.summary,
         }
         if self.causal is not None:
             record["causal"] = self.causal.to_dict()
@@ -180,18 +195,23 @@ class AnalysisEstimand:
         Returns:
             The rebuilt estimand.
         """
-        record = {"causal": None, **record}
-        qualification.require(cls, record)
+        record = qualification.require(
+            cls,
+            {
+                "causal": None,
+                **records.load(cls.__name__, cls.migrations, record),
+            },
+        )
         block = record["causal"]
         return cls(
             kind=record["kind"],
             population=record["population"],
             target=record["target"],
-            prediction_moment=record["prediction_moment"],
-            intercurrent_events=tuple(
-                Event.from_dict(e) for e in record["intercurrent_events"]
+            moment=record["moment"],
+            intercurrent=tuple(
+                Event.from_dict(e) for e in record["intercurrent"]
             ),
-            summary_measure=record["summary_measure"],
+            summary=record["summary"],
             causal=(
                 None
                 if block is None
@@ -205,26 +225,32 @@ class Trigger:
     """Binds one check to the action its outcome triggers.
 
     Attributes:
-        check_id: The check.
+        check: The check.
         trigger: A test outcome at the budgeted level (not a raw threshold).
         action: What happens when the trigger fires.
-        certificate_id: The detector certificate that licenses gating
+        certificate: The detector certificate that licenses gating
             (required for every gating check; see the charter lint).
     """
 
-    check_id: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"check_id": "check", "certificate_id": "certificate"}
+        ),
+    )
+
+    check: str
     trigger: str
     action: Edict
-    certificate_id: str = ""
+    certificate: str = ""
 
     def __post_init__(self) -> None:
         """Validates the row.
 
         Raises:
-            ValueError: If `check_id` or `trigger` is blank, or `action` is
+            ValueError: If `check` or `trigger` is blank, or `action` is
                 not an `Edict`.
         """
-        evidence.require_text(self.check_id, "check_id")
+        evidence.require_text(self.check, "check")
         evidence.require_text(self.trigger, "trigger")
         if not isinstance(self.action, Edict):
             raise errors.InputError("action must be an Edict")
@@ -237,10 +263,10 @@ class Trigger:
             value.
         """
         return {
-            "check_id": self.check_id,
+            "check": self.check,
             "trigger": self.trigger,
             "action": self.action.value,
-            "certificate_id": self.certificate_id,
+            "certificate": self.certificate,
         }
 
     @classmethod
@@ -257,12 +283,12 @@ class Trigger:
         Returns:
             The rebuilt row.
         """
-        qualification.require(cls, record)
+        record = qualification.require(cls, record)
         return cls(
-            check_id=record["check_id"],
+            check=record["check"],
             trigger=record["trigger"],
             action=Edict(record["action"]),
-            certificate_id=record["certificate_id"],
+            certificate=record["certificate"],
         )
 
 
@@ -271,32 +297,39 @@ class SetSizes:
     """How the development rows are divided.
 
     Attributes:
-        confirmation_fraction: Share of development rows carved out as the
+        confirmation: Share of development rows carved out as the
             confirmation set `C`, in (0, 0.5].
-        embargo_rows: Rows dropped around temporal confirmation blocks so
-            serial dependence cannot cross the boundary.
+        embargo: Rows dropped around temporal confirmation blocks so serial
+            dependence cannot cross the boundary.
     """
 
-    confirmation_fraction: float
-    embargo_rows: int = 0
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "confirmation_fraction": "confirmation",
+                "embargo_rows": "embargo",
+            }
+        ),
+    )
+
+    confirmation: float
+    embargo: int = 0
 
     def __post_init__(self) -> None:
         """Validates the sizes.
 
         Raises:
-            ValueError: If `confirmation_fraction` is not finite or is
-                outside (0, `MAX_CONFIRMATION_FRACTION`], or `embargo_rows`
-                is not a non-negative integer.
+            ValueError: If `confirmation` is not finite or is outside (0,
+                `MAX_CONFIRMATION_FRACTION`], or `embargo` is not a
+                non-negative integer.
         """
-        fraction = qualification.finite(
-            self.confirmation_fraction, "confirmation_fraction"
-        )
+        fraction = qualification.finite(self.confirmation, "confirmation")
         if not 0 < fraction <= MAX_CONFIRMATION_FRACTION:
             raise errors.InputError(
-                "confirmation_fraction must be in (0, "
+                "confirmation must be in (0, "
                 f"{MAX_CONFIRMATION_FRACTION}] so exploration keeps a majority"
             )
-        qualification.count(self.embargo_rows, "embargo_rows")
+        qualification.count(self.embargo, "embargo")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.
@@ -319,8 +352,7 @@ class SetSizes:
         Returns:
             The rebuilt sizes.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        return cls(**qualification.require(cls, record))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -332,6 +364,8 @@ class Choice:
         options: The defensible options.
         default: The option used in the primary analysis.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = ()
 
     name: str
     options: tuple[str, ...]
@@ -377,7 +411,7 @@ class Choice:
         Returns:
             The rebuilt choice.
         """
-        qualification.require(cls, record)
+        record = qualification.require(cls, record)
         return cls(
             name=record["name"],
             options=tuple(record["options"]),

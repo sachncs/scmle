@@ -309,9 +309,9 @@ def scout(
             None,
             charter_hash=charter.charter_hash,
             config=online_fdr.Settings(
-                rule, charter.error_budget.exploration.initial
+                rule, charter.budget.exploration.initial
             ),
-            alpha_confirm=charter.error_budget.confirmation.alpha_confirm,
+            alpha_confirm=charter.budget.confirmation.alpha_confirm,
             seed=charter.seed,
         )
     else:
@@ -335,7 +335,7 @@ def scout(
         features,
         codes,
         observed=observed,
-        b=charter.error_budget.permutations_b,
+        b=charter.budget.permutations,
         seed=charter.seed,
         strata=strata,
     )
@@ -396,7 +396,7 @@ def finalise(
     classification = explored.classification
     classes = explored.classes
     withdrawal = explored.withdrawal
-    alpha = Fraction(charter.error_budget.confirmation.alpha_confirm)
+    alpha = Fraction(charter.budget.confirmation.alpha_confirm)
     confirmation = confirm.confirm(
         explored.ledger,
         source,

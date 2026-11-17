@@ -16,11 +16,13 @@ import enum
 from fractions import Fraction
 import math
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
+from scmle.contracts import records
 
 MIN_PERMUTATIONS = 20
 EXACT_HARMONIC_LIMIT = 10_000
@@ -140,14 +142,24 @@ class Tolerance:
     """What a detector certificate must show before the detector may gate.
 
     Attributes:
-        detector_id: The detector.
-        max_false_alarm_rate: Largest tolerated false-alarm rate.
-        min_recall_lower_bound: Smallest tolerated Wilson lower bound.
+        detector: The detector.
+        alarms: Largest tolerated false-alarm rate.
+        recall: Smallest tolerated Wilson lower bound of the recall.
     """
 
-    detector_id: str
-    max_false_alarm_rate: float
-    min_recall_lower_bound: float
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "detector_id": "detector",
+                "max_false_alarm_rate": "alarms",
+                "min_recall_lower_bound": "recall",
+            }
+        ),
+    )
+
+    detector: str
+    alarms: float
+    recall: float
 
     def __post_init__(self) -> None:
         """Validates the tolerances.
@@ -155,13 +167,9 @@ class Tolerance:
         A blank detector id or a rate that is not a finite number in [0, 1]
         is refused with a `ValueError` by the checks it calls.
         """
-        evidence.require_text(self.detector_id, "detector_id")
-        qualification.probability(
-            self.max_false_alarm_rate, "max_false_alarm_rate"
-        )
-        qualification.probability(
-            self.min_recall_lower_bound, "min_recall_lower_bound"
-        )
+        evidence.require_text(self.detector, "detector")
+        qualification.probability(self.alarms, "alarms")
+        qualification.probability(self.recall, "recall")
 
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
@@ -183,8 +191,7 @@ class Tolerance:
             or missing field, or with values the constructor refuses, raises
             a `ValueError` from `require` or the constructor.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        return cls(**qualification.require(cls, record))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -194,49 +201,57 @@ class ErrorBudget:
     Attributes:
         confirmation: Level for the single confirmation test.
         exploration: Alpha-wealth for the exploration phase.
-        permutations_b: Permutations for negative controls (at least 20).
-        detector_tolerances: Certificate thresholds per detector.
+        permutations: Permutations `B` for negative controls (at least 20).
+        tolerances: Certificate thresholds per detector.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "permutations_b": "permutations",
+                "detector_tolerances": "tolerances",
+            },
+            parts={"tolerances": Tolerance.migrations[0]},
+        ),
+    )
 
     confirmation: ConfirmationBudget
     exploration: ExplorationBudget
-    permutations_b: int
-    detector_tolerances: tuple[Tolerance, ...]
+    permutations: int
+    tolerances: tuple[Tolerance, ...]
 
     def __post_init__(self) -> None:
         """Validates the budget.
 
         Raises:
-            ValueError: If `detector_id` appears twice among the tolerances.
-                A `permutations_b` below the minimum or not an integer, or
+            ValueError: If a detector appears twice among the tolerances.
+                A `permutations` below the minimum or not an integer, or
                 tolerances that are not a tuple, are refused by the
                 `qualification` checks with a `ValueError`.
         """
         qualification.count(
-            self.permutations_b, "permutations_b", minimum=MIN_PERMUTATIONS
+            self.permutations, "permutations", minimum=MIN_PERMUTATIONS
         )
-        qualification.tupled(self.detector_tolerances, "detector_tolerances")
-        names = [t.detector_id for t in self.detector_tolerances]
+        qualification.tupled(self.tolerances, "tolerances")
+        names = [t.detector for t in self.tolerances]
         if len(set(names)) != len(names):
-            raise errors.InputError(
-                "duplicate detector_id in detector_tolerances"
-            )
+            raise errors.InputError("duplicate detector in tolerances")
 
     @classmethod
     def create(
         cls,
         alpha_confirm: Number,
         wealth_exploration: Number,
-        permutations_b: int = MIN_PERMUTATIONS,
-        detector_tolerances: tuple[Tolerance, ...] = (),
+        permutations: int = MIN_PERMUTATIONS,
+        tolerances: tuple[Tolerance, ...] = (),
     ) -> Self:
         """Builds a fresh budget from plain numbers.
 
         Args:
             alpha_confirm: Level of the final claims, in (0, 1).
             wealth_exploration: Initial exploration wealth, in [0, 1].
-            permutations_b: Negative-control permutations.
-            detector_tolerances: Certificate thresholds per detector.
+            permutations: Negative-control permutations.
+            tolerances: Certificate thresholds per detector.
 
         Returns:
             A budget whose exploration wealth equals its initial wealth.
@@ -251,8 +266,8 @@ class ErrorBudget:
         return cls(
             confirmation=ConfirmationBudget(alpha),
             exploration=ExplorationBudget(initial=wealth, wealth=wealth),
-            permutations_b=permutations_b,
-            detector_tolerances=tuple(detector_tolerances),
+            permutations=permutations,
+            tolerances=tuple(tolerances),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -270,10 +285,8 @@ class ErrorBudget:
                 "initial": str(self.exploration.initial),
                 "wealth": str(self.exploration.wealth),
             },
-            "permutations_b": self.permutations_b,
-            "detector_tolerances": [
-                t.to_dict() for t in self.detector_tolerances
-            ],
+            "permutations": self.permutations,
+            "tolerances": [t.to_dict() for t in self.tolerances],
         }
 
     @classmethod
@@ -290,7 +303,7 @@ class ErrorBudget:
             ValueError: If the record or its confirmation or exploration
                 part has unexpected or missing fields.
         """
-        qualification.require(cls, record)
+        record = qualification.require(cls, record)
         confirmation = record["confirmation"]
         exploration = record["exploration"]
         names = {"alpha_confirm"}
@@ -306,10 +319,9 @@ class ErrorBudget:
                 initial=parse_fraction(exploration["initial"], "initial"),
                 wealth=parse_fraction(exploration["wealth"], "wealth"),
             ),
-            permutations_b=record["permutations_b"],
-            detector_tolerances=tuple(
-                Tolerance.from_dict(item)
-                for item in record["detector_tolerances"]
+            permutations=record["permutations"],
+            tolerances=tuple(
+                Tolerance.from_dict(item) for item in record["tolerances"]
             ),
         )
 
@@ -484,20 +496,28 @@ class DecisionBudget:
     champion gets the whole rollback level for its own monitoring lifetime.
     Promotion levels follow the discount-only rule (valid by the union bound
     over experiments): experiment ``j`` is assigned
-    ``alpha_promote * gamma_j``. A level is spent when the experiment starts,
-    whether or not it ends in a promotion.
+    ``promotion * gamma_j``. A level is spent when the experiment starts,
+    whether or not it ends in a promotion. The record is stored at schema
+    version 2; a version 1 record loads through `migrations`.
 
     Attributes:
-        alpha_promote: Total level for false promotions, in (0, 1).
-        alpha_rollback: Level of each champion's rollback monitor, in (0, 1).
+        promotion: Total level (alpha) for false promotions, in (0, 1).
+        rollback: Level (alpha) of each champion's rollback monitor, in
+            (0, 1).
         horizon: Number of experiments the discount sequence covers, or None
             for the open-ended sequence ``gamma_j = 1 / (j (j + 1))``.
         assigned: ``(experiment_id, level)`` in assignment order.
         monitored: Champions whose rollback monitor has been started.
     """
 
-    alpha_promote: Fraction
-    alpha_rollback: Fraction
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"alpha_promote": "promotion", "alpha_rollback": "rollback"}
+        ),
+    )
+
+    promotion: Fraction
+    rollback: Fraction
     horizon: int | None = None
     assigned: tuple[tuple[str, Fraction], ...] = ()
     monitored: tuple[str, ...] = ()
@@ -508,11 +528,11 @@ class DecisionBudget:
         Raises:
             ValueError: If a level is outside (0, 1), an experiment id or
                 champion appears twice, an assigned level is not positive,
-                or the assigned levels exceed `alpha_promote`. An invalid
+                or the assigned levels exceed `promotion`. An invalid
                 `horizon` is refused by the `qualification` check with a
                 `ValueError`.
         """
-        for name in ("alpha_promote", "alpha_rollback"):
+        for name in ("promotion", "rollback"):
             if not 0 < getattr(self, name) < 1:
                 raise errors.InputError(
                     f"{name} must be strictly between 0 and 1"
@@ -524,24 +544,23 @@ class DecisionBudget:
             raise errors.InputError("duplicate experiment id in assigned")
         if any(pair[1] <= 0 for pair in self.assigned):
             raise errors.InputError("assigned levels must be positive")
-        if self.spent > self.alpha_promote:
-            raise errors.InputError("assigned levels exceed alpha_promote")
+        if self.spent > self.promotion:
+            raise errors.InputError("assigned levels exceed promotion")
         if len(set(self.monitored)) != len(self.monitored):
             raise errors.InputError("duplicate champion in monitored")
 
     @classmethod
     def create(
         cls,
-        alpha_promote: Number,
-        alpha_rollback: Number,
+        promotion: Number,
+        rollback: Number,
         horizon: int | None = None,
     ) -> Self:
         """Builds a fresh budget from plain numbers (floats read exactly).
 
         Args:
-            alpha_promote: Total level for false promotions, in (0, 1).
-            alpha_rollback: Level of each champion's rollback monitor, in
-                (0, 1).
+            promotion: Total level for false promotions, in (0, 1).
+            rollback: Level of each champion's rollback monitor, in (0, 1).
             horizon: Number of experiments the discount sequence covers, or
                 None for the open-ended sequence.
 
@@ -551,8 +570,8 @@ class DecisionBudget:
             raises a `ValueError` from `exact` or the constructor.
         """
         return cls(
-            alpha_promote=exact(alpha_promote, "alpha_promote"),
-            alpha_rollback=exact(alpha_rollback, "alpha_rollback"),
+            promotion=exact(promotion, "promotion"),
+            rollback=exact(rollback, "rollback"),
             horizon=horizon,
         )
 
@@ -564,18 +583,20 @@ class DecisionBudget:
     @property
     def remaining(self) -> Fraction:
         """The promotion level not yet assigned."""
-        return self.alpha_promote - self.spent
+        return self.promotion - self.spent
 
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
 
         Returns:
-            A mapping in which fractions are written as ``"p/q"`` strings
-            and the assignments as ``[experiment_id, level]`` pairs.
+            A mapping with its `schema_version`, in which fractions are
+            written as ``"p/q"`` strings and the assignments as
+            ``[experiment_id, level]`` pairs.
         """
         return {
-            "alpha_promote": str(self.alpha_promote),
-            "alpha_rollback": str(self.alpha_rollback),
+            records.KEY: records.ORIGIN + len(self.migrations),
+            "promotion": str(self.promotion),
+            "rollback": str(self.rollback),
             "horizon": self.horizon,
             "assigned": [[name, str(level)] for name, level in self.assigned],
             "monitored": list(self.monitored),
@@ -586,22 +607,19 @@ class DecisionBudget:
         """Rebuilds the budget exactly, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping as written by `to_dict`.
+            record: A mapping as written by `to_dict`, of any schema
+                version.
 
         Returns:
             The budget described by the record. An unknown or missing
-            field, an invalid fraction or an overspent state raises a
-            `ValueError` from `require`, `parse_fraction` or the
-            constructor.
+            field, an invalid fraction, a newer schema version or an
+            overspent state raises a `ValueError` from `require`,
+            `parse_fraction` or the constructor.
         """
-        qualification.require(cls, record)
+        record = qualification.require(cls, record)
         return cls(
-            alpha_promote=parse_fraction(
-                record["alpha_promote"], "alpha_promote"
-            ),
-            alpha_rollback=parse_fraction(
-                record["alpha_rollback"], "alpha_rollback"
-            ),
+            promotion=parse_fraction(record["promotion"], "promotion"),
+            rollback=parse_fraction(record["rollback"], "rollback"),
             horizon=record["horizon"],
             assigned=tuple(
                 (str(name), parse_fraction(level, "level"))
@@ -621,7 +639,7 @@ def enroll(
     Args:
         budget: The budget before the assignment; it is not modified.
         experiment_id: A new, non-blank identifier.
-        level: An explicit level; by default ``alpha_promote * gamma_j`` for
+        level: An explicit level; by default ``promotion * gamma_j`` for
             the next index ``j``.
 
     Returns:
@@ -631,7 +649,7 @@ def enroll(
         ValueError: If the id is blank or already used, or the level is not
             positive.
         ExhaustedError: If the level would take the total past
-            `alpha_promote`, or the horizon is used up.
+            `promotion`, or the horizon is used up.
     """
     evidence.require_text(experiment_id, "experiment_id")
     if any(pair[0] == experiment_id for pair in budget.assigned):
@@ -640,7 +658,7 @@ def enroll(
         )
     if level is None:
         gamma = gammas(len(budget.assigned) + 1, budget.horizon)
-        chosen = budget.alpha_promote * gamma
+        chosen = budget.promotion * gamma
         if chosen == 0:
             raise ExhaustedError("the experiment horizon is used up")
     else:
@@ -684,5 +702,5 @@ def start_rollback_monitor(
         raise errors.InputError(f"champion {champion_id} is already monitored")
     return (
         dataclasses.replace(budget, monitored=(*budget.monitored, champion_id)),
-        budget.alpha_rollback,
+        budget.rollback,
     )

@@ -5,10 +5,12 @@ import dataclasses
 from fractions import Fraction
 import hashlib
 from typing import Any
+from typing import ClassVar
 
 from scmle.assurance.ledger import bivariate
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 from scmle.contracts import signing
 import scmle.contracts.evidence
 
@@ -45,8 +47,24 @@ def digest(body: Mapping[str, Any]) -> str:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class Digests:
+    """Hashes a hypothesis specification binds.
+
+    Attributes:
+        code: Hash of the code path that computes the statistic.
+    """
+
+    code: str
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class Test:
     """What is tested, fixed before the data is touched.
+
+    The specification is stored at schema version 2; a version 1 record
+    (`set`, `code_hash`) loads through `migrations`. The survivor
+    fingerprint is computed on the version 1 layout (`anchor`), so a frozen
+    selection keeps its hash.
 
     Attributes:
         name: Human-readable name, unique within the ledger.
@@ -54,42 +72,52 @@ class Test:
         statistic: Registered statistic (see `bivariate.STATISTICS`).
         null: The null hypothesis, in words.
         direction: `two-sided`, `greater` or `less`.
-        set_id: Set the test reads; exploration tests read `X`.
+        subset: Set the test reads; exploration tests read `X`.
         column: Feature column the statistic reads, if any.
-        code_hash: Hash of the code path that computes the statistic.
+        digests: Hashes the specification binds (the statistic's code).
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={"set": "subset"},
+            groups={"digests": {"code_hash": "code"}},
+        ),
+    )
 
     name: str
     family: str
     statistic: str
     null: str
     direction: str
-    set_id: qualification.Subset
+    subset: qualification.Subset
     column: str | None
-    code_hash: str
+    digests: Digests
 
     def __post_init__(self) -> None:
         """Validates the specification.
 
         Raises:
-            ValueError: If `direction` is not a known alternative or
-                `set_id` is not a `Subset`. A blank text field is refused with
-                a `ValueError` by `evidence.require_text`.
+            ValueError: If `direction` is not a known alternative,
+                `subset` is not a `Subset` or `digests` is not a `Digests`.
+                A blank text field is refused with a `ValueError` by
+                `evidence.require_text`.
         """
+        if not isinstance(self.digests, Digests):
+            raise errors.InputError("digests must be a Digests")
         for field, value in (
             ("name", self.name),
             ("family", self.family),
             ("statistic", self.statistic),
             ("null", self.null),
-            ("code_hash", self.code_hash),
+            ("digests.code", self.digests.code),
         ):
             scmle.contracts.evidence.require_text(value, field)
         if self.direction not in bivariate.DIRECTIONS:
             raise errors.InputError(
                 f"direction must be one of {bivariate.DIRECTIONS}"
             )
-        if not isinstance(self.set_id, qualification.Subset):
-            raise errors.InputError("set_id must be a Subset")
+        if not isinstance(self.subset, qualification.Subset):
+            raise errors.InputError("subset must be a Subset")
 
     @classmethod
     def create(
@@ -101,7 +129,7 @@ class Test:
         null: str,
         column: str | None = None,
         direction: str = bivariate.TWO_SIDED,
-        set_id: qualification.Subset = qualification.Subset.EXPLORATION,
+        subset: qualification.Subset = qualification.Subset.EXPLORATION,
     ) -> "Test":
         """Builds a specification, filling the code hash from the registry.
 
@@ -113,7 +141,7 @@ class Test:
             null: The null hypothesis, in words.
             column: Feature column the statistic reads, if any.
             direction: `two-sided`, `greater` or `less`.
-            set_id: Set the test reads (exploration by default).
+            subset: Set the test reads (exploration by default).
 
         Returns:
             The specification, with the hash of the statistic's code.
@@ -124,55 +152,75 @@ class Test:
             statistic=statistic,
             null=null,
             direction=direction,
-            set_id=set_id,
+            subset=subset,
             column=column,
-            code_hash=bivariate.code_hash(statistic),
+            digests=Digests(code=bivariate.code_hash(statistic)),
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Builds the JSON-ready record.
+        """Builds the JSON-ready record at the current schema version.
 
         Returns:
-            A mapping of every field; the set is stored under ``set`` as its
-            value.
+            A mapping of every field and the `schema_version`; the set is
+            stored as its value and the digests as a nested mapping.
         """
         return {
+            records.KEY: records.ORIGIN + len(self.migrations),
             "name": self.name,
             "family": self.family,
             "statistic": self.statistic,
             "null": self.null,
             "direction": self.direction,
-            "set": self.set_id.value,
+            "subset": self.subset.value,
             "column": self.column,
-            "code_hash": self.code_hash,
+            "digests": {"code": self.digests.code},
         }
+
+    def anchor(self) -> records.Layout:
+        """Builds the record in its version 1 layout.
+
+        Returns:
+            The specification as version 1 stored it (`set`, `code_hash`),
+            without `schema_version`.
+        """
+        current = self.to_dict()
+        del current[records.KEY]
+        return records.downgrade(self.migrations, current)
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "Test":
         """Rebuilds a specification, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping as written by `to_dict`.
+            record: A mapping as written by `to_dict`, at any schema
+                version.
 
         Returns:
             The specification described by the record.
 
         Raises:
-            ValueError: If the record has unexpected or missing fields. An
-                unknown set value or an invalid field is also refused with a
-                `ValueError`.
+            ValueError: If the record has unexpected or missing fields or a
+                newer schema version. An unknown set value or an invalid
+                field is also refused with a `ValueError`.
         """
+        record = records.load(cls.__name__, cls.migrations, record)
+        del record[records.KEY]
         names = {
             "name",
             "family",
             "statistic",
             "null",
             "direction",
-            "set",
+            "subset",
             "column",
-            "code_hash",
+            "digests",
         }
-        if set(record) != names:
+        digests = record.get("digests")
+        if (
+            set(record) != names
+            or not isinstance(digests, Mapping)
+            or set(digests) != {"code"}
+        ):
             raise errors.InputError("unexpected or missing hypothesis fields")
         return cls(
             name=record["name"],
@@ -180,9 +228,9 @@ class Test:
             statistic=record["statistic"],
             null=record["null"],
             direction=record["direction"],
-            set_id=qualification.Subset(record["set"]),
+            subset=qualification.Subset(record["subset"]),
             column=record["column"],
-            code_hash=record["code_hash"],
+            digests=Digests(code=digests["code"]),
         )
 
 
@@ -250,8 +298,7 @@ def fingerprint(ids: tuple[str, ...], specs: Mapping[str, Test]) -> str:
         specs: Specification of every hypothesis, by id.
 
     Returns:
-        The digest that binds the ids to their specifications.
+        The digest that binds the ids to their specifications, computed on
+        the version 1 layout of each specification (`Test.anchor`).
     """
-    return digest(
-        {"ids": list(ids), "specs": [specs[i].to_dict() for i in ids]}
-    )
+    return digest({"ids": list(ids), "specs": [specs[i].anchor() for i in ids]})

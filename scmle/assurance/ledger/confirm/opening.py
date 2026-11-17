@@ -67,7 +67,9 @@ def finish(
         "rule": rule.value,
         "alpha_confirm": str(alpha),
         "confirmed": [
-            c.claim_id for c in claims if c.tier is qualification.Tier.CONFIRMED
+            c.identifier
+            for c in claims
+            if c.tier is qualification.Tier.CONFIRMED
         ],
         "custody_head": custody_head,
     }

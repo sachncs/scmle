@@ -2,7 +2,7 @@
 
 Everything here is optional: a charter without a `Layer` runs as it
 always did and makes no decision claim. The costs of acting are not repeated
-here; they stay in the charter's `cost_model`, which a decision layer
+here; they stay in the charter's `costs`, which a decision layer
 requires. What this block adds is how the cost model is used (baselines,
 calibration level, off-policy gates), which fairness constraints are
 declared, and the rollout design with its error levels.
@@ -15,12 +15,14 @@ from collections.abc import Mapping
 import dataclasses
 from fractions import Fraction
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 import scmle.assurance.ledger.budget
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
+from scmle.contracts import records
 
 BASELINES = ("treat_none", "treat_all", "incumbent")
 CRITERIA = (
@@ -33,6 +35,9 @@ MECHANISMS = ("group_thresholds", "reweighing")
 DEFAULT_CALIBRATION_LEVEL = 0.01
 DEFAULT_ESS_FLOOR = 0.2
 DEFAULT_MIN_GROUP = 50
+HIGHER = "higher"
+LOWER = "lower"
+DIRECTIONS = (HIGHER, LOWER)
 
 
 def check(value: Any, name: str) -> float:
@@ -82,15 +87,21 @@ class Gates:
     Attributes:
         clip: Largest importance weight; larger ones are clipped. None
             leaves the weights as they are.
-        min_propensity: Smallest behaviour probability on which the target
+        propensity: Smallest behaviour probability on which the target
             policy may put mass; below it the value is not identified.
-        ess_floor: Smallest Kish effective sample size over `n`.
+        ess: Floor of the Kish effective sample size (ESS) over `n`.
         penalty: Per-row penalty for each treated unit in policy fitting.
     """
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"min_propensity": "propensity", "ess_floor": "ess"}
+        ),
+    )
+
     clip: float | None = None
-    min_propensity: float = 0.01
-    ess_floor: float = DEFAULT_ESS_FLOOR
+    propensity: float = 0.01
+    ess: float = DEFAULT_ESS_FLOOR
     penalty: float = 0.0
 
     def __post_init__(self) -> None:
@@ -98,13 +109,13 @@ class Gates:
 
         Raises:
             ValueError: If `clip` is set and is not a finite number of at
-                least 1, `min_propensity` or `ess_floor` is not strictly in
-                (0, 1), or `penalty` is not finite or is negative.
+                least 1, `propensity` or `ess` is not strictly in (0, 1), or
+                `penalty` is not finite or is negative.
         """
         if self.clip is not None and check(self.clip, "clip") < 1:
             raise errors.InputError("clip must be at least 1")
-        open_unit(self.min_propensity, "min_propensity")
-        open_unit(self.ess_floor, "ess_floor")
+        open_unit(self.propensity, "propensity")
+        open_unit(self.ess, "ess")
         if qualification.finite(self.penalty, "penalty") < 0:
             raise errors.InputError("penalty must be non-negative")
 
@@ -129,8 +140,7 @@ class Gates:
         Returns:
             The rebuilt rules.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        return cls(**qualification.require(cls, record))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -140,17 +150,27 @@ class Policy:
     Attributes:
         unit: Unit of the costs (for example "EUR per case").
         baselines: Rules the model must beat over the cost-ratio range.
-        treatment_cost: Cost per treated unit for causal policies, or None.
-        calibration_level: Level of the calibration check on development
-            data.
-        off_policy: Gates for off-policy evaluation.
+        cost: Cost per treated unit for causal policies, or None.
+        calibration: Level of the calibration check on development data.
+        gates: Gates for off-policy evaluation.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "treatment_cost": "cost",
+                "calibration_level": "calibration",
+                "off_policy": "gates",
+            },
+            parts={"gates": Gates.migrations[0]},
+        ),
+    )
 
     unit: str
     baselines: tuple[str, ...] = BASELINES
-    treatment_cost: float | None = None
-    calibration_level: float = DEFAULT_CALIBRATION_LEVEL
-    off_policy: Gates = dataclasses.field(default_factory=Gates)
+    cost: float | None = None
+    calibration: float = DEFAULT_CALIBRATION_LEVEL
+    gates: Gates = dataclasses.field(default_factory=Gates)
 
     def __post_init__(self) -> None:
         """Validates the model.
@@ -158,8 +178,8 @@ class Policy:
         Raises:
             ValueError: If `unit` is blank, `baselines` is not a tuple, is
                 empty, has a repeat or names a rule outside `BASELINES`,
-                `treatment_cost` is set but not finite, or
-                `calibration_level` is not strictly in (0, 1).
+                `cost` is set but not finite, or `calibration` is not
+                strictly in (0, 1).
         """
         evidence.require_text(self.unit, "unit")
         qualification.tupled(self.baselines, "baselines")
@@ -170,23 +190,23 @@ class Policy:
         for name in self.baselines:
             if name not in BASELINES:
                 raise errors.InputError(f"unknown baseline {name!r}")
-        if self.treatment_cost is not None:
-            qualification.finite(self.treatment_cost, "treatment_cost")
-        open_unit(self.calibration_level, "calibration_level")
+        if self.cost is not None:
+            qualification.finite(self.cost, "cost")
+        open_unit(self.calibration, "calibration")
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the model.
 
         Returns:
             A JSON-ready dict of the fields, with `baselines` as a list and
-            `off_policy` as a nested dict.
+            `gates` as a nested dict.
         """
         return {
             "unit": self.unit,
             "baselines": list(self.baselines),
-            "treatment_cost": self.treatment_cost,
-            "calibration_level": self.calibration_level,
-            "off_policy": self.off_policy.to_dict(),
+            "cost": self.cost,
+            "calibration": self.calibration,
+            "gates": self.gates.to_dict(),
         }
 
     @classmethod
@@ -202,13 +222,13 @@ class Policy:
         Returns:
             The rebuilt model.
         """
-        qualification.require(cls, record)
+        record = qualification.require(cls, record)
         return cls(
             unit=record["unit"],
             baselines=tuple(record["baselines"]),
-            treatment_cost=record["treatment_cost"],
-            calibration_level=record["calibration_level"],
-            off_policy=Gates.from_dict(record["off_policy"]),
+            cost=record["cost"],
+            calibration=record["calibration"],
+            gates=Gates.from_dict(record["gates"]),
         )
 
 
@@ -219,35 +239,39 @@ class Constraint:
     Attributes:
         attribute: Column that defines the groups.
         criterion: One of `CRITERIA`.
-        max_gap: Largest allowed gap between groups, in (0, 1).
+        gap: Largest allowed gap between groups, in (0, 1).
         mechanism: One of `MECHANISMS`.
         attestation: Who attests that the mechanism is permitted (group
             thresholds are a legal and policy question the instrument does
             not decide); required for `group_thresholds`.
-        min_group: Rows below which a group is `not_assessable`.
+        minimum: Rows below which a group is `not_assessable`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"max_gap": "gap", "min_group": "minimum"}),
+    )
 
     attribute: str
     criterion: str
-    max_gap: float
+    gap: float
     mechanism: str
     attestation: str | None = None
-    min_group: int = DEFAULT_MIN_GROUP
+    minimum: int = DEFAULT_MIN_GROUP
 
     def __post_init__(self) -> None:
         """Validates the constraint.
 
         Raises:
             ValueError: If `attribute` is blank, `criterion` is not in
-                `CRITERIA`, `max_gap` is not strictly in (0, 1), `mechanism`
-                is not in `MECHANISMS`, `group_thresholds` is chosen without
-                a non-blank `attestation`, or `min_group` is not an integer
-                of at least 2.
+                `CRITERIA`, `gap` is not strictly in (0, 1), `mechanism` is
+                not in `MECHANISMS`, `group_thresholds` is chosen without a
+                non-blank `attestation`, or `minimum` is not an integer of
+                at least 2.
         """
         evidence.require_text(self.attribute, "attribute")
         if self.criterion not in CRITERIA:
             raise errors.InputError(f"unknown criterion {self.criterion!r}")
-        open_unit(self.max_gap, "max_gap")
+        open_unit(self.gap, "gap")
         if self.mechanism not in MECHANISMS:
             raise errors.InputError(f"unknown mechanism {self.mechanism!r}")
         if self.mechanism == "group_thresholds" and not (
@@ -256,7 +280,7 @@ class Constraint:
             raise errors.InputError(
                 "group thresholds need an attestation that they are permitted"
             )
-        qualification.count(self.min_group, "min_group", minimum=2)
+        qualification.count(self.minimum, "minimum", minimum=2)
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the record.
@@ -279,8 +303,7 @@ class Constraint:
         Returns:
             The rebuilt constraint.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        return cls(**qualification.require(cls, record))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -294,24 +317,50 @@ class Guardrail:
             harm is at least the margin.
         low: Smallest value the metric can take.
         high: Largest value it can take.
-        higher_is_worse: Whether a larger value is the harmful direction.
+        direction: The harmful direction, `higher` (a larger value is
+            worse) or `lower`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"higher_is_worse": "direction"},
+            change=lambda layout: {
+                **layout,
+                **(
+                    {"direction": HIGHER if layout["direction"] else LOWER}
+                    if isinstance(layout.get("direction"), bool)
+                    else {}
+                ),
+            },
+            revert=lambda layout: {
+                **layout,
+                **(
+                    {"direction": layout["direction"] == HIGHER}
+                    if isinstance(layout.get("direction"), str)
+                    else {}
+                ),
+            },
+        ),
+    )
 
     name: str
     margin: float
     low: float = 0.0
     high: float = 1.0
-    higher_is_worse: bool = True
+    direction: str = HIGHER
 
     def __post_init__(self) -> None:
         """Validates the guardrail.
 
         Raises:
             ValueError: If `name` is blank, `margin` is not finite and
-                positive, or `low` is not finite and below a finite `high`.
+                positive, `low` is not finite and below a finite `high`, or
+                `direction` is not in `DIRECTIONS`.
         """
         evidence.require_text(self.name, "name")
         check(self.margin, "margin")
+        if self.direction not in DIRECTIONS:
+            raise errors.InputError(f"direction must be one of {DIRECTIONS}")
         if not qualification.finite(self.low, "low") < qualification.finite(
             self.high, "high"
         ):
@@ -338,8 +387,7 @@ class Guardrail:
         Returns:
             The rebuilt guardrail.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        return cls(**qualification.require(cls, record))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -351,33 +399,48 @@ class Experiment:
         primary: Primary metric.
         low: Smallest value of the primary metric.
         high: Largest value of the primary metric.
-        assignment_prob: Probability of the challenger arm, in (0, 1).
-        delta_min: Smallest improvement worth acting on, in metric units.
+        assignment: Probability of the challenger arm, in (0, 1).
+        delta: Smallest improvement worth acting on, in metric units.
         tolerance: Rollback tolerance `tau`, in metric units.
-        n_max: Most units the experiment may run.
-        alpha_promote: Total false-promotion level, as an exact fraction.
-        alpha_rollback: Rollback level per promoted champion.
+        limit: Most units the experiment may run.
+        promotion: Total false-promotion level (alpha), as an exact
+            fraction.
+        rollback: Rollback level (alpha) per promoted champion.
         guardrails: Metrics that must not get worse.
         salt: Salt of the hashed assignment.
-        srm_level: Level of the sample-ratio check.
+        srm: Level of the sample-ratio-mismatch (SRM) check.
         horizon: Number of experiments over which the false-promotion level
             is divided equally, or None for the open-ended sequence of
             decreasing shares.
     """
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={
+                "assignment_prob": "assignment",
+                "delta_min": "delta",
+                "n_max": "limit",
+                "alpha_promote": "promotion",
+                "alpha_rollback": "rollback",
+                "srm_level": "srm",
+            },
+            parts={"guardrails": Guardrail.migrations[0]},
+        ),
+    )
+
     unit: str
     primary: str
-    assignment_prob: float
-    delta_min: float
+    assignment: float
+    delta: float
     tolerance: float
-    n_max: int
-    alpha_promote: Fraction
-    alpha_rollback: Fraction
+    limit: int
+    promotion: Fraction
+    rollback: Fraction
     low: float = 0.0
     high: float = 1.0
     guardrails: tuple[Guardrail, ...] = ()
     salt: str = "scmle"
-    srm_level: float = 0.001
+    srm: float = 0.001
     horizon: int | None = None
 
     def __post_init__(self) -> None:
@@ -385,22 +448,22 @@ class Experiment:
 
         Raises:
             ValueError: If `unit`, `primary` or `salt` is blank;
-                `assignment_prob` or `srm_level` is not strictly in (0, 1);
-                `delta_min` or `tolerance` is not finite and positive;
-                `n_max` is not an integer of at least 2; `alpha_promote` or
-                `alpha_rollback` is not strictly between 0 and 1; `low` is
-                not finite and below a finite `high`; `delta_min` is not
-                smaller than `high - low`; `guardrails` is not a tuple; or
-                guardrail names repeat or include `primary`.
+                `assignment` or `srm` is not strictly in (0, 1); `delta` or
+                `tolerance` is not finite and positive; `limit` is not an
+                integer of at least 2; `promotion` or `rollback` is not
+                strictly between 0 and 1; `low` is not finite and below a
+                finite `high`; `delta` is not smaller than `high - low`;
+                `guardrails` is not a tuple; or guardrail names repeat or
+                include `primary`.
         """
         evidence.require_text(self.unit, "unit")
         evidence.require_text(self.primary, "primary")
         evidence.require_text(self.salt, "salt")
-        open_unit(self.assignment_prob, "assignment_prob")
-        check(self.delta_min, "delta_min")
+        open_unit(self.assignment, "assignment")
+        check(self.delta, "delta")
         check(self.tolerance, "tolerance")
-        qualification.count(self.n_max, "n_max", minimum=2)
-        for name in ("alpha_promote", "alpha_rollback"):
+        qualification.count(self.limit, "limit", minimum=2)
+        for name in ("promotion", "rollback"):
             if not 0 < getattr(self, name) < 1:
                 raise errors.InputError(
                     f"{name} must be strictly between 0 and 1"
@@ -409,11 +472,11 @@ class Experiment:
             self.high, "high"
         ):
             raise errors.InputError("low must be below high")
-        if self.delta_min >= self.high - self.low:
+        if self.delta >= self.high - self.low:
             raise errors.InputError(
-                "delta_min must be smaller than the metric range"
+                "delta must be smaller than the metric range"
             )
-        open_unit(self.srm_level, "srm_level")
+        open_unit(self.srm, "srm")
         qualification.tupled(self.guardrails, "guardrails")
         names = [g.name for g in self.guardrails]
         if len(set(names)) != len(names) or self.primary in names:
@@ -425,12 +488,12 @@ class Experiment:
         """Builds a decision budget from the rollout's levels.
 
         Returns:
-            A new `DecisionBudget` with this rollout's `alpha_promote`,
-            `alpha_rollback` and `horizon`.
+            A new `DecisionBudget` with this rollout's `promotion`,
+            `rollback` and `horizon`.
         """
         return scmle.assurance.ledger.budget.DecisionBudget(
-            alpha_promote=self.alpha_promote,
-            alpha_rollback=self.alpha_rollback,
+            promotion=self.promotion,
+            rollback=self.rollback,
             horizon=self.horizon,
         )
 
@@ -445,17 +508,17 @@ class Experiment:
         return {
             "unit": self.unit,
             "primary": self.primary,
-            "assignment_prob": self.assignment_prob,
-            "delta_min": self.delta_min,
+            "assignment": self.assignment,
+            "delta": self.delta,
             "tolerance": self.tolerance,
-            "n_max": self.n_max,
-            "alpha_promote": str(self.alpha_promote),
-            "alpha_rollback": str(self.alpha_rollback),
+            "limit": self.limit,
+            "promotion": str(self.promotion),
+            "rollback": str(self.rollback),
             "low": self.low,
             "high": self.high,
             "guardrails": [g.to_dict() for g in self.guardrails],
             "salt": self.salt,
-            "srm_level": self.srm_level,
+            "srm": self.srm,
             "horizon": self.horizon,
         }
 
@@ -474,19 +537,19 @@ class Experiment:
         Returns:
             The rebuilt rollout.
         """
-        qualification.require(cls, record)
+        record = qualification.require(cls, record)
         return cls(
             unit=record["unit"],
             primary=record["primary"],
-            assignment_prob=record["assignment_prob"],
-            delta_min=record["delta_min"],
+            assignment=record["assignment"],
+            delta=record["delta"],
             tolerance=record["tolerance"],
-            n_max=record["n_max"],
-            alpha_promote=scmle.assurance.ledger.budget.parse_fraction(
-                record["alpha_promote"], "alpha_promote"
+            limit=record["limit"],
+            promotion=scmle.assurance.ledger.budget.parse_fraction(
+                record["promotion"], "promotion"
             ),
-            alpha_rollback=scmle.assurance.ledger.budget.parse_fraction(
-                record["alpha_rollback"], "alpha_rollback"
+            rollback=scmle.assurance.ledger.budget.parse_fraction(
+                record["rollback"], "rollback"
             ),
             low=record["low"],
             high=record["high"],
@@ -494,7 +557,7 @@ class Experiment:
                 Guardrail.from_dict(g) for g in record["guardrails"]
             ),
             salt=record["salt"],
-            srm_level=record["srm_level"],
+            srm=record["srm"],
             horizon=record["horizon"],
         )
 
@@ -509,6 +572,17 @@ class Layer:
         rollout: The rollout design, or None when only offline evidence is
             wanted.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            renames={},
+            parts={
+                "model": Policy.migrations[0],
+                "fairness": Constraint.migrations[0],
+                "rollout": Experiment.migrations[0],
+            },
+        ),
+    )
 
     model: Policy
     fairness: tuple[Constraint, ...] = ()
@@ -551,8 +625,13 @@ class Layer:
         Returns:
             The rebuilt block.
         """
-        record = {"rollout": None, **record}
-        qualification.require(cls, record)
+        record = qualification.require(
+            cls,
+            {
+                "rollout": None,
+                **records.load(cls.__name__, cls.migrations, record),
+            },
+        )
         plan = record["rollout"]
         return cls(
             model=Policy.from_dict(record["model"]),

@@ -44,6 +44,7 @@ from collections.abc import Mapping
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
@@ -52,6 +53,7 @@ from scipy import stats
 from scmle.assurance.ledger import budget
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 from scmle.runtime import randomness
 
 QUANTILE = 0.95
@@ -236,19 +238,26 @@ class Control:
         observed: Discoveries on the real data.
         permuted: Discovery counts of the B re-runs.
         p95: The 95th percentile of the permuted counts (see `percentile`).
-        p95_interval: Distribution-free interval for that percentile; its
+        interval: Distribution-free interval for that percentile; its
             exact coverage is `interval_coverage(b)`.
-        exceedance_p: ``(1 + #{permuted >= observed}) / (B + 1)``.
+        exceedance: The exceedance p-value,
+            ``(1 + #{permuted >= observed}) / (B + 1)``.
         exceeds: Whether ``observed > p95``.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"p95_interval": "interval", "exceedance_p": "exceedance"}
+        ),
+    )
 
     kind: str
     scope: str
     observed: int
     permuted: tuple[int, ...]
     p95: int
-    p95_interval: tuple[int, int]
-    exceedance_p: float
+    interval: tuple[int, int]
+    exceedance: float
     exceeds: bool
 
     @property
@@ -274,21 +283,22 @@ class Control:
         """Builds the JSON-ready record (``negative_control.json``).
 
         Returns:
-            A mapping of every field plus the number of re-runs, the
-            interval confidence, the report message and a note on Monte
-            Carlo error; lists replace tuples.
+            A mapping of every field and the `schema_version`, plus the
+            number of re-runs, the interval confidence, the report message
+            and a note on Monte Carlo error; lists replace tuples.
         """
         return {
+            records.KEY: records.ORIGIN + len(self.migrations),
             "kind": self.kind,
             "scope": self.scope,
             "observed": self.observed,
             "permuted": list(self.permuted),
             "b": self.b,
             "p95": self.p95,
-            "p95_interval": list(self.p95_interval),
+            "interval": list(self.interval),
             "p95_interval_confidence": INTERVAL_CONFIDENCE,
             "p95_interval_achieved_confidence": interval_coverage(self.b),
-            "exceedance_p": self.exceedance_p,
+            "exceedance": self.exceedance,
             "exceeds": self.exceeds,
             "message": self.message,
             "note": (
@@ -304,23 +314,25 @@ class Control:
         """Rebuilds a result from its JSON record.
 
         Args:
-            record: A mapping with the fields written by `to_dict`.
+            record: A mapping with the fields written by `to_dict`, at any
+                schema version.
 
         Returns:
             The result described by the record. The fields are not
             validated, `b`, `message` and the other derived entries are
             ignored, and a missing key raises `KeyError`.
         """
+        record = records.load(cls.__name__, cls.migrations, record)
         counts = tuple(int(c) for c in record["permuted"])
-        low, high = record["p95_interval"]
+        low, high = record["interval"]
         return cls(
             kind=record["kind"],
             scope=record["scope"],
             observed=int(record["observed"]),
             permuted=counts,
             p95=int(record["p95"]),
-            p95_interval=(int(low), int(high)),
-            exceedance_p=float(record["exceedance_p"]),
+            interval=(int(low), int(high)),
+            exceedance=float(record["exceedance"]),
             exceeds=bool(record["exceeds"]),
         )
 
@@ -357,8 +369,8 @@ def summarize(
         observed=observed,
         permuted=counts,
         p95=p95,
-        p95_interval=bracket(counts),
-        exceedance_p=(1 + as_large) / (len(counts) + 1),
+        interval=bracket(counts),
+        exceedance=(1 + as_large) / (len(counts) + 1),
         exceeds=observed > p95,
     )
 

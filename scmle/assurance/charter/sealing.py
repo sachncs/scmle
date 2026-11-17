@@ -4,6 +4,10 @@ A charter file wraps the charter with its SHA-256 hash and, when a key is
 available, an HMAC-SHA256 signature over the canonical payload. The signature
 proves possession of the key, not the signer's identity. An unsigned charter
 is allowed: it is hash-only and reported as unsigned.
+
+The hash and the signature cover the charter's schema version 1 layout
+(`AnalysisCharter.anchor`), so a charter signed before its keys were renamed
+still verifies, and a charter written now verifies under its old identity.
 """
 
 import dataclasses
@@ -14,6 +18,7 @@ from typing import Any
 
 from scmle.assurance.charter import contracts
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts import signing
 
 SIGNATURE_FIELD = "signature"
@@ -28,7 +33,7 @@ UNCERTAINTY_FORMAT = 10
 CONFIRMATION_COVERAGE_FORMAT = 11
 BLOCK_FORMATS = (
     ("decision", "a 'decision' block", DECISION_FORMAT),
-    ("unit_of_prediction", "'unit_of_prediction'", UNIT_FORMAT),
+    ("purpose", "'purpose' (the unit of prediction)", UNIT_FORMAT),
     ("ingest", "'ingest'", INGEST_FORMAT),
     ("uncertainty", "'uncertainty'", UNCERTAINTY_FORMAT),
 )
@@ -71,7 +76,7 @@ def envelope(
         "charter_hash": charter.charter_hash,
         "algorithm": signing.SIGNATURE_ALGORITHM,
         SIGNATURE_FIELD: (
-            None if key is None else signing.mac(charter.to_dict(), key)
+            None if key is None else signing.mac(charter.anchor(), key)
         ),
     }
 
@@ -103,6 +108,29 @@ def inscribe(
     return target
 
 
+def lift(path: str | Path, record: Any) -> records.Layout:
+    """Reads a stored charter at its current schema version.
+
+    Args:
+        path: Charter file, used in the error message.
+        record: The stored charter record, of any schema version.
+
+    Returns:
+        The record moved to the current version.
+
+    Raises:
+        ConfigError: If the record's schema version is not supported.
+    """
+    try:
+        return records.load(
+            contracts.AnalysisCharter.__name__,
+            contracts.AnalysisCharter.migrations,
+            record,
+        )
+    except errors.InputError as error:
+        raise errors.ConfigError(f"charter {path}: {error}") from error
+
+
 def check_format(path: str | Path, record: dict[str, Any]) -> None:
     """Refuses a wrapper from a newer format, or a field its format lacks.
 
@@ -114,14 +142,18 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
     confirmation rows; an older wrapper that carries one of them was edited
     or mislabelled.
 
+    The charter is read at its current schema version, so the checks name
+    the current keys whichever version the file stores.
+
     Args:
         path: Charter file, used in the error messages.
         record: The decoded wrapper.
 
     Raises:
         ConfigError: If the declared format is not an integer or is newer
-            than `contracts.FORMAT_VERSION`, or an older format carries a
-            field that a later format introduced.
+            than `contracts.FORMAT_VERSION`, an older format carries a field
+            that a later format introduced, or the charter's schema version
+            is not supported.
     """
     declared = record.get("format", contracts.OLDEST_READABLE_FORMAT)
     if not isinstance(declared, int) or declared > contracts.FORMAT_VERSION:
@@ -129,32 +161,34 @@ def check_format(path: str | Path, record: dict[str, Any]) -> None:
             f"charter {path} has format {declared!r}; this version reads "
             f"formats up to {contracts.FORMAT_VERSION}"
         )
-    if declared < RULES_FORMAT and "rules" in record.get("charter", {}):
+    charter = lift(path, record.get("charter", {}))
+    if declared < RULES_FORMAT and "rules" in charter:
         raise errors.ConfigError(
             f"charter {path} declares format {declared} but carries 'rules', "
             f"which need format {RULES_FORMAT}"
         )
-    estimand = record.get("charter", {}).get("estimand", {})
+    estimand = charter.get("estimand", {})
     if declared < CAUSAL_FORMAT and "causal" in estimand:
         raise errors.ConfigError(
             f"charter {path} declares format {declared} but carries a "
             f"'causal' block, which needs format {CAUSAL_FORMAT}"
         )
     for name, described, introduced in BLOCK_FORMATS:
-        if declared < introduced and name in record.get("charter", {}):
+        if declared < introduced and name in charter:
             raise errors.ConfigError(
                 f"charter {path} declares format {declared} but carries "
                 f"{described}, which needs format {introduced}"
             )
     if declared < CONFIRMATION_COVERAGE_FORMAT and (
-        record.get("charter", {}).get("uncertainty") or {}
-    ).get("coverage_on_confirmation"):
+        charter.get("uncertainty") or {}
+    ).get("confirmatory"):
         raise errors.ConfigError(
             f"charter {path} declares format {declared} but its uncertainty "
-            "block carries 'coverage_on_confirmation', which needs format "
+            "block carries 'confirmatory' (the coverage claim on the "
+            "confirmation rows), which needs format "
             f"{CONFIRMATION_COVERAGE_FORMAT}"
         )
-    block = record.get("charter", {}).get("ingest") or {}
+    block = charter.get("ingest") or {}
     causal_block = estimand.get("causal") or {}
     later = [
         name
@@ -231,7 +265,7 @@ def read_verified(
                 f"charter {path} is signed but no signing key is configured"
             )
         return Verified(charter, charter.charter_hash, signed=False)
-    expected = signing.mac(charter.to_dict(), key)
+    expected = signing.mac(charter.anchor(), key)
     if not hmac.compare_digest(str(signature), expected):
         raise errors.ArtifactError(
             f"charter signature does not verify for {path}"
@@ -257,8 +291,8 @@ def permit(
 ) -> None:
     """Allows an amendment only if it tightens the budget.
 
-    Only a smaller or equal `alpha_confirm`, `k_max` or initial exploration
-    wealth may change; every other field must be identical.
+    Only a smaller or equal `alpha_confirm`, `quota` (`K_max`) or initial
+    exploration wealth may change; every other field must be identical.
 
     Args:
         old: The charter as signed.
@@ -269,22 +303,22 @@ def permit(
             other field differs.
     """
     before, after = old.to_dict(), new.to_dict()
-    budget_old, budget_new = old.error_budget, new.error_budget
+    budget_old, budget_new = old.budget, new.budget
     ok = (
         tighter(
             budget_old.confirmation.alpha_confirm,
             budget_new.confirmation.alpha_confirm,
         )
-        and tighter(old.k_max, new.k_max)
+        and tighter(old.quota, new.quota)
         and tighter(
             budget_old.exploration.initial, budget_new.exploration.initial
         )
     )
     for record in (before, after):
-        record.pop("k_max")
-        record["error_budget"] = {
+        record.pop("quota")
+        record["budget"] = {
             key: value
-            for key, value in record["error_budget"].items()
+            for key, value in record["budget"].items()
             if key not in ("confirmation", "exploration")
         }
     if not ok or before != after:

@@ -18,10 +18,12 @@ import dataclasses
 import enum
 import math
 from typing import Any
+from typing import ClassVar
 
 from scipy import stats
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 MIN_CONFIRMATION_ROWS = 30
 FISHER_Z_OFFSET = 3
@@ -312,49 +314,61 @@ class Feasibility:
     Attributes:
         verdict: Feasible, downgrade (claims capped) or infeasible (no `C`).
         scope: `confirmatory` or `exploratory_unconfirmed`.
-        n_confirmation: Rows available in the confirmation set.
-        n_required: Rows needed for the promised power.
-        mde: Minimum detectable standardised effect at `n_confirmation`.
-        power_at_min_effect: Achieved power at the charter's `min_effect`.
+        confirmation: Rows available in the confirmation set.
+        required: Rows needed for the promised power.
+        mde: Minimum detectable standardised effect at `confirmation` rows.
+        power: Achieved power at the charter's minimum effect.
         reason: Why the verdict was reached.
     """
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "n_confirmation": "confirmation",
+                "n_required": "required",
+                "power_at_min_effect": "power",
+            }
+        ),
+    )
+
     verdict: Verdict
     scope: str
-    n_confirmation: int
-    n_required: int
+    confirmation: int
+    required: int
     mde: float
-    power_at_min_effect: float
+    power: float
     reason: str
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the report.
 
         Returns:
-            A JSON-ready dict of the fields, with `verdict` as its string
-            value and every non-finite float written as None.
+            A JSON-ready dict of the fields and the `schema_version`, with
+            `verdict` as its string value and every non-finite float written
+            as None.
         """
         record = dataclasses.asdict(self)
         record["verdict"] = self.verdict.value
         for key, value in record.items():
             if isinstance(value, float) and not math.isfinite(value):
                 record[key] = None
-        return record
+        return {records.KEY: records.ORIGIN + len(self.migrations), **record}
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "Feasibility":
         """Rebuilds a report written by `to_dict`.
 
         Args:
-            record: Field names to values, as produced by `to_dict`.
+            record: Field names to values, as produced by `to_dict`, at any
+                schema version.
 
         Returns:
-            The report, with a None `mde` or `power_at_min_effect` read back
-            as NaN.
+            The report, with a None `mde` or `power` read back as NaN.
         """
-        values = dict(record)
+        values = records.load(cls.__name__, cls.migrations, record)
+        del values[records.KEY]
         values["verdict"] = Verdict(values["verdict"])
-        for key in ("mde", "power_at_min_effect"):
+        for key in ("mde", "power"):
             if values[key] is None:
                 values[key] = math.nan
         return cls(**values)

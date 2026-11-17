@@ -6,7 +6,7 @@ block fixes, before any data is read, the largest number of bytes of
 cross-validation fold models a regression bundle may carry for CV+ intervals
 (a larger set is not kept and the run says why, `cv_plus.skipped`; the pooled
 out-of-fold scores are served instead) and the columns whose levels the
-coverage report describes slice by slice (`slice_columns`; they enter the
+coverage report describes slice by slice (`slices`; they enter the
 registered coverage claim).
 """
 
@@ -14,10 +14,12 @@ from collections.abc import Iterable
 from collections.abc import Mapping
 import dataclasses
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -25,13 +27,13 @@ class Uncertainty:
     """Fixed choices of the interval and set layer.
 
     Attributes:
-        cv_plus_max_bytes: Largest serialized size of the fold models kept
+        limit: Largest serialized size, in bytes, of the fold models kept
             for CV+, or None for the library default
             (`scmle.evaluation.cv_plus.MAX_BYTES`).
-        slice_columns: Columns of the features whose levels (numeric columns
-            in four bands) get a coverage and set-size description.
-        coverage_on_confirmation: Also test the registered coverage claim on
-            the sealed confirmation rows `C` (format 11): the claim becomes a
+        slices: Columns of the features whose levels (numeric columns in
+            four bands) get a coverage and set-size description.
+        confirmatory: Also test the registered coverage claim on the sealed
+            confirmation rows `C` (format 11): the claim becomes a
             registered claim of the ledger, `C` stays sealed until the model
             and its calibration are frozen, and the claim is `confirmed` only
             if a one-sided exact binomial test passes on the one opening of
@@ -39,57 +41,64 @@ class Uncertainty:
             alone.
     """
 
-    cv_plus_max_bytes: int | None = None
-    slice_columns: tuple[str, ...] = ()
-    coverage_on_confirmation: bool = False
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "cv_plus_max_bytes": "limit",
+                "slice_columns": "slices",
+                "coverage_on_confirmation": "confirmatory",
+            }
+        ),
+    )
+
+    limit: int | None = None
+    slices: tuple[str, ...] = ()
+    confirmatory: bool = False
 
     def __post_init__(self) -> None:
         """Validates the block.
 
         Raises:
-            ValueError: If `coverage_on_confirmation` is not a bool,
-                `slice_columns` is not a tuple, holds a duplicate or a
-                non-string or blank name, or `cv_plus_max_bytes` is set but
-                is not an integer of at least 1.
+            ValueError: If `confirmatory` is not a bool, `slices` is not a
+                tuple, holds a duplicate or a non-string or blank name, or
+                `limit` is set but is not an integer of at least 1.
         """
-        if not isinstance(self.coverage_on_confirmation, bool):
-            raise errors.InputError("coverage_on_confirmation must be a bool")
-        qualification.tupled(self.slice_columns, "slice_columns")
-        columns: Iterable[object] = self.slice_columns
-        if len(set(self.slice_columns)) != len(self.slice_columns) or any(
+        if not isinstance(self.confirmatory, bool):
+            raise errors.InputError("confirmatory must be a bool")
+        qualification.tupled(self.slices, "slices")
+        columns: Iterable[object] = self.slices
+        if len(set(self.slices)) != len(self.slices) or any(
             not isinstance(c, str) or not c.strip() for c in columns
         ):
-            raise errors.InputError(
-                "slice_columns are distinct, non-blank names"
-            )
-        if self.cv_plus_max_bytes is not None:
-            qualification.count(
-                self.cv_plus_max_bytes, "cv_plus_max_bytes", minimum=1
-            )
+            raise errors.InputError("slices are distinct, non-blank names")
+        if self.limit is not None:
+            qualification.count(self.limit, "limit", minimum=1)
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the block.
 
         Returns:
             A JSON-ready dict holding only the fields that are set:
-            `cv_plus_max_bytes` when not None, `slice_columns` (as a list)
-            when non-empty, and `coverage_on_confirmation` (as True) when
-            true. A block with defaults gives an empty dict.
+            `limit` when not None, `slices` (as a list) when non-empty, and
+            `confirmatory` (as True) when true. A block with defaults gives
+            an empty dict.
         """
         record: dict[str, Any] = {}
-        if self.cv_plus_max_bytes is not None:
-            record["cv_plus_max_bytes"] = self.cv_plus_max_bytes
-        if self.slice_columns:
-            record["slice_columns"] = list(self.slice_columns)
-        if self.coverage_on_confirmation:
-            record["coverage_on_confirmation"] = True
+        if self.limit is not None:
+            record["limit"] = self.limit
+        if self.slices:
+            record["slices"] = list(self.slices)
+        if self.confirmatory:
+            record["confirmatory"] = True
         return record
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds the block from a dict.
 
-        Every field is optional and takes its default when absent.
+        Every field is optional and takes its default when absent. A record
+        without `schema_version` is read as version 1; its steps only rename
+        keys, so a current layout passes unchanged.
 
         Args:
             record: Field names to values, as produced by `to_dict`.
@@ -101,17 +110,15 @@ class Uncertainty:
             ValueError: If `record` has a key that is not a field, or a
                 value fails the validation of the constructor.
         """
-        unknown = set(record) - {
-            "cv_plus_max_bytes",
-            "slice_columns",
-            "coverage_on_confirmation",
-        }
+        record = records.load(cls.__name__, cls.migrations, record)
+        del record[records.KEY]
+        unknown = set(record) - {"limit", "slices", "confirmatory"}
         if unknown:
             raise errors.InputError(
                 f"unknown uncertainty fields {sorted(unknown)}"
             )
         return cls(
-            record.get("cv_plus_max_bytes"),
-            tuple(record.get("slice_columns", ())),
-            record.get("coverage_on_confirmation", False),
+            record.get("limit"),
+            tuple(record.get("slices", ())),
+            record.get("confirmatory", False),
         )

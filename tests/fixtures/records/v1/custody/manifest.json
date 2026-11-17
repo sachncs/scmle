@@ -1,0 +1,62 @@
+{
+  "charter_hash": "1e53a524421525f69eb268425289dccd29f5e2fdcf90d3bac59e65c871362bb4",
+  "confirmation_ids": [
+    3,
+    4
+  ],
+  "data_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "embargo_ids": [
+    6
+  ],
+  "embargo_rows": 2,
+  "exploration_ids": [
+    0,
+    1,
+    2,
+    5
+  ],
+  "final_test_ids": [
+    7,
+    8
+  ],
+  "folds": [
+    {
+      "fit": [
+        0,
+        1
+      ],
+      "val": [
+        2,
+        3
+      ]
+    }
+  ],
+  "isolation": [
+    [
+      "C",
+      "sealed"
+    ]
+  ],
+  "manifest_version": 2,
+  "notes": [
+    "note"
+  ],
+  "row_roots": [
+    [
+      "exploration",
+      "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    ],
+    [
+      "confirmation",
+      "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    ],
+    [
+      "final_test",
+      "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    ]
+  ],
+  "scope": "confirmatory",
+  "seed": 3,
+  "sha256": "1170b9fd8c82552026f2f7300e075840309a1e2c38cf0562f47a6ebbd3c4aa06",
+  "strategy": "stratified"
+}

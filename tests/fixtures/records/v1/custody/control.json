@@ -1,0 +1,39 @@
+{
+  "b": 20,
+  "exceedance_p": 0.047619047619047616,
+  "exceeds": true,
+  "kind": "permuted_target",
+  "message": "5 discoveries exceed the 95th percentile (4) of 20 permuted_target re-runs",
+  "note": "The 95th percentile is estimated from B re-runs and has Monte Carlo error; the interval is distribution-free and its confidence is the achieved value, which is below the nominal one when B is small.",
+  "observed": 5,
+  "p95": 4,
+  "p95_interval": [
+    2,
+    4
+  ],
+  "p95_interval_achieved_confidence": 0.6256125515716945,
+  "p95_interval_confidence": 0.9,
+  "permuted": [
+    0,
+    1,
+    2,
+    3,
+    1,
+    0,
+    2,
+    4,
+    1,
+    0,
+    2,
+    1,
+    3,
+    0,
+    1,
+    2,
+    0,
+    1,
+    1,
+    0
+  ],
+  "scope": "strata"
+}

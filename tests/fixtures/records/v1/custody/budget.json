@@ -1,0 +1,14 @@
+{
+  "alpha_promote": "1/20",
+  "alpha_rollback": "1/100",
+  "assigned": [
+    [
+      "exp-1",
+      "1/60"
+    ]
+  ],
+  "horizon": 3,
+  "monitored": [
+    "champion-1"
+  ]
+}

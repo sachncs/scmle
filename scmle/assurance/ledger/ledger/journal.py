@@ -33,7 +33,7 @@ class Journal(chain.Replay):
             LedgerError: If the survivors are frozen, the name repeats or the
                 hypothesis reads a set other than `X`.
         """
-        if spec.set_id is not qualification.Subset.EXPLORATION:
+        if spec.subset is not qualification.Subset.EXPLORATION:
             raise records.LedgerError(
                 "only exploration-set hypotheses are registered"
             )
@@ -156,8 +156,8 @@ class Journal(chain.Replay):
         index = len(self.results)
         decision = records.REJECT if step.rejected else records.RETAIN
         check = qualification.Check(
-            check_id=f"{hypothesis.hypothesis_id}:X",
-            null_hypothesis=hypothesis.spec.null,
+            identifier=f"{hypothesis.hypothesis_id}:X",
+            null=hypothesis.spec.null,
             statistic=outcome.statistic,
             p_value=outcome.p,
             interval=None,
@@ -168,8 +168,8 @@ class Journal(chain.Replay):
                 if step.rejected
                 else qualification.Decision.PASS
             ),
-            set_id=qualification.Subset.EXPLORATION,
-            seed_path=randomness.seed_path(
+            subset=qualification.Subset.EXPLORATION,
+            seeds=randomness.seed_path(
                 self.seed, f"ledger.{hypothesis.spec.statistic}", index
             ),
             tier=qualification.Tier.UNVERIFIED,
@@ -407,7 +407,7 @@ class Ledger(Journal):
         path = directory / records.FILE_NAME
         config = online_fdr.Settings(
             rule=rule,
-            alpha=charter.error_budget.exploration.initial,
+            alpha=charter.budget.exploration.initial,
             horizon=horizon,
         )
         if path.exists():
@@ -426,7 +426,7 @@ class Ledger(Journal):
             path,
             charter_hash=charter.charter_hash,
             config=config,
-            alpha_confirm=charter.error_budget.confirmation.alpha_confirm,
+            alpha_confirm=charter.budget.confirmation.alpha_confirm,
             seed=charter.seed,
         )
 

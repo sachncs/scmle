@@ -251,7 +251,7 @@ class Replay(Chain):
         """
         self.guard()
         check = qualification.Check.from_dict(body["check"])
-        if check.set_id is not qualification.Subset.EXPLORATION:
+        if check.subset is not qualification.Subset.EXPLORATION:
             raise records.LedgerError(
                 "diagnostics may only read the exploration set"
             )

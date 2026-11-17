@@ -15,16 +15,19 @@ from collections.abc import Mapping
 import dataclasses
 import re
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
+from scmle.contracts import records
 
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 PASS_KINDS = ("exact", "prefix", "soundex")
 DEFAULT_WINDOWS = (7.0, 30.0, 90.0)
 DEFAULT_FEATURE_BUDGET = 200
+EPSILONS = {"eps_key": "key", "eps_null": "null", "eps_fk": "link"}
 
 
 def nonnegative(value: Any, name: str) -> float:
@@ -55,6 +58,8 @@ class Attribute:
         name: Column name.
         fuzzy: Three-level string comparison instead of exact agreement.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = ()
 
     name: str
     fuzzy: bool = True
@@ -87,8 +92,7 @@ class Attribute:
         Returns:
             The rebuilt record.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        return cls(**qualification.require(cls, record))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -100,6 +104,8 @@ class Pass:
         kind: `exact`, `prefix` or `soundex`.
         size: Prefix length for `prefix`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = ()
 
     field: str
     kind: str = "exact"
@@ -138,8 +144,7 @@ class Pass:
         Returns:
             The rebuilt record.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        return cls(**qualification.require(cls, record))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -153,6 +158,8 @@ class Entity:
             groups by it, so one real-world entity never straddles
             development and test.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = ()
 
     fields: tuple[Attribute, ...]
     passes: tuple[Pass, ...]
@@ -200,7 +207,7 @@ class Entity:
         Returns:
             The rebuilt block.
         """
-        qualification.require(cls, record)
+        record = qualification.require(cls, record)
         return cls(
             tuple(Attribute.from_dict(f) for f in record["fields"]),
             tuple(Pass.from_dict(p) for p in record["passes"]),
@@ -216,6 +223,8 @@ class Total:
         column: Column of the extracted view.
         total: Its sum in the source system.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = ()
 
     column: str
     total: float
@@ -250,8 +259,7 @@ class Total:
         Returns:
             The rebuilt record.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        return cls(**qualification.require(cls, record))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -262,15 +270,19 @@ class TableTotals:
         view: Name of a view (or nest) of the ingest plan.
         rows: Row count in the source, or None.
         sums: Column totals in the source.
-        checksum_column: Column whose values are checksummed.
+        column: Column whose values are checksummed.
         checksum: SHA-256 of the sorted values of that column as text, joined
             by newlines (`scmle.assurance.ingest.declared.sha`).
     """
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"checksum_column": "column"}),
+    )
+
     view: str
     rows: int | None = None
     sums: tuple[Total, ...] = ()
-    checksum_column: str | None = None
+    column: str | None = None
     checksum: str | None = None
 
     def __post_init__(self) -> None:
@@ -279,7 +291,7 @@ class TableTotals:
         Raises:
             ValueError: If `view` is blank, `sums` is not a tuple, `rows` is
                 set but not a non-negative integer, only one of `checksum`
-                and `checksum_column` is set, `checksum` is not 64
+                and `column` is set, `checksum` is not 64
                 lower-case hex digits, or none of `rows`, `sums` and
                 `checksum` is declared.
         """
@@ -287,8 +299,8 @@ class TableTotals:
         qualification.tupled(self.sums, "sums")
         if self.rows is not None:
             qualification.count(self.rows, "rows")
-        if (self.checksum_column is None) != (self.checksum is None):
-            raise errors.InputError("checksum and checksum_column go together")
+        if (self.column is None) != (self.checksum is None):
+            raise errors.InputError("checksum and column go together")
         if self.checksum is not None and not HEX64.match(self.checksum):
             raise errors.InputError("checksum must be 64 lower-case hex digits")
         if self.rows is None and not self.sums and self.checksum is None:
@@ -301,13 +313,13 @@ class TableTotals:
 
         Returns:
             A JSON-ready dict with `view`, `rows`, `sums` (a list of dicts),
-            `checksum_column` and `checksum`.
+            `column` and `checksum`.
         """
         return {
             "view": self.view,
             "rows": self.rows,
             "sums": [s.to_dict() for s in self.sums],
-            "checksum_column": self.checksum_column,
+            "column": self.column,
             "checksum": self.checksum,
         }
 
@@ -324,12 +336,12 @@ class TableTotals:
         Returns:
             The rebuilt record.
         """
-        qualification.require(cls, record)
+        record = qualification.require(cls, record)
         return cls(
             record["view"],
             record["rows"],
             tuple(Total.from_dict(s) for s in record["sums"]),
-            record["checksum_column"],
+            record["column"],
             record["checksum"],
         )
 
@@ -340,8 +352,12 @@ class Expectation:
 
     Attributes:
         tables: One record per view; the relative gap allowed in a sum is the
-            ingest block's `delta_rec`, counts and checksums are exact.
+            ingest block's `reconciliation`, counts and checksums are exact.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(renames={}, parts={"tables": TableTotals.migrations[0]}),
+    )
 
     tables: tuple[TableTotals, ...]
 
@@ -382,8 +398,64 @@ class Expectation:
         Returns:
             The rebuilt block.
         """
-        qualification.require(cls, record)
+        record = qualification.require(cls, record)
         return cls(tuple(TableTotals.from_dict(t) for t in record["tables"]))
+
+
+def fold(layout: records.Layout) -> records.Layout:
+    """Moves the three `eps_*` keys of a version 1 block into `tolerances`.
+
+    Args:
+        layout: The ingest block; a block that already holds `tolerances`
+            and no `eps_*` key is returned unchanged.
+
+    Returns:
+        The block with its key tolerances nested.
+    """
+    if not EPSILONS.keys() & layout.keys():
+        return layout
+    return records.gather(layout, {"tolerances": EPSILONS})
+
+
+def unfold(layout: records.Layout) -> records.Layout:
+    """Undoes `fold`.
+
+    Args:
+        layout: The ingest block at version 2.
+
+    Returns:
+        The block with `eps_key`, `eps_null` and `eps_fk` at the top.
+    """
+    if "tolerances" not in layout:
+        return layout
+    return records.scatter(layout, {"tolerances": EPSILONS})
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Tolerances:
+    """Tolerances of key and foreign-key inference.
+
+    Attributes:
+        key: Largest `g3` accepted as a key (`eps_key`).
+        null: Largest null rate accepted in a key (`eps_null`).
+        link: Largest share of child values without a parent for a link
+            (`eps_fk`).
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = ()
+
+    key: float = 0.0
+    null: float = 0.0
+    link: float = 0.0
+
+    def __post_init__(self) -> None:
+        """Validates the tolerances.
+
+        A value that is not a finite non-negative number raises `ValueError`
+        (from `nonnegative`).
+        """
+        for name in ("key", "null", "link"):
+            nonnegative(getattr(self, name), name)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -391,19 +463,17 @@ class Ingestion:
     """Budget, windows and tolerances of an ingestion.
 
     Attributes:
-        max_queries: Source queries allowed, or None for no limit.
-        max_rows_scanned: Rows the source may be estimated to scan, or None.
-        max_seconds: Wall time allowed, or None.
-        feature_budget: `B_feat`, the cap on synthesized features.
+        queries: Source queries allowed, or None for no limit.
+        scanned: Rows the source may be estimated to scan, or None.
+        seconds: Wall time allowed, in seconds, or None.
+        features: `B_feat`, the cap on synthesized features.
         windows: Declared windows in days.
         lag: Days between the cutoff and the prediction moment.
-        delta_rec: Serves two purposes: the relative gap a declared sum may
-            have in the extract reconciliation, and the recording delay in
-            days that applies to a view's time rule when the rule states
-            none.
-        eps_key: Largest `g3` accepted as a key.
-        eps_null: Largest null rate accepted in a key.
-        eps_fk: Largest share of child values without a parent for a link.
+        reconciliation: Serves two purposes (`delta_rec`): the relative gap
+            a declared sum may have in the extract reconciliation, and the
+            recording delay in days that applies to a view's time rule when
+            the rule states none.
+        tolerances: Tolerances of key and foreign-key inference.
         strict: Drop features whose weakest source is `unverified`.
         entity: Entity resolution on the run table whose groups become the
             split's group column (format 8), or None.
@@ -411,16 +481,34 @@ class Ingestion:
             (format 8), or None.
     """
 
-    max_queries: int | None = None
-    max_rows_scanned: int | None = None
-    max_seconds: float | None = None
-    feature_budget: int = DEFAULT_FEATURE_BUDGET
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "max_queries": "queries",
+                "max_rows_scanned": "scanned",
+                "max_seconds": "seconds",
+                "feature_budget": "features",
+                "delta_rec": "reconciliation",
+            },
+            change=lambda layout: records.nest(
+                {}, parts={"reconcile": Expectation.migrations[0]}
+            ).upgrade(fold(layout)),
+            revert=lambda layout: unfold(
+                records.nest(
+                    {}, parts={"reconcile": Expectation.migrations[0]}
+                ).downgrade(layout)
+            ),
+        ),
+    )
+
+    queries: int | None = None
+    scanned: int | None = None
+    seconds: float | None = None
+    features: int = DEFAULT_FEATURE_BUDGET
     windows: tuple[float, ...] = DEFAULT_WINDOWS
     lag: float = 0.0
-    delta_rec: float = 0.0
-    eps_key: float = 0.0
-    eps_null: float = 0.0
-    eps_fk: float = 0.0
+    reconciliation: float = 0.0
+    tolerances: Tolerances = dataclasses.field(default_factory=Tolerances)
     strict: bool = False
     entity: Entity | None = None
     reconcile: Expectation | None = None
@@ -429,37 +517,36 @@ class Ingestion:
         """Validates the block.
 
         Raises:
-            ValueError: If `max_queries` or `max_rows_scanned` is set but is
-                not a non-negative integer, `max_seconds`, `lag`,
-                `delta_rec`, `eps_key`, `eps_null` or `eps_fk` is not a
-                finite non-negative number (`max_seconds` only when set),
-                `feature_budget` is not an integer of at least 1, or
+            ValueError: If `queries` or `scanned` is set but is not a
+                non-negative integer, `seconds`, `lag` or `reconciliation`
+                is not a finite non-negative number (`seconds` only when
+                set), `features` is not an integer of at least 1, or
                 `windows` is not a tuple, is empty, has a repeat, or holds a
                 value that is not finite and positive.
         """
-        for name in ("max_queries", "max_rows_scanned"):
+        for name in ("queries", "scanned"):
             value = getattr(self, name)
             if value is not None:
                 qualification.count(value, name)
-        if self.max_seconds is not None:
-            nonnegative(self.max_seconds, "max_seconds")
-        qualification.count(self.feature_budget, "feature_budget", minimum=1)
+        if self.seconds is not None:
+            nonnegative(self.seconds, "seconds")
+        qualification.count(self.features, "features", minimum=1)
         qualification.tupled(self.windows, "windows")
         if not self.windows or len(set(self.windows)) != len(self.windows):
             raise errors.InputError("windows must be non-empty and distinct")
         for window in self.windows:
             if qualification.finite(window, "window") <= 0:
                 raise errors.InputError("windows must be positive")
-        for name in ("lag", "delta_rec", "eps_key", "eps_null", "eps_fk"):
+        for name in ("lag", "reconciliation"):
             nonnegative(getattr(self, name), name)
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the block.
 
         Returns:
-            A JSON-ready dict of the fields, with `windows` as a list.
-            `entity` and `reconcile` are included, as nested dicts, only
-            when set.
+            A JSON-ready dict of the fields, with `windows` as a list and
+            `tolerances` as a nested dict. `entity` and `reconcile` are
+            included, as nested dicts, only when set.
         """
         record = dataclasses.asdict(self)
         record["windows"] = list(self.windows)
@@ -484,9 +571,18 @@ class Ingestion:
         Returns:
             The rebuilt block.
         """
-        values: dict[str, Any] = {"entity": None, "reconcile": None, **record}
-        qualification.require(cls, values)
+        values: dict[str, Any] = qualification.require(
+            cls,
+            {
+                "entity": None,
+                "reconcile": None,
+                **records.load(cls.__name__, cls.migrations, record),
+            },
+        )
         values["windows"] = tuple(values["windows"])
+        values["tolerances"] = Tolerances(
+            **qualification.require(Tolerances, values["tolerances"])
+        )
         block = values["entity"]
         values["entity"] = None if block is None else Entity.from_dict(block)
         totals = values["reconcile"]

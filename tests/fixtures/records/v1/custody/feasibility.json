@@ -1,0 +1,9 @@
+{
+  "mde": 0.17087252685609072,
+  "n_confirmation": 400,
+  "n_required": 292,
+  "power_at_min_effect": 0.9228014673130709,
+  "reason": "400 rows >= 292 needed for power 0.8",
+  "scope": "confirmatory",
+  "verdict": "feasible"
+}
