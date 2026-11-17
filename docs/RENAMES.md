@@ -2915,3 +2915,4 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.models.uplift.wrapper` -> `scmle.preparation.uplift`
 - `scmle.data.ledger` -> `scmle.assurance.ledger`
 - `scmle.data.charter` -> `scmle.assurance.charter`
+- `scmle.data.detectors` -> `scmle.assurance.detectors`

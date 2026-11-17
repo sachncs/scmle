@@ -14,7 +14,7 @@
     python -m benchmarks.qualification --write-f5 F       # detector certs
 
 `--check` fails when a gating detector has no current certificate. The data
-detectors (`scmle.data.detectors`) are checked against
+detectors (`scmle.assurance.detectors`) are checked against
 `detector_certificates.json`: each must have a certificate for its current
 code, and each outcome that passed must still be accepted for gating. An
 outcome that did not pass is simply descriptive and does not fail the check.
@@ -75,8 +75,8 @@ from benchmarks.qualification import smoke
 from benchmarks.qualification import standins
 from benchmarks.qualification import subgroup_certify
 from benchmarks.qualification import uncertainty_certify
+from scmle.assurance.detectors import certificates
 import scmle.data.admissibility.screen
-from scmle.data.detectors import certificates
 
 # Detector id -> (current code hash, defect type it gates on).
 GATING: dict[str, tuple[str, str]] = {}

@@ -74,8 +74,8 @@ import pandas
 from sklearn import datasets
 
 from benchmarks import acceptance
+from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
-from scmle.data.detectors import certificates
 
 PATH = pathlib.Path(__file__).with_suffix(".json")
 ROOT = pathlib.Path(__file__).resolve().parents[2]

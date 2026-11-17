@@ -20,7 +20,7 @@ import numpy
 from scipy import stats
 import support_statistics
 
-from scmle.data.detectors import labels
+from scmle.assurance.detectors import labels
 from scmle.data.framing import costs
 from scmle.data.robustness import shift
 from scmle.decision import ope

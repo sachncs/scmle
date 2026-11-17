@@ -75,9 +75,9 @@ import numpy
 import pandas
 
 from benchmarks.qualification import streams
+from scmle.assurance.detectors import certificates
 import scmle.certificates
 from scmle.data import reference
-from scmle.data.detectors import certificates
 from scmle.evaluation import coverage
 from scmle.governance import escalation
 import scmle.governance.loop

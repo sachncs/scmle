@@ -22,16 +22,16 @@ scmle/data/custody/carve.py unitize single-use union-find with two nested closur
 scmle/data/custody/merkle.py combine single-use tagged parent hash tested directly by ten assertions in test_custody_merkle, test_custody_mutants and test_reliability_contracts
 scmle/data/custody/merkle.py merkle_root single-use named by test_custody_merkle, test_custody_mutants and MUTANTS_custody.md, which pin the odd-level carry and EMPTY_ROOT
 scmle/data/custody/merkle.py fingerprints single-use named by test_custody_mutants and MUTANTS_custody.md, which pin the ascending-id ordering before hashing
-scmle/data/detectors/certificates.py documentation single-use AST scan that keeps a docstring sharing a line with another statement; test_qualification_certificates pins the resulting hash_source behaviour, and the scan is non-obvious next to hash_source's tokenizer loop
-scmle/data/detectors/labels.py assign single-use tested directly in test_detector_labels, which pins the -1 result where no class reaches its threshold
-scmle/data/detectors/labels.py mislabeled single-use tested directly in test_detector_labels and its caller detect is a long assembly of the Noise record
-scmle/data/detectors/labels.py hoeffding single-use formula tested directly in test_detector_labels against the closed form
-scmle/data/detectors/labels.py margins single-use tested directly in test_detector_labels, and its docstring states the MARGIN_LEAVES rationale for the area under the margin rule
-scmle/data/detectors/labels.py noisiness single-use public interval with a documented audit contract (ValueError on duplicate audit positions), tested directly in test_detector_labels
-scmle/data/detectors/missingness.py fit_one single-use named in test_detector_missingness, which asserts the imputer sees train rows only
-scmle/data/detectors/missingness.py imputers single-use named in test_detector_missingness, which asserts per-fold state depends only on the train rows
-scmle/data/detectors/missingness.py make_imputer single-use test_detector_missingness asserts its ValueError for an unknown strategy
-scmle/data/detectors/sentinels.py nullify single-use tested directly in test_detector_sentinels, which pins the integer-to-float recode and the log record
+scmle/assurance/detectors/certificates.py documentation single-use AST scan that keeps a docstring sharing a line with another statement; test_qualification_certificates pins the resulting hash_source behaviour, and the scan is non-obvious next to hash_source's tokenizer loop
+scmle/assurance/detectors/labels.py assign single-use tested directly in test_detector_labels, which pins the -1 result where no class reaches its threshold
+scmle/assurance/detectors/labels.py mislabeled single-use tested directly in test_detector_labels and its caller detect is a long assembly of the Noise record
+scmle/assurance/detectors/labels.py hoeffding single-use formula tested directly in test_detector_labels against the closed form
+scmle/assurance/detectors/labels.py margins single-use tested directly in test_detector_labels, and its docstring states the MARGIN_LEAVES rationale for the area under the margin rule
+scmle/assurance/detectors/labels.py noisiness single-use public interval with a documented audit contract (ValueError on duplicate audit positions), tested directly in test_detector_labels
+scmle/assurance/detectors/missingness.py fit_one single-use named in test_detector_missingness, which asserts the imputer sees train rows only
+scmle/assurance/detectors/missingness.py imputers single-use named in test_detector_missingness, which asserts per-fold state depends only on the train rows
+scmle/assurance/detectors/missingness.py make_imputer single-use test_detector_missingness asserts its ValueError for an unknown strategy
+scmle/assurance/detectors/sentinels.py nullify single-use tested directly in test_detector_sentinels, which pins the integer-to-float recode and the log record
 scmle/data/framing/draft.py linkage single-use tested directly in test_framing_draft, which pins the resolved and unresolved statuses and the gating False flag
 scmle/data/framing/provenance.py claim_tier single-use named by claim.py and baseline.py docstrings and by four tests in test_framing_provenance_questions that pin the unsigned LLM and data-derived cost ceilings
 scmle/data/framing/questions.py judge single-use returns a closure over y, a and b and is tested directly in test_framing_provenance_questions

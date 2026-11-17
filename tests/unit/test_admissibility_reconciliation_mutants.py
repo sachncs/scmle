@@ -2,9 +2,9 @@
 
 import pytest
 
+from scmle.assurance.detectors import certificates
 from scmle.contracts import qualification
 from scmle.data.admissibility import reconciliation
-from scmle.data.detectors import certificates
 
 
 def explanation(amount=-100.0, attested_by="j.doe", detail="cut-off"):

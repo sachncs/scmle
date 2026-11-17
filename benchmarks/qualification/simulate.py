@@ -26,8 +26,8 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.assurance.detectors import certificates
 from scmle.contracts import qualification
-from scmle.data.detectors import certificates
 from scmle.runtime import randomness
 
 TASKS = ("regression", "binary")

@@ -113,7 +113,7 @@ was dropped from the scope.
 
 ## Detectors
 
-Modules: `scmle/data/detectors/{certificates,missingness,labels,sentinels,duplicates,outliers,registry,pipeline}.py`
+Modules: `scmle/assurance/detectors/{certificates,missingness,labels,sentinels,duplicates,outliers,registry,pipeline}.py`
 (`registry.py` produced no mutants). Tests: `test_detector_{missingness,labels,sentinels,structure}.py`
 and `test_duplicate_groups.py`. Same `timeout_multiplier = 2` and load caveat
 as for robustness: the timeout column mixes infinite loops with slow runs,

@@ -9,7 +9,7 @@ import pandas
 import pytest
 from scipy import stats
 
-from scmle.data.detectors import labels
+from scmle.assurance.detectors import labels
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "f5_oracles.json"
 

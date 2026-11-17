@@ -6,7 +6,7 @@ import pytest
 from scipy import stats
 
 from scmle.assurance.charter import feasibility
-from scmle.data.detectors import certificates
+from scmle.assurance.detectors import certificates
 
 
 def message(call):

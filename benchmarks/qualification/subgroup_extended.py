@@ -62,7 +62,7 @@ import pandas
 
 from benchmarks.qualification import subgroup_certify
 from scmle.assurance.charter import causal
-from scmle.data.detectors import certificates
+from scmle.assurance.detectors import certificates
 from scmle.data.identification import run
 
 MEASUREMENTS_PATH = Path(__file__).with_name(

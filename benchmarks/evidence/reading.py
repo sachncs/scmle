@@ -60,8 +60,8 @@ import pandas
 from benchmarks import acceptance
 from benchmarks.qualification import ingest_checks
 from benchmarks.qualification import ingest_naive
+from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
-from scmle.data.detectors import certificates
 from scmle.data.ingest import asof_view
 from scmle.data.ingest import synthesize
 from scmle.data.readers import tabular

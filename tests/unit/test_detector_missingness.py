@@ -7,7 +7,7 @@ from scipy import optimize
 from scipy import stats
 from sklearn import metrics
 
-from scmle.data.detectors import missingness
+from scmle.assurance.detectors import missingness
 
 
 def gaussian_with_gaps(seed=0, n=80, p=3, rate=0.25, mar=False):

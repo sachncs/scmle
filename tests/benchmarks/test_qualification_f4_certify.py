@@ -6,10 +6,10 @@ import pandas
 import pytest
 
 from benchmarks.qualification import f4_certify
+from scmle.assurance.detectors import certificates
 from scmle.data.admissibility import asof
 from scmle.data.admissibility import leakage
 from scmle.data.admissibility import reconciliation
-from scmle.data.detectors import certificates
 
 
 def stored():

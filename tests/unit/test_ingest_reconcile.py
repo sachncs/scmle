@@ -3,7 +3,7 @@
 import pytest
 
 from benchmarks.qualification import ingest_worlds
-from scmle.data.detectors import certificates
+from scmle.assurance.detectors import certificates
 from scmle.data.ingest import reconcile
 
 

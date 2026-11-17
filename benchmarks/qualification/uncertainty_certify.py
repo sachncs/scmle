@@ -94,8 +94,8 @@ from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import neighbors
 
+from scmle.assurance.detectors import certificates
 import scmle.certificates
-from scmle.data.detectors import certificates
 from scmle.evaluation import conformal
 from scmle.evaluation import coverage
 from scmle.evaluation import coverage_slices

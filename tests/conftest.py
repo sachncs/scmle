@@ -116,7 +116,7 @@ HASH_SENSITIVE = frozenset(
 
 def under_mutation() -> bool:
     """Whether mutmut has instrumented the sources the certificates hash."""
-    from scmle.data.detectors import sentinels
+    from scmle.assurance.detectors import sentinels
 
     text = pathlib.Path(sentinels.__file__).read_text(encoding="utf-8")
     return "__mutmut_orig" in text

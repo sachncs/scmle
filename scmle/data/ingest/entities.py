@@ -38,9 +38,9 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.detectors import certificates
 from scmle.runtime import randomness
 
 LEVELS = 3

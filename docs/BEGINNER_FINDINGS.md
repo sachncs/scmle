@@ -15,7 +15,7 @@ beginner has not tested these pages.
 
 | # | What happened | Fix |
 | --- | --- | --- |
-| 1 | A charter run on the Titanic table crashed with `internal: TypeError('sequence item 2: expected str instance, float found')`. The near-duplicate screen joined text columns with a missing value under pandas 3. | `scmle/data/detectors/duplicates.py` fills missing text before joining; a test covers it. Commit "near-duplicate screen no longer crashes on missing text values under pandas 3". |
+| 1 | A charter run on the Titanic table crashed with `internal: TypeError('sequence item 2: expected str instance, float found')`. The near-duplicate screen joined text columns with a missing value under pandas 3. | `scmle/assurance/detectors/duplicates.py` fills missing text before joining; a test covers it. Commit "near-duplicate screen no longer crashes on missing text values under pandas 3". |
 | 2 | `--group-column nosuch` (also `--time-column`, `--weight-column`) ended in a raw `KeyError` traceback from deep inside the splitter. | A clear `data error: group column 'nosuch' not found; columns: [...]` before the split. |
 | 3 | `scmle resume` on a folder that does not exist printed a Python traceback. | Now `artifact error: run directory not found: ...`, exit 1. |
 | 4 | A malformed `--leakage-attestations` file ended in a traceback (`plan`) or `internal error:` (`run`). | Now `config error: invalid leakage attestations: ...`. |

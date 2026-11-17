@@ -59,9 +59,9 @@ from scipy import stats
 
 from scmle.assurance.charter import contracts
 import scmle.assurance.charter.feasibility
+from scmle.assurance.detectors import certificates
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.data.detectors import certificates
 from scmle.data.framing import baseline
 from scmle.data.framing import costs
 from scmle.data.framing import draft

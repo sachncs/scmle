@@ -11,8 +11,8 @@ from benchmarks.qualification import certify
 from benchmarks.qualification import inject
 from benchmarks.qualification import smoke
 from benchmarks.qualification import standins
-from scmle.data.detectors import certificates
-from scmle.data.detectors import sentinels
+from scmle.assurance.detectors import certificates
+from scmle.assurance.detectors import sentinels
 
 POLICY = certificates.Standard(recall_floor=0.5, false_alarm_ceiling=0.1)
 

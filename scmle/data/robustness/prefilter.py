@@ -36,10 +36,10 @@ from collections.abc import Callable
 from collections.abc import Sequence
 import dataclasses
 
+from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import ledger
 from scmle.contracts import qualification
-from scmle.data.detectors import certificates
 from scmle.data.robustness import qualify
 from scmle.data.robustness import shift
 from scmle.data.robustness import stability

@@ -4,11 +4,11 @@ import datetime
 
 import pytest
 
+from scmle.assurance.detectors import certificates
 from scmle.contracts.qualification import Tier
 from scmle.data.admissibility import dag
 from scmle.data.admissibility import provenance
 from scmle.data.admissibility import rules
-from scmle.data.detectors import certificates
 from tests.unit.test_admissibility_provenance import attestation
 from tests.unit.test_admissibility_provenance import make_field
 

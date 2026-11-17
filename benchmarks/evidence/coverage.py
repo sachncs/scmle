@@ -48,10 +48,10 @@ import pandas
 import sklearn
 
 from benchmarks import acceptance
+from scmle.assurance.detectors import certificates
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.detectors import certificates
 from scmle.evaluation import bootstrap
 from scmle.evaluation import diagnostics
 from scmle.evaluation import metrics

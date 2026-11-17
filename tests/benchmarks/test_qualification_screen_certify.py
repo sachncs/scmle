@@ -6,10 +6,10 @@ import pytest
 
 from benchmarks.qualification import f4_certify
 from benchmarks.qualification import screen_certify
+from scmle.assurance.detectors import certificates
 from scmle.data.admissibility import leakage
 from scmle.data.admissibility import screen
 import scmle.data.admissibility.screen
-from scmle.data.detectors import certificates
 
 
 def stored():

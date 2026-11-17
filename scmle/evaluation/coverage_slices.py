@@ -31,8 +31,8 @@ from typing import Any
 import numpy
 import pandas
 
+from scmle.assurance.detectors import certificates
 import scmle.certificates
-from scmle.data.detectors import certificates
 from scmle.evaluation import coverage
 
 MAX_LEVELS = 12

@@ -11,7 +11,7 @@ import numpy
 import pytest
 
 from benchmarks.qualification import uncertainty_certify
-from scmle.data.detectors import certificates
+from scmle.assurance.detectors import certificates
 from scmle.evaluation import coverage_slices
 
 GOLD = {

@@ -5,7 +5,7 @@ import scipy.stats
 
 from benchmarks.qualification import f11_certify
 from benchmarks.qualification import f11_generators
-from scmle.data.detectors import certificates
+from scmle.assurance.detectors import certificates
 
 
 def test_the_committed_f11_certificates_are_current():

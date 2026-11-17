@@ -7,7 +7,7 @@ import pytest
 from scipy import stats
 
 from benchmarks.qualification import f6_certify
-from scmle.data.detectors import certificates
+from scmle.assurance.detectors import certificates
 from scmle.data.robustness import shift
 from scmle.data.robustness import stability
 

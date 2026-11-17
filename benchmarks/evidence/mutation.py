@@ -68,8 +68,8 @@ from mutmut.mutation import file_mutation
 import numpy
 
 from benchmarks import acceptance
+from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
-from scmle.data.detectors import certificates
 import scmle.evaluation.coverage
 
 PATH = Path(__file__).with_suffix(".json")

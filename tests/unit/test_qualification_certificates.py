@@ -6,8 +6,8 @@ import textwrap
 import pytest
 from scipy import stats
 
+from scmle.assurance.detectors import certificates
 from scmle.contracts import qualification
-from scmle.data.detectors import certificates
 
 HASH_A = "a" * 64
 HASH_B = "b" * 64

@@ -5,11 +5,11 @@ import pandas
 import pytest
 from scipy import stats
 
-from scmle.data.detectors import certificates
-from scmle.data.detectors import duplicates
-from scmle.data.detectors import outliers
-from scmle.data.detectors import pipeline
-from scmle.data.detectors import registry
+from scmle.assurance.detectors import certificates
+from scmle.assurance.detectors import duplicates
+from scmle.assurance.detectors import outliers
+from scmle.assurance.detectors import pipeline
+from scmle.assurance.detectors import registry
 
 
 def table(n=200, seed=0):

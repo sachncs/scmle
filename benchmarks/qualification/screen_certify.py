@@ -47,12 +47,12 @@ from sklearn.datasets import load_digits
 from benchmarks.qualification import certify
 from benchmarks.qualification import f4_certify
 from benchmarks.qualification import simulate
+from scmle.assurance.detectors import certificates
 from scmle.contracts import qualification
 from scmle.contracts import tasks
 from scmle.data.admissibility import leakage
 from scmle.data.admissibility import plants
 from scmle.data.admissibility import screen
-from scmle.data.detectors import certificates
 from scmle.data.validation import columns
 from scmle.runtime import randomness
 

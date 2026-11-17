@@ -2,7 +2,7 @@ import json
 
 from benchmarks.qualification import __main__
 from benchmarks.qualification import framing_certify
-from scmle.data.detectors import certificates
+from scmle.assurance.detectors import certificates
 from scmle.data.framing import baseline
 
 

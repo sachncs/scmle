@@ -4,7 +4,7 @@ import json
 
 from benchmarks.qualification import ingest_certify
 from benchmarks.qualification import ingest_worlds
-from scmle.data.detectors import certificates
+from scmle.assurance.detectors import certificates
 
 
 def test_certificate_file_is_current_and_passing():

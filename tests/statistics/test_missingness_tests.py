@@ -11,7 +11,7 @@ import numpy
 import pandas
 import support_statistics
 
-from scmle.data.detectors import missingness
+from scmle.assurance.detectors import missingness
 
 RUNS = 1000
 

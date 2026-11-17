@@ -16,8 +16,8 @@ import inspect
 import textwrap
 from typing import Any
 
+from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
-from scmle.data.detectors import certificates
 
 PACKAGE = "scmle"
 CONSTANTS = (int, float, str, bool, bytes, tuple, frozenset, enum.Enum)

@@ -40,12 +40,12 @@ from sklearn.datasets import load_breast_cancer
 from benchmarks.qualification import certify
 from benchmarks.qualification import inject
 from benchmarks.qualification import simulate
+from scmle.assurance.detectors import certificates
 import scmle.certificates
 from scmle.contracts import qualification
 from scmle.data.admissibility import asof
 from scmle.data.admissibility import leakage
 from scmle.data.admissibility import reconciliation
-from scmle.data.detectors import certificates
 from scmle.runtime import randomness
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f4_certificates.json"

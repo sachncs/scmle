@@ -1525,7 +1525,7 @@ def digest() -> str:
         SHA-256 over the source of every gate function, `gates.toml` and
         the functions of this module that inject and decide.
     """
-    from scmle.data.detectors import certificates
+    from scmle.assurance.detectors import certificates
 
     module = sys.modules[__name__]
     own = certificates.code_hash(module)

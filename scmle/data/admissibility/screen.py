@@ -114,6 +114,8 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.assurance.detectors import certificates
+from scmle.assurance.detectors import trace
 from scmle.assurance.ledger import budget
 from scmle.assurance.ledger import multiplicity
 import scmle.assurance.ledger.budget
@@ -121,8 +123,6 @@ import scmle.certificates
 from scmle.contracts import errors
 from scmle.data.admissibility import leakage
 from scmle.data.admissibility import plants
-from scmle.data.detectors import certificates
-from scmle.data.detectors import trace
 from scmle.runtime import randomness
 
 DETECTOR_ID = "f4-leakage-screen"

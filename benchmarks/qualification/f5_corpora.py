@@ -53,8 +53,8 @@ from benchmarks.qualification import certify
 from benchmarks.qualification import f5
 from benchmarks.qualification import inject
 from benchmarks.qualification import standins
-from scmle.data.detectors import certificates
-from scmle.data.detectors import registry
+from scmle.assurance.detectors import certificates
+from scmle.assurance.detectors import registry
 
 OUTPUT_PATH = Path(__file__).with_name("f5_corpora_measurements.json")
 CORPORA: dict[str, Callable[..., Any]] = {

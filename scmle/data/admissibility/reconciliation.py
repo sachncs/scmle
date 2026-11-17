@@ -23,10 +23,10 @@ import enum
 from typing import Any
 from typing import Self
 
+from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
-from scmle.data.detectors import certificates
 
 DETECTOR_ID = "f4-reconciliation"
 DEFECT_TYPE = "unexplained_gap"

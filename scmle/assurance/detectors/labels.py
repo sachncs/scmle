@@ -39,8 +39,8 @@ from scipy import stats
 from sklearn import ensemble
 from sklearn import model_selection
 
+from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
-from scmle.data.detectors import certificates
 from scmle.runtime import randomness
 
 MIN_ROWS = 50

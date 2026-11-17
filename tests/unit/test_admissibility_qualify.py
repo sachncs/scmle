@@ -5,6 +5,7 @@ import pandas
 import pytest
 
 import scmle.assurance.charter.causal
+from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import online_fdr
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
@@ -12,7 +13,6 @@ from scmle.contracts import qualification
 from scmle.data.admissibility import qualify
 from scmle.data.admissibility import screen
 import scmle.data.admissibility.dag
-from scmle.data.detectors import certificates
 from tests.unit.test_charter_contracts import make_charter
 
 

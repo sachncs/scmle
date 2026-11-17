@@ -8,7 +8,7 @@ dependency):
 
 It draws seeded noisy probabilities, asks `cleanlab.filter.find_label_issues`
 with `filter_by="confident_learning"` for the issue mask, and stores inputs,
-outputs and tool versions. The tests compare `scmle.data.detectors.labels`
+outputs and tool versions. The tests compare `scmle.assurance.detectors.labels`
 with the frozen mask; agreement shows we implemented the reference, not that
 the reference is right.
 """

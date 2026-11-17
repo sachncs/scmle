@@ -32,6 +32,8 @@ from pathlib import Path
 import pandas
 
 import scmle.assurance.charter.causal
+from scmle.assurance.detectors import certificates
+from scmle.assurance.detectors import pipeline
 import scmle.certificates
 from scmle.contracts import errors
 from scmle.contracts import qualification
@@ -41,8 +43,6 @@ from scmle.data.admissibility import rules
 from scmle.data.admissibility import screen
 import scmle.data.admissibility.attestations
 import scmle.data.admissibility.dag
-from scmle.data.detectors import certificates
-from scmle.data.detectors import pipeline
 
 F5_STORE = "detector_certificates.json"
 ATTESTATION_SOURCE = "f4-leakage-attestation"

@@ -14,9 +14,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import multiplicity
 import scmle.certificates
-from scmle.data.detectors import certificates
 from scmle.data.identification import aipw
 from scmle.data.identification import battery
 from scmle.data.identification import did

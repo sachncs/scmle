@@ -62,9 +62,9 @@ import pandas
 
 from benchmarks.qualification import ingest_checks
 from benchmarks.qualification import ingest_worlds
+from scmle.assurance.detectors import certificates
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.data.detectors import certificates
 from scmle.data.ingest import asof_view
 from scmle.data.ingest import budget
 from scmle.data.ingest import entities

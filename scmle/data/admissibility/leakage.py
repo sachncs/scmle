@@ -71,10 +71,10 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.tree import DecisionTreeRegressor
 
+from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import budget
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.detectors import certificates
 from scmle.runtime import randomness
 
 DETECTOR_ID = "f4-leakage-skill"

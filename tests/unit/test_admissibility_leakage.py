@@ -10,12 +10,12 @@ from scipy import stats
 from sklearn.metrics import r2_score
 from sklearn.metrics import roc_auc_score
 
+from scmle.assurance.detectors import certificates
 from scmle.contracts import qualification
 from scmle.contracts.qualification import Decision
 from scmle.contracts.qualification import Subset
 from scmle.contracts.qualification import Tier
 from scmle.data.admissibility import leakage
-from scmle.data.detectors import certificates
 
 CLS = "classification"
 FAST = leakage.Config(

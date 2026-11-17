@@ -6,7 +6,7 @@ planted rows found and clean rows flagged. Detection is judged per row: a
 planted row (an appended copy, or a row with a changed cell) counts as found
 when the detector flags that row. Counts are pooled over the seeds and judged
 by Wilson bounds against the pre-registered policy (see
-`scmle.data.detectors.certificates`). The clean data are scored once, not
+`scmle.assurance.detectors.certificates`). The clean data are scored once, not
 once per seed: a detector sees the same rows every time, so repeating them
 would only shrink the false-alarm interval without adding evidence.
 
@@ -22,8 +22,8 @@ import hashlib
 import pandas
 
 from benchmarks.qualification import inject
+from scmle.assurance.detectors import certificates
 from scmle.contracts import qualification
-from scmle.data.detectors import certificates
 from scmle.runtime import randomness
 
 Detector = Callable[[pandas.DataFrame], pandas.Series]

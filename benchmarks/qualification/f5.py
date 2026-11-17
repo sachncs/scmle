@@ -39,15 +39,15 @@ import pandas
 from benchmarks.qualification import certify
 from benchmarks.qualification import inject
 from benchmarks.qualification import standins
+from scmle.assurance.detectors import certificates
+from scmle.assurance.detectors import duplicates
+from scmle.assurance.detectors import labels
+from scmle.assurance.detectors import missingness
+from scmle.assurance.detectors import outliers
+from scmle.assurance.detectors import registry
+from scmle.assurance.detectors import sentinels
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.data.detectors import certificates
-from scmle.data.detectors import duplicates
-from scmle.data.detectors import labels
-from scmle.data.detectors import missingness
-from scmle.data.detectors import outliers
-from scmle.data.detectors import registry
-from scmle.data.detectors import sentinels
 from scmle.runtime import randomness
 
 CERT_PATH = scmle.certificates.DIRECTORY / "detector_certificates.json"

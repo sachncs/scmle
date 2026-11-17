@@ -12,7 +12,7 @@ import textwrap
 
 import pytest
 
-from scmle.data.detectors import trace
+from scmle.assurance.detectors import trace
 
 BASE = """
 LIMIT = 3

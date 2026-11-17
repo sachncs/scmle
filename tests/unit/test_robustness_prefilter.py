@@ -5,9 +5,9 @@ import json
 import numpy
 import pandas
 
+from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
-from scmle.data.detectors import certificates
 from scmle.data.robustness import prefilter
 from scmle.data.robustness import qualify
 from scmle.data.robustness import report

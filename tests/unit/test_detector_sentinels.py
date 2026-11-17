@@ -4,7 +4,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.data.detectors import sentinels
+from scmle.assurance.detectors import sentinels
 
 
 def column(n=400, seed=0):

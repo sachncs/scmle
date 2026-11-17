@@ -27,7 +27,7 @@ from sklearn.preprocessing import StandardScaler
 
 from benchmarks.qualification import certify
 from benchmarks.qualification import inject
-from scmle.data.detectors import certificates
+from scmle.assurance.detectors import certificates
 
 TARGET = "target"
 SAMPLE_PATH = Path(__file__).with_name("sample_certificates.json")

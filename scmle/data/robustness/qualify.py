@@ -25,8 +25,8 @@ import numpy
 import pandas
 
 from scmle.assurance.charter import contracts
+from scmle.assurance.detectors import certificates
 from scmle.data.admissibility import qualify
-from scmle.data.detectors import certificates
 from scmle.data.robustness import coverage
 from scmle.data.robustness import forward
 from scmle.data.robustness import multiverse

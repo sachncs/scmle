@@ -10,9 +10,9 @@ import pytest
 
 from benchmarks.qualification import f5
 from benchmarks.qualification import standins
+from scmle.assurance.detectors import certificates
+from scmle.assurance.detectors import registry
 from scmle.contracts import qualification
-from scmle.data.detectors import certificates
-from scmle.data.detectors import registry
 from scmle.runtime import randomness
 
 

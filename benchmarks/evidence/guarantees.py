@@ -62,8 +62,8 @@ import sys
 import time
 from typing import Any
 
+from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
-from scmle.data.detectors import certificates
 
 ROOT = Path(__file__).resolve().parents[2]
 RESULTS_PATH = Path(__file__).with_name("guarantees.json")

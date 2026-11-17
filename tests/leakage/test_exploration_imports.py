@@ -23,7 +23,7 @@ FORBIDDEN = (
     "scmle.core.stages",
 )
 PACKAGES = (
-    "scmle.data.detectors",
+    "scmle.assurance.detectors",
     "scmle.data.admissibility",
     "scmle.data.robustness",
 )

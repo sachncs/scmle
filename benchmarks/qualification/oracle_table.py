@@ -31,10 +31,10 @@ from typing import Any
 import numpy
 
 from benchmarks.qualification import oracles
+from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import bivariate
 from scmle.assurance.ledger import budget
 from scmle.assurance.ledger import multiplicity
-from scmle.data.detectors import certificates
 from scmle.evaluation import coverage
 
 FLOOR = 1e-14
@@ -145,7 +145,7 @@ def harmonic(given: Mapping[str, Any]) -> Any:
 
 WIRED: Mapping[str, Wired] = {
     "wilson_interval": Wired(
-        "scmle.data.detectors.certificates.wilson_interval", wilson
+        "scmle.assurance.detectors.certificates.wilson_interval", wilson
     ),
     "clopper_pearson": Wired(
         "scmle.evaluation.coverage.clopper_pearson", clopper

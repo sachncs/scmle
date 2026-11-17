@@ -4,7 +4,7 @@ import types
 
 import pytest
 
-from scmle.data.detectors import certificates
+from scmle.assurance.detectors import certificates
 from scmle.data.robustness import report
 from scmle.data.robustness import shift
 from scmle.data.robustness import stability

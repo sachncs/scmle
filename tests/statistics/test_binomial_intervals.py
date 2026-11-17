@@ -12,8 +12,8 @@ from scipy import stats
 import support_statistics
 
 from scmle.assurance.charter import feasibility
-from scmle.data.detectors import certificates
-from scmle.data.detectors import duplicates
+from scmle.assurance.detectors import certificates
+from scmle.assurance.detectors import duplicates
 from scmle.data.framing import refusal
 from scmle.decision import constraints
 from scmle.evaluation import coverage

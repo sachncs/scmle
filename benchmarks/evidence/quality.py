@@ -76,8 +76,8 @@ from benchmarks import acceptance
 from benchmarks.sota import scmle_runner
 import scmle
 import scmle.api.project
+from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
-from scmle.data.detectors import certificates
 
 PATH = Path(__file__).with_suffix(".json")
 DATA = Path(__file__).parent / "data" / "quality"

@@ -45,10 +45,10 @@ from scipy.spatial import distance
 from sklearn import ensemble
 from sklearn import metrics
 
+from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import controls
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.detectors import certificates
 from scmle.runtime import randomness
 
 C2ST_ID = "f6-shift-c2st"

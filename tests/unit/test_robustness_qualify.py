@@ -8,7 +8,7 @@ import pandas
 import pytest
 
 from scmle.assurance.charter import contracts
-from scmle.data.detectors import certificates
+from scmle.assurance.detectors import certificates
 from scmle.data.robustness import qualify
 from scmle.data.robustness import report
 from scmle.data.robustness import stability
