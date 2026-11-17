@@ -58,9 +58,7 @@ from scmle.contracts import tasks
 
 graph = tasks.Derivation(
     nodes=[
-        tasks.Node(
-            name="unit_price", op="ratio", inputs=["price", "area"]
-        ),
+        tasks.Node(name="unit_price", op="ratio", inputs=["price", "area"]),
         tasks.Node(
             name="month",
             op="datepart",
