@@ -105,7 +105,7 @@ class Estimator:
             raise errors.InputError(
                 "document curation has unresolved blocking findings: "
                 + ", ".join(
-                    finding.finding_id
+                    finding.identifier
                     for finding in report.unresolved_blocking_findings
                 )
             )

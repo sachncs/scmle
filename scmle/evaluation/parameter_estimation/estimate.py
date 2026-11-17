@@ -14,6 +14,7 @@ import numpy
 
 from scmle.contracts import errors
 from scmle.evaluation import parameter_estimation
+from scmle.evaluation.envelope import Counts
 from scmle.evaluation.parameter_estimation.bayesian import bayes
 from scmle.evaluation.parameter_estimation.causal import (
     fit_propensity_estimator,
@@ -144,13 +145,11 @@ def estimate_parameters(
         covariance=tuple(
             tuple(float(value) for value in row) for row in fit.covariance
         ),
-        rows_input=int(input_rows),
-        rows_used=len(values),
-        rows_dropped=int(dropped),
+        rows=Counts(int(input_rows), len(values), int(dropped)),
         diagnostics=diagnostics,
         sensitivity=sensitivity,
         reference=fit.reference,
-        raw_input_fingerprint=fingerprint,
+        digests={"frame": fingerprint},
     )
 
 

@@ -36,10 +36,12 @@ from collections.abc import Sequence
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 import numpy
 
+from scmle.contracts import records
 import scmle.contracts.errors
 
 MIN_CALIBRATION_ROWS = 20
@@ -255,15 +257,21 @@ class ConformalCalibrator:
             (regression) or one minus the probability of the true class
             (classification).
         classes: Class labels, in probability-column order (classification).
-        class_scores: For classification, the scores of the rows whose true
+        conditional: For classification, the scores of the rows whose true
             class is `classes[k]`, one tuple per class (empty when the
             calibrator predates class-conditional sets).
+        migrations: The stored layout's version steps, oldest first; version
+            2 renamed `class_scores` to `conditional`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"class_scores": "conditional"}),
+    )
 
     kind: str
     scores: tuple[float, ...]
     classes: tuple[Any, ...] = ()
-    class_scores: tuple[tuple[float, ...], ...] = ()
+    conditional: tuple[tuple[float, ...], ...] = ()
 
     @classmethod
     def for_regression(
@@ -413,13 +421,13 @@ class ConformalCalibrator:
             raise scmle.contracts.errors.InputError(
                 "coverage must lie strictly between 0 and 1"
             )
-        if self.kind != "classification" or not self.class_scores:
+        if self.kind != "classification" or not self.conditional:
             raise scmle.contracts.errors.InputError(
                 "this calibrator has no per-class scores"
             )
         return tuple(
             cutoff(numpy.asarray(scores), coverage)
-            for scores in self.class_scores
+            for scores in self.conditional
         )
 
     def scarce(self, coverage: float = DEFAULT_COVERAGE) -> list[Any]:
@@ -532,33 +540,54 @@ class ConformalCalibrator:
         ]
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-serializable mapping.
+        """Returns a JSON-serializable mapping at the current version.
 
         Returns:
-            The kind, scores, classes and per-class scores, with tuples as
-            lists.
+            The schema version, kind, scores, classes and per-class scores,
+            with tuples as lists.
         """
         return {
+            records.KEY: records.ORIGIN + len(self.migrations),
             "kind": self.kind,
             "scores": list(self.scores),
             "classes": list(self.classes),
-            "class_scores": [list(scores) for scores in self.class_scores],
+            "conditional": [list(scores) for scores in self.conditional],
         }
 
     @classmethod
     def from_dict(cls, record: dict[str, Any]) -> Self:
-        """Rebuilds a calibrator from `to_dict` output.
+        """Rebuilds a calibrator from `to_dict` output of any version.
+
+        A record without `schema_version` is version 1 and is migrated.
 
         Args:
             record: A mapping with `kind`, `scores`, `classes` and
-                optionally `class_scores`.
+                optionally `conditional` (`class_scores` at version 1).
 
         Returns:
             The rebuilt calibrator.
+
+        Raises:
+            InputError: If the stored version is not an integer, is below 1
+                or is newer than this build.
         """
+        layout = dict(record)
+        stored = layout.pop(records.KEY, records.ORIGIN)
+        latest = records.ORIGIN + len(cls.migrations)
+        if (
+            isinstance(stored, bool)
+            or not isinstance(stored, int)
+            or not records.ORIGIN <= stored <= latest
+        ):
+            raise scmle.contracts.errors.InputError(
+                f"conformal calibrator schema version {stored!r} is not "
+                f"between {records.ORIGIN} and {latest}"
+            )
+        for step in cls.migrations[stored - records.ORIGIN :]:
+            layout = step.upgrade(layout)
         return cls(
-            record["kind"],
-            tuple(record["scores"]),
-            tuple(record["classes"]),
-            tuple(tuple(scores) for scores in record.get("class_scores", ())),
+            layout["kind"],
+            tuple(layout["scores"]),
+            tuple(layout["classes"]),
+            tuple(tuple(scores) for scores in layout.get("conditional", ())),
         )

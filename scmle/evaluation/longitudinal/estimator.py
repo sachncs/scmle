@@ -9,6 +9,7 @@ import pandas
 from scipy import stats
 
 from scmle.contracts import errors
+from scmle.evaluation.envelope import Counts
 from scmle.evaluation.longitudinal.declaration import Config
 from scmle.evaluation.longitudinal.declaration import Estimand
 from scmle.evaluation.longitudinal.panel import prepare
@@ -102,15 +103,13 @@ class Estimator:
             covariance=tuple(
                 tuple(float(value) for value in row) for row in covariance
             ),
-            rows_input=len(frame),
-            rows_used=len(prepared),
-            rows_dropped=rows_dropped,
+            rows=Counts(len(frame), len(prepared), rows_dropped),
             diagnostics=summarize(
                 self.estimand, prepared, fitted, len(periods)
             ),
             limitations=qualify(self.policy, rows_dropped),
             reference=reference,
-            raw_input_fingerprint=fingerprint,
+            digests={"frame": fingerprint},
         )
 
     def wave(

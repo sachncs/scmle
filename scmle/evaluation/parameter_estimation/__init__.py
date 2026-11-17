@@ -18,6 +18,7 @@ scmle.evaluation.parameter_estimation.optimize.minimize.
 
 from scipy import optimize
 
+from scmle.evaluation.envelope import created_temporary
 from scmle.evaluation.parameter_estimation.audit import crosscheck
 from scmle.evaluation.parameter_estimation.audit import (
     reference_hierarchical_random_slope,
@@ -190,7 +191,6 @@ from scmle.evaluation.parameter_estimation.reml import (
 from scmle.evaluation.parameter_estimation.reml import (
     validate_reml_optimizer_result,
 )
-from scmle.evaluation.parameter_estimation.report import created_temporary
 from scmle.evaluation.parameter_estimation.report import Estimation
 from scmle.evaluation.parameter_estimation.report import Fit
 from scmle.evaluation.parameter_estimation.resampling import (

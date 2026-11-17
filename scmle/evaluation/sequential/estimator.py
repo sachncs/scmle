@@ -9,11 +9,13 @@ import pandas
 from scipy import stats
 
 from scmle.contracts import errors
+from scmle.evaluation.envelope import Counts
 from scmle.evaluation.sequential.declaration import Config
 from scmle.evaluation.sequential.declaration import Estimand
 from scmle.evaluation.sequential.panel import order
 from scmle.evaluation.sequential.panel import prepare
 from scmle.evaluation.sequential.panel import tabulate
+from scmle.evaluation.sequential.report import Contrast
 from scmle.evaluation.sequential.report import Estimation
 from scmle.evaluation.sequential.report import PeriodDiagnostics
 from scmle.evaluation.sequential.report import RegimeEstimate
@@ -103,27 +105,27 @@ class Estimator:
         )
         target, comparator = regimes
         contrast = target.estimate - comparator.estimate
-        contrast_standard_error = math.sqrt(max(float(covariance.sum()), 0.0))
+        se = math.sqrt(max(float(covariance.sum()), 0.0))
         return Estimation(
             estimand=self.estimand,
             policy=self.policy,
             periods=tuple(period_diagnostics),
             regimes=regimes,
-            contrast_estimate=contrast,
-            contrast_standard_error=contrast_standard_error,
-            contrast_interval=(
-                contrast - critical_value * contrast_standard_error,
-                contrast + critical_value * contrast_standard_error,
+            contrast=Contrast(
+                estimate=contrast,
+                se=se,
+                interval=(
+                    contrast - critical_value * se,
+                    contrast + critical_value * se,
+                ),
             ),
             covariance=tuple(
                 tuple(float(value) for value in row) for row in covariance
             ),
-            rows_input=len(frame),
-            rows_used=len(prepared),
-            rows_dropped=rows_dropped,
-            subjects_input=subjects_input,
-            subjects_used=len(subject_values),
-            subjects_dropped=subjects_dropped,
+            rows=Counts(len(frame), len(prepared), rows_dropped),
+            subjects=Counts(
+                subjects_input, len(subject_values), subjects_dropped
+            ),
             diagnostics=summarize(
                 self.estimand,
                 self.policy,
@@ -133,7 +135,7 @@ class Estimator:
             ),
             limitations=qualify(self.policy, subjects_dropped),
             reference=reference,
-            raw_input_fingerprint=fingerprint,
+            digests={"frame": fingerprint},
         )
 
 

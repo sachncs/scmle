@@ -100,7 +100,7 @@ class Estimator:
         report = training_data.curate()
         if report.unresolved_blocking_findings:
             blocking_ids = tuple(
-                finding.finding_id
+                finding.identifier
                 for finding in report.unresolved_blocking_findings
             )
             detail = (
