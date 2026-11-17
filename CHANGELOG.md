@@ -128,9 +128,10 @@ marked `Breaking:` and listed first in their group.
   - C6 fails: bundles are byte-identical and metrics equal on this
     platform, but the manifest records no commit, configuration or data
     hash (ML-10); cross-platform is not measured.
-  - C7 is not measured: 3 of 3 kill-and-resume runs match an uninterrupted
-    run, but only 12 of the 299 budget runs the rule needs fit in the time.
-    Two defects were found: profiling (`label_noise.contradict`,
+  - C7 passes on an unloaded laptop: 400 of 400 runs finish within a 20 s
+    budget plus 2 s grace, and 3 of 3 kill-and-resume runs match an
+    uninterrupted run. On a loaded machine most runs overran, and two
+    defects were found: profiling (`label_noise.contradict`,
     `fingerprint.ml_difficulty`) runs outside the time budget and thread
     cap, and a small budget leaves the first trial a 1 s ceiling so the
     whole run fails.

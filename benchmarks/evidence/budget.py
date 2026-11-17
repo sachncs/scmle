@@ -70,8 +70,10 @@ MODULE = "benchmarks.evidence.budget"
 # preparation, the search and the test inside it (about 8 s on 600 rows).
 BUDGET_SECONDS = 20
 # Wall time spent on compliance runs before the module stops starting new
-# ones; with the kill and resume runs it keeps a write under ten minutes.
-COMPLIANCE_SECONDS = 420.0
+# ones. The floor needs at least 299 runs at alpha 0.05; an unloaded run
+# takes about 10 s, so 299 runs need about 3,000 s, and 4,200 s leaves room
+# to reach RUNS_MAX. A write takes about 70 minutes on an unloaded laptop.
+COMPLIANCE_SECONDS = 4200.0
 RUNS_MAX = 400
 # Past the allowance a run is already over; three times the allowance tells
 # a slow run from a stalled one without waiting for a stall to end.
