@@ -79,7 +79,7 @@ Below the 80 target: `independence.py` (79.4), `rules.py` (76.5) and
 in `screen.py` and `leakage.py` are mutants that make the mutated process
 die; they are left out of the score rather than counted as kills.
 
-## Robustness (`scmle/data/robustness/`)
+## Robustness (`scmle/assurance/robustness/`)
 
 Tests: `test_robustness_{multiverse,stability,shift,null,coverage_forward,qualify}.py`.
 `test_the_shipped_certificates_are_found_from_a_checkout` was deselected (it

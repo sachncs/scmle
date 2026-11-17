@@ -9,9 +9,9 @@ from scipy import stats
 from scmle.assurance.charter import contracts
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import bivariate
+from scmle.assurance.robustness import multiverse
+from scmle.assurance.robustness import stability
 from scmle.contracts import qualification
-from scmle.data.robustness import multiverse
-from scmle.data.robustness import stability
 
 CHOICES = (
     contracts.Choice("imputation", ("median", "complete_case"), "median"),

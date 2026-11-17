@@ -6,10 +6,10 @@ import pytest
 from scipy import stats
 
 from scmle.assurance.custody import sealed
+from scmle.assurance.robustness import coverage
+from scmle.assurance.robustness import forward
+from scmle.assurance.robustness import shift
 from scmle.contracts import errors
-from scmle.data.robustness import coverage
-from scmle.data.robustness import forward
-from scmle.data.robustness import shift
 
 
 def test_without_a_reference_every_level_is_unverifiable_never_pass():

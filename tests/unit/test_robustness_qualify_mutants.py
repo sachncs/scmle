@@ -4,12 +4,12 @@ import numpy
 
 from scmle.assurance.charter import contracts
 from scmle.assurance.detectors import certificates
+from scmle.assurance.robustness import coverage
+from scmle.assurance.robustness import multiverse
+from scmle.assurance.robustness import qualify
+from scmle.assurance.robustness import shift
+from scmle.assurance.robustness import stability
 from scmle.contracts import qualification
-from scmle.data.robustness import coverage
-from scmle.data.robustness import multiverse
-from scmle.data.robustness import qualify
-from scmle.data.robustness import shift
-from scmle.data.robustness import stability
 from tests.unit.test_robustness_qualify import RICH
 from tests.unit.test_robustness_qualify import run
 from tests.unit.test_robustness_qualify import world

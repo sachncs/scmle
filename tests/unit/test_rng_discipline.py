@@ -13,7 +13,7 @@ PACKAGES = (
     "scmle.assurance.ledger",
     "scmle.assurance.admissibility",
     "scmle.assurance.detectors",
-    "scmle.data.robustness",
+    "scmle.assurance.robustness",
 )
 ALLOWED_NUMPY_RANDOM = {"Generator", "SeedSequence", "BitGenerator", "PCG64"}
 

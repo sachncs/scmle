@@ -27,11 +27,11 @@ import pandas
 from scmle.assurance.admissibility import qualify
 from scmle.assurance.charter import contracts
 from scmle.assurance.detectors import certificates
-from scmle.data.robustness import coverage
-from scmle.data.robustness import forward
-from scmle.data.robustness import multiverse
-from scmle.data.robustness import shift
-from scmle.data.robustness import stability
+from scmle.assurance.robustness import coverage
+from scmle.assurance.robustness import forward
+from scmle.assurance.robustness import multiverse
+from scmle.assurance.robustness import shift
+from scmle.assurance.robustness import stability
 
 F6_STORE = "f6_certificates.json"
 BUDGET_SECONDS = 60.0

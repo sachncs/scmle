@@ -10,13 +10,13 @@ import scmle.assurance.framing.claim
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 import scmle.assurance.ledger.budget
+from scmle.assurance.robustness import prefilter
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.core import causal_claim
 import scmle.core.context
 from scmle.core.stages import admission
 from scmle.core.stages import scoring
-from scmle.data.robustness import prefilter
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

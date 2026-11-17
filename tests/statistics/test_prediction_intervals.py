@@ -22,7 +22,7 @@ import support_statistics
 
 from scmle.assurance.detectors import labels
 from scmle.assurance.framing import costs
-from scmle.data.robustness import shift
+from scmle.assurance.robustness import shift
 from scmle.decision import ope
 from scmle.decision import threshold
 from scmle.evaluation import conformal

@@ -8,8 +8,8 @@ from scipy import stats
 
 from benchmarks.qualification import f6_certify
 from scmle.assurance.detectors import certificates
-from scmle.data.robustness import shift
-from scmle.data.robustness import stability
+from scmle.assurance.robustness import shift
+from scmle.assurance.robustness import stability
 
 
 def stored():

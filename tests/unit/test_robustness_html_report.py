@@ -2,8 +2,8 @@
 
 import re
 
-from scmle.data.robustness import html_report
-from scmle.data.robustness import report
+from scmle.assurance.robustness import html_report
+from scmle.assurance.robustness import report
 
 
 def finding(name="income", status="stable", effects=(0.3, 0.35, 0.28)):

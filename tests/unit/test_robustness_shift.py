@@ -8,8 +8,8 @@ from scipy import stats
 from sklearn import metrics
 
 from scmle.assurance.detectors import certificates
+from scmle.assurance.robustness import shift
 from scmle.contracts import qualification
-from scmle.data.robustness import shift
 
 
 def frames(rows=120, shift_by=0.0, seed=0, columns=4):

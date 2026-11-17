@@ -9,9 +9,9 @@ import pytest
 
 from scmle.assurance.charter import contracts
 from scmle.assurance.detectors import certificates
-from scmle.data.robustness import qualify
-from scmle.data.robustness import report
-from scmle.data.robustness import stability
+from scmle.assurance.robustness import qualify
+from scmle.assurance.robustness import report
+from scmle.assurance.robustness import stability
 
 RICH = (
     contracts.Choice("imputation", ("median", "complete_case"), "median"),

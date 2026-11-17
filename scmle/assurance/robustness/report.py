@@ -8,10 +8,10 @@ and the choice-to-result attribution are inside each finding.
 
 from typing import Any
 
+from scmle.assurance.robustness import qualify
+from scmle.assurance.robustness import shift
+from scmle.assurance.robustness import stability
 from scmle.contracts import errors
-from scmle.data.robustness import qualify
-from scmle.data.robustness import shift
-from scmle.data.robustness import stability
 
 SCHEMA_VERSION = 1
 STABILITY_KEYS = (

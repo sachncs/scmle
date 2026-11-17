@@ -40,9 +40,9 @@ import numpy
 import pandas
 from scipy import stats
 
+from scmle.assurance.robustness import shift
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.robustness import shift
 
 COMPLETE = "complete"
 LOGGED_PROPENSITY = "logged_propensity"
@@ -296,8 +296,8 @@ def circularity(
 
     Compares next-period features of cases whose decision bypassed the model
     (randomized, logged) with those of model-decided cases, with a kernel
-    two-sample test (`scmle.data.robustness.shift.mmd_test`). A small p-value is
-    evidence that the model's decisions change the data it will see.
+    two-sample test (`scmle.assurance.robustness.shift.mmd_test`). A small
+    p-value is evidence that the model's decisions change the data it will see.
 
     Args:
         bypass_features: Next-period features of the bypass slice.

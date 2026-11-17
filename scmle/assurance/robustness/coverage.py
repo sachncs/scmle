@@ -19,8 +19,8 @@ from typing import Any
 import pandas
 from scipy import stats
 
+from scmle.assurance.robustness import shift
 from scmle.contracts import errors
-from scmle.data.robustness import shift
 
 ALPHA = 0.05
 MISSING_LEVEL = "<missing>"

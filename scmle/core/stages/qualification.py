@@ -8,17 +8,17 @@ import scmle.assurance.framing.claim
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import explore
 from scmle.assurance.ledger import governed
+from scmle.assurance.robustness import html_report
+from scmle.assurance.robustness import prefilter
+import scmle.assurance.robustness.qualify
+import scmle.assurance.robustness.report
+import scmle.assurance.robustness.stability
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.core import ingest_stage
 import scmle.core.context
 from scmle.core.stages import screening
 from scmle.data.readers import tabular
-from scmle.data.robustness import html_report
-from scmle.data.robustness import prefilter
-import scmle.data.robustness.qualify
-import scmle.data.robustness.report
-import scmle.data.robustness.stability
 
 
 class Qualification(screening.Screening):
@@ -116,7 +116,7 @@ class Qualification(screening.Screening):
         charter: contracts.AnalysisCharter,
         view: Any,
         survivors: tuple[str, ...],
-    ) -> scmle.data.robustness.qualify.Robustness:
+    ) -> scmle.assurance.robustness.qualify.Robustness:
         """Assesses the stability of the survivors and shift from a reference.
 
         Reads the exploration view and the data spec's reference sample, if
@@ -146,7 +146,7 @@ class Qualification(screening.Screening):
             else None
         )
         rules = charter.rules
-        return scmle.data.robustness.qualify.run(
+        return scmle.assurance.robustness.qualify.run(
             view.features,
             codes,
             survivors=list(survivors),
@@ -162,9 +162,9 @@ class Qualification(screening.Screening):
             sensitive=tuple(data.sensitive_columns),
             temporal=bool(data.time_column),
             rule=(
-                scmle.data.robustness.stability.DEFAULT_RULE
+                scmle.assurance.robustness.stability.DEFAULT_RULE
                 if rules is None
-                else scmle.data.robustness.stability.Thresholds(
+                else scmle.assurance.robustness.stability.Thresholds(
                     rules.s_min, rules.band, rules.q_min
                 )
             ),
@@ -198,12 +198,12 @@ class Qualification(screening.Screening):
         found = stage.found
         if found is None:  # pragma: no cover - run_governed always calls it
             raise errors.BlockedError("the second stage did not run")
-        stability_document = scmle.data.robustness.report.stability_report(
+        stability_document = scmle.assurance.robustness.report.stability_report(
             found, stage.note if stage.requested else None
         )
-        shift_document = scmle.data.robustness.report.shift_report(found)
-        scmle.data.robustness.report.conform(stability_document)
-        scmle.data.robustness.report.validate_shift(shift_document)
+        shift_document = scmle.assurance.robustness.report.shift_report(found)
+        scmle.assurance.robustness.report.conform(stability_document)
+        scmle.assurance.robustness.report.validate_shift(shift_document)
         context.write_json("stability_report.json", stability_document)
         context.write_json("shift_report.json", shift_document)
         context.write_text(

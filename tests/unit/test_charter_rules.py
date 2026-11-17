@@ -135,7 +135,7 @@ def test_rules_reject_unknown_and_missing_fields():
 
 
 def test_defaults_match_the_shipped_stability_rule():
-    from scmle.data.robustness import stability
+    from scmle.assurance.robustness import stability
 
     defaults = scmle.assurance.charter.rules.Procedure()
     assert dataclasses.asdict(stability.DEFAULT_RULE) == {

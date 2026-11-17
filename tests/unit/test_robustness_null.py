@@ -10,7 +10,7 @@ import numpy
 import pandas
 from scipy import stats
 
-from scmle.data.robustness import shift
+from scmle.assurance.robustness import shift
 
 LEVEL = 0.01
 RUNS = 200

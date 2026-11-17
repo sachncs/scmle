@@ -83,7 +83,7 @@
       "scmle/data/modalities/video/__init__.py",
       "scmle/data/profiling/__init__.py",
       "scmle/data/readers/__init__.py",
-      "scmle/data/robustness/__init__.py",
+      "scmle/assurance/robustness/__init__.py",
       "scmle/data/splitting/__init__.py",
       "scmle/data/store/__init__.py",
       "scmle/data/validation/__init__.py",

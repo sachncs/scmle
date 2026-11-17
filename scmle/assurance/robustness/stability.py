@@ -55,9 +55,9 @@ from scmle.assurance.charter import contracts
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import bivariate
 from scmle.assurance.ledger import controls
+from scmle.assurance.robustness import multiverse
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.robustness import multiverse
 from scmle.runtime import randomness
 
 DETECTOR_ID = "f6-stability"

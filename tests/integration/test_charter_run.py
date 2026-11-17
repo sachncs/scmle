@@ -371,15 +371,15 @@ def test_a_charter_run_writes_valid_stability_and_shift_reports(
     binary_frame, tmp_path
 ):
     # Enforces docs/ARTIFACTS.md:37.
-    import scmle.data.robustness.report
+    import scmle.assurance.robustness.report
 
     result = run(binary_frame, tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
     stability = json.loads((folder / "stability_report.json").read_text())
     shifted = json.loads((folder / "shift_report.json").read_text())
-    scmle.data.robustness.report.conform(stability)
-    scmle.data.robustness.report.validate_shift(shifted)
+    scmle.assurance.robustness.report.conform(stability)
+    scmle.assurance.robustness.report.validate_shift(shifted)
     # The default charter declares one implemented choice with one usable
     # option, so no finding can be called stable.
     assert stability["status"] == "not_evaluated"

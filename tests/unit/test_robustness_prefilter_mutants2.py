@@ -5,10 +5,10 @@ import types
 import pytest
 
 from scmle.assurance.detectors import certificates
+from scmle.assurance.robustness import prefilter
+from scmle.assurance.robustness import shift
+from scmle.assurance.robustness import stability
 from scmle.contracts import qualification
-from scmle.data.robustness import prefilter
-from scmle.data.robustness import shift
-from scmle.data.robustness import stability
 from scmle.runtime import randomness
 
 

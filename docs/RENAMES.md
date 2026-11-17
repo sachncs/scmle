@@ -2921,3 +2921,4 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.governance.vault` -> `scmle.assurance.custody.vault`
 - `scmle.data.framing` -> `scmle.assurance.framing`
 - `scmle.data.ingest` -> `scmle.assurance.ingest`
+- `scmle.data.robustness` -> `scmle.assurance.robustness`

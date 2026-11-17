@@ -33,8 +33,8 @@ import numpy
 import pandas
 
 from scmle.assurance.ledger import confirm
+from scmle.assurance.robustness import stability
 from scmle.contracts import qualification
-from scmle.data.robustness import stability
 from scmle.runtime import randomness
 
 ACTOR = "f6-forward"

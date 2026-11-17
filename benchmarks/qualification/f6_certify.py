@@ -2,7 +2,7 @@
 
 Three robustness checks may gate a run once certified:
 
-* `f6-shift-c2st` (`scmle.data.robustness.shift.c2st`): the classifier
+* `f6-shift-c2st` (`scmle.assurance.robustness.shift.c2st`): the classifier
   two-sample test.
 * `f6-shift-mmd` (`...shift.mmd_test`): the kernel two-sample test.
 * `f6-stability` (`...stability`, `...multiverse`): the multiverse survival
@@ -75,11 +75,11 @@ from sklearn.datasets import load_breast_cancer
 from benchmarks.qualification import certify
 from scmle.assurance.charter import contracts
 from scmle.assurance.detectors import certificates
+from scmle.assurance.robustness import multiverse
+from scmle.assurance.robustness import shift
+from scmle.assurance.robustness import stability
 import scmle.certificates
 from scmle.contracts import qualification
-from scmle.data.robustness import multiverse
-from scmle.data.robustness import shift
-from scmle.data.robustness import stability
 from scmle.runtime import randomness
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f6_certificates.json"

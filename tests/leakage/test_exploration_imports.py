@@ -25,7 +25,7 @@ FORBIDDEN = (
 PACKAGES = (
     "scmle.assurance.detectors",
     "scmle.assurance.admissibility",
-    "scmle.data.robustness",
+    "scmle.assurance.robustness",
 )
 ROOT = pathlib.Path(scmle.__file__).parent.parent
 

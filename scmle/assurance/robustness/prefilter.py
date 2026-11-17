@@ -39,10 +39,10 @@ import dataclasses
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import ledger
+from scmle.assurance.robustness import qualify
+from scmle.assurance.robustness import shift
+from scmle.assurance.robustness import stability
 from scmle.contracts import qualification
-from scmle.data.robustness import qualify
-from scmle.data.robustness import shift
-from scmle.data.robustness import stability
 from scmle.runtime import randomness
 
 FILTER_ID = "f6-stability-filter"

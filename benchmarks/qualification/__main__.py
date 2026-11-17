@@ -18,7 +18,7 @@ detectors (`scmle.assurance.detectors`) are checked against
 `detector_certificates.json`: each must have a certificate for its current
 code, and each outcome that passed must still be accepted for gating. An
 outcome that did not pass is simply descriptive and does not fail the check.
-The robustness checks (`scmle.data.robustness`) are checked the same way
+The robustness checks (`scmle.assurance.robustness`) are checked the same way
 against `f6_certificates.json`. The leakage screen
 (`scmle.assurance.admissibility.screen`, the test behind
 `leakage_policy="block"`) ships its certificates inside the package

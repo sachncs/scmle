@@ -23,8 +23,8 @@ from benchmarks.qualification import simulate
 from benchmarks.qualification import standins
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import budget
+from scmle.assurance.robustness import shift
 from scmle.contracts import qualification
-from scmle.data.robustness import shift
 
 ALPHA = 0.05
 SMOKE_ROWS = 300

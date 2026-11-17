@@ -8,10 +8,10 @@ import pandas
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
-from scmle.data.robustness import prefilter
-from scmle.data.robustness import qualify
-from scmle.data.robustness import report
-from scmle.data.robustness import stability
+from scmle.assurance.robustness import prefilter
+from scmle.assurance.robustness import qualify
+from scmle.assurance.robustness import report
+from scmle.assurance.robustness import stability
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_ledger_governed import locate
 from tests.unit.test_robustness_qualify import RICH
