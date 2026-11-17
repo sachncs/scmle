@@ -916,6 +916,10 @@ class ReleaseRegistry:
         try:
             self.rewind(model, environment, current, target, signing_key)
         except errors.ScmleError as error:
+            # ERR-20: this also catches InputError, which was a ValueError
+            # that escaped here with traffic already on the target. Kept on
+            # purpose: `rollback` documents that done=False puts the serving
+            # revision back, and only this handler does that.
             # handled: recorded event and restore; failure outcome
             restored = self.restore(plane, current)
             self.log(

@@ -460,6 +460,13 @@ class Orchestrator:
             machine.transition(state.Progress.BLOCKED, str(error))
             raise
         except errors.ScmleError as error:
+            # This also takes an `InputError` (and `KindError`,
+            # `OrderError`): before ERR-20 those were bare ValueError,
+            # TypeError or RuntimeError raises that fell to the catch-all
+            # below, failing as `internal:` and escaping wrapped. Kept on
+            # purpose: an InputError is by contract a user or data problem,
+            # not a defect, so the run fails as `input:` and the error
+            # escapes as itself; a bare ValueError still fails as internal.
             error.details["run_dir"] = str(store.directory)
             error.details["recoverable_trials"] = self.recoverable(store)
             machine.transition(

@@ -1175,26 +1175,19 @@ class Executor:
                 )
                 if attempt < step.retries.max_attempts:
                     self.sleep(step.retries.delay(attempt))
-            except errors.ScmleError as error:
-                # handled: scmle error saved in attempts; step recorded FAILED
+            except Exception as error:  # noqa: BLE001 -- handler boundary
+                # handled: handler exception saved in attempts; step recorded
+                # FAILED with error. A framework error keeps its whole text;
+                # any other is cut to 300 characters. ERR-20: an InputError
+                # was a bare ValueError (or TypeError, RuntimeError) and is
+                # still cut like one.
                 total += context.spent
                 failure = errors.Failure.of(error)
                 last_error = failure.text
-                attempts.append(
-                    {
-                        "attempt": attempt,
-                        "state": "failed",
-                        "error": last_error,
-                        "failure": dict(failure.dump()),
-                    }
-                )
-                break
-            except Exception as error:  # noqa: BLE001 -- handler boundary
-                # handled: handler exception saved in attempts; step recorded
-                # FAILED with error
-                total += context.spent
-                failure = errors.Failure.of(error)
-                last_error = failure.text[:300]
+                if not isinstance(error, errors.ScmleError) or isinstance(
+                    error, errors.InputError
+                ):
+                    last_error = last_error[:300]
                 attempts.append(
                     {
                         "attempt": attempt,

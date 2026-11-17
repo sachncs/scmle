@@ -1110,6 +1110,24 @@ marked `Breaking:` and listed first in their group.
 
 ### Fixed
 
+- The move to `InputError`, `KindError` and `OrderError` (ERR-20) changed
+  what some handlers did, because a handler for `ScmleError` now also
+  caught input problems that used to pass it as plain `ValueError`,
+  `TypeError` or `RuntimeError`. Each such handler now does something
+  chosen on purpose, pinned by a test:
+  - Restored: batch processing (`IncrementalProcessor.run`) raises on bad
+    input again instead of returning a partial result; the claims audit
+    raises on an empty signing key instead of recording failed steps; the
+    service answers an input problem while scoring with 400 again (500 for
+    a call made in the wrong order) instead of an undocumented 422, and its
+    public readiness reason shows only an input error's type, not its
+    message; a failed workflow step shortens an input error's text as
+    before.
+  - Kept: the command line exits 1 ("input error", as `docs/CLI.md` says)
+    rather than 70 ("internal error, a defect"); a run that fails on bad
+    input is marked `input` rather than `internal`; a rollback rejected by
+    an input problem puts the previous revision back, as `rollback`
+    promises, instead of leaving the platform out of step.
 - A bundle now traces back to what built it (ML-10). The manifest records
   the run's `seed`, the `configuration` hash, the `dataset` hash, the
   `split` fingerprint, the scmle `commit` (empty when scmle runs from an

@@ -577,6 +577,27 @@ def test_readiness_steps_cannot_be_skipped_or_reordered():
         readiness.begin(guard.Phase.LOADING)
 
 
+def test_a_loader_input_error_shows_its_type_not_its_message():
+    # ERR-20 turned the loader's bare ValueErrors into InputError, a
+    # ScmleError; readiness then published their messages (paths, values).
+    # Only a framework failure's category and message are shown; an input
+    # error keeps the type-name-only form a ValueError had.
+    def loader(readiness):
+        readiness.begin(guard.Phase.VERIFYING)
+        raise errors.InputError("key file /secret/path is empty")
+
+    adapter = serving.HttpServing(loader=loader)
+    adapter.start()
+    try:
+        assert not wait_until_settled(adapter, 20)
+        status, body = call(f"{adapter.address}/readyz")
+        assert status == 503
+        assert "/secret/path" not in body["reason"]
+        assert "InputError" in body["reason"]
+    finally:
+        adapter.stop()
+
+
 def test_the_loader_and_bundle_arguments_are_exclusive(bundle):
     with pytest.raises(errors.ConfigError, match="exactly one"):
         serving.HttpServing()

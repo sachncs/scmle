@@ -2071,7 +2071,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         report("blocked", error, debug=args.debug)
         return EXIT_BLOCKED
     except errors.ScmleError as error:
-        # handled: logged by `report`, exit code EXIT_FAILED
+        # handled: logged by `report`, exit code EXIT_FAILED. This also
+        # catches `InputError` (and `KindError`, `OrderError`), which were
+        # bare ValueError/TypeError/RuntimeError raises exiting 70 before
+        # ERR-20. Kept on purpose: docs/CLI.md gives bad data exit 1, and
+        # exit 70 means a defect; a bare ValueError still exits 70.
         report(f"{error.category} error", error, debug=args.debug)
         return EXIT_FAILED
     except Exception as error:  # noqa: BLE001 -- the process boundary: any other failure is a defect, reported with its traceback

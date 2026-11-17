@@ -389,6 +389,27 @@ def test_an_unconfirmed_rollback_changes_nothing(tmp_path):
     )
 
 
+def test_an_input_error_in_the_registry_step_restores_the_platform(tmp_path):
+    # ERR-20: an InputError (once a bare ValueError that escaped with
+    # traffic on the target) is a rejected rollback that puts NEW back.
+    release, plane, ignored = world(tmp_path)
+    assert promote(release, plane, 1, support_runtime.OLD).done
+    assert promote(release, plane, 2, support_runtime.NEW).done
+    before = snapshot(release)
+    release.store.attach(InputGuard(), "scope")
+    outcome = release.rollback(MODEL, PRODUCTION, plane, support_release.KEY)
+    assert not outcome.done and outcome.restored is True
+    assert outcome.reasons == ("bad rollback input",)
+    assert snapshot(release)["aliases"] == before["aliases"]
+    assert plane.observe().image_digest == support_runtime.NEW
+    assert release.ledger.rows[-1]["body"]["event"] == "rollback_rejected"
+
+
+class InputGuard:
+    def require(self, action, detail, scope):
+        raise errors.InputError("bad rollback input")
+
+
 # ---- reconcile ----------------------------------------------------------
 
 

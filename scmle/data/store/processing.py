@@ -334,6 +334,8 @@ class IncrementalProcessor:
         `CorruptError` propagates if the checkpoint is damaged,
         and `ChangedError` if an input that was already processed now
         has different bytes; both leave the stored checkpoint as it was.
+        An `errors.InputError` from processing an object propagates too,
+        as the `ValueError` it was before ERR-20 did.
         """
         try:
             self.store.put(self.lock_key, b"locked", if_absent=True)
@@ -400,6 +402,10 @@ class IncrementalProcessor:
                 continue
             try:
                 dropped, written, output_key = self.process(meta, checkpoint)
+            except errors.InputError:
+                # ERR-20: an InputError was a bare ValueError (or TypeError,
+                # RuntimeError) that propagated out of the run; it still does.
+                raise
             except (errors.ScmleError, retry.RetryError) as error:
                 LOGGER.exception("processing failed at %s", meta.key)
                 failed, problem = meta.key, errors.Failure.of(error).text

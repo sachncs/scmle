@@ -80,3 +80,25 @@ def test_without_debug_a_handled_failure_is_one_line(monkeypatch, caplog):
     assert run([COMMAND.name], caplog) == cli.EXIT_FAILED
     assert "Traceback" not in caplog.text
     assert "data error: cannot read" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        errors.InputError("bad column"),
+        errors.KindError("bad column"),
+        errors.OrderError("bad column"),
+    ],
+)
+def test_an_input_error_exits_as_failed(monkeypatch, caplog, error):
+    # Before ERR-20 the same raise was a bare ValueError and exited 70.
+    failing(monkeypatch, error)
+    assert run([COMMAND.name], caplog) == cli.EXIT_FAILED
+    assert "input error: bad column" in caplog.text
+    assert "internal error" not in caplog.text
+
+
+def test_a_plain_value_error_still_exits_as_internal(monkeypatch, caplog):
+    failing(monkeypatch, ValueError("unexpected value"))
+    assert run([COMMAND.name], caplog) == cli.EXIT_INTERNAL
+    assert "internal error" in caplog.text

@@ -83,6 +83,40 @@ def test_the_server_rejects_empty_prediction_requests(saved):
     assert body["schema_version"] == "1" and body["request_id"]
 
 
+@pytest.mark.parametrize(
+    ("raised", "status", "category"),
+    [
+        (errors.InputError("bad value"), 400, "request"),
+        (errors.KindError("bad kind"), 400, "request"),
+        (errors.OrderError("not fitted"), 500, "internal"),
+    ],
+)
+def test_an_input_error_while_scoring_keeps_its_old_status(
+    saved, monkeypatch, raised, status, category
+):
+    # ERR-20: these were ValueError, TypeError and RuntimeError (400, 400,
+    # 500); the DataError branch must not turn them into 422.
+    model = scmle.artifacts.bundle.Bundle.load(
+        saved[0] / "bundle", trusted=True
+    )
+    adapter = serving.HttpServing(model)
+
+    def score(request):
+        raise raised
+
+    monkeypatch.setattr(adapter, "score", score)
+    adapter.start()
+    try:
+        answer, body = post(
+            f"{adapter.address}/predict",
+            {"records": [{"a": 1.0, "b": 2.0}]},
+        )
+    finally:
+        adapter.stop()
+
+    assert (answer, body["category"]) == (status, category)
+
+
 def test_the_server_refuses_oversized_bodies_with_413(saved):
     model = scmle.artifacts.bundle.Bundle.load(
         saved[0] / "bundle", trusted=True

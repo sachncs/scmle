@@ -557,9 +557,13 @@ class HttpServing(Server):
             self.loaded = loader(self.readiness)
         except Exception as error:
             LOGGER.exception("verification or load failed")
+            # ERR-20: an InputError was a bare ValueError (or TypeError,
+            # RuntimeError) here, published by type name only; readiness is
+            # public, so its message (paths, values) stays private.
             reason = (
                 f"{error.category}: {error}"
                 if isinstance(error, errors.ScmleError)
+                and not isinstance(error, errors.InputError)
                 else type(error).__name__
             )
             self.readiness.fail(reason)
@@ -978,6 +982,18 @@ class Responder(server.BaseHTTPRequestHandler):
         except serving.MismatchError as error:
             # handled: schema change answered with HTTP 409 and details
             self.fail(409, str(error), error.category, error.details)
+        except errors.OrderError:
+            # ERR-20: a step called out of order inside the server was a
+            # RuntimeError, answered 500 before it became an InputError;
+            # it is still a server defect, not the caller's input.
+            LOGGER.exception("internal serving failure")
+            self.fail(500, "internal serving failure", "internal")
+        except errors.InputError as error:
+            # ERR-20: these were ValueError or TypeError and answered 400
+            # as malformed; the DataError branch below would make them 422,
+            # which the service documents only for schema and policy.
+            # handled: malformed request answered with HTTP 400
+            self.fail(400, f"malformed request: {error}", "request")
         except errors.ScmleError as error:
             # Rows that break the schema are well-formed requests the
             # server cannot process: 422. Anything else is a 400.

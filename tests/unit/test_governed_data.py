@@ -408,6 +408,23 @@ def test_exhausted_or_permanent_failures_stop_at_the_object_and_keep_progress(
     assert run.failed == "input/a.csv" and "RetryError" in run.error
 
 
+def test_an_input_error_propagates_as_the_value_error_it_was(store):
+    # ERR-20: the bare ValueError became InputError; it is not swallowed.
+    seed(store)
+
+    def rejects_b(frame):
+        if 4 in frame["id"].tolist():
+            raise errors.InputError("bad value")
+        return upper(frame)
+
+    with pytest.raises(ValueError, match="bad value"):
+        processing.IncrementalProcessor(
+            store, CONTRACT, rejects_b, sleep=lambda s: None
+        ).run()
+    assert not store.exists("state/lock")
+    assert processor(store).run().processed == ("input/b.csv",)
+
+
 def test_the_gate_runs_before_processing_and_quarantine_is_respected(
     store, tmp_path
 ):

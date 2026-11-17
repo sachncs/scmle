@@ -381,3 +381,33 @@ def test_showing_a_claim_the_ledger_does_not_know_is_an_artifact_error(
     )
     with pytest.raises(errors.ArtifactError, match="h424242"):
         claims_audit.inspect(tmp_path, "h424242")
+
+
+def custody(tmp_path):
+    """Writes a one-entry custody log signed with `KEY`."""
+    log = sealed.Journal(tmp_path / claims_audit.CUSTODY_FILE, KEY)
+    log.append("C", "sealed", "scmle.test", {"rows": 1})
+
+
+def test_an_empty_key_is_an_input_error_not_a_failed_step(tmp_path):
+    # ERR-20: an empty key raised ValueError out of every step before the
+    # error types were narrowed; the steps must not turn it into a finding.
+    sealing.inscribe(
+        tmp_path / claims_audit.CHARTER_FILE, make_charter(), signing_key=KEY
+    )
+    custody(tmp_path)
+    (tmp_path / "coverage_claim.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(errors.InputError, match="must not be empty"):
+        claims_audit.authenticate(tmp_path, None, "")
+    with pytest.raises(errors.InputError, match="must not be empty"):
+        claims_audit.custodial(tmp_path, {}, "")
+    with pytest.raises(errors.InputError, match="must not be empty"):
+        claims_audit.check_decision_files(tmp_path, "")
+    with pytest.raises(errors.InputError, match="must not be empty"):
+        claims_audit.corroborate(tmp_path, "")
+
+
+def test_verify_with_an_empty_key_raises(tmp_path):
+    make_run(tmp_path)
+    with pytest.raises(ValueError, match="must not be empty"):
+        claims_audit.verify(tmp_path, "")

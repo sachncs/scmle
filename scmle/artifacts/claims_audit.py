@@ -386,6 +386,11 @@ def authenticate(
         return [Finding(name, SKIPPED, f"{CHARTER_FILE} is not in the run")]
     try:
         loaded = sealing.read_verified(path, signing_key=signing_key)
+    except errors.InputError:
+        # ERR-20: an unusable signing key (empty) is the caller's input
+        # error and propagates, as its ValueError did before the error
+        # types were narrowed; it is not a finding about the run.
+        raise
     except errors.ScmleError as error:
         # handled: returned as failed finding/problem/refusal with error text
         return [Finding(name, FAIL, str(error))]
@@ -717,6 +722,11 @@ def custodial(
         return Finding(name, SKIPPED, f"{CUSTODY_FILE} is not in the run")
     try:
         log = sealed.Journal(path, signing_key)
+    except errors.InputError:
+        # ERR-20: an unusable signing key (empty) is the caller's input
+        # error and propagates, as its ValueError did before the error
+        # types were narrowed; it is not a finding about the run.
+        raise
     except errors.ScmleError as error:
         # handled: returned as failed finding/problem/refusal with error text
         return Finding(name, FAIL, str(error))
@@ -783,6 +793,11 @@ def check_decision_files(
     if path.exists():
         try:
             log = sealed.Journal(path, signing_key)
+        except errors.InputError:
+            # ERR-20: an unusable signing key (empty) is the caller's input
+            # error and propagates, as its ValueError did before the error
+            # types were narrowed; it is not a finding about the run.
+            raise
         except errors.ScmleError as error:
             # handled: returned as failed finding/problem/refusal with error
             # text
@@ -872,6 +887,11 @@ def corroborate(
     if log_path.exists():
         try:
             log = sealed.Journal(log_path, signing_key)
+        except errors.InputError:
+            # ERR-20: an unusable signing key (empty) is the caller's input
+            # error and propagates, as its ValueError did before the error
+            # types were narrowed; it is not a finding about the run.
+            raise
         except errors.ScmleError as error:
             # handled: returned as failed finding/problem/refusal with error
             # text

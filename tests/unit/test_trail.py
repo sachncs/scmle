@@ -392,3 +392,20 @@ def test_the_committed_evidence_says_what_was_not_run():
         "AWS or GCP",
     ):
         assert word in text
+
+
+def test_a_deployment_row_of_the_wrong_kind_is_a_broken_chain(tmp_path):
+    # ERR-20: the body check now raises KindError, an InputError; the
+    # ledger turns it into its own MisuseError as it did the TypeError, so
+    # the handler's behaviour is unchanged and the row stays a finding.
+    from scmle.data.ledger import ledger
+
+    content = {"seq": 0, "kind": "open", "body": [1], "prev": ledger.GENESIS}
+    row = dict(content, hash=ledger.digest(content))
+    path = tmp_path / records.RETAINED / "deployment/deployment_ledger.jsonl"
+    path.parent.mkdir(parents=True)
+    write_rows(path, [row])
+    tracer = trace.Tracer(tmp_path, {})
+    tracer.deployment()
+    found = [f for f in tracer.findings if f.kind == trace.BROKEN_CHAIN]
+    assert found and "malformed open row 0" in found[0].detail

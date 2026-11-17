@@ -292,6 +292,26 @@ def test_partial_failure_skips_dependents_and_resume_runs_only_the_rest(store):
     assert [n for n, ignored in new] == ["evaluate", "monitor"]
 
 
+@pytest.mark.parametrize(
+    ("kind", "kept"),
+    [(errors.DataError, 1011), (errors.InputError, 300), (ValueError, 300)],
+)
+def test_a_failed_step_keeps_a_framework_error_whole(store, kind, kept):
+    # ERR-20: an InputError was a bare ValueError and is cut like one.
+    clock = Clock()
+    recorder = Recorder(clock)
+    executor = executor_for(store, pipeline(), recorder, clock)
+
+    def broken(context):
+        raise kind("x" * 1000)
+
+    recorder.behaviour["evaluate"] = broken
+    record = executor.start("req-1", "alice")
+    failed = executor.step_record(record["run_id"], "evaluate")
+    assert len(failed["error"]) == kept
+    assert len(failed["attempts"][0]["failure"]["message"]) == 1000
+
+
 def test_interrupted_steps_retry_with_backoff_and_the_same_key(store):
     clock = Clock()
     recorder = Recorder(clock)
