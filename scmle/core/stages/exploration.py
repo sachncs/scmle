@@ -11,9 +11,9 @@ from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 import scmle.assurance.ledger.budget
 from scmle.assurance.robustness import prefilter
+from scmle.causal import claim
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.core import causal_claim
 import scmle.core.context
 from scmle.core.stages import admission
 from scmle.core.stages import scoring
@@ -104,7 +104,7 @@ class Exploration(admission.Admission):
             if c
         )
         block = charter.estimand.causal
-        graph = causal_claim.unseal(block.dag) if block is not None else None
+        graph = claim.unseal(block.dag) if block is not None else None
         found = self.qualify_exploration(
             context, task, charter, view, structure, graph
         )

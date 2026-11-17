@@ -1,4 +1,4 @@
-# Mutation results: causal identification (`scmle/data/identification/`)
+# Mutation results: causal identification (`scmle/causal/identification/`)
 
 mutmut 3.8.0 on Python 3.14 (free-threaded build), run on 2026-11-05 in copies
 of the working tree (`also_copy` as in `setup.cfg`, `timeout_multiplier = 2`,
@@ -30,22 +30,22 @@ inputs do not reach, error-message text, and defensive conversions.
 
 | Module | Killed | Survived | Timeout | Score |
 | --- | --- | --- | --- | --- |
-| `data/identification/aipw.py` | 492 | 58 | 0 | 89.5% |
-| `data/identification/battery.py` | 122 | 25 | 0 | 83.0% |
-| `data/identification/did.py` | 294 | 40 | 0 | 88.0% |
-| `data/identification/iv.py` | 273 | 15 | 0 | 94.8% |
-| `data/identification/rd.py` | 371 | 34 | 0 | 91.6% |
-| `data/identification/select.py` | 137 | 59 | 0 | 69.9% |
-| `data/identification/sensitivity.py` | 379 | 53 | 0 | 87.7% |
-| `data/identification/synth.py` | 179 | 27 | 0 | 86.9% |
-| `data/identification/tier.py` | 185 | 12 | 0 | 93.9% |
+| `causal/identification/aipw.py` | 492 | 58 | 0 | 89.5% |
+| `causal/identification/battery.py` | 122 | 25 | 0 | 83.0% |
+| `causal/identification/did.py` | 294 | 40 | 0 | 88.0% |
+| `causal/identification/iv.py` | 273 | 15 | 0 | 94.8% |
+| `causal/identification/rd.py` | 371 | 34 | 0 | 91.6% |
+| `causal/identification/select.py` | 137 | 59 | 0 | 69.9% |
+| `causal/identification/sensitivity.py` | 379 | 53 | 0 | 87.7% |
+| `causal/identification/synth.py` | 179 | 27 | 0 | 86.9% |
+| `causal/identification/tier.py` | 185 | 12 | 0 | 93.9% |
 | Total | 2432 | 323 | 0 | 88.3% |
 
 ## `run.py`
 
 | Module | Killed | Survived | Timeout | Score |
 | --- | --- | --- | --- | --- |
-| `data/identification/run.py` | 839 | 470 | 0 | 64.1% |
+| `causal/identification/run.py` | 839 | 470 | 0 | 64.1% |
 | Total | 839 | 470 | 0 | 64.1% |
 
 `run.py` is the orchestration and artifact-writing layer; its 470 survivors
@@ -64,16 +64,16 @@ a paragraph says so.
 
 | Module | Not killed | message/string | numpy/zip keyword | replaced by None | comparison boundary | arithmetic operator | other |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `data/identification/aipw.py` | 58 | 4 | 7 | 8 | 11 | 6 | 22 |
-| `data/identification/battery.py` | 25 | 7 | 3 | 0 | 4 | 2 | 9 |
-| `data/identification/did.py` | 40 | 7 | 4 | 2 | 6 | 7 | 14 |
-| `data/identification/iv.py` | 15 | 4 | 0 | 1 | 4 | 0 | 6 |
-| `data/identification/rd.py` | 34 | 1 | 3 | 1 | 13 | 3 | 13 |
-| `data/identification/run.py` | 470 | 118 | 7 | 107 | 12 | 2 | 224 |
-| `data/identification/select.py` | 59 | 25 | 0 | 5 | 0 | 0 | 29 |
-| `data/identification/sensitivity.py` | 53 | 13 | 3 | 2 | 18 | 2 | 15 |
-| `data/identification/synth.py` | 27 | 4 | 5 | 1 | 4 | 1 | 12 |
-| `data/identification/tier.py` | 12 | 7 | 0 | 0 | 0 | 0 | 5 |
+| `causal/identification/aipw.py` | 58 | 4 | 7 | 8 | 11 | 6 | 22 |
+| `causal/identification/battery.py` | 25 | 7 | 3 | 0 | 4 | 2 | 9 |
+| `causal/identification/did.py` | 40 | 7 | 4 | 2 | 6 | 7 | 14 |
+| `causal/identification/iv.py` | 15 | 4 | 0 | 1 | 4 | 0 | 6 |
+| `causal/identification/rd.py` | 34 | 1 | 3 | 1 | 13 | 3 | 13 |
+| `causal/identification/run.py` | 470 | 118 | 7 | 107 | 12 | 2 | 224 |
+| `causal/identification/select.py` | 59 | 25 | 0 | 5 | 0 | 0 | 29 |
+| `causal/identification/sensitivity.py` | 53 | 13 | 3 | 2 | 18 | 2 | 15 |
+| `causal/identification/synth.py` | 27 | 4 | 5 | 1 | 4 | 1 | 12 |
+| `causal/identification/tier.py` | 12 | 7 | 0 | 0 | 0 | 0 | 5 |
 
 Not done: no survivor was read and proved equivalent; the estimators'
 below-target modules are `select.py` (69.9 percent) and `run.py`.

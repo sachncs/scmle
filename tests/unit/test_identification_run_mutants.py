@@ -10,18 +10,18 @@ import pytest
 import scmle.assurance.admissibility.dag
 from scmle.assurance.charter import causal
 from scmle.assurance.ledger import budget
+from scmle.causal.identification import aipw
+from scmle.causal.identification import battery
+from scmle.causal.identification import certified
+from scmle.causal.identification import did
+from scmle.causal.identification import iv
+from scmle.causal.identification import rd
+from scmle.causal.identification import run
+from scmle.causal.identification import select
+from scmle.causal.identification import sensitivity
+from scmle.causal.identification import synth
+from scmle.causal.identification import tier
 from scmle.contracts import qualification
-from scmle.data.identification import aipw
-from scmle.data.identification import battery
-from scmle.data.identification import certified
-from scmle.data.identification import did
-from scmle.data.identification import iv
-from scmle.data.identification import rd
-from scmle.data.identification import run
-from scmle.data.identification import select
-from scmle.data.identification import sensitivity
-from scmle.data.identification import synth
-from scmle.data.identification import tier
 from tests.unit.test_identification_run import did_frame
 from tests.unit.test_identification_run import observational
 
@@ -1961,7 +1961,7 @@ def test_design_only_documents_a_design_with_no_estimate(monkeypatch):
         "available to the run, or the claim could not be registered, so the "
         "claim is unverified. `identify` computes the estimate on the single "
         "opening of C when the ledger hands it the released rows "
-        "(`scmle.core.causal_claim`)."
+        "(`scmle.causal.claim`)."
     )
     assert out.documents["identification_report.json"] == {
         "status": "identified",

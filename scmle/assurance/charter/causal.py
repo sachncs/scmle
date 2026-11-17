@@ -365,7 +365,7 @@ class Question:
             when every assumption it needs carries a verified signed
             attestation by one of them.
         attestations: Path of the JSON file of signed attestations (see
-            `scmle.data.identification.attest`); required with attestors.
+            `scmle.causal.identification.attest`); required with attestors.
     """
 
     treatment: str

@@ -4,7 +4,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.data.identification import did
+from scmle.causal.identification import did
 
 
 def panel(

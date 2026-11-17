@@ -3,7 +3,7 @@
 import numpy
 import pytest
 
-from scmle.data.identification import overid
+from scmle.causal.identification import overid
 
 
 def world(seed, n=500, k=3, direct=0.0, controls=False, heavy=False):

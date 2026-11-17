@@ -8,7 +8,7 @@ import pytest
 
 import scmle.assurance.admissibility.dag
 from scmle.assurance.charter import causal
-from scmle.data.identification import select
+from scmle.causal.identification import select
 
 COVARIATES = "unconfoundedness_given:age,region"
 FIELDS = {
@@ -170,7 +170,9 @@ def test_the_selector_takes_no_data_and_imports_no_estimator():
             imported.update(f"{node.module}.{a.name}" for a in node.names)
     for banned in ("numpy", "pandas", "scipy", "sklearn"):
         assert not any(m.startswith(banned) for m in imported)
-    assert not any(m.startswith("scmle.data.identification") for m in imported)
+    assert not any(
+        m.startswith("scmle.causal.identification") for m in imported
+    )
 
 
 @pytest.mark.parametrize("estimand", causal.CAUSAL_ESTIMANDS)

@@ -4,8 +4,8 @@ import dataclasses
 
 import pytest
 
+from scmle.causal.identification import tier
 from scmle.contracts.qualification import Tier
-from scmle.data.identification import tier
 
 NEEDED = ("positivity", "no_interference")
 GATES = {"overlap", "coverage_aipw", "battery_nco", "sensitivity_bound"}

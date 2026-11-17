@@ -7,10 +7,10 @@ from scmle.assurance.charter import contracts
 from scmle.assurance.framing import draft
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
-from scmle.core import causal_claim
+from scmle.causal import claim
+import scmle.causal.identification.run
 import scmle.core.context
 from scmle.core.stages import qualification
-import scmle.data.identification.run
 
 
 class Identification(qualification.Qualification):
@@ -83,7 +83,7 @@ class Identification(qualification.Qualification):
             return None
         frame = view.features.copy()
         frame[context.spec.data.target] = view.target
-        return causal_claim.rig(
+        return claim.rig(
             block,
             frame,
             context.spec.data.target,
@@ -126,13 +126,13 @@ class Identification(qualification.Qualification):
         if block is None:
             return
         documents = run.confirmation.documents
-        if causal_claim.CLAIM_FILE in documents:
-            claims = documents[causal_claim.CLAIM_FILE]
+        if claim.CLAIM_FILE in documents:
+            claims = documents[claim.CLAIM_FILE]
             context.emit(
                 "identification.completed",
                 f"causal claim status {claims['status']}, tier {claims['tier']}"
                 " (estimated on the single opening of C)",
-                tuple(scmle.data.identification.run.DOCUMENTS),
+                tuple(scmle.causal.identification.run.DOCUMENTS),
                 {
                     "status": claims["status"],
                     "tier": claims["tier"],
@@ -142,7 +142,7 @@ class Identification(qualification.Qualification):
             return
         frame = view.features.copy()
         frame[context.spec.data.target] = view.target
-        outcome = scmle.data.identification.run.design_only(
+        outcome = scmle.causal.identification.run.design_only(
             block,
             frame,
             charter.error_budget,

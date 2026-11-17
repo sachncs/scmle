@@ -5,7 +5,7 @@ import pandas
 import pytest
 from scipy import optimize
 
-from scmle.data.identification import synth
+from scmle.causal.identification import synth
 
 
 def panel(

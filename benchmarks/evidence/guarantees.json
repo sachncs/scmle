@@ -122,7 +122,7 @@
     }
   },
   "claim": "C12",
-  "content_hash": "4e62c0cfc00d8b722e8f8b7aa2484ec59d3578eb396b8a2b1be384e6bbf1bdcc",
+  "content_hash": "8ee42e32a78370fa5f870ad0f522a3563f2d27a22271c2e2e5b715bd6e869fbe",
   "counts": {
     "guarantees": 245,
     "linked": 245,
@@ -479,7 +479,7 @@
         "tests/unit/test_charter_causal.py::test_attestors_need_format_nine_and_round_trip",
         "tests/unit/test_charter_causal.py::test_subgroups_need_format_nine_and_round_trip"
       ],
-      "text": "Charter format 9 adds the optional `subgroups` field of the causal block (`scmle.assurance.charter.causal.Subgroup`, an extension surface) and the optional `attestors` and `attestations` fields (`scmle.assurance.charter.causal.Attestor`, `scmle.data.identification.attest`); a format 4 causal charter keeps its hash and signature.",
+      "text": "Charter format 9 adds the optional `subgroups` field of the causal block (`scmle.assurance.charter.causal.Subgroup`, an extension surface) and the optional `attestors` and `attestations` fields (`scmle.assurance.charter.causal.Attestor`, `scmle.causal.identification.attest`); a format 4 causal charter keeps its hash and signature.",
       "words": [
         "block"
       ]

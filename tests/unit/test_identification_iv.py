@@ -6,7 +6,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.data.identification import iv
+from scmle.causal.identification import iv
 
 
 def world(

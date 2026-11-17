@@ -3,7 +3,7 @@
 import ast
 import pathlib
 
-import scmle.data.identification
+import scmle.causal.identification
 
 FORBIDDEN = (
     "scmle.assurance.custody",
@@ -25,7 +25,7 @@ def imports(path: pathlib.Path) -> set[str]:
 
 
 def test_the_identification_modules_import_no_custody_or_confirmation_api():
-    folder = pathlib.Path(scmle.data.identification.__file__).parent
+    folder = pathlib.Path(scmle.causal.identification.__file__).parent
     files = sorted(folder.glob("*.py"))
     assert len(files) >= 10
     for path in files:

@@ -16,16 +16,16 @@ from typing import Any
 
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import multiplicity
+from scmle.causal.identification import aipw
+from scmle.causal.identification import battery
+from scmle.causal.identification import did
+from scmle.causal.identification import iv
+from scmle.causal.identification import rd
+from scmle.causal.identification import select
+from scmle.causal.identification import sensitivity
+from scmle.causal.identification import synth
+from scmle.causal.identification import tier
 import scmle.certificates
-from scmle.data.identification import aipw
-from scmle.data.identification import battery
-from scmle.data.identification import did
-from scmle.data.identification import iv
-from scmle.data.identification import rd
-from scmle.data.identification import select
-from scmle.data.identification import sensitivity
-from scmle.data.identification import synth
-from scmle.data.identification import tier
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f10_certificates.json"
 METHOD_SOURCES: dict[str, list[Any]] = {
@@ -134,7 +134,7 @@ def fingerprint(report: Any) -> str:
     """Hashes the code a subgroup certificate measured.
 
     Args:
-        report: `scmle.data.identification.run.stratify`, passed in
+        report: `scmle.causal.identification.run.stratify`, passed in
             because that module imports this one's loader.
 
     Returns:
@@ -151,7 +151,7 @@ def subgroup_gate(report: Any, path: Path | None = None) -> SubgroupGate:
     subgroup input); this decides only which word the report carries.
 
     Args:
-        report: `scmle.data.identification.run.stratify`.
+        report: `scmle.causal.identification.run.stratify`.
         path: Certificate file; the shipped one when omitted.
 
     Returns:

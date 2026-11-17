@@ -3,7 +3,7 @@
 import numpy
 import pytest
 
-from scmle.data.identification import battery
+from scmle.causal.identification import battery
 
 
 def test_wald_tests_and_holm_rejections():

@@ -1,6 +1,6 @@
 """The causal estimate on `C` as a registered claim of the ledger.
 
-This glue lives outside `scmle.data.identification` on purpose: that package
+This glue lives outside `scmle.causal.identification` on purpose: that package
 may not import the custody or confirmation APIs (an import test enforces it),
 so the estimator code cannot reach `C` by itself.
 
@@ -27,7 +27,7 @@ Attestors (charter format 9) are named in the causal block, and the signed
 attestations are read from the file it names before `C` opens. An attestation
 counts only if its attestor is listed for that assumption, its scope is this
 charter's hash, it is valid today and its signature verifies under the
-signing key (`scmle.data.identification.attest`); what was accepted and why
+signing key (`scmle.causal.identification.attest`); what was accepted and why
 the rest was not goes into `causal_claims.json`. A charter that names no
 attestors still reports `unverified` ("no named attestor"), and so does one
 whose attestations do not verify; the estimate and its interval are reported
@@ -47,10 +47,10 @@ from scmle.assurance.charter import causal
 from scmle.assurance.ledger import budget
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import ledger
+from scmle.causal.identification import attest
+from scmle.causal.identification import run
+from scmle.causal.identification import select
 from scmle.contracts import errors
-from scmle.data.identification import attest
-from scmle.data.identification import run
-from scmle.data.identification import select
 
 KIND = "causal_primary"
 CLAIM_ID = "causal_primary_theta_zero"

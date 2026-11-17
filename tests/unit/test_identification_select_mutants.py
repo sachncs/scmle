@@ -4,7 +4,7 @@ import pytest
 
 import scmle.assurance.admissibility.dag
 from scmle.assurance.charter import causal
-from scmle.data.identification import select
+from scmle.causal.identification import select
 
 COVARIATES = "unconfoundedness_given:age"
 ASSUMPTIONS = (COVARIATES, "positivity", "no_interference")

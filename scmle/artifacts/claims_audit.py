@@ -55,10 +55,10 @@ from scmle.assurance.ledger import budget
 from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import multiplicity
 import scmle.assurance.ledger.ledger
+from scmle.causal.identification import attest
 from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.core import decision_reports
-from scmle.data.identification import attest
 
 CHARTER_FILE = "analysis_charter.json"
 CUSTODY_FILE = "custody_log.jsonl"

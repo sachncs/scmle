@@ -4,7 +4,7 @@ import json
 
 from benchmarks.qualification import __main__
 from benchmarks.qualification import subgroup_certify
-import scmle.data.identification.certified
+import scmle.causal.identification.certified
 
 
 def stored() -> dict:
@@ -17,19 +17,21 @@ def test_the_certificate_matches_the_current_code():
 
 def test_a_missing_or_stale_certificate_is_reported():
     assert subgroup_certify.problems({"gates": {}}) == [
-        f"{scmle.data.identification.certified.SUBGROUP_GATE}: no certificate"
+        f"{scmle.causal.identification.certified.SUBGROUP_GATE}: no certificate"
     ]
     document = stored()
-    document["gates"][scmle.data.identification.certified.SUBGROUP_GATE][
+    document["gates"][scmle.causal.identification.certified.SUBGROUP_GATE][
         "method_hash"
     ] = "0" * 64
     assert subgroup_certify.problems(document) == [
-        f"{scmle.data.identification.certified.SUBGROUP_GATE}: stale (method code changed since measurement)"
+        f"{scmle.causal.identification.certified.SUBGROUP_GATE}: stale (method code changed since measurement)"
     ]
 
 
 def test_the_seeds_do_not_overlap_development_seeds():
-    entry = stored()["gates"][scmle.data.identification.certified.SUBGROUP_GATE]
+    entry = stored()["gates"][
+        scmle.causal.identification.certified.SUBGROUP_GATE
+    ]
     assert (
         entry["seeds"][0] == 0
         and entry["seeds"][1] < subgroup_certify.DEV_SEED_BASE
@@ -38,11 +40,11 @@ def test_the_seeds_do_not_overlap_development_seeds():
 
 def test_a_missed_floor_is_listed_as_descriptive():
     document = stored()
-    document["gates"][scmle.data.identification.certified.SUBGROUP_GATE][
+    document["gates"][scmle.causal.identification.certified.SUBGROUP_GATE][
         "passed"
     ] = False
     assert subgroup_certify.descriptive_only(document) == [
-        scmle.data.identification.certified.SUBGROUP_GATE
+        scmle.causal.identification.certified.SUBGROUP_GATE
     ]
 
 

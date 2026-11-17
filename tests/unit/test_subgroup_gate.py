@@ -2,8 +2,8 @@
 
 import json
 
-from scmle.data.identification import certified
-from scmle.data.identification import run
+from scmle.causal.identification import certified
+from scmle.causal.identification import run
 from tests.unit.test_identification_run import BUDGET
 from tests.unit.test_identification_run import GATES
 from tests.unit.test_identification_run import NAMED

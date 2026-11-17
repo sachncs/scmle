@@ -72,17 +72,17 @@ import scmle.assurance.admissibility.dag
 from scmle.assurance.charter import causal
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import budget
+from scmle.causal.identification import aipw
+from scmle.causal.identification import battery
+from scmle.causal.identification import certified
+from scmle.causal.identification import did
+from scmle.causal.identification import iv
+from scmle.causal.identification import rd
+from scmle.causal.identification import run
+from scmle.causal.identification import select
+from scmle.causal.identification import sensitivity
+from scmle.causal.identification import synth
 import scmle.certificates
-from scmle.data.identification import aipw
-from scmle.data.identification import battery
-from scmle.data.identification import certified
-from scmle.data.identification import did
-from scmle.data.identification import iv
-from scmle.data.identification import rd
-from scmle.data.identification import run
-from scmle.data.identification import select
-from scmle.data.identification import sensitivity
-from scmle.data.identification import synth
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f10_certificates.json"
 DEV_SEED_BASE = 10_000

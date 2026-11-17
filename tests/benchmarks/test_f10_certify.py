@@ -3,7 +3,7 @@
 import json
 
 from benchmarks.qualification import f10_certify
-from scmle.data.identification import certified
+from scmle.causal.identification import certified
 
 
 def stored() -> dict:

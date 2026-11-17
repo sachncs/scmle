@@ -65,9 +65,9 @@ import pandas
 
 from scmle.assurance.charter import causal
 from scmle.assurance.detectors import certificates
+from scmle.causal.identification import certified
+from scmle.causal.identification import run
 import scmle.certificates
-from scmle.data.identification import certified
-from scmle.data.identification import run
 
 STORE_PATH = scmle.certificates.DIRECTORY / "subgroup_certificates.json"
 DEV_SEED_BASE = 10_000

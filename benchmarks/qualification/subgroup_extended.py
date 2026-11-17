@@ -63,7 +63,7 @@ import pandas
 from benchmarks.qualification import subgroup_certify
 from scmle.assurance.charter import causal
 from scmle.assurance.detectors import certificates
-from scmle.data.identification import run
+from scmle.causal.identification import run
 
 MEASUREMENTS_PATH = Path(__file__).with_name(
     "subgroup_extended_measurements.json"

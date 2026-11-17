@@ -35,17 +35,17 @@ scmle/assurance/detectors/sentinels.py nullify single-use tested directly in tes
 scmle/assurance/framing/draft.py linkage single-use tested directly in test_framing_draft, which pins the resolved and unresolved statuses and the gating False flag
 scmle/assurance/framing/provenance.py claim_tier single-use named by claim.py and baseline.py docstrings and by four tests in test_framing_provenance_questions that pin the unsigned LLM and data-derived cost ceilings
 scmle/assurance/framing/questions.py judge single-use returns a closure over y, a and b and is tested directly in test_framing_provenance_questions
-scmle/data/identification/aipw.py imbalance single-use golden-test target in test_identification_golden, so the IPW formula is pinned by name
-scmle/data/identification/certified.py certificated single-use public certificate reader tested in test_f10_certify and test_identification_run_mutants
-scmle/data/identification/certified.py method_hashes single-use also called by benchmarks/qualification/f10_certify.py to write the certificate, so the benchmark and certificated must share one definition
-scmle/data/identification/certified.py fingerprint single-use also called by benchmarks/qualification/subgroup_certify.py and tests, so the certificate writer and checker share one definition of the hashed code
-scmle/data/identification/did.py arms single-use inlined together with vcov it raises estimate to complexity 11 against a limit of 10 (checked with ruff); estimate is the sequence estimation, covariance, aggregate, pretrend test
-scmle/data/identification/did.py vcov single-use inlined together with arms it raises estimate to complexity 11 against a limit of 10 (checked with ruff), and its triple loop is a separate statistical step
-scmle/data/identification/did.py widen single-use golden-test target in test_identification_golden with a documented ValueError contract for unbalanced or repeated unit-period pairs
-scmle/data/identification/run.py caveats single-use tested directly in test_identification_run_mutants (four references) for the negative-control and unchecked-adjustment notes
-scmle/data/identification/run.py subgroup_results single-use tested directly in test_identification_run_mutants (five references), which pin that adapter.weak is restored
-scmle/data/identification/tier.py evidence_shortfalls single-use inlined into decide it gives complexity 14 and 13 branches against limits of 10 and 12 (checked with ruff)
-scmle/data/identification/tier.py assess single-use its five keys are the CONDITIONS tuple that decide and Assignment report, so the name documents the tier rule; inlined it fits ruff but puts a twenty line boolean table into decide
+scmle/causal/identification/aipw.py imbalance single-use golden-test target in test_identification_golden, so the IPW formula is pinned by name
+scmle/causal/identification/certified.py certificated single-use public certificate reader tested in test_f10_certify and test_identification_run_mutants
+scmle/causal/identification/certified.py method_hashes single-use also called by benchmarks/qualification/f10_certify.py to write the certificate, so the benchmark and certificated must share one definition
+scmle/causal/identification/certified.py fingerprint single-use also called by benchmarks/qualification/subgroup_certify.py and tests, so the certificate writer and checker share one definition of the hashed code
+scmle/causal/identification/did.py arms single-use inlined together with vcov it raises estimate to complexity 11 against a limit of 10 (checked with ruff); estimate is the sequence estimation, covariance, aggregate, pretrend test
+scmle/causal/identification/did.py vcov single-use inlined together with arms it raises estimate to complexity 11 against a limit of 10 (checked with ruff), and its triple loop is a separate statistical step
+scmle/causal/identification/did.py widen single-use golden-test target in test_identification_golden with a documented ValueError contract for unbalanced or repeated unit-period pairs
+scmle/causal/identification/run.py caveats single-use tested directly in test_identification_run_mutants (four references) for the negative-control and unchecked-adjustment notes
+scmle/causal/identification/run.py subgroup_results single-use tested directly in test_identification_run_mutants (five references), which pin that adapter.weak is restored
+scmle/causal/identification/tier.py evidence_shortfalls single-use inlined into decide it gives complexity 14 and 13 branches against limits of 10 and 12 (checked with ruff)
+scmle/causal/identification/tier.py assess single-use its five keys are the CONDITIONS tuple that decide and Assignment report, so the name documents the tier rule; inlined it fits ruff but puts a twenty line boolean table into decide
 scmle/assurance/ingest/declared.py reconcile_source single-use named in the ingest stage and declared.py module docstrings and tested directly in test_ingest_declared; its caller is core/ingest_stage
 scmle/assurance/ingest/entities.py pairing single-use tested by five references in test_ingest_entities and used by benchmarks/qualification/ingest_certify.py, which read the skipped-block count
 scmle/assurance/ingest/entities.py jarowinkler single-use tested against the standard value in test_ingest_entities

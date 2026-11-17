@@ -2,7 +2,7 @@
 
 import types
 
-from scmle.data.identification import tier
+from scmle.causal.identification import tier
 
 
 def test_a_missing_sensitivity_analysis_is_the_only_shortfall() -> None:

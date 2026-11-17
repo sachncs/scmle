@@ -33,18 +33,18 @@ from scmle.assurance.charter import causal
 from scmle.assurance.ledger import budget
 from scmle.assurance.ledger import multiplicity
 import scmle.assurance.ledger.budget
+from scmle.causal.identification import aipw
+from scmle.causal.identification import battery
+from scmle.causal.identification import did
+from scmle.causal.identification import iv
+from scmle.causal.identification import rd
+from scmle.causal.identification import select
+from scmle.causal.identification import sensitivity
+from scmle.causal.identification import synth
+from scmle.causal.identification import tier
+import scmle.causal.identification.certified
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.identification import aipw
-from scmle.data.identification import battery
-from scmle.data.identification import did
-from scmle.data.identification import iv
-from scmle.data.identification import rd
-from scmle.data.identification import select
-from scmle.data.identification import sensitivity
-from scmle.data.identification import synth
-from scmle.data.identification import tier
-import scmle.data.identification.certified
 
 DOCUMENTS = (
     "identification_plan.json",
@@ -1485,20 +1485,20 @@ def certify(found: dict[str, Any], named: tuple[str, ...] | None) -> None:
             from the shipped certificate (None when it is absent, so every
             estimated subgroup then counts as certified size).
     """
-    gate = scmle.data.identification.certified.subgroup_gate(stratify)
+    gate = scmle.causal.identification.certified.subgroup_gate(stratify)
     if named is not None:
-        listed = scmle.data.identification.certified.SUBGROUP_GATE in named
-        gate = scmle.data.identification.certified.SubgroupGate(
-            scmle.data.identification.certified.GATING
+        listed = scmle.causal.identification.certified.SUBGROUP_GATE in named
+        gate = scmle.causal.identification.certified.SubgroupGate(
+            scmle.causal.identification.certified.GATING
             if listed
-            else scmle.data.identification.certified.DESCRIPTIVE,
+            else scmle.causal.identification.certified.DESCRIPTIVE,
             "named among the certified gates"
             if listed
             else "the caller named the certified gates and this is not one",
             gate.min_rows,
         )
     found["gate"] = gate.to_dict()
-    gating = gate.status == scmle.data.identification.certified.GATING
+    gating = gate.status == scmle.causal.identification.certified.GATING
     for row in found["hypotheses"]:
         size = row.get("n")
         row["certified_size"] = bool(
@@ -1650,7 +1650,7 @@ def identify(
     named = certified
     if certified is None:
         certified = tuple(
-            sorted(scmle.data.identification.certified.certificated())
+            sorted(scmle.causal.identification.certified.certificated())
         )
     primary_alpha, alpha_falsify = alphas(error_budget)
     level = 1.0 - primary_alpha
@@ -1762,7 +1762,7 @@ NOT_ESTIMATED = (
     "no estimate was computed on the confirmation set: it was not available "
     "to the run, or the claim could not be registered, so the claim is "
     "unverified. `identify` computes the estimate on the single opening of C "
-    "when the ledger hands it the released rows (`scmle.core.causal_claim`)."
+    "when the ledger hands it the released rows (`scmle.causal.claim`)."
 )
 
 

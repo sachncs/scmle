@@ -8,7 +8,7 @@ import pytest
 
 from scmle.assurance.charter import causal
 from scmle.assurance.ledger import budget
-from scmle.data.identification import run
+from scmle.causal.identification import run
 
 BUDGET = budget.ErrorBudget.create(0.05, 0.1)
 COVARIATES = "unconfoundedness_given:a,b"

@@ -20,8 +20,8 @@ import sys
 from scmle.assurance import coverage_slices
 from scmle.assurance.admissibility import qualify
 from scmle.assurance.admissibility import screen
+from scmle.causal.identification import certified
 import scmle.certificates
-from scmle.data.identification import certified
 from scmle.evaluation import task_gate
 
 

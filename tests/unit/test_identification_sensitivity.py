@@ -6,7 +6,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.data.identification import sensitivity
+from scmle.causal.identification import sensitivity
 
 
 def test_evalue_matches_the_papers_worked_example():

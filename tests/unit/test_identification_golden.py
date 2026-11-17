@@ -9,15 +9,15 @@ from pathlib import Path
 import numpy
 import pytest
 
+from scmle.causal.identification import aipw
+from scmle.causal.identification import battery
+from scmle.causal.identification import did
+from scmle.causal.identification import iv
+from scmle.causal.identification import rd
+from scmle.causal.identification import sensitivity
+from scmle.causal.identification import synth
+from scmle.causal.identification import tier
 from scmle.contracts.qualification import Tier
-from scmle.data.identification import aipw
-from scmle.data.identification import battery
-from scmle.data.identification import did
-from scmle.data.identification import iv
-from scmle.data.identification import rd
-from scmle.data.identification import sensitivity
-from scmle.data.identification import synth
-from scmle.data.identification import tier
 from tests.unit import golden
 from tests.unit import test_identification_aipw
 from tests.unit import test_identification_did

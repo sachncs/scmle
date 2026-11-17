@@ -89,11 +89,11 @@ surfaces); a format 7 ingest charter keeps its hash and signature.
 Charter format 9 adds the optional `subgroups` field of the causal block
 (`scmle.assurance.charter.causal.Subgroup`, an extension surface) and the
 optional `attestors` and `attestations` fields
-(`scmle.assurance.charter.causal.Attestor`, `scmle.data.identification.attest`);
+(`scmle.assurance.charter.causal.Attestor`, `scmle.causal.identification.attest`);
 a format 4 causal charter keeps its hash and signature. The `subgroups` key
 of `identification_report.json` gained `gate`, `statement_gate` and a per
 hypothesis `certified_size`, and the summary in `causal_claims.json` a `gate`;
-`scmle.data.identification.certified.subgroup_gate` and `SubgroupGate` are
+`scmle.causal.identification.certified.subgroup_gate` and `SubgroupGate` are
 additions (extension surfaces).
 
 Charter format 10 adds the optional `uncertainty` block
@@ -173,7 +173,7 @@ Causal identification (F10). No entry of the pinned surface changed.
 `Confounding`); it is omitted from the record when unset, so charters of
 format 1 to 3 keep their hash and signature, and a charter that carries it is
 format 4 (an older wrapper carrying it is refused). `Edict` gained the
-member `refuse_claim`. `scmle.data.identification` (`select`, `aipw`, `did`,
+member `refuse_claim`. `scmle.causal.identification` (`select`, `aipw`, `did`,
 `iv`, `rd`, `synth`, `sensitivity`, `battery`, `tier`, `run`, `certified`) is
 an extension surface like the other qualification modules.
 

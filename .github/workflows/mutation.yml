@@ -31,6 +31,8 @@ jobs:
             patterns: "scmle.data.*"
           - name: assurance
             patterns: "scmle.assurance.*"
+          - name: causal
+            patterns: "scmle.causal.*"
           - name: evaluation
             patterns: "scmle.evaluation.*"
           - name: rest

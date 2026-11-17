@@ -15,9 +15,9 @@ import scmle.assurance.admissibility.dag
 from scmle.assurance.charter import causal
 from scmle.assurance.charter import sealing
 import scmle.assurance.ledger.ledger
+from scmle.causal.identification import attest
+import scmle.causal.identification.run
 from scmle.contracts import errors
-from scmle.data.identification import attest
-import scmle.data.identification.run
 from tests.unit.test_charter_contracts import make_charter
 
 KEY = "identification-key"
@@ -115,7 +115,7 @@ def test_an_identified_charter_estimates_on_the_single_opening_of_c(tmp_path):
     registered = ledger.claims["causal_primary_theta_zero"]
     assert registered["kind"] == "causal_primary"
     sealed = ledger.confirmation["attachments"]
-    assert set(sealed) == set(scmle.data.identification.run.DOCUMENTS)
+    assert set(sealed) == set(scmle.causal.identification.run.DOCUMENTS)
     for name, expected in sealed.items():
         assert (
             scmle.assurance.ledger.ledger.digest(read(result, name)) == expected

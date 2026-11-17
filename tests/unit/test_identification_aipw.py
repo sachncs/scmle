@@ -4,7 +4,7 @@ import numpy
 import pandas
 import pytest
 
-from scmle.data.identification import aipw
+from scmle.causal.identification import aipw
 
 
 def test_the_ate_score_equals_the_hand_computed_toy_table():
