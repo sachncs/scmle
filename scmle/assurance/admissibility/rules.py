@@ -28,6 +28,7 @@ import dataclasses
 import datetime
 import enum
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.assurance.admissibility import dag
@@ -35,8 +36,11 @@ from scmle.assurance.admissibility import provenance
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 
-FORMAT_VERSION = 1
+# Version 2: each decision spells `suspicion_kept` as `suspected`
+# (`Decision.migrations`).
+FORMAT_VERSION = 2
 KINDS = ("predictive", "causal")
 
 
@@ -64,14 +68,21 @@ class Decision:
         admission: The decision.
         tier: Evidence tier of the field's as-of rule.
         reasons: Plain-language reasons, in the order they applied.
-        suspicion_kept: A leakage suspicion remains on record.
+        suspected: A leakage suspicion remains on record.
+        migrations: The layout's version steps, oldest first; version 1
+            spelled `suspected` as `suspicion_kept`. A decision is stored in
+            an `Admissibility` table, whose version it follows.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"suspicion_kept": "suspected"}),
+    )
 
     name: str
     admission: Admission
     tier: qualification.Tier
     reasons: tuple[str, ...]
-    suspicion_kept: bool = False
+    suspected: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """Converts the decision to a JSON-ready record.
@@ -84,7 +95,7 @@ class Decision:
             "admission": self.admission.value,
             "tier": self.tier.value,
             "reasons": list(self.reasons),
-            "suspicion_kept": self.suspicion_kept,
+            "suspected": self.suspected,
         }
 
     @classmethod
@@ -92,19 +103,20 @@ class Decision:
         """Rebuilds a decision, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping in the form `to_dict` returns.
+            record: A mapping in the form `to_dict` returns, or its version-1
+                layout (`suspicion_kept`).
 
         Returns:
             The decision. Unexpected or missing fields and unknown enum
             values are rejected with a `ValueError`.
         """
-        qualification.require(cls, record)
+        layout = qualification.require(cls, record)
         return cls(
-            record["name"],
-            Admission(record["admission"]),
-            qualification.Tier(record["tier"]),
-            tuple(record["reasons"]),
-            record["suspicion_kept"],
+            layout["name"],
+            Admission(layout["admission"]),
+            qualification.Tier(layout["tier"]),
+            tuple(layout["reasons"]),
+            layout["suspected"],
         )
 
 
@@ -123,15 +135,15 @@ def diagnose(
         disagrees with the stored values, the field is unavailable at
         serving, the lead is below the declared lag; None when none failed.
     """
-    check = record.log_check
+    check = record.reconstruction
     if check is not None and not check.passed:
         return (
             f"change log disagrees with {check.mismatched} of {check.rows} "
             "stored values"
         )
-    if record.available_at_serving is provenance.Availability.NO:
+    if record.availability is provenance.Availability.NO:
         return "not available at serving"
-    lead = record.as_of.lead_seconds
+    lead = record.lead.seconds
     if lead is not None and lead < declared_lag_seconds:
         return (
             f"known {lead:g} s before the moment, less than the declared "
@@ -176,9 +188,7 @@ def clock(
             record.name, Admission.QUARANTINE, tier, (failure,), suspect
         )
     reasons: list[str] = []
-    unknown_serving = (
-        record.available_at_serving is provenance.Availability.UNKNOWN
-    )
+    unknown_serving = record.availability is provenance.Availability.UNKNOWN
     if unknown_serving:
         reasons.append("availability at serving is unknown")
     if tier is qualification.Tier.UNVERIFIED:

@@ -203,7 +203,7 @@ def assess(
         (low, high),
         rho,
         deff,
-        point.n_required,
+        point.required,
         effective,
         reason,
     )

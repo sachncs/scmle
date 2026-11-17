@@ -271,8 +271,8 @@ def condition(
     p_value = significance(skill, null)
     keeps = p_value <= cfg.alpha
     check = qualification.Check(
-        check_id=path,
-        null_hypothesis=(
+        identifier=path,
+        null=(
             "given the other features, the feature has no predictive skill "
             "beyond permutation within strata"
         ),
@@ -286,8 +286,8 @@ def condition(
             if keeps
             else qualification.Decision.PASS
         ),
-        set_id=set_id,
-        seed_path=randomness.seed_path(cfg.run_seed, path, 1),
+        subset=set_id,
+        seeds=randomness.seed_path(cfg.run_seed, path, 1),
         tier=qualification.Tier.UNVERIFIED,
     )
     return Conditional(

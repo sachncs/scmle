@@ -93,12 +93,12 @@ def prefill(
         for c in columns
         if c in frame.columns
         and pandas.api.types.is_datetime64_any_dtype(frame[c])
-        and c != request.source.target_time_column
+        and c != request.source.time
     ]
     if len(stamps) == 1:
         slots["prediction_moment"] = stamps[0]
-    if request.source.primary_key:
-        slots["unit"] = list(request.source.primary_key)
+    if request.source.key:
+        slots["unit"] = list(request.source.key)
     slots["question"] = request.text.strip()
     return slots
 
@@ -222,10 +222,10 @@ def order(
             blocking=True,
             detail=f"{moment} missing",
         )
-    if source.target_time_column not in frame.columns:
+    if source.time not in frame.columns:
         return None
     start = pandas.to_datetime(frame[moment], errors="coerce")
-    end = pandas.to_datetime(frame[source.target_time_column], errors="coerce")
+    end = pandas.to_datetime(frame[source.time], errors="coerce")
     bad = int((start >= end).sum())
     return records.Probe(
         "moment_before_target",
@@ -272,22 +272,21 @@ def assemble(
         kind=kind,
         population=pick("population", f"all rows of {request.source.uri}"),
         target=str(slots["target"]),
-        prediction_moment=str(slots["prediction_moment"]),
-        intercurrent_events=[{"event": "none", "strategy": "not applicable"}],
-        summary_measure=(
-            "net benefit over thresholds "
-            f"[{cost_model.t_lo}, {cost_model.t_hi}]"
+        moment=str(slots["prediction_moment"]),
+        intercurrent=[{"event": "none", "strategy": "not applicable"}],
+        summary=(
+            f"net benefit over thresholds [{cost_model.low}, {cost_model.high}]"
             if cost_model
             else pick("summary_measure", records.UNSPECIFIED)
         ),
     )
     record["unit"] = unit if isinstance(unit, str) else "-".join(map(str, unit))
-    record["deployment_population"] = pick(
+    record["population"] = pick(
         "deployment_population", f"same as {request.source.uri}"
     )
     open_items.append("intercurrent_events")
     if cost_model is not None:
-        record["cost_model"] = cost_model.to_dict()
+        record["costs"] = cost_model.to_dict()
     else:
         open_items.append("cost_model")
     return contracts.AnalysisCharter.from_dict(record), open_items
@@ -313,7 +312,7 @@ def linkage(
     known = {normalise(c): c for c in columns}
     fields = {
         "target": charter.estimand.target,
-        "prediction_moment": charter.estimand.prediction_moment,
+        "prediction_moment": charter.estimand.moment,
         "unit": charter.unit,
     }
     out = {}

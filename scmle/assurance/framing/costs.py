@@ -27,6 +27,7 @@ import dataclasses
 import enum
 import hashlib
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 import numpy
@@ -35,6 +36,7 @@ from numpy.typing import NDArray
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 from scmle.contracts import signing
 
 ENTRY_NAMES = ("c_00", "c_01", "c_10", "c_11")
@@ -61,20 +63,29 @@ class Tariff:
         c_01: Cost of not acting when the outcome is 1.
         c_10: Cost of acting when the outcome is 0.
         c_11: Cost of acting when the outcome is 1.
-        t_lo: Lowest plausible threshold, in (0, 1).
-        t_hi: Highest plausible threshold, in (0, 1).
+        low: Lowest plausible threshold, in (0, 1).
+        high: Highest plausible threshold, in (0, 1).
         sources: Source of each cost, in the order c_00, c_01, c_10, c_11.
-        range_source: Source of the range `[t_lo, t_hi]`.
+        basis: Source of the range `[low, high]`.
+        migrations: The stored layout's version steps, oldest first; version
+            1 spelled `low`, `high` and `basis` as `t_lo`, `t_hi` and
+            `range_source`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"t_lo": "low", "t_hi": "high", "range_source": "basis"}
+        ),
+    )
 
     c_00: float
     c_01: float
     c_10: float
     c_11: float
-    t_lo: float
-    t_hi: float
+    low: float
+    high: float
     sources: tuple[Basis, ...]
-    range_source: Basis
+    basis: Basis
 
     def __post_init__(self) -> None:
         """Validates the model, refusing one that is not a decision.
@@ -82,9 +93,9 @@ class Tariff:
         Raises:
             DominatedError: If `c_FP` or `c_FN` is not positive.
             ValueError: If a cost or a range bound is not a finite number,
-                the range does not satisfy `0 < t_lo <= t_hi < 1`, the
+                the range does not satisfy `0 < low <= high < 1`, the
                 implied threshold lies outside the range, or `sources` or
-                `range_source` have the wrong type or length.
+                `basis` have the wrong type or length.
         """
         for name in ENTRY_NAMES:
             qualification.finite(getattr(self, name), name)
@@ -93,11 +104,11 @@ class Tariff:
                 "one action dominates (c_FP and c_FN must both be positive): "
                 f"c_FP={self.c_fp}, c_FN={self.c_fn}"
             )
-        low = qualification.finite(self.t_lo, "t_lo")
-        high = qualification.finite(self.t_hi, "t_hi")
+        low = qualification.finite(self.low, "low")
+        high = qualification.finite(self.high, "high")
         if not 0.0 < low <= high < 1.0:
             raise errors.InputError(
-                "the range must satisfy 0 < t_lo <= t_hi < 1"
+                "the range must satisfy 0 < low <= high < 1"
             )
         if not low <= self.threshold <= high:
             raise errors.InputError(
@@ -109,8 +120,8 @@ class Tariff:
             isinstance(s, Basis) for s in self.sources
         ):
             raise errors.InputError("sources must hold four Basis values")
-        if not isinstance(self.range_source, Basis):
-            raise errors.InputError("range_source must be a Basis")
+        if not isinstance(self.basis, Basis):
+            raise errors.InputError("basis must be a Basis")
 
     @property
     def c_fp(self) -> float:
@@ -141,25 +152,32 @@ class Tariff:
 
     @property
     def model_hash(self) -> str:
-        """SHA-256 of the canonical JSON of the model."""
-        return hashlib.sha256(signing.canonicalise(self.to_dict())).hexdigest()
+        """SHA-256 of the canonical JSON of the model's version-1 layout.
+
+        The hash is anchored at version 1 (`t_lo`, `t_hi`, `range_source`),
+        so a model registered before its keys were renamed keeps its hash.
+        """
+        anchored = records.downgrade(self.migrations, self.to_dict())
+        return hashlib.sha256(signing.canonicalise(anchored)).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
         """Returns the model as a JSON-ready record.
 
         Returns:
             A mapping of the four costs, the range bounds, the source of
-            each cost as its string value, and the source of the range.
+            each cost as its string value, and the source of the range. It
+            carries no version key: the model is stored inside a charter or
+            a framing directory, whose version it follows.
         """
         return {
             "c_00": self.c_00,
             "c_01": self.c_01,
             "c_10": self.c_10,
             "c_11": self.c_11,
-            "t_lo": self.t_lo,
-            "t_hi": self.t_hi,
+            "low": self.low,
+            "high": self.high,
             "sources": [s.value for s in self.sources],
-            "range_source": self.range_source.value,
+            "basis": self.basis.value,
         }
 
     @classmethod
@@ -170,24 +188,27 @@ class Tariff:
         raises `ValueError` or `DominatedError`.
 
         Args:
-            record: A mapping holding exactly the fields of the model.
+            record: A mapping holding exactly the fields of the model, or its
+                version-1 layout (`t_lo`, `t_hi`, `range_source`). A record
+                without `schema_version` is read as version 1; every step
+                only renames keys, so a current layout passes unchanged.
 
         Returns:
             The model.
         """
-        qualification.require(cls, record)
-        sources = tuple(Basis(v) for v in record["sources"])
+        layout = qualification.require(cls, record)
+        sources = tuple(Basis(v) for v in layout["sources"])
         if len(sources) != len(ENTRY_NAMES):
             raise errors.InputError("sources must hold one entry per cost")
         return cls(
-            c_00=record["c_00"],
-            c_01=record["c_01"],
-            c_10=record["c_10"],
-            c_11=record["c_11"],
-            t_lo=record["t_lo"],
-            t_hi=record["t_hi"],
+            c_00=layout["c_00"],
+            c_01=layout["c_01"],
+            c_10=layout["c_10"],
+            c_11=layout["c_11"],
+            low=layout["low"],
+            high=layout["high"],
             sources=sources,
-            range_source=Basis(record["range_source"]),
+            basis=Basis(layout["basis"]),
         )
 
 

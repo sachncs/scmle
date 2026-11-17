@@ -423,9 +423,9 @@ def falsify(
             result.statistic if math.isfinite(result.statistic) else FINITE_CAP
         )
         check = qualification.Check(
-            check_id=f"dag.ci.{statement.x}.{statement.y}|"
+            identifier=f"dag.ci.{statement.x}.{statement.y}|"
             + ",".join(statement.given),
-            null_hypothesis=statement.text(),
+            null=statement.text(),
             statistic=statistic,
             p_value=result.p_value,
             interval=None,
@@ -436,8 +436,8 @@ def falsify(
                 if falsified
                 else qualification.Decision.PASS
             ),
-            set_id=set_id,
-            seed_path=randomness.seed_path(run_seed, COMPONENT, index),
+            subset=set_id,
+            seeds=randomness.seed_path(run_seed, COMPONENT, index),
             tier=qualification.Tier.UNVERIFIED,
         )
         verdict = Verdict.FALSIFIED if falsified else Verdict.NOT_FALSIFIED

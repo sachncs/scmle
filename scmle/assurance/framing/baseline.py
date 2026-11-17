@@ -296,7 +296,7 @@ def gauge(
         ~numpy.isnan(outcomes) if observed is None else numpy.asarray(observed)
     )
     selectivity = selective_labels(mask, b)
-    grid = numpy.linspace(model.t_lo, model.t_hi, 5)
+    grid = numpy.linspace(model.low, model.high, 5)
     profile: dict[str, Any] = {
         "selective_labels": selectivity.to_dict(),
         "thresholds": [float(t) for t in grid],
@@ -372,7 +372,7 @@ def register(
     if not 0.0 < level < 1.0:
         raise errors.InputError("alpha must be strictly between 0 and 1")
     return Registration(
-        model.model_hash, fingerprint(rule), level, model.t_lo, model.t_hi
+        model.model_hash, fingerprint(rule), level, model.low, model.high
     )
 
 
@@ -626,8 +626,8 @@ class Evaluator:
         points = (self.registration.t_lo, self.registration.t_hi)
         checks = tuple(
             qualification.Check(
-                check_id=f"{CHECK_PREFIX}:delta@t={t:.4f}",
-                null_hypothesis=f"Delta(t) <= 0 at t = {t:.4f}",
+                identifier=f"{CHECK_PREFIX}:delta@t={t:.4f}",
+                null=f"Delta(t) <= 0 at t = {t:.4f}",
                 statistic=e.statistic if numpy.isfinite(e.statistic) else 0.0,
                 p_value=e.p_value,
                 interval=None,
@@ -638,19 +638,19 @@ class Evaluator:
                     if e.p_value <= alpha
                     else qualification.Decision.PASS
                 ),
-                set_id=qualification.Subset.CONFIRMATION,
-                seed_path=(seed, "framing.baseline", index),
+                subset=qualification.Subset.CONFIRMATION,
+                seeds=(seed, "framing.baseline", index),
                 tier=tier,
             )
             for index, (t, e) in enumerate(zip(points, endpoints, strict=False))
         )
         claim = qualification.Claim(
-            claim_id=CLAIM_ID,
+            identifier=CLAIM_ID,
             statement=(
                 "net benefit of the model exceeds net benefit of the current "
                 f"process over thresholds [{points[0]:.4f}, {points[1]:.4f}]"
             ),
-            check_ids=tuple(c.check_id for c in checks)
+            checks=tuple(c.identifier for c in checks)
             or (f"{CHECK_PREFIX}:not_computed",),
             adjusted_p_value=p_value if issued else None,
             effect=min((e.mean for e in endpoints), default=0.0),

@@ -1,0 +1,9 @@
+{
+  "name": "copy",
+  "admission": "admit_flagged",
+  "tier": "attested",
+  "reasons": [
+    "leakage suspicion"
+  ],
+  "suspicion_kept": true
+}

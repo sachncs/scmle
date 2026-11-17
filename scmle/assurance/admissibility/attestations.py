@@ -28,41 +28,46 @@ verification of the attester. The signature of the person is not checked; the
 file is as trustworthy as the process that produced it, and the tier says
 `attested`, not `confirmed`.
 
-File format (JSON)::
+File format (JSON, schema version 2; version 1 spelled the version key
+`format_version`, `attestor` as `name_or_id` and `seconds` as
+`lead_seconds`, and still loads)::
 
     {
-        "format_version": 1,
+        "schema_version": 2,
         "attestations": [
             {
                 "column": "...",
-                "name_or_id": "...",
+                "attestor": "...",
                 "role": "...",
                 "statement": "...",
                 "evidence": "...",
                 "date": "YYYY-MM-DD",
                 "expires": "YYYY-MM-DD",
                 "scope": "<charter_hash>",
-                "lead_seconds": 0,
+                "seconds": 0,
             }
         ],
     }
 """
 
+from collections.abc import Callable
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
 import json
 from pathlib import Path
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.assurance.admissibility import provenance
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 
-FORMAT_VERSION = 1
+LEGACY = "format_version"
 WRITER = "attested legitimate predictor"
-OWN_FIELDS = ("column", "lead_seconds")
+OWN_FIELDS = ("column", "seconds")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -72,31 +77,41 @@ class Affidavit:
     Attributes:
         column: The column the statement is about.
         attestation: The statement, its evidence, dates and scope.
-        lead_seconds: How long before the prediction moment the value is
+        seconds: How long before the prediction moment the value is
             known (>= 0 for a value known no later than the moment).
+        migrations: The layout's version steps, oldest first; version 1
+            spelled `seconds` as `lead_seconds` and the attestation's
+            `attestor` as `name_or_id`. A record is stored in an attestation
+            file, whose version it follows.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"lead_seconds": "seconds", "name_or_id": "attestor"}
+        ),
+    )
 
     column: str
     attestation: provenance.Attestation
-    lead_seconds: float
+    seconds: float
 
     def __post_init__(self) -> None:
         """Validates the record.
 
         Raises:
             ValueError: If `column` is empty or not a string, or
-                `lead_seconds` is not a finite number.
+                `seconds` is not a finite number.
         """
         if not self.column or not isinstance(self.column, str):
             raise errors.InputError("column must be a non-empty string")
-        qualification.finite(self.lead_seconds, "lead_seconds")
+        qualification.finite(self.seconds, "seconds")
 
     def field(self) -> provenance.Pedigree:
         """Builds the provenance record the admissibility rules consume.
 
         Returns:
             A record for the column with origin `derived`, `WRITER` as its
-            writer, a `lag` as-of rule of `lead_seconds` whose source is
+            writer, a `lag` as-of rule of `seconds` whose source is
             `attested`, serving availability `yes`, no definition history, an
             unknown write time and overwrite status, and this attestation.
         """
@@ -104,12 +119,12 @@ class Affidavit:
             name=self.column,
             origin=provenance.Origin.DERIVED,
             writer=WRITER,
-            written_at=provenance.Stamp.UNKNOWN,
+            stamp=provenance.Stamp.UNKNOWN,
             overwritten=provenance.Overwritten.UNKNOWN,
-            definition_history=(),
-            as_of=provenance.Lead(provenance.Cutoff.LAG, self.lead_seconds),
-            as_of_source=provenance.Provenance.ATTESTED,
-            available_at_serving=provenance.Availability.YES,
+            definitions=(),
+            lead=provenance.Lead(provenance.Cutoff.LAG, self.seconds),
+            provenance=provenance.Provenance.ATTESTED,
+            availability=provenance.Availability.YES,
             attestation=self.attestation,
         )
 
@@ -117,12 +132,12 @@ class Affidavit:
         """Converts the record to a JSON-ready dict.
 
         Returns:
-            A dict with `column`, `lead_seconds` and the fields of the
+            A dict with `column`, `seconds` and the fields of the
             attestation.
         """
         return {
             "column": self.column,
-            "lead_seconds": self.lead_seconds,
+            "seconds": self.seconds,
             **self.attestation.to_dict(),
         }
 
@@ -131,27 +146,88 @@ class Affidavit:
         """Rebuilds the record, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping with `column`, `lead_seconds` (a finite
-                number, not a bool or text) and the fields of an attestation.
+            record: A mapping with `column`, `seconds` (a finite number, not
+                a bool or text) and the fields of an attestation, or its
+                version-1 layout (`lead_seconds`, `name_or_id`).
 
         Returns:
             The record.
 
         Raises:
-            ValueError: If `column` or `lead_seconds` is missing, `lead_seconds`
-                is not a finite number, or the
-                attestation fields are unexpected, missing or invalid.
+            ValueError: If `column` or `seconds` is missing, `seconds` is not
+                a finite number, or the attestation fields are unexpected,
+                missing or invalid.
         """
-        body = {k: v for k, v in record.items() if k not in OWN_FIELDS}
-        own = {k: record[k] for k in OWN_FIELDS if k in record}
+        layout = records.load(cls.__name__, cls.migrations, record)
+        del layout[records.KEY]
+        body = {k: v for k, v in layout.items() if k not in OWN_FIELDS}
+        own = {k: layout[k] for k in OWN_FIELDS if k in layout}
         missing = sorted(set(OWN_FIELDS) - set(own))
         if missing:
             raise errors.InputError(f"missing field(s): {missing}")
         return cls(
             own["column"],
             provenance.Attestation.from_dict(body),
-            qualification.finite(own["lead_seconds"], "lead_seconds"),
+            qualification.finite(own["seconds"], "seconds"),
         )
+
+
+def forward(document: records.Layout) -> records.Layout:
+    """Moves every entry of a version-1 attestation file to version 2.
+
+    Args:
+        document: The file without its version key.
+
+    Returns:
+        The file with each entry that is an object in the version-2 layout.
+    """
+    return travel(document, records.upgrade)
+
+
+def backward(document: records.Layout) -> records.Layout:
+    """Moves every entry of a version-2 attestation file to version 1.
+
+    Args:
+        document: The file without its version key.
+
+    Returns:
+        The file with each entry that is an object in the version-1 layout.
+    """
+    return travel(document, records.downgrade)
+
+
+def travel(
+    document: records.Layout,
+    move: Callable[
+        [tuple[records.Migration, ...], records.Layout, int], records.Layout
+    ],
+) -> records.Layout:
+    """Moves every entry of an attestation file.
+
+    Args:
+        document: The file without its version key.
+        move: `records.upgrade` or `records.downgrade`.
+
+    Returns:
+        A copy with each entry that is an object moved; anything else is left
+        for the reader to reject.
+    """
+    entries = document.get("attestations")
+    if not isinstance(entries, list):
+        return dict(document)
+    return {
+        **document,
+        "attestations": [
+            move(Affidavit.migrations, dict(e), records.ORIGIN)
+            if isinstance(e, Mapping)
+            else e
+            for e in entries
+        ],
+    }
+
+
+MIGRATIONS = (records.Migration(change=forward, revert=backward),)
+VERSION = records.ORIGIN + len(MIGRATIONS)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -177,8 +253,8 @@ def load(path: str | Path) -> tuple[Affidavit, ...]:
         The attestations, in file order.
 
     Raises:
-        ValueError: On an unreadable file, an unknown format version, a
-            malformed record or two attestations for one column.
+        ValueError: On an unreadable file, a missing or unknown schema
+            version, a malformed record or two attestations for one column.
     """
     try:
         document = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -186,19 +262,19 @@ def load(path: str | Path) -> tuple[Affidavit, ...]:
         raise errors.InputError(
             f"cannot read attestations {path}: {error}"
         ) from error
-    if not isinstance(document, dict) or (
-        document.get("format_version") != FORMAT_VERSION
+    if not isinstance(document, dict) or not (
+        records.KEY in document or LEGACY in document
     ):
         raise errors.InputError(
-            f"attestations must be an object with format_version "
-            f"{FORMAT_VERSION}"
+            f"attestations must be an object with schema_version {VERSION}"
         )
-    records = document.get("attestations")
-    if not isinstance(records, list):
+    layout = records.load("attestations", MIGRATIONS, document, LEGACY)
+    entries = layout.get("attestations")
+    if not isinstance(entries, list):
         raise errors.InputError(
             "attestations must hold a list under 'attestations'"
         )
-    found = tuple(Affidavit.from_dict(r) for r in records)
+    found = tuple(Affidavit.from_dict(r) for r in entries)
     names = [a.column for a in found]
     if len(set(names)) != len(names):
         raise errors.InputError("at most one attestation per column")

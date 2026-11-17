@@ -385,10 +385,8 @@ def emit(draft: records.Draft, directory: str | Path) -> list[str]:
         "robust": list(draft.robust),
         "open_items": list(draft.open_items),
     }
-    if draft.charter is not None and draft.charter.cost_model is not None:
-        documents["decision_cost_model.json"] = (
-            draft.charter.cost_model.to_dict()
-        )
+    if draft.charter is not None and draft.charter.costs is not None:
+        documents["decision_cost_model.json"] = draft.charter.costs.to_dict()
     if draft.baseline is not None:
         documents["baseline_report.json"] = draft.baseline
     if draft.refusal is not None:

@@ -183,8 +183,8 @@ def screened(
         decision = qualification.Decision.PASS
     statistic = finding.statistic if math.isfinite(finding.statistic) else 0.0
     return qualification.Check(
-        check_id=f"leakage.screen.{finding.mechanism}:{finding.feature}",
-        null_hypothesis=(
+        identifier=f"leakage.screen.{finding.mechanism}:{finding.feature}",
+        null=(
             f"'{finding.feature}' has no {screen.WORDS[finding.mechanism]} "
             "with the target"
         ),
@@ -194,8 +194,8 @@ def screened(
         effect=statistic,
         n=rows,
         decision=decision,
-        set_id=qualification.Subset.EXPLORATION,
-        seed_path=(seed, "leakage.screen", index),
+        subset=qualification.Subset.EXPLORATION,
+        seeds=(seed, "leakage.screen", index),
         tier=qualification.Tier.UNVERIFIED,
     )
 
@@ -232,11 +232,11 @@ def waiver(
         default=0.0,
     )
     return qualification.Check(
-        check_id=f"leakage.attestation:{item.column}",
-        null_hypothesis=(
+        identifier=f"leakage.attestation:{item.column}",
+        null=(
             f"'{item.column}' is a legitimate predictor, known "
-            f"{item.lead_seconds:g} s before the prediction moment: attested "
-            f"by {given.name_or_id} ({given.role}) on {given.date}, valid to "
+            f"{item.seconds:g} s before the prediction moment: attested "
+            f"by {given.attestor} ({given.role}) on {given.date}, valid to "
             f"{given.expires}, evidence: {given.evidence}"
         ),
         statistic=statistic,
@@ -245,8 +245,8 @@ def waiver(
         effect=statistic,
         n=rows,
         decision=qualification.Decision.WARN,
-        set_id=qualification.Subset.EXPLORATION,
-        seed_path=(seed, "leakage.attestation", index),
+        subset=qualification.Subset.EXPLORATION,
+        seeds=(seed, "leakage.attestation", index),
         tier=qualification.Tier.ATTESTED,
     )
 

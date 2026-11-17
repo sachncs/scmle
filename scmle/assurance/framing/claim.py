@@ -413,7 +413,7 @@ def rig(
         baseline.CLAIM_ID,
         KIND,
         "net benefit of the frozen rule exceeds net benefit of the current "
-        f"process over thresholds [{model.t_lo:.4f}, {model.t_hi:.4f}]",
+        f"process over thresholds [{model.low:.4f}, {model.high:.4f}]",
         registration.registration_hash,
     )
 

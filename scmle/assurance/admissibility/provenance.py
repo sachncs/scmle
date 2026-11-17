@@ -16,6 +16,7 @@ attested, in what role, on what date and for what scope). Its cryptographic
 signature is not verified by this module.
 """
 
+from collections.abc import Callable
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
@@ -24,13 +25,15 @@ import enum
 import hashlib
 import json
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
+from scmle.contracts import records
 
-FORMAT_VERSION = 1
+LEGACY = "format_version"
 
 
 class Origin(enum.StrEnum):
@@ -89,13 +92,20 @@ class Lead:
     Attributes:
         kind: `timestamp` (a write time compared with the moment), `lag` (a
             constant delay) or `unknown`.
-        lead_seconds: Prediction moment minus the time the value is known,
+        seconds: Prediction moment minus the time the value is known,
             in seconds. Positive means known before the moment, negative
             after it. None exactly when `kind` is `unknown`.
+        migrations: The layout's version steps, oldest first; version 1
+            spelled `seconds` as `lead_seconds`. A rule is stored inside a
+            `Pedigree`, whose version it follows.
     """
 
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"lead_seconds": "seconds"}),
+    )
+
     kind: Cutoff
-    lead_seconds: float | None
+    seconds: float | None
 
     def __post_init__(self) -> None:
         """Validates the rule.
@@ -107,12 +117,12 @@ class Lead:
         if not isinstance(self.kind, Cutoff):
             raise errors.InputError("kind must be an Cutoff")
         if self.kind is Cutoff.UNKNOWN:
-            if self.lead_seconds is not None:
+            if self.seconds is not None:
                 raise errors.InputError("an unknown as-of rule has no lead")
         else:
-            if self.lead_seconds is None:
-                raise errors.InputError("a known as-of rule needs lead_seconds")
-            qualification.finite(self.lead_seconds, "lead_seconds")
+            if self.seconds is None:
+                raise errors.InputError("a known as-of rule needs seconds")
+            qualification.finite(self.seconds, "seconds")
 
     @classmethod
     def unknown(cls) -> Self:
@@ -132,23 +142,24 @@ class Lead:
         """Converts the rule to a JSON-ready record.
 
         Returns:
-            A dict with `kind` (its string value) and `lead_seconds`.
+            A dict with `kind` (its string value) and `seconds`.
         """
-        return {"kind": self.kind.value, "lead_seconds": self.lead_seconds}
+        return {"kind": self.kind.value, "seconds": self.seconds}
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds a rule from a record, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping with exactly `kind` and `lead_seconds`.
+            record: A mapping with exactly `kind` and `seconds` (version 1:
+                `lead_seconds`).
 
         Returns:
             The rule. Unexpected or missing fields, an unknown `kind` and
             an invalid rule are rejected with a `ValueError`.
         """
-        qualification.require(cls, record)
-        return cls(Cutoff(record["kind"]), record["lead_seconds"])
+        layout = qualification.require(cls, record)
+        return cls(Cutoff(layout["kind"]), layout["seconds"])
 
 
 def parse_date(value: str, name: str) -> datetime.date:
@@ -178,7 +189,7 @@ class Attestation:
     """A named person's statement about a field's origin and as-of rule.
 
     Attributes:
-        name_or_id: Who made the statement.
+        attestor: Who made the statement.
         role: Their role (for example "data owner").
         statement: Origin, as-of and meaning, in words.
         evidence: A log table, DDL, ticket or document a third party could
@@ -186,9 +197,15 @@ class Attestation:
         date: ISO date of the statement.
         scope: The dataset version (hash) the statement covers.
         expires: ISO date after which the statement no longer counts.
+        migrations: The layout's version steps, oldest first; version 1
+            spelled `attestor` as `name_or_id`.
     """
 
-    name_or_id: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"name_or_id": "attestor"}),
+    )
+
+    attestor: str
     role: str
     statement: str
     evidence: str
@@ -204,7 +221,7 @@ class Attestation:
                 or `expires` precedes `date`.
         """
         for name in (
-            "name_or_id",
+            "attestor",
             "role",
             "statement",
             "evidence",
@@ -242,14 +259,15 @@ class Attestation:
         """Rebuilds the record, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping holding exactly the record's fields.
+            record: A mapping holding exactly the record's fields (version
+                1: `name_or_id` for `attestor`).
 
         Returns:
             The record. Unexpected or missing fields, empty text and invalid
             dates are rejected with a `ValueError`.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        layout = qualification.require(cls, record)
+        return cls(**layout)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -260,7 +278,10 @@ class Reconstruction:
         rows: Rows compared.
         mismatched: Rows whose reconstruction differs from the stored value.
         tolerance: Largest mismatch share the field may have.
+        migrations: The layout's version steps; none so far.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = ()
 
     rows: int
     mismatched: int
@@ -309,8 +330,54 @@ class Reconstruction:
             The record. Unexpected or missing fields and invalid values are
             rejected with a `ValueError`.
         """
-        qualification.require(cls, record)
-        return cls(**record)
+        return cls(**qualification.require(cls, record))
+
+
+def promote(layout: records.Layout) -> records.Layout:
+    """Moves the parts of a renamed version-1 `Pedigree` to version 2.
+
+    Args:
+        layout: The record after its own keys were renamed.
+
+    Returns:
+        The record with its rule and attestation in the version-2 layout.
+    """
+    return shift(layout, records.upgrade)
+
+
+def demote(layout: records.Layout) -> records.Layout:
+    """Moves the parts of a version-2 `Pedigree` back to version 1.
+
+    Args:
+        layout: The record before its own keys are renamed back.
+
+    Returns:
+        The record with its rule and attestation in the version-1 layout.
+    """
+    return shift(layout, records.downgrade)
+
+
+def shift(
+    layout: records.Layout,
+    move: Callable[
+        [tuple[records.Migration, ...], records.Layout, int], records.Layout
+    ],
+) -> records.Layout:
+    """Moves the rule and the attestation of a `Pedigree` layout.
+
+    Args:
+        layout: The record, its own keys at version 2.
+        move: `records.upgrade` or `records.downgrade`.
+
+    Returns:
+        A copy with `lead` and `attestation` moved; a part that is not an
+        object is left for the reader to reject.
+    """
+    moved = dict(layout)
+    for key, kind in (("lead", Lead), ("attestation", Attestation)):
+        if isinstance(moved.get(key), Mapping):
+            moved[key] = move(kind.migrations, dict(moved[key]), records.ORIGIN)
+    return moved
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -321,70 +388,89 @@ class Pedigree:
         name: Column name.
         origin: How values first come to exist.
         writer: System or person that writes the value.
-        written_at: Clock that stamps the write.
+        stamp: Clock that stamps the write.
         overwritten: Whether stored values can change later.
-        definition_history: Dated notes on changes to the definition.
-        as_of: The as-of rule.
-        as_of_source: `log`, `attested` or `none`; `none` requires an
+        definitions: Dated notes on changes to the definition.
+        lead: The as-of rule.
+        provenance: `log`, `attested` or `none`; `none` requires an
             unknown rule and a known rule requires a source.
-        available_at_serving: Whether the field exists when predicting.
-        attestation: Required when `as_of_source` is `attested`.
-        log_check: Required when `as_of_source` is `log`.
+        availability: Whether the field exists when predicting.
+        attestation: Required when `provenance` is `attested`.
+        reconstruction: Required when `provenance` is `log`.
+        migrations: The layout's version steps, oldest first; version 1
+            spelled `stamp`, `definitions`, `lead`, `provenance`,
+            `availability` and `reconstruction` as `written_at`,
+            `definition_history`, `as_of`, `as_of_source`,
+            `available_at_serving` and `log_check`, and its rule and
+            attestation in their version-1 layouts. A record is stored inside
+            a `Dictionary`, whose version it follows.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "written_at": "stamp",
+                "definition_history": "definitions",
+                "as_of": "lead",
+                "as_of_source": "provenance",
+                "available_at_serving": "availability",
+                "log_check": "reconstruction",
+            },
+            change=promote,
+            revert=demote,
+        ),
+    )
 
     name: str
     origin: Origin
     writer: str
-    written_at: Stamp
+    stamp: Stamp
     overwritten: Overwritten
-    definition_history: tuple[str, ...]
-    as_of: Lead
-    as_of_source: Provenance
-    available_at_serving: Availability
+    definitions: tuple[str, ...]
+    lead: Lead
+    provenance: Provenance
+    availability: Availability
     attestation: Attestation | None = None
-    log_check: Reconstruction | None = None
+    reconstruction: Reconstruction | None = None
 
     def __post_init__(self) -> None:
         """Validates the record.
 
         Raises:
             ValueError: If `name` or `writer` is empty, a definition note is
-                empty, `definition_history` is not a tuple, an enum field has
+                empty, `definitions` is not a tuple, an enum field has
                 the wrong type, or the as-of rule, its source, the
-                attestation and the log check are inconsistent.
+                attestation and the reconstruction are inconsistent.
         """
         evidence.require_text(self.name, "name")
         evidence.require_text(self.writer, "writer")
-        qualification.tupled(self.definition_history, "definition_history")
-        for note in self.definition_history:
-            evidence.require_text(note, "definition_history")
+        qualification.tupled(self.definitions, "definitions")
+        for note in self.definitions:
+            evidence.require_text(note, "definitions")
         for value, kind in (
             (self.origin, Origin),
-            (self.written_at, Stamp),
+            (self.stamp, Stamp),
             (self.overwritten, Overwritten),
-            (self.as_of_source, Provenance),
-            (self.available_at_serving, Availability),
-            (self.as_of, Lead),
+            (self.provenance, Provenance),
+            (self.availability, Availability),
+            (self.lead, Lead),
         ):
             if not isinstance(value, kind):
                 raise errors.InputError(f"expected a {kind.__name__}")
-        known = self.as_of.given
-        if known and self.as_of_source is Provenance.NONE:
+        known = self.lead.given
+        if known and self.provenance is Provenance.NONE:
             raise errors.InputError("a known as-of rule needs a source")
-        if not known and self.as_of_source is not Provenance.NONE:
+        if not known and self.provenance is not Provenance.NONE:
             raise errors.InputError(
                 "an unknown as-of rule cannot have a source"
             )
-        if (
-            self.as_of_source is Provenance.ATTESTED
-            and self.attestation is None
-        ):
+        if self.provenance is Provenance.ATTESTED and self.attestation is None:
             raise errors.InputError(
                 "an attested as-of rule needs an attestation"
             )
-        if self.as_of_source is Provenance.LOG and self.log_check is None:
+        if self.provenance is Provenance.LOG and self.reconstruction is None:
             raise errors.InputError(
-                "a log-derived as-of rule needs a log_check"
+                "a log-derived as-of rule needs a reconstruction"
             )
 
     def tier(self, today: datetime.date | None = None) -> qualification.Tier:
@@ -403,15 +489,15 @@ class Pedigree:
         attested = self.attestation is not None and (
             today is None or self.attestation.effective(today)
         )
-        if self.as_of_source is Provenance.LOG:
-            if self.log_check is not None and self.log_check.passed:
+        if self.provenance is Provenance.LOG:
+            if self.reconstruction is not None and self.reconstruction.passed:
                 return qualification.Tier.CONFIRMED
             return (
                 qualification.Tier.ATTESTED
                 if attested
                 else qualification.Tier.UNVERIFIED
             )
-        if self.as_of_source is Provenance.ATTESTED and attested:
+        if self.provenance is Provenance.ATTESTED and attested:
             return qualification.Tier.ATTESTED
         return qualification.Tier.UNVERIFIED
 
@@ -426,18 +512,18 @@ class Pedigree:
             "name": self.name,
             "origin": self.origin.value,
             "writer": self.writer,
-            "written_at": self.written_at.value,
+            "stamp": self.stamp.value,
             "overwritten": self.overwritten.value,
-            "definition_history": list(self.definition_history),
-            "as_of": self.as_of.to_dict(),
-            "as_of_source": self.as_of_source.value,
-            "available_at_serving": self.available_at_serving.value,
+            "definitions": list(self.definitions),
+            "lead": self.lead.to_dict(),
+            "provenance": self.provenance.value,
+            "availability": self.availability.value,
             "attestation": None
             if self.attestation is None
             else self.attestation.to_dict(),
-            "log_check": None
-            if self.log_check is None
-            else self.log_check.to_dict(),
+            "reconstruction": None
+            if self.reconstruction is None
+            else self.reconstruction.to_dict(),
         }
 
     @classmethod
@@ -445,32 +531,33 @@ class Pedigree:
         """Rebuilds a record, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping in the form `to_dict` returns.
+            record: A mapping in the form `to_dict` returns, or its version-1
+                layout.
 
         Returns:
             The record. Unexpected or missing fields, an unknown enum
             value and an inconsistent record are rejected with a
             `ValueError`.
         """
-        qualification.require(cls, record)
-        attestation = record["attestation"]
-        log_check = record["log_check"]
+        layout = qualification.require(cls, record)
+        attestation = layout["attestation"]
+        reconstruction = layout["reconstruction"]
         return cls(
-            name=record["name"],
-            origin=Origin(record["origin"]),
-            writer=record["writer"],
-            written_at=Stamp(record["written_at"]),
-            overwritten=Overwritten(record["overwritten"]),
-            definition_history=tuple(record["definition_history"]),
-            as_of=Lead.from_dict(record["as_of"]),
-            as_of_source=Provenance(record["as_of_source"]),
-            available_at_serving=Availability(record["available_at_serving"]),
+            name=layout["name"],
+            origin=Origin(layout["origin"]),
+            writer=layout["writer"],
+            stamp=Stamp(layout["stamp"]),
+            overwritten=Overwritten(layout["overwritten"]),
+            definitions=tuple(layout["definitions"]),
+            lead=Lead.from_dict(layout["lead"]),
+            provenance=Provenance(layout["provenance"]),
+            availability=Availability(layout["availability"]),
             attestation=None
             if attestation is None
             else Attestation.from_dict(attestation),
-            log_check=None
-            if log_check is None
-            else Reconstruction.from_dict(log_check),
+            reconstruction=None
+            if reconstruction is None
+            else Reconstruction.from_dict(reconstruction),
         )
 
 
@@ -487,13 +574,67 @@ def undeclared(name: str) -> Pedigree:
         name=name,
         origin=Origin.DERIVED,
         writer="undeclared",
-        written_at=Stamp.UNKNOWN,
+        stamp=Stamp.UNKNOWN,
         overwritten=Overwritten.UNKNOWN,
-        definition_history=(),
-        as_of=Lead.unknown(),
-        as_of_source=Provenance.NONE,
-        available_at_serving=Availability.UNKNOWN,
+        definitions=(),
+        lead=Lead.unknown(),
+        provenance=Provenance.NONE,
+        availability=Availability.UNKNOWN,
     )
+
+
+def forward(document: records.Layout) -> records.Layout:
+    """Moves every field record of a version-1 `Dictionary` to version 2.
+
+    Args:
+        document: The table without its version key.
+
+    Returns:
+        The table with each field record in the version-2 layout.
+    """
+    return travel(document, records.upgrade)
+
+
+def backward(document: records.Layout) -> records.Layout:
+    """Moves every field record of a version-2 `Dictionary` to version 1.
+
+    Args:
+        document: The table without its version key.
+
+    Returns:
+        The table with each field record in the version-1 layout.
+    """
+    return travel(document, records.downgrade)
+
+
+def travel(
+    document: records.Layout,
+    move: Callable[
+        [tuple[records.Migration, ...], records.Layout, int], records.Layout
+    ],
+) -> records.Layout:
+    """Moves every field record of a `Dictionary` document.
+
+    Args:
+        document: The table without its version key.
+        move: `records.upgrade` or `records.downgrade`.
+
+    Returns:
+        A copy with each field record that is an object moved; anything else
+        is left for the reader to reject.
+    """
+    fields = document.get("fields")
+    if not isinstance(fields, list):
+        return dict(document)
+    return {
+        **document,
+        "fields": [
+            move(Pedigree.migrations, dict(f), records.ORIGIN)
+            if isinstance(f, Mapping)
+            else f
+            for f in fields
+        ],
+    }
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -502,7 +643,14 @@ class Dictionary:
 
     Attributes:
         fields: One record per field, in a fixed order, names unique.
+        migrations: The document's version steps, oldest first; version 1
+            spelled its version key `format_version` and held its field
+            records in their version-1 layout.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(change=forward, revert=backward),
+    )
 
     fields: tuple[Pedigree, ...]
 
@@ -582,45 +730,54 @@ class Dictionary:
         """Converts the table to a JSON-ready document.
 
         Returns:
-            A dict with `format_version` and the list of field records.
+            A dict with `schema_version` and the list of field records.
         """
         return {
-            "format_version": FORMAT_VERSION,
+            records.KEY: records.ORIGIN + len(self.migrations),
             "fields": [f.to_dict() for f in self.fields],
         }
 
     @classmethod
     def from_dict(cls, document: Mapping[str, Any]) -> Self:
-        """Rebuilds a table, rejecting unknown versions and fields.
+        """Rebuilds a table of any stored version, rejecting unknown fields.
 
         Args:
-            document: A mapping in the form `to_dict` returns.
+            document: A mapping in the form `to_dict` returns, or the
+                version-1 form with `format_version` 1.
 
         Returns:
             The table.
 
         Raises:
-            ValueError: If `format_version` is not supported, the document
-                has keys other than `format_version` and `fields`, or a
-                field record is invalid.
+            ValueError: If the document carries no version, a version newer
+                than this build, keys other than its version and `fields`,
+                or an invalid field record.
         """
-        if document.get("format_version") != FORMAT_VERSION:
-            raise errors.InputError(
-                f"unsupported format_version: {document.get('format_version')}"
-            )
-        extra = sorted(set(document) - {"format_version", "fields"})
+        if records.KEY not in document and LEGACY not in document:
+            raise errors.InputError("the table carries no schema_version")
+        layout = records.load(cls.__name__, cls.migrations, document, LEGACY)
+        extra = sorted(set(layout) - {records.KEY, "fields"})
         if extra:
             raise errors.InputError(f"unexpected field(s): {extra}")
-        if "fields" not in document:
+        if "fields" not in layout:
             raise errors.InputError("missing field(s): ['fields']")
-        return cls(tuple(Pedigree.from_dict(f) for f in document["fields"]))
+        return cls(tuple(Pedigree.from_dict(f) for f in layout["fields"]))
 
     def digest(self) -> str:
-        """Hashes the table.
+        """Hashes the table, anchored at its version-1 form.
+
+        A table stored before a key was renamed therefore keeps its digest.
 
         Returns:
-            The hex SHA-256 of the table's JSON with sorted keys and no
-            whitespace.
+            The hex SHA-256 of the version-1 document (`format_version` 1 and
+            the field records in their version-1 layout) as JSON with sorted
+            keys and no whitespace.
         """
-        text = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
+        layout = self.to_dict()
+        del layout[records.KEY]
+        anchored = {
+            LEGACY: records.ORIGIN,
+            **records.downgrade(self.migrations, layout),
+        }
+        text = json.dumps(anchored, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(text.encode("utf-8")).hexdigest()

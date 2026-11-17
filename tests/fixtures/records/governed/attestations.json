@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "attestations": [
+    {
+      "column": "copy",
+      "lead_seconds": 3600.0,
+      "name_or_id": "A. Owner",
+      "role": "data owner",
+      "statement": "recorded before the moment",
+      "evidence": "ticket DATA-1",
+      "date": "2026-01-01",
+      "scope": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expires": "2026-12-31"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "uri": "warehouse://crm/accounts",
+  "columns": [
+    "customer_id",
+    "resolved_at",
+    "churn"
+  ],
+  "primary_key": [
+    "customer_id"
+  ],
+  "target_time_column": "resolved_at"
+}

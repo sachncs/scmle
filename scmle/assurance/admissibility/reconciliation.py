@@ -21,16 +21,20 @@ from collections.abc import Sequence
 import dataclasses
 import enum
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
+from scmle.contracts import records
 
 DETECTOR_ID = "f4-reconciliation"
 DEFECT_TYPE = "unexplained_gap"
-FORMAT_VERSION = 1
+# Version 2: each explanation spells `attested_by` as `attestor`
+# (`Explanation.migrations`).
+FORMAT_VERSION = 2
 
 
 class Mechanism(enum.StrEnum):
@@ -57,28 +61,35 @@ class Explanation:
         mechanism: Which mechanism.
         detail: What it is, concretely (the rule, the cut-off, the job).
         amount: Signed part of `extract - source` it accounts for.
-        attested_by: Who vouches for it, or None.
+        attestor: Who vouches for it, or None.
+        migrations: The layout's version steps, oldest first; version 1
+            spelled `attestor` as `attested_by`. An explanation is stored in
+            a reconciliation document, whose version it follows.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"attested_by": "attestor"}),
+    )
 
     mechanism: Mechanism
     detail: str
     amount: float
-    attested_by: str | None = None
+    attestor: str | None = None
 
     def __post_init__(self) -> None:
         """Validates the record.
 
         Raises:
             ValueError: If `mechanism` is not a `Mechanism`, `detail` or
-                `attested_by` (when given) is empty, or `amount` is not
+                `attestor` (when given) is empty, or `amount` is not
                 finite.
         """
         if not isinstance(self.mechanism, Mechanism):
             raise errors.InputError("mechanism must be a Mechanism")
         evidence.require_text(self.detail, "detail")
         qualification.finite(self.amount, "amount")
-        if self.attested_by is not None:
-            evidence.require_text(self.attested_by, "attested_by")
+        if self.attestor is not None:
+            evidence.require_text(self.attestor, "attestor")
 
     def to_dict(self) -> dict[str, Any]:
         """Converts the explanation to a JSON-ready record.
@@ -91,7 +102,7 @@ class Explanation:
             "mechanism": self.mechanism.value,
             "detail": self.detail,
             "amount": self.amount,
-            "attested_by": self.attested_by,
+            "attestor": self.attestor,
         }
 
     @classmethod
@@ -99,18 +110,19 @@ class Explanation:
         """Rebuilds the record, rejecting unknown or missing fields.
 
         Args:
-            record: A mapping in the form `to_dict` returns.
+            record: A mapping in the form `to_dict` returns, or its version-1
+                layout (`attested_by`).
 
         Returns:
             The explanation. Unexpected or missing fields, an unknown
             mechanism and invalid values are rejected with a `ValueError`.
         """
-        qualification.require(cls, record)
+        layout = qualification.require(cls, record)
         return cls(
-            Mechanism(record["mechanism"]),
-            record["detail"],
-            record["amount"],
-            record["attested_by"],
+            Mechanism(layout["mechanism"]),
+            layout["detail"],
+            layout["amount"],
+            layout["attestor"],
         )
 
 
@@ -231,7 +243,7 @@ def settle(
         status = Status.UNEXPLAINED
     attested = status is Status.MATCHED or (
         status is Status.EXPLAINED
-        and all(e.attested_by is not None for e in item.explanations)
+        and all(e.attestor is not None for e in item.explanations)
     )
     tier = (
         qualification.Tier.ATTESTED
@@ -244,8 +256,8 @@ def settle(
         else qualification.Decision.PASS
     )
     check = qualification.Check(
-        check_id=f"reconciliation.{item.name}",
-        null_hypothesis=(
+        identifier=f"reconciliation.{item.name}",
+        null=(
             f"the extract equals {item.source_name} within {level:g}, or a "
             "named mechanism explains the gap"
         ),
@@ -255,8 +267,8 @@ def settle(
         effect=gap,
         n=1,
         decision=certificates.demote(decision, gate),
-        set_id=set_id,
-        seed_path=seed_path,
+        subset=set_id,
+        seeds=seed_path,
         tier=tier,
     )
     return Verdict(item, gap, residual, status, tier, check)

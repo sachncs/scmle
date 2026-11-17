@@ -5,10 +5,12 @@ import dataclasses
 import hashlib
 import re
 from typing import Any
+from typing import ClassVar
 
 from scmle.assurance.charter import contracts
 from scmle.assurance.framing import provenance
 import scmle.assurance.framing.questions
+from scmle.contracts import records
 from scmle.contracts import signing
 
 ISSUED = "issued"
@@ -38,31 +40,42 @@ class Offer:
     Attributes:
         uri: Where the data lives.
         columns: Column names the source has.
-        primary_key: Declared key columns, if any.
-        target_time_column: Column holding when the outcome is known, if any.
+        key: Declared key columns, if any.
+        time: Column holding when the outcome is known, if any.
+        migrations: The stored layout's version steps, oldest first; version
+            1 spelled `key` and `time` as `primary_key` and
+            `target_time_column`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={"primary_key": "key", "target_time_column": "time"}
+        ),
+    )
 
     uri: str
     columns: tuple[str, ...]
-    primary_key: tuple[str, ...] = ()
-    target_time_column: str | None = None
+    key: tuple[str, ...] = ()
+    time: str | None = None
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "Offer":
-        """Builds the description from a JSON object.
+        """Builds the description from a JSON object of any stored version.
 
         Args:
-            record: A mapping with `uri` and `columns`, and optionally
-                `primary_key` and `target_time_column`.
+            record: A mapping with `uri` and `columns`, and optionally `key`
+                and `time` (version 1: `primary_key` and
+                `target_time_column`; no `schema_version` key means 1).
 
         Returns:
             The description. A missing `uri` or `columns` raises `KeyError`.
         """
+        layout = records.load(cls.__name__, cls.migrations, record)
         return cls(
-            uri=str(record["uri"]),
-            columns=tuple(record["columns"]),
-            primary_key=tuple(record.get("primary_key", ())),
-            target_time_column=record.get("target_time_column"),
+            uri=str(layout["uri"]),
+            columns=tuple(layout["columns"]),
+            key=tuple(layout.get("key", ())),
+            time=layout.get("time"),
         )
 
 
@@ -163,5 +176,13 @@ class Draft:
 
     @property
     def sha(self) -> str:
-        """The SHA-256 hex digest of the stored draft document."""
-        return hashlib.sha256(signing.canonicalise(self.to_dict())).hexdigest()
+        """The SHA-256 hex digest of the draft document, anchored at version 1.
+
+        The charter enters in its version-1 layout (`AnalysisCharter.anchor`),
+        so renaming a charter or cost-model key leaves the digest of a
+        registered draft unchanged.
+        """
+        document = self.to_dict()
+        if self.charter is not None:
+            document["charter"] = self.charter.anchor()
+        return hashlib.sha256(signing.canonicalise(document)).hexdigest()

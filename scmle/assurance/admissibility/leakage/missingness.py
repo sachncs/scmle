@@ -129,18 +129,16 @@ def missingness_test(
     suspect = powered and p_value <= cfg.alpha and v >= cfg.association_ceiling
     path = f"{MISSING}.{feature.name}"
     check = qualification.Check(
-        check_id=path,
-        null_hypothesis=(
-            "whether the value is recorded is independent of the outcome"
-        ),
+        identifier=path,
+        null=("whether the value is recorded is independent of the outcome"),
         statistic=v,
         p_value=p_value,
         interval=None,
         effect=v,
         n=len(feature),
         decision=decide(suspect, not powered, gate),
-        set_id=set_id,
-        seed_path=randomness.seed_path(cfg.run_seed, path, 0),
+        subset=set_id,
+        seeds=randomness.seed_path(cfg.run_seed, path, 0),
         tier=qualification.Tier.UNVERIFIED,
     )
     return Missingness(

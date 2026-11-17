@@ -1,0 +1,6 @@
+{
+  "mechanism": "filter",
+  "detail": "test accounts excluded",
+  "amount": -100.0,
+  "attested_by": "j.doe"
+}

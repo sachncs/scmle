@@ -1,0 +1,67 @@
+{
+  "format_version": 1,
+  "fields": [
+    {
+      "name": "attested",
+      "origin": "instrument",
+      "writer": "sensor",
+      "written_at": "event_time",
+      "overwritten": "never",
+      "definition_history": [
+        "2025-01-01 created"
+      ],
+      "as_of": {
+        "kind": "lag",
+        "lead_seconds": 3600.0
+      },
+      "as_of_source": "attested",
+      "available_at_serving": "yes",
+      "attestation": {
+        "name_or_id": "A. Owner",
+        "role": "data owner",
+        "statement": "recorded before the moment",
+        "evidence": "ticket DATA-1",
+        "date": "2026-01-01",
+        "scope": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expires": "2026-12-31"
+      },
+      "log_check": null
+    },
+    {
+      "name": "logged",
+      "origin": "system_default",
+      "writer": "etl",
+      "written_at": "batch_time",
+      "overwritten": "on_update",
+      "definition_history": [],
+      "as_of": {
+        "kind": "timestamp",
+        "lead_seconds": 60.0
+      },
+      "as_of_source": "log",
+      "available_at_serving": "unknown",
+      "attestation": null,
+      "log_check": {
+        "rows": 100,
+        "mismatched": 2,
+        "tolerance": 0.05
+      }
+    },
+    {
+      "name": "unknown",
+      "origin": "derived",
+      "writer": "undeclared",
+      "written_at": "unknown",
+      "overwritten": "unknown",
+      "definition_history": [],
+      "as_of": {
+        "kind": "unknown",
+        "lead_seconds": null
+      },
+      "as_of_source": "none",
+      "available_at_serving": "unknown",
+      "attestation": null,
+      "log_check": null
+    }
+  ]
+}

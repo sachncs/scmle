@@ -86,8 +86,8 @@ def summarize(
     """
     skill, null, bound, p_value = result
     return qualification.Check(
-        check_id=path,
-        null_hypothesis=(
+        identifier=path,
+        null=(
             "the feature has no predictive skill beyond a target permuted "
             "within its blocks"
         ),
@@ -97,7 +97,7 @@ def summarize(
         effect=skill - float(numpy.mean(null)),
         n=n,
         decision=decision,
-        set_id=set_id,
-        seed_path=randomness.seed_path(cfg.run_seed, path, 1),
+        subset=set_id,
+        seeds=randomness.seed_path(cfg.run_seed, path, 1),
         tier=qualification.Tier.UNVERIFIED,
     )
