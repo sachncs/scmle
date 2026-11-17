@@ -11,8 +11,8 @@ from urllib.parse import urlparse
 import pydantic
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
-EXPLANATION_SCHEMA_VERSION = 1
 PrivacyStatus = Literal["allowed", "redacted", "denied"]
 
 
@@ -81,12 +81,10 @@ def sanitise(value: Any, field_name: str = "value") -> object:
     )
 
 
-class Contract(pydantic.BaseModel):
+class Contract(records.Schema):
     """Immutable base model shared by explanation evidence records."""
 
     model_config = pydantic.ConfigDict(
-        extra="forbid",
-        frozen=True,
         str_strip_whitespace=True,
         validate_assignment=True,
     )
@@ -272,7 +270,7 @@ class Link(Contract):
         return None if value is None else require_text(value, "link.digest")
 
 
-class Evidence(Contract):
+class Evidence(Contract, records.Record):
     """Portable evidence record for one global or local explanation.
 
     The record deliberately stores references and JSON-native outputs rather
@@ -300,9 +298,6 @@ class Evidence(Contract):
         schema_version: Version of the evidence record layout; at least one.
     """
 
-    schema_version: int = pydantic.Field(
-        default=EXPLANATION_SCHEMA_VERSION, ge=1
-    )
     model_fingerprint: str
     bundle_digest: str
     input_fingerprint: str
@@ -453,29 +448,10 @@ class Evidence(Contract):
             )
         return value.astimezone(datetime.UTC)
 
-    def to_dict(self) -> dict[str, object]:
-        """Returns a JSON-native, deterministic evidence mapping.
-
-        Returns:
-            The evidence as JSON-native data.
-
-        Raises:
-            TypeError: If the serialized evidence is not an object, which
-                cannot happen in practice because a model dump is always a
-                mapping.
-        """
-        record = self.model_dump(mode="json")
-        normalized = sanitise(record, "evidence")
-        if not isinstance(normalized, dict):
-            raise errors.KindError(
-                "serialized explanation evidence must be an object"
-            )
-        return normalized
-
     def canonize(self) -> str:
         """Returns deterministic JSON safe to embed in an HTML document."""
         payload = json.dumps(
-            self.to_dict(),
+            self.model_dump(mode="json"),
             allow_nan=False,
             ensure_ascii=True,
             separators=(",", ":"),
