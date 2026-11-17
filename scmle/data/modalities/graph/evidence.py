@@ -1,0 +1,164 @@
+"""Profiles, partitions and feature matrices produced from a graph."""
+
+import dataclasses
+from typing import Any
+
+import numpy
+
+from scmle.data.modalities.graph.elements import Edge
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Degrees:
+    """Summary statistics for graph nodes and their degrees.
+
+    Attributes:
+        node_count: Number of nodes.
+        isolated_node_count: Number of nodes with degree zero.
+        labeled_node_count: Number of nodes with a label.
+        feature_dimension: Longest feature vector among the nodes.
+        degree_min: Smallest degree; 0 for an empty graph.
+        degree_max: Largest degree; 0 for an empty graph.
+        degree_mean: Mean degree; 0.0 for an empty graph.
+    """
+
+    node_count: int
+    isolated_node_count: int
+    labeled_node_count: int
+    feature_dimension: int
+    degree_min: int
+    degree_max: int
+    degree_mean: float
+
+    def to_dict(self) -> dict[str, Any]:
+        """Returns a JSON-compatible node profile.
+
+        Returns:
+            A dict of the profile fields.
+        """
+        return dataclasses.asdict(self)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Connectivity:
+    """Summary statistics for graph edges and weights.
+
+    Attributes:
+        edge_count: Number of edges.
+        duplicate_edge_count: Number of edges beyond the first for each
+            duplicate-detection key.
+        self_loop_count: Number of edges whose source equals the target.
+        weight_min: Smallest weight, or None without edges.
+        weight_max: Largest weight, or None without edges.
+        weight_mean: Mean weight, or None without edges.
+    """
+
+    edge_count: int
+    duplicate_edge_count: int
+    self_loop_count: int
+    weight_min: float | None
+    weight_max: float | None
+    weight_mean: float | None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Returns a JSON-compatible edge profile.
+
+        Returns:
+            A dict of the profile fields.
+        """
+        return dataclasses.asdict(self)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Profile:
+    """Combined graph, node, and edge profile.
+
+    Attributes:
+        graph_identity: SHA-256 identity of the graph content.
+        directed: Whether the graph is directed.
+        component_count: Number of weakly connected components.
+        node: Node profile.
+        edge: Edge profile.
+    """
+
+    graph_identity: str
+    directed: bool
+    component_count: int
+    node: Degrees
+    edge: Connectivity
+
+    def to_dict(self) -> dict[str, Any]:
+        """Returns a JSON-compatible graph profile.
+
+        Returns:
+            A dict with the identity, direction, component count and the
+            node and edge profiles as nested dicts.
+        """
+        return {
+            "graph_identity": self.graph_identity,
+            "directed": self.directed,
+            "component_count": self.component_count,
+            "node": self.node.to_dict(),
+            "edge": self.edge.to_dict(),
+        }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Partition:
+    """Leakage-safe node partitions and within-partition edge partitions.
+
+    Attributes:
+        train_nodes: Sorted identifiers of the training nodes.
+        validation_nodes: Sorted identifiers of the validation nodes.
+        test_nodes: Sorted identifiers of the test nodes.
+        train_edges: Edges with both endpoints in the training nodes.
+        validation_edges: Edges with both endpoints in the validation nodes.
+        test_edges: Edges with both endpoints in the test nodes.
+        withheld_edges: Edges whose endpoints fall in different partitions.
+        seed: Seed used for the shuffle.
+    """
+
+    train_nodes: tuple[str, ...]
+    validation_nodes: tuple[str, ...]
+    test_nodes: tuple[str, ...]
+    train_edges: tuple[Edge, ...]
+    validation_edges: tuple[Edge, ...]
+    test_edges: tuple[Edge, ...]
+    withheld_edges: tuple[Edge, ...]
+    seed: int
+
+    @property
+    def divisions(self) -> tuple[tuple[str, ...], ...]:
+        """The train, validation and test node partitions, in that order."""
+        return (self.train_nodes, self.validation_nodes, self.test_nodes)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Features:
+    """Bounded numeric features for a graph baseline.
+
+    Attributes:
+        node_ids: Identifier of each row.
+        feature_names: Name of each column.
+        values: One tuple of feature values per node.
+        standardized: Whether columns were standardised to zero mean and
+            unit variance.
+    """
+
+    node_ids: tuple[str, ...]
+    feature_names: tuple[str, ...]
+    values: tuple[tuple[float, ...], ...]
+    standardized: bool
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        """The number of nodes and the number of features, as a pair."""
+        return (len(self.node_ids), len(self.feature_names))
+
+    def to_numpy(self) -> numpy.ndarray:
+        """Returns a writable copy of the prepared feature matrix.
+
+        Returns:
+            A float64 array of shape ``(nodes, features)``.
+        """
+        return numpy.asarray(self.values, dtype=numpy.float64).copy()

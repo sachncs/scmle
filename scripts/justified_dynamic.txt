@@ -41,13 +41,13 @@ scmle/data/ingest/synthesize.py enlist qualification module: docs/API_STABILITY.
 scmle/data/ledger/budget.py confirmation_alpha documented extension surface: docs/API_STABILITY.md (qualification types, error budget)
 scmle/data/ledger/controls.py resampling_control documented extension surface: docs/API_STABILITY.md (qualification types, error budget)
 scmle/data/ledger/governed.py run_governed documented extension surface: docs/API_STABILITY.md (qualification types, error budget)
-scmle/data/modalities/document.py Reader documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
-scmle/data/modalities/geospatial.py from_geojson documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
-scmle/data/modalities/geospatial.py spatial_join documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
-scmle/data/modalities/geospatial.py reproject documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
-scmle/data/modalities/graph.py from_edge_file kept in doubt: file loader of the public graph Dataset; no doc names it
-scmle/data/modalities/image.py from_path documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
-scmle/data/modalities/image.py deduplicate kept in doubt: the curate step "deduplicate" of website/src/pages/docs/modalities.astro
+scmle/data/modalities/document/reader.py Reader documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
+scmle/data/modalities/geospatial/dataset.py from_geojson documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
+scmle/data/modalities/geospatial/dataset.py spatial_join documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
+scmle/data/modalities/geospatial/dataset.py reproject documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
+scmle/data/modalities/graph/dataset.py from_edge_file kept in doubt: file loader of the public graph Dataset; no doc names it
+scmle/data/modalities/image/sample.py from_path documented: website/src/pages/docs/modalities.astro and api.astro (modality data and explanations)
+scmle/data/modalities/image/dataset.py deduplicate kept in doubt: the curate step "deduplicate" of website/src/pages/docs/modalities.astro
 scmle/data/readers/connectors.py Filesystem public connector surface asserted by tests/unit/test_modality_exports.py; same family as documented Lakehouse
 scmle/data/readers/connectors.py Lakehouse documented: website/src/pages/docs/data.astro (readers, connectors, streaming)
 scmle/data/readers/connectors.py StreamingObjectStoreConnector named in plan.md as a planned connector; same family as documented Lakehouse
@@ -163,7 +163,7 @@ scmle/trail/inputs.py sign_inputs documented: docs/TRAIL.md (inputs.json is sign
 scmle/unsupervised/clustering.py discover documented: docs/BREADTH.md (clustering slice)
 scmle/unsupervised/clustering.py compare documented: docs/BREADTH.md (clustering slice)
 scmle/workflow/definition.py standard_workflow documented extension surface: docs/API_STABILITY.md and docs/ORCHESTRATION.md (workflow)
-scmle/workflow/executor.py decide documented extension surface: docs/API_STABILITY.md and docs/ORCHESTRATION.md (workflow)
-scmle/workflow/executor.py ratify documented extension surface: docs/API_STABILITY.md and docs/ORCHESTRATION.md (workflow)
+scmle/workflow/executor/approvals.py decide documented extension surface: docs/API_STABILITY.md and docs/ORCHESTRATION.md (workflow)
+scmle/workflow/executor/approvals.py ratify documented extension surface: docs/API_STABILITY.md and docs/ORCHESTRATION.md (workflow)
 scmle/workflow/handlers.py delegate documented extension surface: docs/API_STABILITY.md and docs/ORCHESTRATION.md (workflow)
 scmle/workflow/schedule.py Scheduler documented extension surface: docs/API_STABILITY.md and docs/ORCHESTRATION.md (workflow)

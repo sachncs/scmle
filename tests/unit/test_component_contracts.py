@@ -41,7 +41,10 @@ def concrete_subclasses(base, *modules):
             ).values()
             if issubclass(member, base)
             and member is not base
-            and member.__module__ == module.__name__
+            and (
+                member.__module__ == module.__name__
+                or member.__module__.startswith(f"{module.__name__}.")
+            )
         )
     return found
 

@@ -38,8 +38,8 @@ scmle/core/resource_observation.py observe_memory_gb single-use tests/unit/test_
 scmle/core/resource_observation.py observe_windows_memory_gb single-use merged into observe_memory_gb it adds three returns to four, giving seven against the PLR0911 limit of six, and a try/except with the psutil import pragma inside an except branch
 scmle/core/resource_observation.py project_extra_requirements single-use parses requirement strings with EXTRA_MARKER and REQUIREMENT_NAME regexes and groups, sorts and de-duplicates per extra, with a PackageNotFoundError path; the body is non-obvious metadata parsing and optionals keeps only the all(present(...)) loop
 scmle/core/scheduler.py select single-use tests/integration/test_integrations.py (lines 78 and 121) and test_parallel.py call it directly
-scmle/core/stages.py default_stages single-use tests/unit/test_component_contracts.py (lines 110 and 178) call it directly
-scmle/core/stages.py frontier single-use the Pareto-dominance rule is non-obvious (three metrics, at least as good on all and better on one) and needs a nested def over points; inlined it would add 51 lines to the 69-line select_on_front method
+scmle/core/stages/defaults.py default_stages single-use tests/unit/test_component_contracts.py (lines 110 and 178) call it directly
+scmle/core/stages/selecting.py frontier single-use the Pareto-dominance rule is non-obvious (three metrics, at least as good on all and better on one) and needs a nested def over points; inlined it would add 51 lines to the 69-line select_on_front method
 scmle/data/admissibility/asof.py agrees single-use tests/unit/test_admissibility_asof.py:207 calls it directly for the missing-equals-missing case
 scmle/data/admissibility/independence.py entail single-use tests/unit/test_admissibility_independence.py (lines 172 and 187) call it directly
 scmle/data/admissibility/leakage.py rescore single-use called from a lambda inside itertools.repeat and operator.call in lower_bound; its try/except and index construction are statements that cannot sit in the lambda

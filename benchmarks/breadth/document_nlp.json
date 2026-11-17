@@ -6,8 +6,8 @@
   "modality": "document",
   "built": "experimental_lifecycle",
   "evidence_in_repo": [
-    "scmle/models/modality_lifecycle.py",
-    "scmle/data/modalities/document.py",
+    "scmle/models/modality_lifecycle/preparers/document.py",
+    "scmle/data/modalities/document",
     "scmle/models/documents.py",
     "tests/unit/test_modality_lifecycle.py"
   ],

@@ -6,7 +6,7 @@
   "modality": "geospatial",
   "built": "experimental_lifecycle",
   "evidence_in_repo": [
-    "scmle/data/modalities/geospatial.py",
+    "scmle/data/modalities/geospatial",
     "tests/unit/test_modality_lifecycle.py"
   ],
   "deployment_requirement": {

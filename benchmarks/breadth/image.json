@@ -7,7 +7,7 @@
   "built": "experimental_lifecycle",
   "evidence_in_repo": [
     "scmle/models/images.py",
-    "scmle/data/modalities/image.py",
+    "scmle/data/modalities/image",
     "tests/unit/test_media_modalities.py",
     "tests/unit/test_modality_lifecycle.py"
   ],

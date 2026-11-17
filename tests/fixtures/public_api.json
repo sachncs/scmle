@@ -33,11 +33,11 @@
     "scmle.api.project": {
       "Curator": {
         "kind": "class",
-        "signature_sha256": "2d1f0ff2c500a5874c0f23aeb432d0733d5ff099fdb4ed23523c6f9c610166fc"
+        "signature_sha256": "6424f85c3ebeaa7d7be4a33568e252d4e884a7129cd52fd6253da82e7f47e273"
       },
       "ModalityProject": {
         "kind": "class",
-        "signature_sha256": "9436deb8c96560c8b31accd6b942d7ead9237ae108b3c754a37b424317dc0b1c"
+        "signature_sha256": "089dafdce03c153737ae3de1d596d3bc082f59651834ce20f77e13b437d9c417"
       },
       "Project": {
         "kind": "class",
