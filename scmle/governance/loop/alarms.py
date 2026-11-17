@@ -14,7 +14,7 @@ class Alarms(contest.Contest):
 
         A naive alarm under an unverified mechanism halts and escalates; an
         L1 alarm writes an alarm row, then an investigation escalation or a
-        retrain request, by ``alarm_gates_retrain``; a selective-risk alarm
+        retrain request, by ``retrain``; a selective-risk alarm
         halts and escalates. Each crossed alarm is replaced by a fresh one.
 
         Args:
@@ -54,7 +54,7 @@ class Alarms(contest.Contest):
                     "mechanism": self.mechanism.value,
                 },
             )
-            if not self.policy.alarm_gates_retrain:
+            if not self.policy.retrain:
                 newest = (
                     self.escalate(
                         "l1_alarm_investigate",
@@ -65,9 +65,9 @@ class Alarms(contest.Contest):
             else:
                 self.refit(batch)
             self.alarm = sequential_tests.Tripwire(
-                self.policy.reference_risk,
+                self.policy.reference,
                 self.policy.tolerance,
-                self.policy.alpha_alarm,
+                self.policy.alarm,
                 self.policy.scale,
             )
         if verified and bool(self.selective.test.crossed):
@@ -84,7 +84,7 @@ class Alarms(contest.Contest):
                 self.escalate("halt_selective_risk", {"batch": batch}) or newest
             )
             self.selective = sequential_tests.Tripwire(
-                self.policy.r_star, 0.0, self.policy.delta, self.policy.scale
+                self.policy.target, 0.0, self.policy.delta, self.policy.scale
             )
         return newest
 
@@ -104,9 +104,9 @@ class Alarms(contest.Contest):
                 or newest
             )
             self.coverage_test = sequential_tests.Mixture(
-                self.policy.coverage_target or 0.9,
+                self.policy.coverage or 0.9,
                 sequential_tests.LESS,
-                self.policy.alpha_alarm,
+                self.policy.alarm,
             )
         if bool(self.novelty_test.crossed):
             newest = (
@@ -116,8 +116,8 @@ class Alarms(contest.Contest):
                 or newest
             )
             self.novelty_test = sequential_tests.Mixture(
-                min(max(self.policy.novelty_bound, 1e-6), 1 - 1e-6),
+                min(max(self.policy.novelty, 1e-6), 1 - 1e-6),
                 sequential_tests.GREATER,
-                self.policy.alpha_alarm,
+                self.policy.alarm,
             )
         return newest

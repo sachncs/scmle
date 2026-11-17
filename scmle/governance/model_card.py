@@ -119,8 +119,8 @@ class Card:
             model_fingerprint=model_fingerprint,
             task=bundle.schema.task,
             metric=bundle.info.metric,
-            dataset_id=manifest.dataset_id,
-            snapshot_id=manifest.snapshot_id,
+            dataset_id=manifest.identifier,
+            snapshot_id=manifest.snapshot,
             intended_use=(
                 f"Inference for the declared {bundle.schema.task} task using "
                 "the packaged schema and preprocessing pipeline."

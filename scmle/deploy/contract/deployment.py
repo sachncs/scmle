@@ -5,12 +5,14 @@ import dataclasses
 import hashlib
 import json
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.deploy.contract import references
 
-SPEC_FORMAT = 1
+SPEC_FORMAT = 2  # 1: multi-word keys; 2: the vocabulary of phase 5
 SECRET_WORDS = ("SECRET", "PASSWORD", "TOKEN", "CREDENTIAL", "PRIVATE", "KEY")
 PORT_LIMIT = 65536  # exclusive upper bound of a TCP port number
 PRODUCTION = "production"
@@ -19,31 +21,43 @@ ENVIRONMENT_VARIABLE = "SCMLE_ENV"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class Resources:
-    """Compute limits and the isolation the container runs with.
+class Quota:
+    """An amount of CPU and memory, as Kubernetes `requests` and `limits`.
 
     Attributes:
-        cpu_request: CPUs requested.
-        cpu_limit: CPUs allowed; at least `cpu_request`.
-        memory_request_mb: Memory requested, in megabytes.
-        memory_limit_mb: Memory allowed, in megabytes; at least the request.
-        scratch_mb: Size of the writable scratch space, in megabytes.
-        read_only_root: Whether the root filesystem is read-only (must be True).
-        run_as_non_root: Whether the container runs as a non-root user (must be
-            True).
-        max_concurrent_requests: Requests served at the same time.
+        cpu: CPUs.
+        memory: Memory, in megabytes.
     """
 
     __module__ = "scmle.deploy.contract"  # the path pinned signatures name
 
-    cpu_request: float
-    cpu_limit: float
-    memory_request_mb: int
-    memory_limit_mb: int
-    scratch_mb: int = 64
-    read_only_root: bool = True
-    run_as_non_root: bool = True
-    max_concurrent_requests: int = 8
+    cpu: float
+    memory: int
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Resources:
+    """Compute limits and the isolation the container runs with.
+
+    Attributes:
+        requests: CPUs and memory (megabytes) requested.
+        limits: CPUs and memory (megabytes) allowed; each at least its
+            request.
+        scratch: Size of the writable scratch space, in megabytes.
+        immutable: Whether the root filesystem is read-only (must be True).
+        rootless: Whether the container runs as a non-root user (must be
+            True).
+        concurrency: Requests served at the same time.
+    """
+
+    __module__ = "scmle.deploy.contract"  # the path pinned signatures name
+
+    requests: Quota
+    limits: Quota
+    scratch: int = 64
+    immutable: bool = True
+    rootless: bool = True
+    concurrency: int = 8
 
     def __post_init__(self) -> None:
         """Validates that limits dominate requests and isolation holds.
@@ -53,25 +67,21 @@ class Resources:
                 writable or the container runs as root. Non-positive values are
                 refused with the same error.
         """
-        references.require_positive(self.cpu_request, "resources.cpu_request")
-        references.require_positive(self.cpu_limit, "resources.cpu_limit")
-        references.require_positive(
-            self.memory_request_mb, "resources.memory_request_mb"
-        )
-        references.require_positive(
-            self.memory_limit_mb, "resources.memory_limit_mb"
-        )
-        references.require_positive(self.scratch_mb, "resources.scratch_mb")
-        references.require_positive(
-            self.max_concurrent_requests, "resources.max_concurrent_requests"
-        )
-        if self.cpu_limit < self.cpu_request:
-            raise errors.ConfigError("cpu_limit must be at least cpu_request")
-        if self.memory_limit_mb < self.memory_request_mb:
-            raise errors.ConfigError(
-                "memory_limit_mb must be at least memory_request_mb"
+        for side in ("requests", "limits"):
+            quota = getattr(self, side)
+            references.require_positive(quota.cpu, f"resources.{side}.cpu")
+            references.require_positive(
+                quota.memory, f"resources.{side}.memory"
             )
-        if not (self.read_only_root and self.run_as_non_root):
+        references.require_positive(self.scratch, "resources.scratch")
+        references.require_positive(self.concurrency, "resources.concurrency")
+        if self.limits.cpu < self.requests.cpu:
+            raise errors.ConfigError("limits.cpu must be at least requests.cpu")
+        if self.limits.memory < self.requests.memory:
+            raise errors.ConfigError(
+                "limits.memory must be at least requests.memory"
+            )
+        if not (self.immutable and self.rootless):
             raise errors.ConfigError(
                 "a deployable service runs non-root on a read-only root"
             )
@@ -80,7 +90,7 @@ class Resources:
         """Builds a JSON-compatible record.
 
         Returns:
-            A dict of all fields.
+            A dict of all fields, with `requests` and `limits` as objects.
         """
         return dataclasses.asdict(self)
 
@@ -94,7 +104,10 @@ class Resources:
         Returns:
             The limits.
         """
-        return cls(**record)
+        values = dict(record)
+        values["requests"] = Quota(**values["requests"])
+        values["limits"] = Quota(**values["limits"])
+        return cls(**values)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -102,24 +115,24 @@ class Probes:
     """Liveness and readiness probes and their timing.
 
     Attributes:
-        liveness_path: URL path of the liveness probe.
-        readiness_path: URL path of the readiness probe; differs from the
+        liveness: URL path of the liveness probe.
+        readiness: URL path of the readiness probe; differs from the
             liveness path.
-        period_seconds: Seconds between probes.
-        timeout_seconds: Seconds a probe may take; at most the period.
-        failure_threshold: Consecutive failures before the service is judged
+        period: Seconds between probes.
+        timeout: Seconds a probe may take; at most the period.
+        threshold: Consecutive failures before the service is judged
             unhealthy.
-        startup_grace_seconds: Seconds allowed for the service to start.
+        grace: Seconds allowed for the service to start.
     """
 
     __module__ = "scmle.deploy.contract"  # the path pinned signatures name
 
-    liveness_path: str = "/livez"
-    readiness_path: str = "/readyz"
-    period_seconds: float = 10.0
-    timeout_seconds: float = 2.0
-    failure_threshold: int = 3
-    startup_grace_seconds: float = 60.0
+    liveness: str = "/livez"
+    readiness: str = "/readyz"
+    period: float = 10.0
+    timeout: float = 2.0
+    threshold: int = 3
+    grace: float = 60.0
 
     def __post_init__(self) -> None:
         """Validates distinct paths and positive timings.
@@ -129,26 +142,18 @@ class Probes:
                 the same, or the probe timeout exceeds the period. Non-positive
                 timings are refused with the same error.
         """
-        for name in ("liveness_path", "readiness_path"):
+        for name in ("liveness", "readiness"):
             if not getattr(self, name).startswith("/"):
                 raise errors.ConfigError(f"health.{name} must start with '/'")
-        if self.liveness_path == self.readiness_path:
+        if self.liveness == self.readiness:
             raise errors.ConfigError(
                 "liveness and readiness must be different endpoints"
             )
-        references.require_positive(
-            self.period_seconds, "health.period_seconds"
-        )
-        references.require_positive(
-            self.timeout_seconds, "health.timeout_seconds"
-        )
-        references.require_positive(
-            self.failure_threshold, "health.failure_threshold"
-        )
-        references.require_positive(
-            self.startup_grace_seconds, "health.startup_grace_seconds"
-        )
-        if self.timeout_seconds > self.period_seconds:
+        references.require_positive(self.period, "health.period")
+        references.require_positive(self.timeout, "health.timeout")
+        references.require_positive(self.threshold, "health.threshold")
+        references.require_positive(self.grace, "health.grace")
+        if self.timeout > self.period:
             raise errors.ConfigError("probe timeout exceeds the probe period")
 
     def to_dict(self) -> dict[str, Any]:
@@ -170,6 +175,34 @@ class Probes:
             The probes.
         """
         return cls(**record)
+
+
+BUNDLE = records.Migration(renames={"model_version": "version"})
+"""Version 1 to 2 of a spec's bundle reference."""
+RESOURCES = records.nest(
+    {
+        "scratch_mb": "scratch",
+        "read_only_root": "immutable",
+        "run_as_non_root": "rootless",
+        "max_concurrent_requests": "concurrency",
+    },
+    groups={
+        "requests": {"cpu_request": "cpu", "memory_request_mb": "memory"},
+        "limits": {"cpu_limit": "cpu", "memory_limit_mb": "memory"},
+    },
+)
+"""Version 1 to 2 of a spec's resources (the Kubernetes shape)."""
+PROBES = records.Migration(
+    renames={
+        "liveness_path": "liveness",
+        "readiness_path": "readiness",
+        "period_seconds": "period",
+        "timeout_seconds": "timeout",
+        "failure_threshold": "threshold",
+        "startup_grace_seconds": "grace",
+    }
+)
+"""Version 1 to 2 of a spec's probes."""
 
 
 def canonize(payload: Mapping[str, Any]) -> bytes:
@@ -248,9 +281,18 @@ class Deployment:
         config: Plain (non-secret) environment variables, sorted by name.
         secrets: References to the secrets the service may read.
         port: Port the service listens on.
+        migrations: The spec's format steps, oldest first; the format is
+            stored under `format`.
     """
 
     __module__ = "scmle.deploy.contract"  # the path pinned signatures name
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {},
+            parts={"bundle": BUNDLE, "resources": RESOURCES, "health": PROBES},
+        ),
+    )
 
     version: str
     environment: references.Environment
@@ -328,31 +370,44 @@ class Deployment:
             The spec.
 
         Raises:
-            ConfigError: If the record's format is not `SPEC_FORMAT`.
+            ConfigError: If the record's format is newer than `SPEC_FORMAT`;
+                format 1 is migrated. A format that is not a positive integer
+                raises `InputError`.
         """
-        if record.get("format") != SPEC_FORMAT:
+        values = dict(record)
+        stored = records.detect("deployment spec", values, "format")
+        if stored > SPEC_FORMAT:
             raise errors.ConfigError(
-                f"unsupported deployment spec format {record.get('format')}"
+                f"unsupported deployment spec format {stored}"
             )
+        values = records.upgrade(cls.migrations, values, stored)
         return cls(
-            version=record["version"],
-            environment=references.Environment(record["environment"]),
-            image=references.ImageRef.from_dict(record["image"]),
-            bundle=references.BundleRef.from_dict(record["bundle"]),
-            resources=Resources.from_dict(record["resources"]),
-            health=Probes.from_dict(record["health"]),
-            config=dict(record["config"]),
+            version=values["version"],
+            environment=references.Environment(values["environment"]),
+            image=references.ImageRef.from_dict(values["image"]),
+            bundle=references.BundleRef.from_dict(values["bundle"]),
+            resources=Resources.from_dict(values["resources"]),
+            health=Probes.from_dict(values["health"]),
+            config=dict(values["config"]),
             secrets=tuple(
-                references.SecretRef.from_dict(s) for s in record["secrets"]
+                references.SecretRef.from_dict(s) for s in values["secrets"]
             ),
-            port=record["port"],
+            port=values["port"],
         )
 
     def digest(self) -> str:
         """Computes the digest of the canonical spec.
 
+        The digest names the spec across versions, so it is anchored at
+        format 1: it is taken over `to_dict()` moved back to format 1, and a
+        spec keeps the digest it had before the keys were renamed.
+
         Returns:
             `sha256:` followed by the hex SHA-256 of the canonical JSON of
-            `to_dict()`.
+            the spec at format 1.
         """
-        return "sha256:" + hashlib.sha256(canonize(self.to_dict())).hexdigest()
+        layout = self.to_dict()
+        del layout["format"]
+        layout = records.downgrade(self.migrations, layout)
+        layout["format"] = records.ORIGIN
+        return "sha256:" + hashlib.sha256(canonize(layout)).hexdigest()

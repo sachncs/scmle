@@ -489,7 +489,7 @@ class Watcher:
         labeled = int(known.sum())
         rows = len(frame)
         coverage = labeled / max(rows, 1)
-        reference_metrics = dict(self.reference.reference_metrics)
+        reference_metrics = dict(self.reference.metrics)
         if labeled < self.thresholds.min_labeled_rows:
             return Performance(
                 rows,

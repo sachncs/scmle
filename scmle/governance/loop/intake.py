@@ -43,7 +43,7 @@ class Intake(contest.Contest):
 
         Returns:
             The routing and the action taken per case. While halted, every
-            case is escalated. Cases beyond `c_max` get the safe default.
+            case is escalated. Cases beyond `escalation` get the safe default.
 
         Raises:
             ValueError: If the batch is empty or the predictions or decisions
@@ -66,7 +66,7 @@ class Intake(contest.Contest):
             decisions[i]
             if routing.status[i] == escalation.ANSWERED
             else (
-                self.policy.safe_default
+                self.policy.fallback
                 if routing.status[i] == escalation.SAFE_DEFAULT
                 else "escalate"
             )
@@ -159,11 +159,11 @@ class Intake(contest.Contest):
             score = escalation.ambiguity(sizes, novel)
         high = numpy.isin(
             numpy.asarray(decisions, dtype=object),
-            list(self.policy.high_impact_actions),
+            list(self.policy.critical),
         )
         blocked = (novel | under) & high
         routing = escalation.route(
-            score, self.tau, self.policy.c_max, self.halted, blocked
+            score, self.tau, self.policy.escalation, self.halted, blocked
         )
         return novel, score, blocked, routing
 
@@ -197,7 +197,7 @@ class Intake(contest.Contest):
         overwrites the earlier value.
 
         Args:
-            losses: Loss in ``[0, loss_bound]`` of the deployed model, by
+            losses: Loss in ``[0, loss]`` of the deployed model, by
                 case id.
             covered: 1 if the case's outcome was inside its conformal set,
                 by case id.
@@ -240,13 +240,13 @@ class Intake(contest.Contest):
         otherwise it feeds only the naive alarm, which sets a flag on
         crossing. Records the batch's label mechanism on the loop. A
         ``ValueError`` from the estimator (a labelled loss outside
-        ``[0, loss_bound]``) propagates.
+        ``[0, loss]``) propagates.
 
         Args:
             record: The stored batch with its matured labels.
 
         Returns:
-            False if fewer than ``min_matured`` cases decided by the model
+            False if fewer than ``matured`` cases decided by the model
             (not bypassed) have a label, in which case nothing is fed;
             otherwise True.
 
@@ -263,7 +263,7 @@ class Intake(contest.Contest):
         bypass = numpy.asarray(record["bypass"], dtype=bool)
         status = numpy.asarray(record["status"])
         model_cases = ~bypass
-        if int(observed[model_cases].sum()) < self.policy.min_matured:
+        if int(observed[model_cases].sum()) < self.policy.matured:
             return False
         estimate = self.estimate(record, losses, observed, model_cases)
         self.mechanism = estimate.mechanism

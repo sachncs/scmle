@@ -10,9 +10,9 @@
 What the loop does by itself, and how each rule behaves:
 
 * L1. A betting alarm on the matured, propensity-weighted mean loss
-  (`Tripwire`): false alarm probability at most ``alpha_alarm`` over all time
+  (`Tripwire`): false alarm probability at most ``alarm`` over all time
   for the first alarm of an episode. On an alarm with a verified label
-  mechanism it records an `alarm` row. If ``alarm_gates_retrain`` is set it
+  mechanism it records an `alarm` row. If ``retrain`` is set it
   then records a `retrain` request (and calls the `retrain` hook, if given,
   which must train and stage a challenger and return its name); otherwise it
   escalates for investigation and retrains nothing. When the naive
@@ -28,7 +28,7 @@ What the loop does by itself, and how each rule behaves:
 * E1. Cases below the calibrated threshold, and any case beyond the model's
   reach, are escalated. If the selective risk of answered cases is evidenced
   above ``r*`` the loop halts: every case is escalated until a recalibration
-  passes. Escalations beyond ``c_max`` get the safe default action.
+  passes. Escalations beyond ``escalation`` get the safe default action.
 * E2. System-level triggers write an `escalation` row with the question, the
   evidence and the proposed default before anything waits.
 

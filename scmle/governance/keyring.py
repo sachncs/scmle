@@ -18,11 +18,26 @@ from pathlib import Path
 import tempfile
 import threading
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle import durability
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts import signing
+
+CREDENTIAL = records.Migration(
+    renames={
+        "created_at": "created",
+        "expires_at": "expires",
+        "state_changed_at": "changed",
+        "replacement_key_id": "successor",
+    }
+)
+"""Version 1 to 2 of a key record in the registry."""
+WRAPPER = records.Migration(renames={"signed_at": "issued"})
+"""Version 1 to 2 of a signature envelope."""
+VERSION = 2  # of the registry and of a signature envelope
 
 
 class State(enum.StrEnum):
@@ -74,16 +89,27 @@ def parse_timestamp(value: str, field_name: str) -> datetime.datetime:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Credential:
-    """Public lifecycle metadata for one externally-held signing secret."""
+    """Public lifecycle metadata for one externally-held signing secret.
+
+    Attributes:
+        key_id: Identifier of the key.
+        owner: Who holds the secret.
+        created: When the key was created.
+        expires: When the key expires, or None.
+        state: Lifecycle state.
+        changed: When the state last changed, or None while active.
+        reason: Why the state changed.
+        successor: The key that took over, or None.
+    """
 
     key_id: str
     owner: str
-    created_at: str
-    expires_at: str | None = None
+    created: str
+    expires: str | None = None
     state: State = State.ACTIVE
-    state_changed_at: str | None = None
+    changed: str | None = None
     reason: str = ""
-    replacement_key_id: str | None = None
+    successor: str | None = None
 
     def __post_init__(self) -> None:
         """Validates lifecycle fields and time boundaries.
@@ -99,33 +125,27 @@ class Credential:
         """
         require_text(self.key_id, "key_id")
         require_text(self.owner, "owner")
-        created = parse_timestamp(self.created_at, "created_at")
-        if self.expires_at is not None:
-            expires = parse_timestamp(self.expires_at, "expires_at")
+        created = parse_timestamp(self.created, "created")
+        if self.expires is not None:
+            expires = parse_timestamp(self.expires, "expires")
             if expires <= created:
-                raise errors.InputError("expires_at must be after created_at")
+                raise errors.InputError("expires must be after created")
         state: Any = self.state  # may be text from a persisted record
         if not isinstance(state, State):
             object.__setattr__(self, "state", State(state))
         if self.state is not State.ACTIVE:
-            if self.state_changed_at is None:
-                raise errors.InputError(
-                    "non-active keys require state_changed_at"
-                )
-            parse_timestamp(self.state_changed_at, "state_changed_at")
+            if self.changed is None:
+                raise errors.InputError("non-active keys require changed")
+            parse_timestamp(self.changed, "changed")
             require_text(self.reason, "reason")
-        if self.state_changed_at is not None:
-            changed = parse_timestamp(self.state_changed_at, "state_changed_at")
+        if self.changed is not None:
+            changed = parse_timestamp(self.changed, "changed")
             if changed < created:
-                raise errors.InputError(
-                    "state_changed_at must not precede created_at"
-                )
-        if self.replacement_key_id is not None:
-            require_text(self.replacement_key_id, "replacement_key_id")
-            if self.replacement_key_id == self.key_id:
-                raise errors.InputError(
-                    "replacement_key_id must differ from key_id"
-                )
+                raise errors.InputError("changed must not precede created")
+        if self.successor is not None:
+            require_text(self.successor, "successor")
+            if self.successor == self.key_id:
+                raise errors.InputError("successor must differ from key_id")
 
     def signs(self, observed_at: str) -> bool:
         """Returns whether this key may create a signature at a given time.
@@ -138,10 +158,10 @@ class Credential:
             that time.
         """
         observed = parse_timestamp(observed_at, "observed_at")
-        created = parse_timestamp(self.created_at, "created_at")
+        created = parse_timestamp(self.created, "created")
         expires = (
-            parse_timestamp(self.expires_at, "expires_at")
-            if self.expires_at is not None
+            parse_timestamp(self.expires, "expires")
+            if self.expires is not None
             else None
         )
         return (
@@ -175,20 +195,20 @@ class Credential:
         """
         signed = parse_timestamp(signed_at, "signed_at")
         observed = parse_timestamp(observed_at, "observed_at")
-        created = parse_timestamp(self.created_at, "created_at")
+        created = parse_timestamp(self.created, "created")
         if self.state is State.REVOKED or signed < created:
             return False
-        if self.expires_at is not None:
-            expires = parse_timestamp(self.expires_at, "expires_at")
+        if self.expires is not None:
+            expires = parse_timestamp(self.expires, "expires")
             if signed >= expires:
                 return False
             if observed >= expires and not historical:
                 return False
         if self.state is State.ACTIVE:
             return True
-        if not historical or self.state_changed_at is None:
+        if not historical or self.changed is None:
             return False
-        changed = parse_timestamp(self.state_changed_at, "state_changed_at")
+        changed = parse_timestamp(self.changed, "changed")
         return signed < changed
 
     def to_dict(self) -> dict[str, Any]:
@@ -196,24 +216,25 @@ class Credential:
         return {
             "key_id": self.key_id,
             "owner": self.owner,
-            "created_at": self.created_at,
-            "expires_at": self.expires_at,
+            "created": self.created,
+            "expires": self.expires,
             "state": self.state.value,
-            "state_changed_at": self.state_changed_at,
+            "changed": self.changed,
             "reason": self.reason,
-            "replacement_key_id": self.replacement_key_id,
+            "successor": self.successor,
         }
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds key metadata from a JSON object.
 
-        A missing `key_id`, `owner` or `created_at` raises `KeyError`; other
+        A missing `key_id`, `owner` or `created` raises `KeyError`; other
         invalid fields raise the `ValueError` of construction.
 
         Args:
-            record: A mapping with the key's fields; the state defaults to
-                active and unknown entries are ignored.
+            record: A mapping with the key's fields at the registry's current
+                version (`Keyring.from_dict` migrates older ones); the state
+                defaults to active and unknown entries are ignored.
 
         Returns:
             The key record.
@@ -221,22 +242,22 @@ class Credential:
         return cls(
             key_id=str(record["key_id"]),
             owner=str(record["owner"]),
-            created_at=str(record["created_at"]),
-            expires_at=(
-                str(record["expires_at"])
-                if record.get("expires_at") is not None
+            created=str(record["created"]),
+            expires=(
+                str(record["expires"])
+                if record.get("expires") is not None
                 else None
             ),
             state=State(record.get("state", State.ACTIVE)),
-            state_changed_at=(
-                str(record["state_changed_at"])
-                if record.get("state_changed_at") is not None
+            changed=(
+                str(record["changed"])
+                if record.get("changed") is not None
                 else None
             ),
             reason=str(record.get("reason", "")),
-            replacement_key_id=(
-                str(record["replacement_key_id"])
-                if record.get("replacement_key_id") is not None
+            successor=(
+                str(record["successor"])
+                if record.get("successor") is not None
                 else None
             ),
         )
@@ -244,10 +265,23 @@ class Credential:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Wrapper:
-    """A signature plus the metadata needed to evaluate its lifecycle."""
+    """A signature plus the metadata needed to evaluate its lifecycle.
+
+    The HMAC covers the signed payload, not this envelope, so a version-1
+    envelope is migrated without touching what it proves.
+
+    Attributes:
+        key_id: Identifier of the key that signed.
+        issued: When the signature was made.
+        value: The signature.
+        algorithm: The signature algorithm.
+        migrations: The envelope's version steps, oldest first.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (WRAPPER,)
 
     key_id: str
-    signed_at: str
+    issued: str
     value: str
     algorithm: str = signing.SIGNATURE_ALGORITHM
 
@@ -259,17 +293,18 @@ class Wrapper:
                 invalid, or the algorithm is unsupported.
         """
         require_text(self.key_id, "key_id")
-        parse_timestamp(self.signed_at, "signed_at")
+        parse_timestamp(self.issued, "issued")
         require_text(self.value, "value")
         if self.algorithm != signing.SIGNATURE_ALGORITHM:
             raise errors.InputError("unsupported signature algorithm")
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> records.Layout:
         """Returns a JSON-compatible signature envelope."""
         return {
+            records.KEY: VERSION,
             "algorithm": self.algorithm,
             "key_id": self.key_id,
-            "signed_at": self.signed_at,
+            "issued": self.issued,
             "value": self.value,
         }
 
@@ -281,21 +316,35 @@ class Wrapper:
 
         Args:
             record: A mapping with the key id, signing time, value and
-                algorithm.
+                algorithm; one without a `schema_version` is version 1 and
+                is migrated.
 
         Returns:
             The signature envelope.
+
+        Raises:
+            ValueError: If the version is unknown.
         """
+        values = records.load("signature", cls.migrations, record)
         return cls(
-            key_id=str(record["key_id"]),
-            signed_at=str(record["signed_at"]),
-            value=str(record["value"]),
-            algorithm=str(record.get("algorithm", "")),
+            key_id=str(values["key_id"]),
+            issued=str(values["issued"]),
+            value=str(values["value"]),
+            algorithm=str(values.get("algorithm", "")),
         )
 
 
 class Keyring:
-    """Metadata registry that enforces signing and verification policy."""
+    """Metadata registry that enforces signing and verification policy.
+
+    Attributes:
+        migrations: The registry file's version steps, oldest first; each
+            key record moves with the file.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest({}, parts={"keys": CREDENTIAL}),
+    )
 
     def __init__(self, records: Iterable[Credential] = ()) -> None:
         """Creates a registry from unique key records.
@@ -430,12 +479,12 @@ class Keyring:
             updated = dataclasses.replace(
                 current,
                 state=state,
-                state_changed_at=changed_at,
+                changed=changed_at,
                 reason=reason,
-                replacement_key_id=(
+                successor=(
                     replacement_key_id
                     if replacement_key_id is not None
-                    else current.replacement_key_id
+                    else current.successor
                 ),
             )
             if replacement_key_id is not None:
@@ -473,7 +522,7 @@ class Keyring:
             raise errors.InputError(f"signing key cannot sign: {key_id}")
         return Wrapper(
             key_id=key_id,
-            signed_at=signed_at,
+            issued=signed_at,
             value=signing.mac(payload, secret),
         )
 
@@ -508,7 +557,7 @@ class Keyring:
         secret = secrets.get(envelope.key_id)
         if record is None or secret is None:
             return False
-        if not record.verifies(envelope.signed_at, observed_at, historical):
+        if not record.verifies(envelope.issued, observed_at, historical):
             return False
         expected = signing.mac(payload, secret)
         return hmac.compare_digest(envelope.value, expected)
@@ -516,7 +565,7 @@ class Keyring:
     def to_dict(self) -> dict[str, Any]:
         """Returns deterministic metadata without secret material."""
         return {
-            "schema_version": 1,
+            records.KEY: VERSION,
             "keys": [
                 self.records[key].to_dict() for key in sorted(self.records)
             ],
@@ -536,7 +585,8 @@ class Keyring:
         """Rebuilds and validates a registry from JSON-native metadata.
 
         Args:
-            record: A mapping with `schema_version` 1 and a list of `keys`.
+            record: A mapping with `schema_version` 1 or 2 and a list of
+                `keys`; version-1 keys are migrated.
 
         Returns:
             The registry.
@@ -546,14 +596,18 @@ class Keyring:
                 a list, a key record is invalid (a missing required field is a
                 `KeyError`) or a key id appears twice.
         """
-        if record.get("schema_version") != 1:
+        stored = record.get(records.KEY)
+        if not isinstance(stored, int) or stored not in range(
+            records.ORIGIN, VERSION + 1
+        ):
             raise errors.InputError(
                 "unsupported signing-key registry schema version"
             )
         keys = record.get("keys")
         if not isinstance(keys, list):
             raise errors.InputError("signing-key registry keys must be a list")
-        return cls(Credential.from_dict(item) for item in keys)
+        layout = records.upgrade(cls.migrations, {"keys": keys}, stored)
+        return cls(Credential.from_dict(item) for item in layout["keys"])
 
     @classmethod
     def from_json(cls, value: str) -> Self:

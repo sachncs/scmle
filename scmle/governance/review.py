@@ -11,11 +11,18 @@ import os
 from pathlib import Path
 import tempfile
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle import durability
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts import signing
+
+CLAIM = records.Migration(
+    renames={"criterion_id": "criterion", "evidence_uri": "uri"}
+)
+"""Version 1 to 2 of a recomputed claim (versioned by its review)."""
 
 
 class Verdict(enum.StrEnum):
@@ -55,14 +62,24 @@ def require_text(value: object, field_name: str) -> str:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Recomputation:
-    """One independently recomputed claim in a release review."""
+    """One independently recomputed claim in a release review.
 
-    criterion_id: str
+    Attributes:
+        criterion: The criterion recomputed.
+        kind: The claim's category.
+        passed: Whether the recomputation passed.
+        observed: The value recomputed.
+        reference: The value it was compared with.
+        uri: Where the independent evidence is.
+        notes: The reviewer's notes.
+    """
+
+    criterion: str
     kind: Kind
     passed: bool
     observed: str
     reference: str
-    evidence_uri: str
+    uri: str
     notes: str
 
     def __post_init__(self) -> None:
@@ -76,10 +93,10 @@ class Recomputation:
                 is not a valid `Kind` value.
         """
         for field_name in (
-            "criterion_id",
+            "criterion",
             "observed",
             "reference",
-            "evidence_uri",
+            "uri",
             "notes",
         ):
             require_text(getattr(self, field_name), field_name)
@@ -92,12 +109,12 @@ class Recomputation:
     def to_dict(self) -> dict[str, Any]:
         """Returns a deterministic JSON-native claim."""
         return {
-            "criterion_id": self.criterion_id,
+            "criterion": self.criterion,
             "kind": self.kind.value,
             "passed": self.passed,
             "observed": self.observed,
             "reference": self.reference,
-            "evidence_uri": self.evidence_uri,
+            "uri": self.uri,
             "notes": self.notes,
         }
 
@@ -110,41 +127,41 @@ class Recomputation:
         of `__post_init__` applies.
 
         Args:
-            record: A mapping with the claim's fields.
+            record: A mapping with the claim's fields at the current version
+                (`Signoff.from_dict` migrates older claims).
 
         Returns:
             The claim.
         """
         return cls(
-            criterion_id=str(record["criterion_id"]),
+            criterion=str(record["criterion"]),
             kind=Kind(record["kind"]),
             passed=record["passed"],
             observed=str(record["observed"]),
             reference=str(record["reference"]),
-            evidence_uri=str(record["evidence_uri"]),
+            uri=str(record["uri"]),
             notes=str(record["notes"]),
         )
 
 
-def separation(reviewer_id: str, implementer_ids: tuple[object, ...]) -> None:
+def separation(reviewer: str, implementers: tuple[object, ...]) -> None:
     """Checks the implementers are named and do not include the reviewer.
 
     Args:
-        reviewer_id: Identity of the reviewer.
-        implementer_ids: Identities of the implementers.
+        reviewer: Identity of the reviewer.
+        implementers: Identities of the implementers.
 
     Raises:
         ValueError: If there are no implementers, one is not non-empty text, or
             the reviewer is one of them.
     """
-    if not implementer_ids:
-        raise errors.InputError("implementer_ids must not be empty")
+    if not implementers:
+        raise errors.InputError("implementers must not be empty")
     if any(
-        not isinstance(item, str) or not item.strip()
-        for item in implementer_ids
+        not isinstance(item, str) or not item.strip() for item in implementers
     ):
-        raise errors.InputError("implementer_ids must contain non-empty values")
-    if reviewer_id in implementer_ids:
+        raise errors.InputError("implementers must contain non-empty values")
+    if reviewer in implementers:
         raise errors.InputError("reviewer must be independent of implementers")
 
 
@@ -162,7 +179,7 @@ def vet(claims: tuple[Recomputation, ...]) -> None:
         raise errors.InputError("claims must not be empty")
     if not all(isinstance(item, Recomputation) for item in claims):
         raise errors.KindError("claims must contain Recomputation values")
-    claim_ids = [claim.criterion_id for claim in claims]
+    claim_ids = [claim.criterion for claim in claims]
     if len(claim_ids) != len(set(claim_ids)):
         raise errors.InputError("claims must not contain duplicate criteria")
 
@@ -178,7 +195,7 @@ def require_artifact_digests(artifact_digests: Mapping[Any, Any]) -> None:
             text.
     """
     if not artifact_digests:
-        raise errors.InputError("artifact_digests must not be empty")
+        raise errors.InputError("digests.artifacts must not be empty")
     if any(
         not isinstance(name, str)
         or not name.strip()
@@ -186,25 +203,64 @@ def require_artifact_digests(artifact_digests: Mapping[Any, Any]) -> None:
         or not digest.strip()
         for name, digest in artifact_digests.items()
     ):
-        raise errors.InputError("artifact_digests must contain named digests")
+        raise errors.InputError("digests.artifacts must contain named digests")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Signoff:
-    """Signed proof that an independent reviewer checked a release."""
+    """Signed proof that an independent reviewer checked a release.
 
-    release_id: str
-    source_commit: str
-    clean_clone_digest: str
-    reviewer_id: str
-    implementer_ids: tuple[str, ...]
-    environment_digest: str
+    A review keeps the version it was stored in, and its signature covers
+    the content in that layout, so a version-1 review still verifies.
+
+    Attributes:
+        release: The release reviewed.
+        commit: The commit the release is built from.
+        digests: `clone` (the clean clone), `environment` (the review
+            environment) and `artifacts` (each reviewed artifact's digest,
+            by name).
+        reviewer: Identity of the reviewer.
+        implementers: Identities of the implementers.
+        commands: The commands the reviewer ran.
+        claims: The claims recomputed.
+        observed: When the review was made.
+        decision: The reviewer's verdict.
+        signature: The HMAC over `preimage`, or None if unsigned.
+        schema_version: The layout the review was stored (and signed) in.
+        migrations: The review's version steps, oldest first.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "release_id": "release",
+                "source_commit": "commit",
+                "reviewer_id": "reviewer",
+                "implementer_ids": "implementers",
+                "observed_at": "observed",
+            },
+            parts={"claims": CLAIM},
+            groups={
+                "digests": {
+                    "clean_clone_digest": "clone",
+                    "environment_digest": "environment",
+                    "artifact_digests": "artifacts",
+                }
+            },
+        ),
+    )
+
+    release: str
+    commit: str
+    digests: Mapping[str, Any]
+    reviewer: str
+    implementers: tuple[str, ...]
     commands: tuple[str, ...]
     claims: tuple[Recomputation, ...]
-    artifact_digests: Mapping[str, str]
-    observed_at: str
+    observed: str
     decision: Verdict
     signature: str | None = None
+    schema_version: int = records.ORIGIN + len(migrations)
 
     def __post_init__(self) -> None:
         """Rejects reviews that cannot establish independence or replay.
@@ -220,51 +276,53 @@ class Signoff:
                 signature is blank, or the observation time is not an ISO 8601
                 time or has no timezone.
         """
-        for field_name in (
-            "release_id",
-            "source_commit",
-            "clean_clone_digest",
-            "reviewer_id",
-            "environment_digest",
-            "observed_at",
-        ):
+        for field_name in ("release", "commit", "reviewer", "observed"):
             require_text(getattr(self, field_name), field_name)
-        separation(self.reviewer_id, self.implementer_ids)
+        for name in ("clone", "environment"):
+            require_text(self.digests.get(name), f"digests.{name}")
+        separation(self.reviewer, self.implementers)
         if not self.commands or any(not item.strip() for item in self.commands):
             raise errors.InputError(
                 "commands must contain reproducible commands"
             )
         vet(self.claims)
-        require_artifact_digests(self.artifact_digests)
+        require_artifact_digests(self.digests.get("artifacts") or {})
         decision: Any = self.decision  # may be text from a persisted record
         if not isinstance(decision, Verdict):
             object.__setattr__(self, "decision", Verdict(decision))
         if self.signature is not None:
             require_text(self.signature, "signature")
         timestamp = datetime.datetime.fromisoformat(
-            self.observed_at.replace("Z", "+00:00")  # noqa: FURB162 -- keeps the exact set of accepted inputs
+            self.observed.replace("Z", "+00:00")  # noqa: FURB162 -- keeps the exact set of accepted inputs
         )
         if timestamp.tzinfo is None or timestamp.utcoffset() is None:
             raise errors.InputError(
-                "observed_at must include timezone information"
+                "observed must include timezone information"
             )
 
     def preimage(self) -> dict[str, Any]:
-        """Returns the content covered by the review signature."""
-        return {
-            "schema_version": 1,
-            "release_id": self.release_id,
-            "source_commit": self.source_commit,
-            "clean_clone_digest": self.clean_clone_digest,
-            "reviewer_id": self.reviewer_id,
-            "implementer_ids": list(self.implementer_ids),
-            "environment_digest": self.environment_digest,
+        """Returns the content covered by the review signature.
+
+        Returns:
+            The content in the layout the review is stored in.
+        """
+        record: records.Layout = {
+            "release": self.release,
+            "commit": self.commit,
+            "digests": {
+                "clone": self.digests["clone"],
+                "environment": self.digests["environment"],
+                "artifacts": dict(sorted(self.digests["artifacts"].items())),
+            },
+            "reviewer": self.reviewer,
+            "implementers": list(self.implementers),
             "commands": list(self.commands),
             "claims": [claim.to_dict() for claim in self.claims],
-            "artifact_digests": dict(sorted(self.artifact_digests.items())),
-            "observed_at": self.observed_at,
+            "observed": self.observed,
             "decision": self.decision.value,
         }
+        record = records.downgrade(self.migrations, record, self.schema_version)
+        return {records.KEY: self.schema_version, **record}
 
     def to_dict(self) -> dict[str, Any]:
         """Returns a persisted review record."""
@@ -277,33 +335,46 @@ class Signoff:
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
         """Rebuilds a review from a persisted JSON-native record.
 
-        A missing key (other than `claims` and `signature`) raises
-        `KeyError`, and the validation of `__post_init__` applies.
+        A version-1 review is migrated and remembers its version. A missing
+        key (other than `claims` and `signature`) raises `KeyError`, and the
+        validation of `__post_init__` applies.
 
         Args:
             record: A mapping with the review's fields.
 
         Returns:
             The review.
+
+        Raises:
+            ValueError: If the version is unknown.
         """
-        claims = tuple(
-            Recomputation.from_dict(item) for item in record.get("claims", ())
-        )
+        values = {"claims": [], **record}
+        stored = records.detect("review", values)
+        if stored > records.ORIGIN + len(cls.migrations):
+            raise errors.InputError(f"unsupported review version {stored}")
+        values = records.upgrade(cls.migrations, values, stored)
+        digests = values["digests"]
         return cls(
-            release_id=str(record["release_id"]),
-            source_commit=str(record["source_commit"]),
-            clean_clone_digest=str(record["clean_clone_digest"]),
-            reviewer_id=str(record["reviewer_id"]),
-            implementer_ids=tuple(record["implementer_ids"]),
-            environment_digest=str(record["environment_digest"]),
-            commands=tuple(record["commands"]),
-            claims=claims,
-            artifact_digests=dict(record["artifact_digests"]),
-            observed_at=str(record["observed_at"]),
-            decision=Verdict(record["decision"]),
-            signature=str(record["signature"])
-            if record.get("signature") is not None
+            release=str(values["release"]),
+            commit=str(values["commit"]),
+            digests={
+                "clone": str(digests["clone"]),
+                "environment": str(digests["environment"]),
+                "artifacts": dict(digests["artifacts"]),
+            },
+            reviewer=str(values["reviewer"]),
+            implementers=tuple(values["implementers"]),
+            commands=tuple(values["commands"]),
+            claims=tuple(
+                Recomputation.from_dict(item)
+                for item in values.get("claims", ())
+            ),
+            observed=str(values["observed"]),
+            decision=Verdict(values["decision"]),
+            signature=str(values["signature"])
+            if values.get("signature") is not None
             else None,
+            schema_version=stored,
         )
 
     def canonize(self) -> str:
@@ -418,7 +489,7 @@ class Signoff:
             True if the review is of that commit, approved, correctly signed,
             every claim passed and every required kind is covered.
         """
-        if self.source_commit != require_text(source_commit, "source_commit"):
+        if self.commit != require_text(source_commit, "source_commit"):
             return False
         if self.decision is not Verdict.APPROVED:
             return False

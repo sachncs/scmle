@@ -49,7 +49,7 @@ class Risk(desk.Desk):
             else numpy.asarray(propensity, float)[keep],
             None if audit is None else numpy.asarray(audit, bool)[keep],
             self.policy.epsilon,
-            self.policy.loss_bound,
+            self.policy.loss,
         )
 
     def centred(
@@ -59,7 +59,7 @@ class Risk(desk.Desk):
         observed: numpy.ndarray,
         mask: numpy.ndarray,
     ) -> labels.Estimate:
-        """Like `estimate`, for values in ``[-loss_bound, loss_bound]``.
+        """Like `estimate`, for values in ``[-loss, loss]``.
 
         Args:
             record: The stored batch, with its propensities and audit flags.
@@ -81,7 +81,7 @@ class Risk(desk.Desk):
             else numpy.asarray(propensity, float)[mask],
             None if audit is None else numpy.asarray(audit, bool)[mask],
             self.policy.epsilon,
-            self.policy.loss_bound,
+            self.policy.loss,
             signed=True,
         )
 
@@ -115,7 +115,7 @@ class Risk(desk.Desk):
             release when it ends a halt, otherwise as an observation summary.
         """
         result = escalation.select(
-            score, loss, self.policy.r_star, self.policy.delta, weights
+            score, loss, self.policy.target, self.policy.delta, weights
         )
         curve = escalation.risk_coverage(score, loss, weights)
         (self.directory / terms.RISK_COVERAGE_FILE).write_text(
@@ -186,15 +186,15 @@ class Risk(desk.Desk):
         Raises:
             ValueError: If the policy declares no bypass slice.
         """
-        if self.policy.bypass_rate <= 0.0:
+        if self.policy.bypass <= 0.0:
             raise errors.InputError(
-                "no bypass slice is declared (policy.bypass_rate is 0): "
+                "no bypass slice is declared (policy.bypass is 0): "
                 "feedback cannot be tested"
             )
         check = labels.circularity(
             bypass_features, model_features, seed=len(self.ledger.rows)
         )
-        verdict = labels.assessment(self.policy.bypass_rate, check)
+        verdict = labels.assessment(self.policy.bypass, check)
         self.feedback = {
             "verdict": verdict,
             "p_value": check.p_value,
@@ -211,7 +211,7 @@ class Risk(desk.Desk):
             self.escalate(
                 "feedback_loop_detected",
                 {"p_value": check.p_value, "batch": self.batch},
-                proposed_default=self.policy.safe_default,
+                proposed_default=self.policy.fallback,
             )
         self.write_label_mechanism()
         self.save_state()
@@ -223,10 +223,10 @@ class Risk(desk.Desk):
             "mechanism": self.mechanism.value,
             "actions_permitted": labels.actionable(self.mechanism),
             "epsilon": self.policy.epsilon,
-            "bypass_rate": self.policy.bypass_rate,
+            "bypass_rate": self.policy.bypass,
             "feedback": (
                 labels.UNVERIFIED
-                if self.policy.bypass_rate <= 0.0
+                if self.policy.bypass <= 0.0
                 else (
                     "bypass slice declared"
                     if self.feedback is None
@@ -235,11 +235,9 @@ class Risk(desk.Desk):
             ),
             "feedback_test": self.feedback,
             "feedback_note": (
-                labels.FEEDBACK_UNVERIFIED
-                if self.policy.bypass_rate <= 0.0
-                else ""
+                labels.FEEDBACK_UNVERIFIED if self.policy.bypass <= 0.0 else ""
             ),
-            "outcome_window": self.policy.outcome_window,
+            "outcome_window": self.policy.maturity,
         }
         (self.directory / terms.LABEL_MECHANISM_FILE).write_text(
             json.dumps(record, sort_keys=True), encoding="utf-8", newline="\n"

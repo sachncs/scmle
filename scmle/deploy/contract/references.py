@@ -190,7 +190,7 @@ class BundleRef:
 
     Attributes:
         model: Model name.
-        model_version: Model version string.
+        version: Model version string.
         digest: Manifest digest as `sha256:<64 hex>`.
         signed: Whether the bundle carries a verified signature.
     """
@@ -198,7 +198,7 @@ class BundleRef:
     __module__ = "scmle.deploy.contract"  # the path pinned signatures name
 
     model: str
-    model_version: str
+    version: str
     digest: str
     signed: bool
 
@@ -211,8 +211,8 @@ class BundleRef:
                 same error.
         """
         simple(self.model, "bundle.model")
-        if VERSION_PATTERN.fullmatch(str(self.model_version)) is None:
-            raise errors.ConfigError("bundle.model_version is not valid")
+        if VERSION_PATTERN.fullmatch(str(self.version)) is None:
+            raise errors.ConfigError("bundle.version is not valid")
         require_digest(self.digest, "bundle.digest")
         if not isinstance(self.signed, bool):
             raise errors.ConfigError("bundle.signed must be a boolean")
@@ -237,7 +237,7 @@ class BundleRef:
         """
         return cls(
             model=record["model"],
-            model_version=record["model_version"],
+            version=record["version"],
             digest=record["digest"],
             signed=record["signed"],
         )

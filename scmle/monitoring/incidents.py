@@ -10,10 +10,12 @@ import json
 import os
 import pathlib
 from typing import Any
+from typing import ClassVar
 from typing import TypeVar
 
 from scmle import durability
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.monitoring import slo
 
 Method = TypeVar("Method", bound=Callable[..., Any])
@@ -109,42 +111,64 @@ class Incident:
     """Current operator-facing state of one SLO incident.
 
     Attributes:
-        incident_id: Identity of the incident.
-        target_name: Name of the SLO target.
+        identifier: Identity of the incident.
+        target: Name of the SLO target.
         status: Current state.
-        opened_at: Time it was opened.
-        observed_at: Time of the SLO evaluation that caused it.
+        opened: Time it was opened.
+        observed: Time of the SLO evaluation that caused it.
         owner: Who answers for the target.
         runbook: Where the response procedure is described.
-        alert_route: Where alerts go.
+        route: Where alerts go.
         reason: Why the SLO needs an incident.
-        run_id: Serving run the incident concerns.
-        rollback_target: Where to roll back to.
-        acknowledged_at: Time it was acknowledged, if it was.
-        acknowledged_by: Who acknowledged it.
-        resolved_at: Time it was resolved, if it was.
-        resolved_by: Who resolved it.
+        run: Serving run the incident concerns.
+        rollback: Where to roll back to.
+        acknowledged: Time it was acknowledged, if it was.
+        acknowledger: Who acknowledged it.
+        resolved: Time it was resolved, if it was.
+        resolver: Who resolved it.
         resolution: How it was resolved.
-        evidence_digest: Digest of the resolution evidence.
+        digests: `evidence`, the digest of the resolution evidence, or None.
+        migrations: The snapshot's version steps, oldest first.
     """
 
-    incident_id: str
-    target_name: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "incident_id": "identifier",
+                "target_name": "target",
+                "opened_at": "opened",
+                "observed_at": "observed",
+                "alert_route": "route",
+                "run_id": "run",
+                "rollback_target": "rollback",
+                "acknowledged_at": "acknowledged",
+                "acknowledged_by": "acknowledger",
+                "resolved_at": "resolved",
+                "resolved_by": "resolver",
+            },
+            groups={"digests": {"evidence_digest": "evidence"}},
+        ),
+    )
+
+    identifier: str
+    target: str
     status: Phase
-    opened_at: str
-    observed_at: str
+    opened: str
+    observed: str
     owner: str
     runbook: str
-    alert_route: str
+    route: str
     reason: str
-    run_id: str
-    rollback_target: str
-    acknowledged_at: str | None = None
-    acknowledged_by: str | None = None
-    resolved_at: str | None = None
-    resolved_by: str | None = None
+    run: str
+    rollback: str
+    acknowledged: str | None = None
+    acknowledger: str | None = None
+    resolved: str | None = None
+    resolver: str | None = None
     resolution: str | None = None
-    evidence_digest: str | None = None
+    digests: Mapping[str, str | None] = dataclasses.field(
+        default_factory=lambda: {"evidence": None}
+    )
 
     def __post_init__(self) -> None:
         """Validates the state record before it enters the journal.
@@ -155,96 +179,98 @@ class Incident:
                 fields do not fit the status.
         """
         for field_name in (
-            "incident_id",
-            "target_name",
-            "opened_at",
-            "observed_at",
+            "identifier",
+            "target",
+            "opened",
+            "observed",
             "owner",
             "runbook",
-            "alert_route",
+            "route",
             "reason",
-            "run_id",
-            "rollback_target",
+            "run",
+            "rollback",
         ):
             require_text(getattr(self, field_name), field_name)
         status: Any = self.status  # may be text from a persisted record
         if not isinstance(status, Phase):
             object.__setattr__(self, "status", Phase(status))
-        slo.parse_timestamp(self.opened_at, "opened_at")
-        slo.parse_timestamp(self.observed_at, "observed_at")
-        if self.acknowledged_at is not None:
-            slo.parse_timestamp(self.acknowledged_at, "acknowledged_at")
-            require_text(self.acknowledged_by or "", "acknowledged_by")
-        if self.resolved_at is not None:
-            slo.parse_timestamp(self.resolved_at, "resolved_at")
-            require_text(self.resolved_by or "", "resolved_by")
+        slo.parse_timestamp(self.opened, "opened")
+        slo.parse_timestamp(self.observed, "observed")
+        if self.acknowledged is not None:
+            slo.parse_timestamp(self.acknowledged, "acknowledged")
+            require_text(self.acknowledger or "", "acknowledger")
+        if self.resolved is not None:
+            slo.parse_timestamp(self.resolved, "resolved")
+            require_text(self.resolver or "", "resolver")
             require_text(self.resolution or "", "resolution")
-            require_text(self.evidence_digest or "", "evidence_digest")
-        if self.status is Phase.OPEN and self.acknowledged_at:
+            require_text(self.digests.get("evidence") or "", "digests.evidence")
+        if self.status is Phase.OPEN and self.acknowledged:
             raise errors.InputError(
                 "open incidents must not have acknowledgement"
             )
-        if self.status is Phase.ACKNOWLEDGED and not self.acknowledged_at:
+        if self.status is Phase.ACKNOWLEDGED and not self.acknowledged:
             raise errors.InputError(
                 "acknowledged incidents require acknowledgement"
             )
-        if self.status is Phase.RESOLVED and not self.resolved_at:
+        if self.status is Phase.RESOLVED and not self.resolved:
             raise errors.InputError("resolved incidents require resolution")
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns deterministic incident evidence.
+        """Returns deterministic incident evidence at the current version.
 
         Returns:
-            A dict of all fields, with the status as its value.
+            A dict of all fields, with the status as its value, and the
+            `schema_version`.
         """
-        return {
-            "incident_id": self.incident_id,
-            "target_name": self.target_name,
-            "status": self.status.value,
-            "opened_at": self.opened_at,
-            "observed_at": self.observed_at,
-            "owner": self.owner,
-            "runbook": self.runbook,
-            "alert_route": self.alert_route,
-            "reason": self.reason,
-            "run_id": self.run_id,
-            "rollback_target": self.rollback_target,
-            "acknowledged_at": self.acknowledged_at,
-            "acknowledged_by": self.acknowledged_by,
-            "resolved_at": self.resolved_at,
-            "resolved_by": self.resolved_by,
-            "resolution": self.resolution,
-            "evidence_digest": self.evidence_digest,
-        }
+        record = dataclasses.asdict(self)
+        record["status"] = self.status.value
+        record["digests"] = dict(self.digests)
+        return {records.KEY: records.ORIGIN + len(self.migrations), **record}
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "Incident":
         """Rebuilds an incident from a journal snapshot.
+
+        Journal rows are verified as stored (`Incidents.read_events`) before
+        they are rebuilt; a snapshot without `schema_version` is version 1
+        and is migrated.
 
         Args:
             record: A dict produced by `to_dict`.
 
         Returns:
             The incident.
+
+        Raises:
+            ValueError: If the version is not a positive integer or is newer
+                than this build.
         """
+        values = records.load("incident", cls.migrations, record)
+        digests = values.get("digests")
         return cls(
-            incident_id=str(record["incident_id"]),
-            target_name=str(record["target_name"]),
-            status=Phase(record["status"]),
-            opened_at=str(record["opened_at"]),
-            observed_at=str(record["observed_at"]),
-            owner=str(record["owner"]),
-            runbook=str(record["runbook"]),
-            alert_route=str(record["alert_route"]),
-            reason=str(record["reason"]),
-            run_id=str(record["run_id"]),
-            rollback_target=str(record["rollback_target"]),
-            acknowledged_at=record.get("acknowledged_at"),
-            acknowledged_by=record.get("acknowledged_by"),
-            resolved_at=record.get("resolved_at"),
-            resolved_by=record.get("resolved_by"),
-            resolution=record.get("resolution"),
-            evidence_digest=record.get("evidence_digest"),
+            identifier=str(values["identifier"]),
+            target=str(values["target"]),
+            status=Phase(values["status"]),
+            opened=str(values["opened"]),
+            observed=str(values["observed"]),
+            owner=str(values["owner"]),
+            runbook=str(values["runbook"]),
+            route=str(values["route"]),
+            reason=str(values["reason"]),
+            run=str(values["run"]),
+            rollback=str(values["rollback"]),
+            acknowledged=values.get("acknowledged"),
+            acknowledger=values.get("acknowledger"),
+            resolved=values.get("resolved"),
+            resolver=values.get("resolver"),
+            resolution=values.get("resolution"),
+            digests={
+                "evidence": (
+                    digests.get("evidence")
+                    if isinstance(digests, Mapping)
+                    else None
+                )
+            },
         )
 
 
@@ -276,17 +302,17 @@ def proceed(incident: Incident, previous: Incident) -> None:
             comparison is missing, or the transition is dated before the
             previous state.
     """
-    if incident.opened_at != previous.opened_at:
+    if incident.opened != previous.opened:
         raise errors.InputError("incident journal identity changed")
     transition_at = (
-        incident.acknowledged_at
+        incident.acknowledged
         if incident.status is Phase.ACKNOWLEDGED
-        else incident.resolved_at
+        else incident.resolved
     )
     previous_at = (
-        previous.opened_at
+        previous.opened
         if previous.status is Phase.OPEN
-        else previous.acknowledged_at
+        else previous.acknowledged
     )
     if transition_at is None or previous_at is None:
         raise errors.InputError("incident journal timestamps are invalid")
@@ -360,7 +386,7 @@ class Incidents:
                 raise errors.InputError(
                     "incident journal event type is invalid"
                 )
-            previous_status = statuses.get(incident.incident_id)
+            previous_status = statuses.get(incident.identifier)
             allowed_previous = {
                 Phase.OPEN: (None,),
                 Phase.ACKNOWLEDGED: (Phase.OPEN,),
@@ -371,9 +397,9 @@ class Incidents:
                     "incident journal transition is invalid"
                 )
             if previous_status is not None:
-                proceed(incident, previous_records[incident.incident_id])
-            statuses[incident.incident_id] = incident.status
-            previous_records[incident.incident_id] = incident
+                proceed(incident, previous_records[incident.identifier])
+            statuses[incident.identifier] = incident.status
+            previous_records[incident.identifier] = incident
             events.append(record)
             previous_digest = str(record["event_digest"])
         return tuple(events)
@@ -388,7 +414,7 @@ class Incidents:
         latest: dict[str, Incident] = {}
         for record in self.read_events():
             incident = Incident.from_dict(record["incident"])
-            latest[incident.incident_id] = incident
+            latest[incident.identifier] = incident
         return tuple(latest.values())
 
     @serialized
@@ -424,21 +450,21 @@ class Incidents:
         require_text(run_id, "run_id")
         require_text(rollback_target, "rollback_target")
         identity = incident_id(evaluation.target, evaluation.observed_at)
-        current = {record.incident_id: record for record in self.records()}
+        current = {record.identifier: record for record in self.records()}
         if identity in current:
             return current[identity]
         incident = Incident(
-            incident_id=identity,
-            target_name=evaluation.target.name,
+            identifier=identity,
+            target=evaluation.target.name,
             status=Phase.OPEN,
-            opened_at=opened_at,
-            observed_at=evaluation.observed_at,
+            opened=opened_at,
+            observed=evaluation.observed_at,
             owner=evaluation.target.owner,
             runbook=evaluation.target.runbook,
-            alert_route=evaluation.target.alert_route,
+            route=evaluation.target.alert_route,
             reason=evaluation.reason,
-            run_id=run_id,
-            rollback_target=rollback_target,
+            run=run_id,
+            rollback=rollback_target,
         )
         self.log("opened", incident)
         return incident
@@ -472,13 +498,13 @@ class Incidents:
             raise errors.InputError("only open incidents can be acknowledged")
         require_text(actor, "actor")
         timestamp = slo.parse_timestamp(acknowledged_at, "acknowledged_at")
-        if timestamp < slo.parse_timestamp(incident.opened_at, "opened_at"):
+        if timestamp < slo.parse_timestamp(incident.opened, "opened"):
             raise errors.InputError("acknowledgement cannot precede opening")
         updated = dataclasses.replace(
             incident,
             status=Phase.ACKNOWLEDGED,
-            acknowledged_at=acknowledged_at,
-            acknowledged_by=actor,
+            acknowledged=acknowledged_at,
+            acknowledger=actor,
         )
         self.log("acknowledged", updated)
         return updated
@@ -521,16 +547,16 @@ class Incidents:
         require_text(evidence_digest, "evidence_digest")
         timestamp = slo.parse_timestamp(resolved_at, "resolved_at")
         if timestamp < slo.parse_timestamp(
-            incident.acknowledged_at or "", "acknowledged_at"
+            incident.acknowledged or "", "acknowledged"
         ):
             raise errors.InputError("resolution cannot precede acknowledgement")
         updated = dataclasses.replace(
             incident,
             status=Phase.RESOLVED,
-            resolved_at=resolved_at,
-            resolved_by=actor,
+            resolved=resolved_at,
+            resolver=actor,
             resolution=resolution,
-            evidence_digest=evidence_digest,
+            digests={"evidence": evidence_digest},
         )
         self.log("resolved", updated)
         return updated
@@ -549,9 +575,9 @@ class Incidents:
         Raises:
             KeyError: If no incident has that identity.
         """
-        require_text(identity, "incident_id")
+        require_text(identity, "identifier")
         for record in self.records():
-            if record.incident_id == identity:
+            if record.identifier == identity:
                 return record
         raise KeyError(f"unknown incident '{identity}'")
 

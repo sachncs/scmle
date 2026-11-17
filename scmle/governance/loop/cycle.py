@@ -91,7 +91,7 @@ class Loop(intake.Intake, alarms.Alarms, guard.Gatekeeper):
                 path,
                 charter_hash=charter.charter_hash,
                 policy=terms.jsonify(policy.to_dict()),
-                alpha_promo=policy.alpha_promo,
+                alpha_promo=policy.promotion["alpha"],
                 system_keys=sorted(set(fingerprints)),
             )
         guard = never_list.Guard(
@@ -156,7 +156,7 @@ class Loop(intake.Intake, alarms.Alarms, guard.Gatekeeper):
     def step(self) -> terms.Outcome:
         """Processes matured batches and applies the decision map.
 
-        A batch is processed once ``outcome_window`` batches have passed since
+        A batch is processed once ``maturity`` batches have passed since
         it was observed; younger batches stay pending. If the ledger fails
         verification the step stops at once and writes nothing to the ledger.
 
@@ -180,7 +180,7 @@ class Loop(intake.Intake, alarms.Alarms, guard.Gatekeeper):
         keep: list[dict[str, Any]] = []
         used = False
         for record in self.pending_batches:
-            window = self.policy.outcome_window
+            window = self.policy.maturity
             if labels.is_matured(record["index"], now, window):
                 used |= self.feed(record)
             else:
@@ -210,7 +210,7 @@ class Loop(intake.Intake, alarms.Alarms, guard.Gatekeeper):
 
         Acts on a naive alarm under an unverified mechanism (halt and
         escalate), an L1 alarm (alarm row, then an investigation escalation or
-        a retrain request, by ``alarm_gates_retrain``), a selective-risk alarm
+        a retrain request, by ``retrain``), a selective-risk alarm
         (halt and escalate) and a crossed coverage or novelty test
         (escalate). Each crossed monitor is replaced by a fresh one. When the
         mechanism permits action it also decides rollback proposals and the

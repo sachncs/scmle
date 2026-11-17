@@ -141,7 +141,7 @@ class Harness:
             isinstance(item, Emission) for item in artifacts
         ):
             raise errors.KindError("executor must return Emission values")
-        requirements = self.registry.plans[scenario].evidence_requirements
+        requirements = self.registry.plans[scenario].requirements
         evidence_types = tuple(item.evidence_type for item in artifacts)
         if len(evidence_types) != len(set(evidence_types)):
             raise errors.InputError(
@@ -164,12 +164,12 @@ class Harness:
             self.write_atomically(path, artifact.content)
             evidence.append(
                 reliability.Evidence(
-                    evidence_type=artifact.evidence_type,
-                    execution_id=self.execution_id,
-                    artifact_uri=path.as_uri(),
-                    artifact_digest=self.digest(path),
-                    observed_outcome=artifact.observed_outcome,
-                    recorded_at=self.recorded_at,
+                    kind=artifact.evidence_type,
+                    execution=self.execution_id,
+                    uri=path.as_uri(),
+                    digests={"artifact": self.digest(path)},
+                    outcome=artifact.observed_outcome,
+                    recorded=self.recorded_at,
                     reviewer=self.reviewer,
                     observation=artifact.observation,
                 )

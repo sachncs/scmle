@@ -71,8 +71,7 @@ class Desk(memory.Memory):
                 "question": question,
                 "question_hash": scmle.assurance.ledger.ledger.digest(question),
                 "evidence": list(evidence),
-                "proposed_default": proposed_default
-                or self.policy.safe_default,
+                "proposed_default": proposed_default or self.policy.fallback,
             },
         )
         self.escalation_batch[identity] = self.batch
@@ -156,9 +155,9 @@ class Desk(memory.Memory):
             raise terms.RefusalError(
                 f"{escalation_id!r} is not a pending escalation"
             )
-        if attestation.escalation_id != escalation_id:
+        if attestation.escalation != escalation_id:
             raise terms.RefusalError("the reply answers a different escalation")
-        if attestation.question_hash != target.question_hash:
+        if attestation.digests["question"] != target.question_hash:
             raise terms.RefusalError(
                 "the reply is bound to a different question"
             )
@@ -232,7 +231,7 @@ class Desk(memory.Memory):
             self.save_state()
 
     def expire(self) -> terms.Escalation | None:
-        """Closes escalations unanswered for ``reply_timeout`` batches.
+        """Closes escalations unanswered for ``timeout`` batches.
 
         Each is closed with a timeout row that applies its own proposed
         default (the safe default unless the escalation proposed another).
@@ -245,7 +244,7 @@ class Desk(memory.Memory):
         for row in list(self.ledger.pending()):
             identity = str(row["id"])
             opened = self.escalation_batch.setdefault(identity, self.batch)
-            if self.batch - opened >= self.policy.reply_timeout:
+            if self.batch - opened >= self.policy.timeout:
                 self.ledger.commit(
                     deployment_ledger.ESCALATION,
                     {

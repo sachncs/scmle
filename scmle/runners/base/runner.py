@@ -125,7 +125,7 @@ class Runner(abc.ABC):
             manifest: The manifest to store.
         """
         body = json.dumps(manifest.to_dict(), indent=2, sort_keys=True)
-        self.store.put(self.locate(manifest.run_id), body.encode())
+        self.store.put(self.locate(manifest.identifier), body.encode())
 
     def load(self, run_id: str) -> ledger.RunManifest | None:
         """Reads a run's manifest.
@@ -194,7 +194,7 @@ class Runner(abc.ABC):
         manifest = self.register(spec)
         if manifest.state in {s.value for s in job.FINAL}:
             return manifest
-        meter = job.Meter(spec, manifest.total_cost)
+        meter = job.Meter(spec, manifest.cost)
         policy = spec.retries
         while len(manifest.attempts) < policy.max_attempts:
             number = len(manifest.attempts) + 1
@@ -265,8 +265,8 @@ class Runner(abc.ABC):
         record.state = status.state.value
         record.reason = stopped.value if stopped else status.reason
         before = meter.spent
-        manifest.total_cost = round(meter.close(elapsed), 6)
-        record.cost = round(manifest.total_cost - before, 6)
+        manifest.cost = round(meter.close(elapsed), 6)
+        record.cost = round(manifest.cost - before, 6)
         self.save(manifest)
         return stopped if stopped is not None else status.outcome()
 

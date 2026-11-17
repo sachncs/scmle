@@ -4,10 +4,80 @@ from collections.abc import Mapping
 import dataclasses
 import hmac
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
+from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts import signing
 from scmle.governance.deployment_ledger import kinds
+
+REPLY = (
+    records.nest(
+        {"escalation_id": "escalation", "name_or_id": "attestor"},
+        groups={"digests": {"question_hash": "question"}},
+    ),
+)
+"""A reply's version steps, oldest first."""
+GRANT = (
+    records.Migration(
+        renames={"envelope_id": "identifier", "name_or_id": "attestor"}
+    ),
+)
+"""An envelope's version steps, oldest first."""
+VERSION = records.ORIGIN + len(REPLY)  # replies and envelopes move together
+
+
+def store(
+    layout: records.Layout, migrations: tuple[records.Migration, ...]
+) -> records.Layout:
+    """Returns a record's signed content in the layout it is stored in.
+
+    Args:
+        layout: The record's fields at the current version, with its
+            `schema_version` (the version it was stored in).
+        migrations: The kind's version steps.
+
+    Returns:
+        The content at the stored version; a version-1 record carries no
+        version key, as it was written.
+    """
+    stored = layout[records.KEY]
+    content = {k: v for k, v in layout.items() if k != records.KEY}
+    content = records.downgrade(migrations, content, stored)
+    return (
+        content
+        if stored == records.ORIGIN
+        else {records.KEY: stored, **content}
+    )
+
+
+def load(
+    record: Mapping[str, Any], migrations: tuple[records.Migration, ...]
+) -> records.Layout:
+    """Moves a stored record to the current version, keeping its version.
+
+    Args:
+        record: The stored record; one without `schema_version` is version 1.
+        migrations: The kind's version steps.
+
+    Returns:
+        The fields at the current version, with `schema_version` the stored
+        version.
+
+    Raises:
+        MisuseError: If the version is unknown.
+    """
+    values = dict(record)
+    try:
+        stored = records.detect("ledger record", values)
+    except errors.InputError as error:
+        raise kinds.MisuseError(str(error)) from error
+    if stored > records.ORIGIN + len(migrations):
+        raise kinds.MisuseError(f"unsupported record version {stored}")
+    values = records.upgrade(migrations, values, stored)
+    values[records.KEY] = stored
+    return values
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -21,33 +91,41 @@ class Attestation:
     must keep the key where the system cannot read it; the ledger
     refuses the fingerprints of keys the system declared as its own.
 
+    A reply keeps the version it was stored in, and its signature covers
+    the content in that layout, so a version-1 reply still verifies.
+
     Attributes:
-        escalation_id: The escalation answered.
-        question_hash: Hash of that escalation's question.
+        escalation: The escalation answered.
+        digests: `question`, the hash of that escalation's question.
         decision: What the person decides.
         statement: What the person asserts.
         evidence: Ticket, log table or document id.
         role: The person's role.
-        name_or_id: The person.
+        attestor: The person.
         date: Date of the reply.
         scope: Model version hash and stream id the reply applies to.
         expires: Last day the reply is valid.
         key_id: Fingerprint of the signing key.
         signature: HMAC-SHA256 of the other fields.
+        schema_version: The layout the reply was stored (and signed) in.
+        migrations: The reply's version steps, oldest first.
     """
 
-    escalation_id: str
-    question_hash: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = REPLY
+
+    escalation: str
+    digests: Mapping[str, str]
     decision: kinds.Reply
     statement: str
     evidence: str
     role: str
-    name_or_id: str
+    attestor: str
     date: str
     scope: str
     expires: str
     key_id: str
     signature: str = ""
+    schema_version: int = VERSION
 
     def __post_init__(self) -> None:
         """Validates the record's shape.
@@ -58,17 +136,18 @@ class Attestation:
                 ``YYYY-MM-DD``, or the expiry is before the date.
         """
         for name in (
-            "escalation_id",
-            "question_hash",
+            "escalation",
             "statement",
             "evidence",
             "role",
-            "name_or_id",
+            "attestor",
             "scope",
             "key_id",
         ):
             if not str(getattr(self, name)).strip():
                 raise kinds.MisuseError(f"attestation {name} is required")
+        if not str(self.digests.get("question", "")).strip():
+            raise kinds.MisuseError("attestation digests.question is required")
         if not isinstance(self.decision, kinds.Reply):
             raise kinds.MisuseError("decision must be a Reply")
         issued = kinds.parse_date(self.date, "date")
@@ -79,13 +158,14 @@ class Attestation:
         """The signed content.
 
         Returns:
-            The record's fields, with the decision as text and without the
-            signature.
+            The record's fields in its stored layout, with the decision as
+            text and without the signature.
         """
         record = dataclasses.asdict(self)
         record["decision"] = self.decision.value
+        record["digests"] = dict(self.digests)
         del record["signature"]
-        return record
+        return store(record, REPLY)
 
     def to_dict(self) -> dict[str, Any]:
         """The full record.
@@ -119,21 +199,24 @@ class Attestation:
         """Rebuilds a reply from `to_dict`.
 
         Args:
-            record: A mapping as produced by `to_dict`.
+            record: A mapping as produced by `to_dict`; one without a
+                `schema_version` is version 1 and is migrated.
 
         Returns:
             The reply.
 
         Raises:
-            MisuseError: If the fields differ from the reply's fields
-                or fail the checks of construction. A `decision` that is not
-                a `Reply` value fails with `ValueError`.
+            MisuseError: If the version is unknown, the fields differ from
+                the reply's fields or fail the checks of construction. A
+                `decision` that is not a `Reply` value fails with
+                `ValueError`.
         """
+        values = load(record, REPLY)
         names = {f.name for f in dataclasses.fields(cls)}
-        if set(record) != names:
+        if set(values) != names:
             raise kinds.MisuseError("unexpected or missing reply fields")
-        values = dict(record)
         values["decision"] = kinds.Reply(values["decision"])
+        values["digests"] = dict(values["digests"])
         return cls(**values)
 
     def verify(self, key: str | bytes) -> bool:
@@ -164,29 +247,37 @@ class Envelope:
     system cannot read it; the ledger refuses the fingerprints of
     keys the system declared as its own.
 
+    An envelope keeps the version it was stored in, and its signature
+    covers the content in that layout.
+
     Attributes:
-        envelope_id: Identifier, unique in the ledger.
+        identifier: Identifier, unique in the ledger.
         limits: For each permitted action, how many times it may be used.
         statement: What the person authorises, in words.
         role: The person's role.
-        name_or_id: The person.
+        attestor: The person.
         date: First day the envelope is valid.
         scope: Model version hash and stream id it applies to.
         expires: Last day the envelope is valid.
         key_id: Fingerprint of the signing key.
         signature: HMAC-SHA256 of the other fields.
+        schema_version: The layout the envelope was stored (and signed) in.
+        migrations: The envelope's version steps, oldest first.
     """
 
-    envelope_id: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = GRANT
+
+    identifier: str
     limits: Mapping[str, int]
     statement: str
     role: str
-    name_or_id: str
+    attestor: str
     date: str
     scope: str
     expires: str
     key_id: str
     signature: str = ""
+    schema_version: int = VERSION
 
     def __post_init__(self) -> None:
         """Validates the record's shape.
@@ -198,10 +289,10 @@ class Envelope:
                 expiry is before the date.
         """
         for name in (
-            "envelope_id",
+            "identifier",
             "statement",
             "role",
-            "name_or_id",
+            "attestor",
             "scope",
             "key_id",
         ):
@@ -232,12 +323,12 @@ class Envelope:
         """The signed content.
 
         Returns:
-            The record's fields without the signature.
+            The record's fields in its stored layout, without the signature.
         """
         record = dataclasses.asdict(self)
         record["limits"] = dict(self.limits)
         del record["signature"]
-        return record
+        return store(record, GRANT)
 
     def to_dict(self) -> dict[str, Any]:
         """The full record.
@@ -268,19 +359,21 @@ class Envelope:
         """Rebuilds an envelope from `to_dict`.
 
         Args:
-            record: A mapping as produced by `to_dict`.
+            record: A mapping as produced by `to_dict`; one without a
+                `schema_version` is version 1 and is migrated.
 
         Returns:
             The envelope.
 
         Raises:
-            MisuseError: If the fields differ from the envelope's
-                fields or fail the checks of construction.
+            MisuseError: If the version is unknown, or the fields differ from
+                the envelope's fields or fail the checks of construction.
         """
+        values = load(record, GRANT)
         names = {f.name for f in dataclasses.fields(cls)}
-        if set(record) != names:
+        if set(values) != names:
             raise kinds.MisuseError("unexpected or missing envelope fields")
-        return cls(**dict(record))
+        return cls(**values)
 
     def verify(self, key: str | bytes) -> bool:
         """Whether the signature matches under `key`.

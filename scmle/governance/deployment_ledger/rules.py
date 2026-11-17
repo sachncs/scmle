@@ -174,12 +174,12 @@ class Oversight:
                 the system holds. The signature and expiry are not checked.
         """
         reply = grants.Attestation.from_dict(body)
-        escalation = self.escalations.get(reply.escalation_id)
+        escalation = self.escalations.get(reply.escalation)
         if escalation is None:
             raise kinds.MisuseError("attestation answers no escalation")
-        if reply.escalation_id in self.closed:
+        if reply.escalation in self.closed:
             raise kinds.MisuseError("escalation is already closed")
-        if reply.question_hash != escalation["question_hash"]:
+        if reply.digests["question"] != escalation["question_hash"]:
             raise kinds.MisuseError(
                 "attestation is bound to a different question"
             )
@@ -187,8 +187,8 @@ class Oversight:
             raise kinds.MisuseError(
                 "attestation is signed with a key the system holds"
             )
-        self.closed[reply.escalation_id] = kinds.ATTESTATION
-        self.attestations[reply.escalation_id] = dict(body)
+        self.closed[reply.escalation] = kinds.ATTESTATION
+        self.attestations[reply.escalation] = dict(body)
 
     def spend(self, body: Mapping[str, Any]) -> None:
         """Marks an answered escalation's attestation as spent, once.
@@ -262,16 +262,16 @@ class Automation(Oversight):
                 system holds. The signature and expiry are not checked.
         """
         grant = grants.Envelope.from_dict(body)
-        if grant.envelope_id in self.envelopes:
+        if grant.identifier in self.envelopes:
             raise kinds.MisuseError(
-                f"envelope {grant.envelope_id!r} was already granted"
+                f"envelope {grant.identifier!r} was already granted"
             )
         if grant.key_id in self.system_keys:
             raise kinds.MisuseError(
                 "envelope is signed with a key the system holds"
             )
-        self.envelopes[grant.envelope_id] = grant.to_dict()
-        self.envelope_uses[grant.envelope_id] = {}
+        self.envelopes[grant.identifier] = grant.to_dict()
+        self.envelope_uses[grant.identifier] = {}
 
     def consume(self, body: Mapping[str, Any]) -> None:
         """Counts one use, refusing what the envelope does not allow.

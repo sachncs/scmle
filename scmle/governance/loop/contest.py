@@ -36,7 +36,7 @@ class Contest(risk.Risk):
         policy = self.policy
         self.active[name] = {
             "process": sequential_tests.Comparison(
-                policy.delta_promo,
+                policy.promotion["delta"],
                 policy.alpha,
                 policy.scale,
             ),
@@ -57,7 +57,7 @@ class Contest(risk.Risk):
         self.rollback_watch = {
             "previous": previous,
             "process": sequential_tests.Comparison(
-                policy.delta_rb, policy.alpha_rb, policy.scale
+                policy.rollback["delta"], policy.rollback["alpha"], policy.scale
             ),
         }
         self.save_state()
@@ -140,7 +140,7 @@ class Contest(risk.Risk):
         """Turns a crossed reverse process into a rollback proposal.
 
         If the watch has crossed, commits the proposal, raises a finite
-        `tau` by ``tighten_step`` (capped at 1; an infinite `tau` is kept) and
+        `tau` by ``step`` (capped at 1; an infinite `tau` is kept) and
         ends the watch.
 
         Returns:
@@ -161,7 +161,7 @@ class Contest(risk.Risk):
             },
         )
         if not math.isinf(self.tau):
-            self.tau = min(1.0, self.tau + self.policy.tighten_step)
+            self.tau = min(1.0, self.tau + self.policy.step)
         self.rollback_watch = None
         self.consecutive_rollbacks += 1
         if self.consecutive_rollbacks >= terms.ESCALATING_ROLLBACKS:
@@ -174,7 +174,7 @@ class Contest(risk.Risk):
         """Decides challengers in registration order with e-LOND.
 
         Decides the first queued challenger once its evidence reaches the
-        current e-LOND level or it has used ``challenger_budget`` matured
+        current e-LOND level or it has used ``budget`` matured
         batches, then the next, and stops at the first that is neither. A
         rejection writes a promotion proposal.
 
@@ -190,7 +190,7 @@ class Contest(risk.Risk):
             level = sequence.rule.level(sequence.state)
             value = min(item["process"].e_value, 1e300)
             reached = Fraction(value) * level >= 1
-            exhausted = item["batches"] >= self.policy.challenger_budget
+            exhausted = item["batches"] >= self.policy.budget
             if not (reached or exhausted):
                 break
             step = sequence.rule.step(

@@ -51,9 +51,7 @@ class Memory:
         self.verification_keys = dict(verification_keys)
         self.today = today
         self.batch = 0
-        self.tau = (
-            math.inf if policy.initial_tau is None else policy.initial_tau
-        )
+        self.tau = math.inf if policy.tau is None else policy.tau
         self.pending_batches: list[dict[str, Any]] = []
         self.escalation_batch: dict[str, int] = {}
         self.consecutive_rollbacks = 0
@@ -74,33 +72,33 @@ class Memory:
         """Creates fresh monitors from the policy."""
         policy = self.policy
         self.alarm = sequential_tests.Tripwire(
-            policy.reference_risk,
+            policy.reference,
             policy.tolerance,
-            policy.alpha_alarm,
+            policy.alarm,
             policy.scale,
         )
         self.naive_alarm = sequential_tests.Tripwire(
-            policy.reference_risk,
+            policy.reference,
             policy.tolerance,
-            policy.alpha_alarm,
-            policy.loss_bound,
+            policy.alarm,
+            policy.loss,
         )
         self.selective = sequential_tests.Tripwire(
-            policy.r_star, 0.0, policy.delta, policy.scale
+            policy.target, 0.0, policy.delta, policy.scale
         )
         self.coverage_test: sequential_tests.Mixture | None = (
             None
-            if policy.coverage_target is None
+            if policy.coverage is None
             else sequential_tests.Mixture(
-                policy.coverage_target,
+                policy.coverage,
                 sequential_tests.LESS,
-                policy.alpha_alarm,
+                policy.alarm,
             )
         )
         self.novelty_test = sequential_tests.Mixture(
-            min(max(policy.novelty_bound, 1e-6), 1 - 1e-6),
+            min(max(policy.novelty, 1e-6), 1 - 1e-6),
             sequential_tests.GREATER,
-            policy.alpha_alarm,
+            policy.alarm,
         )
 
     @property

@@ -66,7 +66,7 @@ def divergences(spec: deployment.Deployment, report: Runtime) -> list[str]:
         problems.append(
             f"bundle digest {report.bundle_digest} != {spec.bundle.digest}"
         )
-    if report.model_version != spec.bundle.model_version:
+    if report.model_version != spec.bundle.version:
         problems.append("model version differs from the spec")
     if not report.ready:
         problems.append("service is not ready")
@@ -111,12 +111,12 @@ def diff(spec: deployment.Deployment, report: Runtime) -> list[str]:
         problems.append("container runs as root")
     if (
         report.memory_limit_mb is not None
-        and report.memory_limit_mb > spec.resources.memory_limit_mb
+        and report.memory_limit_mb > spec.resources.limits.memory
     ):
         problems.append("memory limit exceeds the spec")
     if (
         report.cpu_limit is not None
-        and report.cpu_limit > spec.resources.cpu_limit
+        and report.cpu_limit > spec.resources.limits.cpu
     ):
         problems.append("cpu limit exceeds the spec")
     return problems

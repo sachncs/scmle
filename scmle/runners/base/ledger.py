@@ -3,12 +3,14 @@
 from collections.abc import Mapping
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
+from scmle.contracts import records
 from scmle.runners import checkpoint
 from scmle.runners.base import job
 from scmle.storage import objectstore
 
-MANIFEST_FORMAT = 1
+MANIFEST_FORMAT = 2  # 1: multi-word keys; 2: the vocabulary of phase 5
 
 
 @dataclasses.dataclass(slots=True)
@@ -45,38 +47,56 @@ class RunManifest:
     """The durable record of a run.
 
     Attributes:
-        run_id: The run.
+        identifier: The run.
         runner: Kind of the runner that executed it.
-        spec_digest: Digest of the job spec.
-        project_digest: Digest of the project specification.
+        digests: `spec` (the job spec), `project` (the project specification,
+            the anchored identity of `Job.project`) and `result` (the result
+            object; empty if none).
         identity: The training identity.
         state: `Progress` value.
         attempts: One record per attempt.
-        total_cost: Estimated cost across attempts.
+        cost: Estimated cost across attempts.
         budget: The cost ceiling, or None if there was none.
         checkpoints: Step and SHA-256 of each verified checkpoint at the end;
             a corrupt one has `sha256` None and its `damage` reason.
-        result_sha256: Digest of the result object; empty if none.
         evidence: Key, SHA-256 and size of every other object stored under the
             run at the end.
-        started_at: UTC time the run was registered.
-        ended_at: UTC time the run ended; empty while running.
+        started: UTC time the run was registered.
+        ended: UTC time the run ended; empty while running.
+        migrations: The manifest's format steps, oldest first; the format
+            is stored under `format` (its attempts keep their keys).
     """
 
-    run_id: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "run_id": "identifier",
+                "total_cost": "cost",
+                "started_at": "started",
+                "ended_at": "ended",
+            },
+            groups={
+                "digests": {
+                    "spec_digest": "spec",
+                    "project_digest": "project",
+                    "result_sha256": "result",
+                }
+            },
+        ),
+    )
+
+    identifier: str
     runner: str
-    spec_digest: str
-    project_digest: str
+    digests: dict[str, str]
     identity: str
     state: str = job.Progress.STARTED.value
     attempts: list[Attempt] = dataclasses.field(default_factory=list)
-    total_cost: float = 0.0
+    cost: float = 0.0
     budget: float | None = None
     checkpoints: list[dict[str, Any]] = dataclasses.field(default_factory=list)
-    result_sha256: str = ""
     evidence: list[dict[str, Any]] = dataclasses.field(default_factory=list)
-    started_at: str = ""
-    ended_at: str = ""
+    started: str = ""
+    ended: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready form.
@@ -93,12 +113,17 @@ class RunManifest:
         """Rebuilds a manifest from its stored form.
 
         Args:
-            record: A dict produced by `to_dict`.
+            record: A dict produced by `to_dict`; format 1 is migrated.
 
         Returns:
             The manifest.
+
+        Raises:
+            InputError: If the format is not a positive integer or is newer
+                than this build.
         """
-        fields = {k: v for k, v in record.items() if k != "format"}
+        fields = records.load("run manifest", cls.migrations, record, "format")
+        del fields[records.KEY]
         fields["attempts"] = [Attempt(**a) for a in fields["attempts"]]
         return cls(**fields)
 
@@ -114,13 +139,16 @@ class RunManifest:
             A manifest with no attempts, started now.
         """
         return cls(
-            run_id=spec.run_id,
+            identifier=spec.run_id,
             runner=runner,
-            spec_digest=spec.digest(),
-            project_digest=spec.project_digest,
+            digests={
+                "spec": spec.digest(),
+                "project": spec.project_digest,
+                "result": "",
+            },
             identity=spec.identity,
             budget=None if spec.budget is None else spec.budget.max_cost,
-            started_at=job.stamp(),
+            started=job.stamp(),
         )
 
     def seal(
@@ -141,7 +169,7 @@ class RunManifest:
             result: The key where the workload leaves its result.
             own: The key of this manifest, left out of the evidence.
         """
-        checkpoints = checkpoint.CheckpointStore(store, self.run_id)
+        checkpoints = checkpoint.CheckpointStore(store, self.identifier)
         self.checkpoints = []
         for step in checkpoints.steps():
             reading = checkpoints.load(step)
@@ -161,11 +189,11 @@ class RunManifest:
                 state = job.Progress.FAILED
                 self.attempts[-1].reason = "job ended without a result"
             else:
-                self.result_sha256 = meta.sha256
+                self.digests["result"] = meta.sha256
         self.evidence = [
             {"key": meta.key, "sha256": meta.sha256, "size": meta.size}
-            for meta in store.list_objects(f"runs/{self.run_id}/")
+            for meta in store.list_objects(f"runs/{self.identifier}/")
             if meta.key != own
         ]
         self.state = state.value
-        self.ended_at = job.stamp()
+        self.ended = job.stamp()

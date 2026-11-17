@@ -6,6 +6,7 @@ import dataclasses
 from typing import Any
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.governance import deployment_ledger
 from scmle.governance import never_list
 from scmle.governance.loop import desk
@@ -182,14 +183,16 @@ class Gatekeeper(desk.Desk):
     def amend_policy(self, **changes: Any) -> terms.Preregistration:
         """Changes the policy: tightening is free, anything else is gated.
 
-        A field in ``NUMERIC_ORIENTATION`` (for example ``r_star`` or
-        ``tolerance``) moved to a stricter or equal value needs no
-        attestation. A looser value needs one (the relax-threshold action),
-        and so does any other field, or setting such a field to None (the
-        change-charter action: safe defaults, high-impact actions, scope).
-        The change is recorded in the ledger and restarts the monitors with
-        fresh state. A gated change without an attestation is refused with
-        `AttestationRequired`, and nothing is changed.
+        A field in ``NUMERIC_ORIENTATION`` (for example ``target`` or
+        ``tolerance``, or ``promotion.delta`` inside an object) moved to a
+        stricter or equal value needs no attestation. A looser value needs
+        one (the relax-threshold action), and so does any other field, or
+        setting such a field to None (the change-charter action: fallbacks,
+        high-impact actions, scope). A change of `promotion` or `rollback`
+        names only the keys it changes. The change is recorded in the ledger
+        and restarts the monitors with fresh state. A gated change without an
+        attestation is refused with `AttestationRequired`, and nothing is
+        changed.
 
         Args:
             **changes: New values of policy fields, by field name.
@@ -205,8 +208,26 @@ class Gatekeeper(desk.Desk):
         unknown = set(changes) - names
         if unknown:
             raise errors.InputError(f"unknown policy fields: {sorted(unknown)}")
+        changes = {
+            field: (
+                {**getattr(self.policy, field), **new}
+                if field in terms.GROUPS
+                else new
+            )
+            for field, new in changes.items()
+        }
+        moves: dict[str, tuple[Any, Any]] = {}
         for field, new in changes.items():
             old = getattr(self.policy, field)
+            if field in terms.GROUPS:
+                moves.update(
+                    {f"{field}.{k}": (old.get(k), v) for k, v in new.items()}
+                )
+            else:
+                moves[field] = (old, new)
+        for field, (old, new) in moves.items():
+            if old == new and field not in changes:
+                continue
             orientation = terms.NUMERIC_ORIENTATION.get(field)
             if orientation is not None and new is not None:
                 if (new - old) * orientation >= 0:
@@ -227,7 +248,10 @@ class Gatekeeper(desk.Desk):
         self.ledger.commit(
             deployment_ledger.OBSERVE_SUMMARY,
             {
-                "policy_amendment": terms.jsonify(changes),
+                "policy_amendment": {
+                    records.KEY: terms.VERSION,
+                    **terms.jsonify(changes),
+                },
                 "batch": self.batch,
             },
         )

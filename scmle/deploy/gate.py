@@ -226,13 +226,16 @@ def audit(candidate: Candidate, key: str | bytes) -> list[str]:
     if staged.environment != STAGING:
         problems.append("the staging record is not for staging")
     expected = {
-        "source_commit": candidate.source_commit,
-        "model_digest": candidate.model_digest,
-        "container_digest": candidate.container_digest,
-        "provider": candidate.provider,
+        "commit": (staged.commit, candidate.source_commit),
+        "model digest": (staged.digests["model"], candidate.model_digest),
+        "container digest": (
+            staged.digests["container"],
+            candidate.container_digest,
+        ),
+        "provider": (staged.provider, candidate.provider),
     }
-    for name, value in expected.items():
-        if getattr(staged, name) != value:
+    for name, (recorded, value) in expected.items():
+        if recorded != value:
             problems.append(f"the staging record has a different {name}")
     shown = dict(staged.evidence)
     missing = [n for n in livetests.CHECK_NAMES if n not in shown]
@@ -263,9 +266,9 @@ def vet(candidate: Candidate) -> list[str]:
             problems.append(f"live check {name} failed: {detail}")
         bound = (
             result.environment == candidate.environment
-            and result.source_commit == candidate.source_commit
-            and result.container_digest == candidate.container_digest
-            and result.model_digest == candidate.model_digest
+            and result.commit == candidate.source_commit
+            and result.digests["container"] == candidate.container_digest
+            and result.digests["model"] == candidate.model_digest
         )
         if not bound:
             problems.append(f"live check {name} was run for a different build")
@@ -333,21 +336,23 @@ def certify(
     seen = candidate.observation
     if problems or seen is None:
         return GateDecision(allowed=False, reasons=tuple(problems))
-    results = {item.name: item.evidence_digest for item in candidate.checks}
+    results = {item.name: item.digests["evidence"] for item in candidate.checks}
     unsigned = scmle.deploy.record.Record(
-        source_commit=candidate.source_commit,
+        commit=candidate.source_commit,
         model=candidate.model.model,
-        model_version=candidate.model.version,
-        model_digest=candidate.model_digest,
-        container_digest=candidate.container_digest,
-        config_digest=candidate.config_digest,
+        version=candidate.model.version,
+        digests={
+            "model": candidate.model_digest,
+            "container": candidate.container_digest,
+            "config": candidate.config_digest,
+        },
         environment=candidate.environment,
         provider=candidate.provider,
-        requested_by=candidate.requested_by,
+        requester=candidate.requested_by,
         approver=candidate.approver,
-        approved_at=candidate.approved_at,
+        approved=candidate.approved_at,
         evidence=tuple(sorted(results.items())),
         revision=seen.revision,
-        recorded_at=now or events.stamp(),
+        recorded=now or events.stamp(),
     )
     return GateDecision(allowed=True, reasons=(), record=unsigned.signed(key))

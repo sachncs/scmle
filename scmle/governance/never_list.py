@@ -234,7 +234,7 @@ class Guard:
                 self.ledger.commit(
                     deployment_ledger.ATTESTATION_USED,
                     {
-                        "escalation_id": reply.escalation_id,
+                        "escalation_id": reply.escalation,
                         "action": action.value,
                     },
                 )

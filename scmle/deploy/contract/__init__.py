@@ -20,6 +20,7 @@ from scmle.deploy.contract.deployment import nonsecret
 from scmle.deploy.contract.deployment import PORT_LIMIT
 from scmle.deploy.contract.deployment import Probes
 from scmle.deploy.contract.deployment import PRODUCTION
+from scmle.deploy.contract.deployment import Quota
 from scmle.deploy.contract.deployment import Resources
 from scmle.deploy.contract.deployment import SECRET_WORDS
 from scmle.deploy.contract.deployment import SPEC_FORMAT
@@ -64,6 +65,7 @@ __all__ = [
     "ImageRef",
     "Probes",
     "Provider",
+    "Quota",
     "Resources",
     "Runtime",
     "SecretRef",

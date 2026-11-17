@@ -20,54 +20,83 @@ import json
 import pathlib
 import re
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts import signing
 from scmle.deploy import contract
 
-RECORD_FORMAT = 1
+LEGACY = "format"  # the version key of a version-1 record
 COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 ENVIRONMENTS = ("staging", "production")
+DIGESTS = {
+    "model_digest": "model",
+    "container_digest": "container",
+    "config_digest": "config",
+}
+"""Version-1 digest keys of a record and their names under `digests`."""
+MIGRATIONS = (
+    records.nest(
+        {
+            "source_commit": "commit",
+            "model_version": "version",
+            "requested_by": "requester",
+            "approved_at": "approved",
+            "recorded_at": "recorded",
+        },
+        groups={"digests": DIGESTS},
+    ),
+)
+"""The deployment record's version steps, oldest first."""
+VERSION = records.ORIGIN + len(MIGRATIONS)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Record:
     """A signed account of one release to one environment.
 
+    A record keeps the version it was stored in: its signed content and its
+    digest are those of the stored layout, so a version-1 record read by
+    this build still verifies and keeps its ledger digest.
+
     Attributes:
-        source_commit: The 40-hex commit the image was built from.
+        commit: The 40-hex commit the image was built from.
         model: Registered model name.
-        model_version: Registry version number.
-        model_digest: Digest the service reports as ``artifact_digest``.
-        container_digest: Image digest that was deployed.
-        config_digest: Digest of the deployment configuration (spec).
+        version: Registry version number.
+        digests: `model` (what the service reports as ``artifact_digest``),
+            `container` (the image deployed) and `config` (the deployment
+            spec).
         environment: ``staging`` or ``production``.
         provider: ``aws`` or ``gcp``.
-        requested_by: Who started the release.
+        requester: Who started the release.
         approver: Who approved it in the protected environment.
-        approved_at: UTC time of the approval.
+        approved: UTC time of the approval.
         evidence: Check name to the digest of the exchange that passed it.
         revision: The runtime revision that was deployed.
-        recorded_at: UTC time the record was written.
+        recorded: UTC time the record was written.
         signature: HMAC over every other field.
+        schema_version: The layout the record was stored (and signed) in.
+        migrations: The record's version steps, oldest first.
     """
 
-    source_commit: str
+    migrations: ClassVar[tuple[records.Migration, ...]] = MIGRATIONS
+
+    commit: str
     model: str
-    model_version: int
-    model_digest: str
-    container_digest: str
-    config_digest: str
+    version: int
+    digests: Mapping[str, str]
     environment: str
     provider: str
-    requested_by: str
+    requester: str
     approver: str
-    approved_at: str
+    approved: str
     evidence: tuple[tuple[str, str], ...]
     revision: str
-    recorded_at: str
+    recorded: str
     signature: str = ""
+    schema_version: int = VERSION
 
     def __post_init__(self) -> None:
         """Validates every field that a reader will rely on.
@@ -76,12 +105,14 @@ class Record:
             ConfigError: If the commit is not 40 hex characters, the environment
                 is not staging or production, a required text field is blank,
                 the model version is below 1, or there is no evidence. A
-                malformed digest is refused with the same error.
+                malformed or missing digest is refused with the same error.
         """
-        if COMMIT_PATTERN.fullmatch(self.source_commit) is None:
-            raise errors.ConfigError("source_commit must be 40 hex characters")
-        for name in ("model_digest", "container_digest", "config_digest"):
-            contract.require_digest(getattr(self, name), name)
+        if COMMIT_PATTERN.fullmatch(self.commit) is None:
+            raise errors.ConfigError("commit must be 40 hex characters")
+        for name in DIGESTS.values():
+            contract.require_digest(
+                str(self.digests.get(name)), f"digests.{name}"
+            )
         if self.environment not in ENVIRONMENTS:
             raise errors.ConfigError(
                 "environment must be staging or production"
@@ -89,32 +120,36 @@ class Record:
         for name in (
             "model",
             "provider",
-            "requested_by",
+            "requester",
             "approver",
-            "approved_at",
+            "approved",
             "revision",
-            "recorded_at",
+            "recorded",
         ):
             if not str(getattr(self, name)).strip():
                 raise errors.ConfigError(f"{name} is required")
-        if self.model_version < 1:
-            raise errors.ConfigError("model_version must be positive")
+        if self.version < 1:
+            raise errors.ConfigError("version must be positive")
         if not self.evidence:
             raise errors.ConfigError("a record needs evidence")
         for check, digest in self.evidence:
             contract.require_digest(digest, f"evidence[{check}]")
 
     def preimage(self) -> dict[str, Any]:
-        """Builds the signed content.
+        """Builds the signed content, in the layout the record is stored in.
 
         Returns:
-            All fields except the signature, with the evidence as a dict and the
-            record format number added.
+            All fields except the signature, with the evidence as a dict; a
+            version-1 record has its version-1 keys and `format` 1.
         """
         record = dataclasses.asdict(self)
         del record["signature"]
         record["evidence"] = dict(self.evidence)
-        record["format"] = RECORD_FORMAT
+        record["digests"] = dict(self.digests)
+        if self.schema_version == records.ORIGIN:
+            del record[records.KEY]
+            record = records.downgrade(self.migrations, record)
+            record[LEGACY] = records.ORIGIN
         return record
 
     def to_dict(self) -> dict[str, Any]:
@@ -165,7 +200,10 @@ class Record:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> Self:
-        """Rebuilds a record from `to_dict`.
+        """Rebuilds a record from `to_dict`, of this or the first version.
+
+        A version-1 record (`format` 1) is migrated and remembers its
+        version, so its signature is checked against its stored layout.
 
         Args:
             record: A record produced by `to_dict`.
@@ -177,15 +215,23 @@ class Record:
             ConfigError: If fields are missing, extra or of a newer format.
         """
         values = dict(record)
-        if values.pop("format", None) != RECORD_FORMAT:
+        if records.KEY not in values and LEGACY not in values:
             raise errors.ConfigError("unsupported deployment record format")
+        stored = records.detect("deployment record", values, LEGACY)
+        if stored > VERSION:
+            raise errors.ConfigError("unsupported deployment record format")
+        values = records.upgrade(cls.migrations, values, stored)
+        values[records.KEY] = stored
         names = {f.name for f in dataclasses.fields(cls)}
-        if set(values) != names:
+        if set(values) != names or set(values["digests"]) != set(
+            DIGESTS.values()
+        ):
             raise errors.ConfigError("unexpected or missing record fields")
         evidence = values["evidence"]
         if not isinstance(evidence, Mapping):
             raise errors.ConfigError("evidence must be an object")
         values["evidence"] = tuple(sorted(evidence.items()))
+        values["digests"] = dict(values["digests"])
         return cls(**values)
 
 

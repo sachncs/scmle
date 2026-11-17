@@ -122,8 +122,8 @@ class Referee:
             )
         frame = data.reset_index(drop=True)[known].reset_index(drop=True)
         target = outcomes.reset_index(drop=True)[known].reset_index(drop=True)
-        group_name = self.champion.schema.group_column
-        time_name = self.champion.schema.time_column
+        group_name = self.champion.schema.group
+        time_name = self.champion.schema.time
         groups = (
             frame[group_name]
             if group_name and group_name in frame.columns

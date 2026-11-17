@@ -19,11 +19,13 @@ import hashlib
 import http
 import json
 from typing import Any
+from typing import ClassVar
 import urllib.error
 import urllib.parse
 import urllib.request
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts import serving
 from scmle.deploy import parity
 
@@ -64,6 +66,14 @@ Fetch = Callable[[str, str, Mapping[str, str], bytes | None], Response]
 """``fetch(method, path, headers, body) -> Response``."""
 
 
+DIGESTS = {
+    "evidence_digest": "evidence",
+    "container_digest": "container",
+    "model_digest": "model",
+}
+"""Version-1 digest keys of a check and their names under `digests`."""
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Check:
     """The outcome of one check, bound to the build it ran against.
@@ -72,50 +82,62 @@ class Check:
         name: Check name (one of `CHECK_NAMES`).
         passed: Whether the check found no problem.
         problems: What the check found wrong; empty if it passed.
-        evidence_digest: Digest of the HTTP exchanges the result rests on.
+        digests: `evidence` (the HTTP exchanges the result rests on),
+            `container` (the image checked) and `model` (the model checked).
         environment: Environment the check ran against.
-        source_commit: Source commit of the build checked.
-        container_digest: Digest of the image checked.
-        model_digest: Digest of the model checked.
+        commit: Source commit of the build checked.
+        migrations: The record's version steps, oldest first.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest({"source_commit": "commit"}, groups={"digests": DIGESTS}),
+    )
 
     name: str
     passed: bool
     problems: tuple[str, ...]
-    evidence_digest: str
+    digests: Mapping[str, str]
     environment: str
-    source_commit: str
-    container_digest: str
-    model_digest: str
+    commit: str
 
     def to_dict(self) -> dict[str, Any]:
-        """Builds a JSON-ready record.
+        """Builds a JSON-ready record at the current version.
 
         Returns:
-            A dict of all fields, with `problems` as a list.
+            A dict of all fields, with `problems` as a list, and the
+            `schema_version`.
         """
         record = dataclasses.asdict(self)
         record["problems"] = list(self.problems)
+        record["digests"] = dict(self.digests)
+        record[records.KEY] = records.ORIGIN + len(self.migrations)
         return record
 
     @classmethod
     def from_dict(cls, record: Mapping[str, Any]) -> "Check":
-        """Rebuilds a result from `to_dict`.
+        """Rebuilds a result from `to_dict`, of this or the first version.
 
         Args:
-            record: A record produced by `to_dict`.
+            record: A record produced by `to_dict`; one without a
+                `schema_version` is version 1 and is migrated.
 
         Returns:
             The result.
 
         Raises:
             ConfigError: If the record's fields are not exactly the result's.
+            InputError: If the version is not a positive integer or is newer
+                than this build.
         """
+        values = records.load("check", cls.migrations, record)
+        del values[records.KEY]
         names = {f.name for f in dataclasses.fields(cls)}
-        if set(record) != names:
+        if set(values) != names or set(values["digests"]) != set(
+            DIGESTS.values()
+        ):
             raise errors.ConfigError("unexpected or missing check fields")
-        values = dict(record)
         values["problems"] = tuple(values["problems"])
+        values["digests"] = dict(values["digests"])
         return cls(**values)
 
 
@@ -243,11 +265,13 @@ def finish(
         name,
         not problems,
         tuple(problems),
-        wire.digest(),
+        {
+            "evidence": wire.digest(),
+            "container": target.container_digest,
+            "model": target.model_digest,
+        },
         target.environment,
         target.source_commit,
-        target.container_digest,
-        target.model_digest,
     )
 
 

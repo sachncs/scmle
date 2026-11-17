@@ -8,7 +8,7 @@ new candidate in front of the promotion process. An *envelope* is how a person
 authorises that step ahead of time:
 
     guard = Guard(ledger, verification_keys={key_id: key})
-    guard.grant(Envelope.create(key, envelope_id="e1", limits={...}, ...))
+    guard.grant(Envelope.create(key, identifier="e1", limits={...}, ...))
     guard.authorize(Action.TRAIN_CHALLENGER, scope, {"batch": 7})
     guard.revoke("e1", "model retired")
 
