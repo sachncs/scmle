@@ -95,8 +95,8 @@ class Recorder:
         return [name for name, ignored in self.calls]
 
 
-def executor_for(store, workflow, recorder, clock, **options):
-    return scmle.workflow.executor.Executor(
+def executor_for(store, workflow, recorder, clock, timer=None, **options):
+    executor = scmle.workflow.executor.Executor(
         workflow,
         store,
         recorder.handlers(workflow),
@@ -105,6 +105,8 @@ def executor_for(store, workflow, recorder, clock, **options):
         sleep=clock.sleep,
         **options,
     )
+    executor.timer = timer or clock
+    return executor
 
 
 def approve(executor, record, who="ml-owner", decision="approve"):
@@ -477,6 +479,90 @@ def test_of_two_executors_racing_for_an_expired_lease_one_wins(store):
         thread.join()
     assert outcomes.count("won") == 1
     assert json.loads(store.get(lock)[0])["fence"] == 1
+
+
+class Racing(objectstore.LocalObjectStore):
+    """A store that runs a hook once, right after a lease is read."""
+
+    hook = None
+
+    def get(self, key):
+        found = super().get(key)
+        if key.endswith("/lock") and self.hook is not None:
+            hook, self.hook = self.hook, None
+            hook()
+        return found
+
+
+def test_a_takeover_between_the_lease_check_and_the_write_is_fenced(
+    tmp_path,
+):
+    # CON-1: `write` checked the lease, then wrote unconditionally; a
+    # successor that took over and wrote in between was overwritten.
+    store = Racing(tmp_path / "state")
+    clock = Clock()
+    flow = pipeline()
+    first = executor_for(store, flow, Recorder(clock), clock)
+    second = executor_for(store, flow, Recorder(clock), clock, owner="second")
+    run_id = "run-c"
+    key = f"workflows/{flow.name}/runs/{run_id}/steps/train.json"
+    first.acquire(run_id)
+    first.write(key, {"by": "first", "n": 1})
+
+    def takeover():
+        clock.now += 301
+        second.acquire(run_id)
+        second.write(key, {"by": "second"})
+
+    store.hook = takeover
+    with pytest.raises(scmle.workflow.executor.EvictionError):
+        first.write(key, {"by": "first", "n": 2})
+    assert json.loads(store.get(key)[0])["by"] == "second"
+
+
+def test_a_stale_fence_never_overwrites_a_later_holders_record(store):
+    clock = Clock()
+    flow = pipeline()
+    first = executor_for(store, flow, Recorder(clock), clock)
+    run_id = "run-d"
+    key = f"workflows/{flow.name}/runs/{run_id}/steps/train.json"
+    first.acquire(run_id)
+    store.put(key, json.dumps({"by": "later", "fence": 2}).encode())
+    with pytest.raises(scmle.workflow.executor.EvictionError):
+        first.write(key, {"by": "first"})
+    assert json.loads(store.get(key)[0])["by"] == "later"
+
+
+def test_a_step_timeout_is_measured_on_the_monotonic_timer(store):
+    # CON-20: a wall-clock step forward (NTP) failed a step that had used
+    # none of its timeout.
+    clock, timer = Clock(), Clock(5.0)
+    recorder = Recorder(clock)
+
+    def jumps(context):
+        clock.now += 10_000
+        context.check()
+        return {"done": True}
+
+    recorder.behaviour["ingest"] = jumps
+    executor = executor_for(store, pipeline(), recorder, clock, timer=timer)
+    record = executor.start("j", "a")
+    assert record["steps"]["ingest"] == "succeeded"
+
+
+def test_a_renewal_never_moves_the_lease_expiry_back(store):
+    # CON-20: a wall clock stepped back made a renewal shorten the lease, so
+    # another executor could take a run whose holder was still working.
+    clock = Clock()
+    flow = pipeline()
+    holder = executor_for(store, flow, Recorder(clock), clock)
+    run_id = "run-e"
+    lock = f"workflows/{flow.name}/runs/{run_id}/lock"
+    holder.acquire(run_id)
+    before = json.loads(store.get(lock)[0])["expires"]
+    clock.now -= 1_000
+    holder.renew_lease(run_id)
+    assert json.loads(store.get(lock)[0])["expires"] >= before
 
 
 def test_timeouts_budgets_and_the_run_budget(store):

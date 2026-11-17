@@ -210,8 +210,9 @@ class StepContext:
         idempotency_key: Stable across retries and re-invocations.
         upstream: Outputs of the steps it depends on, by step name.
         store: The executor's durable store.
-        started: Clock reading when the attempt started.
-        clock: Returns the current time in epoch seconds.
+        started: Timer reading when the attempt started.
+        clock: Returns the timer reading in seconds: monotonic, so a step
+            of the wall clock neither fails nor extends a step (CON-20).
         spent: Cost recorded by this attempt so far.
         run_spent: Cost of the run before this step.
         run_budget: Ceiling for the run's cost, or None.
@@ -303,6 +304,9 @@ class Executor:
         approver_keys: Approver identity to the key their decisions are signed
             with.
         clock: Returns epoch seconds.
+        timer: Returns monotonic seconds, for how long a step has run, so a
+            step of the wall clock neither fails nor extends a step (CON-20);
+            `time.monotonic` unless replaced, as tests do.
         sleep: Waits between retries.
         lease_seconds: Validity of a run lease.
         owner: Name written into the lease.
@@ -330,7 +334,8 @@ class Executor:
             approver_keys: Approver identity to the HMAC key their decisions
                 are signed with (held by the approver, not by the system
                 under approval).
-            clock: Callable returning the current time in epoch seconds.
+            clock: Callable returning the current time in epoch seconds,
+                for records and lease expiry, which other processes read.
             sleep: Callable taking a delay in seconds, called between retries.
             lease_seconds: Validity of a run lease.
             owner: Name written into the lease.
@@ -351,6 +356,7 @@ class Executor:
         self.handlers = dict(handlers)
         self.approver_keys = dict(approver_keys or {})
         self.clock = clock
+        self.timer: Callable[[], float] = time.monotonic
         self.sleep = sleep
         self.lease_seconds = lease_seconds
         self.owner = owner
@@ -392,24 +398,55 @@ class Executor:
     def write(self, key: str, record: Mapping[str, Any]) -> None:
         """Stores a JSON record atomically, fenced by the run's lease.
 
-        A record under a run this executor leases is written only after
-        `hold` confirms the lease is still ours, so an executor that lost
-        its lease stops instead of overwriting the new holder's state.
+        A record under a run this executor leases carries the lease's
+        fencing token. It is written only if the stored record's token is
+        not newer than ours, `hold` confirms the lease is still ours, and
+        the record is still the version read first (compare-and-swap), so
+        an executor that lost its lease, even between the check and the
+        write, stops instead of overwriting the new holder's state (CON-1).
 
         Args:
             key: Object key.
             record: The record to store.
 
         Raises:
-            EvictionError: If the run's lease is no longer ours.
+            EvictionError: If the run's lease is no longer ours, or a later
+                holder wrote the record.
         """
         prefix = f"workflows/{self.workflow.name}/runs/"
-        if key.startswith(prefix) and not key.endswith("/lock"):
-            run_id = key[len(prefix) :].split("/", 1)[0]
-            if run_id in self.fences:
-                self.hold(run_id)
-        body = json.dumps(record, indent=2, sort_keys=True).encode()
-        self.store.put(key, body)
+        run_id = key[len(prefix) :].split("/", 1)[0]
+        if (
+            not key.startswith(prefix)
+            or key.endswith("/lock")
+            or run_id not in self.fences
+        ):
+            body = json.dumps(record, indent=2, sort_keys=True).encode()
+            self.store.put(key, body)
+            return
+        fence = self.fences[run_id]
+        body = json.dumps(
+            {**record, "fence": fence}, indent=2, sort_keys=True
+        ).encode()
+        try:
+            data, meta = self.store.get(key)
+        except objectstore.AbsentError:
+            # handled: no record yet; it is created only if still absent
+            version = None
+        else:
+            version = meta.version
+            stored = parse(key, data).get("fence", 0)
+            if stored > fence:
+                raise EvictionError(
+                    f"{key} was written under fence {stored}, ours {fence}"
+                )
+        self.hold(run_id)
+        try:
+            if version is None:
+                self.store.put(key, body, if_absent=True)
+            else:
+                self.store.put(key, body, if_version=version)
+        except (objectstore.ExistsError, *CHANGED) as error:
+            raise EvictionError(f"{key} changed while writing") from error
 
     def run_record(self, run_id: str) -> dict[str, Any] | None:
         """Reads the stored run record.
@@ -436,12 +473,14 @@ class Executor:
 
     # ---- leases and concurrency ------------------------------------------
 
-    def lease(self, run_id: str, fence: int) -> bytes:
+    def lease(self, run_id: str, fence: int, floor: float = 0.0) -> bytes:
         """The body of this executor's lease on a run.
 
         Args:
             run_id: The run.
             fence: The fencing token: one more than the lease it replaced.
+            floor: An expiry the new one never falls below, so a wall
+                clock stepped back never shortens a renewed lease (CON-20).
 
         Returns:
             The JSON bytes to store.
@@ -450,7 +489,7 @@ class Executor:
         return json.dumps(
             {
                 "owner": self.owner,
-                "expires": self.clock() + self.lease_seconds,
+                "expires": max(self.clock() + self.lease_seconds, floor),
                 "fence": fence,
             }
         ).encode()
@@ -504,15 +543,17 @@ class Executor:
             return
         raise BusyError(f"run {run_id} is changing hands; retry")
 
-    def hold(self, run_id: str) -> objectstore.ObjectMeta:
+    def hold(
+        self, run_id: str
+    ) -> tuple[Mapping[str, Any], objectstore.ObjectMeta]:
         """Checks that this executor still holds the run's lease.
 
         Args:
             run_id: The run.
 
         Returns:
-            The lease object's metadata, whose version a renewal or release
-            must match.
+            The lease record, and its metadata, whose version a renewal or
+            release must match.
 
         Raises:
             EvictionError: If the lease is gone, or another executor or a
@@ -533,7 +574,7 @@ class Executor:
                 f"run {run_id} is now held by {held.get('owner')} "
                 f"(fence {held.get('fence')}, ours {fence})"
             )
-        return meta
+        return held, meta
 
     def renew_lease(self, run_id: str) -> None:
         """Extends the lease, only if this executor still holds it.
@@ -545,11 +586,11 @@ class Executor:
             EvictionError: If the lease was taken over or changed between
                 the check and the renewal.
         """
-        meta = self.hold(run_id)
+        held, meta = self.hold(run_id)
         try:
             self.store.put(
                 self.base(run_id) + "lock",
-                self.lease(run_id, self.fences[run_id]),
+                self.lease(run_id, self.fences[run_id], float(held["expires"])),
                 if_version=meta.version,
             )
         except CHANGED as error:
@@ -564,7 +605,7 @@ class Executor:
             run_id: The run.
         """
         try:
-            meta = self.hold(run_id)
+            meta = self.hold(run_id)[1]
             self.store.delete(
                 self.base(run_id) + "lock", if_version=meta.version
             )
@@ -1144,8 +1185,8 @@ class Executor:
                 key,
                 upstream,
                 self.store,
-                self.clock(),
-                self.clock,
+                self.timer(),
+                self.timer,
                 run_spent=run_spent + total,
                 run_budget=self.workflow.cost_budget,
             )
