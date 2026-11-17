@@ -1,6 +1,6 @@
 # When things go wrong
 
-SCMLE refuses, blocks and warns on purpose. A refusal is the tool doing its
+SCMLE stops and warns on purpose. When it stops you, the tool is doing its
 job. This page lists what you can hit, in the order you are likely to meet it.
 For each: what you see, what it means, why it exists, and what to do.
 
@@ -18,8 +18,10 @@ Words you do not know are in the [glossary](GLOSSARY.md).
 | Exit code | Meaning |
 | --- | --- |
 | 0 | it worked |
-| 1 | something failed: a bad option, bad data, a bad file, a refused bundle, a failed check |
+| 1 | something failed: an invalid setting, bad data, a bad file, a refused bundle, a failed check |
 | 2 | **blocked**: SCMLE stopped on purpose before doing harm; also `deploy gate` refusing a release and `frame` refusing a draft |
+| 64 | the command line itself is wrong: an unknown command or option, or a missing argument |
+| 70 | an unexpected error inside SCMLE (a bug); the message begins with `internal error` |
 
 Check with `echo $?` right after the command. Messages begin with
 `blocked:` or with a category such as `config error:`, `data error:`,
@@ -94,7 +96,7 @@ says so on the first lines and on the last line, and withholds the word
 * The value is known and you can say who vouches for it: write an attestation
   (format and worked example in [Leakage](LEAKAGE.md)). Attestations are read in
   charter runs.
-* You cannot settle it: do not rely on the score, or use `--leakage-policy
+* Nobody can settle it: do not rely on the score, or use `--leakage-policy
   block`.
 
 ### Leakage block (Seen)
@@ -109,9 +111,10 @@ suspiciously well, or whose "is it recorded?" pattern gives the answer away.
 The names are the suspects. A name repeats when more than one test flagged it.
 **Why it exists.** A leaked column makes a model look wonderful and then fail,
 and a warning is easy to miss. `block` turns the suspicion into a stop. It is
-not the default because the screen cannot tell a leak from a strong, legitimate
-column (see [Leakage](LEAKAGE.md)); it flags legitimate measurements too.
-Use `block` when you cannot attest where each value comes from, or in regulated
+not the default because the screen has no way to tell a leak from a strong,
+legitimate column (see [Leakage](LEAKAGE.md)), so it can flag legitimate
+measurements too.
+Use `block` when nobody can attest where each value comes from, or in regulated
 work.
 Only checks with a measured error rate (a certificate) are allowed to block.
 **What to do.** Ask for each suspect: "Would I know this value at the moment I
@@ -147,16 +150,21 @@ Each is exit code 2 and appears as `blocked: <message>`.
 | `monotonic constraints need numeric feature columns ...` / `... not multiclass` / `no available model can enforce the monotonic constraints; install the 'boosting' extra ...` | Your `--monotonic` rule cannot be met | Fix the rule, or `pip install "scmle[boosting]"` |
 | `none of the top N candidates satisfies the serving constraints; relax the limits or allow more candidates` | Your model-size or latency limit is impossible | Relax `max_model_mb` or `max_p95_latency_ms`, or raise `--top-models` |
 | `PLANNING not approved by <reviewer>: <reason>` | A human approval checkpoint said no (Python `checkpoints=`) | Address the reason; run again |
-| `unresolved blocking curation findings` | The data checks found a blocking issue | Read the finding ids in the run's events and fix the data |
 | `admissibility quarantined every feature` (charter runs) | Every feature was kept out | Provide provenance or attestations |
 | `the charter unit '<u>' does not match the grain of the target table` | Your table has a different unit than the charter says | Fix the charter `unit` or the table |
+
+One stop that looks like a block is not one (From the code):
+`unresolved blocking curation findings: [...]` comes from the lifecycle for
+documents, images, audio, video, graphs and maps when the data checks found a blocking issue. It
+is an input error, not `blocked:`, and nothing is packaged. Read the finding
+ids and fix the data.
 
 ## A run fails or is interrupted
 
 ### `state.FAILED` or `cancelled error: interrupted`
 
 **What it means.** A run died (a crash, a Ctrl-C, a lost process, or an
-unexpected error shown as `internal: ...`).
+unexpected error shown as `internal error ...`).
 **Why it matters.** Finished trials are saved. You do not have to start over.
 **What to do.** `scmle resume runs/run_YYYYMMDD_NNN`. It reuses finished trials.
 
@@ -252,8 +260,8 @@ like this:
 
 **What it means.** Nobody told SCMLE when this column is filled in. It is
 allowed (`admit_flagged`), with a note.
-**Why it exists.** SCMLE cannot know from the numbers alone whether a column
-exists at prediction time. It says so rather than assume.
+**Why it exists.** SCMLE has no way to know from the numbers alone whether a
+column exists at prediction time. It says so rather than assume.
 **What to do.**
 
 * For a first model: nothing. Check with your own eyes that each column is
@@ -281,11 +289,14 @@ exists at prediction time. It says so rather than assume.
 }
 ```
 
-All nine keys are required. `scope` must be your charter's hash, so one
-attestation cannot be reused for another analysis. `expires` must not be before
-`date`. One attestation per column. A valid one keeps the column, marks it
-`attested` (never `confirmed`), and writes a diagnostic row in the ledger. A
-malformed file gives `config error: invalid leakage attestations: ...`
+All nine keys are required.
+`scope` must be your charter's hash, so one attestation cannot be reused for
+another analysis.
+`expires` must not be before `date`.
+One attestation per column.
+A valid one keeps the column, marks it `attested` (never `confirmed`), and
+writes a diagnostic row in the ledger.
+A malformed file gives `config error: invalid leakage attestations: ...`
 (Seen as a traceback in an earlier version; now a clean error). If the scope or
 dates do not fit, the run notes
 `attestation for '<col>' ignored: ...` and the column stays quarantined.
@@ -743,8 +754,9 @@ artifact error: manifest lacks environment, provider, source_commit, registry, m
 One of four checks failed: health, schema, inference or security. The failure
 strings (From the code) include `/readyz answered N and is not ready`, `the
 answering model is not the released model`, `the service is not reached over
-HTTPS`, `/predict with no token answered N` (it should refuse), `the refusal
-leaks a traceback`, and `a read-only token reached /predict`. Fix the service,
+HTTPS`, `/predict with no token answered N` (it should refuse), `the refusal with no
+token leaks a traceback`, and `a read-only token reached /predict: N`. Fix the
+service,
 not the test.
 
 ### `scmle deploy reconcile` exits 1

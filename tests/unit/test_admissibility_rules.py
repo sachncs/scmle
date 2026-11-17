@@ -75,6 +75,7 @@ def test_unknown_serving_availability_follows_the_mode():
 
 
 def test_strict_quarantines_every_unverified_field_permissive_flags_it():
+    # Enforces docs/READING_RESULTS.md:324.
     table = provenance.Dictionary.covering(["a", "b"], [make_field("b")])
     strict = rules.build_table(
         table, "predictive", rules.Mode.STRICT, today=DAY
@@ -106,6 +107,7 @@ def test_a_log_that_disagrees_quarantines_even_a_permissive_run():
 
 
 def test_suspicion_without_as_of_evidence_quarantines_only_when_gating():
+    # Enforces docs/READING_RESULTS.md:324.
     record = unverified()
     off = rules.forecastable(record, rules.Mode.PERMISSIVE, suspect=True)
     on = rules.forecastable(

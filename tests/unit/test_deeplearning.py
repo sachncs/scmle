@@ -199,6 +199,7 @@ def test_serving_limits_are_checked_for_a_pytorch_candidate(
 
 
 def test_the_framework_process_never_imports_torch():
+    # Enforces docs/DEPENDENCIES.md:34.
     program = textwrap.dedent(
         """
         import sys

@@ -236,6 +236,7 @@ def test_a_code_change_makes_the_certificate_stale_and_blocks_gating():
 
 
 def test_a_detector_without_a_certificate_cannot_be_marked_gating():
+    # Enforces docs/GLOSSARY.md:425.
     store = certificates.Store()
     assert store.state("d1", HASH_A) is certificates.Freshness.MISSING
     with pytest.raises(certificates.CertificateError, match="no certificate"):
@@ -266,6 +267,8 @@ def test_add_replaces_the_entry_with_the_same_key():
 
 
 def test_descriptive_status_demotes_blocking_decisions():
+    # Enforces docs/GLOSSARY.md:425-426.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:144.
     descriptive = certificates.Authority.DESCRIPTIVE
     gating = certificates.Authority.GATING
     decision = qualification.Decision

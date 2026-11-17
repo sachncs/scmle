@@ -203,6 +203,7 @@ def leaky_frame(binary_frame):
 def test_a_charter_run_writes_the_admissibility_artifacts(
     binary_frame, tmp_path
 ):
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:248.
     result = run(binary_frame, tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
 
@@ -281,6 +282,7 @@ def test_a_stale_certificate_no_longer_keeps_a_suspect_field(
 def test_a_valid_attestation_keeps_a_certified_suspect_and_is_ledgered(
     binary_frame, tmp_path
 ):
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:297.
     attestation = {
         "column": "echo",
         "lead_seconds": 60.0,
@@ -368,6 +370,7 @@ RICH_MULTIVERSE = (
 def test_a_charter_run_writes_valid_stability_and_shift_reports(
     binary_frame, tmp_path
 ):
+    # Enforces docs/ARTIFACTS.md:37.
     import scmle.data.robustness.report
 
     result = run(binary_frame, tmp_path, inscribe(tmp_path))
@@ -417,6 +420,7 @@ def test_survivors_are_rerun_over_the_declared_multiverse(
 def test_a_reference_sample_gives_a_pass_or_fail_never_unverifiable(
     binary_frame, tmp_path
 ):
+    # Enforces docs/ARTIFACTS.md:37.
     reference = tmp_path / "reference.csv"
     binary_frame.drop(columns="y").head(200).to_csv(reference, index=False)
     result = run(
@@ -495,6 +499,7 @@ def test_a_charter_without_rules_is_reported_as_not_chartered(
 
 
 def test_a_specification_that_contradicts_the_chartered_rule_is_refused():
+    # Enforces docs/CLI.md:76.
     from scmle.core import stages
 
     assert stages.governing("x", "by", None, "by") == "by"
@@ -507,6 +512,7 @@ def test_a_specification_that_contradicts_the_chartered_rule_is_refused():
 def test_the_summary_and_report_put_leaks_and_findings_first(
     binary_frame, tmp_path
 ):
+    # Enforces docs/BEGINNER_FINDINGS.md:28.
     result = run(leaky_frame(binary_frame), tmp_path, leakage_policy="warn")
 
     assert "PROVISIONAL: 1 flagged column(s) not attested: echo" in (

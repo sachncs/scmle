@@ -49,9 +49,11 @@ meaning at the top level (`Project(...)` and the snapshot in
 `tests/fixtures/public_api.json` are unchanged); what blocks is now a typed
 result, `Portrait.blockers`, from the permutation screen in
 `scmle.data.admissibility.screen`. Behaviour changes that users may notice:
-blocking needs a passing certificate for the mechanism (binary
-classification only; regression and multiclass targets get warnings with
-p-values), the screen also reports a value recorded only for some outcomes
+in a run every suspect may block, for binary, multiclass and regression
+targets alike, whatever the state of the certificates, which are evidence
+and decide nothing (an earlier version blocked only on a mechanism with a
+passing certificate, which was binary classification alone), the screen
+also reports a value recorded only for some outcomes
 when most rows are blank, and `Portrait` gained the optional field
 `leakage` (default empty) and its `to_dict` key. The fingerprint keeps its
 keys: `target_association` is still computed as a descriptive statistic with

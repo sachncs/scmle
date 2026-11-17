@@ -53,6 +53,7 @@
 * **Licenses:** the project is Apache-2.0. CI traverses the installed base
   runtime dependency closure and publishes `dependency-licenses.json`. A
   missing license record or copyleft license (`GPL`, `LGPL`, `AGPL`, `SSPL`,
-  `BUSL`, or Elastic) fails the security job. Optional extras must be audited
-  in the environment where they are enabled before a release claim includes
-  them; review before adding any copyleft package to an extra.
+  `BUSL`, or Elastic) fails the security job. A second CI job installs every
+  optional extra and runs the same audit and license check there, so a
+  vulnerable or copyleft package in an extra fails the build too; review
+  before adding any copyleft package to an extra.

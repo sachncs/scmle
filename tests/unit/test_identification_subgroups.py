@@ -87,6 +87,7 @@ def test_a_subgroup_too_small_to_estimate_counts_in_the_family_unrejected():
 
 
 def test_subgroups_do_not_change_the_primary_estimate_or_the_tier():
+    # Enforces docs/ARTIFACTS.md:41.
     effects = {"g1": 2.0, "g2": 0.0}
     x, c = world(1500, 5, effects), world(1500, 6, effects)
     plain = go(block(), x, c)

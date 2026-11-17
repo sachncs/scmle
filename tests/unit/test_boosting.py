@@ -19,6 +19,7 @@ def test_adapters_pass_conformance_when_installed(library):
 
 
 def test_adapters_are_rejected_not_failing_when_library_missing(monkeypatch):
+    # Enforces docs/DEPENDENCIES.md:12.
     registry = scmle.models.registry.Catalog.stock()
     monkeypatch.setattr(boosters.XGBOOST, "requires", ("not_installed_pkg",))
     compatible, rejected = registry.candidates(tasks.Task.BINARY)

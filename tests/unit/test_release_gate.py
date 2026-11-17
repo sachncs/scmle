@@ -135,6 +135,7 @@ SEEDED = {
 
 @pytest.mark.parametrize("name", sorted(SEEDED))
 def test_each_seeded_live_failure_fails_its_check_only(name):
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:754.
     document, failing = SEEDED[name]
     results = named(support_release.run_live(document))
     assert not results[failing].passed
@@ -302,6 +303,8 @@ SCAN_FAILURES = {
 
 @pytest.mark.parametrize("name", sorted(SCAN_FAILURES))
 def test_missing_or_failed_pre_deploy_evidence_is_refused(name):
+    # Enforces docs/DECISIONS.md:201.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:737.
     changes, expected = SCAN_FAILURES[name]
     base = support_release.candidate("staging")
     refused(dataclasses.replace(base, **changes), expected)
@@ -443,6 +446,8 @@ def test_a_staging_record_signed_with_another_key_is_refused():
 
 
 def test_every_reason_is_reported_not_only_the_first():
+    # Enforces docs/CLI.md:152.
+    # Enforces docs/GLOSSARY.md:698.
     decision = gate.admit(
         support_release.candidate(
             "staging",

@@ -170,6 +170,7 @@ def test_revoked_tokens_subjects_and_keys_are_refused():
 
 
 def test_the_revocation_file_is_read_on_every_check_and_fails_closed(tmp_path):
+    # Enforces docs/TENANT_ISOLATION.md:66 and docs/TENANT_ISOLATION.md:84.
     clock = support_identity.Clock()
     path = tmp_path / "revoked.json"
     path.write_text(json.dumps({"tokens": []}))

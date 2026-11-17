@@ -212,6 +212,7 @@ def test_custom_tracker_is_honoured(binary_frame, tmp_path):
 def test_resume_refuses_checkpoints_computed_on_different_data(
     binary_frame, tmp_path
 ):
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:171.
     counting, canceller = Counting, Canceller
     counting.fits = canceller.fits = 0
     canceller.armed = True

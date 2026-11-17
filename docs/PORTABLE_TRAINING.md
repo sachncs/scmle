@@ -38,11 +38,13 @@ one is skipped and the one before it is used.
 Training and serving are different identities and different permissions
 (`scmle.runners.roles`). Training reads `data/`, `runs/`, `artifacts/` and
 writes `runs/`, `artifacts/`, `evidence/`; serving reads `bundles/`,
-`artifacts/` and writes `audit/`. `check_separation` refuses overlapping
-write prefixes, a training role that can write `bundles/` and a serving role
-that can write `runs/`. Workloads receive a `RoleStore` that enforces the
-training role. A job spec naming the serving identity is refused by every
-runner. Releasing a bundle is a third act, with an approval, outside both.
+`artifacts/` and writes `audit/`.
+`check_separation` refuses overlapping write prefixes, a training role that
+can write `bundles/` and a serving role that can write `runs/`.
+Workloads receive a `RoleStore` that enforces the training role.
+`Runner.run` refuses a job spec naming the serving identity before any
+attempt starts. Releasing a bundle is a third act, with an approval, outside
+both.
 
 ## Runners
 

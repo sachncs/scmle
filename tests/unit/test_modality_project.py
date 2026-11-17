@@ -38,6 +38,7 @@ class ExtensionTextAdapter(modality_lifecycle.Plaintext):
 
 def test_modality_project_runs_and_persists_all_stages(tmp_path):
     """The public project surface preserves the complete lifecycle contract."""
+    # Enforces docs/BREADTH.md:50.
     project = scmle.api.project.ModalityProject(
         text_adapter(), "test-signing-key", output_dir=tmp_path / "run"
     )

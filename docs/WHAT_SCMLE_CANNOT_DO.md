@@ -7,11 +7,11 @@ linked.
 
 ## It does not replace your judgement about the problem
 
-SCMLE cannot know:
+SCMLE has no way to know:
 
 * Whether you are predicting the right thing.
 * Whether a column will exist when you use the model. It can *suspect* a leak
-  from the numbers, never *know*. `unverified` means exactly that: nobody
+  from the numbers, but not *know* one. `unverified` means exactly that: nobody
   checked.
 * Whether the costs of your mistakes are what you wrote down.
 * Whether it is acceptable, fair or legal to use a model for this purpose.
@@ -103,15 +103,15 @@ benchmarks, which are not a head-to-head with people.
 * **No leak is proven absent.** A leakage screen that finds nothing means
   nothing was flagged, not that none exists.
 * **Calibrated uncertainty (conformal intervals and sets) holds if new data
-  resembles the calibration data.** It is not a guarantee against a changed
-  world.
+  resembles the calibration data.** It does not hold for a world that has
+  changed.
 
 ## Claims: confirmed, attested, unverified, and what each is worth
 
 * **`confirmed` is narrow.** It says a finding passed one test on sealed rows
   with a stated error allowance for the whole list. It says nothing about
   causes, about other data, or about whether the model is good.
-* **The guarantee depends on the charter being honest.** A charter written
+* **What `confirmed` is worth depends on the charter being honest.** A charter written
   after looking at the data defeats its own purpose. The signature proves
   possession of the key, not the identity of the person
   ([`CLI.md`](CLI.md)).
@@ -121,8 +121,8 @@ benchmarks, which are not a head-to-head with people.
   includes every cost, every "when is this column known", and every field a
   language model drafted.
 * **Causal claims need a named attestor for every assumption.** Without one the
-  tier is `unverified`. A held-out set alone never confirms a causal effect,
-  and `confirmed` does not say the assumptions are true. If no identification
+  tier is `unverified`. A held-out set alone never confirms a causal effect.
+  `confirmed` does not say the assumptions are true either. If no identification
   strategy fits your charter, the claim is `not_identified` and SCMLE refuses
   to produce an estimate.
 * **Custody is tamper-evident, not adversary-proof.** The sealed rows sit in a
@@ -169,7 +169,8 @@ against planted problems and is on file as a certificate. Everything else is
   cannot be detected without a randomly chosen slice of cases that bypass the
   model.
 * Retraining, challengers and calibration are Python calls, not commands. The
-  command line cannot, for example, create a signed reply or release a halt.
+  command line cannot, for example, create a signed reply (`scmle loop reply`
+  only records a reply signed elsewhere) or release a halt.
 * `scmle operate` runs the loop without a person at the keyboard, and it has
   only been tried on simulated streams. **A person approves every promotion.**
   Because the alarm missed its floors, an alarm asks a person instead of
@@ -179,8 +180,8 @@ against planted problems and is on file as a certificate. Everything else is
 
 * The built-in HTTP server is a **minimal reference server**: no encryption, no
   user accounts of its own. It refuses to listen beyond your machine unless
-  token checking is configured, and you must terminate TLS elsewhere
-  ([`SERVICE_SLO.md`](SERVICE_SLO.md)).
+  token checking is configured. It has no TLS of its own, so terminate TLS
+  elsewhere ([`SERVICE_SLO.md`](SERVICE_SLO.md)).
 * Signatures are shared-secret (HMAC). They prove "someone with this key made
   this and it has not changed". They are **not** public-key signatures, a
   transparency log, or proof of who built a model or that the build machine
@@ -206,7 +207,7 @@ with the number of numeric columns. These are the only measurements.
 * **Result.** With the default `cooperative` enforcement the peak grew by
   3.7 KB per added row, which is 15 times the table, or about 3.7 GB per
   million rows of this shape. About half of that is the operating system's
-  allocator keeping freed large blocks. With that cache off
+  allocator keeping large freed allocations. With that cache off
   (`MallocLargeCache=0`) the slope was 1.9 KB per row (8 times). The
   allocator-free figure is the one to plan with on systems that return memory
   at once; it is not known what Linux does.
@@ -219,17 +220,17 @@ with the number of numeric columns. These are the only measurements.
   project's copy 0.43 KB, the split and the profile 0.75 KB that stays for the
   whole run, and 0.7 KB of working memory in the step that peaks, a refit,
   of which 0.6 KB is scikit-learn's median imputer building masked copies of the
-  numeric block.
+  numeric columns.
 * **Not measured.** Linux, more than 100,000 rows, other model families,
   hyperparameter search, strategies and ensembles, wide text columns. Tables
   with fewer or narrower columns have a larger multiple of their own size,
-  because the numeric block is rebuilt as float64.
+  because the numeric columns are copied again as float64.
   `tests/unit/test_memory_growth.py` fails if the slope rises above 22 times
   the table.
 
 ## Deployment has not been proven end to end
 
-* The package has **never been run against a hosted platform**. The release
+* The package has **not been run against a hosted platform**. The release
   gate and the release registry are tested against recorded answers, scripted
   runtimes and local processes. How a model reaches a runtime is the user's
   own adapter.
@@ -266,4 +267,4 @@ with the number of numeric columns. These are the only measurements.
 | The deployment steps are tested on a real platform | They are tested on mocks and local processes only |
 | SCMLE chose the right metric | It chose a default. Check it |
 | Signing means trusted | Signing proves the key, not the person |
-| The tool will tell me my target is wrong | It cannot see what your target means |
+| The tool will tell me my target is wrong | It does not know what your target means |

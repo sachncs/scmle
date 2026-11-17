@@ -6,6 +6,7 @@ from scmle.deploy import demo
 
 
 def test_the_native_demo_passes_every_step(tmp_path, capsys):
+    # Enforces docs/LOCAL.md:27.
     transcript = demo.run(tmp_path / "demo")
     capsys.readouterr()
     names = [step.name for step in transcript.steps]

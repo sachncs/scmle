@@ -94,6 +94,7 @@ def test_the_profiler_passes_the_projects_budget_and_warns_first():
 
 
 def test_an_incomplete_screen_is_in_summary_report_log_and_plan(tmp_path):
+    # Enforces docs/LEAKAGE.md:169 and docs/LEAKAGE.md:175.
     result = support.make_project(
         wide(), "y", output_dir=tmp_path, time_budget=SMALL_BUDGET
     ).run()
@@ -117,6 +118,8 @@ def test_an_incomplete_screen_is_in_summary_report_log_and_plan(tmp_path):
 
 
 def test_block_refuses_an_unchecked_screen_and_warn_proceeds(tmp_path):
+    # Enforces docs/ARCHITECTURE.md:131.
+    # Enforces docs/LEAKAGE.md:175.
     with pytest.raises(errors.BlockedError, match="NOT RUN") as raised:
         support.make_project(
             wide(),

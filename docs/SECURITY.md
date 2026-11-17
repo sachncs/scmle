@@ -56,9 +56,10 @@ operating-system user, a service, or a write-once object store. Do not describe
 a confirmation set as sealed beyond this.
 
 Accepted limit, recorded 2026-11-04: the caller's copy of the data (item C3)
-stays. The library cannot delete a DataFrame or file that its caller holds.
+stays. The library does not delete a DataFrame or file that its caller holds.
 The option that would close it is a CLI that reads the file inside the
-orchestrator and never returns the full frame to the caller; it is not built.
+orchestrator and does not return the full frame to the caller; it is not
+built.
 
 ### What is tested about custody, and what is not
 
@@ -83,8 +84,8 @@ listed in `tests/unit/MUTANTS_custody.md`.
    verify the new key before retiring the old one. Maintain the corresponding
    `Keyring` record and transition it to `retired` only after
    parity is confirmed.
-3. Never pass `trusted=True` (or `scmle predict --trusted`) for a bundle you
-   did not produce.
+3. Pass `trusted=True` (or `scmle predict --trusted`) only for a bundle you
+   produced yourself.
 4. Serve behind an authenticating gateway; bind to loopback by default.
 5. Treat the model registry directory as a trust boundary: it is read with
    `trusted=True` after checksum verification at registration time.

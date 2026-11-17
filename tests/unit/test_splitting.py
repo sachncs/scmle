@@ -51,6 +51,7 @@ def test_stratified_preserves_ratio_and_is_disjoint(frame):
 
 
 def test_group_split_has_no_group_overlap(frame):
+    # Enforces docs/GLOSSARY.md:238.
     result = split(frame, make_spec(group_column="g"))
     manifest = result.manifest
     assert manifest.strategy == "group"
@@ -63,6 +64,7 @@ def test_group_split_has_no_group_overlap(frame):
 
 
 def test_temporal_split_respects_order(frame):
+    # Enforces docs/GLOSSARY.md:252.
     shuffled = frame.sample(frac=1, random_state=1).reset_index(drop=True)
     manifest = split(shuffled, make_spec(time_column="t")).manifest
     times = shuffled.t
@@ -77,6 +79,8 @@ def test_temporal_split_respects_order(frame):
 
 
 def test_temporal_with_unparseable_time_blocks(frame):
+    # Enforces README.md:132.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:147.
     broken = frame.assign(t=frame.t.astype(str))
     broken.loc[3, "t"] = "not a date"
     with pytest.raises(errors.BlockedError, match="ambiguous"):
@@ -84,6 +88,7 @@ def test_temporal_with_unparseable_time_blocks(frame):
 
 
 def test_group_split_blocks_with_few_groups(frame):
+    # Enforces README.md:132.
     few = frame.assign(g=frame.index % 3)
     with pytest.raises(errors.BlockedError, match="groups"):
         split(few, make_spec(group_column="g"))
@@ -97,6 +102,7 @@ def test_manifest_is_deterministic(frame):
 
 
 def test_tiny_minority_class_blocks(frame):
+    # Enforces README.md:132.
     rare = frame.assign(y=0)
     rare.loc[0, "y"] = 1
     with pytest.raises(errors.BlockedError):

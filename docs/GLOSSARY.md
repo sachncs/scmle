@@ -36,7 +36,7 @@ you would not have at prediction time is a leak (see below).
 columns (one fact about each thing).
 **Example.** 1309 rows and 10 columns.
 **Why it matters.** The unit of a row ("one passenger", "one customer-month")
-decides how you must split the data. See "grouping" in
+decides how the data should be split. See "grouping" in
 [Decisions](DECISIONS.md).
 
 ### task
@@ -95,7 +95,7 @@ deserves suspicion.
 **Meaning.** The share of predictions that are right.
 **Example.** 0.824: 82 of every 100 passengers guessed right.
 **Why it matters.** It misleads when one answer is rare. If 1 in 100 cases is
-fraud, a model that says "never fraud" is 99 percent accurate and useless.
+fraud, a model that answers "not fraud" every time is 99 percent accurate and useless.
 
 ### precision and recall
 
@@ -142,7 +142,7 @@ overlap are not clearly different.
 about 80 percent should happen.
 **Example.** In our run the model said 0.14 for a group where 0.10 lived: close.
 **Why it matters.** If you act on the number ("call everyone above 70 percent")
-it must mean what it says. Check `diagnostics/calibration.json`.
+it needs to mean what it says. Check `diagnostics/calibration.json`.
 
 ### threshold (cut-off)
 
@@ -163,8 +163,8 @@ false alarms you raise. Choose it from the cost of each mistake, not from habit.
 
 **Meaning.** The rows the model learns from.
 **Example.** 1093 of our 1309 rows.
-**Why it matters.** The model will always look good on rows it has already
-seen. Those scores say nothing about the future.
+**Why it matters.** A model usually looks better on rows it has already seen
+than on new ones. Those scores say nothing about the future.
 
 ### held-out data (exam rows, test set)
 
@@ -221,8 +221,8 @@ is `warn`); the score is labelled provisional until a person settles it. See "un
 values really are known at prediction time.
 **Example.** Two of the 30 breast-cancer measurements (`worst radius` and
 `worst area`) when the whole table is screened.
-**Why it matters.** The screen cannot avoid them, because a strong honest
-predictor and a leak look alike in the data. See [Leakage](LEAKAGE.md).
+**Why it matters.** No screen can tell them from leaks every time, because a
+strong honest predictor and a leak look alike in the data. See [Leakage](LEAKAGE.md).
 
 ### provisional
 
@@ -235,7 +235,8 @@ predictor and a leak look alike in the data. See [Leakage](LEAKAGE.md).
 **Meaning.** How rows are divided into practice and exam parts.
 **Example.** `stratified`: each part keeps the same share of survivors.
 **Why it matters.** A wrong split lets exam information leak into practice.
-Related rows must stay on the same side (see "group" and "time order").
+Related rows must stay on the same side: given a group column, SCMLE keeps
+each group on one side (see "group" and "time order").
 
 ### group, grouping
 
@@ -248,8 +249,8 @@ effectively seen the exam. Scores come out too high.
 
 **Meaning.** Training on the past and testing on the future.
 **Example.** `--time-column event_time`.
-**Why it matters.** Shuffled rows let the model learn from the future. A model
-for the future must be tested on the future.
+**Why it matters.** Shuffled rows let the model learn from the future. Given a
+time column, SCMLE never trains on rows later than the rows it tests on.
 
 ### dataset fingerprint
 
@@ -270,7 +271,7 @@ budget makes the search depend on computer speed.
 ## Charter, custody and claims
 
 These words belong to the careful, "pre-registered" way of working. You can
-build your first model without them. You need them when someone must be able
+build your first model without them. You need them when someone needs to be able
 to trust a finding, not just a model.
 
 ### charter
@@ -289,7 +290,7 @@ answer. A change to even one byte breaks its signature. Create one with
 **Meaning.** The exact thing you are estimating: who, what, when and how it is
 summarised.
 **Example.** Population "passengers", target "survived", moment "at boarding".
-**Why it matters.** Vague questions give answers that cannot be checked.
+**Why it matters.** Vague questions give answers that nobody can check.
 
 ### custody (X, C and F)
 
@@ -300,7 +301,7 @@ have decided what to test. **F** is the forward-in-time set, for data with
 dates: the newest rows, kept for a final check.
 **Example.** In the Titanic charter run, 819 rows were X and 273 were C.
 **Why it matters.** Anything you find by looking is at risk of being luck.
-Testing it once on rows you never looked at is the only way to know. The seal
+Testing it once on rows you have not looked at is the only way to know. The seal
 is held in a separate helper program so ordinary code cannot read C.
 
 ### final test set
@@ -308,8 +309,8 @@ is held in a separate helper program so ordinary code cannot read C.
 **Meaning.** The exam rows used to score the finished model (F for data with
 dates).
 **Example.** 216 rows.
-**Why it matters.** It is separate from C, so a confirmed finding never shapes
-the model that is scored.
+**Why it matters.** It is separate from C, and the model is trained on X
+alone, so the confirmation set never shapes the model that is scored.
 
 ### hypothesis ledger
 
@@ -355,14 +356,14 @@ not, so they fit monitoring over time.
 **Meaning.** A finding that survived exploration on X and was then tested once
 on C.
 **Example.** "fare is associated with survival", effect 0.344, confirmed.
-**Why it matters.** Only claims, not hunches, carry the error guarantee. List
-them with `scmle claims list`.
+**Why it matters.** The charter's limit on false findings covers claims, not
+hunches. List them with `scmle claims list`.
 
 ### tier (confirmed, attested, unverified)
 
 **Meaning.** A label on every claim saying how much evidence stands behind it.
 `confirmed`: it passed the one-time test on fresh rows. `attested`: a named
-person vouched for a fact the data cannot show (for example, "this column is
+person vouched for a fact the data does not show (for example, "this column is
 known before the outcome"). `unverified`: SCMLE used a default and nobody has
 checked it.
 **Example.** In the Titanic charter run, the three claims are `confirmed`; the
@@ -375,12 +376,12 @@ not an error. It is an honest "nobody has checked this yet". See
 
 ### attestation (attestor)
 
-**Meaning.** A signed statement by a named person about something data cannot
-prove.
+**Meaning.** A signed statement by a named person about something the data
+alone does not prove.
 **Example.** "I confirm that column `fare` is known at boarding."
 **Why it matters.** It moves a claim from `unverified` to `attested`, and
-makes a person responsible. SCMLE refuses an attestation signed with a key the
-system itself holds.
+makes a person responsible. In the closed loop, SCMLE refuses an attestation
+signed with a key the system itself holds.
 **Attestor.** The person or role who signs. For a causal claim the charter
 names the attestors in advance and says which assumption each may vouch for;
 a statement from anyone else, for another charter, past its expiry date, or
@@ -421,13 +422,16 @@ fooling you.
 **Meaning.** A measured record of how often a check is wrong, tested on data
 with planted problems.
 **Example.** The leakage screen used a certified detector.
-**Why it matters.** Only a check with a passing certificate may block a run. Any
-other check is shown but never stops anything ("descriptive").
+**Why it matters.** Only a detector or test with a passing certificate may
+block a run. Any other one is shown but never stops anything ("descriptive").
+The leakage screen is the exception: its false-alarm rate is bounded by its
+construction, so it may block without one.
 
 ### gate
 
 **Meaning.** A check that can stop a run or a release.
-**Example.** The leakage block.
+**Example.** The leakage screen stopping a run when `leakage_policy` is
+`block`.
 **Why it matters.** A gate is a decision, so it is only allowed to use checks
 whose error rates are known.
 
@@ -435,7 +439,7 @@ whose error rates are known.
 
 **Meaning.** Output that informs but does not decide anything.
 **Example.** A shift report that says "unverifiable".
-**Why it matters.** Do not treat descriptive output as a guarantee.
+**Why it matters.** Descriptive output is information, not a promise.
 
 ### conformal (prediction sets and intervals)
 
@@ -581,7 +585,8 @@ a reference profile for monitoring, and a manifest of file checksums.
 
 **Meaning.** The list of columns and types the model expects.
 **Example.** `pclass, sex, age, sibsp, parch, fare, embarked`.
-**Why it matters.** Wrong columns are refused, not guessed.
+**Why it matters.** Missing or misnamed columns are refused, not guessed;
+extra columns are ignored and reported.
 
 ### checksum (digest, hash)
 
@@ -596,7 +601,7 @@ and it changes.
 that the content is unchanged and was stamped by a key holder.
 **Example.** `signature.json` in the bundle.
 **Why it matters.** Bundles can run code when opened, so SCMLE refuses an
-unsigned one. A signature proves the key, not the person; it is not a public
+unsigned one unless you pass `--trusted`. A signature proves the key, not the person; it is not a public
 certificate.
 
 ### pickle, trusted
@@ -604,7 +609,7 @@ certificate.
 **Meaning.** Pickle is the file format of the model. Opening one can run code.
 `--trusted` tells SCMLE "I made this myself; open it anyway".
 **Example.** `scmle predict ... --trusted`.
-**Why it matters.** Never use `--trusted` on a model from someone else. It is
+**Why it matters.** Use `--trusted` only on a model you made yourself. It is
 refused outright when `SCMLE_ENV=production`.
 
 ### SBOM (software bill of materials)
@@ -619,8 +624,9 @@ whether you are exposed.
 **Meaning.** A signed record of where something came from and what it was made
 of.
 **Example.** `provenance.json` lists the bundle digest and build files.
-**Why it matters.** The service checks it at start-up. A package without a
-valid one never becomes ready.
+**Why it matters.** The service checks it at start-up. In production a package
+without a valid one never becomes ready; elsewhere a missing one is allowed,
+but one that does not match the package is refused.
 
 ### registry
 
@@ -718,6 +724,8 @@ production readiness.
 
 **Meaning.** The environment variable holding your secret signing key.
 **Example.** `export SCMLE_SIGNING_KEY=...`
-**Why it matters.** Without it signed bundles cannot be opened. Keep it out of
+**Why it matters.** Without it (or a key file named by
+`SCMLE_SIGNING_KEY_FILE`) a signed bundle is refused unless you pass
+`--trusted`. Keep it out of
 files and chat. Keys are read from files, not typed on a command line, in the
 `deploy` commands.

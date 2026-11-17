@@ -49,6 +49,7 @@ def test_applying_is_journalled_as_intent_then_applied(world):
 
 
 def test_a_malformed_file_is_rejected_once_and_escalated(world):
+    # Enforces docs/AUTONOMY.md:35.
     world.deliver(0, corrupt=True)
     world.deliver(1)
     controller = world.controller()

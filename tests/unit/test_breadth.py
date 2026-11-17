@@ -191,6 +191,7 @@ def test_an_extension_adapter_never_inherits_supported():
 
 
 def test_only_the_contract_module_can_name_a_supported_modality():
+    # Enforces docs/BREADTH.md:50.
     named = []
     for path in (ROOT / "scmle").rglob("*.py"):
         text = path.read_text(encoding="utf-8")

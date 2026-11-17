@@ -1392,6 +1392,7 @@ def test_lifecycle_compares_against_a_repeated_performance_baseline(
 
 
 def test_blocking_geospatial_curation_stops_before_packaging(tmp_path: Path):
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:156-160.
     """Missing CRS evidence blocks before a model or package is created."""
     features = tuple(
         geospatial.Placemark(

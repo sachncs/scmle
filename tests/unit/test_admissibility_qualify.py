@@ -52,6 +52,7 @@ def test_the_shipped_stores_are_found_from_a_checkout():
 def test_without_detector_certificates_only_the_screen_gates(tmp_path):
     # The detectors still need their certificates; the leakage screen does
     # not, because its false alarms are bounded by construction (ERR-1).
+    # Enforces docs/GLOSSARY.md:427.
     features, target = leaky()
 
     found = qualify.run(

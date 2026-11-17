@@ -49,6 +49,7 @@ def suspects(report):
 
 @pytest.mark.parametrize("seed", range(4))
 def test_within_fold_auc_matches_sklearn_per_fold(seed):
+    # Enforces docs/ARCHITECTURE.md:112.
     rng = numpy.random.default_rng(seed)
     n = 120
     truth = rng.integers(0, 2, n)
@@ -124,6 +125,7 @@ def test_constant_column_has_a_single_basis_column():
 
 
 def test_permutations_stay_inside_their_strata():
+    # Enforces docs/LEAKAGE.md:212.
     strata = numpy.repeat([0, 1, 2], [5, 7, 3])
     rng = numpy.random.default_rng(0)
     index = screen.permute(strata, 50, rng)
@@ -142,6 +144,7 @@ def test_permutations_are_global_with_one_stratum():
 
 
 def test_strata_follow_groups_blocks_or_nothing():
+    # Enforces docs/ARCHITECTURE.md:112.
     assert screen.stratify(6, None, None).tolist() == [0] * 6
     assert screen.stratify(6, None, 2).tolist() == [0, 0, 1, 1, 2, 2]
     groups = numpy.array(["b", "a", "b", "a"])
@@ -182,6 +185,7 @@ def test_purity_bound_counts_groups_not_rows_when_grouped():
 
 
 def test_chi_square_rows_match_scipy():
+    # Enforces docs/ARCHITECTURE.md:112.
     rng = numpy.random.default_rng(3)
     missing = rng.random(90) < 0.3
     labels = rng.integers(0, 3, 90)
@@ -222,6 +226,7 @@ def test_a_strong_legitimate_predictor_is_significant_but_not_a_suspect():
 
 
 def test_the_family_counts_every_column_and_every_mechanism():
+    # Enforces docs/ARCHITECTURE.md:112.
     frame = world(2, columns=3)
     frame.loc[::4, "x0"] = numpy.nan
     report = run(frame)
@@ -236,6 +241,7 @@ def test_the_family_counts_every_column_and_every_mechanism():
 
 
 def test_by_decisions_equal_the_exact_adjustment_of_the_reported_p_values():
+    # Enforces docs/ARCHITECTURE.md:124.
     frame = world(3).assign(leak=lambda f: f.y + 0.0)
     report = run(frame)
     ps = [f.p_value if f.complete else 1.0 for f in report.findings]
@@ -290,6 +296,7 @@ def test_a_noisy_copy_and_a_threshold_rule_are_suspects():
 
 
 def test_a_value_recorded_only_for_one_class_is_a_suspect():
+    # Enforces docs/ARCHITECTURE.md:112.
     rng = numpy.random.default_rng(7)
     frame = world(7, n=400)
     frame["body"] = numpy.where(
@@ -426,6 +433,8 @@ def test_subsample_keeps_groups_whole_and_time_order():
 
 
 def test_the_global_null_is_flagged_no_more_often_than_alpha():
+    # Enforces docs/ARCHITECTURE.md:124.
+    # Enforces docs/LEAKAGE.md:212.
     significant = 0
     worlds = 60
     for seed in range(worlds):
@@ -459,6 +468,7 @@ def test_the_shipped_certificates_are_current_for_every_kind():
 
 
 def test_a_table_where_every_plant_is_found_gates_every_mechanism():
+    # Enforces docs/LEAKAGE.md:214.
     report = probed(world(20))
     assert report.probe == dict.fromkeys(plants.DEFECTS, True)
     assert set(report.gates) == set(screen.MECHANISM_DEFECTS)
@@ -472,6 +482,7 @@ def test_too_few_rows_say_what_the_screen_would_miss():
 
 
 def test_a_missed_plant_is_reported_and_a_suspect_still_blocks(monkeypatch):
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:154.
     found = {**dict.fromkeys(plants.DEFECTS, True), "leak_threshold": False}
     monkeypatch.setattr(screen, "probe", lambda *a, **k: found)
     report = probed(world(20).assign(leak=lambda f: f.y + 0.0))
@@ -480,6 +491,7 @@ def test_a_missed_plant_is_reported_and_a_suspect_still_blocks(monkeypatch):
 
 
 def test_a_stale_certificate_is_reported_and_does_not_decide(monkeypatch):
+    # Enforces docs/LEAKAGE.md:212.
     monkeypatch.setattr(screen, "code_digest", lambda: "0" * 64)
     report = probed(world(20))
     assert "published certificate for binary targets: stale" in report.notes
@@ -498,6 +510,8 @@ def test_a_column_named_like_a_plant_is_refused():
 
 
 def test_without_gates_a_suspect_warns_and_cannot_block():
+    # Enforces docs/ARCHITECTURE.md:138.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:119.
     frame = world(19).assign(leak=lambda f: f.y + 0.0)
     report = run(frame)
     (found,) = report.suspects
@@ -509,6 +523,7 @@ def test_without_gates_a_suspect_warns_and_cannot_block():
 
 
 def test_with_probed_gates_a_suspect_blocks():
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:119.
     frame = world(20).assign(leak=lambda f: f.y + 0.0)
     report = probed(frame)
     assert [f.feature for f in report.blocking] == ["leak"]
@@ -544,6 +559,7 @@ def test_screen_table_orders_by_time_and_respects_groups():
 
 
 def test_r2_matches_sklearn_for_the_observed_regression_fit():
+    # Enforces docs/ARCHITECTURE.md:112.
     rng = numpy.random.default_rng(23)
     n = 200
     x = rng.normal(size=n)

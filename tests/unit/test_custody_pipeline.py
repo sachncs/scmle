@@ -60,6 +60,7 @@ def run(frame, charter=None, spec=None):
 
 
 def test_three_sets_partition_every_row_and_c_is_sealed():
+    # Enforces docs/GLOSSARY.md:312.
     frame = make_frame()
     outcome, original, vault = run(frame)
     manifest = outcome.manifest
@@ -84,6 +85,7 @@ def test_three_sets_partition_every_row_and_c_is_sealed():
 
 
 def test_the_development_data_is_exploration_only():
+    # Enforces docs/GLOSSARY.md:312.
     frame = make_frame()
     ran = run(frame)
     outcome, vault = ran.outcome, ran.vault

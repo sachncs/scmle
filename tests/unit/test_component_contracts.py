@@ -138,6 +138,7 @@ def run_isolated(code):
 
 def test_registering_and_planning_never_imports_optional_libraries():
     """Spec: a registry entry must not import GPU / heavy dependencies."""
+    # Enforces docs/DEPENDENCIES.md:8.
     result = run_isolated(
         """
         import sys
@@ -156,6 +157,7 @@ def test_registering_and_planning_never_imports_optional_libraries():
 
 
 def test_a_model_is_imported_only_when_it_is_built():
+    # Enforces docs/DEPENDENCIES.md:8.
     pytest.importorskip("lightgbm")
     result = run_isolated(
         """

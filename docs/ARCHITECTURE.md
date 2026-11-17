@@ -56,9 +56,11 @@ tracking database.
   the single release of the test set (`test.opened`).
 * **Data-access ledger** (`diagnostics/data_access.json`) states what every
   fitted operation could see and *verifies* it against the split manifest.
-* **Resource governor** applies CPU / time / memory limits (every trial supervised in its own
-  process, killed at a hard time ceiling or memory limit) and
-  reports, per limit, how it was enforced and what was observed.
+* **Resource governor** applies CPU / time / memory limits and reports, per
+  limit, how it was enforced and what was observed. Under the default
+  `enforcement="hard"` every trial runs supervised in its own process and is
+  killed at a hard time ceiling or memory limit; `enforcement="cooperative"`
+  only stops new trials from starting.
 * **Replay verification** (`Project.verify_replay`) classifies a rerun as
   `exact`, `comparable` or `different`.
 
@@ -71,13 +73,14 @@ universal statement. Rows are pulled only by `profile.untorn`, which
 needs a total order and rejects a read whose snapshot token or rows changed.
 Another table is read only through `asof_view.View.visible`, which
 returns rows recorded at or before the target row's cutoff; `synthesize`
-imports no connector or reader and never sees a frame. What the view cannot
-know is whether the recorded time is true, so every feature carries the
-weakest tier among the tables it reads. Keys, links and entity matches are
-statements about the snapshot read, with their measures; an unlabelled entity
-resolution is `unverified`. A charter run with an `ingest` block calls it
-(`scmle.core.ingest_stage`); when the block carries an `entity` sub-block the
-resolved entity becomes the split's group column.
+imports no connector or reader, so it never reads a table except through a
+view. What the view cannot know is whether the recorded time is true, so
+every feature carries the weakest tier among the tables it reads. Keys,
+links and entity matches are statements about the snapshot read, with their
+measures; an unlabelled entity resolution is `unverified`. A charter run with
+an `ingest` block calls it (`scmle.core.ingest_stage`); when the block
+carries an `entity` sub-block the resolved entity becomes the split's group
+column.
 The charter run reads SQLite only (`ingest_plan.opener`); another
 SQL backend is open. DuckDB would run locally without a server, but it is not
 a dependency or a CI extra, so none was added.
@@ -121,14 +124,20 @@ legitimate predictors are significant.
 Guaranteed: under the null of no association, and conditional on the model and
 fold choices, the chance of any false alarm is at most `alpha`, and the false
 discovery rate of the significant list is at most `alpha` under arbitrary
-dependence between columns. Not guaranteed: telling a legitimate strong
-predictor from a leak (that needs provenance), power below the ceiling,
-detection of leaks that need several columns together. `leakage_policy="block"` (opt-in; the default is `warn`)
-blocks only suspects whose mechanism has a current, passing certificate
-(`scmle/data/admissibility/screen_certificates.json`, produced by
-`python -m benchmarks.qualification.screen_certify --write`); a regression or
-multiclass target, or any change of the settings, makes the screen descriptive:
-the suspect is reported with its p-values as a warning and nothing is blocked.
+dependence between columns. The screen does not tell a legitimate strong
+predictor from a leak (that needs provenance), has little power below the
+ceiling, and does not see a leak that needs several columns together.
+
+`leakage_policy="block"` (opt-in; the default is `warn`) blocks the run on any
+suspect, and on a screen that could not check its columns. The published
+certificates (`scmle/data/admissibility/screen_certificates.json`, produced by
+`python -m benchmarks.qualification.screen_certify --write`) are evidence
+about the screen, reported in the notes; they decide nothing. Each run also
+screens a copy of its rows with one planted leak of each kind and records
+which plants were found, so a clean result says which kinds of leak it would
+have missed. Called directly (`screen.screen`, without gates), the screen is
+descriptive: a suspect is reported with its p-values as a warning and nothing
+is blocked.
 The result is in `dataset_profile.json` under `leakage`.
 
 ## Extension points and polymorphism
@@ -158,8 +167,10 @@ decision boundary, not merely rename a function call.
 | a serving surface | `Server` | direct use |
 | a workflow stage | `Stage` | `Orchestrator(stages=...)` |
 
-Third-party model adapters must pass
-`scmle.models.conformance.comply`.
+An adapter from the `scmle.models` entry point, or an estimator added with
+`register_estimator`, must pass `scmle.models.conformance.comply` or it is
+not registered. `Catalog.register` does not run the check; call `comply`
+yourself on an adapter you register that way.
 
 ## Conventions
 
@@ -204,7 +215,8 @@ journal or run directory are not coordinated (SQLite and `os.replace` keep
 single files intact, but a read-modify-write can still lose an update).
 `Understudy` and `Keyring` are thread safe; the
 `Embedder` cache and `optuna` verbosity live in worker or global state that
-only a single caller drives. One `Context` must not be used by two
-threads. Registry locks are never held while a user estimator runs, but a
-`Maintainer.review` holds its state lock for the whole retrain.
+only a single caller drives. One `Context` is not safe to share between
+two threads: give each thread its own. Registry locks are never held while a
+user estimator runs, but a `Maintainer.review` holds its state lock for the
+whole retrain.
 

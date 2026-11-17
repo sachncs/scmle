@@ -90,6 +90,10 @@ def gate(root, stage="certify", *extra):
 def test_a_complete_release_is_certified_and_the_record_verifies(
     release, capsys
 ):
+    # Enforces docs/CLI.md:152.
+    # Enforces docs/GLOSSARY.md:696.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:21.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:771.
     root, ignored, digest = release
     assert gate(root, "admit") == cli.EXIT_OK
     capsys.readouterr()
@@ -129,6 +133,8 @@ def test_a_complete_release_is_certified_and_the_record_verifies(
 def test_evidence_that_is_not_supplied_blocks_the_release(
     release, capsys, drop
 ):
+    # Enforces docs/CLI.md:152.
+    # Enforces docs/GLOSSARY.md:696-698.
     root, manifest, ignored = release
     del manifest[drop]
     write_manifest(root, manifest)
@@ -139,6 +145,8 @@ def test_evidence_that_is_not_supplied_blocks_the_release(
 
 
 def test_an_unsigned_model_blocks_the_release(release):
+    # Enforces docs/GLOSSARY.md:698.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:22.
     root = release[0]
     path = root / "registry" / "registry.json"
     index = json.loads(path.read_text())
@@ -224,6 +232,7 @@ def test_production_with_the_staging_record_is_certified(release, capsys):
 def test_live_writes_results_and_fails_when_a_check_fails(
     release, monkeypatch, capsys
 ):
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:754.
     root, ignored, digest = release
     (root / "token").write_text("good-token\n", encoding="utf-8")
     document = support_release.recorded(digest)

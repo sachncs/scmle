@@ -43,6 +43,9 @@ def evaluation(result):
 
 
 def test_the_charter_cost_model_sets_the_threshold(binary_frame, tmp_path):
+    # Enforces docs/API_STABILITY.md:184.
+    # Enforces docs/API_STABILITY.md:187.
+    # Enforces docs/ARTIFACTS.md:39.
     path, model = charter_with_costs(tmp_path)
     result = support.make_project(
         binary_frame,
@@ -71,6 +74,7 @@ def test_the_charter_cost_model_sets_the_threshold(binary_frame, tmp_path):
 def test_a_run_without_a_decision_layer_has_no_net_benefit(
     binary_frame, tmp_path
 ):
+    # Enforces docs/API_STABILITY.md:184 and docs/API_STABILITY.md:187.
     result = support.make_project(
         binary_frame, "y", time_budget=300, output_dir=tmp_path / "out"
     ).run()

@@ -81,6 +81,7 @@ def test_a_miscalibrated_score_is_recalibrated_or_falls_back():
 
 
 def test_a_cost_that_is_not_human_lowers_the_tier():
+    # Enforces docs/ARTIFACTS.md:39.
     p, y = world(4000, 3)
     weak = costs.Tariff(
         0,

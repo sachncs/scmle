@@ -46,10 +46,10 @@ dummy baseline   : 0.5
 * **Exam score** (`test_metrics`): the winner scored once on held-out data,
   rows nobody touched. This is the fair preview.
 * **Band**: with 216 exam rows the true score could be 0.84 or 0.93. Quote the
-  band, not just the point. When the bands of two models overlap, you cannot
-  say which is better.
-* **Baseline**: the dummy model scores 0.5. Always check that you beat it by a
-  margin that matters to you.
+  band, not just the point. When the bands of two models overlap, the data do
+  not say which is better.
+* **Baseline**: the dummy model scores 0.5. Check that you beat it by a margin
+  that matters to you.
 
 A trustworthy gap between practice and exam is small, and the exam is often a
 little lower. If the exam is much lower than practice, the model memorised.
@@ -186,7 +186,7 @@ feature 'boat' is a leakage suspect: cross-fitted skill 0.973 ... This is a susp
 
 Two lessons. First, a score of 0.988 for "who survived the Titanic from a
 ticket" should have rung a bell: the real answer is not that predictable.
-Second, a flag is a suspicion and not a verdict: the data cannot say when a
+Second, a flag is a suspicion and not a verdict: the data do not show when a
 value is recorded. Settle it by declaring the column unavailable, or by
 attesting it ([Leakage](LEAKAGE.md)). If you want a hard stop instead of a
 warning, use `--leakage-policy block`.
@@ -246,7 +246,7 @@ scmle run titanic.csv --target survived --unavailable-at-prediction boat body --
 
 (Edit the file *before* you sign it: `charter sign` wraps the plan inside a
 `charter` key next to the hash and signature, so later edits must go inside
-that key and break the signature anyway.)
+that key, and then fail verification anyway.)
 
 (`charter init` writes a template that fails `check` until you fill in the
 question, population, target, prediction moment, one intercurrent event with
@@ -318,11 +318,13 @@ How to read the claims:
 | Tier | Plain meaning | Example from this run |
 | --- | --- | --- |
 | `confirmed` | Passed a one-time test on rows that were sealed from you. | the three claims above |
-| `attested` | A named person vouched for a fact the data cannot show, such as "this column is known before the outcome". | none yet in this run |
+| `attested` | A named person vouched for a fact the data do not show, such as "this column is known before the outcome". | none yet in this run |
 | `unverified` | SCMLE used a default and nobody has checked it. | every feature's availability in `admissibility_table.json`: `availability at serving is unknown` |
 
-`unverified` is not a failure, and not a block. It is an honest label: "this
-rests on an assumption nobody has checked". What to do with it is in
+`unverified` is not a failure, and on its own not a block: a run admits an
+unverified feature with a flag (`admit_flagged`). Only a leakage screen with a
+passing certificate that also suspects the feature keeps it out (`quarantine`).
+It is an honest label: "this rests on an assumption nobody has checked". What to do with it is in
 [When things go wrong](WHEN_THINGS_GO_WRONG.md).
 
 The sealed-row sizes in this run: X had 819 rows, C had 273, and the final test

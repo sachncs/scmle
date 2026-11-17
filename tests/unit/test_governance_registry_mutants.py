@@ -153,6 +153,7 @@ def test_each_signed_field_is_covered_by_the_signature():
 
 
 def test_validate_target_checks_identity_decision_independence_and_signature():
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:523.
     good = review().sign(KEY)
     good.validate("m", 1, "c" * 64, KEY)
     for args in (("x", 1, "c" * 64), ("m", 2, "c" * 64), ("m", 1, "d" * 64)):
@@ -353,6 +354,8 @@ def test_a_staging_alias_moves_without_approval_and_leaves_no_previous(
 
 
 def test_the_champion_needs_an_approval_that_names_the_exact_bundle(tmp_path):
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:521.
+    # Enforces docs/START_HERE.md:746.
     store = make_registry(tmp_path / "reg")
     with pytest.raises(
         errors.ArtifactError,

@@ -13,7 +13,7 @@ in order.
 | Every word you will meet, with an example and why it matters | [`GLOSSARY.md`](GLOSSARY.md) |
 | The questions to answer before you run (target, metric, grouping, time, costs, what not to use) | [`DECISIONS.md`](DECISIONS.md) |
 | How to read the report, the tiers and the claims; good versus suspicious results | [`READING_RESULTS.md`](READING_RESULTS.md) |
-| Every refusal, gate and alarm: what it means and what to do | [`WHEN_THINGS_GO_WRONG.md`](WHEN_THINGS_GO_WRONG.md) |
+| When a run stops, a gate fails or an alarm fires: what it means and what to do | [`WHEN_THINGS_GO_WRONG.md`](WHEN_THINGS_GO_WRONG.md) |
 | Why a leakage flag is a suspicion, with measured error rates and how to settle it | [`LEAKAGE.md`](LEAKAGE.md) |
 | What SCMLE does not do or has not proven | [`WHAT_SCMLE_CANNOT_DO.md`](WHAT_SCMLE_CANNOT_DO.md) |
 | What went wrong or was confusing when the beginner path was run | [`BEGINNER_FINDINGS.md`](BEGINNER_FINDINGS.md) |

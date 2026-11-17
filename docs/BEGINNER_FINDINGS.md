@@ -34,12 +34,12 @@ beginner has not tested these pages.
 | 12 | The charter template (`scmle charter init`) writes `"intercurrent_events": []` and does not show that an item is `{"event": ..., "strategy": ...}`. The error for a wrong key names the wrong key but not the right ones. | Reading results | Put one worked item in the template. |
 | 13 | `charter sign` rewrites the file as a wrapper (`algorithm`, `charter`, `charter_hash`, `signature`). A script that edits the charter after signing finds the fields one level deeper. | Reading results | Document the wrapper in `docs/CLI.md`. |
 | 14 | `scmle charter check --rows N` takes development rows (rows left after the exam rows). Passing the full table size gave a more cheerful verdict (327 rows) than the run itself had (273). | Reading results, Decisions | Say so in the help text, or compute the exam rows. |
-| 15 | The run's saved bundle is not signed. `scmle predict` on it refuses until you sign it by saving a copy with `signing_key=`. A beginner must write a small script for this. | Start here Step 8 | Sign during the run when `SCMLE_SIGNING_KEY` is set (the author did not test whether it already does), or add `scmle sign`. |
-| 16 | The loop commands accept files only by hand-written CSV and JSON, and a reply to an escalation can only be created from Python (`Attestation.create`). Creating a reply is the one step a person must do. | When things go wrong, "How to reply" | Add a `scmle loop attest` command. |
+| 15 | The run's saved bundle was not signed, because `SCMLE_SIGNING_KEY` was set only after the run. `scmle predict` refuses an unsigned bundle unless you pass `--trusted` or sign it by saving a copy with `signing_key=`, which takes a small script. | Start here Step 8 | Checked since: a run signs its bundle when `SCMLE_SIGNING_KEY` is set before it starts. Left: say so in Start here, or add `scmle sign`. |
+| 16 | The loop commands accept files only by hand-written CSV and JSON, and a reply to an escalation can only be created from Python (`Attestation.create`). Creating a reply is the one step left to a person. | When things go wrong, "How to reply" | Add a `scmle loop attest` command. |
 | 17 | `loop mature` with a labels file missing `case_id` gives a raw `KeyError`. | When things go wrong | Check for the column and say which is missing. |
 | 18 | The Titanic table has 14 percent exact duplicates. In a plain run they stay on both sides of the split, which can inflate the exam score; only a charter run keeps copies together. SCMLE does say so (`recommendations.json`), but only in a file. | Start here Step 7, Reading results | Print recommendations at the end of the run. |
 | 19 | `scmle catalog` prints one long line of JSON. | Start here Step 2 shows what to look for | Pretty-print to the terminal. |
-| 20 | The first `scmle run` on a new installation can be slow enough to hit the time ceiling in item 11. | When things go wrong | Warm up, or enforce a minimum. |
+| 20 | The first `scmle run` on a new installation can be slow enough to hit the time ceiling in item 11. | When things go wrong | Warm up, or require a minimum budget. |
 | 21 | In a charter run the label `PROVISIONAL: N flagged column(s) not attested` can still list a column that the person did attest, because the development-row screen flagged it, the charter's exploration-row screen did not, and the attestation was reported `unused`. | [Leakage](LEAKAGE.md) | Count a column as attested when the attestation file names it, or run one screen. |
 | 22 | A claim's tier does not depend on the provenance of the column it uses: `worst radius` claims were `confirmed` while the column was flagged and not attested. That is how tiers work today (the tier is about the one-time test); changing it needs a design. | [Leakage](LEAKAGE.md) | Decide whether a claim on an unattested flagged column should be capped. |
 
@@ -47,8 +47,8 @@ beginner has not tested these pages.
 
 * Install from a fresh clone with `pip install .` (about 20 seconds with
   cached downloads) and the `scmle` command appeared.
-* `plan`, the leakage block (exit 2), the real run, `predict`, signed bundle
-  refusals, `serve` with its readiness endpoints, `package`, the registry
+* `plan`, the leakage stop (exit 2), the real run, `predict`, the turning
+  away of unsigned and altered bundles, `serve` with its readiness endpoints, `package`, the registry
   approval and the rollback, the monitor and the loop commands all behaved as
   the code and docs say.
 * The command-line run and the Python run, with the same seed and data, gave

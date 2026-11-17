@@ -6,9 +6,12 @@ How data is read, checked and processed before training and inference
 ## Object stores
 
 `Depot` is bytes under keys: `put` (atomic replace; `if_absent=True`
-creates only), `get`, `head`, `list_objects`, `delete`, `exists`. Metadata
-always carries a SHA-256 computed by this code, so a changed object raises
-`MismatchError`. The package ships the interface and one backend:
+creates only), `get`, `head`, `list_objects`, `delete`, `exists`.
+Metadata always carries a SHA-256 that this code computes from the bytes.
+The directory backend computes it again on every read, so a changed file
+shows up as a different hash, not as an error; `MismatchError` is for a
+backend that keeps a recorded hash and finds the bytes no longer match it.
+The package ships the interface and one backend:
 
 | Backend | Class | Client |
 | --- | --- | --- |
@@ -47,7 +50,7 @@ walks the lineage. `connector_reader(store)` plugs a store into the ingestion
 | Policy | Effect |
 | --- | --- |
 | `fail` | `QualityGateError` with the report; nothing continues |
-| `quarantine` | row-level rules remove the rows and write them with the report under `quarantine/<snapshot id>/`; dataset-level rules (`SchemaCheck`, `Freshness`, `MinRowsCheck`, `NullFractionCheck`) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until `release` |
+| `quarantine` | row-level rules remove the rows and write them under `quarantine/<snapshot id>/` (the report goes to `quality/`, as for every policy); dataset-level rules (`SchemaCheck`, `Freshness`, `MinRowsCheck`, `NullFractionCheck`) hold the whole snapshot: a marker is written, the run stops, and the same snapshot is refused until `release` |
 | `warn` | recorded in the report, data unchanged |
 
 Rules: `SchemaCheck`, `Freshness`, `MinRowsCheck`, `NullFractionCheck`,
@@ -68,8 +71,9 @@ Delivery semantics: **at-least-once for the work, idempotent for the output.**
 A crash between writing an output and committing the checkpoint makes the next
 run process that object again and rewrite the same bytes under the same key;
 the final outputs and checkpoint equal those of an uninterrupted run (tested).
-Exactly-once is not claimed: a transform with side effects beyond its output
-must be idempotent. A crashed run leaves its lock; `break_lock` is a person's
+Exactly-once is not claimed: after such a crash the transform runs again on
+that object, so a transform with side effects beyond its output must be
+idempotent. A crashed run leaves its lock; `break_lock` is a person's
 decision. The set of seen row keys lives in one JSON object, which is fine for
 millions of keys and not beyond.
 

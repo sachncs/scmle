@@ -159,6 +159,7 @@ def test_an_uncertified_alarm_never_reaches_the_envelope(tmp_path):
 
 
 def test_a_failing_training_is_escalated_and_the_loop_goes_on(tmp_path):
+    # Enforces docs/AUTONOMY.md:53.
     world = tests.simulation.world.World(tmp_path, abrupt())
 
     def broken():
@@ -262,6 +263,7 @@ def challenger_losses(stream, kind):
 
 @pytest.mark.parametrize("kind", ["better", "poisoned"])
 def test_a_challenger_may_earn_a_proposal_but_never_a_promotion(tmp_path, kind):
+    # Enforces docs/AUTONOMY.md:14.
     stream = abrupt(batches=120, size=100, change=20, delta=0.3, seed=8)
     world = tests.simulation.world.World(tmp_path, stream)
     trainer = Trainer(name="candidate")

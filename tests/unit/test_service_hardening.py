@@ -70,6 +70,7 @@ def test_the_folder_has_every_hardening_file(signed_service):
 
 
 def test_the_dockerfile_pins_locks_and_drops_privileges(signed_service):
+    # Enforces docs/ARTIFACTS.md:129.
     text = (signed_service / "Dockerfile").read_text(encoding="utf-8")
     assert f"@{PLACEHOLDER}" in text and "-slim@sha256:" in text
     assert "pip install --no-cache-dir --no-deps -r requirements.lock" in text
@@ -88,6 +89,7 @@ def test_no_generated_text_documents_the_trusted_escape_hatch(signed_service):
 
 
 def test_the_placeholder_digest_stops_the_build(signed_service):
+    # Enforces docs/ARTIFACTS.md:129.
     text = (signed_service / "Dockerfile").read_text(encoding="utf-8")
     block = text[text.index("RUN case") : text.index("ENV PYTHON")]
     script = block.removeprefix("RUN ").replace("\\\n", " ")
@@ -233,6 +235,9 @@ def test_production_verification_accepts_a_signed_service(signed_service):
 def test_trusted_is_refused_in_production_everywhere(
     signed_service, reference, tmp_path, monkeypatch
 ):
+    # Enforces docs/CLI.md:170.
+    # Enforces docs/GLOSSARY.md:612.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:442.
     with pytest.raises(
         errors.ArtifactError, match="SCMLE_TRUSTED=1 is refused"
     ):
@@ -250,6 +255,7 @@ def test_trusted_is_refused_in_production_everywhere(
 def test_verification_happens_before_anything_is_deserialized(
     signed_service, tmp_path, monkeypatch
 ):
+    # Enforces docs/SECURITY.md:35.
     def forbidden(*arguments, **keywords):
         raise AssertionError("deserialization before verification")
 
@@ -266,6 +272,7 @@ def test_verification_happens_before_anything_is_deserialized(
 def test_an_unsigned_bundle_never_verifies_in_production(
     signed_service, tmp_path
 ):
+    # Enforces docs/SECURITY.md:35.
     unsigned = copy_of(signed_service, tmp_path)
     (unsigned / "model" / "signature.json").unlink()
     with pytest.raises(errors.ArtifactError, match="unauthenticated"):
@@ -279,6 +286,7 @@ def test_an_unsigned_bundle_never_verifies_in_production(
 
 
 def test_a_wrong_key_is_refused(signed_service):
+    # Enforces docs/SECURITY.md:35.
     with pytest.raises(errors.ArtifactError, match="signature is invalid"):
         verify.inspect(
             signed_service,
@@ -287,6 +295,8 @@ def test_a_wrong_key_is_refused(signed_service):
 
 
 def test_production_needs_verifiable_provenance(signed_service, tmp_path):
+    # Enforces docs/SECURITY.md:35.
+    # Enforces docs/GLOSSARY.md:627.
     missing = copy_of(signed_service, tmp_path)
     (missing / "provenance.json").unlink()
     with pytest.raises(errors.ArtifactError, match="provenance"):
@@ -297,6 +307,7 @@ def test_production_needs_verifiable_provenance(signed_service, tmp_path):
 
 
 def test_changed_build_materials_are_refused(signed_service, tmp_path):
+    # Enforces docs/SECURITY.md:35.
     changed = copy_of(signed_service, tmp_path)
     with (changed / "requirements.lock").open("a") as handle:
         handle.write("evil-package==1.0\n")
@@ -305,6 +316,8 @@ def test_changed_build_materials_are_refused(signed_service, tmp_path):
 
 
 def test_provenance_for_another_bundle_is_refused(signed_service, tmp_path):
+    # Enforces docs/SECURITY.md:35.
+    # Enforces docs/GLOSSARY.md:627.
     swapped = copy_of(signed_service, tmp_path)
     attest.stamp(
         swapped, "sha256:" + "9" * 64, "someone", "python:3.12-slim", KEY
@@ -346,6 +359,7 @@ def test_the_build_context_holds_no_secret(signed_service):
 
 
 def test_the_context_scan_finds_planted_secrets(signed_service, tmp_path):
+    # Enforces docs/ARTIFACTS.md:129.
     folder = copy_of(signed_service, tmp_path)
     (folder / ".env").write_text("TOKEN=abc")
     (folder / "id_rsa").write_text("x")
@@ -553,6 +567,8 @@ def test_the_shipped_policy_is_valid():
 def test_the_framework_may_be_unscanned_only_while_its_exception_lives(
     signed_service,
 ):
+    # Enforces docs/SERVICE_SLO.md:136.
+    # Enforces docs/ARTIFACTS.md:133.
     document = json.loads((signed_service / "sbom.cdx.json").read_text())
     scanned = {
         "dependencies": [

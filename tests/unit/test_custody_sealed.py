@@ -19,6 +19,7 @@ def resident(values=(1.0, 2.0, 3.0)):
 
 
 def test_log_chains_entries_and_verifies():
+    # Enforces docs/ARTIFACTS.md:32.
     log = sealed.Journal()
     first = log.append("C", "sealed", "orchestrator")
     second = log.append("C", "open", "confirmation")
@@ -78,6 +79,7 @@ def test_a_set_opens_once_and_every_attempt_is_logged():
 
 
 def test_a_wrong_token_is_denied_and_logged_without_opening():
+    # Enforces docs/ARTIFACTS.md:32.
     log = sealed.Journal()
     held = sealed.Locker("C", resident(), log)
     with pytest.raises(errors.LeakageError, match="invalid token"):
@@ -89,6 +91,7 @@ def test_a_wrong_token_is_denied_and_logged_without_opening():
 
 
 def test_the_log_never_contains_row_values():
+    # Enforces docs/ARTIFACTS.md:32.
     log = sealed.Journal()
     held = sealed.Locker("C", resident((123456.789, 2.0, 3.0)), log)
     held.commit("c", "l")

@@ -23,6 +23,7 @@ def test_current_public_api_matches_versioned_snapshot():
 
 
 def test_compatibility_gate_reports_removed_and_changed_exports():
+    # Enforces docs/API_STABILITY.md:198.
     """A removed or changed signature must fail with a useful diagnosis."""
     expected = check_api_compatibility.current_snapshot()
     changed = json.loads(json.dumps(expected))

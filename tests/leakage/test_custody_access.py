@@ -87,6 +87,7 @@ def reachable(root, limit=200_000):
 
 
 def test_the_view_reaches_no_sealed_object_or_token():
+    # Enforces docs/GLOSSARY.md:304.
     built = build()
     outcome, vault = built.outcome, built.vault
     tokens = {s.mint() for s in vault.sets.values()}
@@ -140,6 +141,8 @@ def test_the_open_log_and_manifest_hold_ids_but_never_values():
 
 
 def test_the_orchestrator_process_keeps_only_the_ids():
+    # Enforces docs/GLOSSARY.md:304.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:128.
     built = build()
     outcome, vault = built.outcome, built.vault
     held = vault.sets["C"]

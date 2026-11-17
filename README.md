@@ -65,7 +65,7 @@ More in [`docs/TUTORIAL.md`](docs/TUTORIAL.md).
 | Look up a word | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) |
 | Decide what to predict, measure and avoid | [`docs/DECISIONS.md`](docs/DECISIONS.md) |
 | Read a report, tiers and claims | [`docs/READING_RESULTS.md`](docs/READING_RESULTS.md) |
-| Understand a refusal, gate or alarm | [`docs/WHEN_THINGS_GO_WRONG.md`](docs/WHEN_THINGS_GO_WRONG.md) |
+| Understand a stopped run, a gate or an alarm | [`docs/WHEN_THINGS_GO_WRONG.md`](docs/WHEN_THINGS_GO_WRONG.md) |
 | Know the limits | [`docs/WHAT_SCMLE_CANNOT_DO.md`](docs/WHAT_SCMLE_CANNOT_DO.md) |
 | Understand leakage flags and their measured error rates | [`docs/LEAKAGE.md`](docs/LEAKAGE.md) |
 | Browse every page | [`docs/README.md`](docs/README.md) |
@@ -90,16 +90,18 @@ The hosted documentation is available at
 1. **Profiles** the data: task resolution, column kinds, a full dataset
    fingerprint, and leakage *suspicions* from a permutation screen with
    Benjamini-Yekutieli error control (including outcome-dependent recording
-   such as Titanic's `boat` / `body`). A suspicion is not proof; only
-   mechanisms with a passing certificate may block a run.
+   such as Titanic's `boat` / `body`). A suspicion is not proof, so by
+   default a flagged column is reported and the run goes on; with
+   `leakage_policy="block"` any flagged column blocks the run.
 2. **Splits** without leakage (stratified / random / group / temporal) behind
    a locked test set that opens once.
 3. **Engineers features** declaratively (`Derivation`: ratios, bins,
    clipping, datetime parts, lags and rolling statistics per entity), with
    every statistic learned on the training fold only.
 4. **Searches** the planned compatible model families (scikit-learn,
-   LightGBM, XGBoost, CatBoost, SVM, kNN) within the configured time budget
-   (the plan lists what it included, rejected and deferred), then evaluates data strategies on the
+   LightGBM, XGBoost, CatBoost, SVM, kNN) within the configured time budget.
+   The plan gives a reason for every technique it includes, rejects or
+   defers. The search then evaluates data strategies on the
    original validation folds (class weighting, random and SMOTE-family
    resampling, copula augmentation, calibration, log / interaction features), tunes the winners
    with pruned search (random or Optuna), and assembles a cross-fitted stack
@@ -133,18 +135,21 @@ The hosted documentation is available at
 - **Secure by default.** Bundles are pickle-based, so loading is refused
   unless the HMAC signature verifies or you pass `trusted=True`; checksums
   are verified before anything is unpickled ([`docs/SECURITY.md`](docs/SECURITY.md)).
-- **Honest about limits.** CPU / time / memory limits are enforced (no
-  trial starts past a limit; every trial runs in a supervised process that is
-  killed at a hard time ceiling or when its resident memory exceeds the limit) and each run reports how every limit was applied and what was
-  observed; reruns are classified `exact`, `comparable` or `different`.
+- **Honest about limits.** CPU / time / memory limits are enforced: the
+  first trial always runs, so a result exists, and no later trial starts past
+  the time budget or the memory limit; under the default hard enforcement
+  every trial runs in a supervised process that is killed at a hard time
+  ceiling or when its resident memory exceeds the limit. Each run reports how
+  every limit was applied and what was observed; reruns are classified
+  `exact`, `comparable` or `different`.
 
 ## Does it keep its promises?
 
 `python -m benchmarks.reliability` checks nine properties on synthetic data
 with known answers: same seed gives the same result, replay agrees, noise
-labels never score well, a planted leak is found, signed bundles round-trip
-and reject tampering, 90% intervals cover, drift is flagged only when real, and
-one crashing candidate cannot sink a run. See
+labels score near a ROC AUC of 0.5, a planted leak is found, signed bundles
+round-trip and reject tampering, 90% intervals cover, drift is flagged only
+when real, and one crashing candidate cannot sink a run. See
 [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
 ## Benchmarks on open datasets
@@ -218,7 +223,7 @@ can also register via the `scmle.models` entry-point group and must pass
 
 ## Conventions
 
-Google Python style (80 columns, Google docstrings, module imports), enforced
+Google Python style (80 columns, Google docstrings, module imports), checked
 by `ruff` and `mypy`. No underscore-prefixed names anywhere, enforced by
 `tests/unit/test_conventions.py`.
 
@@ -260,8 +265,8 @@ installed into a clean environment.
   and token; other pretrained models plug in through the `Model`
   contract.
 * `gpu="required"` blocks a run unless PyTorch can see a CUDA device.
-* The test-set vault keeps the locked rows out of trial processes. It cannot
-  stop a process from reading the original data file when a path was given,
+* The test-set vault keeps the locked rows out of trial processes. It does
+  not stop a process from reading the original data file when a path was given,
   and a caller's own in-memory DataFrame still holds every row.
 * Ray and CatBoost have no free-threaded (3.14t) wheels yet.
 * Threads: the public API may be called from several threads of one process

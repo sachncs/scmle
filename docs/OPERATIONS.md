@@ -24,9 +24,10 @@ locally.
 caller caused is available. Latency quantiles are estimated from histogram
 buckets, as Prometheus does, so they are exact only at bucket edges.
 `SignalMonitor` looks at a sliding window and reports, per signal, `ok`,
-`breached` or `insufficient_data`. A window with too few samples is never
-reported healthy. Feature rows are sampled at `sample_rate`; requests and
-outcomes are never sampled. Drift is the noise-adjusted PSI of
+`breached` or `insufficient_data`.
+A window with too few samples is never reported healthy.
+Feature rows are sampled at `sample_rate`; requests and outcomes are never
+sampled. Drift is the noise-adjusted PSI of
 `scmle.monitoring.reference`, so the thresholds are the ones the batch
 monitor already uses (`Thresholds`).
 
@@ -123,8 +124,8 @@ region loss, a container orchestrator's health-driven replacement,
 permission failures of a hosted store, a managed-service outage, secret-manager
 rotation, and on any machine a crash, power loss, full disk or network
 partition. The ledger and
-state files are shown to survive a killed process; no `fsync` guarantee
-against power loss is claimed.
+state files are shown to survive a killed process; nothing is claimed about
+`fsync` or power loss.
 
 ## Not claimed
 

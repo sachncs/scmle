@@ -212,6 +212,7 @@ def test_a_crashed_supervisor_continues_the_numbering(store):
 
 
 def test_training_cannot_run_as_serving_or_touch_released_bundles(store):
+    # Enforces docs/PORTABLE_TRAINING.md:44 and docs/PORTABLE_TRAINING.md:45.
     clock = support_runners.FakeClock()
     runner = local_runner(store, clock)
     with pytest.raises(errors.ConfigError, match="serving identity"):
@@ -227,6 +228,7 @@ def test_training_cannot_run_as_serving_or_touch_released_bundles(store):
 
 
 def test_role_tables_are_separate():
+    # Enforces docs/TENANT_ISOLATION.md:41.
     roles.check_separation(roles.TRAINING_ROLE, roles.SERVING_ROLE)
     both = roles.Role("serving", roles.SERVING_ROLE.reads, ("runs/",))
     with pytest.raises(errors.ConfigError):
@@ -288,6 +290,7 @@ def test_checkpoints_skip_a_damaged_newest_one(store):
 
 
 def test_the_entrypoint_checks_the_spec_digest_and_the_store_scheme(tmp_path):
+    # Enforces docs/PORTABLE_TRAINING.md:55.
     store = make_store(tmp_path)
     clock = support_runners.FakeClock()
     runner = local_runner(store, clock)

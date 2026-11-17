@@ -150,9 +150,10 @@ scmle deploy reconcile REGISTRY --model churn --environment production --observa
 `live` runs the health, schema, inference and security checks and exits 1 if
 any fails. `gate` reads a release manifest and the evidence it names and exits
 2 with every reason when the release is refused; `certify` writes the signed
-deployment record. Keys are read from files, never from the command line.
-`reconcile` exits 1 when the registry, the ledger and the observation
-disagree. The observation file is written by the runtime adapter you provide.
+deployment record.
+Keys are read from files, never from the command line. `reconcile` exits 1
+when the registry, the ledger and the observation disagree. The observation
+file is written by the runtime adapter you provide.
 
 ## Examples
 
@@ -172,7 +173,7 @@ for every command; sign the bundle and supply `SCMLE_SIGNING_KEY` instead.
 
 `predict`, `serve`, `export-onnx` and `package` load a bundle. Bundles are
 pickle-based, so loading requires a valid signature (set `SCMLE_SIGNING_KEY`).
-`--trusted` skips that for an unsigned bundle you produced yourself; never use
+`--trusted` skips that for an unsigned bundle you produced yourself; do not use
 it on a bundle from elsewhere. `predict` also takes `--rename INCOMING=EXPECTED`,
 `--case-insensitive` and `--strip-whitespace` for explicit column mapping.
 

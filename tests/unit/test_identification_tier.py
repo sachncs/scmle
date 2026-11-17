@@ -99,6 +99,8 @@ def test_a_sensitivity_gate_is_not_needed_when_the_strategy_has_none():
 def test_the_held_out_estimate_alone_never_confirms():
     # significant estimate on C, confounded by an unobserved variable, but no
     # negative control, no strata, no sensitivity analysis declared
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:124.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:347.
     out = tier.decide(
         facts(
             battery_ran=False,

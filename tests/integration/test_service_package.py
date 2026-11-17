@@ -159,6 +159,8 @@ def wait_for_state(port, process, phases):
 
 
 def test_the_generated_server_stays_unready_for_an_unsigned_bundle(boosted):
+    # Enforces docs/SECURITY.md:35.
+    # Enforces docs/SERVICE_SLO.md:15.
     bundle, root = boosted[0], boosted[2]
     folder = bundle.export_service(root / "untrusted")
     port = unused()
@@ -175,6 +177,7 @@ def test_the_generated_server_stays_unready_for_an_unsigned_bundle(boosted):
 
 
 def test_production_serves_only_a_signed_verified_folder(boosted):
+    # Enforces docs/SECURITY.md:35.
     bundle, root = boosted[0], boosted[2]
     key = "package-test-key"
     folder = bundle.export_service(root / "production", signing_key=key)

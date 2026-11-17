@@ -63,6 +63,7 @@ def filled(tmp_path):
 
 
 def test_a_valid_ledger_loads_and_has_the_open_row_first(tmp_path):
+    # Enforces docs/ARTIFACTS.md:84.
     ledger = filled(tmp_path)
     again = deployment_ledger.DeploymentLedger.load(
         tmp_path / deployment_ledger.FILE_NAME
@@ -79,6 +80,7 @@ def rewrite(tmp_path, change):
 
 
 def test_deleting_a_middle_row_fails_verification(tmp_path):
+    # Enforces docs/ARTIFACTS.md:84.
     filled(tmp_path)
     rewrite(tmp_path, lambda lines: lines[:2] + lines[3:])
     with pytest.raises(deployment_ledger.MisuseError, match="chain broken"):
@@ -88,6 +90,7 @@ def test_deleting_a_middle_row_fails_verification(tmp_path):
 
 
 def test_reordering_rows_fails_verification(tmp_path):
+    # Enforces docs/ARTIFACTS.md:84.
     filled(tmp_path)
     rewrite(tmp_path, lambda lines: [lines[0], lines[2], lines[1], *lines[3:]])
     with pytest.raises(deployment_ledger.MisuseError, match="chain broken"):
@@ -97,6 +100,7 @@ def test_reordering_rows_fails_verification(tmp_path):
 
 
 def test_editing_a_row_fails_verification(tmp_path):
+    # Enforces docs/ARTIFACTS.md:84.
     filled(tmp_path)
 
     def edit(lines):
@@ -112,6 +116,7 @@ def test_editing_a_row_fails_verification(tmp_path):
 
 
 def test_tail_truncation_is_caught_with_the_recorded_head(tmp_path):
+    # Enforces docs/ARTIFACTS.md:84.
     ledger = filled(tmp_path)
     head = ledger.head
     rewrite(tmp_path, lambda lines: lines[:-1])
@@ -133,6 +138,7 @@ def test_unknown_kinds_and_a_second_open_are_refused():
 
 
 def test_a_challenger_must_be_registered_before_it_is_scored():
+    # Enforces docs/ARTIFACTS.md:84.
     ledger = make()
     body = {
         "name": "c1",
@@ -147,6 +153,7 @@ def test_a_challenger_must_be_registered_before_it_is_scored():
 
 
 def test_challenger_decisions_are_replayed_exactly():
+    # Enforces docs/ARTIFACTS.md:84.
     ledger = make()
     ledger.commit(
         deployment_ledger.CHALLENGER_RESULT,
@@ -181,6 +188,7 @@ def make_with_registered(body):
 
 
 def test_an_attestation_is_bound_to_its_question_hash():
+    # Enforces docs/ARTIFACTS.md:84.
     ledger = make()
     identity, digest = escalate(ledger)
     wrong = reply(identity, "0" * 64)
@@ -195,6 +203,8 @@ def test_an_attestation_is_bound_to_its_question_hash():
 
 
 def test_an_attestation_signed_with_a_system_key_is_refused():
+    # Enforces docs/GLOSSARY.md:383.
+    # Enforces docs/ARTIFACTS.md:84.
     ledger = make()
     identity, digest = escalate(ledger)
     with pytest.raises(deployment_ledger.MisuseError, match="system holds"):
@@ -250,6 +260,7 @@ def test_escalation_needs_a_matching_hash_id_and_evidence():
 
 
 def test_attestation_signature_and_fields():
+    # Enforces docs/ARTIFACTS.md:84.
     answer = reply("esc-1", "a" * 64)
     assert answer.verify(KEY)
     assert not answer.verify("another key")

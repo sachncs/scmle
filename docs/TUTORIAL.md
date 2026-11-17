@@ -90,8 +90,10 @@ project = scmle.api.project.Project(
 Row-wise nodes run inside the pipeline and learn their statistics (`clip`,
 `bin`, `standardize`) on the training fold only. Ordered nodes (`lag`, `diff`,
 `rolling_*`, `expanding_mean`) are computed per group in time order from the
-current and earlier rows, never the target, and are recomputed on the batch
-you score, so that batch must carry each entity's history. The graph is part
+current and earlier rows, never the target. When you score, they look back on
+the recent rows per entity that the bundle stored at training time, plus the
+rows the serving adapters have scored so far, so a single new record still
+gets its lags. The graph is part
 of the configuration hash and is stored, with its fingerprint, in the bundle.
 Declare columns known only after the outcome with
 `unavailable_at_prediction=[...]`, and add `embargo_rows=` for temporal

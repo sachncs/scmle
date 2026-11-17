@@ -22,6 +22,7 @@ def kinds(folder):
 def test_the_claim_is_hashed_and_registered_before_the_test_rows_open(
     tmp_path,
 ):
+    # Enforces docs/ARTIFACTS.md:70.
     result = run(tmp_path, plan=False)
     folder = pathlib.Path(result.run_dir)
 
@@ -67,6 +68,7 @@ def test_a_run_without_a_charter_writes_the_claim_too(tmp_path):
 
 
 def test_declared_slices_are_in_the_claim_and_flagged_by_the_margin(tmp_path):
+    # Enforces docs/ARTIFACTS.md:70.
     from scmle.data.charter import uncertainty
 
     result = run(
@@ -116,6 +118,7 @@ ON_C = "coverage claim on C: registered, recomputed, status matches"
 def test_the_coverage_claim_is_tested_once_on_c_after_the_model_is_frozen(
     tmp_path,
 ):
+    # Enforces docs/ARTIFACTS.md:70.
     result = confirmation_run(tmp_path)
     folder = pathlib.Path(result.run_dir)
 
@@ -137,6 +140,7 @@ def test_the_coverage_claim_is_tested_once_on_c_after_the_model_is_frozen(
 
 
 def test_an_edited_confirmation_document_fails_the_verification(tmp_path):
+    # Enforces docs/ARTIFACTS.md:70.
     result = confirmation_run(tmp_path)
     folder = pathlib.Path(result.run_dir)
     path = folder / "coverage_confirmation.json"

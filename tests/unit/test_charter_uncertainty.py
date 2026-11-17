@@ -26,6 +26,7 @@ def with_cap(size=5_000_000):
 
 
 def test_a_charter_without_the_block_keeps_its_hash_and_format():
+    # Enforces docs/API_STABILITY.md:99.
     charter = make_charter()
     assert charter.charter_hash == PINNED_HASH
     assert "uncertainty" not in charter.to_dict()
@@ -42,6 +43,7 @@ def test_an_empty_block_is_an_empty_record_and_still_format_ten():
 
 
 def test_the_block_changes_the_hash_round_trips_and_needs_format_ten():
+    # Enforces docs/API_STABILITY.md:99.
     charter = with_cap()
     assert charter.charter_hash != PINNED_HASH
     assert charter.format_version == 10
@@ -51,6 +53,7 @@ def test_the_block_changes_the_hash_round_trips_and_needs_format_ten():
 
 
 def test_a_format_ten_charter_keeps_its_hash_and_signature():
+    # Enforces docs/API_STABILITY.md:104.
     charter = with_cap()
     assert charter.charter_hash == FORMAT_TEN_HASH
     assert sealing.envelope(charter, "k")["signature"] == FORMAT_TEN_SIGNATURE
@@ -116,6 +119,7 @@ def test_slice_columns_are_distinct_non_blank_names(bad):
 
 
 def test_the_confirmation_coverage_flag_needs_format_eleven_and_round_trips():
+    # Enforces docs/API_STABILITY.md:104.
     spec = uncertainty.Uncertainty(None, (), True)
     charter = make_charter(uncertainty=spec)
     assert charter.format_version == 11
@@ -129,6 +133,7 @@ def test_the_confirmation_coverage_flag_needs_format_eleven_and_round_trips():
 
 
 def test_without_the_flag_a_format_ten_charter_keeps_its_hash():
+    # Enforces docs/API_STABILITY.md:104.
     off = uncertainty.Uncertainty(5_000_000, (), False)
     charter = make_charter(uncertainty=off)
     assert charter.format_version == 10

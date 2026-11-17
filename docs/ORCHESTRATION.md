@@ -28,7 +28,7 @@ State lives in a `Depot` under `workflows/<name>/runs/<run id>/`.
 | Durable run id | derived from workflow name, version and the caller's trigger key (a schedule slot, a request id); the same trigger is the same run |
 | Idempotency key | hash of run id, step, parameters and upstream outputs; a step already succeeded with that key is not run again and the key is passed to the handler for external deduplication |
 | Duplicate invocation | `start` with a finished trigger returns the record and runs nothing; a second executor on a run in flight gets `BusyError` (lease) |
-| Partial failure | the failing step is retried under its policy; dependents are `skipped`; independent steps finish; `resume` re-runs only what has not succeeded (an explicit act; `start` never retries a failed run) |
+| Partial failure | a step that raises a transient error is retried under its policy, and any other error fails it at once; dependents are `skipped`; independent steps finish; `resume` re-runs only what has not succeeded (an explicit act; `start` never retries a failed run) |
 | Interrupted job | `PreemptedError` (or any `TransientError`) is retried with the same key and the declared backoff; `delegate` runs training through a `Runner`, whose own checkpoints make the retry a resume |
 | Crashed executor | its lease expires (`lease_seconds`); another executor takes the run over and re-runs the step that was in flight |
 | Timeouts | cooperative: handlers call `context.check()` |
@@ -46,6 +46,6 @@ busy is `deferred` and stays due.
 ## Not done here
 
 The definition runs only on the local executor. The package emits no
-definition for an external workflow engine; concurrency limits, cost budgets
-and groups are enforced by the local executor only. The approval step is not
+definition for an external workflow engine, so concurrency limits, cost
+budgets and groups apply only when the local executor runs the workflow. The approval step is not
 wired to a notification channel or a UI.

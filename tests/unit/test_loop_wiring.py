@@ -75,6 +75,7 @@ def read_mechanism(loop):
 
 
 def test_feedback_cannot_be_tested_without_a_declared_bypass_slice(tmp_path):
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:168.
     loop = test_loop.open_loop(tmp_path)
     bypass, model = feedback_groups(0.8)
     with pytest.raises(ValueError) as caught:

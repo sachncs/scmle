@@ -144,6 +144,7 @@ def judge(rows, **options):
 
 
 def test_drift_alone_is_never_a_reason_to_retrain():
+    # Enforces docs/OPERATIONS.md:78.
     drift = named("feature_psi_max", signals.Category.DATA_QUALITY, True)
     primary, support, held = judge([drift])
     assert primary == [] and support and held is None
@@ -294,6 +295,7 @@ def test_a_challenger_that_wins_is_proposed_by_the_loop_in_order(tmp_path):
 def test_a_new_model_deploys_only_after_the_proposal_the_gate_and_the_approval(
     tmp_path,
 ):
+    # Enforces docs/OPERATIONS.md:84.
     ignored, ev = winning_challenger(tmp_path)
     release, plane, store = release_world(tmp_path)
     assert release.promote(
@@ -340,6 +342,7 @@ def test_a_new_model_deploys_only_after_the_proposal_the_gate_and_the_approval(
 
 
 def test_production_replacement_needs_the_signed_staging_record(tmp_path):
+    # Enforces docs/OPERATIONS.md:84.
     ignored, ev = winning_challenger(tmp_path)
     release, plane, store = release_world(tmp_path)
     prod = support_release.candidate(
@@ -355,6 +358,7 @@ def test_production_replacement_needs_the_signed_staging_record(tmp_path):
 
 
 def test_a_platform_that_does_not_confirm_leaves_the_registry_alone(tmp_path):
+    # Enforces docs/OPERATIONS.md:84.
     ignored, ev = winning_challenger(tmp_path)
     release, ignored, store = release_world(tmp_path)
     plane = support_runtime.MemoryPlane(never_settles=True)
@@ -372,6 +376,7 @@ def test_a_platform_that_does_not_confirm_leaves_the_registry_alone(tmp_path):
 def test_an_offline_comparison_that_keeps_the_champion_blocks_replacement(
     tmp_path,
 ):
+    # Enforces docs/OPERATIONS.md:84.
     ignored, ev = winning_challenger(tmp_path)
     release, plane, store = release_world(tmp_path)
     keep = types.SimpleNamespace(decision="keep")

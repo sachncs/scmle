@@ -12,6 +12,8 @@ from scmle.data.catalog import Catalog
 
 
 def test_plan_run_predict_roundtrip(binary_frame, tmp_path, caplog):
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:21.
+    # Enforces docs/BEGINNER_FINDINGS.md:37.
     caplog.set_level(logging.INFO)
     data = tmp_path / "d.csv"
     binary_frame.to_csv(data, index=False)
@@ -64,6 +66,8 @@ def test_plan_run_predict_roundtrip(binary_frame, tmp_path, caplog):
 
 
 def test_blocked_run_returns_exit_code_two(binary_frame, tmp_path, caplog):
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:22.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:71.
     broken = binary_frame.assign(y=range(len(binary_frame)))
     broken["y"] = broken["y"] % 5
     path = tmp_path / "d.csv"

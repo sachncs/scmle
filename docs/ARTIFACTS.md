@@ -23,7 +23,7 @@ Start with `report.html`, then `diagnostics/decision_log.json`.
 | --- | --- |
 | `config.json` | The complete project specification; `scmle resume` and `scmle run --config` read the same format. |
 | `execution_plan.json` | The plan: resolved task, metric, validation strategy, candidate models. |
-| `dataset_manifest.json`, `dataset_profile.json`, `dataset_card.json` | Row and column counts, hashes, resolved column kinds and findings. `dataset_profile.json` also holds `leakage`: the leakage screen's level, family size, suspects and the suspects that may block a run (only mechanisms with a passing certificate can). |
+| `dataset_manifest.json`, `dataset_profile.json`, `dataset_card.json` | Row and column counts, hashes, resolved column kinds and findings. `dataset_profile.json` also holds `leakage`: the leakage screen's level, family size, suspects and the suspects that may block a run (in a run every suspect may block, whatever the state of the certificates). |
 | `source_registry.json` | Source identities and the snapshots seen. |
 | `curation_report.json` | What curation found and changed (missingness, duplicates, drift, representativeness). |
 | `validation_manifest.json` | Which rows went to development folds and to the locked test set. |
@@ -130,7 +130,7 @@ Use `result.save(directory, signing_key=...)` to export one for deployment.
 | `requirements.txt`, `requirements.lock`, `environment.lock` | Direct pins; the runtime closure installed with `--no-deps`; every package of the build environment. |
 | `sbom.cdx.json` | CycloneDX SBOM: runtime libraries, the bundle (by manifest digest) and the base image. |
 | `provenance.json` | Signed statement: subject is the bundle digest; materials are the files above. Verified by the service at start. |
-| `vuln-policy.json` | The gate policy: block at HIGH and above, no exceptions. |
+| `vuln-policy.json` | The gate policy: block at HIGH and above, with no vulnerability exceptions. One dated waiver lets the `scmle` package itself go unscanned (no index a scanner can query holds it; its dependencies are scanned), and it blocks again once it expires. |
 | `base-image.lock.json`, `scan.json`, `build-metadata.json`, `image-attestation.json` | Written by `build.sh`: the resolved base digest, the scanner report, the build's image digest, and the signed statement binding the image to the provenance. |
 
 The attestations are HMAC-signed: they prove possession of the signing key and

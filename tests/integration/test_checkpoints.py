@@ -55,6 +55,7 @@ def test_reviewers_see_the_plan_and_the_selection(binary_frame, tmp_path):
 
 
 def test_rejecting_the_plan_stops_before_any_training(binary_frame, tmp_path):
+    # Enforces README.md:132.
     reject = policies.Callback(
         lambda review: policies.Approval(False, "alice", "too many models"),
         gates=frozenset({scmle.core.state.Progress.PLANNING}),
@@ -76,6 +77,7 @@ def test_rejecting_the_plan_stops_before_any_training(binary_frame, tmp_path):
 def test_rejecting_the_selection_keeps_the_test_set_locked(
     binary_frame, tmp_path
 ):
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:71.
     reject = policies.Callback(
         lambda review: review.gate is not scmle.core.state.Progress.SELECTING
     )

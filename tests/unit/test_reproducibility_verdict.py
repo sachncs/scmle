@@ -45,6 +45,7 @@ def facts() -> dict[str, Any]:
 
 
 def test_identical_runs_are_exact():
+    # Enforces README.md:138.
     verdict = reproducibility.judge(facts(), facts())
 
     assert verdict.level == reproducibility.EXACT
@@ -66,6 +67,7 @@ def test_environment_difference_is_a_note_only():
 
 
 def test_small_score_drift_is_comparable():
+    # Enforces README.md:138.
     other = facts()
     other["trials"][0] = trial("t1", (0.81, 0.9, 0.99))
 
@@ -77,6 +79,7 @@ def test_small_score_drift_is_comparable():
 
 
 def test_large_score_drift_is_different():
+    # Enforces README.md:138.
     other = facts()
     other["trials"][1] = trial("t2", (0.1, 0.2, 0.3))
 

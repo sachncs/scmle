@@ -28,6 +28,9 @@ def test_pure_noise_is_not_inflated_by_the_pipeline(tmp_path):
 
 
 def test_leaked_feature_is_flagged_and_can_block(binary_frame, tmp_path):
+    # Enforces README.md:93 and README.md:180.
+    # Enforces docs/BENCHMARKS.md:16 and docs/LEAKAGE.md:209.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:89.
     leaky = binary_frame.assign(leak=binary_frame.y * 3.0 + 1)
     result = support.make_project(
         leaky, "y", output_dir=tmp_path, leakage_policy="warn"
@@ -45,6 +48,7 @@ def test_leaked_feature_is_flagged_and_can_block(binary_frame, tmp_path):
 def test_a_noisy_copy_and_a_value_recorded_for_one_class_also_block(
     binary_frame, tmp_path
 ):
+    # Enforces docs/API_STABILITY.md:51.
     rng = numpy.random.default_rng(8)
     flip = rng.random(len(binary_frame)) < 0.02
     noisy = binary_frame.assign(
@@ -81,6 +85,7 @@ def regression_leak():
 def test_a_regression_leak_blocks_under_block(tmp_path):
     # ERR-1: the screen is certified for regression, so the copied target
     # blocks by name; before, regression was uncertified and trained.
+    # Enforces docs/API_STABILITY.md:51.
     with pytest.raises(
         errors.BlockedError, match="unresolved leakage risk"
     ) as raised:
@@ -95,6 +100,8 @@ def test_a_regression_leak_blocks_under_block(tmp_path):
 
 
 def test_a_regression_leak_warns_under_warn(tmp_path):
+    # Enforces docs/LEAKAGE.md:204.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:89.
     result = support.make_project(
         regression_leak(),
         "y",
@@ -121,6 +128,7 @@ def test_groups_never_straddle_the_test_boundary(binary_frame, tmp_path):
 
 
 def test_test_set_is_opened_exactly_once_per_run(binary_frame, tmp_path):
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:59.
     result = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
     assert result.evaluation["test_set_opened"] is True
     events = (result.run_dir / "events.jsonl").read_text().splitlines()
@@ -145,6 +153,7 @@ def test_search_is_invariant_to_test_labels_and_test_features(
     imbalanced_frame, tmp_path
 ):
     """Nothing the search sees may depend on the locked test partition."""
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:59.
     first = run_default(imbalanced_frame, tmp_path / "a")
     manifest = json.loads(
         (first.run_dir / "validation_manifest.json").read_text()

@@ -9,8 +9,9 @@ permissions) belongs to wherever you host it and is not claimed here.
 
 * A **tenant** is the owner of a deployment: its models, its data and its
   audit trail. A deployment serves exactly one tenant, named by
-  `SCMLE_TENANT`. Two tenants never share a process, a model bundle, a
-  ledger file or a signing key.
+  `SCMLE_TENANT`, so one process never serves two tenants. Give each
+  tenant's deployment its own model bundles, ledger file and signing key: the
+  service does not check that these are kept apart.
 * A caller proves its tenant with the `tenant` claim of a verified token. The
   claim is read only after the signature, issuer, audience, expiry and
   revocation checks pass.
@@ -56,8 +57,8 @@ permissions) belongs to wherever you host it and is not claimed here.
 ## What this does not give you
 
 * **TLS.** The reference server speaks plain HTTP. Terminate TLS at the
-  ingress; the token travels in a header and must not cross a network
-  unencrypted.
+  ingress; the token travels in a plain header, which anyone on an
+  unencrypted network path can read.
 * **Protection from a compromised host.** Whoever can read the process
   memory or `SCMLE_AUTH_HS256_SECRET` can mint tokens. Prefer RS256 with the
   private key held by the identity provider: the service holds public keys

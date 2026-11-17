@@ -25,6 +25,7 @@ def chartered(**changes):
 
 
 def test_a_charter_without_rules_keeps_its_hash_and_signature():
+    # Enforces docs/API_STABILITY.md:99 and docs/API_STABILITY.md:171.
     charter = make_charter()
     assert charter.rules is None
     assert charter.charter_hash == FROZEN_HASH
@@ -35,6 +36,7 @@ def test_a_charter_without_rules_keeps_its_hash_and_signature():
 
 
 def test_an_old_signed_file_still_loads_and_verifies(tmp_path):
+    # Enforces docs/API_STABILITY.md:99 and docs/API_STABILITY.md:171.
     path = tmp_path / "old.json"
     wrapper = sealing.envelope(make_charter(), KEY)
     wrapper["format"] = 1

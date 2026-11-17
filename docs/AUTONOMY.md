@@ -48,10 +48,12 @@ the loop's own rules (F13); the controller adds only the following.
   charter, editing the ledger or registering late, relaxing a threshold, acting
   on an unverified stream, answering a flagged high-impact case, suppressing
   its own alert, changing the labelling policy, deleting or sending
-  externally, and creating or signing an attestation. They cannot be put in an
-  envelope.
-* **A halt, a rejected file, silence, or a failed training.** Each opens an
-  escalation that waits for a person.
+  externally, and creating or signing an attestation.
+  They cannot be put in an envelope.
+* **A halt by the controller, a rejected file, silence, or a failed
+  training.** Each opens an escalation that waits for a person. A halt made
+  elsewhere (`scmle operate halt`, or the loop's own) writes an `incident` row
+  instead.
 
 ## Envelopes
 
@@ -86,7 +88,7 @@ Without an envelope the retrain hook trains nothing and escalates
   crash inside a call leaves the loop's saved state behind the ledger; the loop
   then starts halted instead of guessing.
 * **The key.** Envelopes and attestations are HMAC-signed. Whoever can verify
-  can also sign, so keep the verification key where the system cannot read it.
+  can also sign, so keep the verification key out of the system's reach.
   When you give the controller no keys it relies on the grant row, which was
   checked when it was written. A process with write access to the ledger file
   can still write rows; this is code around the entry points of the package,

@@ -6,6 +6,7 @@ from scmle.data.framing import questions
 
 
 def test_unsigned_llm_field_caps_the_claim_and_a_signature_lifts_it():
+    # Enforces docs/ARTIFACTS.md:76.
     sources = [provenance.Filling.TEMPLATE, provenance.Filling.LLM]
     assert (
         provenance.grade(qualification.Tier.CONFIRMED, sources, signed=False)

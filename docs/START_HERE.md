@@ -5,7 +5,7 @@ watched and rolled back. You need no data-science background. You need to be
 able to open a terminal and type commands.
 
 Every command below was run by the author on a real dataset, and every
-"What you should see" block is the real output (trimmed where it says so).
+"What you should see" section is the real output (trimmed where it says so).
 Your numbers may differ in the last digits. Time-limited searches depend on
 how fast your computer is.
 
@@ -96,7 +96,7 @@ All the commands below run inside `~/first-model`.
 
 ## Step 2. Look at the data first
 
-Never train on a table you have not looked at. Print its size and first rows:
+Look at a table before you train on it. Print its size and first rows:
 
 ```bash runnable
 python -c "import pandas as pd; d = pd.read_csv('titanic.csv'); print(d.shape); print(d.head(3).to_string())"
@@ -119,7 +119,7 @@ SCMLE for a fact sheet about the table:
 scmle catalog titanic.csv --label-column survived --output catalog.json
 ```
 
-What you should see: a block of JSON. Find these parts:
+What you should see: a page of JSON. Find these parts:
 
 ```text
 "label": {"distribution": {"0": 809, "1": 500}, ...}
@@ -193,8 +193,8 @@ the first day it is used for real.
 
 Why SCMLE warns instead of refusing. From the data alone, a leaked column and a
 genuinely strong, legitimate column look identical. The screen has no way to
-know when a value is recorded. If it refused every flagged column, it would also
-refuse good analyses (it flags legitimate measurements on the breast-cancer
+know when a value is recorded. If it stopped on every flagged column, it would
+also stop good analyses (it flags legitimate measurements on the breast-cancer
 table). So it trains, says so loudly, labels the score provisional, and leaves
 the decision to a person who knows when each value is known. The full
 reasoning and the measured error rates are in [Leakage](LEAKAGE.md).
@@ -248,7 +248,7 @@ What to look at:
   keep the survivor share the same in each part), `budget=1800s` (it would
   search up to 30 minutes).
 * `Candidates` lists the **models** it will try. `dummy` is a model that
-  ignores the features. It is the floor every real model must beat.
+  ignores the features. It is the floor: a useful model has to beat it.
 * `[reject] ... missing dependency: lightgbm` lines are normal. Those models
   need optional extras you did not install.
 * The two `WARNING` lines say `body` and `boat` look like leaks. SCMLE is
@@ -395,7 +395,7 @@ stops when the time budget ends, so a slower or busier computer tries fewer
 models. When the author repeated this page on a second, busier machine with the
 same command, the winner was `bagged_logistic_regression` (practice 0.835, exam
 0.869) instead of `stacking` (practice 0.848, exam 0.885), and the importance
-rows were missing because the time ran out. What must hold on your machine: the
+rows were missing because the time ran out. What to check on your machine: the
 exam score is clearly above 0.5, it is close to the practice score, and
 `fit health` says `healthy`. If the importance rows are missing, rerun with
 `--time-budget 300`.
@@ -439,7 +439,8 @@ one:
 export SCMLE_SIGNING_KEY=demo-key-change-me
 ```
 
-The run did not sign its bundle. Sign it by saving a copy. Save this as
+The run did not sign its bundle, because the key was not set when it ran.
+Sign it by saving a copy. Save this as
 `save_model.py`. The `if __name__` lines at the bottom are required (see the
 note after):
 
@@ -482,7 +483,7 @@ signature.json
 Notice the new file `signature.json`. (On a slower computer the list can lack
 `conformal.json` and `coverage_report.json`; that is the time budget again.)
 
-`trusted=True` means "I made this folder myself, open it." Never use it on a
+`trusted=True` means "I made this folder myself, open it." Do not use it on a
 folder from someone else.
 
 Now make a small file of new passengers. They have the same columns as before,
@@ -545,7 +546,7 @@ terminal.
 A note on the `if __name__ == "__main__":` lines. SCMLE trains models in helper
 processes. On macOS and Windows, a script without that guard makes the helper
 re-run your whole script, and you get a long error about "bootstrapping phase".
-Always keep the guard in scripts that call `run()`.
+Keep the guard in every script that calls `run()`.
 
 ## Step 9. Package, then serve
 
@@ -610,7 +611,7 @@ config error: refusing to listen on '0.0.0.0' without authentication: set SCMLE_
 
 The reference server has no login and no encryption. It only listens on your
 own machine unless you set up tokens (see
-[`TENANT_ISOLATION.md`](TENANT_ISOLATION.md)). Never put it on the internet as
+[`TENANT_ISOLATION.md`](TENANT_ISOLATION.md)). Do not put it on the internet as
 it is.
 
 To ship to a real server you build a container. `scmle package` writes the
@@ -727,7 +728,7 @@ How to read it:
 * **PSI** is a number for "how different is this column from training".
   Under about 0.1 is calm. Above about 0.25 is a strong shift.
 * **Drift** means the incoming data stopped looking like the training data.
-* A drift alarm is not always a real problem. In the author's first try, a
+* A drift alarm does not by itself mean a real problem. In the author's first try, a
   "fresh" batch was the last 509 rows of the file, which is sorted by
   passenger class, so it was nearly all third class and the monitor said
   `investigate`. The alarm was right: that batch really was different. The cure
@@ -870,7 +871,7 @@ worse. See [`TUTORIAL.md`](TUTORIAL.md) section 7.
 
 * A beginner trap list: [Decisions](DECISIONS.md).
 * Understand every number you saw: [Reading results](READING_RESULTS.md).
-* A refusal you do not understand: [When things go wrong](WHEN_THINGS_GO_WRONG.md).
+* A stopped run or an error you do not understand: [When things go wrong](WHEN_THINGS_GO_WRONG.md).
 * The "charter" and the claims it produces (the careful, pre-registered mode
   of working): see "A second mode: the charter" in
   [Reading results](READING_RESULTS.md).

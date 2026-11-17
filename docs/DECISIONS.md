@@ -28,7 +28,7 @@ mean what I think it means?
 
 **If you choose wrong.** You get a precise answer to the wrong question. A
 model that predicts "customer has closed their account" is useless for finding
-customers about to leave. SCMLE cannot see this; only you can.
+customers about to leave. SCMLE has no way to know what you meant; only you do.
 
 **Command.** `--target survived`.
 
@@ -51,7 +51,7 @@ SCMLE lists the others it knows in `scmle.evaluation.metrics.CATALOG`. You can
 also add your own with `scmle.evaluation.metrics.register_metric`, for example the money lost.
 
 **If you choose wrong.** The search picks the model that is best at the wrong
-thing. Accuracy on a rare event picks a model that always says "no". The
+thing. Accuracy on a rare event rewards a model that says "no" to every row. The
 tool's pick is `roc_auc` for two answers by default; that is only a default.
 
 **Command.** `--metric pr_auc`.
@@ -84,7 +84,7 @@ Tools:
 * `--exclude colA colB` drops columns for any other reason.
 * `--leakage-policy warn` is the default: the run finishes, labels the score
   `PROVISIONAL` and names the flagged columns. `--leakage-policy block` stops
-  instead; choose it when you cannot attest where each value comes from, or in
+  instead; choose it when nobody can attest where each value comes from, or in
   regulated work. Why neither is a verdict: [Leakage](LEAKAGE.md).
 
 **If you choose wrong.** A leak makes the model look brilliant. On the Titanic
@@ -114,8 +114,8 @@ times and you do not group, SCMLE may print a recommendation about duplicates
 
 **The question.** Will I use this model to predict the future from the past?
 
-**How to choose.** If your rows have dates and you will always predict later
-rows, then yes. Name the date column. SCMLE trains on the earlier rows and
+**How to choose.** If your rows have dates and every prediction will be for
+later rows, then yes. Name the date column. SCMLE trains on the earlier rows and
 tests on the later ones. If the order of rows is meaningless, no.
 
 * `--time-column event_time` trains on the past and tests on the future.
@@ -137,7 +137,7 @@ lab and not in use.
 
 **How to choose.** Put a number on each, in any unit you like, as long as they
 are in the same unit. A missed fraud may cost 8 times a false alarm. A missed
-disease may cost 50 times an unneeded test. If you truly cannot tell, say so,
+disease may cost 50 times an unneeded test. If you truly do not know, say so,
 and see "If you do not know the costs" below.
 
 Write it down once:
@@ -198,9 +198,10 @@ how fast your computer is.
 **The question.** Who will review the model before it goes live, and where is
 the secret signing key kept?
 
-**How to choose.** The person who approves a promotion must not be the one who
-built the model. Keep the signing key in a secret manager, not in a file in
-the repository. Use `SCMLE_SIGNING_KEY_FILE` to point at a mounted file.
+**How to choose.** The person who approves a release must not be the one who
+asked for it; the release gate refuses a self-approval. Keep the signing key
+in a secret manager, not in a file in the repository. Use
+`SCMLE_SIGNING_KEY_FILE` to point at a mounted file.
 
 **If you choose wrong.** If you sign your own approvals with a key you leave in
 the code, the signature proves nothing. SCMLE checks the mechanism, not the
@@ -208,8 +209,8 @@ honesty of the people.
 
 ## 10. What will make me stop?
 
-Write this before you see results, so that you cannot talk yourself out of it
-later.
+Write this before you see results, so that the results do not talk you out of
+it later.
 
 * The lowest exam score I would accept (a number, not "good").
 * The largest gap between practice and exam score I would accept.

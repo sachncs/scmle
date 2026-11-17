@@ -147,6 +147,8 @@ def test_group_and_temporal_runs(binary_frame, tmp_path):
 
 
 def test_blocked_run_records_terminal_state(binary_frame, tmp_path):
+    # Enforces README.md:132.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:71.
     ambiguous = binary_frame.assign(y=numpy.arange(len(binary_frame)) % 5)
     with pytest.raises(errors.BlockedError) as caught:
         run(ambiguous, tmp_path)

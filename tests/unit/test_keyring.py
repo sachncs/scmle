@@ -45,6 +45,7 @@ def test_active_key_signs_and_verifies_without_persisting_secret():
 
 def test_retirement_stops_signing_but_allows_explicit_historical_verification():
     """Rotation preserves old evidence without permitting new signatures."""
+    # Enforces docs/SECURITY.md:94.
     registry = keyring.Keyring((record(), record("release-2026-11")))
     payload = {"release": "candidate-1"}
     envelope = registry.sign(

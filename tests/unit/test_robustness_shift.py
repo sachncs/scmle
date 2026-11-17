@@ -166,6 +166,8 @@ def test_the_checks_are_exploration_checks_with_the_documented_fields():
 
 
 def test_a_descriptive_test_never_blocks_and_a_gating_one_does_what_asked():
+    # Enforces docs/GLOSSARY.md:425-426.
+    # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:144.
     left, right = frames(rows=200, shift_by=1.5)
     block = qualification.Decision.BLOCK
     quiet = shift.c2st(left, right, 0, permutations=49, on_shift=block)
@@ -258,6 +260,8 @@ def test_a_column_with_one_level_and_an_empty_column_have_p_one():
 
 
 def test_no_reference_is_unverifiable_never_pass():
+    # Enforces docs/READING_RESULTS.md:346.
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:232-234.
     left = frames()[0]
     result = shift.assess(left, None, 0)
     assert result.status is shift.Status.UNVERIFIABLE
@@ -266,6 +270,7 @@ def test_no_reference_is_unverifiable_never_pass():
 
 
 def test_a_reference_without_shared_columns_or_rows_is_unverifiable():
+    # Enforces docs/WHEN_THINGS_GO_WRONG.md:232-234.
     left, right = frames()
     other = right.rename(columns=lambda name: "z" + name)
     assert shift.assess(left, other, 0).status is shift.Status.UNVERIFIABLE

@@ -169,6 +169,7 @@ def test_healthy_traffic_and_data_breach_nothing():
 
 
 def test_too_little_data_is_reported_not_called_healthy():
+    # Enforces docs/OPERATIONS.md:28.
     watch = support_ops.monitor(minimum=50)
     support_ops.healthy_traffic(watch, count=10)
     rows = watch.evaluate(support_ops.START + 5)
@@ -628,6 +629,7 @@ def test_a_healthy_window_is_retained_but_opens_nothing(tmp_path):
 
 
 def test_a_failed_page_is_recorded_not_hidden(tmp_path):
+    # Enforces docs/OPERATIONS.md:56.
     desk, log = make_desk(tmp_path, script=(500,))
     result = desk.handle(window(availability="breach"))
     assert not any(d.delivered for d in result.deliveries)

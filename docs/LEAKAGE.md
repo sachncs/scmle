@@ -192,15 +192,16 @@ the file. The second re-measures the 1000 null worlds and the planted leaks.
 
 ## What the product does about it
 
-The right design is a **qualification instrument**: it attaches evidence and a
-tier to every claim and never hands you a silent verdict. For leakage:
+The aim is a **qualification instrument**: it attaches evidence and a tier to
+its claims and says what it found, instead of handing you a silent verdict.
+For leakage:
 
 * **It trains and reports loudly.** The default `leakage_policy` is `warn`. The
   run logs a line naming the flagged columns, labels the score
   `test (PROVISIONAL: N flagged column(s) not attested: ...)` on its last line
   and in the first line of `report.html`, and lists the suspicions under
   "Findings" at the top of the report.
-* **It does not refuse by default.** A default refusal would stop honest
+* **It does not refuse by default.** Stopping by default would stop honest
   analyses (it would stop breast cancer). A default silence was also wrong: an
   earlier version printed nothing at the end of a run that scored 0.988 on
   Titanic because of two leaks. Loud, labelled, and settled by a person is the
@@ -208,7 +209,7 @@ tier to every claim and never hands you a silent verdict. For leakage:
 * **It lets you stop.** `--leakage-policy block` (opt-in) refuses a run that has
   a flagged column. A flag is a column whose test is significant after the
   Benjamini-Yekutieli step over permutation p-values and whose effect bound is
-  above the pre-registered ceiling; the false-alarm control holds by
+  above the pre-registered ceiling. The false-alarm control holds by
   construction on any rows that can be shuffled within their groups or time
   blocks, so no certificate is needed to act on a flag. What a clean result
   means is measured on each run's own rows: the screen also screens a copy
@@ -218,8 +219,8 @@ tier to every claim and never hands you a silent verdict. For leakage:
   groups, time blocks and budget. A plant it did not find is logged as a
   WARNING and recorded in the run: a leak of that kind may remain undetected
   on these rows (usually because there are too few of them). Use `block` when
-  you cannot attest where each value comes from, and in regulated settings
-  where an unexplained column must not reach a model.
+  no one can attest where each value comes from, and in regulated settings
+  where no unexplained column is allowed to reach a model.
 * **In a charter run it withholds.** A suspect is left out of the
   features until a person attests it. With a valid attestation the column is
   kept and recorded at tier `attested`, never `confirmed`.
@@ -321,9 +322,9 @@ analysis, until when. It does not check that they were right.
 
 Choose `--leakage-policy block` when:
 
-* you cannot get a person to say when each value is known;
-* the work is regulated, and an unexplained strong column must not reach a
-  model;
+* no person can tell you when each value is known;
+* the work is regulated, and no unexplained strong column is allowed to reach
+  a model;
 * you would rather stop and ask than read a label.
 
 The price is false stops on honest analyses: strong legitimate predictors can

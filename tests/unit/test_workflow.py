@@ -141,6 +141,7 @@ def test_the_standard_pipeline_is_valid_and_ordered():
 
 
 def test_invalid_definitions_are_refused():
+    # Enforces docs/ORCHESTRATION.md:14 and docs/ORCHESTRATION.md:17.
     s = definition.StepKind
     with pytest.raises(errors.ConfigError, match="cycle"):
         definition.Workflow(
@@ -580,6 +581,7 @@ def test_independent_steps_run_in_parallel_and_a_group_limit_holds(store):
 
 
 def test_approval_rules_are_enforced(store):
+    # Enforces docs/ORCHESTRATION.md:37.
     clock = Clock()
     recorder = Recorder(clock)
     executor = executor_for(store, pipeline(), recorder, clock)
@@ -621,6 +623,7 @@ def test_approval_rules_are_enforced(store):
 
 
 def test_a_rejection_or_an_expiry_never_reaches_the_approved_step(store):
+    # Enforces docs/ORCHESTRATION.md:37.
     clock = Clock()
     recorder = Recorder(clock)
     executor = executor_for(store, pipeline(), recorder, clock)
@@ -715,6 +718,7 @@ def test_the_first_tick_does_not_backfill_and_a_second_tick_is_quiet(store):
 
 
 def test_a_scheduler_that_lost_its_state_does_not_repeat_finished_slots(store):
+    # Enforces docs/ORCHESTRATION.md:41.
     flow = scheduled(definition.CatchUp.LATEST_ONLY)
     clock = Clock(3600.0 + 1.0)
     recorder = Recorder(clock)
