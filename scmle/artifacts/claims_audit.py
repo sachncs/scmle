@@ -58,7 +58,7 @@ import scmle.assurance.ledger.ledger
 from scmle.causal.identification import attest
 from scmle.contracts import errors
 from scmle.contracts import signing
-from scmle.core import decision_reports
+from scmle.decision import reports
 
 CHARTER_FILE = "analysis_charter.json"
 CUSTODY_FILE = "custody_log.jsonl"
@@ -754,10 +754,10 @@ def tampered(run_dir: Path, registered: dict[str, Any]) -> list[str]:
         changed; empty if all match.
     """
     problems = []
-    for file_name in decision_reports.DECISION_FILES:
+    for file_name in reports.DECISION_FILES:
         expected = registered.get(file_name)
         try:
-            found = decision_reports.file_digest(run_dir / file_name)
+            found = reports.file_digest(run_dir / file_name)
         except ValueError as error:
             # handled: returned as failed finding/problem/refusal with error
             # text
@@ -805,11 +805,9 @@ def check_decision_files(
         entries = [
             e
             for e in log.entries
-            if e.get("event") == decision_reports.REGISTRATION_EVENT
+            if e.get("event") == reports.REGISTRATION_EVENT
         ]
-    present = [
-        n for n in decision_reports.DECISION_FILES if (run_dir / n).exists()
-    ]
+    present = [n for n in reports.DECISION_FILES if (run_dir / n).exists()]
     if not entries:
         if not present:
             return None

@@ -15,8 +15,8 @@ from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
-from scmle.core import decision_reports
 from scmle.data.splitting import splitters
+from scmle.decision import reports
 from tests.unit.test_charter_causal import causal_charter
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_claims_audit import edit_claims
@@ -770,9 +770,7 @@ def test_decision_files_without_a_registration_are_an_older_run(tmp_path):
     assert claims_audit.check_decision_files(tmp_path, KEY) is None
     write_custody(tmp_path, [("C", "sealed", {})])
     assert claims_audit.check_decision_files(tmp_path, KEY) is None
-    (tmp_path / decision_reports.DECISION_FILES[0]).write_text(
-        "{}", encoding="utf-8"
-    )
+    (tmp_path / reports.DECISION_FILES[0]).write_text("{}", encoding="utf-8")
     assert claims_audit.check_decision_files(tmp_path, KEY) == finding(
         DECISION,
         "skipped",
@@ -782,16 +780,16 @@ def test_decision_files_without_a_registration_are_an_older_run(tmp_path):
 
 def test_decision_files_registration_counts_and_joins_problems(tmp_path):
     folder = tmp_path
-    names = decision_reports.DECISION_FILES
+    names = reports.DECISION_FILES
     for name in names[:3]:
         (folder / name).write_text(json.dumps({"n": name}), encoding="utf-8")
-    digests = decision_reports.hashsums(folder)
+    digests = reports.hashsums(folder)
     write_custody(
         folder,
         [
             (
                 "final_test",
-                decision_reports.REGISTRATION_EVENT,
+                reports.REGISTRATION_EVENT,
                 {"files": digests},
             )
         ],
@@ -812,7 +810,7 @@ def test_decision_files_registration_counts_and_joins_problems(tmp_path):
         [
             (
                 "final_test",
-                decision_reports.REGISTRATION_EVENT,
+                reports.REGISTRATION_EVENT,
                 {"files": digests},
             )
         ],
@@ -823,9 +821,7 @@ def test_decision_files_registration_counts_and_joins_problems(tmp_path):
 
 
 def test_a_decision_registration_without_files_registers_nothing(tmp_path):
-    write_custody(
-        tmp_path, [("final_test", decision_reports.REGISTRATION_EVENT, {})]
-    )
+    write_custody(tmp_path, [("final_test", reports.REGISTRATION_EVENT, {})])
     assert claims_audit.check_decision_files(tmp_path, KEY) == finding(
         DECISION, "pass", "0 file(s) hash to the registration"
     )

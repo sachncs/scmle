@@ -23,8 +23,8 @@ scmle/runtime/config.py overlay single-use tests/unit/test_config.py (lines 14 t
 scmle/core/context.py experimental_tabular_capability single-use builds the experimental deep-tabular Capability (deeplearning extra, 4 GB, 100000 rows); inlined into the generator in enrol at loop depth three it would add a 43-line constructor to an 87-line function
 scmle/core/context.py extension_capability single-use tests/unit/test_breadth.py:189 calls it directly; its caller in stages.py is a nested except branch of the capability gate
 scmle/core/context.py advertise single-use builds the supported Capability with the TABULAR_BETA_EVALUATIONS lookup and the deep_learning extras rule; inlined into the generator in enrol at loop depth three it would add a 45-line constructor
-scmle/core/decision_reports.py decision_report single-use tests/integration/test_decision_reports_run.py (lines 101 and 122) call it directly to check the summary document
-scmle/core/decision_reports.py hashsums single-use tests/unit/test_claims_audit_mutants.py:799 and test_claims_audit.py:287 call it directly to build the registered digests
+scmle/decision/reports.py decision_report single-use tests/integration/test_decision_reports_run.py (lines 101 and 122) call it directly to check the summary document
+scmle/decision/reports.py hashsums single-use tests/unit/test_claims_audit_mutants.py:799 and test_claims_audit.py:287 call it directly to build the registered digests
 scmle/core/ingest_stage.py recipe single-use synthesize is at complexity 7 with six branches and 20 statements; recipe adds a try/except and a required-keys check with two ConfigError raises, and the ingest_stage module docstring (lines 18 to 27) documents the plan file whose five required keys recipe enforces
 scmle/runtime/ipc.py rendezvous single-use its raise StartError sits in the caller's try whose except StartError kills the process, so inlining would trigger TRY301 (raise inside try)
 scmle/runtime/limits.py preforked single-use contextlib.contextmanager with a lock and reference-counted environment restore; tests/unit/test_thread_safety.py:664 and docs/ARCHITECTURE.md line 187 refer to it

@@ -9,10 +9,10 @@ from scmle.assurance import coverage_run
 from scmle.assurance.charter import sealing
 import scmle.assurance.ledger.ledger
 from scmle.contracts import tasks
-from scmle.core import decision_reports
 import scmle.core.context
 from scmle.core.stages import relabelling
 from scmle.core.stages import scoring
+from scmle.decision import reports
 from scmle.evaluation import coverage
 
 
@@ -81,9 +81,9 @@ class Reporting(relabelling.Relabelling):
             return
         vault.log.append(
             "final_test",
-            decision_reports.REGISTRATION_EVENT,
+            reports.REGISTRATION_EVENT,
             "scmle.decision",
-            {"files": decision_reports.hashsums(context.store.directory)},
+            {"files": reports.hashsums(context.store.directory)},
         )
 
     def decide(
@@ -138,10 +138,10 @@ class Reporting(relabelling.Relabelling):
             if data.propensity_column and data.propensity_column in features
             else None
         )
-        value = decision_reports.policy_value(
+        value = reports.policy_value(
             layer, actions, outcome, logged, propensity
         )
-        satisfaction = decision_reports.fairness(
+        satisfaction = reports.fairness(
             layer,
             features,
             outcome,
@@ -149,10 +149,10 @@ class Reporting(relabelling.Relabelling):
             float(charter.error_budget.confirmation.alpha_confirm),
         )
         design_record = None
-        built = decision_reports.rollout_design(
+        built = reports.rollout_design(
             charter, float(numpy.mean(outcome)) if len(outcome) else 0.0
         )
-        report = decision_reports.decision_report(
+        report = reports.decision_report(
             charter,
             decision,
             net_benefit,
@@ -160,14 +160,14 @@ class Reporting(relabelling.Relabelling):
             satisfaction,
             None if built is None else built[0],
         )
-        context.write_json(decision_reports.POLICY_FILE, value)
-        written = ["decision_report.json", decision_reports.POLICY_FILE]
+        context.write_json(reports.POLICY_FILE, value)
+        written = ["decision_report.json", reports.POLICY_FILE]
         if decision is not None:
-            context.write_json(decision_reports.THRESHOLD_FILE, decision)
-            written.append(decision_reports.THRESHOLD_FILE)
+            context.write_json(reports.THRESHOLD_FILE, decision)
+            written.append(reports.THRESHOLD_FILE)
         if net_benefit is not None:
-            context.write_json(decision_reports.NET_BENEFIT_FILE, net_benefit)
-            written.append(decision_reports.NET_BENEFIT_FILE)
+            context.write_json(reports.NET_BENEFIT_FILE, net_benefit)
+            written.append(reports.NET_BENEFIT_FILE)
         if built is not None:
             design_record, log = built
             context.write_json("rollout_design.json", design_record)

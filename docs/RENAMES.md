@@ -2927,3 +2927,4 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.evaluation.coverage_confirm` -> `scmle.assurance.coverage_confirm`
 - `scmle.data.identification` -> `scmle.causal.identification`
 - `scmle.core.causal_claim` -> `scmle.causal.claim`
+- `scmle.core.decision_reports` -> `scmle.decision.reports`

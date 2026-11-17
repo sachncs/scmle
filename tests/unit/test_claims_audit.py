@@ -278,7 +278,7 @@ DECISION = "decision files: hashes match the custody log"
 
 def notarize(tmp_path, files):
     """Writes the files and the custody event that registers their hashes."""
-    from scmle.core import decision_reports
+    from scmle.decision import reports
 
     for name, body in files.items():
         (tmp_path / name).write_text(json.dumps(body), encoding="utf-8")
@@ -287,7 +287,7 @@ def notarize(tmp_path, files):
         "final_test",
         "decision_files",
         "scmle.decision",
-        {"files": decision_reports.hashsums(tmp_path)},
+        {"files": reports.hashsums(tmp_path)},
     )
 
 
