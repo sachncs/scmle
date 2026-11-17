@@ -10,6 +10,7 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
+from scmle.data import reference
 from scmle.data.curation import preprocessing
 from scmle.data.modalities import document
 from scmle.data.profiling import profiler
@@ -19,7 +20,6 @@ import scmle.data.validation.target
 from scmle.governance import attestation
 from scmle.models import registry
 from scmle.models import thresholds
-from scmle.monitoring import reference
 from scmle.sampling import resampling
 
 SETTINGS = settings(

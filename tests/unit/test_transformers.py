@@ -3,7 +3,7 @@
 import numpy
 from sklearn import base
 
-from scmle.data.curation import transformers
+from scmle.data import transformers
 
 
 def make_features():

@@ -261,7 +261,7 @@ def test_run_store_cleans_partial_write_when_replace_fails(
 
 
 def test_reference_profile_roundtrips_and_is_checksummed(trained, tmp_path):
-    from scmle.monitoring import reference
+    from scmle.data import reference
 
     bundle, features = trained
     scores = pandas.Series(bundle.predict_proba(features)[:, 1], name="score")

@@ -21,8 +21,8 @@ import sklearn.tree
 from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.curation import embedding
-from scmle.data.curation import transformers
+from scmle.data import embedding
+from scmle.data import transformers
 
 MISSING_TOKEN = "__missing__"  # nosec B105  # noqa: S105 -- a category placeholder, not a secret
 ID_UNIQUE_RATIO = 0.95

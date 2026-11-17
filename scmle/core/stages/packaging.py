@@ -10,11 +10,11 @@ from scmle.contracts import tasks
 import scmle.core.context
 from scmle.core.stages import assessment
 from scmle.core.stages import tracing
+import scmle.data.reference
 from scmle.governance import attestation
 from scmle.governance import ledger
 from scmle.governance import model_card
 from scmle.inference import novelty
-import scmle.monitoring.reference
 import scmle.runtime.state
 
 PARITY_ROWS = 200
@@ -81,7 +81,7 @@ class PackageStage(tracing.Tracing):
             configuration=context.spec.config_hash(),
             dataset=context.manifest.data_hash if context.manifest else "",
             split=split.manifest.fingerprint,
-            reference=scmle.monitoring.reference.Baseline.build(
+            reference=scmle.data.reference.Baseline.build(
                 split.dev_features,
                 profile.feature_plan,
                 scmle.core.context.require(

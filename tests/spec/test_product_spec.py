@@ -220,7 +220,7 @@ def test_l101_l105_three_planes_are_separate_packages():
     for plane in (
         ("core", "intelligence"),
         ("data", "models"),
-        ("artifacts", "integrations"),
+        ("artifacts", "storage"),
     ):
         assert all((PACKAGE / name).is_dir() for name in plane)
 
@@ -238,7 +238,6 @@ def test_l113_l176_package_organization():
         "data/validation",
         "data/curation",
         "data/splitting",
-        "features",
         "sampling",
         "models",
         "models/sklearn",
@@ -251,7 +250,8 @@ def test_l113_l176_package_organization():
         "inference",
         "monitoring",
         "governance",
-        "integrations",
+        "runtime",
+        "storage",
     )
     for package in packages:
         assert (PACKAGE / package / "__init__.py").exists(), package
@@ -1204,9 +1204,9 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
     import pickle
 
     from scmle.core import policies
+    from scmle.data import feature_graph
     from scmle.data.splitting import splitters
     from scmle.experimentation import trials
-    from scmle.features import feature_graph
     from scmle.intelligence import knowledge
     import scmle.models.registry
     import scmle.monitoring.events

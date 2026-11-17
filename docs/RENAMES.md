@@ -2897,3 +2897,7 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.data.store.conformance` -> `scmle.storage.conformance`
 - `scmle.experimentation.stores` -> `scmle.storage.stores`
 - `scmle.integrations.mlflow_store` -> `scmle.storage.mlflow_store`
+- `scmle.features.feature_graph` -> `scmle.data.feature_graph`
+- `scmle.monitoring.reference` -> `scmle.data.reference`
+- `scmle.data.curation.transformers` -> `scmle.data.transformers`
+- `scmle.data.curation.embedding` -> `scmle.data.embedding`

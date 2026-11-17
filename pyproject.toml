@@ -296,7 +296,7 @@ source_modules = ["scmle.contracts", "scmle.durability", "scmle.unsupervised"]
 forbidden_modules = [
     "scmle.api", "scmle.artifacts", "scmle.cli", "scmle.core", "scmle.data",
     "scmle.decision", "scmle.deploy", "scmle.evaluation", "scmle.experimentation",
-    "scmle.explainability", "scmle.features", "scmle.governance", "scmle.inference",
+    "scmle.explainability", "scmle.governance", "scmle.inference",
     "scmle.intelligence", "scmle.models", "scmle.monitoring",
     "scmle.operations", "scmle.optimization", "scmle.runners", "scmle.runtime",
     "scmle.sampling", "scmle.security", "scmle.storage", "scmle.trail",
@@ -311,12 +311,12 @@ source_modules = ["scmle"]
 forbidden_modules = ["scmle.cli"]
 allow_indirect_imports = true
 
-# 19 packages import each other in one cycle at package level (api, artifacts,
-# core, data, decision, deploy, evaluation, experimentation, explainability,
-# features, governance, inference, intelligence, models, monitoring,
-# operations, sampling, security), so no layering exists among them; the
-# layer map (scripts/layers.toml, register phase 3) is untangling it. The
-# contracts below pin the layers around that cycle.
+# These packages imported each other in one cycle at package level (api,
+# artifacts, core, data, decision, deploy, evaluation, experimentation,
+# explainability, governance, inference, intelligence, models, monitoring,
+# operations, sampling, security), so no layering exists among them; the layer
+# map (scripts/layers.toml, register phase 3) is untangling it. The contracts
+# below pin the layers around that cycle.
 [[tool.importlinter.contracts]]
 name = "Top of the stack: cli above workflow above runners and trail"
 type = "layers"
@@ -328,7 +328,7 @@ type = "forbidden"
 source_modules = [
     "scmle.api", "scmle.artifacts", "scmle.core", "scmle.data",
     "scmle.decision", "scmle.deploy", "scmle.evaluation",
-    "scmle.experimentation", "scmle.explainability", "scmle.features",
+    "scmle.experimentation", "scmle.explainability",
     "scmle.governance", "scmle.inference", "scmle.intelligence",
     "scmle.models", "scmle.monitoring", "scmle.operations", "scmle.runtime",
     "scmle.sampling", "scmle.security", "scmle.storage", "scmle.optimization",
@@ -345,7 +345,7 @@ source_modules = ["scmle.optimization"]
 forbidden_modules = [
     "scmle.api", "scmle.artifacts", "scmle.core", "scmle.data",
     "scmle.decision", "scmle.deploy", "scmle.evaluation",
-    "scmle.experimentation", "scmle.explainability", "scmle.features",
+    "scmle.experimentation", "scmle.explainability",
     "scmle.governance", "scmle.inference", "scmle.intelligence",
     "scmle.models", "scmle.monitoring", "scmle.operations", "scmle.runtime",
     "scmle.sampling", "scmle.security", "scmle.storage", "scmle.durability",

@@ -5,7 +5,7 @@ import pandas
 import pytest
 
 from scmle.contracts import data
-from scmle.monitoring import reference
+from scmle.data import reference
 
 
 def test_psi_is_zero_for_identical_and_grows_with_shift():

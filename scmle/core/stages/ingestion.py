@@ -12,11 +12,11 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 import scmle.core.context
 from scmle.core.stages import interface
+from scmle.data import feature_graph
 from scmle.data.curation import forecasting
 from scmle.data.readers import streaming
 from scmle.data.readers import tabular
 import scmle.data.readers.registry
-from scmle.features import feature_graph
 import scmle.runtime.state
 
 

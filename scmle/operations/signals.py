@@ -6,7 +6,7 @@
   request events (every request is counted; none is sampled);
 * data quality: missing-rate increase, unseen categories, the share of
   requests rejected as invalid, and the noise-adjusted PSI of each feature
-  against the training reference (`scmle.monitoring.reference`), from feature
+  against the training reference (`scmle.data.reference`), from feature
   rows (sampled at ``sample_rate``);
 * model performance: the mean loss of cases whose outcome has arrived
   (delayed labels) against ``reference_loss`` plus a tolerance, using the same
@@ -30,8 +30,8 @@ import pandas
 
 from scmle.contracts import errors
 from scmle.contracts import observability
+import scmle.data.reference
 from scmle.monitoring import monitor
-import scmle.monitoring.reference
 
 INVALID_STATUSES = frozenset({400, 409, 413, 415, 422})
 
@@ -229,7 +229,7 @@ class SignalMonitor:
         self,
         policy: Window = Window(),  # noqa: B008
         thresholds: SignalThresholds = SignalThresholds(),  # noqa: B008
-        profile: scmle.monitoring.reference.Baseline | None = None,
+        profile: scmle.data.reference.Baseline | None = None,
     ) -> None:
         """Creates a monitor.
 

@@ -39,8 +39,10 @@ from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.contracts import tasks
 import scmle.contracts.data
+from scmle.data import feature_graph
 from scmle.data.readers import interchange
 from scmle.data.readers import tabular
+import scmle.data.reference
 from scmle.evaluation import cv_plus
 from scmle.evaluation import dirichlet
 from scmle.evaluation import reliability
@@ -49,13 +51,11 @@ import scmle.evaluation.conformal
 import scmle.evaluation.quantile
 from scmle.explainability import local
 import scmle.explainability.counterfactual
-from scmle.features import feature_graph
 from scmle.inference import onnx_export
 from scmle.inference import validation
 import scmle.inference.mapping
 import scmle.inference.novelty
 from scmle.models import thresholds
-import scmle.monitoring.reference
 
 # Format 2 signs and checksums the schema alongside every serialized model
 # component. Format 1 bundles did not authenticate schema.json and are refused
@@ -569,7 +569,7 @@ def hydrate(
     reference = None
     path = resolve(root, info, REFERENCE_FILE, "reference profile was modified")
     if path is not None:
-        reference = scmle.monitoring.reference.Baseline.from_dict(
+        reference = scmle.data.reference.Baseline.from_dict(
             json.loads(path.read_text(encoding="utf-8"))
         )
     history = None
@@ -653,7 +653,7 @@ class Bundle:
         pipeline: Any,
         schema: artifacts.Interface,
         info: Manifest,
-        reference: scmle.monitoring.reference.Baseline | None = None,
+        reference: scmle.data.reference.Baseline | None = None,
         history: pandas.DataFrame | None = None,
         calibrator: Any = None,
         conformal: scmle.evaluation.conformal.ConformalCalibrator | None = None,
@@ -712,7 +712,7 @@ class Bundle:
         model_params: dict[str, Any] | None = None,
         strategy: str = "default",
         decision_threshold: float | None = None,
-        reference: scmle.monitoring.reference.Baseline | None = None,
+        reference: scmle.data.reference.Baseline | None = None,
         graph_fingerprint: str = "",
         group_column: str | None = None,
         time_column: str | None = None,

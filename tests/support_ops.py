@@ -3,7 +3,7 @@
 import numpy
 import pandas
 
-from scmle.monitoring import reference
+from scmle.data import reference
 from scmle.operations import signals
 
 START = 1_000_000.0

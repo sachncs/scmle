@@ -14,7 +14,7 @@ from scmle.contracts import tasks
 from scmle.evaluation import metrics
 
 if TYPE_CHECKING:
-    from scmle.monitoring import reference
+    from scmle.data import reference
 
 STABLE = "stable"
 MODERATE = "moderate"

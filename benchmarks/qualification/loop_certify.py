@@ -76,12 +76,12 @@ import pandas
 
 from benchmarks.qualification import streams
 import scmle.certificates
+from scmle.data import reference
 from scmle.data.detectors import certificates
 from scmle.evaluation import coverage
 from scmle.governance import escalation
 import scmle.governance.loop
 from scmle.monitoring import labels
-from scmle.monitoring import reference
 from scmle.monitoring import sequential_tests
 import scmle.monitoring.monitor
 

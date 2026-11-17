@@ -15,7 +15,7 @@ from typing import Self
 import numpy
 from sklearn import base
 
-from scmle.data.curation import transformers
+from scmle.data import transformers
 from scmle.runtime import worker
 
 LOGGER = logging.getLogger(__name__)

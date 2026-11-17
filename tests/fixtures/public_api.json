@@ -59,7 +59,7 @@
     "scmle.artifacts.bundle": {
       "Bundle": {
         "kind": "class",
-        "signature_sha256": "388b34a7781327cc0a5a5c06be09d1f468f875d03f4cf7939fbac17a848ca5f6"
+        "signature_sha256": "146136aedec3af2ecb7602d39b87aed731fb7125ae81a5ffb4acf34deada7cec"
       }
     },
     "scmle.data.catalog": {
@@ -533,7 +533,7 @@
       },
       "SignalMonitor": {
         "kind": "class",
-        "signature_sha256": "ba9184df4cd9e19f99b46da079af38f719270806317ea7ccdf84ffbe5a7dc31b"
+        "signature_sha256": "91a645caf57edb594b83e048fe58d974237ce7b9a0620e92517e14d2d25bdb24"
       },
       "SignalThresholds": {
         "kind": "class",

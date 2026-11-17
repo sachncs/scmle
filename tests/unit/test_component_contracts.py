@@ -12,12 +12,12 @@ from scmle.contracts import models
 import scmle.contracts.experiments
 from scmle.core import policies
 from scmle.core import stages
+from scmle.data import feature_graph
 from scmle.data.readers import tabular
 from scmle.data.splitting import splitters
 from scmle.data.validation import columns
 from scmle.evaluation import diagnostics
 from scmle.evaluation import selection
-from scmle.features import feature_graph
 from scmle.inference import serving
 from scmle.intelligence import planner
 from scmle.models import registry

@@ -19,9 +19,9 @@ from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import models
 from scmle.contracts import tasks
+from scmle.data import feature_graph
 from scmle.data.curation import selection
 from scmle.data.validation import columns
-from scmle.features import feature_graph
 from scmle.models import weighting
 from scmle.models import wrappers
 from scmle.models.forecasting import estimators

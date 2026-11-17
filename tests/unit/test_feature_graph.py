@@ -9,7 +9,7 @@ from sklearn import base
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.features import feature_graph
+from scmle.data import feature_graph
 
 
 def node(name, op, inputs, **params):
