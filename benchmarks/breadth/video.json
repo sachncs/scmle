@@ -7,7 +7,7 @@
   "built": "experimental_lifecycle",
   "evidence_in_repo": [
     "scmle/data/modalities/video",
-    "scmle/models/modality_lifecycle/preparers/video.py",
+    "scmle/pipeline/modality_lifecycle/preparers/video.py",
     "tests/unit/test_media_modalities.py",
     "tests/unit/test_modality_lifecycle.py"
   ],

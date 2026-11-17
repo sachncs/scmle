@@ -2938,3 +2938,6 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.intelligence.knowledge` -> `scmle.pipeline.knowledge`
 - `scmle.intelligence.planner` -> `scmle.pipeline.planner`
 - `scmle.intelligence.recommendations` -> `scmle.pipeline.recommendations`
+- `scmle.data.profiling.profiler` -> `scmle.pipeline.profiler`
+- `scmle.evaluation.suite` -> `scmle.pipeline.suite`
+- `scmle.models.modality_lifecycle` -> `scmle.pipeline.modality_lifecycle`

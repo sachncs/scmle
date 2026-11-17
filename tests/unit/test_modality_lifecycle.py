@@ -23,7 +23,7 @@ from scmle.data.modalities import image
 from scmle.data.modalities import video
 from scmle.explainability import quality
 from scmle.governance import attestation
-from scmle.models import modality_lifecycle
+from scmle.pipeline import modality_lifecycle
 
 
 def document_adapter() -> modality_lifecycle.DocumentPreparer:

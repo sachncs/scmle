@@ -6,7 +6,7 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.profiling import profiler
+from scmle.pipeline import profiler
 from scmle.runtime import budget
 from scmle.runtime import limits
 

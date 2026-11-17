@@ -319,7 +319,7 @@ ROOT_SURFACES = {
         "register_estimator",
         "unregister_estimator",
     ),
-    "scmle.models.modality_lifecycle": (
+    "scmle.pipeline.modality_lifecycle": (
         "Cancellation",
         "Checkpoint",
         "Curation",

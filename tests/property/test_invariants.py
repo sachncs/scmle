@@ -12,13 +12,13 @@ from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data import reference
 from scmle.data.modalities import document
-from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 from scmle.data.splitting import splitters
 import scmle.data.validation.target
 from scmle.governance import attestation
 from scmle.models import registry
 from scmle.models import thresholds
+from scmle.pipeline import profiler
 from scmle.preparation import preprocessing
 from scmle.preparation import resampling
 

@@ -10,9 +10,9 @@ import numpy
 from scmle.contracts import errors
 from scmle.contracts import modalities
 from scmle.explainability import quality
-from scmle.models.modality_lifecycle import constants
-from scmle.models.modality_lifecycle import containers
-from scmle.models.modality_lifecycle import state
+from scmle.pipeline.modality_lifecycle import constants
+from scmle.pipeline.modality_lifecycle import containers
+from scmle.pipeline.modality_lifecycle import state
 
 if TYPE_CHECKING:
     from sklearn.linear_model import LogisticRegression

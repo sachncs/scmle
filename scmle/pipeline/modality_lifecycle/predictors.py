@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING
 from scmle.contracts import errors
 from scmle.contracts import modalities
 from scmle.governance import attestation
-from scmle.models.modality_lifecycle import containers
-from scmle.models.modality_lifecycle import curators
-from scmle.models.modality_lifecycle import reporting
-from scmle.models.modality_lifecycle import verification
+from scmle.pipeline.modality_lifecycle import containers
+from scmle.pipeline.modality_lifecycle import curators
+from scmle.pipeline.modality_lifecycle import reporting
+from scmle.pipeline.modality_lifecycle import verification
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -26,8 +26,8 @@ if TYPE_CHECKING:
 
     # Predictor's fields name these two bare, as the public API snapshot
     # records them (tests/fixtures/public_api.json).
-    from scmle.models.modality_lifecycle.containers import Package
-    from scmle.models.modality_lifecycle.curators import Preparer
+    from scmle.pipeline.modality_lifecycle.containers import Package
+    from scmle.pipeline.modality_lifecycle.curators import Preparer
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

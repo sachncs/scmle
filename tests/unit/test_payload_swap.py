@@ -20,7 +20,7 @@ from scmle.contracts import errors
 from scmle.contracts import signing
 from scmle.models import documents
 from scmle.models import images
-from scmle.models import modality_lifecycle
+from scmle.pipeline import modality_lifecycle
 
 KEY = "swap-test-key"
 TRIPPED: list[str] = []

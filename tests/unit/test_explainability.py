@@ -8,11 +8,11 @@ import pandas
 import test_diagnostics
 
 from scmle.contracts import tasks
-from scmle.evaluation import suite
 from scmle.explainability import dependence
 from scmle.explainability import importance
 from scmle.explainability import interaction
 from scmle.explainability import local
+from scmle.pipeline import suite
 
 
 def test_occlusion_attributes_the_prediction_to_the_feature_that_drives_it():

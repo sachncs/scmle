@@ -377,7 +377,7 @@ def test_a_tampered_artifact_never_loads_in_production(reference, tmp_path):
 def test_the_modality_service_is_gated_the_same_way(tmp_path):
     # Enforces docs/API_STABILITY.md:209.
     from scmle.inference import modality_serving
-    from scmle.models import modality_lifecycle
+    from scmle.pipeline import modality_lifecycle
     from tests.unit import test_modality_serving
 
     reference = test_modality_serving.adapter()

@@ -22,7 +22,7 @@ START_SECONDS = 1.0
 # tasks at a 60 s budget, OMP_NUM_THREADS=1, two runs at a time). n is the
 # row count, p the feature columns, C' the classes when more than two, else
 # 1. Each constant is the fitted coefficient of its model. Preparation has
-# its own estimate (`scmle.data.profiling.profiler.estimate`), which the
+# its own estimate (`scmle.pipeline.profiler.estimate`), which the
 # caller passes to `Reserve.provision`.
 # The first trial of the run on the cheapest model: 1.86 s on 52,035 rows,
 # 0.6-1.4 s on 702-2,949 rows; START_SECONDS plus 2e-5 s per row covers

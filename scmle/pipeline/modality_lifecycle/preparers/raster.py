@@ -13,10 +13,10 @@ from scmle.contracts import errors
 from scmle.contracts import modalities
 from scmle.data.modalities import curation
 from scmle.data.modalities import geospatial
-from scmle.models.modality_lifecycle import constants
-from scmle.models.modality_lifecycle import containers
-from scmle.models.modality_lifecycle import curators
-from scmle.models.modality_lifecycle import scoring
+from scmle.pipeline.modality_lifecycle import constants
+from scmle.pipeline.modality_lifecycle import containers
+from scmle.pipeline.modality_lifecycle import curators
+from scmle.pipeline.modality_lifecycle import scoring
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

@@ -8,9 +8,9 @@ from scmle.assurance.admissibility import screen
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.profiling import label_noise
-from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 from scmle.pipeline import fingerprint
+from scmle.pipeline import profiler
 
 
 def labelled(rows=2000, seed=0):

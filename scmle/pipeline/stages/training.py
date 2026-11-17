@@ -5,8 +5,8 @@ from typing import ClassVar
 
 from scmle.contracts import errors
 from scmle.contracts import experiments
-from scmle.data.profiling import profiler
 from scmle.pipeline import ensemble_search
+from scmle.pipeline import profiler
 from scmle.pipeline import strategy_search
 from scmle.pipeline import trials
 from scmle.pipeline import tuning

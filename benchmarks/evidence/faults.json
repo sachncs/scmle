@@ -1,6 +1,6 @@
 {
   "claim": "C1",
-  "code": "89be4932229a387baa35c6c8ccf61b9df7a223d88818bdbdc8112ca0bb1293a8",
+  "code": "b017183ded92dc7f9ee426a91ae2668d9d8be0567755a22ae5a00edd35cebf58",
   "data": "simulated tables and synthetic inputs only",
   "floor": 1.0,
   "gates": [
@@ -304,7 +304,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.8,
-      "site": "scmle.data.profiling.profiler:Profiler.monotonic_features"
+      "site": "scmle.pipeline.profiler:Profiler.monotonic_features"
     },
     {
       "cause": "monotonic constraint on a categorical column",
@@ -324,7 +324,7 @@
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.05,
-      "site": "scmle.data.profiling.profiler:Profiler.portray"
+      "site": "scmle.pipeline.profiler:Profiler.portray"
     },
     {
       "by": "split.event.folds",

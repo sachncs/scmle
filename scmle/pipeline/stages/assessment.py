@@ -10,7 +10,7 @@ from scmle.contracts import tasks
 from scmle.evaluation import confidence
 from scmle.evaluation import criteria
 from scmle.evaluation import diagnostics
-from scmle.evaluation import suite
+from scmle.pipeline import suite
 import scmle.pipeline.context
 from scmle.pipeline.stages import cost
 from scmle.pipeline.stages import reporting

@@ -397,9 +397,9 @@ def test_l198_l206_foundational_and_production_contracts(run):
 def test_l210_l224_module_io_matrix_invariants(run, tmp_path):
     """Key invariant of each module in the I/O matrix."""
     project, result = run
-    from scmle.data.profiling import profiler
     from scmle.data.readers import tabular
     from scmle.data.splitting import splitters
+    from scmle.pipeline import profiler
 
     frame = make_frame(200)
     before = frame.copy()
@@ -730,8 +730,8 @@ def test_l374_l393_balancing_and_augmentation(frame):
         and "copula_augment" in strategies.OPT_IN
     )  # research plugins
     import scmle.contracts.data
-    from scmle.data.profiling import profiler
     from scmle.data.readers import tabular
+    from scmle.pipeline import profiler
     from scmle.preparation import resampling
 
     # Sampling happens inside the training fold (inside fit), never on the full dataset.
@@ -1143,9 +1143,9 @@ def test_l739_l747_first_sprint_outcomes(run):
     assert (ROOT / "pyproject.toml").exists() and list(
         (ROOT / "tests").rglob("test_*.py")
     )  # 2 package skeleton + tests
-    from scmle.data.profiling import profiler
     from scmle.data.readers import tabular
     from scmle.data.splitting import splitters
+    from scmle.pipeline import profiler
 
     frame = make_frame()
     manifest = tabular.manifested(frame, "y", "<memory>")
@@ -1285,8 +1285,8 @@ def test_l765_l778_future_expansion_commitments(frame, tmp_path):
 
 def scmle_profile(frame):
     """Profile of `frame` for fingerprint checks."""
-    from scmle.data.profiling import profiler
     from scmle.data.readers import tabular
+    from scmle.pipeline import profiler
 
     manifest = tabular.manifested(frame, "y", "<memory>")
     spec = tasks.Config(data=tasks.Dataset(uri="x", target="y"))

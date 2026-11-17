@@ -9,10 +9,10 @@ from scmle.contracts import tasks
 import scmle.contracts.data
 from scmle.data import feature_graph
 from scmle.data.profiling import label_noise
-from scmle.data.profiling import profiler
 from scmle.data.profiling import representativeness
 from scmle.data.readers import tabular
 from scmle.evaluation import uplift
+from scmle.pipeline import profiler
 import scmle.pipeline.context
 from scmle.pipeline.stages import labelling
 

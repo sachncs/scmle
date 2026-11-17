@@ -15,7 +15,6 @@ from scmle.contracts import experiments
 from scmle.contracts import models
 from scmle.contracts import tasks
 import scmle.contracts.metrics
-from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 from scmle.evaluation import metrics
 from scmle.governance import lifecycle
@@ -23,6 +22,7 @@ import scmle.governance.registry
 from scmle.models import custom
 from scmle.models import registry
 from scmle.pipeline import planner
+from scmle.pipeline import profiler
 
 
 def test_the_plan_records_included_rejected_and_deferred_techniques():

@@ -11,7 +11,7 @@ from typing import Any
 import numpy
 
 from scmle.contracts import errors
-from scmle.models.modality_lifecycle import constants
+from scmle.pipeline.modality_lifecycle import constants
 
 
 class LifecycleCancelledError(errors.CancelledError):

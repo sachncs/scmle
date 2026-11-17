@@ -12,8 +12,8 @@ import scmle.api.project
 from scmle.contracts import modalities
 from scmle.data.modalities import curation
 from scmle.data.modalities import document
-from scmle.models import modality_lifecycle
-import scmle.models.modality_lifecycle
+from scmle.pipeline import modality_lifecycle
+import scmle.pipeline.modality_lifecycle
 
 
 def text_adapter() -> modality_lifecycle.Plaintext:
@@ -50,7 +50,7 @@ def test_modality_project_runs_and_persists_all_stages(tmp_path):
     assert project.declaration().status.value == "experimental"
     assert (tmp_path / "run" / "model" / "manifest.json").is_file()
     assert (tmp_path / "run" / "modality_lifecycle.json").is_file()
-    predictor = scmle.models.modality_lifecycle.Predictor.from_package(
+    predictor = scmle.pipeline.modality_lifecycle.Predictor.from_package(
         project.adapter,
         report.package.path,
         "test-signing-key",
@@ -174,7 +174,7 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
     assert result.dataset_card["manifest"]["task"] == "not_declared"
     assert Path(result.path).is_file()
 
-    restored = scmle.models.modality_lifecycle.Curation.read_verified(
+    restored = scmle.pipeline.modality_lifecycle.Curation.read_verified(
         result.path, "test-signing-key"
     )
     assert restored == result
@@ -188,7 +188,7 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
         ValueError,
         match=r"signature does not verify|content_digest does not match evidence",
     ):
-        scmle.models.modality_lifecycle.Curation.read_verified(
+        scmle.pipeline.modality_lifecycle.Curation.read_verified(
             result.path, "test-signing-key"
         )
     with pytest.raises(
@@ -284,7 +284,7 @@ def test_extension_curation_adapter_accepts_arbitrary_records_without_model_hook
         sample_count=len(records),
         profile={"record_type": "point", "dimensions": 2},
     )
-    adapter = scmle.models.modality_lifecycle.ExtensionCurator(
+    adapter = scmle.pipeline.modality_lifecycle.ExtensionCurator(
         extension=extension,
         sample_values=records,
         dataset_hash_value=dataset_hash,
@@ -313,7 +313,7 @@ def test_extension_curation_adapter_rejects_detached_report():
         sample_count=1,
         profile={},
     )
-    adapter = scmle.models.modality_lifecycle.ExtensionCurator(
+    adapter = scmle.pipeline.modality_lifecycle.ExtensionCurator(
         extension=extension,
         sample_values=({"x": 1},),
         dataset_hash_value=hashlib.sha256(b"declared-snapshot").hexdigest(),
@@ -329,7 +329,7 @@ def test_extension_curation_adapter_accepts_empty_raw_snapshot(tmp_path):
     """Empty snapshots remain valid curation evidence without modelling."""
     extension = modalities.Bespoke("acme/empty-stream")
     dataset_hash = hashlib.sha256(b"empty-snapshot").hexdigest()
-    adapter = scmle.models.modality_lifecycle.ExtensionCurator(
+    adapter = scmle.pipeline.modality_lifecycle.ExtensionCurator(
         extension=extension,
         sample_values=(),
         dataset_hash_value=dataset_hash,

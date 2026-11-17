@@ -192,7 +192,7 @@ def test_to_finite_maps_text_and_infinities_to_nan():
 
 
 def test_all_missing_columns_are_reported_as_missing_not_constant():
-    from scmle.data.profiling import profiler
+    from scmle.pipeline import profiler
 
     assert (
         profiler.disqualify(

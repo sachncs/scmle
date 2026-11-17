@@ -6,9 +6,9 @@ import pytest
 
 from scmle.contracts import errors
 from scmle.contracts import tasks
-from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 import scmle.data.validation.target
+from scmle.pipeline import profiler
 
 
 def make_spec(task="auto", **data_overrides):

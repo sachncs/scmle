@@ -5,10 +5,10 @@ import pandas
 import pytest
 
 from scmle.contracts import tasks
-from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 from scmle.data.validation import columns
 from scmle.pipeline import fingerprint
+from scmle.pipeline import profiler
 
 
 def profile_of(frame, task=tasks.Task.BINARY, **data_overrides):

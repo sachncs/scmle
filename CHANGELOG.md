@@ -18,8 +18,10 @@ marked `Breaking:` and listed first in their group.
   module are unchanged; replace the module path to migrate. Pinned public
   modules moved so far: `scmle.core.retry` -> `scmle.runtime.retry`,
   `scmle.data.store.objectstore` -> `scmle.storage.objectstore`,
-  `scmle.api.results` -> `scmle.artifacts.results`. Logger
-  names follow the module path, so a log filter on an old path must change.
+  `scmle.api.results` -> `scmle.artifacts.results`,
+  `scmle.models.modality_lifecycle` -> `scmle.pipeline.modality_lifecycle`.
+  Logger names follow the module path, so a log filter on an old path must
+  change.
 * **Bundle format 4.** The package layering (register phase 3) moves
   modules whose classes are pickled inside a bundle, so `BUNDLE_FORMAT` goes
   from 3 to 4 and `Bundle.load` refuses a format 3 bundle with the existing

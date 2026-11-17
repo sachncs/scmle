@@ -22,8 +22,8 @@ from scmle.contracts import signing
 from scmle.data.modalities import curation
 from scmle.data.modalities import document
 from scmle.governance import attestation
-from scmle.models.modality_lifecycle import constants
-from scmle.models.modality_lifecycle import containers
+from scmle.pipeline.modality_lifecycle import constants
+from scmle.pipeline.modality_lifecycle import containers
 
 if TYPE_CHECKING:
     import numpy

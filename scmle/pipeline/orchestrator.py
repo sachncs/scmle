@@ -25,12 +25,12 @@ from scmle.contracts import errors
 from scmle.contracts import events
 from scmle.contracts import experiments
 from scmle.contracts import tasks
-from scmle.data.profiling import profiler
 from scmle.evaluation import metrics
 from scmle.evaluation import selection
 import scmle.models.registry
 from scmle.pipeline import compiler
 from scmle.pipeline import policies
+from scmle.pipeline import profiler
 import scmle.pipeline.context
 import scmle.pipeline.stages
 from scmle.runtime import limits

@@ -13,7 +13,7 @@ from typing import Self
 from scmle.contracts import errors
 from scmle.contracts import modalities
 from scmle.contracts import signing
-from scmle.models.modality_lifecycle import reporting
+from scmle.pipeline.modality_lifecycle import reporting
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

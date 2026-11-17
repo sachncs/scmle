@@ -29,7 +29,7 @@ from scmle.security import access
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from scmle.models import modality_lifecycle
+    from scmle.pipeline import modality_lifecycle
 
 MAX_MODALITY_REQUEST_BYTES = 16 * 1024 * 1024
 MAX_MODALITY_REQUEST_SAMPLES = 10_000

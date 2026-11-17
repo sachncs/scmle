@@ -20,7 +20,7 @@ from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import modalities
 from scmle.contracts import performance
-from scmle.models import modality_lifecycle
+from scmle.pipeline import modality_lifecycle
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

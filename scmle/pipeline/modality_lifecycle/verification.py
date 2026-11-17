@@ -16,8 +16,8 @@ from sklearn.linear_model import LogisticRegression
 from scmle import envelope
 from scmle.contracts import errors
 from scmle.contracts import signing
-from scmle.models.modality_lifecycle import constants
-from scmle.models.modality_lifecycle import containers
+from scmle.pipeline.modality_lifecycle import constants
+from scmle.pipeline.modality_lifecycle import containers
 
 
 def file_digest(path: Path) -> str:

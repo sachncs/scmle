@@ -20,8 +20,8 @@ if TYPE_CHECKING:
 
     from sklearn.linear_model import LogisticRegression
 
-    from scmle.models.modality_lifecycle import containers
-    from scmle.models.modality_lifecycle import curators
+    from scmle.pipeline.modality_lifecycle import containers
+    from scmle.pipeline.modality_lifecycle import curators
 
 
 @dataclasses.dataclass

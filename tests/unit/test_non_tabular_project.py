@@ -15,7 +15,7 @@ from scmle.data.modalities import geospatial
 from scmle.data.modalities import graph
 from scmle.data.modalities import image
 from scmle.data.modalities import video
-from scmle.models import modality_lifecycle
+from scmle.pipeline import modality_lifecycle
 
 
 def text_adapter() -> modality_lifecycle.Plaintext:

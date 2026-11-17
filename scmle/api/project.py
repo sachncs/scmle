@@ -32,7 +32,7 @@ from scmle.data.readers import tabular
 from scmle.evaluation import parameter_estimation
 from scmle.governance import attestation
 from scmle.inference import evidence
-from scmle.models import modality_lifecycle
+from scmle.pipeline import modality_lifecycle
 from scmle.pipeline import policies
 import scmle.pipeline.context
 import scmle.pipeline.orchestrator

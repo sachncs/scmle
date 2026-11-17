@@ -17,12 +17,12 @@ from scmle.contracts import errors
 from scmle.contracts import modalities
 from scmle.contracts import performance
 from scmle.governance import attestation
-from scmle.models.modality_lifecycle import checkpoints
-from scmle.models.modality_lifecycle import containers
-from scmle.models.modality_lifecycle import curators
-from scmle.models.modality_lifecycle import predictors
-from scmle.models.modality_lifecycle import reporting
-from scmle.models.modality_lifecycle import state
+from scmle.pipeline.modality_lifecycle import checkpoints
+from scmle.pipeline.modality_lifecycle import containers
+from scmle.pipeline.modality_lifecycle import curators
+from scmle.pipeline.modality_lifecycle import predictors
+from scmle.pipeline.modality_lifecycle import reporting
+from scmle.pipeline.modality_lifecycle import state
 
 if TYPE_CHECKING:
     from collections.abc import Callable

@@ -115,7 +115,7 @@ override = "none"
 variables = []
 
 [profile.monotonic_columns]
-site = "scmle.data.profiling.profiler:Profiler.monotonic_features"
+site = "scmle.pipeline.profiler:Profiler.monotonic_features"
 error = "BlockedError"
 claim = "C1"
 passes = "Every column in data.monotonic_constraints is a numeric feature."
@@ -124,7 +124,7 @@ override = "none"
 variables = ["data.monotonic_constraints"]
 
 [profile.target_and_features]
-site = "scmle.data.profiling.profiler:Profiler.portray"
+site = "scmle.pipeline.profiler:Profiler.portray"
 error = "BlockedError"
 claim = "C5"
 passes = "The target has no missing values, a usable numeric, categorical, datetime or text feature remains, and the monotonic constraints name numeric features."

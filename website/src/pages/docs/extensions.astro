@@ -39,7 +39,7 @@ print(modality.value)
   <h2>Implement the polymorphic adapter</h2>
   <p>An extension adapter implements the same narrow interface as the built-in adapters. Each method has one responsibility: source identity, canonical samples, data understanding, leakage-aware partitions, bounded representations, stable sample identity, labels, monitoring, and user-visible limitations. The optional explanation hook is where your domain-specific raw-data explanation belongs; the shared lifecycle never invents one.</p>
   <pre><code>{`from scmle.contracts import modalities
-from scmle.models import modality_lifecycle
+from scmle.pipeline import modality_lifecycle
 
 
 class PointCloudAdapter(modality_lifecycle.Preparer):
@@ -104,7 +104,7 @@ print(curation.dataset_card["curation"])
 print(curation.path)
 # No modelling stage was run.`}</code></pre>
   <p>If the family is not ready for a full lifecycle adapter, use <code>ExtensionCurator</code>. It accepts arbitrary caller-owned records and a curation callback, but deliberately has no split, feature, label, or model hooks. The callback must return a report bound to the extension identity, dataset hash, and sample count.</p>
-  <pre><code>{`from scmle.models.modality_lifecycle import ExtensionCurator
+  <pre><code>{`from scmle.pipeline.modality_lifecycle import ExtensionCurator
 from scmle.api.project import Curator
 from scmle.contracts import modalities
 from scmle.data.modalities.curation import Curation

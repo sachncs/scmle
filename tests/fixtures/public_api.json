@@ -33,11 +33,11 @@
     "scmle.api.project": {
       "Curator": {
         "kind": "class",
-        "signature_sha256": "6424f85c3ebeaa7d7be4a33568e252d4e884a7129cd52fd6253da82e7f47e273"
+        "signature_sha256": "fc5d51960bd0109361ad288e68686177bb92eae4f5b2c49e0f00575e50fb2227"
       },
       "ModalityProject": {
         "kind": "class",
-        "signature_sha256": "089dafdce03c153737ae3de1d596d3bc082f59651834ce20f77e13b437d9c417"
+        "signature_sha256": "cb28c77250cc6eac4eb49e4500dcf7630eac80620ec2ecf029ba6b025749572d"
       },
       "Project": {
         "kind": "class",
@@ -400,36 +400,6 @@
         "signature_sha256": "fe0fd9428b7396a18a2f9240650f0dc4c56f5371ac4b9f56163fae9135fe6b8e"
       }
     },
-    "scmle.models.modality_lifecycle": {
-      "Cancellation": {
-        "kind": "class",
-        "signature_sha256": "db8e35344392f513210cb6964ec5058b3f7659bccd52411ec4b50b0afda2ad81"
-      },
-      "Checkpoint": {
-        "kind": "class",
-        "signature_sha256": "0cbe5c89435e77fffe1df59cf10f7c0799a5eccf0082b32260e538f899dabc53"
-      },
-      "Curation": {
-        "kind": "class",
-        "signature_sha256": "17ae8b6274e913e2bcf36e240db6a9aa73e82a0299e4d3ed4f2969fc2f2d30bd"
-      },
-      "Curator": {
-        "kind": "class",
-        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
-      },
-      "ExtensionCurator": {
-        "kind": "class",
-        "signature_sha256": "d2a472f7380ee3bbe061a2e2cf045112350c152efb7946a98972aa99efad32c3"
-      },
-      "LifecycleCancelledError": {
-        "kind": "class",
-        "signature_sha256": "5b78ac7b90bb70f10da35d4abb1167104119d557823caf5e7035c50104f25832"
-      },
-      "Predictor": {
-        "kind": "class",
-        "signature_sha256": "77169e73ad26425bcb6af599de834e935d648231fcadfa3d6d8ac7799891bcc0"
-      }
-    },
     "scmle.operations.classify": {
       "Classification": {
         "kind": "class",
@@ -556,6 +526,36 @@
       "MetricsSpool": {
         "kind": "class",
         "signature_sha256": "06b0437d0e2c1ce293dfb4f2cf009737aeb69dfe41f1565e90d3ffc9838dbe18"
+      }
+    },
+    "scmle.pipeline.modality_lifecycle": {
+      "Cancellation": {
+        "kind": "class",
+        "signature_sha256": "db8e35344392f513210cb6964ec5058b3f7659bccd52411ec4b50b0afda2ad81"
+      },
+      "Checkpoint": {
+        "kind": "class",
+        "signature_sha256": "0cbe5c89435e77fffe1df59cf10f7c0799a5eccf0082b32260e538f899dabc53"
+      },
+      "Curation": {
+        "kind": "class",
+        "signature_sha256": "17ae8b6274e913e2bcf36e240db6a9aa73e82a0299e4d3ed4f2969fc2f2d30bd"
+      },
+      "Curator": {
+        "kind": "class",
+        "signature_sha256": "9ec044f0a984a38ab0c4eda6249dd69a133b03645e371b9455e31c37e42a50d2"
+      },
+      "ExtensionCurator": {
+        "kind": "class",
+        "signature_sha256": "d2a472f7380ee3bbe061a2e2cf045112350c152efb7946a98972aa99efad32c3"
+      },
+      "LifecycleCancelledError": {
+        "kind": "class",
+        "signature_sha256": "5b78ac7b90bb70f10da35d4abb1167104119d557823caf5e7035c50104f25832"
+      },
+      "Predictor": {
+        "kind": "class",
+        "signature_sha256": "77169e73ad26425bcb6af599de834e935d648231fcadfa3d6d8ac7799891bcc0"
       }
     },
     "scmle.runners.base": {

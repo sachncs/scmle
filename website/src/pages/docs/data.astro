@@ -155,7 +155,7 @@ report = lifecycle.run(adapter, package_path, signing_key, manifest=manifest)`}<
 
   <h2>Verify a modality package before prediction</h2>
   <p>The experimental lifecycle exposes a library predictor for callers that already own a typed adapter. It verifies the signed package, modality, feature names, and estimator dimension before converting new samples into features. Codec choice and raw transport remain caller-owned.</p>
-  <pre><code>{`from scmle.models.modality_lifecycle import Predictor
+  <pre><code>{`from scmle.pipeline.modality_lifecycle import Predictor
 
 predictor = Predictor.from_package(
     adapter, "artifacts/modality-package", signing_key

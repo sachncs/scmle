@@ -13,10 +13,10 @@ from scmle.assurance.admissibility import screen
 from scmle.contracts import experiments
 from scmle.contracts import models
 from scmle.contracts import tasks
-from scmle.data.profiling import profiler
 from scmle.data.readers import tabular
 from scmle.models import custom
 from scmle.models import registry
+from scmle.pipeline import profiler
 import scmle.pipeline.planner
 
 TITANIC = (

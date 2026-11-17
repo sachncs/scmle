@@ -21,11 +21,11 @@ from scmle.contracts import modalities
 from scmle.contracts import performance
 from scmle.contracts import signing
 from scmle.data.modalities import curation
-from scmle.models.modality_lifecycle import constants
-from scmle.models.modality_lifecycle import containers
-from scmle.models.modality_lifecycle import predictors
-from scmle.models.modality_lifecycle import state
-from scmle.models.modality_lifecycle import verification
+from scmle.pipeline.modality_lifecycle import constants
+from scmle.pipeline.modality_lifecycle import containers
+from scmle.pipeline.modality_lifecycle import predictors
+from scmle.pipeline.modality_lifecycle import state
+from scmle.pipeline.modality_lifecycle import verification
 
 
 class Ingestion(state.Stage):

@@ -15,7 +15,7 @@ from scmle.data.modalities import document
 from scmle.inference import guard
 from scmle.inference import modality_serving
 import scmle.inference.modality_serving
-from scmle.models import modality_lifecycle
+from scmle.pipeline import modality_lifecycle
 
 
 class DocumentDecoder(modality_serving.ModalitySampleDecoder):
