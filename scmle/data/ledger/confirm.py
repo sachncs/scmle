@@ -95,6 +95,7 @@ from scmle.core import randomness
 from scmle.data.ledger import bivariate
 from scmle.data.ledger import budget
 from scmle.data.ledger import multiplicity
+from scmle.data.ledger import usage
 import scmle.data.ledger.ledger
 
 LOGGER = logging.getLogger(__name__)
@@ -836,6 +837,7 @@ def confirm(
     encode: Callable[[pandas.Series], Any] = default_encoding,
     withdrawal: Withdrawal | None = None,
     claim_runner: Docket | None = None,
+    register: usage.Register | None = None,
 ) -> Confirmation:
     """Freezes the survivors and tests them once on the confirmation set.
 
@@ -861,6 +863,8 @@ def confirm(
             set is still frozen and hashed, and `C` tests the rest.
         claim_runner: Claims registered in the ledger and evaluated on the
             same opening (module docstring, "Registered claims").
+        register: The durable record of this confirmation set across runs
+            (`usage`); the use is written just before `C` is opened.
 
     Returns:
         The confirmation, also recorded in the ledger. Cases that stop
@@ -870,7 +874,9 @@ def confirm(
         claims, not raised.
 
     Raises:
-        LeakageError: If the confirmation was already performed. The attempt
+        LeakageError: If the confirmation was already performed, in this run
+            or, by `register`, in another run of the same charter on the same
+            data. The attempt
             is written to the custody log. A `LeakageError` from opening the
             set is also propagated. A `LedgerError` from registering claims,
             freezing the survivors or building the withdrawal accounting
@@ -878,14 +884,7 @@ def confirm(
     """
     enforce(policy)
     if ledger.confirmation is not None:
-        denied_log = custody_log or (source.log if source is not None else None)
-        if denied_log is not None:
-            denied_log.append(
-                "C",
-                "denied",
-                ACTOR,
-                {"reason": "confirmation was already performed"},
-            )
+        deny(custody_log or (source.log if source is not None else None))
         raise errors.LeakageError(
             "the confirmation set was already used for the confirmation"
         )
@@ -943,6 +942,10 @@ def confirm(
                 stage_two=record,
             )
     log = custody_log or source.log
+    spent = None if register is None else register.record()
+    if spent is not None:
+        deny(log)
+        raise errors.LeakageError(spent)
     registered = () if claim_runner is None else claim_runner.registered
     claims_hash = preregister(log, ledger, survivors, rule, record, registered)
     return unseal(
@@ -957,6 +960,21 @@ def confirm(
         encode,
         record,
     )
+
+
+def deny(log: Log | None) -> None:
+    """Writes a refused second confirmation to the custody log, if any.
+
+    Args:
+        log: The custody log, or None.
+    """
+    if log is not None:
+        log.append(
+            "C",
+            "denied",
+            ACTOR,
+            {"reason": "confirmation was already performed"},
+        )
 
 
 def preregister(

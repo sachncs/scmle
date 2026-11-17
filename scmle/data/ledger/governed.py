@@ -34,6 +34,7 @@ from scmle.data.ledger import confirm
 from scmle.data.ledger import controls
 from scmle.data.ledger import explore
 from scmle.data.ledger import online_fdr
+from scmle.data.ledger import usage
 import scmle.data.ledger.budget
 import scmle.data.ledger.ledger
 import scmle.data.ledger.online_fdr
@@ -150,6 +151,8 @@ class Explored:
         classification: Whether the target holds classes.
         classes: The target's classes in coding order, or None.
         run_dir: Directory for the artifacts, or None.
+        data: Fingerprint of the exploration rows and target
+            (`usage.fingerprint`), or None when nothing is recorded.
     """
 
     ledger: scmle.data.ledger.ledger.Ledger
@@ -161,6 +164,7 @@ class Explored:
     classification: bool
     classes: tuple[Any, ...] | None
     run_dir: str | Path | None
+    data: str | None = None
 
 
 def run_governed(
@@ -351,6 +355,7 @@ def scout(
         classification=classification,
         classes=classes,
         run_dir=run_dir,
+        data=None if run_dir is None else usage.fingerprint(features, target),
     )
 
 
@@ -363,6 +368,7 @@ def finalise(
     ),
     policy: str = confirm.UNCONFIRMED,
     claim_runner: confirm.Docket | None = None,
+    registry: str | Path | None = None,
 ) -> Governance:
     """Freezes the survivors and tests once on `C` (see `run_governed`).
 
@@ -373,12 +379,17 @@ def finalise(
         policy: Failure policy of the confirmation.
         claim_runner: Claims registered in the ledger and evaluated on the
             same opening of `C`.
+        registry: Folder that keeps, across runs, the record of spent
+            confirmation sets (`usage`); the pipeline passes the folder
+            holding its run directories. None records nothing.
 
     Returns:
         The governed run. When the exploration has a run directory, the
         claims file and the negative control record are written there after
         the confirmation returns; a second confirmation raises
-        `LeakageError` and writes nothing. A withdrawal that is not
+        `LeakageError` and writes nothing, and so does a confirmation of
+        a set another run recorded in `registry` already spent under the
+        same charter on the same data (`usage`). A withdrawal that is not
         accounted is not passed to the confirmation.
     """
     charter = explored.charter
@@ -397,6 +408,7 @@ def finalise(
         ).to_numpy(dtype=float),
         withdrawal=withdrawal if withdrawal and withdrawal.accounted else None,
         claim_runner=claim_runner,
+        register=spend(explored, source, registry),
     )
     if explored.run_dir is not None:
         folder = Path(explored.run_dir)
@@ -413,4 +425,38 @@ def finalise(
         control=explored.control,
         confirmation=confirmation,
         scope=explored.scope,
+    )
+
+
+def spend(
+    explored: Explored,
+    source: confirm.Source | None,
+    registry: str | Path | None,
+) -> usage.Register | None:
+    """The cross-run record of the confirmation set this run would open.
+
+    Args:
+        explored: The state returned by `scout`.
+        source: The sealed confirmation set, or None.
+        registry: Folder that keeps the records, or None.
+
+    Returns:
+        A register in `registry`, keyed by the charter hash, the exploration
+        data and the confirmation row ids, naming the run by its directory;
+        None without a registry, a run directory or `C`.
+    """
+    if (
+        registry is None
+        or explored.run_dir is None
+        or explored.data is None
+        or source is None
+    ):
+        return None
+    folder = Path(explored.run_dir).resolve()
+    charter = explored.charter.charter_hash
+    return usage.Register(
+        registry,
+        usage.key(charter, explored.data, getattr(source, "ids", ())),
+        folder.name,
+        {"charter_hash": charter, "data": explored.data},
     )
