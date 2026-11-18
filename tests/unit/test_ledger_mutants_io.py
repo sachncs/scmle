@@ -23,7 +23,7 @@ from scmle.assurance.ledger import online_fdr
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.splitting import splitters
+from scmle.data.splitting.splitters import lockbox
 from scmle.runtime import randomness
 from tests.unit.test_charter_contracts import make_charter
 
@@ -226,9 +226,7 @@ def test_the_direction_and_seed_path_reach_the_check():
 
 def locate(features, target):
     log = sealed.Journal()
-    locked = splitters.ResidentTestSet(
-        features, target, tuple(range(len(target)))
-    )
+    locked = lockbox.Resident(features, target, tuple(range(len(target))))
     return sealed.Locker("C", locked, log)
 
 

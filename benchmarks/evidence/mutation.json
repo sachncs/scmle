@@ -10,9 +10,9 @@
     "excluded": {
       "entry point": 4,
       "no mutants": 110,
-      "untested": 355
+      "untested": 349
     },
-    "frame": 321,
+    "frame": 327,
     "kill_set": "tests/unit/test_*.py files importing the module",
     "modules": 19,
     "mutants": "default_rng([SEED, position]).choice of mutmut names",
@@ -27,7 +27,7 @@
       "causal": 12,
       "cli": 2,
       "contracts": 18,
-      "data": 23,
+      "data": 25,
       "decision": 8,
       "deploy": 15,
       "evaluation": 37,
@@ -38,7 +38,7 @@
       "monitoring": 11,
       "operations": 12,
       "optimization": 1,
-      "pipeline": 18,
+      "pipeline": 22,
       "preparation": 9,
       "root": 2,
       "runners": 6,
@@ -222,7 +222,7 @@
       "mutants": 334,
       "not_run": 0,
       "note": null,
-      "seconds": 23.1,
+      "seconds": 24.5,
       "stratum": "assurance",
       "survivors": [],
       "tests": [
@@ -279,7 +279,7 @@
       "mutants": 84,
       "not_run": 0,
       "note": null,
-      "seconds": 5.2,
+      "seconds": 5.7,
       "stratum": "assurance",
       "survivors": [],
       "tests": [
@@ -328,12 +328,12 @@
         "scmle.assurance.ledger.bivariate.x_untestable__mutmut_6",
         "scmle.assurance.ledger.bivariate.x_untestable__mutmut_7"
       ],
-      "files": "118eaab59cfad8047112ffd4ced72bfc62efa346d858c576557c5b80f7afc429",
+      "files": "4647bcb83cc216227a686c032706949b264df6f139c0a86129be8d50ae52a02a",
       "module": "scmle/assurance/ledger/bivariate.py",
       "mutants": 241,
       "not_run": 0,
       "note": null,
-      "seconds": 10.5,
+      "seconds": 11.2,
       "stratum": "assurance",
       "survivors": [
         "scmle.assurance.ledger.bivariate.x_spearman__mutmut_93"
@@ -393,7 +393,7 @@
       "mutants": 173,
       "not_run": 0,
       "note": null,
-      "seconds": 36.2,
+      "seconds": 35.6,
       "stratum": "assurance",
       "survivors": [
         "scmle.assurance.robustness.multiverse.x_universe__mutmut_29",
@@ -454,7 +454,7 @@
       "mutants": 168,
       "not_run": 0,
       "note": null,
-      "seconds": 4.8,
+      "seconds": 4.9,
       "stratum": "causal",
       "survivors": [
         "scmle.causal.identification.attest.x_apply__mutmut_34"
@@ -510,7 +510,7 @@
       "mutants": 361,
       "not_run": 0,
       "note": null,
-      "seconds": 8.0,
+      "seconds": 8.2,
       "stratum": "contracts",
       "survivors": [
         "scmle.contracts.reliability.x\u01c1Registry\u01c1insist__mutmut_9"
@@ -547,7 +547,7 @@
       "mutants": 6,
       "not_run": 0,
       "note": null,
-      "seconds": 3.9,
+      "seconds": 4.2,
       "stratum": "data",
       "survivors": [],
       "tests": [
@@ -561,63 +561,77 @@
     {
       "counts": {
         "crash": 0,
-        "killed": 30,
-        "no tests": 0,
-        "survived": 0,
+        "killed": 25,
+        "no tests": 1,
+        "survived": 4,
         "timeout": 0
       },
       "decided": 30,
       "drawn": [
-        "scmle.data.readers.streaming.transaction.x\u01c1Acknowledgement\u01c1__post_init____mutmut_16",
-        "scmle.data.readers.streaming.transaction.x\u01c1Acknowledgement\u01c1__post_init____mutmut_2",
-        "scmle.data.readers.streaming.transaction.x\u01c1Acknowledgement\u01c1from_dict__mutmut_16",
-        "scmle.data.readers.streaming.transaction.x\u01c1Acknowledgement\u01c1from_dict__mutmut_18",
-        "scmle.data.readers.streaming.transaction.x\u01c1Acknowledgement\u01c1from_dict__mutmut_20",
-        "scmle.data.readers.streaming.transaction.x\u01c1Acknowledgement\u01c1to_dict__mutmut_2",
-        "scmle.data.readers.streaming.transaction.x\u01c1Acknowledgement\u01c1to_dict__mutmut_4",
-        "scmle.data.readers.streaming.transaction.x\u01c1Commitment\u01c1from_dict__mutmut_14",
-        "scmle.data.readers.streaming.transaction.x\u01c1Commitment\u01c1from_dict__mutmut_17",
-        "scmle.data.readers.streaming.transaction.x\u01c1Commitment\u01c1from_dict__mutmut_23",
-        "scmle.data.readers.streaming.transaction.x\u01c1Commitment\u01c1from_dict__mutmut_29",
-        "scmle.data.readers.streaming.transaction.x\u01c1Commitment\u01c1from_dict__mutmut_6",
-        "scmle.data.readers.streaming.transaction.x\u01c1Commitment\u01c1to_dict__mutmut_10",
-        "scmle.data.readers.streaming.transaction.x\u01c1Receipt\u01c1__post_init____mutmut_12",
-        "scmle.data.readers.streaming.transaction.x\u01c1Receipt\u01c1__post_init____mutmut_24",
-        "scmle.data.readers.streaming.transaction.x\u01c1Receipt\u01c1__post_init____mutmut_7",
-        "scmle.data.readers.streaming.transaction.x\u01c1Settlement\u01c1__post_init____mutmut_10",
-        "scmle.data.readers.streaming.transaction.x\u01c1Settlement\u01c1from_dict__mutmut_1",
-        "scmle.data.readers.streaming.transaction.x\u01c1Settlement\u01c1from_dict__mutmut_14",
-        "scmle.data.readers.streaming.transaction.x\u01c1Settlement\u01c1from_dict__mutmut_23",
-        "scmle.data.readers.streaming.transaction.x\u01c1Settlement\u01c1from_dict__mutmut_33",
-        "scmle.data.readers.streaming.transaction.x\u01c1Settlement\u01c1to_dict__mutmut_7",
-        "scmle.data.readers.streaming.transaction.x\u01c1Voucher\u01c1__post_init____mutmut_15",
-        "scmle.data.readers.streaming.transaction.x\u01c1Voucher\u01c1__post_init____mutmut_2",
-        "scmle.data.readers.streaming.transaction.x\u01c1Voucher\u01c1__post_init____mutmut_8",
-        "scmle.data.readers.streaming.transaction.x\u01c1Voucher\u01c1from_dict__mutmut_1",
-        "scmle.data.readers.streaming.transaction.x\u01c1Voucher\u01c1from_dict__mutmut_14",
-        "scmle.data.readers.streaming.transaction.x\u01c1Voucher\u01c1from_dict__mutmut_9",
-        "scmle.data.readers.streaming.transaction.x\u01c1Voucher\u01c1to_dict__mutmut_2",
-        "scmle.data.readers.streaming.transaction.x\u01c1Voucher\u01c1to_dict__mutmut_7"
+        "scmle.data.readers.tabular.x_data_hash__mutmut_1",
+        "scmle.data.readers.tabular.x_data_hash__mutmut_5",
+        "scmle.data.readers.tabular.x_identify__mutmut_2",
+        "scmle.data.readers.tabular.x_identify__mutmut_21",
+        "scmle.data.readers.tabular.x_identify__mutmut_24",
+        "scmle.data.readers.tabular.x_identify__mutmut_45",
+        "scmle.data.readers.tabular.x_identify__mutmut_47",
+        "scmle.data.readers.tabular.x_manifested__mutmut_32",
+        "scmle.data.readers.tabular.x_manifested__mutmut_35",
+        "scmle.data.readers.tabular.x_manifested__mutmut_41",
+        "scmle.data.readers.tabular.x_manifested__mutmut_47",
+        "scmle.data.readers.tabular.x_manifested__mutmut_55",
+        "scmle.data.readers.tabular.x_manifested__mutmut_9",
+        "scmle.data.readers.tabular.x_raw_source_hash__mutmut_2",
+        "scmle.data.readers.tabular.x_raw_source_hash__mutmut_6",
+        "scmle.data.readers.tabular.x_sanitize__mutmut_13",
+        "scmle.data.readers.tabular.x_sanitize__mutmut_16",
+        "scmle.data.readers.tabular.x_schema_hash__mutmut_10",
+        "scmle.data.readers.tabular.x_schema_hash__mutmut_2",
+        "scmle.data.readers.tabular.x_semantic__mutmut_11",
+        "scmle.data.readers.tabular.x_semantic__mutmut_9",
+        "scmle.data.readers.tabular.x\u01c1Csv\u01c1load__mutmut_4",
+        "scmle.data.readers.tabular.x\u01c1Excel\u01c1load__mutmut_4",
+        "scmle.data.readers.tabular.x\u01c1Jsonl\u01c1load__mutmut_1",
+        "scmle.data.readers.tabular.x\u01c1Loader\u01c1__init____mutmut_1",
+        "scmle.data.readers.tabular.x\u01c1Loader\u01c1extensions__mutmut_1",
+        "scmle.data.readers.tabular.x\u01c1Loader\u01c1load__mutmut_13",
+        "scmle.data.readers.tabular.x\u01c1Loader\u01c1pick__mutmut_3",
+        "scmle.data.readers.tabular.x\u01c1Loader\u01c1pick__mutmut_5",
+        "scmle.data.readers.tabular.x\u01c1Tsv\u01c1__init____mutmut_4"
       ],
-      "files": "a533d7395c42104d25b252440bb9e6e08df3dfdf12b57f745a96ff0bad310529",
-      "module": "scmle/data/readers/streaming/transaction.py",
-      "mutants": 288,
+      "files": "2d639f3df59dd6e467e0872f398a361fc71f89ebd0600d81287faeaea34f5c65",
+      "module": "scmle/data/readers/tabular.py",
+      "mutants": 286,
       "not_run": 0,
       "note": null,
-      "seconds": 5.7,
+      "seconds": 200.5,
       "stratum": "data",
-      "survivors": [],
+      "survivors": [
+        "scmle.data.readers.tabular.x_data_hash__mutmut_5",
+        "scmle.data.readers.tabular.x_identify__mutmut_47",
+        "scmle.data.readers.tabular.x_sanitize__mutmut_16",
+        "scmle.data.readers.tabular.x\u01c1Tsv\u01c1__init____mutmut_4"
+      ],
       "tests": [
-        "tests/unit/test_mutation_transaction.py",
-        "tests/unit/test_plumbing_records.py"
+        "tests/unit/test_component_contracts.py",
+        "tests/unit/test_delimited.py",
+        "tests/unit/test_fingerprint.py",
+        "tests/unit/test_knowledge.py",
+        "tests/unit/test_planner.py",
+        "tests/unit/test_preparation_budget.py",
+        "tests/unit/test_profiling.py",
+        "tests/unit/test_readers.py",
+        "tests/unit/test_screen_budget.py",
+        "tests/unit/test_strategies.py",
+        "tests/unit/test_swallows.py"
       ]
     },
     {
       "counts": {
         "crash": 0,
-        "killed": 27,
+        "killed": 30,
         "no tests": 0,
-        "survived": 3,
+        "survived": 0,
         "timeout": 0
       },
       "decided": 30,
@@ -653,29 +667,26 @@
         "scmle.decision.netbenefit.x_stretch__mutmut_20",
         "scmle.decision.netbenefit.x\u01c1FinalNetBenefit\u01c1evaluate__mutmut_8"
       ],
-      "files": "820d03404babf95867862d06c781a1ff2049d5f83521efa75405b900eec1b2a1",
+      "files": "82cd2c79dc182426da06020f03775d3d8f616f8f38fb704dc0cab43fd4e25731",
       "module": "scmle/decision/netbenefit.py",
       "mutants": 446,
       "not_run": 0,
       "note": null,
-      "seconds": 5.9,
+      "seconds": 5.8,
       "stratum": "decision",
-      "survivors": [
-        "scmle.decision.netbenefit.x_lowerband__mutmut_24",
-        "scmle.decision.netbenefit.x_stretch__mutmut_20",
-        "scmle.decision.netbenefit.x\u01c1FinalNetBenefit\u01c1evaluate__mutmut_8"
-      ],
+      "survivors": [],
       "tests": [
         "tests/unit/test_decision_golden.py",
-        "tests/unit/test_decision_threshold_netbenefit.py"
+        "tests/unit/test_decision_threshold_netbenefit.py",
+        "tests/unit/test_mutation_netbenefit.py"
       ]
     },
     {
       "counts": {
         "crash": 0,
-        "killed": 26,
+        "killed": 27,
         "no tests": 0,
-        "survived": 4,
+        "survived": 3,
         "timeout": 0
       },
       "decided": 30,
@@ -711,17 +722,16 @@
         "scmle.deploy.parity.x\u01c1Parity\u01c1to_dict__mutmut_4",
         "scmle.deploy.parity.x\u01c1Parity\u01c1to_dict__mutmut_9"
       ],
-      "files": "59fc5aa7df32a13a96b613d8377ca17bc5b09586501274ac3f0effc1dd15fa2a",
+      "files": "8b40bdc81d892f4a90d702bcb8d0a80260607c8d2f53429fe9bece4ce6b99ee4",
       "module": "scmle/deploy/parity.py",
       "mutants": 456,
       "not_run": 0,
       "note": null,
-      "seconds": 42.2,
+      "seconds": 43.9,
       "stratum": "deploy",
       "survivors": [
         "scmle.deploy.parity.x_compare__mutmut_19",
         "scmle.deploy.parity.x_crosscheck__mutmut_33",
-        "scmle.deploy.parity.x_goldens__mutmut_19",
         "scmle.deploy.parity.x_read_json__mutmut_3"
       ],
       "tests": [
@@ -780,7 +790,7 @@
       "mutants": 325,
       "not_run": 0,
       "note": null,
-      "seconds": 6.1,
+      "seconds": 5.9,
       "stratum": "evaluation",
       "survivors": [],
       "tests": [
@@ -834,7 +844,7 @@
       "mutants": 327,
       "not_run": 0,
       "note": null,
-      "seconds": 10.9,
+      "seconds": 10.8,
       "stratum": "evaluation",
       "survivors": [
         "scmle.evaluation.shift.x\u01c1Adversary\u01c1sample__mutmut_7"
@@ -890,7 +900,7 @@
       "mutants": 188,
       "not_run": 0,
       "note": null,
-      "seconds": 4.6,
+      "seconds": 4.5,
       "stratum": "governance",
       "survivors": [],
       "tests": [
@@ -944,7 +954,7 @@
       "mutants": 270,
       "not_run": 0,
       "note": null,
-      "seconds": 8.0,
+      "seconds": 7.9,
       "stratum": "models",
       "survivors": [
         "scmle.models.ensembles.x\u01c1Blender\u01c1fit__mutmut_29",
@@ -1002,7 +1012,7 @@
       "mutants": 277,
       "not_run": 0,
       "note": null,
-      "seconds": 18.6,
+      "seconds": 18.5,
       "stratum": "monitoring",
       "survivors": [],
       "tests": [
@@ -1016,9 +1026,9 @@
     {
       "counts": {
         "crash": 0,
-        "killed": 29,
+        "killed": 30,
         "no tests": 0,
-        "survived": 1,
+        "survived": 0,
         "timeout": 0
       },
       "decided": 30,
@@ -1054,16 +1064,14 @@
         "scmle.operations.cost.x\u01c1Usage\u01c1allocate__mutmut_13",
         "scmle.operations.cost.x\u01c1Usage\u01c1allocate__mutmut_14"
       ],
-      "files": "a22a415c3b6ab859c98c0b70a6e7fd9e6ae84fb52d9eff52b767861f60468f5b",
+      "files": "413e7f61add6896b92d88c1296918fa30575d3f66b6e17ae4bd64d7000d50810",
       "module": "scmle/operations/cost.py",
       "mutants": 164,
       "not_run": 0,
       "note": null,
-      "seconds": 4.6,
+      "seconds": 4.9,
       "stratum": "operations",
-      "survivors": [
-        "scmle.operations.cost.x_report__mutmut_80"
-      ],
+      "survivors": [],
       "tests": [
         "tests/unit/test_mutation_cost.py",
         "tests/unit/test_operations_telemetry.py"
@@ -1072,9 +1080,9 @@
     {
       "counts": {
         "crash": 0,
-        "killed": 8,
-        "no tests": 17,
-        "survived": 5,
+        "killed": 30,
+        "no tests": 0,
+        "survived": 0,
         "timeout": 0
       },
       "decided": 30,
@@ -1110,30 +1118,25 @@
         "scmle.pipeline.strategy_search.x\u01c1Strategist\u01c1tune__mutmut_44",
         "scmle.pipeline.strategy_search.x\u01c1Strategist\u01c1tune__mutmut_6"
       ],
-      "files": "4db77b765ed62faba9fae2a032a9ccbb259fd6c4008f5edbf06aac66241f431a",
+      "files": "8f6d89a8231b037d51e33401f2125338ae534664c7e0608b115e05e87c44ac96",
       "module": "scmle/pipeline/strategy_search.py",
       "mutants": 141,
       "not_run": 0,
       "note": null,
-      "seconds": 4.1,
+      "seconds": 4.8,
       "stratum": "pipeline",
-      "survivors": [
-        "scmle.pipeline.strategy_search.x\u01c1Strategist\u01c1__init____mutmut_17",
-        "scmle.pipeline.strategy_search.x\u01c1Strategist\u01c1search__mutmut_10",
-        "scmle.pipeline.strategy_search.x\u01c1Strategist\u01c1search__mutmut_11",
-        "scmle.pipeline.strategy_search.x\u01c1Strategist\u01c1search__mutmut_13",
-        "scmle.pipeline.strategy_search.x\u01c1Strategist\u01c1search__mutmut_41"
-      ],
+      "survivors": [],
       "tests": [
+        "tests/unit/test_mutation_strategy_search.py",
         "tests/unit/test_trial_dispatch.py"
       ]
     },
     {
       "counts": {
         "crash": 0,
-        "killed": 0,
-        "no tests": 28,
-        "survived": 2,
+        "killed": 27,
+        "no tests": 0,
+        "survived": 3,
         "timeout": 0
       },
       "decided": 30,
@@ -1169,27 +1172,29 @@
         "scmle.preparation.multitarget.x\u01c1Multitarget\u01c1predict__mutmut_1",
         "scmle.preparation.multitarget.x\u01c1Multitarget\u01c1predict__mutmut_3"
       ],
-      "files": "d5ecd1b61201a73bd871683ac404caaca2d8835c92ea980e8658d6ab398f90ed",
+      "files": "97c22b71b1b3b84f9bd8605773dc1c8b4eec1166a553f6439a03c31fca192abf",
       "module": "scmle/preparation/multitarget.py",
       "mutants": 40,
       "not_run": 0,
       "note": null,
-      "seconds": 3.2,
+      "seconds": 4.4,
       "stratum": "preparation",
       "survivors": [
-        "scmle.preparation.multitarget.x\u01c1Multitarget\u01c1__init____mutmut_1",
-        "scmle.preparation.multitarget.x\u01c1Multitarget\u01c1__init____mutmut_2"
+        "scmle.preparation.multitarget.x\u01c1Multitarget\u01c1fit__mutmut_13",
+        "scmle.preparation.multitarget.x\u01c1Multitarget\u01c1fit__mutmut_15",
+        "scmle.preparation.multitarget.x\u01c1Multitarget\u01c1fit__mutmut_9"
       ],
       "tests": [
+        "tests/unit/test_mutation_multitarget.py",
         "tests/unit/test_mutation_preprocessing.py"
       ]
     },
     {
       "counts": {
         "crash": 0,
-        "killed": 28,
+        "killed": 27,
         "no tests": 0,
-        "survived": 2,
+        "survived": 3,
         "timeout": 0
       },
       "decided": 30,
@@ -1199,42 +1204,43 @@
         "scmle.runtime.limits.x_footprint__mutmut_9",
         "scmle.runtime.limits.x_peak_memory_gb__mutmut_14",
         "scmle.runtime.limits.x_peak_memory_gb__mutmut_19",
-        "scmle.runtime.limits.x_ps_table__mutmut_19",
-        "scmle.runtime.limits.x_ps_table__mutmut_24",
-        "scmle.runtime.limits.x_psutil_table__mutmut_10",
-        "scmle.runtime.limits.x_tabulate__mutmut_27",
-        "scmle.runtime.limits.x_tabulate__mutmut_31",
-        "scmle.runtime.limits.x_tabulate__mutmut_9",
-        "scmle.runtime.limits.x\u01c1Governor\u01c1deadline__mutmut_4",
-        "scmle.runtime.limits.x\u01c1Governor\u01c1explain__mutmut_1",
-        "scmle.runtime.limits.x\u01c1Governor\u01c1overdue__mutmut_12",
-        "scmle.runtime.limits.x\u01c1Governor\u01c1overdue__mutmut_16",
-        "scmle.runtime.limits.x\u01c1Governor\u01c1report__mutmut_21",
-        "scmle.runtime.limits.x\u01c1Governor\u01c1report__mutmut_37",
-        "scmle.runtime.limits.x\u01c1Governor\u01c1report__mutmut_48",
-        "scmle.runtime.limits.x\u01c1Governor\u01c1report__mutmut_63",
-        "scmle.runtime.limits.x\u01c1Governor\u01c1report__mutmut_9",
-        "scmle.runtime.limits.x\u01c1Governor\u01c1skip_reason__mutmut_13",
-        "scmle.runtime.limits.x\u01c1Governor\u01c1skip_reason__mutmut_2",
+        "scmle.runtime.limits.x_ps_table__mutmut_2",
+        "scmle.runtime.limits.x_ps_table__mutmut_25",
+        "scmle.runtime.limits.x_psutil_table__mutmut_11",
+        "scmle.runtime.limits.x_tabulate__mutmut_29",
+        "scmle.runtime.limits.x_tabulate__mutmut_33",
+        "scmle.runtime.limits.x_tabulate__mutmut_6",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1deadline__mutmut_1",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1deadline__mutmut_8",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1overdue__mutmut_10",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1overdue__mutmut_13",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1report__mutmut_2",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1report__mutmut_35",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1report__mutmut_46",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1report__mutmut_61",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1report__mutmut_8",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1skip_reason__mutmut_12",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1skip_reason__mutmut_16",
+        "scmle.runtime.limits.x\u01c1Supervisor\u01c1run__mutmut_1",
         "scmle.runtime.limits.x\u01c1Supervisor\u01c1run__mutmut_10",
-        "scmle.runtime.limits.x\u01c1Supervisor\u01c1run__mutmut_11",
         "scmle.runtime.limits.x\u01c1Supervisor\u01c1run__mutmut_24",
-        "scmle.runtime.limits.x\u01c1Supervisor\u01c1run__mutmut_4",
+        "scmle.runtime.limits.x\u01c1Supervisor\u01c1run__mutmut_39",
         "scmle.runtime.limits.x\u01c1Supervisor\u01c1run__mutmut_44",
         "scmle.runtime.limits.x\u01c1Supervisor\u01c1run__mutmut_49",
         "scmle.runtime.limits.x\u01c1Supervisor\u01c1run__mutmut_50",
         "scmle.runtime.limits.x\u01c1Supervisor\u01c1run__mutmut_51"
       ],
-      "files": "768e99d7299b011e656ba4d0e8e8db51a1584988689f2b3ec556c9c22a24b309",
+      "files": "dae92baa5b0526919dcd6433fbfae36f2d62c880325e8ce4396746b45451ffdf",
       "module": "scmle/runtime/limits.py",
-      "mutants": 342,
+      "mutants": 347,
       "not_run": 0,
       "note": null,
-      "seconds": 33.8,
+      "seconds": 42.3,
       "stratum": "runtime",
       "survivors": [
-        "scmle.runtime.limits.x_tabulate__mutmut_27",
-        "scmle.runtime.limits.x_tabulate__mutmut_9"
+        "scmle.runtime.limits.x_tabulate__mutmut_29",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1report__mutmut_35",
+        "scmle.runtime.limits.x\u01c1Governor\u01c1skip_reason__mutmut_12"
       ],
       "tests": [
         "tests/unit/test_budget_reserve.py",
@@ -1258,16 +1264,16 @@
   "pooled": {
     "counts": {
       "crash": 0,
-      "killed": 473,
-      "no tests": 45,
-      "survived": 28,
+      "killed": 521,
+      "no tests": 1,
+      "survived": 24,
       "timeout": 0
     },
     "decided": 546,
-    "killed": 473,
-    "lower": 0.8399463868107703,
+    "killed": 521,
+    "lower": 0.9366346060654834,
     "not_run": 0,
-    "score": 0.8663003663003663
+    "score": 0.9542124542124543
   },
   "power": 0.8,
   "sample": [
@@ -1278,7 +1284,7 @@
     "scmle/causal/identification/attest.py",
     "scmle/contracts/reliability.py",
     "scmle/data/modalities/image/__init__.py",
-    "scmle/data/readers/streaming/transaction.py",
+    "scmle/data/readers/tabular.py",
     "scmle/decision/netbenefit.py",
     "scmle/deploy/parity.py",
     "scmle/evaluation/fairness.py",
@@ -1291,7 +1297,7 @@
     "scmle/preparation/multitarget.py",
     "scmle/runtime/limits.py"
   ],
-  "seconds": 525.7,
+  "seconds": 706.0,
   "untested": [
     "scmle/api/curator.py",
     "scmle/api/estimation.py",
@@ -1446,11 +1452,8 @@
     "scmle/data/readers/streaming/feed.py",
     "scmle/data/readers/streaming/journal.py",
     "scmle/data/readers/streaming/sampling.py",
-    "scmle/data/splitting/splitters/chronology.py",
-    "scmle/data/splitting/splitters/grouping.py",
     "scmle/data/splitting/splitters/partitions.py",
     "scmle/data/splitting/splitters/splitter.py",
-    "scmle/data/splitting/splitters/stratification.py",
     "scmle/decision/constraints/cuts.py",
     "scmle/decision/constraints/rates.py",
     "scmle/decision/constraints/satisfaction.py",
@@ -1548,7 +1551,6 @@
     "scmle/operations/continuous/promotion.py",
     "scmle/operations/continuous/records.py",
     "scmle/operations/continuous/retraining.py",
-    "scmle/pipeline/archive.py",
     "scmle/pipeline/context.py",
     "scmle/pipeline/ensemble_search.py",
     "scmle/pipeline/hyperband.py",
@@ -1582,7 +1584,6 @@
     "scmle/pipeline/stages/exploration.py",
     "scmle/pipeline/stages/identification.py",
     "scmle/pipeline/stages/impounding.py",
-    "scmle/pipeline/stages/ingestion.py",
     "scmle/pipeline/stages/labelling.py",
     "scmle/pipeline/stages/packaging.py",
     "scmle/pipeline/stages/planning.py",
@@ -1599,7 +1600,6 @@
     "scmle/pipeline/stages/summary.py",
     "scmle/pipeline/stages/surveying.py",
     "scmle/pipeline/stages/tracing.py",
-    "scmle/pipeline/stages/training.py",
     "scmle/preparation/forecasters.py",
     "scmle/preparation/forecasting.py",
     "scmle/preparation/strategies/features.py",

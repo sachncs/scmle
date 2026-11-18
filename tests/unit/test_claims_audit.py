@@ -13,7 +13,7 @@ from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 from scmle.assurance.ledger import ledger
 from scmle.contracts import errors
-from scmle.data.splitting import splitters
+from scmle.data.splitting.splitters import lockbox
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_ledger_governed import build
 
@@ -35,9 +35,7 @@ def make_run(tmp_path, withdraw=True, rules=None):
     log = sealed.Journal(tmp_path / claims_audit.CUSTODY_FILE, KEY)
     source = sealed.Locker(
         "C",
-        splitters.ResidentTestSet(
-            cfeatures, ctarget, tuple(range(len(ctarget)))
-        ),
+        lockbox.Resident(cfeatures, ctarget, tuple(range(len(ctarget)))),
         log,
     )
     charter = make_charter(rules=rules)

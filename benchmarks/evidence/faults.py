@@ -574,7 +574,7 @@ def confirmation(times: int) -> None:
         controls.summarize("permuted_target", "strata", 6, (0,) * 20).to_dict()
     )
     rows, labels = world(500, 2)
-    locked = splitters.ResidentTestSet(rows, labels, tuple(range(len(rows))))
+    locked = splitters.lockbox.Resident(rows, labels, tuple(range(len(rows))))
     source = sealed.Locker("C", locked, sealed.Journal())
     for _ in range(times):
         confirm.confirm(ledger, source, alpha_confirm=alpha)
@@ -702,11 +702,11 @@ def folds(kind: str, rare: int) -> Any:
     labels[rows // 2 + rare :] = 0
     if kind == "stratified":
         frame["y"] = labels
-        split: Any = splitters.StratifiedSplit(spec(), tasks.Task.BINARY)
+        split: Any = splitters.splits.Stratified(spec(), tasks.Task.BINARY)
     elif kind == "events":
         frame["y"] = numpy.arange(rows, dtype=float) + 1
         frame["event"] = labels
-        split = splitters.EventStratifiedSplit(
+        split = splitters.splits.Events(
             spec("survival", event_column="event"), tasks.Task.SURVIVAL
         )
     else:
@@ -715,7 +715,7 @@ def folds(kind: str, rare: int) -> Any:
         frame.loc[frame["treated"] == 1, "y"] = 1
         frame.loc[frame.index[-1], "y"] = 0
         frame.loc[frame.index[-2], "y"] = 1
-        split = splitters.TreatmentStratifiedSplit(
+        split = splitters.splits.Treatment(
             spec("uplift", treatment_column="treated"), tasks.Task.UPLIFT
         )
     if kind == "treatment" and rare == 1:
@@ -763,7 +763,7 @@ def resident(fault: str) -> None:
     """
     from scmle.data.splitting import splitters
 
-    locked = splitters.ResidentTestSet(
+    locked = splitters.lockbox.Resident(
         pandas.DataFrame({"a": [1.0, 2.0]}), pandas.Series([0, 1]), (0, 1)
     )
     locked.bind("selection")

@@ -17,11 +17,11 @@ from scmle.assurance.custody import merkle
 from scmle.assurance.custody import sealed
 from scmle.assurance.custody import vault
 from scmle.contracts import errors
-from scmle.data.splitting import splitters
+from scmle.data.splitting.splitters import lockbox
 
 
 def resident(values=(1.0, 2.0, 3.0)):
-    return splitters.ResidentTestSet(
+    return lockbox.Resident(
         pandas.DataFrame({"a": list(values)}),
         pandas.Series([0, 1, 0], name="y"),
         (10, 11, 12),
@@ -154,7 +154,7 @@ def test_the_vault_seals_in_process_only_when_asked_not_to_use_one():
     target = pandas.Series([0, 1, 0], name="y")
     protocol = sealed.Vault(sealed.Journal(), process=False)
     held = protocol.seal("C", frame, target, (4, 5, 6))
-    assert isinstance(held.locked, splitters.ResidentTestSet)
+    assert isinstance(held.locked, lockbox.Resident)
     assert protocol.level == sealed.PROTOCOL_LEVEL
     held.commit("c", "l")
     features, labels = held.open(held.mint(), claims_hash="c", ledger_hash="l")

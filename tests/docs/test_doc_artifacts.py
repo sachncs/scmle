@@ -11,7 +11,7 @@ from benchmarks import reliability
 from scmle.artifacts import bundle
 from scmle.assurance.custody import sealed
 from scmle.contracts import errors
-from scmle.data.splitting import splitters
+from scmle.data.splitting.splitters import lockbox
 from scmle.deploy import packaging
 from scmle.deploy import parity
 from scmle.deploy import vuln_gate
@@ -108,7 +108,7 @@ def test_the_model_folder_is_checksummed_and_unsigned_needs_trust(folder):
 def test_the_custody_log_records_seal_issue_open_and_refusal():
     """Enforces docs/ARTIFACTS.md:38."""
     log = sealed.Journal()
-    rows = splitters.ResidentTestSet(
+    rows = lockbox.Resident(
         pandas.DataFrame({"a": [123456.789, 2.0, 3.0]}),
         pandas.Series([0, 1, 0]),
         (10, 11, 12),

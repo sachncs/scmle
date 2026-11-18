@@ -15,7 +15,7 @@ from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
-from scmle.data.splitting import splitters
+from scmle.data.splitting.splitters import lockbox
 from scmle.decision import reports
 from tests.unit.test_charter_causal import causal_charter
 from tests.unit.test_charter_contracts import make_charter
@@ -201,9 +201,7 @@ def registered_claim_run(folder, baseline_report=True, causal_report=True):
     log = sealed.Journal(folder / claims_audit.CUSTODY_FILE, KEY)
     source = sealed.Locker(
         "C",
-        splitters.ResidentTestSet(
-            cfeatures, ctarget, tuple(range(len(ctarget)))
-        ),
+        lockbox.Resident(cfeatures, ctarget, tuple(range(len(ctarget)))),
         log,
     )
     charter = make_charter()

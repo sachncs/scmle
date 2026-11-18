@@ -17,7 +17,7 @@ from scmle.assurance.ledger import online_fdr
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
-from scmle.data.splitting import splitters
+from scmle.data.splitting.splitters import lockbox
 
 ALPHA = Fraction(1, 20)
 SIGNAL = ("s1", "s2", "s3")
@@ -59,7 +59,7 @@ def explored(tmp_path=None, effect=0.6, control=True, rule=online_fdr.ELOND):
 
 def source_with(features, target, ids=None):
     log = sealed.Journal()
-    locked = splitters.ResidentTestSet(
+    locked = lockbox.Resident(
         features, target, tuple(ids or range(len(target)))
     )
     return sealed.Locker("C", locked, log)

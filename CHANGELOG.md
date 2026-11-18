@@ -12,6 +12,18 @@ marked `Breaking:` and listed first in their group.
 
 ### Breaking changes
 
+* **Splitter classes renamed, old names removed.** The splitters are single
+  nouns in `scmle.data.splitting.splitters.splits` (`Random`, `Stratified`,
+  `Events`, `Treatment`, `Group`, `Rolling`, `Chronology`, ...) and the sealed
+  test set is `lockbox.Resident`; `RandomSplit`, `GroupSplit`,
+  `ResidentTestSet` and the rest are gone. See `docs/RENAMES.md`.
+* **Resume skips finished stages.** A stage's typed product (planning,
+  training, selection) is saved, signed, beside its stage record and loaded on
+  resume instead of re-running the stage; a product whose record or inputs
+  changed, or that was saved without the signing key, is re-run. Stages that
+  hold source rows, the locked test set or the budget reserve always re-run.
+  The engine takes dependency matching and tie-breaking as parameters and
+  exposes `ready(done, remaining)`, the seams the workflow path needs.
 * **Stored record keys renamed.** The multi-word keys of the records scmle
   writes (charters, custody manifests, ledgers, contracts, catalogs, detector
   certificates, governance, deployment, monitoring and run records) are now
@@ -1236,6 +1248,10 @@ marked `Breaking:` and listed first in their group.
 
 ### Fixed
 
+- On Linux the memory limit no longer undercounts: a process whose name holds
+  non-ASCII bytes failed to decode in `/proc/<pid>/stat` and was skipped from
+  the resident-memory sum. Only the numeric fields after the name are read,
+  and undecodable bytes in the name are replaced.
 - Resume: a run whose test set was opened, or that has no intact custody
   journal, cannot be resumed (`BlockedError`), and a gate a checkpoint
   rejected stays rejected until a checkpoint passed to

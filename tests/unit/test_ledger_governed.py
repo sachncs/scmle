@@ -12,7 +12,7 @@ from scmle.assurance.ledger import explore
 from scmle.assurance.ledger import governed
 from scmle.assurance.ledger import online_fdr
 import scmle.assurance.ledger.ledger
-from scmle.data.splitting import splitters
+from scmle.data.splitting.splitters import lockbox
 from tests.unit.test_charter_contracts import make_charter
 
 
@@ -30,9 +30,7 @@ def build(rows=500, seed=0, effect=0.7, kind="regression"):
 
 def locate(features, target):
     log = sealed.Journal()
-    locked = splitters.ResidentTestSet(
-        features, target, tuple(range(len(target)))
-    )
+    locked = lockbox.Resident(features, target, tuple(range(len(target))))
     return sealed.Locker("C", locked, log)
 
 

@@ -57,10 +57,10 @@ def arm(index, phase):
     """Kills the process at one stage record boundary."""
     real = archive.Directory.record
 
-    def record(self, position, name, progress, seconds):
+    def record(self, position, *args):
         if position == index and phase == "before":
             failpoints.kill_process()
-        body = real(self, position, name, progress, seconds)
+        body = real(self, position, *args)
         if position == index and phase == "after":
             failpoints.kill_process()
         return body

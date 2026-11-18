@@ -7,11 +7,11 @@ import pytest
 
 from scmle.assurance.custody import sealed
 from scmle.contracts import errors
-from scmle.data.splitting import splitters
+from scmle.data.splitting.splitters import lockbox
 
 
 def resident(values=(1.0, 2.0, 3.0)):
-    return splitters.ResidentTestSet(
+    return lockbox.Resident(
         pandas.DataFrame({"a": list(values)}),
         pandas.Series([0, 1, 0]),
         (10, 11, 12),
