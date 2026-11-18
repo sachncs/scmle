@@ -31,14 +31,10 @@ def apportion(
     positive_indices = [index for index, value in enumerate(fractions) if value]
     counts = [0, 0, 0]
     if node_count >= len(positive_indices):
-        for index in positive_indices:
-            counts[index] = 1
-        remaining = node_count - len(positive_indices)
-        raw_counts = [remaining * value for value in fractions]
+        raw_counts = [node_count * value for value in fractions]
         floor_counts = [int(value) for value in raw_counts]
-        for index, count in enumerate(floor_counts):
-            counts[index] += count
-        remainder = remaining - sum(floor_counts)
+        counts = list(floor_counts)
+        remainder = node_count - sum(floor_counts)
         order = sorted(
             range(len(fractions)),
             key=lambda index: (
@@ -50,6 +46,18 @@ def apportion(
         )
         for index in order[:remainder]:
             counts[index] += 1
+        empty = sorted(
+            (index for index in positive_indices if not counts[index]),
+            key=lambda index: (fractions[index], -index),
+            reverse=True,
+        )
+        for index in empty:
+            donor = max(
+                range(len(fractions)),
+                key=lambda other: (counts[other], fractions[other], -other),
+            )
+            counts[donor] -= 1
+            counts[index] = 1
     else:
         order = sorted(
             range(len(fractions)),

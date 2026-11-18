@@ -77,18 +77,18 @@ def pick(
         identity: Identity of the source, used in error evidence.
 
     Returns:
-        At most `rows` rows starting at `position`, taken from the frame
-        that holds that row, and whether rows remain after them.
+        At most `rows` rows starting at `position`, taken from as many
+        consecutive frames as needed, and whether rows remain after them.
 
     Raises:
         StreamingError: If a frame is not a DataFrame, or no rows remain
             after `position`.
     """
-    selected: pandas.DataFrame | None = None
+    parts: list[pandas.DataFrame] = []
+    taken = 0
     offset = 0
     has_more = False
-    batches = iter(frames)
-    for batch in batches:
+    for batch in frames:
         if not isinstance(batch, pandas.DataFrame):
             raise failure.StreamingError(
                 "invalid_batch",
@@ -98,19 +98,19 @@ def pick(
             )
         batch_start = offset
         offset += len(batch)
-        if batch_start + len(batch) <= position:
+        if offset <= position or batch.empty:
             continue
-        start = max(0, position - batch_start)
-        candidate = batch.iloc[start:]
-        take = min(rows, len(candidate))
-        selected = candidate.iloc[:take].copy()
-        has_more = len(candidate) > take
-        if take == rows:
-            if not has_more:
-                next_batch = next(batches, None)
-                has_more = next_batch is not None and len(next_batch) > 0
+        if taken == rows:
+            has_more = True
             break
-        break
+        candidate = batch.iloc[max(0, position - batch_start) :]
+        take = min(rows - taken, len(candidate))
+        parts.append(candidate.iloc[:take])
+        taken += take
+        if len(candidate) > take:
+            has_more = True
+            break
+    selected = pandas.concat(parts).copy() if parts else None
     if selected is None or selected.empty:
         raise failure.StreamingError(
             "end_of_source",

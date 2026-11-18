@@ -249,14 +249,18 @@ def certify(
     lows = [e.low for e in effects if e.low is not None]
     highs = [e.high for e in effects if e.high is not None]
     envelope = (min(lows), max(highs)) if lows and highs else None
-    check = qualification.Check(
+    p_value = None if curve is None else curve.p_median
+    effect = float(numbers["median"] or 0.0)
+    if p_value is None and envelope is None:
+        envelope = (effect, effect)
+    return qualification.Check(
         identifier=f"{estimation.DETECTOR_ID}:{name}",
         null="the finding's sign and size are unaffected by "
         "the declared analysis choices",
         statistic=float(numbers["sign_share"] or 0.0),
-        p_value=None if curve is None else curve.p_median,
+        p_value=p_value,
         interval=envelope,
-        effect=float(numbers["median"] or 0.0),
+        effect=effect,
         n=len(values),
         decision=(
             qualification.Decision.PASS
@@ -267,11 +271,6 @@ def certify(
         seeds=randomness.seed_path(seed, f"f6.stability.{name}", 0),
         tier=qualification.Tier.UNVERIFIED,
     )
-    if check.p_value is None and check.interval is None:
-        check = dataclasses.replace(
-            check, interval=(check.effect, check.effect)
-        )
-    return check
 
 
 def code_digest() -> str:

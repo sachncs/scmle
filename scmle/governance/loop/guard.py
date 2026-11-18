@@ -187,12 +187,12 @@ class Gatekeeper(desk.Desk):
         ``tolerance``, or ``promotion.delta`` inside an object) moved to a
         stricter or equal value needs no attestation. A looser value needs
         one (the relax-threshold action), and so does any other field, or
-        setting such a field to None (the change-charter action: fallbacks,
-        high-impact actions, scope). A change of `promotion` or `rollback`
-        names only the keys it changes. The change is recorded in the ledger
-        and restarts the monitors with fresh state. A gated change without an
-        attestation is refused with `AttestationRequired`, and nothing is
-        changed.
+        moving such a field to or from None, as turning a test off or on
+        (the change-charter action: fallbacks, high-impact actions, scope).
+        A change of `promotion` or `rollback` names only the keys it changes.
+        The change is recorded in the ledger and restarts the monitors with
+        fresh state. A gated change without an attestation is refused with
+        `AttestationRequired`, and nothing is changed.
 
         Args:
             **changes: New values of policy fields, by field name.
@@ -229,7 +229,7 @@ class Gatekeeper(desk.Desk):
             if old == new and field not in changes:
                 continue
             orientation = terms.NUMERIC_ORIENTATION.get(field)
-            if orientation is not None and new is not None:
+            if orientation is not None and None not in (old, new):
                 if (new - old) * orientation >= 0:
                     continue
                 action = never_list.Forbidden.RELAX_THRESHOLD

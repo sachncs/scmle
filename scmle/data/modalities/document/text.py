@@ -64,7 +64,12 @@ def segment(content: str) -> tuple[Span, ...]:
                 )
             )
 
-    headings = list(re.finditer(r"(?m)^\s{0,3}#{1,6}\s+(.+?)\s*$", content))
+    headings = list(
+        re.finditer(
+            r"(?m)(?:^|(?<=\f))[^\S\f\n]{0,3}#{1,6}[^\S\f\n]+([^\f\n]+?)\s*(?=\f|$)",
+            content,
+        )
+    )
     for index, heading in enumerate(headings):
         end = (
             headings[index + 1].start()

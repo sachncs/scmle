@@ -418,10 +418,34 @@ class Placemark:
 
     @property
     def bounds(self) -> tuple[float, float, float, float]:
-        """The x/y bounds of the geometry as (min x, min y, max x, max y)."""
-        coordinates = unpack(self.geometry)
-        xs = coordinates[0::2]
-        ys = coordinates[1::2]
+        """The x/y bounds of the geometry as (min x, min y, max x, max y).
+
+        Only the first two values of each position count, so an elevation
+        or measure in a 3-D or 4-D position never enters the bounds.
+        """
+        unpack(self.geometry)
+        xs: list[float] = []
+        ys: list[float] = []
+
+        def visit(value: Any) -> None:
+            if all(
+                isinstance(item, (int, float)) and not isinstance(item, bool)
+                for item in value
+            ):
+                xs.append(float(value[0]))
+                ys.append(float(value[1]))
+                return
+            for item in value:
+                visit(item)
+
+        def walk(geometry: Mapping[str, Any]) -> None:
+            if geometry["type"] == "GeometryCollection":
+                for nested in geometry["geometries"]:
+                    walk(nested)
+            else:
+                visit(geometry["coordinates"])
+
+        walk(self.geometry)
         return min(xs), min(ys), max(xs), max(ys)
 
     @property

@@ -59,17 +59,20 @@ def partition(
 
     Returns:
         The unseen events, each identity once, and the identities skipped as
-        already committed or repeated within `records`.
+        already committed. A repeat within `records` of an identity accepted
+        here is dropped, not reported as a duplicate, so the two results
+        stay disjoint.
     """
-    known = set(seen)
+    committed = set(seen)
+    known = set(committed)
     duplicates: set[str] = set()
     accepted: list[timeline.Event] = []
     for event in sorted(
         records, key=lambda value: (value.sequence, value.identifier)
     ):
-        if event.identifier in known:
+        if event.identifier in committed:
             duplicates.add(event.identifier)
-        else:
+        elif event.identifier not in known:
             known.add(event.identifier)
             accepted.append(event)
     return accepted, duplicates

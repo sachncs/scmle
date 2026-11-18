@@ -117,11 +117,18 @@ class Journal:
             )
         self.entries: list[dict[str, Any]] = []
         if self.path is not None and self.path.exists():
-            self.entries = [
-                json.loads(line)
-                for line in self.path.read_text(encoding="utf-8").splitlines()
-                if line.strip()
-            ]
+            try:
+                self.entries = [
+                    json.loads(line)
+                    for line in self.path.read_text(
+                        encoding="utf-8"
+                    ).splitlines()
+                    if line.strip()
+                ]
+            except (json.JSONDecodeError, UnicodeDecodeError) as caught:
+                raise errors.ArtifactError(
+                    f"{self.path.name} is not JSON lines: {caught}"
+                ) from caught
             self.verify()
 
     def append(
@@ -171,6 +178,10 @@ class Journal:
         """
         previous = GENESIS
         for index, entry in enumerate(self.entries):
+            if not isinstance(entry, dict):
+                raise errors.ArtifactError(
+                    f"custody log entry {index} is not a JSON object"
+                )
             body = {k: v for k, v in entry.items() if k not in ("hash", "mac")}
             if (
                 entry.get("seq") != index
