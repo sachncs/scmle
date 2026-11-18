@@ -39,10 +39,12 @@ import json
 import logging
 import time
 from typing import Any
+from typing import ClassVar
 
 import pandas
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.store import quality
 from scmle.data.store import snapshot
 from scmle.runtime import retry
@@ -173,14 +175,21 @@ class Processing:
     error: str | None
     retries: tuple[float, ...]
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {"duplicate_objects": "duplicates"},
+        groups={"rows": {"duplicate_rows": "dropped", "rows_out": "used"}},
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Converts the result to plain data.
 
         Returns:
-            A dict of the fields; the tuples stay tuples, which JSON writes
-            as arrays.
+            A dict of the fields in single-word keys, with the row counts
+            under `rows.{dropped, used}`; the tuples stay tuples, which
+            JSON writes as arrays.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 class IncrementalProcessor:

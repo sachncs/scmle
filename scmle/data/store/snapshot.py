@@ -24,12 +24,14 @@ import hashlib
 import json
 import pathlib
 from typing import Any
+from typing import ClassVar
 from urllib.parse import urlsplit
 
 import pandas
 
 from scmle import durability
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.readers import connectors
 from scmle.storage import objectstore
 
@@ -206,15 +208,33 @@ class SnapshotRecord:
     freshness: str
     lineage: tuple[str, ...]
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {
+            "snapshot_id": "identifier",
+            "schema_matches": "conforms",
+            "read_at": "read",
+            "age_seconds": "age",
+            "max_age_seconds": "staleness",
+        },
+        groups={"digests": {"schema_digest": "schema"}},
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1.
+
+    `schema_version` stays: it is the declared data schema's version, not
+    this record's layout version.
+    """
+
     def to_dict(self) -> dict[str, Any]:
         """Converts the record to plain data.
 
         Returns:
-            A dict of the fields, with `lineage` as a list.
+            A dict of the fields in single-word keys (`identifier`,
+            `digests.schema`, `conforms`, `read`, `age`, `staleness`), with
+            `lineage` as a list.
         """
         record = dataclasses.asdict(self)
         record["lineage"] = list(self.lineage)
-        return record
+        return self.KEYS.upgrade(record)
 
 
 class ReadLog:

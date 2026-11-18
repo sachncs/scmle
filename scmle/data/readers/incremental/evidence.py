@@ -69,7 +69,21 @@ class Ack:
         duplicate_event_ids: Sorted, unique identities of events skipped
             because they were already committed.
         checkpoint: The checkpoint after the attempt.
+        migrations: The receipt's version steps, oldest first: version 2
+            renames the checkpoint's keys, version 3 writes `source`,
+            `accepted` and `duplicates`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(change=lift, revert=lower),
+        records.Migration(
+            renames={
+                "source_identity": "source",
+                "accepted_event_ids": "accepted",
+                "duplicate_event_ids": "duplicates",
+            }
+        ),
+    )
 
     source_identity: str
     accepted_event_ids: tuple[str, ...]
@@ -103,14 +117,19 @@ class Ack:
         """Returns a JSON-compatible commit receipt.
 
         Returns:
-            A dictionary holding the schema version and the receipt fields.
+            A dictionary holding the schema version and the receipt fields
+            in the version-3 layout.
         """
         return {
-            "schema_version": VERSION,
-            "source_identity": self.source_identity,
-            "accepted_event_ids": list(self.accepted_event_ids),
-            "duplicate_event_ids": list(self.duplicate_event_ids),
-            "checkpoint": self.checkpoint.to_dict(),
+            records.KEY: records.ORIGIN + len(self.migrations),
+            **self.migrations[-1].upgrade(
+                {
+                    "source_identity": self.source_identity,
+                    "accepted_event_ids": list(self.accepted_event_ids),
+                    "duplicate_event_ids": list(self.duplicate_event_ids),
+                    "checkpoint": self.checkpoint.to_dict(),
+                }
+            ),
         }
 
 
@@ -221,7 +240,21 @@ class Consumption:
         receipt: Receipt of the sink commit.
         acknowledged_event_ids: Sorted, unique identities of the events
             whose acknowledgement was delivered in this cycle.
+        migrations: The evidence's version steps, oldest first: version 2
+            changed only the nested receipt (versioned on its own), version
+            3 writes `source`, `consumer` and `acknowledged`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(),
+        records.Migration(
+            renames={
+                "source_identity": "source",
+                "consumer_group": "consumer",
+                "acknowledged_event_ids": "acknowledged",
+            }
+        ),
+    )
 
     source_identity: str
     consumer_group: str
@@ -253,14 +286,19 @@ class Consumption:
         """Returns JSON-compatible consume evidence.
 
         Returns:
-            A dictionary holding the schema version and the result fields.
+            A dictionary holding the schema version and the result fields
+            in the version-3 layout.
         """
         return {
-            "schema_version": VERSION,
-            "source_identity": self.source_identity,
-            "consumer_group": self.consumer_group,
-            "receipt": self.receipt.to_dict(),
-            "acknowledged_event_ids": list(self.acknowledged_event_ids),
+            records.KEY: records.ORIGIN + len(self.migrations),
+            **self.migrations[-1].upgrade(
+                {
+                    "source_identity": self.source_identity,
+                    "consumer_group": self.consumer_group,
+                    "receipt": self.receipt.to_dict(),
+                    "acknowledged_event_ids": list(self.acknowledged_event_ids),
+                }
+            ),
         }
 
 

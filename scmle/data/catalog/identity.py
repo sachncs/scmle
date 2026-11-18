@@ -93,6 +93,7 @@ class Source:
                 "privacy_classification": "privacy",
             }
         ),
+        records.Migration(renames={"source_identity": "identity"}),
     )
 
     uri: str | pathlib.Path = "memory://"
@@ -143,7 +144,8 @@ class Source:
         """Returns JSON-native source evidence.
 
         Returns:
-            A dictionary of the five source fields plus ``source_identity``.
+            A dictionary of the five source fields plus the source identity
+            under ``identity``.
         """
         return {
             "uri": self.uri,
@@ -151,7 +153,7 @@ class Source:
             "owner": self.owner,
             "acquisition": self.acquisition,
             "privacy": self.privacy,
-            "source_identity": self.source_identity,
+            "identity": self.source_identity,
         }
 
     @classmethod
@@ -167,8 +169,9 @@ class Source:
             The reconstructed source.
 
         Raises:
-            ValueError: If the record's ``source_identity`` is absent or differs
-                from the identity recomputed from the source fields.
+            ValueError: If the record's identity (``identity``, or
+                ``source_identity`` as version 2 wrote it) is absent or
+                differs from the identity recomputed from the source fields.
         """
         source = cls(
             uri=str(record["uri"]),
@@ -177,7 +180,7 @@ class Source:
             acquisition=str(record.get("acquisition", "")),
             privacy=str(record.get("privacy", "")),
         )
-        expected = record.get("source_identity")
+        expected = record.get("identity", record.get("source_identity"))
         if expected != source.source_identity:
             raise errors.InputError(
                 "source_identity does not match source fields"

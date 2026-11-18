@@ -5,8 +5,10 @@ import enum
 import math
 import re
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 
 class Format(enum.StrEnum):
@@ -159,6 +161,16 @@ class Citation:
     locator: str
     page_number: int | None = None
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {
+            "document_id": "document",
+            "source_uri": "uri",
+            "page_number": "page",
+        },
+        groups={"digests": {"source_digest": "source"}},
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def __post_init__(self) -> None:
         """Validates the source identity and character locator.
 
@@ -188,9 +200,10 @@ class Citation:
         """Returns JSON-native citation evidence.
 
         Returns:
-            A dict of the citation fields.
+            A dict of the citation fields: `document`, `uri`,
+            `digests.source`, `start`, `end`, `locator` and `page`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -275,6 +288,12 @@ class Layout:
     ocr_confidence: float | None = None
     source_digest: str | None = None
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {"provider_version": "version", "ocr_confidence": "confidence"},
+        groups={"digests": {"source_digest": "source"}},
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def __post_init__(self) -> None:
         """Validates the extraction identity and optional OCR confidence.
 
@@ -319,9 +338,11 @@ class Layout:
         """Returns JSON-native extraction evidence.
 
         Returns:
-            A dict of the layout fields, with elements as nested dicts.
+            A dict of the layout fields, with elements as nested dicts, the
+            provider version as `version`, the OCR confidence as
+            `confidence` and the source digest under `digests.source`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

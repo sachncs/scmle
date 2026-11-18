@@ -7,12 +7,75 @@ import hashlib
 import json
 import random
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import data
 from scmle.contracts import errors
+from scmle.contracts import records
 
 MIN_HOLDOUT_GROUPS = 3
+
+DIGESTS = {"digests": {"dataset_hash": "dataset"}}
+"""The dataset digest, stored under `digests`."""
+
+CURATION = records.nest(
+    {
+        "sample_count": "samples",
+        "release_ready": "ready",
+        "unresolved_blocking_findings": "blockers",
+    },
+    groups={
+        **DIGESTS,
+        "findings": {"quality_findings": "quality", "risk_findings": "risk"},
+    },
+)
+"""Version 2 of the curation report: single-word keys."""
+
+DATASHEET = records.nest(
+    {"sample_count": "samples", "intended_use": "use"}, groups=DIGESTS
+)
+"""Version 2 of the dataset card: single-word keys."""
+
+
+def identify(report: Mapping[str, Any]) -> tuple[object, object]:
+    """Reads the dataset digest and sample count of a report or card.
+
+    Both layouts are read: version 2 (`digests.dataset`, `samples`) and
+    version 1 (`dataset_hash`, `sample_count`), so stored evidence written
+    before the rename still checks against its record.
+
+    Args:
+        report: A curation report or dataset card, as stored.
+
+    Returns:
+        The dataset digest and the sample count, each None when absent.
+    """
+    digests = report.get("digests")
+    if isinstance(digests, Mapping) and "dataset" in digests:
+        digest = digests["dataset"]
+    else:
+        digest = report.get("dataset_hash")
+    samples = report.get("samples", report.get("sample_count"))
+    return digest, samples
+
+
+def findings(report: Mapping[str, Any]) -> tuple[Any, ...]:
+    """Reads the quality then risk findings of a report in either layout.
+
+    Args:
+        report: A curation report, as stored at version 1 or 2.
+
+    Returns:
+        The stored quality findings followed by the risk findings.
+    """
+    grouped = report.get("findings")
+    if isinstance(grouped, Mapping):
+        return (*grouped.get("quality", ()), *grouped.get("risk", ()))
+    return (
+        *report.get("quality_findings", ()),
+        *report.get("risk_findings", ()),
+    )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -27,7 +90,12 @@ class Curation:
         quality_findings: Findings about data quality.
         risk_findings: Findings about risk (leakage, privacy, bias).
         schema_version: Version of the serialised report layout.
+        migrations: Version steps of the stored report; version 2 writes
+            `digests.dataset`, `samples`, `findings.{quality, risk}`, `ready`
+            and `blockers`; the fields keep their names.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (CURATION,)
 
     modality: str
     dataset_hash: str
@@ -35,7 +103,7 @@ class Curation:
     profile: Mapping[str, Any]
     quality_findings: tuple[data.Finding, ...] = ()
     risk_findings: tuple[data.Finding, ...] = ()
-    schema_version: int = 1
+    schema_version: int = records.ORIGIN + len(migrations)
 
     @property
     def unresolved_blocking_findings(
@@ -66,12 +134,11 @@ class Curation:
         """Serialises the report to a stable JSON-compatible mapping.
 
         Returns:
-            A dict with the report fields, each finding as its own dict, the
-            derived `release_ready` flag and the ids of the unresolved
-            blocking findings.
+            A dict with the report fields in the version-2 layout, each
+            finding as its own dict, the derived `ready` flag and the ids of
+            the unresolved blocking findings under `blockers`.
         """
-        return {
-            "schema_version": self.schema_version,
+        layout = {
             "modality": self.modality,
             "dataset_hash": self.dataset_hash,
             "sample_count": self.sample_count,
@@ -87,6 +154,10 @@ class Curation:
                 finding.identifier
                 for finding in self.unresolved_blocking_findings
             ],
+        }
+        return {
+            records.KEY: self.schema_version,
+            **records.upgrade(self.migrations, layout, records.ORIGIN),
         }
 
 
@@ -323,8 +394,9 @@ class Datasheet:
         modality: Name of the modality the card describes.
         dataset_hash: Order-independent digest of the sample identities.
         sample_count: Number of samples; never negative.
-        curation: The curation report as a JSON-native mapping. Its
-            `dataset_hash` and `sample_count` must equal the card's.
+        curation: The curation report as a JSON-native mapping, at either
+            version. Its dataset digest and sample count must equal the
+            card's.
         intended_use: Statement of what the data may be used for.
         limitations: Non-empty tuple of known limitations.
         provenance: Non-empty mapping of provenance status fields.
@@ -332,7 +404,12 @@ class Datasheet:
         manifest: Optional manifest that must agree with the card on content
             hash, sample count and modality.
         schema_version: Version of the serialised card layout.
+        migrations: Version steps of the stored card; version 2 writes
+            `digests.dataset`, `samples` and `use`; the fields keep their
+            names. The nested curation report carries its own version.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (DATASHEET,)
 
     modality: str
     dataset_hash: str
@@ -343,7 +420,7 @@ class Datasheet:
     provenance: Mapping[str, str]
     privacy: Mapping[str, str]
     manifest: data.Passport | None = None
-    schema_version: int = 1
+    schema_version: int = records.ORIGIN + len(migrations)
 
     def __post_init__(self) -> None:
         """Rejects a card that is detached from its curation report.
@@ -366,11 +443,12 @@ class Datasheet:
             self.limitations,
         )
         object.__setattr__(self, "curation", roundtrip(self.curation))
-        if self.curation.get("dataset_hash") != self.dataset_hash:
+        digest, samples = identify(self.curation)
+        if digest != self.dataset_hash:
             raise errors.InputError(
                 "curation report does not match dataset_hash"
             )
-        if self.curation.get("sample_count") != self.sample_count:
+        if samples != self.sample_count:
             raise errors.InputError(
                 "curation report does not match sample_count"
             )
@@ -403,8 +481,8 @@ class Datasheet:
         Args:
             modality: Name of the modality.
             report: A curation report as produced by
-                `Curation.to_dict`; must hold `dataset_hash`
-                (str) and `sample_count` (int).
+                `Curation.to_dict`, at either version; must hold the
+                dataset digest (str) and the sample count (int).
             limitations: Known limitations to record on the card.
             manifest: Manifest to attach. When None, one is built from the
                 report and its findings.
@@ -421,8 +499,7 @@ class Datasheet:
                 report on dataset hash, sample count or modality, or on any
                 validation failure of the card itself.
         """
-        dataset_hash_value = report.get("dataset_hash")
-        sample_count_value = report.get("sample_count")
+        dataset_hash_value, sample_count_value = identify(report)
         if not isinstance(dataset_hash_value, str):
             raise errors.InputError("curation report must contain dataset_hash")
         if not isinstance(sample_count_value, int):
@@ -437,10 +514,7 @@ class Datasheet:
                 digests={"content": dataset_hash_value},
                 findings=tuple(
                     data.Finding.from_dict(finding)
-                    for finding in (
-                        *report.get("quality_findings", ()),
-                        *report.get("risk_findings", ()),
-                    )
+                    for finding in findings(report)
                 ),
             )
         if manifest.digests["content"] != dataset_hash_value:
@@ -466,11 +540,11 @@ class Datasheet:
         """Serialises the card to a deterministic JSON-native mapping.
 
         Returns:
-            A dict of the card fields. Provenance and privacy are sorted by
-            key; the manifest is its own dict, or None when absent.
+            A dict of the card fields in the version-2 layout. Provenance
+            and privacy are sorted by key; the manifest is its own dict, or
+            None when absent.
         """
-        return {
-            "schema_version": self.schema_version,
+        layout = {
             "modality": self.modality,
             "dataset_hash": self.dataset_hash,
             "sample_count": self.sample_count,
@@ -482,6 +556,10 @@ class Datasheet:
             "manifest": (
                 self.manifest.to_dict() if self.manifest is not None else None
             ),
+        }
+        return {
+            records.KEY: self.schema_version,
+            **records.upgrade(self.migrations, layout, records.ORIGIN),
         }
 
 
@@ -604,6 +682,8 @@ __all__ = [
     "Datasheet",
     "conflicting_label_groups",
     "dataset_hash",
+    "findings",
     "flaw",
+    "identify",
     "label_counts",
 ]

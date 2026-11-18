@@ -58,7 +58,7 @@ def findings(
 
     Args:
         survey: The dataset being curated.
-        profile: Its curation profile, with ``temporal``, ``geometry_types``
+        profile: Its curation profile, with ``temporal``, ``geometries``
             and ``label_counts``.
 
     Returns:
@@ -92,13 +92,13 @@ def findings(
                 blocking=True,
             )
         )
-    if len(profile["geometry_types"]) > 1:
+    if len(profile["geometries"]) > 1:
         quality_findings.append(
             flaw(
                 "quality.geospatial-mixed-geometry",
                 data.FindingSeverity.WARNING,
                 {"source": survey.source},
-                {"geometry_types": list(profile["geometry_types"])},
+                {"geometry_types": list(profile["geometries"])},
                 "Choose a geometry normalization or task-specific "
                 "handling policy.",
                 blocking=False,

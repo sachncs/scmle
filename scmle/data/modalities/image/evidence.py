@@ -2,7 +2,9 @@
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
+from scmle.contracts import records
 from scmle.data.modalities.image.sample import Sample
 
 
@@ -48,13 +50,38 @@ class Profile:
     mean_pixel: tuple[float, ...]
     pixel_std: tuple[float, ...]
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {
+            "dataset_count": "samples",
+            "profiled_count": "profiled",
+            "profiled_bytes": "size",
+            "unique_content_count": "unique",
+            "duplicate_count": "duplicates",
+        },
+        groups={
+            "width": {
+                "width_min": "low",
+                "width_max": "high",
+                "width_mean": "mean",
+            },
+            "height": {
+                "height_min": "low",
+                "height_max": "high",
+                "height_mean": "mean",
+            },
+            "pixel": {"mean_pixel": "mean", "pixel_std": "std"},
+        },
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible profile data.
 
         Returns:
-            A dict of every field of the profile.
+            A dict of every field of the profile in single-word keys, with
+            extremes and means under `width`, `height` and `pixel`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

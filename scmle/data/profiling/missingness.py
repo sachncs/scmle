@@ -10,10 +10,13 @@ Bonferroni correction across columns.
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
 from scipy import stats
+
+from scmle.contracts import records
 
 MIN_MISSING_RATE = 0.02
 MIN_PRESENT_ROWS = 30
@@ -43,13 +46,18 @@ class Finding:
     effect: float
     informative: bool
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"missing_rate": "missing"}
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
 
         Returns:
-            The finding's fields as a dict.
+            The finding's fields as a dict, the missing rate as `missing`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def chisquare(

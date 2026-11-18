@@ -2,9 +2,11 @@
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 import numpy
 
+from scmle.contracts import records
 from scmle.data.modalities.graph.elements import Edge
 
 
@@ -30,13 +32,31 @@ class Degrees:
     degree_max: int
     degree_mean: float
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {
+            "node_count": "nodes",
+            "isolated_node_count": "isolated",
+            "labeled_node_count": "labeled",
+            "feature_dimension": "dimension",
+        },
+        groups={
+            "degree": {
+                "degree_min": "low",
+                "degree_max": "high",
+                "degree_mean": "mean",
+            }
+        },
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible node profile.
 
         Returns:
-            A dict of the profile fields.
+            A dict of the profile fields in single-word keys, with the
+            degree extremes and mean under `degree.{low, high, mean}`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -60,13 +80,30 @@ class Connectivity:
     weight_max: float | None
     weight_mean: float | None
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {
+            "edge_count": "edges",
+            "duplicate_edge_count": "duplicates",
+            "self_loop_count": "loops",
+        },
+        groups={
+            "weight": {
+                "weight_min": "low",
+                "weight_max": "high",
+                "weight_mean": "mean",
+            }
+        },
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible edge profile.
 
         Returns:
-            A dict of the profile fields.
+            A dict of the profile fields in single-word keys, with the
+            weight extremes and mean under `weight.{low, high, mean}`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -87,20 +124,28 @@ class Profile:
     node: Degrees
     edge: Connectivity
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {"component_count": "components"},
+        groups={"digests": {"graph_identity": "graph"}},
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Returns a JSON-compatible graph profile.
 
         Returns:
-            A dict with the identity, direction, component count and the
-            node and edge profiles as nested dicts.
+            A dict with the identity under `digests.graph`, direction,
+            component count and the node and edge profiles as nested dicts.
         """
-        return {
-            "graph_identity": self.graph_identity,
-            "directed": self.directed,
-            "component_count": self.component_count,
-            "node": self.node.to_dict(),
-            "edge": self.edge.to_dict(),
-        }
+        return self.KEYS.upgrade(
+            {
+                "graph_identity": self.graph_identity,
+                "directed": self.directed,
+                "component_count": self.component_count,
+                "node": self.node.to_dict(),
+                "edge": self.edge.to_dict(),
+            }
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

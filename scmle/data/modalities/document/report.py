@@ -2,9 +2,43 @@
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import data
+from scmle.contracts import records
 from scmle.data.modalities.document.elements import Profile
+
+CURATION = records.nest(
+    {
+        "sample_count": "samples",
+        "document_count": "documents",
+        "duplicate_groups": "duplicates",
+        "max_characters": "characters",
+        "max_tokens": "tokens",
+        "table_element_count": "tables",
+        "source_traceability_coverage": "traceability",
+        "citation_count": "citations",
+        "release_ready": "ready",
+        "unresolved_blocking_findings": "blockers",
+    },
+    groups={
+        "digests": {"dataset_hash": "dataset"},
+        "counts": {
+            "language_counts": "languages",
+            "format_counts": "formats",
+            "label_counts": "labels",
+            "sensitive_match_counts": "sensitive",
+        },
+        "findings": {"quality_findings": "quality", "risk_findings": "risk"},
+        "layout": {
+            "layout_coverage": "coverage",
+            "layout_providers": "providers",
+            "layout_element_count": "elements",
+        },
+        "ocr": {"ocr_confidence_min": "low", "ocr_confidence_max": "high"},
+    },
+)
+"""Version 2 of the document curation report: single-word keys."""
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -42,7 +76,16 @@ class Curation:
         source_traceability_coverage: Share of samples with both a source URI
             and a source digest.
         citation_count: Number of citations over the traceable samples.
+        migrations: Version steps of the stored report; version 2 writes
+            single-word keys (`digests.dataset`, `samples`, `documents`,
+            `duplicates`, `counts.{languages, formats, labels, sensitive}`,
+            `findings.{quality, risk}`, `characters`, `tokens`,
+            `layout.{coverage, providers, elements}`, `tables`,
+            `ocr.{low, high}`, `traceability`, `citations`, `ready` and
+            `blockers`); the fields keep their names.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (CURATION,)
 
     dataset_hash: str
     sample_count: int
@@ -98,11 +141,11 @@ class Curation:
 
         Returns:
             A dict with every report field (profiles and findings as nested
-            dicts), schema version 1, the derived `release_ready` flag and
-            the ids of the unresolved blocking findings.
+            dicts) in the version-2 layout, the schema version, the derived
+            `ready` flag and the ids of the unresolved blocking findings
+            under `blockers`.
         """
-        return {
-            "schema_version": 1,
+        layout = {
             "dataset_hash": self.dataset_hash,
             "sample_count": self.sample_count,
             "document_count": self.document_count,
@@ -137,4 +180,8 @@ class Curation:
                 finding.identifier
                 for finding in self.unresolved_blocking_findings
             ],
+        }
+        return {
+            records.KEY: records.ORIGIN + len(self.migrations),
+            **records.upgrade(self.migrations, layout, records.ORIGIN),
         }

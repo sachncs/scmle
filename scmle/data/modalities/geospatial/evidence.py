@@ -6,10 +6,12 @@ from datetime import datetime
 from datetime import UTC
 import math
 from typing import Any
+from typing import ClassVar
 
 import numpy
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.modalities.geospatial.geometry import MIN_OBSERVATIONS
 from scmle.data.modalities.geospatial.geometry import Placemark
 from scmle.data.modalities.geospatial.geometry import verify
@@ -27,6 +29,11 @@ class Match:
     left_feature_id: str
     right_feature_id: str
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"left_feature_id": "left", "right_feature_id": "right"}
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def __post_init__(self) -> None:
         """Validates both feature identities before recording a match.
 
@@ -42,9 +49,10 @@ class Match:
         """Returns JSON-native join-match evidence.
 
         Returns:
-            A mapping with the left and right feature IDs.
+            A mapping with the left and right feature IDs under `left` and
+            `right`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -81,6 +89,33 @@ class Join:
     comparison_limit: int
     match_limit: int
     matches: tuple[Match, ...]
+
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {
+            "predicate_name": "predicate",
+            "comparison_count": "comparisons",
+            "match_count": "matched",
+        },
+        groups={
+            "digests": {
+                "left_dataset_hash": "left",
+                "right_dataset_hash": "right",
+            },
+            "features": {
+                "left_feature_count": "left",
+                "right_feature_count": "right",
+            },
+            "unmatched": {
+                "unmatched_left_count": "left",
+                "unmatched_right_count": "right",
+            },
+            "limits": {
+                "comparison_limit": "comparisons",
+                "match_limit": "matches",
+            },
+        },
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
 
     def __post_init__(self) -> None:
         """Rejects incomplete or internally inconsistent join evidence.
@@ -149,24 +184,26 @@ class Join:
         """Returns JSON-native join evidence without raw geometry.
 
         Returns:
-            A mapping of every report field, with matches as a list of
-            mappings.
+            A mapping of every report field in single-word keys, with
+            matches as a list of mappings.
         """
-        return {
-            "left_dataset_hash": self.left_dataset_hash,
-            "right_dataset_hash": self.right_dataset_hash,
-            "crs": self.crs,
-            "predicate_name": self.predicate_name,
-            "left_feature_count": self.left_feature_count,
-            "right_feature_count": self.right_feature_count,
-            "comparison_count": self.comparison_count,
-            "match_count": self.match_count,
-            "unmatched_left_count": self.unmatched_left_count,
-            "unmatched_right_count": self.unmatched_right_count,
-            "comparison_limit": self.comparison_limit,
-            "match_limit": self.match_limit,
-            "matches": [match.to_dict() for match in self.matches],
-        }
+        return self.KEYS.upgrade(
+            {
+                "left_dataset_hash": self.left_dataset_hash,
+                "right_dataset_hash": self.right_dataset_hash,
+                "crs": self.crs,
+                "predicate_name": self.predicate_name,
+                "left_feature_count": self.left_feature_count,
+                "right_feature_count": self.right_feature_count,
+                "comparison_count": self.comparison_count,
+                "match_count": self.match_count,
+                "unmatched_left_count": self.unmatched_left_count,
+                "unmatched_right_count": self.unmatched_right_count,
+                "comparison_limit": self.comparison_limit,
+                "match_limit": self.match_limit,
+                "matches": [match.to_dict() for match in self.matches],
+            }
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -189,6 +226,18 @@ class Provenance:
     target_crs: str
     transformer_name: str
     feature_count: int
+
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {"transformer_name": "transformer", "feature_count": "features"},
+        groups={
+            "digests": {
+                "source_dataset_hash": "source",
+                "target_dataset_hash": "target",
+            },
+            "crs": {"source_crs": "source", "target_crs": "target"},
+        },
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
 
     def __post_init__(self) -> None:
         """Validates reprojection identity and scope.
@@ -219,9 +268,9 @@ class Provenance:
         """Returns JSON-native reprojection evidence.
 
         Returns:
-            A mapping of every report field.
+            A mapping of every report field in single-word keys.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -247,6 +296,18 @@ class Leakage:
     crossing_feature_ids: tuple[str, ...]
     truncated_feature_ids: tuple[str, ...]
     max_blocks_per_feature: int
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "block_size": "block",
+            "feature_count": "features",
+            "feature_block_counts": "blocks",
+            "crossing_feature_ids": "crossing",
+            "truncated_feature_ids": "truncated",
+            "max_blocks_per_feature": "spread",
+        }
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
 
     def __post_init__(self) -> None:
         """Validates bounded and internally consistent leakage evidence.
@@ -294,21 +355,23 @@ class Leakage:
         """Returns JSON-native boundary-leakage evidence.
 
         Returns:
-            A mapping of the status and every report field, with block counts
-            as a list of ID and count mappings.
+            A mapping of the status and every report field in single-word
+            keys, with block counts as a list of ID and count mappings.
         """
-        return {
-            "status": self.status,
-            "block_size": self.block_size,
-            "feature_count": self.feature_count,
-            "feature_block_counts": [
-                {"feature_id": feature_id, "block_count": block_count}
-                for feature_id, block_count in self.feature_block_counts
-            ],
-            "crossing_feature_ids": list(self.crossing_feature_ids),
-            "truncated_feature_ids": list(self.truncated_feature_ids),
-            "max_blocks_per_feature": self.max_blocks_per_feature,
-        }
+        return self.KEYS.upgrade(
+            {
+                "status": self.status,
+                "block_size": self.block_size,
+                "feature_count": self.feature_count,
+                "feature_block_counts": [
+                    {"feature_id": feature_id, "block_count": block_count}
+                    for feature_id, block_count in self.feature_block_counts
+                ],
+                "crossing_feature_ids": list(self.crossing_feature_ids),
+                "truncated_feature_ids": list(self.truncated_feature_ids),
+                "max_blocks_per_feature": self.max_blocks_per_feature,
+            }
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -329,13 +392,19 @@ class Profile:
     bounds: tuple[float, float, float, float]
     content_hash: str
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {"feature_count": "features", "geometry_types": "geometries"},
+        groups={"digests": {"content_hash": "content"}},
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-compatible geospatial profile data.
 
         Returns:
-            A mapping of every profile field.
+            A mapping of every profile field in single-word keys.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -432,6 +501,16 @@ class Autocorrelation:
     p_value: float | None
     seed: int
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "feature_count": "features",
+            "neighbor_count": "neighbors",
+            "edge_count": "edges",
+            "permutation_count": "permutations",
+        }
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def __post_init__(self) -> None:
         """Validates a finite and reproducible spatial statistic.
 
@@ -460,9 +539,9 @@ class Autocorrelation:
         """Returns JSON-native autocorrelation evidence.
 
         Returns:
-            A mapping of every field.
+            A mapping of every field in single-word keys.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

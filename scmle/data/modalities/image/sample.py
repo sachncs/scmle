@@ -9,9 +9,11 @@ import json
 import pathlib
 from types import MappingProxyType
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.modalities import image
 from scmle.data.modalities.image.failures import ImageValidationError
 from scmle.data.modalities.image.pixels import Pixels
@@ -182,6 +184,11 @@ class Augmentation:
     parameters: Mapping[str, Any] = dataclasses.field(default_factory=dict)
     tool: str = ""
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"parent_source": "parent"}
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def __post_init__(self) -> None:
         """Validates and normalizes transformation provenance.
 
@@ -218,23 +225,30 @@ class Augmentation:
     def identity(self) -> str:
         """A deterministic identity string for the transformation record.
 
-        It is the compact, key-sorted JSON of `to_dict`.
+        It is the compact, key-sorted JSON of `to_dict` at version 1
+        (`parent_source`), so renaming the stored key keeps every dataset
+        hash that includes it.
         """
-        return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
+        return json.dumps(
+            self.KEYS.downgrade(self.to_dict()),
+            sort_keys=True,
+            separators=(",", ":"),
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """Returns JSON-native transformation provenance.
 
         Returns:
-            A dict with `parent_source`, `operation`, `parameters` and
-            `tool`.
+            A dict with `parent`, `operation`, `parameters` and `tool`.
         """
-        return {
-            "parent_source": self.parent_source,
-            "operation": self.operation,
-            "parameters": dict(self.parameters),
-            "tool": self.tool,
-        }
+        return self.KEYS.upgrade(
+            {
+                "parent_source": self.parent_source,
+                "operation": self.operation,
+                "parameters": dict(self.parameters),
+                "tool": self.tool,
+            }
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -280,6 +294,17 @@ class Sample(Pixels):
     exif_tags: tuple[str, ...] = ()
     sensitive_metadata: tuple[str, ...] = ()
     augmentation: Augmentation | None = None
+
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {
+            "byte_size": "size",
+            "group_id": "group",
+            "exif_tags": "exif",
+            "sensitive_metadata": "sensitive",
+        },
+        groups={"digests": {"file_hash": "file", "content_hash": "content"}},
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
 
     def __post_init__(self) -> None:
         """Validates immutable identity and geometry metadata.
@@ -494,26 +519,29 @@ class Sample(Pixels):
         """Returns JSON-compatible metadata without embedding image bytes.
 
         Returns:
-            A dict of every field except ``encoded_bytes``; the tag tuples
+            A dict of every field except ``encoded_bytes`` in single-word
+            keys, the hashes under `digests.{file, content}`; the tag tuples
             become lists and the augmentation becomes its own dict or None.
         """
-        return {
-            "source": self.source,
-            "file_hash": self.file_hash,
-            "content_hash": self.content_hash,
-            "width": self.width,
-            "height": self.height,
-            "channels": self.channels,
-            "mode": self.mode,
-            "format": self.format,
-            "byte_size": self.byte_size,
-            "label": self.label,
-            "group_id": self.group_id,
-            "exif_tags": list(self.exif_tags),
-            "sensitive_metadata": list(self.sensitive_metadata),
-            "augmentation": (
-                self.augmentation.to_dict()
-                if self.augmentation is not None
-                else None
-            ),
-        }
+        return self.KEYS.upgrade(
+            {
+                "source": self.source,
+                "file_hash": self.file_hash,
+                "content_hash": self.content_hash,
+                "width": self.width,
+                "height": self.height,
+                "channels": self.channels,
+                "mode": self.mode,
+                "format": self.format,
+                "byte_size": self.byte_size,
+                "label": self.label,
+                "group_id": self.group_id,
+                "exif_tags": list(self.exif_tags),
+                "sensitive_metadata": list(self.sensitive_metadata),
+                "augmentation": (
+                    self.augmentation.to_dict()
+                    if self.augmentation is not None
+                    else None
+                ),
+            }
+        )

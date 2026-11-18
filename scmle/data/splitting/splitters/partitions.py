@@ -10,6 +10,7 @@ import numpy
 import pandas
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.data.splitting.splitters.lockbox import Lockbox
 
@@ -52,6 +53,11 @@ class Manifest:
     folds: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]
     notes: tuple[str, ...] = ()
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"train_ids": "training", "test_ids": "test"}
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     @property
     def fingerprint(self) -> str:
         """The first 16 hex digits of a SHA-256 hash of the entire split.
@@ -75,23 +81,26 @@ class Manifest:
 
         Returns:
             A dict with the strategy, seed, fingerprint, row counts, the train
-            and test ids as lists, the folds as `{"train": ..., "val": ...}`
-            dicts of positions, and the notes as a list.
+            and test ids as lists under `training` and `test`, the folds as
+            `{"train": ..., "val": ...}` dicts of positions, and the notes as
+            a list.
         """
-        return {
-            "strategy": self.strategy,
-            "seed": self.seed,
-            "fingerprint": self.fingerprint,
-            "n_train": len(self.train_ids),
-            "n_test": len(self.test_ids),
-            "train_ids": list(self.train_ids),
-            "test_ids": list(self.test_ids),
-            "folds": [
-                {"train": list(train), "val": list(val)}
-                for train, val in self.folds
-            ],
-            "notes": list(self.notes),
-        }
+        return self.KEYS.upgrade(
+            {
+                "strategy": self.strategy,
+                "seed": self.seed,
+                "fingerprint": self.fingerprint,
+                "n_train": len(self.train_ids),
+                "n_test": len(self.test_ids),
+                "train_ids": list(self.train_ids),
+                "test_ids": list(self.test_ids),
+                "folds": [
+                    {"train": list(train), "val": list(val)}
+                    for train, val in self.folds
+                ],
+                "notes": list(self.notes),
+            }
+        )
 
 
 @dataclasses.dataclass(slots=True)

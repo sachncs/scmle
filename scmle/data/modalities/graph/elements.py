@@ -5,8 +5,10 @@ from datetime import datetime
 from datetime import UTC
 import math
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 
 class GraphError(ValueError):
@@ -245,6 +247,11 @@ class Validation:
 
     issues: tuple[Issue, ...]
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"is_valid": "valid", "error_codes": "codes"}
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     @property
     def is_valid(self) -> bool:
         """Whether no validation issues were found."""
@@ -259,11 +266,13 @@ class Validation:
         """Returns a JSON-compatible report mapping.
 
         Returns:
-            A dict with `is_valid`, `error_codes` and `issues` (each issue as
-            a dict).
+            A dict with `valid`, `codes` and `issues` (each issue as a
+            dict).
         """
-        return {
-            "is_valid": self.is_valid,
-            "error_codes": list(self.error_codes),
-            "issues": [issue.to_dict() for issue in self.issues],
-        }
+        return self.KEYS.upgrade(
+            {
+                "is_valid": self.is_valid,
+                "error_codes": list(self.error_codes),
+                "issues": [issue.to_dict() for issue in self.issues],
+            }
+        )

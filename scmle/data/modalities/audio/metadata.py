@@ -2,8 +2,10 @@
 
 import dataclasses
 import math
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 SHA256_HEX_LENGTH = 64
 
@@ -130,6 +132,11 @@ class Transcript:
     segments: tuple[Segment, ...] = ()
     confidence: float | None = None
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"provider_version": "version"}
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def __post_init__(self) -> None:
         """Validates provenance, ordering, and optional confidence.
 
@@ -175,9 +182,10 @@ class Transcript:
         """Returns JSON-native transcript provenance.
 
         Returns:
-            A dict of the fields, with segments as nested dicts.
+            A dict of the fields, with segments as nested dicts and the
+            provider version as `version`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

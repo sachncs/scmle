@@ -240,6 +240,17 @@ class Compatibility:
     removed: tuple[str, ...]
     changed: tuple[str, ...]
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {},
+        groups={
+            "snapshots": {
+                "previous_snapshot_id": "previous",
+                "current_snapshot_id": "current",
+            }
+        },
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     @property
     def compatible(self) -> bool:
         """Whether no column was removed or changed (additions allowed)."""
@@ -263,19 +274,21 @@ class Compatibility:
         """Serializes the compatibility decision.
 
         Returns:
-            A JSON-compatible mapping with both snapshot ids, ``status``,
-            ``compatible`` and the added, removed and changed column names
-            as lists.
+            A JSON-compatible mapping with both snapshot ids under
+            ``snapshots.{previous, current}``, ``status``, ``compatible`` and
+            the added, removed and changed column names as lists.
         """
-        return {
-            "previous_snapshot_id": self.previous_snapshot_id,
-            "current_snapshot_id": self.current_snapshot_id,
-            "status": self.status,
-            "compatible": self.compatible,
-            "added": list(self.added),
-            "removed": list(self.removed),
-            "changed": list(self.changed),
-        }
+        return self.KEYS.upgrade(
+            {
+                "previous_snapshot_id": self.previous_snapshot_id,
+                "current_snapshot_id": self.current_snapshot_id,
+                "status": self.status,
+                "compatible": self.compatible,
+                "added": list(self.added),
+                "removed": list(self.removed),
+                "changed": list(self.changed),
+            }
+        )
 
 
 def diff(previous: Observation | None, current: Observation) -> Compatibility:

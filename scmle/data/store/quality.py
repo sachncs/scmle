@@ -109,12 +109,13 @@ class Finding:
         """Converts the finding to plain data.
 
         Returns:
-            A dict of the fields, with the policy as its string value and
-            at most the first 20 row positions as a list.
+            A dict of the fields, with the policy as its string value, at
+            most 20 row positions as a list, and `row_level` as `granular`.
         """
         record = dataclasses.asdict(self)
         record["policy"] = self.policy.value
         record["rows"] = list(self.rows[:20])
+        record["granular"] = record.pop("row_level")
         return record
 
 
@@ -145,16 +146,15 @@ class Assessment:
         """Converts the report to plain data.
 
         Returns:
-            A dict with the stage, snapshot id, dataset, decision, row
-            counts and `findings`, a list of `Finding.to_dict` results.
+            A dict with the stage, `snapshot`, dataset, decision, row counts
+            as `rows.{received, used}` and the `Finding.to_dict` results.
         """
         return {
             "stage": self.stage,
-            "snapshot_id": self.snapshot_id,
+            "snapshot": self.snapshot_id,
             "dataset": self.dataset,
             "decision": self.decision,
-            "rows_in": self.rows_in,
-            "rows_out": self.rows_out,
+            "rows": {"received": self.rows_in, "used": self.rows_out},
             "findings": [finding.to_dict() for finding in self.findings],
         }
 

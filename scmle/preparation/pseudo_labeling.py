@@ -12,11 +12,14 @@ from collections.abc import Sequence
 import dataclasses
 from typing import Any
 from typing import cast
+from typing import ClassVar
 from typing import TYPE_CHECKING
 
 import numpy
 import pandas
 from sklearn import base
+
+from scmle.contracts import records
 
 if TYPE_CHECKING:
     from scmle.contracts import models
@@ -42,13 +45,19 @@ class Outcome:
     pseudo_rows: float
     accepted: bool
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"pseudo_rows": "pseudo"}
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Converts the outcome to a JSON-ready record.
 
         Returns:
-            A dictionary with one entry per attribute.
+            A dictionary with one entry per attribute, `pseudo_rows`
+            written as `pseudo`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def assured(

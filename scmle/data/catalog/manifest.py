@@ -19,7 +19,7 @@ from scmle.data.catalog import identity
 from scmle.data.catalog import inspection
 
 PARTS = {
-    "source": identity.Source.migrations,
+    "source": identity.Source.migrations[:1],
     "missingness": evidence.Missingness.migrations,
     "duplicates": evidence.Duplication.migrations,
     "label": evidence.Labeling.migrations,
@@ -98,6 +98,7 @@ MIGRATIONS = (
         change=lift,
         revert=lower,
     ),
+    records.nest({}, parts={"source": identity.Source.migrations[1]}),
 )
 CATALOG_SCHEMA_VERSION = records.ORIGIN + len(MIGRATIONS)
 
@@ -240,11 +241,13 @@ def load(path: str | pathlib.Path) -> tuple[Mapping[str, Any], str]:
         path: A file written by ``Catalog.write``.
 
     Returns:
-        The catalog content without ``catalog_digest``, and that digest.
+        The catalog content without its digest, and that digest. The digest
+        is stored as ``digest``, or as ``catalog_digest`` by version 2 and
+        older.
 
     Raises:
         ValueError: If the file cannot be read or parsed, is not a JSON
-            object, or lacks a string ``catalog_digest``.
+            object, or lacks a string digest.
     """
     try:
         record = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
@@ -254,11 +257,12 @@ def load(path: str | pathlib.Path) -> tuple[Mapping[str, Any], str]:
         ) from error
     if not isinstance(record, dict):
         raise errors.InputError("catalog evidence must be a JSON object")
-    expected_digest = record.get("catalog_digest")
+    key = "digest" if "digest" in record else "catalog_digest"
+    expected_digest = record.get(key)
     if not isinstance(expected_digest, str):
         raise errors.InputError("catalog evidence is missing catalog_digest")
     payload = dict(record)
-    del payload["catalog_digest"]
+    del payload[key]
     return payload, expected_digest
 
 
@@ -458,10 +462,10 @@ class Catalog:
         """Returns JSON-native catalog evidence with its integrity digest.
 
         Returns:
-            The content dictionary plus a ``catalog_digest`` entry.
+            The content dictionary plus the catalog digest as ``digest``.
         """
         record = self.contents()
-        record["catalog_digest"] = self.catalog_digest
+        record["digest"] = self.catalog_digest
         return record
 
     def canonize(self) -> str:
@@ -477,7 +481,7 @@ class Catalog:
 
         Args:
             path: Destination file.  The indented JSON, including
-                ``catalog_digest``, is written atomically.
+                digest (``digest``), is written atomically.
         """
         encoded = (
             json.dumps(
@@ -506,7 +510,7 @@ class Catalog:
 
         Raises:
             ValueError: If the file cannot be read or parsed, is not a JSON
-                object, lacks a string ``catalog_digest``, its digest does
+                object, lacks a string digest, its digest does
                 not match the stored content, or the content does not
                 rebuild into a valid catalog.
         """
@@ -535,7 +539,7 @@ class Catalog:
 
         Args:
             record: A mapping of catalog content as produced by ``to_dict``.
-                Any ``catalog_digest`` is not checked here. A missing
+                Any stored digest is not checked here. A missing
                 required entry raises ``KeyError``; ``blockers`` may be
                 absent.
 

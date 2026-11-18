@@ -6,7 +6,10 @@ access to the training data.
 """
 
 import abc
+from collections.abc import Callable
+from collections.abc import Mapping
 import dataclasses
+import functools
 from typing import Any
 from typing import ClassVar
 from typing import Self
@@ -23,6 +26,38 @@ MAX_CATEGORIES = 50
 OTHER = "__other__"
 EPSILON = 1e-4
 NOISE_TAIL = 1.5
+
+REFERENCE = records.Migration(renames={"missing_rate": "missing"})
+"""Version-1 keys of one stored reference to the written ones."""
+
+
+def respell(
+    layout: records.Layout, move: Callable[[records.Layout], records.Layout]
+) -> records.Layout:
+    """Moves every stored reference of a profile one version.
+
+    Args:
+        layout: The stored profile; changed in place.
+        move: `REFERENCE.upgrade` or `REFERENCE.downgrade`.
+
+    Returns:
+        The profile with each feature reference and the output reference
+        moved.
+    """
+    if isinstance(layout.get("features"), Mapping):
+        layout["features"] = {
+            name: move(dict(item)) for name, item in layout["features"].items()
+        }
+    if isinstance(layout.get("output"), Mapping):
+        layout["output"] = move(dict(layout["output"]))
+    return layout
+
+
+BASELINE = records.Migration(
+    change=functools.partial(respell, move=REFERENCE.upgrade),
+    revert=functools.partial(respell, move=REFERENCE.downgrade),
+)
+"""Version 3 of the profile: each reference writes `missing`."""
 
 
 def divergence(expected: numpy.ndarray, actual: numpy.ndarray) -> float:
@@ -213,15 +248,18 @@ class Deciles(Reference):
         """Returns a JSON-serializable mapping.
 
         Returns:
-            A dict with the kind, missing rate, row count, edges and fractions.
+            A dict with the kind, missing rate (as `missing`), row count,
+            edges and fractions.
         """
-        return {
-            "kind": self.kind,
-            "missing_rate": self.missing_rate,
-            "rows": self.rows,
-            "edges": list(self.edges),
-            "fractions": list(self.fractions),
-        }
+        return REFERENCE.upgrade(
+            {
+                "kind": self.kind,
+                "missing_rate": self.missing_rate,
+                "rows": self.rows,
+                "edges": list(self.edges),
+                "fractions": list(self.fractions),
+            }
+        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -309,14 +347,17 @@ class CategoricalReference(Reference):
         """Returns a JSON-serializable mapping.
 
         Returns:
-            A dict with the kind, missing rate, row count and frequencies.
+            A dict with the kind, missing rate (as `missing`), row count and
+            frequencies.
         """
-        return {
-            "kind": self.kind,
-            "missing_rate": self.missing_rate,
-            "rows": self.rows,
-            "frequencies": self.frequencies,
-        }
+        return REFERENCE.upgrade(
+            {
+                "kind": self.kind,
+                "missing_rate": self.missing_rate,
+                "rows": self.rows,
+                "frequencies": self.frequencies,
+            }
+        )
 
 
 REFERENCE_KINDS: dict[str, type[Reference]] = {
@@ -328,22 +369,25 @@ def rebuild(record: dict[str, Any]) -> Reference:
     """Rebuilds a reference from `to_dict` output.
 
     Args:
-        record: A dict produced by `to_dict`.
+        record: A dict produced by `to_dict`; the version-1 spelling
+            `missing_rate` is read too.
 
     Returns:
         A numeric reference if its kind is `numeric`, otherwise a categorical
         one.
     """
+    if "missing_rate" in record:
+        record = REFERENCE.upgrade(dict(record))
     kind = record["kind"]
     if kind == "numeric":
         return Deciles(
-            record["missing_rate"],
+            record["missing"],
             record["rows"],
             tuple(record["edges"]),
             tuple(record["fractions"]),
         )
     return CategoricalReference(
-        record["missing_rate"], record["rows"], record["frequencies"]
+        record["missing"], record["rows"], record["frequencies"]
     )
 
 
@@ -356,13 +400,15 @@ class Baseline:
         output: Reference of the model's score / predicted class.
         name: What `output` describes.
         metrics: Held-out metrics at training time.
-        migrations: The profile's version steps, oldest first.
+        migrations: The profile's version steps, oldest first; version 3
+            writes each reference's missing rate as `missing`.
     """
 
     migrations: ClassVar[tuple[records.Migration, ...]] = (
         records.Migration(
             renames={"output_name": "name", "reference_metrics": "metrics"}
         ),
+        BASELINE,
     )
 
     features: dict[str, Reference]
