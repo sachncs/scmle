@@ -619,7 +619,7 @@ def test_a_degenerate_target_lists_every_column_as_unchecked():
     frame = world(31).assign(y=0)
     report = run(frame)
     assert report.unchecked == ("x0", "x1", "x2", "x3")
-    assert report.unchecked_reason.startswith("screen not run")
+    assert report.rationale.startswith("screen not run")
 
 
 def test_columns_that_cannot_be_tested_are_unchecked_not_clean():

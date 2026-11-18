@@ -110,9 +110,7 @@ def test_valid_policy_contains_task_aware_contracts():
 
     assert policy.task is tasks.Task.BINARY
     assert (
-        policy.model_dump(mode="json")["release"]["metric_gates"][0][
-            "threshold"
-        ]
+        policy.model_dump(mode="json")["release"]["metrics"][0]["threshold"]
         == 0.75
     )
     assert json.loads(policy.canonize())["task"] == "binary_classification"
@@ -129,8 +127,14 @@ def test_explanation_quality_thresholds_are_explicit_and_serialized():
         fidelity_threshold=0.9,
     )
 
-    assert policy.model_dump(mode="json")["stability_threshold"] == 0.8
-    assert policy.model_dump(mode="json")["fidelity_threshold"] == 0.9
+    assert policy.model_dump(mode="json")["stability"] == {
+        "required": True,
+        "threshold": 0.8,
+    }
+    assert policy.model_dump(mode="json")["fidelity"] == {
+        "required": True,
+        "threshold": 0.9,
+    }
 
 
 @pytest.mark.parametrize(

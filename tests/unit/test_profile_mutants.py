@@ -207,7 +207,7 @@ def test_the_profile_issues_these_exact_statements_and_charges():
             {
                 "name": "a",
                 "kind": "number",
-                "non_null": 3,
+                "present": 3,
                 "distinct": 2,
                 "minimum": "1",
                 "maximum": "2",
@@ -215,7 +215,7 @@ def test_the_profile_issues_these_exact_statements_and_charges():
             {
                 "name": "b",
                 "kind": "text",
-                "non_null": 2,
+                "present": 2,
                 "distinct": 2,
                 "minimum": "x",
                 "maximum": "y",

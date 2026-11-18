@@ -80,13 +80,13 @@ def test_the_claim_is_registered_by_hash_and_tested_once_on_c(tmp_path):
     claims = read(result, "confirmed_claims.json")
     entry = claims["registered_claims"]["baseline_vs_current_process"]
     assert entry["kind"] == "baseline"
-    assert entry["sha256"] == report["registration_hash"]
+    assert entry["sha256"] == report["digests"]["registration"]
     ledger = scmle.assurance.ledger.ledger.Ledger.load(
         pathlib.Path(result.run_dir) / scmle.assurance.ledger.ledger.FILE_NAME
     )
     assert (
         ledger.claims["baseline_vs_current_process"]["sha256"]
-        == (report["registration_hash"])
+        == (report["digests"]["registration"])
     )
     sealed = ledger.confirmation["attachments"]
     assert set(sealed) == {"baseline_report.json"}
@@ -98,7 +98,7 @@ def test_the_current_decision_is_never_a_model_feature(tmp_path):
     result = run(frame(), tmp_path, charter_file(tmp_path))
 
     profile = read(result, "dataset_profile.json")
-    plan = profile["feature_plan"]
+    plan = profile["plan"]
     assert "current" not in plan["numeric"] + plan["categorical"]
 
 
@@ -195,7 +195,7 @@ def test_the_selected_model_is_the_subject_of_the_claim(tmp_path):
     assert order.index("ledger.completed") < order.index("test.opened")
     claims = read(result, "confirmed_claims.json")
     entry = claims["registered_claims"]["baseline_vs_current_process"]
-    assert entry["sha256"] == report["registration_hash"]
+    assert entry["sha256"] == report["digests"]["registration"]
     assert subject["selection_sha256"]
     log = (pathlib.Path(result.run_dir) / "custody_log.jsonl").read_text()
     assert log.count('"event":"open"') + log.count('"event": "open"') == 1

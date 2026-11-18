@@ -109,7 +109,7 @@ def test_the_decision_files_are_written_with_a_randomized_log(tmp_path):
     assert design["plan_hash"] == report["rollout"]["plan_hash"]
     log = rollout.Journal.read(folder / "rollout_decisions.jsonl")
     assert log.verify() and len(log.rows) == 1
-    profile = read(result, "dataset_profile.json")["feature_plan"]
+    profile = read(result, "dataset_profile.json")["plan"]
     assert "prop" not in profile["numeric"] + profile["categorical"]
 
 

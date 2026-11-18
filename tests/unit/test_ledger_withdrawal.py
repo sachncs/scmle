@@ -81,7 +81,7 @@ def test_the_accounting_is_in_the_claims_file_and_the_sealed_ledger(tmp_path):
     result = run(withdraw_columns("f1"), tmp_path)
 
     document = json.loads((tmp_path / confirm.CLAIMS_FILE).read_text())
-    stage_two = document["stage_two"]
+    stage_two = document["second"]
     assert stage_two["statement"] == confirm.STAGE_TWO_STATEMENT
     assert stage_two["rule"] == {"name": "test-rule", "columns": ["f1"]}
     assert len(stage_two["survivors"]) == 2 and len(stage_two["family"]) == 1

@@ -66,12 +66,12 @@
       "stable": 300
     },
     "rule": {
+      "agreement": 0.8,
       "band": 0.5,
-      "q_min": 0.8,
-      "s_min": 0.8
+      "exclusion": 0.8
     },
     "seed_offset": 0,
     "specifications": 18
   },
-  "seconds": 585.9
+  "seconds": 565.1
 }

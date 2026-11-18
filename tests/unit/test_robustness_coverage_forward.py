@@ -137,7 +137,7 @@ def test_a_finding_whose_column_is_absent_is_inconclusive():
     )
     assert result.findings[0].label == forward.INCONCLUSIVE
     assert result.findings[0].check is None
-    assert result.to_dict()["findings"][0]["effect_f"] is None
+    assert result.to_dict()["findings"][0]["effects"]["forward"] is None
 
 
 def test_labels_follow_the_interval_and_the_sign_on_x():

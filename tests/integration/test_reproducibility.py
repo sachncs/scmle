@@ -47,14 +47,14 @@ def test_changed_data_is_detected(binary_frame, tmp_path):
 
 def make_facts(scores, std=0.02, selected="logistic_regression"):
     trial = {
-        "trial_id": "trial_001",
-        "model_name": "logistic_regression",
+        "identifier": "trial_001",
+        "model": "logistic_regression",
         "strategy": "default",
         "params": {},
         "status": "ok",
-        "fold_scores": scores,
-        "score_mean": sum(scores) / len(scores),
-        "score_std": std,
+        "folds": scores,
+        "score": sum(scores) / len(scores),
+        "deviation": std,
     }
     return {
         "config": {"seed": 42},

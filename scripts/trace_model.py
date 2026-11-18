@@ -343,7 +343,8 @@ class Walk:
             field(charter, "costs", "cost_model") == costs,
             "the cost model is the chartered one",
         )
-        self.say(f"  open items left to a person: {draft['open_items']}")
+        pending = field(draft, "pending", "open_items")
+        self.say(f"  open items left to a person: {pending}")
         cut = (costs["c_10"] - costs["c_00"]) / (
             costs["c_10"] - costs["c_00"] + costs["c_01"] - costs["c_11"]
         )

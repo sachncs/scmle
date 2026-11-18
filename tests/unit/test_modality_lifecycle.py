@@ -583,7 +583,7 @@ def test_lifecycle_report_rejects_a_stage_without_evidence_links(
         report_path=report_path,
     )
     record = report.to_dict()
-    record["evidence"][0]["evidence_links"] = []
+    record["evidence"][0]["links"] = []
     unsigned = dict(record)
     unsigned.pop("signature")
     record["signature"] = {
@@ -594,6 +594,34 @@ def test_lifecycle_report_rejects_a_stage_without_evidence_links(
 
     with pytest.raises(ValueError, match="evidence links"):
         modality_lifecycle.Record.read_verified(report_path, "report-key")
+
+
+def test_lifecycle_report_signed_before_the_stage_key_rename_verifies(
+    tmp_path: Path,
+):
+    """A report whose stages still say `evidence_links` keeps verifying."""
+    report_path = tmp_path / "report.json"
+    report = modality_lifecycle.Lifecycle().run(
+        document_adapter(),
+        tmp_path / "package",
+        signing_key="report-key",
+        report_path=report_path,
+    )
+    record = report.to_dict()
+    for stage in record["evidence"]:
+        stage["evidence_links"] = stage.pop("links")
+    unsigned = dict(record)
+    unsigned.pop("signature")
+    record["signature"] = {
+        "algorithm": attestation.SIGNATURE_ALGORITHM,
+        "value": attestation.mac(unsigned, "report-key"),
+    }
+    report_path.write_text(json.dumps(record), encoding="utf-8")
+
+    loaded = modality_lifecycle.Record.read_verified(report_path, "report-key")
+
+    assert loaded.signature == report.signature
+    assert loaded.to_dict() == report.to_dict()
 
 
 def test_package_loader_rejects_an_unsupported_manifest_version(
@@ -1359,7 +1387,7 @@ def test_lifecycle_compares_against_a_repeated_performance_baseline(
     )
 
     assert report.performance["comparison"]["passed"] is True
-    assert report.performance["comparison"]["baseline_run_count"] == 2
+    assert report.performance["comparison"]["baselines"] == 2
 
     fast_reference_runs = tuple(
         performance.Run(

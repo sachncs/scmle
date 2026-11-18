@@ -126,7 +126,7 @@ def test_claim_is_issued_with_a_real_gain_and_only_once():
     assert {c.subset for c in report.checks} == {
         qualification.Subset.CONFIRMATION
     }
-    assert report.to_dict()["registration_hash"] == (
+    assert report.to_dict()["digests"]["registration"] == (
         g.registration.registration_hash
     )
     with pytest.raises(baseline.BaselineError, match="already evaluated"):

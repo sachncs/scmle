@@ -40,7 +40,9 @@ def rehydrate(
     """Restores the per-stage evidence of a persisted lifecycle report.
 
     Args:
-        raw_stage_evidence: The report's `evidence` entry.
+        raw_stage_evidence: The report's `evidence` entry; each stage
+            record may carry its links as `links` or, as written before
+            the key was renamed, `evidence_links`.
 
     Returns:
         The restored stage evidence, in order.
@@ -57,18 +59,17 @@ def rehydrate(
             raise errors.InputError(
                 "lifecycle report stage evidence is invalid"
             )
-        stage = item.get("stage")
-        evidence_links = item.get("evidence_links")
-        evidence = item.get("evidence")
-        notes = item.get("notes")
+        layout = records.load("Proof", modalities.Proof.migrations, item)
+        stage = layout.get("stage")
+        evidence_links = layout.get("links")
+        evidence = layout.get("evidence")
+        notes = layout.get("notes")
         if not isinstance(stage, str):
             raise errors.InputError("lifecycle report stage is invalid")
         if not isinstance(evidence_links, list) or not all(
             isinstance(value, str) for value in evidence_links
         ):
-            raise errors.InputError(
-                "lifecycle report evidence_links are invalid"
-            )
+            raise errors.InputError("lifecycle report links are invalid")
         if not isinstance(evidence, Mapping):
             raise errors.InputError("lifecycle report evidence is invalid")
         if not isinstance(notes, list) or not all(
@@ -281,17 +282,28 @@ class Record:
             )
         object.__setattr__(self, "evidence", stages)
 
-    def preimage(self) -> dict[str, object]:
-        """Builds the exact report content covered by the signature.
+    def preimage(self, anchored: bool = True) -> dict[str, object]:
+        """Lays out every field except the signature as at `schema_version`.
+
+        Args:
+            anchored: Whether each stage record is taken at its version 1
+                (`evidence_links`), as the signature covers it, so renaming
+                a stage key never changes the signature of a stored report.
+                A version-2 report always lays its stages out so.
 
         Returns:
-            JSON-native mapping of every field except the signature, laid
-            out as at `schema_version`.
+            JSON-native mapping of the report content.
         """
+        evidence = [proof.to_dict() for proof in self.evidence]
+        if anchored or self.schema_version == PREVIOUS:
+            evidence = [
+                records.downgrade(modalities.Proof.migrations, stage)
+                for stage in evidence
+            ]
         content: records.Layout = {
             "modality": self.modality,
             "digests": dict(self.digests),
-            "evidence": [proof.to_dict() for proof in self.evidence],
+            "evidence": evidence,
             "evaluation": self.evaluation,
             "performance": self.performance,
             "package": self.package.to_dict(),
@@ -446,7 +458,7 @@ class Record:
             The unsigned content plus a `signature` entry that is None if
             unsigned, otherwise the algorithm and value.
         """
-        record = self.preimage()
+        record = self.preimage(anchored=False)
         record["signature"] = (
             None
             if self.signature is None

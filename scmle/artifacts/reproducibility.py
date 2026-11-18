@@ -16,6 +16,7 @@ import json
 import pathlib
 from typing import Any
 
+from scmle.contracts import experiments
 from scmle.contracts import records
 from scmle.contracts.data import provenance
 from scmle.evaluation import parameter_estimation
@@ -59,8 +60,9 @@ def reread(directory: str | pathlib.Path) -> dict[str, Any]:
     Returns:
         A dict with the keys `config`, `dataset` (the manifest), `split`
         (the split fingerprint), `trials` (the `trials/trial_*.json` records
-        in file-name order), `selected` (a tuple of the selected model, its
-        strategy and its parameters as sorted-key JSON text), `environment`
+        in file-name order, at the current trial layout), `selected` (a
+        tuple of the selected model, its strategy and its parameters as
+        sorted-key JSON text), `environment`
         (the environment lock text, empty if absent) and
         `parameter_estimation` (the report digest, None if the run has no such
         report). A missing required file raises the underlying file or JSON
@@ -68,7 +70,7 @@ def reread(directory: str | pathlib.Path) -> dict[str, Any]:
     """
     root = pathlib.Path(directory)
     trials = [
-        json.loads(path.read_text(encoding="utf-8"))
+        migrate(json.loads(path.read_text(encoding="utf-8")))
         for path in sorted((root / "trials").glob("trial_*.json"))
     ]
     evaluation = json.loads(
@@ -101,6 +103,21 @@ def reread(directory: str | pathlib.Path) -> dict[str, Any]:
     }
 
 
+def migrate(trial: records.Layout) -> records.Layout:
+    """Moves a stored trial of either layout to the current keys.
+
+    Args:
+        trial: A `trials/trial_*.json` record.
+
+    Returns:
+        The record with the current keys (`identifier`, `model`, `score`,
+        `deviation`, `folds`, ...); a trial carries no version key.
+    """
+    layout = records.load("Trial", experiments.Trial.migrations, trial)
+    layout.pop(records.KEY)
+    return layout
+
+
 def identify(trial: dict[str, Any]) -> tuple[Any, ...]:
     """Names the part of a trial that must not change between runs.
 
@@ -111,8 +128,8 @@ def identify(trial: dict[str, Any]) -> tuple[Any, ...]:
         Its id, model name, strategy and key-sorted JSON parameters.
     """
     return (
-        trial["trial_id"],
-        trial["model_name"],
+        trial["identifier"],
+        trial["model"],
         trial["strategy"],
         json.dumps(trial["params"], sort_keys=True),
     )
@@ -192,28 +209,26 @@ def judge(
     for left, right in zip(a, b, strict=True):
         if left["status"] != right["status"]:
             was, now = left["status"], right["status"]
-            reasons.append(f"{left['trial_id']}: status {was} -> {now}")
+            reasons.append(f"{left['identifier']}: status {was} -> {now}")
             exact = False
             comparable = False
             continue
         gaps = [
             abs(x - y)
-            for x, y in zip(
-                left["fold_scores"], right["fold_scores"], strict=True
-            )
+            for x, y in zip(left["folds"], right["folds"], strict=True)
         ]
         if gaps:
             largest = max(largest, *gaps)
-        if left["fold_scores"] != right["fold_scores"]:
+        if left["folds"] != right["folds"]:
             exact = False
             allowed = tolerance_std * max(
-                left["score_std"], right["score_std"], FLOOR
+                left["deviation"], right["deviation"], FLOOR
             )
-            if abs(left["score_mean"] - right["score_mean"]) > allowed:
+            if abs(left["score"] - right["score"]) > allowed:
                 comparable = False
                 reasons.append(
-                    f"{left['trial_id']}: mean score moved "
-                    f"{abs(left['score_mean'] - right['score_mean']):.4g} "
+                    f"{left['identifier']}: mean score moved "
+                    f"{abs(left['score'] - right['score']):.4g} "
                     f"(allowed {allowed:.4g})"
                 )
     if first["selected"] != second["selected"]:

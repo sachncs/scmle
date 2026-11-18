@@ -15,11 +15,11 @@ from scmle.evaluation import fit_health
 from scmle.evaluation import parameter_estimation
 
 LEADERBOARD_DETAILS = (
-    "fold_scores",
-    "observed_access",
-    "evaluation_config",
+    "folds",
+    "access",
+    "evaluation",
     "runtime",
-    "train_scores",
+    "training",
 )
 
 
@@ -100,11 +100,11 @@ class Run:
         board = board.drop(columns=list(LEADERBOARD_DETAILS))
         board["params"] = board["params"].map(json.dumps)
         board["selected"] = (
-            board["trial_id"] == self.evaluation["selected_trial_id"]
+            board["identifier"] == self.evaluation["selected_trial_id"]
         )
         succeeded = board["status"] == str(experiments.Termination.OK)
         ranked = board[succeeded].sort_values(
-            "score_mean",
+            "score",
             ascending=not self.evaluation["metric_greater_is_better"],
         )
         return pandas.concat([ranked, board[~succeeded]]).reset_index(drop=True)

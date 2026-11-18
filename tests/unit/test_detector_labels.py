@@ -188,7 +188,7 @@ def test_detect_requires_agreement_and_reports_overlap():
         report.rate.method == "detector_only" and report.sampling_bound == 0.0
     )
     assert report.rows_checked == report.input_rows == len(x)
-    assert report.to_dict()["rows_checked"] == len(x)
+    assert report.to_dict()["checked"] == len(x)
     assert labels.detect(x, y, seed=0) == report
 
 

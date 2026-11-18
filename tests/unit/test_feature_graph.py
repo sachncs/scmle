@@ -143,7 +143,7 @@ def build_series(nodes, frame):
 
 
 def test_series_features_are_computed_per_group_in_time_order():
-    # Enforces docs/TUTORIAL.md:91.
+    # Enforces docs/TUTORIAL.md:89.
     result = build_series(
         [
             node("prev", "lag", ["v"], k=1),
@@ -169,7 +169,7 @@ def test_series_features_are_computed_per_group_in_time_order():
 
 
 def test_series_features_never_use_future_rows():
-    # Enforces docs/TUTORIAL.md:91.
+    # Enforces docs/TUTORIAL.md:89.
     frame = series_frame()
     result = build_series(
         [
@@ -236,7 +236,7 @@ def test_series_requires_parseable_times_and_a_time_column():
 
 
 def test_validation_rejects_bad_graphs():
-    # Enforces docs/TUTORIAL.md:91.
+    # Enforces docs/TUTORIAL.md:89.
     available = {"a", "b", "t", "y"}
 
     def check(nodes, **data):

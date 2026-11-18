@@ -18,6 +18,8 @@ from typing import Any
 
 import pandas
 
+from scmle.contracts import experiments
+
 STATUSES = ("ok", "failed", "pruned", "skipped")
 
 
@@ -75,7 +77,9 @@ def summarize_run(run_dir: pathlib.Path) -> dict[str, Any]:
     budget = float(config["resources"]["time_budget_seconds"])
     events = read_events(run_dir)
     elapsed = seconds_between(events[0]["timestamp"], events[-1]["timestamp"])
-    board = pandas.read_parquet(run_dir / "leaderboard.parquet")
+    board = pandas.read_parquet(run_dir / "leaderboard.parquet").rename(
+        columns=experiments.Trial.migrations[0].renames
+    )
     counts = collections.Counter(board["status"])
     finished = board[board["status"] == "ok"]
     selected = board[board["selected"]]
@@ -84,19 +88,19 @@ def summarize_run(run_dir: pathlib.Path) -> dict[str, Any]:
         "seconds_events": round(elapsed, 2),
         "fraction_used": round(elapsed / budget, 3),
         "trials": {status: counts.get(status, 0) for status in STATUSES},
-        "fit_seconds": round(float(board["fit_seconds"].sum()), 2),
+        "fit_seconds": round(float(board["fit"].sum()), 2),
         "skipped_stages": [
             {"event": e["kind"], "reason": e["data"].get("reason", "")}
             for e in events
             if e["kind"].endswith(".skipped")
         ],
-        "models": dict(collections.Counter(finished["model_name"])),
+        "models": dict(collections.Counter(finished["model"])),
         "strategies": dict(collections.Counter(finished["strategy"])),
         "failures": {
-            row.trial_id: str(row.error)
+            row.identifier: str(row.error)
             for row in board[board["status"] == "failed"].itertuples()
         },
-        "selected": "" if selected.empty else selected.iloc[0]["model_name"],
+        "selected": "" if selected.empty else selected.iloc[0]["model"],
     }
 
 

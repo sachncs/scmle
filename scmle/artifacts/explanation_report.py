@@ -76,7 +76,7 @@ class Renderer:
             reason.
         """
         record = evidence.model_dump(mode="json")
-        privacy = cast("dict[str, Any]", record["privacy_decision"])
+        privacy = cast("dict[str, Any]", record["clearance"])
         output: Any = record["output"]
         if privacy["decision"] == "denied":
             output = {
@@ -92,7 +92,7 @@ class Renderer:
             output,
             cast("list[str]", record["limitations"]),
             privacy,
-            cast("list[dict[str, Any]]", record["evidence_links"]),
+            cast("list[dict[str, Any]]", record["links"]),
             rendered_record,
         )
 

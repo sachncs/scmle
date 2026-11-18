@@ -312,9 +312,9 @@ def test_claims_file_round_trips_and_carries_the_hashes(tmp_path):
     result.write(path)
     record = json.loads(path.read_text(encoding="utf-8"))
     assert record["outcome"] == confirm.CONFIRMED
-    assert record["alpha_confirm"] == "1/20"
-    assert record["survivors_sha256"] == ledger.survivor_set.sha256
-    assert record["ledger_head"] == ledger.head
+    assert record["alpha"] == "1/20"
+    assert record["digests"] == {"survivors": ledger.survivor_set.sha256}
+    assert record["heads"]["ledger"] == ledger.head
     assert record["negative_control"]["exceeds"] is True
     assert record["guarantee"].startswith("FDR <=")
     assert [qualification.Claim.from_dict(c) for c in record["claims"]] == list(
@@ -335,7 +335,7 @@ def test_claims_file_round_trips_and_carries_the_hashes(tmp_path):
     with pytest.raises(scmle.assurance.ledger.ledger.LedgerError, match="head"):
         scmle.assurance.ledger.ledger.Ledger.load(
             tmp_path / scmle.assurance.ledger.ledger.FILE_NAME,
-            expected_head=record["ledger_head"],
+            expected_head=record["heads"]["ledger"],
         )
 
 

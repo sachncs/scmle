@@ -30,7 +30,7 @@ def check_ledger_head(
         A passing finding if the heads agree, otherwise a failing one.
     """
     name = "claims file names the ledger head"
-    if document.get("ledger_head") == ledger.head:
+    if document.get("heads", {}).get("ledger") == ledger.head:
         return verdict.Finding(name, verdict.PASS, f"head {ledger.head[:12]}")
     return verdict.Finding(
         name,
@@ -144,13 +144,13 @@ def compare(
         The names of the differing fields, in a fixed order; empty if none.
     """
     problems = []
-    if document.get("survivors_sha256") != survivors.sha256:
+    if document.get("digests", {}).get("survivors") != survivors.sha256:
         problems.append("survivor hash")
     if document.get("outcome") != sealed_row.get("outcome"):
         problems.append("outcome")
     if document.get("rule") != sealed_row.get("rule"):
         problems.append("rule")
-    if document.get("alpha_confirm") != sealed_row.get("alpha_confirm"):
+    if document.get("alpha") != sealed_row.get("alpha_confirm"):
         problems.append("alpha_confirm")
     return problems
 
@@ -192,7 +192,7 @@ def crosscheck(
     ]
     if confirmed != list(sealed_row.get("confirmed", [])):
         problems.append("confirmed set")
-    if document.get("stage_two") != sealed_row.get("stage_two"):
+    if document.get("second") != sealed_row.get("stage_two"):
         problems.append("second-stage accounting")
     if problems:
         return verdict.Finding(
@@ -253,7 +253,7 @@ def rederive(document: dict[str, Any]) -> verdict.Finding:
         adjustment = multiplicity.adjust(
             values,
             budget.Correction(document["rule"]),
-            Fraction(document["alpha_confirm"]),
+            Fraction(document["alpha"]),
         )
         for index, claim in enumerate(tested):
             recorded = claim["adjusted_p_value"]
@@ -292,7 +292,7 @@ def stage_two_record_problems(
     """Checks a second-stage record against the frozen survivors.
 
     Args:
-        record: The claims document's `stage_two` record.
+        record: The claims document's `second` record.
         survivors: The ledger's frozen survivor set.
         withdrawn: The withdrawn hypothesis ids.
         family: The survivors that remain after the withdrawal.
@@ -329,7 +329,7 @@ def tally(
         problems (also failing if the ledger has no frozen survivors).
     """
     name = "second-stage accounting is consistent"
-    record = document.get("stage_two")
+    record = document.get("second")
     if record is None:
         return verdict.Finding(name, verdict.SKIPPED, "no withdrawal rule ran")
     survivors = ledger.survivor_set

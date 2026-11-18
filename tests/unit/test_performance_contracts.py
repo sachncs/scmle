@@ -153,7 +153,7 @@ def test_result_and_budget_are_deterministic():
         }
     )
 
-    assert list(budget.to_dict()["max_seconds"]) == ["inference", "ingest"]
+    assert list(budget.to_dict()["seconds"]) == ["inference", "ingest"]
 
 
 def test_repeated_baseline_compares_median_time_and_memory():
@@ -170,7 +170,7 @@ def test_repeated_baseline_compares_median_time_and_memory():
     assert result.relative_regressions["ingest"][
         "elapsed_seconds"
     ] == pytest.approx((1.2 - 1.05) / 1.05)
-    assert result.to_dict()["current_run_id"] == "current"
+    assert result.to_dict()["run"] == "current"
 
 
 def test_repeated_baseline_fails_time_and_memory_regressions():

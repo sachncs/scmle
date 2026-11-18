@@ -1,16 +1,19 @@
 """Writes the stored-record key map: docs/record_keys.json and RECORD_KEYS.md.
 
 Stage B renamed the multi-word keys of every stored record (for example
-`data_hash -> digests.data`, `run_id -> run`). The approved vocabulary,
-`plan/stage_b/phase5_vocabulary.md`, holds one table per record class. This
-script reads those tables into `docs/record_keys.json` (old key -> new
-dotted key, per record kind) and renders `docs/RECORD_KEYS.md` from that
-JSON, so the two always agree.
+`data_hash -> digests.data`, `run_id -> run`). The approved vocabularies,
+`plan/stage_b/phase5_vocabulary.md` (records read back) and
+`plan/stage_b/phase5_vocabulary_rest.md` (write-only records), hold one
+table per record class. This script reads the tables whose renames have
+landed into `docs/record_keys.json` (old stored key -> new dotted key, per
+record kind) and renders `docs/RECORD_KEYS.md` from that JSON, so the two
+always agree. A row of the second file counts only when the key it names is
+written to disk.
 
     python scripts/keys.py                 # rebuild both files
     python scripts/keys.py --check         # fail if RECORD_KEYS.md is stale
 
-The vocabulary file is a planning file and may be absent from a checkout;
+The vocabulary files are planning files and may be absent from a checkout;
 then the JSON is kept as it is and only the Markdown is rendered from it.
 """
 
@@ -22,10 +25,54 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 VOCABULARY = ROOT / "plan" / "stage_b" / "phase5_vocabulary.md"
+REST = ROOT / "plan" / "stage_b" / "phase5_vocabulary_rest.md"
 TABLE = ROOT / "docs" / "record_keys.json"
 DOC = ROOT / "docs" / "RECORD_KEYS.md"
 HEADING = re.compile(r"^### `([^`]+)` `([^`]+)`")
-ROW = re.compile(r"^\| `([^`]+)` \| (keep )?`([^`]+)` \|")
+ROW = re.compile(r"^\| `([^`]+)` \| (keep )?`?([^`|]+?)`? \|")
+FAMILY = re.compile(r"^## (F\d+) ")
+LANDED = frozenset({"F1", "F2", "F3", "F8"})
+"""Families of the rest vocabulary whose renames are in the code."""
+PROPERTIES = frozenset(
+    {
+        "contracts/data/profiles.py Curation",
+        "contracts/modalities.py Declaration",
+    }
+)
+"""Kinds of the stored-property family (F10) that a landed family writes."""
+UNWRITTEN = frozenset(
+    {
+        ("assurance/admissibility/screen/report.py Screen", "unchecked_reason"),
+        ("contracts/data/profiles.py Portrait", "column_statistics"),
+        ("contracts/data/profiles.py Portrait", "target_summary"),
+        *(
+            ("contracts/data/profiles.py Blueprint", key)
+            for key in (
+                "group_column",
+                "time_column",
+                "weight_column",
+                "event_column",
+                "ordinal_levels",
+                "query_column",
+                "target_columns",
+                "value_column",
+                "treatment_column",
+                "binary_outcome",
+                "text_encoding",
+                "embedding_model",
+                "informative_missing",
+            )
+        ),
+    }
+)
+"""Rest rows whose old key never reached a file, or reached it unchanged."""
+STORED = {
+    ("causal/identification/select.py Plan", "chartered_order"): (
+        "order_chartered"
+    ),
+    ("contracts/data/profiles.py Portrait", "dataset_statistics"): "dataset",
+}
+"""Rest rows whose field was written under another old key."""
 
 PREFACE = """\
 # Stored record keys
@@ -36,7 +83,13 @@ certificates, governance, deployment and monitoring records, run manifests
 and evaluation members). Each name became one word or a nested object:
 `data_hash` is now `digests.data`, `row_count` is now `rows`, `run_id` is
 `identifier` on the record that is the run and `run` on a record that
-refers to a run. Every renamed record kind has a higher `schema_version`.
+refers to a run. Every renamed record kind has a higher `schema_version`,
+except the few that carry none (a trial checkpoint, the stage records of a
+lifecycle report): scmle tells their two layouts apart by the keys. The
+write-only records (detector certificates, framing and ingest reports,
+robustness and causal reports, decision reports, capability, modality,
+observability and performance contracts, release policies and explanation
+evidence) were renamed in a second pass and are listed here too.
 
 **scmle reads old files itself.** Each record kind has a migration, so a
 folder written by an older scmle loads without any change. Hashes and
@@ -105,6 +158,40 @@ def parse(text: str) -> dict[str, dict[str, str]]:
     return kinds
 
 
+def landed(text: str) -> dict[str, dict[str, str]]:
+    """Reads the landed, written rows of the rest vocabulary.
+
+    Args:
+        text: The rest vocabulary Markdown.
+
+    Returns:
+        `"<module> <Class>"` -> {old stored key: new dotted key} for the
+        families in `LANDED` and the kinds in `PROPERTIES`, without the rows
+        in `UNWRITTEN` and with the old keys in `STORED` substituted.
+    """
+    kinds: dict[str, dict[str, str]] = {}
+    family = kind = ""
+    for line in text.splitlines():
+        found = FAMILY.match(line)
+        if found:
+            family = found.group(1)
+            continue
+        heading = HEADING.match(line)
+        if heading:
+            kind = f"{heading.group(1)} {heading.group(2)}"
+            continue
+        row = ROW.match(line)
+        wanted = family in LANDED or (family == "F10" and kind in PROPERTIES)
+        if not row or not kind or row.group(2) or not wanted:
+            continue
+        old = row.group(1)
+        if (kind, old) in UNWRITTEN:
+            continue
+        old = STORED.get((kind, old), old)
+        kinds.setdefault(kind, {})[old] = row.group(3)
+    return kinds
+
+
 def render(kinds: dict[str, dict[str, str]]) -> str:
     """Renders the Markdown table of every record kind.
 
@@ -152,7 +239,12 @@ def main(arguments: list[str]) -> int:
         return 0
     if VOCABULARY.is_file():
         kinds = parse(VOCABULARY.read_text(encoding="utf-8"))
-        document = {"source": "plan/stage_b/phase5_vocabulary.md"}
+        sources = ["plan/stage_b/phase5_vocabulary.md"]
+        if REST.is_file():
+            for kind, keys in landed(REST.read_text(encoding="utf-8")).items():
+                kinds.setdefault(kind, {}).update(keys)
+            sources.append("plan/stage_b/phase5_vocabulary_rest.md")
+        document: dict[str, object] = {"source": ", ".join(sources)}
         document["kinds"] = kinds
         TABLE.write_text(
             json.dumps(document, indent=2) + "\n", encoding="utf-8"

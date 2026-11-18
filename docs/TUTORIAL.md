@@ -13,9 +13,7 @@ project = scmle.api.project.Project(
 )
 logging.info(project.plan().summary())  # nothing is trained or written
 result = project.run()
-logging.info(
-    "\n%s", result.leaderboard()[["model_name", "status", "score_mean"]]
-)
+logging.info("\n%s", result.leaderboard()[["model", "status", "score"]])
 logging.info("\n%s", result.salience().head())
 result.save("artifacts/churn", signing_key="...")  # or set SCMLE_SIGNING_KEY
 ```

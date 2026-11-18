@@ -102,8 +102,7 @@ def test_a_verdict_is_recorded_under_exact_keys():
     assert verdict.to_dict() == {
         "strategy": "iv",
         "eligible": False,
-        "missing_assumptions": ["a"],
-        "missing_design": ["b", "c"],
+        "missing": {"assumptions": ["a"], "design": ["b", "c"]},
         "reasons": ["because"],
         "adjustment_checked_by_dag": True,
     }
@@ -122,14 +121,14 @@ def test_the_plan_record_of_an_identified_run_has_no_refusal_fields():
         "primary",
         "multiverse",
         "order",
-        "order_chartered",
+        "chartered",
         "strategies",
     }
     assert record["status"] == "identified"
     assert record["primary"] == "backdoor_aipw"
     assert record["multiverse"] == []
     assert record["order"] == list(select.STRATEGIES)
-    assert record["order_chartered"] is False
+    assert record["chartered"] is False
     assert record["strategies"] == [v.to_dict() for v in plan.verdicts]
     assert [s["strategy"] for s in record["strategies"]] == list(
         select.STRATEGIES
@@ -323,7 +322,7 @@ def test_a_chartered_order_is_kept_and_the_first_eligible_leads():
     assert plan.multiverse == ("backdoor_aipw",)
     assert [v.strategy for v in plan.verdicts] == list(plan.order)
     assert plan.status == "identified"
-    assert plan.to_dict()["order_chartered"] is True
+    assert plan.to_dict()["chartered"] is True
     assert plan.to_dict()["multiverse"] == ["backdoor_aipw"]
 
 
@@ -343,20 +342,24 @@ def test_the_refusal_report_lists_what_each_strategy_lacks():
         "action": "refuse_claim",
         "missing_per_strategy": {
             "iv": {
-                "missing_assumptions": [
-                    "instrument_relevance",
-                    "independence",
-                    "monotonicity",
-                ],
-                "missing_design": ["instrument"],
+                "missing": {
+                    "assumptions": [
+                        "instrument_relevance",
+                        "independence",
+                        "monotonicity",
+                    ],
+                    "design": ["instrument"],
+                },
                 "reasons": [],
             },
             "rd": {
-                "missing_assumptions": [
-                    "continuity_at_cutoff",
-                    "no_manipulation",
-                ],
-                "missing_design": ["running_variable", "cutoff"],
+                "missing": {
+                    "assumptions": [
+                        "continuity_at_cutoff",
+                        "no_manipulation",
+                    ],
+                    "design": ["running_variable", "cutoff"],
+                },
                 "reasons": [
                     "estimand LATE is not answered by rd (answers LATE_RD)"
                 ],

@@ -90,64 +90,64 @@
    "capability_registry.json": {
     "capabilities": [
      {
-      "evidence_links": [
+      "extras": [
        "str"
       ],
-      "failure_modes": [
+      "failures": [
        "str"
       ],
       "key": {
        "evaluation": "str",
        "explainability": "str",
        "fairness": "str",
+       "family": "str",
        "inference": "str",
        "modality": "str",
-       "model_family": "str",
        "task": "str",
        "uncertainty": "str"
       },
       "limitations": [
        "str"
       ],
-      "required_extras": [
+      "links": [
        "str"
       ],
       "resources": {
-       "cpu_cores": "int",
-       "disk_gb": "float",
-       "gpu_required": "bool",
-       "max_rows": "NoneType",
-       "memory_gb": "float",
-       "network_required": "bool",
-       "notes": []
+       "cpu": "int",
+       "disk": "float",
+       "gpu": "bool",
+       "memory": "float",
+       "network": "bool",
+       "notes": [],
+       "rows": "NoneType"
       },
       "status": "str"
      }
     ],
     "model_families": [
      {
-      "evidence_links": [],
-      "failure_modes": [
+      "extras": [
        "str"
       ],
+      "failures": [
+       "str"
+      ],
+      "family": "str",
       "limitations": [
        "str"
       ],
+      "links": [],
       "modalities": [
        "str"
       ],
-      "model_family": "str",
-      "required_extras": [
-       "str"
-      ],
       "resources": {
-       "cpu_cores": "int",
-       "disk_gb": "float",
-       "gpu_required": "bool",
-       "max_rows": "NoneType",
-       "memory_gb": "float",
-       "network_required": "bool",
-       "notes": []
+       "cpu": "int",
+       "disk": "float",
+       "gpu": "bool",
+       "memory": "float",
+       "network": "bool",
+       "notes": [],
+       "rows": "NoneType"
       },
       "status": "str"
      }
@@ -653,9 +653,9 @@
     "rows_read": "str"
    },
    "curation_report.json": {
-    "cleaning_notes": [],
-    "dropped_columns": {},
-    "feature_columns": {
+    "blockers": [],
+    "dropped": {},
+    "features": {
      "categorical": [
       "str"
      ],
@@ -663,6 +663,29 @@
       "str"
      ],
      "text": []
+    },
+    "findings": {
+     "quality": [
+      {
+       "blocking": "bool",
+       "confidence": "float",
+       "disposition": "str",
+       "evidence": {
+        "message": "str"
+       },
+       "identifier": "str",
+       "owner": "str",
+       "remediation": "str",
+       "reviewer": "NoneType",
+       "rule": "str",
+       "scope": {
+        "category": "str"
+       },
+       "severity": "str",
+       "timestamp": "str"
+      }
+     ],
+     "risk": []
     },
     "manifest": {
      "columns": "int",
@@ -717,34 +740,15 @@
      "task": "str",
      "uri": "str"
     },
-    "profiled_rows": "int",
-    "quality_findings": [
-     {
-      "blocking": "bool",
-      "confidence": "float",
-      "disposition": "str",
-      "evidence": {
-       "message": "str"
-      },
-      "identifier": "str",
-      "owner": "str",
-      "remediation": "str",
-      "reviewer": "NoneType",
-      "rule": "str",
-      "scope": {
-       "category": "str"
-      },
-      "severity": "str",
-      "timestamp": "str"
-     }
-    ],
-    "read_seconds": "float",
-    "release_ready": "bool",
-    "risk_findings": [],
+    "notes": [],
+    "read": "float",
+    "ready": "bool",
+    "rows": {
+     "profiled": "int",
+     "source": "int"
+    },
     "schema_version": "int",
-    "source_rows": "int",
-    "streamed": "bool",
-    "unresolved_blocking_findings": []
+    "streamed": "bool"
    },
    "dataset_card.json": {
     "composition": {
@@ -753,8 +757,11 @@
      "profiled_rows": "int",
      "source_rows": "int"
     },
-    "dataset_id": "str",
-    "feature_summary": {
+    "dataset": "str",
+    "excluded": [
+     "str"
+    ],
+    "features": {
      "categorical": [
       "str"
      ],
@@ -763,8 +770,30 @@
      ],
      "text": []
     },
-    "generated_at": "str",
-    "intended_use": "str",
+    "findings": {
+     "quality": [
+      {
+       "blocking": "bool",
+       "confidence": "float",
+       "disposition": "str",
+       "evidence": {
+        "message": "str"
+       },
+       "identifier": "str",
+       "owner": "str",
+       "remediation": "str",
+       "reviewer": "NoneType",
+       "rule": "str",
+       "scope": {
+        "category": "str"
+       },
+       "severity": "str",
+       "timestamp": "str"
+      }
+     ],
+     "risk": []
+    },
+    "generated": "str",
     "limitations": [
      "str"
     ],
@@ -783,9 +812,6 @@
      "transformations": []
     },
     "modality": "str",
-    "out_of_scope": [
-     "str"
-    ],
     "owner": "str",
     "privacy": {
      "access": "str",
@@ -797,30 +823,9 @@
      "retention": "str",
      "sensitive": []
     },
-    "quality_findings": [
-     {
-      "blocking": "bool",
-      "confidence": "float",
-      "disposition": "str",
-      "evidence": {
-       "message": "str"
-      },
-      "identifier": "str",
-      "owner": "str",
-      "remediation": "str",
-      "reviewer": "NoneType",
-      "rule": "str",
-      "scope": {
-       "category": "str"
-      },
-      "severity": "str",
-      "timestamp": "str"
-     }
-    ],
-    "review_status": "str",
-    "risk_findings": [],
+    "review": "str",
     "schema_version": "int",
-    "snapshot_id": "str",
+    "snapshot": "str",
     "source": {
      "access": "str",
      "acquisition": "str",
@@ -835,7 +840,8 @@
      "units": {}
     },
     "target": "str",
-    "task": "str"
+    "task": "str",
+    "use": "str"
    },
    "dataset_manifest.json": {
     "columns": "int",
@@ -935,88 +941,43 @@
       }
      }
     },
-    "dataset": {
-     "features": {
-      "max_cardinality": "int",
-      "mean_categorical_entropy_bits": "float",
-      "mean_outlier_rate": "float",
-      "scale_orders_of_magnitude": "float"
-     },
-     "missingness": {
-      "columns_with_missing": "int",
-      "overall_rate": "float",
-      "patterns": {
-       "co_missing": "int",
-       "pattern_count": "int",
-       "top_pattern_share": "float"
+    "evidence": [
+     {
+      "limitations": [
+       "str"
+      ],
+      "method": "str",
+      "metrics": {
+       "classes": "int",
+       "folds": "int",
+       "suspect_rate": "float",
+       "suspect_rows": "int"
       },
-      "rows_with_any_missing": "float"
-     },
-     "ml_difficulty": {
-      "available": "bool",
-      "constant_baseline": "float",
-      "headroom_over_constant": "float",
-      "linear_baseline": "float",
-      "metric": "str",
-      "nonlinear_baseline": "float",
-      "nonlinearity_gain": "float",
-      "rows": "int",
-      "seconds": "float",
-      "separability": "float"
-     },
-     "operational": {
-      "feature_count": "int",
-      "memory_mb": "float",
-      "read_seconds": "float"
-     },
-     "quality": {
-      "duplicate_rows": "int",
-      "duplicate_share": "float"
-     },
-     "relationships": {
-      "max_target_association": "float",
-      "redundant_numeric_pairs": []
-     },
-     "risk": {
-      "leakage_hypotheses": "int",
-      "order_drift_psi": "float",
-      "rare_classes": "bool"
-     },
-     "shape": {
-      "columns": "int",
-      "effective_samples": "int",
-      "rows": "int",
-      "sparsity": "float",
-      "total_rows": "int"
-     },
-     "structure": {},
-     "target": {
-      "cardinality": "int",
-      "entropy_bits": "float",
-      "imbalance_ratio": "float",
-      "min_class_count": "int"
-     },
-     "types": {
-      "categorical": "int",
-      "datetime": "int",
-      "id_like": "int",
-      "numeric": "int",
-      "text_like": "int"
+      "observation": "str",
+      "sample_bounds": {
+       "input_rows": "int",
+       "maximum_rows": "int",
+       "rows_checked": "int",
+       "sampled": "bool"
+      },
+      "seed": "int",
+      "status": "str",
+      "thresholds": {
+       "class_own_label_probability": [
+        "float"
+       ],
+       "maximum_folds": "int",
+       "minimum_classes": "int",
+       "minimum_finding_rate": "float",
+       "minimum_rows": "int"
+      }
      }
-    },
-    "feature_plan": {
-     "categorical": [
+    ],
+    "findings": {
+     "quality": [
       "str"
      ],
-     "derived": [],
-     "dropped": {},
-     "extra_inputs": [],
-     "high_cardinality": [],
-     "numeric": [
-      "str"
-     ],
-     "series": [],
-     "text": []
+     "risk": []
     },
     "leakage": {
      "alpha": "float",
@@ -1119,42 +1080,89 @@
      "uri": "str"
     },
     "missingness": [],
-    "quality_evidence": [
-     {
-      "limitations": [
-       "str"
-      ],
-      "method": "str",
-      "metrics": {
-       "classes": "int",
-       "folds": "int",
-       "suspect_rate": "float",
-       "suspect_rows": "int"
+    "plan": {
+     "cardinal": [],
+     "categorical": [
+      "str"
+     ],
+     "derived": [],
+     "dropped": {},
+     "extras": [],
+     "numeric": [
+      "str"
+     ],
+     "series": [],
+     "text": []
+    },
+    "statistics": {
+     "features": {
+      "max_cardinality": "int",
+      "mean_categorical_entropy_bits": "float",
+      "mean_outlier_rate": "float",
+      "scale_orders_of_magnitude": "float"
+     },
+     "missingness": {
+      "columns_with_missing": "int",
+      "overall_rate": "float",
+      "patterns": {
+       "co_missing": "int",
+       "pattern_count": "int",
+       "top_pattern_share": "float"
       },
-      "observation": "str",
-      "sample_bounds": {
-       "input_rows": "int",
-       "maximum_rows": "int",
-       "rows_checked": "int",
-       "sampled": "bool"
-      },
-      "seed": "int",
-      "status": "str",
-      "thresholds": {
-       "class_own_label_probability": [
-        "float"
-       ],
-       "maximum_folds": "int",
-       "minimum_classes": "int",
-       "minimum_finding_rate": "float",
-       "minimum_rows": "int"
-      }
+      "rows_with_any_missing": "float"
+     },
+     "ml_difficulty": {
+      "available": "bool",
+      "constant_baseline": "float",
+      "headroom_over_constant": "float",
+      "linear_baseline": "float",
+      "metric": "str",
+      "nonlinear_baseline": "float",
+      "nonlinearity_gain": "float",
+      "rows": "int",
+      "seconds": "float",
+      "separability": "float"
+     },
+     "operational": {
+      "feature_count": "int",
+      "memory_mb": "float",
+      "read_seconds": "float"
+     },
+     "quality": {
+      "duplicate_rows": "int",
+      "duplicate_share": "float"
+     },
+     "relationships": {
+      "max_target_association": "float",
+      "redundant_numeric_pairs": []
+     },
+     "risk": {
+      "leakage_hypotheses": "int",
+      "order_drift_psi": "float",
+      "rare_classes": "bool"
+     },
+     "shape": {
+      "columns": "int",
+      "effective_samples": "int",
+      "rows": "int",
+      "sparsity": "float",
+      "total_rows": "int"
+     },
+     "structure": {},
+     "target": {
+      "cardinality": "int",
+      "entropy_bits": "float",
+      "imbalance_ratio": "float",
+      "min_class_count": "int"
+     },
+     "types": {
+      "categorical": "int",
+      "datetime": "int",
+      "id_like": "int",
+      "numeric": "int",
+      "text_like": "int"
      }
-    ],
-    "quality_findings": [
-     "str"
-    ],
-    "risk_findings": [],
+    },
     "target": {
      "class_counts": {
       "0": "int",
@@ -1468,27 +1476,30 @@
     "execution_backend": "str",
     "explanation_evidence": {
      "pairwise_interaction": {
-      "bundle_digest": "str",
-      "causal_warning": "str",
-      "dataset_snapshot": {
-       "digest": "str",
-       "identifier": "str",
-       "version": "str"
+      "caveat": "str",
+      "clearance": {
+       "decision": "str",
+       "reason": "str",
+       "redacted": []
       },
-      "evidence_links": [
+      "digests": {
+       "bundle": "str",
+       "model": "str",
+       "payload": "str"
+      },
+      "limitations": [
+       "str"
+      ],
+      "lineage": {
+       "fingerprint": "str",
+       "version": "int"
+      },
+      "links": [
        {
         "digest": "str",
         "relation": "str",
         "uri": "str"
        }
-      ],
-      "feature_graph": {
-       "fingerprint": "str",
-       "version": "int"
-      },
-      "input_fingerprint": "str",
-      "limitations": [
-       "str"
       ],
       "method": {
        "name": "str",
@@ -1496,7 +1507,6 @@
         "seed": "int"
        }
       },
-      "model_fingerprint": "str",
       "output": {
        "features": [
         {
@@ -1515,13 +1525,13 @@
        "rows": "int",
        "truncated": "bool"
       },
-      "privacy_decision": {
-       "decision": "str",
-       "reason": "str",
-       "redacted_fields": []
-      },
       "schema_version": "int",
-      "software_version": "str",
+      "snapshot": {
+       "digest": "str",
+       "identifier": "str",
+       "version": "str"
+      },
+      "software": "str",
       "stability": {
        "reason": "str",
        "status": "str"
@@ -1533,27 +1543,30 @@
       }
      },
      "partial_dependence": {
-      "bundle_digest": "str",
-      "causal_warning": "str",
-      "dataset_snapshot": {
-       "digest": "str",
-       "identifier": "str",
-       "version": "str"
+      "caveat": "str",
+      "clearance": {
+       "decision": "str",
+       "reason": "str",
+       "redacted": []
       },
-      "evidence_links": [
+      "digests": {
+       "bundle": "str",
+       "model": "str",
+       "payload": "str"
+      },
+      "limitations": [
+       "str"
+      ],
+      "lineage": {
+       "fingerprint": "str",
+       "version": "int"
+      },
+      "links": [
        {
         "digest": "str",
         "relation": "str",
         "uri": "str"
        }
-      ],
-      "feature_graph": {
-       "fingerprint": "str",
-       "version": "int"
-      },
-      "input_fingerprint": "str",
-      "limitations": [
-       "str"
       ],
       "method": {
        "name": "str",
@@ -1561,7 +1574,6 @@
         "seed": "int"
        }
       },
-      "model_fingerprint": "str",
       "output": {
        "features": {
         "x0": {
@@ -1582,13 +1594,13 @@
         }
        }
       },
-      "privacy_decision": {
-       "decision": "str",
-       "reason": "str",
-       "redacted_fields": []
-      },
       "schema_version": "int",
-      "software_version": "str",
+      "snapshot": {
+       "digest": "str",
+       "identifier": "str",
+       "version": "str"
+      },
+      "software": "str",
       "stability": {
        "reason": "str",
        "status": "str"
@@ -1600,27 +1612,30 @@
       }
      },
      "permutation_importance": {
-      "bundle_digest": "str",
-      "causal_warning": "str",
-      "dataset_snapshot": {
-       "digest": "str",
-       "identifier": "str",
-       "version": "str"
+      "caveat": "str",
+      "clearance": {
+       "decision": "str",
+       "reason": "str",
+       "redacted": []
       },
-      "evidence_links": [
+      "digests": {
+       "bundle": "str",
+       "model": "str",
+       "payload": "str"
+      },
+      "limitations": [
+       "str"
+      ],
+      "lineage": {
+       "fingerprint": "str",
+       "version": "int"
+      },
+      "links": [
        {
         "digest": "str",
         "relation": "str",
         "uri": "str"
        }
-      ],
-      "feature_graph": {
-       "fingerprint": "str",
-       "version": "int"
-      },
-      "input_fingerprint": "str",
-      "limitations": [
-       "str"
       ],
       "method": {
        "name": "str",
@@ -1628,7 +1643,6 @@
         "seed": "int"
        }
       },
-      "model_fingerprint": "str",
       "output": {
        "features": [
         {
@@ -1642,13 +1656,13 @@
        "metric": "str",
        "truncated": "bool"
       },
-      "privacy_decision": {
-       "decision": "str",
-       "reason": "str",
-       "redacted_fields": []
-      },
       "schema_version": "int",
-      "software_version": "str",
+      "snapshot": {
+       "digest": "str",
+       "identifier": "str",
+       "version": "str"
+      },
+      "software": "str",
       "stability": {
        "reason": "str",
        "status": "str"
@@ -2049,27 +2063,30 @@
     "warnings": []
    },
    "explanations/pairwise_interaction.json": {
-    "bundle_digest": "str",
-    "causal_warning": "str",
-    "dataset_snapshot": {
-     "digest": "str",
-     "identifier": "str",
-     "version": "str"
+    "caveat": "str",
+    "clearance": {
+     "decision": "str",
+     "reason": "str",
+     "redacted": []
     },
-    "evidence_links": [
+    "digests": {
+     "bundle": "str",
+     "model": "str",
+     "payload": "str"
+    },
+    "limitations": [
+     "str"
+    ],
+    "lineage": {
+     "fingerprint": "str",
+     "version": "int"
+    },
+    "links": [
      {
       "digest": "str",
       "relation": "str",
       "uri": "str"
      }
-    ],
-    "feature_graph": {
-     "fingerprint": "str",
-     "version": "int"
-    },
-    "input_fingerprint": "str",
-    "limitations": [
-     "str"
     ],
     "method": {
      "name": "str",
@@ -2077,7 +2094,6 @@
       "seed": "int"
      }
     },
-    "model_fingerprint": "str",
     "output": {
      "features": [
       {
@@ -2096,13 +2112,13 @@
      "rows": "int",
      "truncated": "bool"
     },
-    "privacy_decision": {
-     "decision": "str",
-     "reason": "str",
-     "redacted_fields": []
-    },
     "schema_version": "int",
-    "software_version": "str",
+    "snapshot": {
+     "digest": "str",
+     "identifier": "str",
+     "version": "str"
+    },
+    "software": "str",
     "stability": {
      "reason": "str",
      "status": "str"
@@ -2114,27 +2130,30 @@
     }
    },
    "explanations/partial_dependence.json": {
-    "bundle_digest": "str",
-    "causal_warning": "str",
-    "dataset_snapshot": {
-     "digest": "str",
-     "identifier": "str",
-     "version": "str"
+    "caveat": "str",
+    "clearance": {
+     "decision": "str",
+     "reason": "str",
+     "redacted": []
     },
-    "evidence_links": [
+    "digests": {
+     "bundle": "str",
+     "model": "str",
+     "payload": "str"
+    },
+    "limitations": [
+     "str"
+    ],
+    "lineage": {
+     "fingerprint": "str",
+     "version": "int"
+    },
+    "links": [
      {
       "digest": "str",
       "relation": "str",
       "uri": "str"
      }
-    ],
-    "feature_graph": {
-     "fingerprint": "str",
-     "version": "int"
-    },
-    "input_fingerprint": "str",
-    "limitations": [
-     "str"
     ],
     "method": {
      "name": "str",
@@ -2142,7 +2161,6 @@
       "seed": "int"
      }
     },
-    "model_fingerprint": "str",
     "output": {
      "features": {
       "x0": {
@@ -2163,13 +2181,13 @@
       }
      }
     },
-    "privacy_decision": {
-     "decision": "str",
-     "reason": "str",
-     "redacted_fields": []
-    },
     "schema_version": "int",
-    "software_version": "str",
+    "snapshot": {
+     "digest": "str",
+     "identifier": "str",
+     "version": "str"
+    },
+    "software": "str",
     "stability": {
      "reason": "str",
      "status": "str"
@@ -2181,27 +2199,30 @@
     }
    },
    "explanations/permutation_importance.json": {
-    "bundle_digest": "str",
-    "causal_warning": "str",
-    "dataset_snapshot": {
-     "digest": "str",
-     "identifier": "str",
-     "version": "str"
+    "caveat": "str",
+    "clearance": {
+     "decision": "str",
+     "reason": "str",
+     "redacted": []
     },
-    "evidence_links": [
+    "digests": {
+     "bundle": "str",
+     "model": "str",
+     "payload": "str"
+    },
+    "limitations": [
+     "str"
+    ],
+    "lineage": {
+     "fingerprint": "str",
+     "version": "int"
+    },
+    "links": [
      {
       "digest": "str",
       "relation": "str",
       "uri": "str"
      }
-    ],
-    "feature_graph": {
-     "fingerprint": "str",
-     "version": "int"
-    },
-    "input_fingerprint": "str",
-    "limitations": [
-     "str"
     ],
     "method": {
      "name": "str",
@@ -2209,7 +2230,6 @@
       "seed": "int"
      }
     },
-    "model_fingerprint": "str",
     "output": {
      "features": [
       {
@@ -2223,13 +2243,13 @@
      "metric": "str",
      "truncated": "bool"
     },
-    "privacy_decision": {
-     "decision": "str",
-     "reason": "str",
-     "redacted_fields": []
-    },
     "schema_version": "int",
-    "software_version": "str",
+    "snapshot": {
+     "digest": "str",
+     "identifier": "str",
+     "version": "str"
+    },
+    "software": "str",
     "stability": {
      "reason": "str",
      "status": "str"
@@ -3052,21 +3072,7 @@
     "time": "str"
    },
    "trials/trial_001.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -3078,36 +3084,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_002.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -3119,36 +3125,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_003.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -3160,36 +3166,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_004.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -3201,36 +3207,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_005.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -3242,36 +3248,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_006.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -3283,36 +3289,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_007.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -3324,36 +3330,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_008.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -3365,36 +3371,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_009.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -3406,19 +3412,33 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "validation_manifest.json": {
     "fingerprint": "str",
@@ -3530,64 +3550,64 @@
    "capability_registry.json": {
     "capabilities": [
      {
-      "evidence_links": [
+      "extras": [
        "str"
       ],
-      "failure_modes": [
+      "failures": [
        "str"
       ],
       "key": {
        "evaluation": "str",
        "explainability": "str",
        "fairness": "str",
+       "family": "str",
        "inference": "str",
        "modality": "str",
-       "model_family": "str",
        "task": "str",
        "uncertainty": "str"
       },
       "limitations": [
        "str"
       ],
-      "required_extras": [
+      "links": [
        "str"
       ],
       "resources": {
-       "cpu_cores": "int",
-       "disk_gb": "float",
-       "gpu_required": "bool",
-       "max_rows": "NoneType",
-       "memory_gb": "float",
-       "network_required": "bool",
-       "notes": []
+       "cpu": "int",
+       "disk": "float",
+       "gpu": "bool",
+       "memory": "float",
+       "network": "bool",
+       "notes": [],
+       "rows": "NoneType"
       },
       "status": "str"
      }
     ],
     "model_families": [
      {
-      "evidence_links": [],
-      "failure_modes": [
+      "extras": [
        "str"
       ],
+      "failures": [
+       "str"
+      ],
+      "family": "str",
       "limitations": [
        "str"
       ],
+      "links": [],
       "modalities": [
        "str"
       ],
-      "model_family": "str",
-      "required_extras": [
-       "str"
-      ],
       "resources": {
-       "cpu_cores": "int",
-       "disk_gb": "float",
-       "gpu_required": "bool",
-       "max_rows": "NoneType",
-       "memory_gb": "float",
-       "network_required": "bool",
-       "notes": []
+       "cpu": "int",
+       "disk": "float",
+       "gpu": "bool",
+       "memory": "float",
+       "network": "bool",
+       "notes": [],
+       "rows": "NoneType"
       },
       "status": "str"
      }
@@ -4189,9 +4209,9 @@
     "rows_read": "str"
    },
    "curation_report.json": {
-    "cleaning_notes": [],
-    "dropped_columns": {},
-    "feature_columns": {
+    "blockers": [],
+    "dropped": {},
+    "features": {
      "categorical": [
       "str"
      ],
@@ -4199,6 +4219,29 @@
       "str"
      ],
      "text": []
+    },
+    "findings": {
+     "quality": [
+      {
+       "blocking": "bool",
+       "confidence": "float",
+       "disposition": "str",
+       "evidence": {
+        "message": "str"
+       },
+       "identifier": "str",
+       "owner": "str",
+       "remediation": "str",
+       "reviewer": "NoneType",
+       "rule": "str",
+       "scope": {
+        "category": "str"
+       },
+       "severity": "str",
+       "timestamp": "str"
+      }
+     ],
+     "risk": []
     },
     "manifest": {
      "columns": "int",
@@ -4253,34 +4296,15 @@
      "task": "str",
      "uri": "str"
     },
-    "profiled_rows": "int",
-    "quality_findings": [
-     {
-      "blocking": "bool",
-      "confidence": "float",
-      "disposition": "str",
-      "evidence": {
-       "message": "str"
-      },
-      "identifier": "str",
-      "owner": "str",
-      "remediation": "str",
-      "reviewer": "NoneType",
-      "rule": "str",
-      "scope": {
-       "category": "str"
-      },
-      "severity": "str",
-      "timestamp": "str"
-     }
-    ],
-    "read_seconds": "float",
-    "release_ready": "bool",
-    "risk_findings": [],
+    "notes": [],
+    "read": "float",
+    "ready": "bool",
+    "rows": {
+     "profiled": "int",
+     "source": "int"
+    },
     "schema_version": "int",
-    "source_rows": "int",
-    "streamed": "bool",
-    "unresolved_blocking_findings": []
+    "streamed": "bool"
    },
    "dataset_card.json": {
     "composition": {
@@ -4289,8 +4313,11 @@
      "profiled_rows": "int",
      "source_rows": "int"
     },
-    "dataset_id": "str",
-    "feature_summary": {
+    "dataset": "str",
+    "excluded": [
+     "str"
+    ],
+    "features": {
      "categorical": [
       "str"
      ],
@@ -4299,8 +4326,30 @@
      ],
      "text": []
     },
-    "generated_at": "str",
-    "intended_use": "str",
+    "findings": {
+     "quality": [
+      {
+       "blocking": "bool",
+       "confidence": "float",
+       "disposition": "str",
+       "evidence": {
+        "message": "str"
+       },
+       "identifier": "str",
+       "owner": "str",
+       "remediation": "str",
+       "reviewer": "NoneType",
+       "rule": "str",
+       "scope": {
+        "category": "str"
+       },
+       "severity": "str",
+       "timestamp": "str"
+      }
+     ],
+     "risk": []
+    },
+    "generated": "str",
     "limitations": [
      "str"
     ],
@@ -4319,9 +4368,6 @@
      "transformations": []
     },
     "modality": "str",
-    "out_of_scope": [
-     "str"
-    ],
     "owner": "str",
     "privacy": {
      "access": "str",
@@ -4333,30 +4379,9 @@
      "retention": "str",
      "sensitive": []
     },
-    "quality_findings": [
-     {
-      "blocking": "bool",
-      "confidence": "float",
-      "disposition": "str",
-      "evidence": {
-       "message": "str"
-      },
-      "identifier": "str",
-      "owner": "str",
-      "remediation": "str",
-      "reviewer": "NoneType",
-      "rule": "str",
-      "scope": {
-       "category": "str"
-      },
-      "severity": "str",
-      "timestamp": "str"
-     }
-    ],
-    "review_status": "str",
-    "risk_findings": [],
+    "review": "str",
     "schema_version": "int",
-    "snapshot_id": "str",
+    "snapshot": "str",
     "source": {
      "access": "str",
      "acquisition": "str",
@@ -4371,7 +4396,8 @@
      "units": {}
     },
     "target": "str",
-    "task": "str"
+    "task": "str",
+    "use": "str"
    },
    "dataset_manifest.json": {
     "columns": "int",
@@ -4471,88 +4497,43 @@
       }
      }
     },
-    "dataset": {
-     "features": {
-      "max_cardinality": "int",
-      "mean_categorical_entropy_bits": "float",
-      "mean_outlier_rate": "float",
-      "scale_orders_of_magnitude": "float"
-     },
-     "missingness": {
-      "columns_with_missing": "int",
-      "overall_rate": "float",
-      "patterns": {
-       "co_missing": "int",
-       "pattern_count": "int",
-       "top_pattern_share": "float"
+    "evidence": [
+     {
+      "limitations": [
+       "str"
+      ],
+      "method": "str",
+      "metrics": {
+       "classes": "int",
+       "folds": "int",
+       "suspect_rate": "float",
+       "suspect_rows": "int"
       },
-      "rows_with_any_missing": "float"
-     },
-     "ml_difficulty": {
-      "available": "bool",
-      "constant_baseline": "float",
-      "headroom_over_constant": "float",
-      "linear_baseline": "float",
-      "metric": "str",
-      "nonlinear_baseline": "float",
-      "nonlinearity_gain": "float",
-      "rows": "int",
-      "seconds": "float",
-      "separability": "float"
-     },
-     "operational": {
-      "feature_count": "int",
-      "memory_mb": "float",
-      "read_seconds": "float"
-     },
-     "quality": {
-      "duplicate_rows": "int",
-      "duplicate_share": "float"
-     },
-     "relationships": {
-      "max_target_association": "float",
-      "redundant_numeric_pairs": []
-     },
-     "risk": {
-      "leakage_hypotheses": "int",
-      "order_drift_psi": "float",
-      "rare_classes": "bool"
-     },
-     "shape": {
-      "columns": "int",
-      "effective_samples": "int",
-      "rows": "int",
-      "sparsity": "float",
-      "total_rows": "int"
-     },
-     "structure": {},
-     "target": {
-      "cardinality": "int",
-      "entropy_bits": "float",
-      "imbalance_ratio": "float",
-      "min_class_count": "int"
-     },
-     "types": {
-      "categorical": "int",
-      "datetime": "int",
-      "id_like": "int",
-      "numeric": "int",
-      "text_like": "int"
+      "observation": "str",
+      "sample_bounds": {
+       "input_rows": "int",
+       "maximum_rows": "int",
+       "rows_checked": "int",
+       "sampled": "bool"
+      },
+      "seed": "int",
+      "status": "str",
+      "thresholds": {
+       "class_own_label_probability": [
+        "float"
+       ],
+       "maximum_folds": "int",
+       "minimum_classes": "int",
+       "minimum_finding_rate": "float",
+       "minimum_rows": "int"
+      }
      }
-    },
-    "feature_plan": {
-     "categorical": [
+    ],
+    "findings": {
+     "quality": [
       "str"
      ],
-     "derived": [],
-     "dropped": {},
-     "extra_inputs": [],
-     "high_cardinality": [],
-     "numeric": [
-      "str"
-     ],
-     "series": [],
-     "text": []
+     "risk": []
     },
     "leakage": {
      "alpha": "float",
@@ -4655,42 +4636,89 @@
      "uri": "str"
     },
     "missingness": [],
-    "quality_evidence": [
-     {
-      "limitations": [
-       "str"
-      ],
-      "method": "str",
-      "metrics": {
-       "classes": "int",
-       "folds": "int",
-       "suspect_rate": "float",
-       "suspect_rows": "int"
+    "plan": {
+     "cardinal": [],
+     "categorical": [
+      "str"
+     ],
+     "derived": [],
+     "dropped": {},
+     "extras": [],
+     "numeric": [
+      "str"
+     ],
+     "series": [],
+     "text": []
+    },
+    "statistics": {
+     "features": {
+      "max_cardinality": "int",
+      "mean_categorical_entropy_bits": "float",
+      "mean_outlier_rate": "float",
+      "scale_orders_of_magnitude": "float"
+     },
+     "missingness": {
+      "columns_with_missing": "int",
+      "overall_rate": "float",
+      "patterns": {
+       "co_missing": "int",
+       "pattern_count": "int",
+       "top_pattern_share": "float"
       },
-      "observation": "str",
-      "sample_bounds": {
-       "input_rows": "int",
-       "maximum_rows": "int",
-       "rows_checked": "int",
-       "sampled": "bool"
-      },
-      "seed": "int",
-      "status": "str",
-      "thresholds": {
-       "class_own_label_probability": [
-        "float"
-       ],
-       "maximum_folds": "int",
-       "minimum_classes": "int",
-       "minimum_finding_rate": "float",
-       "minimum_rows": "int"
-      }
+      "rows_with_any_missing": "float"
+     },
+     "ml_difficulty": {
+      "available": "bool",
+      "constant_baseline": "float",
+      "headroom_over_constant": "float",
+      "linear_baseline": "float",
+      "metric": "str",
+      "nonlinear_baseline": "float",
+      "nonlinearity_gain": "float",
+      "rows": "int",
+      "seconds": "float",
+      "separability": "float"
+     },
+     "operational": {
+      "feature_count": "int",
+      "memory_mb": "float",
+      "read_seconds": "float"
+     },
+     "quality": {
+      "duplicate_rows": "int",
+      "duplicate_share": "float"
+     },
+     "relationships": {
+      "max_target_association": "float",
+      "redundant_numeric_pairs": []
+     },
+     "risk": {
+      "leakage_hypotheses": "int",
+      "order_drift_psi": "float",
+      "rare_classes": "bool"
+     },
+     "shape": {
+      "columns": "int",
+      "effective_samples": "int",
+      "rows": "int",
+      "sparsity": "float",
+      "total_rows": "int"
+     },
+     "structure": {},
+     "target": {
+      "cardinality": "int",
+      "entropy_bits": "float",
+      "imbalance_ratio": "float",
+      "min_class_count": "int"
+     },
+     "types": {
+      "categorical": "int",
+      "datetime": "int",
+      "id_like": "int",
+      "numeric": "int",
+      "text_like": "int"
      }
-    ],
-    "quality_findings": [
-     "str"
-    ],
-    "risk_findings": [],
+    },
     "target": {
      "class_counts": {
       "high": "int",
@@ -4979,27 +5007,30 @@
     "execution_backend": "str",
     "explanation_evidence": {
      "pairwise_interaction": {
-      "bundle_digest": "str",
-      "causal_warning": "str",
-      "dataset_snapshot": {
-       "digest": "str",
-       "identifier": "str",
-       "version": "str"
+      "caveat": "str",
+      "clearance": {
+       "decision": "str",
+       "reason": "str",
+       "redacted": []
       },
-      "evidence_links": [
+      "digests": {
+       "bundle": "str",
+       "model": "str",
+       "payload": "str"
+      },
+      "limitations": [
+       "str"
+      ],
+      "lineage": {
+       "fingerprint": "str",
+       "version": "int"
+      },
+      "links": [
        {
         "digest": "str",
         "relation": "str",
         "uri": "str"
        }
-      ],
-      "feature_graph": {
-       "fingerprint": "str",
-       "version": "int"
-      },
-      "input_fingerprint": "str",
-      "limitations": [
-       "str"
       ],
       "method": {
        "name": "str",
@@ -5007,7 +5038,6 @@
         "seed": "int"
        }
       },
-      "model_fingerprint": "str",
       "output": {
        "features": [
         {
@@ -5026,13 +5056,13 @@
        "rows": "int",
        "truncated": "bool"
       },
-      "privacy_decision": {
-       "decision": "str",
-       "reason": "str",
-       "redacted_fields": []
-      },
       "schema_version": "int",
-      "software_version": "str",
+      "snapshot": {
+       "digest": "str",
+       "identifier": "str",
+       "version": "str"
+      },
+      "software": "str",
       "stability": {
        "reason": "str",
        "status": "str"
@@ -5044,27 +5074,30 @@
       }
      },
      "permutation_importance": {
-      "bundle_digest": "str",
-      "causal_warning": "str",
-      "dataset_snapshot": {
-       "digest": "str",
-       "identifier": "str",
-       "version": "str"
+      "caveat": "str",
+      "clearance": {
+       "decision": "str",
+       "reason": "str",
+       "redacted": []
       },
-      "evidence_links": [
+      "digests": {
+       "bundle": "str",
+       "model": "str",
+       "payload": "str"
+      },
+      "limitations": [
+       "str"
+      ],
+      "lineage": {
+       "fingerprint": "str",
+       "version": "int"
+      },
+      "links": [
        {
         "digest": "str",
         "relation": "str",
         "uri": "str"
        }
-      ],
-      "feature_graph": {
-       "fingerprint": "str",
-       "version": "int"
-      },
-      "input_fingerprint": "str",
-      "limitations": [
-       "str"
       ],
       "method": {
        "name": "str",
@@ -5072,7 +5105,6 @@
         "seed": "int"
        }
       },
-      "model_fingerprint": "str",
       "output": {
        "features": [
         {
@@ -5086,13 +5118,13 @@
        "metric": "str",
        "truncated": "bool"
       },
-      "privacy_decision": {
-       "decision": "str",
-       "reason": "str",
-       "redacted_fields": []
-      },
       "schema_version": "int",
-      "software_version": "str",
+      "snapshot": {
+       "digest": "str",
+       "identifier": "str",
+       "version": "str"
+      },
+      "software": "str",
       "stability": {
        "reason": "str",
        "status": "str"
@@ -5489,27 +5521,30 @@
     "warnings": []
    },
    "explanations/pairwise_interaction.json": {
-    "bundle_digest": "str",
-    "causal_warning": "str",
-    "dataset_snapshot": {
-     "digest": "str",
-     "identifier": "str",
-     "version": "str"
+    "caveat": "str",
+    "clearance": {
+     "decision": "str",
+     "reason": "str",
+     "redacted": []
     },
-    "evidence_links": [
+    "digests": {
+     "bundle": "str",
+     "model": "str",
+     "payload": "str"
+    },
+    "limitations": [
+     "str"
+    ],
+    "lineage": {
+     "fingerprint": "str",
+     "version": "int"
+    },
+    "links": [
      {
       "digest": "str",
       "relation": "str",
       "uri": "str"
      }
-    ],
-    "feature_graph": {
-     "fingerprint": "str",
-     "version": "int"
-    },
-    "input_fingerprint": "str",
-    "limitations": [
-     "str"
     ],
     "method": {
      "name": "str",
@@ -5517,7 +5552,6 @@
       "seed": "int"
      }
     },
-    "model_fingerprint": "str",
     "output": {
      "features": [
       {
@@ -5536,13 +5570,13 @@
      "rows": "int",
      "truncated": "bool"
     },
-    "privacy_decision": {
-     "decision": "str",
-     "reason": "str",
-     "redacted_fields": []
-    },
     "schema_version": "int",
-    "software_version": "str",
+    "snapshot": {
+     "digest": "str",
+     "identifier": "str",
+     "version": "str"
+    },
+    "software": "str",
     "stability": {
      "reason": "str",
      "status": "str"
@@ -5554,27 +5588,30 @@
     }
    },
    "explanations/permutation_importance.json": {
-    "bundle_digest": "str",
-    "causal_warning": "str",
-    "dataset_snapshot": {
-     "digest": "str",
-     "identifier": "str",
-     "version": "str"
+    "caveat": "str",
+    "clearance": {
+     "decision": "str",
+     "reason": "str",
+     "redacted": []
     },
-    "evidence_links": [
+    "digests": {
+     "bundle": "str",
+     "model": "str",
+     "payload": "str"
+    },
+    "limitations": [
+     "str"
+    ],
+    "lineage": {
+     "fingerprint": "str",
+     "version": "int"
+    },
+    "links": [
      {
       "digest": "str",
       "relation": "str",
       "uri": "str"
      }
-    ],
-    "feature_graph": {
-     "fingerprint": "str",
-     "version": "int"
-    },
-    "input_fingerprint": "str",
-    "limitations": [
-     "str"
     ],
     "method": {
      "name": "str",
@@ -5582,7 +5619,6 @@
       "seed": "int"
      }
     },
-    "model_fingerprint": "str",
     "output": {
      "features": [
       {
@@ -5596,13 +5632,13 @@
      "metric": "str",
      "truncated": "bool"
     },
-    "privacy_decision": {
-     "decision": "str",
-     "reason": "str",
-     "redacted_fields": []
-    },
     "schema_version": "int",
-    "software_version": "str",
+    "snapshot": {
+     "digest": "str",
+     "identifier": "str",
+     "version": "str"
+    },
+    "software": "str",
     "stability": {
      "reason": "str",
      "status": "str"
@@ -6517,21 +6553,7 @@
     "time": "str"
    },
    "trials/trial_001.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -6543,36 +6565,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_002.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -6584,36 +6606,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_003.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -6625,36 +6647,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_004.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -6666,36 +6688,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_005.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -6707,36 +6729,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_006.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -6748,36 +6770,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_007.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -6789,36 +6811,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_008.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -6830,36 +6852,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_009.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -6871,19 +6893,33 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "validation_manifest.json": {
     "fingerprint": "str",
@@ -7000,64 +7036,64 @@
    "capability_registry.json": {
     "capabilities": [
      {
-      "evidence_links": [
+      "extras": [
        "str"
       ],
-      "failure_modes": [
+      "failures": [
        "str"
       ],
       "key": {
        "evaluation": "str",
        "explainability": "str",
        "fairness": "str",
+       "family": "str",
        "inference": "str",
        "modality": "str",
-       "model_family": "str",
        "task": "str",
        "uncertainty": "str"
       },
       "limitations": [
        "str"
       ],
-      "required_extras": [
+      "links": [
        "str"
       ],
       "resources": {
-       "cpu_cores": "int",
-       "disk_gb": "float",
-       "gpu_required": "bool",
-       "max_rows": "NoneType",
-       "memory_gb": "float",
-       "network_required": "bool",
-       "notes": []
+       "cpu": "int",
+       "disk": "float",
+       "gpu": "bool",
+       "memory": "float",
+       "network": "bool",
+       "notes": [],
+       "rows": "NoneType"
       },
       "status": "str"
      }
     ],
     "model_families": [
      {
-      "evidence_links": [],
-      "failure_modes": [
+      "extras": [
        "str"
       ],
+      "failures": [
+       "str"
+      ],
+      "family": "str",
       "limitations": [
        "str"
       ],
+      "links": [],
       "modalities": [
        "str"
       ],
-      "model_family": "str",
-      "required_extras": [
-       "str"
-      ],
       "resources": {
-       "cpu_cores": "int",
-       "disk_gb": "float",
-       "gpu_required": "bool",
-       "max_rows": "NoneType",
-       "memory_gb": "float",
-       "network_required": "bool",
-       "notes": []
+       "cpu": "int",
+       "disk": "float",
+       "gpu": "bool",
+       "memory": "float",
+       "network": "bool",
+       "notes": [],
+       "rows": "NoneType"
       },
       "status": "str"
      }
@@ -7417,9 +7453,9 @@
     "rows_read": "str"
    },
    "curation_report.json": {
-    "cleaning_notes": [],
-    "dropped_columns": {},
-    "feature_columns": {
+    "blockers": [],
+    "dropped": {},
+    "features": {
      "categorical": [
       "str"
      ],
@@ -7427,6 +7463,29 @@
       "str"
      ],
      "text": []
+    },
+    "findings": {
+     "quality": [
+      {
+       "blocking": "bool",
+       "confidence": "float",
+       "disposition": "str",
+       "evidence": {
+        "message": "str"
+       },
+       "identifier": "str",
+       "owner": "str",
+       "remediation": "str",
+       "reviewer": "NoneType",
+       "rule": "str",
+       "scope": {
+        "category": "str"
+       },
+       "severity": "str",
+       "timestamp": "str"
+      }
+     ],
+     "risk": []
     },
     "manifest": {
      "columns": "int",
@@ -7481,34 +7540,15 @@
      "task": "str",
      "uri": "str"
     },
-    "profiled_rows": "int",
-    "quality_findings": [
-     {
-      "blocking": "bool",
-      "confidence": "float",
-      "disposition": "str",
-      "evidence": {
-       "message": "str"
-      },
-      "identifier": "str",
-      "owner": "str",
-      "remediation": "str",
-      "reviewer": "NoneType",
-      "rule": "str",
-      "scope": {
-       "category": "str"
-      },
-      "severity": "str",
-      "timestamp": "str"
-     }
-    ],
-    "read_seconds": "float",
-    "release_ready": "bool",
-    "risk_findings": [],
+    "notes": [],
+    "read": "float",
+    "ready": "bool",
+    "rows": {
+     "profiled": "int",
+     "source": "int"
+    },
     "schema_version": "int",
-    "source_rows": "int",
-    "streamed": "bool",
-    "unresolved_blocking_findings": []
+    "streamed": "bool"
    },
    "dataset_card.json": {
     "composition": {
@@ -7517,8 +7557,11 @@
      "profiled_rows": "int",
      "source_rows": "int"
     },
-    "dataset_id": "str",
-    "feature_summary": {
+    "dataset": "str",
+    "excluded": [
+     "str"
+    ],
+    "features": {
      "categorical": [
       "str"
      ],
@@ -7527,8 +7570,30 @@
      ],
      "text": []
     },
-    "generated_at": "str",
-    "intended_use": "str",
+    "findings": {
+     "quality": [
+      {
+       "blocking": "bool",
+       "confidence": "float",
+       "disposition": "str",
+       "evidence": {
+        "message": "str"
+       },
+       "identifier": "str",
+       "owner": "str",
+       "remediation": "str",
+       "reviewer": "NoneType",
+       "rule": "str",
+       "scope": {
+        "category": "str"
+       },
+       "severity": "str",
+       "timestamp": "str"
+      }
+     ],
+     "risk": []
+    },
+    "generated": "str",
     "limitations": [
      "str"
     ],
@@ -7547,9 +7612,6 @@
      "transformations": []
     },
     "modality": "str",
-    "out_of_scope": [
-     "str"
-    ],
     "owner": "str",
     "privacy": {
      "access": "str",
@@ -7561,30 +7623,9 @@
      "retention": "str",
      "sensitive": []
     },
-    "quality_findings": [
-     {
-      "blocking": "bool",
-      "confidence": "float",
-      "disposition": "str",
-      "evidence": {
-       "message": "str"
-      },
-      "identifier": "str",
-      "owner": "str",
-      "remediation": "str",
-      "reviewer": "NoneType",
-      "rule": "str",
-      "scope": {
-       "category": "str"
-      },
-      "severity": "str",
-      "timestamp": "str"
-     }
-    ],
-    "review_status": "str",
-    "risk_findings": [],
+    "review": "str",
     "schema_version": "int",
-    "snapshot_id": "str",
+    "snapshot": "str",
     "source": {
      "access": "str",
      "acquisition": "str",
@@ -7599,7 +7640,8 @@
      "units": {}
     },
     "target": "str",
-    "task": "str"
+    "task": "str",
+    "use": "str"
    },
    "dataset_manifest.json": {
     "columns": "int",
@@ -7699,87 +7741,12 @@
       }
      }
     },
-    "dataset": {
-     "features": {
-      "max_cardinality": "int",
-      "mean_categorical_entropy_bits": "float",
-      "mean_outlier_rate": "float",
-      "scale_orders_of_magnitude": "float"
-     },
-     "missingness": {
-      "columns_with_missing": "int",
-      "overall_rate": "float",
-      "patterns": {
-       "co_missing": "int",
-       "pattern_count": "int",
-       "top_pattern_share": "float"
-      },
-      "rows_with_any_missing": "float"
-     },
-     "ml_difficulty": {
-      "available": "bool",
-      "constant_baseline": "float",
-      "headroom_over_constant": "float",
-      "linear_baseline": "float",
-      "metric": "str",
-      "nonlinear_baseline": "float",
-      "nonlinearity_gain": "float",
-      "rows": "int",
-      "seconds": "float",
-      "separability": "NoneType"
-     },
-     "operational": {
-      "feature_count": "int",
-      "memory_mb": "float",
-      "read_seconds": "float"
-     },
-     "quality": {
-      "duplicate_rows": "int",
-      "duplicate_share": "float"
-     },
-     "relationships": {
-      "max_target_association": "float",
-      "redundant_numeric_pairs": []
-     },
-     "risk": {
-      "leakage_hypotheses": "int",
-      "order_drift_psi": "float",
-      "rare_classes": "bool"
-     },
-     "shape": {
-      "columns": "int",
-      "effective_samples": "int",
-      "rows": "int",
-      "sparsity": "float",
-      "total_rows": "int"
-     },
-     "structure": {},
-     "target": {
-      "cardinality": "int",
-      "outlier_rate": "float",
-      "skew": "float"
-     },
-     "types": {
-      "categorical": "int",
-      "datetime": "int",
-      "id_like": "int",
-      "numeric": "int",
-      "text_like": "int"
-     }
-    },
-    "feature_plan": {
-     "categorical": [
+    "evidence": [],
+    "findings": {
+     "quality": [
       "str"
      ],
-     "derived": [],
-     "dropped": {},
-     "extra_inputs": [],
-     "high_cardinality": [],
-     "numeric": [
-      "str"
-     ],
-     "series": [],
-     "text": []
+     "risk": []
     },
     "leakage": {
      "alpha": "float",
@@ -7882,11 +7849,88 @@
      "uri": "str"
     },
     "missingness": [],
-    "quality_evidence": [],
-    "quality_findings": [
-     "str"
-    ],
-    "risk_findings": [],
+    "plan": {
+     "cardinal": [],
+     "categorical": [
+      "str"
+     ],
+     "derived": [],
+     "dropped": {},
+     "extras": [],
+     "numeric": [
+      "str"
+     ],
+     "series": [],
+     "text": []
+    },
+    "statistics": {
+     "features": {
+      "max_cardinality": "int",
+      "mean_categorical_entropy_bits": "float",
+      "mean_outlier_rate": "float",
+      "scale_orders_of_magnitude": "float"
+     },
+     "missingness": {
+      "columns_with_missing": "int",
+      "overall_rate": "float",
+      "patterns": {
+       "co_missing": "int",
+       "pattern_count": "int",
+       "top_pattern_share": "float"
+      },
+      "rows_with_any_missing": "float"
+     },
+     "ml_difficulty": {
+      "available": "bool",
+      "constant_baseline": "float",
+      "headroom_over_constant": "float",
+      "linear_baseline": "float",
+      "metric": "str",
+      "nonlinear_baseline": "float",
+      "nonlinearity_gain": "float",
+      "rows": "int",
+      "seconds": "float",
+      "separability": "NoneType"
+     },
+     "operational": {
+      "feature_count": "int",
+      "memory_mb": "float",
+      "read_seconds": "float"
+     },
+     "quality": {
+      "duplicate_rows": "int",
+      "duplicate_share": "float"
+     },
+     "relationships": {
+      "max_target_association": "float",
+      "redundant_numeric_pairs": []
+     },
+     "risk": {
+      "leakage_hypotheses": "int",
+      "order_drift_psi": "float",
+      "rare_classes": "bool"
+     },
+     "shape": {
+      "columns": "int",
+      "effective_samples": "int",
+      "rows": "int",
+      "sparsity": "float",
+      "total_rows": "int"
+     },
+     "structure": {},
+     "target": {
+      "cardinality": "int",
+      "outlier_rate": "float",
+      "skew": "float"
+     },
+     "types": {
+      "categorical": "int",
+      "datetime": "int",
+      "id_like": "int",
+      "numeric": "int",
+      "text_like": "int"
+     }
+    },
     "target": {
      "mean": "float",
      "skew": "float",
@@ -8215,27 +8259,30 @@
     "execution_backend": "str",
     "explanation_evidence": {
      "pairwise_interaction": {
-      "bundle_digest": "str",
-      "causal_warning": "str",
-      "dataset_snapshot": {
-       "digest": "str",
-       "identifier": "str",
-       "version": "str"
+      "caveat": "str",
+      "clearance": {
+       "decision": "str",
+       "reason": "str",
+       "redacted": []
       },
-      "evidence_links": [
+      "digests": {
+       "bundle": "str",
+       "model": "str",
+       "payload": "str"
+      },
+      "limitations": [
+       "str"
+      ],
+      "lineage": {
+       "fingerprint": "str",
+       "version": "int"
+      },
+      "links": [
        {
         "digest": "str",
         "relation": "str",
         "uri": "str"
        }
-      ],
-      "feature_graph": {
-       "fingerprint": "str",
-       "version": "int"
-      },
-      "input_fingerprint": "str",
-      "limitations": [
-       "str"
       ],
       "method": {
        "name": "str",
@@ -8243,7 +8290,6 @@
         "seed": "int"
        }
       },
-      "model_fingerprint": "str",
       "output": {
        "features": [
         {
@@ -8262,13 +8308,13 @@
        "rows": "int",
        "truncated": "bool"
       },
-      "privacy_decision": {
-       "decision": "str",
-       "reason": "str",
-       "redacted_fields": []
-      },
       "schema_version": "int",
-      "software_version": "str",
+      "snapshot": {
+       "digest": "str",
+       "identifier": "str",
+       "version": "str"
+      },
+      "software": "str",
       "stability": {
        "reason": "str",
        "status": "str"
@@ -8280,27 +8326,30 @@
       }
      },
      "partial_dependence": {
-      "bundle_digest": "str",
-      "causal_warning": "str",
-      "dataset_snapshot": {
-       "digest": "str",
-       "identifier": "str",
-       "version": "str"
+      "caveat": "str",
+      "clearance": {
+       "decision": "str",
+       "reason": "str",
+       "redacted": []
       },
-      "evidence_links": [
+      "digests": {
+       "bundle": "str",
+       "model": "str",
+       "payload": "str"
+      },
+      "limitations": [
+       "str"
+      ],
+      "lineage": {
+       "fingerprint": "str",
+       "version": "int"
+      },
+      "links": [
        {
         "digest": "str",
         "relation": "str",
         "uri": "str"
        }
-      ],
-      "feature_graph": {
-       "fingerprint": "str",
-       "version": "int"
-      },
-      "input_fingerprint": "str",
-      "limitations": [
-       "str"
       ],
       "method": {
        "name": "str",
@@ -8308,7 +8357,6 @@
         "seed": "int"
        }
       },
-      "model_fingerprint": "str",
       "output": {
        "features": {
         "x0": {
@@ -8329,13 +8377,13 @@
         }
        }
       },
-      "privacy_decision": {
-       "decision": "str",
-       "reason": "str",
-       "redacted_fields": []
-      },
       "schema_version": "int",
-      "software_version": "str",
+      "snapshot": {
+       "digest": "str",
+       "identifier": "str",
+       "version": "str"
+      },
+      "software": "str",
       "stability": {
        "reason": "str",
        "status": "str"
@@ -8347,27 +8395,30 @@
       }
      },
      "permutation_importance": {
-      "bundle_digest": "str",
-      "causal_warning": "str",
-      "dataset_snapshot": {
-       "digest": "str",
-       "identifier": "str",
-       "version": "str"
+      "caveat": "str",
+      "clearance": {
+       "decision": "str",
+       "reason": "str",
+       "redacted": []
       },
-      "evidence_links": [
+      "digests": {
+       "bundle": "str",
+       "model": "str",
+       "payload": "str"
+      },
+      "limitations": [
+       "str"
+      ],
+      "lineage": {
+       "fingerprint": "str",
+       "version": "int"
+      },
+      "links": [
        {
         "digest": "str",
         "relation": "str",
         "uri": "str"
        }
-      ],
-      "feature_graph": {
-       "fingerprint": "str",
-       "version": "int"
-      },
-      "input_fingerprint": "str",
-      "limitations": [
-       "str"
       ],
       "method": {
        "name": "str",
@@ -8375,7 +8426,6 @@
         "seed": "int"
        }
       },
-      "model_fingerprint": "str",
       "output": {
        "features": [
         {
@@ -8389,13 +8439,13 @@
        "metric": "str",
        "truncated": "bool"
       },
-      "privacy_decision": {
-       "decision": "str",
-       "reason": "str",
-       "redacted_fields": []
-      },
       "schema_version": "int",
-      "software_version": "str",
+      "snapshot": {
+       "digest": "str",
+       "identifier": "str",
+       "version": "str"
+      },
+      "software": "str",
       "stability": {
        "reason": "str",
        "status": "str"
@@ -8797,27 +8847,30 @@
     "warnings": []
    },
    "explanations/pairwise_interaction.json": {
-    "bundle_digest": "str",
-    "causal_warning": "str",
-    "dataset_snapshot": {
-     "digest": "str",
-     "identifier": "str",
-     "version": "str"
+    "caveat": "str",
+    "clearance": {
+     "decision": "str",
+     "reason": "str",
+     "redacted": []
     },
-    "evidence_links": [
+    "digests": {
+     "bundle": "str",
+     "model": "str",
+     "payload": "str"
+    },
+    "limitations": [
+     "str"
+    ],
+    "lineage": {
+     "fingerprint": "str",
+     "version": "int"
+    },
+    "links": [
      {
       "digest": "str",
       "relation": "str",
       "uri": "str"
      }
-    ],
-    "feature_graph": {
-     "fingerprint": "str",
-     "version": "int"
-    },
-    "input_fingerprint": "str",
-    "limitations": [
-     "str"
     ],
     "method": {
      "name": "str",
@@ -8825,7 +8878,6 @@
       "seed": "int"
      }
     },
-    "model_fingerprint": "str",
     "output": {
      "features": [
       {
@@ -8844,13 +8896,13 @@
      "rows": "int",
      "truncated": "bool"
     },
-    "privacy_decision": {
-     "decision": "str",
-     "reason": "str",
-     "redacted_fields": []
-    },
     "schema_version": "int",
-    "software_version": "str",
+    "snapshot": {
+     "digest": "str",
+     "identifier": "str",
+     "version": "str"
+    },
+    "software": "str",
     "stability": {
      "reason": "str",
      "status": "str"
@@ -8862,27 +8914,30 @@
     }
    },
    "explanations/partial_dependence.json": {
-    "bundle_digest": "str",
-    "causal_warning": "str",
-    "dataset_snapshot": {
-     "digest": "str",
-     "identifier": "str",
-     "version": "str"
+    "caveat": "str",
+    "clearance": {
+     "decision": "str",
+     "reason": "str",
+     "redacted": []
     },
-    "evidence_links": [
+    "digests": {
+     "bundle": "str",
+     "model": "str",
+     "payload": "str"
+    },
+    "limitations": [
+     "str"
+    ],
+    "lineage": {
+     "fingerprint": "str",
+     "version": "int"
+    },
+    "links": [
      {
       "digest": "str",
       "relation": "str",
       "uri": "str"
      }
-    ],
-    "feature_graph": {
-     "fingerprint": "str",
-     "version": "int"
-    },
-    "input_fingerprint": "str",
-    "limitations": [
-     "str"
     ],
     "method": {
      "name": "str",
@@ -8890,7 +8945,6 @@
       "seed": "int"
      }
     },
-    "model_fingerprint": "str",
     "output": {
      "features": {
       "x0": {
@@ -8911,13 +8965,13 @@
       }
      }
     },
-    "privacy_decision": {
-     "decision": "str",
-     "reason": "str",
-     "redacted_fields": []
-    },
     "schema_version": "int",
-    "software_version": "str",
+    "snapshot": {
+     "digest": "str",
+     "identifier": "str",
+     "version": "str"
+    },
+    "software": "str",
     "stability": {
      "reason": "str",
      "status": "str"
@@ -8929,27 +8983,30 @@
     }
    },
    "explanations/permutation_importance.json": {
-    "bundle_digest": "str",
-    "causal_warning": "str",
-    "dataset_snapshot": {
-     "digest": "str",
-     "identifier": "str",
-     "version": "str"
+    "caveat": "str",
+    "clearance": {
+     "decision": "str",
+     "reason": "str",
+     "redacted": []
     },
-    "evidence_links": [
+    "digests": {
+     "bundle": "str",
+     "model": "str",
+     "payload": "str"
+    },
+    "limitations": [
+     "str"
+    ],
+    "lineage": {
+     "fingerprint": "str",
+     "version": "int"
+    },
+    "links": [
      {
       "digest": "str",
       "relation": "str",
       "uri": "str"
      }
-    ],
-    "feature_graph": {
-     "fingerprint": "str",
-     "version": "int"
-    },
-    "input_fingerprint": "str",
-    "limitations": [
-     "str"
     ],
     "method": {
      "name": "str",
@@ -8957,7 +9014,6 @@
       "seed": "int"
      }
     },
-    "model_fingerprint": "str",
     "output": {
      "features": [
       {
@@ -8971,13 +9027,13 @@
      "metric": "str",
      "truncated": "bool"
     },
-    "privacy_decision": {
-     "decision": "str",
-     "reason": "str",
-     "redacted_fields": []
-    },
     "schema_version": "int",
-    "software_version": "str",
+    "snapshot": {
+     "digest": "str",
+     "identifier": "str",
+     "version": "str"
+    },
+    "software": "str",
     "stability": {
      "reason": "str",
      "status": "str"
@@ -9642,21 +9698,7 @@
     "time": "str"
    },
    "trials/trial_001.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -9668,36 +9710,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_002.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -9709,36 +9751,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_003.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -9750,36 +9792,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_004.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -9791,36 +9833,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_005.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -9832,36 +9874,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_006.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -9873,36 +9915,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_007.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -9914,36 +9956,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_008.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -9955,36 +9997,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_009.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -9996,36 +10038,36 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "trials/trial_010.json": {
-    "error": "str",
-    "evaluation_config": {
-     "folds": "int",
-     "metric": "str",
-     "seed": "int",
-     "weighted": "bool"
-    },
-    "failure": "str",
-    "fit_seconds": "float",
-    "fold_scores": [
-     "float"
-    ],
-    "metric": "str",
-    "model_name": "str",
-    "observed_access": [
+    "access": [
      {
       "evaluate": {
        "digest": "str",
@@ -10037,19 +10079,33 @@
       }
      }
     ],
+    "deviation": "float",
+    "error": "str",
+    "evaluation": {
+     "folds": "int",
+     "metric": "str",
+     "seed": "int",
+     "weighted": "bool"
+    },
+    "failure": "str",
+    "fit": "float",
+    "folds": [
+     "float"
+    ],
+    "identifier": "str",
+    "metric": "str",
+    "model": "str",
     "params": {},
     "runtime": {
      "libraries": "installed",
      "python": "str"
     },
-    "score_mean": "float",
-    "score_std": "float",
+    "score": "float",
     "status": "str",
     "strategy": "str",
-    "train_scores": [
+    "training": [
      "float"
-    ],
-    "trial_id": "str"
+    ]
    },
    "validation_manifest.json": {
     "fingerprint": "str",

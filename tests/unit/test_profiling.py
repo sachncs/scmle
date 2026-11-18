@@ -204,7 +204,7 @@ def test_regression_target_summary():
 def test_profile_serializes(classification_frame):
     result = profile(classification_frame)[1]
     payload = result.to_dict()
-    assert payload["feature_plan"]["numeric"] == ["num"]
+    assert payload["plan"]["numeric"] == ["num"]
 
 
 def test_outcome_dependent_recording_is_reported_as_possible_leakage():

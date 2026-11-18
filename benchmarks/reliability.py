@@ -525,7 +525,7 @@ def check_failure_isolation(directory: pathlib.Path) -> CheckRecord:
     finally:
         scmle.models.custom.unregister_estimator("crashing_probe")
     board = result.leaderboard()
-    crashed = board[board.model_name == "crashing_probe"]
+    crashed = board[board.model == "crashing_probe"]
     others_ok = bool((board.status == "ok").any())
     record.measured = {
         "state": result.state,

@@ -171,7 +171,8 @@ def test_a_declared_dag_is_loaded_checked_and_lifts_the_adjustment_cap(
     plan = read(result, "identification_plan.json")
     assert plan["primary"] == "backdoor_aipw"
     table = read(result, "admissibility_table.json")
-    assert table["kind"] == "causal" and table["dag_hash"] == graph.digest()
+    assert table["kind"] == "causal"
+    assert table["digests"]["dag"] == graph.digest()
     claims = read(result, "causal_claims.json")
     assert "adjustment set is an unchecked attestation" not in " ".join(
         read(result, "identification_report.json")["notes"]

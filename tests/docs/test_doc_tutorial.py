@@ -13,7 +13,7 @@ class Shipped(naive_bayes.GaussianNB):
 
 
 def test_a_registered_class_reaches_trials_only_if_defined_at_module_level():
-    """Enforces docs/TUTORIAL.md:289.
+    """Enforces docs/TUTORIAL.md:287.
 
     Trial processes receive the adapter by pickle, which stores a class by
     its import path, so a class defined inside a function cannot travel.

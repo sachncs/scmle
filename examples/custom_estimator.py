@@ -42,7 +42,7 @@ def main() -> None:
         make_dataset(), "y", metric="roc_auc", time_budget=60
     ).run()
     board = result.leaderboard()
-    LOGGER.info("\n%s", board[board.model_name == "gaussian_nb"])
+    LOGGER.info("\n%s", board[board.model == "gaussian_nb"])
 
 
 if __name__ == "__main__":

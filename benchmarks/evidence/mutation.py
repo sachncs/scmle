@@ -478,7 +478,8 @@ def configure(work: Path, path: str, tests: list[str]) -> None:
         f"timeout_multiplier = {MULTIPLIER}",
         f"timeout_constant = {CONSTANT}",
         "use_git_change_detection = false",
-        "pytest_add_cli_args =\n    -p\n    no:cacheprovider",
+        "pytest_add_cli_args =\n    -p\n    no:cacheprovider\n    -k\n    "
+        + STALENESS,
     ]
     if tests:
         lines.append(
@@ -486,6 +487,18 @@ def configure(work: Path, path: str, tests: list[str]) -> None:
             + "\n".join(f"    {t}" for t in tests)
         )
     (work / "setup.cfg").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+# Tests that a stored certificate or evidence file is for the current code
+# compare source hashes; mutmut instruments every module it copies, so they
+# fail in its tree whatever the mutant does, abort the baseline and leave the
+# module undecided. They test bookkeeping, not behaviour, so the mutation
+# runs deselect them by the phrases their names share.
+STALENESS = (
+    "not (are_current or is_current or match_the_current_code or "
+    "files_are_current or current_published or current_code_hash or "
+    "for_the_current_code)"
+)
 
 
 def environment() -> dict[str, str]:

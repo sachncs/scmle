@@ -150,13 +150,13 @@ def test_features_come_from_the_database_and_reach_the_ledger(tmp_path):
 
     manifest = read(result, "feature_manifest.json")
     kept = [f["name"] for f in manifest["features"] if f["kept"]]
-    assert manifest["declared_family_size"] == len(kept) > 3
+    assert manifest["family"] == len(kept) > 3
     assert all(
         f["tier"] == "attested" for f in manifest["features"] if f["kept"]
     )
     for name in ("ingest_catalog.json", "grain_report.json", "join_graph.json"):
         assert (folder / name).exists()
-    profile = read(result, "dataset_profile.json")["feature_plan"]
+    profile = read(result, "dataset_profile.json")["plan"]
     assert set(kept) & set(profile["numeric"])
     ledger = scmle.assurance.ledger.ledger.Ledger.load(
         folder / scmle.assurance.ledger.ledger.FILE_NAME

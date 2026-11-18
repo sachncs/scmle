@@ -40,7 +40,8 @@ def test_metrics_events_and_policy_have_deterministic_json():
 
     payload = observability.canonize((metric,), (event,), policy())
 
-    assert '"error_category":"schema"' in payload
+    assert '"error":"schema"' in payload
+    assert '"digests":{"model":"model-sha","payload":null}' in payload
     assert '"email"' in payload
     assert observability.Sample.from_dict(metric.to_dict()) == metric
 

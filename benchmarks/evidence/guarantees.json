@@ -122,7 +122,7 @@
     }
   },
   "claim": "C12",
-  "content_hash": "203153d26310d9ed98637487c4e8b285884b3cadca1199c087a1564093393379",
+  "content_hash": "e2c89595cbd168f65762ff0daa94d4135e4a4ddef83550b183e570552f7846c2",
   "counts": {
     "guarantees": 246,
     "linked": 246,
@@ -3425,8 +3425,8 @@
     {
       "cited": [],
       "doc": "docs/TUTORIAL.md",
-      "end": 93,
-      "line": 91,
+      "end": 91,
+      "line": 89,
       "missing": [],
       "section": "4-feature-graph",
       "tests": [
@@ -3444,8 +3444,8 @@
     {
       "cited": [],
       "doc": "docs/TUTORIAL.md",
-      "end": 290,
-      "line": 289,
+      "end": 288,
+      "line": 287,
       "missing": [],
       "section": "9-beyond-the-basics",
       "tests": [
@@ -4200,7 +4200,7 @@
       ]
     }
   ],
-  "seconds": 1.1,
+  "seconds": 1.2,
   "test_links": 445,
   "version": 1
 }

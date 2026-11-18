@@ -102,7 +102,9 @@ class Planning(reader.Reader):
                 llm_filled=sorted(
                     k for k, v in draft.get("fields", {}).items() if v == "llm"
                 ),
-                open_items=list(draft.get("open_items", [])),
+                open_items=list(
+                    draft.get("pending") or draft.get("open_items") or []
+                ),
                 data_checks_passed=all(
                     c.get("ok") for c in draft.get("checks", [])
                 ),

@@ -45,7 +45,7 @@ def test_noisy_labels_and_a_shifted_reference_are_reported(tmp_path):
         (result.run_dir / "dataset_profile.json").read_text(encoding="utf-8")
     )
     evidence_by_observation = {
-        item["observation"]: item for item in profile["quality_evidence"]
+        item["observation"]: item for item in profile["evidence"]
     }
     assert set(evidence_by_observation) == {
         "label_noise",
@@ -58,9 +58,9 @@ def test_noisy_labels_and_a_shifted_reference_are_reported(tmp_path):
         assert item["seed"] == 42
         assert item["metrics"]
         assert item["limitations"]
-    assert report["schema_version"] == 1
-    assert report["source_rows"] >= report["profiled_rows"]
-    assert report["quality_findings"]
+    assert report["schema_version"] == 2
+    assert report["rows"]["source"] >= report["rows"]["profiled"]
+    assert report["findings"]["quality"]
     assert all(
         set(finding)
         == {
@@ -77,9 +77,9 @@ def test_noisy_labels_and_a_shifted_reference_are_reported(tmp_path):
             "blocking",
             "timestamp",
         }
-        for finding in report["quality_findings"]
+        for finding in report["findings"]["quality"]
     )
-    assert report["feature_columns"]["numeric"]
+    assert report["features"]["numeric"]
 
 
 def test_clean_data_with_a_matching_reference_reports_nothing(tmp_path):

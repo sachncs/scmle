@@ -39,11 +39,13 @@ def recall(run_dir: str | Path) -> dict[str, Any]:
         run_dir: The run directory.
 
     Returns:
-        The parsed claims document.
+        The parsed claims document at the current version (`alpha`,
+        `digests.survivors`, `heads.ledger`, `second`), whichever version
+        the run wrote.
 
     Raises:
-        ArtifactError: If the file is missing or unreadable, or is not a JSON
-            object with a `claims` key.
+        ArtifactError: If the file is missing or unreadable, is not a JSON
+            object with a `claims` key, or has an unsupported version.
     """
     path = Path(run_dir) / confirm.CLAIMS_FILE
     try:
@@ -52,7 +54,12 @@ def recall(run_dir: str | Path) -> dict[str, Any]:
         raise errors.ArtifactError(f"cannot read {path}: {error}") from error
     if not isinstance(document, dict) or "claims" not in document:
         raise errors.ArtifactError(f"{path} is not a claims document")
-    return document
+    try:
+        return records.load(
+            "Confirmation", confirm.Confirmation.migrations, document
+        )
+    except errors.InputError as error:
+        raise errors.ArtifactError(f"{path}: {error}") from error
 
 
 def rehydrate(run_dir: str | Path) -> scmle.assurance.ledger.ledger.Ledger:

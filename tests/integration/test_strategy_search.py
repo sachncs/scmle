@@ -213,9 +213,9 @@ def test_leaderboard_marks_exactly_the_selected_trial(
     board = result.leaderboard()
     assert board["selected"].sum() == 1
     winner = board[board["selected"]].iloc[0]
-    assert winner["trial_id"] == result.evaluation["selected_trial_id"]
-    assert winner["model_name"] == result.selected_model
-    assert winner["score_mean"] == pytest.approx(
+    assert winner["identifier"] == result.evaluation["selected_trial_id"]
+    assert winner["model"] == result.selected_model
+    assert winner["score"] == pytest.approx(
         result.evaluation["selected_cv_score"]
     )
 

@@ -284,7 +284,7 @@ def test_search_is_invariant_to_future_target_rewrites_with_a_graph(tmp_path):
 def test_a_single_new_record_gets_lag_and_rolling_values_from_stored_history(
     tmp_path,
 ):
-    # Enforces docs/TUTORIAL.md:91.
+    # Enforces docs/TUTORIAL.md:89.
     frame = series_frame()
     result = run_series(frame, tmp_path)
     raw = frame.drop(columns=["y"])
@@ -323,7 +323,7 @@ def test_history_survives_save_and_load_and_tampering_is_detected(tmp_path):
 def test_serving_remembers_records_so_the_next_single_record_sees_them(
     tmp_path,
 ):
-    # Enforces docs/TUTORIAL.md:91.
+    # Enforces docs/TUTORIAL.md:89.
     from scmle.serving import server
 
     result = run_series(series_frame(), tmp_path)

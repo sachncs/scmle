@@ -260,7 +260,7 @@ def test_every_trial_records_its_evaluation_config_and_runtime(
     record = json.loads(
         (result.run_dir / "trials" / "trial_002.json").read_text()
     )
-    assert record["evaluation_config"]["folds"] == 4
+    assert record["evaluation"]["folds"] == 4
     lightgbm = [t for t in result.trials if t.model_name == "lightgbm"]
     for trial in lightgbm:
         assert "lightgbm" in trial.runtime["libraries"]

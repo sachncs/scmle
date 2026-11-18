@@ -174,8 +174,8 @@ def test_dataset_profile_serializes_typed_quality_evidence():
 
     record = profile.to_dict()
 
-    assert record["quality_findings"] == ["label noise: review"]
-    assert record["quality_evidence"][0]["seed"] == 3
+    assert record["findings"]["quality"] == ["label noise: review"]
+    assert record["evidence"][0]["seed"] == 3
     assert json.loads(json.dumps(record)) == record
 
 
@@ -266,8 +266,12 @@ def test_curation_report_serializes_structured_quality_and_risk_findings():
 
     record = report.to_dict()
 
-    assert record["quality_findings"] == [quality.to_dict()]
-    assert record["risk_findings"] == [risk.to_dict()]
+    assert record["findings"] == {
+        "quality": [quality.to_dict()],
+        "risk": [risk.to_dict()],
+    }
+    assert record["rows"] == {"source": 10, "profiled": 10}
+    assert record["schema_version"] == 2
     assert json.loads(json.dumps(record)) == record
 
 
@@ -294,9 +298,8 @@ def test_curation_report_is_not_release_ready_with_open_blocking_findings():
 
     assert report.release_ready is False
     assert report.unresolved_blocking_findings == (risk,)
-    assert report.to_dict()["unresolved_blocking_findings"] == [
-        "risk.target-leakage"
-    ]
+    assert report.to_dict()["blockers"] == ["risk.target-leakage"]
+    assert report.to_dict()["ready"] is False
 
 
 def test_curation_report_accepts_explicit_safe_dispositions():
@@ -360,6 +363,7 @@ def test_dataset_card_makes_intended_use_and_limits_explicit():
         "feature_columns": 1,
         "dropped_columns": 1,
     }
-    assert "release approval" in " ".join(record["out_of_scope"])
+    assert "release approval" in " ".join(record["excluded"])
+    assert record["schema_version"] == 2
     assert "two rows were excluded" in record["limitations"]
     assert json.loads(json.dumps(record)) == record

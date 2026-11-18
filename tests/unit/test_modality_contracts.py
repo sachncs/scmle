@@ -109,7 +109,7 @@ def test_complete_declaration_serializes_evidence_in_required_stage_order():
     assert declaration.complete
     assert declaration.missing_stages == ()
     payload = declaration.to_dict()
-    stage_records = cast("list[dict[str, object]]", payload["stage_evidence"])
+    stage_records = cast("list[dict[str, object]]", payload["evidence"])
     resources = cast("dict[str, object]", payload["resources"])
 
     assert payload["status"] == "supported"
@@ -117,7 +117,7 @@ def test_complete_declaration_serializes_evidence_in_required_stage_order():
     assert [item["stage"] for item in stage_records] == [
         stage.value for stage in modalities.REQUIRED_LIFECYCLE_STAGES
     ]
-    assert resources["memory_gb"] == 4.0
+    assert resources["memory"] == 4.0
     assert stage_records[0]["evidence"] == {}
 
 

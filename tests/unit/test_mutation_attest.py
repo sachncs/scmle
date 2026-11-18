@@ -26,7 +26,7 @@ def test_a_document_without_a_list_is_refused(tmp_path) -> None:
 def test_the_applied_section_names_its_evaluation_date() -> None:
     applied = attest.Applied({}, (), {"a": "none"}, "2026-01-02")
     assert applied.to_dict() == {
-        "evaluated_on": "2026-01-02",
+        "evaluated": "2026-01-02",
         "accepted": [],
         "rejected": {"a": "none"},
     }

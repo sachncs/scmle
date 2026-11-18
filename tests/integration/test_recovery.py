@@ -51,7 +51,7 @@ def test_failed_trial_is_isolated(binary_frame, tmp_path):
     failed = next(t for t in result.trials if t.model_name == "exploding")
     assert failed.status == "failed" and "boom" in failed.error
     assert result.selected_model != "exploding"
-    assert failed.trial_id in result.leaderboard()["trial_id"].tolist()
+    assert failed.trial_id in result.leaderboard()["identifier"].tolist()
     assert "trial.failed" in [e["kind"] for e in read_events(result.run_dir)]
 
 

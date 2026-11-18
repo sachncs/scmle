@@ -9,8 +9,10 @@ from scmle.artifacts.claims_audit import files
 from scmle.artifacts.claims_audit import verdict
 from scmle.assurance import coverage_confirm
 from scmle.assurance import coverage_run
+from scmle.assurance.framing import baseline
 from scmle.assurance.ledger import confirm
 import scmle.assurance.ledger.ledger
+from scmle.contracts import records
 
 
 def orphaned(
@@ -145,13 +147,15 @@ def misnamed(
         A message for each baseline claim whose registration the report does
         not name; empty if there is no report or all match.
     """
-    baseline_doc = files.read_optional(run_dir / files.BASELINE_FILE)
+    stored = files.read_optional(run_dir / files.BASELINE_FILE)
+    if stored is None:
+        return []
+    report = records.load("Outcome", baseline.Outcome.migrations, stored)
+    named = report.get("digests", {}).get("registration")
     return [
         f"{claim_id}: report names another registration"
         for claim_id, item in ledger.claims.items()
-        if item["kind"] == "baseline"
-        and baseline_doc is not None
-        and baseline_doc.get("registration_hash") != item["sha256"]
+        if item["kind"] == "baseline" and named != item["sha256"]
     ]
 
 

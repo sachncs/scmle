@@ -37,7 +37,7 @@ def test_a_custom_cost_metric_is_optimised_and_reported(
     assert result.evaluation["metric_greater_is_better"] is False
     assert "business_cost" in result.evaluation["test_metrics"]
     board = result.leaderboard()
-    best = board[board["status"] == "ok"]["score_mean"]
+    best = board[board["status"] == "ok"]["score"]
     assert best.iloc[0] == best.min()
 
 

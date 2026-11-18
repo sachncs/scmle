@@ -9,6 +9,7 @@ from typing import Any
 import numpy
 
 from scmle.artifacts import reproducibility
+from scmle.contracts import experiments
 from scmle.evaluation import parameter_estimation
 
 
@@ -20,14 +21,14 @@ def trial(
 ) -> dict[str, Any]:
     """Return one trial record."""
     return {
-        "trial_id": trial_id,
-        "model_name": "ridge",
+        "identifier": trial_id,
+        "model": "ridge",
         "strategy": "single",
         "params": {"alpha": 1.0},
         "status": status,
-        "fold_scores": list(scores),
-        "score_mean": sum(scores) / len(scores) if scores else 0.0,
-        "score_std": std,
+        "folds": list(scores),
+        "score": sum(scores) / len(scores) if scores else 0.0,
+        "deviation": std,
     }
 
 
@@ -125,7 +126,7 @@ def test_matching_failed_trials_without_scores_are_exact():
     first, second = facts(), facts()
     first["trials"] = [trial("t1", (), status="failed")]
     second["trials"] = [trial("t1", (), status="failed")]
-    first["trials"][0]["score_mean"] = 0.0
+    first["trials"][0]["score"] = 0.0
 
     verdict = reproducibility.judge(first, second)
 
@@ -192,7 +193,9 @@ def write_run(root: pathlib.Path, with_extras: bool = False) -> None:
             "selected_params": {"b": 2, "a": 1},
         },
     )
-    write_json(root / "trials" / "trial_2.json", trial("t2"))
+    # A trial written before the key renames still loads.
+    old = experiments.Trial.migrations[0].downgrade(trial("t2"))
+    write_json(root / "trials" / "trial_2.json", old)
     write_json(root / "trials" / "trial_1.json", trial("t1"))
     if with_extras:
         (root / "environment.lock").write_text("numpy==2.0", encoding="utf-8")
@@ -203,7 +206,7 @@ def test_load_run_reads_sorted_trials_and_defaults(tmp_path):
 
     loaded = reproducibility.reread(str(tmp_path))
 
-    assert [t["trial_id"] for t in loaded["trials"]] == ["t1", "t2"]
+    assert [t["identifier"] for t in loaded["trials"]] == ["t1", "t2"]
     assert loaded["config"] == {"seed": 1}
     assert loaded["dataset"] == {"data_hash": "abc"}
     assert loaded["split"] == "split-1"

@@ -89,7 +89,12 @@ def test_read_claims_refuses_unreadable_and_foreign_documents(tmp_path):
     with pytest.raises(errors.ArtifactError, match=r"is not a claims document"):
         claims_audit.recall(tmp_path)
     path.write_text(json.dumps({"claims": []}), encoding="utf-8")
-    assert claims_audit.recall(tmp_path) == {"claims": []}
+    assert claims_audit.recall(tmp_path) == {
+        "schema_version": 2,
+        "claims": [],
+        "digests": {},
+        "heads": {},
+    }
 
 
 def test_read_optional_returns_only_json_objects(tmp_path):
@@ -113,14 +118,14 @@ def test_column_of_names_the_feature_or_none(run):
 
 
 def test_list_and_show_work_when_the_claims_file_has_no_withdrawals(run):
-    edit_claims(run, lambda d: d.pop("stage_two"))
+    edit_claims(run, lambda d: d.pop("second"))
     rows = claims_audit.inventory(run)
     assert [r["withdrawn"] for r in rows] == [False, False]
     shown = claims_audit.inspect(run, rows[0]["claim_id"])
     assert shown["withdrawn"] is None
 
     def hollow(document):
-        document["stage_two"] = {}
+        document["second"] = {}
 
     edit_claims(run, hollow)
     assert [r["withdrawn"] for r in claims_audit.inventory(run)] == [
@@ -316,7 +321,7 @@ def test_ledger_head_findings_are_exact(run):
         "pass",
         f"head {ledger.head[:12]}",
     )
-    document["ledger_head"] = "0" * 64
+    document["heads"]["ledger"] = "0" * 64
     assert claims_audit.check_ledger_head(document, ledger) == finding(
         "claims file names the ledger head",
         "fail",
@@ -413,17 +418,17 @@ def test_header_mismatches_are_named_in_a_fixed_order():
     survivors = types.SimpleNamespace(sha256="s", hypothesis_ids=("h1",))
     row = {"outcome": "o", "rule": "r", "alpha_confirm": "a"}
     document = {
-        "survivors_sha256": "s",
+        "digests": {"survivors": "s"},
         "outcome": "o",
         "rule": "r",
-        "alpha_confirm": "a",
+        "alpha": "a",
     }
     assert claims_audit.compare(document, row, survivors) == []
-    assert claims_audit.compare({"survivors_sha256": "x"}, {}, survivors) == [
-        "survivor hash"
-    ]
     assert claims_audit.compare(
-        {"survivors_sha256": "x", "outcome": "p", "rule": "q"},
+        {"digests": {"survivors": "x"}}, {}, survivors
+    ) == ["survivor hash"]
+    assert claims_audit.compare(
+        {"digests": {"survivors": "x"}, "outcome": "p", "rule": "q"},
         row,
         survivors,
     ) == ["survivor hash", "outcome", "rule", "alpha_confirm"]
@@ -444,11 +449,11 @@ def make_sealed_ledger(confirmed=None, outcome="confirmed", stage_two=None):
 
 def make_claims_document(**changes):
     document = {
-        "survivors_sha256": "s",
+        "digests": {"survivors": "s"},
         "outcome": "confirmed",
         "rule": "holm",
-        "alpha_confirm": "1/20",
-        "stage_two": None,
+        "alpha": "1/20",
+        "second": None,
         "claims": [
             {"claim_id": "h1", "tier": "confirmed"},
             {"claim_id": "h2", "tier": "unverified"},
@@ -477,7 +482,7 @@ def test_claims_against_ledger_findings_are_exact():
             {"claim_id": "h1", "tier": "unverified"},
             {"claim_id": "h2", "tier": "unverified"},
         ],
-        stage_two={"x": 1},
+        second={"x": 1},
     )
     assert claims_audit.crosscheck(wrong_set, ledger) == finding(
         name,
@@ -512,7 +517,7 @@ def replay_document(adjusted, p_value=1e-6, tier="confirmed"):
     return {
         "outcome": confirm.CONFIRMED,
         "rule": "holm",
-        "alpha_confirm": "1/20",
+        "alpha": "1/20",
         "claims": [
             {"claim_id": "h1", "tier": tier, "adjusted_p_value": adjusted}
         ],
@@ -578,7 +583,7 @@ def stage_two_document(**changes):
         {"survivors_sha256": "s", "family": family}
     )
     document = {
-        "stage_two": {
+        "second": {
             "withdrawn": {"h3": "why"},
             "family": family,
             "family_sha256": digest,
@@ -625,7 +630,7 @@ def test_stage_two_findings_are_exact():
         name, "fail", "a withdrawn survivor is confirmed"
     )
     bad_hash = stage_two_document()
-    bad_hash["stage_two"]["family_sha256"] = "x"
+    bad_hash["second"]["family_sha256"] = "x"
     assert claims_audit.tally(bad_hash, ledger).detail == ("family hash")
 
 
@@ -652,7 +657,7 @@ def test_custody_open_finding_judges_how_often_c_was_opened():
 def test_frozen_selection_problems_are_named():
     frozen = {"event": "selection_frozen", "detail": {"survivors_sha256": "s"}}
     opened = {"event": "open"}
-    document = {"survivors_sha256": "s"}
+    document = {"digests": {"survivors": "s"}}
     names = ["selection_frozen", "open"]
     assert (
         claims_audit.frozen_selection_problem([frozen, opened], names, document)
@@ -679,7 +684,7 @@ def test_frozen_selection_problems_are_named():
     )
     assert (
         claims_audit.frozen_selection_problem(
-            [frozen, opened], names, {"survivors_sha256": "other"}
+            [frozen, opened], names, {"digests": {"survivors": "other"}}
         )
         == "frozen survivor hash differs from the claims"
     )
@@ -687,7 +692,7 @@ def test_frozen_selection_problems_are_named():
     assert (
         claims_audit.frozen_selection_problem([bare, opened], names, {}) is None
     )
-    with_family = dict(document, stage_two={"family_sha256": "f"})
+    with_family = dict(document, second={"family_sha256": "f"})
     assert (
         claims_audit.frozen_selection_problem(
             [frozen, opened], names, with_family
@@ -715,7 +720,7 @@ def write_custody(folder, events, key=KEY):
 
 def test_custody_findings_are_exact_for_hand_made_logs(tmp_path):
     # Enforces docs/CLI.md:106.
-    document = {"outcome": confirm.CONFIRMED, "survivors_sha256": "s"}
+    document = {"outcome": confirm.CONFIRMED, "digests": {"survivors": "s"}}
     assert claims_audit.custodial(tmp_path, document, KEY) == finding(
         CUSTODY, "skipped", "custody_log.jsonl is not in the run"
     )
@@ -723,7 +728,7 @@ def test_custody_findings_are_exact_for_hand_made_logs(tmp_path):
     assert claims_audit.custodial(tmp_path, document, KEY) == finding(
         CUSTODY, "fail", "outcome is confirmed but C has no open event"
     )
-    other = {"outcome": "none", "survivors_sha256": "s"}
+    other = {"outcome": "none", "digests": {"survivors": "s"}}
     assert claims_audit.custodial(tmp_path, other, KEY) == finding(
         CUSTODY, "pass", "C not opened (outcome none)"
     )
@@ -746,7 +751,7 @@ def test_custody_pass_counts_entries_and_a_wrong_key_fails(tmp_path):
         ("final_test", "sealed", {}),
     ]
     log = write_custody(tmp_path, events)
-    document = {"outcome": confirm.CONFIRMED, "survivors_sha256": "s"}
+    document = {"outcome": confirm.CONFIRMED, "digests": {"survivors": "s"}}
     assert claims_audit.custodial(tmp_path, document, KEY) == finding(
         CUSTODY, "pass", f"{len(log.entries)} entries, chain verified"
     )

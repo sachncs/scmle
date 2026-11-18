@@ -43,7 +43,7 @@ def assess(
         problems.append(f"{given.assumption}: {given.attestor} not permitted")
     if given.scope != charter.charter_hash:
         problems.append(f"{given.assumption}: scope is not this charter")
-    day = str(report.get("evaluated_on", ""))
+    day = str(attest.Applied.KEYS.upgrade(report).get("evaluated", ""))
     try:
         valid = given.date <= day <= given.expires
     except TypeError:

@@ -84,7 +84,7 @@ def test_no_chartered_order_uses_the_registry_order_and_says_so():
     plan = select.select(block())
     assert not plan.chartered_order
     assert plan.order == tuple(select.STRATEGIES)
-    assert plan.to_dict()["order_chartered"] is False
+    assert plan.to_dict()["chartered"] is False
 
 
 def test_a_declared_dag_checks_the_adjustment_set():

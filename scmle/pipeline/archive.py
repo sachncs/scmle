@@ -317,9 +317,9 @@ class Directory:
         """
         found: dict[str, experiments.Trial] = {}
         for path in sorted((self.directory / "trials").glob("trial_*.json")):
-            record = json.loads(path.read_text(encoding="utf-8"))
-            record["status"] = experiments.Termination(record["status"])
-            found[record["trial_id"]] = experiments.Trial(**record)
+            stored = json.loads(path.read_text(encoding="utf-8"))
+            trial = experiments.Trial.load(stored)
+            found[trial.trial_id] = trial
         return found
 
     def recoverable(self) -> list[str]:

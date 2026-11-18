@@ -165,7 +165,7 @@ def inventory(run_dir: str | Path) -> list[dict[str, Any]]:
     """
     document = recall(run_dir)
     ledger = rehydrate(run_dir)
-    stage_two = document.get("stage_two") or {}
+    stage_two = document.get("second") or {}
     withdrawn = stage_two.get("withdrawn", {})
     listed = [
         {
@@ -274,7 +274,7 @@ def inspect(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
         )
     hypothesis = ledger.hypotheses[claim_id]
     result = ledger.results[claim_id]
-    stage_two = document.get("stage_two") or {}
+    stage_two = document.get("second") or {}
     return {
         "claim": claim,
         "hypothesis": hypothesis.spec.to_dict(),

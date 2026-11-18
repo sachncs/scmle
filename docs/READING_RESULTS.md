@@ -22,7 +22,7 @@ Terms are in the [glossary](GLOSSARY.md).
 | The headline | the last line of the run output | `selected ... (cv ...); test: ...` |
 | The story in one page | `report.html` | findings first, then the leaderboard; the long plan list is folded at the bottom |
 | Every number | `evaluation.json` | `test_metrics`, `selected_cv_score`, `fit_health`, `cv_confidence` |
-| Every model tried | `leaderboard.parquet` or `result.leaderboard()` | `score_mean`, `score_std`, `status`, `fit_health` |
+| Every model tried | `leaderboard.parquet` or `result.leaderboard()` | `score`, `deviation`, `status`, `fit_health` |
 | Why each choice was made | `diagnostics/decision_log.json` | `selection`, `outcomes` |
 | What the model relies on | `diagnostics/permutation_importance.json` | the first rows |
 | Warnings about your data | `diagnostics/recommendations.json` and the "Findings" part of `report.html` | duplicates, label noise, leakage suspects |
@@ -61,9 +61,9 @@ If the exam is higher, that is luck or a small exam set; do not count on it.
 
 | Column | Meaning |
 | --- | --- |
-| `model_name` | the model recipe |
+| `model` | the model recipe |
 | `status` | `ok`, `failed`, `pruned` (given up early), `skipped` (out of time) |
-| `score_mean`, `score_std` | practice score and its spread over folds |
+| `score`, `deviation` | practice score and its spread over folds |
 | `strategy` | the data treatment used, such as `iterative_imputation` or `default` |
 | `fit_health` | `healthy`, `overfit` or `underfit` |
 | `selected` | true for the winner |
@@ -71,10 +71,10 @@ If the exam is higher, that is luck or a small exam set; do not count on it.
 From our run:
 
 ```text
-                   model_name status  score_mean  score_std
-0                    stacking     ok    0.848248   0.022959
-1                    blending     ok    0.847238   0.023506
-2  bagged_logistic_regression     ok    0.834896   0.007738
+                        model status     score  deviation
+0                    stacking     ok  0.848248   0.022959
+1                    blending     ok  0.847238   0.023506
+2  bagged_logistic_regression     ok  0.834896   0.007738
 ```
 
 How to read it:

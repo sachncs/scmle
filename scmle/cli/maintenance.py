@@ -34,9 +34,11 @@ from scmle.assurance.charter import sealing
 from scmle.assurance.custody import manifest
 from scmle.assurance.framing import costs
 from scmle.assurance.ledger import budget
+from scmle.assurance.ledger import confirm
 from scmle.cli import command
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 from scmle.contracts.data import provenance
 
 LOGGER = logging.getLogger(__name__)
@@ -88,8 +90,11 @@ def rewrite(name: str, stored: Any) -> Any:
         inner = contracts.AnalysisCharter.from_dict(stored["charter"])
         return {**stored, "charter": inner.to_dict()}
     if name == CLAIMS:
+        header = records.load(
+            "Confirmation", confirm.Confirmation.migrations, stored
+        )
         return {
-            **stored,
+            **header,
             "claims": [
                 qualification.Claim.from_dict(row).to_dict()
                 for row in stored["claims"]

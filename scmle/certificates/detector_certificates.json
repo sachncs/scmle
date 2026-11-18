@@ -1,65 +1,73 @@
 {
   "certificates": [
     {
-      "code_hash": "a99bb9f7e74d32bb6503427f32045c7730564505c871c1a71706ec0b75bcb09b",
-      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
       "created": null,
-      "detector_id": "f5-duplicates",
+      "detector": "f5-duplicates",
+      "digests": {
+        "code": "5a0500b9a74c8a147d2846a314df9aef2dadad720cba42dda7b0bc8be118a693",
+        "corpus": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1"
+      },
       "outcomes": [
         {
+          "alarms": [
+            0.0,
+            0.006705972065294502
+          ],
           "certificate": {
-            "clean_rows": 569,
-            "defect_type": "duplicate_exact",
+            "alarms": 0,
+            "clean": 569,
+            "defect": "duplicate_exact",
             "detected": 285,
-            "detector_id": "f5-duplicates",
-            "false_alarms": 0,
+            "detector": "f5-duplicates",
             "planted": 285,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "certify.f5-duplicates",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.006705972065294502
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.986700459011742,
             1.0
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0,
+            0.006705972065294502
+          ],
           "certificate": {
-            "clean_rows": 569,
-            "defect_type": "duplicate_near",
+            "alarms": 0,
+            "clean": 569,
+            "defect": "duplicate_near",
             "detected": 285,
-            "detector_id": "f5-duplicates",
-            "false_alarms": 0,
+            "detector": "f5-duplicates",
             "planted": 285,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "certify.f5-duplicates",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.006705972065294502
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.986700459011742,
             1.0
-          ]
+          ],
+          "schema_version": 2
         }
       ],
       "policy": {
+        "alarms": 0.05,
         "confidence": 0.95,
-        "false_alarm_ceiling": 0.05,
-        "recall_floor": 0.8
+        "recall": 0.8,
+        "schema_version": 2
       },
+      "schema_version": 2,
       "seeds": [
         0,
         1,
@@ -69,65 +77,73 @@
       ]
     },
     {
-      "code_hash": "1980dfbe0b54374d61bc69498b3b97b65157f0579e0ddbab8b8fa1d20f9f8f52",
-      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
       "created": null,
-      "detector_id": "f5-label-noise",
+      "detector": "f5-label-noise",
+      "digests": {
+        "code": "12d30138d73673c537192313dc438b95766e3ccc7b5c814fce2a159e902dbe8c",
+        "corpus": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1"
+      },
       "outcomes": [
         {
+          "alarms": [
+            0.0037591031606135205,
+            0.020403705950985118
+          ],
           "certificate": {
-            "clean_rows": 569,
-            "defect_type": "label_flip_symmetric",
+            "alarms": 5,
+            "clean": 569,
+            "defect": "label_flip_symmetric",
             "detected": 228,
-            "detector_id": "f5-label-noise",
-            "false_alarms": 5,
+            "detector": "f5-label-noise",
             "planted": 285,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "certify.f5-label-noise",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0037591031606135205,
-            0.020403705950985118
-          ],
           "passed": false,
-          "recall_interval": [
+          "recall": [
             0.7497084578283153,
             0.8423118175787299
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0037591031606135205,
+            0.020403705950985118
+          ],
           "certificate": {
-            "clean_rows": 569,
-            "defect_type": "label_flip_class_conditional",
+            "alarms": 5,
+            "clean": 569,
+            "defect": "label_flip_class_conditional",
             "detected": 212,
-            "detector_id": "f5-label-noise",
-            "false_alarms": 5,
+            "detector": "f5-label-noise",
             "planted": 300,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "certify.f5-label-noise",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0037591031606135205,
-            0.020403705950985118
-          ],
           "passed": false,
-          "recall_interval": [
+          "recall": [
             0.6527939127218992,
             0.755313659171955
-          ]
+          ],
+          "schema_version": 2
         }
       ],
       "policy": {
+        "alarms": 0.05,
         "confidence": 0.95,
-        "false_alarm_ceiling": 0.05,
-        "recall_floor": 0.8
+        "recall": 0.8,
+        "schema_version": 2
       },
+      "schema_version": 2,
       "seeds": [
         0,
         1,
@@ -137,65 +153,73 @@
       ]
     },
     {
-      "code_hash": "515dd97205a064781e4002f3368879a4c73f6965c0c7afe3b73179bc4ae3e11e",
-      "corpus_hash": "2c64ca924c041cab2ccd41f5dab78a8c5d0dd7b4166e3080254364af03bcdb89",
       "created": null,
-      "detector_id": "f5-missingness",
+      "detector": "f5-missingness",
+      "digests": {
+        "code": "11c53842564a7a4f14898eee4b539220610f3d440a99942bc544e4d6b06be2f3",
+        "corpus": "2c64ca924c041cab2ccd41f5dab78a8c5d0dd7b4166e3080254364af03bcdb89"
+      },
       "outcomes": [
         {
+          "alarms": [
+            0.0008831687156009814,
+            0.02777370439789293
+          ],
           "certificate": {
-            "clean_rows": 200,
-            "defect_type": "missing_mar",
+            "alarms": 1,
+            "clean": 200,
+            "defect": "missing_mar",
             "detected": 200,
-            "detector_id": "f5-missingness",
-            "false_alarms": 1,
+            "detector": "f5-missingness",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "certify.f5-missingness",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0008831687156009814,
-            0.02777370439789293
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0008831687156009814,
+            0.02777370439789293
+          ],
           "certificate": {
-            "clean_rows": 200,
-            "defect_type": "missing_mnar",
+            "alarms": 1,
+            "clean": 200,
+            "defect": "missing_mnar",
             "detected": 200,
-            "detector_id": "f5-missingness",
-            "false_alarms": 1,
+            "detector": "f5-missingness",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "certify.f5-missingness",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0008831687156009814,
-            0.02777370439789293
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         }
       ],
       "policy": {
+        "alarms": 0.05,
         "confidence": 0.95,
-        "false_alarm_ceiling": 0.05,
-        "recall_floor": 0.8
+        "recall": 0.8,
+        "schema_version": 2
       },
+      "schema_version": 2,
       "seeds": [
         0,
         1,
@@ -400,41 +424,47 @@
       ]
     },
     {
-      "code_hash": "89af4eaf67489c876d2f32e23e287c1d95d5bbfb6056052a9ae69a5e298037cf",
-      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
       "created": null,
-      "detector_id": "f5-outlier-triage",
+      "detector": "f5-outlier-triage",
+      "digests": {
+        "code": "89af4eaf67489c876d2f32e23e287c1d95d5bbfb6056052a9ae69a5e298037cf",
+        "corpus": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1"
+      },
       "outcomes": [
         {
+          "alarms": [
+            0.0,
+            0.006705972065294502
+          ],
           "certificate": {
-            "clean_rows": 569,
-            "defect_type": "outlier_error",
+            "alarms": 0,
+            "clean": 569,
+            "defect": "outlier_error",
             "detected": 764,
-            "detector_id": "f5-outlier-triage",
-            "false_alarms": 0,
+            "detector": "f5-outlier-triage",
             "planted": 768,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "certify.f5-outlier-triage",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.006705972065294502
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9866853997985304,
             0.9979727723100437
-          ]
+          ],
+          "schema_version": 2
         }
       ],
       "policy": {
+        "alarms": 0.05,
         "confidence": 0.95,
-        "false_alarm_ceiling": 0.05,
-        "recall_floor": 0.8
+        "recall": 0.8,
+        "schema_version": 2
       },
+      "schema_version": 2,
       "seeds": [
         0,
         1,
@@ -444,41 +474,47 @@
       ]
     },
     {
-      "code_hash": "d583f581be1c5fe326bb1d586207d4ca7a6e51f249d22b12f1ad9a28bde8e6df",
-      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
       "created": null,
-      "detector_id": "f5-sentinel",
+      "detector": "f5-sentinel",
+      "digests": {
+        "code": "d583f581be1c5fe326bb1d586207d4ca7a6e51f249d22b12f1ad9a28bde8e6df",
+        "corpus": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1"
+      },
       "outcomes": [
         {
+          "alarms": [
+            0.013399735423753773,
+            0.0386940129619315
+          ],
           "certificate": {
-            "clean_rows": 569,
-            "defect_type": "sentinel",
+            "alarms": 13,
+            "clean": 569,
+            "defect": "sentinel",
             "detected": 540,
-            "detector_id": "f5-sentinel",
-            "false_alarms": 13,
+            "detector": "f5-sentinel",
             "planted": 540,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "certify.f5-sentinel",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.013399735423753773,
-            0.0386940129619315
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9929364362381928,
             1.0
-          ]
+          ],
+          "schema_version": 2
         }
       ],
       "policy": {
+        "alarms": 0.05,
         "confidence": 0.95,
-        "false_alarm_ceiling": 0.05,
-        "recall_floor": 0.8
+        "recall": 0.8,
+        "schema_version": 2
       },
+      "schema_version": 2,
       "seeds": [
         0,
         1,

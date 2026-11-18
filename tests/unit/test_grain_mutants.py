@@ -584,7 +584,7 @@ def test_a_verdict_serializes_every_field_and_whether_it_blocks():
     assert verdict.to_dict() == {
         "verdict": "unknown",
         "unit": "u",
-        "unit_columns": ["a", "b"],
+        "columns": ["a", "b"],
         "reason": "why",
         "questions": ["q1", "q2"],
         "blocks": True,
@@ -606,13 +606,12 @@ def test_a_scan_serializes_keys_ties_and_state():
     assert document["keys"][0] == {
         "columns": ["a"],
         "g3": 0.0,
-        "null_rate": 0.0,
+        "nulls": 0.0,
         "distinct": 5,
         "rows": 10,
-        "small_n": True,
+        "small": True,
     }
     assert document["ties"] == [[["a"], ["b"]]]
-    assert document["levels_done"] == 2
+    assert document["levels"] == 2
     assert document["partial"] is False
-    assert document["eps_key"] == 0.0
-    assert document["eps_null"] == 0.0
+    assert document["tolerances"] == {"key": 0.0, "null": 0.0}

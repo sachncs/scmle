@@ -407,7 +407,7 @@ def test_replication_tests_each_declared_stratum_column():
     assert set(column["strata"]) == {"region=a", "region=b"}
     assert column["strata"]["region=a"] == [1.0, 0.1]
     assert column["alpha"] == 0.05
-    assert column["pooled_sign"] == 1
+    assert column["sign"] == 1
     assert adapter.calls == [(60, 0.95), (80, 0.95)]
 
 
@@ -461,7 +461,7 @@ def test_replication_passes_only_when_every_usable_column_does():
     assert both["passed"] is True
     opposite = run.replication(adapter, frame, 0.95, -1.0, 0.05)
     assert opposite["passed"] is False
-    assert opposite["by_column"]["region"]["same_sign"] is False
+    assert opposite["by_column"]["region"]["agreeing"] is False
     # first column fails, second passes: the failure must stick
     frame["shift"] = [1.0] * 60 + [-1.0] * 60
     mixed = run.replication(adapter, frame, 0.95, 1.0, 0.05)
@@ -599,7 +599,7 @@ def test_naming_the_subgroup_gate_makes_the_family_gating():
         "met their pre-registered floors"
     )
     assert found["statement_gate"].endswith(
-        "(a result for a subgroup under `min_rows` is still descriptive)"
+        "(a result for a subgroup under `rows` is still descriptive)"
     )
     flags = [row["certified_size"] for row in found["hypotheses"]]
     shipped = certified.subgroup_gate(run.stratify).min_rows
@@ -628,7 +628,7 @@ def test_leaving_the_subgroup_gate_out_keeps_the_family_descriptive():
 def test_the_minimum_rows_come_from_the_shipped_certificate():
     found = label((certified.SUBGROUP_GATE,))
     shipped = certified.subgroup_gate(run.stratify)
-    assert found["gate"]["min_rows"] == shipped.min_rows
+    assert found["gate"]["rows"] == shipped.min_rows
     unnamed = label(None)
     assert unnamed["gate"] == shipped.to_dict()
     if shipped.status == "descriptive":
@@ -2302,7 +2302,7 @@ def test_the_certified_minimum_size_decides_which_subgroups_gate(
     found = {"hypotheses": [{"n": 100}, {"n": 80}, {"n": 79}, {"n": None}]}
     run.certify(found, ("subgroup_holm",))
     assert found["gate"]["status"] == "gating"
-    assert found["gate"]["min_rows"] == 80
+    assert found["gate"]["rows"] == 80
     assert [r["certified_size"] for r in found["hypotheses"]] == [
         True,
         True,
@@ -2314,13 +2314,13 @@ def test_the_certified_minimum_size_decides_which_subgroups_gate(
     assert unnamed["gate"] == {
         "status": "gating",
         "reason": "family-wise error and power met their pre-registered floors",
-        "min_rows": 80,
+        "rows": 80,
     }
     assert [r["certified_size"] for r in unnamed["hypotheses"]] == [True, False]
     left_out = {"hypotheses": [{"n": 80}]}
     run.certify(left_out, ("other",))
     assert left_out["gate"]["status"] == "descriptive"
-    assert left_out["gate"]["min_rows"] == 80
+    assert left_out["gate"]["rows"] == 80
     assert left_out["hypotheses"][0]["certified_size"] is False
 
 

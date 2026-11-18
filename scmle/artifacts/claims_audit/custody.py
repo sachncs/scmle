@@ -65,9 +65,11 @@ def frozen_selection_problem(
     ):
         return "no single selection_frozen before the open"
     detail = frozen[0].get("detail", {})
-    if detail.get("survivors_sha256") != document.get("survivors_sha256"):
+    if detail.get("survivors_sha256") != document.get("digests", {}).get(
+        "survivors"
+    ):
         return "frozen survivor hash differs from the claims"
-    record = document.get("stage_two")
+    record = document.get("second")
     if (
         record is not None
         and detail.get("family_sha256") != record["family_sha256"]

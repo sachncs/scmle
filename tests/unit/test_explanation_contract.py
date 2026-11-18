@@ -51,21 +51,23 @@ def test_evidence_contains_every_phase_four_binding():
 
     record = evidence.model_dump(mode="json")
 
-    assert record["model_fingerprint"] == "model-123"
-    assert record["bundle_digest"] == "sha256:bundle-123"
-    assert record["input_fingerprint"] == "input-123"
-    assert record["dataset_snapshot"]["digest"] == "sha256:data-123"
-    assert record["feature_graph"]["fingerprint"] == "graph-123"
+    assert record["digests"] == {
+        "model": "model-123",
+        "bundle": "sha256:bundle-123",
+        "payload": "input-123",
+    }
+    assert record["snapshot"]["digest"] == "sha256:data-123"
+    assert record["lineage"]["fingerprint"] == "graph-123"
     assert record["method"]["parameters"] == {"repeats": 5, "seed": 7}
     assert record["output"]["features"][0]["importance"] == 0.4
     assert record["timestamp"] == "2026-10-20T10:30:00Z"
-    assert record["software_version"] == "0.1.0b1"
+    assert record["software"] == "0.1.0b1"
     assert record["uncertainty"]["confidence"] == 0.95
     assert record["stability"]["score"] == 0.98
     assert record["limitations"] == ["Associational attribution only."]
-    assert record["causal_warning"].startswith("This explanation")
-    assert record["privacy_decision"]["decision"] == "allowed"
-    assert record["evidence_links"][0]["uri"].startswith("artifact:")
+    assert record["caveat"].startswith("This explanation")
+    assert record["clearance"]["decision"] == "allowed"
+    assert record["links"][0]["uri"].startswith("artifact:")
 
 
 def test_canonical_json_is_deterministic_and_html_safe():

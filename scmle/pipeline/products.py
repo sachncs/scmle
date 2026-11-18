@@ -148,6 +148,7 @@ class Kept(Product):
         try:
             joblib.dump(values, buffer)
         except (pickle.PicklingError, TypeError, AttributeError):
+            # handled: returns None, so the stage runs again on resume
             path.unlink(missing_ok=True)
             return None
         payload = buffer.getvalue()
@@ -169,6 +170,7 @@ class Kept(Product):
         try:
             meta, payload = envelope.read(path)
         except (OSError, errors.InputError, errors.ArtifactError):
+            # handled: returns None, so the stage runs again on resume
             return None
         if meta.get("product") != cls.__name__ or digest(payload) != expected:
             return None

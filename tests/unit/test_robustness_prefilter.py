@@ -96,7 +96,7 @@ def test_a_fragile_planted_effect_is_not_tested_on_c(tmp_path):
     assert stage_two["rule"]["thresholds"] == stability.DEFAULT_RULE.to_dict()
     assert stage.applied and stage.note.startswith("applied before C")
     claims = json.loads((tmp_path / confirm.CLAIMS_FILE).read_text())
-    assert claims["stage_two"]["family_sha256"] == stage_two["family_sha256"]
+    assert claims["second"]["family_sha256"] == stage_two["family_sha256"]
 
 
 def test_without_the_charter_request_the_fragile_effect_is_still_tested():

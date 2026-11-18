@@ -1,6 +1,6 @@
 {
   "claim": "C6",
-  "code": "f114f2fa1366f220d14193fa6bbed9c1cecf41e45fe798016a2df137f3108a5c",
+  "code": "a4af6ab74cc740be974ac26ad7aa2fa4a0e5e6f6d74d12c5877f11f06417b6f7",
   "not_measured": [
     "platforms other than those recorded here",
     "a clean-runner rebuild from the lock file",
@@ -27,7 +27,7 @@
         }
       },
       "rows": 600,
-      "seconds": 39.7,
+      "seconds": 40.2,
       "seed": 7,
       "tasks": {
         "binary": {
@@ -39,12 +39,12 @@
           "hashes": {
             "conformal.json": "0acdda4b2b8c5dbe0edd17b67714f67870510c27b6aa4b098e905a1ef2cbf5b4",
             "coverage_report.json": "f9bed89f1d321a3592f3d0dd6c7bf7098cbf8b4760552fd66b676194033b1e3b",
-            "model_manifest.json": "1a3f33fda0753cc4d2246db226aad061578bc8c9d2a3ea8f80d8a1e6534f7949",
+            "model_manifest.json": "f29b742bfdaf051838f583db567171775ffaeb00f904aecea2042417af9ba107",
             "novelty.joblib": "9064537f33db4f61ea6aec6caa8949613d712c7d86338820fc2c81e15f5d9ffc",
             "pipeline.joblib": "25c6a38f56b6b844980d4c4249a0f3087cccfba417bcb956411d1c8e9f02f8a8",
             "reference.json": "50784221a9505d6e5e06e3d3ed9d2bf210132b6f4a5bbc85e4f9211269f87635",
             "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-            "signature.json": "1fa324fb92c0b6ad1afe008e8e81593527a1a9a102e5be16005b9875c6d36e26"
+            "signature.json": "522dbd17003535aecd80c095c2e333ae682a9b028f9940bc778a4101f3d81212"
           },
           "members": 8,
           "metrics": {
@@ -57,7 +57,7 @@
           },
           "seconds": [
             2.6,
-            2.6
+            2.7
           ],
           "selected": [
             "logistic_regression",
@@ -85,12 +85,12 @@
           "hashes": {
             "conformal.json": "c53e56dc776e7d91b89229f5d1e56fff73a83958ac28e8749622fca806b1682f",
             "coverage_report.json": "55c021183fefafdc785e94307e24357426835fdde481bf6afa0d8d2cf80bf626",
-            "model_manifest.json": "110fe7752e13dc3480db56e0ed737b2b8fd36219a3d620a1b45c8c7d25f4dbbf",
+            "model_manifest.json": "92bee633a24e1d3b4431e35d408616c5348f695ed77d89a5e92aa35cb80c39d0",
             "novelty.joblib": "72bb57854c0eb134a0a5841141e9a9fba807580b0e004a6e011ddb93387fd8c5",
             "pipeline.joblib": "cd71db618141ea12d9303539a7690952599fa87864c4d1a7f78a4951b1eeb175",
             "reference.json": "1d660243eb62649c5d59050b7c9a7f2361ab32f88f26ff420821394a226a8283",
             "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-            "signature.json": "2282414b8461687cc9409bebde090b11b6a5a14964b39dcf6d86822fc4b51643"
+            "signature.json": "102102540ded0be5f4a4a770e8d841447617fdcea643c10bdf7d439075d146af"
           },
           "members": 8,
           "metrics": {
@@ -103,7 +103,7 @@
           },
           "seconds": [
             3.2,
-            3.3
+            3.2
           ],
           "selected": [
             "random_forest",
@@ -131,12 +131,12 @@
           "hashes": {
             "conformal.json": "fd926007ec8e2278e82be3604bf8682a74f60ddef350ff31a9e20e3377a6f383",
             "coverage_report.json": "b962ed592bbe565cdd5f0f077845291d96ee79798a9ae931849d5300a6eecdfe",
-            "model_manifest.json": "6c9ecfae91d06e83e0d1cb4a1210d5f44d14aaa04572bb705d93a1ceee5f927d",
+            "model_manifest.json": "0b29f4f5c1e5c295d468ee05f758c89a6f932c71446b9b1056735a556ec71266",
             "novelty.joblib": "54146f7d822f6789680d2c004377f2e6997f4ee654b926cd59694542afbf9ad5",
             "pipeline.joblib": "546d3b2c6b395a50e948d8721059e4debf844f63c3b43ed8bf74c7e780603d9b",
             "reference.json": "26dffd528abc0dd252db47ee2b919a0adbef91cf563687ae072720c135cc350f",
             "schema.json": "9328b9e7e7899e6e6b1d43ca3a12e7f80488bcaa10e8c94828b369f9bf5b8af0",
-            "signature.json": "eeacba38652c9a48337d1644de6afd7d7de4ab226a6b1de3befccc285b03634b"
+            "signature.json": "58d120f8d9c6f80e974e4eeadb9fb6f3560ac8b2a839a87cfe2cc2bca8ba7975"
           },
           "members": 8,
           "metrics": {
@@ -147,7 +147,7 @@
           },
           "seconds": [
             6.4,
-            6.4
+            6.5
           ],
           "selected": [
             "logistic_regression",
@@ -176,13 +176,13 @@
             "conformal.json": "8fb2722c2938e9ae4ae988f90d1cc883e82fb68af215402e43a6379b757a6e65",
             "coverage_report.json": "5746ebe9f1977517097a44780d1848a2aa38848533b6cefc4a846549344e9d5b",
             "cv_plus.joblib": "5af87ecc7e65ebd6628eb6cb433fed95d124ab70977d640e464ef13d9aec755f",
-            "model_manifest.json": "8021d7279313398c6e33a85bab7f23e04dac0ad429d6c284978c47bc0739ff6c",
+            "model_manifest.json": "bcc5f648fd3da281f5dba5f8172584eac2a224d00e9346e9ca2df60757c04257",
             "novelty.joblib": "73b4418b09c0fe119f7d1511ba86a24231b4a831d15cd245bafbb61a40214616",
             "pipeline.joblib": "317b000b380bc7a615582d023de6d24ce9412569eb1d779cd48d37c253e96174",
             "quantile.joblib": "b089c6326f85845b73bfb3cc867fdb699f9fbbeee4cdc17ed380ab8c04071dbe",
             "reference.json": "dc92313251ed935330eba0581d1d1a43ec4ed47bf3474330cbbf5b57bf410f0a",
             "schema.json": "26fb7bc1a1560ce271d432aedc31d2dfcb678bbb14221244681825785972337f",
-            "signature.json": "9d47e6ea244649c1e4fa16009b319bd027ce090d1e23d9fb2e3b58671a7e200f"
+            "signature.json": "1e436a66a1bcf0b35d982d58647676d592d57280bcadc2745dcdcdc66e4a5902"
           },
           "members": 10,
           "metrics": {

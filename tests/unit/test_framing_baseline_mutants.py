@@ -135,8 +135,7 @@ def test_selective_labels_reports_every_field_in_the_flagged_direction():
     assert got.tolerance == 0.2 and got.alpha == 0.01
     assert got.to_dict() == {
         "flagged": True,
-        "missing_rate_b0": 0.5,
-        "missing_rate_b1": 0.1,
+        "missing": {"control": 0.5, "treated": 0.1},
         "difference": got.difference,
         "p_value": got.p_value,
         "tolerance": 0.2,
@@ -437,13 +436,15 @@ def test_the_report_document_states_the_guarantee():
     g = guard()
     report = run(g, y, a, b, cluster)
     document = report.to_dict()
-    assert document["schema_version"] == 1
+    assert document["schema_version"] == 2
     assert document["status"] == "issued" and document["issued"] is True
     assert document["reasons"] == []
     assert document["p_value_intersection_union"] == report.p_value
     assert [e["clusters"] for e in document["endpoints"]] == [30, 30]
     assert document["selective_labels"] == report.selectivity.to_dict()
-    assert document["registration_hash"] == g.registration.registration_hash
+    assert document["digests"] == {
+        "registration": g.registration.registration_hash
+    }
     assert [c["identifier"] for c in document["checks"]] == [
         c.identifier for c in report.checks
     ]

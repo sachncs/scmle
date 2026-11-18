@@ -89,7 +89,7 @@ def test_profiling_sees_exploration_rows_only(binary_frame, tmp_path):
     def profiled(result):
         folder = pathlib.Path(result.run_dir)
         report = json.loads((folder / "curation_report.json").read_text())
-        return report["profiled_rows"]
+        return report["rows"]["profiled"]
 
     manifest = json.loads(
         (pathlib.Path(governed.run_dir) / "split_manifest.json").read_text()
@@ -168,7 +168,7 @@ def test_a_charter_run_writes_the_ledger_control_and_claims(
         assert (folder / name).exists(), name
     done = event(result.run_dir, "ledger.completed")["data"]
     claims = json.loads((folder / "confirmed_claims.json").read_text())
-    assert done["ledger_head"] == claims["ledger_head"]
+    assert done["ledger_head"] == claims["heads"]["ledger"]
     import scmle.assurance.ledger.ledger
 
     ledger = scmle.assurance.ledger.ledger.Ledger.load(
@@ -240,11 +240,8 @@ def test_a_certified_leakage_suspect_is_quarantined_and_ledgered(
     assert diagnostics
     assert {r["body"]["check"]["subset"] for r in diagnostics} == {"X"}
     plan = json.loads((folder / "dataset_profile.json").read_text())
-    assert "echo" not in plan["feature_plan"]["numeric"]
-    assert (
-        "quarantined by admissibility"
-        in plan["feature_plan"]["dropped"]["echo"]
-    )
+    assert "echo" not in plan["plan"]["numeric"]
+    assert "quarantined by admissibility" in plan["plan"]["dropped"]["echo"]
 
 
 def test_the_curation_report_and_card_list_the_final_feature_plan(
@@ -257,10 +254,10 @@ def test_the_curation_report_and_card_list_the_final_feature_plan(
     curation = json.loads((folder / "curation_report.json").read_text())
     card = json.loads((folder / "dataset_card.json").read_text())
     for key in ("numeric", "categorical", "text"):
-        assert curation["feature_columns"][key] == plan["feature_plan"][key]
-        assert card["feature_summary"][key] == plan["feature_plan"][key]
-    assert "echo" not in curation["feature_columns"]["numeric"]
-    assert "quarantined by admissibility" in curation["dropped_columns"]["echo"]
+        assert curation["features"][key] == plan["plan"][key]
+        assert card["features"][key] == plan["plan"][key]
+    assert "echo" not in curation["features"]["numeric"]
+    assert "quarantined by admissibility" in curation["dropped"]["echo"]
 
 
 def test_a_stale_certificate_no_longer_keeps_a_suspect_field(
@@ -473,7 +470,7 @@ def test_chartered_rules_drive_the_ledger_and_the_second_stage(
     )
     assert ledger.confirmation["rule"] == "bh"
     claims = json.loads((folder / "confirmed_claims.json").read_text())
-    stage_two = claims["stage_two"]
+    stage_two = claims["second"]
     assert stage_two["rule"]["requested"] is True
     assert stage_two["family"] == [
         i for i in stage_two["survivors"] if i not in stage_two["withdrawn"]
@@ -495,7 +492,7 @@ def test_a_charter_without_rules_is_reported_as_not_chartered(
     assert done["rules"] == "not chartered" and done["rule"] == "e-lond"
     folder = pathlib.Path(result.run_dir)
     claims = json.loads((folder / "confirmed_claims.json").read_text())
-    assert "stage_two" not in claims
+    assert "second" not in claims
 
 
 def test_a_specification_that_contradicts_the_chartered_rule_is_refused():

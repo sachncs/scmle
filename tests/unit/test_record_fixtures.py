@@ -2,8 +2,9 @@
 
 Each fixture in `tests/fixtures/records/v1` was written by the writer that
 existed before the kind became a `records.Record` (the hand-written
-`to_dict`). Loading it with `model_validate` and dumping it again must give
-the same bytes, and every pinned identity digest in
+`to_dict`). Both kinds are now at version 2 (single-word keys); loading a
+fixture migrates it, its version-1 anchor (`records.anchor`) must give back
+the stored record, and every pinned identity digest in
 `tests/fixtures/record_digests.json` must be unchanged.
 """
 
@@ -46,12 +47,13 @@ def test_every_fixture_names_a_kind():
 
 
 @pytest.mark.parametrize("name", sorted(KINDS))
-def test_a_version_one_record_loads_and_dumps_the_same_bytes(name):
+def test_a_version_one_record_loads_and_anchors_to_the_same_record(name):
     text = stored(name)
     record = KINDS[name].model_validate(json.loads(text))
-    assert record.schema_version == 1
-    assert write(record) == text
+    assert record.schema_version == 2
+    assert records.anchor(record) == json.loads(text)
     assert KINDS[name].model_validate_json(record.model_dump_json()) == record
+    assert KINDS[name].model_validate_json(write(record)) == record
 
 
 @pytest.mark.parametrize("name", sorted(KINDS))
@@ -114,7 +116,7 @@ def test_an_old_version_fixture_loads_through_its_migration():
     restored = Successor.migrations[0].downgrade(newer)
     assert {"schema_version": 1, **restored} == layout
     original = evaluation.Criteria.model_validate(layout)
-    assert write(original) == stored("evaluation_policy")
+    assert records.anchor(original) == json.loads(stored("evaluation_policy"))
 
 
 @hypothesis.given(
@@ -124,11 +126,8 @@ def test_an_old_version_fixture_loads_through_its_migration():
 def test_a_policy_survives_a_round_trip(threshold, warning):
     base = evaluation.Criteria.model_validate_json(stored("evaluation_policy"))
     layout = base.model_dump(mode="json")
-    layout["release"]["metric_gates"][0]["threshold"] = threshold
-    layout["small_groups"] = {
-        "warning_threshold": warning,
-        "blocking_threshold": None,
-    }
+    layout["release"]["metrics"][0]["threshold"] = threshold
+    layout["small"] = {"warning": warning, "blocking": None}
     policy = evaluation.Criteria.model_validate(layout)
     assert (
         evaluation.Criteria.model_validate(

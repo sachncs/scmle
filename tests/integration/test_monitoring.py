@@ -140,10 +140,10 @@ def test_prediction_log_can_emit_redacted_observability_sidecar(
         json.loads(line)
         for line in log.observability_path.read_text().splitlines()
     ]
-    assert [record["request_id"] for record in records] == ["a", "b", "c"]
-    assert all(record["run_id"] == "serve-1" for record in records)
+    assert [record["request"] for record in records] == ["a", "b", "c"]
+    assert all(record["run"] == "serve-1" for record in records)
     assert all(record["outcome"] == "success" for record in records)
-    assert all(record["redacted_fields"] == ["features"] for record in records)
+    assert all(record["redacted"] == ["features"] for record in records)
     assert all("features" not in record for record in records)
 
 

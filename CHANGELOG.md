@@ -39,6 +39,29 @@ marked `Breaking:` and listed first in their group.
   keeps a `.bak` of each file, verifies seals, signatures and chains before
   and after, and restores every file and exits 1 if a check fails (see
   [`docs/CLI.md`](docs/CLI.md)).
+* **Write-only record keys renamed.** The same renames now cover the records
+  scmle writes and does not read back. Assurance: detector certificates
+  (duplicates, label noise, missingness), framing (feasibility, questions,
+  refusal calibration, baseline report, framing draft `open_items` ->
+  `pending`), ingest (budget, grain, joins, profile, reconciliation, entity
+  resolution, synthesis selection), admissibility and reconciliation reports
+  and the robustness reports (coverage, forward, shift, stability). Causal and
+  decision: the AIPW, DiD, IV, RD and synthetic-control estimates, the
+  identification plan and battery, sensitivity, subgroup gate, constraint
+  satisfaction, net benefit, off-policy and rollout decisions and the
+  thresholding report; `decision_report.json` is now `schema_version` 2.
+  Contracts: capability declarations and the capability registry, data
+  profiles, curation reports and datasheets, trial records (and so the
+  `result.leaderboard()` and `leaderboard.parquet` columns: `trial_id` ->
+  `identifier`, `model_name` -> `model`, `score_mean` -> `score`,
+  `score_std` -> `deviation`, `fit_seconds` -> `fit`), modality, observability
+  and performance contracts, release policies and explanation evidence
+  (`privacy_decision` -> `clearance`, `evidence_links` -> `links`).
+  `confirmed_claims.json` now carries a `schema_version` (2), with `alpha`,
+  `digests.survivors`, `heads.{ledger, custody}` and `second`. scmle reads
+  files of either version and anchored digests and signatures still verify;
+  scripts of your own that read these files must use the new keys, listed in
+  [`docs/RECORD_KEYS.md`](docs/RECORD_KEYS.md).
 * **Modules moved by the package layering (DES-13).** Each package now imports
   only the layers below it; the moves are listed, `old -> new`, under "Module
   moves" in [`docs/RENAMES.md`](docs/RENAMES.md). Names inside a module are

@@ -139,7 +139,7 @@ def test_regression_target_fingerprint():
 
 def test_profile_serializes_the_fingerprint():
     payload = profile_of(frame_with_everything()).to_dict()
-    assert payload["dataset"]["shape"]["columns"] == 6
+    assert payload["statistics"]["shape"]["columns"] == 6
     assert payload["columns"]["num"]["outlier_rate"] >= 0
 
 

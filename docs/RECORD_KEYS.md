@@ -6,7 +6,13 @@ certificates, governance, deployment and monitoring records, run manifests
 and evaluation members). Each name became one word or a nested object:
 `data_hash` is now `digests.data`, `row_count` is now `rows`, `run_id` is
 `identifier` on the record that is the run and `run` on a record that
-refers to a run. Every renamed record kind has a higher `schema_version`.
+refers to a run. Every renamed record kind has a higher `schema_version`,
+except the few that carry none (a trial checkpoint, the stage records of a
+lifecycle report): scmle tells their two layouts apart by the keys. The
+write-only records (detector certificates, framing and ingest reports,
+robustness and causal reports, decision reports, capability, modality,
+observability and performance contracts, release policies and explanation
+evidence) were renamed in a second pass and are listed here too.
 
 **scmle reads old files itself.** Each record kind has a migration, so a
 folder written by an older scmle loads without any change. Hashes and
@@ -52,7 +58,7 @@ hand.
 
 ## The map
 
-349 renamed keys on 90 record kinds.
+559 renamed keys on 160 record kinds.
 
 ### `Confounding` (`data/charter/causal.py`)
 
@@ -852,3 +858,563 @@ hand.
 |---|---|
 | `dataset_hash` | `digests.dataset` |
 | `stage_evidence` | `evidence` |
+
+### `Verdict` (`assurance/admissibility/reconciliation.py`)
+
+| Old | New |
+|---|---|
+| `residual_gap` | `residual` |
+
+### `Admissibility` (`assurance/admissibility/rules.py`)
+
+| Old | New |
+|---|---|
+| `dag_hash` | `digests.dag` |
+| `adjustment_set` | `adjustment` |
+
+### `FlagGate` (`assurance/coverage_slices.py`)
+
+| Old | New |
+|---|---|
+| `min_rows` | `rows` |
+
+### `Duplicates` (`assurance/detectors/duplicates.py`)
+
+| Old | New |
+|---|---|
+| `exact_extra` | `exact.extra` |
+| `exact_rate` | `exact.rate` |
+| `exact_interval` | `exact.interval` |
+| `near_extra` | `near` |
+| `label_conflicts` | `conflicts` |
+
+### `Noise` (`assurance/detectors/labels.py`)
+
+| Old | New |
+|---|---|
+| `confident_learning` | `candidates` |
+| `rows_checked` | `checked` |
+| `input_rows` | `received` |
+| `sampling_bound` | `bound` |
+
+### `Missingness` (`assurance/detectors/missingness.py`)
+
+| Old | New |
+|---|---|
+| `rows_checked` | `checked` |
+| `input_rows` | `received` |
+| `mcar_rejected` | `rejected` |
+
+### `Selectivity` (`assurance/framing/baseline.py`)
+
+| Old | New |
+|---|---|
+| `missing_rate_b0` | `missing.control` |
+| `missing_rate_b1` | `missing.treated` |
+
+### `Outcome` (`assurance/framing/baseline.py`)
+
+| Old | New |
+|---|---|
+| `registration_hash` | `digests.registration` |
+
+### `Draft` (`assurance/framing/draft/records.py`)
+
+| Old | New |
+|---|---|
+| `open_items` | `pending` |
+
+### `Verdict` (`assurance/framing/feasibility.py`)
+
+| Old | New |
+|---|---|
+| `s_d` | `deviation` |
+| `s_d_interval` | `interval` |
+| `design_effect` | `deff` |
+| `n_required` | `required` |
+| `n_effective` | `effective` |
+
+### `Question` (`assurance/framing/questions.py`)
+
+| Old | New |
+|---|---|
+| `tipping_value` | `tipping` |
+
+### `Calibration` (`assurance/framing/refusal.py`)
+
+| Old | New |
+|---|---|
+| `n_calibration` | `calibration` |
+
+### `Budget` (`assurance/ingest/budget.py`)
+
+| Old | New |
+|---|---|
+| `max_queries` | `queries` |
+| `max_rows_scanned` | `scanned` |
+| `max_seconds` | `seconds` |
+| `max_features` | `features` |
+
+### `Resolution` (`assurance/ingest/entities/resolution.py`)
+
+| Old | New |
+|---|---|
+| `t_group` | `thresholds.group` |
+| `t_match` | `thresholds.linkage` |
+| `reduction_ratio` | `reduction` |
+| `skipped_blocks` | `skipped` |
+
+### `Candidate` (`assurance/ingest/grain.py`)
+
+| Old | New |
+|---|---|
+| `null_rate` | `nulls` |
+| `small_n` | `small` |
+
+### `Scan` (`assurance/ingest/grain.py`)
+
+| Old | New |
+|---|---|
+| `levels_done` | `levels` |
+| `eps_key` | `tolerances.key` |
+| `eps_null` | `tolerances.null` |
+
+### `UnitVerdict` (`assurance/ingest/grain.py`)
+
+| Old | New |
+|---|---|
+| `unit_columns` | `columns` |
+
+### `Link` (`assurance/ingest/joins.py`)
+
+| Old | New |
+|---|---|
+| `child_columns` | `columns.child` |
+| `parent_columns` | `columns.parent` |
+| `child_distinct` | `distinct` |
+| `name_support` | `named` |
+
+### `Aggregates` (`assurance/ingest/profile.py`)
+
+| Old | New |
+|---|---|
+| `non_null` | `present` |
+
+### `Report` (`assurance/ingest/reconcile.py`)
+
+| Old | New |
+|---|---|
+| `not_reconciled` | `unreconciled` |
+
+### `Selection` (`assurance/ingest/synthesize/selection.py`)
+
+| Old | New |
+|---|---|
+| `declared_family_size` | `family` |
+
+### `Confirmation` (`assurance/ledger/confirm/records.py`)
+
+| Old | New |
+|---|---|
+| `alpha_confirm` | `alpha` |
+| `survivors_sha256` | `digests.survivors` |
+| `ledger_head` | `heads.ledger` |
+| `custody_head` | `heads.custody` |
+| `stage_two` | `second` |
+
+### `Cell` (`assurance/robustness/coverage.py`)
+
+| Old | New |
+|---|---|
+| `deployment_share` | `deployment` |
+
+### `Finding` (`assurance/robustness/forward.py`)
+
+| Old | New |
+|---|---|
+| `effect_x` | `effects.observed` |
+| `effect_f` | `effects.forward` |
+
+### `Drift` (`assurance/robustness/shift.py`)
+
+| Old | New |
+|---|---|
+| `low_counts` | `sparse` |
+
+### `Thresholds` (`assurance/robustness/stability/estimation.py`)
+
+| Old | New |
+|---|---|
+| `s_min` | `agreement` |
+| `q_min` | `exclusion` |
+
+### `Curve` (`assurance/robustness/stability/permutation.py`)
+
+| Old | New |
+|---|---|
+| `median_abs_effect` | `median` |
+| `share_significant` | `significant` |
+| `p_median` | `pvalues.median` |
+| `p_share` | `pvalues.share` |
+
+### `Estimate` (`causal/identification/aipw.py`)
+
+| Old | New |
+|---|---|
+| `n_input` | `received` |
+| `nuisance_digest` | `digests.nuisance` |
+
+### `Applied` (`causal/identification/attest.py`)
+
+| Old | New |
+|---|---|
+| `evaluated_on` | `evaluated` |
+
+### `Replication` (`causal/identification/battery.py`)
+
+| Old | New |
+|---|---|
+| `pooled_sign` | `sign` |
+| `same_sign` | `agreeing` |
+| `p_heterogeneity` | `heterogeneity` |
+
+### `SubgroupGate` (`causal/identification/certified.py`)
+
+| Old | New |
+|---|---|
+| `min_rows` | `rows` |
+
+### `Estimate` (`causal/identification/did.py`)
+
+| Old | New |
+|---|---|
+| `n_never` | `untreated` |
+| `pretrend_p` | `pretrend` |
+| `max_pre_change` | `drift` |
+| `mean_horizon` | `horizon` |
+
+### `Estimate` (`causal/identification/iv.py`)
+
+| Old | New |
+|---|---|
+| `wald_low` | `wald.low` |
+| `wald_high` | `wald.high` |
+| `first_stage` | `stage` |
+| `f_stat` | `fstat` |
+| `ar_kind` | `ar.kind` |
+| `ar_low` | `ar.low` |
+| `ar_high` | `ar.high` |
+
+### `Estimate` (`causal/identification/rd.py`)
+
+| Old | New |
+|---|---|
+| `bias_corrected` | `corrected` |
+| `n_left` | `counts.left` |
+| `n_right` | `counts.right` |
+| `density_p` | `density` |
+
+### `Verdict` (`causal/identification/select.py`)
+
+| Old | New |
+|---|---|
+| `missing_assumptions` | `missing.assumptions` |
+| `missing_design` | `missing.design` |
+
+### `Plan` (`causal/identification/select.py`)
+
+| Old | New |
+|---|---|
+| `order_chartered` | `chartered` |
+
+### `Sensitivity` (`causal/identification/sensitivity.py`)
+
+| Old | New |
+|---|---|
+| `rv_alpha` | `rvalpha` |
+
+### `Estimate` (`causal/identification/synth.py`)
+
+| Old | New |
+|---|---|
+| `pre_rmspe` | `rmspe.pre` |
+| `post_rmspe` | `rmspe.post` |
+| `min_p` | `floor` |
+| `placebo_ratios` | `placebos` |
+
+### `Satisfaction` (`decision/constraints/satisfaction.py`)
+
+| Old | New |
+|---|---|
+| `max_gap` | `gap` |
+| `point_gap` | `estimate` |
+| `upper_bound` | `upper` |
+| `small_groups` | `small` |
+
+### `Benefit` (`decision/netbenefit.py`)
+
+| Old | New |
+|---|---|
+| `treat_all` | `everyone` |
+| `useful_range` | `useful` |
+
+### `Estimate` (`decision/ope.py`)
+
+| Old | New |
+|---|---|
+| `ess_ratio` | `ess` |
+| `clipped_share` | `truncation` |
+
+### `Decision` (`decision/rollout.py`)
+
+| Old | New |
+|---|---|
+| `log_e` | `evalues` |
+| `lower_bound` | `lower` |
+| `challenger_units` | `challenger` |
+
+### `Thresholding` (`decision/threshold.py`)
+
+| Old | New |
+|---|---|
+| `expected_cost` | `cost` |
+| `cost_interval` | `interval` |
+| `stable_range` | `stable` |
+
+### `Declaration` (`contracts/capabilities/declarations.py`)
+
+| Old | New |
+|---|---|
+| `model_family` | `family` |
+| `required_extras` | `extras` |
+| `failure_modes` | `failures` |
+| `evidence_links` | `links` |
+
+### `Coordinate` (`contracts/capabilities/declarations.py`)
+
+| Old | New |
+|---|---|
+| `model_family` | `family` |
+
+### `Resources` (`contracts/capabilities/declarations.py`)
+
+| Old | New |
+|---|---|
+| `cpu_cores` | `cpu` |
+| `memory_gb` | `memory` |
+| `disk_gb` | `disk` |
+| `gpu_required` | `gpu` |
+| `network_required` | `network` |
+| `max_rows` | `rows` |
+
+### `Capability` (`contracts/capabilities/declarations.py`)
+
+| Old | New |
+|---|---|
+| `required_extras` | `extras` |
+| `failure_modes` | `failures` |
+| `evidence_links` | `links` |
+
+### `Blueprint` (`contracts/data/profiles.py`)
+
+| Old | New |
+|---|---|
+| `extra_inputs` | `extras` |
+| `high_cardinality` | `cardinal` |
+
+### `Portrait` (`contracts/data/profiles.py`)
+
+| Old | New |
+|---|---|
+| `quality_findings` | `findings.quality` |
+| `risk_findings` | `findings.risk` |
+| `feature_plan` | `plan` |
+| `dataset` | `statistics` |
+| `quality_evidence` | `evidence` |
+
+### `Curation` (`contracts/data/profiles.py`)
+
+| Old | New |
+|---|---|
+| `source_rows` | `rows.source` |
+| `profiled_rows` | `rows.profiled` |
+| `read_seconds` | `read` |
+| `cleaning_notes` | `notes` |
+| `quality_findings` | `findings.quality` |
+| `risk_findings` | `findings.risk` |
+| `feature_columns` | `features` |
+| `dropped_columns` | `dropped` |
+| `release_ready` | `ready` |
+| `unresolved_blocking_findings` | `blockers` |
+
+### `Datasheet` (`contracts/data/profiles.py`)
+
+| Old | New |
+|---|---|
+| `dataset_id` | `dataset` |
+| `snapshot_id` | `snapshot` |
+| `intended_use` | `use` |
+| `out_of_scope` | `excluded` |
+| `feature_summary` | `features` |
+| `quality_findings` | `findings.quality` |
+| `risk_findings` | `findings.risk` |
+| `review_status` | `review` |
+| `generated_at` | `generated` |
+
+### `Trial` (`contracts/experiments.py`)
+
+| Old | New |
+|---|---|
+| `trial_id` | `identifier` |
+| `model_name` | `model` |
+| `score_mean` | `score` |
+| `score_std` | `deviation` |
+| `fold_scores` | `folds` |
+| `fit_seconds` | `fit` |
+| `observed_access` | `access` |
+| `evaluation_config` | `evaluation` |
+| `train_scores` | `training` |
+
+### `Proof` (`contracts/modalities.py`)
+
+| Old | New |
+|---|---|
+| `evidence_links` | `links` |
+
+### `Declaration` (`contracts/modalities.py`)
+
+| Old | New |
+|---|---|
+| `stage_evidence` | `evidence` |
+| `required_extras` | `extras` |
+| `failure_modes` | `failures` |
+| `missing_stages` | `missing` |
+
+### `Inference` (`contracts/observability.py`)
+
+| Old | New |
+|---|---|
+| `request_id` | `request` |
+| `run_id` | `run` |
+| `model_fingerprint` | `digests.model` |
+| `latency_ms` | `latency` |
+| `input_fingerprint` | `digests.payload` |
+| `error_category` | `error` |
+| `redacted_fields` | `redacted` |
+
+### `Requirements` (`contracts/observability.py`)
+
+| Old | New |
+|---|---|
+| `retention_days` | `retention` |
+| `required_signals` | `signals` |
+| `redacted_fields` | `redacted` |
+| `alert_thresholds` | `thresholds` |
+
+### `Comparison` (`contracts/performance.py`)
+
+| Old | New |
+|---|---|
+| `baseline_run_count` | `baselines` |
+| `current_run_id` | `run` |
+| `relative_regressions` | `regressions` |
+
+### `Baseline` (`contracts/performance.py`)
+
+| Old | New |
+|---|---|
+| `reference_runs` | `runs` |
+| `max_relative_regression` | `regression` |
+
+### `Budget` (`contracts/performance.py`)
+
+| Old | New |
+|---|---|
+| `max_seconds` | `seconds` |
+| `max_peak_memory_gb` | `memory` |
+
+### `Uncertainty` (`contracts/evaluation/parts.py`)
+
+| Old | New |
+|---|---|
+| `confidence_level` | `confidence` |
+| `coverage_target` | `coverage` |
+| `minimum_rows` | `rows` |
+
+### `Calibration` (`contracts/evaluation/parts.py`)
+
+| Old | New |
+|---|---|
+| `maximum_error` | `error` |
+
+### `Fairness` (`contracts/evaluation/parts.py`)
+
+| Old | New |
+|---|---|
+| `sensitive_columns` | `sensitive` |
+
+### `Equity` (`contracts/evaluation/parts.py`)
+
+| Old | New |
+|---|---|
+| `required_evidence` | `evidence` |
+
+### `Subgroups` (`contracts/evaluation/parts.py`)
+
+| Old | New |
+|---|---|
+| `warning_threshold` | `warning` |
+| `blocking_threshold` | `blocking` |
+
+### `Explanations` (`contracts/evaluation/parts.py`)
+
+| Old | New |
+|---|---|
+| `required_methods` | `methods` |
+| `required_evidence` | `evidence` |
+| `require_stability` | `stability.required` |
+| `require_fidelity` | `fidelity.required` |
+| `stability_threshold` | `stability.threshold` |
+| `fidelity_threshold` | `fidelity.threshold` |
+
+### `Requirement` (`contracts/evaluation/parts.py`)
+
+| Old | New |
+|---|---|
+| `required_evidence` | `evidence` |
+
+### `Gates` (`contracts/evaluation/parts.py`)
+
+| Old | New |
+|---|---|
+| `metric_gates` | `metrics` |
+| `diagnostic_gates` | `diagnostics` |
+| `fairness_gates` | `fairness` |
+| `required_evidence` | `evidence` |
+
+### `Criteria` (`contracts/evaluation/policy.py`)
+
+| Old | New |
+|---|---|
+| `primary_metric` | `metric` |
+| `small_groups` | `small` |
+
+### `Clearance` (`contracts/explanations.py`)
+
+| Old | New |
+|---|---|
+| `redacted_fields` | `redacted` |
+
+### `Evidence` (`contracts/explanations.py`)
+
+| Old | New |
+|---|---|
+| `model_fingerprint` | `digests.model` |
+| `bundle_digest` | `digests.bundle` |
+| `input_fingerprint` | `digests.payload` |
+| `dataset_snapshot` | `snapshot` |
+| `feature_graph` | `lineage` |
+| `software_version` | `software` |
+| `causal_warning` | `caveat` |
+| `privacy_decision` | `clearance` |
+| `evidence_links` | `links` |

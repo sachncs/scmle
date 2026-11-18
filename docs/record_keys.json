@@ -1,5 +1,5 @@
 {
-  "source": "plan/stage_b/phase5_vocabulary.md",
+  "source": "plan/stage_b/phase5_vocabulary.md, plan/stage_b/phase5_vocabulary_rest.md",
   "kinds": {
     "data/charter/causal.py Confounding": {
       "m_max": "multiple"
@@ -529,6 +529,356 @@
     "models/modality_lifecycle/reporting.py Record": {
       "dataset_hash": "digests.dataset",
       "stage_evidence": "evidence"
+    },
+    "assurance/admissibility/reconciliation.py Verdict": {
+      "residual_gap": "residual"
+    },
+    "assurance/admissibility/rules.py Admissibility": {
+      "dag_hash": "digests.dag",
+      "adjustment_set": "adjustment"
+    },
+    "assurance/coverage_slices.py FlagGate": {
+      "min_rows": "rows"
+    },
+    "assurance/detectors/duplicates.py Duplicates": {
+      "exact_extra": "exact.extra",
+      "exact_rate": "exact.rate",
+      "exact_interval": "exact.interval",
+      "near_extra": "near",
+      "label_conflicts": "conflicts"
+    },
+    "assurance/detectors/labels.py Noise": {
+      "confident_learning": "candidates",
+      "rows_checked": "checked",
+      "input_rows": "received",
+      "sampling_bound": "bound"
+    },
+    "assurance/detectors/missingness.py Missingness": {
+      "rows_checked": "checked",
+      "input_rows": "received",
+      "mcar_rejected": "rejected"
+    },
+    "assurance/framing/baseline.py Selectivity": {
+      "missing_rate_b0": "missing.control",
+      "missing_rate_b1": "missing.treated"
+    },
+    "assurance/framing/baseline.py Outcome": {
+      "registration_hash": "digests.registration"
+    },
+    "assurance/framing/draft/records.py Draft": {
+      "open_items": "pending"
+    },
+    "assurance/framing/feasibility.py Verdict": {
+      "s_d": "deviation",
+      "s_d_interval": "interval",
+      "design_effect": "deff",
+      "n_required": "required",
+      "n_effective": "effective"
+    },
+    "assurance/framing/questions.py Question": {
+      "tipping_value": "tipping"
+    },
+    "assurance/framing/refusal.py Calibration": {
+      "n_calibration": "calibration"
+    },
+    "assurance/ingest/budget.py Budget": {
+      "max_queries": "queries",
+      "max_rows_scanned": "scanned",
+      "max_seconds": "seconds",
+      "max_features": "features"
+    },
+    "assurance/ingest/entities/resolution.py Resolution": {
+      "t_group": "thresholds.group",
+      "t_match": "thresholds.linkage",
+      "reduction_ratio": "reduction",
+      "skipped_blocks": "skipped"
+    },
+    "assurance/ingest/grain.py Candidate": {
+      "null_rate": "nulls",
+      "small_n": "small"
+    },
+    "assurance/ingest/grain.py Scan": {
+      "levels_done": "levels",
+      "eps_key": "tolerances.key",
+      "eps_null": "tolerances.null"
+    },
+    "assurance/ingest/grain.py UnitVerdict": {
+      "unit_columns": "columns"
+    },
+    "assurance/ingest/joins.py Link": {
+      "child_columns": "columns.child",
+      "parent_columns": "columns.parent",
+      "child_distinct": "distinct",
+      "name_support": "named"
+    },
+    "assurance/ingest/profile.py Aggregates": {
+      "non_null": "present"
+    },
+    "assurance/ingest/reconcile.py Report": {
+      "not_reconciled": "unreconciled"
+    },
+    "assurance/ingest/synthesize/selection.py Selection": {
+      "declared_family_size": "family"
+    },
+    "assurance/ledger/confirm/records.py Confirmation": {
+      "alpha_confirm": "alpha",
+      "survivors_sha256": "digests.survivors",
+      "ledger_head": "heads.ledger",
+      "custody_head": "heads.custody",
+      "stage_two": "second"
+    },
+    "assurance/robustness/coverage.py Cell": {
+      "deployment_share": "deployment"
+    },
+    "assurance/robustness/forward.py Finding": {
+      "effect_x": "effects.observed",
+      "effect_f": "effects.forward"
+    },
+    "assurance/robustness/shift.py Drift": {
+      "low_counts": "sparse"
+    },
+    "assurance/robustness/stability/estimation.py Thresholds": {
+      "s_min": "agreement",
+      "q_min": "exclusion"
+    },
+    "assurance/robustness/stability/permutation.py Curve": {
+      "median_abs_effect": "median",
+      "share_significant": "significant",
+      "p_median": "pvalues.median",
+      "p_share": "pvalues.share"
+    },
+    "causal/identification/aipw.py Estimate": {
+      "n_input": "received",
+      "nuisance_digest": "digests.nuisance"
+    },
+    "causal/identification/attest.py Applied": {
+      "evaluated_on": "evaluated"
+    },
+    "causal/identification/battery.py Replication": {
+      "pooled_sign": "sign",
+      "same_sign": "agreeing",
+      "p_heterogeneity": "heterogeneity"
+    },
+    "causal/identification/certified.py SubgroupGate": {
+      "min_rows": "rows"
+    },
+    "causal/identification/did.py Estimate": {
+      "n_never": "untreated",
+      "pretrend_p": "pretrend",
+      "max_pre_change": "drift",
+      "mean_horizon": "horizon"
+    },
+    "causal/identification/iv.py Estimate": {
+      "wald_low": "wald.low",
+      "wald_high": "wald.high",
+      "first_stage": "stage",
+      "f_stat": "fstat",
+      "ar_kind": "ar.kind",
+      "ar_low": "ar.low",
+      "ar_high": "ar.high"
+    },
+    "causal/identification/rd.py Estimate": {
+      "bias_corrected": "corrected",
+      "n_left": "counts.left",
+      "n_right": "counts.right",
+      "density_p": "density"
+    },
+    "causal/identification/select.py Verdict": {
+      "missing_assumptions": "missing.assumptions",
+      "missing_design": "missing.design"
+    },
+    "causal/identification/select.py Plan": {
+      "order_chartered": "chartered"
+    },
+    "causal/identification/sensitivity.py Sensitivity": {
+      "rv_alpha": "rvalpha"
+    },
+    "causal/identification/synth.py Estimate": {
+      "pre_rmspe": "rmspe.pre",
+      "post_rmspe": "rmspe.post",
+      "min_p": "floor",
+      "placebo_ratios": "placebos"
+    },
+    "decision/constraints/satisfaction.py Satisfaction": {
+      "max_gap": "gap",
+      "point_gap": "estimate",
+      "upper_bound": "upper",
+      "small_groups": "small"
+    },
+    "decision/netbenefit.py Benefit": {
+      "treat_all": "everyone",
+      "useful_range": "useful"
+    },
+    "decision/ope.py Estimate": {
+      "ess_ratio": "ess",
+      "clipped_share": "truncation"
+    },
+    "decision/rollout.py Decision": {
+      "log_e": "evalues",
+      "lower_bound": "lower",
+      "challenger_units": "challenger"
+    },
+    "decision/threshold.py Thresholding": {
+      "expected_cost": "cost",
+      "cost_interval": "interval",
+      "stable_range": "stable"
+    },
+    "contracts/capabilities/declarations.py Declaration": {
+      "model_family": "family",
+      "required_extras": "extras",
+      "failure_modes": "failures",
+      "evidence_links": "links"
+    },
+    "contracts/capabilities/declarations.py Coordinate": {
+      "model_family": "family"
+    },
+    "contracts/capabilities/declarations.py Resources": {
+      "cpu_cores": "cpu",
+      "memory_gb": "memory",
+      "disk_gb": "disk",
+      "gpu_required": "gpu",
+      "network_required": "network",
+      "max_rows": "rows"
+    },
+    "contracts/capabilities/declarations.py Capability": {
+      "required_extras": "extras",
+      "failure_modes": "failures",
+      "evidence_links": "links"
+    },
+    "contracts/data/profiles.py Blueprint": {
+      "extra_inputs": "extras",
+      "high_cardinality": "cardinal"
+    },
+    "contracts/data/profiles.py Portrait": {
+      "quality_findings": "findings.quality",
+      "risk_findings": "findings.risk",
+      "feature_plan": "plan",
+      "dataset": "statistics",
+      "quality_evidence": "evidence"
+    },
+    "contracts/data/profiles.py Curation": {
+      "source_rows": "rows.source",
+      "profiled_rows": "rows.profiled",
+      "read_seconds": "read",
+      "cleaning_notes": "notes",
+      "quality_findings": "findings.quality",
+      "risk_findings": "findings.risk",
+      "feature_columns": "features",
+      "dropped_columns": "dropped",
+      "release_ready": "ready",
+      "unresolved_blocking_findings": "blockers"
+    },
+    "contracts/data/profiles.py Datasheet": {
+      "dataset_id": "dataset",
+      "snapshot_id": "snapshot",
+      "intended_use": "use",
+      "out_of_scope": "excluded",
+      "feature_summary": "features",
+      "quality_findings": "findings.quality",
+      "risk_findings": "findings.risk",
+      "review_status": "review",
+      "generated_at": "generated"
+    },
+    "contracts/experiments.py Trial": {
+      "trial_id": "identifier",
+      "model_name": "model",
+      "score_mean": "score",
+      "score_std": "deviation",
+      "fold_scores": "folds",
+      "fit_seconds": "fit",
+      "observed_access": "access",
+      "evaluation_config": "evaluation",
+      "train_scores": "training"
+    },
+    "contracts/modalities.py Proof": {
+      "evidence_links": "links"
+    },
+    "contracts/modalities.py Declaration": {
+      "stage_evidence": "evidence",
+      "required_extras": "extras",
+      "failure_modes": "failures",
+      "missing_stages": "missing"
+    },
+    "contracts/observability.py Inference": {
+      "request_id": "request",
+      "run_id": "run",
+      "model_fingerprint": "digests.model",
+      "latency_ms": "latency",
+      "input_fingerprint": "digests.payload",
+      "error_category": "error",
+      "redacted_fields": "redacted"
+    },
+    "contracts/observability.py Requirements": {
+      "retention_days": "retention",
+      "required_signals": "signals",
+      "redacted_fields": "redacted",
+      "alert_thresholds": "thresholds"
+    },
+    "contracts/performance.py Comparison": {
+      "baseline_run_count": "baselines",
+      "current_run_id": "run",
+      "relative_regressions": "regressions"
+    },
+    "contracts/performance.py Baseline": {
+      "reference_runs": "runs",
+      "max_relative_regression": "regression"
+    },
+    "contracts/performance.py Budget": {
+      "max_seconds": "seconds",
+      "max_peak_memory_gb": "memory"
+    },
+    "contracts/evaluation/parts.py Uncertainty": {
+      "confidence_level": "confidence",
+      "coverage_target": "coverage",
+      "minimum_rows": "rows"
+    },
+    "contracts/evaluation/parts.py Calibration": {
+      "maximum_error": "error"
+    },
+    "contracts/evaluation/parts.py Fairness": {
+      "sensitive_columns": "sensitive"
+    },
+    "contracts/evaluation/parts.py Equity": {
+      "required_evidence": "evidence"
+    },
+    "contracts/evaluation/parts.py Subgroups": {
+      "warning_threshold": "warning",
+      "blocking_threshold": "blocking"
+    },
+    "contracts/evaluation/parts.py Explanations": {
+      "required_methods": "methods",
+      "required_evidence": "evidence",
+      "require_stability": "stability.required",
+      "require_fidelity": "fidelity.required",
+      "stability_threshold": "stability.threshold",
+      "fidelity_threshold": "fidelity.threshold"
+    },
+    "contracts/evaluation/parts.py Requirement": {
+      "required_evidence": "evidence"
+    },
+    "contracts/evaluation/parts.py Gates": {
+      "metric_gates": "metrics",
+      "diagnostic_gates": "diagnostics",
+      "fairness_gates": "fairness",
+      "required_evidence": "evidence"
+    },
+    "contracts/evaluation/policy.py Criteria": {
+      "primary_metric": "metric",
+      "small_groups": "small"
+    },
+    "contracts/explanations.py Clearance": {
+      "redacted_fields": "redacted"
+    },
+    "contracts/explanations.py Evidence": {
+      "model_fingerprint": "digests.model",
+      "bundle_digest": "digests.bundle",
+      "input_fingerprint": "digests.payload",
+      "dataset_snapshot": "snapshot",
+      "feature_graph": "lineage",
+      "software_version": "software",
+      "causal_warning": "caveat",
+      "privacy_decision": "clearance",
+      "evidence_links": "links"
     }
   }
 }

@@ -131,23 +131,23 @@ def test_the_sidecar_carries_one_redacted_success_event_per_request(tmp_path):
     )
     log.chronicle(bundle, data, ["x", "y"])
     sidecar = records(log.observability_path)
-    assert [r["request_id"] for r in sidecar] == ["x", "y"]
+    assert [r["request"] for r in sidecar] == ["x", "y"]
     for record in sidecar:
         assert record["type"] == "inference"
-        assert record["run_id"] == "serve-9"
-        assert record["model_fingerprint"] == "model-digest"
+        assert record["run"] == "serve-9"
+        assert record["digests"]["model"] == "model-digest"
         assert record["outcome"] == "success"
-        assert record["error_category"] is None
-        assert record["redacted_fields"] == ["email", "features"]
-        assert record["latency_ms"] >= 0.0
+        assert record["error"] is None
+        assert record["redacted"] == ["email", "features"]
+        assert record["latency"] >= 0.0
         assert record["timestamp"].endswith("+00:00")
-    assert sidecar[0]["input_fingerprint"] == sidecar[1]["input_fingerprint"]
+    assert sidecar[0]["digests"]["payload"] == sidecar[1]["digests"]["payload"]
     expected = hashlib.sha256(
         pandas.util.hash_pandas_object(data, index=False)
         .to_numpy(dtype="uint64")
         .tobytes()
     ).hexdigest()
-    assert sidecar[0]["input_fingerprint"] == expected
+    assert sidecar[0]["digests"]["payload"] == expected
     assert log.observability_path.read_text().count("\n") == 2
     assert ", " not in log.observability_path.read_text().splitlines()[0]
 
@@ -160,8 +160,8 @@ def test_the_run_id_and_model_fingerprint_fall_back_to_the_model_version(
     )
     log.chronicle(make_bundle(), pandas.DataFrame({"a": [1.0]}), ["only"])
     (record,) = records(log.observability_path)
-    assert record["run_id"] == "v7"
-    assert record["model_fingerprint"] == "v7"
+    assert record["run"] == "v7"
+    assert record["digests"]["model"] == "v7"
 
 
 @pytest.mark.parametrize("failure", [TypeError, ValueError])
@@ -181,10 +181,10 @@ def test_unhashable_cells_fall_back_to_a_json_fingerprint(
     payload = data.to_json(
         orient="split", date_format="iso", default_handler=str
     ).encode("utf-8")
-    assert second["input_fingerprint"] == first["input_fingerprint"]
+    assert second["digests"]["payload"] == first["digests"]["payload"]
     # The prefix marks the fallback so it never equals a pandas-hash print.
     expected = "json:" + hashlib.sha256(payload).hexdigest()
-    assert first["input_fingerprint"] == expected
+    assert first["digests"]["payload"] == expected
 
 
 def test_a_failure_is_logged_as_an_error_event_and_propagates(tmp_path):
@@ -197,10 +197,10 @@ def test_a_failure_is_logged_as_an_error_event_and_propagates(tmp_path):
             make_bundle(fail=KeyError("boom")), data, ["first", "second"]
         )
     (record,) = records(log.observability_path)
-    assert record["request_id"] == "first"
+    assert record["request"] == "first"
     assert record["outcome"] == "error"
-    assert record["error_category"] == "KeyError"
-    assert record["input_fingerprint"] is None
+    assert record["error"] == "KeyError"
+    assert record["digests"]["payload"] is None
     assert not (tmp_path / "p.jsonl").exists()
 
 
@@ -214,8 +214,8 @@ def test_a_failure_without_event_ids_still_gets_a_request_id(tmp_path):
             pandas.DataFrame({"a": [1.0]}),
         )
     (record,) = records(log.observability_path)
-    assert len(record["request_id"]) == 32
-    assert record["error_category"] == "ValueError"
+    assert len(record["request"]) == 32
+    assert record["error"] == "ValueError"
     empty = events.PredictionLog(
         tmp_path / "q.jsonl", observability_policy=make_policy()
     )
@@ -225,7 +225,7 @@ def test_a_failure_without_event_ids_still_gets_a_request_id(tmp_path):
             pandas.DataFrame({"a": []}),
         )
     (record,) = records(empty.observability_path)
-    assert len(record["request_id"]) == 32
+    assert len(record["request"]) == 32
 
 
 def test_log_observability_does_nothing_without_a_policy(tmp_path):
@@ -249,9 +249,9 @@ def test_the_error_category_and_latency_are_recorded(tmp_path):
         error_category="OSError",
     )
     (record,) = records(log.observability_path)
-    assert record["error_category"] == "OSError"
-    assert record["input_fingerprint"] == "fp"
-    assert record["latency_ms"] > 0.0
+    assert record["error"] == "OSError"
+    assert record["digests"]["payload"] == "fp"
+    assert record["latency"] > 0.0
 
 
 def sidecar_line(timestamp):

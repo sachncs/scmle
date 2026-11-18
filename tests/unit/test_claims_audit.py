@@ -13,6 +13,7 @@ from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import governed
 from scmle.assurance.ledger import ledger
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.splitting.splitters import lockbox
 from tests.unit.test_charter_contracts import make_charter
 from tests.unit.test_ledger_governed import build
@@ -118,6 +119,21 @@ def edit_claims(tmp_path, change):
     path.write_text(json.dumps(document))
 
 
+def test_a_claims_file_written_before_the_key_renames_verifies(tmp_path):
+    make_run(tmp_path)
+
+    def downgrade(document):
+        document.pop(records.KEY)
+        old = records.downgrade(confirm.Confirmation.migrations, document)
+        document.clear()
+        document.update(old)
+
+    edit_claims(tmp_path, downgrade)
+    stored = json.loads((tmp_path / confirm.CLAIMS_FILE).read_text())
+    assert "alpha_confirm" in stored and "second" not in stored
+    assert claims_audit.verify(tmp_path, KEY).ok
+
+
 @pytest.mark.parametrize(
     ("change", "step"),
     [
@@ -130,15 +146,15 @@ def edit_claims(tmp_path, change):
             "claims agree with the sealed ledger",
         ),
         (
-            lambda d: d.update(survivors_sha256="0" * 64),
+            lambda d: d["digests"].update(survivors="0" * 64),
             "claims agree with the sealed ledger",
         ),
         (
-            lambda d: d.update(ledger_head="0" * 64),
+            lambda d: d["heads"].update(ledger="0" * 64),
             "claims file names the ledger head",
         ),
         (
-            lambda d: d["stage_two"]["withdrawn"].clear(),
+            lambda d: d["second"]["withdrawn"].clear(),
             "claims agree with the sealed ledger",
         ),
     ],
@@ -155,7 +171,7 @@ def test_a_withdrawn_survivor_tested_on_c_is_caught(tmp_path):
     make_run(tmp_path)
 
     def add_check(document):
-        withdrawn = next(iter(document["stage_two"]["withdrawn"]))
+        withdrawn = next(iter(document["second"]["withdrawn"]))
         document["checks"].append(
             dict(document["checks"][0], identifier=f"{withdrawn}:C")
         )
@@ -360,7 +376,7 @@ def test_a_malformed_claims_document_fails_the_replay_instead_of_raising():
     document = {
         "outcome": confirm.CONFIRMED,
         "rule": "holm",
-        "alpha_confirm": "1/20",
+        "alpha": "1/20",
         "claims": [{"claim_id": "h1"}],
         "checks": [{"check_id": "h1:C", "p_value": 0.001}],
     }

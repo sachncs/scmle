@@ -719,11 +719,10 @@ def test_to_dict_of_a_labelled_resolution_has_every_field():
     document = result.to_dict()
     assert set(document) == {
         "tier",
-        "t_group",
-        "t_match",
+        "thresholds",
         "compared_pairs",
-        "reduction_ratio",
-        "skipped_blocks",
+        "reduction",
+        "skipped",
         "links",
         "groups",
         "records",
@@ -731,11 +730,11 @@ def test_to_dict_of_a_labelled_resolution_has_every_field():
         "estimate",
     }
     assert document["tier"] == "attested"
-    assert document["t_group"] == result.t_group
-    assert document["t_match"] == result.t_match
+    assert document["thresholds"]["group"] == result.t_group
+    assert document["thresholds"]["linkage"] == result.t_match
     assert document["compared_pairs"] == 5
-    assert document["reduction_ratio"] == result.reduction_ratio
-    assert document["skipped_blocks"] == 0
+    assert document["reduction"] == result.reduction_ratio
+    assert document["skipped"] == 0
     assert document["links"] == 5
     assert document["groups"] == 4
     assert document["records"] == 8
@@ -846,7 +845,7 @@ def test_unlabelled_thresholds_come_from_the_posterior(world):
     assert result.t_group == pytest.approx(8.609669212785187)
     assert result.t_match == pytest.approx(9.651041949752166)
     assert document["compared_pairs"] == 2241
-    assert document["reduction_ratio"] == pytest.approx(0.9483223797993774)
+    assert document["reduction"] == pytest.approx(0.9483223797993774)
     assert document["links"] == 95
     assert document["groups"] == 200
     assert document["records"] == 295

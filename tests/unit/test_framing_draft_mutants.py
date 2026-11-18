@@ -756,7 +756,7 @@ def test_a_draft_serialises_to_the_stored_document():
     frame = table()
     result = draft.frame(request(frame), frame, cost_model=MODEL)
     document = result.to_dict()
-    assert document["schema_version"] == 1
+    assert document["schema_version"] == 2
     assert document["status"] == draft.WITH_QUESTIONS
     assert document["charter"] == result.charter.to_dict()
     assert document["charter_hash"] == result.charter.charter_hash
@@ -765,7 +765,7 @@ def test_a_draft_serialises_to_the_stored_document():
     }
     assert list(document["fields"]) == sorted(document["fields"])
     assert document["checks"] == [c.to_dict() for c in result.checks]
-    assert document["open_items"] == list(result.open_items)
+    assert document["pending"] == list(result.open_items)
     assert document["llm"] is None and document["discarded"] == []
     assert document["label"] == (
         "a drafted charter is a draft: nothing here shows it is correct; llm "
@@ -778,7 +778,7 @@ def test_a_draft_serialises_to_the_stored_document():
         "charter_hash",
         "fields",
         "checks",
-        "open_items",
+        "pending",
         "llm",
         "discarded",
         "label",
@@ -796,7 +796,14 @@ def test_a_refused_draft_has_no_charter_in_its_document():
 def test_the_draft_hash_is_the_sha256_of_the_canonical_document():
     frame = table()
     result = draft.frame(request(frame), frame)
-    document = {**result.to_dict(), "charter": result.charter.anchor()}
+    current = result.to_dict()
+    document = {
+        **{k: v for k, v in current.items() if k != "pending"},
+        "schema_version": 1,
+        "open_items": current["pending"],
+        "charter": result.charter.anchor(),
+    }
+    assert result.anchor() == {**document, "charter": current["charter"]}
     assert (
         result.sha == hashlib.sha256(signing.canonicalise(document)).hexdigest()
     )

@@ -40,9 +40,7 @@ def main() -> None:
     LOGGER.info(project.plan().summary())
     result = project.run()
     LOGGER.info(result.summary())
-    LOGGER.info(
-        "\n%s", result.leaderboard()[["model_name", "status", "score_mean"]]
-    )
+    LOGGER.info("\n%s", result.leaderboard()[["model", "status", "score"]])
     LOGGER.info("%s", result.predict(data.drop(columns="churn").head(5)))
 
 

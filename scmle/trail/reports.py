@@ -9,7 +9,10 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from scmle.contracts.data import profiles
 from scmle.contracts.data import provenance
+import scmle.contracts.experiments
+import scmle.contracts.records
 from scmle.trail import records
 
 BAR_WIDTH = 30
@@ -43,7 +46,11 @@ def exploratory(directory: Path) -> dict[str, Any]:
         counts by kind and the confirmation outcome with its checks by tier.
     """
     base = directory / records.RETAINED / "run"
-    curation = records.read_json(base / "curation_report.json")
+    curation = scmle.contracts.records.load(
+        "Curation",
+        profiles.Curation.migrations,
+        records.read_json(base / "curation_report.json"),
+    )
     manifest = provenance.DatasetManifest.from_dict(
         records.read_json(base / "dataset_manifest.json")
     )
@@ -52,9 +59,7 @@ def exploratory(directory: Path) -> dict[str, Any]:
     ledger = records.read_lines(base / "hypothesis_ledger.jsonl")
     kinds = Counter(row["kind"] for row in ledger)
     tiers = Counter(check["tier"] for check in claims["checks"])
-    findings = curation.get("quality_findings", []) + curation.get(
-        "risk_findings", []
-    )
+    findings = curation["findings"]["quality"] + curation["findings"]["risk"]
     body = {
         "kind": "exploratory_report",
         "dataset": {
@@ -64,10 +69,10 @@ def exploratory(directory: Path) -> dict[str, Any]:
             "columns": manifest.columns,
             "target": manifest.target,
         },
-        "profiled_rows": curation["profiled_rows"],
+        "profiled_rows": curation["rows"]["profiled"],
         "profiled_set": "exploration rows only",
-        "feature_columns": sorted(curation["feature_columns"]),
-        "dropped_columns": curation["dropped_columns"],
+        "feature_columns": sorted(curation["features"]),
+        "dropped_columns": curation["dropped"],
         "findings": [
             {
                 "severity": str(item.get("severity", "")),
@@ -105,6 +110,32 @@ def bar(score: float, top: float) -> str:
     return "#" * filled
 
 
+def entry(path: Path) -> scmle.contracts.records.Layout:
+    """Reads one trial checkpoint, of either key layout, as a ranking row.
+
+    Args:
+        path: A `trials/trial_*.json` file.
+
+    Returns:
+        The trial id, model, strategy, status, mean score, its spread and
+        the number of folds.
+    """
+    trial = scmle.contracts.records.load(
+        "Trial",
+        scmle.contracts.experiments.Trial.migrations,
+        records.read_json(path),
+    )
+    return {
+        "trial": trial["identifier"],
+        "model": trial["model"],
+        "strategy": trial["strategy"],
+        "status": trial["status"],
+        "score": trial["score"],
+        "spread": trial["deviation"],
+        "folds": len(trial.get("folds", [])),
+    }
+
+
 def experiments(directory: Path) -> dict[str, Any]:
     """Ranks the scored candidates the search tried, with their spread.
 
@@ -126,20 +157,7 @@ def experiments(directory: Path) -> dict[str, Any]:
     """
     base = directory / records.RETAINED / "run"
     evaluation = records.read_json(base / "evaluation.json")
-    rows = []
-    for path in sorted((base / "trials").glob("trial_*.json")):
-        trial = records.read_json(path)
-        rows.append(
-            {
-                "trial": trial["trial_id"],
-                "model": trial["model_name"],
-                "strategy": trial["strategy"],
-                "status": trial["status"],
-                "score": trial["score_mean"],
-                "spread": trial["score_std"],
-                "folds": len(trial.get("fold_scores", [])),
-            }
-        )
+    rows = [entry(p) for p in sorted((base / "trials").glob("trial_*.json"))]
     done = [r for r in rows if r["status"] == "ok" and r["score"] is not None]
     done.sort(key=lambda r: (-r["score"], r["trial"]))
     top = done[0]["score"] if done else 1.0

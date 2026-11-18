@@ -44,7 +44,7 @@ def make_finding(name, status):
 def test_a_report_without_a_grid_or_findings_is_exact():
     document = report.stability_report(found_stability())
 
-    assert document["schema_version"] == 1
+    assert document["schema_version"] == 2
     assert document["status"] == "not_evaluated"
     assert document["reason"] == "no grid"
     assert document["rule"] == {"s_min": 0.5}
@@ -191,7 +191,7 @@ def found_shift(**overrides):
 def test_the_shift_report_carries_each_part():
     document = report.shift_report(found_shift())
 
-    assert document["schema_version"] == 1
+    assert document["schema_version"] == 2
     assert document["status"] == "pass"
     assert document["reason"] == "r"
     assert document["agreement"] == 0.5
@@ -221,7 +221,7 @@ def test_the_shift_report_carries_each_part():
 
 
 def test_the_key_tuples_are_exact():
-    assert report.SCHEMA_VERSION == 1
+    assert report.SCHEMA_VERSION == 2
     assert report.STABILITY_STATUSES == ("evaluated", "not_evaluated")
     assert report.FINDING_STATUSES == ("stable", "fragile", "not_evaluable")
     assert report.FINDING_KEYS == (
@@ -267,8 +267,13 @@ def test_require_keys_names_the_document_and_the_missing_keys():
     with pytest.raises(
         ValueError, match=r"^thing has an unsupported schema_version$"
     ):
-        report.require({"schema_version": 2, "a": 1}, ("a",), "thing")
+        report.require({"schema_version": 3, "a": 1}, ("a",), "thing")
+    with pytest.raises(
+        ValueError, match=r"^thing has an unsupported schema_version$"
+    ):
+        report.require({"schema_version": 0, "a": 1}, ("a",), "thing")
     report.require({"schema_version": 1, "a": 1}, ("a",), "thing")
+    report.require({"schema_version": 2, "a": 1}, ("a",), "thing")
 
 
 def valid_stability():
@@ -336,4 +341,4 @@ def test_validate_stability_names_the_report_in_its_errors():
         ValueError,
         match=r"^stability report has an unsupported schema_version$",
     ):
-        report.conform({**good, "schema_version": 2})
+        report.conform({**good, "schema_version": 3})

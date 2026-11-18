@@ -51,7 +51,7 @@ def test_key_covers_every_support_boundary_dimension():
     assert key.to_dict() == {
         "modality": "tabular",
         "task": "binary_classification",
-        "model_family": "tree",
+        "family": "tree",
         "evaluation": "calibrated",
         "uncertainty": "calibrated_probability",
         "fairness": "group_report",
@@ -66,18 +66,18 @@ def test_capability_declaration_serializes_resources_failures_and_evidence():
     assert record.to_dict() == {
         "key": record.key.to_dict(),
         "status": "supported",
-        "required_extras": ["core"],
+        "extras": ["core"],
         "resources": {
-            "cpu_cores": 2,
-            "memory_gb": 4.0,
-            "disk_gb": 1.0,
-            "gpu_required": False,
-            "network_required": False,
-            "max_rows": None,
+            "cpu": 2,
+            "memory": 4.0,
+            "disk": 1.0,
+            "gpu": False,
+            "network": False,
+            "rows": None,
             "notes": ["uses bounded in-memory batches"],
         },
-        "failure_modes": ["missing sensitive columns", "calibration failure"],
-        "evidence_links": ["tests/unit/test_capability_registry.py"],
+        "failures": ["missing sensitive columns", "calibration failure"],
+        "links": ["tests/unit/test_capability_registry.py"],
         "limitations": ["library inference only"],
     }
 
@@ -165,7 +165,7 @@ def test_registry_serialization_is_canonical_across_registration_order():
 
     assert first.canonize() == second.to_json()
     assert json.loads(first.canonize()) == first.to_dict()
-    assert first.to_dict()["schema_version"] == 1
+    assert first.to_dict()["schema_version"] == 2
 
 
 def test_transformer_and_jepa_family_statuses_are_explicit():

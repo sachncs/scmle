@@ -316,7 +316,7 @@ def test_the_calibration_record_lists_its_curve_as_lists():
     assert calibration.to_dict() == {
         "tau": 0.2,
         "epsilon": 0.05,
-        "n_calibration": 40,
+        "calibration": 40,
         "risk_coverage": [[0.1, 0.5, 0.0, 0.1]],
     }
 

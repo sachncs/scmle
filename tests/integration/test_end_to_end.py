@@ -105,7 +105,7 @@ def test_regression_is_ranked_by_lower_rmse(regression_frame, tmp_path):
     )
     board = result.leaderboard()
     succeeded = board[board.status == "ok"]
-    assert board.iloc[0]["score_mean"] == succeeded["score_mean"].min()
+    assert board.iloc[0]["score"] == succeeded["score"].min()
 
 
 def test_csv_input_and_plan_without_side_effects(binary_frame, tmp_path):
@@ -364,7 +364,7 @@ def test_fit_health_is_recorded_for_the_selected_model_and_each_trial(
         "underfit",
         "unstable",
     }
-    assert "train_scores" not in board.columns
+    assert "training" not in board.columns
     assert all(len(t.train_scores) == len(t.fold_scores) for t in result.trials)
 
 

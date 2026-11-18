@@ -22,7 +22,7 @@ def make_item(extract=900.0, source=1000.0, explanations=(), name="rows"):
 def test_constants_and_mechanism_values_are_the_filed_names():
     assert reconciliation.DETECTOR_ID == "f4-reconciliation"
     assert reconciliation.DEFECT_TYPE == "unexplained_gap"
-    assert reconciliation.FORMAT_VERSION == 2
+    assert reconciliation.FORMAT_VERSION == 3
     assert [m.value for m in reconciliation.Mechanism] == [
         "filter",
         "late_arrival",
@@ -96,7 +96,7 @@ def test_an_explained_verdict_serialises_every_field():
         "source": 1000.0,
         "source_name": "finance ledger",
         "gap": pytest.approx(0.1),
-        "residual_gap": 0.0,
+        "residual": 0.0,
         "status": "explained",
         "tier": "attested",
         "explanations": [explanation().to_dict()],
@@ -210,7 +210,7 @@ def test_reconcile_numbers_the_seed_paths_and_reports_the_document():
     ]
     assert result.passed is False
     document = result.to_dict()
-    assert document["format_version"] == 2
+    assert document["format_version"] == 3
     assert document["tolerance"] == 0.05
     assert document["passed"] is False
     assert [r["name"] for r in document["results"]] == ["a", "b"]
