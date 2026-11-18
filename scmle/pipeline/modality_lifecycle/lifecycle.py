@@ -13,6 +13,7 @@ from scmle.contracts import modalities
 from scmle.contracts import performance
 from scmle.governance import attestation
 from scmle.pipeline.modality_lifecycle import checkpoints
+from scmle.pipeline.modality_lifecycle import constants
 from scmle.pipeline.modality_lifecycle import curators
 from scmle.pipeline.modality_lifecycle import explanation
 from scmle.pipeline.modality_lifecycle import plans
@@ -280,13 +281,21 @@ class Lifecycle:
         Returns:
             A modality declaration with the report's stage evidence and
             limitations; its status is extension-only for extension modalities
-            and experimental otherwise.
+            and experimental otherwise, when the limitations also give the
+            reason it is not yet at parity with the tabular path.
         """
+        bespoke = report.modality.startswith("extension:")
+        limitations = tuple(
+            str(value)
+            for value in cast(
+                "Sequence[object]", report.documentation["limitations"]
+            )
+        )
         return modalities.Declaration(
             modality=modalities.restore(report.modality),
             status=(
                 modalities.Status.EXTENSION_ONLY
-                if report.modality.startswith("extension:")
+                if bespoke
                 else modalities.Status.EXPERIMENTAL
             ),
             stage_evidence=report.evidence,
@@ -297,10 +306,7 @@ class Lifecycle:
                 "resource limits exceeded",
                 "package signature or inference parity failure",
             ),
-            limitations=tuple(
-                str(value)
-                for value in cast(
-                    "Sequence[object]", report.documentation["limitations"]
-                )
+            limitations=(
+                limitations if bespoke else (*limitations, constants.SHORTFALL)
             ),
         )

@@ -60,18 +60,7 @@ class Remedy(examination.Examination):
             )
             return pipeline
         split = scmle.pipeline.context.require(context.split, "split")
-        strategy = strategies.lookup(selected.strategy)
-        adapter = context.registry.get(selected.model_name)
-        plan = scmle.pipeline.context.require(
-            context.profile, "profile"
-        ).feature_plan
-        seed = context.spec.validation.seed
-        probabilities, positions = thresholds.heldout(
-            lambda: strategy.build(plan, adapter, task, seed, selected.params),
-            split.dev_features,
-            split.dev_target,
-            split.manifest.folds,
-        )
+        probabilities, positions = self.outfold(context, selected)
         actual = (
             split.dev_target.iloc[positions] == pipeline.classes_[1]
         ).to_numpy()
@@ -103,6 +92,35 @@ class Remedy(examination.Examination):
             return pipeline
         return thresholds.Segmenter(
             pipeline, column, assigner, result.thresholds, base_cut
+        )
+
+    def outfold(
+        self,
+        context: scmle.pipeline.context.Context,
+        selected: experiments.Trial,
+    ) -> tuple[Any, Any]:
+        """Out-of-fold development probabilities of the selected candidate.
+
+        Args:
+            context: The run context, holding the split and feature plan.
+            selected: The selected trial, rebuilt for each fold.
+
+        Returns:
+            The held-out probabilities and the positions they belong to.
+        """
+        split = scmle.pipeline.context.require(context.split, "split")
+        task = scmle.pipeline.context.require(context.task, "task")
+        strategy = strategies.lookup(selected.strategy)
+        adapter = context.registry.get(selected.model_name)
+        plan = scmle.pipeline.context.require(
+            context.profile, "profile"
+        ).feature_plan
+        seed = context.spec.validation.seed
+        return thresholds.heldout(
+            lambda: strategy.build(plan, adapter, task, seed, selected.params),
+            split.dev_features,
+            split.dev_target,
+            split.manifest.folds,
         )
 
     def relearn(

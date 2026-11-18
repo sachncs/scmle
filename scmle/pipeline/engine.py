@@ -8,8 +8,10 @@ order the stages were given).
 moves the state machine only when the stage's state differs from the
 current one, it limits the math-library threads, times the stage, consults
 the reviewers once the last stage of a state has run, and maps a failure to
-the run's terminal state. `Pipeline.advance(until=...)` runs only the stages
-a given stage needs, which is the side-effect-free plan preview.
+the run's terminal state. With an archive it writes each stage's record once
+the stage and its review are done, and the completion marker after the
+completed state. `Pipeline.advance(until=...)` runs only the stages a given
+stage needs, which is the side-effect-free plan preview.
 """
 
 from collections.abc import Callable
@@ -21,6 +23,7 @@ from typing import Protocol
 from typing import TypeVar
 
 from scmle.contracts import errors
+from scmle.pipeline import archive
 import scmle.pipeline.context
 from scmle.runtime import limits
 from scmle.runtime import state
@@ -137,17 +140,23 @@ class Pipeline:
 
     Attributes:
         stages: The stages in execution order.
+        records: Where each finished stage's record and the completion
+            marker are written, or None for a run that keeps none.
         timings: The cost of each stage of the latest run, keyed by the
-            stage's class name; kept in memory only.
+            stage's class name.
     """
 
-    def __init__(self, stages: Sequence[Node]) -> None:
+    def __init__(
+        self, stages: Sequence[Node], records: archive.Directory | None = None
+    ) -> None:
         """Orders the stages.
 
         Args:
             stages: The stages; see `order` for the errors.
+            records: The run's stage records, or None.
         """
         self.stages = order(stages)
+        self.records = records
         self.timings: dict[str, Lap] = {}
 
     def select(self, until: type) -> tuple[Node, ...]:
@@ -198,14 +207,20 @@ class Pipeline:
             started = time.perf_counter()
             with context.regulator.cap():
                 stage.execute(context)
-            self.timings[type(stage).__name__] = Lap(
-                time.perf_counter() - started, limits.peak_memory_gb()
-            )
+            lap = Lap(time.perf_counter() - started, limits.peak_memory_gb())
+            self.timings[type(stage).__name__] = lap
             following = stages[index + 1] if index + 1 < len(stages) else None
             if review is not None and (
                 following is None or following.state is not stage.state
             ):
                 review(stage.state, context)
+            if self.records is not None:
+                self.records.record(
+                    self.stages.index(stage),
+                    type(stage).__name__,
+                    stage.state,
+                    lap.seconds,
+                )
 
     def run(
         self,
@@ -240,6 +255,8 @@ class Pipeline:
             machine.transition(
                 state.Progress.COMPLETED, "run complete", artifacts
             )
+            if self.records is not None:
+                self.records.finish()
         except errors.CancelledError as error:
             found = details()
             error.details.setdefault("run_dir", found["run_dir"])

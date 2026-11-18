@@ -1,6 +1,7 @@
 """Sealing and impounding the locked test rows."""
 
 import hashlib
+from typing import Any
 
 import pandas
 
@@ -162,8 +163,28 @@ class Impounding(exploration.Exploration):
         )
         context.custody = outcome
         context.custody_vault = vault_set
+        self.chronicle(context, path, verified, outcome)
+        return outcome.split
+
+    def chronicle(
+        self,
+        context: scmle.pipeline.context.Context,
+        path: str,
+        verified: Any,
+        outcome: Any,
+    ) -> None:
+        """Writes the charter, error budget, feasibility and split manifest.
+
+        Args:
+            context: The run context that receives the files and the event.
+            path: The charter file.
+            verified: The verified charter and whether it is signed.
+            outcome: The custody outcome of the sealing.
+        """
         context.write_json("analysis_charter.json", contracts.deserialize(path))
-        context.write_json("error_budget.json", charter.budget.to_dict())
+        context.write_json(
+            "error_budget.json", verified.charter.budget.to_dict()
+        )
         context.write_json("feasibility.json", outcome.feasibility.to_dict())
         context.write_json("split_manifest.json", outcome.manifest.to_dict())
         context.emit(
@@ -176,7 +197,7 @@ class Impounding(exploration.Exploration):
                 "custody_log.jsonl",
             ),
             {
-                "charter_hash": charter.charter_hash,
+                "charter_hash": verified.charter.charter_hash,
                 "charter_signed": verified.signed,
                 "manifest_sha256": outcome.manifest.sha256,
                 "scope": outcome.manifest.scope,
@@ -186,7 +207,6 @@ class Impounding(exploration.Exploration):
                 "isolation": dict(outcome.manifest.isolation),
             },
         )
-        return outcome.split
 
     def check_known_entity(
         self,

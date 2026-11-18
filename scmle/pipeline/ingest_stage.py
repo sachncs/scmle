@@ -64,6 +64,7 @@ from scmle.assurance.ingest import profile
 from scmle.assurance.ingest import synthesize
 import scmle.assurance.ingest.plan
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.readers import connectors
 
 MANIFEST = "feature_manifest.json"
@@ -221,8 +222,163 @@ def load(
     )
 
 
+def configure(
+    plan_document: records.Layout, spec: ingest.Ingestion
+) -> tuple[scmle.assurance.ingest.plan.Config, budget.Budget]:
+    """The ingest plan's settings and query budget.
+
+    Args:
+        plan_document: The loaded ingest plan.
+        spec: The charter's ingest settings.
+
+    Returns:
+        The plan settings and the query, scan, time and feature budget.
+    """
+    settings = scmle.assurance.ingest.plan.Config(
+        tables=tuple(plan_document["tables"]),
+        unit=plan_document.get("unit"),
+        target_table=plan_document.get("target_table"),
+        eps_key=spec.tolerances.key,
+        eps_null=spec.tolerances.null,
+        eps_fk=spec.tolerances.link,
+        declared=scmle.assurance.ingest.plan.declarations(
+            plan_document.get("declared", [])
+        ),
+    )
+    limits = budget.Budget(
+        spec.queries,
+        spec.scanned,
+        spec.seconds,
+        spec.features,
+    )
+    return settings, limits
+
+
+def reconcile(
+    entries: list[records.Layout],
+    extracts: list[pandas.DataFrame],
+    spec: ingest.Ingestion,
+    expectation: ingest.Expectation,
+    factory: Any,
+) -> records.Layout:
+    """Checks the extracts against the charter's declared and source totals.
+
+    Args:
+        entries: The plan's view and nest entries.
+        extracts: The table extracted for each entry.
+        spec: The charter's ingest settings.
+        expectation: Their `reconcile` block.
+        factory: Opens a database connection.
+
+    Returns:
+        The reconciliation report, with the source-queried checks.
+    """
+    frames_by_name = {
+        str(entry.get("name", entry["table"])): extract
+        for entry, extract in zip(entries, extracts, strict=True)
+    }
+    tables_by_name = {
+        str(entry.get("name", entry["table"])): identifier(
+            entry["table"], "table"
+        )
+        for entry in entries
+    }
+    report = declared.reconcile(
+        frames_by_name,
+        expectation,
+        spec.reconciliation,
+    )
+    report["source_checks"] = declared.reconcile_source(
+        frames_by_name,
+        tables_by_name,
+        expectation,
+        factory,
+        spec.reconciliation,
+    )
+    report["source_passed"] = all(c["passed"] for c in report["source_checks"])
+    return report
+
+
+def assemble(
+    plan_document: records.Layout,
+    factory: Any,
+    spec: ingest.Ingestion,
+    extracts: list[pandas.DataFrame],
+) -> tuple[list[Any], list[Any], list[Any], list[Any]]:
+    """Builds the as-of views, sources, leaves and nests of the plan.
+
+    Args:
+        plan_document: The loaded ingest plan.
+        factory: Opens a database connection.
+        spec: The charter's ingest settings.
+        extracts: The table extracted for each view, then each nest.
+
+    Returns:
+        The views, their synthesis sources, the nest leaves and the nests.
+    """
+    count = len(plan_document["views"])
+    views = [
+        load(v, factory, spec, extract)
+        for v, extract in zip(
+            plan_document["views"], extracts[:count], strict=True
+        )
+    ]
+    sources = [
+        synthesize.Source(
+            view,
+            entry.get("target_key", entry["key"]),
+            entry.get("role", synthesize.CHILD),
+        )
+        for view, entry in zip(views, plan_document["views"], strict=True)
+    ]
+    leaves = [
+        load(n, factory, spec, extract)
+        for n, extract in zip(
+            plan_document.get("nests", []), extracts[count:], strict=True
+        )
+    ]
+    nests = [
+        synthesize.Nest(sources[n["mid"]], leaf, n["mid_id"])
+        for leaf, n in zip(leaves, plan_document.get("nests", []), strict=True)
+    ]
+    return views, sources, leaves, nests
+
+
+def deliver(
+    found: Any, table: Any, report: records.Layout | None, summary: Any
+) -> Output:
+    """Packs the synthesized features with the documents that describe them.
+
+    Args:
+        found: The synthesis result.
+        table: Its field provenance.
+        report: The reconciliation report, or None.
+        summary: The ingest plan's summary.
+
+    Returns:
+        The ingest output.
+    """
+    documents = {
+        MANIFEST: found.to_dict(),
+        PROVENANCE: table.to_dict(),
+    }
+    if report is not None:
+        documents[declared.FILE] = report
+    return Output(
+        found.frame,
+        found.declared_family_size,
+        table.fields,
+        documents,
+        {
+            **summary,
+            "declared_family_size": found.declared_family_size,
+            "proposed": len(found.manifest),
+        },
+    )
+
+
 def run(
-    plan_document: dict[str, Any],
+    plan_document: records.Layout,
     spec: ingest.Ingestion,
     frame: pandas.DataFrame,
     run_dir: Path | None,
@@ -253,23 +409,7 @@ def run(
     if missing:
         raise errors.ConfigError(f"ingest plan names columns {missing} absent")
     factory = scmle.assurance.ingest.plan.opener(plan_document["database"])
-    settings = scmle.assurance.ingest.plan.Config(
-        tables=tuple(plan_document["tables"]),
-        unit=plan_document.get("unit"),
-        target_table=plan_document.get("target_table"),
-        eps_key=spec.tolerances.key,
-        eps_null=spec.tolerances.null,
-        eps_fk=spec.tolerances.link,
-        declared=scmle.assurance.ingest.plan.declarations(
-            plan_document.get("declared", [])
-        ),
-    )
-    limits = budget.Budget(
-        spec.queries,
-        spec.scanned,
-        spec.seconds,
-        spec.features,
-    )
+    settings, limits = configure(plan_document, spec)
     with tempfile.TemporaryDirectory() as scratch:
         folder = run_dir if run_dir is not None else Path(scratch)
         plan = scmle.assurance.ingest.plan.Plan(
@@ -287,57 +427,11 @@ def run(
     extracts = [read_frame(entry, factory) for entry in entries]
     report = None
     if spec.reconcile is not None:
-        frames_by_name = {
-            str(entry.get("name", entry["table"])): extract
-            for entry, extract in zip(entries, extracts, strict=True)
-        }
-        tables_by_name = {
-            str(entry.get("name", entry["table"])): identifier(
-                entry["table"], "table"
-            )
-            for entry in entries
-        }
-        report = declared.reconcile(
-            frames_by_name,
-            spec.reconcile,
-            spec.reconciliation,
-        )
-        report["source_checks"] = declared.reconcile_source(
-            frames_by_name,
-            tables_by_name,
-            spec.reconcile,
-            factory,
-            spec.reconciliation,
-        )
-        report["source_passed"] = all(
-            c["passed"] for c in report["source_checks"]
-        )
+        report = reconcile(entries, extracts, spec, spec.reconcile, factory)
         declared.require(report)
-    count = len(plan_document["views"])
-    views = [
-        load(v, factory, spec, extract)
-        for v, extract in zip(
-            plan_document["views"], extracts[:count], strict=True
-        )
-    ]
-    sources = [
-        synthesize.Source(
-            view,
-            entry.get("target_key", entry["key"]),
-            entry.get("role", synthesize.CHILD),
-        )
-        for view, entry in zip(views, plan_document["views"], strict=True)
-    ]
-    leaves = [
-        load(n, factory, spec, extract)
-        for n, extract in zip(
-            plan_document.get("nests", []), extracts[count:], strict=True
-        )
-    ]
-    nests = [
-        synthesize.Nest(sources[n["mid"]], leaf, n["mid_id"])
-        for leaf, n in zip(leaves, plan_document.get("nests", []), strict=True)
-    ]
+    views, sources, leaves, nests = assemble(
+        plan_document, factory, spec, extracts
+    )
     targets = frame[[key, moment]].reset_index(drop=True)
     found = synthesize.synthesize(
         targets,
@@ -350,23 +444,7 @@ def run(
         strict=spec.strict,
     )
     table = synthesize.lineage(found, spec.lag, [*views, *leaves])
-    documents = {
-        MANIFEST: found.to_dict(),
-        PROVENANCE: table.to_dict(),
-    }
-    if report is not None:
-        documents[declared.FILE] = report
-    return Output(
-        found.frame,
-        found.declared_family_size,
-        table.fields,
-        documents,
-        {
-            **summary,
-            "declared_family_size": found.declared_family_size,
-            "proposed": len(found.manifest),
-        },
-    )
+    return deliver(found, table, report, summary)
 
 
 def resolve_entities(

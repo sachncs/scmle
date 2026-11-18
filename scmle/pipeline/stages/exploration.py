@@ -97,7 +97,6 @@ class Exploration(admission.Admission):
         charter = verified.charter
         data = spec.data
         view = outcome.view
-        run_dir = context.store.directory if context.store is not None else None
         structure = tuple(
             c
             for c in (data.group_column, data.time_column, data.baseline_column)
@@ -120,12 +119,60 @@ class Exploration(admission.Admission):
             context, task, charter, view, structure, signed=verified.signed
         )
         causal = self.hypothesise(context, charter, view, graph, found)
-        explored = governed.scout(
+        explored = self.explore(
+            context, task, charter, (structure, found, stage)
+        )
+        pending = Escrow(
+            explored,
+            task,
+            charter,
+            view,
+            structure,
+            graph,
+            found,
+            stage,
+            verified.signed,
+            baseline,
+            causal,
+            holds_for_coverage=scoring.coverage_on_confirmation(charter, task),
+        )
+        if self.defer(context, pending):
+            return
+        self.conclude(context, pending)
+
+    def explore(
+        self,
+        context: scmle.pipeline.context.Context,
+        task: tasks.Task,
+        charter: Any,
+        setting: tuple[tuple[str, ...], Any, prefilter.Prefilter],
+    ) -> Any:
+        """Explores the exploration view under the charter's claim ledger.
+
+        Args:
+            context: The run context, holding the custody outcome.
+            task: The resolved task.
+            charter: The verified charter.
+            setting: The structure columns, the qualification findings (its
+                quarantined columns are kept out too) and the second-stage
+                stability prefilter.
+
+        Returns:
+            The exploration, its ledger and its survivors.
+        """
+        structure, found, stage = setting
+        spec = context.spec
+        data = spec.data
+        view = scmle.pipeline.context.require(context.custody, "custody").view
+        rules = charter.rules
+        return governed.scout(
             charter=charter,
             features=view.features,
             target=view.target,
             classification=task.is_classification,
-            run_dir=run_dir,
+            run_dir=context.store.directory
+            if context.store is not None
+            else None,
             exclude=structure + tuple(found.quarantined),
             strata=governed.strata_labels(
                 view.features, data.group_column, data.time_column
@@ -145,20 +192,21 @@ class Exploration(admission.Admission):
             diagnostics=found.checks,
             second_stage=stage,
         )
-        pending = Escrow(
-            explored,
-            task,
-            charter,
-            view,
-            structure,
-            graph,
-            found,
-            stage,
-            verified.signed,
-            baseline,
-            causal,
-            holds_for_coverage=scoring.coverage_on_confirmation(charter, task),
-        )
+
+    def defer(
+        self, context: scmle.pipeline.context.Context, pending: "Escrow"
+    ) -> bool:
+        """Keeps the confirmation sealed until the model is frozen, if needed.
+
+        Args:
+            context: The run context; receives the pending ledger.
+            pending: The explored ledger awaiting confirmation.
+
+        Returns:
+            Whether the confirmation waits: the baseline claim is about the
+            selected model, or the coverage claim needs the calibrated model.
+        """
+        data = context.spec.data
         selected = bool(
             data.baseline_column and data.baseline_subject == "selected_model"
         )
@@ -175,8 +223,8 @@ class Exploration(admission.Admission):
                     "claim can be about that model"
                 ),
             )
-            return
-        self.conclude(context, pending)
+            return True
+        return False
 
     def conclude(
         self,

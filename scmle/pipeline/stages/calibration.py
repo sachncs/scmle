@@ -20,6 +20,17 @@ from scmle.pipeline.stages import documentation
 from scmle.preparation import strategies
 from scmle.runtime import randomness
 
+MARGINLESS = (
+    tasks.Task.SURVIVAL,
+    tasks.Task.ORDINAL,
+    tasks.Task.RANKING,
+    tasks.Task.MULTILABEL,
+    tasks.Task.MULTIOUTPUT,
+    tasks.Task.FORECAST,
+    tasks.Task.UPLIFT,
+)
+"""Tasks without a conformal margin: it needs point predictions or labels."""
+
 
 class Calibration(documentation.Documentation):
     """Prediction intervals and sets calibrated from out-of-fold predictions.
@@ -68,63 +79,18 @@ class Calibration(documentation.Documentation):
             time budget is spent or too few held-out rows exist.
         """
         task = scmle.pipeline.context.require(context.task, "task")
-        if task in (
-            tasks.Task.SURVIVAL,
-            tasks.Task.ORDINAL,
-            tasks.Task.RANKING,
-            tasks.Task.MULTILABEL,
-            tasks.Task.MULTIOUTPUT,
-            tasks.Task.FORECAST,
-            tasks.Task.UPLIFT,
-        ):
-            return None  # Conformal margins need point predictions or labels.
+        if task in MARGINLESS:
+            return None
         reason = cost.halt(context, selected, "conformal calibration")
         if reason:
             self.waive(context, reason)
             return None
-        split = scmle.pipeline.context.require(context.split, "split")
-        template = strategies.lookup(selected.strategy).build(
-            scmle.pipeline.context.require(
-                context.profile, "profile"
-            ).feature_plan,
-            context.registry.get(selected.model_name),
-            task,
-            context.spec.validation.seed,
-            selected.params,
-        )
-        held_labels: list[Any] = []
-        held_scores: list[Any] = []
-        held_entities: list[Any] = []
-        fold_models: list[Any] = []
         classes = list(bundle.classes or ())
         entity_column = self.grouping(context)
-        for fit_positions, evaluate_positions in split.manifest.folds:
-            reason = cost.halt(context, selected, "conformal calibration")
-            if reason:
-                self.waive(context, reason)
-                return None
-            fit = numpy.asarray(fit_positions)
-            evaluate = numpy.asarray(evaluate_positions)
-            candidate = cast(
-                "scmle.contracts.models.Estimator", base.clone(template)
-            ).fit(split.dev_features.iloc[fit], split.dev_target.iloc[fit])
-            rows = split.dev_features.iloc[evaluate]
-            held_labels.extend(split.dev_target.iloc[evaluate])
-            if entity_column is not None:
-                held_entities.extend(rows[entity_column].astype(str))
-            if task is tasks.Task.REGRESSION:
-                held_scores.extend(candidate.predict(rows))
-                fold_models.append(candidate)
-                continue
-            known = list(candidate.classes_)
-            probabilities = candidate.predict_proba(rows)
-            held_scores.extend(
-                [
-                    probabilities[i, known.index(c)] if c in known else 0.0
-                    for c in classes
-                ]
-                for i in range(len(rows))
-            )
+        held = self.holdout(context, selected, classes, entity_column)
+        if held is None:
+            return None
+        held_labels, held_scores, held_entities, fold_models = held
         if entity_column is not None:
             chosen = conformal.representatives(
                 held_entities,
@@ -163,6 +129,72 @@ class Calibration(documentation.Documentation):
         return conformal.ConformalCalibrator.classify(
             held_labels, numpy.asarray(held_scores), classes
         )
+
+    def holdout(
+        self,
+        context: scmle.pipeline.context.Context,
+        selected: experiments.Trial,
+        classes: list[Any],
+        entity_column: str | None,
+    ) -> tuple[list[Any], list[Any], list[Any], list[Any]] | None:
+        """Scores each fold's held-out rows with a model refit without them.
+
+        Args:
+            context: The run context, holding the split, budget and charter.
+            selected: The selected trial, rebuilt for each fold; the budget
+                is checked before each fold.
+            classes: The bundle's classes, in order (empty for regression).
+            entity_column: The entity column when calibration is entity-wise,
+                else None.
+
+        Returns:
+            The held-out labels, scores (predictions, or class probabilities
+            in `classes` order), entities and, for regression, the fold
+            models; None when the time budget ran out (recorded).
+        """
+        held_labels: list[Any] = []
+        held_scores: list[Any] = []
+        held_entities: list[Any] = []
+        fold_models: list[Any] = []
+        task = scmle.pipeline.context.require(context.task, "task")
+        split = scmle.pipeline.context.require(context.split, "split")
+        template = strategies.lookup(selected.strategy).build(
+            scmle.pipeline.context.require(
+                context.profile, "profile"
+            ).feature_plan,
+            context.registry.get(selected.model_name),
+            task,
+            context.spec.validation.seed,
+            selected.params,
+        )
+        for fit_positions, evaluate_positions in split.manifest.folds:
+            reason = cost.halt(context, selected, "conformal calibration")
+            if reason:
+                self.waive(context, reason)
+                return None
+            fit = numpy.asarray(fit_positions)
+            evaluate = numpy.asarray(evaluate_positions)
+            candidate = cast(
+                "scmle.contracts.models.Estimator", base.clone(template)
+            ).fit(split.dev_features.iloc[fit], split.dev_target.iloc[fit])
+            rows = split.dev_features.iloc[evaluate]
+            held_labels.extend(split.dev_target.iloc[evaluate])
+            if entity_column is not None:
+                held_entities.extend(rows[entity_column].astype(str))
+            if task is tasks.Task.REGRESSION:
+                held_scores.extend(candidate.predict(rows))
+                fold_models.append(candidate)
+                continue
+            known = list(candidate.classes_)
+            probabilities = candidate.predict_proba(rows)
+            held_scores.extend(
+                [
+                    probabilities[i, known.index(c)] if c in known else 0.0
+                    for c in classes
+                ]
+                for i in range(len(rows))
+            )
+        return held_labels, held_scores, held_entities, fold_models
 
     def grouping(self, context: scmle.pipeline.context.Context) -> str | None:
         """Returns the group column when the charter's unit is a new entity.

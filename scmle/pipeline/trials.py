@@ -149,6 +149,57 @@ def weigh(
     return {"sample_weight": values}
 
 
+def crossfit(
+    payload: Payload, pipeline: Any, result: experiments.Trial
+) -> tuple[list[Any], list[Any]]:
+    """Fits a clone of the pipeline on each fold and scores it.
+
+    Args:
+        payload: The job, its data and folds.
+        pipeline: The unfitted candidate pipeline.
+        result: The trial; gains the rows each fold fitted and evaluated.
+
+    Returns:
+        The raw held-out scores and the raw training scores (on at most
+        `TRAIN_SCORE_ROWS` fitted rows), one per fold.
+    """
+    scorer = payload.metric.scorer(payload.positive_label)
+    raw_scores = []
+    raw_train_scores = []
+    with threadpoolctl.threadpool_limits(limits=payload.threadcap):
+        for fit_list, evaluate_list in payload.folds[: payload.job.fold_count]:
+            fit = numpy.asarray(fit_list)
+            evaluate = numpy.asarray(evaluate_list)
+            candidate = cast("models.Estimator", base.clone(pipeline))
+            candidate.fit(payload.features.iloc[fit], payload.target.iloc[fit])
+            sample = fit[:TRAIN_SCORE_ROWS]
+            raw_scores.append(
+                scorer(
+                    candidate,
+                    payload.features.iloc[evaluate],
+                    payload.target.iloc[evaluate],
+                    **weigh(payload, evaluate),
+                )
+            )
+            raw_train_scores.append(
+                scorer(
+                    candidate,
+                    payload.features.iloc[sample],
+                    payload.target.iloc[sample],
+                    **weigh(payload, sample),
+                )
+            )
+            result.observed_access.append(
+                {
+                    "fit": summarise(payload.features.index.take(fit)),
+                    "evaluate": summarise(
+                        payload.features.index.take(evaluate)
+                    ),
+                }
+            )
+    return raw_scores, raw_train_scores
+
+
 def evaluate_payload(payload: Payload) -> experiments.Trial:
     """Cross-validates one job; never raises for model failures.
 
@@ -185,42 +236,7 @@ def evaluate_payload(payload: Payload) -> experiments.Trial:
             payload.seed,
             job.params,
         )
-        scorer = metric.scorer(payload.positive_label)
-        raw_scores = []
-        raw_train_scores = []
-        with threadpoolctl.threadpool_limits(limits=payload.threadcap):
-            for fit_list, evaluate_list in folds:
-                fit = numpy.asarray(fit_list)
-                evaluate = numpy.asarray(evaluate_list)
-                candidate = cast("models.Estimator", base.clone(pipeline))
-                candidate.fit(
-                    payload.features.iloc[fit], payload.target.iloc[fit]
-                )
-                sample = fit[:TRAIN_SCORE_ROWS]
-                raw_scores.append(
-                    scorer(
-                        candidate,
-                        payload.features.iloc[evaluate],
-                        payload.target.iloc[evaluate],
-                        **weigh(payload, evaluate),
-                    )
-                )
-                raw_train_scores.append(
-                    scorer(
-                        candidate,
-                        payload.features.iloc[sample],
-                        payload.target.iloc[sample],
-                        **weigh(payload, sample),
-                    )
-                )
-                result.observed_access.append(
-                    {
-                        "fit": summarise(payload.features.index.take(fit)),
-                        "evaluate": summarise(
-                            payload.features.index.take(evaluate)
-                        ),
-                    }
-                )
+        raw_scores, raw_train_scores = crossfit(payload, pipeline, result)
         scores = [metric.naturalise(float(s)) for s in raw_scores]
         result.fold_scores = scores
         result.train_scores = [

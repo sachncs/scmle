@@ -18,6 +18,7 @@ from sklearn import linear_model
 from sklearn import model_selection
 from sklearn import pipeline
 
+from scmle.contracts import records
 from scmle.contracts import tasks
 import scmle.contracts.data
 from scmle.data import reference
@@ -246,13 +247,89 @@ def affordable(columns: int, classes: int, allowance: float) -> int:
     return min(DIFFICULTY_ROWS, int(spare / per * (1 + 1e-9)))
 
 
+def contenders(task: tasks.Task) -> tuple[str, records.Layout]:
+    """The difficulty baselines of a task and the score they are compared on.
+
+    Args:
+        task: Resolved task type.
+
+    Returns:
+        The scoring name and the constant, linear and non-linear estimators.
+    """
+    if task.is_classification:
+        scoring = (
+            "roc_auc" if task is tasks.Task.BINARY else ("balanced_accuracy")
+        )
+        estimators = {
+            "constant": dummy.DummyClassifier(strategy="prior"),
+            "linear": linear_model.LogisticRegression(max_iter=300),
+            "nonlinear": ensemble.HistGradientBoostingClassifier(
+                max_iter=60, random_state=0
+            ),
+        }
+    else:
+        scoring = "r2"
+        estimators = {
+            "constant": dummy.DummyRegressor(),
+            "linear": linear_model.Ridge(),
+            "nonlinear": ensemble.HistGradientBoostingRegressor(
+                max_iter=60, random_state=0
+            ),
+        }
+    return scoring, estimators
+
+
+def crossval(
+    estimators: records.Layout,
+    plan: scmle.contracts.data.Blueprint,
+    features: pandas.DataFrame,
+    target: pandas.Series,
+    scoring: str,
+) -> dict[str, float] | str:
+    """Cross-validates each baseline behind the standard preprocessing.
+
+    Args:
+        estimators: The baselines by name.
+        plan: Feature plan.
+        features: The sampled features.
+        target: The sampled target.
+        scoring: The scoring name.
+
+    Returns:
+        The mean finite score of each baseline, or the reason one could not
+        be scored.
+    """
+    options = scmle.contracts.data.Preprocessing(scale=True)
+    scores: dict[str, float] = {}
+    try:
+        for name, estimator in estimators.items():
+            model = pipeline.Pipeline(
+                [
+                    ("prep", preprocessing.build_preprocessor(plan, options)),
+                    ("model", estimator),
+                ]
+            )
+            result = model_selection.cross_val_score(
+                model, features, target, cv=DIFFICULTY_FOLDS, scoring=scoring
+            )
+            finite = numpy.asarray(result, dtype=float)
+            finite = finite[numpy.isfinite(finite)]
+            if not finite.size:
+                return f"{name} baseline produced no finite scores"
+            scores[name] = float(numpy.mean(finite))
+    except ValueError as error:
+        # handled: the caller reports it as available False with reason
+        return str(error)[:200]
+    return scores
+
+
 def ml_difficulty(
     frame: pandas.DataFrame,
     spec: tasks.Config,
     task: tasks.Task,
     plan: scmle.contracts.data.Blueprint,
     allowance: float | None = None,
-) -> dict[str, Any]:
+) -> records.Layout:
     """Runs cheap baselines that show how hard the problem looks.
 
     A few-second cross-validation on a subsample compares a constant predictor,
@@ -301,51 +378,11 @@ def ml_difficulty(
         sample = sample.sample(limit, random_state=0)
     features = sample[list(plan.features)]
     target = sample[spec.data.target]
-    if task.is_classification:
-        scoring = (
-            "roc_auc" if task is tasks.Task.BINARY else ("balanced_accuracy")
-        )
-        estimators = {
-            "constant": dummy.DummyClassifier(strategy="prior"),
-            "linear": linear_model.LogisticRegression(max_iter=300),
-            "nonlinear": ensemble.HistGradientBoostingClassifier(
-                max_iter=60, random_state=0
-            ),
-        }
-    else:
-        scoring = "r2"
-        estimators = {
-            "constant": dummy.DummyRegressor(),
-            "linear": linear_model.Ridge(),
-            "nonlinear": ensemble.HistGradientBoostingRegressor(
-                max_iter=60, random_state=0
-            ),
-        }
-    options = scmle.contracts.data.Preprocessing(scale=True)
-    scores: dict[str, float] = {}
+    scoring, estimators = contenders(task)
     started = time.monotonic()
-    try:
-        for name, estimator in estimators.items():
-            model = pipeline.Pipeline(
-                [
-                    ("prep", preprocessing.build_preprocessor(plan, options)),
-                    ("model", estimator),
-                ]
-            )
-            result = model_selection.cross_val_score(
-                model, features, target, cv=DIFFICULTY_FOLDS, scoring=scoring
-            )
-            finite = numpy.asarray(result, dtype=float)
-            finite = finite[numpy.isfinite(finite)]
-            if not finite.size:
-                return {
-                    "available": False,
-                    "reason": f"{name} baseline produced no finite scores",
-                }
-            scores[name] = float(numpy.mean(finite))
-    except ValueError as error:
-        # handled: returned available False with reason
-        return {"available": False, "reason": str(error)[:200]}
+    scores = crossval(estimators, plan, features, target, scoring)
+    if isinstance(scores, str):
+        return {"available": False, "reason": scores}
     gain = scores["nonlinear"] - scores["linear"]
     return {
         "available": True,
@@ -396,18 +433,167 @@ def structure(frame: pandas.DataFrame, spec: tasks.Config) -> dict[str, Any]:
     return result
 
 
+def tally(
+    frame: pandas.DataFrame,
+    spec: tasks.Config,
+    plan: scmle.contracts.data.Blueprint,
+    column_statistics: dict[str, records.Layout],
+) -> dict[str, int]:
+    """Counts the columns of each kind.
+
+    Args:
+        frame: The dataset.
+        spec: Project specification, naming the id columns.
+        plan: Feature plan.
+        column_statistics: Per-column statistics.
+
+    Returns:
+        The numeric, categorical, datetime, text-like and id-like counts.
+    """
+    kinds = {
+        kind: sum(1 for s in column_statistics.values() if s["kind"] == kind)
+        for kind in ("numeric", "categorical", "datetime")
+    }
+    kinds["text_like"] = len(texts(frame, plan))
+    kinds["id_like"] = sum(
+        1 for reason in plan.dropped.values() if reason.startswith("id-like")
+    ) + len(spec.data.id_columns)
+    return kinds
+
+
+def aim(target: pandas.Series, task: tasks.Task) -> records.Layout:
+    """Describes the target: its classes, or its skew and outliers.
+
+    Args:
+        target: The target column.
+        task: Resolved task type.
+
+    Returns:
+        The cardinality, with the entropy, rarest class count and imbalance
+        ratio for classification, else the skew and outlier rate.
+    """
+    target_block: records.Layout = {"cardinality": int(target.nunique())}
+    if task.is_classification:
+        counts = target.value_counts()
+        target_block |= {
+            "entropy_bits": columns.entropy(target),
+            "min_class_count": int(counts.min()),
+            "imbalance_ratio": float(counts.iloc[0] / counts.iloc[-1]),
+        }
+    else:
+        values = target.astype(float)
+        target_block |= {
+            "skew": float(numpy.nan_to_num(values.agg("skew"))),
+            "outlier_rate": columns.outlier_rate(values),
+        }
+    return target_block
+
+
+def characterise(
+    frame: pandas.DataFrame,
+    plan: scmle.contracts.data.Blueprint,
+    column_statistics: dict[str, records.Layout],
+) -> records.Layout:
+    """Summarises the feature columns.
+
+    Args:
+        frame: The dataset.
+        plan: Feature plan.
+        column_statistics: Per-column statistics.
+
+    Returns:
+        The largest categorical cardinality, the mean numeric outlier rate,
+        the orders of magnitude of the numeric scales and the mean
+        categorical entropy.
+    """
+    return {
+        "max_cardinality": max(
+            (column_statistics[c]["n_unique"] for c in plan.categorical),
+            default=0,
+        ),
+        "mean_outlier_rate": float(
+            numpy.mean(
+                [
+                    column_statistics[c].get("outlier_rate", 0.0)
+                    for c in plan.numeric
+                ]
+            )
+        )
+        if plan.numeric
+        else 0.0,
+        "scale_orders_of_magnitude": magnitudes(frame, plan.numeric),
+        "mean_categorical_entropy_bits": float(
+            numpy.mean(
+                [column_statistics[c]["entropy_bits"] for c in plan.categorical]
+            )
+        )
+        if plan.categorical
+        else 0.0,
+    }
+
+
+def absence(features: pandas.DataFrame) -> records.Layout:
+    """Summarises the missing values of the feature columns.
+
+    Args:
+        features: The feature columns.
+
+    Returns:
+        The overall missing rate, the columns and share of rows with a
+        missing value, and the missingness patterns.
+    """
+    missing = features.isna()
+    return {
+        "overall_rate": float(missing.to_numpy().mean())
+        if missing.size
+        else 0.0,
+        "columns_with_missing": int(missing.any().sum()),
+        "rows_with_any_missing": float(missing.any(axis=1).mean())
+        if missing.size
+        else 0.0,
+        "patterns": summarise(features),
+    }
+
+
+def relate(
+    frame: pandas.DataFrame,
+    plan: scmle.contracts.data.Blueprint,
+    column_statistics: dict[str, records.Layout],
+) -> records.Layout:
+    """Summarises how the columns relate to each other and to the target.
+
+    Args:
+        frame: The dataset.
+        plan: Feature plan.
+        column_statistics: Per-column statistics.
+
+    Returns:
+        The redundant numeric pairs and the largest target association.
+    """
+    return {
+        "redundant_numeric_pairs": redundant(frame, plan.numeric),
+        "max_target_association": max(
+            (
+                s.get("target_association", 0.0)
+                for s in column_statistics.values()
+            ),
+            default=0.0,
+        ),
+    }
+
+
 def imprint(
     frame: pandas.DataFrame,
     spec: tasks.Config,
     task: tasks.Task,
     plan: scmle.contracts.data.Blueprint,
-    column_statistics: dict[str, dict[str, Any]],
+    column_statistics: dict[str, records.Layout],
     duplicate_rows: int,
     read_seconds: float,
     leakage_flags: int,
     total_rows: int | None = None,
     allowance: float | None = None,
-) -> dict[str, Any]:
+) -> records.Layout:
     """Assembles the dataset-level fingerprint.
 
     Args:
@@ -436,29 +622,8 @@ def imprint(
         if numeric.size
         else 0.0
     )
-    missing = features.isna()
-    kinds = {
-        kind: sum(1 for s in column_statistics.values() if s["kind"] == kind)
-        for kind in ("numeric", "categorical", "datetime")
-    }
-    kinds["text_like"] = len(texts(frame, plan))
-    kinds["id_like"] = sum(
-        1 for reason in plan.dropped.values() if reason.startswith("id-like")
-    ) + len(spec.data.id_columns)
-    target_block: dict[str, Any] = {"cardinality": int(target.nunique())}
-    if task.is_classification:
-        counts = target.value_counts()
-        target_block |= {
-            "entropy_bits": columns.entropy(target),
-            "min_class_count": int(counts.min()),
-            "imbalance_ratio": float(counts.iloc[0] / counts.iloc[-1]),
-        }
-    else:
-        values = target.astype(float)
-        target_block |= {
-            "skew": float(numpy.nan_to_num(values.agg("skew"))),
-            "outlier_rate": columns.outlier_rate(values),
-        }
+    kinds = tally(frame, spec, plan, column_statistics)
+    target_block = aim(target, task)
     return {
         "shape": {
             "rows": len(frame),
@@ -468,54 +633,10 @@ def imprint(
             "sparsity": zero_share,
         },
         "types": kinds,
-        "missingness": {
-            "overall_rate": float(missing.to_numpy().mean())
-            if missing.size
-            else 0.0,
-            "columns_with_missing": int(missing.any().sum()),
-            "rows_with_any_missing": float(missing.any(axis=1).mean())
-            if missing.size
-            else 0.0,
-            "patterns": summarise(features),
-        },
+        "missingness": absence(features),
         "target": target_block,
-        "features": {
-            "max_cardinality": max(
-                (column_statistics[c]["n_unique"] for c in plan.categorical),
-                default=0,
-            ),
-            "mean_outlier_rate": float(
-                numpy.mean(
-                    [
-                        column_statistics[c].get("outlier_rate", 0.0)
-                        for c in plan.numeric
-                    ]
-                )
-            )
-            if plan.numeric
-            else 0.0,
-            "scale_orders_of_magnitude": magnitudes(frame, plan.numeric),
-            "mean_categorical_entropy_bits": float(
-                numpy.mean(
-                    [
-                        column_statistics[c]["entropy_bits"]
-                        for c in plan.categorical
-                    ]
-                )
-            )
-            if plan.categorical
-            else 0.0,
-        },
-        "relationships": {
-            "redundant_numeric_pairs": redundant(frame, plan.numeric),
-            "max_target_association": max(
-                (
-                    s.get("target_association", 0.0)
-                    for s in column_statistics.values()
-                ),
-                default=0.0,
-            ),
-        },
+        "features": characterise(frame, plan, column_statistics),
+        "relationships": relate(frame, plan, column_statistics),
         "ml_difficulty": ml_difficulty(frame, spec, task, plan, allowance),
         "structure": structure(frame, spec),
         "quality": {

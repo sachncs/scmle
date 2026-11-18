@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 import scmle.artifacts.bundle
+from scmle.contracts import records
 from scmle.contracts import signing
 import scmle.contracts.evaluation
 import scmle.contracts.evidence
@@ -123,22 +124,7 @@ class Releasing(interface.Stage):
             context.spec.problem.success_criteria,
         )
         if policy is None:
-            record = {
-                "status": "policy_not_declared",
-                "passed": False,
-                "blocked": True,
-                "blocking_reasons": [
-                    (
-                        "no explicit success criteria were declared; release "
-                        "thresholds were not invented from observed metrics"
-                    ),
-                ],
-                "findings": [],
-            }
-            evaluation["release_policy"] = None
-            evaluation["release_evaluation"] = record
-            evaluation["release_evidence"] = {"records": [], "ready": False}
-            store.write_json("release_evaluation.json", record)
+            self.abstain(store, evaluation)
             return
 
         evidence_index = self.evidence_index(context, store, policy)
@@ -159,26 +145,7 @@ class Releasing(interface.Stage):
             evidence_index,
         )
         outcome = release.faults(outcome, evaluation.get("reliability_plan"))
-        verification = False
-        try:
-            release_attestation = attestation.Attestation.from_dict(
-                evaluation["release_attestation"]
-            )
-            verification = release_attestation.verify(
-                evaluation["provenance"],
-                evaluation["sbom"],
-                signing_key=signing.keying(None),
-            )
-        except (KeyError, TypeError, ValueError) as error:
-            # handled: verification=False fed to attestation gate, which
-            # blocks; the reason is logged, not discarded (ERR-4)
-            LOGGER.warning(
-                "release attestation could not be checked (%s: %s); the "
-                "release is blocked",
-                type(error).__name__,
-                error,
-            )
-            verification = False
+        verification = self.vouch(evaluation)
         outcome = release.certify(
             outcome, evaluation.get("release_attestation"), verification
         )
@@ -196,3 +163,57 @@ class Releasing(interface.Stage):
         )
         store.write_json("release_evidence.json", evidence_index.to_dict())
         store.write_json("release_evaluation.json", outcome.to_dict())
+
+    def abstain(self, store: Any, evaluation: records.Layout) -> None:
+        """Records a release blocked because no success criteria were declared.
+
+        Args:
+            store: The run store receiving `release_evaluation.json`.
+            evaluation: The evaluation document; gains empty release entries.
+        """
+        record = {
+            "status": "policy_not_declared",
+            "passed": False,
+            "blocked": True,
+            "blocking_reasons": [
+                (
+                    "no explicit success criteria were declared; release "
+                    "thresholds were not invented from observed metrics"
+                ),
+            ],
+            "findings": [],
+        }
+        evaluation["release_policy"] = None
+        evaluation["release_evaluation"] = record
+        evaluation["release_evidence"] = {"records": [], "ready": False}
+        store.write_json("release_evaluation.json", record)
+
+    def vouch(self, evaluation: records.Layout) -> bool:
+        """Verifies the release attestation against the provenance and SBOM.
+
+        Args:
+            evaluation: The evaluation document holding the attestation,
+                provenance and SBOM.
+
+        Returns:
+            Whether the attestation verifies; False when it cannot be read.
+        """
+        try:
+            release_attestation = attestation.Attestation.from_dict(
+                evaluation["release_attestation"]
+            )
+            return release_attestation.verify(
+                evaluation["provenance"],
+                evaluation["sbom"],
+                signing_key=signing.keying(None),
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            # handled: verification=False fed to attestation gate, which
+            # blocks; the reason is logged, not discarded (ERR-4)
+            LOGGER.warning(
+                "release attestation could not be checked (%s: %s); the "
+                "release is blocked",
+                type(error).__name__,
+                error,
+            )
+            return False

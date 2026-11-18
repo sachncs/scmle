@@ -193,6 +193,55 @@ def experimental_tabular_capability(
     )
 
 
+EXPERIMENTAL = (
+    (
+        capabilities.ModelFamily.TRANSFORMER.value,
+        (
+            ("torch runtime or tabular transformer adapter is unavailable"),
+            "numeric feature-token training or evaluation fails",
+            ("resource limits or experimental evidence are incomplete"),
+        ),
+        (
+            "tests/integration/test_capability_gate.py",
+            "tests/unit/test_deeplearning.py",
+        ),
+        (
+            "experimental tabular FT-Transformer only",
+            "requires explicit models.experimental_models opt-in",
+            ("not a text, image, audio, video, or multimodal transformer"),
+            "no production support guarantee",
+        ),
+    ),
+    (
+        capabilities.ModelFamily.JEPA.value,
+        (
+            "torch runtime or tabular JEPA adapter is unavailable",
+            (
+                "numeric representation training or downstream "
+                "head evaluation fails"
+            ),
+            ("resource limits or experimental evidence are incomplete"),
+        ),
+        (
+            "tests/integration/test_capability_gate.py",
+            "tests/integration/test_experimental_models.py",
+            "tests/unit/test_jepa_contract.py",
+        ),
+        (
+            (
+                "experimental tabular numeric representation plus "
+                "supervised head only"
+            ),
+            "requires explicit models.experimental_models opt-in",
+            ("not a text, image, audio, video, graph, or multimodal JEPA"),
+            "no production support guarantee",
+        ),
+    ),
+)
+"""The experimental tabular families: name, failure modes, evidence links and
+limitations."""
+
+
 def enrol() -> capabilities.Registry:
     """Builds the explicit capability registry for the tabular beta.
 
@@ -212,57 +261,12 @@ def enrol() -> capabilities.Registry:
                 advertise(task, model_family, fairness)
                 for fairness in fairnesses(task)
             )
-    experimental_families = (
-        (
-            capabilities.ModelFamily.TRANSFORMER.value,
-            (
-                ("torch runtime or tabular transformer adapter is unavailable"),
-                "numeric feature-token training or evaluation fails",
-                ("resource limits or experimental evidence are incomplete"),
-            ),
-            (
-                "tests/integration/test_capability_gate.py",
-                "tests/unit/test_deeplearning.py",
-            ),
-            (
-                "experimental tabular FT-Transformer only",
-                "requires explicit models.experimental_models opt-in",
-                ("not a text, image, audio, video, or multimodal transformer"),
-                "no production support guarantee",
-            ),
-        ),
-        (
-            capabilities.ModelFamily.JEPA.value,
-            (
-                "torch runtime or tabular JEPA adapter is unavailable",
-                (
-                    "numeric representation training or downstream "
-                    "head evaluation fails"
-                ),
-                ("resource limits or experimental evidence are incomplete"),
-            ),
-            (
-                "tests/integration/test_capability_gate.py",
-                "tests/integration/test_experimental_models.py",
-                "tests/unit/test_jepa_contract.py",
-            ),
-            (
-                (
-                    "experimental tabular numeric representation plus "
-                    "supervised head only"
-                ),
-                "requires explicit models.experimental_models opt-in",
-                ("not a text, image, audio, video, graph, or multimodal JEPA"),
-                "no production support guarantee",
-            ),
-        ),
-    )
     for (
         model_family,
         failure_modes,
         evidence_links,
         limitations,
-    ) in experimental_families:
+    ) in EXPERIMENTAL:
         for task in (
             tasks.Task.BINARY,
             tasks.Task.MULTICLASS,

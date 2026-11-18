@@ -36,11 +36,81 @@ class Tracing(bracketing.Bracketing):
             optional feature graph, split, model and evaluation to the bundle,
             with an explanations node when explanation files exist.
         """
-        manifest = scmle.pipeline.context.require(context.manifest, "manifest")
         split = scmle.pipeline.context.require(context.split, "split")
         selected = scmle.pipeline.context.require(context.selected, "selected")
         graph = lineage.Graph()
 
+        split_parent = self.originate(context, store, graph)
+
+        graph.add_node(
+            lineage.Node(
+                "split",
+                lineage.Kind.SPLIT,
+                split.manifest.fingerprint,
+                {"artifact": "validation_manifest.json"},
+            )
+        )
+        graph.connect(lineage.Edge(split_parent, "split", "partitions"))
+
+        pipeline_path = store.path("model/pipeline.joblib")
+        model_manifest_path = store.path(
+            f"model/{scmle.artifacts.bundle.MANIFEST_FILE}"
+        )
+        graph.add_node(
+            lineage.Node(
+                "model",
+                lineage.Kind.MODEL,
+                scmle.artifacts.bundle.shasum(pipeline_path),
+                {"model_family": selected.model_name},
+            )
+        )
+        graph.connect(lineage.Edge("split", "model", "trains"))
+        graph.add_node(
+            lineage.Node(
+                "evaluation",
+                lineage.Kind.EVALUATION,
+                scmle.artifacts.bundle.shasum(store.path("evaluation.json")),
+                {"artifact": "evaluation.json"},
+            )
+        )
+        graph.connect(lineage.Edge("model", "evaluation", "evaluates"))
+
+        explained = self.annotate(store, graph)
+
+        graph.add_node(
+            lineage.Node(
+                "bundle",
+                lineage.Kind.BUNDLE,
+                scmle.artifacts.bundle.shasum(model_manifest_path),
+                {"artifact": "model/" + scmle.artifacts.bundle.MANIFEST_FILE},
+            )
+        )
+        graph.connect(lineage.Edge("model", "bundle", "packages"))
+        graph.connect(lineage.Edge("evaluation", "bundle", "gates"))
+        if explained:
+            graph.connect(lineage.Edge("explanations", "bundle", "includes"))
+        graph.validate()
+        context.evidence_graph = graph
+        return graph
+
+    def originate(
+        self,
+        context: scmle.pipeline.context.Context,
+        store: Any,
+        graph: lineage.Graph,
+    ) -> str:
+        """Adds the source, snapshot, curation and feature-graph nodes.
+
+        Args:
+            context: The run context, supplying the manifest.
+            store: The run store holding the curation report.
+            graph: The graph being built.
+
+        Returns:
+            The node the split descends from: the feature graph when the
+            project declares one, else the curation.
+        """
+        manifest = scmle.pipeline.context.require(context.manifest, "manifest")
         raw_digest = manifest.lineage.digests.get(
             "raw-source", manifest.digests["data"]
         )
@@ -85,43 +155,19 @@ class Tracing(bracketing.Bracketing):
             graph.connect(
                 lineage.Edge("curation", "feature-graph", "transforms")
             )
-            split_parent = "feature-graph"
-        else:
-            split_parent = "curation"
+            return "feature-graph"
+        return "curation"
 
-        graph.add_node(
-            lineage.Node(
-                "split",
-                lineage.Kind.SPLIT,
-                split.manifest.fingerprint,
-                {"artifact": "validation_manifest.json"},
-            )
-        )
-        graph.connect(lineage.Edge(split_parent, "split", "partitions"))
+    def annotate(self, store: Any, graph: lineage.Graph) -> bool:
+        """Adds the explanations node when explanation files exist.
 
-        pipeline_path = store.path("model/pipeline.joblib")
-        model_manifest_path = store.path(
-            f"model/{scmle.artifacts.bundle.MANIFEST_FILE}"
-        )
-        graph.add_node(
-            lineage.Node(
-                "model",
-                lineage.Kind.MODEL,
-                scmle.artifacts.bundle.shasum(pipeline_path),
-                {"model_family": selected.model_name},
-            )
-        )
-        graph.connect(lineage.Edge("split", "model", "trains"))
-        graph.add_node(
-            lineage.Node(
-                "evaluation",
-                lineage.Kind.EVALUATION,
-                scmle.artifacts.bundle.shasum(store.path("evaluation.json")),
-                {"artifact": "evaluation.json"},
-            )
-        )
-        graph.connect(lineage.Edge("model", "evaluation", "evaluates"))
+        Args:
+            store: The run store holding the explanation files.
+            graph: The graph being built, holding the model and evaluation.
 
+        Returns:
+            Whether the node was added.
+        """
         explanation_paths = sorted(
             store.path("explanations").glob("*.json")
             if store.path("explanations").exists()
@@ -146,22 +192,7 @@ class Tracing(bracketing.Bracketing):
             graph.connect(
                 lineage.Edge("evaluation", "explanations", "contextualizes")
             )
-
-        graph.add_node(
-            lineage.Node(
-                "bundle",
-                lineage.Kind.BUNDLE,
-                scmle.artifacts.bundle.shasum(model_manifest_path),
-                {"artifact": "model/" + scmle.artifacts.bundle.MANIFEST_FILE},
-            )
-        )
-        graph.connect(lineage.Edge("model", "bundle", "packages"))
-        graph.connect(lineage.Edge("evaluation", "bundle", "gates"))
-        if explanation_paths:
-            graph.connect(lineage.Edge("explanations", "bundle", "includes"))
-        graph.validate()
-        context.evidence_graph = graph
-        return graph
+        return bool(explanation_paths)
 
     def lineage(self, store: Any) -> dict[str, str]:
         """Returns checksums of the artifacts a run produced, for lineage.

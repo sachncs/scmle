@@ -94,22 +94,7 @@ class Labelling(interface.Stage):
                 f"the approved plan is for {approved.task} but the data "
                 f"resolves to {task.value}"
             )
-        if task is tasks.Task.SURVIVAL:
-            scmle.data.validation.target.check_events(
-                frame, spec.data.event_column
-            )
-        if task is tasks.Task.UPLIFT:
-            scmle.data.validation.target.check_treatment(
-                frame, spec.data.treatment_column
-            )
-        if task in (
-            tasks.Task.MULTILABEL,
-            tasks.Task.MULTIOUTPUT,
-            tasks.Task.FORECAST,
-        ):
-            scmle.data.validation.target.check_targets(
-                frame, spec.data.targets, task
-            )
+        self.confirm(spec, frame, task)
         if task is tasks.Task.ORDINAL:
             ranks = {
                 label: rank
@@ -133,6 +118,33 @@ class Labelling(interface.Stage):
                 f"available: {sorted(context.catalog.report_names[task])}"
             )
         return frame, task
+
+    def confirm(
+        self, spec: tasks.Config, frame: pandas.DataFrame, task: tasks.Task
+    ) -> None:
+        """Checks the event, treatment or target columns a task needs.
+
+        Args:
+            spec: Project specification naming the columns.
+            frame: The loaded data.
+            task: The resolved task.
+        """
+        if task is tasks.Task.SURVIVAL:
+            scmle.data.validation.target.check_events(
+                frame, spec.data.event_column
+            )
+        if task is tasks.Task.UPLIFT:
+            scmle.data.validation.target.check_treatment(
+                frame, spec.data.treatment_column
+            )
+        if task in (
+            tasks.Task.MULTILABEL,
+            tasks.Task.MULTIOUTPUT,
+            tasks.Task.FORECAST,
+        ):
+            scmle.data.validation.target.check_targets(
+                frame, spec.data.targets, task
+            )
 
     def vet(self, spec: tasks.Config, frame: pandas.DataFrame) -> None:
         """Checks that the declared group, time and weight columns exist.

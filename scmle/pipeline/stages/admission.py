@@ -84,35 +84,8 @@ class Admission(identification.Identification):
                 f"baseline column '{column}' is not in the exploration rows"
             )
         classes = sorted(view.target.dropna().unique(), key=str)
-        outcome = explore.vectorize(
-            view.target, classification=True, classes=classes
-        )
-        plan = scmle.pipeline.context.require(
-            context.profile, "profile"
-        ).feature_plan
-        numeric = [
-            c
-            for c in plan.numeric
-            if c in view.features.columns and c not in structure
-        ]
-        rule = scmle.assurance.framing.claim.solidify(
-            view.features,
-            list(outcome.to_numpy(float)),
-            numeric,
-            model.threshold,
-            charter.seed,
-        )
-        decisions = view.features[column].to_numpy(dtype=float)
-        seen = numpy.ones(len(decisions), dtype=bool)
-        if context.unlabeled is not None and column in context.unlabeled:
-            extra = context.unlabeled[column].to_numpy(dtype=float)
-            decisions = numpy.concatenate([decisions, extra])
-            seen = numpy.concatenate(
-                [seen, numpy.zeros(len(extra), dtype=bool)]
-            )
-        selection = scmle.assurance.framing.baseline.selective_labels(
-            seen, decisions
-        )
+        rule = self.solidify(context, charter, view, structure, classes)
+        selection = select(context, view, column)
         ceiling, why = scmle.assurance.framing.claim.source_ceiling(
             data.framing_draft, charter.charter_hash, model, signed=signed
         )
@@ -170,16 +143,7 @@ class Admission(identification.Identification):
             ConfigError: If the leakage attestations file is invalid.
         """
         spec = context.spec
-        try:
-            given = (
-                attestations.load(spec.leakage_attestations)
-                if spec.leakage_attestations
-                else ()
-            )
-        except ValueError as error:
-            raise errors.ConfigError(
-                f"invalid leakage attestations: {error}"
-            ) from error
+        given = attested(spec)
         found = qualify.run(
             view.features,
             view.target,
@@ -195,17 +159,7 @@ class Admission(identification.Identification):
             dag=graph,
             declared=() if context.ingest is None else context.ingest.records,
         )
-        written: list[str] = []
-        if found.table is not None:
-            context.write_json(
-                "admissibility_table.json", found.table.to_dict()
-            )
-            written.append("admissibility_table.json")
-        if found.f5_store is not None:
-            context.write_json(
-                "detector_certificates.json", found.f5_store.to_dict()
-            )
-            written.append("detector_certificates.json")
+        written = register(context, found)
         quarantined = found.quarantined
         profile = scmle.pipeline.context.require(context.profile, "profile")
         plan = profile.feature_plan
@@ -216,62 +170,219 @@ class Admission(identification.Identification):
                     "admissibility quarantined every feature",
                     {"fields": sorted(quarantined)},
                 )
-            gone = frozenset(quarantined)
-            plan = dataclasses.replace(
-                plan,
-                numeric=tuple(c for c in plan.numeric if c not in gone),
-                categorical=tuple(c for c in plan.categorical if c not in gone),
-                text=tuple(c for c in plan.text if c not in gone),
-                monotonic={
-                    k: v for k, v in plan.monotonic.items() if k not in gone
-                },
-                high_cardinality=tuple(
-                    c for c in plan.high_cardinality if c not in gone
-                ),
-                dropped={
-                    **plan.dropped,
-                    **{
-                        name: f"quarantined by admissibility: {why}"
-                        for name, why in quarantined.items()
-                        if name in plan.features
-                    },
-                },
-            )
-            profile = dataclasses.replace(profile, feature_plan=plan)
-            context.profile = profile
-            context.write_json("dataset_profile.json", profile.to_dict())
-            curation = context.curation
-            if curation is not None:
-                amended = dataclasses.replace(
-                    curation,
-                    feature_columns={
-                        "numeric": plan.numeric,
-                        "categorical": plan.categorical,
-                        "text": plan.text,
-                    },
-                    dropped_columns=plan.dropped,
-                )
-                context.curation = amended
-                context.write_json("curation_report.json", amended.to_dict())
-                context.write_json(
-                    "dataset_card.json",
-                    scmle.contracts.data.Datasheet.distill(amended).to_dict(),
-                )
-                written.extend(["curation_report.json", "dataset_card.json"])
-        context.emit(
-            "admissibility.completed",
-            "admissibility and detectors ran on the exploration set",
-            tuple(written),
-            {
-                "leakage_gate": found.leakage_gate.value,
-                "quarantined": quarantined,
-                "suspects": sorted(found.suspects),
-                "detector_status": {
-                    detector: {d: s.value for d, s in by_defect.items()}
-                    for detector, by_defect in found.detectors.status.items()
-                },
-                "skipped_detectors": dict(found.detectors.skipped),
-                "notes": list(found.notes),
-            },
-        )
+            plan = prune(plan, quarantined)
+            written.extend(amend(context, plan))
+        announce(context, found, tuple(written))
         return found
+
+    def solidify(
+        self,
+        context: scmle.pipeline.context.Context,
+        charter: contracts.AnalysisCharter,
+        view: Any,
+        structure: tuple[str, ...],
+        classes: list[Any],
+    ) -> Any:
+        """Fits the logistic baseline rule on the exploration rows.
+
+        Args:
+            context: The run context, holding the profile.
+            charter: The analysis charter, supplying the cost model and seed.
+            view: The exploration view (features and target).
+            structure: Group, time and baseline columns, not rule inputs.
+            classes: The observed outcome classes, sorted.
+
+        Returns:
+            The frozen rule.
+        """
+        model = scmle.pipeline.context.require(charter.costs, "cost_model")
+        outcome = explore.vectorize(
+            view.target, classification=True, classes=classes
+        )
+        plan = scmle.pipeline.context.require(
+            context.profile, "profile"
+        ).feature_plan
+        numeric = [
+            c
+            for c in plan.numeric
+            if c in view.features.columns and c not in structure
+        ]
+        return scmle.assurance.framing.claim.solidify(
+            view.features,
+            list(outcome.to_numpy(float)),
+            numeric,
+            model.threshold,
+            charter.seed,
+        )
+
+
+def prune(
+    plan: scmle.contracts.data.Blueprint, quarantined: dict[str, str]
+) -> scmle.contracts.data.Blueprint:
+    """Removes quarantined fields from a feature plan, recording why.
+
+    Args:
+        plan: The feature plan.
+        quarantined: The quarantined fields and their reasons.
+
+    Returns:
+        The plan without them; each listed in `dropped` with its reason.
+    """
+    gone = frozenset(quarantined)
+    return dataclasses.replace(
+        plan,
+        numeric=tuple(c for c in plan.numeric if c not in gone),
+        categorical=tuple(c for c in plan.categorical if c not in gone),
+        text=tuple(c for c in plan.text if c not in gone),
+        monotonic={k: v for k, v in plan.monotonic.items() if k not in gone},
+        high_cardinality=tuple(
+            c for c in plan.high_cardinality if c not in gone
+        ),
+        dropped={
+            **plan.dropped,
+            **{
+                name: f"quarantined by admissibility: {why}"
+                for name, why in quarantined.items()
+                if name in plan.features
+            },
+        },
+    )
+
+
+def register(
+    context: scmle.pipeline.context.Context, found: qualify.Qualification
+) -> list[str]:
+    """Writes the admissibility table and the detector certificates used.
+
+    Args:
+        context: The run context that receives the files.
+        found: The qualification.
+
+    Returns:
+        The files written.
+    """
+    written: list[str] = []
+    if found.table is not None:
+        context.write_json("admissibility_table.json", found.table.to_dict())
+        written.append("admissibility_table.json")
+    if found.f5_store is not None:
+        context.write_json(
+            "detector_certificates.json", found.f5_store.to_dict()
+        )
+        written.append("detector_certificates.json")
+    return written
+
+
+def select(
+    context: scmle.pipeline.context.Context, view: Any, column: str
+) -> Any:
+    """Checks the selection of outcomes by the baseline's decisions.
+
+    Args:
+        context: The run context, holding the rows without a target.
+        view: The exploration view.
+        column: The baseline column.
+
+    Returns:
+        The selective-labels check over the exploration rows and the rows
+        set aside for a missing target.
+    """
+    decisions = view.features[column].to_numpy(dtype=float)
+    seen = numpy.ones(len(decisions), dtype=bool)
+    if context.unlabeled is not None and column in context.unlabeled:
+        extra = context.unlabeled[column].to_numpy(dtype=float)
+        decisions = numpy.concatenate([decisions, extra])
+        seen = numpy.concatenate([seen, numpy.zeros(len(extra), dtype=bool)])
+    return scmle.assurance.framing.baseline.selective_labels(seen, decisions)
+
+
+def attested(spec: tasks.Config) -> Any:
+    """Loads the leakage attestations the specification names.
+
+    Args:
+        spec: Project specification.
+
+    Returns:
+        The attestations, empty when none are named.
+
+    Raises:
+        ConfigError: If the attestations file is invalid.
+    """
+    try:
+        return (
+            attestations.load(spec.leakage_attestations)
+            if spec.leakage_attestations
+            else ()
+        )
+    except ValueError as error:
+        raise errors.ConfigError(
+            f"invalid leakage attestations: {error}"
+        ) from error
+
+
+def amend(
+    context: scmle.pipeline.context.Context,
+    plan: scmle.contracts.data.Blueprint,
+) -> list[str]:
+    """Rewrites the profile, curation report and dataset card for a plan.
+
+    Args:
+        context: The run context; its profile and curation are replaced.
+        plan: The feature plan without the quarantined fields.
+
+    Returns:
+        The curation report and dataset card when they were rewritten.
+    """
+    profile = scmle.pipeline.context.require(context.profile, "profile")
+    profile = dataclasses.replace(profile, feature_plan=plan)
+    context.profile = profile
+    context.write_json("dataset_profile.json", profile.to_dict())
+    curation = context.curation
+    if curation is not None:
+        amended = dataclasses.replace(
+            curation,
+            feature_columns={
+                "numeric": plan.numeric,
+                "categorical": plan.categorical,
+                "text": plan.text,
+            },
+            dropped_columns=plan.dropped,
+        )
+        context.curation = amended
+        context.write_json("curation_report.json", amended.to_dict())
+        context.write_json(
+            "dataset_card.json",
+            scmle.contracts.data.Datasheet.distill(amended).to_dict(),
+        )
+        return ["curation_report.json", "dataset_card.json"]
+    return []
+
+
+def announce(
+    context: scmle.pipeline.context.Context,
+    found: qualify.Qualification,
+    written: tuple[str, ...],
+) -> None:
+    """Emits the admissibility event with the detector outcomes.
+
+    Args:
+        context: The run context that receives the event.
+        found: The qualification.
+        written: The files written for it.
+    """
+    context.emit(
+        "admissibility.completed",
+        "admissibility and detectors ran on the exploration set",
+        written,
+        {
+            "leakage_gate": found.leakage_gate.value,
+            "quarantined": found.quarantined,
+            "suspects": sorted(found.suspects),
+            "detector_status": {
+                detector: {d: s.value for d, s in by_defect.items()}
+                for detector, by_defect in found.detectors.status.items()
+            },
+            "skipped_detectors": dict(found.detectors.skipped),
+            "notes": list(found.notes),
+        },
+    )

@@ -45,3 +45,17 @@ MIN_CLASS_COUNT = 2
 
 
 MIN_STABILITY_COEFFICIENT = 1e-12
+
+
+SHORTFALL = (
+    "experimental until parity: the modality runs the bounded lifecycle (one "
+    "split, one regularized linear classifier), not the shared pipeline "
+    "engine, so it has no candidate search, cross-validation, baseline "
+    "comparison, prediction intervals, locked test set and vault, or analysis "
+    "charter"
+)
+"""Why every built-in non-tabular modality stays experimental (task 4.5).
+
+A modality loses this reason only when it runs the shared engine's stages
+from planning to packaging with the same controls as the tabular path.
+"""

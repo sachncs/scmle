@@ -8,7 +8,6 @@ side-effect-free plan preview.
 
 import logging
 
-from scmle.pipeline.stages.assessment import BASELINE
 from scmle.pipeline.stages.assessment import FinalEvaluationStage
 from scmle.pipeline.stages.cost import affordable
 from scmle.pipeline.stages.cost import dimensions
@@ -46,6 +45,7 @@ from scmle.pipeline.stages.scoring import slicers
 from scmle.pipeline.stages.selecting import Candidate
 from scmle.pipeline.stages.selecting import frontier
 from scmle.pipeline.stages.selecting import SelectStage
+from scmle.pipeline.stages.summary import BASELINE
 from scmle.pipeline.stages.surveying import graft
 from scmle.pipeline.stages.training import TrainStage
 

@@ -41,7 +41,6 @@ class Documentation(releasing.Releasing):
             explanation diagnostic that ran without error and has a report.
         """
         manifest = scmle.pipeline.context.require(context.manifest, "manifest")
-        split = scmle.pipeline.context.require(context.split, "split")
         model_manifest = store.path(
             f"model/{scmle.artifacts.bundle.MANIFEST_FILE}"
         )
@@ -71,50 +70,12 @@ class Documentation(releasing.Releasing):
             report_path = store.path(f"diagnostics/{name}.json")
             if not report_path.exists():
                 continue
-            limitations = [
-                "associational evidence is not causal evidence",
-                "stability and fidelity require separate validation",
-            ]
-            if result.get("truncated"):
-                limitations.append("feature coverage was truncated by budget")
-            record = scmle.explainability.suite.substantiate(
+            record = self.substantiate(
+                context,
                 diagnostic,
-                result,
-                model_fingerprint=bundle_digest,
-                bundle_digest=bundle_digest,
-                input_fingerprint=split.manifest.fingerprint,
-                dataset_snapshot=snapshot,
-                feature_graph=feature_graph,
-                method_parameters={"seed": context.spec.validation.seed},
-                timestamp=datetime.datetime.now(datetime.UTC),
-                software_version=scmle.__version__,
-                uncertainty={
-                    "status": "not_estimated",
-                    "reason": "explanation evidence does not estimate "
-                    "prediction uncertainty",
-                },
-                stability={
-                    "status": "not_estimated",
-                    "reason": "repeatability must be evaluated separately",
-                },
-                limitations=tuple(limitations),
-                causal_warning=(
-                    "This explanation describes model associations; it does "
-                    "not establish that changing a feature causes an outcome."
-                ),
-                privacy_decision=explanations.Clearance(
-                    decision="allowed",
-                    reason=(
-                        "diagnostic output contains aggregate feature evidence"
-                    ),
-                ),
-                evidence_links=(
-                    explanations.Link(
-                        relation="diagnostic-report",
-                        uri=f"diagnostics/{name}.json",
-                        digest=scmle.artifacts.bundle.shasum(report_path),
-                    ),
-                ),
+                (report_path, bundle_digest),
+                snapshot,
+                feature_graph,
             )
             evidence[name] = record.model_dump(mode="json")
             store.write_json(f"explanations/{name}.json", evidence[name])
@@ -125,6 +86,76 @@ class Documentation(releasing.Releasing):
                 ),
             )
         return evidence
+
+    def substantiate(
+        self,
+        context: scmle.pipeline.context.Context,
+        diagnostic: Any,
+        report: tuple[Any, str],
+        snapshot: explanations.Snapshot,
+        feature_graph: explanations.Lineage,
+    ) -> Any:
+        """Builds the evidence record of one explanation diagnostic.
+
+        Args:
+            context: The run context, holding the diagnostics and split.
+            diagnostic: The explanation diagnostic.
+            report: The path of its report and the digest of the bundle
+                manifest.
+            snapshot: The dataset snapshot explained.
+            feature_graph: The feature graph's version and fingerprint.
+
+        Returns:
+            The evidence record.
+        """
+        split = scmle.pipeline.context.require(context.split, "split")
+        result = context.diagnostics[diagnostic.name]
+        report_path, bundle_digest = report
+        limitations = [
+            "associational evidence is not causal evidence",
+            "stability and fidelity require separate validation",
+        ]
+        if result.get("truncated"):
+            limitations.append("feature coverage was truncated by budget")
+        return scmle.explainability.suite.substantiate(
+            diagnostic,
+            result,
+            model_fingerprint=bundle_digest,
+            bundle_digest=bundle_digest,
+            input_fingerprint=split.manifest.fingerprint,
+            dataset_snapshot=snapshot,
+            feature_graph=feature_graph,
+            method_parameters={"seed": context.spec.validation.seed},
+            timestamp=datetime.datetime.now(datetime.UTC),
+            software_version=scmle.__version__,
+            uncertainty={
+                "status": "not_estimated",
+                "reason": "explanation evidence does not estimate "
+                "prediction uncertainty",
+            },
+            stability={
+                "status": "not_estimated",
+                "reason": "repeatability must be evaluated separately",
+            },
+            limitations=tuple(limitations),
+            causal_warning=(
+                "This explanation describes model associations; it does "
+                "not establish that changing a feature causes an outcome."
+            ),
+            privacy_decision=explanations.Clearance(
+                decision="allowed",
+                reason=(
+                    "diagnostic output contains aggregate feature evidence"
+                ),
+            ),
+            evidence_links=(
+                explanations.Link(
+                    relation="diagnostic-report",
+                    uri=f"diagnostics/{diagnostic.name}.json",
+                    digest=scmle.artifacts.bundle.shasum(report_path),
+                ),
+            ),
+        )
 
     def notarise(
         self,

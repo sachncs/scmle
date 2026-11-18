@@ -8,6 +8,7 @@ import pandas
 from scmle.assurance import coverage_run
 from scmle.assurance.charter import sealing
 import scmle.assurance.ledger.ledger
+from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.decision import reports
 from scmle.evaluation import coverage
@@ -92,8 +93,8 @@ class Reporting(relabelling.Relabelling):
         pipeline: Any,
         features: pandas.DataFrame,
         target: pandas.Series,
-        decision: dict[str, Any] | None,
-        net_benefit: dict[str, Any] | None,
+        decision: records.Layout | None,
+        net_benefit: records.Layout | None,
     ) -> None:
         """Writes the policy value, fairness satisfaction and rollout design.
 
@@ -127,17 +128,8 @@ class Reporting(relabelling.Relabelling):
         actions = (
             numpy.asarray(pipeline.predict(features)) == positive
         ).astype(float)
-        logged = (
-            features[data.logged_action_column].to_numpy(dtype=float)
-            if data.logged_action_column
-            and data.logged_action_column in features
-            else None
-        )
-        propensity = (
-            features[data.propensity_column].to_numpy(dtype=float)
-            if data.propensity_column and data.propensity_column in features
-            else None
-        )
+        logged = self.column(features, data.logged_action_column)
+        propensity = self.column(features, data.propensity_column)
         value = reports.policy_value(
             layer, actions, outcome, logged, propensity
         )
@@ -148,7 +140,6 @@ class Reporting(relabelling.Relabelling):
             actions,
             float(charter.budget.confirmation.alpha_confirm),
         )
-        design_record = None
         built = reports.rollout_design(
             charter, float(numpy.mean(outcome)) if len(outcome) else 0.0
         )
@@ -160,20 +151,7 @@ class Reporting(relabelling.Relabelling):
             satisfaction,
             None if built is None else built[0],
         )
-        context.write_json(reports.POLICY_FILE, value)
-        written = ["decision_report.json", reports.POLICY_FILE]
-        if decision is not None:
-            context.write_json(reports.THRESHOLD_FILE, decision)
-            written.append(reports.THRESHOLD_FILE)
-        if net_benefit is not None:
-            context.write_json(reports.NET_BENEFIT_FILE, net_benefit)
-            written.append(reports.NET_BENEFIT_FILE)
-        if built is not None:
-            design_record, log = built
-            context.write_json("rollout_design.json", design_record)
-            if context.store is not None:
-                log.write(context.store.directory / "rollout_decisions.jsonl")
-            written += ["rollout_design.json", "rollout_decisions.jsonl"]
+        written = self.deposit(context, value, decision, net_benefit, built)
         context.write_json("decision_report.json", report)
         self.notarize(context)
         context.emit(
@@ -185,3 +163,55 @@ class Reporting(relabelling.Relabelling):
                 "fairness": [f["status"] for f in satisfaction],
             },
         )
+
+    @staticmethod
+    def column(features: pandas.DataFrame, name: str | None) -> Any:
+        """A declared column of the released rows as floats, if present.
+
+        Args:
+            features: The released rows.
+            name: The declared column, or None.
+
+        Returns:
+            The column's values, or None when it is not declared or absent.
+        """
+        if name and name in features:
+            return features[name].to_numpy(dtype=float)
+        return None
+
+    def deposit(
+        self,
+        context: scmle.pipeline.context.Context,
+        value: records.Layout,
+        decision: records.Layout | None,
+        net_benefit: records.Layout | None,
+        built: Any,
+    ) -> list[str]:
+        """Writes the policy value, threshold, net-benefit and rollout files.
+
+        Args:
+            context: The run context that stores the files.
+            value: The policy value.
+            decision: The chartered threshold description, or None.
+            net_benefit: The net-benefit report, or None.
+            built: The rollout design and its decision log, or None.
+
+        Returns:
+            The decision files, with `decision_report.json` (written later)
+            first.
+        """
+        context.write_json(reports.POLICY_FILE, value)
+        written = ["decision_report.json", reports.POLICY_FILE]
+        if decision is not None:
+            context.write_json(reports.THRESHOLD_FILE, decision)
+            written.append(reports.THRESHOLD_FILE)
+        if net_benefit is not None:
+            context.write_json(reports.NET_BENEFIT_FILE, net_benefit)
+            written.append(reports.NET_BENEFIT_FILE)
+        if built is not None:
+            design, log = built
+            context.write_json("rollout_design.json", design)
+            if context.store is not None:
+                log.write(context.store.directory / "rollout_decisions.jsonl")
+            written += ["rollout_design.json", "rollout_decisions.jsonl"]
+        return written

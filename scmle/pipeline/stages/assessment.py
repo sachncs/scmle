@@ -1,29 +1,25 @@
 """The final evaluation stage on the locked test set."""
 
 import time
+from typing import Any
 from typing import ClassVar
 
-import numpy
+import pandas
 
 from scmle.assurance.custody import journal
 from scmle.contracts import experiments
+from scmle.contracts import records
 from scmle.contracts import tasks
-from scmle.evaluation import confidence
-from scmle.evaluation import criteria
-from scmle.evaluation import diagnostics
-from scmle.pipeline import suite
 import scmle.pipeline.context
 from scmle.pipeline.stages import cost
-from scmle.pipeline.stages import reporting
 from scmle.pipeline.stages import scoring
 from scmle.pipeline.stages import selecting
+from scmle.pipeline.stages import summary
 from scmle.preparation import strategies
 import scmle.runtime.state
 
-BASELINE = "dummy"
 
-
-class FinalEvaluationStage(reporting.Reporting):
+class FinalEvaluationStage(summary.Summary):
     """Refits the frozen candidate and opens the locked test set once."""
 
     requires: ClassVar[tuple[type, ...]] = (selecting.SelectStage,)
@@ -67,19 +63,7 @@ class FinalEvaluationStage(reporting.Reporting):
             )
         selected = scmle.pipeline.context.require(context.selected, "selected")
         task = scmle.pipeline.context.require(context.task, "task")
-        metric = scmle.pipeline.context.require(context.metric, "metric")
-        pipeline = context.refits.get(selected.trial_id)
-        if pipeline is None:
-            pipeline = strategies.lookup(selected.strategy).build(
-                scmle.pipeline.context.require(
-                    context.profile, "profile"
-                ).feature_plan,
-                context.registry.get(selected.model_name),
-                task,
-                context.spec.validation.seed,
-                selected.params,
-            )
-            pipeline.fit(split.dev_features, split.dev_target)
+        pipeline = self.refit(context, selected, task)
         pipeline = self.pseudolabel(context, selected, pipeline)
         pipeline = self.relearn(context, pipeline)
         pipeline, decision = scoring.choose_decision_threshold(
@@ -89,16 +73,7 @@ class FinalEvaluationStage(reporting.Reporting):
         pipeline = self.mitigate(context, selected, pipeline, decision)
         self.pledge(context)
         locked = split.locked_test
-        binding = scoring.pin(selected, decision)
-        locked.bind(binding)
-        test_features, test_target = locked.open(locked.mint(), binding)
-        if (
-            context.spec.data.weight_column == tasks.FAIRNESS_WEIGHT
-            and tasks.FAIRNESS_WEIGHT not in test_features
-        ):
-            # Reweighing weights development rows only; locked rows carry a
-            # neutral weight so the pipeline finds the column it expects.
-            test_features = test_features.assign(**{tasks.FAIRNESS_WEIGHT: 1.0})
+        test_features, test_target = self.unlock(context, decision)
         context.test_rows = (test_features, test_target)
         self.corroborate(
             context, unmitigated, pipeline, test_features, test_target
@@ -111,148 +86,25 @@ class FinalEvaluationStage(reporting.Reporting):
                 "fingerprint": split.manifest.fingerprint,
             },
         )
-        baseline = next(
-            (
-                t
-                for t in context.trials
-                if t.model_name == BASELINE
-                and t.status is experiments.Termination.OK
-            ),
-            None,
-        )
         context.final_pipeline = pipeline
         usage = cost.meter(context, pipeline, split.dev_features)
-        test_metrics = context.catalog.evaluate(
-            pipeline, test_features, test_target, task
+        test_metrics = self.measure(
+            context, pipeline, test_features, test_target
         )
-        weight_column = context.spec.data.weight_column
-        weighted_test_metrics = (
-            context.catalog.evaluate(
-                pipeline,
-                test_features,
-                test_target,
-                task,
-                test_features[weight_column].to_numpy(dtype=float),
-            )
-            if weight_column and weight_column != tasks.FAIRNESS_WEIGHT
-            else None
-        )
-        context.track(
-            selected_strategy=selected.strategy,
-            selected_model=selected.model_name,
-            metric=metric.name,
-            cv_score=selected.score_mean,
-            test_metrics=test_metrics,
-        )
-        context.reference_scores = scoring.reference_scores(
-            pipeline, test_features, task
-        )
-        context.diagnostics = suite.run_suite(
-            diagnostics.DiagnosticInput(
-                pipeline,
-                test_features,
-                test_target,
-                task,
-                metric,
-                scmle.pipeline.context.require(
-                    context.profile, "profile"
-                ).feature_plan,
-                context.spec.validation.seed,
-                groups=(
-                    test_features[context.spec.data.group_column]
-                    if (
-                        split.manifest.strategy == "group"
-                        or context.cluster_column
-                    )
-                    and context.spec.data.group_column
-                    else None
-                ),
-                temporal=split.manifest.strategy == "temporal",
-                reference_features=split.dev_features,
-                sensitive_columns=tuple(context.spec.data.sensitive_columns),
-            ),
-            suite.lineup(),
-            self.ration(context),
-            context.regulator.until("finish")
-            - context.regulator.reserve.parts.get("package", 0.0),
-        )
-        for name, report_body in context.diagnostics.items():
-            context.write_json(f"diagnostics/{name}.json", report_body)
-            if report_body.get("skipped") is True:
-                context.forgo(
-                    f"diagnostic {name}", report_body.get("reason", "")
-                )
-            elif report_body.get("truncated"):
-                context.forgo(
-                    f"diagnostic {name} (cut short)",
-                    str(report_body.get("reason", "")),
-                )
+        self.examine(context, pipeline, test_features, test_target)
         net_benefit = scoring.appraise(
             context, pipeline, test_features, test_target, decision
         )
         self.decide(
             context, pipeline, test_features, test_target, decision, net_benefit
         )
-        context.evaluation = {
-            "run_id": context.store.run_id if context.store else "",
-            "task": task.value,
-            "metric": metric.name,
-            "metric_greater_is_better": metric.greater_is_better,
-            "selection_policy": context.policy.description,
-            "selected_model": selected.model_name,
-            "selected_trial_id": selected.trial_id,
-            "selected_params": selected.params,
-            "selected_strategy": selected.strategy,
-            "selected_cv_score": selected.score_mean,
-            "selected_cv_std": selected.score_std,
-            "fit_health": self.diagnose(context, selected),
-            "cv_confidence": confidence.cv_interval(
-                selected.fold_scores,
-                float(
-                    numpy.mean([len(fold[0]) for fold in split.manifest.folds])
-                ),
-                float(
-                    numpy.mean([len(fold[1]) for fold in split.manifest.folds])
-                ),
-                split.manifest.strategy,
-                [
-                    trial.fold_scores
-                    for trial in context.trials
-                    if trial.status is experiments.Termination.OK
-                ],
-                metric.greater_is_better,
-            ),
-            "baseline_cv_score": baseline.score_mean if baseline else None,
-            "test_metrics": test_metrics,
-            "weighted_test_metrics": weighted_test_metrics,
-            "semi_supervised": context.semi_supervised,
-            "fairness_mitigation": context.fairness_mitigation,
-            "execution_backend": context.backend.name,
-            "pareto_front": context.pareto_front,
-            "evaluation_prevalence": {
-                "natural": True,
-                "note": "resampling strategies change only training folds; "
-                "validation and test rows keep their real class mix",
-                "strategy": selected.strategy,
-            },
-            "success_criteria": [
-                r.to_dict()
-                for r in criteria.check(
-                    context.spec.problem.success_criteria,
-                    test_metrics,
-                    context.catalog,
-                )
-            ],
-            "streamed_locked": self.tally(context, pipeline),
-            "uplift": self.uplift_report(
-                context, pipeline, test_features, test_target
-            ),
-            "n_dev": len(split.dev_features),
-            "n_test": len(test_features),
-            "split_fingerprint": split.manifest.fingerprint,
-            "split_strategy": split.manifest.strategy,
-            "decision": decision,
-            "net_benefit": net_benefit,
+        context.evaluation = self.document(
+            context,
+            pipeline,
+            (test_features, test_target),
+            test_metrics,
+            {"decision": decision, "net_benefit": net_benefit},
+        ) | {
             "resources": usage.to_dict(),
             "resource_limits": context.regulator.report(),
             "skipped_for_time": context.skipped,
@@ -264,3 +116,63 @@ class FinalEvaluationStage(reporting.Reporting):
                 "differ"
             ),
         }
+
+    def refit(
+        self,
+        context: scmle.pipeline.context.Context,
+        selected: experiments.Trial,
+        task: tasks.Task,
+    ) -> Any:
+        """The selected pipeline fitted on all development data.
+
+        Args:
+            context: The run context.
+            selected: The selected trial.
+            task: The resolved task.
+
+        Returns:
+            The refit made during selection if there is one, else a new fit.
+        """
+        pipeline = context.refits.get(selected.trial_id)
+        if pipeline is None:
+            split = scmle.pipeline.context.require(context.split, "split")
+            pipeline = strategies.lookup(selected.strategy).build(
+                scmle.pipeline.context.require(
+                    context.profile, "profile"
+                ).feature_plan,
+                context.registry.get(selected.model_name),
+                task,
+                context.spec.validation.seed,
+                selected.params,
+            )
+            pipeline.fit(split.dev_features, split.dev_target)
+        return pipeline
+
+    def unlock(
+        self,
+        context: scmle.pipeline.context.Context,
+        decision: records.Layout | None,
+    ) -> tuple[pandas.DataFrame, pandas.Series]:
+        """Opens the locked rows once, bound to the frozen selection.
+
+        Args:
+            context: The run context, holding the split and the selection.
+            decision: The decision threshold the selection is frozen with.
+
+        Returns:
+            The test features and labels.
+        """
+        split = scmle.pipeline.context.require(context.split, "split")
+        selected = scmle.pipeline.context.require(context.selected, "selected")
+        locked = split.locked_test
+        binding = scoring.pin(selected, decision)
+        locked.bind(binding)
+        features, target = locked.open(locked.mint(), binding)
+        if (
+            context.spec.data.weight_column == tasks.FAIRNESS_WEIGHT
+            and tasks.FAIRNESS_WEIGHT not in features
+        ):
+            # Reweighing weights development rows only; locked rows carry a
+            # neutral weight so the pipeline finds the column it expects.
+            features = features.assign(**{tasks.FAIRNESS_WEIGHT: 1.0})
+        return features, target
