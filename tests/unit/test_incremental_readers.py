@@ -9,9 +9,9 @@ from scmle.data.readers import incremental
 
 def event(event_id, sequence, minute, value=None):
     return incremental.Event(
-        event_id=event_id,
+        identifier=event_id,
         sequence=sequence,
-        event_time=f"2026-10-20T10:{minute:02d}:00+00:00",
+        occurred=f"2026-10-20T10:{minute:02d}:00+00:00",
         payload={"value": sequence if value is None else value},
     )
 
@@ -58,7 +58,7 @@ def test_ingestion_ledger_commits_atomically_and_retries_idempotently(tmp_path):
     assert committed.checkpoint.sequence == 1
     assert next_batch.event_ids == ("b",)
     assert ledger.lockfile.exists()
-    assert json.loads(ledger.path.read_text())["schema_version"] == 1
+    assert json.loads(ledger.path.read_text())["schema_version"] == 2
 
 
 def test_late_data_policy_is_explicit():
@@ -218,7 +218,7 @@ def test_idempotent_sink_commit_filters_duplicates_and_persists_receipt(
     assert first.accepted_event_ids == ("a", "b")
     assert second.accepted_event_ids == ()
     assert second.duplicate_event_ids == ("a", "b")
-    assert [item.event_id for item in written] == ["a", "b"]
+    assert [item.identifier for item in written] == ["a", "b"]
     assert first.to_dict()["checkpoint"]["sequence"] == 2
 
 
@@ -236,7 +236,7 @@ def test_idempotent_sink_keeps_state_unchanged_when_writer_fails(tmp_path):
         ledger.finalize((event("a", 1, 0),), fail)
 
     assert not ledger.path.exists()
-    assert ledger.load().seen_event_ids == ()
+    assert ledger.load().seen == ()
 
 
 def test_event_consumer_commits_before_acknowledging(tmp_path):
@@ -260,10 +260,10 @@ def test_event_consumer_commits_before_acknowledging(tmp_path):
 
     result = consumer.consume(limit=2)
 
-    assert [item.event_id for item in written] == ["a", "b"]
+    assert [item.identifier for item in written] == ["a", "b"]
     assert result.receipt.accepted_event_ids == ("a", "b")
     assert result.acknowledged_event_ids == ("a", "b")
-    assert acknowledgements[0].event_ids == ("a", "b")
+    assert acknowledgements[0].events == ("a", "b")
     assert not ledger.pending_acknowledgement_path.exists()
 
 
@@ -280,7 +280,7 @@ def test_event_consumer_retries_ack_without_replaying_the_sink(tmp_path):
     attempts = []
 
     def first_ack_fails(acknowledgement):
-        attempts.append(acknowledgement.event_ids)
+        attempts.append(acknowledgement.events)
         if len(attempts) == 1:
             raise OSError("broker unavailable")
         available.clear()
@@ -295,15 +295,15 @@ def test_event_consumer_retries_ack_without_replaying_the_sink(tmp_path):
 
     with pytest.raises(incremental.IncrementalError, match="acknowledgement"):
         consumer.consume()
-    assert [item.event_id for item in written] == ["a"]
-    assert ledger.load().seen_event_ids == ("a",)
+    assert [item.identifier for item in written] == ["a"]
+    assert ledger.load().seen == ("a",)
     assert ledger.pending_acknowledgement_path.exists()
 
     result = consumer.consume()
 
     assert result.receipt.accepted_event_ids == ()
     assert attempts == [("a",), ("a",)]
-    assert [item.event_id for item in written] == ["a"]
+    assert [item.identifier for item in written] == ["a"]
     assert not ledger.pending_acknowledgement_path.exists()
 
 

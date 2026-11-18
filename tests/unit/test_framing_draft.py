@@ -33,11 +33,11 @@ def table(n=400, seed=0):
 
 def request(frame, text="Predict churn for each customer.", **kw):
     if "resolved_at" in frame.columns:
-        kw.setdefault("target_time_column", "resolved_at")
+        kw.setdefault("time", "resolved_at")
     source = draft.Offer(
         "warehouse://crm/accounts",
         tuple(frame.columns),
-        primary_key=("customer_id",),
+        key=("customer_id",),
         **kw,
     )
     return draft.Request(text, source)
@@ -49,9 +49,9 @@ def test_deterministic_draft_assembles_an_unsigned_charter():
     assert result.status == draft.WITH_QUESTIONS
     assert result.charter is not None
     assert result.charter.estimand.target == "churn"
-    assert result.charter.estimand.prediction_moment == "as_of"
+    assert result.charter.estimand.moment == "as_of"
     assert result.charter.unit == "customer_id"
-    assert result.charter.cost_model == MODEL
+    assert result.charter.costs == MODEL
     assert "deployment_population" in result.open_items
     assert provenance.Filling.LLM not in result.fields.values()
     again = draft.frame(request(frame), frame, cost_model=MODEL)
@@ -59,7 +59,7 @@ def test_deterministic_draft_assembles_an_unsigned_charter():
 
 
 def test_missing_named_column_refuses_and_lists_it():
-    # Enforces docs/ARTIFACTS.md:74.
+    # Enforces docs/ARTIFACTS.md:80.
     frame = table()
     result = draft.frame(request(frame, "Predict `churn_flag` please."), frame)
     assert result.status == draft.REFUSED
@@ -68,7 +68,7 @@ def test_missing_named_column_refuses_and_lists_it():
 
 
 def test_unfillable_critical_slot_refuses_with_a_closed_question():
-    # Enforces docs/ARTIFACTS.md:74.
+    # Enforces docs/ARTIFACTS.md:80.
     frame = table().drop(columns=["as_of", "resolved_at"])
     result = draft.frame(request(frame), frame)
     assert result.status == draft.REFUSED
@@ -76,12 +76,10 @@ def test_unfillable_critical_slot_refuses_with_a_closed_question():
 
 
 def test_moment_after_target_time_is_a_blocking_check():
-    # Enforces docs/ARTIFACTS.md:74.
+    # Enforces docs/ARTIFACTS.md:80.
     frame = table()
     frame["resolved_at"] = frame["as_of"] - pandas.Timedelta(days=1)
-    result = draft.frame(
-        request(frame, target_time_column="resolved_at"), frame
-    )
+    result = draft.frame(request(frame, time="resolved_at"), frame)
     assert result.status == draft.REFUSED
     assert result.refusal["failed"] == ["moment_before_target"]
 
@@ -121,7 +119,7 @@ def test_cost_question_is_raised_only_when_it_changes_the_verdict():
 
 
 def test_artifacts_are_written(tmp_path):
-    # Enforces docs/ARTIFACTS.md:74.
+    # Enforces docs/ARTIFACTS.md:80.
     frame = table()
     result = draft.frame(
         request(frame), frame, cost_model=MODEL, baseline_column="current_rule"
@@ -140,7 +138,7 @@ def test_artifacts_are_written(tmp_path):
 
 
 def test_link_report_is_descriptive():
-    # Enforces docs/ARTIFACTS.md:40.
+    # Enforces docs/ARTIFACTS.md:46.
     frame = table()
     result = draft.frame(request(frame), frame)
     link = draft.linkage(result.charter, list(frame.columns))
@@ -194,7 +192,7 @@ def test_llm_path_fills_slots_as_llm_and_replay_is_hash_identical(monkeypatch):
 
 
 def test_disagreement_or_missing_tau_refuses():
-    # Enforces docs/ARTIFACTS.md:74 and docs/ARTIFACTS.md:76.
+    # Enforces docs/ARTIFACTS.md:80 and docs/ARTIFACTS.md:82.
     frame = table()
     mixed = [SAMPLE] * 6 + [{**SAMPLE, "target": "region"}] * 4
     result = draft.frame(request(frame), frame, sampler=replay(mixed), tau=0.1)

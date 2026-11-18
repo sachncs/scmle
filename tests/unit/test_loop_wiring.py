@@ -27,7 +27,7 @@ MODELS = scmle.models.registry.Catalog.stock()
 def halted_loop(tmp_path, hooks=None):
     loop = test_loop.open_loop(
         tmp_path,
-        test_loop.make_policy(reference_risk=0.5, tolerance=0.4, r_star=0.05),
+        test_loop.make_policy(reference=0.5, tolerance=0.4, target=0.05),
         hooks=hooks,
     )
     test_loop.feed(
@@ -81,7 +81,7 @@ def test_feedback_cannot_be_tested_without_a_declared_bypass_slice(tmp_path):
     with pytest.raises(ValueError) as caught:
         loop.performativity(bypass, model)
     assert str(caught.value) == (
-        "no bypass slice is declared (policy.bypass_rate is 0): "
+        "no bypass slice is declared (policy.bypass is 0): "
         "feedback cannot be tested"
     )
 
@@ -89,7 +89,7 @@ def test_feedback_cannot_be_tested_without_a_declared_bypass_slice(tmp_path):
 def test_a_feedback_loop_is_recorded_escalated_and_survives_reopening(
     tmp_path,
 ):
-    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass_rate=0.3))
+    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass=0.3))
     bypass, model = feedback_groups(0.8)
     check = loop.performativity(bypass, model)
     assert check.p_value is not None and check.p_value <= 0.05
@@ -100,15 +100,13 @@ def test_a_feedback_loop_is_recorded_escalated_and_survives_reopening(
         e.question["action"] == "feedback_loop_detected"
         for e in loop.pending_escalations()
     )
-    again = test_loop.open_loop(
-        tmp_path, test_loop.make_policy(bypass_rate=0.3)
-    )
+    again = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass=0.3))
     assert not again.halted
     assert again.feedback == loop.feedback
 
 
 def test_no_feedback_loop_is_reported_without_an_escalation(tmp_path):
-    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass_rate=0.3))
+    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass=0.3))
     bypass, model = feedback_groups(0.0)
     loop.performativity(bypass, model)
     assert read_mechanism(loop)["feedback"] == "no_loop_detected"

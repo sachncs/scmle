@@ -12,44 +12,44 @@ def observation(
     elapsed: float = 1.0,
     memory: float | None = 1.0,
     machine: str = "test-machine",
-    sample_count: int = 10,
+    samples: int = 10,
 ) -> performance.Observation:
     """Build one deterministic performance observation."""
     return performance.Observation(
         operation=operation,
-        elapsed_seconds=elapsed,
-        peak_memory_gb=memory,
-        sample_count=sample_count,
+        elapsed=elapsed,
+        memory=memory,
+        samples=samples,
         machine=machine,
-        observed_at=OBSERVED,
+        observed=OBSERVED,
         software="test-python",
     )
 
 
 def run(
-    run_id: str,
+    identifier: str,
     elapsed: float = 1.0,
     memory: float | None = 1.0,
     machine: str = "test-machine",
-    sample_count: int = 10,
+    samples: int = 10,
 ) -> performance.Run:
     """Build a deterministic repeated performance run."""
     return performance.Run(
-        run_id,
+        identifier,
         (
             observation(
                 performance.Operation.INGEST,
                 elapsed,
                 memory,
                 machine,
-                sample_count,
+                samples,
             ),
             observation(
                 performance.Operation.FIT,
                 elapsed,
                 memory,
                 machine,
-                sample_count,
+                samples,
             ),
         ),
     )
@@ -128,7 +128,7 @@ def test_measurements_are_unique_and_json_round_trip():
 
 def test_invalid_measurement_and_budget_values_fail_at_the_boundary():
     """NaN, negative, naive, and empty values cannot become evidence."""
-    with pytest.raises(ValueError, match="elapsed_seconds"):
+    with pytest.raises(ValueError, match="elapsed"):
         observation(performance.Operation.LOAD, float("nan"))
     with pytest.raises(ValueError, match="positive"):
         performance.Budget({"load": 0.0})
@@ -232,7 +232,7 @@ def test_repeated_baseline_fails_closed_for_workload_drift():
     """A performance comparison cannot silently change its sample count."""
     baseline = performance.Baseline((run("reference-1"), run("reference-2")))
 
-    result = baseline.evaluate(run("current", sample_count=11))
+    result = baseline.evaluate(run("current", samples=11))
 
     assert not result.passed
     assert result.violations == (

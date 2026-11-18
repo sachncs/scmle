@@ -1,0 +1,27 @@
+{
+  "completed_stages": [
+    "ingestion",
+    "validation",
+    "profiling"
+  ],
+  "dataset_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "manifest_digest": null,
+  "modality": "text",
+  "observed_dataset_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "package_path": "run/model",
+  "record_type": "modality_lifecycle_checkpoint",
+  "report_path": "run/modality_lifecycle.json",
+  "require_independent_ground_truth": true,
+  "schema_version": 1,
+  "seed": 7,
+  "signature": {
+    "algorithm": "hmac-sha256",
+    "value": "9cadbbda12cc8d059db86bb0d566367bb5e49b72efaaef116a2bbe6420157d40"
+  },
+  "stage_digests": [
+    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  ],
+  "status": "running"
+}

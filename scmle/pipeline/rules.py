@@ -96,7 +96,7 @@ class Memory(Refiner):
         Returns:
             The candidates whose estimated training memory is within the limit.
         """
-        rows = context.profile.manifest.row_count
+        rows = context.profile.manifest.rows
         width = max(len(context.profile.feature_plan.features), 1)
         limit = context.spec.resources.memory_limit_gb
         base_gb = rows * width * 8 / 1024**3

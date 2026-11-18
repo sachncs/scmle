@@ -16,7 +16,7 @@ def profile_of(frame, **spec_fields):
     )
     task = scmle.data.validation.target.TaskResolver(spec).resolve(frame["y"])
     manifest = scmle.contracts.data.DatasetManifest(
-        "d", "s", "h", len(frame), frame.shape[1], "y"
+        "d", {"schema": "s", "data": "h"}, len(frame), frame.shape[1], "y"
     )
     return spec, profiler.Profiler(spec).profile(frame, manifest, task, 0.0)
 

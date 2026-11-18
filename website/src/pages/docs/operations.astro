@@ -80,12 +80,12 @@ incident = workflow.open(
     rollback_target="model-previous",
 )
 workflow.acknowledge(
-    incident.incident_id,
+    incident.identifier,
     actor="ml-on-call",
     acknowledged_at=now,
 )
 workflow.resolve(
-    incident.incident_id,
+    incident.identifier,
     actor="ml-on-call",
     resolved_at=resolved_at,
     resolution="rolled back and replayed the affected window",

@@ -23,7 +23,7 @@ def test_project_persists_atomic_report_and_verifies_exact_replay(
     replay = project.verify_replay()
 
     assert project.result == result
-    assert envelope["schema_version"] == 1
+    assert envelope["schema_version"] == 2
     assert envelope["digest"] == result.digest()
     assert replay.level == "exact"
     assert replay.reasons == []
@@ -52,7 +52,7 @@ def test_project_rejects_tampered_report_before_replay(tmp_path) -> None:
     )
     project.run()
     envelope = json.loads(project.artifact_path.read_text(encoding="utf-8"))
-    envelope["report"]["rows_used"] += 1
+    envelope["report"]["rows"]["used"] += 1
     project.artifact_path.write_text(json.dumps(envelope), encoding="utf-8")
 
     with pytest.raises(ValueError, match="digest mismatch"):

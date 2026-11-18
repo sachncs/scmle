@@ -11,9 +11,9 @@ URI = "kafka://broker/topic"
 
 
 def make_event(
-    event_id="a", sequence=1, event_time="2026-01-01T00:00:00Z", **kw
+    identifier="a", sequence=1, occurred="2026-01-01T00:00:00Z", **kw
 ):
-    return incremental.Event(event_id, sequence, event_time, {"v": 1}, **kw)
+    return incremental.Event(identifier, sequence, occurred, {"v": 1}, **kw)
 
 
 def make_source(events=(), policy=incremental.Lateness.REJECT):
@@ -55,10 +55,10 @@ def test_parse_timestamp_converts_to_utc_and_names_the_field():
 
 
 def test_event_validation_messages_and_types():
-    with pytest.raises(ValueError, match=r"^event_id must not be empty$"):
-        make_event(event_id="  ")
-    with pytest.raises(ValueError, match=r"^event_id must not be empty$"):
-        make_event(event_id=4)
+    with pytest.raises(ValueError, match=r"^identifier must not be empty$"):
+        make_event(identifier="  ")
+    with pytest.raises(ValueError, match=r"^identifier must not be empty$"):
+        make_event(identifier=4)
     with pytest.raises(TypeError, match=r"^sequence must be an integer$"):
         make_event(sequence=True)
     with pytest.raises(TypeError, match=r"^sequence must be an integer$"):
@@ -68,10 +68,10 @@ def test_event_validation_messages_and_types():
     ):
         make_event(sequence=0)
     assert make_event(sequence=1).sequence == 1
-    with pytest.raises(ValueError, match=r"^event_time must be ISO-8601$"):
-        make_event(event_time="nope")
-    with pytest.raises(ValueError, match=r"^ingest_time must be ISO-8601$"):
-        make_event(ingest_time="nope")
+    with pytest.raises(ValueError, match=r"^occurred must be ISO-8601$"):
+        make_event(occurred="nope")
+    with pytest.raises(ValueError, match=r"^ingested must be ISO-8601$"):
+        make_event(ingested="nope")
     with pytest.raises(TypeError, match=r"^payload must be a mapping$"):
         incremental.Event("a", 1, "2026-01-01T00:00:00Z", [1])
     original = {"k": 1}
@@ -80,18 +80,19 @@ def test_event_validation_messages_and_types():
     assert event.payload is not original
 
 
-def test_event_dict_round_trip_includes_ingest_time_only_when_set():
+def test_event_dict_round_trip_includes_ingested_only_when_set():
     plain = make_event()
     assert plain.to_dict() == {
-        "event_id": "a",
+        "schema_version": 2,
+        "identifier": "a",
         "sequence": 1,
-        "event_time": "2026-01-01T00:00:00Z",
+        "occurred": "2026-01-01T00:00:00Z",
         "payload": {"v": 1},
     }
-    stamped = make_event(ingest_time="2026-01-02T00:00:00Z")
-    assert stamped.to_dict()["ingest_time"] == "2026-01-02T00:00:00Z"
+    stamped = make_event(ingested="2026-01-02T00:00:00Z")
+    assert stamped.to_dict()["ingested"] == "2026-01-02T00:00:00Z"
     assert incremental.Event.from_dict(stamped.to_dict()) == stamped
-    assert incremental.Event.from_dict(plain.to_dict()).ingest_time == ""
+    assert incremental.Event.from_dict(plain.to_dict()).ingested == ""
     rebuilt = incremental.Event.from_dict(
         {
             "event_id": 7,
@@ -100,13 +101,11 @@ def test_event_dict_round_trip_includes_ingest_time_only_when_set():
             "payload": {},
         }
     )
-    assert (rebuilt.event_id, rebuilt.sequence) == ("7", 3)
+    assert (rebuilt.identifier, rebuilt.sequence) == ("7", 3)
 
 
 def test_checkpoint_validation_and_round_trip():
-    with pytest.raises(
-        ValueError, match=r"^source_identity must not be empty$"
-    ):
+    with pytest.raises(ValueError, match=r"^source must not be empty$"):
         incremental.Checkpoint("  ")
     with pytest.raises(TypeError, match=r"^sequence must be an integer$"):
         incremental.Checkpoint("s", True)
@@ -122,14 +121,12 @@ def test_checkpoint_validation_and_round_trip():
 
     point = incremental.Checkpoint("s", 4, "2026-01-01T00:00:00+00:00")
     assert point.to_dict() == {
-        "source_identity": "s",
+        "source": "s",
         "sequence": 4,
         "watermark": "2026-01-01T00:00:00+00:00",
     }
     assert incremental.Checkpoint.from_dict(point.to_dict()) == point
-    loose = incremental.Checkpoint.from_dict(
-        {"source_identity": 12, "sequence": "5"}
-    )
+    loose = incremental.Checkpoint.from_dict({"source": 12, "sequence": "5"})
     assert loose == incremental.Checkpoint("12", 5, "")
     with pytest.raises(ValueError, match=r"different source"):
         point.bind("other")
@@ -158,7 +155,7 @@ def test_receipt_to_dict_and_validation():
     point = incremental.Checkpoint("s", 2)
     receipt = incremental.Ack("s", ("a",), ("b",), point)
     assert receipt.to_dict() == {
-        "schema_version": 1,
+        "schema_version": 2,
         "source_identity": "s",
         "accepted_event_ids": ["a"],
         "duplicate_event_ids": ["b"],
@@ -186,29 +183,27 @@ def test_acknowledgement_validation_and_round_trip():
     point = incremental.Checkpoint("s", 1)
     ack = incremental.EventAcknowledgement("s", "g", ("a", "b"), point)
     assert ack.to_dict() == {
-        "schema_version": 1,
-        "source_identity": "s",
-        "consumer_group": "g",
-        "event_ids": ["a", "b"],
+        "schema_version": 2,
+        "source": "s",
+        "consumer": "g",
+        "events": ["a", "b"],
         "checkpoint": point.to_dict(),
     }
     assert incremental.EventAcknowledgement.from_dict(ack.to_dict()) == ack
-    for version in (2, None):
+    for version in (3, None):
         record = ack.to_dict()
         record["schema_version"] = version
-        with pytest.raises(ValueError, match=r"^unsupported acknowledgement"):
+        with pytest.raises(
+            ValueError, match=r"^(unsupported ack|Event.*newer)"
+        ):
             incremental.EventAcknowledgement.from_dict(record)
-    with pytest.raises(
-        ValueError, match=r"^source_identity must not be empty$"
-    ):
+    with pytest.raises(ValueError, match=r"^source must not be empty$"):
         incremental.EventAcknowledgement(
             " ", "g", (), incremental.Checkpoint("x")
         )
-    with pytest.raises(ValueError, match=r"^consumer_group must not be empty$"):
+    with pytest.raises(ValueError, match=r"^consumer must not be empty$"):
         incremental.EventAcknowledgement("s", " ", (), point)
-    with pytest.raises(
-        ValueError, match=r"^event_ids must be sorted and unique$"
-    ):
+    with pytest.raises(ValueError, match=r"^events must be sorted and unique$"):
         incremental.EventAcknowledgement("s", "g", ("b", "a"), point)
     with pytest.raises(ValueError, match=r"^acknowledgement and checkpoint"):
         incremental.EventAcknowledgement(
@@ -221,7 +216,7 @@ def test_consumption_validation_and_dict():
     receipt = incremental.Ack("s", ("a",), (), point)
     done = incremental.Consumption("s", "g", receipt, ("a",))
     assert done.to_dict() == {
-        "schema_version": 1,
+        "schema_version": 2,
         "source_identity": "s",
         "consumer_group": "g",
         "receipt": receipt.to_dict(),
@@ -385,17 +380,19 @@ def test_committed_state_round_trip_and_validation():
     point = incremental.Checkpoint("s", 2)
     state = incremental.Settlement(point, ("a", "b"))
     assert state.to_dict() == {
-        "schema_version": 1,
+        "schema_version": 2,
         "checkpoint": point.to_dict(),
-        "seen_event_ids": ["a", "b"],
+        "seen": ["a", "b"],
     }
     assert incremental.Settlement.from_dict(state.to_dict()) == state
-    for version in (2, None):
+    for version in (3, None):
         record = state.to_dict()
         record["schema_version"] = version
-        with pytest.raises(ValueError, match=r"^unsupported incremental state"):
+        with pytest.raises(
+            ValueError, match=r"^(unsupported inc|Settl.*newer)"
+        ):
             incremental.Settlement.from_dict(record)
-    with pytest.raises(ValueError, match=r"^seen_event_ids must be sorted"):
+    with pytest.raises(ValueError, match=r"^seen must be sorted"):
         incremental.Settlement(point, ("b", "a"))
 
 
@@ -475,7 +472,7 @@ def test_commit_is_idempotent_and_rejects_regression(tmp_path):
         incremental.Checkpoint(ident, 4, "2026-01-01T00:00:00+00:00"),
     )
     state = ledger.commit(first)
-    assert state.seen_event_ids == ("a",)
+    assert state.seen == ("a",)
     assert ledger.load() == state
     before = ledger.path.stat().st_mtime_ns
     assert ledger.commit(first) == state
@@ -497,7 +494,7 @@ def test_commit_is_idempotent_and_rejects_regression(tmp_path):
         (make_event("c", 3),),
         incremental.Checkpoint(ident, 4, "2026-01-01T00:00:00+00:00"),
     )
-    assert ledger.commit(same_point).seen_event_ids == ("a", "c")
+    assert ledger.commit(same_point).seen == ("a", "c")
 
 
 def test_commit_with_writer_receipt_and_checkpoint(tmp_path):
@@ -509,12 +506,14 @@ def test_commit_with_writer_receipt_and_checkpoint(tmp_path):
     ]
     receipt = ledger.finalize(events, written.append)
 
-    assert [tuple(e.event_id for e in call) for call in written] == [("a", "b")]
+    assert [tuple(e.identifier for e in call) for call in written] == [
+        ("a", "b")
+    ]
     assert receipt.accepted_event_ids == ("a", "b")
     assert receipt.duplicate_event_ids == ()
     assert receipt.checkpoint.sequence == 2
     assert receipt.checkpoint.watermark == "2026-01-05T00:00:00+00:00"
-    assert ledger.load().seen_event_ids == ("a", "b")
+    assert ledger.load().seen == ("a", "b")
 
     again = ledger.finalize(
         [make_event("a", 1), make_event("c", 9, "2026-01-03T00:00:00Z")],
@@ -557,7 +556,7 @@ def test_commit_with_writer_stages_the_acknowledgement_at_the_checkpoint(
 
     staged = ledger.reclaim()
     assert staged.checkpoint.sequence == 3
-    assert staged.consumer_group == "g"
+    assert staged.consumer == "g"
     text = ledger.pending_acknowledgement_path.read_text(encoding="utf-8")
     assert text == json.dumps(staged.to_dict(), sort_keys=True) + "\n"
     ledger.retract()
@@ -634,7 +633,7 @@ def test_consume_commits_and_acknowledges_everything_seen(tmp_path):
     assert done.receipt.accepted_event_ids == ("a", "b")
     assert done.acknowledged_event_ids == ("a", "b")
     assert len(sink) == 1
-    assert delivered[0].event_ids == ("a", "b")
+    assert delivered[0].events == ("a", "b")
     assert delivered[0].checkpoint.sequence == 2
     assert ledger.reclaim() is None
 

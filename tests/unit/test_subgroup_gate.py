@@ -32,7 +32,7 @@ def test_without_a_certificate_the_family_is_descriptive(tmp_path):
 
 
 def test_a_passing_current_certificate_makes_the_family_gating(tmp_path):
-    # Enforces docs/ARTIFACTS.md:41.
+    # Enforces docs/ARTIFACTS.md:47.
     gate = certified.subgroup_gate(
         run.stratify, certificate(tmp_path / "c.json")
     )

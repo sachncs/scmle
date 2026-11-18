@@ -239,15 +239,13 @@ def measure_corpus(name: str) -> dict[str, Any]:
             rows.append(
                 {
                     "detector": detector_id,
-                    "defect_type": item.defect_type,
+                    "defect_type": item.defect,
                     "planted": item.planted,
                     "detected": item.detected,
-                    "recall_lower": round(outcome.recall_interval[0], 4),
-                    "clean_rows": item.clean_rows,
-                    "false_alarms": item.false_alarms,
-                    "false_alarm_upper": round(
-                        outcome.false_alarm_interval[1], 4
-                    ),
+                    "recall_lower": round(outcome.recall[0], 4),
+                    "clean_rows": item.clean,
+                    "false_alarms": item.alarms,
+                    "false_alarm_upper": round(outcome.alarms[1], 4),
                     "passes_floor": outcome.passed,
                 }
             )
@@ -299,8 +297,8 @@ def measure_all() -> dict[str, Any]:
     tables = {name: measure_corpus(name) for name in CORPORA}
     return {
         "policy": {
-            "recall_floor": f5.POLICY.recall_floor,
-            "false_alarm_ceiling": f5.POLICY.false_alarm_ceiling,
+            "recall_floor": f5.POLICY.recall,
+            "false_alarm_ceiling": f5.POLICY.alarms,
             "confidence": f5.POLICY.confidence,
         },
         "seeds": list(f5.ROW_SEEDS),

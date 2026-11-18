@@ -6,6 +6,7 @@ repository, the code that built the model, or the original run.
 """
 
 import ast
+import importlib.util
 import json
 import pathlib
 import shutil
@@ -98,3 +99,17 @@ def test_a_wrong_key_fails_the_walk(reviewer_desk):
     done = walk(reviewer_desk, "--keys", "keys.json")
     assert done.returncode == 1
     assert "the approval: signature made with the reviewer key" in done.stdout
+
+
+def test_a_record_key_is_read_under_its_new_or_its_old_name():
+    """A trail written before or after the stage B key renames is read."""
+    spec = importlib.util.spec_from_file_location("trace", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    field = module.field
+    paths = ("digests.charter", "charter_hash")
+
+    assert field({"digests": {"charter": "new"}}, *paths) == "new"
+    assert field({"charter_hash": "old"}, *paths) == "old"
+    with pytest.raises(KeyError):
+        field({}, *paths)

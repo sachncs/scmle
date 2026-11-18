@@ -144,5 +144,5 @@ def test_the_boosted_multi_target_model_survives_a_tight_budget(tmp_path):
         output_dir=tmp_path,
     ).plan()
 
-    assert "multi_hist_gradient_boosting" in plan.candidate_models
-    assert "multi_random_forest" not in plan.candidate_models
+    assert "multi_hist_gradient_boosting" in plan.candidates
+    assert "multi_random_forest" not in plan.candidates

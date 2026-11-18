@@ -110,38 +110,36 @@ def test_the_declared_fault_plan_is_exactly_the_reviewed_table():
         tuple(
             (
                 plan.scenario.name,
-                plan.expected_safe_outcome.name,
+                plan.outcome.name,
                 plan.recoverability.name,
-                plan.evidence_requirements,
+                plan.requirements,
             )
             for plan in plans
         )
         == DECLARED
     )
-    assert all(plan.release_blocking is True for plan in plans)
+    assert all(plan.blocking is True for plan in plans)
 
 
 def test_plan_enum_fields_are_type_checked_under_their_own_names():
     good = {
         "scenario": reliability.Contingency.PROCESS_DEATH,
-        "expected_safe_outcome": (
-            reliability.SafeOutcome.RESUME_DURABLE_CHECKPOINT
-        ),
+        "outcome": (reliability.SafeOutcome.RESUME_DURABLE_CHECKPOINT),
         "recoverability": reliability.Recoverability.AUTOMATIC,
-        "evidence_requirements": ("a",),
-        "release_blocking": True,
-        "verification_status": reliability.Verification.PLANNED,
+        "requirements": ("a",),
+        "blocking": True,
+        "verification": reliability.Verification.PLANNED,
     }
     for name, expected in (
         ("scenario", "Contingency"),
-        ("expected_safe_outcome", "SafeOutcome"),
+        ("outcome", "SafeOutcome"),
         ("recoverability", "Recoverability"),
-        ("verification_status", "Verification"),
+        ("verification", "Verification"),
     ):
         with pytest.raises(TypeError, match=f"^{name} must be {expected}$"):
             reliability.Plan(**{**good, name: "wrong"})
-    with pytest.raises(TypeError, match="release_blocking must be bool"):
-        reliability.Plan(**{**good, "release_blocking": 1})
+    with pytest.raises(TypeError, match="blocking must be bool"):
+        reliability.Plan(**{**good, "blocking": 1})
 
 
 def test_blank_or_non_text_requirements_are_rejected_individually():
@@ -196,7 +194,7 @@ def test_plan_round_trip_keeps_status_and_evidence():
     restored = reliability.Plan.from_dict(plan.to_dict())
 
     assert restored == plan
-    assert restored.verification_status is reliability.Verification.PASSED
+    assert restored.verification is reliability.Verification.PASSED
     assert restored.evidence == evidence
 
 
@@ -212,11 +210,11 @@ def test_record_evidence_validates_its_input_with_specific_messages():
     ):
         registry.log(scenario, [make_evidence("process_termination")])
     other = dataclasses.replace(
-        make_evidence("checkpoint_resume"), execution_id="different"
+        make_evidence("checkpoint_resume"), execution="different"
     )
     with pytest.raises(
         ValueError,
-        match=r"^evidence for one scenario must share an execution_id$",
+        match=r"^evidence for one scenario must share an execution$",
     ):
         registry.log(scenario, (make_evidence("process_termination"), other))
     with pytest.raises(

@@ -12,20 +12,18 @@ from scmle.contracts import qualification
 HASH_A = "a" * 64
 HASH_B = "b" * 64
 CORPUS = "c" * 64
-POLICY = certificates.Standard(
-    recall_floor=0.8, false_alarm_ceiling=0.05, confidence=0.95
-)
+POLICY = certificates.Standard(recall=0.8, alarms=0.05, confidence=0.95)
 
 
 def measured(defect="label_flip", planted=200, detected=190, fa=2, clean=1000):
     return qualification.Certificate(
-        detector_id="d1",
-        defect_type=defect,
+        detector="d1",
+        defect=defect,
         planted=planted,
         detected=detected,
-        clean_rows=clean,
-        false_alarms=fa,
-        seed_path=(0, "inject.label_flip", 0),
+        clean=clean,
+        alarms=fa,
+        seeds=(0, "inject.label_flip", 0),
     )
 
 
@@ -137,8 +135,8 @@ def test_certify_passes_only_when_both_bounds_hold():
     good = certified()
     assert good.certified_defect_types == ("label_flip",)
     outcome = good.outcomes[0]
-    assert outcome.recall_interval[0] >= POLICY.recall_floor
-    assert outcome.false_alarm_interval[1] <= POLICY.false_alarm_ceiling
+    assert outcome.recall[0] >= POLICY.recall
+    assert outcome.alarms[1] <= POLICY.alarms
 
 
 def test_low_recall_lower_bound_fails_even_when_the_point_estimate_passes():
@@ -190,7 +188,7 @@ def test_store_rejects_tampered_pass_flags_and_unknown_fields(tmp_path):
         certificates.Store.from_dict(document)
 
     document = store.to_dict()
-    document["certificates"][0]["outcomes"][0]["recall_interval"] = [0.9, 1.0]
+    document["certificates"][0]["outcomes"][0]["recall"] = [0.9, 1.0]
     with pytest.raises(certificates.CertificateError, match="interval"):
         certificates.Store.from_dict(document)
 

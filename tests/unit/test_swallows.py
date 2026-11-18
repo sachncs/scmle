@@ -169,9 +169,7 @@ def test_champion_counts_every_dropped_resample(monkeypatch):
     )
     monkeypatch.setattr(metrics.CATALOG, "resolve", lambda name, task: metric)
     model = types.SimpleNamespace(
-        schema=types.SimpleNamespace(
-            task="regression", group_column=None, time_column=None
-        ),
+        schema=types.SimpleNamespace(task="regression", group=None, time=None),
         info=types.SimpleNamespace(metric="rmse"),
         pipeline=None,
         prepare=lambda frame: frame,
@@ -235,12 +233,12 @@ def test_a_malformed_policy_amendment_is_refused_not_applied(tmp_path):
     from scmle.governance import loop
 
     policy = loop.Preregistration(
-        reference_risk=0.1,
+        reference=0.1,
         tolerance=0.05,
-        r_star=0.6,
-        initial_tau=0.5,
-        min_matured=5,
-        outcome_window=0,
+        target=0.6,
+        tau=0.5,
+        matured=5,
+        maturity=0,
         scope="m:s",
     )
     charter = types.SimpleNamespace(charter_hash="a" * 64)

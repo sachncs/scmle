@@ -616,5 +616,5 @@ class Controller:
                 identity: self.envelopes.remaining(identity)
                 for identity in ledger.envelopes
             },
-            "alarm_gates_retrain": self.loop.policy.alarm_gates_retrain,
+            "alarm_gates_retrain": self.loop.policy.retrain,
         }

@@ -16,7 +16,7 @@ def spec(**changes):
     values = {
         "rows": 100,
         "sums": (ingest.Total("amount", 5000.0),),
-        "checksum_column": "order_id",
+        "column": "order_id",
         "checksum": declared.sha(orders()["order_id"]),
     }
     values.update(changes)
@@ -50,7 +50,7 @@ def test_a_dropped_row_stops_the_run_with_the_quantity_named():
 def test_a_sum_within_the_tolerance_passes_and_beyond_it_fails():
     frame = orders()
     frame.loc[0, "amount"] = 60.0
-    block = spec(rows=None, checksum_column=None, checksum=None)
+    block = spec(rows=None, column=None, checksum=None)
     assert not declared.reconcile({"orders": frame}, block, 0.0)["passed"]
     assert not declared.reconcile({"orders": frame}, block, 0.001)["passed"]
     assert declared.reconcile({"orders": frame}, block, 0.01)["passed"]
@@ -103,7 +103,7 @@ def test_the_source_is_queried_and_a_zero_total_is_compared_not_skipped():
             ingest.TableTotals(
                 "orders",
                 sums=(ingest.Total("amount", 0.0),),
-                checksum_column="order_id",
+                column="order_id",
                 checksum=declared.sha(orders()["order_id"]),
             ),
         )

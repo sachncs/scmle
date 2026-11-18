@@ -608,12 +608,12 @@ def run_mnar_loop(seed: int) -> dict[str, Any]:
     )
     charter = types.SimpleNamespace(charter_hash="c" * 64)
     policy = scmle.governance.loop.Preregistration(
-        reference_risk=R_REF,
+        reference=R_REF,
         tolerance=DELTA,
-        r_star=0.6,
-        initial_tau=0.5,
-        min_matured=5,
-        outcome_window=0,
+        target=0.6,
+        tau=0.5,
+        matured=5,
+        maturity=0,
     )
     with tempfile.TemporaryDirectory() as directory:
         loop = scmle.governance.loop.Loop.open(

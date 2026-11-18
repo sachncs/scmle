@@ -27,14 +27,14 @@ def spec(**changes):
 
 def make_policy(**changes):
     values = {
-        "reference_risk": 0.10,
+        "reference": 0.10,
         "tolerance": 0.05,
         "scope": SCOPE,
-        "initial_tau": 0.5,
-        "min_matured": 5,
-        "r_star": 0.6,
-        "alarm_gates_retrain": True,
-        "outcome_window": 0,
+        "tau": 0.5,
+        "matured": 5,
+        "target": 0.6,
+        "retrain": True,
+        "maturity": 0,
     }
     values.update(changes)
     return scmle.governance.loop.Preregistration(**values)
@@ -100,15 +100,15 @@ def rows(loop, kind):
     return [r for r in loop.ledger.rows if r["kind"] == kind]
 
 
-def reply_to(escalation, key=HUMAN_KEY, **changes):
+def reply_to(pending, key=HUMAN_KEY, **changes):
     fields = {
-        "escalation_id": escalation.id,
-        "question_hash": escalation.question_hash,
+        "escalation": pending.id,
+        "digests": {"question": pending.question_hash},
         "decision": "approve",
         "statement": "reviewed",
         "evidence": "ticket-1",
         "role": "owner",
-        "name_or_id": "P. Owner",
+        "attestor": "P. Owner",
         "date": "2026-11-01",
         "scope": SCOPE,
         "expires": "2026-12-01",
@@ -135,16 +135,16 @@ def test_a_different_charter_or_policy_is_refused(tmp_path):
             tmp_path / "deploy", other, make_policy()
         )
     with pytest.raises(deployment_ledger.MisuseError, match="policy"):
-        open_loop(tmp_path, make_policy(r_star=0.04))
+        open_loop(tmp_path, make_policy(target=0.04))
 
 
 def test_policy_validation():
     with pytest.raises(ValueError):
-        make_policy(r_star=1.5)
+        make_policy(target=1.5)
     with pytest.raises(ValueError):
-        make_policy(reference_risk=0.99, tolerance=0.5)
-    with pytest.raises(ValueError, match="safe_default"):
-        make_policy(safe_default=" ")
+        make_policy(reference=0.99, tolerance=0.5)
+    with pytest.raises(ValueError, match="fallback"):
+        make_policy(fallback=" ")
 
 
 def test_state_that_does_not_match_the_ledger_starts_halted(tmp_path):
@@ -168,7 +168,7 @@ def test_state_that_does_not_match_the_ledger_starts_halted(tmp_path):
 
 
 def test_cases_are_routed_by_score_and_capacity(tmp_path):
-    loop = open_loop(tmp_path, make_policy(c_max=0.2))
+    loop = open_loop(tmp_path, make_policy(escalation=0.2))
     stream = streams.simulate(spec(batches=1, seed=2))
     sizes = numpy.where(numpy.arange(50) < 20, 3, 1)
     outcome = loop.observe(
@@ -187,7 +187,7 @@ def test_cases_are_routed_by_score_and_capacity(tmp_path):
 
 
 def test_everything_escalates_until_the_first_calibration(tmp_path):
-    loop = open_loop(tmp_path, make_policy(initial_tau=None, c_max=1.0))
+    loop = open_loop(tmp_path, make_policy(tau=None, escalation=1.0))
     stream = streams.simulate(spec(batches=1, seed=2))
     outcome = loop.observe(batch_frame(stream, 0), numpy.zeros(50), ["a"] * 50)
     assert outcome.routing.coverage == 0.0
@@ -208,9 +208,7 @@ def test_observe_validates_alignment(tmp_path):
 
 
 def test_out_of_support_high_impact_cases_are_not_answered(tmp_path):
-    loop = open_loop(
-        tmp_path, make_policy(high_impact_actions=("deny",), c_max=1.0)
-    )
+    loop = open_loop(tmp_path, make_policy(critical=("deny",), escalation=1.0))
     stream = streams.simulate(spec(batches=1, seed=2))
     novel = numpy.arange(50) < 5
     decisions = ["deny"] * 25 + ["approve"] * 25
@@ -366,10 +364,10 @@ def test_a_better_challenger_yields_a_promotion_proposal_in_order(tmp_path):
     loop = open_loop(
         tmp_path,
         make_policy(
-            reference_risk=0.2,
+            reference=0.2,
             tolerance=0.3,
-            challenger_budget=100,
-            reply_timeout=1000,
+            budget=100,
+            timeout=1000,
         ),
     )
     stream, sequence = paired([0.0, 0.12])
@@ -406,10 +404,10 @@ def test_a_challenger_without_evidence_escalates_at_the_label_budget(tmp_path):
     loop = open_loop(
         tmp_path,
         make_policy(
-            reference_risk=0.2,
+            reference=0.2,
             tolerance=0.3,
-            challenger_budget=20,
-            reply_timeout=1000,
+            budget=20,
+            timeout=1000,
         ),
     )
     stream, sequence = paired([0.0])
@@ -425,7 +423,7 @@ def test_a_challenger_without_evidence_escalates_at_the_label_budget(tmp_path):
 def test_a_worse_new_champion_creates_a_rollback_proposal_and_tightens_tau(
     tmp_path,
 ):
-    loop = open_loop(tmp_path, make_policy(reference_risk=0.2, tolerance=0.3))
+    loop = open_loop(tmp_path, make_policy(reference=0.2, tolerance=0.3))
     stream, sequence = paired([0.12])
     loop.surveil("previous")
     feed(loop, stream, challengers={"previous": sequence.challengers[0]})
@@ -435,7 +433,7 @@ def test_a_worse_new_champion_creates_a_rollback_proposal_and_tightens_tau(
 
 
 def test_two_consecutive_rollbacks_escalate(tmp_path):
-    loop = open_loop(tmp_path, make_policy(reference_risk=0.2, tolerance=0.3))
+    loop = open_loop(tmp_path, make_policy(reference=0.2, tolerance=0.3))
     for seed in (1, 2):
         stream, sequence = paired([0.12], seed=seed)
         loop.surveil("previous")
@@ -453,7 +451,7 @@ def test_two_consecutive_rollbacks_escalate(tmp_path):
 
 def test_selective_risk_above_target_halts_and_coverage_goes_to_zero(tmp_path):
     loop = open_loop(
-        tmp_path, make_policy(reference_risk=0.5, tolerance=0.4, r_star=0.05)
+        tmp_path, make_policy(reference=0.5, tolerance=0.4, target=0.05)
     )
     stream = streams.simulate(spec(base=0.3, batches=60, seed=8))
     feed(loop, stream)
@@ -469,7 +467,7 @@ def test_selective_risk_above_target_halts_and_coverage_goes_to_zero(tmp_path):
 
 def test_halt_is_released_only_by_a_passing_recalibration(tmp_path):
     loop = open_loop(
-        tmp_path, make_policy(reference_risk=0.5, tolerance=0.4, r_star=0.05)
+        tmp_path, make_policy(reference=0.5, tolerance=0.4, target=0.05)
     )
     stream = streams.simulate(spec(base=0.3, batches=60, seed=8))
     feed(loop, stream)
@@ -484,7 +482,7 @@ def test_halt_is_released_only_by_a_passing_recalibration(tmp_path):
 def test_lowering_tau_after_the_first_calibration_needs_an_attestation(
     tmp_path,
 ):
-    loop = open_loop(tmp_path, make_policy(initial_tau=None))
+    loop = open_loop(tmp_path, make_policy(tau=None))
     data = streams.draw_calibration(3000, 0.05, seed=1)
     first = loop.calibrate(data["score"], data["loss"])
     loop.tau = min(1.0, first.tau + 0.2)
@@ -493,9 +491,7 @@ def test_lowering_tau_after_the_first_calibration_needs_an_attestation(
 
 
 def test_coverage_and_novelty_triggers_escalate(tmp_path):
-    loop = open_loop(
-        tmp_path, make_policy(coverage_target=0.9, novelty_bound=0.05)
-    )
+    loop = open_loop(tmp_path, make_policy(coverage=0.9, novelty=0.05))
     stream = streams.simulate(spec(batches=40, seed=9))
     for index in range(40):
         frame = batch_frame(stream, index, novel=numpy.arange(50) < 20)
@@ -548,11 +544,11 @@ def test_rejecting_or_undecided_replies_apply_the_safe_default(tmp_path):
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
-        ({"question_hash": "f" * 64}, "different question"),
+        ({"digests": {"question": "f" * 64}}, "different question"),
         ({"scope": "other"}, "scope"),
         ({"expires": "2026-11-02"}, "expired"),
         ({"date": "2026-11-10", "expires": "2026-12-10"}, "future"),
-        ({"escalation_id": "esc-99"}, "different escalation"),
+        ({"escalation": "esc-99"}, "different escalation"),
     ],
 )
 def test_replies_that_do_not_fit_are_refused(tmp_path, changes, message):
@@ -585,7 +581,7 @@ def test_signature_key_and_system_key_checks(tmp_path):
 
 
 def test_unanswered_escalations_time_out_with_the_safe_default(tmp_path):
-    loop = open_loop(tmp_path, make_policy(reply_timeout=3))
+    loop = open_loop(tmp_path, make_policy(timeout=3))
     with pytest.raises(never_list.AttestationRequired):
         loop.rewrite(lambda: None, {"op": "truncate"})
     stream = streams.simulate(spec(batches=6, seed=1))
@@ -637,13 +633,11 @@ NEVER_CASES = {
     "reopen_sealed": lambda loop, calls: loop.reopen_sealed(
         lambda: calls.append("c"), {"set": "C"}
     ),
-    "change_charter": lambda loop, calls: loop.amend_policy(
-        safe_default="approve"
-    ),
+    "change_charter": lambda loop, calls: loop.amend_policy(fallback="approve"),
     "rewrite_ledger": lambda loop, calls: loop.rewrite(
         lambda: calls.append("x"), {"op": "rm"}
     ),
-    "relax_threshold": lambda loop, calls: loop.amend_policy(r_star=0.9),
+    "relax_threshold": lambda loop, calls: loop.amend_policy(target=0.9),
     "act_on_unverified": lambda loop, calls: loop.act_on_unverified(
         "retrain", lambda: calls.append("r")
     ),
@@ -721,15 +715,15 @@ def test_the_system_cannot_attest_for_itself(tmp_path):
 
 def test_tightening_is_free_and_loosening_is_not(tmp_path):
     loop = open_loop(tmp_path)
-    updated = loop.amend_policy(r_star=0.03, delta_promo=0.01)
-    assert updated.r_star == 0.03
+    updated = loop.amend_policy(target=0.03, promotion={"delta": 0.01})
+    assert updated.target == 0.03
     with pytest.raises(never_list.AttestationRequired):
-        loop.amend_policy(r_star=0.9)
+        loop.amend_policy(target=0.9)
     esc = loop.pending_escalations()[-1]
     loop.reply(esc.id, reply_to(esc))
-    assert loop.amend_policy(r_star=0.9).r_star == 0.9
+    assert loop.amend_policy(target=0.9).target == 0.9
     again = open_loop(tmp_path, loop.policy)
-    assert again.policy.r_star == 0.9
+    assert again.policy.target == 0.9
     with pytest.raises(ValueError, match="unknown"):
         loop.amend_policy(nothing=1)
 
@@ -827,7 +821,7 @@ def test_an_uncertified_alarm_escalates_instead_of_retraining(tmp_path):
     calls = []
     loop = open_loop(
         tmp_path,
-        make_policy(alarm_gates_retrain=False),
+        make_policy(retrain=False),
         hooks=scmle.governance.loop.Hooks(retrain=lambda: calls.append(1)),
     )
     stream = streams.simulate(

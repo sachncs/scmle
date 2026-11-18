@@ -20,24 +20,24 @@ def message(call):
 
 
 def test_rule_choices_are_named_in_full():
-    assert message(partial(rules.Procedure, ledger_rule="x")) == (
-        f"ledger_rule must be one of {online_fdr.RULE_NAMES}"
+    assert message(partial(rules.Procedure, ledger="x")) == (
+        f"ledger must be one of {online_fdr.RULE_NAMES}"
     )
     allowed = ("bonferroni", "holm", "bh", "by")
-    assert message(partial(rules.Procedure, confirmation_rule="x")) == (
-        f"confirmation_rule must be one of {allowed}"
+    assert message(partial(rules.Procedure, confirmation="x")) == (
+        f"confirmation must be one of {allowed}"
     )
-    assert message(partial(rules.Procedure, failure_policy="retry")) == (
-        "failure_policy must be 'unconfirmed': no other policy is implemented"
+    assert message(partial(rules.Procedure, failure="retry")) == (
+        "failure must be 'unconfirmed': no other policy is implemented"
     )
-    assert message(partial(rules.Procedure, stability_filter=1)) == (
-        "stability_filter must be a boolean"
+    assert message(partial(rules.Procedure, stability=1)) == (
+        "stability must be a boolean"
     )
 
 
 def test_stability_shares_are_in_the_half_open_unit_interval():
-    assert rules.Procedure(s_min=1.0, q_min=1.0).s_min == 1.0
-    for name in ("s_min", "q_min"):
+    assert rules.Procedure(agreement=1.0, exclusion=1.0).agreement == 1.0
+    for name in ("agreement", "exclusion"):
         for bad in (0.0, -0.1, 1.01):
             assert message(partial(rules.Procedure, **{name: bad})) == (
                 f"{name} must be within (0, 1]"
@@ -72,9 +72,9 @@ def test_an_amendment_that_loosens_any_one_of_the_three_is_refused():
     old = make_charter()
     same = make_charter()
     sealing.permit(old, same)
-    sealing.permit(old, make_charter(k_max=old.k_max - 1))
+    sealing.permit(old, make_charter(quota=old.quota - 1))
     for loosened in (
-        make_charter(k_max=old.k_max + 1),
+        make_charter(quota=old.quota + 1),
         make_charter(question="Another question?"),
         make_charter(seed=99),
     ):
@@ -90,26 +90,26 @@ def test_an_amendment_that_loosens_any_one_of_the_three_is_refused():
 
 def test_an_amendment_may_tighten_alpha_or_wealth_but_not_loosen_either():
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:388.
-    old = make_charter(error_budget=budget.ErrorBudget.create(0.05, 0.1))
+    old = make_charter(budget=budget.ErrorBudget.create(0.05, 0.1))
     for tighter in (
         budget.ErrorBudget.create(0.04, 0.1),
         budget.ErrorBudget.create(0.05, 0.05),
         budget.ErrorBudget.create(0.04, 0.05),
     ):
-        sealing.permit(old, make_charter(error_budget=tighter))
+        sealing.permit(old, make_charter(budget=tighter))
     for looser in (
         budget.ErrorBudget.create(0.06, 0.1),
         budget.ErrorBudget.create(0.05, 0.2),
     ):
         with pytest.raises(Exception, match="may only tighten"):
-            sealing.permit(old, make_charter(error_budget=looser))
+            sealing.permit(old, make_charter(budget=looser))
 
 
 def test_an_amendment_that_changes_another_budget_field_is_refused():
-    old = make_charter(error_budget=budget.ErrorBudget.create(0.05, 0.1))
+    old = make_charter(budget=budget.ErrorBudget.create(0.05, 0.1))
     other = make_charter(
-        error_budget=budget.ErrorBudget.create(
-            0.05, 0.1, permutations_b=old.error_budget.permutations_b + 100
+        budget=budget.ErrorBudget.create(
+            0.05, 0.1, permutations=old.budget.permutations + 100
         )
     )
     with pytest.raises(Exception, match="may only tighten"):

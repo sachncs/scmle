@@ -1,6 +1,6 @@
 {
   "claim": "C6",
-  "code": "4cbab4701ccff3e5277ff4b85430b81c73afbb9fc818d5963de904d0c409487c",
+  "code": "6e83dbb9350983840379e1a01ac35940508049a57e7ad298cc81b4a2f2c91f02",
   "not_measured": [
     "platforms other than those recorded here",
     "a clean-runner rebuild from the lock file",
@@ -27,7 +27,7 @@
         }
       },
       "rows": 600,
-      "seconds": 62.5,
+      "seconds": 59.3,
       "seed": 7,
       "tasks": {
         "binary": {
@@ -37,14 +37,14 @@
             "relative": 0.0
           },
           "hashes": {
-            "conformal.json": "c56e7abe3d6529f9c7843571238bd5aa1c1f673faa012d13e43068fa82285f58",
+            "conformal.json": "0acdda4b2b8c5dbe0edd17b67714f67870510c27b6aa4b098e905a1ef2cbf5b4",
             "coverage_report.json": "f9bed89f1d321a3592f3d0dd6c7bf7098cbf8b4760552fd66b676194033b1e3b",
-            "model_manifest.json": "08c4b76d9d737d82493ab210cfe7e83dd0c30821d154db971af67d50936cf800",
+            "model_manifest.json": "b01282e274d290d822c0fec36829d1d6549b3bde738f82396d996c6a4c4bda9a",
             "novelty.joblib": "9064537f33db4f61ea6aec6caa8949613d712c7d86338820fc2c81e15f5d9ffc",
             "pipeline.joblib": "25c6a38f56b6b844980d4c4249a0f3087cccfba417bcb956411d1c8e9f02f8a8",
-            "reference.json": "b1a7360712ac3ab9402bc5b2376d6e8f9569f22c0394ccb750de6b6a52d50a07",
-            "schema.json": "6141ad7e54feef8ed46bd90746a4059cc10fa570be55c0aeb3879c838c27e2c7",
-            "signature.json": "8e8b0938aa4b214b743620071311a84a0b6275dbb86136891d63f7d8a97e5b4d"
+            "reference.json": "50784221a9505d6e5e06e3d3ed9d2bf210132b6f4a5bbc85e4f9211269f87635",
+            "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
+            "signature.json": "e054722e0b2b230e216c2dbec87c048662649319e4c6ead2fb4458f9169e8c9b"
           },
           "members": 8,
           "metrics": {
@@ -56,7 +56,7 @@
             "roc_auc": 0.9598997493734336
           },
           "seconds": [
-            4.3,
+            3.9,
             4.0
           ],
           "selected": [
@@ -83,14 +83,14 @@
             "relative": 0.0
           },
           "hashes": {
-            "conformal.json": "213dde484f30526e949308cf91d3434f5e5fa4fa841952c49d378ce341e67983",
+            "conformal.json": "c53e56dc776e7d91b89229f5d1e56fff73a83958ac28e8749622fca806b1682f",
             "coverage_report.json": "55c021183fefafdc785e94307e24357426835fdde481bf6afa0d8d2cf80bf626",
-            "model_manifest.json": "6e966dbace4b9940d14859219144b48801de6596c38a30b26a7f7b24e5965b9d",
+            "model_manifest.json": "1073572bfe8eb2ed405f39d879c420d63720fa9cf29a5143153b00cf17dce9ee",
             "novelty.joblib": "72bb57854c0eb134a0a5841141e9a9fba807580b0e004a6e011ddb93387fd8c5",
             "pipeline.joblib": "cd71db618141ea12d9303539a7690952599fa87864c4d1a7f78a4951b1eeb175",
-            "reference.json": "67b755fad1a616a85599790e2c70fea990c5176274cad5d149f607dc581f1193",
-            "schema.json": "6141ad7e54feef8ed46bd90746a4059cc10fa570be55c0aeb3879c838c27e2c7",
-            "signature.json": "ce1479a37d30691e8a1c2e7ac2900d4f9b5510a5af77d864c84130d727f7e064"
+            "reference.json": "1d660243eb62649c5d59050b7c9a7f2361ab32f88f26ff420821394a226a8283",
+            "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
+            "signature.json": "6f2d7043f06c624879084b3764371b23935838c785bba34e0a315189d0c5c879"
           },
           "members": 8,
           "metrics": {
@@ -102,8 +102,8 @@
             "roc_auc": 0.8672135706340378
           },
           "seconds": [
-            5.2,
-            5.0
+            4.7,
+            4.5
           ],
           "selected": [
             "random_forest",
@@ -129,14 +129,14 @@
             "relative": 0.0
           },
           "hashes": {
-            "conformal.json": "389184d09b0f79263a1f18913cd67430adf47db2cb76a0a15144f92005389651",
+            "conformal.json": "fd926007ec8e2278e82be3604bf8682a74f60ddef350ff31a9e20e3377a6f383",
             "coverage_report.json": "b962ed592bbe565cdd5f0f077845291d96ee79798a9ae931849d5300a6eecdfe",
-            "model_manifest.json": "db0acf211e44525e0c65c344b60a99f979bfd0d74f47bef533c0fe70f349edcc",
+            "model_manifest.json": "48d569c7cbe97e08837d118b6513c997563eec94c40601760b83b512ace3dc2d",
             "novelty.joblib": "54146f7d822f6789680d2c004377f2e6997f4ee654b926cd59694542afbf9ad5",
             "pipeline.joblib": "546d3b2c6b395a50e948d8721059e4debf844f63c3b43ed8bf74c7e780603d9b",
-            "reference.json": "2603a01f1898acebe5a05cb53476a76433aeab6e45d57d2c9b56265e2f4d3f2e",
-            "schema.json": "755e0ae4b9b6ed25795171859cda2db53744007478e5c2d896dc43cca0d34f73",
-            "signature.json": "c42f62fcec44f43ccc0669da0688a99e398f2a46986be2d36193a3540855eaec"
+            "reference.json": "26dffd528abc0dd252db47ee2b919a0adbef91cf563687ae072720c135cc350f",
+            "schema.json": "9328b9e7e7899e6e6b1d43ca3a12e7f80488bcaa10e8c94828b369f9bf5b8af0",
+            "signature.json": "489e35433872351ffc737b0b4d1dd39fda125f0f272273f44df8f413182cfe63"
           },
           "members": 8,
           "metrics": {
@@ -146,8 +146,8 @@
             "log_loss": 0.6388598548604971
           },
           "seconds": [
-            10.0,
-            10.0
+            10.3,
+            9.3
           ],
           "selected": [
             "logistic_regression",
@@ -173,16 +173,16 @@
             "relative": 0.0
           },
           "hashes": {
-            "conformal.json": "4a40f56ad7b7f75fab25b6ee64458aa1852bd1b060bef65fdd4950ca4c18623e",
+            "conformal.json": "8fb2722c2938e9ae4ae988f90d1cc883e82fb68af215402e43a6379b757a6e65",
             "coverage_report.json": "5746ebe9f1977517097a44780d1848a2aa38848533b6cefc4a846549344e9d5b",
             "cv_plus.joblib": "5af87ecc7e65ebd6628eb6cb433fed95d124ab70977d640e464ef13d9aec755f",
-            "model_manifest.json": "ce5a8df115c4d1f5090681368b7b1efae681cd56165c8a8ed930c8d922808d78",
+            "model_manifest.json": "81e3c801dce6743b84656e0667cba93c42bebf5d7fef0de371e2264133c9d6a5",
             "novelty.joblib": "73b4418b09c0fe119f7d1511ba86a24231b4a831d15cd245bafbb61a40214616",
             "pipeline.joblib": "317b000b380bc7a615582d023de6d24ce9412569eb1d779cd48d37c253e96174",
             "quantile.joblib": "b089c6326f85845b73bfb3cc867fdb699f9fbbeee4cdc17ed380ab8c04071dbe",
-            "reference.json": "33c08be43fec9ff5a9d4bb4cb2d29f233164bdbfb7d0cd21abcda5d2f13626d7",
-            "schema.json": "067f8739d06eec5aec5e2bf0c8e0944c5779ecd53a5efacbab5662fe05c2b7f2",
-            "signature.json": "3ab44b99ee663a4fe5e460ee1828ba4eac9f0bfb611141310502df979ae30988"
+            "reference.json": "dc92313251ed935330eba0581d1d1a43ec4ed47bf3474330cbbf5b57bf410f0a",
+            "schema.json": "26fb7bc1a1560ce271d432aedc31d2dfcb678bbb14221244681825785972337f",
+            "signature.json": "03b6cbd8233403690495f1cb13f78100d4c781475f524f077472729de93f4f0d"
           },
           "members": 10,
           "metrics": {
@@ -191,8 +191,8 @@
             "rmse": 0.929535482795817
           },
           "seconds": [
-            3.6,
-            3.6
+            3.5,
+            3.3
           ],
           "selected": [
             "ridge",

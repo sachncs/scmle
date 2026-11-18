@@ -64,11 +64,11 @@ def test_noisy_labels_and_a_shifted_reference_are_reported(tmp_path):
     assert all(
         set(finding)
         == {
-            "id",
-            "rule_version",
+            "identifier",
+            "rule",
             "severity",
             "confidence",
-            "affected_scope",
+            "scope",
             "evidence",
             "remediation",
             "owner",

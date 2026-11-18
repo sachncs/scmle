@@ -681,7 +681,7 @@ def test_sensitivity_of_a_single_treated_unit_is_the_placebo_note():
 
 def test_the_closing_notes_name_unsupported_exposures_then_the_unchecked_set():
     spec = block(
-        negative_controls=(
+        controls=(
             causal.Control("exposure", "e1"),
             causal.Control("outcome", "o1"),
             causal.Control("exposure", "e2"),
@@ -736,7 +736,7 @@ def with_exposure(frame, seed):
 
 def backdoor_spec(**changes):
     values = {
-        "negative_controls": (
+        "controls": (
             causal.Control("outcome", "nco"),
             causal.Control("exposure", "z"),
         ),
@@ -829,7 +829,7 @@ def test_the_backdoor_estimate_is_the_frozen_aipw_estimate_on_c():
     spec = adapter.spec
     out = adapter.estimate(c, 0.9)
     direct = aipw.estimate(
-        adapter.nuisances, c, "t", "y", "ATE", 0.9, spec.trim, spec.min_share
+        adapter.nuisances, c, "t", "y", "ATE", 0.9, spec.trim, spec.retained
     )
     assert (out.estimate, out.se, out.low, out.high, out.n) == (
         direct.estimate,
@@ -868,7 +868,7 @@ def test_the_backdoor_estimate_for_another_outcome_refits_on_x():
     other = adapter.reckon(c, 0.9, "nco")
     fitted = aipw.prefit(x, ("a", "b"), "t", "nco", 3, "linear")
     direct = aipw.estimate(
-        fitted, c, "t", "nco", "ATE", 0.9, spec.trim, spec.min_share
+        fitted, c, "t", "nco", "ATE", 0.9, spec.trim, spec.retained
     )
     assert (other.estimate, other.se, other.low, other.high, other.n) == (
         direct.estimate,
@@ -891,7 +891,7 @@ def test_the_backdoor_controls_test_each_negative_outcome_and_exposure():
     spec = adapter.spec
     fitted = aipw.prefit(x, ("a", "b"), "z", "y", 3, "linear")
     found = aipw.estimate(
-        fitted, c, "z", "y", "ATE", 0.95, spec.trim, spec.min_share
+        fitted, c, "z", "y", "ATE", 0.95, spec.trim, spec.retained
     )
     assert tests[1] == battery.wald(
         "negative_exposure:z", "negative_exposure", found.estimate, found.se
@@ -900,7 +900,7 @@ def test_the_backdoor_controls_test_each_negative_outcome_and_exposure():
     assert tests[0] == battery.wald(
         "negative_outcome:nco", "negative_outcome", outcome.estimate, outcome.se
     )
-    only = backdoor_spec(negative_controls=())
+    only = backdoor_spec(controls=())
     quiet = prepared(only)[0]
     assert quiet.controls(c, 0.95) == []
 
@@ -960,7 +960,7 @@ def test_the_randomized_adapter_is_the_difference_in_means():
     spec = block(
         estimand="ATE",
         strategies=("randomized_diff",),
-        negative_controls=(
+        controls=(
             causal.Control("exposure", "z"),
             causal.Control("outcome", "nco"),
         ),
@@ -1012,11 +1012,11 @@ def did_spec(**changes):
             "no_interference",
         ),
         "strategies": ("did",),
-        "negative_controls": (
+        "controls": (
             causal.Control("outcome", "nco"),
             causal.Control("exposure", "z"),
         ),
-        "sensitivity": causal.Confounding(m_max=1.0),
+        "sensitivity": causal.Confounding(multiple=1.0),
     }
     values.update(changes)
     return causal.Question(**values)
@@ -1122,7 +1122,7 @@ def test_the_did_sensitivity_widens_the_interval_at_m_max():
         "note": "simplified relative-magnitudes bound, not HonestDiD",
     }
     wide = run.DiD(
-        did_spec(sensitivity=causal.Confounding(m_max=50.0)),
+        did_spec(sensitivity=causal.Confounding(multiple=50.0)),
         did_frame(1, 200),
         0,
         "linear",
@@ -1174,7 +1174,7 @@ def iv_spec(**changes):
             "monotonicity",
         ),
         "strategies": ("iv",),
-        "negative_controls": (
+        "controls": (
             causal.Control("exposure", "z"),
             causal.Control("outcome", "nco"),
         ),
@@ -1314,7 +1314,7 @@ def rd_spec(**changes):
         "cutoff": 0.0,
         "assumptions": ("continuity_at_cutoff", "no_manipulation"),
         "strategies": ("rd",),
-        "negative_controls": (
+        "controls": (
             causal.Control("outcome", "cov"),
             causal.Control("exposure", "z"),
         ),
@@ -1329,7 +1329,7 @@ def test_the_rd_adapter_balances_on_the_negative_control_outcomes():
     assert adapter.bandwidth == 0.0
     assert adapter.pretreatment() == ("cov",)
     none = run.RdEstimator(
-        rd_spec(negative_controls=()), rd_world(100, 1), 0, "linear", 0.01
+        rd_spec(controls=()), rd_world(100, 1), 0, "linear", 0.01
     )
     assert none.pretreatment() == ()
 
@@ -1641,7 +1641,7 @@ def test_identify_runs_the_adapter_and_documents_every_step(monkeypatch):
     x, c = frames()
     spec = block(
         strata=("region",),
-        negative_controls=(causal.Control("outcome", "nco"),),
+        controls=(causal.Control("outcome", "nco"),),
     )
     out = run.identify(
         spec,
@@ -2041,8 +2041,8 @@ def test_the_declared_minimum_share_reaches_every_backdoor_estimate():
     x, c = thin_overlap_rows(3000, 0), thin_overlap_rows(3000, 1)
     spec = block(
         trim=0.2,
-        min_share=0.99,
-        negative_controls=(causal.Control("exposure", "z"),),
+        retained=0.99,
+        controls=(causal.Control("exposure", "z"),),
     )
     adapter = run.Backdoor(spec, x, 0, "linear", 0.01)
     adapter.prepare()
@@ -2055,8 +2055,8 @@ def test_the_declared_minimum_share_reaches_every_backdoor_estimate():
         adapter.controls(c, 0.95)
     lenient = block(
         trim=0.2,
-        min_share=0.1,
-        negative_controls=(causal.Control("exposure", "z"),),
+        retained=0.1,
+        controls=(causal.Control("exposure", "z"),),
     )
     ok = run.Backdoor(lenient, x, 0, "linear", 0.01)
     ok.prepare()
@@ -2070,7 +2070,7 @@ def test_the_boosted_learner_and_seed_reach_every_nuisance_fit():
     c = with_exposure(observational(800, 2), 51)
     spec = backdoor_spec(
         sensitivity=None,
-        negative_controls=(
+        controls=(
             causal.Control("outcome", "nco"),
             causal.Control("exposure", "z"),
         ),
@@ -2212,7 +2212,7 @@ def small_effect_panel(tau):
 
 
 def test_the_did_sensitivity_holds_only_when_the_widened_interval_avoids_zero():
-    spec = did_spec(sensitivity=causal.Confounding(m_max=0.01))
+    spec = did_spec(sensitivity=causal.Confounding(multiple=0.01))
     adapter = run.DiD(spec, did_frame(1, 100), 0, "linear", 0.01)
     positive = adapter.sensitivity(small_effect_panel(0.5), 0.95)
     assert 0 < positive["low"] < 1
@@ -2337,7 +2337,7 @@ def test_an_exposure_control_is_only_a_note_for_other_strategies(monkeypatch):
     install(monkeypatch)
     x, c = frames()
     spec = block(
-        negative_controls=(causal.Control("exposure", "z"),),
+        controls=(causal.Control("exposure", "z"),),
     )
     out = run.identify(spec, x, c, BUDGET, certified=())
     assert out.documents["identification_report.json"]["notes"] == [UNCHECKED]
@@ -2352,7 +2352,7 @@ def test_an_exposure_control_is_only_a_note_for_other_strategies(monkeypatch):
             "independence",
             "monotonicity",
         ),
-        negative_controls=(causal.Control("exposure", "z"),),
+        controls=(causal.Control("exposure", "z"),),
     )
     other = run.identify(instrumental, x, c, BUDGET, certified=())
     assert other.documents["identification_report.json"]["notes"] == [

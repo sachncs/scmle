@@ -88,7 +88,7 @@ def test_range_must_contain_the_implied_threshold():
     assert model().threshold == pytest.approx(1 / 6)
     with pytest.raises(ValueError, match="outside"):
         model(lo=0.3, hi=0.5)
-    with pytest.raises(ValueError, match="0 < t_lo"):
+    with pytest.raises(ValueError, match="0 < low"):
         model(lo=0.0)
 
 
@@ -129,19 +129,19 @@ def test_charter_cost_model_round_trip_and_old_charters_keep_their_hash():
     record["estimand"].update(
         population="p",
         target="y",
-        prediction_moment="m",
-        summary_measure="nb",
-        intercurrent_events=[{"event": "none", "strategy": "not applicable"}],
+        moment="m",
+        summary="nb",
+        intercurrent=[{"event": "none", "strategy": "not applicable"}],
     )
     record["unit"] = "u"
-    record["deployment_population"] = "d"
+    record["population"] = "d"
     old = contracts.AnalysisCharter.from_dict(record)
-    assert "cost_model" not in old.to_dict()
-    assert old.cost_model is None
+    assert "costs" not in old.to_dict()
+    assert old.costs is None
     new = contracts.AnalysisCharter.from_dict(
-        {**record, "cost_model": model().to_dict()}
+        {**record, "costs": model().to_dict()}
     )
-    assert new.cost_model == model()
+    assert new.costs == model()
     assert new.charter_hash != old.charter_hash
     again = contracts.AnalysisCharter.from_dict(new.to_dict())
     assert again.charter_hash == new.charter_hash

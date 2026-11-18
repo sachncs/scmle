@@ -412,7 +412,7 @@ def span(
         treating no one, or None if there is none.
     """
     acts = rule.act(p)
-    grid = numpy.linspace(model.t_lo, model.t_hi, points)
+    grid = numpy.linspace(model.low, model.high, points)
     good = numpy.array(
         [
             costs.net_benefit(y, acts, t)

@@ -109,7 +109,7 @@ def test_a_certified_suspect_is_quarantined_and_ledgered():
     assert "leakage suspicion" in found.quarantined["copy"]
     sources = {source for source, check in found.checks}
     assert sources == {screen.DETECTOR_ID}
-    by_id = {check.check_id: check for source, check in found.checks}
+    by_id = {check.identifier: check for source, check in found.checks}
     assert by_id["leakage.screen.skill:copy"].decision is (
         qualification.Decision.QUARANTINE
     )
@@ -297,25 +297,25 @@ def make_ledger(path=None):
         path,
         charter_hash=charter.charter_hash,
         config=online_fdr.Settings(
-            online_fdr.ELOND, charter.error_budget.exploration.initial
+            online_fdr.ELOND, charter.budget.exploration.initial
         ),
-        alpha_confirm=charter.error_budget.confirmation.alpha_confirm,
+        alpha_confirm=charter.budget.confirmation.alpha_confirm,
         seed=0,
     )
 
 
 def sample_check(set_id=qualification.Subset.EXPLORATION):
     return qualification.Check(
-        check_id="leakage.skill:copy",
-        null_hypothesis="no skill",
+        identifier="leakage.skill:copy",
+        null="no skill",
         statistic=0.9,
         p_value=0.01,
         interval=None,
         effect=0.9,
         n=100,
         decision=qualification.Decision.WARN,
-        set_id=set_id,
-        seed_path=(0, "leakage", 0),
+        subset=set_id,
+        seeds=(0, "leakage", 0),
         tier=qualification.Tier.UNVERIFIED,
     )
 

@@ -81,9 +81,9 @@ def main(arguments: list[str] | None = None) -> int:
         json.dumps(
             {
                 "accepted": True,
-                "release_id": artifact.release_id,
-                "source_commit": artifact.source_commit,
-                "reviewer_id": artifact.reviewer_id,
+                "release_id": artifact.release,
+                "source_commit": artifact.commit,
+                "reviewer_id": artifact.reviewer,
                 "claim_kinds": sorted(
                     {claim.kind.value for claim in artifact.claims}
                 ),

@@ -14,6 +14,7 @@ from scmle.assurance.ledger import confirm
 from scmle.assurance.ledger import multiplicity
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
+from scmle.contracts import qualification
 
 
 def check_ledger_head(
@@ -111,19 +112,19 @@ def ruled(
         )
     used = ledger.header["rule"]["rule"]
     confirmed_with = (ledger.confirmation or {}).get("rule")
-    if used != rules.ledger_rule or confirmed_with not in (
+    if used != rules.ledger or confirmed_with not in (
         None,
-        rules.confirmation_rule,
+        rules.confirmation,
     ):
         return verdict.Finding(
             rule_step,
             verdict.FAIL,
             f"ledger rule {used!r} / confirmation rule "
             f"{confirmed_with!r} differ from the charter's "
-            f"{rules.ledger_rule!r} / {rules.confirmation_rule!r}",
+            f"{rules.ledger!r} / {rules.confirmation!r}",
         )
     return verdict.Finding(
-        rule_step, verdict.PASS, f"{used} and {rules.confirmation_rule}"
+        rule_step, verdict.PASS, f"{used} and {rules.confirmation}"
     )
 
 
@@ -174,14 +175,21 @@ def crosscheck(
     if sealed_row is None or survivors is None:
         return verdict.Finding(name, verdict.FAIL, "the ledger is not sealed")
     problems = compare(document, sealed_row, survivors)
-    ids = [c["claim_id"] for c in document["claims"]]
+    ids = [
+        files.migrate(qualification.Claim, c)["identifier"]
+        for c in document["claims"]
+    ]
     if document.get("outcome") == confirm.NO_SURVIVORS:
         ok_ids = ids == []
     else:
         ok_ids = ids == list(survivors.hypothesis_ids)
     if not ok_ids:
         problems.append("claim ids differ from the frozen survivors")
-    confirmed = [c["claim_id"] for c in document["claims"] if upheld(c)]
+    confirmed = [
+        files.migrate(qualification.Claim, c)["identifier"]
+        for c in document["claims"]
+        if upheld(c)
+    ]
     if confirmed != list(sealed_row.get("confirmed", [])):
         problems.append("confirmed set")
     if document.get("stage_two") != sealed_row.get("stage_two"):
@@ -226,11 +234,22 @@ def rederive(document: dict[str, Any]) -> verdict.Finding:
             name, verdict.SKIPPED, f"outcome is {document.get('outcome')!r}"
         )
     try:
-        by_check = {c["check_id"]: c for c in document["checks"]}
+        checks = {
+            c["identifier"]: c
+            for c in (
+                files.migrate(qualification.Check, c)
+                for c in document["checks"]
+            )
+        }
         tested = [
-            c for c in document["claims"] if f"{c['claim_id']}:C" in by_check
+            c
+            for c in (
+                files.migrate(qualification.Claim, c)
+                for c in document["claims"]
+            )
+            if f"{c['identifier']}:C" in checks
         ]
-        values = [by_check[f"{c['claim_id']}:C"]["p_value"] for c in tested]
+        values = [checks[f"{c['identifier']}:C"]["p_value"] for c in tested]
         adjustment = multiplicity.adjust(
             values,
             budget.Correction(document["rule"]),
@@ -244,11 +263,11 @@ def rederive(document: dict[str, Any]) -> verdict.Finding:
                 return verdict.Finding(
                     name,
                     verdict.FAIL,
-                    f"{claim['claim_id']}: adjusted p differs",
+                    f"{claim['identifier']}: adjusted p differs",
                 )
             if upheld(claim) != adjustment.rejected[index]:
                 return verdict.Finding(
-                    name, verdict.FAIL, f"{claim['claim_id']}: tier differs"
+                    name, verdict.FAIL, f"{claim['identifier']}: tier differs"
                 )
     except (
         ValueError,
@@ -326,7 +345,10 @@ def tally(
     problems = stage_two_record_problems(
         record, survivors, withdrawn, family, expected
     )
-    tested = {c["check_id"].split(":")[0] for c in document["checks"]}
+    tested = {
+        files.migrate(qualification.Check, c)["identifier"].split(":")[0]
+        for c in document["checks"]
+    }
     if tested & withdrawn:
         problems.append("a withdrawn survivor was tested on C")
     if tested - set(family):
@@ -334,7 +356,8 @@ def tally(
     problems.extend(
         "a withdrawn survivor is confirmed"
         for claim in document["claims"]
-        if claim["claim_id"] in withdrawn and upheld(claim)
+        if files.migrate(qualification.Claim, claim)["identifier"] in withdrawn
+        and upheld(claim)
     )
     if problems:
         return verdict.Finding(name, verdict.FAIL, "; ".join(problems))

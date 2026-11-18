@@ -80,7 +80,7 @@ class Predictor:
         dataset_hash, model_digest, signature_value = identity
         if report.modality != modalities.serialise(adapter.modality):
             raise errors.InputError("lifecycle report modality does not match")
-        if report.dataset_hash != dataset_hash:
+        if report.digests["dataset"] != dataset_hash:
             raise errors.InputError(
                 "lifecycle report dataset identity does not match"
             )

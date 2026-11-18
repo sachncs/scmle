@@ -74,9 +74,7 @@ def test_the_ledger_refuses_a_use_the_envelope_does_not_allow(world):
     controller = world.controller()
     ledger = controller.loop.ledger
     controller.envelopes.grant(tests.simulation.world.envelope(limit=1))
-    controller.envelopes.grant(
-        tests.simulation.world.envelope(envelope_id="e2")
-    )
+    controller.envelopes.grant(tests.simulation.world.envelope(identifier="e2"))
     controller.envelopes.revoke("e2", "retired")
 
     def use(**changes):

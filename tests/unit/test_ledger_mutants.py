@@ -337,16 +337,17 @@ def test_result_dictionary_keys_and_round_trip_with_exceeds_true():
     result = controls.summarize("permuted_target", "strata", 4, (0,) * 20)
     record = result.to_dict()
     assert set(record) == {
+        "schema_version",
         "kind",
         "scope",
         "observed",
         "permuted",
         "b",
         "p95",
-        "p95_interval",
+        "interval",
         "p95_interval_confidence",
         "p95_interval_achieved_confidence",
-        "exceedance_p",
+        "exceedance",
         "exceeds",
         "message",
         "note",

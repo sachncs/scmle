@@ -114,7 +114,7 @@ def test_target_encoding_strategy_is_cross_fitted_and_conditional(registry):
 def planning_context(spec, plan):
     profile = scmle.contracts.data.Portrait(
         manifest=scmle.contracts.data.DatasetManifest(
-            "ds", "s", "h", 900, 3, "y", "<in-memory>"
+            "ds", {"schema": "s", "data": "h"}, 900, 3, "y", "<in-memory>"
         ),
         column_statistics={},
         quality_findings=(),
@@ -142,7 +142,7 @@ def test_planner_prefers_native_categorical_models_for_high_cardinality(
     assert "native_categorical_boosting" in by_name
     assert by_name["native_categorical_boosting"].action == "include"
     assert "regularized_target_encoding" in by_name
-    models_ = list(plan.candidate_models)
+    models_ = list(plan.candidates)
     assert models_.index("hist_gradient_boosting") < models_.index(
         "random_forest"
     )

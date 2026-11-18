@@ -27,6 +27,7 @@ in order.
 | Know what a run leaves behind | [`ARTIFACTS.md`](ARTIFACTS.md) |
 | See which parts of the API are stable | [`API_STABILITY.md`](API_STABILITY.md) |
 | Find what a renamed function or class is called now | [`RENAMES.md`](RENAMES.md) |
+| Find what a renamed key in a stored record is called now (for your own scripts) | [`RECORD_KEYS.md`](RECORD_KEYS.md) |
 | Choose extras and see dependency policy | [`DEPENDENCIES.md`](DEPENDENCIES.md) |
 
 ## Understand it

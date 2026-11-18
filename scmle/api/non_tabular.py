@@ -130,7 +130,10 @@ class Predictor:
             raise errors.InputError(
                 "report and capability modalities do not match"
             )
-        if self.predictor.training_dataset_hash != self.report.dataset_hash:
+        if (
+            self.predictor.training_dataset_hash
+            != self.report.digests["dataset"]
+        ):
             raise errors.InputError(
                 "predictor and report dataset identities differ"
             )
@@ -143,7 +146,7 @@ class Predictor:
     @property
     def dataset_hash(self) -> str:
         """The immutable training snapshot identity."""
-        return self.report.dataset_hash
+        return self.report.digests["dataset"]
 
     def predict(self, samples: Sequence[Any]) -> numpy.ndarray:
         """Predicts labels after validating the stored representation schema.
@@ -619,7 +622,7 @@ class Modeler:
             raise errors.InputError(
                 "lifecycle report modality does not match project"
             )
-        if report.dataset_hash != self.adapter.dataset_hash:
+        if report.digests["dataset"] != self.adapter.dataset_hash:
             raise errors.InputError(
                 "lifecycle report dataset does not match project"
             )

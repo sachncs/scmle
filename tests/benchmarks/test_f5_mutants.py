@@ -23,13 +23,13 @@ def demo():
 
 def outcome_certificate(detector_id, defect_type, detected):
     return qualification.Certificate(
-        detector_id=detector_id,
-        defect_type=defect_type,
+        detector=detector_id,
+        defect=defect_type,
         planted=300,
         detected=detected,
-        clean_rows=500,
-        false_alarms=0,
-        seed_path=(0, "x", 0),
+        clean=500,
+        alarms=0,
+        seeds=(0, "x", 0),
     )
 
 
@@ -224,22 +224,25 @@ def test_select_cut_follows_the_policy_ceiling_and_confidence(demo):
 def test_certify_missingness_counts_one_replicate_per_seed(demo):
     certificate = f5.certify_missingness(demo, seeds=(4, 5, 6, 7))
     assert certificate.seeds == (4, 5, 6, 7)
-    assert [o.certificate.defect_type for o in certificate.outcomes] == [
+    assert [o.certificate.defect for o in certificate.outcomes] == [
         "missing_mar",
         "missing_mnar",
     ]
     base = demo.iloc[:, : f5.MISSING_COLUMNS]
     for outcome in certificate.outcomes:
         record = outcome.certificate
-        assert record.detector_id == "f5-missingness"
-        assert (record.planted, record.clean_rows) == (4, 4)
+        assert record.detector == "f5-missingness"
+        assert (record.planted, record.clean) == (4, 4)
         assert record.detected == 4
-        assert record.false_alarms == 0
-        assert record.seed_path == randomness.seed_path(
+        assert record.alarms == 0
+        assert record.seeds == randomness.seed_path(
             4, "certify.f5-missingness", 0
         )
-    assert certificate.code_hash == registry.SPECS["f5-missingness"].code_hash()
-    assert certificate.corpus_hash == certificates.corpus_hash(
+    assert (
+        certificate.digests["code"]
+        == registry.SPECS["f5-missingness"].code_hash()
+    )
+    assert certificate.digests["corpus"] == certificates.corpus_hash(
         [f5.certify.frame_digest(base)]
     )
 
@@ -258,14 +261,12 @@ def test_certify_all_restricts_to_the_requested_detectors(demo):
     only_missing = f5.certify_all(
         missing_seeds=(0, 1), frame=demo, only=["f5-missingness"]
     )
-    assert [c.detector_id for c in only_missing.certificates] == [
-        "f5-missingness"
-    ]
+    assert [c.detector for c in only_missing.certificates] == ["f5-missingness"]
     assert only_missing.certificates[0].seeds == (0, 1)
     only_rows = f5.certify_all(
         seeds=(0,), frame=demo, only=["f5-label-noise", "f5-outlier-triage"]
     )
-    assert [c.detector_id for c in only_rows.certificates] == [
+    assert [c.detector for c in only_rows.certificates] == [
         "f5-label-noise",
         "f5-outlier-triage",
     ]
@@ -287,11 +288,12 @@ def test_certify_all_pools_row_counts_over_seeds_and_files_the_policy(demo):
     for item in store.certificates:
         assert item.policy == f5.POLICY
         assert item.seeds in {(0, 1), (0,)}
-        spec = registry.SPECS[item.detector_id]
-        assert item.code_hash == spec.code_hash()
+        spec = registry.SPECS[item.detector]
+        assert item.digests["code"] == spec.code_hash()
     default_frame = f5.certify_all(seeds=(0,), only=["f5-sentinel"])
-    assert default_frame.certificates[0].corpus_hash == (
-        store.certificates[2].corpus_hash
+    assert (
+        default_frame.certificates[0].digests["corpus"]
+        == (store.certificates[2].digests["corpus"])
     )
 
 
@@ -368,13 +370,13 @@ def test_audit_reports_each_pair_the_store_would_refuse(monkeypatch):
 
 def test_summary_rounds_bounds_and_reports_every_outcome():
     certificate = qualification.Certificate(
-        detector_id="f5-sentinel",
-        defect_type="sentinel",
+        detector="f5-sentinel",
+        defect="sentinel",
         planted=250,
         detected=240,
-        clean_rows=700,
-        false_alarms=3,
-        seed_path=(0, "x", 0),
+        clean=700,
+        alarms=3,
+        seeds=(0, "x", 0),
     )
     store = certificates.Store(
         [
@@ -395,14 +397,14 @@ def test_summary_rounds_bounds_and_reports_every_outcome():
         "defect_type": "sentinel",
         "planted": 250,
         "detected": 240,
-        "recall_lower": round(outcome.recall_interval[0], 4),
+        "recall_lower": round(outcome.recall[0], 4),
         "clean": 700,
         "false_alarms": 3,
-        "false_alarm_upper": round(outcome.false_alarm_interval[1], 4),
+        "false_alarm_upper": round(outcome.alarms[1], 4),
         "gates": outcome.passed,
     }
-    assert row["recall_lower"] != outcome.recall_interval[0]
-    assert row["false_alarm_upper"] != outcome.false_alarm_interval[1]
+    assert row["recall_lower"] != outcome.recall[0]
+    assert row["false_alarm_upper"] != outcome.alarms[1]
     assert list(row) == [
         "detector",
         "defect_type",

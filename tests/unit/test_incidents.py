@@ -49,8 +49,8 @@ def test_workflow_is_idempotent_and_preserves_runbook_and_rollback(tmp_path):
 
     assert first == second
     assert first.status is incidents.Phase.OPEN
-    assert first.run_id == "run-42"
-    assert first.rollback_target == "model-previous"
+    assert first.run == "run-42"
+    assert first.rollback == "model-previous"
     assert len(workflow.read_events()) == 1
 
 
@@ -62,7 +62,7 @@ def test_workflow_requires_acknowledgement_before_evidence_backed_resolution(
 
     with pytest.raises(ValueError, match="acknowledged"):
         workflow.resolve(
-            opened.incident_id,
+            opened.identifier,
             actor="operator",
             resolved_at="2026-10-20T12:03:00+00:00",
             resolution="rolled back",
@@ -70,12 +70,12 @@ def test_workflow_requires_acknowledgement_before_evidence_backed_resolution(
         )
 
     acknowledged = workflow.acknowledge(
-        opened.incident_id,
+        opened.identifier,
         actor="operator",
         acknowledged_at="2026-10-20T12:02:00+00:00",
     )
     resolved = workflow.resolve(
-        opened.incident_id,
+        opened.identifier,
         actor="operator",
         resolved_at="2026-10-20T12:03:00+00:00",
         resolution="rolled back to the previous model",
@@ -84,10 +84,10 @@ def test_workflow_requires_acknowledgement_before_evidence_backed_resolution(
 
     assert acknowledged.status is incidents.Phase.ACKNOWLEDGED
     assert resolved.status is incidents.Phase.RESOLVED
-    assert resolved.evidence_digest == "sha256:fix"
+    assert resolved.digests["evidence"] == "sha256:fix"
     assert (
         workflow.resolve(
-            opened.incident_id,
+            opened.identifier,
             actor="another-operator",
             resolved_at="2026-10-20T12:04:00+00:00",
             resolution="duplicate retry",

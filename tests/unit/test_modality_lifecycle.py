@@ -259,7 +259,7 @@ def test_raster_curation_records_declared_and_unknown_nodata_state():
 
     assert unknown_report.profile["nodata"]["statuses"] == ["unknown"]
     assert [
-        finding.finding_id for finding in unknown_report.quality_findings
+        finding.identifier for finding in unknown_report.quality_findings
     ] == [
         "quality.raster-nodata-unknown",
     ]
@@ -349,7 +349,7 @@ def test_decoded_raster_lifecycle_emits_pixel_occlusion_evidence(
         signing_key="test-signing-key",
     )
 
-    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+    evidence = {item.stage: item.evidence for item in report.evidence}[
         modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
@@ -421,14 +421,14 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
         report_path=report_path,
     )
 
-    stages = tuple(evidence.stage for evidence in report.stage_evidence)
+    stages = tuple(evidence.stage for evidence in report.evidence)
     assert stages == modalities.REQUIRED_LIFECYCLE_STAGES
-    assert all(evidence.evidenced for evidence in report.stage_evidence)
+    assert all(evidence.evidenced for evidence in report.evidence)
     evidence_by_stage = {
-        evidence.stage: evidence for evidence in report.stage_evidence
+        evidence.stage: evidence for evidence in report.evidence
     }
     assert evidence_by_stage[modalities.Phase.INGESTION].evidence == {
-        "dataset_hash": report.dataset_hash,
+        "dataset_hash": report.digests["dataset"],
         "sample_count": len(adapter.samples),
     }
     assert isinstance(
@@ -502,11 +502,11 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
         for observation in performance_evidence["observations"]
     ] == [operation.value for operation in performance.Operation]
     assert all(
-        observation["sample_count"] > 0
+        observation["samples"] > 0
         for observation in performance_evidence["observations"]
     )
     assert all(
-        observation["peak_memory_gb"] > 0
+        observation["memory"] > 0
         for observation in performance_evidence["observations"]
     )
     assert performance_evidence["budget"] is None
@@ -516,7 +516,7 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     assert declaration.status is modalities.Status.EXPERIMENTAL
     assert declaration.complete
     assert json.loads(report_path.read_text()) == report.to_dict()
-    assert report.to_dict()["schema_version"] == 2
+    assert report.to_dict()["schema_version"] == 3
     assert report.signature
     assert report.verify_signature("test-signing-key") is True
     assert report.verify_signature("wrong-key") is False
@@ -526,7 +526,7 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     )
 
     tampered = json.loads(report_path.read_text())
-    tampered["dataset_hash"] = "tampered-dataset"
+    tampered["digests"]["dataset"] = "tampered-dataset"
     report_path.write_text(json.dumps(tampered), encoding="utf-8")
     with pytest.raises(ValueError, match="signature does not verify"):
         modality_lifecycle.Record.read_verified(report_path, "test-signing-key")
@@ -558,7 +558,7 @@ def test_lifecycle_report_rejects_a_signed_incomplete_stage_record(
         report_path=report_path,
     )
     record = report.to_dict()
-    record["stage_evidence"] = record["stage_evidence"][:-1]
+    record["evidence"] = record["evidence"][:-1]
     unsigned = dict(record)
     unsigned.pop("signature")
     record["signature"] = {
@@ -583,7 +583,7 @@ def test_lifecycle_report_rejects_a_stage_without_evidence_links(
         report_path=report_path,
     )
     record = report.to_dict()
-    record["stage_evidence"][0]["evidence_links"] = []
+    record["evidence"][0]["evidence_links"] = []
     unsigned = dict(record)
     unsigned.pop("signature")
     record["signature"] = {
@@ -711,7 +711,7 @@ def test_lifecycle_checkpoint_resumes_after_a_post_package_failure(
         checkpoint_path, "checkpoint-key"
     )
     assert checkpoint.status == "running"
-    assert checkpoint.completed_stages[-1] == "inference"
+    assert checkpoint.completed[-1] == "inference"
     package_digest = modality_lifecycle.file_digest(
         package_path / "manifest.json"
     )
@@ -733,7 +733,7 @@ def test_lifecycle_checkpoint_resumes_after_a_post_package_failure(
         checkpoint_path, "checkpoint-key"
     )
     assert completed.status == "completed"
-    assert completed.completed_stages == tuple(
+    assert completed.completed == tuple(
         stage.value for stage in modalities.REQUIRED_LIFECYCLE_STAGES
     )
 
@@ -825,7 +825,7 @@ def test_lifecycle_checkpoint_rejects_tampering_and_changed_identity(
     )
 
     tampered = json.loads(checkpoint_path.read_text(encoding="utf-8"))
-    tampered["dataset_hash"] = "changed"
+    tampered["digests"]["dataset"] = "changed"
     checkpoint_path.write_text(json.dumps(tampered), encoding="utf-8")
     with pytest.raises(ValueError, match="signature does not verify"):
         lifecycle.run(
@@ -841,18 +841,20 @@ def test_lifecycle_checkpoint_rejects_tampering_and_changed_identity(
         json.dumps(
             modality_lifecycle.Checkpoint(
                 modality="text",
-                dataset_hash=adapter.dataset_hash,
-                observed_dataset_hash=adapter.dataset_hash,
-                package_path=str(tmp_path / "package"),
-                report_path=str(tmp_path / "report.json"),
+                digests=modality_lifecycle.checkpoints.Digests(
+                    dataset=adapter.dataset_hash,
+                    observed=adapter.dataset_hash,
+                    stages=("digest",)
+                    * len(modalities.REQUIRED_LIFECYCLE_STAGES),
+                ),
+                package=str(tmp_path / "package"),
+                report=str(tmp_path / "report.json"),
                 seed=0,
-                completed_stages=tuple(
+                completed=tuple(
                     stage.value
                     for stage in modalities.REQUIRED_LIFECYCLE_STAGES
                 ),
-                stage_digests=("digest",)
-                * len(modalities.REQUIRED_LIFECYCLE_STAGES),
-                require_independent_ground_truth=False,
+                independent=False,
                 status="completed",
             )
             .sign("checkpoint-key")
@@ -937,7 +939,7 @@ def test_image_lifecycle_emits_region_occlusion_evidence(tmp_path: Path):
         signing_key="test-signing-key",
     )
 
-    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+    evidence = {item.stage: item.evidence for item in report.evidence}[
         modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
@@ -972,7 +974,7 @@ def test_document_lifecycle_emits_span_provenance_evidence(tmp_path: Path):
         signing_key="test-signing-key",
     )
 
-    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+    evidence = {item.stage: item.evidence for item in report.evidence}[
         modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
@@ -1019,7 +1021,7 @@ def test_graph_lifecycle_emits_one_hop_context_evidence(tmp_path: Path):
         signing_key="test-signing-key",
     )
 
-    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+    evidence = {item.stage: item.evidence for item in report.evidence}[
         modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
@@ -1085,7 +1087,7 @@ def test_geospatial_lifecycle_emits_crs_bound_explanation(tmp_path: Path):
         signing_key="test-signing-key",
     )
 
-    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+    evidence = {item.stage: item.evidence for item in report.evidence}[
         modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
@@ -1132,7 +1134,7 @@ def test_geospatial_curation_records_boundary_leakage_warning():
         "potential_leakage"
     )
     assert "quality.geospatial-boundary-leakage" in {
-        finding.finding_id for finding in report.quality_findings
+        finding.identifier for finding in report.quality_findings
     }
 
 
@@ -1144,7 +1146,7 @@ def test_audio_lifecycle_emits_time_local_explanation(tmp_path):
         signing_key="test-signing-key",
     )
 
-    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+    evidence = {item.stage: item.evidence for item in report.evidence}[
         modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
@@ -1179,23 +1181,23 @@ def test_lifecycle_persists_supplied_modality_manifest(tmp_path: Path):
     """Lifecycle documentation carries caller-owned governance evidence."""
     adapter = document_adapter()
     manifest = data.Passport(
-        dataset_id="document-dataset",
-        snapshot_id="document-snapshot",
+        identifier="document-dataset",
+        snapshot="document-snapshot",
         modality="document",
         task="binary_classification",
-        sample_count=len(adapter.samples),
-        content_hash=adapter.dataset_hash,
+        samples=len(adapter.samples),
+        digests={"content": adapter.dataset_hash},
         source=data.Origin(
             owner="records-team",
-            acquisition_method="approved export",
+            acquisition="approved export",
             license="internal-use",
         ),
         privacy=data.Confidentiality(
             classification="restricted",
-            contains_pii=True,
-            consent_basis="employment-contract",
-            retention_period="90d",
-            deletion_policy="case-closure",
+            identifying=True,
+            consent="employment-contract",
+            retention="90d",
+            deletion="case-closure",
         ),
     )
 
@@ -1210,7 +1212,7 @@ def test_lifecycle_persists_supplied_modality_manifest(tmp_path: Path):
     assert card["manifest"] == manifest.to_dict()
     assert card["provenance"]["status"] == "declared"
     assert card["privacy"]["status"] == "declared"
-    assert card["manifest"]["privacy"]["contains_pii"] is True
+    assert card["manifest"]["privacy"]["identifying"] is True
 
 
 def test_lifecycle_evaluates_complete_independent_ground_truth_suite(
@@ -1224,7 +1226,7 @@ def test_lifecycle_evaluates_complete_independent_ground_truth_suite(
         signing_key="test-signing-key",
     )
 
-    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+    evidence = {item.stage: item.evidence for item in report.evidence}[
         modalities.Phase.MODEL_EXPLAINABILITY
     ]
     ground_truth = evidence["independent_ground_truth"]
@@ -1242,7 +1244,7 @@ def test_video_lifecycle_emits_temporal_frame_evidence(tmp_path: Path):
         signing_key="test-signing-key",
     )
 
-    evidence = {item.stage: item.evidence for item in report.stage_evidence}[
+    evidence = {item.stage: item.evidence for item in report.evidence}[
         modalities.Phase.MODEL_EXPLAINABILITY
     ]
     local = evidence["modality_specific"]
@@ -1361,12 +1363,12 @@ def test_lifecycle_compares_against_a_repeated_performance_baseline(
 
     fast_reference_runs = tuple(
         performance.Run(
-            run_id=f"fast-reference-{index}",
+            identifier=f"fast-reference-{index}",
             observations=tuple(
                 dataclasses.replace(
                     observation,
-                    elapsed_seconds=1e-9,
-                    peak_memory_gb=1e-9,
+                    elapsed=1e-9,
+                    memory=1e-9,
                 )
                 for observation in reference_run.observations
             ),

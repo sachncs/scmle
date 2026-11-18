@@ -62,6 +62,7 @@ from scmle.artifacts.claims_audit.files import CAUSAL_FILE
 from scmle.artifacts.claims_audit.files import CHARTER_FILE
 from scmle.artifacts.claims_audit.files import CONTROL_FILE
 from scmle.artifacts.claims_audit.files import CUSTODY_FILE
+from scmle.artifacts.claims_audit.files import migrate
 from scmle.artifacts.claims_audit.files import read_optional
 from scmle.artifacts.claims_audit.files import recall
 from scmle.artifacts.claims_audit.files import rehydrate
@@ -87,6 +88,7 @@ from scmle.artifacts.claims_audit.verdict import TOLERANCE
 from scmle.artifacts.claims_audit.verdict import Verification
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
+from scmle.contracts import qualification
 
 __all__ = [
     "BASELINE_FILE",
@@ -167,14 +169,16 @@ def inventory(run_dir: str | Path) -> list[dict[str, Any]]:
     withdrawn = stage_two.get("withdrawn", {})
     listed = [
         {
-            "claim_id": claim["claim_id"],
-            "feature": locate(ledger, claim["claim_id"]),
+            "claim_id": claim["identifier"],
+            "feature": locate(ledger, claim["identifier"]),
             "tier": claim["tier"],
             "adjusted_p_value": claim["adjusted_p_value"],
             "effect": claim["effect"],
-            "withdrawn": claim["claim_id"] in withdrawn,
+            "withdrawn": claim["identifier"] in withdrawn,
         }
-        for claim in document["claims"]
+        for claim in (
+            migrate(qualification.Claim, c) for c in document["claims"]
+        )
     ]
     return listed + enrolled(run_dir, ledger)
 
@@ -252,11 +256,15 @@ def inspect(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
             "status": (document.get("registered_claims") or {}).get(claim_id),
             "outcome": document["outcome"],
         }
-    claim = next(
-        (c for c in document["claims"] if c["claim_id"] == claim_id), None
-    )
+    claims = {
+        c["identifier"]: c
+        for c in (
+            migrate(qualification.Claim, row) for row in document["claims"]
+        )
+    }
+    claim = claims.get(claim_id)
     if claim is None:
-        known = ", ".join(c["claim_id"] for c in document["claims"])
+        known = ", ".join(claims)
         raise errors.ArtifactError(
             f"no claim {claim_id!r}; the run has: {known or 'none'}"
         )
@@ -276,7 +284,13 @@ def inspect(run_dir: str | Path, claim_id: str) -> dict[str, Any]:
             "check": None if result.check is None else result.check.to_dict(),
         },
         "confirmation_check": next(
-            (c for c in document["checks"] if c["check_id"] == f"{claim_id}:C"),
+            (
+                check
+                for check in (
+                    migrate(qualification.Check, c) for c in document["checks"]
+                )
+                if check["identifier"] == f"{claim_id}:C"
+            ),
             None,
         ),
         "withdrawn": stage_two.get("withdrawn", {}).get(claim_id),

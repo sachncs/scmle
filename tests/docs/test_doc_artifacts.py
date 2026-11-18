@@ -79,14 +79,14 @@ def read(path):
 
 
 def test_the_decision_log_holds_included_rejected_and_deferred_choices(folder):
-    """Enforces docs/ARTIFACTS.md:17."""
+    """Enforces docs/ARTIFACTS.md:23."""
     plan = read(folder / "diagnostics" / "decision_log.json")["plan"]
     assert {d["action"] for d in plan} == {"include", "reject", "defer"}
     assert all(d["technique"] and d["reason"] for d in plan)
 
 
 def test_without_criteria_the_release_evaluation_blocks(folder):
-    """Enforces docs/ARTIFACTS.md:119."""
+    """Enforces docs/ARTIFACTS.md:125."""
     record = read(folder / "release_evaluation.json")
     assert record["status"] == "policy_not_declared"
     assert record["blocked"] is True and record["passed"] is False
@@ -94,7 +94,7 @@ def test_without_criteria_the_release_evaluation_blocks(folder):
 
 
 def test_the_model_folder_is_checksummed_and_unsigned_needs_trust(folder):
-    """Enforces docs/ARTIFACTS.md:102."""
+    """Enforces docs/ARTIFACTS.md:108."""
     model = folder / "model"
     for name in MODEL_FILES:
         assert (model / name).is_file(), name
@@ -106,7 +106,7 @@ def test_the_model_folder_is_checksummed_and_unsigned_needs_trust(folder):
 
 
 def test_the_custody_log_records_seal_issue_open_and_refusal():
-    """Enforces docs/ARTIFACTS.md:32."""
+    """Enforces docs/ARTIFACTS.md:38."""
     log = sealed.Journal()
     rows = splitters.ResidentTestSet(
         pandas.DataFrame({"a": [123456.789, 2.0, 3.0]}),
@@ -128,7 +128,7 @@ def test_the_custody_log_records_seal_issue_open_and_refusal():
 
 
 def test_build_sh_scans_resolves_builds_scans_and_attests_in_order(service):
-    """Enforces docs/ARTIFACTS.md:130."""
+    """Enforces docs/ARTIFACTS.md:136."""
     script = (service / "build.sh").read_text(encoding="utf-8")
     assert "set -euo pipefail" in script
     places = [script.index(step) for step in STEPS]
@@ -138,7 +138,7 @@ def test_build_sh_scans_resolves_builds_scans_and_attests_in_order(service):
 
 
 def test_the_shipped_gate_policy_blocks_high_with_one_dated_waiver(service):
-    """Enforces docs/ARTIFACTS.md:134."""
+    """Enforces docs/ARTIFACTS.md:140."""
     policy = read(service / "vuln-policy.json")
     assert policy == vuln_gate.DEFAULT_POLICY
     assert policy["fail_at_or_above"] == "HIGH"

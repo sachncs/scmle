@@ -76,12 +76,12 @@ def test_a_registered_hypothesis_is_tested_and_recorded_with_wealth():
     assert result.level == Fraction(1, 10) * Fraction(1, 2)
     assert ledger.decision(h) is result
     check = result.check
-    assert check.set_id is qualification.Subset.EXPLORATION
+    assert check.subset is qualification.Subset.EXPLORATION
     assert check.tier is qualification.Tier.UNVERIFIED
     assert check.decision is qualification.Decision.WARN
     assert check.p_value < 1e-10
-    assert check.seed_path[0] == 7
-    assert check.check_id == "h000001:X"
+    assert check.seeds[0] == 7
+    assert check.identifier == "h000001:X"
 
 
 def test_a_retained_hypothesis_passes():
@@ -141,7 +141,7 @@ def test_only_exploration_hypotheses_can_be_registered():
         statistic="spearman",
         null="n",
         column="a",
-        set_id=qualification.Subset.CONFIRMATION,
+        subset=qualification.Subset.CONFIRMATION,
     )
     with pytest.raises(
         scmle.assurance.ledger.ledger.LedgerError, match="exploration"
@@ -152,7 +152,7 @@ def test_only_exploration_hypotheses_can_be_registered():
 def test_spec_validation_and_round_trip():
     s = spec("signal")
     assert scmle.assurance.ledger.ledger.Test.from_dict(s.to_dict()) == s
-    assert len(s.code_hash) == 64
+    assert len(s.digests.code) == 64
     with pytest.raises(ValueError, match="direction"):
         scmle.assurance.ledger.ledger.Test.create(
             name="n", family="f", statistic="spearman", null="x", direction="up"
@@ -379,9 +379,9 @@ def test_open_creates_then_reuses_and_rejects_a_different_charter(tmp_path):
     charter = make_charter()
     first = scmle.assurance.ledger.ledger.Ledger.open(tmp_path, charter)
     assert (tmp_path / scmle.assurance.ledger.ledger.FILE_NAME).exists()
-    assert first.config.alpha == charter.error_budget.exploration.initial
+    assert first.config.alpha == charter.budget.exploration.initial
     assert first.header["alpha_confirm"] == str(
-        charter.error_budget.confirmation.alpha_confirm
+        charter.budget.confirmation.alpha_confirm
     )
     assert first.header["guarantee"]["dependence"] == "arbitrary"
     again = scmle.assurance.ledger.ledger.Ledger.open(tmp_path, charter)

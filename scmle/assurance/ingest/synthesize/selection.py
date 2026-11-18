@@ -255,14 +255,14 @@ def lineage(
                 name=entry["name"],
                 origin=provenance.Origin.DERIVED,
                 writer="scmle.assurance.ingest.synthesize",
-                written_at=provenance.Stamp.UNKNOWN,
+                stamp=provenance.Stamp.UNKNOWN,
                 overwritten=provenance.Overwritten.NEVER,
-                definition_history=history,
-                as_of=as_of,
-                as_of_source=source,
-                available_at_serving=provenance.Availability.UNKNOWN,
+                definitions=history,
+                lead=as_of,
+                provenance=source,
+                availability=provenance.Availability.UNKNOWN,
                 attestation=attestation,
-                log_check=rule.log_check
+                reconstruction=rule.log_check
                 if tier is qualification.Tier.CONFIRMED
                 else None,
             )

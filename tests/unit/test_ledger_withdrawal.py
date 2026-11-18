@@ -52,7 +52,7 @@ def run(second_stage, tmp_path=None, source=None, **world):
 
 
 def columns_of(run_, claims):
-    return {run_.ledger.hypotheses[c.claim_id].spec.column for c in claims}
+    return {run_.ledger.hypotheses[c.identifier].spec.column for c in claims}
 
 
 def test_a_withdrawn_survivor_is_not_tested_on_c_and_is_unverified(tmp_path):
@@ -61,14 +61,14 @@ def test_a_withdrawn_survivor_is_not_tested_on_c_and_is_unverified(tmp_path):
     confirmation = result.confirmation
     assert confirmation.outcome == confirm.CONFIRMED
     assert columns_of(result, confirmation.confirmed) == {"f0"}
-    tested = {c.check_id.split(":")[0] for c in confirmation.checks}
+    tested = {c.identifier.split(":")[0] for c in confirmation.checks}
     withdrawn = next(
         h.hypothesis_id
         for h in result.ledger.survivors()
         if h.spec.column == "f1"
     )
     assert withdrawn not in tested
-    claim = next(c for c in confirmation.claims if c.claim_id == withdrawn)
+    claim = next(c for c in confirmation.claims if c.identifier == withdrawn)
     assert claim.tier.value == "unverified" and claim.adjusted_p_value is None
     assert "withdrawn before C was opened" in claim.assumptions[0]
     assert any(

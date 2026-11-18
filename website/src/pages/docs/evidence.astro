@@ -11,15 +11,15 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 
   <h2>One claim, one evidence record</h2>
   <p>Every release criterion is a named record. Do not write “quality checked” when the useful claim is “the curation report contains a structured finding for every detected issue.” The record should make the claim falsifiable.</p>
-  <pre><code>{`criterion_id:
+  <pre><code>{`criterion:
   claim: structured curation findings are persisted
   scope: {release: beta, area: data}
-  raw_inputs: {dataset: sha256:...}
-  command_or_test: uv run pytest tests/integration/test_quality_checks_in_run.py
+  inputs: {dataset: sha256:...}
+  command: uv run pytest tests/integration/test_quality_checks_in_run.py
   artifact: {path: curation_report.json, digest: sha256:...}
   result: pass
   reviewer: independent-reviewer
-  observed_at: 2026-10-20T12:00:00+00:00
+  observed: 2026-10-20T12:00:00+00:00
   limitations: [range-backed and warehouse snapshot identity remains transport-owned]
   decision: accepted`}</code></pre>
 

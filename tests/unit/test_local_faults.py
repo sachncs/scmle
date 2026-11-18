@@ -27,14 +27,13 @@ def test_local_executor_passes_every_declared_scenario(tmp_path):
     for scenario in reliability.Contingency:
         plan = harness.run(scenario, executor.execute)
 
-        assert plan.verification_status is reliability.Verification.PASSED
+        assert plan.verification is reliability.Verification.PASSED
         assert all(
-            evidence.observed_outcome
-            is reliability.Outcome.SAFE_OUTCOME_OBSERVED
+            evidence.outcome is reliability.Outcome.SAFE_OUTCOME_OBSERVED
             for evidence in plan.evidence
         )
         assert all(
-            Path(url2pathname(urlparse(evidence.artifact_uri).path)).exists()
+            Path(url2pathname(urlparse(evidence.uri).path)).exists()
             for evidence in plan.evidence
         )
 
@@ -49,7 +48,7 @@ def test_local_executor_returns_declared_evidence_only(tmp_path, scenario):
     )
 
     assert tuple(item.evidence_type for item in artifacts) == (
-        plan.evidence_requirements
+        plan.requirements
     )
 
 

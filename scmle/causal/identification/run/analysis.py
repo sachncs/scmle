@@ -130,7 +130,7 @@ def caveats(
     notes = [
         f"negative-control exposure {control.variable} is only "
         "supported for backdoor_aipw and was not run"
-        for control in spec.negative_controls
+        for control in spec.controls
         if control.kind == "exposure" and strategy != "backdoor_aipw"
     ]
     if not checked:
@@ -276,7 +276,7 @@ def grade(
         interval_gate=INTERVAL_GATES[strategy],
         battery_ran=report_battery.ran,
         battery_passed=report_battery.passed,
-        negative_control_declared=bool(spec.negative_controls),
+        negative_control_declared=bool(spec.controls),
         battery_gate=BATTERY_GATES[strategy],
         replication_passed=rep["passed"],
         sensitivity_holds=sens.get("holds"),

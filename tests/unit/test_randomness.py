@@ -106,16 +106,16 @@ for index, name in enumerate(("alpha", "beta", "gamma")):
     rng = randomness.component_rng(42, name, index)
     checks.append(
         q.Check(
-            check_id=name,
-            null_hypothesis="x is independent of y",
+            identifier=name,
+            null="x is independent of y",
             statistic=float(rng.standard_normal()),
             p_value=float(rng.random()),
             interval=None,
             effect=float(rng.random()),
             n=100,
             decision=q.Decision.PASS,
-            set_id=q.Subset.EXPLORATION,
-            seed_path=randomness.seed_path(42, name, index),
+            subset=q.Subset.EXPLORATION,
+            seeds=randomness.seed_path(42, name, index),
             tier=q.Tier.UNVERIFIED,
         ).to_dict()
     )
@@ -140,7 +140,7 @@ def test_check_lists_are_bit_identical_across_processes():
     second = run_in_new_process("999")
     assert first == second
     records = json.loads(first)
-    assert [record["check_id"] for record in records] == [
+    assert [record["identifier"] for record in records] == [
         "alpha",
         "beta",
         "gamma",

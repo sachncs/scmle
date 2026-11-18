@@ -249,7 +249,7 @@ def test_comparison_resamples_whole_groups_and_time_blocks(
 
     clustered = copy.copy(trained.bundle)
     clustered.schema = dataclasses.replace(
-        trained.bundle.schema, group_column="entity"
+        trained.bundle.schema, group="entity"
     )
     champion.Referee(clustered, clustered, bootstraps=5).compare(
         features, holdout["y"]
@@ -258,8 +258,6 @@ def test_comparison_resamples_whole_groups_and_time_blocks(
 
     seen.clear()
     timed = copy.copy(trained.bundle)
-    timed.schema = dataclasses.replace(
-        trained.bundle.schema, time_column="when"
-    )
+    timed.schema = dataclasses.replace(trained.bundle.schema, time="when")
     champion.Referee(timed, timed, bootstraps=5).compare(features, holdout["y"])
     assert seen and all(block and not group for group, block in seen)

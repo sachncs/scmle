@@ -129,7 +129,7 @@ class Instrument(Estimator):
             usable standard error.
         """
         tests = []
-        for control in self.spec.negative_controls:
+        for control in self.spec.controls:
             if control.kind == "outcome":
                 est = self.reckon(c, level, control.variable)
                 test = waldify(
@@ -163,9 +163,7 @@ class RdEstimator(Estimator):
             The variables of the declared negative-control outcomes.
         """
         return tuple(
-            c.variable
-            for c in self.spec.negative_controls
-            if c.kind == "outcome"
+            c.variable for c in self.spec.controls if c.kind == "outcome"
         )
 
     def prepare(self) -> None:

@@ -14,14 +14,15 @@ def load():
     return module
 
 
-def test_unchanged_lines_follow_an_insertion_and_changed_ones_stay():
+def test_lines_follow_an_insertion_and_a_reworded_line_keeps_its_place():
     module = load()
     before = ["a", "b", "c", "d"]
     after = ["a", "new", "new", "b", "C", "d"]
 
     found = module.align(before, after)
 
-    assert found == {1: 1, 2: 4, 4: 6}  # "c" changed, so line 3 is not mapped
+    # "c" was reworded in place, so line 3 maps to its new position.
+    assert found == {1: 1, 2: 4, 3: 5, 4: 6}
 
 
 def test_a_citation_names_the_doc_and_the_line():

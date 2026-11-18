@@ -90,7 +90,7 @@ def gate(root, stage="certify", *extra):
 def test_a_complete_release_is_certified_and_the_record_verifies(
     release, capsys
 ):
-    # Enforces docs/CLI.md:155.
+    # Enforces docs/CLI.md:156.
     # Enforces docs/GLOSSARY.md:698.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:21.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:771.
@@ -101,7 +101,7 @@ def test_a_complete_release_is_certified_and_the_record_verifies(
     assert gate(root, "certify", "--output", str(output)) == cli.EXIT_OK
     decision = json.loads(capsys.readouterr().out)
     assert decision["allowed"] is True
-    assert decision["record"]["model_digest"] == digest
+    assert decision["record"]["digests"]["model"] == digest
     code = cli.main(
         [
             "deploy",
@@ -133,7 +133,7 @@ def test_a_complete_release_is_certified_and_the_record_verifies(
 def test_evidence_that_is_not_supplied_blocks_the_release(
     release, capsys, drop
 ):
-    # Enforces docs/CLI.md:155.
+    # Enforces docs/CLI.md:156.
     # Enforces docs/GLOSSARY.md:698-698.
     root, manifest, ignored = release
     del manifest[drop]

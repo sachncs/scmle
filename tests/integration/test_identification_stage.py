@@ -40,7 +40,7 @@ def causal_frame() -> pandas.DataFrame:
 def charter_file(
     tmp_path, assumptions, dag=None, subgroups=(), attestors=(), signed=None
 ) -> pathlib.Path:
-    base = make_charter(min_effect=0.5, k_max=3)
+    base = make_charter(effect=0.5, quota=3)
     estimand = dataclasses.replace(
         base.estimand,
         kind="causal",
@@ -58,7 +58,7 @@ def charter_file(
     )
     path = tmp_path / "charter.json"
     sealing.inscribe(
-        path, make_charter(estimand=estimand, min_effect=0.5, k_max=3), KEY
+        path, make_charter(estimand=estimand, effect=0.5, quota=3), KEY
     )
     return path
 
@@ -88,7 +88,7 @@ def read(result, name):
 
 
 def test_an_identified_charter_estimates_on_the_single_opening_of_c(tmp_path):
-    # Enforces docs/ARTIFACTS.md:41.
+    # Enforces docs/ARTIFACTS.md:47.
     result = run(tmp_path, ASSUMPTIONS)
     plan = read(result, "identification_plan.json")
     report = read(result, "identification_report.json")
@@ -130,7 +130,7 @@ def test_an_identified_charter_estimates_on_the_single_opening_of_c(tmp_path):
 
 
 def test_claims_prints_the_identification_status_and_verifies(tmp_path, capsys):
-    # Enforces docs/ARTIFACTS.md:41.
+    # Enforces docs/ARTIFACTS.md:47.
     result = run(tmp_path, ASSUMPTIONS)
 
     assert cli.main(["claims", "list", str(result.run_dir)]) == 0
@@ -152,7 +152,7 @@ def test_claims_prints_the_identification_status_and_verifies(tmp_path, capsys):
 def test_a_declared_dag_is_loaded_checked_and_lifts_the_adjustment_cap(
     tmp_path,
 ):
-    # Enforces docs/ARTIFACTS.md:41.
+    # Enforces docs/ARTIFACTS.md:47.
     graph = scmle.assurance.admissibility.dag.Dag(
         ("t", "x1", "x2", "y"),
         (("t", "y"), ("x1", "t"), ("x1", "y"), ("x2", "y")),
@@ -209,7 +209,7 @@ def test_a_dag_that_cannot_be_loaded_is_a_config_error(tmp_path):
 def test_a_charter_no_strategy_identifies_is_refused_without_an_estimate(
     tmp_path,
 ):
-    # Enforces docs/ARTIFACTS.md:41.
+    # Enforces docs/ARTIFACTS.md:47.
     result = run(tmp_path, ("positivity",))
     claims = read(result, "causal_claims.json")
     report = read(result, "identification_report.json")
@@ -221,7 +221,7 @@ def test_a_charter_no_strategy_identifies_is_refused_without_an_estimate(
 def test_subgroup_hypotheses_are_registered_and_reported_in_the_causal_files(
     tmp_path,
 ):
-    # Enforces docs/ARTIFACTS.md:41.
+    # Enforces docs/ARTIFACTS.md:47.
     frame = causal_frame()
     frame["seg"] = numpy.where(frame["x1"] > 0, "hi", "lo")
     plain = run(tmp_path / "plain", ASSUMPTIONS, frame=frame)
@@ -289,7 +289,7 @@ def attested_run(tmp_path, monkeypatch, key=KEY, skip=()):
 def test_verified_attestations_lift_the_claim_above_unverified(
     tmp_path, monkeypatch
 ):
-    # Enforces docs/ARTIFACTS.md:41.
+    # Enforces docs/ARTIFACTS.md:47.
     result = attested_run(tmp_path, monkeypatch)
     claims = read(result, "causal_claims.json")
     assert claims["tier"] in ("attested", "confirmed")
@@ -308,7 +308,7 @@ def test_verified_attestations_lift_the_claim_above_unverified(
 def test_a_forged_or_missing_attestation_leaves_the_claim_unverified(
     tmp_path, monkeypatch
 ):
-    # Enforces docs/ARTIFACTS.md:41.
+    # Enforces docs/ARTIFACTS.md:47.
     forged = attested_run(tmp_path / "forged", monkeypatch, key="forger")
     claims = read(forged, "causal_claims.json")
     assert claims["tier"] == "unverified"

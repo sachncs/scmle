@@ -47,7 +47,7 @@ def voucher(batch) -> streaming.Voucher:
 
 def test_a_voucher_from_another_source_is_refused(tmp_path) -> None:
     batch = first(tmp_path)[2]
-    other = dataclasses.replace(batch.next_checkpoint, source_identity="x")
+    other = dataclasses.replace(batch.next_checkpoint, source="x")
     with pytest.raises(
         errors.InputError, match=r"^receipt and checkpoint sources differ$"
     ):
@@ -108,7 +108,7 @@ def test_state_of_another_source_names_that_source(tmp_path) -> None:
 
 @pytest.mark.parametrize(
     "change",
-    [{"source_identity": "elsewhere"}, {"snapshot_sha256": "0" * 64}],
+    [{"source": "elsewhere"}, {"digests": {"snapshot": "0" * 64}}],
 )
 def test_rebind_names_this_source(tmp_path, change) -> None:
     feed, batch = first(tmp_path)[::2]

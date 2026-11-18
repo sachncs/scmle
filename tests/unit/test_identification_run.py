@@ -69,7 +69,7 @@ def block(**changes) -> causal.Question:
         "estimand": "ATE",
         "assumptions": ASSUMPTIONS,
         "strategies": ("backdoor_aipw",),
-        "negative_controls": (causal.Control("outcome", "nco"),),
+        "controls": (causal.Control("outcome", "nco"),),
         "strata": ("region",),
         "sensitivity": causal.Confounding("strongest_observed", 1.0),
     }
@@ -133,7 +133,7 @@ def test_with_a_checked_dag_and_certificates_the_claim_is_confirmed():
 
 
 def test_uncertified_gates_keep_the_claim_at_attested():
-    # Enforces docs/ARTIFACTS.md:41.
+    # Enforces docs/ARTIFACTS.md:47.
     out = go(
         block(), observational(2000, 5), observational(3000, 6), certified=()
     )
@@ -144,7 +144,7 @@ def test_the_held_out_estimate_alone_is_not_confirmed():
     # unobserved confounding, significant on C, no negative control, no strata
     # Enforces docs/GLOSSARY.md:409.
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:126.
-    spec = block(negative_controls=(), strata=(), sensitivity=None)
+    spec = block(controls=(), strata=(), sensitivity=None)
     x, c = (
         observational(3000, 7, hidden=1.2),
         observational(5000, 8, hidden=1.2),
@@ -192,7 +192,7 @@ def test_overlap_failure_without_trimming_refuses_and_with_trimming_runs():
             {"a": a, "b": rng.standard_normal(n), "t": t, "y": y}
         )
 
-    spec = block(negative_controls=(), strata=(), sensitivity=None)
+    spec = block(controls=(), strata=(), sensitivity=None)
     refused = go(spec, world(3000), world(3000))
     assert refused.documents["causal_claims.json"]["status"] == "not_identified"
     assert (
@@ -200,7 +200,7 @@ def test_overlap_failure_without_trimming_refuses_and_with_trimming_runs():
         in refused.documents["identification_report.json"]["reason"]
     )
     trimmed = go(
-        block(trim=0.05, negative_controls=(), strata=(), sensitivity=None),
+        block(trim=0.05, controls=(), strata=(), sensitivity=None),
         world(3000),
         world(3000),
     )
@@ -256,9 +256,9 @@ def test_difference_in_differences_runs_through_the_same_documents():
         adoption="g",
         assumptions=("parallel_trends", "no_anticipation", "no_interference"),
         strategies=("did",),
-        negative_controls=(causal.Control("outcome", "nco"),),
+        controls=(causal.Control("outcome", "nco"),),
         strata=("region",),
-        sensitivity=causal.Confounding(m_max=1.0),
+        sensitivity=causal.Confounding(multiple=1.0),
     )
     out = go(spec, did_frame(1, 400), did_frame(2, 400))
     est = out.documents["identification_report.json"]["estimate"]

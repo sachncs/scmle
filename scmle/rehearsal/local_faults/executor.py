@@ -86,7 +86,7 @@ class Executor(
                 f"local fault scenario failed: {scenario.value}"
             ) from error
         expected = next(
-            plan.evidence_requirements
+            plan.requirements
             for plan in reliability.drills()
             if plan.scenario is scenario
         )

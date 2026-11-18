@@ -217,24 +217,24 @@ def simulate(
         if none crossed), `n_max` and `runs`.
     """
     qualification.count(runs, "runs", minimum=1)
-    chosen = float(plan.alpha_promote) if level is None else level
+    chosen = float(plan.promotion) if level is None else level
     rng = randomness.component_rng(seed, "decision.design.esn", 0)
-    q = plan.assignment_prob
-    arm = (rng.random((runs, plan.n_max)) < q).astype(float)
-    y = (rng.random((runs, plan.n_max)) < p_control + effect * arm).astype(
+    q = plan.assignment
+    arm = (rng.random((runs, plan.limit)) < q).astype(float)
+    y = (rng.random((runs, plan.limit)) < p_control + effect * arm).astype(
         float
     )
-    scaled = plan.delta_min / (plan.high - plan.low)
+    scaled = plan.delta / (plan.high - plan.low)
     paths = anytime.recentre(arm, y, q, scaled)
     hit = paths >= -math.log(chosen)
     crossed = hit.any(axis=1)
-    when = numpy.where(crossed, hit.argmax(axis=1) + 1, plan.n_max)
+    when = numpy.where(crossed, hit.argmax(axis=1) + 1, plan.limit)
     return {
         "crossed_share": float(crossed.mean()),
         "mean_units": float(when[crossed].mean()) if crossed.any() else None,
         "median_units": (
             float(numpy.median(when[crossed])) if crossed.any() else None
         ),
-        "n_max": plan.n_max,
+        "n_max": plan.limit,
         "runs": runs,
     }

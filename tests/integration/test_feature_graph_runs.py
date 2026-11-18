@@ -61,7 +61,7 @@ def run(frame, tmp_path, graph=GRAPH, models=None, **kwargs):
     )
     if models is None:
         return project.run()
-    plan = dataclasses.replace(project.plan(), candidate_models=tuple(models))
+    plan = dataclasses.replace(project.plan(), candidates=tuple(models))
     return project.run(plan)
 
 
@@ -120,7 +120,7 @@ def test_bundle_with_a_graph_roundtrips_and_records_its_fingerprint(tmp_path):
     numpy.testing.assert_allclose(
         loaded.predict_proba(raw), result.predict_proba(raw)
     )
-    assert loaded.schema.graph_fingerprint == GRAPH.fingerprint()
+    assert loaded.schema.digests["graph"] == GRAPH.fingerprint()
     events = (result.run_dir / "events.jsonl").read_text().splitlines()
     graph_events = [
         json.loads(e)
@@ -246,7 +246,7 @@ def test_time_series_features_are_generated_within_groups_and_scored_with_histor
         "load_change",
         "load_avg3",
     ]
-    assert {"unit", "day"} <= set(result.bundle.schema.extra_inputs)
+    assert {"unit", "day"} <= set(result.bundle.schema.extras)
     raw = frame.drop(columns=["y"])
     predictions = result.predict(raw)  # batch carries its own history
     assert len(predictions) == len(raw)

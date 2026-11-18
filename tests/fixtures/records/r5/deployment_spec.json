@@ -1,0 +1,45 @@
+{
+  "digest": "sha256:80f6f5e948262ef6fe91be74da089c4f7a795d0581ab258e8c589261bf9e916d",
+  "record": {
+    "bundle": {
+      "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "model": "churn",
+      "model_version": "v3",
+      "signed": true
+    },
+    "config": {
+      "PORT": "8000"
+    },
+    "environment": "staging",
+    "format": 1,
+    "health": {
+      "failure_threshold": 3,
+      "liveness_path": "/livez",
+      "period_seconds": 5.0,
+      "readiness_path": "/readyz",
+      "startup_grace_seconds": 60.0,
+      "timeout_seconds": 1.0
+    },
+    "image": {
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "repository": "registry.example/scmle-svc"
+    },
+    "port": 8000,
+    "resources": {
+      "cpu_limit": 1.0,
+      "cpu_request": 0.5,
+      "max_concurrent_requests": 8,
+      "memory_limit_mb": 512,
+      "memory_request_mb": 256,
+      "read_only_root": true,
+      "run_as_non_root": true,
+      "scratch_mb": 64
+    },
+    "secrets": [],
+    "version": "1.2.0"
+  }
+}

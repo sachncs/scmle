@@ -1,0 +1,37 @@
+{
+  "payload": {
+    "release": "candidate-1"
+  },
+  "record": {
+    "keys": [
+      {
+        "created_at": "2026-09-01T00:00:00+00:00",
+        "expires_at": null,
+        "key_id": "k0",
+        "owner": "release",
+        "reason": "rotation",
+        "replacement_key_id": "k1",
+        "state": "retired",
+        "state_changed_at": "2026-10-01T00:00:00+00:00"
+      },
+      {
+        "created_at": "2026-10-01T00:00:00+00:00",
+        "expires_at": null,
+        "key_id": "k1",
+        "owner": "release",
+        "reason": "",
+        "replacement_key_id": null,
+        "state": "active",
+        "state_changed_at": null
+      }
+    ],
+    "schema_version": 1
+  },
+  "secret": "secret",
+  "wrapper": {
+    "algorithm": "hmac-sha256",
+    "key_id": "k1",
+    "signed_at": "2026-10-02T00:00:00+00:00",
+    "value": "8055862fa6f0847de906e040855a6c6aae732207ddc4eaa44289de5e09878dd8"
+  }
+}

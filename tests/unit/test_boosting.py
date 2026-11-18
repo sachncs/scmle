@@ -149,7 +149,7 @@ def test_catboost_handles_string_labels_natively(multiclass_frame, tmp_path):
         strategies=only,
     )
     plan = project.plan()
-    assert "catboost" in plan.candidate_models
+    assert "catboost" in plan.candidates
     result = project.run()
     assert {"catboost"} <= {
         t.model_name for t in result.trials if t.status == "ok"

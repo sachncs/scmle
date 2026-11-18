@@ -66,9 +66,9 @@ def test_only_models_that_can_enforce_the_constraint_are_planned(tmp_path):
 
     plan = project.plan()
 
-    assert "logistic_regression" not in plan.candidate_models
-    assert "stacking" not in plan.candidate_models
-    assert "hist_gradient_boosting" in plan.candidate_models
+    assert "logistic_regression" not in plan.candidates
+    assert "stacking" not in plan.candidates
+    assert "hist_gradient_boosting" in plan.candidates
     reasons = {d.technique: d.reason for d in plan.decisions}
     assert reasons["random_forest"] == "cannot enforce monotonic constraints"
 

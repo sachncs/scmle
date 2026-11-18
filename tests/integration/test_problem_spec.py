@@ -53,7 +53,7 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
     assert (result.run_dir / "provenance.json").exists()
     assert result.evaluation["sbom"]["bomFormat"] == "CycloneDX"
     assert (result.run_dir / "sbom.json").exists()
-    assert result.evaluation["release_attestation"]["schema_version"] == 1
+    assert result.evaluation["release_attestation"]["schema_version"] == 2
     assert (result.run_dir / "release_attestation.json").exists()
     assert result.evaluation["reliability_plan"]["release_blocked"] is True
     assert (result.run_dir / "fault_injection_plan.json").exists()
@@ -126,7 +126,7 @@ def test_packaged_release_attestation_is_signed_when_key_is_configured(
         result.evaluation["release_attestation"]
     )
 
-    assert record.attestation_signature
+    assert record.signature
     assert record.verify(
         result.evaluation["provenance"],
         result.evaluation["sbom"],

@@ -46,7 +46,7 @@ def test_modality_project_runs_and_persists_all_stages(tmp_path):
     report = project.run()
 
     assert report.modality == "text"
-    assert len(report.stage_evidence) == 15
+    assert len(report.evidence) == 15
     assert project.declaration().status.value == "experimental"
     assert (tmp_path / "run" / "model" / "manifest.json").is_file()
     assert (tmp_path / "run" / "modality_lifecycle.json").is_file()
@@ -168,10 +168,10 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
     ).run()
 
     assert result.modality == "text"
-    assert result.sample_count == 3
+    assert result.samples == 3
     assert result.curation["sample_count"] == 3
-    assert result.dataset_card["privacy"]["status"] == "not_assessed"
-    assert result.dataset_card["manifest"]["task"] == "not_declared"
+    assert result.card["privacy"]["status"] == "not_assessed"
+    assert result.card["manifest"]["task"] == "not_declared"
     assert Path(result.path).is_file()
 
     restored = scmle.pipeline.modality_lifecycle.Curation.read_verified(
@@ -182,7 +182,7 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
         result.to_dict()
     )
     tampered = json.loads(Path(result.path).read_text(encoding="utf-8"))
-    tampered["dataset_card"]["intended_use"] = "tampered"
+    tampered["card"]["intended_use"] = "tampered"
     Path(result.path).write_text(json.dumps(tampered), encoding="utf-8")
     with pytest.raises(
         ValueError,
@@ -300,8 +300,8 @@ def test_extension_curation_adapter_accepts_arbitrary_records_without_model_hook
     ).run()
 
     assert result.modality == "extension:acme/point-cloud"
-    assert result.sample_count == 2
-    assert result.dataset_card["manifest"]["task"] == "not_declared"
+    assert result.samples == 2
+    assert result.card["manifest"]["task"] == "not_declared"
 
 
 def test_extension_curation_adapter_rejects_detached_report():
@@ -348,5 +348,5 @@ def test_extension_curation_adapter_accepts_empty_raw_snapshot(tmp_path):
         output_dir=tmp_path / "empty-curation",
     ).run()
 
-    assert result.sample_count == 0
+    assert result.samples == 0
     assert result.curation["profile"]["empty"] is True

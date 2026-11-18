@@ -52,7 +52,7 @@ def rehashed(tmp_path, monkeypatch):
 
 
 def test_trusted_load_refuses_a_signature_it_cannot_check(rehashed):
-    # Enforces docs/CLI.md:180.
+    # Enforces docs/CLI.md:181.
     # Enforces docs/GLOSSARY.md:613.
     with pytest.raises(errors.ArtifactError, match="no signing key set"):
         scmle.artifacts.bundle.Bundle.load(rehashed, trusted=True)

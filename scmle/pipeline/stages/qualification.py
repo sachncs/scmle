@@ -153,7 +153,7 @@ class Qualification(screening.Screening):
             multiclass=kind == explore.MULTICLASS,
             choices=charter.multiverse,
             seed=charter.seed,
-            permutations=charter.error_budget.permutations_b,
+            permutations=charter.budget.permutations,
             strata=governed.strata_labels(
                 view.features, data.group_column, data.time_column
             ),
@@ -165,7 +165,7 @@ class Qualification(screening.Screening):
                 scmle.assurance.robustness.stability.DEFAULT_RULE
                 if rules is None
                 else scmle.assurance.robustness.stability.Thresholds(
-                    rules.s_min, rules.band, rules.q_min
+                    rules.agreement, rules.band, rules.exclusion
                 )
             ),
         )

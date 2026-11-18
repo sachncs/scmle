@@ -33,7 +33,7 @@ def test_a_signed_older_charter_still_verifies(tmp_path):
 
 
 def test_the_block_changes_the_hash_round_trips_and_needs_format_seven():
-    charter = make_charter(ingest=ingest.Ingestion(feature_budget=50, lag=1.0))
+    charter = make_charter(ingest=ingest.Ingestion(features=50, lag=1.0))
     assert charter.charter_hash != PINNED_HASH
     assert charter.format_version == 7
     record = json.loads(json.dumps(charter.to_dict()))
@@ -54,18 +54,23 @@ def test_the_block_in_an_older_format_is_refused(tmp_path):
 @pytest.mark.parametrize(
     "bad",
     [
-        {"feature_budget": 0},
+        {"features": 0},
         {"windows": ()},
         {"windows": (7.0, 7.0)},
         {"windows": (-1.0,)},
         {"lag": -1.0},
-        {"eps_fk": -0.1},
-        {"max_seconds": -1.0},
+        {"reconciliation": -0.1},
+        {"seconds": -1.0},
     ],
 )
 def test_invalid_blocks_are_refused(bad):
     with pytest.raises(ValueError):
         ingest.Ingestion(**bad)
+
+
+def test_a_negative_key_tolerance_is_refused():
+    with pytest.raises(ValueError, match="link"):
+        ingest.Tolerances(link=-0.1)
 
 
 # Hash and signature (key "k") of an ingest charter written under format 7,
@@ -90,7 +95,7 @@ def entity_block():
 
 def test_a_format_seven_ingest_charter_keeps_hash_and_signature():
     # Enforces docs/API_STABILITY.md:85.
-    charter = make_charter(ingest=ingest.Ingestion(feature_budget=50, lag=1.0))
+    charter = make_charter(ingest=ingest.Ingestion(features=50, lag=1.0))
     assert charter.charter_hash == FORMAT_SEVEN_HASH
     assert charter.format_version == 7
     assert "entity" not in charter.to_dict()["ingest"]
@@ -99,7 +104,7 @@ def test_a_format_seven_ingest_charter_keeps_hash_and_signature():
 
 def test_the_entity_block_needs_format_eight_and_round_trips():
     # Enforces docs/API_STABILITY.md:85.
-    spec = ingest.Ingestion(feature_budget=50, lag=1.0, entity=entity_block())
+    spec = ingest.Ingestion(features=50, lag=1.0, entity=entity_block())
     charter = make_charter(ingest=spec)
     assert charter.format_version == 8
     assert charter.charter_hash != FORMAT_SEVEN_HASH
@@ -145,7 +150,7 @@ def reconcile_block():
                 "orders",
                 rows=100,
                 sums=(ingest.Total("amount", 5000.0),),
-                checksum_column="order_id",
+                column="order_id",
                 checksum="ab" * 32,
             ),
         )
@@ -160,7 +165,7 @@ def test_the_reconcile_block_needs_format_eight_and_round_trips():
     assert charter.charter_hash != FORMAT_SEVEN_HASH
     record = json.loads(json.dumps(charter.to_dict()))
     assert contracts.AnalysisCharter.from_dict(record) == charter
-    plain = make_charter(ingest=ingest.Ingestion(feature_budget=50, lag=1.0))
+    plain = make_charter(ingest=ingest.Ingestion(features=50, lag=1.0))
     assert "reconcile" not in plain.to_dict()["ingest"]
     assert plain.charter_hash == FORMAT_SEVEN_HASH
 
@@ -182,9 +187,9 @@ def test_the_reconcile_block_in_format_seven_is_refused(tmp_path):
         lambda: ingest.Expectation(()),
         lambda: ingest.TableTotals("t"),
         lambda: ingest.TableTotals("t", rows=-1),
-        lambda: ingest.TableTotals("t", checksum_column="k"),
+        lambda: ingest.TableTotals("t", column="k"),
         lambda: ingest.TableTotals("t", checksum="ab" * 32),
-        lambda: ingest.TableTotals("t", checksum_column="k", checksum="zz"),
+        lambda: ingest.TableTotals("t", column="k", checksum="zz"),
         lambda: ingest.Total("a", float("nan")),
         lambda: ingest.Expectation(
             (ingest.TableTotals("t", rows=1), ingest.TableTotals("t", rows=2))

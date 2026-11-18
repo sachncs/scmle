@@ -98,7 +98,7 @@ class Interruptions(workspace.Workspace):
                 scenario,
                 "checkpoint_identity",
                 "checkpoint source identity was compared before resume",
-                {"source": checkpoint.source_identity},
+                {"source": checkpoint.source},
             ),
             self.artifact(
                 scenario,

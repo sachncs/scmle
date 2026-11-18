@@ -1,0 +1,232 @@
+{
+  "digest": "01a4e02d24ca27088a6955734a372e4967de5f600a60c641b2ca49b62fe44f07",
+  "report": {
+    "covariance": [
+      [
+        0.022998896781215323,
+        0.0038697829726390613,
+        -0.008383302688097172
+      ],
+      [
+        0.0038697829726390613,
+        0.03454829797390631,
+        0.004094966464401047
+      ],
+      [
+        -0.008383302688097172,
+        0.004094966464401047,
+        0.047039916892376
+      ]
+    ],
+    "diagnostics": {
+      "covariance_method": "subject-aligned_influence_function_sandwich",
+      "effective_sample_size": {
+        "0": {
+          "control": 24.460726823557447,
+          "treated": 29.04187774720064
+        },
+        "1": {
+          "control": 28.91656253457941,
+          "treated": 30.883866686493814
+        },
+        "2": {
+          "control": 12.600952158174715,
+          "treated": 31.243715988651356
+        }
+      },
+      "method": "period_specific_covariate_adjusted_hajek_ipw",
+      "overlap": {
+        "0": {
+          "common_support_lower": 0.32433223812751644,
+          "common_support_upper": 0.7940130240534009,
+          "fraction_clipped": 0.0,
+          "propensity_max": 0.8124171145073636,
+          "propensity_min": 0.1358256581259467
+        },
+        "1": {
+          "common_support_lower": 0.4452400911905548,
+          "common_support_upper": 0.5693096065345657,
+          "fraction_clipped": 0.0,
+          "propensity_max": 0.5740455982402817,
+          "propensity_min": 0.4372926647319989
+        },
+        "2": {
+          "common_support_lower": 0.22547853116509245,
+          "common_support_upper": 0.9239908641316631,
+          "fraction_clipped": 0.0,
+          "propensity_max": 0.9528628890873542,
+          "propensity_min": 0.062172712609199814
+        }
+      },
+      "period_count": 3,
+      "propensity_model": "deterministic_newton_logistic_with_ridge",
+      "subject_count": 60,
+      "time_ordering": "strictly_increasing_within_subject"
+    },
+    "estimand": {
+      "assumptions": [
+        "consistency",
+        "positivity",
+        "conditional_exchangeability",
+        "no_unmeasured_time_varying_confounding",
+        "no_time_varying_covariates"
+      ],
+      "covariates": [
+        "baseline_score"
+      ],
+      "name": "period_specific_treatment_effect",
+      "outcome": "outcome",
+      "population": "eligible subjects observed at each declared period",
+      "subject_identity": "subject_id",
+      "time_column": "time",
+      "treatment_column": "treatment"
+    },
+    "limitations": {
+      "distribution_shift": {
+        "message": "No target-population shift data were supplied.",
+        "status": "not_evaluated"
+      },
+      "longitudinal_scope": "Period-specific cross-sectional weighting; not a full sequential g-formula or marginal structural model.",
+      "missingness": {
+        "message": "Complete-case deletion is not a missing-at-random proof; the declared assumptions must cover missingness.",
+        "policy": "reject",
+        "rows_dropped": 0
+      },
+      "prior": {
+        "message": "This frequentist IPW estimator has no Bayesian prior.",
+        "status": "not_applicable"
+      }
+    },
+    "periods": [
+      {
+        "control_rows": 29,
+        "converged": true,
+        "effective_sample_size_control": 24.460726823557447,
+        "effective_sample_size_treated": 29.04187774720064,
+        "estimate": 1.592672519885217,
+        "fraction_clipped": 0.0,
+        "interval": [
+          1.2954363933688842,
+          1.8899086464015498
+        ],
+        "iterations": 5,
+        "period": "0",
+        "propensity_max": 0.8124171145073636,
+        "propensity_min": 0.1358256581259467,
+        "rows": 60,
+        "standard_error": 0.1516538716327919,
+        "treated_rows": 31
+      },
+      {
+        "control_rows": 29,
+        "converged": true,
+        "effective_sample_size_control": 28.91656253457941,
+        "effective_sample_size_treated": 30.883866686493814,
+        "estimate": 1.2775240239209849,
+        "fraction_clipped": 0.0,
+        "interval": [
+          0.9132221381286775,
+          1.6418259097132921
+        ],
+        "iterations": 4,
+        "period": "1",
+        "propensity_max": 0.5740455982402817,
+        "propensity_min": 0.4372926647319989,
+        "rows": 60,
+        "standard_error": 0.18587172451426362,
+        "treated_rows": 31
+      },
+      {
+        "control_rows": 23,
+        "converged": true,
+        "effective_sample_size_control": 12.600952158174715,
+        "effective_sample_size_treated": 31.243715988651356,
+        "estimate": 1.3986007390239847,
+        "fraction_clipped": 0.0,
+        "interval": [
+          0.9735102737451968,
+          1.8236912043027727
+        ],
+        "iterations": 6,
+        "period": "2",
+        "propensity_max": 0.9528628890873542,
+        "propensity_min": 0.062172712609199814,
+        "rows": 60,
+        "standard_error": 0.21688687579559995,
+        "treated_rows": 37
+      }
+    ],
+    "policy": {
+      "confidence_level": 0.95,
+      "max_iterations": 100,
+      "minimum_effective_sample_size": 2.0,
+      "minimum_rows_per_arm": 2,
+      "minimum_rows_per_period": 8,
+      "missingness": "reject",
+      "propensity_clip": 0.01,
+      "reference_tolerance": 1e-06,
+      "seed": 0,
+      "tolerance": 1e-08
+    },
+    "raw_input_fingerprint": "53bd14b6b826d4a745399886701511ca8f26c77454141775ec3e11a860ee39e3",
+    "reference": {
+      "method": "independent_direct_hajek_recalculation",
+      "passed": true,
+      "periods": [
+        {
+          "absolute_difference": 0.0,
+          "control_mean": 0.8569661443177047,
+          "control_rows": 29,
+          "estimate": 1.592672519885217,
+          "independent_method": "direct_normalized_weighted_means",
+          "passed": true,
+          "period": "0",
+          "primary_estimate": 1.592672519885217,
+          "propensity_range": [
+            0.1358256581259467,
+            0.8124171145073636
+          ],
+          "treated_mean": 2.4496386642029218,
+          "treated_rows": 31
+        },
+        {
+          "absolute_difference": 0.0,
+          "control_mean": 1.4147340940240625,
+          "control_rows": 29,
+          "estimate": 1.2775240239209849,
+          "independent_method": "direct_normalized_weighted_means",
+          "passed": true,
+          "period": "1",
+          "primary_estimate": 1.2775240239209849,
+          "propensity_range": [
+            0.4372926647319989,
+            0.5740455982402817
+          ],
+          "treated_mean": 2.6922581179450473,
+          "treated_rows": 31
+        },
+        {
+          "absolute_difference": 0.0,
+          "control_mean": 1.4186245589311746,
+          "control_rows": 23,
+          "estimate": 1.3986007390239847,
+          "independent_method": "direct_normalized_weighted_means",
+          "passed": true,
+          "period": "2",
+          "primary_estimate": 1.3986007390239847,
+          "propensity_range": [
+            0.062172712609199814,
+            0.9528628890873542
+          ],
+          "treated_mean": 2.8172252979551593,
+          "treated_rows": 37
+        }
+      ],
+      "tolerance": 1e-06
+    },
+    "rows_dropped": 0,
+    "rows_input": 180,
+    "rows_used": 180
+  },
+  "schema_version": 1
+}

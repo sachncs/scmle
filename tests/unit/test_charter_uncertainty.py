@@ -48,7 +48,7 @@ def test_the_block_changes_the_hash_round_trips_and_needs_format_ten():
     assert charter.charter_hash != PINNED_HASH
     assert charter.format_version == 10
     record = json.loads(json.dumps(charter.to_dict()))
-    assert record["uncertainty"] == {"cv_plus_max_bytes": 5_000_000}
+    assert record["uncertainty"] == {"limit": 5_000_000}
     assert contracts.AnalysisCharter.from_dict(record) == charter
 
 
@@ -77,7 +77,7 @@ def test_a_cap_must_be_a_positive_integer(bad):
 
 def test_unknown_fields_are_refused():
     with pytest.raises(ValueError, match="unknown"):
-        uncertainty.Uncertainty.from_dict({"cv_plus_max_bytes": 5, "x": 1})
+        uncertainty.Uncertainty.from_dict({"limit": 5, "x": 1})
 
 
 def stage_context(path):
@@ -105,10 +105,10 @@ def test_slice_columns_round_trip_and_leave_a_cap_only_charter_alone():
     spec = uncertainty.Uncertainty(5_000_000, ("grp", "region"))
     charter = make_charter(uncertainty=spec)
     record = json.loads(json.dumps(charter.to_dict()))
-    assert record["uncertainty"]["slice_columns"] == ["grp", "region"]
+    assert record["uncertainty"]["slices"] == ["grp", "region"]
     assert contracts.AnalysisCharter.from_dict(record) == charter
     assert charter.charter_hash != FORMAT_TEN_HASH
-    assert "slice_columns" not in with_cap().to_dict()["uncertainty"]
+    assert "slices" not in with_cap().to_dict()["uncertainty"]
     assert with_cap().charter_hash == FORMAT_TEN_HASH
 
 
@@ -124,7 +124,7 @@ def test_the_confirmation_coverage_flag_needs_format_eleven_and_round_trips():
     charter = make_charter(uncertainty=spec)
     assert charter.format_version == 11
     record = json.loads(json.dumps(charter.to_dict()))
-    assert record["uncertainty"] == {"coverage_on_confirmation": True}
+    assert record["uncertainty"] == {"confirmatory": True}
     assert contracts.AnalysisCharter.from_dict(record) == charter
     assert (
         charter.charter_hash
@@ -138,7 +138,7 @@ def test_without_the_flag_a_format_ten_charter_keeps_its_hash():
     charter = make_charter(uncertainty=off)
     assert charter.format_version == 10
     assert charter.charter_hash == FORMAT_TEN_HASH
-    assert "coverage_on_confirmation" not in charter.to_dict()["uncertainty"]
+    assert "confirmatory" not in charter.to_dict()["uncertainty"]
 
 
 def test_the_flag_in_an_older_format_is_refused(tmp_path):

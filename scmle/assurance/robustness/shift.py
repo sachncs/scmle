@@ -270,8 +270,8 @@ def c2st(
     auc, interval = delong(scores, held)
     fires = p_value <= alpha and interval[0] > 0.5 + delta
     return qualification.Check(
-        check_id=C2ST_ID,
-        null_hypothesis="exploration rows and the reference sample come "
+        identifier=C2ST_ID,
+        null="exploration rows and the reference sample come "
         "from one distribution",
         statistic=auc,
         p_value=p_value,
@@ -279,8 +279,8 @@ def c2st(
         effect=auc - 0.5,
         n=len(test),
         decision=decide(fires, on_shift, gate),
-        set_id=qualification.Subset.EXPLORATION,
-        seed_path=randomness.seed_path(seed, C2ST_ID, 0),
+        subset=qualification.Subset.EXPLORATION,
+        seeds=randomness.seed_path(seed, C2ST_ID, 0),
         tier=qualification.Tier.UNVERIFIED,
     )
 
@@ -473,8 +473,8 @@ def mmd_test(
         null[start:stop] = mmds(kernel, block)
     p_value = permutation_p_value(observed, null)
     return qualification.Check(
-        check_id=MMD_ID,
-        null_hypothesis="exploration rows and the reference sample come "
+        identifier=MMD_ID,
+        null="exploration rows and the reference sample come "
         "from one distribution",
         statistic=observed,
         p_value=p_value,
@@ -482,8 +482,8 @@ def mmd_test(
         effect=math.sqrt(max(observed, 0.0)),
         n=len(both),
         decision=decide(p_value <= alpha, on_shift, gate),
-        set_id=qualification.Subset.EXPLORATION,
-        seed_path=randomness.seed_path(seed, MMD_ID, 0),
+        subset=qualification.Subset.EXPLORATION,
+        seeds=randomness.seed_path(seed, MMD_ID, 0),
         tier=qualification.Tier.UNVERIFIED,
     )
 

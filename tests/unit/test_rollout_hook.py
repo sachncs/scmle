@@ -93,7 +93,7 @@ def test_the_level_is_spent_even_without_a_promotion(tmp_path):
 
 
 def test_assignment_rows_hold_arm_and_probability_per_unit(tmp_path):
-    env = hook_for(tmp_path, assignment_prob=0.3)
+    env = hook_for(tmp_path, assignment=0.3)
     ledger = env.ledger
     hook = env.hook
     hook.start("exp-1")
@@ -169,7 +169,7 @@ def test_a_hold_cannot_be_promoted(tmp_path):
 
 
 def test_a_rollback_decision_restores_the_previous_champion(tmp_path):
-    env = hook_for(tmp_path, n_max=5000, tolerance=0.01)
+    env = hook_for(tmp_path, limit=5000, tolerance=0.01)
     store = env.store
     challenger = env.challenger
     ledger = env.ledger
@@ -285,7 +285,7 @@ def test_the_bootstrap_rollback_check_never_moves_the_alias_once_a_hook_is_bound
 
 
 def test_the_hook_is_the_only_decider_of_promotion_and_rollback(tmp_path):
-    env = hook_for(tmp_path, n_max=5000, tolerance=0.01)
+    env = hook_for(tmp_path, limit=5000, tolerance=0.01)
     store, manager, hook = env.store, env.manager, env.hook
     challenger = env.challenger
     hook.start("exp-1")

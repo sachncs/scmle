@@ -13,7 +13,6 @@ from scmle.contracts import signing
 import scmle.contracts.data
 from scmle.data.modalities import curation
 from scmle.data.modalities import document
-from scmle.governance import attestation
 from scmle.pipeline import modality_lifecycle
 
 
@@ -67,9 +66,9 @@ def conform(
     """
     if manifest.modality != modality:
         raise errors.InputError("manifest modality must match adapter")
-    if manifest.content_hash != dataset_hash:
+    if manifest.digests["content"] != dataset_hash:
         raise errors.InputError("manifest content_hash must match adapter")
-    if manifest.sample_count != sample_count:
+    if manifest.samples != sample_count:
         raise errors.InputError("manifest sample_count must match adapter")
 
 
@@ -98,26 +97,19 @@ def verify(
         raise errors.InputError(
             "existing curation modality does not match current adapter"
         ) from None
-    if existing.dataset_hash != candidate.dataset_hash:
+    if existing.digests != candidate.digests:
         raise errors.InputError(
             "existing curation dataset_hash does not match current adapter"
         ) from None
-    if existing.sample_count != candidate.sample_count:
+    if existing.samples != candidate.samples:
         raise errors.InputError(
             "existing curation sample_count does not match current adapter"
         ) from None
-    try:
-        existing_record = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, TypeError, ValueError) as error:
-        raise errors.InputError(
-            "existing curation artifact is unreadable"
-        ) from error
-    if not isinstance(existing_record, dict):
-        raise errors.InputError(
-            "existing curation artifact must be an object"
-        ) from None
-    if attestation.checksum(existing_record) != (
-        attestation.checksum(candidate.to_dict())
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    canonical = json.loads(json.dumps(existing.to_dict()))
+    if (
+        stored != canonical
+        or existing.content_digest != candidate.content_digest
     ):
         raise errors.InputError(
             "existing curation canonical content does not match current adapter"
@@ -226,23 +218,23 @@ class Curator:
             task="not_declared",
         )
         unsigned: dict[str, object] = {
-            "schema_version": 1,
+            "schema_version": modality_lifecycle.CURATION_SCHEMA_VERSION,
             "record_type": "modality_curation",
             "modality": modality,
-            "dataset_hash": dataset_hash,
-            "sample_count": sample_count,
+            "digests": {"dataset": dataset_hash},
+            "samples": sample_count,
             "curation": curation_payload,
-            "dataset_card": card.to_dict(),
+            "card": card.to_dict(),
         }
         signature = signing.mac(unsigned, self.signing_key)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         path = self.output_dir / "modality_curation.json"
         candidate = modality_lifecycle.Curation(
             modality=modality,
-            dataset_hash=dataset_hash,
-            sample_count=sample_count,
+            digests={"dataset": dataset_hash},
+            samples=sample_count,
             curation=curation_payload,
-            dataset_card=card.to_dict(),
+            card=card.to_dict(),
             path=str(path),
             signature=signature,
         )

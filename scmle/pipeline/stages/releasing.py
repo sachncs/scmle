@@ -50,7 +50,7 @@ class Releasing(interface.Stage):
         """
         manifest = scmle.pipeline.context.require(context.manifest, "manifest")
         raw_inputs = {
-            "snapshot_id": manifest.snapshot_id or manifest.data_hash,
+            "snapshot_id": manifest.snapshot or manifest.digests["data"],
             "config_hash": context.spec.config_hash(),
         }
         records: list[scmle.contracts.evidence.Record] = []
@@ -60,7 +60,7 @@ class Releasing(interface.Stage):
                 continue
             records.append(
                 scmle.contracts.evidence.Record(
-                    criterion_id=reference,
+                    criterion=reference,
                     claim=(
                         f"artifact exists and matches run output: {reference}"
                     ),
@@ -70,17 +70,15 @@ class Releasing(interface.Stage):
                         ).value,
                         "modality": manifest.modality,
                     },
-                    raw_inputs=raw_inputs,
-                    command_or_test=(
-                        "scmle automated release evidence collector"
-                    ),
+                    inputs=raw_inputs,
+                    command=("scmle automated release evidence collector"),
                     artifact={
                         "path": reference,
                         "sha256": scmle.artifacts.bundle.shasum(path),
                     },
                     result=scmle.contracts.evidence.Outcome.PASS,
                     reviewer="scmle.automation",
-                    observed_at=datetime.datetime.now(datetime.UTC).isoformat(),
+                    observed=datetime.datetime.now(datetime.UTC).isoformat(),
                     limitations=(
                         (
                             "automated artifact-presence and digest check; "

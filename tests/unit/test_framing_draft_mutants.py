@@ -69,7 +69,9 @@ def test_a_source_description_reads_a_record_with_defaults():
             "target_time_column": "b",
         }
     )
-    assert full.primary_key == ("a",) and full.target_time_column == "b"
+    assert full.key == ("a",) and full.time == "b"
+    current = {"schema_version": 2, "uri": "u", "columns": ["a", "b"]}
+    assert draft.Offer.from_dict({**current, "key": ["a"], "time": "b"}) == full
     with pytest.raises(KeyError):
         draft.Offer.from_dict({"columns": ["a"]})
     with pytest.raises(KeyError):
@@ -139,7 +141,7 @@ def test_the_prediction_moment_is_the_only_datetime_column_apart_from_the_end():
     frame = table()
     slots = draft.prefill(request(frame), frame)
     assert slots["prediction_moment"] == "as_of"
-    both = request(frame, target_time_column=None)
+    both = request(frame, time=None)
     assert "prediction_moment" not in draft.prefill(both, frame)
     none = draft.prefill(request(frame), frame.drop(columns=["as_of"]))
     assert "prediction_moment" not in none
@@ -201,10 +203,7 @@ def test_the_moment_checks_say_what_is_wrong():
         "moment_exists", ok=False, blocking=True, detail="m missing"
     )
     assert checks_of(frame, {"prediction_moment": "a"}) == ()
-    assert (
-        checks_of(frame, {"prediction_moment": "a"}, target_time_column="zz")
-        == ()
-    )
+    assert checks_of(frame, {"prediction_moment": "a"}, time="zz") == ()
 
 
 def test_a_moment_equal_to_the_target_time_counts_as_a_violation():
@@ -214,9 +213,7 @@ def test_a_moment_equal_to_the_target_time_counts_as_a_violation():
             "e": pandas.to_datetime(["2024-01-02", "2024-01-02", "2024-01-04"]),
         }
     )
-    (check,) = checks_of(
-        frame, {"prediction_moment": "m"}, target_time_column="e"
-    )
+    (check,) = checks_of(frame, {"prediction_moment": "m"}, time="e")
     assert check == draft.Probe(
         "moment_before_target",
         ok=False,
@@ -224,22 +221,16 @@ def test_a_moment_equal_to_the_target_time_counts_as_a_violation():
         detail="1 rows have the moment at or after the target time",
     )
     clean = frame.assign(e=pandas.to_datetime(["2024-02-01"] * 3))
-    (check,) = checks_of(
-        clean, {"prediction_moment": "m"}, target_time_column="e"
-    )
+    (check,) = checks_of(clean, {"prediction_moment": "m"}, time="e")
     assert check.ok is True and check.blocking is True
     assert check.detail == "0 rows have the moment at or after the target time"
     after = frame.assign(
         e=pandas.to_datetime(["2023-01-01", "2024-01-02", "2024-01-04"])
     )
-    (check,) = checks_of(
-        after, {"prediction_moment": "m"}, target_time_column="e"
-    )
+    (check,) = checks_of(after, {"prediction_moment": "m"}, time="e")
     assert check.detail.startswith("2 rows")
     unparsable = frame.assign(e=["x", "y", "z"])
-    (check,) = checks_of(
-        unparsable, {"prediction_moment": "m"}, target_time_column="e"
-    )
+    (check,) = checks_of(unparsable, {"prediction_moment": "m"}, time="e")
     assert check.ok is True
 
 
@@ -306,10 +297,7 @@ def test_the_checks_come_in_order_and_absent_slots_are_skipped():
         "prediction_moment": "as_of",
         "target": "churn",
     }
-    names = [
-        c.name
-        for c in checks_of(frame, slots, target_time_column="resolved_at")
-    ]
+    names = [c.name for c in checks_of(frame, slots, time="resolved_at")]
     assert names == [
         "target_complete",
         "moment_before_target",
@@ -342,14 +330,14 @@ def test_assembly_fills_blanks_with_placeholders_and_lists_them():
         "all rows of warehouse://crm/accounts"
     )
     assert record["estimand"]["target"] == "churn"
-    assert record["estimand"]["prediction_moment"] == "as_of"
-    assert record["estimand"]["summary_measure"] == draft.UNSPECIFIED
-    assert record["estimand"]["intercurrent_events"] == [
+    assert record["estimand"]["moment"] == "as_of"
+    assert record["estimand"]["summary"] == draft.UNSPECIFIED
+    assert record["estimand"]["intercurrent"] == [
         {"event": "none", "strategy": "not applicable"}
     ]
     assert record["unit"] == "customer_id"
-    assert record["deployment_population"] == "same as warehouse://crm/accounts"
-    assert record["cost_model"] is None if "cost_model" in record else True
+    assert record["population"] == "same as warehouse://crm/accounts"
+    assert record.get("costs") is None
     assert open_items == [
         "population",
         "summary_measure",
@@ -371,19 +359,19 @@ def test_assembly_uses_given_slots_and_the_cost_model():
     charter, open_items = draft.assemble(slots, request(frame, "x"), MODEL)
     record = charter.to_dict()
     assert record["estimand"]["population"] == "region == 'n'"
-    assert record["deployment_population"] == "all of them"
+    assert record["population"] == "all of them"
     assert record["unit"] == "a-b"
     assert record["question"] == draft.UNSPECIFIED
-    assert record["estimand"]["summary_measure"] == (
+    assert record["estimand"]["summary"] == (
         "net benefit over thresholds [0.05, 0.5]"
     )
-    assert charter.cost_model == MODEL
+    assert charter.costs == MODEL
     assert open_items == ["intercurrent_events"]
     with_text = draft.assemble(
         slot_set(unit="solo", summary_measure="auc"), request(frame, "x"), None
     )[0]
     assert with_text.unit == "solo"
-    assert with_text.estimand.summary_measure == "auc"
+    assert with_text.estimand.summary == "auc"
 
 
 def test_causal_words_set_the_kind_and_a_missing_required_slot_raises():
@@ -808,9 +796,9 @@ def test_a_refused_draft_has_no_charter_in_its_document():
 def test_the_draft_hash_is_the_sha256_of_the_canonical_document():
     frame = table()
     result = draft.frame(request(frame), frame)
+    document = {**result.to_dict(), "charter": result.charter.anchor()}
     assert (
-        result.sha
-        == hashlib.sha256(signing.canonicalise(result.to_dict())).hexdigest()
+        result.sha == hashlib.sha256(signing.canonicalise(document)).hexdigest()
     )
 
 
@@ -963,8 +951,8 @@ def test_blank_slot_values_are_placeholders_and_open_items():
     )
     charter, open_items = draft.assemble(slots, request(frame), None)
     assert charter.estimand.population == "all rows of warehouse://crm/accounts"
-    assert charter.deployment_population == "same as warehouse://crm/accounts"
-    assert charter.estimand.summary_measure == draft.UNSPECIFIED
+    assert charter.population == "same as warehouse://crm/accounts"
+    assert charter.estimand.summary == draft.UNSPECIFIED
     assert open_items[:3] == [
         "population",
         "summary_measure",
@@ -1070,9 +1058,7 @@ def test_an_unparsable_moment_is_not_counted_as_a_violation():
             "e": pandas.to_datetime(["2024-02-01", "2023-01-01", "2024-02-01"]),
         }
     )
-    (check,) = checks_of(
-        frame, {"prediction_moment": "m"}, target_time_column="e"
-    )
+    (check,) = checks_of(frame, {"prediction_moment": "m"}, time="e")
     assert check.detail == "1 rows have the moment at or after the target time"
     assert check.ok is False
 

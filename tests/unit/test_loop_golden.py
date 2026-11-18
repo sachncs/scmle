@@ -71,9 +71,7 @@ def scenario_abrupt(tmp_path):
 
 
 def scenario_uncertified(tmp_path):
-    loop = test_loop.open_loop(
-        tmp_path, test_loop.make_policy(alarm_gates_retrain=False)
-    )
+    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(retrain=False))
     stream = streams.simulate(
         test_loop.spec(kind="abrupt", batches=60, change=25, delta=0.3, seed=4)
     )
@@ -85,10 +83,10 @@ def scenario_promotion(tmp_path):
     loop = test_loop.open_loop(
         tmp_path,
         test_loop.make_policy(
-            reference_risk=0.2,
+            reference=0.2,
             tolerance=0.3,
-            challenger_budget=100,
-            reply_timeout=1000,
+            budget=100,
+            timeout=1000,
         ),
     )
     stream, sequence = test_loop.paired([0.0, 0.12])
@@ -108,9 +106,7 @@ def scenario_promotion(tmp_path):
 def scenario_rollback(tmp_path):
     loop = test_loop.open_loop(
         tmp_path,
-        test_loop.make_policy(
-            reference_risk=0.2, tolerance=0.3, reply_timeout=1000
-        ),
+        test_loop.make_policy(reference=0.2, tolerance=0.3, timeout=1000),
     )
     sequence = streams.challenger_sequence([-0.1], 120, 100, 0.2, 1)
     stream = streams.simulate(test_loop.spec(batches=120, size=100, seed=1))
@@ -125,7 +121,7 @@ def scenario_rollback(tmp_path):
 def scenario_halt(tmp_path):
     loop = test_loop.open_loop(
         tmp_path,
-        test_loop.make_policy(reference_risk=0.5, tolerance=0.4, r_star=0.05),
+        test_loop.make_policy(reference=0.5, tolerance=0.4, target=0.05),
     )
     stream = streams.simulate(test_loop.spec(base=0.3, batches=50, seed=8))
     test_loop.feed(loop, stream)
@@ -142,9 +138,7 @@ def scenario_halt(tmp_path):
 def scenario_routing(tmp_path):
     loop = test_loop.open_loop(
         tmp_path,
-        test_loop.make_policy(
-            high_impact_actions=("approve",), coverage_target=0.9
-        ),
+        test_loop.make_policy(critical=("approve",), coverage=0.9),
     )
     stream = streams.simulate(test_loop.spec(batches=30, seed=9))
     routed = []
@@ -199,7 +193,7 @@ def scenario_mnar(tmp_path):
 
 
 def scenario_replies(tmp_path):
-    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(reply_timeout=3))
+    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(timeout=3))
     registry = types.SimpleNamespace(promote=lambda *a, **k: "moved")
     outcomes = []
     for version in (3, 4):
@@ -216,10 +210,10 @@ def scenario_replies(tmp_path):
     with pytest.raises(never_list.AttestationRequired):
         loop.move_champion(registry, "m", 4, None)
     try:
-        loop.amend_policy(r_star=0.9)
+        loop.amend_policy(target=0.9)
     except Exception as error:  # noqa: BLE001 -- the golden record keeps the type name of whatever error is raised
         outcomes.append(type(error).__name__)
-    outcomes.append(loop.amend_policy(r_star=0.04))
+    outcomes.append(loop.amend_policy(target=0.04))
     try:
         loop.rewrite(lambda: None, {"op": "truncate"})
     except Exception as error:  # noqa: BLE001 -- the golden record keeps the type name of whatever error is raised
@@ -231,7 +225,7 @@ def scenario_replies(tmp_path):
 
 
 def scenario_wiring(tmp_path):
-    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass_rate=0.3))
+    loop = test_loop.open_loop(tmp_path, test_loop.make_policy(bypass=0.3))
     stream = streams.feedback_stream(100, 100, gamma=0.8, bypass=0.3, seed=1)
     frame = pandas.DataFrame({"z": stream.next_z.reshape(-1)})
     flags = stream.bypass.reshape(-1)

@@ -39,7 +39,7 @@ class Provenance(workspace.Workspace):
         record = attestation.Attestation.from_records(
             provenance, {}, signing_key="local-key"
         )
-        tampered = dataclasses.replace(record, attestation_signature="0" * 64)
+        tampered = dataclasses.replace(record, signature="0" * 64)
         rejected = not tampered.verify(provenance, {}, signing_key="local-key")
         quarantine = self.root / "quarantine-signature.json"
         self.write_json(
@@ -91,7 +91,7 @@ class Provenance(workspace.Workspace):
         def accept(
             events: tuple[incremental.Event, ...],
         ) -> None:
-            accepted.extend(item.event_id for item in events)
+            accepted.extend(item.identifier for item in events)
 
         first = ledger.finalize((event,), accept)
         second = ledger.finalize((event,), accept)
@@ -115,7 +115,7 @@ class Provenance(workspace.Workspace):
                 scenario,
                 "state_transition",
                 "duplicate submission left one committed event",
-                {"committed": ledger.load().seen_event_ids},
+                {"committed": ledger.load().seen},
             ),
         )
 
@@ -233,19 +233,19 @@ class Provenance(workspace.Workspace):
         """
         scenario = reliability.Contingency.CHANGED_SNAPSHOT
         previous = scmle.data.readers.registry.Observation(
-            source_id="source",
-            source_uri="file:///source.csv",
-            snapshot_id="snapshot-1",
-            schema_hash="schema-1",
-            data_hash="data-1",
-            raw_source_hash="raw-1",
-            row_count=1,
-            schema={"value": "int"},
-            captured_at="2026-10-20T10:00:00+00:00",
+            source="source",
+            uri="file:///source.csv",
+            snapshot="snapshot-1",
+            digests={"schema": "schema-1", "data": "data-1", "raw": "raw-1"},
+            rows=1,
+            layout={"value": "int"},
+            captured="2026-10-20T10:00:00+00:00",
         )
         registry = scmle.data.readers.registry.Sources()
         registry.register(previous)
-        changed = dataclasses.replace(previous, data_hash="data-2")
+        changed = dataclasses.replace(
+            previous, digests={**previous.digests, "data": "data-2"}
+        )
         rejected = False
         try:
             registry.register(changed)
@@ -258,7 +258,7 @@ class Provenance(workspace.Workspace):
                 scenario,
                 "snapshot_digest_change",
                 "the same snapshot ID was presented with changed data",
-                {"snapshot_id": changed.snapshot_id},
+                {"snapshot_id": changed.snapshot},
             ),
             self.artifact(
                 scenario,

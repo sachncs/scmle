@@ -113,7 +113,7 @@ def test_a_strong_and_robust_effect_is_stable():
     result = stability.assess_finding("x", x, y, grid(), 0, bootstrap=60)
     assert result.status == stability.STABLE, result.reason
     assert result.check.decision is qualification.Decision.PASS
-    assert result.check.set_id is qualification.Subset.EXPLORATION
+    assert result.check.subset is qualification.Subset.EXPLORATION
     assert result.check.interval[0] > 0.0
     assert result.headline == pytest.approx(
         next(

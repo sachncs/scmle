@@ -30,17 +30,17 @@ def test_attestation_binds_model_provenance_and_sbom_digests():
     record = attestation.Attestation.from_records(provenance, sbom)
 
     assert record.verify(provenance, sbom)
-    assert record.to_dict()["subjects"] == {
-        "model_manifest_sha256": "model-digest",
-        "provenance_sha256": attestation.checksum(provenance),
-        "sbom_sha256": attestation.checksum(sbom),
+    assert record.to_dict()["digests"] == {
+        "manifest": "model-digest",
+        "provenance": attestation.checksum(provenance),
+        "sbom": attestation.checksum(sbom),
     }
 
 
 def test_attestation_fails_after_a_source_record_changes():
     provenance, sbom = records()
     record = attestation.Attestation.from_records(provenance, sbom)
-    changed = dataclasses.replace(record, signature_present=False)
+    changed = dataclasses.replace(record, signed=False)
 
     assert not changed.verify(provenance, sbom)
     sbom["components"] = []
@@ -62,7 +62,7 @@ def test_attestation_signature_binds_all_release_subjects():
         provenance, sbom, signing_key="release-key"
     )
 
-    assert record.attestation_signature
+    assert record.signature
     assert record.verify(provenance, sbom, signing_key="release-key")
     assert not record.verify(provenance, sbom, signing_key="wrong-key")
     assert attestation.Attestation.from_dict(record.to_dict()) == record
@@ -74,7 +74,7 @@ def test_attestation_signature_rejects_tampered_persisted_record():
         provenance, sbom, signing_key="release-key"
     )
     persisted = record.to_dict()
-    persisted["subjects"]["sbom_sha256"] = "tampered"
+    persisted["digests"]["sbom"] = "tampered"
 
     loaded = attestation.Attestation.from_dict(persisted)
 

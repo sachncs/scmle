@@ -61,9 +61,7 @@ def contents(folder):
 def test_no_artifact_holds_a_canary_of_c_or_the_final_test_set(tmp_path):
     frame = canary_frame()
     path = tmp_path / "charter.json"
-    sealing.inscribe(
-        path, make_charter(min_effect=0.5, k_max=3), signing_key=KEY
-    )
+    sealing.inscribe(path, make_charter(effect=0.5, quota=3), signing_key=KEY)
     result = support.make_project(
         frame,
         "y",
@@ -74,8 +72,9 @@ def test_no_artifact_holds_a_canary_of_c_or_the_final_test_set(tmp_path):
     folder = pathlib.Path(result.run_dir)
     manifest = json.loads((folder / "split_manifest.json").read_text())
     values = frame[CANARY].to_numpy()
-    sealed_ids = manifest["confirmation_ids"] + manifest["final_test_ids"]
-    assert manifest["confirmation_ids"] and manifest["final_test_ids"]
+    sets = manifest["sets"]
+    sealed_ids = sets["confirmation"] + sets["final"]
+    assert sets["confirmation"] and sets["final"]
     files = contents(folder)
     assert "custody_log.jsonl" in files and len(files) >= 10
     for name, text in files.items():

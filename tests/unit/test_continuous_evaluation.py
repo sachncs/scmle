@@ -57,7 +57,7 @@ def test_the_f13_alarm_escalates_for_investigation_and_trains_nothing(tmp_path):
     assert kinds(loop, deployment_ledger.ALARM) and not kinds(
         loop, deployment_ledger.RETRAIN
     )
-    assert not called and loop.policy.alarm_gates_retrain is False
+    assert not called and loop.policy.retrain is False
     actions = [e.question["action"] for e in loop.pending_escalations()]
     assert "l1_alarm_investigate" in actions
 
@@ -115,7 +115,7 @@ def test_trigger_mode_trains_a_challenger_at_once_and_still_escalates(tmp_path):
     assert (
         kinds(loop, deployment_ledger.RETRAIN)[0]["body"]["mode"] == "trigger"
     )
-    assert loop.policy.alarm_gates_retrain is False
+    assert loop.policy.retrain is False
     assert "challenger-1" in loop.ledger.registered
 
 

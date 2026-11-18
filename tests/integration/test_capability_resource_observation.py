@@ -159,7 +159,7 @@ def test_bound_observation_is_used_by_the_capability_gate(monkeypatch):
 
     plan = stages.devise(context)
 
-    assert plan.candidate_models == ("dummy",)
+    assert plan.candidates == ("dummy",)
 
 
 def test_unknown_declared_facts_fail_closed_and_are_persisted(

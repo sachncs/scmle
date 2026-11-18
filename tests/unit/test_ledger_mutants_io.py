@@ -217,8 +217,8 @@ def test_the_direction_and_seed_path_reach_the_check():
     )
     assert up.check.p_value + down.check.p_value == pytest.approx(1.0)
     assert up.check.p_value != both.p
-    assert up.check.seed_path == randomness.seed_path(7, "ledger.spearman", 0)
-    assert down.check.seed_path == randomness.seed_path(7, "ledger.spearman", 1)
+    assert up.check.seeds == randomness.seed_path(7, "ledger.spearman", 0)
+    assert down.check.seeds == randomness.seed_path(7, "ledger.spearman", 1)
 
 
 # --- confirmation record ----------------------------------------------------
@@ -302,10 +302,10 @@ def test_unconfirmed_claims_keep_the_exploration_effect_and_say_why():
     result = confirm.confirm(ledger, None, alpha_confirm=Fraction(1, 20))
     assert result.outcome == confirm.FLOOR_NOT_EXCEEDED
     claim = result.claims[0]
-    expected = ledger.results[claim.claim_id].check.effect
+    expected = ledger.results[claim.identifier].check.effect
     assert claim.effect == expected and claim.effect != 0.0
     assert claim.assumptions[0].startswith("not confirmed on C: findings do")
-    assert claim.check_ids == (f"{claim.claim_id}:X",)
+    assert claim.checks == (f"{claim.identifier}:X",)
     assert claim.adjusted_p_value is None
 
 
@@ -327,7 +327,7 @@ def test_reasons_and_event_names_are_exact():
     check = result.checks[0]
     assert check.decision is qualification.Decision.WARN
     assert check.tier is qualification.Tier.CONFIRMED
-    assert check.seed_path == randomness.seed_path(7, "confirm.spearman", 0)
+    assert check.seeds == randomness.seed_path(7, "confirm.spearman", 0)
     # A repeat is denied on set C with a reason.
     with pytest.raises(errors.LeakageError):
         confirm.confirm(ledger, source, alpha_confirm=Fraction(1, 20))
@@ -643,7 +643,7 @@ def test_every_check_on_c_has_its_own_seed_index():
     result = confirm.confirm(
         ledger, locate(cfeatures, ctarget), alpha_confirm=Fraction(1, 20)
     )
-    assert [c.seed_path for c in result.checks] == [
+    assert [c.seeds for c in result.checks] == [
         randomness.seed_path(7, "confirm.spearman", 0),
         randomness.seed_path(7, "confirm.spearman", 1),
     ]
@@ -688,7 +688,7 @@ def test_an_in_memory_governed_ledger_records_the_charter():
     )
     assert run.ledger.header["charter_hash"] == charter.charter_hash
     assert run.ledger.header["alpha_confirm"] == str(
-        charter.error_budget.confirmation.alpha_confirm
+        charter.budget.confirmation.alpha_confirm
     )
     assert run.ledger.header["seed"] == charter.seed
 

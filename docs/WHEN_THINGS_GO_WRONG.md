@@ -233,7 +233,7 @@ An exam ROC AUC of 0.988 on a real table is a warning, not a prize. See
 it cannot say whether your data resembles it. It will never say `pass` without
 evidence.
 **What to do.** Supply a deployment sample in the charter's
-`deployment_population` reference, or accept that this check was not done.
+`population` reference, or accept that this check was not done.
 
 ### Stability says `not_evaluated` (Seen)
 
@@ -272,18 +272,18 @@ column exists at prediction time. It says so rather than assume.
 
 ```json
 {
-  "format_version": 1,
+  "schema_version": 2,
   "attestations": [
     {
       "column": "days_since_signup",
-      "name_or_id": "A. Owner",
+      "attestor": "A. Owner",
       "role": "data owner",
       "statement": "Recorded at signup, always before the prediction moment.",
       "evidence": "ticket DATA-7",
       "date": "2026-11-05",
       "expires": "2027-11-05",
       "scope": "<the charter_hash from charter.json>",
-      "lead_seconds": 0
+      "seconds": 0
     }
   ]
 }
@@ -320,7 +320,7 @@ A claim in a charter run stays `unverified` when:
   hunches.
 * The confirmation set was too small (`feasibility` = `downgrade` or
   `infeasible`): scope becomes `exploratory_unconfirmed`. Get more rows or
-  lower your promise (`min_effect`).
+  lower your promise (`effect`).
 
 ### 3. A cost is `unverified`
 
@@ -358,9 +358,9 @@ recorded as `unverified`. See [The closed loop](#the-closed-loop-and-escalations
 **What it means.** You ran `scmle charter check` on the fresh template. It is
 meant to fail until you fill it in.
 **What to do.** Fill in `question`, `estimand.population`, `estimand.target`,
-`estimand.prediction_moment`, `estimand.summary_measure`, at least one
-`estimand.intercurrent_events` item as `{"event": "...", "strategy": "..."}`,
-`unit` and `deployment_population`.
+`estimand.moment`, `estimand.summary`, at least one
+`estimand.intercurrent` item as `{"event": "...", "strategy": "..."}`,
+`unit` and `population`.
 
 ### `config error: invalid analysis charter: unexpected field(s): ['description']` (Seen)
 
@@ -394,7 +394,7 @@ like a new plan.
 size you promised.
 **Why it exists.** A test with too little data would usually find nothing even
 when something is there, so the claim could not be called confirmed.
-**What to do.** Add rows, or lower your ambition (`min_effect` 0.25 made the
+**What to do.** Add rows, or lower your ambition (`effect` 0.25 made the
 same data feasible: `feasible (273 rows >= 214 needed for power 0.8)`). The run
 still completes when downgraded; the scope is `exploratory_unconfirmed` and no
 claim is called confirmed. `infeasible` (under 30 confirmation rows) carves no
@@ -601,8 +601,8 @@ scmle loop pending deploy_c
 
 ### What the loop needs
 
-* `policy.json`: at minimum `{"reference_risk": 0.1}` (the loss rate you expect
-  when all is well). The author used also `"min_matured": 5, "outcome_window":
+* `policy.json`: at minimum `{"reference": 0.1}` (the loss rate you expect
+  when all is well). The author used also `"matured": 5, "maturity":
   0` for a quick test. Everything else has a default.
 * A batch file: columns `case_id`, `prediction`, `decision`. Optional columns:
   `set_size`, `score`, `novel`, `under_covered`, `propensity`, `audit`,
@@ -655,13 +655,13 @@ from scmle.governance import deployment_ledger as dl
 
 reply = dl.Attestation.create(
     "alices-own-secret",  # your key, never the system's
-    escalation_id="esc-5",
-    question_hash="d1044b61...",  # copy from `scmle loop pending`
+    escalation="esc-5",
+    digests={"question": "d1044b61..."},  # copy from `scmle loop pending`
     decision="approve",  # approve | override | reject | cannot_decide
     statement="I looked at the batch: the labels were mis-keyed, not the model.",
     evidence="ticket-1234",
     role="model owner",
-    name_or_id="alice",
+    attestor="alice",
     date="2026-11-05",
     scope="stream",
     expires="2026-12-05",
@@ -701,7 +701,7 @@ recorded and the safe default applies.
 
 | Event | Meaning | What to do |
 | --- | --- | --- |
-| `insufficient_labels` status | fewer than `min_matured` outcomes arrived | keep feeding labels |
+| `insufficient_labels` status | fewer than `matured` outcomes arrived | keep feeding labels |
 | `alarm_on_unverified_label_mechanism` halt | the loop cannot tell how labels were chosen (no logged propensity, no audit slice), so it will not retrain or promote | arrange labels that are complete, have logged propensities, or include a random audit slice |
 | `selective_risk_above_target` halt (escalation `halt_selective_risk`) | among the cases the system answers itself, errors exceed the target | a person reviews; calibrate again (Python `Loop.calibrate`) |
 | `ledger_verification_failed` / `state_does_not_match_ledger` halt | the files do not agree; possible edit | stop; run `scmle loop verify`; restore from a trusted copy |

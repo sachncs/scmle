@@ -117,7 +117,7 @@ class Plan:
         """The digest of the manifest, or None without one."""
         if self.manifest is None:
             return None
-        return attestation.checksum(self.manifest.to_dict())
+        return attestation.checksum(self.manifest.anchor())
 
     def poll(self) -> None:
         """Stops before publication and removes this run's artifacts.
@@ -167,9 +167,9 @@ class Plan:
             return
         if manifest.modality != modalities.serialise(self.adapter.modality):
             raise errors.InputError("manifest modality must match adapter")
-        if manifest.content_hash != self.adapter.dataset_hash:
+        if manifest.digests["content"] != self.adapter.dataset_hash:
             raise errors.InputError("manifest content_hash must match adapter")
-        if manifest.sample_count != len(self.adapter.samples):
+        if manifest.samples != len(self.adapter.samples):
             raise errors.InputError("manifest sample_count must match adapter")
 
     def expect(self, *, resume: bool) -> None:
@@ -198,15 +198,13 @@ class Plan:
         """
         return {
             "modality": modalities.serialise(self.adapter.modality),
-            "dataset_hash": self.adapter.dataset_hash,
-            "observed_dataset_hash": self.observed.dataset_hash,
-            "package_path": str(self.package_target),
-            "report_path": str(self.report_target),
+            "dataset": self.adapter.dataset_hash,
+            "observed": self.observed.dataset_hash,
+            "package": str(self.package_target),
+            "report": str(self.report_target),
             "seed": self.seed,
-            "require_independent_ground_truth": (
-                self.require_independent_ground_truth
-            ),
-            "manifest_digest": self.manifest_digest,
+            "independent": self.require_independent_ground_truth,
+            "manifest": self.manifest_digest,
         }
 
     def reload(self, stage_names: Sequence[str]) -> checkpoints.Checkpoint:
@@ -227,25 +225,20 @@ class Plan:
         )
         actual_identity = {
             "modality": checkpoint.modality,
-            "dataset_hash": checkpoint.dataset_hash,
-            "observed_dataset_hash": checkpoint.observed_dataset_hash,
-            "package_path": checkpoint.package_path,
-            "report_path": checkpoint.report_path,
+            "dataset": checkpoint.digests.dataset,
+            "observed": checkpoint.digests.observed,
+            "package": checkpoint.package,
+            "report": checkpoint.report,
             "seed": checkpoint.seed,
-            "require_independent_ground_truth": (
-                checkpoint.require_independent_ground_truth
-            ),
-            "manifest_digest": checkpoint.manifest_digest,
+            "independent": checkpoint.independent,
+            "manifest": checkpoint.digests.manifest,
         }
         if actual_identity != self.identity():
             raise errors.InputError(
                 "lifecycle checkpoint identity does not match the "
                 "requested resume"
             )
-        if (
-            checkpoint.completed_stages
-            != stage_names[: len(checkpoint.completed_stages)]
-        ):
+        if checkpoint.completed != stage_names[: len(checkpoint.completed)]:
             raise errors.InputError(
                 "lifecycle checkpoint stage order does not match "
                 "the current lifecycle"
@@ -272,7 +265,7 @@ class Plan:
         if (
             completed_report.modality
             != modalities.serialise(self.adapter.modality)
-            or completed_report.dataset_hash != self.adapter.dataset_hash
+            or completed_report.digests["dataset"] != self.adapter.dataset_hash
             or Path(completed_report.package.path) != self.package_target
         ):
             raise errors.InputError(
@@ -305,17 +298,17 @@ class Plan:
             return
         record = checkpoints.Checkpoint(
             modality=modalities.serialise(self.adapter.modality),
-            dataset_hash=self.adapter.dataset_hash,
-            observed_dataset_hash=self.observed.dataset_hash,
-            package_path=str(self.package_target),
-            report_path=str(self.report_target),
-            seed=self.seed,
-            completed_stages=tuple(completed_stages),
-            stage_digests=tuple(stage_digests),
-            require_independent_ground_truth=(
-                self.require_independent_ground_truth
+            digests=checkpoints.Digests(
+                dataset=self.adapter.dataset_hash,
+                observed=self.observed.dataset_hash,
+                stages=tuple(stage_digests),
+                manifest=self.manifest_digest,
             ),
-            manifest_digest=self.manifest_digest,
+            package=str(self.package_target),
+            report=str(self.report_target),
+            seed=self.seed,
+            completed=tuple(completed_stages),
+            independent=self.require_independent_ground_truth,
             status=status,
         ).sign(self.signing_key)
         durability.write_atomically(
@@ -367,7 +360,7 @@ def benchmark(
         if operation in context.performance_observations
     )
     performance_run = performance.Run(
-        run_id=f"{plan.adapter.dataset_hash}:{plan.seed}",
+        identifier=f"{plan.adapter.dataset_hash}:{plan.seed}",
         observations=observations,
     )
     performance_result = (
@@ -509,8 +502,8 @@ def publish(
     )
     report = reporting.Record(
         modality=modalities.serialise(plan.adapter.modality),
-        dataset_hash=plan.adapter.dataset_hash,
-        stage_evidence=records,
+        digests={"dataset": plan.adapter.dataset_hash},
+        evidence=records,
         evaluation=context.evaluation,
         performance=performance_evidence,
         package=package,

@@ -17,28 +17,28 @@ def make_charter(**overrides):
             kind="predictive",
             population="active subscribers in 2024",
             target="churned within 30 days of the prediction moment",
-            prediction_moment="first day of each billing month",
-            intercurrent_events=(
+            moment="first day of each billing month",
+            intercurrent=(
                 contracts.Event("account closed", "treat as outcome"),
             ),
-            summary_measure="ROC AUC",
+            summary="ROC AUC",
         ),
         "unit": "customer-month",
-        "deployment_population": "stated marginals: all active subscribers",
-        "gating_checks": ("leakage.skill",),
-        "decision_map": (
+        "population": "stated marginals: all active subscribers",
+        "gates": ("leakage.skill",),
+        "triggers": (
             contracts.Trigger(
-                check_id="leakage.skill",
+                check="leakage.skill",
                 trigger="lower bound above floor at the budgeted level",
                 action=contracts.Edict.QUARANTINE_COLUMN,
-                certificate_id="cert.leakage.skill",
+                certificate="cert.leakage.skill",
             ),
         ),
-        "sets": contracts.SetSizes(confirmation_fraction=0.25, embargo_rows=0),
-        "min_effect": 0.2,
-        "k_max": 10,
+        "sets": contracts.SetSizes(confirmation=0.25, embargo=0),
+        "effect": 0.2,
+        "quota": 10,
         "power": 0.8,
-        "error_budget": budget.ErrorBudget.create(0.05, 0.1),
+        "budget": budget.ErrorBudget.create(0.05, 0.1),
         "multiverse": (
             contracts.Choice("imputation", ("median", "mice"), "median"),
         ),
@@ -69,12 +69,10 @@ def test_hash_ignores_dict_key_order():
     assert rebuilt.charter_hash == make_charter().charter_hash
 
 
-@pytest.mark.parametrize(
-    "field", ["population", "target", "prediction_moment", "summary_measure"]
-)
+@pytest.mark.parametrize("field", ["population", "target", "moment", "summary"])
 def test_estimand_rejects_a_blank_required_attribute(field):
     values = dataclasses.asdict(make_charter().estimand)
-    values["intercurrent_events"] = make_charter().estimand.intercurrent_events
+    values["intercurrent"] = make_charter().estimand.intercurrent
     values[field] = "  "
     with pytest.raises(ValueError, match=field):
         contracts.AnalysisEstimand(**values)
@@ -82,8 +80,8 @@ def test_estimand_rejects_a_blank_required_attribute(field):
 
 def test_estimand_requires_an_intercurrent_event_strategy():
     base = make_charter().estimand
-    with pytest.raises(ValueError, match="intercurrent_events"):
-        dataclasses.replace(base, intercurrent_events=())
+    with pytest.raises(ValueError, match="intercurrent"):
+        dataclasses.replace(base, intercurrent=())
 
 
 def test_estimand_kind_is_closed():
@@ -94,24 +92,24 @@ def test_estimand_kind_is_closed():
 
 def test_gating_check_without_a_decision_row_is_rejected():
     with pytest.raises(ValueError, match="no decision row"):
-        make_charter(gating_checks=("leakage.skill", "missingness.mcar"))
+        make_charter(gates=("leakage.skill", "missingness.mcar"))
 
 
 def test_gating_row_needs_a_certificate_id():
     row = contracts.Trigger(
-        check_id="leakage.skill",
+        check="leakage.skill",
         trigger="t",
         action=contracts.Edict.BLOCK_RUN,
-        certificate_id="",
+        certificate="",
     )
-    with pytest.raises(ValueError, match="certificate_id"):
-        make_charter(decision_map=(row,))
+    with pytest.raises(ValueError, match="certificate"):
+        make_charter(triggers=(row,))
 
 
 def test_duplicate_decision_rows_for_one_check_are_rejected():
-    row = make_charter().decision_map[0]
+    row = make_charter().triggers[0]
     with pytest.raises(ValueError, match="duplicate"):
-        make_charter(decision_map=(row, row))
+        make_charter(triggers=(row, row))
 
 
 def test_decision_row_for_unknown_check_is_rejected_by_the_registry_lint():
@@ -136,9 +134,9 @@ def test_decision_action_is_a_closed_set():
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("min_effect", 0.0),
-        ("min_effect", float("nan")),
-        ("k_max", 0),
+        ("effect", 0.0),
+        ("effect", float("nan")),
+        ("quota", 0),
         ("power", 1.0),
         ("power", 0.0),
         ("seed", -1),
@@ -151,8 +149,8 @@ def test_numeric_fields_are_range_checked(field, value):
 
 @pytest.mark.parametrize("fraction", [0.0, 1.0, -0.1, float("nan"), 0.6, True])
 def test_confirmation_fraction_must_leave_room_for_exploration(fraction):
-    with pytest.raises(ValueError, match="confirmation_fraction"):
-        contracts.SetSizes(confirmation_fraction=fraction, embargo_rows=0)
+    with pytest.raises(ValueError, match="confirmation"):
+        contracts.SetSizes(confirmation=fraction, embargo=0)
 
 
 def test_from_dict_rejects_unknown_and_missing_fields():

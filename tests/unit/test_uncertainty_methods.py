@@ -109,7 +109,7 @@ def test_class_scores_survive_a_round_trip_and_old_records_load() -> None:
     again = conformal.ConformalCalibrator.from_dict(calibrator.to_dict())
     assert again == calibrator
     old = calibrator.to_dict()
-    del old["class_scores"]
+    del old["conditional"]
     legacy = conformal.ConformalCalibrator.from_dict(old)
     assert legacy.sets(numpy.array([[0.5, 0.5]]), 0.9) == calibrator.sets(
         numpy.array([[0.5, 0.5]]), 0.9

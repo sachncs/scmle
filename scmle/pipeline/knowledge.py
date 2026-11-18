@@ -50,7 +50,7 @@ def fingerprint(
         else 0.0
     )
     return {
-        "log_rows": math.log10(max(profile.manifest.row_count, 1)),
+        "log_rows": math.log10(max(profile.manifest.rows, 1)),
         "log_features": math.log10(max(len(features), 1)),
         "categorical_share": len(plan.categorical) / max(len(features), 1),
         "missing_rate": missing_rate,

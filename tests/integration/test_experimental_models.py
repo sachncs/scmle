@@ -94,7 +94,7 @@ def test_transformer_and_jepa_are_explicit_opt_in_candidates(monkeypatch):
 
     plan = stages.devise(context)
 
-    assert {transformer.name, representation.name} <= set(plan.candidate_models)
+    assert {transformer.name, representation.name} <= set(plan.candidates)
     decisions = {
         decision.technique: decision.reason
         for decision in plan.decisions
@@ -193,7 +193,7 @@ def test_explicit_deep_model_project_packages_and_predicts(
     )
     plan = dataclasses.replace(
         project.plan(),
-        candidate_models=(model_name,),
+        candidates=(model_name,),
     )
 
     result = project.run(plan)

@@ -41,9 +41,7 @@ SENTINEL_RATE = 0.10
 DUPLICATE_RATE = 0.10
 # Fixed in advance: 50 percent recall floor, 10 percent false-alarm ceiling,
 # 95 percent Wilson intervals.
-POLICY = certificates.Standard(
-    recall_floor=0.5, false_alarm_ceiling=0.10, confidence=0.95
-)
+POLICY = certificates.Standard(recall=0.5, alarms=0.10, confidence=0.95)
 DEFAULT_SEEDS = (0, 1, 2)
 
 

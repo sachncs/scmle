@@ -1,0 +1,534 @@
+{
+  "source": "plan/stage_b/phase5_vocabulary.md",
+  "kinds": {
+    "data/charter/causal.py Confounding": {
+      "m_max": "multiple"
+    },
+    "data/charter/causal.py Question": {
+      "negative_controls": "controls",
+      "min_share": "retained"
+    },
+    "data/charter/contracts.py AnalysisCharter": {
+      "deployment_population": "population",
+      "gating_checks": "gates",
+      "decision_map": "triggers",
+      "min_effect": "effect",
+      "k_max": "quota",
+      "error_budget": "budget",
+      "cost_model": "costs",
+      "unit_of_prediction": "purpose"
+    },
+    "data/charter/contracts.py AnalysisEstimand": {
+      "prediction_moment": "moment",
+      "intercurrent_events": "intercurrent",
+      "summary_measure": "summary"
+    },
+    "data/charter/contracts.py SetSizes": {
+      "confirmation_fraction": "confirmation",
+      "embargo_rows": "embargo"
+    },
+    "data/charter/contracts.py Trigger": {
+      "check_id": "check",
+      "certificate_id": "certificate"
+    },
+    "data/charter/decision.py Constraint": {
+      "max_gap": "gap",
+      "min_group": "minimum"
+    },
+    "data/charter/decision.py Experiment": {
+      "assignment_prob": "assignment",
+      "delta_min": "delta",
+      "n_max": "limit",
+      "alpha_promote": "promotion",
+      "alpha_rollback": "rollback",
+      "srm_level": "srm"
+    },
+    "data/charter/decision.py Gates": {
+      "min_propensity": "propensity",
+      "ess_floor": "ess"
+    },
+    "data/charter/decision.py Guardrail": {
+      "higher_is_worse": "direction"
+    },
+    "data/charter/decision.py Policy": {
+      "treatment_cost": "cost",
+      "calibration_level": "calibration",
+      "off_policy": "gates"
+    },
+    "data/charter/feasibility.py Feasibility": {
+      "n_confirmation": "confirmation",
+      "n_required": "required",
+      "power_at_min_effect": "power"
+    },
+    "data/charter/ingest.py Ingestion": {
+      "max_queries": "queries",
+      "max_rows_scanned": "scanned",
+      "max_seconds": "seconds",
+      "feature_budget": "features",
+      "delta_rec": "reconciliation",
+      "eps_key": "tolerances.key",
+      "eps_null": "tolerances.null",
+      "eps_fk": "tolerances.link"
+    },
+    "data/charter/ingest.py TableTotals": {
+      "checksum_column": "column"
+    },
+    "data/charter/rules.py Procedure": {
+      "ledger_rule": "ledger",
+      "confirmation_rule": "confirmation",
+      "failure_policy": "failure",
+      "stability_filter": "stability",
+      "s_min": "agreement",
+      "q_min": "exclusion"
+    },
+    "data/charter/uncertainty.py Uncertainty": {
+      "cv_plus_max_bytes": "limit",
+      "slice_columns": "slices",
+      "coverage_on_confirmation": "confirmatory"
+    },
+    "data/custody/manifest.py Manifest": {
+      "embargo_rows": "embargo",
+      "charter_hash": "digests.charter",
+      "data_hash": "digests.data",
+      "exploration_ids": "sets.exploration",
+      "confirmation_ids": "sets.confirmation",
+      "embargo_ids": "sets.embargo",
+      "final_test_ids": "sets.final",
+      "row_roots": "roots"
+    },
+    "data/ledger/budget.py DecisionBudget": {
+      "alpha_promote": "promotion",
+      "alpha_rollback": "rollback"
+    },
+    "data/ledger/budget.py ErrorBudget": {
+      "permutations_b": "permutations",
+      "detector_tolerances": "tolerances"
+    },
+    "data/ledger/budget.py Tolerance": {
+      "detector_id": "detector",
+      "max_false_alarm_rate": "alarms",
+      "min_recall_lower_bound": "recall"
+    },
+    "data/ledger/controls.py Control": {
+      "p95_interval": "interval",
+      "exceedance_p": "exceedance"
+    },
+    "data/ledger/ledger.py Test": {
+      "set_id": "subset",
+      "code_hash": "digests.code"
+    },
+    "data/admissibility/attestations.py Affidavit": {
+      "lead_seconds": "seconds"
+    },
+    "data/admissibility/provenance.py Attestation": {
+      "name_or_id": "attestor"
+    },
+    "data/admissibility/provenance.py Lead": {
+      "lead_seconds": "seconds"
+    },
+    "data/admissibility/provenance.py Pedigree": {
+      "written_at": "stamp",
+      "definition_history": "definitions",
+      "as_of": "lead",
+      "as_of_source": "provenance",
+      "available_at_serving": "availability",
+      "log_check": "reconstruction"
+    },
+    "data/admissibility/reconciliation.py Explanation": {
+      "attested_by": "attestor"
+    },
+    "data/admissibility/rules.py Decision": {
+      "suspicion_kept": "suspected"
+    },
+    "data/framing/costs.py Tariff": {
+      "t_lo": "low",
+      "t_hi": "high",
+      "range_source": "basis"
+    },
+    "data/framing/draft.py Offer": {
+      "primary_key": "key",
+      "target_time_column": "time"
+    },
+    "contracts/artifacts.py Interface": {
+      "known_categories": "categories",
+      "extra_inputs": "extras",
+      "series_columns": "derived",
+      "graph_fingerprint": "digests.graph",
+      "group_column": "group",
+      "time_column": "time",
+      "optional_inputs": "optional"
+    },
+    "contracts/data.py Ancestry": {
+      "source_snapshot": "snapshot",
+      "parent_datasets": "parents",
+      "label_source": "labelling",
+      "label_generator_version": "generator",
+      "annotator_version": "annotator",
+      "adjudication_status": "adjudication",
+      "partition_ids": "partitions",
+      "object_hashes": "digests",
+      "schema_evolution": "evolution"
+    },
+    "contracts/data.py Confidentiality": {
+      "contains_pii": "identifying",
+      "sensitive_fields": "sensitive",
+      "consent_basis": "consent",
+      "retention_period": "retention",
+      "deletion_policy": "deletion",
+      "access_policy": "access",
+      "redaction_required": "redaction"
+    },
+    "contracts/data.py DatasetManifest": {
+      "dataset_id": "identifier",
+      "schema_hash": "digests.schema",
+      "data_hash": "digests.data",
+      "row_count": "rows",
+      "column_count": "columns",
+      "snapshot_id": "snapshot"
+    },
+    "contracts/data.py Finding": {
+      "id": "identifier",
+      "rule_version": "rule",
+      "affected_scope": "scope"
+    },
+    "contracts/data.py Origin": {
+      "acquisition_method": "acquisition",
+      "captured_at": "captured",
+      "sampling_frame": "sampling",
+      "semantic_definitions": "definitions",
+      "extraction_query": "query",
+      "object_prefix": "prefix",
+      "access_policy": "access"
+    },
+    "contracts/data.py Passport": {
+      "dataset_id": "identifier",
+      "snapshot_id": "snapshot",
+      "sample_count": "samples",
+      "content_hash": "digests.content"
+    },
+    "contracts/evidence.py Record": {
+      "criterion_id": "criterion",
+      "raw_inputs": "inputs",
+      "command_or_test": "command",
+      "observed_at": "observed"
+    },
+    "contracts/experiments.py Plan": {
+      "plan_id": "identifier",
+      "validation_strategy": "validation",
+      "candidate_models": "candidates",
+      "optimization_budget_seconds": "budget"
+    },
+    "contracts/lineage.py Edge": {
+      "source_id": "source",
+      "target_id": "target"
+    },
+    "contracts/lineage.py Node": {
+      "node_id": "identifier"
+    },
+    "contracts/performance.py Observation": {
+      "elapsed_seconds": "elapsed",
+      "peak_memory_gb": "memory",
+      "sample_count": "samples",
+      "observed_at": "observed"
+    },
+    "contracts/performance.py Run": {
+      "run_id": "identifier"
+    },
+    "contracts/qualification.py Certificate": {
+      "detector_id": "detector",
+      "defect_type": "defect",
+      "clean_rows": "clean",
+      "false_alarms": "alarms",
+      "seed_path": "seeds"
+    },
+    "contracts/qualification.py Check": {
+      "check_id": "identifier",
+      "null_hypothesis": "null",
+      "set_id": "subset",
+      "seed_path": "seeds"
+    },
+    "contracts/qualification.py Claim": {
+      "claim_id": "identifier",
+      "check_ids": "checks"
+    },
+    "contracts/reliability.py Evidence": {
+      "evidence_type": "kind",
+      "execution_id": "execution",
+      "artifact_uri": "uri",
+      "artifact_digest": "digests.artifact",
+      "observed_outcome": "outcome",
+      "recorded_at": "recorded"
+    },
+    "contracts/reliability.py Plan": {
+      "expected_safe_outcome": "outcome",
+      "evidence_requirements": "requirements",
+      "release_blocking": "blocking",
+      "verification_status": "verification"
+    },
+    "data/catalog.py Catalog": {
+      "data_kind": "kind",
+      "sample_count": "samples",
+      "content_identity": "digests.content",
+      "release_blockers": "blockers",
+      "schema": "columns"
+    },
+    "data/catalog.py Duplication": {
+      "duplicate_rows": "rows",
+      "duplicate_fraction": "fraction"
+    },
+    "data/catalog.py Field": {
+      "data_type": "kind"
+    },
+    "data/catalog.py Labeling": {
+      "observed_count": "observed",
+      "missing_count": "missing",
+      "distinct_count": "distinct"
+    },
+    "data/catalog.py Missingness": {
+      "total_values": "total",
+      "missing_values": "missing",
+      "rows_with_missing": "incomplete",
+      "by_field": "fields"
+    },
+    "data/catalog.py Source": {
+      "acquisition_method": "acquisition",
+      "privacy_classification": "privacy"
+    },
+    "data/detectors/certificates.py Certification": {
+      "detector_id": "detector",
+      "code_hash": "digests.code",
+      "corpus_hash": "digests.corpus"
+    },
+    "data/detectors/certificates.py Outcome": {
+      "recall_interval": "recall",
+      "false_alarm_interval": "alarms"
+    },
+    "data/detectors/certificates.py Standard": {
+      "recall_floor": "recall",
+      "false_alarm_ceiling": "alarms"
+    },
+    "data/readers/incremental.py Checkpoint": {
+      "source_identity": "source"
+    },
+    "data/readers/incremental.py Event": {
+      "event_id": "identifier",
+      "event_time": "occurred",
+      "ingest_time": "ingested"
+    },
+    "data/readers/incremental.py EventAcknowledgement": {
+      "source_identity": "source",
+      "consumer_group": "consumer",
+      "event_ids": "events"
+    },
+    "data/readers/incremental.py Settlement": {
+      "seen_event_ids": "seen"
+    },
+    "data/readers/registry.py Observation": {
+      "source_id": "source",
+      "source_uri": "uri",
+      "snapshot_id": "snapshot",
+      "schema": "layout",
+      "schema_hash": "digests.schema",
+      "data_hash": "digests.data",
+      "raw_source_hash": "digests.raw",
+      "row_count": "rows",
+      "captured_at": "captured"
+    },
+    "data/readers/streaming.py Acknowledgement": {
+      "source_identity": "source",
+      "consumer_group": "consumer",
+      "batch_id": "batch"
+    },
+    "data/readers/streaming.py Checkpoint": {
+      "source_identity": "source",
+      "snapshot_sha256": "digests.snapshot",
+      "watermark_column": "column"
+    },
+    "data/readers/streaming.py Commitment": {
+      "source_identity": "source",
+      "batch_id": "batch",
+      "sink_receipt": "receipt"
+    },
+    "data/readers/streaming.py Settlement": {
+      "committed_batch_ids": "committed",
+      "transaction_evidence": "commitments"
+    },
+    "data/readers/streaming.py Voucher": {
+      "source_identity": "source",
+      "batch_id": "batch"
+    },
+    "deploy/contract.py BundleRef": {
+      "model_version": "version"
+    },
+    "deploy/contract.py Probes": {
+      "liveness_path": "liveness",
+      "readiness_path": "readiness",
+      "period_seconds": "period",
+      "timeout_seconds": "timeout",
+      "failure_threshold": "threshold",
+      "startup_grace_seconds": "grace"
+    },
+    "deploy/contract.py Resources": {
+      "cpu_request": "requests.cpu",
+      "cpu_limit": "limits.cpu",
+      "memory_request_mb": "requests.memory",
+      "memory_limit_mb": "limits.memory",
+      "scratch_mb": "scratch",
+      "read_only_root": "immutable",
+      "run_as_non_root": "rootless",
+      "max_concurrent_requests": "concurrency"
+    },
+    "deploy/livetests.py Check": {
+      "evidence_digest": "digests.evidence",
+      "source_commit": "commit",
+      "container_digest": "digests.container",
+      "model_digest": "digests.model"
+    },
+    "deploy/record.py Record": {
+      "source_commit": "commit",
+      "model_version": "version",
+      "model_digest": "digests.model",
+      "container_digest": "digests.container",
+      "config_digest": "digests.config",
+      "requested_by": "requester",
+      "approved_at": "approved",
+      "recorded_at": "recorded"
+    },
+    "governance/attestation.py Attestation": {
+      "run_id": "run",
+      "model_manifest_sha256": "digests.manifest",
+      "provenance_sha256": "digests.provenance",
+      "sbom_sha256": "digests.sbom",
+      "signature_present": "signed",
+      "attestation_signature": "signature"
+    },
+    "governance/deployment_ledger.py Attestation": {
+      "escalation_id": "escalation",
+      "question_hash": "digests.question",
+      "name_or_id": "attestor"
+    },
+    "governance/deployment_ledger.py Envelope": {
+      "envelope_id": "identifier",
+      "name_or_id": "attestor"
+    },
+    "governance/keyring.py Credential": {
+      "created_at": "created",
+      "expires_at": "expires",
+      "state_changed_at": "changed",
+      "replacement_key_id": "successor"
+    },
+    "governance/keyring.py Wrapper": {
+      "signed_at": "issued"
+    },
+    "governance/loop.py Preregistration": {
+      "reference_risk": "reference",
+      "alpha_alarm": "alarm",
+      "delta_promo": "promotion.delta",
+      "alpha_promo": "promotion.alpha",
+      "alpha_rb": "rollback.alpha",
+      "delta_rb": "rollback.delta",
+      "r_star": "target",
+      "c_max": "escalation",
+      "alarm_gates_retrain": "retrain",
+      "outcome_window": "maturity",
+      "bypass_rate": "bypass",
+      "loss_bound": "loss",
+      "safe_default": "fallback",
+      "reply_timeout": "timeout",
+      "min_matured": "matured",
+      "challenger_budget": "budget",
+      "coverage_target": "coverage",
+      "novelty_bound": "novelty",
+      "high_impact_actions": "critical",
+      "tighten_step": "step",
+      "initial_tau": "tau"
+    },
+    "governance/review.py Recomputation": {
+      "criterion_id": "criterion",
+      "evidence_uri": "uri"
+    },
+    "governance/review.py Signoff": {
+      "release_id": "release",
+      "source_commit": "commit",
+      "clean_clone_digest": "digests.clone",
+      "reviewer_id": "reviewer",
+      "implementer_ids": "implementers",
+      "environment_digest": "digests.environment",
+      "artifact_digests": "digests.artifacts",
+      "observed_at": "observed"
+    },
+    "monitoring/incidents.py Incident": {
+      "incident_id": "identifier",
+      "target_name": "target",
+      "opened_at": "opened",
+      "observed_at": "observed",
+      "alert_route": "route",
+      "run_id": "run",
+      "rollback_target": "rollback",
+      "acknowledged_at": "acknowledged",
+      "acknowledged_by": "acknowledger",
+      "resolved_at": "resolved",
+      "resolved_by": "resolver",
+      "evidence_digest": "digests.evidence"
+    },
+    "monitoring/reference.py Baseline": {
+      "output_name": "name",
+      "reference_metrics": "metrics"
+    },
+    "runners/base.py RunManifest": {
+      "run_id": "identifier",
+      "spec_digest": "digests.spec",
+      "project_digest": "digests.project",
+      "total_cost": "cost",
+      "result_sha256": "digests.result",
+      "started_at": "started",
+      "ended_at": "ended"
+    },
+    "evaluation/conformal.py ConformalCalibrator": {
+      "class_scores": "conditional"
+    },
+    "evaluation/longitudinal.py Estimation": {
+      "rows_input": "rows.received",
+      "rows_used": "rows.used",
+      "rows_dropped": "rows.dropped",
+      "raw_input_fingerprint": "digests.frame"
+    },
+    "evaluation/parameter_estimation/report.py Estimation": {
+      "rows_input": "rows.received",
+      "rows_used": "rows.used",
+      "rows_dropped": "rows.dropped",
+      "raw_input_fingerprint": "digests.frame"
+    },
+    "evaluation/sequential.py Estimation": {
+      "contrast_estimate": "contrast.estimate",
+      "contrast_standard_error": "contrast.se",
+      "contrast_interval": "contrast.interval",
+      "rows_input": "rows.received",
+      "rows_used": "rows.used",
+      "rows_dropped": "rows.dropped",
+      "subjects_input": "subjects.received",
+      "subjects_used": "subjects.used",
+      "subjects_dropped": "subjects.dropped",
+      "raw_input_fingerprint": "digests.frame"
+    },
+    "models/modality_lifecycle/checkpoints.py Checkpoint": {
+      "dataset_hash": "digests.dataset",
+      "observed_dataset_hash": "digests.observed",
+      "package_path": "package",
+      "report_path": "report",
+      "completed_stages": "completed",
+      "stage_digests": "digests.stages",
+      "require_independent_ground_truth": "independent",
+      "manifest_digest": "digests.manifest"
+    },
+    "models/modality_lifecycle/curators.py Curation": {
+      "dataset_hash": "digests.dataset",
+      "sample_count": "samples",
+      "dataset_card": "card"
+    },
+    "models/modality_lifecycle/reporting.py Record": {
+      "dataset_hash": "digests.dataset",
+      "stage_evidence": "evidence"
+    }
+  }
+}

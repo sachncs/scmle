@@ -129,7 +129,7 @@ class Impounding(exploration.Exploration):
         verified = sealing.read_verified(path)
         charter = verified.charter
         if (
-            charter.unit_of_prediction == contracts.NEW_ENTITY
+            charter.purpose == contracts.NEW_ENTITY
             and not context.spec.data.group_column
         ):
             raise errors.ConfigError(
@@ -145,7 +145,7 @@ class Impounding(exploration.Exploration):
         )
         vault_set = scmle.assurance.custody.sealed.Vault(log)
         data_hash = (
-            context.manifest.data_hash
+            context.manifest.digests["data"]
             if context.manifest is not None
             else hashlib.sha256(
                 pandas.util.hash_pandas_object(frame).to_numpy().tobytes()
@@ -163,7 +163,7 @@ class Impounding(exploration.Exploration):
         context.custody = outcome
         context.custody_vault = vault_set
         context.write_json("analysis_charter.json", contracts.deserialize(path))
-        context.write_json("error_budget.json", charter.error_budget.to_dict())
+        context.write_json("error_budget.json", charter.budget.to_dict())
         context.write_json("feasibility.json", outcome.feasibility.to_dict())
         context.write_json("split_manifest.json", outcome.manifest.to_dict())
         context.emit(
@@ -180,9 +180,9 @@ class Impounding(exploration.Exploration):
                 "charter_signed": verified.signed,
                 "manifest_sha256": outcome.manifest.sha256,
                 "scope": outcome.manifest.scope,
-                "exploration_rows": len(outcome.manifest.exploration_ids),
-                "confirmation_rows": len(outcome.manifest.confirmation_ids),
-                "embargo_rows": len(outcome.manifest.embargo_ids),
+                "exploration_rows": len(outcome.manifest.sets.exploration),
+                "confirmation_rows": len(outcome.manifest.sets.confirmation),
+                "embargo_rows": len(outcome.manifest.sets.embargo),
                 "isolation": dict(outcome.manifest.isolation),
             },
         )
@@ -212,7 +212,7 @@ class Impounding(exploration.Exploration):
             ConfigError: If a column is missing or the split strategy is not
                 time-ordered.
         """
-        if charter.unit_of_prediction != contracts.KNOWN_ENTITY_FUTURE:
+        if charter.purpose != contracts.KNOWN_ENTITY_FUTURE:
             return
         data = context.spec.data
         for role, column in (

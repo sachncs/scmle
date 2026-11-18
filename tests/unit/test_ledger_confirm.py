@@ -74,17 +74,20 @@ def test_the_full_flow_confirms_true_effects_and_only_those():
     source = source_with(*c_rows())
     result = confirm.confirm(ledger, source, alpha_confirm=ALPHA)
     assert result.outcome == confirm.CONFIRMED
-    confirmed = {c.claim_id for c in result.confirmed}
+    confirmed = {c.identifier for c in result.confirmed}
     names = {ledger.hypotheses[i].spec.column: i for i in ledger.hypotheses}
     assert {names[s] for s in SIGNAL} == confirmed
     assert source.opened
     for check in result.checks:
-        assert check.set_id is qualification.Subset.CONFIRMATION
+        assert check.subset is qualification.Subset.CONFIRMATION
     for claim in result.confirmed:
         assert claim.tier is qualification.Tier.CONFIRMED
         assert claim.adjusted_p_value is not None
         assert any("independent of rows of X" in a for a in claim.assumptions)
-        assert claim.check_ids == (f"{claim.claim_id}:X", f"{claim.claim_id}:C")
+        assert claim.checks == (
+            f"{claim.identifier}:X",
+            f"{claim.identifier}:C",
+        )
 
 
 def test_by_is_the_default_and_the_statistics_are_those_on_c():
@@ -96,7 +99,7 @@ def test_by_is_the_default_and_the_statistics_are_those_on_c():
     assert result.rule == "by"
     expected = {}
     for check in result.checks:
-        hid = check.check_id.split(":")[0]
+        hid = check.identifier.split(":")[0]
         column = ledger.hypotheses[hid].spec.column
         expected[hid] = bivariate.spearman(
             features[column].to_numpy(), target.to_numpy()
@@ -291,11 +294,11 @@ def test_rules_change_the_family_adjustment():
         )
         assert results[rule].rule == rule.value
     by = {
-        c.claim_id: c.adjusted_p_value
+        c.identifier: c.adjusted_p_value
         for c in results[budget.Correction.BY].claims
     }
     bh = {
-        c.claim_id: c.adjusted_p_value
+        c.identifier: c.adjusted_p_value
         for c in results[budget.Correction.BH].claims
     }
     assert all(by[i] >= bh[i] for i in by)

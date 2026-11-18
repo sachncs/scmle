@@ -53,11 +53,11 @@ def test_exceedance_p_counts_ties_and_adds_one():
     counts = tuple([0] * 15 + [2] * 5)
     assert controls.summarize(
         "x", "strata", 3, counts
-    ).exceedance_p == pytest.approx(1 / 21)
+    ).exceedance == pytest.approx(1 / 21)
     assert controls.summarize(
         "x", "strata", 2, counts
-    ).exceedance_p == pytest.approx(6 / 21)
-    assert controls.summarize("x", "strata", 0, counts).exceedance_p == 1.0
+    ).exceedance == pytest.approx(6 / 21)
+    assert controls.summarize("x", "strata", 0, counts).exceedance == 1.0
 
 
 def test_fewer_than_twenty_reruns_are_refused():

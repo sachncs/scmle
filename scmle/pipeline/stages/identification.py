@@ -87,7 +87,7 @@ class Identification(qualification.Qualification):
             block,
             frame,
             context.spec.data.target,
-            charter.error_budget,
+            charter.budget,
             dag=graph,
             seed=charter.seed,
             dag_report=found.dag,
@@ -145,7 +145,7 @@ class Identification(qualification.Qualification):
         outcome = scmle.causal.identification.run.design_only(
             block,
             frame,
-            charter.error_budget,
+            charter.budget,
             dag=graph,
             seed=charter.seed,
             dag_checks=found.dag,

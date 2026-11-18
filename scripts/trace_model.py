@@ -147,6 +147,28 @@ def dotted(document: Any, path: str) -> Any:
     return document
 
 
+def field(document: Any, *paths: str) -> Any:
+    """Reads a record key under its current name or an older one.
+
+    Stage B renamed stored record keys (docs/RECORD_KEYS.md), so a trail
+    written by an older scmle holds the old names. The first path that
+    exists wins; when none does, the last one raises as `dotted` does.
+
+    Args:
+        document: The mapping or list to start from.
+        *paths: Dotted paths, the current name first.
+
+    Returns:
+        The value at the first path present.
+    """
+    for path in paths[:-1]:
+        try:
+            return dotted(document, path)
+        except (KeyError, IndexError, ValueError, TypeError):
+            continue
+    return dotted(document, paths[-1])
+
+
 class Walk:
     """Collects the checks of one walk and prints them as it goes.
 
@@ -288,10 +310,12 @@ class Walk:
         self.say(
             f"  target {charter['estimand']['target']}, unit "
             f"{charter['unit']}, moment "
-            f"{charter['estimand']['prediction_moment']}"
+            f"{field(charter, 'estimand.moment', 'estimand.prediction_moment')}"
         )
         self.check(
-            digest(charter) == wrapper["charter_hash"], "charter hash matches"
+            digest(charter)
+            == field(wrapper, "digests.charter", "charter_hash"),
+            "charter hash matches",
         )
         self.signed(charter, wrapper["signature"], "analyst", "the charter")
         return wrapper
@@ -312,11 +336,11 @@ class Walk:
         draft = load(self.base / "framing/framing_draft.json")
         costs = load(self.base / "framing/decision_cost_model.json")
         self.check(
-            draft["charter_hash"] == charter_hash,
+            field(draft, "digests.charter", "charter_hash") == charter_hash,
             "the framing draft is for this charter",
         )
         self.check(
-            charter["cost_model"] == costs,
+            field(charter, "costs", "cost_model") == costs,
             "the cost model is the chartered one",
         )
         self.say(f"  open items left to a person: {draft['open_items']}")
@@ -370,7 +394,8 @@ class Walk:
         """Runs every step."""
         trail = self.files_and_chain()
         wrapper = self.question()
-        costs, cut = self.framing(trail["charter_hash"], wrapper["charter"])
+        chartered = field(trail, "digests.charter", "charter_hash")
+        costs, cut = self.framing(chartered, wrapper["charter"])
         inputs = load(self.directory / "inputs.json")
         self.say("4. KPIs, acceptance and the approved expectation")
         feed, observed = self.outcomes(costs, cut)
@@ -378,7 +403,7 @@ class Walk:
         for kpi in inputs["stakeholder"]["kpis"]:
             self.say(f"  KPI '{kpi['kpi']}' -> {kpi['metric']}")
         self.check(
-            inputs["charter_hash"] == trail["charter_hash"],
+            field(inputs, "digests.charter", "charter_hash") == chartered,
             "inputs name this charter",
         )
         for role in ("stakeholder", "reviewer"):
@@ -389,7 +414,9 @@ class Walk:
                 "role": role,
                 "model": inputs["model"],
                 "version": inputs["version"],
-                "charter_hash": inputs["charter_hash"],
+                "charter_hash": field(
+                    inputs, "digests.charter", "charter_hash"
+                ),
                 "body": section,
             }
             self.signed(payload, inputs[role].get("signature"), role, role)
@@ -449,7 +476,8 @@ class Walk:
             "the registered bundle is the bundle the run wrote",
         )
         self.check(
-            entry["run_id"] == evaluation["run_id"], "registry names this run"
+            field(entry, "run", "run_id") == field(evaluation, "run", "run_id"),
+            "registry names this run",
         )
         promoted = [
             row
@@ -493,7 +521,8 @@ class Walk:
         self.check(intact, f"{len(rows)} ledger rows chain")
         header = rows[0]["body"]
         self.check(
-            header["charter_hash"] == trail["charter_hash"],
+            field(header, "digests.charter", "charter_hash")
+            == field(trail, "digests.charter", "charter_hash"),
             "the ledger belongs to this charter",
         )
         content_id = file_digest(self.base / "run/model/model_manifest.json")

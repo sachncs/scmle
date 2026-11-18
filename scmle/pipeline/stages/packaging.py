@@ -79,7 +79,9 @@ class PackageStage(tracing.Tracing):
             class_labels=context.ordinal_labels,
             seed=context.spec.validation.seed,
             configuration=context.spec.config_hash(),
-            dataset=context.manifest.data_hash if context.manifest else "",
+            dataset=context.manifest.digests["data"]
+            if context.manifest
+            else "",
             split=split.manifest.fingerprint,
             reference=scmle.data.reference.Baseline.build(
                 split.dev_features,

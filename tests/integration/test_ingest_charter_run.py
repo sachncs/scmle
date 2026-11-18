@@ -97,7 +97,7 @@ def plan_file(tmp_path, unit="customer"):
 
 def charter_file(tmp_path, block=True, entity=None, reconcile=None):
     spec = ingest.Ingestion(
-        feature_budget=40,
+        features=40,
         windows=(30.0, 90.0),
         lag=1.0,
         entity=entity,
@@ -106,7 +106,7 @@ def charter_file(tmp_path, block=True, entity=None, reconcile=None):
     path = tmp_path / "charter.json"
     sealing.inscribe(
         path,
-        make_charter(min_effect=0.5, k_max=3, ingest=spec if block else None),
+        make_charter(effect=0.5, quota=3, ingest=spec if block else None),
         signing_key=KEY,
     )
     return path
@@ -144,7 +144,7 @@ def read(result, name):
 
 def test_features_come_from_the_database_and_reach_the_ledger(tmp_path):
     # Enforces docs/ARCHITECTURE.md:105.
-    # Enforces docs/ARTIFACTS.md:67.
+    # Enforces docs/ARTIFACTS.md:73.
     result = run(tmp_path)
     folder = pathlib.Path(result.run_dir)
 
@@ -222,8 +222,8 @@ def entity_block():
 def split_sets(result):
     manifest = read(result, "split_manifest.json")
     out = {}
-    for name in ("exploration_ids", "confirmation_ids", "final_test_ids"):
-        out.update(dict.fromkeys(manifest[name], name))
+    for name in ("exploration", "confirmation", "final"):
+        out.update(dict.fromkeys(manifest["sets"][name], name))
     return out
 
 
@@ -234,7 +234,7 @@ def straddling(result):
         for i in range(250)
         if sets.get(i) is not None
         and sets.get(i + 250) is not None
-        and (sets[i] == "final_test_ids") != (sets[i + 250] == "final_test_ids")
+        and (sets[i] == "final") != (sets[i + 250] == "final")
     ]
 
 
@@ -277,7 +277,7 @@ def declared_totals(path, rows_off=0):
                 "orders",
                 rows=len(keys) + rows_off,
                 sums=(ingest.Total("amount", float(keys.amount.sum())),),
-                checksum_column="order_id",
+                column="order_id",
                 checksum=declared.sha(keys.order_id),
             ),
         )
@@ -299,7 +299,7 @@ def run_reconciled(tmp_path, rows_off):
 
 
 def test_the_extract_is_reconciled_to_the_declared_totals(tmp_path):
-    # Enforces docs/ARTIFACTS.md:54.
+    # Enforces docs/ARTIFACTS.md:60.
     result = run_reconciled(tmp_path, 0)
     report = read(result, "extract_reconciliation.json")
     assert report["passed"] is True
@@ -345,7 +345,7 @@ def test_a_corrupted_extract_is_named_by_the_source_queries(
 
 
 def test_a_faithful_extract_passes_the_source_queries(tmp_path):
-    # Enforces docs/ARTIFACTS.md:54.
+    # Enforces docs/ARTIFACTS.md:60.
     result = run_reconciled(tmp_path, 0)
     report = read(result, "extract_reconciliation.json")
     assert report["source_passed"] is True

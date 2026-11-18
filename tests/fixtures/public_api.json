@@ -65,7 +65,7 @@
     "scmle.data.catalog": {
       "Catalog": {
         "kind": "class",
-        "signature_sha256": "2b8c4750ec45dc99eaa3c2eb8e387dbbb9d304c2acf1ead56e0976867855bbec"
+        "signature_sha256": "e5fddcac28eb18c5f1a477a8df5062246f6e834e03158552b93893b658e7cfeb"
       }
     },
     "scmle.data.store.processing": {
@@ -133,7 +133,7 @@
       },
       "BundleRef": {
         "kind": "class",
-        "signature_sha256": "f36c4df7d1633d5788bcc619931ae3be4eb0ec090b741f35e73c8c0e20c78704"
+        "signature_sha256": "8e265dc71d99d9dd8df94c2dd125d44c35aa564743ea6e5d20f6385b3c9b347e"
       },
       "Deployment": {
         "kind": "class",
@@ -149,7 +149,7 @@
       },
       "Probes": {
         "kind": "class",
-        "signature_sha256": "c872e18c3a96428229922c05a849fd88642dfd9a651ce09bdf8c36ef3b9ea548"
+        "signature_sha256": "474318ede3bf9654757bfff724e8a83aa65c67dd133b68b8971998f1c046fcb9"
       },
       "Provider": {
         "kind": "class",
@@ -157,7 +157,7 @@
       },
       "Resources": {
         "kind": "class",
-        "signature_sha256": "191ea8346bf5b744bd8fe5d93a9050ff13b5dbd1faa992d4aea7f20619e2d909"
+        "signature_sha256": "93e19046d74eccf5310017405d3725d8f93cd871e12e6befe74494a716dbf47b"
       },
       "Runtime": {
         "kind": "class",
@@ -231,7 +231,7 @@
     "scmle.deploy.livetests": {
       "Check": {
         "kind": "class",
-        "signature_sha256": "d5d87db18acdfa8b5c5129b5d381cf9ee784c7ecb219f7f1ae2b0d5e07f782d5"
+        "signature_sha256": "13ba8364cfc2f4c48b7ca99e9e8b836ba9eea78a3d7d3bccde1781b9f86e2240"
       },
       "Response": {
         "kind": "class",
@@ -263,7 +263,7 @@
     "scmle.deploy.record": {
       "Record": {
         "kind": "class",
-        "signature_sha256": "6d5d8ade8acb7b7bf1dcce3529c1c03f2adea209c286b3cca3e4172868ef8cae"
+        "signature_sha256": "79aa602af6737acf433a7ad82862673c1f4bba582cf02bf56e6a7138050ae6d4"
       },
       "read_record": {
         "kind": "callable",
@@ -311,7 +311,7 @@
       },
       "Estimation": {
         "kind": "class",
-        "signature_sha256": "da9e199705528cc98c97fcffa763dd0da1b85b500565ef86222b7efbf5cfd7bc"
+        "signature_sha256": "9cbd0f8f8ada3de54e3826b87101db1a9b8e6d39ae2824945d425337a562118c"
       },
       "Estimator": {
         "kind": "class",
@@ -343,7 +343,7 @@
       },
       "Estimation": {
         "kind": "class",
-        "signature_sha256": "ae0b4e62d1f85362f2520d828018ab381ef1df136e5c5a5cbab2c7b339ae65c5"
+        "signature_sha256": "3fcb9c05793fc0a590db32c81c0e904b0ba83858ef29a4b4e0b61f4b597d69cb"
       },
       "ParameterEstimate": {
         "kind": "class",
@@ -365,7 +365,7 @@
       },
       "Estimation": {
         "kind": "class",
-        "signature_sha256": "5fd5eba1bb514900766f2d0148996b746a6326ae392d54c395860b555fe0bc16"
+        "signature_sha256": "21d0bed9fa8927f9d525f10c31e4a9bda09843ef67483b959c970c058bd01393"
       },
       "Estimator": {
         "kind": "class",
@@ -525,11 +525,11 @@
       },
       "Checkpoint": {
         "kind": "class",
-        "signature_sha256": "0cbe5c89435e77fffe1df59cf10f7c0799a5eccf0082b32260e538f899dabc53"
+        "signature_sha256": "474e6671e0ef8e48b72bb3f18817489053c40e7810e3b71e8b29ee62ce2bc50a"
       },
       "Curation": {
         "kind": "class",
-        "signature_sha256": "17ae8b6274e913e2bcf36e240db6a9aa73e82a0299e4d3ed4f2969fc2f2d30bd"
+        "signature_sha256": "9de7f33bbd899d809ca40d7b0486d8a6d6f45f859edaeaa52ef7c12b077c06b0"
       },
       "Curator": {
         "kind": "class",
@@ -571,7 +571,7 @@
       },
       "RunManifest": {
         "kind": "class",
-        "signature_sha256": "a79d29c712a1beedd4821e04a17deeec4361f6f41608a1e29227e291a22b40f3"
+        "signature_sha256": "dfd3d63e58bb5723fb30380613f4f2f9c4156d4e12726fa09bcdaa03ad5da915"
       },
       "Runner": {
         "kind": "class",

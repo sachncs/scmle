@@ -46,18 +46,20 @@ def delegate(
             ScmleError: If the job ended in any other final state.
         """
         manifest = runner.run(make_spec(context))
-        context.spend(manifest.total_cost)
+        context.spend(manifest.cost)
         if manifest.state == base.Progress.SUCCEEDED:
             return {
-                "run_id": manifest.run_id,
-                "result_sha256": manifest.result_sha256,
+                "run_id": manifest.identifier,
+                "result_sha256": manifest.digests["result"],
                 "attempts": len(manifest.attempts),
-                "cost": manifest.total_cost,
+                "cost": manifest.cost,
             }
         if manifest.state == base.Progress.RETRIES_EXHAUSTED:
             raise executor.PreemptedError(
-                f"job {manifest.run_id} was interrupted on every attempt"
+                f"job {manifest.identifier} was interrupted on every attempt"
             )
-        raise errors.ScmleError(f"job {manifest.run_id} ended {manifest.state}")
+        raise errors.ScmleError(
+            f"job {manifest.identifier} ended {manifest.state}"
+        )
 
     return handler

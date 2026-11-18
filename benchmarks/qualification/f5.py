@@ -51,9 +51,7 @@ from scmle.contracts import qualification
 from scmle.runtime import randomness
 
 CERT_PATH = scmle.certificates.DIRECTORY / "detector_certificates.json"
-POLICY = certificates.Standard(
-    recall_floor=0.80, false_alarm_ceiling=0.05, confidence=0.95
-)
+POLICY = certificates.Standard(recall=0.80, alarms=0.05, confidence=0.95)
 ROW_SEEDS = (0, 1, 2, 3, 4)
 MISSING_SEEDS = tuple(range(200))
 MISSING_COLUMNS = 6
@@ -257,15 +255,13 @@ def certify_missingness(
         rejected[mechanism] = count
     results = [
         qualification.Certificate(
-            detector_id="f5-missingness",
-            defect_type=f"missing_{mechanism}",
+            detector="f5-missingness",
+            defect=f"missing_{mechanism}",
             planted=len(seeds),
             detected=rejected[mechanism],
-            clean_rows=len(seeds),
-            false_alarms=rejected["mcar"],
-            seed_path=randomness.seed_path(
-                seeds[0], "certify.f5-missingness", 0
-            ),
+            clean=len(seeds),
+            alarms=rejected["mcar"],
+            seeds=randomness.seed_path(seeds[0], "certify.f5-missingness", 0),
         )
         for mechanism in ("mar", "mnar")
     ]
@@ -304,7 +300,7 @@ def select_cut(
         upper = certificates.wilson_interval(
             flagged, len(frame), policy.confidence
         )[1]
-        if upper <= policy.false_alarm_ceiling:
+        if upper <= policy.alarms:
             best = cut
     return best
 
@@ -427,16 +423,14 @@ def summary(store: certificates.Store) -> list[dict[str, object]]:
             cert = outcome.certificate
             rows.append(
                 {
-                    "detector": item.detector_id,
-                    "defect_type": cert.defect_type,
+                    "detector": item.detector,
+                    "defect_type": cert.defect,
                     "planted": cert.planted,
                     "detected": cert.detected,
-                    "recall_lower": round(outcome.recall_interval[0], 4),
-                    "clean": cert.clean_rows,
-                    "false_alarms": cert.false_alarms,
-                    "false_alarm_upper": round(
-                        outcome.false_alarm_interval[1], 4
-                    ),
+                    "recall_lower": round(outcome.recall[0], 4),
+                    "clean": cert.clean,
+                    "false_alarms": cert.alarms,
+                    "false_alarm_upper": round(outcome.alarms[1], 4),
                     "gates": outcome.passed,
                 }
             )

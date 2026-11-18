@@ -1,9 +1,17 @@
-"""Signed stage-boundary checkpoints of a modality lifecycle run."""
+"""Signed stage-boundary checkpoints of a modality lifecycle run.
+
+Version 2 of the checkpoint layout renamed its keys to single words and
+nested the four digests under `digests`. A checkpoint is signed over the
+layout of the version it is stored at, so a version-1 checkpoint still
+verifies after it is loaded: its content is laid out again as version 1
+before the signature is checked, and it is never re-signed.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 import dataclasses
+import functools
 import hmac
 import json
 from pathlib import Path
@@ -12,8 +20,76 @@ from typing import Self
 
 from scmle.contracts import errors
 from scmle.contracts import modalities
+from scmle.contracts import records
 from scmle.contracts import signing
+from scmle.evaluation import envelope
 from scmle.pipeline.modality_lifecycle import reporting
+
+NESTED = {
+    "digests": {
+        "dataset_hash": "dataset",
+        "observed_dataset_hash": "observed",
+        "stage_digests": "stages",
+        "manifest_digest": "manifest",
+    }
+}
+MIGRATION = records.Migration(
+    renames={
+        "package_path": "package",
+        "report_path": "report",
+        "completed_stages": "completed",
+        "require_independent_ground_truth": "independent",
+    },
+    change=functools.partial(envelope.fold, groups=NESTED),
+    revert=functools.partial(envelope.unfold, groups=NESTED),
+)
+VERSION = records.ORIGIN + 1
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Digests:
+    """The digests a checkpoint binds.
+
+    Attributes:
+        dataset: Hash identifying the training dataset.
+        observed: Hash identifying the dataset used for monitoring.
+        stages: Digest of each completed stage's evidence, in stage order.
+        manifest: Digest of the package manifest once it exists, else None.
+    """
+
+    dataset: str
+    observed: str
+    stages: tuple[str, ...]
+    manifest: str | None = None
+
+    @classmethod
+    def restore(cls, record: object) -> Self:
+        """Restores stored digests; blank values are rejected by `Checkpoint`.
+
+        Args:
+            record: The checkpoint's `digests` entry.
+
+        Returns:
+            The digests.
+
+        Raises:
+            ValueError: If the entry is not an object, its stages are not a
+                list of strings, or its manifest is neither None nor text.
+        """
+        if not isinstance(record, Mapping):
+            raise errors.InputError("checkpoint digests must be an object")
+        stages = reporting.require(
+            record.get("stages"), "checkpoint digests.stages must be a list"
+        )
+        manifest = record.get("manifest")
+        if manifest is not None and not isinstance(manifest, str):
+            raise errors.InputError("checkpoint digests.manifest is invalid")
+        return cls(
+            dataset=str(record.get("dataset", "")),
+            observed=str(record.get("observed", "")),
+            stages=tuple(stages),
+            manifest=manifest,
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -28,75 +104,72 @@ class Checkpoint:
 
     Attributes:
         modality: Modality value of the run.
-        dataset_hash: Hash identifying the training dataset.
-        observed_dataset_hash: Hash identifying the dataset used for
-            monitoring.
-        package_path: Where the model package is written.
-        report_path: Where the lifecycle report is written.
+        digests: The dataset, monitoring dataset, stage and manifest
+            digests.
+        package: Where the model package is written.
+        report: Where the lifecycle report is written.
         seed: Random seed of the run.
-        completed_stages: Values of the lifecycle stages finished so far, a
-            prefix of the required order.
-        stage_digests: Digest of each completed stage's evidence, in the same
-            order.
-        require_independent_ground_truth: Whether the run demands independently
-            authored explanation ground truth.
-        manifest_digest: Digest of the package manifest once it exists, else
-            None.
+        completed: Values of the lifecycle stages finished so far, a prefix
+            of the required order.
+        independent: Whether the run demands independently authored
+            explanation ground truth.
         status: "running" until every stage is done, then "completed".
         signature: Signature value over the content, or None if unsigned.
-        schema_version: Version of the checkpoint layout.
+        schema_version: Version of the layout the checkpoint is stored and
+            signed in.
     """
 
     modality: str
-    dataset_hash: str
-    observed_dataset_hash: str
-    package_path: str
-    report_path: str
+    digests: Digests
+    package: str
+    report: str
     seed: int
-    completed_stages: tuple[str, ...]
-    stage_digests: tuple[str, ...]
-    require_independent_ground_truth: bool
-    manifest_digest: str | None = None
+    completed: tuple[str, ...]
+    independent: bool
     status: Literal["running", "completed"] = "running"
     signature: str | None = None
-    schema_version: int = 1
+    schema_version: int = VERSION
 
     def __post_init__(self) -> None:
         """Rejects incomplete, non-prefix, or unsigned-identity state.
 
         Raises:
-            ValueError: If an identity field is blank, the status is unknown, a
-                digest or signature is blank, the completed stages are not an
-                ordered prefix of the lifecycle, the digests do not match the
-                stages, or a completed checkpoint lacks a stage.
-            TypeError: If the seed is not an integer or the ground-truth
-                requirement is not a boolean.
+            ValueError: If an identity field is blank, the status or schema
+                version is unknown, a digest or signature is blank, the
+                completed stages are not an ordered prefix of the lifecycle,
+                the digests do not match the stages, or a completed
+                checkpoint lacks a stage.
+            TypeError: If the digests are not `Digests`, the seed is not an
+                integer or the ground-truth requirement is not a boolean.
         """
-        for field_name in (
-            "modality",
-            "dataset_hash",
-            "observed_dataset_hash",
-            "package_path",
-            "report_path",
-        ):
-            value = getattr(self, field_name)
+        if not isinstance(self.digests, Digests):
+            raise errors.KindError("digests must be Digests")
+        identity: tuple[tuple[str, object], ...] = (
+            ("modality", self.modality),
+            ("digests.dataset", self.digests.dataset),
+            ("digests.observed", self.digests.observed),
+            ("package", self.package),
+            ("report", self.report),
+        )
+        for field_name, value in identity:
             if not isinstance(value, str) or not value.strip():
                 raise errors.InputError(f"{field_name} must not be empty")
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
             raise errors.KindError("seed must be an integer")
-        if not isinstance(self.require_independent_ground_truth, bool):
-            raise errors.KindError(
-                "require_independent_ground_truth must be bool"
-            )
+        if not isinstance(self.independent, bool):
+            raise errors.KindError("independent must be bool")
         if self.status not in ("running", "completed"):
             raise errors.InputError(
                 "checkpoint status must be running or completed"
             )
-        if self.manifest_digest is not None and not (
-            self.manifest_digest.strip()
-        ):
+        if self.schema_version not in (records.ORIGIN, VERSION):
             raise errors.InputError(
-                "manifest_digest must be non-empty when provided"
+                "unsupported lifecycle checkpoint schema version"
+            )
+        manifest = self.digests.manifest
+        if manifest is not None and not manifest.strip():
+            raise errors.InputError(
+                "digests.manifest must be non-empty when provided"
             )
         if self.signature is not None and not self.signature.strip():
             raise errors.InputError("signature must be non-empty when provided")
@@ -112,16 +185,16 @@ class Checkpoint:
         """
         expected_stages = tuple(
             stage.value for stage in modalities.REQUIRED_LIFECYCLE_STAGES
-        )[: len(self.completed_stages)]
-        if tuple(self.completed_stages) != expected_stages:
+        )[: len(self.completed)]
+        if tuple(self.completed) != expected_stages:
             raise errors.InputError(
                 "completed stages must be an ordered lifecycle prefix"
             )
-        if len(self.stage_digests) != len(self.completed_stages):
+        if len(self.digests.stages) != len(self.completed):
             raise errors.InputError("stage digests must match completed stages")
-        if any(not digest.strip() for digest in self.stage_digests):
+        if any(not digest.strip() for digest in self.digests.stages):
             raise errors.InputError("stage digests must not be empty")
-        if self.status == "completed" and len(self.completed_stages) != len(
+        if self.status == "completed" and len(self.completed) != len(
             modalities.REQUIRED_LIFECYCLE_STAGES
         ):
             raise errors.InputError(
@@ -133,25 +206,25 @@ class Checkpoint:
 
         Returns:
             JSON-native mapping of every field except the signature, plus a
-            fixed `record_type` entry.
+            fixed `record_type` entry, laid out as at `schema_version`.
         """
-        return {
-            "schema_version": self.schema_version,
+        content: records.Layout = {
             "record_type": "modality_lifecycle_checkpoint",
             "modality": self.modality,
-            "dataset_hash": self.dataset_hash,
-            "observed_dataset_hash": self.observed_dataset_hash,
-            "package_path": self.package_path,
-            "report_path": self.report_path,
+            "digests": {
+                **dataclasses.asdict(self.digests),
+                "stages": list(self.digests.stages),
+            },
+            "package": self.package,
+            "report": self.report,
             "seed": self.seed,
-            "completed_stages": list(self.completed_stages),
-            "stage_digests": list(self.stage_digests),
-            "require_independent_ground_truth": (
-                self.require_independent_ground_truth
-            ),
-            "manifest_digest": self.manifest_digest,
+            "completed": list(self.completed),
+            "independent": self.independent,
             "status": self.status,
         }
+        if self.schema_version == records.ORIGIN:
+            content = MIGRATION.downgrade(content)
+        return {records.KEY: self.schema_version, **content}
 
     def sign(self, signing_key: str | bytes) -> Self:
         """Signs the checkpoint over its exact serialized identity.
@@ -184,7 +257,11 @@ class Checkpoint:
 
     @classmethod
     def from_dict(cls, record: Mapping[str, object]) -> Self:
-        """Restores a checkpoint without trusting its serialized claims.
+        """Restores a checkpoint of either version without trusting its claims.
+
+        A version-1 record is migrated to the current field names but keeps
+        its stored version, so its signature is checked over the layout it
+        was signed in.
 
         Args:
             record: Mapping produced by `to_dict`.
@@ -196,32 +273,37 @@ class Checkpoint:
             ValueError: If the schema version, record type, signature or any
                 field is unsupported, missing or malformed.
         """
-        if record.get("schema_version") != 1:
+        version = record.get(records.KEY)
+        if (
+            isinstance(version, bool)
+            or not isinstance(version, int)
+            or version not in (records.ORIGIN, VERSION)
+        ):
             raise errors.InputError(
                 "unsupported lifecycle checkpoint schema version"
             )
-        if record.get("record_type") != "modality_lifecycle_checkpoint":
+        layout = dict(record)
+        del layout[records.KEY]
+        if version == records.ORIGIN:
+            layout = MIGRATION.upgrade(layout)
+        if layout.get("record_type") != "modality_lifecycle_checkpoint":
             raise errors.InputError("invalid lifecycle checkpoint record type")
         completed = reporting.require(
-            record.get("completed_stages"),
-            "checkpoint completed_stages must be a list",
+            layout.get("completed"), "checkpoint completed must be a list"
         )
-        digests = reporting.require(
-            record.get("stage_digests"),
-            "checkpoint stage_digests must be a list",
-        )
-        seed = record.get("seed")
+        digests = Digests.restore(layout.get("digests"))
+        seed = layout.get("seed")
         if isinstance(seed, bool) or not isinstance(seed, int):
             raise errors.InputError("checkpoint seed is invalid")
-        require_ground_truth = record.get("require_independent_ground_truth")
-        if not isinstance(require_ground_truth, bool):
+        independent = layout.get("independent")
+        if not isinstance(independent, bool):
             raise errors.InputError(
                 "checkpoint ground-truth requirement is invalid"
             )
-        status = record.get("status")
+        status = layout.get("status")
         if status not in ("running", "completed"):
             raise errors.InputError("checkpoint status is invalid")
-        signature = record.get("signature")
+        signature = layout.get("signature")
         if not isinstance(signature, Mapping):
             raise errors.InputError("checkpoint signature is missing")
         if signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
@@ -231,31 +313,25 @@ class Checkpoint:
         signature_value = signature.get("value")
         if not isinstance(signature_value, str) or not signature_value.strip():
             raise errors.InputError("lifecycle checkpoint signature is invalid")
-        manifest_digest = record.get("manifest_digest")
-        if manifest_digest is not None and not isinstance(manifest_digest, str):
-            raise errors.InputError("checkpoint manifest_digest is invalid")
         return cls(
-            modality=str(record.get("modality", "")),
-            dataset_hash=str(record.get("dataset_hash", "")),
-            observed_dataset_hash=str(record.get("observed_dataset_hash", "")),
-            package_path=str(record.get("package_path", "")),
-            report_path=str(record.get("report_path", "")),
+            modality=str(layout.get("modality", "")),
+            digests=digests,
+            package=str(layout.get("package", "")),
+            report=str(layout.get("report", "")),
             seed=seed,
-            completed_stages=tuple(completed),
-            stage_digests=tuple(digests),
-            require_independent_ground_truth=require_ground_truth,
-            manifest_digest=manifest_digest,
+            completed=tuple(completed),
+            independent=independent,
             status=status,
             signature=signature_value,
-            schema_version=1,
+            schema_version=version,
         )
 
     def to_dict(self) -> dict[str, object]:
         """Converts the checkpoint to deterministic JSON-native evidence.
 
         Returns:
-            The unsigned content plus a `signature` entry holding the algorithm
-            and value.
+            The unsigned content, laid out as at `schema_version`, plus a
+            `signature` entry holding the algorithm and value.
         """
         record = self.preimage()
         record["signature"] = {

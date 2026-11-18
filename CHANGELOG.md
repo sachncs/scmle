@@ -12,6 +12,21 @@ marked `Breaking:` and listed first in their group.
 
 ### Breaking changes
 
+* **Stored record keys renamed.** The multi-word keys of the records scmle
+  writes (charters, custody manifests, ledgers, contracts, catalogs, detector
+  certificates, governance, deployment, monitoring and run records) are now
+  one word or a nested object, for example `data_hash` -> `digests.data`,
+  `charter_hash` -> `digests.charter`, `row_count` -> `rows` and `run_id` ->
+  `identifier` (own id) or `run` (reference). Every renamed record kind has a
+  higher `schema_version` and a migration, so scmle reads files written
+  earlier, and anchored hashes and signatures still verify. Scripts, queries
+  and notebooks of your own that read the JSON directly must use the new keys:
+  see [`docs/RECORD_KEYS.md`](docs/RECORD_KEYS.md) and the machine-readable
+  map [`docs/record_keys.json`](docs/record_keys.json). To rewrite a folder
+  on disk at the new keys, run `scmle records upgrade FOLDER [--dry-run]`: it
+  keeps a `.bak` of each file, verifies seals, signatures and chains before
+  and after, and restores every file and exits 1 if a check fails (see
+  [`docs/CLI.md`](docs/CLI.md)).
 * **Modules moved by the package layering (DES-13).** Each package now imports
   only the layers below it; the moves are listed, `old -> new`, under "Module
   moves" in [`docs/RENAMES.md`](docs/RENAMES.md). Names inside a module are

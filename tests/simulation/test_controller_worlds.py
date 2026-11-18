@@ -143,7 +143,7 @@ def test_an_uncertified_alarm_never_reaches_the_envelope(tmp_path):
     world = tests.simulation.world.World(
         tmp_path,
         abrupt(),
-        policy=tests.simulation.world.make_policy(alarm_gates_retrain=False),
+        policy=tests.simulation.world.make_policy(retrain=False),
     )
     trainer = Trainer()
     controller = world.controller(retrain=trainer)
@@ -192,7 +192,7 @@ def test_delayed_labels_alarm_only_after_they_arrive(tmp_path):
     world = tests.simulation.world.World(
         tmp_path,
         stream,
-        policy=tests.simulation.world.make_policy(outcome_window=3),
+        policy=tests.simulation.world.make_policy(maturity=3),
     )
     trainer = Trainer()
     controller = world.controller(retrain=trainer)

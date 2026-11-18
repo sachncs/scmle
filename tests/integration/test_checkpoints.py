@@ -48,7 +48,7 @@ def test_reviewers_see_the_plan_and_the_selection(binary_frame, tmp_path):
     plan_review, selection_review = seen
     assert plan_review.gate is state.Progress.PLANNING
     assert "Candidates:" in plan_review.summary
-    assert plan_review.details["candidate_models"]
+    assert plan_review.details["candidates"]
     assert selection_review.gate is state.Progress.SELECTING
     assert "test set is still locked" in selection_review.summary
     assert selection_review.details["status"] == "ok"

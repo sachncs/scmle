@@ -122,7 +122,7 @@ def test_sequential_report_round_trip_is_digest_bound(tmp_path) -> None:
     assert digest == result.digest() == restored.digest()
     assert restored.to_dict() == result.to_dict()
     envelope = json.loads(destination.read_text(encoding="utf-8"))
-    envelope["report"]["rows_used"] += 1
+    envelope["report"]["rows"]["used"] += 1
     destination.write_text(json.dumps(envelope), encoding="utf-8")
     with pytest.raises(ValueError, match="digest mismatch"):
         Estimation.read(destination)
@@ -135,9 +135,9 @@ def test_unsorted_rows_are_ordered_by_subject_and_period() -> None:
     shuffled = frame.sample(frac=1.0, random_state=9).reset_index(drop=True)
     result = Estimator(make_estimand(), make_policy()).fit(shuffled)
 
-    assert result.rows_used == len(frame)
+    assert result.rows.used == len(frame)
     assert result.reference["passed"] is True
-    assert result.contrast_estimate == baseline.contrast_estimate
+    assert result.contrast.estimate == baseline.contrast.estimate
     assert result.periods == baseline.periods
 
 
@@ -149,10 +149,11 @@ def test_complete_case_drops_subjects_as_whole_sequences() -> None:
 
     result = Estimator(make_estimand(), policy).fit(frame)
 
-    assert result.subjects_dropped == 1
-    assert result.rows_dropped == 3
+    assert result.subjects.dropped == 1
+    assert result.rows.dropped == 3
     assert (
-        result.subjects_used + result.subjects_dropped == result.subjects_input
+        result.subjects.used + result.subjects.dropped
+        == result.subjects.received
     )
 
 
@@ -291,7 +292,7 @@ def test_contract_dataclasses_reject_invalid_evidence() -> None:
     with pytest.raises(ValueError, match="symmetric"):
         dataclasses.replace(result, covariance=((1.0, 2.0), (0.0, 1.0)))
     with pytest.raises(ValueError, match="SHA-256"):
-        dataclasses.replace(result, raw_input_fingerprint="invalid")
+        dataclasses.replace(result, digests={"frame": "invalid"})
 
 
 @pytest.mark.parametrize(

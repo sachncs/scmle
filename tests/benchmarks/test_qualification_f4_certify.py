@@ -29,9 +29,7 @@ def test_every_required_defect_type_has_an_outcome_on_file():
     digests = f4_certify.current_digests()
     for detector, defects in f4_certify.required_defects().items():
         (cert,) = store.current(detector, digests[detector])
-        assert {o.certificate.defect_type for o in cert.outcomes} == set(
-            defects
-        )
+        assert {o.certificate.defect for o in cert.outcomes} == set(defects)
 
 
 def test_stale_and_missing_certificates_are_reported():
@@ -53,8 +51,8 @@ def test_stale_and_missing_certificates_are_reported():
 def test_planned_sizes_follow_the_phase_floors():
     assert f4_certify.NULL_REPLICATES >= 1000
     assert f4_certify.PLANT_REPLICATES >= 200
-    assert f4_certify.LEAK_POLICY.recall_floor == 0.9
-    assert f4_certify.LEAK_POLICY.false_alarm_ceiling == 0.05
+    assert f4_certify.LEAK_POLICY.recall == 0.9
+    assert f4_certify.LEAK_POLICY.alarms == 0.05
 
 
 def test_measurements_agree_with_the_certificate():
@@ -65,9 +63,9 @@ def test_measurements_agree_with_the_certificate():
     (cert,) = store.current(leakage.DETECTOR_ID, leakage.code_digest())
     for outcome in cert.outcomes:
         c = outcome.certificate
-        assert c.false_alarms == document["suspect_false_alarms"]
-        assert c.detected == document["detected"][c.defect_type]
-        assert c.clean_rows == document["null_replicates"]
+        assert c.alarms == document["suspect_false_alarms"]
+        assert c.detected == document["detected"][c.defect]
+        assert c.clean == document["null_replicates"]
         assert c.planted == document["plant_replicates_per_type"]
     assert (
         document["settings"]["skill_ceiling"] == leakage.CERTIFIED.skill_ceiling
@@ -140,9 +138,9 @@ def test_the_cheap_certificates_reproduce_and_pass():
     for cert in (first, f4_certify.certify_reconciliation()):
         (outcome,) = cert.outcomes
         assert outcome.passed
-        assert outcome.certificate.false_alarms == 0
+        assert outcome.certificate.alarms == 0
         assert outcome.certificate.recall == 1.0
-        assert outcome.recall_interval[0] >= 0.9
+        assert outcome.recall[0] >= 0.9
 
 
 def test_detector_code_hashes_cover_the_whole_module():
@@ -159,7 +157,7 @@ def test_the_measured_verdicts_are_the_ones_the_gates_rely_on():
     store = stored()
     digests = f4_certify.current_digests()
     (cert,) = store.current(leakage.DETECTOR_ID, digests[leakage.DETECTOR_ID])
-    verdicts = {o.certificate.defect_type: o.passed for o in cert.outcomes}
+    verdicts = {o.certificate.defect: o.passed for o in cert.outcomes}
     # Measured, not tuned: a 2 percent noisy copy sits at the 0.95 ceiling
     # and its recall lower bound (0.66) misses the 0.9 floor.
     assert verdicts == {

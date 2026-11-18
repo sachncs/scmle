@@ -11,10 +11,8 @@ from tests.unit.test_reliability_contracts import make_plan
 
 
 def test_release_blocking_must_be_a_bool() -> None:
-    with pytest.raises(
-        errors.KindError, match=r"^release_blocking must be bool$"
-    ):
-        dataclasses.replace(make_plan(), release_blocking=1)
+    with pytest.raises(errors.KindError, match=r"^blocking must be bool$"):
+        dataclasses.replace(make_plan(), blocking=1)
 
 
 def test_an_unknown_schema_version_is_refused() -> None:
@@ -22,7 +20,9 @@ def test_an_unknown_schema_version_is_refused() -> None:
         errors.InputError,
         match=r"^unsupported fault-injection plan schema version$",
     ):
-        reliability.Registry.from_dict({"schema_version": 2})
+        reliability.Registry.from_dict(
+            {"schema_version": reliability.VERSION + 1}
+        )
 
 
 def test_only_a_plan_can_be_registered() -> None:

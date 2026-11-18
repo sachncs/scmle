@@ -41,13 +41,13 @@ def test_count_discoveries_matches_the_ledger_on_the_same_data():
     charter = make_charter()
     plan = explore.hypothesize(features, explore.NUMERIC)
     config = online_fdr.Settings(
-        online_fdr.ELOND, charter.error_budget.exploration.initial
+        online_fdr.ELOND, charter.budget.exploration.initial
     )
     ledger = scmle.assurance.ledger.ledger.Ledger.create(
         None,
         charter_hash=charter.charter_hash,
         config=config,
-        alpha_confirm=charter.error_budget.confirmation.alpha_confirm,
+        alpha_confirm=charter.budget.confirmation.alpha_confirm,
         seed=1,
     )
     results = explore.run_exploration(ledger, features, target, plan)
@@ -73,7 +73,7 @@ def test_a_planted_signal_is_found_controlled_and_confirmed(tmp_path):
     assert run.control.scope == "global"
     assert run.confirmation.outcome == confirm.CONFIRMED
     columns = {
-        run.ledger.hypotheses[c.claim_id].spec.column
+        run.ledger.hypotheses[c.identifier].spec.column
         for c in run.confirmation.confirmed
     }
     assert columns == {"f0", "f1"}
@@ -127,7 +127,7 @@ def test_binary_labels_are_coded_consistently_for_c():
         run_dir=None,
     )
     assert {
-        run.ledger.hypotheses[c.claim_id].spec.column
+        run.ledger.hypotheses[c.identifier].spec.column
         for c in run.confirmation.confirmed
     } == {"f0", "f1"}
 

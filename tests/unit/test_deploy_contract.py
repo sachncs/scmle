@@ -11,13 +11,19 @@ IMAGE = "sha256:" + "a" * 64
 BUNDLE = "sha256:" + "b" * 64
 
 
+def resources(cpu, cpus, memory, memories, **changes):
+    return contract.Resources(
+        contract.Quota(cpu, memory), contract.Quota(cpus, memories), **changes
+    )
+
+
 def make_spec(**changes):
     values = {
         "version": "1.2.0",
         "environment": "staging",
         "image": contract.ImageRef("registry.example/scmle-svc", IMAGE),
         "bundle": contract.BundleRef("churn", "v3", BUNDLE, True),
-        "resources": contract.Resources(0.5, 1.0, 256, 512),
+        "resources": resources(0.5, 1.0, 256, 512),
         "config": {"PORT": "8000", "SCMLE_ENV": "staging"},
         "secrets": (
             contract.SecretRef("SCMLE_SIGNING_KEY", "env", "SIGNING_KEY_SRC"),
@@ -48,7 +54,7 @@ class FakeAdapter(contract.Provider):
             "spec_digest": spec.digest(),
             "image_digest": spec.image.digest,
             "bundle_digest": spec.bundle.digest,
-            "model_version": spec.bundle.model_version,
+            "model_version": spec.bundle.version,
             "ready": True,
             "secret_names": tuple(s.name for s in spec.secrets),
         }
@@ -72,7 +78,9 @@ def test_a_spec_round_trips_and_has_a_stable_digest():
 def test_the_digest_changes_with_any_field():
     spec = make_spec()
     other = make_spec(
-        resources=dataclasses.replace(spec.resources, memory_limit_mb=1024)
+        resources=dataclasses.replace(
+            spec.resources, limits=contract.Quota(1.0, 1024)
+        )
     )
     assert other.digest() != spec.digest()
 
@@ -138,16 +146,16 @@ def test_production_refuses_trusted_loading_and_unsigned_bundles():
 
 
 def test_resources_need_limits_above_requests_and_isolation():
-    with pytest.raises(errors.ConfigError, match="cpu_limit"):
-        contract.Resources(1.0, 0.5, 256, 512)
-    with pytest.raises(errors.ConfigError, match="memory_limit_mb"):
-        contract.Resources(0.5, 1.0, 512, 256)
+    with pytest.raises(errors.ConfigError, match=r"limits\.cpu"):
+        resources(1.0, 0.5, 256, 512)
+    with pytest.raises(errors.ConfigError, match=r"limits\.memory"):
+        resources(0.5, 1.0, 512, 256)
     with pytest.raises(errors.ConfigError, match="read-only"):
-        contract.Resources(0.5, 1.0, 256, 512, read_only_root=False)
+        resources(0.5, 1.0, 256, 512, immutable=False)
     with pytest.raises(errors.ConfigError, match="positive"):
-        contract.Resources(0.0, 1.0, 256, 512)
+        resources(0.0, 1.0, 256, 512)
     with pytest.raises(errors.ConfigError, match="positive"):
-        contract.Resources(True, 1.0, 256, 512)
+        resources(True, 1.0, 256, 512)
 
 
 def test_health_needs_distinct_endpoints_and_sane_timing():
@@ -156,7 +164,7 @@ def test_health_needs_distinct_endpoints_and_sane_timing():
     with pytest.raises(errors.ConfigError, match="start with"):
         contract.Probes("livez", "/readyz")
     with pytest.raises(errors.ConfigError, match="period"):
-        contract.Probes(period_seconds=1.0, timeout_seconds=2.0)
+        contract.Probes(period=1.0, timeout=2.0)
 
 
 def test_other_spec_formats_are_refused():

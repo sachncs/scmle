@@ -10,6 +10,7 @@ import numpy
 import pytest
 
 from scmle.evaluation import parameter_estimation
+from scmle.evaluation.envelope import Counts
 from scmle.evaluation.parameter_estimation import BayesianPrior
 from scmle.evaluation.parameter_estimation import Config
 from scmle.evaluation.parameter_estimation import Estimand
@@ -254,12 +255,10 @@ def test_estimation_fingerprint_binds_raw_feature_outcome_and_clusters():
         clusters=numpy.roll(clusters, 1),
     )
 
-    assert first.raw_input_fingerprint == second.raw_input_fingerprint
-    assert first.raw_input_fingerprint != changed.raw_input_fingerprint
-    assert len(first.raw_input_fingerprint) == 64
-    assert first.to_dict()["raw_input_fingerprint"] == (
-        first.raw_input_fingerprint
-    )
+    assert first.digests["frame"] == second.digests["frame"]
+    assert first.digests["frame"] != changed.digests["frame"]
+    assert len(first.digests["frame"]) == 64
+    assert first.to_dict()["digests"]["frame"] == (first.digests["frame"])
 
 
 def test_clustered_covariance_and_shift_diagnostics_are_explicit():
@@ -1604,9 +1603,9 @@ def test_complete_case_is_explicit_and_reject_is_fail_closed():
         estimand,
         Config(estimator="linear", missing="complete_case"),
     )
-    assert result.rows_input == 6
-    assert result.rows_used == 5
-    assert result.rows_dropped == 1
+    assert result.rows.received == 6
+    assert result.rows.used == 5
+    assert result.rows.dropped == 1
 
 
 def test_estimation_validates_vector_and_cluster_shapes_before_fitting():
@@ -1721,9 +1720,7 @@ def test_report_persistence_is_atomic_and_digest_bound(tmp_path):
 
     restored = Estimation.read(path)
     assert digest == result.digest() == restored.digest()
-    path.write_text(
-        path.read_text().replace('"rows_used": 40', '"rows_used": 39')
-    )
+    path.write_text(path.read_text().replace('"used": 40', '"used": 39'))
     with pytest.raises(ValueError, match="digest mismatch"):
         Estimation.read(path)
 
@@ -1756,26 +1753,12 @@ def test_parameter_report_rejects_inconsistent_shape_and_row_accounting():
             policy,
             (parameter,),
             ((1.0, 0.0), (0.0, 1.0)),
-            2,
-            2,
-            0,
+            Counts(2, 2, 0),
             {},
             {},
             {},
-            "0" * 64,
+            {"frame": "0" * 64},
         )
 
-    with pytest.raises(ValueError, match="row accounting"):
-        Estimation(
-            estimand,
-            policy,
-            (parameter,),
-            ((1.0,),),
-            2,
-            1,
-            0,
-            {},
-            {},
-            {},
-            "0" * 64,
-        )
+    with pytest.raises(ValueError, match="reconcile"):
+        Counts(2, 1, 0)

@@ -70,8 +70,8 @@ def shifts(
     for index, row in ordered[:MAX_FEATURE_ROWS]:
         checks.append(
             qualification.Check(
-                check_id=f"{FEATURE_SHIFT_ID}:{row.column}",
-                null_hypothesis=f"'{row.column}' has the same distribution "
+                identifier=f"{FEATURE_SHIFT_ID}:{row.column}",
+                null=f"'{row.column}' has the same distribution "
                 "in the exploration rows and the reference sample",
                 statistic=row.statistic,
                 p_value=row.p_value,
@@ -83,8 +83,8 @@ def shifts(
                     if row.rejected
                     else qualification.Decision.PASS
                 ),
-                set_id=qualification.Subset.EXPLORATION,
-                seed_path=randomness.seed_path(seed, FEATURE_SHIFT_ID, index),
+                subset=qualification.Subset.EXPLORATION,
+                seeds=randomness.seed_path(seed, FEATURE_SHIFT_ID, index),
                 tier=qualification.Tier.UNVERIFIED,
             )
         )
@@ -126,7 +126,7 @@ def gather(
     return tuple(
         (source, check)
         for source, check in out
-        if check.set_id is qualification.Subset.EXPLORATION
+        if check.subset is qualification.Subset.EXPLORATION
     )
 
 

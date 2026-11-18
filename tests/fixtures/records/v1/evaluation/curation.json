@@ -1,0 +1,23 @@
+{
+  "content_digest": "8c5d1e056ed0705844a02301f7491fc65f1294f81399aa72a2766570c8fff52a",
+  "curation": {
+    "dataset_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "modality": "text",
+    "sample_count": 3
+  },
+  "dataset_card": {
+    "dataset_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "intended_use": "fixture",
+    "sample_count": 3
+  },
+  "dataset_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "modality": "text",
+  "path": "run/modality_curation.json",
+  "record_type": "modality_curation",
+  "sample_count": 3,
+  "schema_version": 1,
+  "signature": {
+    "algorithm": "hmac-sha256",
+    "value": "964296fcb0b73195a5b5f32c7cd18f0ffb471c6eead1aa1af5c5139dcdd756c7"
+  }
+}

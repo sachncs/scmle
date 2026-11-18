@@ -75,7 +75,7 @@ def test_cancelled_run_resumes_and_reuses_completed_trials(
     project.orchestrator.registry = registry
     canceller.orchestrator = project.orchestrator
     plan = dataclasses.replace(
-        project.plan(), candidate_models=("dummy", "canceller", "counted")
+        project.plan(), candidates=("dummy", "canceller", "counted")
     )
 
     with pytest.raises(errors.CancelledError) as caught:
@@ -171,8 +171,8 @@ def test_tracking_database_records_runs_trials_and_lineage(
     runs = store.runs()
     assert len(runs) == 2 and {r["state"] for r in runs} == {"COMPLETED"}
     row = next(r for r in runs if r["run_id"] == first.run_id)
-    assert row["dataset_id"] == first.profile.manifest.dataset_id
-    assert row["data_hash"] == first.profile.manifest.data_hash
+    assert row["dataset_id"] == first.profile.manifest.identifier
+    assert row["data_hash"] == first.profile.manifest.digests["data"]
     assert row["split_fingerprint"] == first.evaluation["split_fingerprint"]
     assert row["selected_model"] == first.selected_model
     assert json.loads(row["test_metrics"])["roc_auc"] == pytest.approx(
@@ -228,7 +228,7 @@ def test_resume_refuses_checkpoints_computed_on_different_data(
     project.orchestrator.registry = registry
     canceller.orchestrator = project.orchestrator
     plan = dataclasses.replace(
-        project.plan(), candidate_models=("dummy", "canceller")
+        project.plan(), candidates=("dummy", "canceller")
     )
     with pytest.raises(errors.CancelledError) as caught:
         project.run(plan)

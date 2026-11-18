@@ -16,8 +16,8 @@ def committed():
 
 
 def test_policy_is_the_pre_declared_one():
-    assert f5.POLICY.recall_floor == 0.80
-    assert f5.POLICY.false_alarm_ceiling == 0.05
+    assert f5.POLICY.recall == 0.80
+    assert f5.POLICY.alarms == 0.05
     assert f5.POLICY.confidence == 0.95
     assert set(f5.ROW_SEEDS).isdisjoint(range(100, 200))
 
@@ -25,12 +25,10 @@ def test_policy_is_the_pre_declared_one():
 def test_committed_certificates_are_current_and_consistent(committed):
     assert f5.problems(committed) == []
     assert f5.audit_problems(committed) == []
-    assert {c.detector_id for c in committed.certificates} == set(
-        registry.SPECS
-    )
+    assert {c.detector for c in committed.certificates} == set(registry.SPECS)
     for item in committed.certificates:
-        types = {o.certificate.defect_type for o in item.outcomes}
-        assert types == set(registry.SPECS[item.detector_id].defect_types)
+        types = {o.certificate.defect for o in item.outcomes}
+        assert types == set(registry.SPECS[item.detector].defect_types)
 
 
 def test_committed_certificates_meet_the_planted_count_requirement(committed):
@@ -55,7 +53,7 @@ def test_certify_all_is_deterministic_and_certifies_row_detectors():
     first = f5.certify_all(seeds=(0,), only=["f5-sentinel", "f5-duplicates"])
     second = f5.certify_all(seeds=(0,), only=["f5-sentinel", "f5-duplicates"])
     assert first.certificates == second.certificates
-    assert {c.detector_id for c in first.certificates} == {
+    assert {c.detector for c in first.certificates} == {
         "f5-sentinel",
         "f5-duplicates",
     }
@@ -67,10 +65,10 @@ def test_certify_all_is_deterministic_and_certifies_row_detectors():
 def test_missingness_certificate_counts_replicates():
     frame = standins.demo_frame()
     certificate = f5.certify_missingness(frame, seeds=(0, 1, 2))
-    assert certificate.detector_id == "f5-missingness"
+    assert certificate.detector == "f5-missingness"
     for outcome in certificate.outcomes:
         assert outcome.certificate.planted == 3
-        assert outcome.certificate.clean_rows == 3
+        assert outcome.certificate.clean == 3
         assert outcome.certificate.detected == 3
     assert certificate.policy == f5.POLICY
 

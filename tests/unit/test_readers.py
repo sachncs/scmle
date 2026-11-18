@@ -116,8 +116,8 @@ def test_manifest_deterministic_and_input_immutable(frame):
     pandas.testing.assert_frame_equal(frame, before)
     changed = frame.assign(a=[9, 2, 3])
     changed_manifest = tabular.manifested(changed, "y")
-    assert changed_manifest.data_hash != first.data_hash
-    assert changed_manifest.schema_hash == first.schema_hash
+    assert changed_manifest.digests["data"] != first.digests["data"]
+    assert changed_manifest.digests["schema"] == first.digests["schema"]
 
 
 def test_manifest_populates_deterministic_snapshot_and_lineage(frame, tmp_path):
@@ -126,15 +126,15 @@ def test_manifest_populates_deterministic_snapshot_and_lineage(frame, tmp_path):
     first = tabular.manifested(frame, "y", path)
     second = tabular.manifested(frame.copy(), "y", path)
 
-    assert first.snapshot_id == second.snapshot_id
-    assert first.snapshot_id.startswith("snap_")
-    assert len(first.snapshot_id) == len("snap_") + 64
-    assert first.source.acquisition_method == "local-file"
+    assert first.snapshot == second.snapshot
+    assert first.snapshot.startswith("snap_")
+    assert len(first.snapshot) == len("snap_") + 64
+    assert first.source.acquisition == "local-file"
     assert first.source.owner == ""
     assert first.source.license == ""
-    assert first.lineage.source_snapshot == first.snapshot_id
-    assert first.lineage.object_hashes["tabular-frame"] == first.data_hash
-    assert first.lineage.object_hashes["raw-source"] == (
+    assert first.lineage.snapshot == first.snapshot
+    assert first.lineage.digests["tabular-frame"] == first.digests["data"]
+    assert first.lineage.digests["raw-source"] == (
         tabular.raw_source_hash(path)
     )
 
@@ -147,12 +147,12 @@ def test_raw_source_hash_changes_snapshot_when_bytes_change(frame, tmp_path):
     path.write_bytes(path.read_bytes() + b"\n")
     second = tabular.manifested(frame, "y", path)
 
-    assert first.data_hash == second.data_hash
+    assert first.digests["data"] == second.digests["data"]
     assert (
-        first.lineage.object_hashes["raw-source"]
-        != (second.lineage.object_hashes["raw-source"])
+        first.lineage.digests["raw-source"]
+        != (second.lineage.digests["raw-source"])
     )
-    assert first.snapshot_id != second.snapshot_id
+    assert first.snapshot != second.snapshot
 
 
 def test_snapshot_identity_changes_for_content_schema_and_uri(frame):
@@ -165,15 +165,15 @@ def test_snapshot_identity_changes_for_content_schema_and_uri(frame):
     )
     changed_uri = tabular.manifested(frame, "y", "s3://bucket/other-records")
 
-    assert changed_content.snapshot_id != baseline.snapshot_id
-    assert changed_schema.snapshot_id != baseline.snapshot_id
-    assert changed_uri.snapshot_id != baseline.snapshot_id
+    assert changed_content.snapshot != baseline.snapshot
+    assert changed_schema.snapshot != baseline.snapshot
+    assert changed_uri.snapshot != baseline.snapshot
 
 
 def test_uri_semantics_are_explicit_without_ownership_or_license_claims(frame):
     manifest = tabular.manifested(frame, "y", "s3://bucket/records")
 
-    assert manifest.source.acquisition_method == "s3-uri"
+    assert manifest.source.acquisition == "s3-uri"
     assert manifest.source.owner == ""
     assert manifest.source.license == ""
     assert tabular.semantic("<in-memory>") == "memory"

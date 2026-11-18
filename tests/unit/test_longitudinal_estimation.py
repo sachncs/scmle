@@ -91,7 +91,7 @@ def test_report_round_trip_is_digest_bound_and_atomic(tmp_path) -> None:
     assert digest == result.digest() == restored.digest()
     assert restored.to_dict() == result.to_dict()
     envelope = json.loads(destination.read_text(encoding="utf-8"))
-    envelope["report"]["rows_used"] += 1
+    envelope["report"]["rows"]["used"] += 1
     destination.write_text(json.dumps(envelope), encoding="utf-8")
     with pytest.raises(ValueError, match="digest mismatch"):
         Estimation.read(destination)
@@ -140,8 +140,8 @@ def test_complete_case_policy_records_dropped_rows() -> None:
 
     result = Estimator(make_estimand(), policy).fit(frame)
 
-    assert result.rows_dropped == 1
-    assert result.rows_used == result.rows_input - 1
+    assert result.rows.dropped == 1
+    assert result.rows.used == result.rows.received - 1
     assert result.limitations["missingness"]["policy"] == "complete_case"
 
 

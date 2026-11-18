@@ -63,7 +63,7 @@ def run(tmp_path, *extra):
 
 def test_frame_writes_artifacts_and_an_unsigned_charter(tmp_path):
     # Enforces docs/CLI.md:32.
-    # Enforces docs/ARTIFACTS.md:63.
+    # Enforces docs/ARTIFACTS.md:69.
     inputs(tmp_path)
     assert run(tmp_path, "--cost-model", str(tmp_path / "cost.json")) == 0
     out = tmp_path / "out"
@@ -75,7 +75,7 @@ def test_frame_writes_artifacts_and_an_unsigned_charter(tmp_path):
     }
     loaded = sealing.read_verified(out / "charter.json")
     assert not loaded.signed
-    assert loaded.charter.cost_model is not None
+    assert loaded.charter.costs is not None
     stored = json.loads((out / "framing_draft.json").read_text())
     assert stored["charter_hash"] == loaded.charter_hash
     assert stored["status"] == "issued_with_questions"
@@ -83,7 +83,7 @@ def test_frame_writes_artifacts_and_an_unsigned_charter(tmp_path):
 
 def test_frame_refuses_a_request_naming_a_missing_column(tmp_path):
     # Enforces docs/CLI.md:32.
-    # Enforces docs/ARTIFACTS.md:63.
+    # Enforces docs/ARTIFACTS.md:69.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:22.
     inputs(tmp_path)
     (tmp_path / "request.txt").write_text("Predict `churn_flag`.")
@@ -96,7 +96,7 @@ def test_frame_refuses_a_request_naming_a_missing_column(tmp_path):
 
 
 def test_frame_replay_without_tau_is_refused(tmp_path):
-    # Enforces docs/ARTIFACTS.md:76.
+    # Enforces docs/ARTIFACTS.md:82.
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:254.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:335.
     inputs(tmp_path)

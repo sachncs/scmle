@@ -1,9 +1,16 @@
-"""The signed modality lifecycle report and its persisted form."""
+"""The signed modality lifecycle report and its persisted form.
+
+Version 3 of the report layout renamed `stage_evidence` to `evidence` and
+nested the dataset hash under `digests`. A report is signed over the layout
+of the version it is stored at, so a version-2 report still verifies after
+it is loaded and is never re-signed.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 import dataclasses
+import functools
 import hmac
 import json
 from pathlib import Path
@@ -12,9 +19,19 @@ from typing import Self
 
 from scmle.contracts import errors
 from scmle.contracts import modalities
+from scmle.contracts import records
 from scmle.contracts import signing
+from scmle.evaluation import envelope
 from scmle.pipeline.modality_lifecycle import constants
 from scmle.pipeline.modality_lifecycle import containers
+
+DATASET = {"digests": {"dataset_hash": "dataset"}}
+MIGRATION = records.Migration(
+    renames={"stage_evidence": "evidence"},
+    change=functools.partial(envelope.fold, groups=DATASET),
+    revert=functools.partial(envelope.unfold, groups=DATASET),
+)
+PREVIOUS = constants.REPORT_SCHEMA_VERSION - 1
 
 
 def rehydrate(
@@ -23,7 +40,7 @@ def rehydrate(
     """Restores the per-stage evidence of a persisted lifecycle report.
 
     Args:
-        raw_stage_evidence: The report's `stage_evidence` entry.
+        raw_stage_evidence: The report's `evidence` entry.
 
     Returns:
         The restored stage evidence, in order.
@@ -33,9 +50,7 @@ def rehydrate(
             stage, evidence links, evidence mapping or notes.
     """
     if not isinstance(raw_stage_evidence, list):
-        raise errors.InputError(
-            "lifecycle report stage_evidence must be a list"
-        )
+        raise errors.InputError("lifecycle report evidence must be a list")
     stage_evidence: list[modalities.Proof] = []
     for item in raw_stage_evidence:
         if not isinstance(item, Mapping):
@@ -159,8 +174,8 @@ class Record:
 
     Attributes:
         modality: Modality value the lifecycle ran for.
-        dataset_hash: Hash identifying the dataset.
-        stage_evidence: Evidence of every required lifecycle stage, in order.
+        digests: The hash identifying the dataset, under `dataset`.
+        evidence: Evidence of every required lifecycle stage, in order.
         evaluation: Held-out evaluation evidence.
         performance: Resource and timing evidence.
         package: Identity of the written model package.
@@ -169,11 +184,13 @@ class Record:
         documentation: Documentation evidence.
         recovery: Recovery and resource evidence.
         signature: SHA-256 signature of the report content, or None if unsigned.
+        schema_version: Version of the layout the report is stored and
+            signed in.
     """
 
     modality: str
-    dataset_hash: str
-    stage_evidence: tuple[modalities.Proof, ...]
+    digests: Mapping[str, str]
+    evidence: tuple[modalities.Proof, ...]
     evaluation: dict[str, object]
     performance: dict[str, object]
     package: containers.Package
@@ -182,6 +199,7 @@ class Record:
     documentation: dict[str, object]
     recovery: dict[str, object]
     signature: str | None = None
+    schema_version: int = constants.REPORT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         """Validates the report identity and optional signature.
@@ -193,35 +211,34 @@ class Record:
         `normalise`.
 
         Raises:
-            ValueError: If the modality or dataset hash is blank, the stage
-                evidence is not every required stage once in order or lacks
-                evidence links, or the signature is not a SHA-256 digest.
+            ValueError: If the modality or dataset hash is blank, the digests
+                are not exactly the dataset's, the schema version is
+                unknown, the stage evidence is not every required stage once
+                in order or lacks evidence links, or the signature is not a
+                SHA-256 digest.
             TypeError: If the package is not a `Package` or the stage
                 evidence holds other objects.
         """
-        for field_name in ("modality", "dataset_hash"):
-            value = getattr(self, field_name)
+        if set(self.digests) != {"dataset"}:
+            raise errors.InputError("digests must hold exactly the dataset")
+        identity: tuple[tuple[str, object], ...] = (
+            ("modality", self.modality),
+            ("digests.dataset", self.digests["dataset"]),
+        )
+        for field_name, value in identity:
             if not isinstance(value, str) or not value.strip():
                 raise errors.InputError(f"{field_name} must not be empty")
+        if self.schema_version not in (
+            PREVIOUS,
+            constants.REPORT_SCHEMA_VERSION,
+        ):
+            raise errors.InputError(
+                "unsupported lifecycle report schema version"
+            )
+        object.__setattr__(self, "digests", dict(self.digests))
         if not isinstance(self.package, containers.Package):
             raise errors.KindError("package must be Package")
-        stages = tuple(self.stage_evidence)
-        if any(
-            not isinstance(evidence, modalities.Proof) for evidence in stages
-        ):
-            raise errors.KindError("stage_evidence must contain Proof records")
-        expected_stages = modalities.REQUIRED_LIFECYCLE_STAGES
-        actual_stages = tuple(evidence.stage for evidence in stages)
-        if actual_stages != expected_stages:
-            raise errors.InputError(
-                "lifecycle report stage evidence must contain every required "
-                "stage exactly once in order"
-            )
-        if any(not evidence.evidenced for evidence in stages):
-            raise errors.InputError(
-                "lifecycle report stages must contain evidence links"
-            )
-        object.__setattr__(self, "stage_evidence", stages)
+        self.order()
         for field_name in (
             "evaluation",
             "performance",
@@ -240,19 +257,41 @@ class Record:
         ):
             raise errors.InputError("signature must be a SHA-256 digest")
 
+    def order(self) -> None:
+        """Checks the stage evidence and freezes it as a tuple.
+
+        Raises:
+            ValueError: If the evidence is not every required stage once in
+                order or a stage lacks evidence links.
+            TypeError: If the evidence holds objects other than `Proof`.
+        """
+        stages = tuple(self.evidence)
+        if any(not isinstance(proof, modalities.Proof) for proof in stages):
+            raise errors.KindError("evidence must contain Proof records")
+        expected_stages = modalities.REQUIRED_LIFECYCLE_STAGES
+        actual_stages = tuple(proof.stage for proof in stages)
+        if actual_stages != expected_stages:
+            raise errors.InputError(
+                "lifecycle report stage evidence must contain every required "
+                "stage exactly once in order"
+            )
+        if any(not proof.evidenced for proof in stages):
+            raise errors.InputError(
+                "lifecycle report stages must contain evidence links"
+            )
+        object.__setattr__(self, "evidence", stages)
+
     def preimage(self) -> dict[str, object]:
         """Builds the exact report content covered by the signature.
 
         Returns:
-            JSON-native mapping of every field except the signature.
+            JSON-native mapping of every field except the signature, laid
+            out as at `schema_version`.
         """
-        return {
-            "schema_version": 2,
+        content: records.Layout = {
             "modality": self.modality,
-            "dataset_hash": self.dataset_hash,
-            "stage_evidence": [
-                evidence.to_dict() for evidence in self.stage_evidence
-            ],
+            "digests": dict(self.digests),
+            "evidence": [proof.to_dict() for proof in self.evidence],
             "evaluation": self.evaluation,
             "performance": self.performance,
             "package": self.package.to_dict(),
@@ -261,6 +300,9 @@ class Record:
             "documentation": self.documentation,
             "recovery": self.recovery,
         }
+        if self.schema_version == PREVIOUS:
+            content = MIGRATION.downgrade(content)
+        return {records.KEY: self.schema_version, **content}
 
     def sign(self, signing_key: str | bytes) -> Self:
         """Signs the report over its exact serialized evidence.
@@ -295,6 +337,10 @@ class Record:
     def from_dict(cls, record: Mapping[str, object]) -> Self:
         """Restores a versioned report without trusting its evidence claims.
 
+        A version-2 report is migrated to the current field names but keeps
+        its stored version, so its signature is checked over the layout it
+        was signed in.
+
         Args:
             record: Mapping produced by `to_dict`.
 
@@ -305,32 +351,44 @@ class Record:
             ValueError: If the schema version is unsupported or any field is
                 missing or has the wrong shape.
         """
-        if record.get("schema_version") != constants.REPORT_SCHEMA_VERSION:
+        version = record.get(records.KEY)
+        if (
+            isinstance(version, bool)
+            or not isinstance(version, int)
+            or version not in (PREVIOUS, constants.REPORT_SCHEMA_VERSION)
+        ):
             raise errors.InputError(
                 "unsupported lifecycle report schema version"
             )
-
-        stage_evidence = rehydrate(record.get("stage_evidence"))
-        package = unpack(record.get("package"))
+        layout = dict(record)
+        del layout[records.KEY]
+        if version == PREVIOUS:
+            layout = MIGRATION.upgrade(layout)
+        evidence = rehydrate(layout.get("evidence"))
+        package = unpack(layout.get("package"))
 
         def pluck(name: str) -> dict[str, object]:
-            value = record.get(name)
+            value = layout.get(name)
             if not isinstance(value, Mapping):
                 raise errors.InputError(
                     f"lifecycle report {name} must be an object"
                 )
             return dict(value)
 
-        signature = unseal(record.get("signature"))
+        signature = unseal(layout.get("signature"))
 
-        modality = record.get("modality")
-        dataset_hash = record.get("dataset_hash")
-        if not isinstance(modality, str) or not isinstance(dataset_hash, str):
+        modality = layout.get("modality")
+        digests = layout.get("digests")
+        if (
+            not isinstance(modality, str)
+            or not isinstance(digests, Mapping)
+            or not isinstance(digests.get("dataset"), str)
+        ):
             raise errors.InputError("lifecycle report identity is invalid")
         return cls(
             modality=modality,
-            dataset_hash=dataset_hash,
-            stage_evidence=stage_evidence,
+            digests=digests,
+            evidence=evidence,
             evaluation=pluck("evaluation"),
             performance=pluck("performance"),
             package=package,
@@ -339,6 +397,7 @@ class Record:
             documentation=pluck("documentation"),
             recovery=pluck("recovery"),
             signature=signature,
+            schema_version=version,
         )
 
     @classmethod

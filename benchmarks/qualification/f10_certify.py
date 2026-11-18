@@ -972,7 +972,7 @@ def confirm_world(kind: str, runs: int, base: int) -> dict[str, Any]:
             "no_interference",
         ),
         strategies=("backdoor_aipw",),
-        negative_controls=(causal.Control("outcome", "nco"),),
+        controls=(causal.Control("outcome", "nco"),),
         strata=("region",),
         sensitivity=causal.Confounding("strongest_observed", 0.2),
     )

@@ -1,0 +1,30 @@
+{
+  "key": "fixture-key",
+  "provenance": {
+    "model": {
+      "manifest_sha256": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+    },
+    "run_id": "run-1",
+    "signature": {
+      "present": true
+    }
+  },
+  "record": {
+    "run_id": "run-1",
+    "schema_version": 1,
+    "signature": {
+      "algorithm": "hmac-sha256",
+      "value": "e534cf853ced7cf38ddd85bcc600448e171d23eb7b8b771baaf070ec15b15919"
+    },
+    "signature_present": true,
+    "subjects": {
+      "model_manifest_sha256": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
+      "provenance_sha256": "a8050772ad002fcb80e1e5925c0c9001bb67840a39078b8dd06e42d38829a1c3",
+      "sbom_sha256": "ff1b2d95440b441b0bcea089c776669531f6bf88861b40c5dceb771820076173"
+    }
+  },
+  "sbom": {
+    "bomFormat": "CycloneDX",
+    "components": []
+  }
+}

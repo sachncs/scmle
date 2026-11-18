@@ -12,15 +12,15 @@ import pytest
 from scmle.governance import review
 
 
-def claim(kind: review.Kind, criterion_id: str) -> review.Recomputation:
+def claim(kind: review.Kind, criterion: str) -> review.Recomputation:
     """Build a deterministic independent claim."""
     return review.Recomputation(
-        criterion_id=criterion_id,
+        criterion=criterion,
         kind=kind,
         passed=True,
         observed="0.91",
         reference=">=0.90",
-        evidence_uri=f"evidence/{criterion_id}.json",
+        uri=f"evidence/{criterion}.json",
         notes="Recomputed from the clean checkout.",
     )
 
@@ -28,12 +28,15 @@ def claim(kind: review.Kind, criterion_id: str) -> review.Recomputation:
 def make_review() -> review.Signoff:
     """Build a complete review fixture."""
     return review.Signoff(
-        release_id="beta-2026-10-20",
-        source_commit="abc1234",
-        clean_clone_digest="sha256:clone",
-        reviewer_id="reviewer@example.com",
-        implementer_ids=("engineer@example.com",),
-        environment_digest="sha256:environment",
+        release="beta-2026-10-20",
+        commit="abc1234",
+        digests={
+            "clone": "sha256:clone",
+            "environment": "sha256:environment",
+            "artifacts": {"wheel": "sha256:wheel", "evidence": "sha256:index"},
+        },
+        reviewer="reviewer@example.com",
+        implementers=("engineer@example.com",),
         commands=("uv run pytest -q", "uv run python -m benchmarks"),
         claims=(
             claim(review.Kind.METRIC, "metric.roc_auc"),
@@ -42,8 +45,7 @@ def make_review() -> review.Signoff:
             claim(review.Kind.RELIABILITY, "reliability.faults"),
             claim(review.Kind.SECURITY, "security.provenance"),
         ),
-        artifact_digests={"wheel": "sha256:wheel", "evidence": "sha256:index"},
-        observed_at="2026-10-20T12:00:00+00:00",
+        observed="2026-10-20T12:00:00+00:00",
         decision=review.Verdict.APPROVED,
     )
 
@@ -162,12 +164,12 @@ def test_review_rejects_conflicted_identity_and_incomplete_evidence():
         review.Signoff.from_dict(
             {
                 **make_review().to_dict(),
-                "implementer_ids": ["reviewer@example.com"],
+                "implementers": ["reviewer@example.com"],
             }
         )
     with pytest.raises(ValueError, match="timezone"):
         review.Signoff.from_dict(
-            {**make_review().to_dict(), "observed_at": "2026-10-20T12:00:00"}
+            {**make_review().to_dict(), "observed": "2026-10-20T12:00:00"}
         )
     with pytest.raises(ValueError, match="duplicate"):
         review.Signoff.from_dict(

@@ -213,7 +213,7 @@ class SelectStage(interface.Stage):
             pipeline.fit(split.dev_features, split.dev_target)
             context.refits[selected.trial_id] = pipeline
         model = scmle.pipeline.context.require(
-            pending.charter.cost_model, "cost_model"
+            pending.charter.costs, "cost_model"
         )
         classes = sorted(pending.view.target.dropna().unique(), key=str)
         return scmle.assurance.framing.claim.Selection(

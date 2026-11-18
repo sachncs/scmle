@@ -14,7 +14,7 @@ from benchmarks.qualification import standins
 from scmle.assurance.detectors import certificates
 from scmle.assurance.detectors import sentinels
 
-POLICY = certificates.Standard(recall_floor=0.5, false_alarm_ceiling=0.1)
+POLICY = certificates.Standard(recall=0.5, alarms=0.1)
 
 
 def under_mutation() -> bool:
@@ -62,12 +62,12 @@ def test_a_detector_that_finds_the_plants_is_certified():
     outcome = result.outcomes[0]
     assert outcome.certificate.planted == 2 * round(0.1 * len(frame))
     assert outcome.certificate.recall == 1.0
-    assert outcome.certificate.false_alarms == 0
+    assert outcome.certificate.alarms == 0
     # Clean rows are counted once even with two seeds (no pseudo-replication).
-    assert outcome.certificate.clean_rows == len(frame)
+    assert outcome.certificate.clean == len(frame)
     assert result.certified_defect_types == ("duplicate_exact",)
     assert result.seeds == (0, 1)
-    assert result.corpus_hash == certificates.corpus_hash(
+    assert result.digests["corpus"] == certificates.corpus_hash(
         [certify.frame_digest(frame)]
     )
 
@@ -175,7 +175,7 @@ def test_editing_a_standin_makes_its_certificate_stale():
 
 def test_the_committed_sample_is_current_for_the_standin_code():
     store = certificates.Store.load(standins.SAMPLE_PATH)
-    assert {c.detector_id for c in store.certificates} == set(standins.STANDINS)
+    assert {c.detector for c in store.certificates} == set(standins.STANDINS)
     problems = standins.sample_problems(store)
     assert problems == []
 
@@ -183,7 +183,7 @@ def test_the_committed_sample_is_current_for_the_standin_code():
 def test_a_sample_with_an_old_code_hash_is_reported():
     store = certificates.Store.load(standins.SAMPLE_PATH)
     document = store.to_dict()
-    document["certificates"][0]["code_hash"] = "0" * 64
+    document["certificates"][0]["digests"]["code"] = "0" * 64
     stale = certificates.Store.from_dict(document)
     assert standins.sample_problems(stale)
 

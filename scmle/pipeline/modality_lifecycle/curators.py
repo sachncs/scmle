@@ -7,6 +7,7 @@ from collections.abc import Callable
 from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
+import functools
 import hmac
 import json
 from pathlib import Path
@@ -18,9 +19,11 @@ from typing import TYPE_CHECKING
 
 from scmle.contracts import errors
 from scmle.contracts import modalities
+from scmle.contracts import records
 from scmle.contracts import signing
 from scmle.data.modalities import curation
 from scmle.data.modalities import document
+from scmle.evaluation import envelope
 from scmle.governance import attestation
 from scmle.pipeline.modality_lifecycle import constants
 from scmle.pipeline.modality_lifecycle import containers
@@ -32,95 +35,166 @@ if TYPE_CHECKING:
     from scmle.explainability import quality
 
 
+DATASET = {"digests": {"dataset_hash": "dataset"}}
+MIGRATION = records.Migration(
+    renames={"sample_count": "samples", "dataset_card": "card"},
+    change=functools.partial(envelope.fold, groups=DATASET),
+    revert=functools.partial(envelope.unfold, groups=DATASET),
+)
+VERSIONS = (records.ORIGIN, constants.CURATION_SCHEMA_VERSION)
+
+
+def unseal(signature: object) -> str:
+    """Restores the stored signature value of a curation record.
+
+    Args:
+        signature: The record's `signature` entry.
+
+    Returns:
+        The signature value.
+
+    Raises:
+        ValueError: If the entry is missing, names another algorithm or
+            holds a value that is not a SHA-256 digest.
+    """
+    if not isinstance(signature, Mapping):
+        raise errors.InputError("modality curation signature is missing")
+    if signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
+        raise errors.InputError("unsupported modality curation signature")
+    value = signature.get("value")
+    if not isinstance(value, str) or not containers.hashlike(value):
+        raise errors.InputError("modality curation signature is invalid")
+    return value
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Curation:
     """Signed curation evidence for a dataset without a model claim.
 
     ``content_digest`` is the SHA-256 digest of the canonical unsigned
     evidence. It is deliberately independent of the signing key so that
-    consumers can compare curation content across attestations.
+    consumers can compare curation content across attestations, and it is
+    anchored at schema version 1: it is computed over the evidence as
+    version 1 laid it out, whatever version the record is stored at. The
+    signature covers the layout of the version the record is stored at, so
+    a version-1 record still verifies after it is loaded.
 
     Attributes:
         modality: Modality value of the dataset.
-        dataset_hash: Hash identifying the dataset.
-        sample_count: Number of samples curated; non-negative.
+        digests: The hash identifying the dataset, under `dataset`.
+        samples: Number of samples curated; non-negative.
         curation: Curation report evidence as a JSON-native mapping.
-        dataset_card: Dataset card evidence as a JSON-native mapping.
+        card: Dataset card evidence as a JSON-native mapping.
         path: Where the evidence file is written.
         signature: SHA-256 signature of the unsigned evidence.
+        schema_version: Version of the layout the record is stored and
+            signed in.
     """
 
     modality: str
-    dataset_hash: str
-    sample_count: int
+    digests: Mapping[str, str]
+    samples: int
     curation: Mapping[str, object]
-    dataset_card: Mapping[str, object]
+    card: Mapping[str, object]
     path: str
     signature: str
+    schema_version: int = constants.CURATION_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         """Validates curation evidence identity before it is published.
 
         Raises:
-            ValueError: If an identity field is blank, the sample count is not a
-                non-negative integer, the signature is not a SHA-256 digest, or
-                the curation or dataset card disagrees with the modality,
-                dataset hash or sample count.
+            ValueError: If an identity field is blank, the digests are not
+                exactly the dataset's, the sample count is not a
+                non-negative integer, the schema version is unknown, the
+                signature is not a SHA-256 digest, or the curation or
+                dataset card disagrees with the modality, dataset hash or
+                sample count.
         """
-        for field_name in ("modality", "dataset_hash", "path"):
-            value = getattr(self, field_name)
+        if set(self.digests) != {"dataset"}:
+            raise errors.InputError("digests must hold exactly the dataset")
+        identity: tuple[tuple[str, object], ...] = (
+            ("modality", self.modality),
+            ("digests.dataset", self.digests["dataset"]),
+            ("path", self.path),
+        )
+        for field_name, value in identity:
             if not isinstance(value, str) or not value.strip():
                 raise errors.InputError(f"{field_name} must be non-empty")
-        sample_count: object = self.sample_count
+        samples: object = self.samples
         signature: object = self.signature
         if (
-            isinstance(sample_count, bool)
-            or not isinstance(sample_count, int)
-            or sample_count < 0
+            isinstance(samples, bool)
+            or not isinstance(samples, int)
+            or samples < 0
         ):
+            raise errors.InputError("samples must be a non-negative integer")
+        if self.schema_version not in VERSIONS:
             raise errors.InputError(
-                "sample_count must be a non-negative integer"
+                "unsupported modality curation schema version"
             )
         if not isinstance(signature, str) or not containers.hashlike(signature):
             raise errors.InputError("signature must be a SHA-256 digest")
+        self.agree()
+
+    def agree(self) -> None:
+        """Normalises the curation and card and checks they match the record.
+
+        Raises:
+            ValueError: If the curation or dataset card disagrees with the
+                modality, dataset hash or sample count, or is not finite
+                JSON.
+        """
         roundtrip = containers.normalise(self.curation, "curation")
-        normalized_card = containers.normalise(
-            self.dataset_card, "dataset_card"
-        )
+        normalized_card = containers.normalise(self.card, "card")
         for name, record in (
             ("curation", roundtrip),
-            ("dataset_card", normalized_card),
+            ("card", normalized_card),
         ):
             if "modality" in record and record.get("modality") != self.modality:
                 raise errors.InputError(f"{name} does not match modality")
-            if record.get("dataset_hash") != self.dataset_hash:
+            if record.get("dataset_hash") != self.digests["dataset"]:
                 raise errors.InputError(f"{name} does not match dataset_hash")
-            if record.get("sample_count") != self.sample_count:
+            if record.get("sample_count") != self.samples:
                 raise errors.InputError(f"{name} does not match sample_count")
+        object.__setattr__(self, "digests", dict(self.digests))
         object.__setattr__(self, "curation", roundtrip)
-        object.__setattr__(self, "dataset_card", normalized_card)
+        object.__setattr__(self, "card", normalized_card)
+
+    def layout(self, version: int) -> records.Layout:
+        """Builds the unsigned evidence laid out as at a schema version.
+
+        Args:
+            version: 1 or the current version.
+
+        Returns:
+            JSON-native mapping of the version, record type, identity,
+            curation and dataset card.
+        """
+        content: records.Layout = {
+            "record_type": "modality_curation",
+            "modality": self.modality,
+            "digests": dict(self.digests),
+            "samples": self.samples,
+            "curation": dict(self.curation),
+            "card": dict(self.card),
+        }
+        if version == records.ORIGIN:
+            content = MIGRATION.downgrade(content)
+        return {records.KEY: version, **content}
 
     def preimage(self) -> dict[str, object]:
         """Builds the exact curation content covered by the signature.
 
         Returns:
-            JSON-native mapping of the record type, identity, curation and
-            dataset card.
+            The unsigned evidence laid out as at `schema_version`.
         """
-        return {
-            "schema_version": constants.CURATION_SCHEMA_VERSION,
-            "record_type": "modality_curation",
-            "modality": self.modality,
-            "dataset_hash": self.dataset_hash,
-            "sample_count": self.sample_count,
-            "curation": dict(self.curation),
-            "dataset_card": dict(self.dataset_card),
-        }
+        return self.layout(self.schema_version)
 
     @property
     def content_digest(self) -> str:
-        """The deterministic digest of the unsigned evidence."""
-        return attestation.checksum(self.preimage())
+        """The deterministic digest of the unsigned evidence at version 1."""
+        return attestation.checksum(self.layout(records.ORIGIN))
 
     def verify_signature(self, signing_key: str | bytes) -> bool:
         """Checks the persisted curation signature.
@@ -140,8 +214,9 @@ class Curation:
         """Converts the result to JSON-native curation evidence.
 
         Returns:
-            The unsigned content plus the content digest, path and a `signature`
-            entry holding the algorithm and value.
+            The unsigned content, laid out as at `schema_version`, plus the
+            content digest, path and a `signature` entry holding the
+            algorithm and value.
         """
         record = self.preimage()
         record["content_digest"] = self.content_digest
@@ -156,6 +231,10 @@ class Curation:
     def from_dict(cls, record: Mapping[str, object]) -> Self:
         """Restores a curation result without trusting its signature claim.
 
+        A version-1 record is migrated to the current field names but keeps
+        its stored version, so its signature is checked over the layout it
+        was signed in.
+
         Args:
             record: Mapping produced by `to_dict`.
 
@@ -167,49 +246,47 @@ class Curation:
                 signature or content digest is unsupported, malformed or does
                 not match.
         """
-        if record.get("schema_version") != constants.CURATION_SCHEMA_VERSION:
+        version = record.get(records.KEY)
+        if (
+            isinstance(version, bool)
+            or not isinstance(version, int)
+            or version not in VERSIONS
+        ):
             raise errors.InputError(
                 "unsupported modality curation schema version"
             )
-        if record.get("record_type") != "modality_curation":
+        layout = dict(record)
+        del layout[records.KEY]
+        if version == records.ORIGIN:
+            layout = MIGRATION.upgrade(layout)
+        if layout.get("record_type") != "modality_curation":
             raise errors.InputError("invalid modality curation record type")
-        modality = record.get("modality")
-        dataset_hash = record.get("dataset_hash")
-        path = record.get("path")
-        sample_count = record.get("sample_count")
-        if not all(
+        modality = layout.get("modality")
+        digests = layout.get("digests")
+        path = layout.get("path")
+        samples = layout.get("samples")
+        if not isinstance(digests, Mapping) or not all(
             isinstance(value, str) and value.strip()
-            for value in (modality, dataset_hash, path)
+            for value in (modality, digests.get("dataset"), path)
         ):
             raise errors.InputError("modality curation identity is invalid")
-        if isinstance(sample_count, bool) or not isinstance(sample_count, int):
-            raise errors.InputError("modality curation sample_count is invalid")
-        curation = record.get("curation")
-        dataset_card = record.get("dataset_card")
-        if not isinstance(curation, Mapping) or not isinstance(
-            dataset_card, Mapping
-        ):
+        if isinstance(samples, bool) or not isinstance(samples, int):
+            raise errors.InputError("modality curation samples is invalid")
+        evidence = layout.get("curation")
+        card = layout.get("card")
+        if not isinstance(evidence, Mapping) or not isinstance(card, Mapping):
             raise errors.InputError("modality curation evidence is invalid")
-        signature = record.get("signature")
-        if not isinstance(signature, Mapping):
-            raise errors.InputError("modality curation signature is missing")
-        if signature.get("algorithm") != signing.SIGNATURE_ALGORITHM:
-            raise errors.InputError("unsupported modality curation signature")
-        signature_value = signature.get("value")
-        if not isinstance(signature_value, str) or not containers.hashlike(
-            signature_value
-        ):
-            raise errors.InputError("modality curation signature is invalid")
         result = cls(
             modality=cast("str", modality),
-            dataset_hash=cast("str", dataset_hash),
-            sample_count=sample_count,
-            curation=curation,
-            dataset_card=dataset_card,
+            digests=cast("Mapping[str, str]", digests),
+            samples=samples,
+            curation=evidence,
+            card=card,
             path=cast("str", path),
-            signature=signature_value,
+            signature=unseal(layout.get("signature")),
+            schema_version=version,
         )
-        content_digest = record.get("content_digest")
+        content_digest = layout.get("content_digest")
         if content_digest is not None:
             result.attest(content_digest)
         return result

@@ -41,9 +41,7 @@ def run(feed, batches, label, rows=40):
 def test_violations_are_counted_ledgered_and_escalate_without_retraining(
     tmp_path,
 ):
-    loop = open_loop(
-        tmp_path, make_policy(coverage_target=0.9, alarm_gates_retrain=False)
-    )
+    loop = open_loop(tmp_path, make_policy(coverage=0.9, retrain=False))
     feed = uncertainty_feed.UncertaintyFeed(loop, StubBundle(), 0.9)
 
     violations = run(feed, 30, "z")
@@ -59,13 +57,11 @@ def test_violations_are_counted_ledgered_and_escalate_without_retraining(
     assert "coverage_below_nominal" in actions
     kinds = {r["kind"] for r in loop.ledger.rows}
     assert "retrain" not in kinds
-    assert loop.policy.alarm_gates_retrain is False
+    assert loop.policy.retrain is False
 
 
 def test_covered_cases_raise_no_coverage_escalation(tmp_path):
-    loop = open_loop(
-        tmp_path, make_policy(coverage_target=0.9, alarm_gates_retrain=False)
-    )
+    loop = open_loop(tmp_path, make_policy(coverage=0.9, retrain=False))
     feed = uncertainty_feed.UncertaintyFeed(loop, StubBundle(), 0.9)
 
     assert run(feed, 30, "a") == 0
@@ -75,7 +71,7 @@ def test_covered_cases_raise_no_coverage_escalation(tmp_path):
 
 
 def test_set_size_and_novelty_go_to_the_loop(tmp_path):
-    loop = open_loop(tmp_path, make_policy(alarm_gates_retrain=False))
+    loop = open_loop(tmp_path, make_policy(retrain=False))
     bundle = StubBundle()
     bundle.novelty = types.SimpleNamespace(
         score=lambda f: pandas.DataFrame(
@@ -94,7 +90,7 @@ def test_set_size_and_novelty_go_to_the_loop(tmp_path):
 
 
 def test_labels_of_unserved_cases_and_bad_nominals_are_refused(tmp_path):
-    loop = open_loop(tmp_path, make_policy(alarm_gates_retrain=False))
+    loop = open_loop(tmp_path, make_policy(retrain=False))
     feed = uncertainty_feed.UncertaintyFeed(loop, StubBundle(), 0.9)
     with pytest.raises(errors.ScmleError, match="did not serve"):
         feed.mature({"ghost": "a"}, {})

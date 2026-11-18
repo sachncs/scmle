@@ -144,5 +144,5 @@ def test_no_null_world_of_the_certification_was_flagged(kind):
     assert document["suspect_false_alarms"] == 0
     assert document["null_replicates"] == 1000
     for outcome in cert.outcomes:
-        assert outcome.certificate.false_alarms == 0
-        assert outcome.certificate.clean_rows == 1000
+        assert outcome.certificate.alarms == 0
+        assert outcome.certificate.clean == 1000

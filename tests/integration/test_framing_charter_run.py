@@ -11,7 +11,7 @@ from tests.integration.test_charter_run import run
 def test_a_charter_run_writes_a_descriptive_framing_link(
     binary_frame, tmp_path
 ):
-    # Enforces docs/ARTIFACTS.md:40.
+    # Enforces docs/ARTIFACTS.md:46.
     result = run(binary_frame, tmp_path, inscribe(tmp_path))
     folder = pathlib.Path(result.run_dir)
 

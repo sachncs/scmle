@@ -401,26 +401,26 @@ def test_an_issued_claim_carries_every_check_and_the_claim_fields():
     assert report.endpoints == (lo, hi)
     assert report.p_value == max(lo.p_value, hi.p_value)
     first, second = report.checks
-    assert first.check_id == "baseline:delta@t=0.1000"
-    assert second.check_id == "baseline:delta@t=0.4000"
-    assert first.null_hypothesis == "Delta(t) <= 0 at t = 0.1000"
-    assert second.null_hypothesis == "Delta(t) <= 0 at t = 0.4000"
-    assert first.seed_path == (7, "framing.baseline", 0)
-    assert second.seed_path == (7, "framing.baseline", 1)
+    assert first.identifier == "baseline:delta@t=0.1000"
+    assert second.identifier == "baseline:delta@t=0.4000"
+    assert first.null == "Delta(t) <= 0 at t = 0.1000"
+    assert second.null == "Delta(t) <= 0 at t = 0.4000"
+    assert first.seeds == (7, "framing.baseline", 0)
+    assert second.seeds == (7, "framing.baseline", 1)
     assert first.p_value == lo.p_value and first.effect == lo.mean
     assert first.n == lo.n == 120
     assert first.interval is None
-    assert first.set_id is qualification.Subset.CONFIRMATION
+    assert first.subset is qualification.Subset.CONFIRMATION
     assert first.tier is qualification.Tier.CONFIRMED
     assert first.decision is qualification.Decision.WARN
     assert first.statistic == lo.statistic
     claim = report.claim
-    assert claim.claim_id == "baseline_vs_current_process"
+    assert claim.identifier == "baseline_vs_current_process"
     assert claim.statement == (
         "net benefit of the model exceeds net benefit of the current process "
         "over thresholds [0.1000, 0.4000]"
     )
-    assert claim.check_ids == (first.check_id, second.check_id)
+    assert claim.checks == (first.identifier, second.identifier)
     assert claim.adjusted_p_value == report.p_value
     assert claim.effect == min(lo.mean, hi.mean)
     assert claim.tier is qualification.Tier.CONFIRMED
@@ -444,10 +444,10 @@ def test_the_report_document_states_the_guarantee():
     assert [e["clusters"] for e in document["endpoints"]] == [30, 30]
     assert document["selective_labels"] == report.selectivity.to_dict()
     assert document["registration_hash"] == g.registration.registration_hash
-    assert [c["check_id"] for c in document["checks"]] == [
-        c.check_id for c in report.checks
+    assert [c["identifier"] for c in document["checks"]] == [
+        c.identifier for c in report.checks
     ]
-    assert document["claim"]["claim_id"] == baseline.CLAIM_ID
+    assert document["claim"]["identifier"] == baseline.CLAIM_ID
     assert document["guarantee"] == (
         "Pr(claim | no true gain at some t in the range) <= alpha under "
         "independent C, read once, a rule frozen on X and outcomes observed "
@@ -471,7 +471,7 @@ def test_no_gain_is_not_shown_and_the_checks_pass():
     assert report.p_value == 0.5
     assert report.claim.effect == 0.0
     assert report.claim.tier is qualification.Tier.UNVERIFIED
-    assert report.claim.check_ids == (
+    assert report.claim.checks == (
         "baseline:delta@t=0.1000",
         "baseline:delta@t=0.4000",
     )
@@ -518,7 +518,7 @@ def test_too_few_clusters_are_reported_with_the_count_and_the_minimum():
     )
     assert report.endpoints == () and report.checks == ()
     assert report.p_value is None
-    assert report.claim.check_ids == ("baseline:not_computed",)
+    assert report.claim.checks == ("baseline:not_computed",)
     assert report.claim.adjusted_p_value is None
     assert report.claim.effect == 0.0
     assert report.claim.tier is qualification.Tier.UNVERIFIED
@@ -593,7 +593,7 @@ def test_the_input_tier_is_kept_only_when_the_claim_is_issued():
 def test_the_default_seed_is_zero():
     y, a, b, cluster = world(30)
     report = run(guard(), y, a, b, cluster)
-    assert report.checks[0].seed_path == (0, "framing.baseline", 0)
+    assert report.checks[0].seeds == (0, "framing.baseline", 0)
 
 
 def test_the_default_input_tier_is_confirmed():

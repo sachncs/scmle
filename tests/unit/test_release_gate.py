@@ -23,23 +23,25 @@ def test_the_recorded_staging_responses_pass_every_live_check():
     results = support_release.run_live()
     assert [r.name for r in results] == list(livetests.CHECK_NAMES)
     assert all(r.passed for r in results), [r.problems for r in results]
-    assert all(r.source_commit == support_release.COMMIT for r in results)
-    assert all(r.evidence_digest.startswith("sha256:") for r in results)
+    assert all(r.commit == support_release.COMMIT for r in results)
+    assert all(r.digests["evidence"].startswith("sha256:") for r in results)
 
 
 def test_the_evidence_digest_is_repeatable_and_tracks_the_exchange():
     first = named(support_release.run_live())
     again = named(support_release.run_live())
-    assert {k: v.evidence_digest for k, v in first.items()} == {
-        k: v.evidence_digest for k, v in again.items()
+    assert {k: v.digests["evidence"] for k, v in first.items()} == {
+        k: v.digests["evidence"] for k, v in again.items()
     }
     document = support_release.recorded()
     for item in document["exchanges"]:
         if item["path"] == "/livez":
             item["body"] = {"status": "alive", "uptime": 1}
     changed = named(support_release.run_live(document))
-    assert changed["health"].evidence_digest != first["health"].evidence_digest
-    assert changed["schema"].evidence_digest == first["schema"].evidence_digest
+    health = changed["health"].digests["evidence"]
+    assert health != first["health"].digests["evidence"]
+    schema = changed["schema"].digests["evidence"]
+    assert schema == first["schema"].digests["evidence"]
 
 
 def mutate(path, method, auth, **fields):
@@ -183,12 +185,12 @@ def test_a_complete_staging_release_is_admitted_and_certified_with_a_record():
     assert decision.allowed and decision.reasons == ()
     record = decision.record
     assert record.verify(support_release.KEY)
-    assert (record.source_commit, record.container_digest) == (
+    assert (record.commit, record.digests["container"]) == (
         support_release.COMMIT,
         support_release.CONTAINER,
     )
-    assert record.model_digest == candidate.model_digest
-    assert record.config_digest == support_release.CONFIG
+    assert record.digests["model"] == candidate.model_digest
+    assert record.digests["config"] == support_release.CONFIG
     assert record.approver == "release-manager"
     assert set(dict(record.evidence)) == set(livetests.CHECK_NAMES)
     assert record.revision == "serve:12"
@@ -209,13 +211,17 @@ def test_a_record_round_trips_and_detects_tampering(tmp_path):
 def test_a_record_refuses_malformed_fields():
     record = support_release.staging_record()
     with pytest.raises(errors.ConfigError):
-        dataclasses.replace(record, source_commit="abc123")
+        dataclasses.replace(record, commit="abc123")
     with pytest.raises(errors.ConfigError):
-        dataclasses.replace(record, container_digest="repo:latest")
+        dataclasses.replace(
+            record, digests={**record.digests, "container": "repo:latest"}
+        )
     with pytest.raises(errors.ConfigError):
         dataclasses.replace(record, environment="local")
     with pytest.raises(errors.ConfigError):
-        scmle.deploy.record.Record.from_dict({**record.to_dict(), "format": 9})
+        scmle.deploy.record.Record.from_dict(
+            {**record.to_dict(), "schema_version": 9}
+        )
 
 
 def refused(candidate, expected, certify=False):
@@ -347,13 +353,21 @@ def test_a_failed_live_check_blocks_the_record(name):
 def test_evidence_from_another_build_is_refused():
     full = support_release.candidate("staging")
     for field, value in (
-        ("source_commit", "0" * 40),
-        ("container_digest", support_release.OTHER_CONTAINER),
+        ("commit", "0" * 40),
+        ("container", support_release.OTHER_CONTAINER),
         ("environment", "production"),
-        ("model_digest", "sha256:" + "5" * 64),
+        ("model", "sha256:" + "5" * 64),
     ):
         stale = tuple(
-            dataclasses.replace(c, **{field: value}) for c in full.checks
+            dataclasses.replace(
+                c,
+                **(
+                    {field: value}
+                    if field in ("commit", "environment")
+                    else {"digests": {**c.digests, field: value}}
+                ),
+            )
+            for c in full.checks
         )
         refused(
             dataclasses.replace(full, checks=stale),
@@ -405,14 +419,19 @@ def test_production_needs_a_matching_signed_staging_record():
     )
     for field, value, expected in (
         (
-            "container_digest",
+            "container",
             support_release.OTHER_CONTAINER,
-            "different container_digest",
+            "different container digest",
         ),
-        ("source_commit", "0" * 40, "different source_commit"),
-        ("model_digest", "sha256:" + "2" * 64, "different model_digest"),
+        ("commit", "0" * 40, "different commit"),
+        ("model", "sha256:" + "2" * 64, "different model digest"),
     ):
-        other = dataclasses.replace(staged, **{field: value}).signed(
+        changes = (
+            {field: value}
+            if field == "commit"
+            else {"digests": {**staged.digests, field: value}}
+        )
+        other = dataclasses.replace(staged, **changes).signed(
             support_release.KEY
         )
         refused(
@@ -446,7 +465,7 @@ def test_a_staging_record_signed_with_another_key_is_refused():
 
 
 def test_every_reason_is_reported_not_only_the_first():
-    # Enforces docs/CLI.md:155.
+    # Enforces docs/CLI.md:156.
     # Enforces docs/GLOSSARY.md:700.
     decision = gate.admit(
         support_release.candidate(

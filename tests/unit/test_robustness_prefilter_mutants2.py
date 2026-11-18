@@ -12,18 +12,18 @@ from scmle.contracts import qualification
 from scmle.runtime import randomness
 
 
-def make_check(check_id, set_id=qualification.Subset.EXPLORATION):
+def make_check(identifier, subset=qualification.Subset.EXPLORATION):
     return qualification.Check(
-        check_id=check_id,
-        null_hypothesis="h",
+        identifier=identifier,
+        null="h",
         statistic=0.5,
         p_value=0.5,
         interval=None,
         effect=0.1,
         n=10,
         decision=qualification.Decision.PASS,
-        set_id=set_id,
-        seed_path=(1, check_id, 0),
+        subset=subset,
+        seeds=(1, identifier, 0),
         tier=qualification.Tier.UNVERIFIED,
     )
 
@@ -87,8 +87,8 @@ def test_a_feature_check_records_the_row_and_the_context():
         types.SimpleNamespace(features=(row,)), rows=33, seed=9
     )
 
-    assert check.check_id == "f6-shift-feature:age"
-    assert check.null_hypothesis == (
+    assert check.identifier == "f6-shift-feature:age"
+    assert check.null == (
         "'age' has the same distribution in the exploration rows and the "
         "reference sample"
     )
@@ -98,7 +98,7 @@ def test_a_feature_check_records_the_row_and_the_context():
     assert check.effect == 0.75
     assert check.n == 33
     assert check.tier is qualification.Tier.UNVERIFIED
-    assert check.seed_path == randomness.seed_path(9, "f6-shift-feature", 0)
+    assert check.seeds == randomness.seed_path(9, "f6-shift-feature", 0)
 
 
 def test_the_cap_keeps_the_first_rejected_columns():
@@ -118,10 +118,10 @@ def test_the_cap_keeps_the_first_rejected_columns():
     )
 
     assert len(checks) == 200
-    assert checks[0].check_id == "f6-shift-feature:c250"
-    assert checks[49].check_id == "f6-shift-feature:c299"
-    assert checks[50].check_id == "f6-shift-feature:c0"
-    assert checks[-1].check_id == "f6-shift-feature:c149"
+    assert checks[0].identifier == "f6-shift-feature:c250"
+    assert checks[49].identifier == "f6-shift-feature:c299"
+    assert checks[50].identifier == "f6-shift-feature:c0"
+    assert checks[-1].identifier == "f6-shift-feature:c149"
 
 
 def test_diagnostics_are_ordered_and_keep_only_exploration_checks():
@@ -159,7 +159,7 @@ def test_diagnostics_are_ordered_and_keep_only_exploration_checks():
     assert rows[0][1] is first
     assert rows[1][1] is c2st
     assert rows[2][1] is mmd
-    assert rows[3][1].check_id == "f6-shift-feature:x"
+    assert rows[3][1].identifier == "f6-shift-feature:x"
     assert rows[3][1].n == 7
 
 
@@ -281,7 +281,7 @@ def test_a_gating_requested_stage_withdraws_the_fragile_survivors():
     assert len(result.diagnostics) == 2
     feature = result.diagnostics[1][1]
     assert feature.n == 12
-    assert feature.seed_path == randomness.seed_path(5, "f6-shift-feature", 0)
+    assert feature.seeds == randomness.seed_path(5, "f6-shift-feature", 0)
 
 
 def test_survivors_without_a_column_are_not_assessed():

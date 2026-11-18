@@ -16,12 +16,12 @@ def run(*arguments):
 
 def policy_file(tmp_path):
     policy = loop.Preregistration(
-        reference_risk=0.1,
+        reference=0.1,
         tolerance=0.05,
-        r_star=0.6,
-        initial_tau=0.5,
-        min_matured=5,
-        outcome_window=0,
+        target=0.6,
+        tau=0.5,
+        matured=5,
+        maturity=0,
         scope="m:s",
     )
     path = tmp_path / "policy.json"
@@ -76,13 +76,13 @@ def test_the_cli_runs_a_batch_through_step_and_a_reply(tmp_path, capsys):
     assert [p["question"]["action"] for p in pending] == ["needs_a_person"]
     answer = deployment_ledger.Attestation.create(
         KEY,
-        escalation_id=pending[0]["id"],
-        question_hash=pending[0]["question_hash"],
+        escalation=pending[0]["id"],
+        digests={"question": pending[0]["question_hash"]},
         decision="approve",
         statement="ok",
         evidence="ticket",
         role="owner",
-        name_or_id="P",
+        attestor="P",
         date="2020-01-01",
         scope="m:s",
         expires="2099-01-01",
@@ -121,13 +121,13 @@ def test_a_refused_reply_and_a_broken_ledger_fail(tmp_path, capsys):
     loop.Loop.resume(deploy).escalate("needs_a_person", {})
     answer = deployment_ledger.Attestation.create(
         KEY,
-        escalation_id="esc-1",
-        question_hash="0" * 64,
+        escalation="esc-1",
+        digests={"question": "0" * 64},
         decision="approve",
         statement="ok",
         evidence="t",
         role="r",
-        name_or_id="n",
+        attestor="n",
         date="2020-01-01",
         scope="m:s",
         expires="2099-01-01",
@@ -152,6 +152,7 @@ def test_a_refused_reply_and_a_broken_ledger_fail(tmp_path, capsys):
 
 
 def test_a_policy_file_needs_only_the_reference_risk():
-    policy = loop.Preregistration.from_dict({"reference_risk": 0.1})
-    assert policy.high_impact_actions == ()
-    assert policy.reference_risk == 0.1
+    policy = loop.Preregistration.from_dict({"reference": 0.1})
+    assert policy.critical == ()
+    assert policy.reference == 0.1
+    assert loop.Preregistration.from_dict({"reference_risk": 0.1}) == policy

@@ -51,8 +51,8 @@ catalog.write("artifacts/orders-catalog.json")
 verified = Catalog.read_verified(
     "artifacts/orders-catalog.json"
 )
-print(verified.content_identity)
-print(verified.release_blockers)
+print(verified.digests["content"])
+print(verified.blockers)
 `}</code></pre>
   <p>The catalog reports shape, ordered schema, sample count, missingness, duplicate rows, explicitly named label state, source governance, limitations, and release blockers. It does not impute, infer a task, decode a modality, choose a split, or claim that the data can be modelled. Treat blockers as review work: missingness and duplicate policy, undeclared labels, source ownership, privacy classification, and modality-specific decoders must be resolved before promotion.</p>
 
@@ -130,23 +130,23 @@ next_batch = connector.read_rows(batch.checkpoint, limit=10_000)`}</code></pre>
   <pre><code>{`from scmle.contracts.data import Passport, Confidentiality, Origin
 
 manifest = Passport(
-    dataset_id="documents-2026-10-21",
-    snapshot_id="approved-export-17",
+    identifier="documents-2026-10-21",
+    snapshot="approved-export-17",
     modality="document",
     task="binary_classification",
-    sample_count=len(dataset.samples),
-    content_hash=dataset.content_hash,
+    samples=len(dataset.samples),
+    digests={"content": dataset.content_hash},
     source=Origin(
         owner="records-team",
-        acquisition_method="approved export",
+        acquisition="approved export",
         license="internal-use",
     ),
     privacy=Confidentiality(
         classification="restricted",
-        contains_pii=True,
-        consent_basis="employment-contract",
-        retention_period="90d",
-        deletion_policy="case-closure",
+        identifying=True,
+        consent="employment-contract",
+        retention="90d",
+        deletion="case-closure",
     ),
 )
 

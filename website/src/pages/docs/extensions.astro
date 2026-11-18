@@ -87,7 +87,7 @@ report = project.run()
 
 assert report.modality == "extension:acme/point-cloud"
 assert report.documentation["status"] == "extension-only"
-assert len(report.stage_evidence) == 15`}</code></pre>
+assert len(report.evidence) == 15`}</code></pre>
   <p>When source, lineage, privacy, and task metadata are available, pass a <code>Passport</code>. The lifecycle rejects a manifest whose content hash or sample count does not match the adapter before modelling begins. Missing governance metadata remains visible as a gap in the dataset card.</p>
 
   <h2>Curate without modelling</h2>
@@ -100,7 +100,7 @@ curation = Curator(
     output_dir="runs/point-cloud-curation",
 ).run()
 
-print(curation.dataset_card["curation"])
+print(curation.card["curation"])
 print(curation.path)
 # No modelling stage was run.`}</code></pre>
   <p>If the family is not ready for a full lifecycle adapter, use <code>ExtensionCurator</code>. It accepts arbitrary caller-owned records and a curation callback, but deliberately has no split, feature, label, or model hooks. The callback must return a report bound to the extension identity, dataset hash, and sample count.</p>

@@ -262,10 +262,11 @@ def test_project_run_rejects_valid_digest_for_tampered_report(
         envelope["report"]["diagnostics"]["data_identity"]["source_uri"] = (
             "tampered"
         )
+        anchored = Estimation.migration.downgrade(envelope["report"])
         envelope["digest"] = hashlib.sha256(
-            json.dumps(
-                envelope["report"], sort_keys=True, separators=(",", ":")
-            ).encode("utf-8")
+            json.dumps(anchored, sort_keys=True, separators=(",", ":")).encode(
+                "utf-8"
+            )
         ).hexdigest()
         path.write_text(json.dumps(envelope), encoding="utf-8")
         return original_read(path)
@@ -412,7 +413,7 @@ def test_complete_case_binds_missingness_and_run_artifact_to_result(tmp_path):
     restored = Estimation.read(artifact)
     assert result.estimation is not None
     assert result.estimation.digest() == restored.digest()
-    assert result.estimation.rows_dropped == 1
+    assert result.estimation.rows.dropped == 1
     assert result.estimation.diagnostics["data_columns"]["outcome"] == (
         "outcome"
     )

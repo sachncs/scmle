@@ -47,10 +47,8 @@ def make_run(tmp_path, withdraw=True, rules=None):
     options = {}
     if rules is not None:
         options = {
-            "rule": rules.ledger_rule,
-            "confirmation_rule": confirm.budget.Correction(
-                rules.confirmation_rule
-            ),
+            "rule": rules.ledger,
+            "confirmation_rule": confirm.budget.Correction(rules.confirmation),
         }
     return governed.run_governed(
         charter=charter,
@@ -96,7 +94,7 @@ def test_a_signed_run_cannot_pass_the_audit_without_its_key(tmp_path):
 
 def test_chartered_rules_are_checked_against_the_ledger(tmp_path):
     rules = scmle.assurance.charter.rules.Procedure(
-        ledger_rule="lord++", confirmation_rule="bh"
+        ledger="lord++", confirmation="bh"
     )
     make_run(tmp_path, rules=rules)
     result = claims_audit.verify(tmp_path, KEY)
@@ -108,7 +106,7 @@ def test_chartered_rules_are_checked_against_the_ledger(tmp_path):
     make_run(other)
     changed = json.loads((other / "analysis_charter.json").read_text())
     changed["charter"]["rules"] = scmle.assurance.charter.rules.Procedure(
-        confirmation_rule="holm"
+        confirmation="holm"
     ).to_dict()
     changed["format"] = 3
     (other / "analysis_charter.json").write_text(json.dumps(changed))
@@ -160,7 +158,9 @@ def test_a_withdrawn_survivor_tested_on_c_is_caught(tmp_path):
 
     def add_check(document):
         withdrawn = next(iter(document["stage_two"]["withdrawn"]))
-        document["checks"].append({"check_id": f"{withdrawn}:C"})
+        document["checks"].append(
+            dict(document["checks"][0], identifier=f"{withdrawn}:C")
+        )
 
     edit_claims(tmp_path, add_check)
     assert (
@@ -233,7 +233,7 @@ def test_list_and_show_report_the_claims(tmp_path):
     assert [r["withdrawn"] for r in rows if r["feature"] == "f1"] == [True]
     detail = claims_audit.inspect(tmp_path, rows[0]["claim_id"])
     assert detail["hypothesis"]["column"] == "f0"
-    assert detail["confirmation_check"]["check_id"].endswith(":C")
+    assert detail["confirmation_check"]["identifier"].endswith(":C")
     assert detail["exploration"]["decision"] == "reject"
     held = claims_audit.inspect(tmp_path, rows[1]["claim_id"])
     assert held["withdrawn"] == "fragile on X"
@@ -260,7 +260,7 @@ def test_the_cli_lists_shows_and_verifies(tmp_path, capsys, monkeypatch):
 
     claim = rows[0]["claim_id"]
     assert cli.main(["claims", "show", str(tmp_path), claim]) == 0
-    assert json.loads(capsys.readouterr().out)["claim"]["claim_id"] == claim
+    assert json.loads(capsys.readouterr().out)["claim"]["identifier"] == claim
 
     assert cli.main(["claims", "verify", str(tmp_path)]) == 0
     assert "8 of 10 steps passed" in capsys.readouterr().out
@@ -377,7 +377,9 @@ def test_showing_a_claim_the_ledger_does_not_know_is_an_artifact_error(
     make_run(tmp_path)
     edit_claims(
         tmp_path,
-        lambda d: d["claims"].append(dict(d["claims"][0], claim_id="h424242")),
+        lambda d: d["claims"].append(
+            dict(d["claims"][0], identifier="h424242")
+        ),
     )
     with pytest.raises(errors.ArtifactError, match="h424242"):
         claims_audit.inspect(tmp_path, "h424242")

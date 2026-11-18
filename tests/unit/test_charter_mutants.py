@@ -34,9 +34,9 @@ ESTIMAND = {
     "kind": "predictive",
     "population": "p",
     "target": "t",
-    "prediction_moment": "m",
-    "intercurrent_events": (contracts.Event("e", "s"),),
-    "summary_measure": "auc",
+    "moment": "m",
+    "intercurrent": (contracts.Event("e", "s"),),
+    "summary": "auc",
 }
 
 
@@ -48,9 +48,7 @@ def test_intercurrent_event_fields_are_named(field):
     )
 
 
-@pytest.mark.parametrize(
-    "field", ["population", "target", "prediction_moment", "summary_measure"]
-)
+@pytest.mark.parametrize("field", ["population", "target", "moment", "summary"])
 def test_estimand_text_fields_are_named(field):
     values = {**ESTIMAND, field: ""}
     assert message(partial(contracts.AnalysisEstimand, **values)) == (
@@ -63,26 +61,26 @@ def test_estimand_events_must_be_a_non_empty_tuple():
         message(
             partial(
                 contracts.AnalysisEstimand,
-                **{**ESTIMAND, "intercurrent_events": []},
+                **{**ESTIMAND, "intercurrent": []},
             )
         )
-        == "intercurrent_events must be a tuple"
+        == "intercurrent must be a tuple"
     )
     assert message(
         partial(
             contracts.AnalysisEstimand,
-            **{**ESTIMAND, "intercurrent_events": ()},
+            **{**ESTIMAND, "intercurrent": ()},
         )
     ) == (
-        "intercurrent_events must not be empty: state a strategy "
+        "intercurrent must not be empty: state a strategy "
         "for each event, or declare 'none' as not applicable"
     )
 
 
-@pytest.mark.parametrize("field", ["check_id", "trigger"])
+@pytest.mark.parametrize("field", ["check", "trigger"])
 def test_decision_row_fields_are_named(field):
     values = {
-        "check_id": "leakage.skill",
+        "check": "leakage.skill",
         "trigger": "t",
         "action": contracts.Edict.QUARANTINE_COLUMN,
         field: " ",
@@ -93,23 +91,18 @@ def test_decision_row_fields_are_named(field):
 
 
 def test_set_sizes_bounds_and_messages():
-    contracts.SetSizes(
-        confirmation_fraction=contracts.MAX_CONFIRMATION_FRACTION
-    )
+    contracts.SetSizes(confirmation=contracts.MAX_CONFIRMATION_FRACTION)
     bound = (
-        "confirmation_fraction must be in (0, "
+        "confirmation must be in (0, "
         f"{contracts.MAX_CONFIRMATION_FRACTION}] so exploration keeps a majority"
     )
     for bad in (0.0, contracts.MAX_CONFIRMATION_FRACTION + 0.01, -0.1):
-        assert (
-            message(partial(contracts.SetSizes, confirmation_fraction=bad))
-            == bound
-        )
-    assert message(
-        partial(contracts.SetSizes, confirmation_fraction=float("nan"))
-    ) == ("confirmation_fraction must be a finite number")
+        assert message(partial(contracts.SetSizes, confirmation=bad)) == bound
+    assert message(partial(contracts.SetSizes, confirmation=float("nan"))) == (
+        "confirmation must be a finite number"
+    )
     assert message(partial(contracts.SetSizes, 0.25, -1)) == (
-        "embargo_rows must be non-negative"
+        "embargo must be non-negative"
     )
 
 
@@ -138,15 +131,15 @@ def test_choice_messages():
         ("question", " ", "question must not be empty"),
         ("unit", " ", "unit must not be empty"),
         (
-            "deployment_population",
+            "population",
             " ",
-            "deployment_population must not be empty",
+            "population must not be empty",
         ),
-        ("gating_checks", [], "gating_checks must be a tuple"),
-        ("decision_map", [], "decision_map must be a tuple"),
+        ("gates", [], "gates must be a tuple"),
+        ("triggers", [], "triggers must be a tuple"),
         ("multiverse", [], "multiverse must be a tuple"),
-        ("min_effect", 0, "min_effect must be greater than 0"),
-        ("k_max", 0, "k_max must be at least 1"),
+        ("effect", 0, "effect must be greater than 0"),
+        ("quota", 0, "quota must be at least 1"),
         ("power", 1.0, "power must be strictly between 0 and 1"),
         ("power", 0.0, "power must be strictly between 0 and 1"),
         ("seed", -1, "seed must be non-negative"),
@@ -157,8 +150,8 @@ def test_charter_fields_are_named_in_their_errors(field, bad, expected):
 
 
 def test_a_single_trial_and_a_seed_of_zero_are_allowed():
-    charter = make_charter(k_max=1, seed=0)
-    assert charter.k_max == 1 and charter.seed == 0
+    charter = make_charter(quota=1, seed=0)
+    assert charter.quota == 1 and charter.seed == 0
 
 
 def test_the_template_is_pinned():
@@ -166,29 +159,29 @@ def test_the_template_is_pinned():
     assert json.loads(json.dumps(template)) == template
     assert template["estimand"]["kind"] == "predictive"
     assert template["sets"] == {
-        "confirmation_fraction": 0.25,
-        "embargo_rows": 0,
+        "confirmation": 0.25,
+        "embargo": 0,
     }
-    assert (template["min_effect"], template["k_max"]) == (0.2, 10)
+    assert (template["effect"], template["quota"]) == (0.2, 10)
     assert (template["power"], template["seed"]) == (0.8, 0)
     assert template["question"] == ""
     assert template["unit"] == ""
-    assert template["deployment_population"] == ""
-    assert template["gating_checks"] == []
-    assert template["decision_map"] == []
+    assert template["population"] == ""
+    assert template["gates"] == []
+    assert template["triggers"] == []
     assert template["multiverse"] == []
     assert set(template) >= {
         "question",
         "estimand",
         "unit",
-        "deployment_population",
-        "gating_checks",
-        "decision_map",
+        "population",
+        "gates",
+        "triggers",
         "sets",
-        "min_effect",
-        "k_max",
+        "effect",
+        "quota",
         "power",
-        "error_budget",
+        "budget",
         "multiverse",
         "seed",
     }
@@ -196,23 +189,21 @@ def test_the_template_is_pinned():
         "kind",
         "population",
         "target",
-        "prediction_moment",
-        "intercurrent_events",
-        "summary_measure",
+        "moment",
+        "intercurrent",
+        "summary",
     }
     assert template["estimand"]["population"] == ""
-    assert template["estimand"]["intercurrent_events"] == []
+    assert template["estimand"]["intercurrent"] == []
 
 
 def test_a_charter_with_and_without_a_cost_model_round_trips():
     plain = make_charter()
-    assert plain.cost_model is None
-    assert (
-        contracts.AnalysisCharter.from_dict(plain.to_dict()).cost_model is None
-    )
-    priced = make_charter(cost_model=cost_model())
+    assert plain.costs is None
+    assert contracts.AnalysisCharter.from_dict(plain.to_dict()).costs is None
+    priced = make_charter(costs=cost_model())
     again = contracts.AnalysisCharter.from_dict(priced.to_dict())
-    assert again.cost_model == cost_model()
+    assert again.costs == cost_model()
     assert again == priced
 
 
@@ -231,7 +222,7 @@ def test_an_attestation_needs_a_column_and_a_finite_lead():
     )
     assert (
         message(partial(attestations.Affidavit, "c", good, float("inf")))
-        == "lead_seconds must be a finite number"
+        == "seconds must be a finite number"
     )
 
 
@@ -241,20 +232,20 @@ def test_the_provenance_record_of_an_attestation_is_exact():
     assert field.name == "copy"
     assert field.origin is provenance.Origin.DERIVED
     assert field.writer == attestations.WRITER
-    assert field.written_at is provenance.Stamp.UNKNOWN
+    assert field.stamp is provenance.Stamp.UNKNOWN
     assert field.overwritten is provenance.Overwritten.UNKNOWN
-    assert field.definition_history == ()
-    assert field.as_of == provenance.Lead(provenance.Cutoff.LAG, 3600.0)
-    assert field.as_of_source is provenance.Provenance.ATTESTED
-    assert field.available_at_serving is provenance.Availability.YES
+    assert field.definitions == ()
+    assert field.lead == provenance.Lead(provenance.Cutoff.LAG, 3600.0)
+    assert field.provenance is provenance.Provenance.ATTESTED
+    assert field.availability is provenance.Availability.YES
     assert field.attestation == item.attestation
 
 
 def test_a_missing_own_field_is_reported_by_name():
     record = attest().to_dict()
-    del record["lead_seconds"]
+    del record["seconds"]
     assert message(partial(attestations.Affidavit.from_dict, record)) == (
-        "missing field(s): ['lead_seconds']"
+        "missing field(s): ['seconds']"
     )
 
 
@@ -275,15 +266,15 @@ def test_load_errors_are_whole_messages(tmp_path):
     path = tmp_path / "a.json"
     path.write_text("[]")
     assert message(partial(attestations.load, path)) == (
-        "attestations must be an object with format_version 1"
+        "attestations must be an object with schema_version 2"
     )
-    path.write_text(json.dumps({"format_version": 1, "attestations": {}}))
+    path.write_text(json.dumps({"schema_version": 2, "attestations": {}}))
     assert message(partial(attestations.load, path)) == (
         "attestations must hold a list under 'attestations'"
     )
     one = attest("a").to_dict()
     path.write_text(
-        json.dumps({"format_version": 1, "attestations": [one, one]})
+        json.dumps({"schema_version": 2, "attestations": [one, one]})
     )
     assert message(partial(attestations.load, path)) == (
         "at most one attestation per column"
@@ -295,7 +286,7 @@ def test_load_errors_are_whole_messages(tmp_path):
 
 def test_every_text_slot_of_the_template_is_empty_and_named():
     estimand = contracts.template()["estimand"]
-    for key in ("population", "target", "prediction_moment", "summary_measure"):
+    for key in ("population", "target", "moment", "summary"):
         assert estimand[key] == "", key
 
 

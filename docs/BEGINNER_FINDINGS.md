@@ -19,7 +19,7 @@ beginner has not tested these pages.
 | 2 | `--group-column nosuch` (also `--time-column`, `--weight-column`) ended in a raw `KeyError` traceback from deep inside the splitter. | A clear `data error: group column 'nosuch' not found; columns: [...]` before the split. |
 | 3 | `scmle resume` on a folder that does not exist printed a Python traceback. | Now `artifact error: run directory not found: ...`, exit 1. |
 | 4 | A malformed `--leakage-attestations` file ended in a traceback (`plan`) or `internal error:` (`run`). | Now `config error: invalid leakage attestations: ...`. |
-| 5 | A loop policy file containing only the one required key, `reference_risk`, failed with `KeyError: 'high_impact_actions'`. | `high_impact_actions` defaults to none. |
+| 5 | A loop policy file containing only the one required key, `reference` (then `reference_risk`), failed with `KeyError: 'high_impact_actions'`. | `critical` (formerly `high_impact_actions`) defaults to none. |
 
 ## Documented, not fixed (a decision is needed)
 
@@ -31,7 +31,7 @@ beginner has not tested these pages.
 | 9 | **Fixed.** `report.html` now opens with the summary and the findings, then the leaderboard; the plan is folded at the bottom. Was: `report.html` begins with the whole plan (about 60 lines of techniques). The leaderboard is below it. | Reading results, "Which file to open first" | Put the result summary first and fold the plan. |
 | 10 | With a short time budget the permutation-importance table is empty (`"truncated": true`), and `result.salience()` returns an empty table. Nothing warns you. On the author's second machine the same 120 second command gave an empty table. | Start here Step 7 | Warn when a diagnostic was cut short, and name the budget. |
 | 11 | With `--time-budget 60` on a busy computer, every trial failed with `trial exceeded its 6.0s hard time ceiling and was killed`, and the run ended with the bare message `all trials failed`. | When things go wrong | Say in the message that the budget is too small, and suggest a minimum. |
-| 12 | The charter template (`scmle charter init`) writes `"intercurrent_events": []` and does not show that an item is `{"event": ..., "strategy": ...}`. The error for a wrong key names the wrong key but not the right ones. | Reading results | Put one worked item in the template. |
+| 12 | The charter template (`scmle charter init`) writes `"intercurrent": []` and does not show that an item is `{"event": ..., "strategy": ...}`. The error for a wrong key names the wrong key but not the right ones. | Reading results | Put one worked item in the template. |
 | 13 | `charter sign` rewrites the file as a wrapper (`algorithm`, `charter`, `charter_hash`, `signature`). A script that edits the charter after signing finds the fields one level deeper. | Reading results | Document the wrapper in `docs/CLI.md`. |
 | 14 | `scmle charter check --rows N` takes development rows (rows left after the exam rows). Passing the full table size gave a more cheerful verdict (327 rows) than the run itself had (273). | Reading results, Decisions | Say so in the help text, or compute the exam rows. |
 | 15 | The run's saved bundle was not signed, because `SCMLE_SIGNING_KEY` was set only after the run. `scmle predict` refuses an unsigned bundle unless you pass `--trusted` or sign it by saving a copy with `signing_key=`, which takes a small script. | Start here Step 8 | Checked since: a run signs its bundle when `SCMLE_SIGNING_KEY` is set before it starts. Left: say so in Start here, or add `scmle sign`. |

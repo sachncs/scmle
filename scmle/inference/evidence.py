@@ -141,7 +141,7 @@ class Linker:
             ).encode("utf-8")
         ).hexdigest()
         node = lineage.Node(
-            node_id=node_id,
+            identifier=node_id,
             kind=lineage.Kind.INFERENCE,
             digest=node_digest,
             attributes={

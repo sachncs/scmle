@@ -66,6 +66,7 @@ from scmle.assurance.framing import draft
 from scmle.assurance.framing import feasibility
 import scmle.certificates
 from scmle.contracts import qualification
+from scmle.contracts import records
 from scmle.runtime import randomness
 
 STORE_PATH = scmle.certificates.DIRECTORY / "framing_certificates.json"
@@ -363,13 +364,13 @@ def label_certificate(
         for s in range(LABEL_RUNS)
     )
     result = qualification.Certificate(
-        detector_id=baseline.DETECTOR_ID,
-        defect_type=baseline.DEFECT_TYPE,
+        detector=baseline.DETECTOR_ID,
+        defect=baseline.DEFECT_TYPE,
         planted=LABEL_RUNS,
         detected=detected,
-        clean_rows=LABEL_RUNS,
-        false_alarms=alarms,
-        seed_path=randomness.seed_path(offset, "framing.certify.labels", 0),
+        clean=LABEL_RUNS,
+        alarms=alarms,
+        seeds=randomness.seed_path(offset, "framing.certify.labels", 0),
     )
     cert = certificates.certify(
         baseline.DETECTOR_ID,
@@ -536,7 +537,7 @@ def omission_asks(seed: int, flips: bool, given: bool) -> bool:
     source = draft.Offer(
         "warehouse://crm/accounts",
         tuple(frame.columns),
-        primary_key=("customer_id",),
+        key=("customer_id",),
     )
     request = draft.Request("Predict churn for each customer.", source)
     model = (
@@ -612,12 +613,12 @@ def fuzz_rows(count: int = 1000) -> dict[str, Any]:
     base["estimand"].update(
         population="p",
         target="y",
-        prediction_moment="m",
-        summary_measure="s",
-        intercurrent_events=[{"event": "none", "strategy": "n/a"}],
+        moment="m",
+        summary="s",
+        intercurrent=[{"event": "none", "strategy": "n/a"}],
     )
     base["unit"] = "u"
-    base["deployment_population"] = "d"
+    base["population"] = "d"
     rng = numpy.random.default_rng(DEV_SEED_BASE)
     accepted = 0
     for number in range(count):
@@ -626,7 +627,10 @@ def fuzz_rows(count: int = 1000) -> dict[str, Any]:
         kind = rng.integers(0, 6)
         match kind:
             case 0:
-                del record[str(rng.choice(sorted(record)))]
+                # Without `schema_version` a record is read as version 1 by
+                # design, so only the other keys are deleted.
+                keys = sorted(set(record) - {records.KEY})
+                del record[str(rng.choice(keys))]
             case 1:
                 record[f"extra{rng.integers(1000)}"] = 1
             case 2:
@@ -636,7 +640,7 @@ def fuzz_rows(count: int = 1000) -> dict[str, Any]:
             case 4:
                 record["estimand"]["kind"] = "other"
             case _:
-                record["k_max"] = float(rng.choice([0, -3]))
+                record["quota"] = float(rng.choice([0, -3]))
         try:
             contracts.AnalysisCharter.from_dict(record)
             accepted += 1

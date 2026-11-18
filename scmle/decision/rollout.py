@@ -123,9 +123,9 @@ def metric_stream(
         The stream on which the e-process for that metric is run, with its
         null in rescaled units.
     """
-    q = plan.assignment_prob
+    q = plan.assignment
     if guard is None:
-        return anytime.deviations(q, plan.delta_min / (plan.high - plan.low))
+        return anytime.deviations(q, plan.delta / (plan.high - plan.low))
     margin = guard.margin / (guard.high - guard.low)
     return anytime.deviations(q, margin, "less")
 
@@ -160,9 +160,12 @@ def metric_values(
     )
     y = (numpy.asarray(outcome, dtype=float) - low) / (high - low)
     z = anytime.pseudo_outcomes(
-        arm, y, plan.assignment_prob, anytime.centers(y, carry=carry)
+        arm, y, plan.assignment, anytime.centers(y, carry=carry)
     )
-    if guard is not None and not guard.higher_is_worse:
+    if (
+        guard is not None
+        and guard.direction == scmle.assurance.charter.decision.LOWER
+    ):
         z = -z
     return z, (carry[0] + float(y.sum()), carry[1] + len(y))
 
@@ -256,7 +259,7 @@ class Rollout:
         if self.status != HOLD:
             return self.decision()
         a = numpy.asarray(arm, dtype=float)
-        room = self.plan.n_max - self.units
+        room = self.plan.limit - self.units
         a = a[:room]
         supplied = dict(guardrails or {})
         missing = [
@@ -281,8 +284,8 @@ class Rollout:
         counts = self.challenger_units + numpy.cumsum(a)
         totals = self.units + numpy.arange(1, len(a) + 1)
         invalid = design.srm_log_bayes_factor(
-            counts, totals, self.plan.assignment_prob
-        ) >= -math.log(self.plan.srm_level)
+            counts, totals, self.plan.assignment
+        ) >= -math.log(self.plan.srm)
         crossed = (numpy.vstack(paths) >= self.target).all(axis=0)
         first_bad = int(numpy.argmax(invalid)) if invalid.any() else None
         first_win = int(numpy.argmax(crossed)) if crossed.any() else None
@@ -294,7 +297,7 @@ class Rollout:
             self.status, self.done_at = PROMOTE, self.units + first_win + 1
         self.units += len(a)
         self.challenger_units += int(a.sum())
-        if self.status == HOLD and self.units >= self.plan.n_max:
+        if self.status == HOLD and self.units >= self.plan.limit:
             self.status, self.done_at = HOLD_FINAL, self.units
         return self.decision()
 

@@ -144,7 +144,7 @@ class Estimation:
         frame = tabulate(replay_input)
         reasons: list[str] = []
         observed_fingerprint = sequential.imprint(frame)
-        if observed_fingerprint != persisted.raw_input_fingerprint:
+        if observed_fingerprint != persisted.digests["frame"]:
             reasons.append("input fingerprint differs from persisted evidence")
         if persisted.estimand.to_dict() != self.estimand.to_dict():
             reasons.append(

@@ -50,7 +50,7 @@ def test_the_plan_records_included_rejected_and_deferred_techniques():
         for d in plan.decisions
         if d.action is experiments.Edict.INCLUDE
     }
-    assert set(plan.candidate_models) <= included
+    assert set(plan.candidates) <= included
 
 
 def recorded(monkeypatch):

@@ -155,12 +155,12 @@ def decode(record: dict[str, Any], spec: ingest.Ingestion) -> asof_view.Timing:
         The time rule, with no delay for a non-versioned view.
     """
     note = record.get("attestation")
-    delay = record.get("delta_rec_days", spec.delta_rec)
+    delay = record.get("delta_rec_days", spec.reconciliation)
     return asof_view.Timing(
         record["mode"],
         record.get("known_column"),
         None if record["mode"] == asof_view.NON_VERSIONED else float(delay),
-        None if note is None else provenance.Attestation(**note),
+        None if note is None else provenance.Attestation.from_dict(note),
     )
 
 
@@ -257,18 +257,18 @@ def run(
         tables=tuple(plan_document["tables"]),
         unit=plan_document.get("unit"),
         target_table=plan_document.get("target_table"),
-        eps_key=spec.eps_key,
-        eps_null=spec.eps_null,
-        eps_fk=spec.eps_fk,
+        eps_key=spec.tolerances.key,
+        eps_null=spec.tolerances.null,
+        eps_fk=spec.tolerances.link,
         declared=scmle.assurance.ingest.plan.declarations(
             plan_document.get("declared", [])
         ),
     )
     limits = budget.Budget(
-        spec.max_queries,
-        spec.max_rows_scanned,
-        spec.max_seconds,
-        spec.feature_budget,
+        spec.queries,
+        spec.scanned,
+        spec.seconds,
+        spec.features,
     )
     with tempfile.TemporaryDirectory() as scratch:
         folder = run_dir if run_dir is not None else Path(scratch)
@@ -300,14 +300,14 @@ def run(
         report = declared.reconcile(
             frames_by_name,
             spec.reconcile,
-            spec.delta_rec,
+            spec.reconciliation,
         )
         report["source_checks"] = declared.reconcile_source(
             frames_by_name,
             tables_by_name,
             spec.reconcile,
             factory,
-            spec.delta_rec,
+            spec.reconciliation,
         )
         report["source_passed"] = all(
             c["passed"] for c in report["source_checks"]
@@ -346,7 +346,7 @@ def run(
         nests,
         lag_days=spec.lag,
         windows=spec.windows,
-        max_features=spec.feature_budget,
+        max_features=spec.features,
         strict=spec.strict,
     )
     table = synthesize.lineage(found, spec.lag, [*views, *leaves])

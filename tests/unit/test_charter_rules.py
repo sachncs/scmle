@@ -54,12 +54,12 @@ def test_an_old_signed_file_still_loads_and_verifies(tmp_path):
 @pytest.mark.parametrize(
     "changes",
     [
-        {"ledger_rule": "lord++"},
-        {"confirmation_rule": "bh"},
-        {"stability_filter": True},
-        {"s_min": 0.9},
+        {"ledger": "lord++"},
+        {"confirmation": "bh"},
+        {"stability": True},
+        {"agreement": 0.9},
         {"band": 0.4},
-        {"q_min": 0.7},
+        {"exclusion": 0.7},
     ],
 )
 def test_changing_any_rule_changes_the_charter_hash(changes):
@@ -70,18 +70,18 @@ def test_changing_any_rule_changes_the_charter_hash(changes):
 
 
 def test_rules_round_trip_through_a_signed_file(tmp_path):
-    charter = chartered(stability_filter=True, s_min=0.9)
+    charter = chartered(stability=True, agreement=0.9)
     path = sealing.inscribe(tmp_path / "c.json", charter, KEY)
     assert json.loads(path.read_text())["format"] == 3
     loaded = sealing.read_verified(path, signing_key=KEY)
     assert loaded.signed and loaded.charter == charter
-    assert loaded.charter.rules.stability_filter is True
+    assert loaded.charter.rules.stability is True
 
 
 def test_editing_a_rule_in_a_signed_file_is_detected(tmp_path):
     path = sealing.inscribe(tmp_path / "c.json", chartered(), KEY)
     document = json.loads(path.read_text())
-    document["charter"]["rules"]["stability_filter"] = True
+    document["charter"]["rules"]["stability"] = True
     path.write_text(json.dumps(document))
     with pytest.raises(errors.ArtifactError):
         sealing.read_verified(path, signing_key=KEY)
@@ -108,12 +108,12 @@ def test_rules_in_an_older_format_are_refused(tmp_path):
 @pytest.mark.parametrize(
     "changes",
     [
-        {"ledger_rule": "alpha-investing"},
-        {"confirmation_rule": "fisher"},
-        {"failure_policy": "thresholdout"},
-        {"stability_filter": "yes"},
-        {"s_min": 0.0},
-        {"q_min": 1.5},
+        {"ledger": "alpha-investing"},
+        {"confirmation": "fisher"},
+        {"failure": "thresholdout"},
+        {"stability": "yes"},
+        {"agreement": 0.0},
+        {"exclusion": 1.5},
         {"band": 0.0},
         {"band": float("nan")},
     ],
@@ -139,7 +139,7 @@ def test_defaults_match_the_shipped_stability_rule():
 
     defaults = scmle.assurance.charter.rules.Procedure()
     assert dataclasses.asdict(stability.DEFAULT_RULE) == {
-        "s_min": defaults.s_min,
+        "s_min": defaults.agreement,
         "band": defaults.band,
-        "q_min": defaults.q_min,
+        "q_min": defaults.exclusion,
     }

@@ -267,7 +267,7 @@ def test_report_binding_rejects_tampered_lifecycle_evidence(tmp_path):
         report_path=report_path,
     )
     record = json.loads(report_path.read_text(encoding="utf-8"))
-    record["dataset_hash"] = "tampered"
+    record["digests"]["dataset"] = "tampered"
     report_path.write_text(json.dumps(record), encoding="utf-8")
 
     with pytest.raises(ValueError, match="signature does not verify"):

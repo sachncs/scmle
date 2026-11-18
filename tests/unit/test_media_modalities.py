@@ -140,7 +140,7 @@ def test_audio_transcript_confidence_and_timing_fail_closed():
         )
     ).curate()
 
-    assert [finding.finding_id for finding in report.quality_findings] == [
+    assert [finding.identifier for finding in report.quality_findings] == [
         "quality.audio-transcript-confidence-missing",
     ]
     out_of_range = audio.Transcript(
@@ -174,7 +174,7 @@ def test_audio_curation_blocks_conflicting_duplicate_labels():
 
     assert report.profile["conflicting_label_groups"]
     assert report.release_ready is False
-    assert [finding.finding_id for finding in report.risk_findings] == [
+    assert [finding.identifier for finding in report.risk_findings] == [
         "risk.audio-conflicting-duplicate-labels",
     ]
 
@@ -361,7 +361,7 @@ def test_video_temporal_state_fails_closed_when_incomplete():
         "untimed_video_count": 1,
     }
     assert "quality.video-mixed-temporal-state" in {
-        finding.finding_id for finding in report.quality_findings
+        finding.identifier for finding in report.quality_findings
     }
     with pytest.raises(video.VideoTemporalError, match="every video"):
         dataset.cutover("2026-01-02T00:00:00Z")
@@ -393,11 +393,11 @@ def test_video_curation_blocks_measured_sync_drift_and_surfaces_unknown_sync():
     ).curate()
 
     assert drift_report.release_ready is False
-    assert drift_report.quality_findings[0].finding_id == (
+    assert drift_report.quality_findings[0].identifier == (
         "quality.video-audio-sync-out-of-tolerance"
     )
     assert unknown_report.release_ready
-    assert unknown_report.quality_findings[0].finding_id == (
+    assert unknown_report.quality_findings[0].identifier == (
         "quality.video-audio-sync-unknown"
     )
 
@@ -430,7 +430,7 @@ def test_video_curation_surfaces_encoding_and_dimension_drift():
 
     assert report.profile["formats"] == ["mp4", "webm"]
     assert report.profile["dimensions"] == [[2, 2], [4, 4]]
-    assert [finding.finding_id for finding in report.quality_findings] == [
+    assert [finding.identifier for finding in report.quality_findings] == [
         "quality.video-encoding-drift",
         "quality.video-dimension-drift",
     ]
@@ -454,7 +454,7 @@ def test_video_curation_blocks_conflicting_duplicate_labels():
 
     assert report.profile["conflicting_label_groups"]
     assert report.release_ready is False
-    assert [finding.finding_id for finding in report.risk_findings] == [
+    assert [finding.identifier for finding in report.risk_findings] == [
         "risk.video-conflicting-duplicate-labels",
     ]
 
@@ -837,7 +837,7 @@ def test_geospatial_curation_blocks_missing_crs():
     report = dataset.curate()
 
     assert report.release_ready is False
-    assert report.unresolved_blocking_findings[0].finding_id == (
+    assert report.unresolved_blocking_findings[0].identifier == (
         "quality.geospatial-missing-crs"
     )
 
@@ -862,7 +862,7 @@ def test_geospatial_curation_reports_mixed_label_state():
         "str:park": 1,
         "unlabeled": 1,
     }
-    assert [finding.finding_id for finding in report.risk_findings] == [
+    assert [finding.identifier for finding in report.risk_findings] == [
         "risk.geospatial-mixed-label-state",
     ]
 
@@ -1017,7 +1017,7 @@ def test_geospatial_temporal_state_fails_closed_when_incomplete():
     )
 
     report = mixed.curate()
-    quality_ids = {finding.finding_id for finding in report.quality_findings}
+    quality_ids = {finding.identifier for finding in report.quality_findings}
 
     assert report.profile["temporal"] == {
         "status": "mixed",

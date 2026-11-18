@@ -38,7 +38,7 @@ class Validator:
         unseen = {}
         for column in self.schema.categorical:
             if column in frame.columns:
-                known = set(self.schema.known_categories[column])
+                known = set(self.schema.categories[column])
                 new = sorted(set(frame[column].dropna().astype(str)) - known)
                 if new:
                     unseen[column] = new[:MAX_REPORTED_UNSEEN]
@@ -74,7 +74,7 @@ class Validator:
         unseen_values: dict[str, pandas.Series] = {}
         for column in self.schema.categorical:
             if column in frame.columns:
-                known = set(self.schema.known_categories[column])
+                known = set(self.schema.categories[column])
                 values = frame[column]
                 unseen_values[column] = values.notna() & ~values.astype(
                     str

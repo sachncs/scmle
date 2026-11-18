@@ -66,7 +66,7 @@ def make_bundle(
     reference = types.SimpleNamespace(
         features=features or {"a": Profile(0.0)},
         output=Profile(output),
-        reference_metrics=reference_metrics or {},
+        metrics=reference_metrics or {},
     )
     return types.SimpleNamespace(
         reference=reference,

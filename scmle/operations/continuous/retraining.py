@@ -54,7 +54,7 @@ class Retraining(feeding.Feeding):
         primary, support, held = policies.decide(
             self.policy, rows, fresh_alarm, age_days, since
         )
-        gates = self.loop.policy.alarm_gates_retrain
+        gates = self.loop.policy.retrain
         reasons = tuple(primary + support)
         if not primary or held is not None:
             decision = policies.RetrainDecision(
@@ -143,12 +143,12 @@ class Retraining(feeding.Feeding):
                 checked here.
         """
         for row in self.loop.ledger.rows:
-            body = row["body"]
+            if row["kind"] != deployment_ledger.ATTESTATION:
+                continue
+            reply = deployment_ledger.Attestation.from_dict(row["body"])
             if (
-                row["kind"] == deployment_ledger.ATTESTATION
-                and body.get("escalation_id") == escalation_id
-                and deployment_ledger.Reply(body["decision"])
-                in never_list.ALLOWING
+                reply.escalation == escalation_id
+                and reply.decision in never_list.ALLOWING
             ):
                 return self.train(("approved recommendation",))
         raise errors.InputError(f"{escalation_id} has no approving reply")

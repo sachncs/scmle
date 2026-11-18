@@ -122,7 +122,7 @@ class Curating(state.Stage):
                 []
                 if report is None
                 else [
-                    finding.finding_id
+                    finding.identifier
                     for finding in report.unresolved_blocking_findings
                 ]
             )

@@ -50,13 +50,13 @@ def devise(
             context.spec,
             scmle.pipeline.context.require(context.profile, "profile"),
             scmle.pipeline.context.require(context.task, "task"),
-            approved.candidate_models if approved is not None else None,
+            approved.candidates if approved is not None else None,
             context.history,
         )
     )
     task = scmle.pipeline.context.require(context.task, "task")
     manifest = scmle.pipeline.context.require(context.manifest, "manifest")
-    for model_name in plan.candidate_models:
+    for model_name in plan.candidates:
         adapter = context.registry.get(model_name)
         model_family = adapter.capability_family or adapter.family
         key = requisition(context, task, model_family)
@@ -72,7 +72,7 @@ def devise(
             context.capability_registry.require(
                 key,
                 allowed_statuses=allowed_statuses,
-                row_count=manifest.row_count,
+                row_count=manifest.rows,
             )
         except capabilities.UnsupportedError as error:
             if model_family not in {"custom", "test"}:
@@ -90,7 +90,7 @@ def devise(
             context.capability_registry.require(
                 key,
                 allowed_statuses={capabilities.Status.EXTENSION_ONLY},
-                row_count=manifest.row_count,
+                row_count=manifest.rows,
             )
     return plan
 

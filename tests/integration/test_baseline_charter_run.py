@@ -48,7 +48,7 @@ def charter_file(tmp_path, sources=None):
     path = tmp_path / "charter.json"
     sealing.inscribe(
         path,
-        make_charter(min_effect=0.5, k_max=3, cost_model=model),
+        make_charter(effect=0.5, quota=3, costs=model),
         signing_key=KEY,
     )
     return path
@@ -129,9 +129,7 @@ def test_selective_labels_on_x_stop_the_comparison(tmp_path):
 
 def test_the_column_needs_a_cost_model(tmp_path):
     path = tmp_path / "charter.json"
-    sealing.inscribe(
-        path, make_charter(min_effect=0.5, k_max=3), signing_key=KEY
-    )
+    sealing.inscribe(path, make_charter(effect=0.5, quota=3), signing_key=KEY)
     with pytest.raises(errors.ConfigError, match="cost_model"):
         run(frame(), tmp_path, path)
 

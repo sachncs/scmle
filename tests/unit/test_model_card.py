@@ -34,7 +34,7 @@ def test_model_card_requires_review_and_preserves_evaluation_context():
 def build(evaluation):
     import types
 
-    manifest = types.SimpleNamespace(dataset_id="ds_1", snapshot_id="snap_1")
+    manifest = types.SimpleNamespace(identifier="ds_1", snapshot="snap_1")
     plan = types.SimpleNamespace(features=("amount",), text=(), extra_inputs=())
     profile = types.SimpleNamespace(feature_plan=plan)
     bundle = types.SimpleNamespace(

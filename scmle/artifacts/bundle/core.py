@@ -158,7 +158,7 @@ class Core:
             *self.schema.consumed,
             *(
                 c
-                for c in self.schema.optional_inputs
+                for c in self.schema.optional
                 if c in frame.columns and c not in self.schema.consumed
             ),
         ]
@@ -236,8 +236,8 @@ class Core:
         """
         return feature_graph.Temporal(
             [tasks.Node(**node) for node in self.schema.series],
-            self.schema.group_column,
-            self.schema.time_column,
+            self.schema.group,
+            self.schema.time,
             self.history,
         )
 
@@ -262,11 +262,7 @@ class Core:
             if self.history is not None:
                 parts.insert(0, self.history)
             combined = pandas.concat(parts, ignore_index=True)
-            key = [
-                c
-                for c in (self.schema.group_column, self.schema.time_column)
-                if c
-            ]
+            key = [c for c in (self.schema.group, self.schema.time) if c]
             combined = combined.drop_duplicates(subset=key, keep="last")
             self.history = builder.retain(combined)
 

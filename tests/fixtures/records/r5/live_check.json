@@ -1,0 +1,12 @@
+{
+  "record": {
+    "container_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "environment": "staging",
+    "evidence_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "model_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "name": "health",
+    "passed": true,
+    "problems": [],
+    "source_commit": "1111111111111111111111111111111111111111"
+  }
+}

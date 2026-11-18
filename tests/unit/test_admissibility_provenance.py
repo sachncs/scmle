@@ -13,7 +13,7 @@ DAY = datetime.date(2026, 6, 15)
 
 def attestation(date="2026-01-01", expires="2026-12-31", **kw):
     fields = {
-        "name_or_id": "j.doe",
+        "attestor": "j.doe",
         "role": "data owner",
         "statement": "written at event time, never overwritten",
         "evidence": "DDL table orders_v3, ticket DATA-42",
@@ -48,22 +48,22 @@ def make_field(
         name=name,
         origin=provenance.Origin.INSTRUMENT,
         writer="sensor",
-        written_at=provenance.Stamp.EVENT_TIME,
+        stamp=provenance.Stamp.EVENT_TIME,
         overwritten=provenance.Overwritten.NEVER,
-        definition_history=("2025-01-01 created",),
-        as_of=as_of,
-        as_of_source=source,
-        available_at_serving=serving,
+        definitions=("2025-01-01 created",),
+        lead=as_of,
+        provenance=source,
+        availability=serving,
         attestation=att,
-        log_check=log,
+        reconstruction=log,
     )
 
 
 def test_undeclared_field_is_unverified_with_everything_unknown():
     record = provenance.undeclared("x")
     assert record.tier() is Tier.UNVERIFIED
-    assert record.as_of == provenance.Lead.unknown()
-    assert record.available_at_serving is provenance.Availability.UNKNOWN
+    assert record.lead == provenance.Lead.unknown()
+    assert record.availability is provenance.Availability.UNKNOWN
 
 
 def test_attested_field_is_attested_not_confirmed():
@@ -108,8 +108,8 @@ def test_attestation_validity_is_inclusive_at_both_ends():
 def test_attestation_needs_named_evidence_and_ordered_dates():
     with pytest.raises(ValueError, match="evidence"):
         attestation(evidence=" ")
-    with pytest.raises(ValueError, match="name_or_id"):
-        attestation(name_or_id="")
+    with pytest.raises(ValueError, match="attestor"):
+        attestation(attestor="")
     with pytest.raises(ValueError, match="expires"):
         attestation(date="2026-02-01", expires="2026-01-31")
     with pytest.raises(ValueError, match="ISO date"):
@@ -120,7 +120,7 @@ def test_attestation_needs_named_evidence_and_ordered_dates():
 def test_as_of_rule_consistency():
     with pytest.raises(ValueError, match="no lead"):
         provenance.Lead(provenance.Cutoff.UNKNOWN, 1.0)
-    with pytest.raises(ValueError, match="needs lead_seconds"):
+    with pytest.raises(ValueError, match="needs seconds"):
         provenance.Lead(provenance.Cutoff.LAG, None)
     with pytest.raises(ValueError):
         provenance.Lead(provenance.Cutoff.LAG, float("nan"))
@@ -155,7 +155,7 @@ def test_source_and_rule_must_agree():
         )
     with pytest.raises(ValueError, match="needs an attestation"):
         make_field(att=None)
-    with pytest.raises(ValueError, match="needs a log_check"):
+    with pytest.raises(ValueError, match="needs a reconstruction"):
         provenance.Pedigree(
             "f",
             provenance.Origin.MANUAL,
@@ -209,8 +209,10 @@ def test_digest_changes_with_any_edit():
 
 def test_from_dict_rejects_unknown_versions_and_fields():
     table = provenance.Dictionary((make_field("a"),)).to_dict()
-    with pytest.raises(ValueError, match="format_version"):
-        provenance.Dictionary.from_dict({**table, "format_version": 9})
+    with pytest.raises(ValueError, match="schema version 9, newer"):
+        provenance.Dictionary.from_dict({**table, "schema_version": 9})
+    with pytest.raises(ValueError, match="no schema_version"):
+        provenance.Dictionary.from_dict({"fields": table["fields"]})
     with pytest.raises(ValueError, match="unexpected"):
         provenance.Dictionary.from_dict({**table, "extra": 1})
     record = dict(table["fields"][0])

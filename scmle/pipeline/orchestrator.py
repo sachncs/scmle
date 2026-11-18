@@ -184,10 +184,8 @@ class Orchestrator:
         if approved is None:
             return
         record = self.spec.model_dump()
-        record["validation"]["strategy"] = approved.validation_strategy
-        record["resources"]["time_budget_seconds"] = (
-            approved.optimization_budget_seconds
-        )
+        record["validation"]["strategy"] = approved.validation
+        record["resources"]["time_budget_seconds"] = approved.budget
         record["metric"] = approved.metric
         self.spec = tasks.Config.model_validate(record)
 

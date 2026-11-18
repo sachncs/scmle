@@ -1,409 +1,451 @@
 {
   "certificates": [
     {
-      "code_hash": "4d1208249cc02c045b19a2b9fcbaffad13cf5e1b45593e6077d974ccc5febfdb",
-      "corpus_hash": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1",
       "created": null,
-      "detector_id": "f4-leakage-screen",
+      "detector": "f4-leakage-screen",
+      "digests": {
+        "code": "937bb240e8ac95e10dcbc8177aaa7b7b8f85fed75c1d1e3a16235a7463d01a24",
+        "corpus": "cceddf4a479da3f9ff3de50d63f53ad240870e042e600665ce5ebeeafc16d8e1"
+      },
       "outcomes": [
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_copy",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_copy",
             "detected": 200,
-            "detector_id": "f4-leakage-screen",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_noisy_copy",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_noisy_copy",
             "detected": 197,
-            "detector_id": "f4-leakage-screen",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9568342712073097,
             0.9948857622067417
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_threshold",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_threshold",
             "detected": 200,
-            "detector_id": "f4-leakage-screen",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
+          "passed": true,
+          "recall": [
+            0.9811546736227335,
+            1.0
+          ],
+          "schema_version": 2
+        },
+        {
+          "alarms": [
             0.0,
             0.0038267584855551234
           ],
-          "passed": true,
-          "recall_interval": [
-            0.9811546736227335,
-            1.0
-          ]
-        },
-        {
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_missing_for_class",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_missing_for_class",
             "detected": 200,
-            "detector_id": "f4-leakage-screen",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
+          "passed": true,
+          "recall": [
+            0.9811546736227335,
+            1.0
+          ],
+          "schema_version": 2
+        },
+        {
+          "alarms": [
             0.0,
             0.0038267584855551234
           ],
-          "passed": true,
-          "recall_interval": [
-            0.9811546736227335,
-            1.0
-          ]
-        },
-        {
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_rare_record",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_rare_record",
             "detected": 200,
-            "detector_id": "f4-leakage-screen",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         }
       ],
       "policy": {
+        "alarms": 0.05,
         "confidence": 0.95,
-        "false_alarm_ceiling": 0.05,
-        "recall_floor": 0.9
+        "recall": 0.9,
+        "schema_version": 2
       },
+      "schema_version": 2,
       "seeds": [
         0
       ]
     },
     {
-      "code_hash": "4d1208249cc02c045b19a2b9fcbaffad13cf5e1b45593e6077d974ccc5febfdb",
-      "corpus_hash": "4e30ce01769c47a609a468d6a0f1a2e9f30883c5ccc6d68d3b40aa01012a04b3",
       "created": null,
-      "detector_id": "f4-leakage-screen-multiclass",
+      "detector": "f4-leakage-screen-multiclass",
+      "digests": {
+        "code": "937bb240e8ac95e10dcbc8177aaa7b7b8f85fed75c1d1e3a16235a7463d01a24",
+        "corpus": "4e30ce01769c47a609a468d6a0f1a2e9f30883c5ccc6d68d3b40aa01012a04b3"
+      },
       "outcomes": [
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_copy",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_copy",
             "detected": 200,
-            "detector_id": "f4-leakage-screen-multiclass",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen-multiclass",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_noisy_copy",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_noisy_copy",
             "detected": 200,
-            "detector_id": "f4-leakage-screen-multiclass",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen-multiclass",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_threshold",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_threshold",
             "detected": 200,
-            "detector_id": "f4-leakage-screen-multiclass",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen-multiclass",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_missing_for_class",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_missing_for_class",
             "detected": 200,
-            "detector_id": "f4-leakage-screen-multiclass",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen-multiclass",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_rare_record",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_rare_record",
             "detected": 200,
-            "detector_id": "f4-leakage-screen-multiclass",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen-multiclass",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         }
       ],
       "policy": {
+        "alarms": 0.05,
         "confidence": 0.95,
-        "false_alarm_ceiling": 0.05,
-        "recall_floor": 0.9
+        "recall": 0.9,
+        "schema_version": 2
       },
+      "schema_version": 2,
       "seeds": [
         0
       ]
     },
     {
-      "code_hash": "4d1208249cc02c045b19a2b9fcbaffad13cf5e1b45593e6077d974ccc5febfdb",
-      "corpus_hash": "0c02f0f57d9610d1aa2f11a09c147224af8a299fcfe6ff7fc0df2b29ef147cf9",
       "created": null,
-      "detector_id": "f4-leakage-screen-regression",
+      "detector": "f4-leakage-screen-regression",
+      "digests": {
+        "code": "937bb240e8ac95e10dcbc8177aaa7b7b8f85fed75c1d1e3a16235a7463d01a24",
+        "corpus": "0c02f0f57d9610d1aa2f11a09c147224af8a299fcfe6ff7fc0df2b29ef147cf9"
+      },
       "outcomes": [
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_copy",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_copy",
             "detected": 200,
-            "detector_id": "f4-leakage-screen-regression",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen-regression",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_noisy_copy",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_noisy_copy",
             "detected": 200,
-            "detector_id": "f4-leakage-screen-regression",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen-regression",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_threshold",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_threshold",
             "detected": 200,
-            "detector_id": "f4-leakage-screen-regression",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen-regression",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_missing_for_class",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_missing_for_class",
             "detected": 200,
-            "detector_id": "f4-leakage-screen-regression",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen-regression",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         },
         {
+          "alarms": [
+            0.0,
+            0.0038267584855551234
+          ],
           "certificate": {
-            "clean_rows": 1000,
-            "defect_type": "leak_rare_record",
+            "alarms": 0,
+            "clean": 1000,
+            "defect": "leak_rare_record",
             "detected": 200,
-            "detector_id": "f4-leakage-screen-regression",
-            "false_alarms": 0,
+            "detector": "f4-leakage-screen-regression",
             "planted": 200,
-            "seed_path": [
+            "schema_version": 2,
+            "seeds": [
               0,
               "screen.certify",
               0
             ]
           },
-          "false_alarm_interval": [
-            0.0,
-            0.0038267584855551234
-          ],
           "passed": true,
-          "recall_interval": [
+          "recall": [
             0.9811546736227335,
             1.0
-          ]
+          ],
+          "schema_version": 2
         }
       ],
       "policy": {
+        "alarms": 0.05,
         "confidence": 0.95,
-        "false_alarm_ceiling": 0.05,
-        "recall_floor": 0.9
+        "recall": 0.9,
+        "schema_version": 2
       },
+      "schema_version": 2,
       "seeds": [
         0
       ]

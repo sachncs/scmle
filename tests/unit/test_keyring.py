@@ -14,14 +14,14 @@ OBSERVED = "2026-10-21T01:00:00+00:00"
 def record(
     key_id: str = "release-2026-10",
     state: keyring.State = keyring.State.ACTIVE,
-    created_at: str = CREATED,
+    created: str = CREATED,
     **kwargs: str,
 ) -> keyring.Credential:
     """Build representative key metadata."""
     return keyring.Credential(
         key_id=key_id,
         owner="release-engineering",
-        created_at=created_at,
+        created=created,
         state=state,
         **kwargs,
     )
@@ -97,7 +97,7 @@ def test_revocation_invalidates_even_historical_signatures():
 def test_expired_key_can_only_verify_pre_expiry_historical_evidence():
     """Expiry blocks current acceptance while preserving explicit history."""
     expires = "2026-10-21T00:30:00+00:00"
-    registry = keyring.Keyring((record(expires_at=expires),))
+    registry = keyring.Keyring((record(expires=expires),))
     payload = {"release": "candidate-1"}
     envelope = registry.sign(
         payload,
@@ -138,11 +138,11 @@ def test_registry_round_trip_is_deterministic_and_atomic(tmp_path):
 def test_key_metadata_rejects_naive_or_invalid_transitions():
     """Key state is not a free-form label that can weaken verification."""
     with pytest.raises(ValueError, match="timezone"):
-        record(created_at="2026-10-20T00:00:00")
-    with pytest.raises(ValueError, match="state_changed_at"):
+        record(created="2026-10-20T00:00:00")
+    with pytest.raises(ValueError, match="changed"):
         record(state=keyring.State.REVOKED)
-    with pytest.raises(ValueError, match="after created_at"):
-        record(expires_at=CREATED)
+    with pytest.raises(ValueError, match="after created"):
+        record(expires=CREATED)
 
 
 def test_signature_envelope_rejects_tampering_and_wrong_algorithm():
@@ -150,14 +150,14 @@ def test_signature_envelope_rejects_tampering_and_wrong_algorithm():
     with pytest.raises(ValueError, match="unsupported signature algorithm"):
         keyring.Wrapper(
             key_id="release-2026-10",
-            signed_at=OBSERVED,
+            issued=OBSERVED,
             value="signature",
             algorithm="none",
         )
     with pytest.raises(ValueError, match="key_id"):
         keyring.Wrapper(
             key_id="",
-            signed_at=OBSERVED,
+            issued=OBSERVED,
             value="signature",
         )
 

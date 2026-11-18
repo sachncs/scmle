@@ -6,21 +6,21 @@ from scmle.contracts import evidence
 
 
 def make_record(
-    criterion_id: str = "quality.contracts",
+    criterion: str = "quality.contracts",
     result: evidence.Outcome = evidence.Outcome.PASS,
     decision: evidence.Disposition = evidence.Disposition.ACCEPTED,
 ) -> evidence.Record:
     """Builds a representative release evidence record."""
     return evidence.Record(
-        criterion_id=criterion_id,
+        criterion=criterion,
         claim="structured curation findings are persisted",
         scope={"release": "beta", "area": "data"},
-        raw_inputs={"dataset": "sha256:dataset"},
-        command_or_test="uv run pytest tests/unit/test_evidence_contracts.py",
+        inputs={"dataset": "sha256:dataset"},
+        command="uv run pytest tests/unit/test_evidence_contracts.py",
         artifact={"path": "curation_report.json", "digest": "sha256:report"},
         result=result,
         reviewer="independent-reviewer",
-        observed_at="2026-10-20T12:00:00+00:00",
+        observed="2026-10-20T12:00:00+00:00",
         limitations=(
             "This fixture does not prove external connector behavior.",
         ),
@@ -31,7 +31,7 @@ def make_record(
 def test_record_round_trips_and_index_is_deterministic():
     index = evidence.Index([make_record("z.last"), make_record("a.first")])
 
-    assert [record.criterion_id for record in index.ordered()] == [
+    assert [record.criterion for record in index.ordered()] == [
         "a.first",
         "z.last",
     ]
@@ -83,19 +83,19 @@ def test_index_rejects_duplicate_and_pending_records():
         ]
     )
     assert not blocked.ready()
-    assert [item.criterion_id for item in blocked.pending()] == [
+    assert [item.criterion for item in blocked.pending()] == [
         "quality.contracts"
     ]
 
 
-@pytest.mark.parametrize("observed_at", ["2026-10-20T12:00:00", "not-a-time"])
-def test_record_requires_aware_timestamp(observed_at):
+@pytest.mark.parametrize("observed", ["2026-10-20T12:00:00", "not-a-time"])
+def test_record_requires_aware_timestamp(observed):
     with pytest.raises(ValueError):
         evidence.Record(
             **{
                 **make_record().to_dict(),
                 "result": evidence.Outcome.PASS,
                 "decision": evidence.Disposition.ACCEPTED,
-                "observed_at": observed_at,
+                "observed": observed,
             }
         )

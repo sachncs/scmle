@@ -265,7 +265,7 @@ feasibility: feasible (273 rows >= 214 needed for power 0.8)
 gave
 `feasibility: downgrade (273 rows < 333 needed for power 0.8 at effect 0.2; detectable effect is 0.221)`.
 That is a warning that your sealed set is too small for your promise. You
-either lower the promise (`min_effect` 0.25 made it feasible) or you get more
+either lower the promise (`effect` 0.25 made it feasible) or you get more
 rows.
 
 After the run, list the claims:
@@ -332,8 +332,8 @@ set 216. In `split_manifest.json` you can see which row ids went where.
 
 ### Other charter files worth a glance
 
-* `feasibility.json`: `verdict: feasible`, `n_confirmation: 273`,
-  `n_required: 214`, `power_at_min_effect: 0.907`. The sealed set was big
+* `feasibility.json`: `verdict: feasible`, `confirmation: 273`,
+  `required: 214`, `power: 0.907`. The sealed set was big
   enough.
 * `hypothesis_ledger.jsonl`: the hypothesis ledger, the log of every idea
   tested on `X`.

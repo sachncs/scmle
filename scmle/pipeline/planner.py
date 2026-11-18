@@ -223,8 +223,8 @@ class History(Refiner):
         recommendations = learner.recommend(
             knowledge.fingerprint(context.profile, context.task),
             context.task,
-            manifest.dataset_id,
-            manifest.data_hash,
+            manifest.identifier,
+            manifest.digests["data"],
         )
         weights = dict(recommendations)
         baselines = [a for a in candidates if a.family == "baseline"]
@@ -471,7 +471,7 @@ class Planner:
         metric = self.catalog.resolve(spec.primary_metric, task)
         compatible, rejected = self.registry.candidates(
             task,
-            profile.manifest.row_count,
+            profile.manifest.rows,
             tuple(spec.models.experimental_models),
         )
         decisions = [
@@ -512,17 +512,16 @@ class Planner:
                 | {"strategy": strategy},
             }
         )
-        identity = (
-            f"{resolved.config_hash()}|{profile.manifest.data_hash}|{names}"
-        )
+        data = profile.manifest.digests["data"]
+        identity = f"{resolved.config_hash()}|{data}|{names}"
         plan_id = hashlib.sha256(identity.encode()).hexdigest()[:10]
         return experiments.Plan(
-            plan_id=f"plan_{plan_id}",
+            identifier=f"plan_{plan_id}",
             task=task.value,
             metric=metric.name,
-            validation_strategy=strategy,
-            candidate_models=names,
-            optimization_budget_seconds=spec.resources.time_budget_seconds,
+            validation=strategy,
+            candidates=names,
+            budget=spec.resources.time_budget_seconds,
             decisions=tuple(decisions),
             warnings=profile.risk_findings,
         )

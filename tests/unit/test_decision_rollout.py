@@ -15,12 +15,12 @@ def make_plan(**overrides):
     values = {
         "unit": "user",
         "primary": "conversion",
-        "assignment_prob": 0.5,
-        "delta_min": 0.01,
+        "assignment": 0.5,
+        "delta": 0.01,
         "tolerance": 0.01,
-        "n_max": 40000,
-        "alpha_promote": Fraction(1, 50),
-        "alpha_rollback": Fraction(1, 100),
+        "limit": 40000,
+        "promotion": Fraction(1, 50),
+        "rollback": Fraction(1, 100),
         "guardrails": (
             scmle.assurance.charter.decision.Guardrail("bounce", margin=0.05),
         ),
@@ -88,7 +88,7 @@ def test_a_clear_win_is_promoted_with_a_bound_above_the_minimum_effect():
     decision = run.observe(arm, primary, guards)
     assert decision.status == rollout.PROMOTE
     assert decision.tier == "confirmed"
-    assert decision.lower_bound > plan.delta_min
+    assert decision.lower_bound > plan.delta
     assert decision.units < 40000
     again = run.observe(arm, primary, guards)
     assert again.units == decision.units and again.status == rollout.PROMOTE
@@ -112,7 +112,7 @@ def test_batch_size_does_not_change_the_decision_time():
 
 
 def test_an_effect_below_the_minimum_ends_in_hold_final():
-    plan = make_plan(n_max=8000)
+    plan = make_plan(limit=8000)
     run = rollout.Rollout(plan, "e", 0.02)
     arm, primary, guards = traffic(8000, 2, lift=0.003)
     decision = run.observe(arm, primary, guards)
@@ -123,7 +123,7 @@ def test_an_effect_below_the_minimum_ends_in_hold_final():
 
 
 def test_a_harmful_guardrail_blocks_promotion():
-    plan = make_plan(n_max=30000)
+    plan = make_plan(limit=30000)
     run = rollout.Rollout(plan, "e", 0.02)
     arm, primary, guards = traffic(30000, 3, bounce_lift=0.08)
     assert run.observe(arm, primary, guards).status == rollout.HOLD_FINAL
@@ -131,9 +131,9 @@ def test_a_harmful_guardrail_blocks_promotion():
 
 def test_a_lower_is_worse_guardrail_is_read_in_the_other_direction():
     guard = scmle.assurance.charter.decision.Guardrail(
-        "rating", 0.05, higher_is_worse=False
+        "rating", 0.05, direction="lower"
     )
-    plan = make_plan(guardrails=(guard,), n_max=30000)
+    plan = make_plan(guardrails=(guard,), limit=30000)
     arm, primary, ignored = traffic(30000, 4)
     rng = numpy.random.default_rng(44)
     worse = (rng.random(30000) < 0.8 - 0.10 * arm).astype(float)
@@ -153,7 +153,7 @@ def test_a_lower_is_worse_guardrail_is_read_in_the_other_direction():
 
 
 def test_a_broken_allocation_halts_inference():
-    plan = make_plan(n_max=20000)
+    plan = make_plan(limit=20000)
     rng = numpy.random.default_rng(5)
     arm = (rng.random(20000) < 0.56).astype(float)
     primary = (rng.random(20000) < 0.10 + 0.04 * arm).astype(float)
@@ -174,7 +174,7 @@ def test_a_missing_guardrail_series_is_refused():
 
 
 def test_the_boundary_null_is_promoted_rarely_under_peeking():
-    plan = make_plan(guardrails=(), n_max=2500, delta_min=0.02)
+    plan = make_plan(guardrails=(), limit=2500, delta=0.02)
     hits = 0
     runs = 150
     for seed in range(runs):
@@ -212,7 +212,7 @@ def test_the_decision_log_chain_detects_edits_and_round_trips(tmp_path):
 
 
 def test_the_simulated_stopping_time_is_reported_with_its_crossed_share():
-    plan = make_plan(guardrails=(), n_max=4000, delta_min=0.02)
+    plan = make_plan(guardrails=(), limit=4000, delta=0.02)
     found = design.simulate(plan, 0.10, 0.08, runs=200, seed=1)
     assert found["crossed_share"] > 0.9
     assert 0 < found["median_units"] < 4000

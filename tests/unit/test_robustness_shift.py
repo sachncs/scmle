@@ -153,12 +153,12 @@ def test_the_checks_are_exploration_checks_with_the_documented_fields():
     check = shift.c2st(
         left, right, 3, permutations=49, gate=certificates.Authority.GATING
     )
-    assert check.set_id is qualification.Subset.EXPLORATION
+    assert check.subset is qualification.Subset.EXPLORATION
     assert check.tier is qualification.Tier.UNVERIFIED
-    assert check.check_id == shift.C2ST_ID
+    assert check.identifier == shift.C2ST_ID
     assert check.effect == pytest.approx(check.statistic - 0.5)
     assert check.interval[0] <= check.statistic <= check.interval[1]
-    assert check.seed_path[0] == 3
+    assert check.seeds[0] == 3
     again = shift.c2st(
         left, right, 3, permutations=49, gate=certificates.Authority.GATING
     )
@@ -288,7 +288,7 @@ def test_assess_reports_fail_pass_and_whether_the_tests_agree():
     passed = shift.assess(same_left, same_right, 0, permutations=99)
     assert passed.status is shift.Status.PASS
     record = passed.to_dict()
-    assert record["status"] == "pass" and record["c2st"]["check_id"]
+    assert record["status"] == "pass" and record["c2st"]["identifier"]
 
 
 def test_the_digest_is_a_sha256_of_the_module():

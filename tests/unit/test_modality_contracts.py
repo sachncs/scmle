@@ -189,53 +189,53 @@ def test_modality_curation_card_can_describe_an_empty_snapshot():
 
     assert card.sample_count == 0
     assert card.manifest is not None
-    assert card.manifest.sample_count == 0
+    assert card.manifest.samples == 0
 
 
 def test_modality_manifest_round_trip_binds_governance_to_content():
     """A modality manifest preserves source and privacy evidence exactly."""
     manifest = data.Passport(
-        dataset_id="image-dataset",
-        snapshot_id="snapshot-1",
+        identifier="image-dataset",
+        snapshot="snapshot-1",
         modality="image",
         task="binary_classification",
-        sample_count=3,
-        content_hash="b" * 64,
+        samples=3,
+        digests={"content": "b" * 64},
         source=data.Origin(
             owner="vision-team",
-            acquisition_method="licensed object export",
+            acquisition="licensed object export",
             license="internal-use",
         ),
         lineage=data.Ancestry(
-            source_snapshot="source-1",
+            snapshot="source-1",
             transformations=("resize-v1",),
         ),
         privacy=data.Confidentiality(
             classification="confidential",
-            contains_pii=True,
-            consent_basis="contract",
-            retention_period="30d",
-            deletion_policy="delete-on-request",
+            identifying=True,
+            consent="contract",
+            retention="30d",
+            deletion="delete-on-request",
         ),
     )
 
     restored = data.Passport.from_dict(manifest.to_dict())
 
     assert restored == manifest
-    assert restored.privacy.contains_pii is True
+    assert restored.privacy.identifying is True
 
 
-@pytest.mark.parametrize("sample_count", [True, 1.5])
-def test_modality_manifest_rejects_non_integer_sample_counts(sample_count):
+@pytest.mark.parametrize("samples", [True, 1.5])
+def test_modality_manifest_rejects_non_integer_sample_counts(samples):
     """Lifecycle counts must remain exact integers in persisted evidence."""
-    with pytest.raises(TypeError, match="sample_count must be an integer"):
+    with pytest.raises(TypeError, match="samples must be an integer"):
         data.Passport(
-            dataset_id="image-dataset",
-            snapshot_id="snapshot-1",
+            identifier="image-dataset",
+            snapshot="snapshot-1",
             modality="image",
             task="binary_classification",
-            sample_count=sample_count,
-            content_hash="b" * 64,
+            samples=samples,
+            digests={"content": "b" * 64},
         )
 
 

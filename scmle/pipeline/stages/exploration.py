@@ -111,7 +111,7 @@ class Exploration(admission.Admission):
         rules = charter.rules
         stage = prefilter.Prefilter(
             lambda columns: self.stress(context, task, charter, view, columns),
-            requested=bool(rules and rules.stability_filter),
+            requested=bool(rules and rules.stability),
             rows=len(view.features),
             seed=charter.seed,
         )
@@ -133,13 +133,13 @@ class Exploration(admission.Admission):
             rule=governing(
                 "ledger_rule",
                 spec.ledger_rule,
-                None if rules is None else rules.ledger_rule,
+                None if rules is None else rules.ledger,
                 "e-lond",
             ),
             policy=governing(
                 "failure_policy",
                 spec.confirmation_failure_policy,
-                None if rules is None else rules.failure_policy,
+                None if rules is None else rules.failure,
                 "unconfirmed",
             ),
             diagnostics=found.checks,
@@ -221,14 +221,14 @@ class Exploration(admission.Admission):
                 governing(
                     "confirmation_rule",
                     context.spec.confirmation_rule,
-                    None if rules is None else rules.confirmation_rule,
+                    None if rules is None else rules.confirmation,
                     "by",
                 )
             ),
             policy=governing(
                 "failure_policy",
                 context.spec.confirmation_failure_policy,
-                None if rules is None else rules.failure_policy,
+                None if rules is None else rules.failure,
                 "unconfirmed",
             ),
             claim_runner=runner,

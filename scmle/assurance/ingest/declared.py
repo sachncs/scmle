@@ -154,11 +154,11 @@ def reconcile(
                     tolerance,
                 )
             )
-        if table.checksum is not None and table.checksum_column is not None:
-            found_sum = sha(locate(frame, table.view, table.checksum_column))
+        if table.checksum is not None and table.column is not None:
+            found_sum = sha(locate(frame, table.view, table.column))
             checks.append(
                 check(
-                    f"{table.view}.checksum.{table.checksum_column}",
+                    f"{table.view}.checksum.{table.column}",
                     found_sum,
                     table.checksum,
                     0.0 if found_sum == table.checksum else 1.0,
@@ -255,12 +255,12 @@ def compare(
         checks.append(
             check(f"{view}.{name}", extract, theirs, gap / denominator, limit)
         )
-    if totals.checksum_column is not None:
-        column = locate(frame, view, totals.checksum_column)
+    if totals.column is not None:
+        column = locate(frame, view, totals.column)
         values = source.fetch(
             profile.statement(
                 "SELECT {c} FROM {t}",
-                c=profile.quote(totals.checksum_column),
+                c=profile.quote(totals.column),
                 t=profile.quote(table),
             )
         )
@@ -268,7 +268,7 @@ def compare(
         my_sum = sha(column)
         checks.append(
             {
-                "name": f"{view}.checksum.{totals.checksum_column}",
+                "name": f"{view}.checksum.{totals.column}",
                 "extract": my_sum,
                 "source": their_sum,
                 "gap": 0.0 if my_sum == their_sum else 1.0,

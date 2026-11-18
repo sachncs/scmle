@@ -120,54 +120,34 @@ def test_create_names_the_offending_argument_for_non_finite_input():
 
 
 def test_detector_tolerance_names_each_invalid_field():
-    with pytest.raises(ValueError, match=r"^detector_id must not be empty$"):
+    with pytest.raises(ValueError, match=r"^detector must not be empty$"):
         scmle.assurance.ledger.budget.Tolerance("  ", 0.1, 0.9)
-    with pytest.raises(
-        ValueError, match=r"^max_false_alarm_rate must be within"
-    ):
+    with pytest.raises(ValueError, match=r"^alarms must be within"):
         scmle.assurance.ledger.budget.Tolerance("d", 1.1, 0.9)
-    with pytest.raises(
-        ValueError, match=r"^min_recall_lower_bound must be within"
-    ):
+    with pytest.raises(ValueError, match=r"^recall must be within"):
         scmle.assurance.ledger.budget.Tolerance("d", 0.1, -0.1)
-    with pytest.raises(
-        ValueError, match=r"^min_recall_lower_bound must be a finite"
-    ):
+    with pytest.raises(ValueError, match=r"^recall must be a finite"):
         scmle.assurance.ledger.budget.Tolerance("d", 0.1, float("nan"))
 
 
 def test_detector_tolerance_accepts_the_probability_ends():
-    assert (
-        scmle.assurance.ledger.budget.Tolerance(
-            "d", 0.0, 1.0
-        ).min_recall_lower_bound
-        == 1.0
-    )
-    assert (
-        scmle.assurance.ledger.budget.Tolerance(
-            "d", 1.0, 0.0
-        ).max_false_alarm_rate
-        == 1.0
-    )
+    assert scmle.assurance.ledger.budget.Tolerance("d", 0.0, 1.0).recall == 1.0
+    assert scmle.assurance.ledger.budget.Tolerance("d", 1.0, 0.0).alarms == 1.0
 
 
 def test_error_budget_validation_messages():
-    with pytest.raises(
-        ValueError, match=r"^permutations_b must be at least 20$"
-    ):
+    with pytest.raises(ValueError, match=r"^permutations must be at least 20$"):
         make_budget(
-            permutations_b=scmle.assurance.ledger.budget.MIN_PERMUTATIONS - 1
+            permutations=scmle.assurance.ledger.budget.MIN_PERMUTATIONS - 1
         )
     assert (
         make_budget(
-            permutations_b=scmle.assurance.ledger.budget.MIN_PERMUTATIONS
-        ).permutations_b
+            permutations=scmle.assurance.ledger.budget.MIN_PERMUTATIONS
+        ).permutations
         == 20
     )
     good = make_budget()
-    with pytest.raises(
-        ValueError, match=r"^detector_tolerances must be a tuple$"
-    ):
+    with pytest.raises(ValueError, match=r"^tolerances must be a tuple$"):
         scmle.assurance.ledger.budget.ErrorBudget(
             good.confirmation,
             good.exploration,
@@ -175,10 +155,8 @@ def test_error_budget_validation_messages():
             [scmle.assurance.ledger.budget.Tolerance("d", 0.1, 0.9)],  # type: ignore[arg-type]
         )
     tolerance = scmle.assurance.ledger.budget.Tolerance("d", 0.1, 0.9)
-    with pytest.raises(
-        ValueError, match=r"^duplicate detector_id in detector_tolerances$"
-    ):
-        make_budget(detector_tolerances=(tolerance, tolerance))
+    with pytest.raises(ValueError, match=r"^duplicate detector in tolerances$"):
+        make_budget(tolerances=(tolerance, tolerance))
 
 
 def test_from_dict_names_the_unparseable_field():
@@ -229,15 +207,13 @@ def test_spend_error_messages_name_the_amount_and_the_wealth():
 
 def test_spend_keeps_the_initial_wealth_and_other_fields():
     budget = make_budget(
-        permutations_b=77,
-        detector_tolerances=(
-            scmle.assurance.ledger.budget.Tolerance("d", 0.1, 0.9),
-        ),
+        permutations=77,
+        tolerances=(scmle.assurance.ledger.budget.Tolerance("d", 0.1, 0.9),),
     )
     spent = scmle.assurance.ledger.budget.spend(budget, 0.04)
     assert spent.exploration.initial == budget.exploration.initial
-    assert spent.permutations_b == 77
-    assert spent.detector_tolerances == budget.detector_tolerances
+    assert spent.permutations == 77
+    assert spent.tolerances == budget.tolerances
 
 
 def test_spend_conserves_wealth_and_is_order_independent():

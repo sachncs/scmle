@@ -1,0 +1,25 @@
+{
+  "digest": "sha256:6c26f631631a9945640156cd72d7d36f1f8e4c7c394fc9ea7b2a3222f228b887",
+  "key": "fixture-key",
+  "record": {
+    "approved_at": "2026-11-01T00:00:00Z",
+    "approver": "manager",
+    "config_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "container_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "environment": "staging",
+    "evidence": {
+      "health": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "schema": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "format": 1,
+    "model": "churn",
+    "model_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "model_version": 3,
+    "provider": "aws",
+    "recorded_at": "2026-11-01T01:00:00Z",
+    "requested_by": "author",
+    "revision": "serve:1",
+    "signature": "c1501f7e21bc53cc8c2b32316472e67d37fbc7b06d224f7cd4bcf99c0073ac80",
+    "source_commit": "1111111111111111111111111111111111111111"
+  }
+}

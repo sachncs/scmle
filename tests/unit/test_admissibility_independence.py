@@ -225,12 +225,12 @@ def test_report_never_confirms_and_records_every_test():
     assert summary["status"] == "hypothesis"
     assert "confirm" not in " ".join(k for k in summary if k != "note")
     for check in report.checks:
-        assert check.set_id is Subset.EXPLORATION
+        assert check.subset is Subset.EXPLORATION
         assert check.tier is Tier.UNVERIFIED
         assert check.decision in (Decision.PASS, Decision.WARN)
-        assert check.seed_path[0] == 7
-    assert len({c.check_id for c in report.checks}) == len(report.checks)
-    assert len({c.seed_path for c in report.checks}) == len(report.checks)
+        assert check.seeds[0] == 7
+    assert len({c.identifier for c in report.checks}) == len(report.checks)
+    assert len({c.seeds for c in report.checks}) == len(report.checks)
 
 
 def test_falsification_threshold_is_inclusive(monkeypatch):

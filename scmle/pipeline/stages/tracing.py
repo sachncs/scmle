@@ -41,8 +41,8 @@ class Tracing(bracketing.Bracketing):
         selected = scmle.pipeline.context.require(context.selected, "selected")
         graph = lineage.Graph()
 
-        raw_digest = manifest.lineage.object_hashes.get(
-            "raw-source", manifest.data_hash
+        raw_digest = manifest.lineage.digests.get(
+            "raw-source", manifest.digests["data"]
         )
         graph.add_node(
             lineage.Node(
@@ -56,8 +56,8 @@ class Tracing(bracketing.Bracketing):
             lineage.Node(
                 "snapshot",
                 lineage.Kind.SNAPSHOT,
-                manifest.snapshot_id or manifest.data_hash,
-                {"dataset_id": manifest.dataset_id},
+                manifest.snapshot or manifest.digests["data"],
+                {"dataset_id": manifest.identifier},
             )
         )
         graph.connect(lineage.Edge("raw-source", "snapshot", "materializes"))

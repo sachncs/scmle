@@ -9,6 +9,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from scmle.contracts.data import provenance
 from scmle.trail import records
 
 BAR_WIDTH = 30
@@ -43,7 +44,9 @@ def exploratory(directory: Path) -> dict[str, Any]:
     """
     base = directory / records.RETAINED / "run"
     curation = records.read_json(base / "curation_report.json")
-    manifest = records.read_json(base / "dataset_manifest.json")
+    manifest = provenance.DatasetManifest.from_dict(
+        records.read_json(base / "dataset_manifest.json")
+    )
     feasibility = records.read_json(base / "feasibility.json")
     claims = records.read_json(base / "confirmed_claims.json")
     ledger = records.read_lines(base / "hypothesis_ledger.jsonl")
@@ -55,11 +58,11 @@ def exploratory(directory: Path) -> dict[str, Any]:
     body = {
         "kind": "exploratory_report",
         "dataset": {
-            "data_hash": manifest["data_hash"],
-            "schema_hash": manifest["schema_hash"],
-            "rows": manifest["row_count"],
-            "columns": manifest["column_count"],
-            "target": manifest["target"],
+            "data_hash": manifest.digests["data"],
+            "schema_hash": manifest.digests["schema"],
+            "rows": manifest.rows,
+            "columns": manifest.columns,
+            "target": manifest.target,
         },
         "profiled_rows": curation["profiled_rows"],
         "profiled_set": "exploration rows only",

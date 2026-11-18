@@ -9,8 +9,8 @@ import scmle.assurance.ledger.budget
 
 def fresh(**overrides):
     values = {
-        "alpha_promote": Fraction(1, 50),
-        "alpha_rollback": Fraction(1, 100),
+        "promotion": Fraction(1, 50),
+        "rollback": Fraction(1, 100),
     }
     values.update(overrides)
     return scmle.assurance.ledger.budget.DecisionBudget(**values)
@@ -73,9 +73,9 @@ def test_the_rollback_level_is_per_champion_and_leaves_promotion_alone():
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"alpha_promote": Fraction(0)},
-        {"alpha_promote": Fraction(1)},
-        {"alpha_rollback": Fraction(3, 2)},
+        {"promotion": Fraction(0)},
+        {"promotion": Fraction(1)},
+        {"rollback": Fraction(3, 2)},
         {"assigned": (("a", Fraction(1, 2)),)},
         {"assigned": (("a", Fraction(1, 100)), ("a", Fraction(1, 100)))},
         {"assigned": (("a", Fraction(-1, 100)),)},
@@ -90,7 +90,7 @@ def test_invalid_budgets_are_refused(overrides):
 
 def test_floats_are_read_as_written_and_records_reject_extras():
     budget = scmle.assurance.ledger.budget.DecisionBudget.create(0.02, 0.01)
-    assert budget.alpha_promote == Fraction(1, 50)
+    assert budget.promotion == Fraction(1, 50)
     record = budget.to_dict()
     assert (
         scmle.assurance.ledger.budget.DecisionBudget.from_dict(record) == budget

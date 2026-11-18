@@ -31,8 +31,8 @@ def budget_from(alpha, wealth):
         exploration=scmle.assurance.ledger.budget.ExplorationBudget(
             initial=wealth, wealth=wealth
         ),
-        permutations_b=scmle.assurance.ledger.budget.MIN_PERMUTATIONS,
-        detector_tolerances=(),
+        permutations=scmle.assurance.ledger.budget.MIN_PERMUTATIONS,
+        tolerances=(),
     )
 
 

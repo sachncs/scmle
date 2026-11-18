@@ -465,7 +465,7 @@ def admissibility(attest: bool) -> str | None:
     rows = [c for s, c in found.checks if s == qualify.ATTESTATION_SOURCE]
     if not rows:
         return None
-    return f"ledger check {rows[0].check_id}, tier {rows[0].tier.value}"
+    return f"ledger check {rows[0].identifier}, tier {rows[0].tier.value}"
 
 
 def unlabeled(policy: str) -> str | None:
@@ -524,7 +524,7 @@ def reconcile(drop: int) -> None:
                 "orders",
                 rows=100,
                 sums=(ingest.Total("amount", 5000.0),),
-                checksum_column="order_id",
+                column="order_id",
                 checksum=declared.sha(orders["order_id"]),
             ),
         )

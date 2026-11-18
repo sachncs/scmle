@@ -73,7 +73,7 @@ class Admission(identification.Identification):
         column = data.baseline_column
         if not column:
             return None
-        model = charter.cost_model
+        model = charter.costs
         if model is None or task is not tasks.Task.BINARY:
             raise errors.ConfigError(
                 "data.baseline_column needs a binary task and a charter with "
@@ -121,7 +121,7 @@ class Admission(identification.Identification):
             rule=rule if subject is None else subject,
             reference=None if subject is None else rule,
             model=model,
-            alpha=float(charter.error_budget.confirmation.alpha_confirm),
+            alpha=float(charter.budget.confirmation.alpha_confirm),
             baseline_column=column,
             group_column=data.group_column,
             classes=classes,

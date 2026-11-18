@@ -197,7 +197,7 @@ class Outputs(core.Core):
         frame = self.read_frame(history)
         if mapping is not None:
             frame = mapping.apply(frame, self.features)
-        clock, entity = self.schema.time_column, self.schema.group_column
+        clock, entity = self.schema.time, self.schema.group
         time_name = clock or "time"
         prepared = self.prepare(frame)
         stamps = pandas.to_datetime(frame[clock], errors="coerce")

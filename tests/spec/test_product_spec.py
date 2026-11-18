@@ -623,7 +623,7 @@ def test_l311_l321_decision_policy_examples():
     frame["c"] = rng.choice([f"k{i}" for i in range(200)], 300)
     frame["y"] = (rng.random(300) < 0.05).astype(int)
     plan = scmle.api.project.Project(frame, "y", time_budget=60).plan()
-    names = set(plan.candidate_models)
+    names = set(plan.candidates)
     assert (
         "dummy" in names and "logistic_regression" in names
     )  # baseline + linear
@@ -1151,7 +1151,7 @@ def test_l739_l747_first_sprint_outcomes(run):
 
     frame = make_frame()
     manifest = tabular.manifested(frame, "y", "<memory>")
-    assert manifest.row_count == len(frame)  # 3 ingestion
+    assert manifest.rows == len(frame)  # 3 ingestion
     profile = profiler.Profiler(
         tasks.Config(data=tasks.Dataset(uri="x", target="y"))
     ).profile(frame, manifest, tasks.Task.BINARY)
@@ -1190,7 +1190,7 @@ def test_l751_l761_frozen_api(frame, tmp_path):
         result.evaluation["task"] == "binary_classification"
     )  # alias resolved and recorded
     modified = dataclasses.replace(
-        plan, candidate_models=("dummy", "logistic_regression")
+        plan, candidates=("dummy", "logistic_regression")
     )
     assert {t.model_name for t in project.run(modified).trials} == {
         "dummy",
@@ -1323,7 +1323,7 @@ def test_l786_l801_risks_have_mitigations_and_candidates_are_whole_pipelines(
     assert hasattr(
         resampled, "resampler"
     )  # sampling policy part of the candidate
-    assert plan.metric and plan.validation_strategy  # evaluation configuration
+    assert plan.metric and plan.validation  # evaluation configuration
     bundle = scmle.artifacts.bundle.Manifest("m", "v1", "roc_auc")
     assert bundle.python and bundle.sklearn  # runtime requirements
 

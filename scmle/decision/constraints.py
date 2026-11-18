@@ -243,14 +243,14 @@ def satisfy(
             str(g)
             for table in tables.values()
             for g, counts in table.items()
-            if counts[1] < constraint.min_group
+            if counts[1] < constraint.minimum
         }
     )
     if small or len(names) < MIN_GROUPS:
         return Satisfaction(
             NOT_ASSESSABLE,
             constraint.criterion,
-            constraint.max_gap,
+            constraint.gap,
             None,
             None,
             tuple(small),
@@ -268,11 +268,11 @@ def satisfy(
                 abs(table[a][0] / table[a][1] - table[b][0] / table[b][1]),
             )
             upper = max(upper, abs(lo), abs(hi))
-    status = SATISFIED if upper <= constraint.max_gap else NOT_SATISFIED
+    status = SATISFIED if upper <= constraint.gap else NOT_SATISFIED
     return Satisfaction(
         status,
         constraint.criterion,
-        constraint.max_gap,
+        constraint.gap,
         point,
         upper,
         (),
@@ -358,7 +358,7 @@ def cluster_satisfaction_test(
             str(g)
             for table in tables.values()
             for g, counts in table.items()
-            if counts[1] < constraint.min_group
+            if counts[1] < constraint.minimum
         }
     )
     cluster_ids, inverse = numpy.unique(keys, return_inverse=True)
@@ -366,7 +366,7 @@ def cluster_satisfaction_test(
         return Satisfaction(
             NOT_ASSESSABLE,
             constraint.criterion,
-            constraint.max_gap,
+            constraint.gap,
             None,
             None,
             tuple(small),
@@ -411,11 +411,11 @@ def cluster_satisfaction_test(
     ).astype(float)
     resampled = spread(numpy.einsum("dk,krgp->drgp", weights, matrix))
     upper = max(point, float(numpy.quantile(resampled, 1.0 - alpha)))
-    status = SATISFIED if upper <= constraint.max_gap else NOT_SATISFIED
+    status = SATISFIED if upper <= constraint.gap else NOT_SATISFIED
     return Satisfaction(
         status,
         constraint.criterion,
-        constraint.max_gap,
+        constraint.gap,
         point,
         upper,
         (),
@@ -622,7 +622,7 @@ def equalize(
         raise errors.InputError(
             "group thresholds cannot target predictive parity"
         )
-    bound = margin * constraint.max_gap
+    bound = margin * constraint.gap
     common = (s >= t).astype(float)
     names = sorted(str(g) for g in numpy.unique(labels))
     gap = development_gap(outcomes, common, labels, constraint.criterion)
@@ -698,7 +698,7 @@ def frontier(
     """
     rows = []
     for gap in gaps:
-        trial = dataclasses.replace(constraint, max_gap=gap)
+        trial = dataclasses.replace(constraint, gap=gap)
         try:
             fitted = equalize(scores, y, groups, trial, t)
         except InfeasibleError:

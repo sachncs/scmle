@@ -39,7 +39,7 @@ class TrainStage(interface.Stage):
             The candidate count as text.
         """
         plan = scmle.pipeline.context.require(context.plan, "plan")
-        return f"{len(plan.candidate_models)} candidates"
+        return f"{len(plan.candidates)} candidates"
 
     def execute(self, context: scmle.pipeline.context.Context) -> None:
         """Runs every candidate, then searches strategies, tunes and ensembles.
@@ -64,7 +64,7 @@ class TrainStage(interface.Stage):
             )
         runner = trials.Runner(context)
         plan = scmle.pipeline.context.require(context.plan, "plan")
-        names = plan.candidate_models
+        names = plan.candidates
         for start in range(0, len(names), runner.workers):
             context.check_cancelled()
             chunk = names[start : start + runner.workers]

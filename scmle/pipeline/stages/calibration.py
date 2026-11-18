@@ -182,7 +182,7 @@ class Calibration(documentation.Documentation):
         if not path:
             return None
         charter = sealing.read_verified(str(path)).charter
-        if charter.unit_of_prediction != contracts.NEW_ENTITY:
+        if charter.purpose != contracts.NEW_ENTITY:
             return None
         return context.spec.data.group_column
 
@@ -247,6 +247,6 @@ class Calibration(documentation.Documentation):
         path = context.spec.charter_path
         if path:
             block = sealing.read_verified(str(path)).charter.uncertainty
-            if block is not None and block.cv_plus_max_bytes is not None:
-                return block.cv_plus_max_bytes
+            if block is not None and block.limit is not None:
+                return block.limit
         return cv_plus.MAX_BYTES

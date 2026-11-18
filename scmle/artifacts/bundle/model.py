@@ -107,20 +107,20 @@ def describe(
         dtypes={
             c: str(dev_features[c].dtype) for c in (*numeric, *categorical)
         },
-        known_categories=known,
+        categories=known,
         classes=class_labels
         if class_labels is not None
         else None
         if classes is None
         else tuple(numpy.asarray(classes).tolist()),
-        extra_inputs=extra,
+        extras=extra,
         series=tuple(n.model_dump(mode="json") for n in plan.series),
-        series_columns=series_columns,
-        graph_fingerprint=graph_fingerprint,
-        group_column=group_column,
-        time_column=time_column,
+        derived=series_columns,
+        digests={"graph": graph_fingerprint} if graph_fingerprint else {},
+        group=group_column,
+        time=time_column,
         targets=tuple(getattr(pipeline, "target_columns", ())),
-        optional_inputs=(
+        optional=(
             (pipeline.column,)
             if isinstance(pipeline, thresholds.Segmenter)
             else ()

@@ -263,7 +263,7 @@ def test_feature_tier_is_the_weakest_source_tier():
     )
     solo_table = synthesize.lineage(solo, 1.0, [attested])
     assert set(solo_table.tiers().values()) == {qualification.Tier.ATTESTED}
-    assert solo_table.fields[0].as_of.lead_seconds == 86_400.0
+    assert solo_table.fields[0].lead.seconds == 86_400.0
 
 
 def test_nested_features_are_depth_two_and_registered():

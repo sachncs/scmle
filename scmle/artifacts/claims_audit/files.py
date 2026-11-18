@@ -7,12 +7,29 @@ from typing import Any
 from scmle.assurance.ledger import confirm
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
+from scmle.contracts import records
 
 CHARTER_FILE = "analysis_charter.json"
 CUSTODY_FILE = "custody_log.jsonl"
 CONTROL_FILE = "negative_control.json"
 BASELINE_FILE = "baseline_report.json"
 CAUSAL_FILE = "causal_claims.json"
+
+
+def migrate(kind: Any, row: Any) -> records.Layout:
+    """Moves a stored claim or check row to its kind's current layout.
+
+    Only the keys move; the row is not validated, so a malformed row is
+    reported by the check that reads it rather than here.
+
+    Args:
+        kind: `qualification.Claim` or `qualification.Check`.
+        row: The stored row, at any supported schema version.
+
+    Returns:
+        The row at the current version.
+    """
+    return records.load(kind.__name__, kind.migrations, row)
 
 
 def recall(run_dir: str | Path) -> dict[str, Any]:

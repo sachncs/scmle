@@ -189,7 +189,7 @@ def test_graph_curation_reports_mixed_label_state():
         "str:source": 1,
         "unlabeled": 1,
     }
-    assert [finding.finding_id for finding in report.risk_findings] == [
+    assert [finding.identifier for finding in report.risk_findings] == [
         "risk.graph-mixed-label-state",
     ]
 
@@ -243,7 +243,7 @@ def test_temporal_graphs_fail_closed_on_mixed_or_invalid_time_state() -> None:
         "timed_edge_count": 1,
         "untimed_edge_count": 1,
     }
-    quality_ids = {finding.finding_id for finding in report.quality_findings}
+    quality_ids = {finding.identifier for finding in report.quality_findings}
     assert "quality.graph-mixed-temporal-state" in quality_ids
     with pytest.raises(ParseError, match="invalid event time"):
         link(

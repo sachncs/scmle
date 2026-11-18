@@ -544,7 +544,7 @@ def test_concurrent_incident_open_keeps_a_valid_chain(tmp_path):
     opened, failures = run_together(THREADS, work)
 
     assert not failures
-    assert len({incident.incident_id for incident in opened}) == 1
+    assert len({incident.identifier for incident in opened}) == 1
     assert len(workflow.read_events()) == 1
 
 
@@ -560,7 +560,7 @@ def test_concurrent_incident_transitions_keep_a_valid_chain(tmp_path):
 
     def work(index):
         workflow.acknowledge(
-            first.incident_id,
+            first.identifier,
             actor=f"op{index}",
             acknowledged_at="2026-10-20T12:02:00+00:00",
         )
@@ -639,7 +639,7 @@ def test_shadow_evaluator_keeps_observations_aligned(trained):
 def test_key_registry_register_has_exactly_one_winner():
     registry = keyring.Keyring()
     record = keyring.Credential(
-        key_id="k1", owner="release", created_at="2026-01-01T00:00:00+00:00"
+        key_id="k1", owner="release", created="2026-01-01T00:00:00+00:00"
     )
 
     def register(index):
@@ -697,7 +697,7 @@ def test_worker_client_is_a_singleton_per_process(monkeypatch):
 def test_bundle_remember_does_not_lose_rows():
     bundle = object.__new__(scmle.artifacts.bundle.Bundle)
     bundle.schema = type(
-        "Schema", (), {"series": [1], "group_column": "g", "time_column": "t"}
+        "Schema", (), {"series": [1], "group": "g", "time": "t"}
     )()
 
     class Builder:

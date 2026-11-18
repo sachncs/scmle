@@ -60,7 +60,7 @@ def test_small_groups_are_not_assessable_never_passing():
     groups = numpy.array([0] * 300 + [1] * 10)
     y = numpy.tile([1.0, 0.0], 155)
     acts = y.copy()
-    result = constraints.satisfy(y, acts, groups, constraint(min_group=30))
+    result = constraints.satisfy(y, acts, groups, constraint(minimum=30))
     assert result.status == constraints.NOT_ASSESSABLE
     assert result.small_groups == ("1",)
     assert result.point_gap is None
@@ -170,7 +170,7 @@ def test_clustered_rows_are_not_declared_satisfied_more_often_than_alpha():
     # test may make it in at most 7 percent of 400 worlds, and the row-wise
     # test, which treats the rows as independent, makes it at least 3 points
     # more often.
-    rule = constraint("demographic_parity", gap=0.05, min_group=30)
+    rule = constraint("demographic_parity", gap=0.05, minimum=30)
     worlds = 400
     rows = cluster_aware = 0
     for seed in range(worlds):
@@ -202,7 +202,7 @@ def test_cluster_aware_small_groups_and_bad_inputs():
         acts,
         groups,
         cluster,
-        constraint("demographic_parity", min_group=5000),
+        constraint("demographic_parity", minimum=5000),
     )
     assert small.status == constraints.NOT_ASSESSABLE
     with pytest.raises(ValueError):
@@ -227,7 +227,7 @@ def test_the_cluster_test_is_reproducible_and_reads_every_criterion():
         "equalized_odds",
         "predictive_parity",
     ):
-        rule = constraint(criterion, gap=0.5, min_group=30)
+        rule = constraint(criterion, gap=0.5, minimum=30)
         first = constraints.cluster_satisfaction_test(
             y, acts, groups, cluster, rule, draws=200, seed=4
         )

@@ -250,8 +250,8 @@ def certify(
     highs = [e.high for e in effects if e.high is not None]
     envelope = (min(lows), max(highs)) if lows and highs else None
     check = qualification.Check(
-        check_id=f"{estimation.DETECTOR_ID}:{name}",
-        null_hypothesis="the finding's sign and size are unaffected by "
+        identifier=f"{estimation.DETECTOR_ID}:{name}",
+        null="the finding's sign and size are unaffected by "
         "the declared analysis choices",
         statistic=float(numbers["sign_share"] or 0.0),
         p_value=None if curve is None else curve.p_median,
@@ -263,8 +263,8 @@ def certify(
             if status == estimation.STABLE
             else certificates.demote(qualification.Decision.QUARANTINE, gate)
         ),
-        set_id=qualification.Subset.EXPLORATION,
-        seed_path=randomness.seed_path(seed, f"f6.stability.{name}", 0),
+        subset=qualification.Subset.EXPLORATION,
+        seeds=randomness.seed_path(seed, f"f6.stability.{name}", 0),
         tier=qualification.Tier.UNVERIFIED,
     )
     if check.p_value is None and check.interval is None:

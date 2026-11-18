@@ -33,18 +33,18 @@ def harness(tmp_path):
 def test_harness_persists_digest_bound_evidence_and_passes_scenario(tmp_path):
     runner = harness(tmp_path)
     scenario = reliability.Contingency.PARTIAL_WRITE
-    requirements = runner.registry.plans[scenario].evidence_requirements
+    requirements = runner.registry.plans[scenario].requirements
 
     plan = runner.run(
         scenario, lambda current_scenario: tuple(map(artifact, requirements))
     )
 
-    assert plan.verification_status is reliability.Verification.PASSED
+    assert plan.verification is reliability.Verification.PASSED
     for evidence in plan.evidence:
-        path = tmp_path / evidence.artifact_uri.rsplit("/", 1)[-1]
+        path = tmp_path / evidence.uri.rsplit("/", 1)[-1]
         assert path.exists()
         assert (
-            evidence.artifact_digest
+            evidence.digests["artifact"]
             == hashlib.sha256(path.read_bytes()).hexdigest()
         )
 
@@ -58,7 +58,7 @@ def test_harness_keeps_partial_executor_output_inconclusive(tmp_path):
         lambda current_scenario: (artifact("signature_tampering"),),
     )
 
-    assert plan.verification_status is reliability.Verification.INCONCLUSIVE
+    assert plan.verification is reliability.Verification.INCONCLUSIVE
 
 
 def test_harness_rejects_duplicate_evidence_before_writing(tmp_path):

@@ -16,6 +16,8 @@ import json
 import pathlib
 from typing import Any
 
+from scmle.contracts import records
+from scmle.contracts.data import provenance
 from scmle.evaluation import parameter_estimation
 
 EXACT = "exact"
@@ -136,7 +138,15 @@ def compare(
         notes.append("environments differ; exact replay is not guaranteed")
     if first["config"] != second["config"]:
         reasons.append("configurations differ")
-    if first["dataset"]["data_hash"] != second["dataset"]["data_hash"]:
+    datasets = [
+        records.load(
+            provenance.DatasetManifest.__name__,
+            provenance.DatasetManifest.migrations,
+            record["dataset"],
+        )["digests"]["data"]
+        for record in (first, second)
+    ]
+    if datasets[0] != datasets[1]:
         reasons.append("datasets differ")
     if first["split"] != second["split"]:
         reasons.append("splits differ")

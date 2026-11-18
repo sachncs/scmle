@@ -105,13 +105,13 @@ def test_the_wilson_interval_agrees_with_scipy_on_every_frozen_case():
             abs_tol=1e-15,
         )
         record = qualification.Certificate(
-            detector_id="d",
-            defect_type="t",
+            detector="d",
+            defect="t",
             planted=given["n"],
             detected=given["successes"],
-            clean_rows=1,
-            false_alarms=0,
-            seed_path=(0, "x", 0),
+            clean=1,
+            alarms=0,
+            seeds=(0, "x", 0),
         )
         oracles.assert_agrees(
             record.recall_lower_bound(given["confidence"]),

@@ -26,7 +26,7 @@ def spec(**changes) -> causal.Question:
             "no_interference",
         ),
         "strategies": ("backdoor_aipw",),
-        "negative_controls": (causal.Control("outcome", "prior"),),
+        "controls": (causal.Control("outcome", "prior"),),
         "strata": ("region",),
         "sensitivity": causal.Confounding("strongest_observed", 1.0),
     }
@@ -69,7 +69,7 @@ def test_the_block_round_trips_and_needs_format_four():
         {"strategies": ("did", "backdoor_aipw")},
         {"strata": ("period",)},
         {"sensitivity": causal.Confounding("fixed", 0.1)},
-        {"negative_controls": ()},
+        {"controls": ()},
     ],
 )
 def test_the_hash_changes_with_any_causal_field(changes):
@@ -92,7 +92,7 @@ def test_a_causal_block_needs_a_causal_kind():
         ({"assumptions": ("positivity", "positivity")}, "duplicate"),
         ({"strategies": ("did", "did")}, "duplicate"),
         ({"trim": 0.5}, "trim"),
-        ({"min_share": 0.0}, "min_share"),
+        ({"retained": 0.0}, "retained"),
         ({"assumptions": ["positivity"]}, "tuple"),
     ],
 )
@@ -108,11 +108,11 @@ def test_covariates_are_read_from_the_attestation():
 
 
 def test_m_max_is_part_of_the_hash_and_must_not_be_negative():
-    one = causal_charter(sensitivity=causal.Confounding(m_max=1.0))
-    two = causal_charter(sensitivity=causal.Confounding(m_max=2.0))
+    one = causal_charter(sensitivity=causal.Confounding(multiple=1.0))
+    two = causal_charter(sensitivity=causal.Confounding(multiple=2.0))
     assert one.charter_hash != two.charter_hash
-    with pytest.raises(ValueError, match="m_max"):
-        causal.Confounding(m_max=-1.0)
+    with pytest.raises(ValueError, match="multiple"):
+        causal.Confounding(multiple=-1.0)
 
 
 def test_a_fixed_benchmark_is_a_partial_r2():
@@ -148,7 +148,7 @@ def format_four_charter():
         assumptions=("positivity",),
         strategies=("backdoor_aipw",),
         strata=("region",),
-        negative_controls=(),
+        controls=(),
         sensitivity=None,
         treatment="t",
         outcome="y",

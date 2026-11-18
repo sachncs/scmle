@@ -47,9 +47,9 @@ class Documentation(releasing.Releasing):
         )
         bundle_digest = scmle.artifacts.bundle.shasum(model_manifest)
         snapshot = explanations.Snapshot(
-            identifier=manifest.dataset_id,
-            version=manifest.snapshot_id or manifest.data_hash,
-            digest=manifest.data_hash,
+            identifier=manifest.identifier,
+            version=manifest.snapshot or manifest.digests["data"],
+            digest=manifest.digests["data"],
         )
         feature_graph = explanations.Lineage(
             version=context.spec.feature_graph.version,
@@ -157,12 +157,10 @@ class Documentation(releasing.Releasing):
             "software_version": scmle.__version__,
             "config_hash": context.spec.config_hash(),
             "dataset": {
-                "snapshot_id": manifest.snapshot_id or manifest.data_hash,
-                "dataset_id": manifest.dataset_id,
-                "data_hash": manifest.data_hash,
-                "raw_source_hash": manifest.lineage.object_hashes.get(
-                    "raw-source"
-                ),
+                "snapshot_id": manifest.snapshot or manifest.digests["data"],
+                "dataset_id": manifest.identifier,
+                "data_hash": manifest.digests["data"],
+                "raw_source_hash": manifest.lineage.digests.get("raw-source"),
             },
             "model": {
                 "manifest_path": (

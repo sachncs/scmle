@@ -63,7 +63,7 @@ Delayed labels become 0/1 losses and business outcomes become
 both go to `Loop.mature`, for the serving model and for each challenger on the
 same cases. Raw labels and outcomes are kept in `retained_outcomes.jsonl`.
 
-The loop's own alarm still does **not** gate retraining. `alarm_gates_retrain`
+The loop's own alarm still does **not** gate retraining. The policy's `retrain`
 stays False because the loop's detection-delay gates (H2, H10) missed their
 floors; the alarm records a row and opens an `l1_alarm_investigate`
 escalation, and trains nothing. Retraining comes from `RetrainPolicy`:

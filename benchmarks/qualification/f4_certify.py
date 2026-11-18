@@ -240,13 +240,13 @@ def certify_leakage(workers: int = 1) -> tuple[Any, dict[str, Any]]:
         recalls[defect] = detected
         results.append(
             qualification.Certificate(
-                detector_id=leakage.DETECTOR_ID,
-                defect_type=defect,
+                detector=leakage.DETECTOR_ID,
+                defect=defect,
                 planted=PLANT_REPLICATES,
                 detected=detected,
-                clean_rows=NULL_REPLICATES,
-                false_alarms=false_alarms,
-                seed_path=randomness.seed_path(0, "f4.certify.leakage", 0),
+                clean=NULL_REPLICATES,
+                alarms=false_alarms,
+                seeds=randomness.seed_path(0, "f4.certify.leakage", 0),
             )
         )
     cert = certificates.certify(

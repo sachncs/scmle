@@ -9,17 +9,17 @@ from scmle.contracts import reliability
 
 
 def make_evidence(
-    evidence_type: str,
+    kind: str,
     outcome: reliability.Outcome = (reliability.Outcome.SAFE_OUTCOME_OBSERVED),
 ) -> reliability.Evidence:
     """Build one concrete evidence record for contract tests."""
     return reliability.Evidence(
-        evidence_type=evidence_type,
-        execution_id="fault-run-2026-10-20-001",
-        artifact_uri=f"artifact://faults/{evidence_type}.json",
-        artifact_digest=f"sha256:{evidence_type}",
-        observed_outcome=outcome,
-        recorded_at="2026-10-20T10:00:00+00:00",
+        kind=kind,
+        execution="fault-run-2026-10-20-001",
+        uri=f"artifact://faults/{kind}.json",
+        digests={"artifact": f"sha256:{kind}"},
+        outcome=outcome,
+        recorded="2026-10-20T10:00:00+00:00",
         reviewer="reliability-reviewer",
         observation="Observed safe terminal behavior with no partial publication.",
     )
@@ -32,11 +32,11 @@ def make_plan(
     """Build one representative scenario plan."""
     return reliability.Plan(
         scenario=reliability.Contingency.PROCESS_DEATH,
-        expected_safe_outcome=reliability.SafeOutcome.RESUME_DURABLE_CHECKPOINT,
+        outcome=reliability.SafeOutcome.RESUME_DURABLE_CHECKPOINT,
         recoverability=reliability.Recoverability.AUTOMATIC,
-        evidence_requirements=("process_termination", "checkpoint_resume"),
-        release_blocking=True,
-        verification_status=status,
+        requirements=("process_termination", "checkpoint_resume"),
+        blocking=True,
+        verification=status,
         evidence=evidence,
     )
 
@@ -46,19 +46,19 @@ def test_default_plan_declares_every_required_scenario_without_claiming_executio
 
     assert set(registry.plans) == set(reliability.Contingency)
     assert all(
-        plan.verification_status is reliability.Verification.PLANNED
+        plan.verification is reliability.Verification.PLANNED
         for plan in registry.plans.values()
     )
-    assert all(plan.release_blocking for plan in registry.plans.values())
+    assert all(plan.blocking for plan in registry.plans.values())
 
 
 def test_default_plan_has_explicit_safe_outcome_recovery_and_evidence_requirements():
     plans = reliability.drills()
 
     assert len(plans) == len(reliability.Contingency)
-    assert all(plan.expected_safe_outcome for plan in plans)
+    assert all(plan.outcome for plan in plans)
     assert all(plan.recoverability for plan in plans)
-    assert all(plan.evidence_requirements for plan in plans)
+    assert all(plan.requirements for plan in plans)
 
 
 def test_passed_scenario_requires_all_safe_execution_evidence():
@@ -72,7 +72,7 @@ def test_passed_scenario_requires_all_safe_execution_evidence():
         evidence=evidence,
     )
 
-    assert plan.verification_status is reliability.Verification.PASSED
+    assert plan.verification is reliability.Verification.PASSED
 
 
 @pytest.mark.parametrize(
@@ -113,14 +113,14 @@ def test_passed_scenario_rejects_unsafe_evidence():
 
 
 def test_evidence_rejects_empty_review_fields():
-    with pytest.raises(ValueError, match="artifact_digest"):
+    with pytest.raises(ValueError, match=r"digests\.artifact"):
         make_evidence("process_termination").__class__(
-            evidence_type="process_termination",
-            execution_id="run-1",
-            artifact_uri="artifact://run/evidence.json",
-            artifact_digest=" ",
-            observed_outcome=reliability.Outcome.SAFE_OUTCOME_OBSERVED,
-            recorded_at="2026-10-20T10:00:00+00:00",
+            kind="process_termination",
+            execution="run-1",
+            uri="artifact://run/evidence.json",
+            digests={"artifact": " "},
+            outcome=reliability.Outcome.SAFE_OUTCOME_OBSERVED,
+            recorded="2026-10-20T10:00:00+00:00",
             reviewer="reviewer",
             observation="observed",
         )
@@ -185,7 +185,7 @@ def test_registry_marks_a_scenario_passed_only_after_full_safe_evidence():
         ),
     )
 
-    assert plan.verification_status is reliability.Verification.PASSED
+    assert plan.verification is reliability.Verification.PASSED
     assert registry.plans[reliability.Contingency.PROCESS_DEATH] == plan
 
 
@@ -197,10 +197,7 @@ def test_registry_marks_unsafe_evidence_failed_and_incomplete_safe_evidence_inco
         reliability.Contingency.PROCESS_DEATH,
         (make_evidence("process_termination"),),
     )
-    assert (
-        inconclusive.verification_status
-        is reliability.Verification.INCONCLUSIVE
-    )
+    assert inconclusive.verification is reliability.Verification.INCONCLUSIVE
 
     failed = registry.log(
         reliability.Contingency.PROCESS_DEATH,
@@ -212,7 +209,7 @@ def test_registry_marks_unsafe_evidence_failed_and_incomplete_safe_evidence_inco
             ),
         ),
     )
-    assert failed.verification_status is reliability.Verification.FAILED
+    assert failed.verification is reliability.Verification.FAILED
 
 
 def test_registry_rejects_evidence_not_declared_by_scenario():
@@ -231,10 +228,10 @@ def test_registry_rejects_evidence_mixed_across_executions():
     registry = reliability.Registry()
     registry.register(make_plan())
     second_execution = dataclasses.replace(
-        make_evidence("checkpoint_resume"), execution_id="fault-run-002"
+        make_evidence("checkpoint_resume"), execution="fault-run-002"
     )
 
-    with pytest.raises(ValueError, match="execution_id"):
+    with pytest.raises(ValueError, match="execution"):
         registry.log(
             reliability.Contingency.PROCESS_DEATH,
             (make_evidence("process_termination"), second_execution),

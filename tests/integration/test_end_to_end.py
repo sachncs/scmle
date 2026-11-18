@@ -115,14 +115,14 @@ def test_csv_input_and_plan_without_side_effects(binary_frame, tmp_path):
     )
     plan = project.plan()
     assert not (tmp_path / "runs").exists()
-    assert project.profile is not None and "dummy" in plan.candidate_models
-    assert project.run(plan).plan.plan_id == plan.plan_id
+    assert project.profile is not None and "dummy" in plan.candidates
+    assert project.run(plan).plan.identifier == plan.identifier
 
 
 def test_approved_plan_restricts_models(binary_frame, tmp_path):
     project = support.make_project(binary_frame, "y", output_dir=tmp_path)
     plan = dataclasses.replace(
-        project.plan(), candidate_models=("dummy", "logistic_regression")
+        project.plan(), candidates=("dummy", "logistic_regression")
     )
     result = project.run(plan)
     assert {t.model_name for t in result.trials} == {
@@ -277,10 +277,10 @@ def test_a_modified_plan_changes_validation_budget_and_metric(
     plan = project.plan()
     modified = dataclasses.replace(
         plan,
-        validation_strategy="random",
+        validation="random",
         metric="pr_auc",
-        optimization_budget_seconds=250,
-        candidate_models=("dummy", "logistic_regression"),
+        budget=250,
+        candidates=("dummy", "logistic_regression"),
     )
     result = project.run(modified)
     assert result.evaluation["split_strategy"] == "random"
@@ -305,7 +305,7 @@ def test_a_plan_for_another_task_or_an_impossible_strategy_is_refused(
     wrong_task = dataclasses.replace(plan, task="regression")
     with pytest.raises(errors.ConfigError, match="approved plan is for"):
         project.run(wrong_task)
-    impossible = dataclasses.replace(plan, validation_strategy="group")
+    impossible = dataclasses.replace(plan, validation="group")
     with pytest.raises(pydantic.ValidationError, match="group_column"):
         support.make_project(binary_frame, "y", output_dir=tmp_path / "x").run(
             impossible
@@ -490,7 +490,7 @@ def test_a_delayed_column_is_used_only_through_its_lagged_copy(tmp_path):
         n.name == "report__available" for n in project.spec.feature_graph.nodes
     )
     assert "report__available" in result.bundle.features or (
-        "report__available" in result.bundle.schema.series_columns
+        "report__available" in result.bundle.schema.derived
     )
 
 

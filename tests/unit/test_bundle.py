@@ -289,7 +289,7 @@ def test_unsigned_bundles_are_refused_unless_trusted(
     trained, tmp_path, monkeypatch
 ):
     # Enforces docs/GLOSSARY.md:603.
-    # Enforces docs/ARTIFACTS.md:102.
+    # Enforces docs/ARTIFACTS.md:108.
     # Enforces README.md:135 and docs/START_HERE.md:433.
     # Enforces docs/BEGINNER_FINDINGS.md:37.
     monkeypatch.delenv(scmle.contracts.signing.SIGNING_KEY_ENV, raising=False)
@@ -307,7 +307,7 @@ def test_unsigned_bundles_are_refused_unless_trusted(
 def test_signed_bundles_load_without_trust_and_detect_tampering(
     trained, tmp_path, monkeypatch
 ):
-    # Enforces docs/ARTIFACTS.md:102.
+    # Enforces docs/ARTIFACTS.md:108.
     # Enforces docs/BENCHMARKS.md:18.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:437.
     # Enforces README.md:135.

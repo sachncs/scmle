@@ -109,7 +109,7 @@ def test_missing_configured_column(classification_frame):
 
 
 def test_leaky_feature_flagged(classification_frame):
-    # Enforces docs/ARTIFACTS.md:26.
+    # Enforces docs/ARTIFACTS.md:32.
     leaky = classification_frame.assign(leak=classification_frame["y"] * 10 + 1)
     result = profile(leaky)[1]
     assert any("'leak'" in finding for finding in result.risk_findings)

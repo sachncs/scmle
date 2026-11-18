@@ -116,9 +116,7 @@ def test_a_trial_past_the_hard_ceiling_is_killed_and_the_run_continues(
         output_dir=tmp_path,
     )
     project.orchestrator.registry = registry
-    plan = dataclasses.replace(
-        project.plan(), candidate_models=("dummy", "sleepy")
-    )
+    plan = dataclasses.replace(project.plan(), candidates=("dummy", "sleepy"))
     started = time.monotonic()
     result = project.run(plan)
     # No grace past the budget: the sleeper is killed when the trial window

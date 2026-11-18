@@ -26,8 +26,8 @@ def test_measured_floors_are_recomputed_from_counts():
     high = certificates.wilson_interval(
         labels["false_alarms"], labels["clean"]
     )[1]
-    assert low >= framing_certify.LABEL_POLICY.recall_floor
-    assert high <= framing_certify.LABEL_POLICY.false_alarm_ceiling
+    assert low >= framing_certify.LABEL_POLICY.recall
+    assert high <= framing_certify.LABEL_POLICY.alarms
     assert document["schema_fuzz"]["accepted"] == 0
 
 

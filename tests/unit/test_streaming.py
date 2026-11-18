@@ -194,7 +194,7 @@ def test_stream_checkpoint_binds_snapshot_offset_and_watermark(tmp_path):
 
     assert first.start_offset == 0
     assert first.next_checkpoint.offset == 2
-    assert first.next_checkpoint.watermark_column == "event_time"
+    assert first.next_checkpoint.column == "event_time"
     assert first.next_checkpoint.watermark.endswith("10:01:00+00:00")
     assert first.has_more
     assert second.start_offset == 2
@@ -203,7 +203,7 @@ def test_stream_checkpoint_binds_snapshot_offset_and_watermark(tmp_path):
     assert not second.has_more
 
     changed = dataclasses.replace(
-        first.next_checkpoint, snapshot_sha256="0" * 64
+        first.next_checkpoint, digests={"snapshot": "0" * 64}
     )
     with pytest.raises(
         streaming.StreamingError, match="does not match the checkpoint"
@@ -243,7 +243,7 @@ def test_transactional_sink_binds_receipt_ack_and_checkpoint_durably(
     retry_sink = RecordingSink(sink_receipt)
     second = reopened.commit_transaction(batch, retry_sink, acknowledgement)
     durable = json.loads(ledger.path.read_text(encoding="utf-8"))
-    evidence = durable["transaction_evidence"][0]
+    evidence = durable["commitments"][0]
 
     assert first.accepted and not first.duplicate
     assert second.duplicate and not second.accepted
@@ -251,8 +251,8 @@ def test_transactional_sink_binds_receipt_ack_and_checkpoint_durably(
     assert second.sink_receipt == sink_receipt
     assert sink.committed_batch_ids == [batch.batch_id]
     assert retry_sink.committed_batch_ids == []
-    assert evidence["batch_id"] == batch.batch_id
-    assert evidence["sink_receipt"]["receipt"] == "sink-receipt-1"
+    assert evidence["batch"] == batch.batch_id
+    assert evidence["receipt"]["receipt"] == "sink-receipt-1"
     assert evidence["acknowledgement"]["checkpoint"] == (
         batch.next_checkpoint.to_dict()
     )
@@ -289,7 +289,7 @@ def test_transactional_sink_rejects_receipts_not_bound_to_the_batch(
         )
     elif receipt_kind == "source":
         other_checkpoint = dataclasses.replace(
-            batch.next_checkpoint, source_identity="other-events.csv"
+            batch.next_checkpoint, source="other-events.csv"
         )
         receipt = streaming.Voucher(
             "other-events.csv",
@@ -377,7 +377,7 @@ def test_stream_ledger_commits_idempotently_and_persists_checkpoint(tmp_path):
     assert len(written) == 1
     assert written[0][1] == batch.batch_id
     assert reopened.load().checkpoint.offset == 2
-    assert batch.batch_id in reopened.load().committed_batch_ids
+    assert batch.batch_id in reopened.load().committed
 
 
 def test_stream_consumer_retries_ack_after_restart_without_replaying_writer(
@@ -421,7 +421,7 @@ def test_stream_consumer_retries_ack_after_restart_without_replaying_writer(
 
     assert second.accepted
     assert len(written) == 2
-    assert [item.batch_id for item in acknowledgements] == [
+    assert [item.batch for item in acknowledgements] == [
         written[0][1],
         written[1][1],
     ]

@@ -131,7 +131,7 @@ def test_streaming_models_are_not_candidates_for_ordinary_runs(tmp_path):
         frame, "y", time_budget=300, output_dir=tmp_path
     ).plan()
 
-    assert "sgd_logistic" not in plan.candidate_models
+    assert "sgd_logistic" not in plan.candidates
     reasons = [
         d.reason for d in plan.decisions if d.technique == "sgd_logistic"
     ]

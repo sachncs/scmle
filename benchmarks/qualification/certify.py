@@ -140,13 +140,13 @@ def certify_detector(
             detected += int((flags & truth).sum())
         results.append(
             qualification.Certificate(
-                detector_id=detector_id,
-                defect_type=plan.defect_type,
+                detector=detector_id,
+                defect=plan.defect_type,
                 planted=planted,
                 detected=detected,
-                clean_rows=len(frame),
-                false_alarms=int(clean_flags.sum()),
-                seed_path=randomness.seed_path(
+                clean=len(frame),
+                alarms=int(clean_flags.sum()),
+                seeds=randomness.seed_path(
                     seeds[0], f"certify.{detector_id}", 0
                 ),
             )

@@ -147,9 +147,7 @@ def test_a_trial_past_the_memory_limit_is_killed_on_a_ray_worker(
     registry = scmle.models.registry.Catalog.stock()
     registry.register(support.HungryAdapter())
     project.orchestrator.registry = registry
-    plan = dataclasses.replace(
-        project.plan(), candidate_models=("dummy", "hungry")
-    )
+    plan = dataclasses.replace(project.plan(), candidates=("dummy", "hungry"))
 
     result = project.run(plan)
 

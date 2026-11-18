@@ -166,7 +166,7 @@ def test_curation_reports_duplicate_and_sampling_findings():
     assert report.modality == "image"
     assert report.profile["duplicate_count"] == 0
     assert report.profile["truncated"] is True
-    assert [finding.finding_id for finding in report.quality_findings] == [
+    assert [finding.identifier for finding in report.quality_findings] == [
         "quality.image-profile-truncated",
     ]
     assert report.profile["label_counts"] == {"unlabeled": 2}
@@ -201,7 +201,7 @@ def test_near_duplicate_and_augmentation_provenance_are_explicit():
         "external_parent_sources": [],
     }
     assert "quality.image-near-duplicate-content" in {
-        finding.finding_id for finding in report.quality_findings
+        finding.identifier for finding in report.quality_findings
     }
 
 
@@ -239,7 +239,7 @@ def test_curation_reports_mixed_label_state():
         "str:dark": 1,
         "unlabeled": 1,
     }
-    assert [finding.finding_id for finding in report.risk_findings] == [
+    assert [finding.identifier for finding in report.risk_findings] == [
         "risk.image-mixed-label-state",
     ]
 
@@ -257,7 +257,7 @@ def test_curation_blocks_conflicting_duplicate_labels():
 
     assert report.profile["conflicting_label_groups"]
     assert report.release_ready is False
-    assert [finding.finding_id for finding in report.risk_findings] == [
+    assert [finding.identifier for finding in report.risk_findings] == [
         "risk.image-conflicting-duplicate-labels",
     ]
 
@@ -277,7 +277,7 @@ def test_curation_blocks_sensitive_exif_metadata():
 
     assert report.profile["sensitive_metadata"] == ["artist", "gps_info"]
     assert report.release_ready is False
-    assert [finding.finding_id for finding in report.risk_findings] == [
+    assert [finding.identifier for finding in report.risk_findings] == [
         "risk.image-sensitive-metadata",
     ]
 

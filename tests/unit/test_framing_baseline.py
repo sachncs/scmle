@@ -123,7 +123,7 @@ def test_claim_is_issued_with_a_real_gain_and_only_once():
     report = g.evaluate(y, a, b, group, rule=RULE, model=MODEL)
     assert report.issued and report.status == "issued"
     assert report.claim.tier is qualification.Tier.CONFIRMED
-    assert {c.set_id for c in report.checks} == {
+    assert {c.subset for c in report.checks} == {
         qualification.Subset.CONFIRMATION
     }
     assert report.to_dict()["registration_hash"] == (

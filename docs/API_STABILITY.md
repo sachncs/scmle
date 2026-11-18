@@ -101,11 +101,11 @@ Charter format 10 adds the optional `uncertainty` block
 snapshot is unchanged); a charter of format 9 or older keeps its hash and
 signature.
 
-Charter format 11 adds the optional `coverage_on_confirmation` field of the
-`uncertainty` block (`scmle.assurance.charter.uncertainty.Uncertainty`, an
-extension surface; a format 10 charter keeps its hash and signature, both
-pinned). `scmle.assurance.coverage_confirm`, `coverage.undercovered`,
-`coverage_slices.flag_gate` and `FlagGate` are additions (extension
+Charter format 11 adds the optional `coverage_on_confirmation` field (stored
+as `confirmatory` since Stage B) of the `uncertainty` block (an extension
+surface, `scmle.assurance.charter.uncertainty.Uncertainty`; a format 10 charter
+keeps its hash and signature, both pinned). `scmle.assurance.coverage_confirm`,
+`coverage.undercovered`, `coverage_slices.flag_gate` and `FlagGate` are additions (extension
 surfaces); the per-slice records of `coverage_report.json` gained `flag`,
 `flag_p_value` and `flag_certified`, and the slice summary `flagged`,
 `flag_margin` and `flag_gate`. `claims verify` gained the step "coverage claim
@@ -138,8 +138,8 @@ alone. A charter run with a decision block now also writes `decision_report.json
 
 Uncertainty (F12). `Bundle.predict_set` gained the optional argument
 `conditional` (default `None`, the previous behaviour). `conformal.json` gained
-`class_scores`; bundles saved earlier load and answer pooled queries, and
-`conditional="class"` raises for them. `ForecastMetric` gained the field
+`conditional` (stored as `class_scores` before Stage B); bundles saved earlier
+load and answer pooled queries, and `conditional="class"` raises for them. `ForecastMetric` gained the field
 `scale` and the kinds `mase_same_rows` and `mase_insample`. The metric named
 `mase` is unchanged and is the same-rows score (the model's error divided by
 the no-change error on the evaluation rows); it is not the usual MASE and is
@@ -160,7 +160,7 @@ shuffle; plain tables are shuffled as before. `scmle.monitoring.sequential_tests
 `scmle.governance.deployment_ledger`, `scmle.governance.never_list`,
 `scmle.governance.loop` and the command `scmle loop` are extension surfaces
 like the other qualification modules. A `Preregistration` does not let an alarm
-retrain unless `alarm_gates_retrain` is set, and it should be set only when
+retrain unless `retrain` is set, and it should be set only when
 `python -m benchmarks.qualification --check loop` lists the detection-delay
 gate H2 as passed for the policy's settings (today it is descriptive).
 `ModelRegistryStore` gained the optional `guard` and `scope` arguments, the

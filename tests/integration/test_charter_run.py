@@ -17,7 +17,7 @@ KEY = "integration-key"
 
 
 def inscribe(tmp_path, **overrides):
-    values = {"min_effect": 0.5, "k_max": 3}
+    values = {"effect": 0.5, "quota": 3}
     values.update(overrides)
     path = tmp_path / "charter.json"
     sealing.inscribe(path, make_charter(**values), signing_key=KEY)
@@ -94,9 +94,9 @@ def test_profiling_sees_exploration_rows_only(binary_frame, tmp_path):
     manifest = json.loads(
         (pathlib.Path(governed.run_dir) / "split_manifest.json").read_text()
     )
-    assert profiled(governed) == len(manifest["exploration_ids"])
+    assert profiled(governed) == len(manifest["sets"]["exploration"])
     assert profiled(governed) < profiled(plain)
-    assert set(manifest["final_test_ids"]) == set(
+    assert set(manifest["sets"]["final"]) == set(
         json.loads(
             (
                 pathlib.Path(plain.run_dir) / "validation_manifest.json"
@@ -238,7 +238,7 @@ def test_a_certified_leakage_suspect_is_quarantined_and_ledgered(
     ]
     diagnostics = [r for r in rows if r["kind"] == "diagnostic"]
     assert diagnostics
-    assert {r["body"]["check"]["set_id"] for r in diagnostics} == {"X"}
+    assert {r["body"]["check"]["subset"] for r in diagnostics} == {"X"}
     plan = json.loads((folder / "dataset_profile.json").read_text())
     assert "echo" not in plan["feature_plan"]["numeric"]
     assert (
@@ -291,7 +291,7 @@ def test_a_valid_attestation_keeps_a_certified_suspect_and_is_ledgered(
         "statement": "echo is the clinic's own earlier reading",
         "evidence": "ticket DATA-7",
         "date": "2020-01-01",
-        "scope": make_charter(min_effect=0.5, k_max=3).charter_hash,
+        "scope": make_charter(effect=0.5, quota=3).charter_hash,
         "expires": "2099-01-01",
     }
     path = tmp_path / "attestations.json"
@@ -318,7 +318,7 @@ def test_a_valid_attestation_keeps_a_certified_suspect_and_is_ledgered(
         r["body"]["check"]
         for r in rows
         if r["kind"] == "diagnostic"
-        and r["body"]["check"]["check_id"] == "leakage.attestation:echo"
+        and r["body"]["check"]["identifier"] == "leakage.attestation:echo"
     ]
     assert [c["tier"] for c in overrides] == ["attested"]
     table = json.loads((folder / "admissibility_table.json").read_text())
@@ -370,7 +370,7 @@ RICH_MULTIVERSE = (
 def test_a_charter_run_writes_valid_stability_and_shift_reports(
     binary_frame, tmp_path
 ):
-    # Enforces docs/ARTIFACTS.md:37.
+    # Enforces docs/ARTIFACTS.md:43.
     import scmle.assurance.robustness.report
 
     result = run(binary_frame, tmp_path, inscribe(tmp_path))
@@ -420,7 +420,7 @@ def test_survivors_are_rerun_over_the_declared_multiverse(
 def test_a_reference_sample_gives_a_pass_or_fail_never_unverifiable(
     binary_frame, tmp_path
 ):
-    # Enforces docs/ARTIFACTS.md:37.
+    # Enforces docs/ARTIFACTS.md:43.
     reference = tmp_path / "reference.csv"
     binary_frame.drop(columns="y").head(200).to_csv(reference, index=False)
     result = run(
@@ -434,8 +434,8 @@ def test_a_reference_sample_gives_a_pass_or_fail_never_unverifiable(
         (pathlib.Path(result.run_dir) / "shift_report.json").read_text()
     )
     assert shifted["status"] in {"pass", "fail"}
-    assert shifted["c2st"]["check_id"] == "f6-shift-c2st"
-    assert shifted["mmd"]["set_id"] == "X"
+    assert shifted["c2st"]["identifier"] == "f6-shift-c2st"
+    assert shifted["mmd"]["subset"] == "X"
     assert {row["column"] for row in shifted["coverage"]} == {"c"}
     assert shifted["periods"]["status"] == "not_run"
 
@@ -459,7 +459,7 @@ def test_chartered_rules_drive_the_ledger_and_the_second_stage(
     import scmle.assurance.ledger.ledger
 
     rules = scmle.assurance.charter.rules.Procedure(
-        ledger_rule="lord++", confirmation_rule="bh", stability_filter=True
+        ledger="lord++", confirmation="bh", stability=True
     )
     path = inscribe(tmp_path, multiverse=RICH_MULTIVERSE, rules=rules)
     result = run(binary_frame, tmp_path, path)
@@ -481,7 +481,7 @@ def test_chartered_rules_drive_the_ledger_and_the_second_stage(
     stability = json.loads((folder / "stability_report.json").read_text())
     assert stability["confirmation_filter"] == stage_two["rule"]["note"]
     assert any(
-        c.check_id.startswith("f6-stability:") for c in ledger.diagnostics
+        c.identifier.startswith("f6-stability:") for c in ledger.diagnostics
     )
     robustness = event(result.run_dir, "robustness.completed")["data"]
     assert robustness["stability_filter"] == stage_two["rule"]["note"]
@@ -499,7 +499,7 @@ def test_a_charter_without_rules_is_reported_as_not_chartered(
 
 
 def test_a_specification_that_contradicts_the_chartered_rule_is_refused():
-    # Enforces docs/CLI.md:79.
+    # Enforces docs/CLI.md:80.
     from scmle.pipeline import stages
 
     assert stages.governing("x", "by", None, "by") == "by"

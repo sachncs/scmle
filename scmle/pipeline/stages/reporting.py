@@ -146,7 +146,7 @@ class Reporting(relabelling.Relabelling):
             features,
             outcome,
             actions,
-            float(charter.error_budget.confirmation.alpha_confirm),
+            float(charter.budget.confirmation.alpha_confirm),
         )
         design_record = None
         built = reports.rollout_design(

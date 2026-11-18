@@ -94,7 +94,7 @@ class Server(abc.ABC):
     @property
     def schema_digest(self) -> str:
         """Digest of the input schema of the bundle being served."""
-        return serving.schema_digest(self.bundle.schema.to_dict())
+        return serving.schema_digest(self.bundle.schema.anchor())
 
     def synthesise(self) -> dict[str, Any] | None:
         """Derives a record that is valid for the schema.
@@ -106,11 +106,11 @@ class Server(abc.ABC):
             optional inputs.
         """
         schema = self.bundle.schema
-        if schema.series or schema.extra_inputs or schema.optional_inputs:
+        if schema.series or schema.extras or schema.optional:
             return None
         record: dict[str, Any] = dict.fromkeys(schema.numeric, 0.0)
         for name in schema.categorical:
-            known = schema.known_categories.get(name) or [""]
+            known = schema.categories.get(name) or [""]
             record[name] = known[0]
         return record
 

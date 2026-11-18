@@ -154,4 +154,4 @@ def test_the_dataset_gate_fails_on_any_unexplained_item():
     assert not bad.passed
     assert bad.to_dict()["passed"] is False
     assert len(bad.checks) == 2
-    assert {c.seed_path[2] for c in bad.checks} == {0, 1}
+    assert {c.seeds[2] for c in bad.checks} == {0, 1}

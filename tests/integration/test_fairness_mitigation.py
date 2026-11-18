@@ -80,7 +80,7 @@ def test_thresholds_apply_only_when_the_group_is_supplied(tmp_path):
     with_group = result.bundle.predict(rows)
     without = result.bundle.predict(rows.drop(columns="group"))
 
-    assert "group" in result.bundle.schema.optional_inputs
+    assert "group" in result.bundle.schema.optional
     assert "group" not in result.bundle.features
     assert (with_group != without).any()
 

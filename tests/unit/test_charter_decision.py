@@ -11,12 +11,12 @@ def plan(**overrides):
     values = {
         "unit": "user",
         "primary": "conversion",
-        "assignment_prob": 0.5,
-        "delta_min": 0.005,
+        "assignment": 0.5,
+        "delta": 0.005,
         "tolerance": 0.01,
-        "n_max": 1000,
-        "alpha_promote": Fraction(1, 50),
-        "alpha_rollback": Fraction(1, 100),
+        "limit": 1000,
+        "promotion": Fraction(1, 50),
+        "rollback": Fraction(1, 100),
         "guardrails": (
             scmle.assurance.charter.decision.Guardrail(
                 "latency", margin=20.0, low=0, high=500
@@ -31,8 +31,8 @@ def test_the_full_block_round_trips_through_its_record():
     layer = scmle.assurance.charter.decision.Layer(
         model=scmle.assurance.charter.decision.Policy(
             unit="EUR per case",
-            treatment_cost=2.0,
-            off_policy=scmle.assurance.charter.decision.Gates(
+            cost=2.0,
+            gates=scmle.assurance.charter.decision.Gates(
                 clip=20.0, penalty=0.01
             ),
         ),
@@ -80,7 +80,7 @@ def test_group_thresholds_need_an_attestation():
             "s", "equalized_odds", 0.1, "magic"
         ),
         lambda: scmle.assurance.charter.decision.Constraint(
-            "s", "equalized_odds", 0.1, "reweighing", min_group=1
+            "s", "equalized_odds", 0.1, "reweighing", minimum=1
         ),
         lambda: scmle.assurance.charter.decision.Policy(
             "u", baselines=("treat_all", "treat_all")
@@ -88,20 +88,18 @@ def test_group_thresholds_need_an_attestation():
         lambda: scmle.assurance.charter.decision.Policy(
             "u", baselines=("best",)
         ),
-        lambda: scmle.assurance.charter.decision.Policy(
-            "u", calibration_level=1.0
-        ),
+        lambda: scmle.assurance.charter.decision.Policy("u", calibration=1.0),
         lambda: scmle.assurance.charter.decision.Gates(clip=0.5),
-        lambda: scmle.assurance.charter.decision.Gates(min_propensity=0.0),
+        lambda: scmle.assurance.charter.decision.Gates(propensity=0.0),
         lambda: scmle.assurance.charter.decision.Gates(penalty=-1.0),
         lambda: scmle.assurance.charter.decision.Guardrail("g", margin=0.0),
         lambda: scmle.assurance.charter.decision.Guardrail(
             "g", margin=1.0, low=1.0, high=1.0
         ),
-        lambda: plan(assignment_prob=1.0),
-        lambda: plan(delta_min=2.0),
-        lambda: plan(alpha_promote=Fraction(1, 1)),
-        lambda: plan(n_max=1),
+        lambda: plan(assignment=1.0),
+        lambda: plan(delta=2.0),
+        lambda: plan(promotion=Fraction(1, 1)),
+        lambda: plan(limit=1),
         lambda: plan(
             guardrails=(
                 scmle.assurance.charter.decision.Guardrail(
@@ -109,7 +107,7 @@ def test_group_thresholds_need_an_attestation():
                 ),
             )
         ),
-        lambda: plan(srm_level=0.0),
+        lambda: plan(srm=0.0),
     ],
 )
 def test_invalid_blocks_are_refused(build):
@@ -120,7 +118,7 @@ def test_invalid_blocks_are_refused(build):
 def test_the_plan_builds_its_budget_and_rejects_unknown_fields():
     rollout = plan(horizon=5)
     budget = rollout.budget()
-    assert budget.alpha_promote == Fraction(1, 50) and budget.horizon == 5
+    assert budget.promotion == Fraction(1, 50) and budget.horizon == 5
     record = rollout.to_dict()
     with pytest.raises(ValueError, match="unexpected"):
         scmle.assurance.charter.decision.Experiment.from_dict(
@@ -174,17 +172,17 @@ def test_the_layer_changes_the_hash_round_trips_and_needs_format_five():
     from scmle.assurance.charter import contracts
     from tests.unit.test_charter_contracts import make_charter
 
-    base = make_charter(cost_model=with_cost_model())
-    charter = make_charter(cost_model=with_cost_model(), decision=layer())
+    base = make_charter(costs=with_cost_model())
+    charter = make_charter(costs=with_cost_model(), decision=layer())
     assert charter.charter_hash != base.charter_hash
     assert charter.format_version == 5
     record = json.loads(json.dumps(charter.to_dict()))
     assert contracts.AnalysisCharter.from_dict(record) == charter
     other = make_charter(
-        cost_model=with_cost_model(),
+        costs=with_cost_model(),
         decision=scmle.assurance.charter.decision.Layer(
             scmle.assurance.charter.decision.Policy(
-                "EUR per case", calibration_level=0.05
+                "EUR per case", calibration=0.05
             ),
             rollout=plan(),
         ),
@@ -195,7 +193,7 @@ def test_the_layer_changes_the_hash_round_trips_and_needs_format_five():
 def test_a_layer_without_a_cost_model_is_refused():
     from tests.unit.test_charter_contracts import make_charter
 
-    with pytest.raises(ValueError, match="needs a cost_model"):
+    with pytest.raises(ValueError, match="needs costs"):
         make_charter(decision=layer())
 
 
@@ -206,7 +204,7 @@ def test_a_layer_in_an_older_format_is_refused(tmp_path):
     from scmle.contracts import errors
     from tests.unit.test_charter_contracts import make_charter
 
-    charter = make_charter(cost_model=with_cost_model(), decision=layer())
+    charter = make_charter(costs=with_cost_model(), decision=layer())
     wrapper = sealing.envelope(charter, "k")
     assert wrapper["format"] == 5
     wrapper["format"] = 4

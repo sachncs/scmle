@@ -52,23 +52,23 @@ def frame():
 def test_classification_includes_baseline_linear_and_trees(planner, frame):
     plan = make_plan(planner, frame)
     assert {"dummy", "logistic_regression", "random_forest"} <= set(
-        plan.candidate_models
+        plan.candidates
     )
-    assert plan.metric == "roc_auc" and plan.validation_strategy == "stratified"
+    assert plan.metric == "roc_auc" and plan.validation == "stratified"
     assert "Candidates:" in plan.summary()
 
 
 def test_plan_is_deterministic(planner, frame):
     assert (
-        make_plan(planner, frame).plan_id
-        == make_plan(planner, frame.copy()).plan_id
+        make_plan(planner, frame).identifier
+        == make_plan(planner, frame.copy()).identifier
     )
 
 
 def test_small_budget_prefers_fast_models(planner, frame):
     plan = make_plan(planner, frame, budget=60)
-    assert "random_forest" not in plan.candidate_models
-    assert "hist_gradient_boosting" in plan.candidate_models
+    assert "random_forest" not in plan.candidates
+    assert "hist_gradient_boosting" in plan.candidates
     assert any(
         d.technique == "random_forest" and d.action is experiments.Edict.REJECT
         for d in plan.decisions
@@ -137,7 +137,7 @@ def test_unknown_strategy_name_is_a_config_error(planner, frame):
 
 def test_approved_subset_and_invalid_approval(planner, frame):
     plan = make_plan(planner, frame, approved=("dummy", "logistic_regression"))
-    assert plan.candidate_models == ("dummy", "logistic_regression")
+    assert plan.candidates == ("dummy", "logistic_regression")
     with pytest.raises(errors.ConfigError, match="approved"):
         make_plan(planner, frame, approved=("ridge",))
 
@@ -150,7 +150,7 @@ def test_custom_rule_chain_is_honoured(frame):
     custom = scmle.pipeline.planner.Planner(
         registry.Catalog.stock(), rules=(KeepOnlyDummy(),)
     )
-    assert make_plan(custom, frame).candidate_models == ("dummy",)
+    assert make_plan(custom, frame).candidates == ("dummy",)
 
 
 def test_no_candidates_is_an_error(frame):
@@ -184,9 +184,9 @@ def test_memory_characteristics_drive_rejection_under_a_tight_limit(planner):
     plan = planner.plan(
         scmle.pipeline.planner.Situation(spec, profile, tasks.Task.BINARY)
     )
-    assert "random_forest" not in plan.candidate_models
-    assert "svm" not in plan.candidate_models
-    assert "logistic_regression" in plan.candidate_models
+    assert "random_forest" not in plan.candidates
+    assert "svm" not in plan.candidates
+    assert "logistic_regression" in plan.candidates
     reasons = {
         d.technique: d.reason for d in plan.decisions if d.action == "reject"
     }
@@ -212,8 +212,8 @@ def test_excluded_models_and_families_are_not_planned_and_are_explained(
         ),
     )
 
-    assert "random_forest" not in plan.candidate_models
-    assert "logistic_regression" not in plan.candidate_models
+    assert "random_forest" not in plan.candidates
+    assert "logistic_regression" not in plan.candidates
     reasons = {d.technique: d.reason for d in plan.decisions}
     assert reasons["random_forest"] == "excluded by models.exclude_models"
     assert "family 'linear' is excluded" in reasons["logistic_regression"]

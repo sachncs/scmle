@@ -24,17 +24,17 @@ MODEL = "churn"
 
 def make_loop(tmp_path, **changes):
     values = {
-        "reference_risk": 0.10,
+        "reference": 0.10,
         "tolerance": 0.10,
         "scope": SCOPE,
-        "initial_tau": 0.5,
-        "min_matured": 5,
-        "r_star": 0.6,
-        "outcome_window": 0,
-        "alarm_gates_retrain": False,
-        "challenger_budget": 100,
-        "reply_timeout": 10_000,
-        "delta_promo": 0.0,
+        "tau": 0.5,
+        "matured": 5,
+        "target": 0.6,
+        "maturity": 0,
+        "retrain": False,
+        "budget": 100,
+        "timeout": 10_000,
+        "promotion": {"alpha": "1/20", "delta": 0.0},
     }
     values.update(changes)
     return scmle.governance.loop.Loop.open(
@@ -50,13 +50,13 @@ def make_loop(tmp_path, **changes):
 def reply_to(escalation, decision="approve"):
     return deployment_ledger.Attestation.create(
         HUMAN_KEY,
-        escalation_id=escalation.id,
-        question_hash=escalation.question_hash,
+        escalation=escalation.id,
+        digests={"question": escalation.question_hash},
         decision=decision,
         statement="reviewed the evidence",
         evidence="ticket-9",
         role="owner",
-        name_or_id="P. Owner",
+        attestor="P. Owner",
         date="2026-11-01",
         scope=SCOPE,
         expires="2026-12-01",

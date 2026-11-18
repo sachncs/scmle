@@ -31,6 +31,7 @@ server; the generated service writes JSON when `SCMLE_LOG_JSON` is set).
 | `scmle claims list\|show\|verify RUN_DIR` | List the claims of a charter run, show one with its hypothesis and checks, or verify the run's ledger and claims (see below). `verify` exits 1 when any step fails. |
 | `scmle frame REQUEST --source S --data X --output DIR` | Draft an unsigned charter, a cost-model record and the questions only a person can answer, from a plain request. Exit 2 when refused. See [ARTIFACTS](ARTIFACTS.md). |
 | `scmle trail build\|verify\|show` | Join the charter, framing, cost model, claim ledger, registry, release state and deployment ledger of one model into a hash-chained, signed trail; verify a trail folder against its own records; print it. `build` and `verify` exit 1 on any finding. See [TRAIL](TRAIL.md). |
+| `scmle records upgrade FOLDER [--dry-run]` | Rewrite the stored records of a folder at the current schema version, keeping a `.bak` of each file; exit 1, with every file restored, if a seal, signature or chain fails to verify (see below). |
 
 `plan` and `run` take the same options; `scmle run --help` lists them all.
 The common ones:
@@ -70,10 +71,10 @@ support the promised power the run still completes: the scope becomes
 `exploratory_unconfirmed` and `feasibility.json` reports the detectable effect.
 
 Format 3 charters may carry a `rules` object that fixes, before data, the
-online rule of the ledger (`ledger_rule`), the confirmation rule
-(`confirmation_rule`), the failure policy, whether `fragile` survivors are
-withdrawn before `C` opens (`stability_filter`) and the stability thresholds
-(`s_min`, `band`, `q_min`). The charter hash and signature cover them. A
+online rule of the ledger (`ledger`), the confirmation rule
+(`confirmation`), the failure policy (`failure`), whether `fragile` survivors
+are withdrawn before `C` opens (`stability`) and the stability thresholds
+(`agreement`, `band`, `exclusion`). The charter hash and signature cover them. A
 charter without `rules` is hashed, signed and loaded exactly as before and the
 run uses the defaults, reporting `"rules": "not chartered"`. A run
 specification that names a different non-default rule than the charter is
@@ -185,3 +186,24 @@ no key set to verify it is refused even with `--trusted`. `predict` also takes `
 credentials; on any other address it refuses to start unless the `SCMLE_AUTH_*`
 variables of [`TENANT_ISOLATION.md`](TENANT_ISOLATION.md) configure token
 verification. See [`SECURITY.md`](SECURITY.md).
+
+## Stored records
+
+```bash
+scmle records upgrade runs/run_x --dry-run
+scmle records upgrade runs/run_x [--key-file key]
+```
+
+Records written by an older scmle load without change (each record kind
+migrates on read; see [`RECORD_KEYS.md`](RECORD_KEYS.md)). `records upgrade`
+rewrites them on disk at the current schema version: the charter, the split
+and dataset manifests, the feasibility, error budget and cost model records
+and the claims file, in the folder and its sub-folders. It first verifies
+the stored bytes (each record loads and its seal holds, the charter's hash
+and signature verify with `--key-file` or `SCMLE_SIGNING_KEY`, and a charter
+run passes `claims verify`); if that fails it writes nothing and exits 1.
+It then keeps each old file as `NAME.bak`, writes the new one and verifies
+again; if that fails, every file is restored from its `.bak` and it exits 1.
+`--dry-run` lists the files that would change and writes nothing.
+Hash-chained logs, `negative_control.json` (its digest is in the ledger) and
+the files of a sealed trail are left as stored.

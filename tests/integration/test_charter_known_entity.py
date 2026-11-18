@@ -1,4 +1,4 @@
-"""A charter with unit_of_prediction known_entity_future does not make an
+"""A charter with purpose known_entity_future does not make an
 entity the unit: its rows sit on both sides, the final test rows come last."""
 
 import json
@@ -35,9 +35,9 @@ def panel(entities=60, per=30, seed=0):
 def charter_file(tmp_path, **overrides):
     path = tmp_path / "charter.json"
     values = {
-        "min_effect": 0.5,
-        "k_max": 3,
-        "unit_of_prediction": contracts.KNOWN_ENTITY_FUTURE,
+        "effect": 0.5,
+        "quota": 3,
+        "purpose": contracts.KNOWN_ENTITY_FUTURE,
         **overrides,
     }
     sealing.inscribe(path, make_charter(**values), signing_key=KEY)
@@ -66,8 +66,8 @@ def test_entities_are_on_both_sides_and_the_final_rows_come_last(tmp_path):
 
     manifest = read(result, "split_manifest.json")
     frame = panel()
-    explore = frame.iloc[manifest["exploration_ids"]]
-    confirm = frame.iloc[manifest["confirmation_ids"]]
+    explore = frame.iloc[manifest["sets"]["exploration"]]
+    confirm = frame.iloc[manifest["sets"]["confirmation"]]
     assert len(confirm) > 0
     shared = set(explore.entity) & set(confirm.entity)
     assert len(shared) > 0.5 * confirm.entity.nunique()
@@ -81,12 +81,12 @@ def test_entities_are_on_both_sides_and_the_final_rows_come_last(tmp_path):
 
 
 def test_without_the_field_whole_entities_are_the_units(tmp_path):
-    path = charter_file(tmp_path, unit_of_prediction=None)
+    path = charter_file(tmp_path, purpose=None)
     result = run(tmp_path, path)
     manifest = read(result, "split_manifest.json")
     frame = panel()
-    explore = frame.iloc[manifest["exploration_ids"]]
-    confirm = frame.iloc[manifest["confirmation_ids"]]
+    explore = frame.iloc[manifest["sets"]["exploration"]]
+    confirm = frame.iloc[manifest["sets"]["confirmation"]]
     assert not (set(explore.entity) & set(confirm.entity)) or len(confirm) == 0
 
 

@@ -245,8 +245,8 @@ class Hook:
         """
         self.started()
         names = [str(u) for u in numpy.asarray(unit_ids).ravel()]
-        arms = design.assign(names, self.plan.salt, self.plan.assignment_prob)
-        q = self.plan.assignment_prob
+        arms = design.assign(names, self.plan.salt, self.plan.assignment)
+        q = self.plan.assignment
         odds = [q if a else 1.0 - q for a in arms]
         self.ledger.commit(
             deployment_ledger.ROLLOUT_ASSIGNMENT,
@@ -343,7 +343,7 @@ class Hook:
         self.monitor = rollout.Watchdog(
             self.plan.tolerance,
             float(level),
-            self.plan.assignment_prob,
+            self.plan.assignment,
             self.plan.low,
             self.plan.high,
         )

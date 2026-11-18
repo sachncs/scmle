@@ -1,6 +1,6 @@
 {
   "claim": "C1",
-  "code": "aeef412124269faba29f1fd26895bc6faa452075090adbd7193e5deffe6684f9",
+  "code": "86b334e9aee4e87574d82f8d6d781d6412a8de2cbed6cefa8893d922eae64a51",
   "data": "simulated tables and synthetic inputs only",
   "floor": 1.0,
   "gates": [
@@ -66,7 +66,7 @@
       "message": "unit verdict coarser: ['customer_id'] is already a key, so rows are coarser than the unit",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.65,
+      "seconds": 0.45,
       "site": "scmle.cli.intake:IngestCommand.execute"
     },
     {
@@ -75,7 +75,7 @@
       "level": "site",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.65
+      "seconds": 0.45
     },
     {
       "by": "ingest.multiplicity",
@@ -146,7 +146,7 @@
       "message": "PLANNING not approved by reviewer: fault",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.92,
+      "seconds": 0.85,
       "site": "scmle.pipeline.orchestrator:Orchestrator.consult_checkpoints"
     },
     {
@@ -155,7 +155,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 1.71
+      "seconds": 1.61
     },
     {
       "by": "robustness.assessment_present",
@@ -178,7 +178,7 @@
       "message": "unresolved leakage risk (permutation screen, Benjamini-Yekutieli level 0.05): leak",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.15,
+      "seconds": 1.11,
       "site": "scmle.pipeline.stages.screening:Screening.enforce_leakage_policy"
     },
     {
@@ -188,7 +188,7 @@
       "outcome": "override",
       "path": "override",
       "record": "leakage suspect(s) leak stay in the features; the test score is provisional until a person settles them (declare the column unavailable at prediction, or attest it)",
-      "seconds": 2.0
+      "seconds": 1.87
     },
     {
       "by": "admissibility.quarantine_all",
@@ -199,7 +199,7 @@
       "message": "admissibility quarantined every feature",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.75,
+      "seconds": 0.71,
       "site": "scmle.pipeline.stages.admission:Admission.qualify_exploration"
     },
     {
@@ -209,7 +209,7 @@
       "outcome": "override",
       "path": "override",
       "record": "ledger check leakage.attestation:copy, tier attested",
-      "seconds": 0.74
+      "seconds": 0.71
     },
     {
       "by": "data.unlabeled",
@@ -220,7 +220,7 @@
       "message": "target 'y' has 40 missing values; set data.unlabeled to 'ignore' or 'pseudo_label' to use the unlabeled rows",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.04,
       "site": "scmle.pipeline.stages.labelling:Labelling.set_aside_unlabeled"
     },
     {
@@ -230,7 +230,7 @@
       "outcome": "override",
       "path": "override",
       "record": "curation_report.json: rows set aside (policy ignore)",
-      "seconds": 1.46
+      "seconds": 1.34
     },
     {
       "by": "select.serving_limits",
@@ -241,7 +241,7 @@
       "message": "none of the top 3 candidates satisfies the serving constraints; relax the limits or allow more candidates",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.29,
+      "seconds": 1.21,
       "site": "scmle.pipeline.stages.selecting:SelectStage.choose"
     },
     {
@@ -251,7 +251,7 @@
       "outcome": "override",
       "path": "override",
       "record": "decision_log.json: within serving limits (max_model_mb 1000.0)",
-      "seconds": 1.66
+      "seconds": 1.59
     },
     {
       "by": "select.pareto_front",
@@ -262,7 +262,7 @@
       "message": "none of the top 3 candidates satisfies the serving constraints; relax the limits or allow more candidates",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.27,
+      "seconds": 1.21,
       "site": "scmle.pipeline.stages.selecting:SelectStage.select_on_front"
     },
     {
@@ -272,7 +272,7 @@
       "outcome": "override",
       "path": "override",
       "record": "decision_log.json: fastest within (max_model_mb 1000.0)",
-      "seconds": 1.75
+      "seconds": 1.7
     },
     {
       "by": "confirm.single_use",
@@ -303,7 +303,7 @@
       "message": "monotonic constraints need numeric feature columns: ['region'] are missing, excluded or not numeric",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.79,
+      "seconds": 0.77,
       "site": "scmle.pipeline.profiler:Profiler.monotonic_features"
     },
     {
@@ -312,7 +312,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 2.08
+      "seconds": 2.0
     },
     {
       "by": "profile.target_and_features",
@@ -323,7 +323,7 @@
       "message": "no usable feature columns remain after exclusions",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.04,
       "site": "scmle.pipeline.profiler:Profiler.portray"
     },
     {
@@ -364,7 +364,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.62
+      "seconds": 0.59
     },
     {
       "by": "split.group.class_complete_folds",
@@ -384,7 +384,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 1.83
+      "seconds": 1.71
     },
     {
       "by": "split.group.partition",
@@ -395,7 +395,7 @@
       "message": "need at least 7 groups for group validation",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.04,
       "site": "scmle.data.splitting.splitters.grouping:GroupSplit.partition"
     },
     {
@@ -416,7 +416,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 1.73
+      "seconds": 1.61
     },
     {
       "by": "split.resident.bind",
@@ -484,7 +484,7 @@
       "error": "BlockedError",
       "gate": "split.resident.journal",
       "level": "site",
-      "message": "custody journal /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-slt8dhmv/custody/run_x.jsonl was edited; run run_x cannot be resumed",
+      "message": "custody journal /var/folders/hb/3t139lys3sl87tzw_r0f84k80000gn/T/faults-8tkgii16/custody/run_x.jsonl was edited; run run_x cannot be resumed",
       "outcome": "blocked",
       "path": "fault",
       "seconds": 0.0,
@@ -517,7 +517,7 @@
       "outcome": "override",
       "path": "override",
       "record": "config.json: validation.horizon_rows 10",
-      "seconds": 1.15
+      "seconds": 1.02
     },
     {
       "by": "split.stratified.folds",
@@ -620,7 +620,7 @@
       "message": "a treatment / outcome combination has fewer than 2 rows",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.04,
       "site": "scmle.data.splitting.splitters.stratification:TreatmentStratifiedSplit.stratifier"
     },
     {
@@ -629,7 +629,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.88
+      "seconds": 0.81
     },
     {
       "by": "task.resolve",
@@ -670,7 +670,7 @@
       "outcome": "override",
       "path": "override",
       "record": "config.json: task regression",
-      "seconds": 1.38
+      "seconds": 1.27
     },
     {
       "by": "task.classification",
@@ -681,7 +681,7 @@
       "message": "binary_classification requested but target has 3 classes",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.05,
+      "seconds": 0.04,
       "site": "scmle.data.validation.target:TaskResolver.resolve_classification"
     },
     {
@@ -702,7 +702,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 2.22
+      "seconds": 2.11
     },
     {
       "by": "task.ranking",
@@ -722,7 +722,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.87
+      "seconds": 0.82
     },
     {
       "by": "task.regression",
@@ -754,7 +754,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.63
+      "seconds": 0.6
     },
     {
       "by": "task.uplift",
@@ -774,7 +774,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 0.85
+      "seconds": 0.8
     },
     {
       "by": "target.events",
@@ -821,7 +821,7 @@
       "message": "test set is locked: already bound or released",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.18,
+      "seconds": 0.98,
       "site": "scmle.assurance.custody.vault:SealedTestSet.bind"
     },
     {
@@ -830,7 +830,7 @@
       "level": "site",
       "outcome": "passed",
       "path": "control",
-      "seconds": 1.13
+      "seconds": 0.98
     },
     {
       "by": "vault.open",
@@ -841,7 +841,7 @@
       "message": "test set is locked: invalid token",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 1.12,
+      "seconds": 0.98,
       "site": "scmle.assurance.custody.vault:SealedTestSet.open"
     },
     {
@@ -850,7 +850,7 @@
       "level": "site",
       "outcome": "passed",
       "path": "control",
-      "seconds": 1.15
+      "seconds": 0.97
     },
     {
       "by": "plan.gpu_required",
@@ -861,7 +861,7 @@
       "message": "resources.gpu='required' but no compatible model can use a GPU; set gpu='auto' or install a GPU-capable adapter",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.87,
+      "seconds": 0.83,
       "site": "scmle.pipeline.planner:GpuFilter.apply"
     },
     {
@@ -871,7 +871,7 @@
       "outcome": "override",
       "path": "override",
       "record": "config.json: resources.gpu auto",
-      "seconds": 1.68
+      "seconds": 1.57
     },
     {
       "by": "plan.monotonic",
@@ -882,7 +882,7 @@
       "message": "monotonic constraints are supported for binary classification and regression, not multiclass",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 2.32,
+      "seconds": 2.23,
       "site": "scmle.pipeline.planner:MonotonicFilter.apply"
     },
     {
@@ -892,7 +892,7 @@
       "outcome": "override",
       "path": "override",
       "record": "config.json: data.monotonic_constraints {}",
-      "seconds": 5.54
+      "seconds": 5.35
     },
     {
       "by": "budget.minimum_run",
@@ -912,7 +912,7 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 1.58
+      "seconds": 1.54
     },
     {
       "by": "train.first_trial",
@@ -923,7 +923,7 @@
       "message": "preparation took 0.8 s and left no time for a first trial (trial window closed: 0.0 s left before the 18.5 s reserved for the final refit, diagnostics and packaging); the smallest budget that fits is about 8 s",
       "outcome": "blocked",
       "path": "fault",
-      "seconds": 0.89,
+      "seconds": 0.82,
       "site": "scmle.pipeline.stages.training:TrainStage.execute"
     },
     {
@@ -932,10 +932,10 @@
       "level": "run",
       "outcome": "passed",
       "path": "control",
-      "seconds": 1.57
+      "seconds": 1.54
     }
   ],
-  "seconds": 27.4,
+  "seconds": 25.5,
   "tally": {
     "controls": {
       "not_passed": [],

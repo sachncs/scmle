@@ -34,11 +34,15 @@ def lines(ref: str, doc: str) -> list[str]:
 
 
 def align(before: list[str], after: list[str]) -> dict[int, int]:
-    """Maps 1-based line numbers of unchanged lines from before to after."""
+    """Maps 1-based line numbers from before to after.
+
+    Unchanged lines follow their text; a block replaced by one of the same
+    size was reworded in place, so its lines keep their position in it.
+    """
     found: dict[int, int] = {}
     matcher = difflib.SequenceMatcher(a=before, b=after, autojunk=False)
-    for tag, first, last, start, _ in matcher.get_opcodes():
-        if tag == "equal":
+    for tag, first, last, start, end in matcher.get_opcodes():
+        if tag == "equal" or (tag == "replace" and last - first == end - start):
             for offset in range(last - first):
                 found[first + offset + 1] = start + offset + 1
     return found
@@ -75,17 +79,23 @@ def main(arguments: list[str] | None = None) -> int:
         # A file whose citations differ from the committed file's was already
         # moved or edited by hand; its numbers are not the committed ones,
         # so it is left alone (running this twice moves nothing twice).
-        committed = CITATION.findall(
-            "\n".join(lines(ref[0], str(path.relative_to(ROOT))))
+        # A citation the committed test already had uses the committed
+        # numbering and is moved; one added or moved since is left alone,
+        # citation by citation, so a test file edited for other reasons is
+        # still kept in step. Run this once after each doc edit.
+        committed = set(
+            CITATION.findall(
+                "\n".join(lines(ref[0], str(path.relative_to(ROOT))))
+            )
         )
-        if CITATION.findall(text) != committed:
-            if any(doc in maps for doc, _ in committed):
-                print(f"left alone (already edited): {path.relative_to(ROOT)}")
-            continue
 
-        def shift(match: re.Match[str]) -> str:
+        def shift(
+            match: re.Match[str], kept: set[tuple[str, str]] = committed
+        ) -> str:
             nonlocal moved
             doc, number = match.group(1), int(match.group(2))
+            if (doc, str(number)) not in kept:
+                return match.group(0)
             target = maps.get(doc, {}).get(number, number)
             moved += target != number
             return f"{doc}:{target}"

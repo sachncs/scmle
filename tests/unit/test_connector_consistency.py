@@ -204,21 +204,21 @@ def test_warehouse_snapshot_token_change_is_refused():
         conn.read_rows(first.checkpoint, limit=2)
 
 
-def test_event_ingest_time_round_trips_and_is_validated():
+def test_event_ingested_round_trips_and_is_validated():
     event = incremental.Event(
         "e1",
         1,
         "2024-01-01T00:00:00Z",
         {"a": 1},
-        ingest_time="2024-01-02T00:00:00Z",
+        ingested="2024-01-02T00:00:00Z",
     )
     assert incremental.Event.from_dict(event.to_dict()) == event
     legacy = incremental.Event("e1", 1, "2024-01-01T00:00:00Z", {"a": 1})
-    assert "ingest_time" not in legacy.to_dict()
+    assert "ingested" not in legacy.to_dict()
     assert incremental.Event.from_dict(legacy.to_dict()) == legacy
     with pytest.raises(ValueError):
-        incremental.Event("e1", 1, "2024-01-01T00:00:00Z", {}, ingest_time="no")
+        incremental.Event("e1", 1, "2024-01-01T00:00:00Z", {}, ingested="no")
     with pytest.raises(ValueError):
         incremental.Event(
-            "e1", 1, "2024-01-01T00:00:00Z", {}, ingest_time="2024-01-01"
+            "e1", 1, "2024-01-01T00:00:00Z", {}, ingested="2024-01-01"
         )

@@ -239,13 +239,13 @@ class Lifecycle:
                 checkpoint = plan.reload(stage_names)
                 if checkpoint.status == "completed":
                     return plan.verify()
-                resume_count = len(checkpoint.completed_stages)
-                resume_digests = checkpoint.stage_digests
+                resume_count = len(checkpoint.completed)
+                resume_digests = checkpoint.digests.stages
         completed_stages = list(
-            checkpoint.completed_stages if checkpoint is not None else ()
+            checkpoint.completed if checkpoint is not None else ()
         )
         stage_digests = list(
-            checkpoint.stage_digests if checkpoint is not None else ()
+            checkpoint.digests.stages if checkpoint is not None else ()
         )
         plan.persist(completed_stages, stage_digests, "running")
         context = state.Context(
@@ -289,7 +289,7 @@ class Lifecycle:
                 if report.modality.startswith("extension:")
                 else modalities.Status.EXPERIMENTAL
             ),
-            stage_evidence=report.stage_evidence,
+            stage_evidence=report.evidence,
             required_extras=("core",),
             failure_modes=(
                 "malformed or unsupported modality input",

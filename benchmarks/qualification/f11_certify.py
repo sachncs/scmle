@@ -1254,12 +1254,12 @@ def plan_for(
     return scmle.assurance.charter.decision.Experiment(
         unit="user",
         primary="conversion",
-        assignment_prob=0.5,
-        delta_min=delta_min,
+        assignment=0.5,
+        delta=delta_min,
         tolerance=tolerance,
-        n_max=n_max,
-        alpha_promote=scmle.assurance.ledger.budget.exact(ALPHA_PROMOTE, "a"),
-        alpha_rollback=scmle.assurance.ledger.budget.exact(ALPHA_ROLLBACK, "a"),
+        limit=n_max,
+        promotion=scmle.assurance.ledger.budget.exact(ALPHA_PROMOTE, "a"),
+        rollback=scmle.assurance.ledger.budget.exact(ALPHA_ROLLBACK, "a"),
         guardrails=guardrails,
     )
 
@@ -1329,8 +1329,8 @@ def class_agreement(base: int) -> dict[str, Any]:
     runs = 100
     for index in range(runs):
         rng = rng_for(base, "b1.class", index)
-        arm, y = f11_generators.experiment(rng, 1, plan.n_max, 0.5, 0.10, 0.04)
-        paths = peeking_paths(arm, y, 0.5, plan.delta_min)
+        arm, y = f11_generators.experiment(rng, 1, plan.limit, 0.5, 0.10, 0.04)
+        paths = peeking_paths(arm, y, 0.5, plan.delta)
         vector_stop = numpy.nonzero(paths[0] >= -math.log(ALPHA_PROMOTE))[0]
         run = rollout.Rollout(plan, f"e{index}", ALPHA_PROMOTE)
         decision = run.observe(arm[0], y[0])
@@ -1358,9 +1358,9 @@ def gate_b1(runs: int, base: int = 0) -> dict[str, Any]:
     for start in range(0, runs, chunk):
         size = min(chunk, runs - start)
         arm, y = f11_generators.experiment(
-            rng_for(base, "b1", start), size, plan.n_max, 0.5, 0.10, 0.02
+            rng_for(base, "b1", start), size, plan.limit, 0.5, 0.10, 0.02
         )
-        paths = peeking_paths(arm, y, 0.5, plan.delta_min)
+        paths = peeking_paths(arm, y, 0.5, plan.delta)
         hits += int((paths.max(axis=1) >= -math.log(ALPHA_PROMOTE)).sum())
     bound = ALPHA_PROMOTE + tol(ALPHA_PROMOTE, runs)
     agreement = class_agreement(base)
@@ -1397,12 +1397,12 @@ def gate_b2(runs: int, base: int = 0) -> dict[str, Any]:
     for start in range(0, runs, chunk):
         size = min(chunk, runs - start)
         rng = rng_for(base, "b2", start)
-        arm = (rng.random((size, plan.n_max)) < ARM_SHARE).astype(float)
+        arm = (rng.random((size, plan.limit)) < ARM_SHARE).astype(float)
         primary = (rng.random(arm.shape) < 0.10 + 0.06 * arm).astype(float)
         bounce = (rng.random(arm.shape) < 0.20 + 0.05 * arm).astype(float)
         target = -math.log(ALPHA_PROMOTE)
         both = [
-            anytime.recentre(arm, primary, 0.5, plan.delta_min) >= target,
+            anytime.recentre(arm, primary, 0.5, plan.delta) >= target,
             anytime.recentre(arm, bounce, 0.5, guard.margin, "less") >= target,
         ]
         hits += int((both[0] & both[1]).any(axis=1).sum())
@@ -1462,7 +1462,7 @@ def esn_metric(kind: str, runs: int, base: int) -> dict[str, Any]:
     for start in range(0, runs, chunk):
         size = min(chunk, runs - start)
         rng = rng_for(base, f"b3.{kind}", start)
-        arm = (rng.random((size, plan.n_max)) < ARM_SHARE).astype(float)
+        arm = (rng.random((size, plan.limit)) < ARM_SHARE).astype(float)
         if kind == "binary":
             y = (rng.random(arm.shape) < 0.10 + 0.04 * arm).astype(float)
         else:
@@ -1471,10 +1471,10 @@ def esn_metric(kind: str, runs: int, base: int) -> dict[str, Any]:
                 rng.beta(2.4, 7.6, arm.shape),
                 rng.beta(2.0, 8.0, arm.shape),
             )
-        paths = peeking_paths(arm, y, 0.5, plan.delta_min)
+        paths = peeking_paths(arm, y, 0.5, plan.delta)
         hit = paths >= -math.log(ALPHA_PROMOTE)
         crossed = hit.any(axis=1)
-        when = numpy.where(crossed, hit.argmax(axis=1) + 1, plan.n_max)
+        when = numpy.where(crossed, hit.argmax(axis=1) + 1, plan.limit)
         stops.extend(when[crossed].tolist() + [None] * int((~crossed).sum()))
     done = [s for s in stops if s is not None]
     if kind == "binary":
@@ -1872,9 +1872,7 @@ def hook_path(base: int = 0) -> dict[str, Any]:
                             arm[world, window], y[world, window]
                         ).status
                     target = hook.started().target
-                    path = peeking_paths(
-                        arm[world], y[world], 0.5, plan.delta_min
-                    )
+                    path = peeking_paths(arm[world], y[world], 0.5, plan.delta)
                     expected = bool(path.max() >= target)
                     won = status == rollout.PROMOTE
                 else:
@@ -1948,7 +1946,7 @@ def gate_b9(runs: int, base: int = 0) -> dict[str, Any]:
         Returns:
             A boolean array, True where the e-process reaches the level.
         """
-        paths = peeking_paths(arm, y, 0.5, plan.delta_min)
+        paths = peeking_paths(arm, y, 0.5, plan.delta)
         return numpy.asarray(paths.max(axis=1) >= target_p)
 
     for label, (start, end) in {

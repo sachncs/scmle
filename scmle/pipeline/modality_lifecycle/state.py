@@ -120,11 +120,11 @@ class Context:
         """
         self.performance_observations[operation] = performance.Observation(
             operation=operation,
-            elapsed_seconds=elapsed_seconds,
-            peak_memory_gb=limits.peak_memory_gb(),
-            sample_count=sample_count,
+            elapsed=elapsed_seconds,
+            memory=limits.peak_memory_gb(),
+            samples=sample_count,
             machine=platform.platform(),
-            observed_at=events.stamp(),
+            observed=events.stamp(),
             software=(
                 f"{platform.python_implementation()} "
                 f"{platform.python_version()}"

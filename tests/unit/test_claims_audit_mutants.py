@@ -135,7 +135,7 @@ def test_show_claim_reports_every_recorded_part(run):
     ledger = claims_audit.rehydrate(run)
     checks_seen = set()
     for claim in document["claims"]:
-        claim_id = claim["claim_id"]
+        claim_id = claim["identifier"]
         shown = claims_audit.inspect(run, claim_id)
         result = ledger.results[claim_id]
         expected_check = (
@@ -163,7 +163,7 @@ def test_show_claim_reports_every_recorded_part(run):
 
 def test_show_claim_names_the_known_claims_when_unknown(run):
     document = json.loads((run / confirm.CLAIMS_FILE).read_text())
-    known = ", ".join(c["claim_id"] for c in document["claims"])
+    known = ", ".join(c["identifier"] for c in document["claims"])
     with pytest.raises(errors.ArtifactError) as caught:
         claims_audit.inspect(run, "zz")
     assert str(caught.value) == f"no claim 'zz'; the run has: {known}"
@@ -362,7 +362,7 @@ def test_chartered_rules_compare_both_ledger_and_confirmation_rules(
     tmp_path, monkeypatch
 ):
     (tmp_path / claims_audit.CHARTER_FILE).write_text("{}", encoding="utf-8")
-    rules = types.SimpleNamespace(ledger_rule="lord++", confirmation_rule="bh")
+    rules = types.SimpleNamespace(ledger="lord++", confirmation="bh")
     monkeypatch.setattr(
         sealing,
         "read_verified",
@@ -716,7 +716,7 @@ def write_custody(folder, events, key=KEY):
 
 
 def test_custody_findings_are_exact_for_hand_made_logs(tmp_path):
-    # Enforces docs/CLI.md:105.
+    # Enforces docs/CLI.md:106.
     document = {"outcome": confirm.CONFIRMED, "survivors_sha256": "s"}
     assert claims_audit.custodial(tmp_path, document, KEY) == finding(
         CUSTODY, "skipped", "custody_log.jsonl is not in the run"

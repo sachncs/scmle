@@ -39,7 +39,7 @@ def test_the_stored_certificate_is_for_the_current_code():
 @pytest.mark.parametrize("kind", screen_certify.KINDS)
 def test_every_leak_type_of_every_mechanism_has_an_outcome_on_file(kind):
     (cert,) = stored().current(screen.DETECTORS[kind], screen.code_digest())
-    types = {o.certificate.defect_type for o in cert.outcomes}
+    types = {o.certificate.defect for o in cert.outcomes}
     wanted = {d for ds in screen.MECHANISM_DEFECTS.values() for d in ds}
     assert types == wanted == set(screen_certify.DEFECTS)
 
@@ -78,9 +78,9 @@ def test_measurements_agree_with_the_certificate(kind):
     (cert,) = stored().current(screen.DETECTORS[kind], screen.code_digest())
     for outcome in cert.outcomes:
         c = outcome.certificate
-        assert c.false_alarms == document["suspect_false_alarms"]
-        assert c.detected == document["recall"][c.defect_type]["detected"]
-        assert c.clean_rows == document["null_replicates"]
+        assert c.alarms == document["suspect_false_alarms"]
+        assert c.detected == document["recall"][c.defect]["detected"]
+        assert c.clean == document["null_replicates"]
         assert c.planted == document["plant_replicates_per_type"]
     assert document["settings"]["skill_ceiling"] == (
         leakage.CERTIFIED.skill_ceiling

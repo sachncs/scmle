@@ -122,7 +122,7 @@
     }
   },
   "claim": "C12",
-  "content_hash": "4892cfb47b8098f0adc9acc003cb330c1348afaba06fe80609b7d6106dd63016",
+  "content_hash": "3f7be4130ec9b1ee22645424355118b033968911669ed27882c231ad8206a132",
   "counts": {
     "guarantees": 246,
     "linked": 246,
@@ -190,6 +190,7 @@
     "docs/PORTABLE_TRAINING.md",
     "docs/READING_RESULTS.md",
     "docs/README.md",
+    "docs/RECORD_KEYS.md",
     "docs/RELEASING.md",
     "docs/RENAMES.md",
     "docs/SECURITY.md",
@@ -514,7 +515,7 @@
         "tests/unit/test_charter_uncertainty.py::test_the_confirmation_coverage_flag_needs_format_eleven_and_round_trips",
         "tests/unit/test_charter_uncertainty.py::test_without_the_flag_a_format_ten_charter_keeps_its_hash"
       ],
-      "text": "Charter format 11 adds the optional `coverage_on_confirmation` field of the `uncertainty` block (`scmle.assurance.charter.uncertainty.Uncertainty`, an extension surface; a format 10 charter keeps its hash and signature, both pinned).",
+      "text": "Charter format 11 adds the optional `coverage_on_confirmation` field (stored as `confirmatory` since Stage B) of the `uncertainty` block (an extension surface, `scmle.assurance.charter.uncertainty.Uncertainty`; a format 10 charter keeps its hash and signature, both pinned).",
       "words": [
         "block"
       ]
@@ -961,8 +962,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 17,
-      "line": 17,
+      "end": 23,
+      "line": 23,
       "missing": [],
       "section": "read-first",
       "tests": [
@@ -976,8 +977,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 26,
-      "line": 26,
+      "end": 32,
+      "line": 32,
       "missing": [],
       "section": "configuration-and-inputs",
       "tests": [
@@ -993,8 +994,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 32,
-      "line": 32,
+      "end": 38,
+      "line": 38,
       "missing": [],
       "section": "configuration-and-inputs",
       "tests": [
@@ -1012,8 +1013,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 37,
-      "line": 37,
+      "end": 43,
+      "line": 43,
       "missing": [],
       "section": "configuration-and-inputs",
       "tests": [
@@ -1028,8 +1029,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 39,
-      "line": 39,
+      "end": 45,
+      "line": 45,
       "missing": [],
       "section": "configuration-and-inputs",
       "tests": [
@@ -1044,8 +1045,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 40,
-      "line": 40,
+      "end": 46,
+      "line": 46,
       "missing": [],
       "section": "configuration-and-inputs",
       "tests": [
@@ -1061,8 +1062,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 41,
-      "line": 41,
+      "end": 47,
+      "line": 47,
       "missing": [],
       "section": "configuration-and-inputs",
       "tests": [
@@ -1087,8 +1088,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 54,
-      "line": 54,
+      "end": 60,
+      "line": 60,
       "missing": [],
       "section": "raw-data-ingestion-scmle-ingest",
       "tests": [
@@ -1103,8 +1104,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 63,
-      "line": 63,
+      "end": 69,
+      "line": 69,
       "missing": [],
       "section": "problem-framing-scmle-frame",
       "tests": [
@@ -1119,8 +1120,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 67,
-      "line": 67,
+      "end": 73,
+      "line": 73,
       "missing": [],
       "section": "problem-framing-scmle-frame",
       "tests": [
@@ -1134,8 +1135,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 68,
-      "line": 68,
+      "end": 74,
+      "line": 74,
       "missing": [],
       "section": "problem-framing-scmle-frame",
       "tests": [
@@ -1150,8 +1151,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 69,
-      "line": 69,
+      "end": 75,
+      "line": 75,
       "missing": [],
       "section": "problem-framing-scmle-frame",
       "tests": [
@@ -1165,8 +1166,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 70,
-      "line": 70,
+      "end": 76,
+      "line": 76,
       "missing": [],
       "section": "problem-framing-scmle-frame",
       "tests": [
@@ -1175,7 +1176,7 @@
         "tests/integration/test_coverage_claim_run.py::test_the_claim_is_hashed_and_registered_before_the_test_rows_open",
         "tests/integration/test_coverage_claim_run.py::test_the_coverage_claim_is_tested_once_on_c_after_the_model_is_frozen"
       ],
-      "text": "`coverage_claim.json`, `coverage_report.json` | With intervals or sets on a regression or classification task: the claim (levels, methods, tolerance, rule) fixed and hashed before the final test rows are released, and the coverage measured on those rows once, with the claim's hash. In a charter run the hash is in the custody log and `scmle claims verify` checks it. A charter whose `uncertainty` block sets `coverage_on_confirmation` (format 11) also writes `coverage_confirmation.json`: the same claim for one served interval or set (`residual` for regression, pooled sets for classification, level 0.9, tolerance 0.02) tested once on the confirmation rows `C` after the model and its calibration are frozen. It holds the covered count, the exact one-sided binomial p-value, and a status `confirmed` (p at most 0.05) or `unverified`; the other methods and levels are described on the same rows without a status. Each declared slice in `coverage_report.json` carries `flag` (below nominal by more than 0.05, Holm over the slices), `flag_certified` and a `flag_gate` that is `gating` only while the stored G5b certificate is current and passing.",
+      "text": "`coverage_claim.json`, `coverage_report.json` | With intervals or sets on a regression or classification task: the claim (levels, methods, tolerance, rule) fixed and hashed before the final test rows are released, and the coverage measured on those rows once, with the claim's hash. In a charter run the hash is in the custody log and `scmle claims verify` checks it. A charter whose `uncertainty` block sets `confirmatory` (format 11) also writes `coverage_confirmation.json`: the same claim for one served interval or set (`residual` for regression, pooled sets for classification, level 0.9, tolerance 0.02) tested once on the confirmation rows `C` after the model and its calibration are frozen. It holds the covered count, the exact one-sided binomial p-value, and a status `confirmed` (p at most 0.05) or `unverified`; the other methods and levels are described on the same rows without a status. Each declared slice in `coverage_report.json` carries `flag` (below nominal by more than 0.05, Holm over the slices), `flag_certified` and a `flag_gate` that is `gating` only while the stored G5b certificate is current and passing.",
       "words": [
         "block"
       ]
@@ -1183,8 +1184,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 71,
-      "line": 71,
+      "end": 77,
+      "line": 77,
       "missing": [],
       "section": "problem-framing-scmle-frame",
       "tests": [
@@ -1199,8 +1200,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 74,
-      "line": 74,
+      "end": 80,
+      "line": 80,
       "missing": [],
       "section": "problem-framing-scmle-frame",
       "tests": [
@@ -1219,8 +1220,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 76,
-      "line": 76,
+      "end": 82,
+      "line": 82,
       "missing": [],
       "section": "problem-framing-scmle-frame",
       "tests": [
@@ -1237,8 +1238,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 84,
-      "line": 84,
+      "end": 90,
+      "line": 90,
       "missing": [],
       "section": "closed-loop-scmle-loop",
       "tests": [
@@ -1263,8 +1264,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 108,
-      "line": 102,
+      "end": 114,
+      "line": 108,
       "missing": [],
       "section": "the-model",
       "tests": [
@@ -1280,8 +1281,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 119,
-      "line": 119,
+      "end": 125,
+      "line": 125,
       "missing": [],
       "section": "provenance-and-governance",
       "tests": [
@@ -1296,8 +1297,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 130,
-      "line": 130,
+      "end": 136,
+      "line": 136,
       "missing": [],
       "section": "the-service-folder-scmle-package",
       "tests": [
@@ -1314,8 +1315,8 @@
     {
       "cited": [],
       "doc": "docs/ARTIFACTS.md",
-      "end": 134,
-      "line": 134,
+      "end": 140,
+      "line": 140,
       "missing": [],
       "section": "the-service-folder-scmle-package",
       "tests": [
@@ -1617,8 +1618,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 80,
-      "line": 78,
+      "end": 81,
+      "line": 79,
       "missing": [],
       "section": "analysis-charter",
       "tests": [
@@ -1632,8 +1633,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 105,
-      "line": 104,
+      "end": 106,
+      "line": 105,
       "missing": [],
       "section": "claims-of-a-charter-run",
       "tests": [
@@ -1647,8 +1648,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 156,
-      "line": 154,
+      "end": 157,
+      "line": 155,
       "missing": [],
       "section": "release-evidence-and-the-runtime",
       "tests": [
@@ -1664,8 +1665,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 157,
-      "line": 157,
+      "end": 158,
+      "line": 158,
       "missing": [],
       "section": "release-evidence-and-the-runtime",
       "tests": [
@@ -1679,8 +1680,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 174,
-      "line": 173,
+      "end": 175,
+      "line": 174,
       "missing": [],
       "section": "bundles-signed-versus-trusted",
       "tests": [
@@ -1694,8 +1695,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 181,
-      "line": 180,
+      "end": 182,
+      "line": 181,
       "missing": [],
       "section": "bundles-signed-versus-trusted",
       "tests": [
@@ -1710,8 +1711,8 @@
     {
       "cited": [],
       "doc": "docs/CLI.md",
-      "end": 187,
-      "line": 184,
+      "end": 188,
+      "line": 185,
       "missing": [],
       "section": "bundles-signed-versus-trusted",
       "tests": [
@@ -4199,7 +4200,7 @@
       ]
     }
   ],
-  "seconds": 1.2,
+  "seconds": 1.1,
   "test_links": 445,
   "version": 1
 }

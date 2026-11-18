@@ -70,7 +70,7 @@ def test_a_valid_attestation_keeps_the_column_flagged_and_attested():
     decision = next(d for d in found.table.decisions if d.name == "copy")
     assert decision.admission is rules.Admission.ADMIT_FLAGGED
     assert decision.tier is qualification.Tier.ATTESTED
-    assert decision.suspicion_kept
+    assert decision.suspected
     assert "copy" in found.suspects
 
 
@@ -79,11 +79,11 @@ def test_the_override_is_a_ledger_row_with_the_attester_and_the_p_value():
     found = run_with([attest()])
 
     rows = [c for s, c in found.checks if s == qualify.ATTESTATION_SOURCE]
-    assert [c.check_id for c in rows] == ["leakage.attestation:copy"]
+    assert [c.identifier for c in rows] == ["leakage.attestation:copy"]
     row = rows[0]
     assert row.tier is qualification.Tier.ATTESTED
-    assert "A. Owner" in row.null_hypothesis
-    assert "ticket DATA-1" in row.null_hypothesis
+    assert "A. Owner" in row.null
+    assert "ticket DATA-1" in row.null
     assert row.p_value is not None and row.p_value < 0.05
 
 
@@ -116,7 +116,7 @@ def test_a_file_round_trips(tmp_path):
     item = attest()
     path = tmp_path / "attestations.json"
     path.write_text(
-        json.dumps({"format_version": 1, "attestations": [item.to_dict()]})
+        json.dumps({"schema_version": 2, "attestations": [item.to_dict()]})
     )
 
     assert attestations.load(path) == (item,)
@@ -125,7 +125,8 @@ def test_a_file_round_trips(tmp_path):
 @pytest.mark.parametrize(
     "document",
     [
-        {"format_version": 2, "attestations": []},
+        {"schema_version": 3, "attestations": []},
+        {"attestations": []},
         {"format_version": 1},
         [],
     ],
@@ -142,7 +143,7 @@ def test_two_attestations_for_one_column_are_refused(tmp_path):
     record = attest().to_dict()
     path = tmp_path / "a.json"
     path.write_text(
-        json.dumps({"format_version": 1, "attestations": [record, record]})
+        json.dumps({"schema_version": 2, "attestations": [record, record]})
     )
 
     with pytest.raises(ValueError, match="one attestation per column"):
@@ -163,9 +164,9 @@ def test_a_missing_file_is_a_value_error(tmp_path):
 
 @pytest.mark.parametrize("lead", [True, "5", None])
 def test_a_lead_that_is_not_a_number_is_a_value_error(lead):
-    record = {**attest().to_dict(), "lead_seconds": lead}
+    record = {**attest().to_dict(), "seconds": lead}
 
-    with pytest.raises(ValueError, match="lead_seconds"):
+    with pytest.raises(ValueError, match="seconds"):
         attestations.Affidavit.from_dict(record)
 
 

@@ -9,16 +9,16 @@ from scmle.contracts import data
 
 
 def make_finding(
-    finding_id: str = "quality.missingness",
+    identifier: str = "quality.missingness",
     severity: data.FindingSeverity = data.FindingSeverity.WARNING,
 ) -> data.Finding:
     """Builds a representative structured curation finding."""
     return data.Finding(
-        finding_id=finding_id,
-        rule_version="missingness.v2",
+        identifier=identifier,
+        rule="missingness.v2",
         severity=severity,
         confidence=0.97,
-        affected_scope={"columns": ["income"], "rows": 12},
+        scope={"columns": ["income"], "rows": 12},
         evidence={"missing_fraction": 0.12, "sample": "rows:0-11"},
         remediation="Review the source collection and impute explicitly.",
         owner="data-platform",
@@ -39,11 +39,11 @@ def test_curation_finding_has_stable_json_contract_and_round_trips():
     record = finding.to_dict()
 
     assert set(record) == {
-        "id",
-        "rule_version",
+        "identifier",
+        "rule",
         "severity",
         "confidence",
-        "affected_scope",
+        "scope",
         "evidence",
         "remediation",
         "owner",
@@ -60,11 +60,11 @@ def test_curation_finding_has_stable_json_contract_and_round_trips():
 def test_curation_finding_rejects_invalid_confidence(confidence):
     with pytest.raises(ValueError, match="confidence"):
         make_finding().__class__(
-            finding_id="quality.invalid",
-            rule_version="rule.v1",
+            identifier="quality.invalid",
+            rule="rule.v1",
             severity=data.FindingSeverity.INFO,
             confidence=confidence,
-            affected_scope={},
+            scope={},
             evidence={},
             remediation="Investigate the source.",
             owner="data-platform",
@@ -78,11 +78,9 @@ def test_observation_conversion_has_deterministic_identity_and_evidence():
     first = data.Finding.glean("column 'income' has missing values", "quality")
     second = data.Finding.glean("column 'income' has missing values", "quality")
 
-    assert first.finding_id == second.finding_id
-    assert first.finding_id.startswith("quality.")
-    assert (
-        first.rule_version == second.rule_version == "pipeline-observation.v1"
-    )
+    assert first.identifier == second.identifier
+    assert first.identifier.startswith("quality.")
+    assert first.rule == second.rule == "pipeline-observation.v1"
     assert (
         first.evidence
         == second.evidence
@@ -93,60 +91,59 @@ def test_observation_conversion_has_deterministic_identity_and_evidence():
 def test_dataset_manifest_carries_source_lineage_privacy_and_findings():
     finding = make_finding()
     manifest = data.DatasetManifest(
-        dataset_id="ds_12345678",
-        schema_hash="schema-hash",
-        data_hash="data-hash",
-        row_count=100,
-        column_count=4,
+        identifier="ds_12345678",
+        digests={"schema": "schema-hash", "data": "data-hash"},
+        rows=100,
+        columns=4,
         target="label",
         uri="s3://warehouse/events/",
-        snapshot_id="snapshot-2026-10-20",
+        snapshot="snapshot-2026-10-20",
         modality="tabular",
         task="binary",
         schema_version=2,
         source=data.Origin(
             owner="analytics",
-            acquisition_method="warehouse-export",
-            captured_at="2026-10-20T09:00:00+00:00",
+            acquisition="warehouse-export",
+            captured="2026-10-20T09:00:00+00:00",
             timezone="UTC",
-            sampling_frame="production customers",
+            sampling="production customers",
             units={"income": "USD"},
-            semantic_definitions={"label": "conversion within 30 days"},
-            extraction_query="select * from events",
+            definitions={"label": "conversion within 30 days"},
+            query="select * from events",
             license="internal",
-            access_policy="restricted",
+            access="restricted",
         ),
         lineage=data.Ancestry(
-            source_snapshot="warehouse:events:2026-10-20",
-            parent_datasets=("raw-events",),
+            snapshot="warehouse:events:2026-10-20",
+            parents=("raw-events",),
             transformations=("deduplicate-events.v3",),
-            label_source="labels/conversion.py",
-            label_generator_version="labels-4.1",
-            annotator_version="annotators-2.0",
-            adjudication_status="complete",
-            partition_ids=("date=2026-10-20",),
-            object_hashes={"part-000": "abc123"},
-            schema_evolution="compatible-additive",
+            labelling="labels/conversion.py",
+            generator="labels-4.1",
+            annotator="annotators-2.0",
+            adjudication="complete",
+            partitions=("date=2026-10-20",),
+            digests={"part-000": "abc123"},
+            evolution="compatible-additive",
         ),
         privacy=data.Confidentiality(
             classification="confidential",
-            contains_pii=True,
-            sensitive_fields=("email",),
-            consent_basis="service agreement",
-            retention_period="90d",
-            deletion_policy="delete-on-request",
-            access_policy="approved-data-users",
-            redaction_required=True,
+            identifying=True,
+            sensitive=("email",),
+            consent="service agreement",
+            retention="90d",
+            deletion="delete-on-request",
+            access="approved-data-users",
+            redaction=True,
         ),
         findings=(finding,),
     )
 
     record = manifest.to_dict()
 
-    assert record["snapshot_id"] == "snapshot-2026-10-20"
+    assert record["snapshot"] == "snapshot-2026-10-20"
     assert record["source"]["units"] == {"income": "USD"}
-    assert record["lineage"]["partition_ids"] == ["date=2026-10-20"]
-    assert record["privacy"]["sensitive_fields"] == ["email"]
+    assert record["lineage"]["partitions"] == ["date=2026-10-20"]
+    assert record["privacy"]["sensitive"] == ["email"]
     assert record["findings"] == [finding.to_dict()]
     assert json.loads(json.dumps(record)) == record
     assert data.DatasetManifest.from_dict(record) == manifest
@@ -155,7 +152,9 @@ def test_dataset_manifest_carries_source_lineage_privacy_and_findings():
 def test_dataset_profile_serializes_typed_quality_evidence():
     """Quality evidence is JSON-native without changing existing fields."""
     profile = data.Portrait(
-        manifest=data.DatasetManifest("ds_1", "schema", "data", 10, 2, "y"),
+        manifest=data.DatasetManifest(
+            "ds_1", {"schema": "schema", "data": "data"}, 10, 2, "y"
+        ),
         column_statistics={},
         quality_findings=("label noise: review",),
         risk_findings=(),
@@ -197,23 +196,22 @@ def test_dataset_profile_rejects_non_json_quality_evidence():
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("dataset_id", "", "dataset_id"),
-        ("schema_hash", "", "schema_hash"),
-        ("data_hash", "", "data_hash"),
+        ("identifier", "", "identifier"),
+        ("digests", {"schema": "", "data": "data"}, "digests.schema"),
+        ("digests", {"schema": "schema", "data": ""}, "digests.data"),
         ("target", "", "target"),
-        ("row_count", -1, "row_count"),
-        ("column_count", -1, "column_count"),
+        ("rows", -1, "rows"),
+        ("columns", -1, "columns"),
         ("schema_version", 0, "schema_version"),
     ],
 )
 def test_dataset_manifest_rejects_invalid_identity(field, value, message):
     """Dataset identity cannot be persisted with incomplete metadata."""
     values = {
-        "dataset_id": "dataset",
-        "schema_hash": "schema",
-        "data_hash": "data",
-        "row_count": 1,
-        "column_count": 1,
+        "identifier": "dataset",
+        "digests": {"schema": "schema", "data": "data"},
+        "rows": 1,
+        "columns": 1,
         "target": "label",
         "schema_version": 1,
     }
@@ -227,22 +225,34 @@ def test_dataset_manifest_rejects_untyped_evidence_components():
     """Lineage, privacy, and findings remain typed contract components."""
     with pytest.raises(TypeError, match="source"):
         data.DatasetManifest(
-            "dataset", "schema", "data", 1, 1, "label", source={}
+            "dataset",
+            {"schema": "schema", "data": "data"},
+            1,
+            1,
+            "label",
+            source={},
         )
     with pytest.raises(TypeError, match="findings"):
         data.DatasetManifest(
-            "dataset", "schema", "data", 1, 1, "label", findings=(object(),)
+            "dataset",
+            {"schema": "schema", "data": "data"},
+            1,
+            1,
+            "label",
+            findings=(object(),),
         )
 
 
 def test_curation_report_serializes_structured_quality_and_risk_findings():
     quality = make_finding()
     risk = make_finding(
-        finding_id="risk.target-leakage",
+        identifier="risk.target-leakage",
         severity=data.FindingSeverity.ERROR,
     )
     report = data.Curation(
-        manifest=data.DatasetManifest("ds_1", "schema", "data", 10, 2, "label"),
+        manifest=data.DatasetManifest(
+            "ds_1", {"schema": "schema", "data": "data"}, 10, 2, "label"
+        ),
         source_rows=10,
         profiled_rows=10,
         read_seconds=0.25,
@@ -264,11 +274,13 @@ def test_curation_report_serializes_structured_quality_and_risk_findings():
 def test_curation_report_is_not_release_ready_with_open_blocking_findings():
     """Open blocking observations must stop the lifecycle before training."""
     risk = make_finding(
-        finding_id="risk.target-leakage",
+        identifier="risk.target-leakage",
         severity=data.FindingSeverity.ERROR,
     )
     report = data.Curation(
-        manifest=data.DatasetManifest("ds_1", "schema", "data", 10, 2, "label"),
+        manifest=data.DatasetManifest(
+            "ds_1", {"schema": "schema", "data": "data"}, 10, 2, "label"
+        ),
         source_rows=10,
         profiled_rows=10,
         read_seconds=0.25,
@@ -290,11 +302,13 @@ def test_curation_report_is_not_release_ready_with_open_blocking_findings():
 def test_curation_report_accepts_explicit_safe_dispositions():
     """Resolved, waived, and false-positive findings are reviewable states."""
     risk = make_finding(
-        finding_id="risk.target-leakage",
+        identifier="risk.target-leakage",
         severity=data.FindingSeverity.ERROR,
     )
     report = data.Curation(
-        manifest=data.DatasetManifest("ds_1", "schema", "data", 10, 2, "label"),
+        manifest=data.DatasetManifest(
+            "ds_1", {"schema": "schema", "data": "data"}, 10, 2, "label"
+        ),
         source_rows=10,
         profiled_rows=10,
         read_seconds=0.25,
@@ -316,12 +330,11 @@ def test_dataset_card_makes_intended_use_and_limits_explicit():
     report = data.Curation(
         manifest=data.DatasetManifest(
             "ds_1",
-            "schema",
-            "data",
+            {"schema": "schema", "data": "data"},
             10,
             2,
             "label",
-            snapshot_id="snapshot-1",
+            snapshot="snapshot-1",
             task="binary_classification",
             source=data.Origin(owner="ml-platform"),
         ),

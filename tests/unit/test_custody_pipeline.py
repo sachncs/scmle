@@ -48,7 +48,7 @@ def run(frame, charter=None, spec=None):
     log = sealed.Journal()
     vault = sealed.Vault(log)
     outcome = pipeline.sequester(
-        charter=charter or make_charter(min_effect=0.3, k_max=5),
+        charter=charter or make_charter(effect=0.3, quota=5),
         split=split,
         frame=frame,
         spec=spec,
@@ -64,10 +64,10 @@ def test_three_sets_partition_every_row_and_c_is_sealed():
     frame = make_frame()
     outcome, original, vault = run(frame)
     manifest = outcome.manifest
-    x = set(manifest.exploration_ids)
-    c = set(manifest.confirmation_ids)
-    e = set(manifest.embargo_ids)
-    final = set(manifest.final_test_ids)
+    x = set(manifest.sets.exploration)
+    c = set(manifest.sets.confirmation)
+    e = set(manifest.sets.embargo)
+    final = set(manifest.sets.final)
     assert x | c | e | final == set(range(len(frame)))
     assert not (x & c) and not (x & final) and not (c & final)
     assert final == set(original.manifest.test_ids)
@@ -75,7 +75,7 @@ def test_three_sets_partition_every_row_and_c_is_sealed():
     assert manifest.scope == "confirmatory"
     assert set(vault.sets) == {"C"}
     held = vault.sets["C"]
-    assert held.ids == manifest.confirmation_ids
+    assert held.ids == manifest.sets.confirmation
     held.commit("c", "l")
     rows = held.open(held.mint(), "test", claims_hash="c", ledger_hash="l")
     assert numpy.allclose(
@@ -89,7 +89,7 @@ def test_the_development_data_is_exploration_only():
     frame = make_frame()
     ran = run(frame)
     outcome, vault = ran.outcome, ran.vault
-    x = list(outcome.manifest.exploration_ids)
+    x = list(outcome.manifest.sets.exploration)
     assert len(outcome.split.dev_features) == len(x)
     assert outcome.split.manifest.train_ids == tuple(x)
     assert numpy.allclose(
@@ -104,10 +104,10 @@ def test_the_development_data_is_exploration_only():
 def test_too_few_rows_leave_no_confirmation_set():
     frame = make_frame(rows=120)
     outcome, original, vault = run(frame)
-    assert outcome.manifest.confirmation_ids == ()
+    assert outcome.manifest.sets.confirmation == ()
     assert outcome.manifest.scope == "exploratory_unconfirmed"
     assert outcome.feasibility.verdict is feasibility.Verdict.INFEASIBLE
-    assert set(outcome.manifest.exploration_ids) == set(
+    assert set(outcome.manifest.sets.exploration) == set(
         original.manifest.train_ids
     )
     assert not vault.sets
@@ -116,11 +116,11 @@ def test_too_few_rows_leave_no_confirmation_set():
 
 def test_an_underpowered_confirmation_set_is_kept_but_capped():
     frame = make_frame(rows=1200)
-    charter = make_charter(min_effect=0.05, k_max=10)
+    charter = make_charter(effect=0.05, quota=10)
     ran = run(frame, charter)
     outcome, vault = ran.outcome, ran.vault
     assert outcome.feasibility.verdict is feasibility.Verdict.DOWNGRADE
-    assert len(outcome.manifest.confirmation_ids) > 0
+    assert len(outcome.manifest.sets.confirmation) > 0
     assert outcome.manifest.scope == "exploratory_unconfirmed"
     vault.close()
 
@@ -143,7 +143,7 @@ def test_the_group_column_keeps_groups_out_of_both_sets():
     log = sealed.Journal()
     vault = sealed.Vault(log)
     outcome = pipeline.sequester(
-        charter=make_charter(min_effect=0.3, k_max=5),
+        charter=make_charter(effect=0.3, quota=5),
         split=split,
         frame=frame,
         spec=spec,
@@ -152,8 +152,8 @@ def test_the_group_column_keeps_groups_out_of_both_sets():
         vault=vault,
     )
     groups = frame["g"].to_numpy()
-    c = groups[list(outcome.manifest.confirmation_ids)]
-    x = groups[list(outcome.manifest.exploration_ids)]
+    c = groups[list(outcome.manifest.sets.confirmation)]
+    x = groups[list(outcome.manifest.sets.exploration)]
     assert len(c) > 0 and set(c).isdisjoint(x)
     vault.close()
 
@@ -176,10 +176,12 @@ def test_a_refused_carve_becomes_a_run_with_no_confirmation_set(monkeypatch):
     ran = run(frame)
     manifest = ran.outcome.manifest
 
-    assert manifest.confirmation_ids == ()
-    assert manifest.embargo_ids == ()
+    assert manifest.sets.confirmation == ()
+    assert manifest.sets.embargo == ()
     assert manifest.scope == "exploratory_unconfirmed"
-    assert set(manifest.exploration_ids) == set(ran.original.manifest.train_ids)
+    assert set(manifest.sets.exploration) == set(
+        ran.original.manifest.train_ids
+    )
     assert any("not carved" in note for note in manifest.notes)
     assert ran.outcome.split.manifest.folds == ran.original.manifest.folds
     assert not ran.vault.sets
@@ -189,14 +191,14 @@ def test_a_refused_carve_becomes_a_run_with_no_confirmation_set(monkeypatch):
 def test_the_manifest_commits_to_the_row_content_of_each_set():
     frame = make_frame()
     manifest = run(frame).outcome.manifest
-    assert [name for name, ignored in manifest.row_roots] == [
+    assert [name for name, ignored in manifest.roots] == [
         "exploration",
         "confirmation",
         "final_test",
     ]
     manifest.verify_rows(frame)
     edited = frame.copy()
-    edited.loc[manifest.confirmation_ids[0], "x"] += 1e-9
+    edited.loc[manifest.sets.confirmation[0], "x"] += 1e-9
     with pytest.raises(errors.ArtifactError, match="confirmation"):
         manifest.verify_rows(edited)
 
@@ -233,20 +235,20 @@ def run_temporal(frame, charter):
 
 def test_a_serially_dependent_target_raises_the_embargo_above_the_charter():
     outcome = run_temporal(
-        temporal_frame(0.9), make_charter(min_effect=0.3, k_max=5)
+        temporal_frame(0.9), make_charter(effect=0.3, quota=5)
     )
     manifest = outcome.manifest
-    assert manifest.confirmation_ids
-    assert manifest.embargo_rows > 0
-    assert manifest.embargo_ids
+    assert manifest.sets.confirmation
+    assert manifest.embargo > 0
+    assert manifest.sets.embargo
     assert any("autocorrelation" in note for note in manifest.notes)
 
 
 def test_an_independent_target_keeps_the_charter_embargo():
     outcome = run_temporal(
-        temporal_frame(0.0), make_charter(min_effect=0.3, k_max=5)
+        temporal_frame(0.0), make_charter(effect=0.3, quota=5)
     )
-    assert outcome.manifest.embargo_rows == 0
+    assert outcome.manifest.embargo == 0
     assert not any("autocorrelation" in n for n in outcome.manifest.notes)
 
 

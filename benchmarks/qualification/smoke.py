@@ -435,10 +435,10 @@ def check_certificates() -> list[SmokeCheck]:
         outcome = item.outcomes[0]
         cert = outcome.certificate
         lines.append(
-            f"{item.detector_id}: recall {cert.recall:.3f} "
-            f"(lower {outcome.recall_interval[0]:.3f}), false alarms "
+            f"{item.detector}: recall {cert.recall:.3f} "
+            f"(lower {outcome.recall[0]:.3f}), false alarms "
             f"{cert.false_alarm_rate:.4f} "
-            f"(upper {outcome.false_alarm_interval[1]:.4f}), "
+            f"(upper {outcome.alarms[1]:.4f}), "
             f"{'pass' if outcome.passed else 'FAIL'}"
         )
     all_passed = all(

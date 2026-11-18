@@ -105,6 +105,7 @@ def test_commands_are_polymorphic():
         "operate",
         "deploy",
         "trail",
+        "records",
     ]
     assert all(isinstance(c, cli.Command) for c in cli.COMMANDS)
 
@@ -165,8 +166,8 @@ def test_catalog_command_catalogs_raw_bytes_without_decoding(tmp_path, capsys):
     assert cli.main(["catalog", "--raw-bytes", str(raw_path)]) == cli.EXIT_OK
 
     emitted = json.loads(capsys.readouterr().out)
-    assert emitted["data_kind"] == "bytes"
-    assert emitted["content_identity"] == (
+    assert emitted["kind"] == "bytes"
+    assert emitted["digests"]["content"] == (
         f"sha256:{hashlib.sha256(payload).hexdigest()}"
     )
     assert (
@@ -189,7 +190,7 @@ def test_catalog_command_reads_raw_bytes_from_standard_input(
 
     emitted = json.loads(capsys.readouterr().out)
     assert emitted["source"]["uri"] == "memory://stdin"
-    assert emitted["sample_count"] == 1
+    assert emitted["samples"] == 1
 
 
 def test_catalog_command_rejects_unknown_tabular_suffix(tmp_path, caplog):

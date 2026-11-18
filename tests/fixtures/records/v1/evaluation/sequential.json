@@ -1,0 +1,246 @@
+{
+  "digest": "3d9cdca6c9daab468eae6c769dd0289009a081261494128125969c539fe8ed9d",
+  "report": {
+    "contrast_estimate": 1.735072455045989,
+    "contrast_interval": [
+      1.4583254770425416,
+      2.011819433049437
+    ],
+    "contrast_standard_error": 0.14120003234059014,
+    "covariance": [
+      [
+        0.012448465531803489,
+        0.0
+      ],
+      [
+        0.0,
+        0.007488983601180212
+      ]
+    ],
+    "diagnostics": {
+      "fit_iterations_final_period": {
+        "denominator": 5,
+        "numerator": 4
+      },
+      "method": "stabilized_treatment_history_ipw",
+      "period_count": 3,
+      "periods": [
+        {
+          "control_rows": 111,
+          "denominator_propensity_max": 0.6203036119526578,
+          "denominator_propensity_min": 0.15099378108921835,
+          "effective_sample_size": 172.36838742874912,
+          "fraction_weight_truncated": 0.0,
+          "maximum_untruncated_weight": 1.7258126357666763,
+          "maximum_weight": 1.7258126357666763,
+          "numerator_propensity_max": 0.38333333335974573,
+          "numerator_propensity_min": 0.38333333335974573,
+          "period": "0",
+          "rows": 180,
+          "treated_rows": 69
+        },
+        {
+          "control_rows": 89,
+          "denominator_propensity_max": 0.6807619600977806,
+          "denominator_propensity_min": 0.29254861188869113,
+          "effective_sample_size": 170.01351160865676,
+          "fraction_weight_truncated": 0.0,
+          "maximum_untruncated_weight": 2.4672798233848994,
+          "maximum_weight": 2.4672798233848994,
+          "numerator_propensity_max": 0.5797101448573764,
+          "numerator_propensity_min": 0.4594594595177137,
+          "period": "1",
+          "rows": 180,
+          "treated_rows": 91
+        },
+        {
+          "control_rows": 88,
+          "denominator_propensity_max": 0.779323417892327,
+          "denominator_propensity_min": 0.18982751588714689,
+          "effective_sample_size": 162.7568736337925,
+          "fraction_weight_truncated": 0.0,
+          "maximum_untruncated_weight": 2.3683894264718592,
+          "maximum_weight": 2.3683894264718592,
+          "numerator_propensity_max": 0.6050871303471556,
+          "numerator_propensity_min": 0.4200580870767332,
+          "period": "2",
+          "rows": 180,
+          "treated_rows": 92
+        }
+      ],
+      "propensity_model": "deterministic_newton_logistic_with_ridge",
+      "regime_history": {
+        "comparator": [
+          0,
+          0,
+          0
+        ],
+        "target": [
+          1,
+          1,
+          1
+        ]
+      },
+      "subject_count": 180,
+      "time_ordering": "strictly_increasing_with_complete_follow_up",
+      "weight_truncation": {
+        "fraction_truncated_final": 0.0,
+        "maximum_weight": 12.0
+      }
+    },
+    "estimand": {
+      "assumptions": [
+        "consistency",
+        "positivity",
+        "sequential_exchangeability",
+        "no_unmeasured_time_varying_confounding",
+        "time_varying_covariates_are_pre_treatment",
+        "complete_follow_up"
+      ],
+      "baseline_covariates": [
+        "baseline_score"
+      ],
+      "comparator_treatment": 0,
+      "name": "sustained_treatment_effect",
+      "outcome": "outcome",
+      "population": "subjects with complete follow-up across declared periods",
+      "subject_identity": "subject_id",
+      "target_treatment": 1,
+      "time_column": "time",
+      "time_varying_covariates": [
+        "state"
+      ],
+      "treatment_column": "treatment"
+    },
+    "limitations": {
+      "missingness": {
+        "message": "Complete-case deletion is not a missing-at-random proof; the declared assumptions must cover missingness.",
+        "policy": "reject",
+        "subjects_dropped": 0
+      },
+      "regimes": "static always-treated versus always-control histories only",
+      "truncation": "Hard cumulative-weight truncation trades variance for bias; the cap is recorded in policy and diagnostics.",
+      "uncertainty": "Intervals include weighted outcome influence only; propensity-model uncertainty is not propagated.",
+      "unsupported": "Dynamic regimes, intermittent follow-up, continuous treatment, g-computation, and marginal structural model contrasts are outside this bounded contract."
+    },
+    "periods": [
+      {
+        "control_rows": 111,
+        "denominator_propensity_max": 0.6203036119526578,
+        "denominator_propensity_min": 0.15099378108921835,
+        "effective_sample_size": 172.36838742874912,
+        "fraction_weight_truncated": 0.0,
+        "maximum_untruncated_weight": 1.7258126357666763,
+        "maximum_weight": 1.7258126357666763,
+        "numerator_propensity_max": 0.38333333335974573,
+        "numerator_propensity_min": 0.38333333335974573,
+        "period": "0",
+        "rows": 180,
+        "treated_rows": 69
+      },
+      {
+        "control_rows": 89,
+        "denominator_propensity_max": 0.6807619600977806,
+        "denominator_propensity_min": 0.29254861188869113,
+        "effective_sample_size": 170.01351160865676,
+        "fraction_weight_truncated": 0.0,
+        "maximum_untruncated_weight": 2.4672798233848994,
+        "maximum_weight": 2.4672798233848994,
+        "numerator_propensity_max": 0.5797101448573764,
+        "numerator_propensity_min": 0.4594594595177137,
+        "period": "1",
+        "rows": 180,
+        "treated_rows": 91
+      },
+      {
+        "control_rows": 88,
+        "denominator_propensity_max": 0.779323417892327,
+        "denominator_propensity_min": 0.18982751588714689,
+        "effective_sample_size": 162.7568736337925,
+        "fraction_weight_truncated": 0.0,
+        "maximum_untruncated_weight": 2.3683894264718592,
+        "maximum_weight": 2.3683894264718592,
+        "numerator_propensity_max": 0.6050871303471556,
+        "numerator_propensity_min": 0.4200580870767332,
+        "period": "2",
+        "rows": 180,
+        "treated_rows": 92
+      }
+    ],
+    "policy": {
+      "confidence_level": 0.95,
+      "max_iterations": 100,
+      "maximum_weight": 12.0,
+      "minimum_arm_rows": 2,
+      "minimum_effective_sample_size": 2.0,
+      "minimum_subjects": 100,
+      "missingness": "reject",
+      "propensity_clip": 0.01,
+      "reference_tolerance": 1e-06,
+      "seed": 17,
+      "tolerance": 1e-08
+    },
+    "raw_input_fingerprint": "e335a14280707b4c957df66e3b8c6ff2f0deb59e61f08cbfa3278d3cfcabfc26",
+    "reference": {
+      "contrast": 1.7350724550459893,
+      "method": "independent_direct_normalized_history_weight_means",
+      "passed": true,
+      "regimes": [
+        {
+          "absolute_difference": 4.440892098500626e-16,
+          "estimate": 3.107971843862305,
+          "independent_method": "direct_normalized_history_weight_mean",
+          "passed": true,
+          "primary_estimate": 3.1079718438623045,
+          "regime": "always_treated",
+          "rows": 22
+        },
+        {
+          "absolute_difference": 2.220446049250313e-16,
+          "estimate": 1.3728993888163157,
+          "independent_method": "direct_normalized_history_weight_mean",
+          "passed": true,
+          "primary_estimate": 1.3728993888163155,
+          "regime": "always_control",
+          "rows": 37
+        }
+      ],
+      "tolerance": 1e-06
+    },
+    "regimes": [
+      {
+        "effective_sample_size": 18.38881910561556,
+        "estimate": 3.1079718438623045,
+        "interval": [
+          2.8892933864842325,
+          3.3266503012403765
+        ],
+        "regime": "always_treated",
+        "rows": 22,
+        "standard_error": 0.11157269169381678,
+        "treatment": 1,
+        "weight_sum": 21.65256836370648
+      },
+      {
+        "effective_sample_size": 30.711216534881373,
+        "estimate": 1.3728993888163155,
+        "interval": [
+          1.2032862345128024,
+          1.5425125431198285
+        ],
+        "regime": "always_control",
+        "rows": 37,
+        "standard_error": 0.08653891379709022,
+        "treatment": 0,
+        "weight_sum": 36.25084150744674
+      }
+    ],
+    "rows_dropped": 0,
+    "rows_input": 540,
+    "rows_used": 540,
+    "subjects_dropped": 0,
+    "subjects_input": 180,
+    "subjects_used": 180
+  },
+  "schema_version": 1
+}

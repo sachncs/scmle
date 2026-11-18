@@ -61,7 +61,7 @@ def test_tabular_beta_plan_has_an_explicit_library_capability_path():
 
     plan = stages.devise(context)
 
-    assert set(plan.candidate_models) == {"dummy", "logistic_regression"}
+    assert set(plan.candidates) == {"dummy", "logistic_regression"}
     declarations = context.capability_registry.catalogue()
     assert declarations
     assert {declaration.key.modality for declaration in declarations} == {
@@ -133,14 +133,14 @@ def test_experimental_transformer_requires_explicit_model_opt_in():
     registry = scmle.models.registry.Catalog((classical.Dummy(), adapter))
     default_context = make_context(model_registry=registry)
     default_plan = stages.devise(default_context)
-    assert adapter.name not in default_plan.candidate_models
+    assert adapter.name not in default_plan.candidates
 
     spec = default_context.spec.model_copy(
         update={"models": tasks.Candidates(experimental_models=[adapter.name])}
     )
     opted_in_context = make_context(model_registry=registry, spec=spec)
     opted_in_plan = stages.devise(opted_in_context)
-    assert adapter.name in opted_in_plan.candidate_models
+    assert adapter.name in opted_in_plan.candidates
 
 
 def test_capability_family_is_used_before_training():
@@ -173,7 +173,7 @@ def test_extension_only_foundation_adapter_cannot_break_auto_planning(
 
     plan = stages.devise(make_context(model_registry=registry))
 
-    assert "tabpfn" not in plan.candidate_models
+    assert "tabpfn" not in plan.candidates
 
 
 def test_unimplemented_contract_dimensions_are_not_promoted():

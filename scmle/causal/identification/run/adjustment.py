@@ -99,7 +99,7 @@ class Backdoor(Estimator):
             spec.estimand,
             level,
             spec.trim,
-            spec.min_share,
+            spec.retained,
         )
         self.design["overlap_on_c"] = result.overlap
         self.design["population"] = result.population
@@ -144,7 +144,7 @@ class Backdoor(Estimator):
             spec.estimand,
             level,
             spec.trim,
-            spec.min_share,
+            spec.retained,
         )
         return Est(
             result.estimate, result.se, result.low, result.high, result.n
@@ -163,7 +163,7 @@ class Backdoor(Estimator):
         """
         spec = self.spec
         tests = []
-        for control in spec.negative_controls:
+        for control in spec.controls:
             if control.kind == "outcome":
                 est = self.reckon(c, level, control.variable)
                 name = f"negative_outcome:{control.variable}"
@@ -184,7 +184,7 @@ class Backdoor(Estimator):
                     spec.estimand,
                     level,
                     spec.trim,
-                    spec.min_share,
+                    spec.retained,
                 )
                 est = Est(
                     found.estimate, found.se, found.low, found.high, found.n
@@ -295,7 +295,7 @@ class RandomizedEstimator(Estimator):
             usable standard error; exposures are not supported here.
         """
         tests = []
-        for control in self.spec.negative_controls:
+        for control in self.spec.controls:
             if control.kind != "outcome":
                 continue
             est = self.reckon(c, level, control.variable)

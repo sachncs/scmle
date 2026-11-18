@@ -90,7 +90,9 @@ def test_the_governed_data_modules_are_pinned_in_the_snapshot(module):
 def test_a_portrait_has_an_empty_leakage_field_and_writes_its_key():
     """Enforces docs/API_STABILITY.md:51."""
     portrait = data.Portrait(
-        manifest=data.DatasetManifest("ds", "schema", "data", 3, 1, "y"),
+        manifest=data.DatasetManifest(
+            "ds", {"schema": "schema", "data": "data"}, 3, 1, "y"
+        ),
         column_statistics={},
         quality_findings=(),
         risk_findings=(),
@@ -103,7 +105,7 @@ def test_a_portrait_has_an_empty_leakage_field_and_writes_its_key():
 
 
 def test_a_multiclass_copy_of_the_target_blocks_in_a_run_screen():
-    """Enforces docs/API_STABILITY.md:51 and docs/ARTIFACTS.md:26.
+    """Enforces docs/API_STABILITY.md:51 and docs/ARTIFACTS.md:32.
 
     The screen a run uses lets every mechanism gate, so a suspect blocks for
     a three-class target too, not only for a binary one.

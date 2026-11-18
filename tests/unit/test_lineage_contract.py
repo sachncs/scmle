@@ -5,13 +5,13 @@ import pytest
 from scmle.contracts import lineage
 
 
-def node(node_id: str, kind: lineage.Kind) -> lineage.Node:
+def node(identifier: str, kind: lineage.Kind) -> lineage.Node:
     """Build a deterministic evidence node fixture."""
     return lineage.Node(
-        node_id=node_id,
+        identifier=identifier,
         kind=kind,
-        digest=f"sha256:{node_id}",
-        attributes={"path": f"{node_id}.json"},
+        digest=f"sha256:{identifier}",
+        attributes={"path": f"{identifier}.json"},
     )
 
 

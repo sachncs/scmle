@@ -646,49 +646,51 @@
      "text": []
     },
     "manifest": {
-     "column_count": "int",
-     "data_hash": "str",
-     "dataset_id": "str",
+     "columns": "int",
+     "digests": {
+      "data": "str",
+      "schema": "str"
+     },
      "findings": [],
+     "identifier": "str",
      "lineage": {
-      "adjudication_status": "str",
-      "annotator_version": "str",
-      "label_generator_version": "str",
-      "label_source": "str",
-      "object_hashes": {
+      "adjudication": "str",
+      "annotator": "str",
+      "digests": {
        "tabular-frame": "str"
       },
-      "parent_datasets": [],
-      "partition_ids": [],
-      "schema_evolution": "str",
-      "source_snapshot": "str",
+      "evolution": "str",
+      "generator": "str",
+      "labelling": "str",
+      "parents": [],
+      "partitions": [],
+      "snapshot": "str",
       "transformations": []
      },
      "modality": "str",
      "privacy": {
-      "access_policy": "str",
+      "access": "str",
       "classification": "str",
-      "consent_basis": "str",
-      "contains_pii": "bool",
-      "deletion_policy": "str",
-      "redaction_required": "bool",
-      "retention_period": "str",
-      "sensitive_fields": []
+      "consent": "str",
+      "deletion": "str",
+      "identifying": "bool",
+      "redaction": "bool",
+      "retention": "str",
+      "sensitive": []
      },
-     "row_count": "int",
-     "schema_hash": "str",
+     "rows": "int",
      "schema_version": "int",
-     "snapshot_id": "str",
+     "snapshot": "str",
      "source": {
-      "access_policy": "str",
-      "acquisition_method": "str",
-      "captured_at": "str",
-      "extraction_query": "str",
+      "access": "str",
+      "acquisition": "str",
+      "captured": "str",
+      "definitions": {},
       "license": "str",
-      "object_prefix": "str",
       "owner": "str",
-      "sampling_frame": "str",
-      "semantic_definitions": {},
+      "prefix": "str",
+      "query": "str",
+      "sampling": "str",
       "timezone": "str",
       "units": {}
      },
@@ -699,20 +701,20 @@
     "profiled_rows": "int",
     "quality_findings": [
      {
-      "affected_scope": {
-       "category": "str"
-      },
       "blocking": "bool",
       "confidence": "float",
       "disposition": "str",
       "evidence": {
        "message": "str"
       },
-      "id": "str",
+      "identifier": "str",
       "owner": "str",
       "remediation": "str",
       "reviewer": "NoneType",
-      "rule_version": "str",
+      "rule": "str",
+      "scope": {
+       "category": "str"
+      },
       "severity": "str",
       "timestamp": "str"
      }
@@ -748,17 +750,17 @@
      "str"
     ],
     "lineage": {
-     "adjudication_status": "str",
-     "annotator_version": "str",
-     "label_generator_version": "str",
-     "label_source": "str",
-     "object_hashes": {
+     "adjudication": "str",
+     "annotator": "str",
+     "digests": {
       "tabular-frame": "str"
      },
-     "parent_datasets": [],
-     "partition_ids": [],
-     "schema_evolution": "str",
-     "source_snapshot": "str",
+     "evolution": "str",
+     "generator": "str",
+     "labelling": "str",
+     "parents": [],
+     "partitions": [],
+     "snapshot": "str",
      "transformations": []
     },
     "modality": "str",
@@ -767,31 +769,31 @@
     ],
     "owner": "str",
     "privacy": {
-     "access_policy": "str",
+     "access": "str",
      "classification": "str",
-     "consent_basis": "str",
-     "contains_pii": "bool",
-     "deletion_policy": "str",
-     "redaction_required": "bool",
-     "retention_period": "str",
-     "sensitive_fields": []
+     "consent": "str",
+     "deletion": "str",
+     "identifying": "bool",
+     "redaction": "bool",
+     "retention": "str",
+     "sensitive": []
     },
     "quality_findings": [
      {
-      "affected_scope": {
-       "category": "str"
-      },
       "blocking": "bool",
       "confidence": "float",
       "disposition": "str",
       "evidence": {
        "message": "str"
       },
-      "id": "str",
+      "identifier": "str",
       "owner": "str",
       "remediation": "str",
       "reviewer": "NoneType",
-      "rule_version": "str",
+      "rule": "str",
+      "scope": {
+       "category": "str"
+      },
       "severity": "str",
       "timestamp": "str"
      }
@@ -801,15 +803,15 @@
     "schema_version": "int",
     "snapshot_id": "str",
     "source": {
-     "access_policy": "str",
-     "acquisition_method": "str",
-     "captured_at": "str",
-     "extraction_query": "str",
+     "access": "str",
+     "acquisition": "str",
+     "captured": "str",
+     "definitions": {},
      "license": "str",
-     "object_prefix": "str",
      "owner": "str",
-     "sampling_frame": "str",
-     "semantic_definitions": {},
+     "prefix": "str",
+     "query": "str",
+     "sampling": "str",
      "timezone": "str",
      "units": {}
     },
@@ -817,49 +819,51 @@
     "task": "str"
    },
    "dataset_manifest.json": {
-    "column_count": "int",
-    "data_hash": "str",
-    "dataset_id": "str",
+    "columns": "int",
+    "digests": {
+     "data": "str",
+     "schema": "str"
+    },
     "findings": [],
+    "identifier": "str",
     "lineage": {
-     "adjudication_status": "str",
-     "annotator_version": "str",
-     "label_generator_version": "str",
-     "label_source": "str",
-     "object_hashes": {
+     "adjudication": "str",
+     "annotator": "str",
+     "digests": {
       "tabular-frame": "str"
      },
-     "parent_datasets": [],
-     "partition_ids": [],
-     "schema_evolution": "str",
-     "source_snapshot": "str",
+     "evolution": "str",
+     "generator": "str",
+     "labelling": "str",
+     "parents": [],
+     "partitions": [],
+     "snapshot": "str",
      "transformations": []
     },
     "modality": "str",
     "privacy": {
-     "access_policy": "str",
+     "access": "str",
      "classification": "str",
-     "consent_basis": "str",
-     "contains_pii": "bool",
-     "deletion_policy": "str",
-     "redaction_required": "bool",
-     "retention_period": "str",
-     "sensitive_fields": []
+     "consent": "str",
+     "deletion": "str",
+     "identifying": "bool",
+     "redaction": "bool",
+     "retention": "str",
+     "sensitive": []
     },
-    "row_count": "int",
-    "schema_hash": "str",
+    "rows": "int",
     "schema_version": "int",
-    "snapshot_id": "str",
+    "snapshot": "str",
     "source": {
-     "access_policy": "str",
-     "acquisition_method": "str",
-     "captured_at": "str",
-     "extraction_query": "str",
+     "access": "str",
+     "acquisition": "str",
+     "captured": "str",
+     "definitions": {},
      "license": "str",
-     "object_prefix": "str",
      "owner": "str",
-     "sampling_frame": "str",
-     "semantic_definitions": {},
+     "prefix": "str",
+     "query": "str",
+     "sampling": "str",
      "timezone": "str",
      "units": {}
     },
@@ -1043,49 +1047,51 @@
      "warning": "str"
     },
     "manifest": {
-     "column_count": "int",
-     "data_hash": "str",
-     "dataset_id": "str",
+     "columns": "int",
+     "digests": {
+      "data": "str",
+      "schema": "str"
+     },
      "findings": [],
+     "identifier": "str",
      "lineage": {
-      "adjudication_status": "str",
-      "annotator_version": "str",
-      "label_generator_version": "str",
-      "label_source": "str",
-      "object_hashes": {
+      "adjudication": "str",
+      "annotator": "str",
+      "digests": {
        "tabular-frame": "str"
       },
-      "parent_datasets": [],
-      "partition_ids": [],
-      "schema_evolution": "str",
-      "source_snapshot": "str",
+      "evolution": "str",
+      "generator": "str",
+      "labelling": "str",
+      "parents": [],
+      "partitions": [],
+      "snapshot": "str",
       "transformations": []
      },
      "modality": "str",
      "privacy": {
-      "access_policy": "str",
+      "access": "str",
       "classification": "str",
-      "consent_basis": "str",
-      "contains_pii": "bool",
-      "deletion_policy": "str",
-      "redaction_required": "bool",
-      "retention_period": "str",
-      "sensitive_fields": []
+      "consent": "str",
+      "deletion": "str",
+      "identifying": "bool",
+      "redaction": "bool",
+      "retention": "str",
+      "sensitive": []
      },
-     "row_count": "int",
-     "schema_hash": "str",
+     "rows": "int",
      "schema_version": "int",
-     "snapshot_id": "str",
+     "snapshot": "str",
      "source": {
-      "access_policy": "str",
-      "acquisition_method": "str",
-      "captured_at": "str",
-      "extraction_query": "str",
+      "access": "str",
+      "acquisition": "str",
+      "captured": "str",
+      "definitions": {},
       "license": "str",
-      "object_prefix": "str",
       "owner": "str",
-      "sampling_frame": "str",
-      "semantic_definitions": {},
+      "prefix": "str",
+      "query": "str",
+      "sampling": "str",
       "timezone": "str",
       "units": {}
      },
@@ -1745,14 +1751,14 @@
      "software_version": "str"
     },
     "release_attestation": {
-     "run_id": "str",
+     "digests": {
+      "manifest": "str",
+      "provenance": "str",
+      "sbom": "str"
+     },
+     "run": "str",
      "schema_version": "int",
-     "signature_present": "bool",
-     "subjects": {
-      "model_manifest_sha256": "str",
-      "provenance_sha256": "str",
-      "sbom_sha256": "str"
-     }
+     "signed": "bool"
     },
     "release_evaluation": {
      "blocked": "bool",
@@ -1774,15 +1780,15 @@
      "release_blocked": "bool",
      "scenarios": [
       {
+       "blocking": "bool",
        "evidence": [],
-       "evidence_requirements": [
+       "outcome": "str",
+       "recoverability": "str",
+       "requirements": [
         "str"
        ],
-       "expected_safe_outcome": "str",
-       "recoverability": "str",
-       "release_blocking": "bool",
        "scenario": "str",
-       "verification_status": "str"
+       "verification": "str"
       }
      ],
      "schema_version": "int"
@@ -1984,8 +1990,8 @@
     "edges": [
      {
       "relationship": "str",
-      "source_id": "str",
-      "target_id": "str"
+      "source": "str",
+      "target": "str"
      }
     ],
     "graph_digest": "str",
@@ -1995,8 +2001,8 @@
        "artifact": "str"
       },
       "digest": "str",
-      "kind": "str",
-      "node_id": "str"
+      "identifier": "str",
+      "kind": "str"
      }
     ],
     "schema_version": "int",
@@ -2005,7 +2011,8 @@
     ]
    },
    "execution_plan.json": {
-    "candidate_models": [
+    "budget": "int",
+    "candidates": [
      "str"
     ],
     "decisions": [
@@ -2015,11 +2022,11 @@
       "technique": "str"
      }
     ],
+    "identifier": "str",
     "metric": "str",
-    "optimization_budget_seconds": "int",
-    "plan_id": "str",
+    "schema_version": "int",
     "task": "str",
-    "validation_strategy": "str",
+    "validation": "str",
     "warnings": []
    },
    "explanations/pairwise_interaction.json": {
@@ -2220,29 +2227,30 @@
     "release_blocked": "bool",
     "scenarios": [
      {
+      "blocking": "bool",
       "evidence": [],
-      "evidence_requirements": [
+      "outcome": "str",
+      "recoverability": "str",
+      "requirements": [
        "str"
       ],
-      "expected_safe_outcome": "str",
-      "recoverability": "str",
-      "release_blocking": "bool",
       "scenario": "str",
-      "verification_status": "str"
+      "verification": "str"
      }
     ],
     "schema_version": "int"
    },
    "model/conformal.json": {
-    "class_scores": [
+    "classes": [
+     "int"
+    ],
+    "conditional": [
      [
       "float"
      ]
     ],
-    "classes": [
-     "int"
-    ],
     "kind": "str",
+    "schema_version": "int",
     "scores": [
      "float"
     ]
@@ -2656,6 +2664,15 @@
       "rows": "int"
      }
     },
+    "metrics": {
+     "accuracy": "float",
+     "balanced_accuracy": "float",
+     "f1": "float",
+     "log_loss": "float",
+     "pr_auc": "float",
+     "roc_auc": "float"
+    },
+    "name": "str",
     "output": {
      "edges": [
       "float"
@@ -2667,46 +2684,39 @@
      "missing_rate": "float",
      "rows": "int"
     },
-    "output_name": "str",
-    "reference_metrics": {
-     "accuracy": "float",
-     "balanced_accuracy": "float",
-     "f1": "float",
-     "log_loss": "float",
-     "pr_auc": "float",
-     "roc_auc": "float"
-    }
+    "schema_version": "int"
    },
    "model/schema.json": {
     "categorical": [
      "str"
     ],
+    "categories": {
+     "x2": [
+      "str"
+     ]
+    },
     "classes": [
      "int"
     ],
+    "derived": [],
+    "digests": {},
     "dtypes": {
      "x0": "str",
      "x1": "str",
      "x2": "str"
     },
-    "extra_inputs": [],
-    "graph_fingerprint": "str",
-    "group_column": "NoneType",
-    "known_categories": {
-     "x2": [
-      "str"
-     ]
-    },
+    "extras": [],
+    "group": "NoneType",
     "numeric": [
      "str"
     ],
-    "optional_inputs": [],
+    "optional": [],
+    "schema_version": "int",
     "series": [],
-    "series_columns": [],
     "target": "str",
     "targets": [],
     "task": "str",
-    "time_column": "NoneType"
+    "time": "NoneType"
    },
    "model_card.json": {
     "dataset_id": "str",
@@ -2797,14 +2807,14 @@
     "software_version": "str"
    },
    "release_attestation.json": {
-    "run_id": "str",
+    "digests": {
+     "manifest": "str",
+     "provenance": "str",
+     "sbom": "str"
+    },
+    "run": "str",
     "schema_version": "int",
-    "signature_present": "bool",
-    "subjects": {
-     "model_manifest_sha256": "str",
-     "provenance_sha256": "str",
-     "sbom_sha256": "str"
-    }
+    "signed": "bool"
    },
    "release_evaluation.json": {
     "blocked": "bool",
@@ -2862,20 +2872,22 @@
      {
       "snapshots": [
        {
-        "captured_at": "str",
-        "data_hash": "str",
-        "raw_source_hash": "str",
-        "row_count": "int",
-        "schema": {
+        "captured": "str",
+        "digests": {
+         "data": "str",
+         "raw": "str",
+         "schema": "str"
+        },
+        "layout": {
          "x0": "str",
          "x1": "str",
          "x2": "str",
          "y": "str"
         },
-        "schema_hash": "str",
-        "snapshot_id": "str",
-        "source_id": "str",
-        "source_uri": "str",
+        "rows": "int",
+        "snapshot": "str",
+        "source": "str",
+        "uri": "str",
         "watermark": "str"
        }
       ],
@@ -4014,49 +4026,51 @@
      "text": []
     },
     "manifest": {
-     "column_count": "int",
-     "data_hash": "str",
-     "dataset_id": "str",
+     "columns": "int",
+     "digests": {
+      "data": "str",
+      "schema": "str"
+     },
      "findings": [],
+     "identifier": "str",
      "lineage": {
-      "adjudication_status": "str",
-      "annotator_version": "str",
-      "label_generator_version": "str",
-      "label_source": "str",
-      "object_hashes": {
+      "adjudication": "str",
+      "annotator": "str",
+      "digests": {
        "tabular-frame": "str"
       },
-      "parent_datasets": [],
-      "partition_ids": [],
-      "schema_evolution": "str",
-      "source_snapshot": "str",
+      "evolution": "str",
+      "generator": "str",
+      "labelling": "str",
+      "parents": [],
+      "partitions": [],
+      "snapshot": "str",
       "transformations": []
      },
      "modality": "str",
      "privacy": {
-      "access_policy": "str",
+      "access": "str",
       "classification": "str",
-      "consent_basis": "str",
-      "contains_pii": "bool",
-      "deletion_policy": "str",
-      "redaction_required": "bool",
-      "retention_period": "str",
-      "sensitive_fields": []
+      "consent": "str",
+      "deletion": "str",
+      "identifying": "bool",
+      "redaction": "bool",
+      "retention": "str",
+      "sensitive": []
      },
-     "row_count": "int",
-     "schema_hash": "str",
+     "rows": "int",
      "schema_version": "int",
-     "snapshot_id": "str",
+     "snapshot": "str",
      "source": {
-      "access_policy": "str",
-      "acquisition_method": "str",
-      "captured_at": "str",
-      "extraction_query": "str",
+      "access": "str",
+      "acquisition": "str",
+      "captured": "str",
+      "definitions": {},
       "license": "str",
-      "object_prefix": "str",
       "owner": "str",
-      "sampling_frame": "str",
-      "semantic_definitions": {},
+      "prefix": "str",
+      "query": "str",
+      "sampling": "str",
       "timezone": "str",
       "units": {}
      },
@@ -4067,20 +4081,20 @@
     "profiled_rows": "int",
     "quality_findings": [
      {
-      "affected_scope": {
-       "category": "str"
-      },
       "blocking": "bool",
       "confidence": "float",
       "disposition": "str",
       "evidence": {
        "message": "str"
       },
-      "id": "str",
+      "identifier": "str",
       "owner": "str",
       "remediation": "str",
       "reviewer": "NoneType",
-      "rule_version": "str",
+      "rule": "str",
+      "scope": {
+       "category": "str"
+      },
       "severity": "str",
       "timestamp": "str"
      }
@@ -4116,17 +4130,17 @@
      "str"
     ],
     "lineage": {
-     "adjudication_status": "str",
-     "annotator_version": "str",
-     "label_generator_version": "str",
-     "label_source": "str",
-     "object_hashes": {
+     "adjudication": "str",
+     "annotator": "str",
+     "digests": {
       "tabular-frame": "str"
      },
-     "parent_datasets": [],
-     "partition_ids": [],
-     "schema_evolution": "str",
-     "source_snapshot": "str",
+     "evolution": "str",
+     "generator": "str",
+     "labelling": "str",
+     "parents": [],
+     "partitions": [],
+     "snapshot": "str",
      "transformations": []
     },
     "modality": "str",
@@ -4135,31 +4149,31 @@
     ],
     "owner": "str",
     "privacy": {
-     "access_policy": "str",
+     "access": "str",
      "classification": "str",
-     "consent_basis": "str",
-     "contains_pii": "bool",
-     "deletion_policy": "str",
-     "redaction_required": "bool",
-     "retention_period": "str",
-     "sensitive_fields": []
+     "consent": "str",
+     "deletion": "str",
+     "identifying": "bool",
+     "redaction": "bool",
+     "retention": "str",
+     "sensitive": []
     },
     "quality_findings": [
      {
-      "affected_scope": {
-       "category": "str"
-      },
       "blocking": "bool",
       "confidence": "float",
       "disposition": "str",
       "evidence": {
        "message": "str"
       },
-      "id": "str",
+      "identifier": "str",
       "owner": "str",
       "remediation": "str",
       "reviewer": "NoneType",
-      "rule_version": "str",
+      "rule": "str",
+      "scope": {
+       "category": "str"
+      },
       "severity": "str",
       "timestamp": "str"
      }
@@ -4169,15 +4183,15 @@
     "schema_version": "int",
     "snapshot_id": "str",
     "source": {
-     "access_policy": "str",
-     "acquisition_method": "str",
-     "captured_at": "str",
-     "extraction_query": "str",
+     "access": "str",
+     "acquisition": "str",
+     "captured": "str",
+     "definitions": {},
      "license": "str",
-     "object_prefix": "str",
      "owner": "str",
-     "sampling_frame": "str",
-     "semantic_definitions": {},
+     "prefix": "str",
+     "query": "str",
+     "sampling": "str",
      "timezone": "str",
      "units": {}
     },
@@ -4185,49 +4199,51 @@
     "task": "str"
    },
    "dataset_manifest.json": {
-    "column_count": "int",
-    "data_hash": "str",
-    "dataset_id": "str",
+    "columns": "int",
+    "digests": {
+     "data": "str",
+     "schema": "str"
+    },
     "findings": [],
+    "identifier": "str",
     "lineage": {
-     "adjudication_status": "str",
-     "annotator_version": "str",
-     "label_generator_version": "str",
-     "label_source": "str",
-     "object_hashes": {
+     "adjudication": "str",
+     "annotator": "str",
+     "digests": {
       "tabular-frame": "str"
      },
-     "parent_datasets": [],
-     "partition_ids": [],
-     "schema_evolution": "str",
-     "source_snapshot": "str",
+     "evolution": "str",
+     "generator": "str",
+     "labelling": "str",
+     "parents": [],
+     "partitions": [],
+     "snapshot": "str",
      "transformations": []
     },
     "modality": "str",
     "privacy": {
-     "access_policy": "str",
+     "access": "str",
      "classification": "str",
-     "consent_basis": "str",
-     "contains_pii": "bool",
-     "deletion_policy": "str",
-     "redaction_required": "bool",
-     "retention_period": "str",
-     "sensitive_fields": []
+     "consent": "str",
+     "deletion": "str",
+     "identifying": "bool",
+     "redaction": "bool",
+     "retention": "str",
+     "sensitive": []
     },
-    "row_count": "int",
-    "schema_hash": "str",
+    "rows": "int",
     "schema_version": "int",
-    "snapshot_id": "str",
+    "snapshot": "str",
     "source": {
-     "access_policy": "str",
-     "acquisition_method": "str",
-     "captured_at": "str",
-     "extraction_query": "str",
+     "access": "str",
+     "acquisition": "str",
+     "captured": "str",
+     "definitions": {},
      "license": "str",
-     "object_prefix": "str",
      "owner": "str",
-     "sampling_frame": "str",
-     "semantic_definitions": {},
+     "prefix": "str",
+     "query": "str",
+     "sampling": "str",
      "timezone": "str",
      "units": {}
     },
@@ -4411,49 +4427,51 @@
      "warning": "str"
     },
     "manifest": {
-     "column_count": "int",
-     "data_hash": "str",
-     "dataset_id": "str",
+     "columns": "int",
+     "digests": {
+      "data": "str",
+      "schema": "str"
+     },
      "findings": [],
+     "identifier": "str",
      "lineage": {
-      "adjudication_status": "str",
-      "annotator_version": "str",
-      "label_generator_version": "str",
-      "label_source": "str",
-      "object_hashes": {
+      "adjudication": "str",
+      "annotator": "str",
+      "digests": {
        "tabular-frame": "str"
       },
-      "parent_datasets": [],
-      "partition_ids": [],
-      "schema_evolution": "str",
-      "source_snapshot": "str",
+      "evolution": "str",
+      "generator": "str",
+      "labelling": "str",
+      "parents": [],
+      "partitions": [],
+      "snapshot": "str",
       "transformations": []
      },
      "modality": "str",
      "privacy": {
-      "access_policy": "str",
+      "access": "str",
       "classification": "str",
-      "consent_basis": "str",
-      "contains_pii": "bool",
-      "deletion_policy": "str",
-      "redaction_required": "bool",
-      "retention_period": "str",
-      "sensitive_fields": []
+      "consent": "str",
+      "deletion": "str",
+      "identifying": "bool",
+      "redaction": "bool",
+      "retention": "str",
+      "sensitive": []
      },
-     "row_count": "int",
-     "schema_hash": "str",
+     "rows": "int",
      "schema_version": "int",
-     "snapshot_id": "str",
+     "snapshot": "str",
      "source": {
-      "access_policy": "str",
-      "acquisition_method": "str",
-      "captured_at": "str",
-      "extraction_query": "str",
+      "access": "str",
+      "acquisition": "str",
+      "captured": "str",
+      "definitions": {},
       "license": "str",
-      "object_prefix": "str",
       "owner": "str",
-      "sampling_frame": "str",
-      "semantic_definitions": {},
+      "prefix": "str",
+      "query": "str",
+      "sampling": "str",
       "timezone": "str",
       "units": {}
      },
@@ -5019,14 +5037,14 @@
      "software_version": "str"
     },
     "release_attestation": {
-     "run_id": "str",
+     "digests": {
+      "manifest": "str",
+      "provenance": "str",
+      "sbom": "str"
+     },
+     "run": "str",
      "schema_version": "int",
-     "signature_present": "bool",
-     "subjects": {
-      "model_manifest_sha256": "str",
-      "provenance_sha256": "str",
-      "sbom_sha256": "str"
-     }
+     "signed": "bool"
     },
     "release_evaluation": {
      "blocked": "bool",
@@ -5048,15 +5066,15 @@
      "release_blocked": "bool",
      "scenarios": [
       {
+       "blocking": "bool",
        "evidence": [],
-       "evidence_requirements": [
+       "outcome": "str",
+       "recoverability": "str",
+       "requirements": [
         "str"
        ],
-       "expected_safe_outcome": "str",
-       "recoverability": "str",
-       "release_blocking": "bool",
        "scenario": "str",
-       "verification_status": "str"
+       "verification": "str"
       }
      ],
      "schema_version": "int"
@@ -5256,8 +5274,8 @@
     "edges": [
      {
       "relationship": "str",
-      "source_id": "str",
-      "target_id": "str"
+      "source": "str",
+      "target": "str"
      }
     ],
     "graph_digest": "str",
@@ -5267,8 +5285,8 @@
        "artifact": "str"
       },
       "digest": "str",
-      "kind": "str",
-      "node_id": "str"
+      "identifier": "str",
+      "kind": "str"
      }
     ],
     "schema_version": "int",
@@ -5277,7 +5295,8 @@
     ]
    },
    "execution_plan.json": {
-    "candidate_models": [
+    "budget": "int",
+    "candidates": [
      "str"
     ],
     "decisions": [
@@ -5287,11 +5306,11 @@
       "technique": "str"
      }
     ],
+    "identifier": "str",
     "metric": "str",
-    "optimization_budget_seconds": "int",
-    "plan_id": "str",
+    "schema_version": "int",
     "task": "str",
-    "validation_strategy": "str",
+    "validation": "str",
     "warnings": []
    },
    "explanations/pairwise_interaction.json": {
@@ -5425,29 +5444,30 @@
     "release_blocked": "bool",
     "scenarios": [
      {
+      "blocking": "bool",
       "evidence": [],
-      "evidence_requirements": [
+      "outcome": "str",
+      "recoverability": "str",
+      "requirements": [
        "str"
       ],
-      "expected_safe_outcome": "str",
-      "recoverability": "str",
-      "release_blocking": "bool",
       "scenario": "str",
-      "verification_status": "str"
+      "verification": "str"
      }
     ],
     "schema_version": "int"
    },
    "model/conformal.json": {
-    "class_scores": [
+    "classes": [
+     "str"
+    ],
+    "conditional": [
      [
       "float"
      ]
     ],
-    "classes": [
-     "str"
-    ],
     "kind": "str",
+    "schema_version": "int",
     "scores": [
      "float"
     ]
@@ -5957,6 +5977,13 @@
       "rows": "int"
      }
     },
+    "metrics": {
+     "accuracy": "float",
+     "balanced_accuracy": "float",
+     "f1_macro": "float",
+     "log_loss": "float"
+    },
+    "name": "str",
     "output": {
      "frequencies": {
       "__other__": "float",
@@ -5968,44 +5995,39 @@
      "missing_rate": "float",
      "rows": "int"
     },
-    "output_name": "str",
-    "reference_metrics": {
-     "accuracy": "float",
-     "balanced_accuracy": "float",
-     "f1_macro": "float",
-     "log_loss": "float"
-    }
+    "schema_version": "int"
    },
    "model/schema.json": {
     "categorical": [
      "str"
     ],
+    "categories": {
+     "x2": [
+      "str"
+     ]
+    },
     "classes": [
      "str"
     ],
+    "derived": [],
+    "digests": {},
     "dtypes": {
      "x0": "str",
      "x1": "str",
      "x2": "str"
     },
-    "extra_inputs": [],
-    "graph_fingerprint": "str",
-    "group_column": "NoneType",
-    "known_categories": {
-     "x2": [
-      "str"
-     ]
-    },
+    "extras": [],
+    "group": "NoneType",
     "numeric": [
      "str"
     ],
-    "optional_inputs": [],
+    "optional": [],
+    "schema_version": "int",
     "series": [],
-    "series_columns": [],
     "target": "str",
     "targets": [],
     "task": "str",
-    "time_column": "NoneType"
+    "time": "NoneType"
    },
    "model_card.json": {
     "dataset_id": "str",
@@ -6094,14 +6116,14 @@
     "software_version": "str"
    },
    "release_attestation.json": {
-    "run_id": "str",
+    "digests": {
+     "manifest": "str",
+     "provenance": "str",
+     "sbom": "str"
+    },
+    "run": "str",
     "schema_version": "int",
-    "signature_present": "bool",
-    "subjects": {
-     "model_manifest_sha256": "str",
-     "provenance_sha256": "str",
-     "sbom_sha256": "str"
-    }
+    "signed": "bool"
    },
    "release_evaluation.json": {
     "blocked": "bool",
@@ -6159,20 +6181,22 @@
      {
       "snapshots": [
        {
-        "captured_at": "str",
-        "data_hash": "str",
-        "raw_source_hash": "str",
-        "row_count": "int",
-        "schema": {
+        "captured": "str",
+        "digests": {
+         "data": "str",
+         "raw": "str",
+         "schema": "str"
+        },
+        "layout": {
          "x0": "str",
          "x1": "str",
          "x2": "str",
          "y": "str"
         },
-        "schema_hash": "str",
-        "snapshot_id": "str",
-        "source_id": "str",
-        "source_uri": "str",
+        "rows": "int",
+        "snapshot": "str",
+        "source": "str",
+        "uri": "str",
         "watermark": "str"
        }
       ],
@@ -7074,49 +7098,51 @@
      "text": []
     },
     "manifest": {
-     "column_count": "int",
-     "data_hash": "str",
-     "dataset_id": "str",
+     "columns": "int",
+     "digests": {
+      "data": "str",
+      "schema": "str"
+     },
      "findings": [],
+     "identifier": "str",
      "lineage": {
-      "adjudication_status": "str",
-      "annotator_version": "str",
-      "label_generator_version": "str",
-      "label_source": "str",
-      "object_hashes": {
+      "adjudication": "str",
+      "annotator": "str",
+      "digests": {
        "tabular-frame": "str"
       },
-      "parent_datasets": [],
-      "partition_ids": [],
-      "schema_evolution": "str",
-      "source_snapshot": "str",
+      "evolution": "str",
+      "generator": "str",
+      "labelling": "str",
+      "parents": [],
+      "partitions": [],
+      "snapshot": "str",
       "transformations": []
      },
      "modality": "str",
      "privacy": {
-      "access_policy": "str",
+      "access": "str",
       "classification": "str",
-      "consent_basis": "str",
-      "contains_pii": "bool",
-      "deletion_policy": "str",
-      "redaction_required": "bool",
-      "retention_period": "str",
-      "sensitive_fields": []
+      "consent": "str",
+      "deletion": "str",
+      "identifying": "bool",
+      "redaction": "bool",
+      "retention": "str",
+      "sensitive": []
      },
-     "row_count": "int",
-     "schema_hash": "str",
+     "rows": "int",
      "schema_version": "int",
-     "snapshot_id": "str",
+     "snapshot": "str",
      "source": {
-      "access_policy": "str",
-      "acquisition_method": "str",
-      "captured_at": "str",
-      "extraction_query": "str",
+      "access": "str",
+      "acquisition": "str",
+      "captured": "str",
+      "definitions": {},
       "license": "str",
-      "object_prefix": "str",
       "owner": "str",
-      "sampling_frame": "str",
-      "semantic_definitions": {},
+      "prefix": "str",
+      "query": "str",
+      "sampling": "str",
       "timezone": "str",
       "units": {}
      },
@@ -7127,20 +7153,20 @@
     "profiled_rows": "int",
     "quality_findings": [
      {
-      "affected_scope": {
-       "category": "str"
-      },
       "blocking": "bool",
       "confidence": "float",
       "disposition": "str",
       "evidence": {
        "message": "str"
       },
-      "id": "str",
+      "identifier": "str",
       "owner": "str",
       "remediation": "str",
       "reviewer": "NoneType",
-      "rule_version": "str",
+      "rule": "str",
+      "scope": {
+       "category": "str"
+      },
       "severity": "str",
       "timestamp": "str"
      }
@@ -7176,17 +7202,17 @@
      "str"
     ],
     "lineage": {
-     "adjudication_status": "str",
-     "annotator_version": "str",
-     "label_generator_version": "str",
-     "label_source": "str",
-     "object_hashes": {
+     "adjudication": "str",
+     "annotator": "str",
+     "digests": {
       "tabular-frame": "str"
      },
-     "parent_datasets": [],
-     "partition_ids": [],
-     "schema_evolution": "str",
-     "source_snapshot": "str",
+     "evolution": "str",
+     "generator": "str",
+     "labelling": "str",
+     "parents": [],
+     "partitions": [],
+     "snapshot": "str",
      "transformations": []
     },
     "modality": "str",
@@ -7195,31 +7221,31 @@
     ],
     "owner": "str",
     "privacy": {
-     "access_policy": "str",
+     "access": "str",
      "classification": "str",
-     "consent_basis": "str",
-     "contains_pii": "bool",
-     "deletion_policy": "str",
-     "redaction_required": "bool",
-     "retention_period": "str",
-     "sensitive_fields": []
+     "consent": "str",
+     "deletion": "str",
+     "identifying": "bool",
+     "redaction": "bool",
+     "retention": "str",
+     "sensitive": []
     },
     "quality_findings": [
      {
-      "affected_scope": {
-       "category": "str"
-      },
       "blocking": "bool",
       "confidence": "float",
       "disposition": "str",
       "evidence": {
        "message": "str"
       },
-      "id": "str",
+      "identifier": "str",
       "owner": "str",
       "remediation": "str",
       "reviewer": "NoneType",
-      "rule_version": "str",
+      "rule": "str",
+      "scope": {
+       "category": "str"
+      },
       "severity": "str",
       "timestamp": "str"
      }
@@ -7229,15 +7255,15 @@
     "schema_version": "int",
     "snapshot_id": "str",
     "source": {
-     "access_policy": "str",
-     "acquisition_method": "str",
-     "captured_at": "str",
-     "extraction_query": "str",
+     "access": "str",
+     "acquisition": "str",
+     "captured": "str",
+     "definitions": {},
      "license": "str",
-     "object_prefix": "str",
      "owner": "str",
-     "sampling_frame": "str",
-     "semantic_definitions": {},
+     "prefix": "str",
+     "query": "str",
+     "sampling": "str",
      "timezone": "str",
      "units": {}
     },
@@ -7245,49 +7271,51 @@
     "task": "str"
    },
    "dataset_manifest.json": {
-    "column_count": "int",
-    "data_hash": "str",
-    "dataset_id": "str",
+    "columns": "int",
+    "digests": {
+     "data": "str",
+     "schema": "str"
+    },
     "findings": [],
+    "identifier": "str",
     "lineage": {
-     "adjudication_status": "str",
-     "annotator_version": "str",
-     "label_generator_version": "str",
-     "label_source": "str",
-     "object_hashes": {
+     "adjudication": "str",
+     "annotator": "str",
+     "digests": {
       "tabular-frame": "str"
      },
-     "parent_datasets": [],
-     "partition_ids": [],
-     "schema_evolution": "str",
-     "source_snapshot": "str",
+     "evolution": "str",
+     "generator": "str",
+     "labelling": "str",
+     "parents": [],
+     "partitions": [],
+     "snapshot": "str",
      "transformations": []
     },
     "modality": "str",
     "privacy": {
-     "access_policy": "str",
+     "access": "str",
      "classification": "str",
-     "consent_basis": "str",
-     "contains_pii": "bool",
-     "deletion_policy": "str",
-     "redaction_required": "bool",
-     "retention_period": "str",
-     "sensitive_fields": []
+     "consent": "str",
+     "deletion": "str",
+     "identifying": "bool",
+     "redaction": "bool",
+     "retention": "str",
+     "sensitive": []
     },
-    "row_count": "int",
-    "schema_hash": "str",
+    "rows": "int",
     "schema_version": "int",
-    "snapshot_id": "str",
+    "snapshot": "str",
     "source": {
-     "access_policy": "str",
-     "acquisition_method": "str",
-     "captured_at": "str",
-     "extraction_query": "str",
+     "access": "str",
+     "acquisition": "str",
+     "captured": "str",
+     "definitions": {},
      "license": "str",
-     "object_prefix": "str",
      "owner": "str",
-     "sampling_frame": "str",
-     "semantic_definitions": {},
+     "prefix": "str",
+     "query": "str",
+     "sampling": "str",
      "timezone": "str",
      "units": {}
     },
@@ -7470,49 +7498,51 @@
      "warning": "str"
     },
     "manifest": {
-     "column_count": "int",
-     "data_hash": "str",
-     "dataset_id": "str",
+     "columns": "int",
+     "digests": {
+      "data": "str",
+      "schema": "str"
+     },
      "findings": [],
+     "identifier": "str",
      "lineage": {
-      "adjudication_status": "str",
-      "annotator_version": "str",
-      "label_generator_version": "str",
-      "label_source": "str",
-      "object_hashes": {
+      "adjudication": "str",
+      "annotator": "str",
+      "digests": {
        "tabular-frame": "str"
       },
-      "parent_datasets": [],
-      "partition_ids": [],
-      "schema_evolution": "str",
-      "source_snapshot": "str",
+      "evolution": "str",
+      "generator": "str",
+      "labelling": "str",
+      "parents": [],
+      "partitions": [],
+      "snapshot": "str",
       "transformations": []
      },
      "modality": "str",
      "privacy": {
-      "access_policy": "str",
+      "access": "str",
       "classification": "str",
-      "consent_basis": "str",
-      "contains_pii": "bool",
-      "deletion_policy": "str",
-      "redaction_required": "bool",
-      "retention_period": "str",
-      "sensitive_fields": []
+      "consent": "str",
+      "deletion": "str",
+      "identifying": "bool",
+      "redaction": "bool",
+      "retention": "str",
+      "sensitive": []
      },
-     "row_count": "int",
-     "schema_hash": "str",
+     "rows": "int",
      "schema_version": "int",
-     "snapshot_id": "str",
+     "snapshot": "str",
      "source": {
-      "access_policy": "str",
-      "acquisition_method": "str",
-      "captured_at": "str",
-      "extraction_query": "str",
+      "access": "str",
+      "acquisition": "str",
+      "captured": "str",
+      "definitions": {},
       "license": "str",
-      "object_prefix": "str",
       "owner": "str",
-      "sampling_frame": "str",
-      "semantic_definitions": {},
+      "prefix": "str",
+      "query": "str",
+      "sampling": "str",
       "timezone": "str",
       "units": {}
      },
@@ -8160,14 +8190,14 @@
      }
     ],
     "release_attestation": {
-     "run_id": "str",
+     "digests": {
+      "manifest": "str",
+      "provenance": "str",
+      "sbom": "str"
+     },
+     "run": "str",
      "schema_version": "int",
-     "signature_present": "bool",
-     "subjects": {
-      "model_manifest_sha256": "str",
-      "provenance_sha256": "str",
-      "sbom_sha256": "str"
-     }
+     "signed": "bool"
     },
     "release_evaluation": {
      "blocked": "bool",
@@ -8189,15 +8219,15 @@
      "release_blocked": "bool",
      "scenarios": [
       {
+       "blocking": "bool",
        "evidence": [],
-       "evidence_requirements": [
+       "outcome": "str",
+       "recoverability": "str",
+       "requirements": [
         "str"
        ],
-       "expected_safe_outcome": "str",
-       "recoverability": "str",
-       "release_blocking": "bool",
        "scenario": "str",
-       "verification_status": "str"
+       "verification": "str"
       }
      ],
      "schema_version": "int"
@@ -8396,8 +8426,8 @@
     "edges": [
      {
       "relationship": "str",
-      "source_id": "str",
-      "target_id": "str"
+      "source": "str",
+      "target": "str"
      }
     ],
     "graph_digest": "str",
@@ -8407,8 +8437,8 @@
        "artifact": "str"
       },
       "digest": "str",
-      "kind": "str",
-      "node_id": "str"
+      "identifier": "str",
+      "kind": "str"
      }
     ],
     "schema_version": "int",
@@ -8417,7 +8447,8 @@
     ]
    },
    "execution_plan.json": {
-    "candidate_models": [
+    "budget": "int",
+    "candidates": [
      "str"
     ],
     "decisions": [
@@ -8427,11 +8458,11 @@
       "technique": "str"
      }
     ],
+    "identifier": "str",
     "metric": "str",
-    "optimization_budget_seconds": "int",
-    "plan_id": "str",
+    "schema_version": "int",
     "task": "str",
-    "validation_strategy": "str",
+    "validation": "str",
     "warnings": []
    },
    "explanations/pairwise_interaction.json": {
@@ -8632,23 +8663,24 @@
     "release_blocked": "bool",
     "scenarios": [
      {
+      "blocking": "bool",
       "evidence": [],
-      "evidence_requirements": [
+      "outcome": "str",
+      "recoverability": "str",
+      "requirements": [
        "str"
       ],
-      "expected_safe_outcome": "str",
-      "recoverability": "str",
-      "release_blocking": "bool",
       "scenario": "str",
-      "verification_status": "str"
+      "verification": "str"
      }
     ],
     "schema_version": "int"
    },
    "model/conformal.json": {
-    "class_scores": [],
     "classes": [],
+    "conditional": [],
     "kind": "str",
+    "schema_version": "int",
     "scores": [
      "float"
     ]
@@ -8918,6 +8950,12 @@
       "rows": "int"
      }
     },
+    "metrics": {
+     "mae": "float",
+     "r2": "float",
+     "rmse": "float"
+    },
+    "name": "str",
     "output": {
      "edges": [
       "float"
@@ -8929,41 +8967,37 @@
      "missing_rate": "float",
      "rows": "int"
     },
-    "output_name": "str",
-    "reference_metrics": {
-     "mae": "float",
-     "r2": "float",
-     "rmse": "float"
-    }
+    "schema_version": "int"
    },
    "model/schema.json": {
     "categorical": [
      "str"
     ],
+    "categories": {
+     "x2": [
+      "str"
+     ]
+    },
     "classes": "NoneType",
+    "derived": [],
+    "digests": {},
     "dtypes": {
      "x0": "str",
      "x1": "str",
      "x2": "str"
     },
-    "extra_inputs": [],
-    "graph_fingerprint": "str",
-    "group_column": "NoneType",
-    "known_categories": {
-     "x2": [
-      "str"
-     ]
-    },
+    "extras": [],
+    "group": "NoneType",
     "numeric": [
      "str"
     ],
-    "optional_inputs": [],
+    "optional": [],
+    "schema_version": "int",
     "series": [],
-    "series_columns": [],
     "target": "str",
     "targets": [],
     "task": "str",
-    "time_column": "NoneType"
+    "time": "NoneType"
    },
    "model_card.json": {
     "dataset_id": "str",
@@ -9051,14 +9085,14 @@
     "software_version": "str"
    },
    "release_attestation.json": {
-    "run_id": "str",
+    "digests": {
+     "manifest": "str",
+     "provenance": "str",
+     "sbom": "str"
+    },
+    "run": "str",
     "schema_version": "int",
-    "signature_present": "bool",
-    "subjects": {
-     "model_manifest_sha256": "str",
-     "provenance_sha256": "str",
-     "sbom_sha256": "str"
-    }
+    "signed": "bool"
    },
    "release_evaluation.json": {
     "blocked": "bool",
@@ -9116,20 +9150,22 @@
      {
       "snapshots": [
        {
-        "captured_at": "str",
-        "data_hash": "str",
-        "raw_source_hash": "str",
-        "row_count": "int",
-        "schema": {
+        "captured": "str",
+        "digests": {
+         "data": "str",
+         "raw": "str",
+         "schema": "str"
+        },
+        "layout": {
          "x0": "str",
          "x1": "str",
          "x2": "str",
          "y": "str"
         },
-        "schema_hash": "str",
-        "snapshot_id": "str",
-        "source_id": "str",
-        "source_uri": "str",
+        "rows": "int",
+        "snapshot": "str",
+        "source": "str",
+        "uri": "str",
         "watermark": "str"
        }
       ],

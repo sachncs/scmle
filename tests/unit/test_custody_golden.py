@@ -47,7 +47,7 @@ def inventory(spec, task, frame):
     split = splitters.Splitter(spec, task).split(frame)
     vault = sealed.Vault(sealed.Journal(), process=False)
     return pipeline.sequester(
-        charter=make_charter(min_effect=0.3, k_max=5),
+        charter=make_charter(effect=0.3, quota=5),
         split=split,
         frame=frame,
         spec=spec,
@@ -75,13 +75,13 @@ def temporal():
 
 def test_the_grouped_manifest_has_its_pinned_hash():
     manifest = grouped()
-    assert manifest.confirmation_ids and manifest.row_roots
+    assert manifest.sets.confirmation and manifest.roots
     assert manifest.sha256 == GROUPED_SHA256
 
 
 def test_the_temporal_manifest_has_its_pinned_hash():
     manifest = temporal()
-    assert manifest.confirmation_ids and manifest.row_roots
+    assert manifest.sets.confirmation and manifest.roots
     assert manifest.sha256 == TEMPORAL_SHA256
 
 

@@ -154,13 +154,13 @@ def policy_value(
         behaviour,
         target,
     )
-    rules = layer.model.off_policy
+    rules = layer.model.gates
     found = ope.evaluate(
         log,
         ESTIMATOR,
         clip=rules.clip,
-        min_propensity=rules.min_propensity,
-        ess_floor=rules.ess_floor,
+        min_propensity=rules.propensity,
+        ess_floor=rules.ess,
     )
     return {
         **found.to_dict(),
@@ -232,7 +232,7 @@ def rollout_design(
         return None
     plan_hash = hashlib.sha256(signing.canonicalise(plan.to_dict())).hexdigest()
     budget = plan.budget()
-    level = float(plan.alpha_promote) / 2.0
+    level = float(plan.promotion) / 2.0
     record: dict[str, Any] = {
         "plan": plan.to_dict(),
         "plan_hash": plan_hash,
@@ -243,15 +243,15 @@ def rollout_design(
         "note": "design only: no experiment has run, so there is no "
         "assignment or decision; the first level shown is illustrative",
     }
-    if base_rate > 0.0 and base_rate + plan.delta_min < 1.0:
+    if base_rate > 0.0 and base_rate + plan.delta < 1.0:
         record["fixed_horizon_rows"] = design.fixed_horizon_rows(
             base_rate,
-            plan.delta_min,
-            alpha=float(plan.alpha_promote),
+            plan.delta,
+            alpha=float(plan.promotion),
             power=charter.power,
         )
         record["expected_sample_number"] = design.simulate(
-            plan, base_rate, plan.delta_min, SIMULATION_RUNS, charter.seed
+            plan, base_rate, plan.delta, SIMULATION_RUNS, charter.seed
         )
     else:
         record["fixed_horizon_rows"] = None
@@ -292,7 +292,7 @@ def decision_report(
         the fairness records, the rollout plan hash (marked as not run) and
         the limits of the analysis.
     """
-    model = charter.cost_model
+    model = charter.costs
     return {
         "schema_version": 1,
         "cost_model_hash": None if model is None else model.model_hash,

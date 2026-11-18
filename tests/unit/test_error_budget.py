@@ -19,9 +19,7 @@ def test_create_reads_decimals_exactly_as_written():
     assert budget.confirmation.alpha_confirm == Fraction(1, 20)
     assert budget.exploration.wealth == Fraction(1, 10)
     assert budget.exploration.initial == Fraction(1, 10)
-    assert (
-        budget.permutations_b == scmle.assurance.ledger.budget.MIN_PERMUTATIONS
-    )
+    assert budget.permutations == scmle.assurance.ledger.budget.MIN_PERMUTATIONS
 
 
 @pytest.mark.parametrize("alpha", [0.0, 1.0, -0.1, float("nan"), True])
@@ -42,11 +40,11 @@ def test_zero_wealth_means_no_exploration_budget():
 
 
 def test_permutation_count_has_a_floor():
-    with pytest.raises(ValueError, match="permutations_b"):
+    with pytest.raises(ValueError, match="permutations"):
         make_budget(
-            permutations_b=scmle.assurance.ledger.budget.MIN_PERMUTATIONS - 1
+            permutations=scmle.assurance.ledger.budget.MIN_PERMUTATIONS - 1
         )
-    assert make_budget(permutations_b=100).permutations_b == 100
+    assert make_budget(permutations=100).permutations == 100
 
 
 def test_spending_returns_a_new_budget_and_never_mutates():
@@ -56,7 +54,7 @@ def test_spending_returns_a_new_budget_and_never_mutates():
     assert scmle.assurance.ledger.budget.remaining(spent) == pytest.approx(0.06)
     assert spent.confirmation is budget.confirmation
     with pytest.raises(AttributeError):
-        budget.permutations_b = 5  # type: ignore[misc]
+        budget.permutations = 5  # type: ignore[misc]
 
 
 def test_overspending_is_refused_and_leaves_the_budget_intact():
@@ -114,9 +112,7 @@ def test_split_budget_shares_sum_exactly_to_the_totals():
     assert sum(p.exploration.initial for p in parts.values()) == (
         budget.exploration.initial
     )
-    assert all(
-        p.permutations_b == budget.permutations_b for p in parts.values()
-    )
+    assert all(p.permutations == budget.permutations for p in parts.values())
 
 
 @pytest.mark.parametrize(
@@ -161,21 +157,21 @@ def test_detector_tolerances_validate_and_round_trip():
     tolerance = scmle.assurance.ledger.budget.Tolerance(
         "label_noise", 0.05, 0.8
     )
-    budget = make_budget(detector_tolerances=(tolerance,))
-    assert budget.detector_tolerances == (tolerance,)
-    with pytest.raises(ValueError, match="max_false_alarm_rate"):
+    budget = make_budget(tolerances=(tolerance,))
+    assert budget.tolerances == (tolerance,)
+    with pytest.raises(ValueError, match="alarms"):
         scmle.assurance.ledger.budget.Tolerance("x", 1.5, 0.8)
     with pytest.raises(ValueError, match="duplicate"):
-        make_budget(detector_tolerances=(tolerance, tolerance))
+        make_budget(tolerances=(tolerance, tolerance))
 
 
 def test_json_round_trip_is_exact():
     budget = scmle.assurance.ledger.budget.spend(
         make_budget(
-            detector_tolerances=(
+            tolerances=(
                 scmle.assurance.ledger.budget.Tolerance("d", 0.05, 0.8),
             ),
-            permutations_b=50,
+            permutations=50,
         ),
         0.0123,
     )

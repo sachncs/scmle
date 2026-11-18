@@ -185,13 +185,13 @@ def test_assess_boundaries_and_record():
     )
     assert below.verdict is feasibility.Verdict.INFEASIBLE
     assert at.verdict is not feasibility.Verdict.INFEASIBLE
-    assert at.n_confirmation == feasibility.MIN_CONFIRMATION_ROWS
-    assert at.power_at_min_effect == pytest.approx(
+    assert at.confirmation == feasibility.MIN_CONFIRMATION_ROWS
+    assert at.power == pytest.approx(
         feasibility.detectability(
             0.3, feasibility.MIN_CONFIRMATION_ROWS, alpha=0.05, k_max=3
         )
     )
-    assert at.n_required == feasibility.n_required_mean(
+    assert at.required == feasibility.n_required_mean(
         0.3, alpha=0.05, k_max=3, power=0.8
     )
 
@@ -233,9 +233,9 @@ def test_the_record_of_a_verdict_names_its_verdict_and_nulls_non_finite():
     assert type(record["verdict"]) is str
     assert record["verdict"] == "infeasible"
     assert "VERDICT" not in record
-    assert record["n_confirmation"] == 5
+    assert record["confirmation"] == 5
     assert record["mde"] is None or math.isfinite(record["mde"])
     nan = feasibility.Feasibility(
         feasibility.Verdict.FEASIBLE, "s", 1, 1, math.nan, math.inf, "r"
     ).to_dict()
-    assert nan["mde"] is None and nan["power_at_min_effect"] is None
+    assert nan["mde"] is None and nan["power"] is None

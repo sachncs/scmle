@@ -10,6 +10,7 @@ import pandas
 from scmle.contracts import capabilities
 from scmle.contracts import errors
 from scmle.contracts import tasks
+from scmle.contracts.data import provenance
 from scmle.data import feature_graph
 from scmle.data.readers import streaming
 from scmle.data.readers import tabular
@@ -168,8 +169,8 @@ class IngestStage(interface.Stage):
         self.forbid(context)
         context.write_json("dataset_manifest.json", context.manifest.to_dict())
         context.track(
-            dataset_id=context.manifest.dataset_id,
-            data_hash=context.manifest.data_hash,
+            dataset_id=context.manifest.identifier,
+            data_hash=context.manifest.digests["data"],
         )
 
     def enrol(
@@ -215,7 +216,7 @@ class IngestStage(interface.Stage):
             )
         registry.register(snapshot)
         record = registry.to_dict()
-        record["current_snapshot_id"] = snapshot.snapshot_id
+        record["current_snapshot_id"] = snapshot.snapshot
         record["schema_compatibility"] = compatibility.to_dict()
         context.write_json("source_registry.json", record)
         context.emit(
@@ -223,8 +224,8 @@ class IngestStage(interface.Stage):
             "source identity and schema evolution recorded",
             ("source_registry.json",),
             {
-                "source_id": snapshot.source_id,
-                "snapshot_id": snapshot.snapshot_id,
+                "source_id": snapshot.source,
+                "snapshot_id": snapshot.snapshot,
                 "schema_status": compatibility.status,
             },
         )
@@ -244,12 +245,12 @@ class IngestStage(interface.Stage):
         saved = context.store.path("dataset_manifest.json")
         if not saved.exists():
             return
-        previous = json.loads(saved.read_text(encoding="utf-8")).get(
-            "data_hash"
-        )
+        previous = provenance.DatasetManifest.from_dict(
+            json.loads(saved.read_text(encoding="utf-8"))
+        ).digests["data"]
         current = scmle.pipeline.context.require(
             context.manifest, "manifest"
-        ).data_hash
+        ).digests["data"]
         if previous != current:
             raise errors.ConfigError(
                 "cannot resume: the data changed since the checkpointed "

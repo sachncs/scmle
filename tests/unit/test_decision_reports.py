@@ -22,19 +22,19 @@ def plan():
     return scmle.assurance.charter.decision.Experiment(
         unit="user",
         primary="conv",
-        assignment_prob=0.5,
-        delta_min=0.05,
+        assignment=0.5,
+        delta=0.05,
         tolerance=0.02,
-        n_max=500,
-        alpha_promote=Fraction(1, 20),
-        alpha_rollback=Fraction(1, 20),
+        limit=500,
+        promotion=Fraction(1, 20),
+        rollback=Fraction(1, 20),
     )
 
 
 def charter(**kwargs):
     human = (costs.Basis.HUMAN,) * 4
     model = costs.Tariff(0.0, 2.0, 1.0, 0.0, 0.1, 0.5, human, costs.Basis.HUMAN)
-    return make_charter(cost_model=model, decision=layer(**kwargs))
+    return make_charter(costs=model, decision=layer(**kwargs))
 
 
 def test_without_a_randomized_log_the_value_is_not_assessable():

@@ -42,7 +42,7 @@ the loop's own rules (F13); the controller adds only the following.
   signed approval in the registry moves the alias.
 * **Training a challenger when an alarm fires.** By default an alarm only
   opens the escalation `l1_alarm_investigate`, because the alarm design has not
-  met its detection-delay gates (H2 and H10), so `alarm_gates_retrain` is off.
+  met its detection-delay gates (H2 and H10), so the policy's `retrain` is off.
   Until it is certified, nobody should switch it on for a real deployment.
 * **The other ten never-list actions**: reopening a sealed set, changing the
   charter, editing the ledger or registering late, relaxing a threshold, acting

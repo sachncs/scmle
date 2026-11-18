@@ -34,8 +34,8 @@ def profile(rows=2000, seed=99):
             "plan": reference.CategoricalReference.fit(base["plan"]),
         },
         output=reference.Deciles.fit(score),
-        output_name="score",
-        reference_metrics={},
+        name="score",
+        metrics={},
     )
 
 

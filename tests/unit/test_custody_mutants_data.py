@@ -32,12 +32,24 @@ def message(call):
     return str(caught.value)
 
 
-@pytest.mark.parametrize("field", ["strategy", "charter_hash", "data_hash"])
+def nested(field, value):
+    """`make` keyword arguments that set one field, nested or not."""
+    if "." not in field:
+        return {field: value}
+    group, leaf = field.split(".")
+    return {group: {leaf: value}}
+
+
+@pytest.mark.parametrize(
+    "field", ["strategy", "digests.charter", "digests.data"]
+)
 def test_an_empty_text_field_is_named_in_the_error(field):
-    assert message(lambda: make(**{field: " "})) == f"{field} must not be empty"
+    assert message(lambda: make(**nested(field, " "))) == (
+        f"{field} must not be empty"
+    )
 
 
-@pytest.mark.parametrize("field", ["seed", "embargo_rows"])
+@pytest.mark.parametrize("field", ["seed", "embargo"])
 def test_a_bad_count_is_named_in_the_error(field):
     assert message(lambda: make(**{field: -1})) == (
         f"{field} must be non-negative"
@@ -47,56 +59,42 @@ def test_a_bad_count_is_named_in_the_error(field):
     )
 
 
+SETS = ["sets.exploration", "sets.confirmation", "sets.embargo", "sets.final"]
+
+
 @pytest.mark.parametrize(
-    "field",
-    [
-        "exploration_ids",
-        "confirmation_ids",
-        "embargo_ids",
-        "final_test_ids",
-        "folds",
-        "isolation",
-        "notes",
-        "row_roots",
-    ],
+    "field", [*SETS, "folds", "isolation", "notes", "roots"]
 )
 def test_a_list_instead_of_a_tuple_is_named_in_the_error(field):
-    assert message(lambda: make(**{field: []})) == f"{field} must be a tuple"
+    assert message(lambda: make(**nested(field, []))) == (
+        f"{field} must be a tuple"
+    )
 
 
-@pytest.mark.parametrize(
-    "field",
-    ["exploration_ids", "confirmation_ids", "embargo_ids", "final_test_ids"],
-)
+@pytest.mark.parametrize("field", SETS)
 def test_non_integer_ids_are_refused_by_name(field):
     for bad in ((1.5,), (True,), ("a",)):
-        assert message(partial(make, **{field: bad})) == (
+        assert message(partial(make, **nested(field, bad))) == (
             f"{field} must hold integers"
         )
 
 
-@pytest.mark.parametrize(
-    ("field", "other"),
-    [
-        ("exploration_ids", (9, 9)),
-        ("confirmation_ids", (9, 9)),
-        ("embargo_ids", (9, 9)),
-        ("final_test_ids", (9, 9)),
-    ],
-)
-def test_a_repeated_row_is_named_by_its_set(field, other):
-    assert message(lambda: make(**{field: other})) == f"{field} repeats a row"
+@pytest.mark.parametrize("field", SETS)
+def test_a_repeated_row_is_named_by_its_set(field):
+    assert message(lambda: make(**nested(field, (9, 9)))) == (
+        f"{field} repeats a row"
+    )
 
 
 def test_an_overlap_is_named_by_the_later_set():
-    assert message(lambda: make(confirmation_ids=(3, 4))) == (
-        "confirmation_ids overlap another set"
+    assert message(lambda: make(sets={"confirmation": (3, 4)})) == (
+        "sets.confirmation overlap another set"
     )
-    assert message(lambda: make(embargo_ids=(0,))) == (
-        "embargo_ids overlap another set"
+    assert message(lambda: make(sets={"embargo": (0,)})) == (
+        "sets.embargo overlap another set"
     )
-    assert message(lambda: make(final_test_ids=(1,))) == (
-        "final_test_ids overlap another set"
+    assert message(lambda: make(sets={"final": (1,)})) == (
+        "sets.final overlap another set"
     )
 
 
@@ -152,19 +150,18 @@ def test_a_v1_record_without_notes_loads_and_a_bad_fingerprint_is_exact():
 
 def test_a_manifest_without_roots_loads_with_empty_roots():
     record = make().to_dict()
-    assert "row_roots" not in record
-    assert (
-        scmle.assurance.custody.manifest.Manifest.from_dict(record).row_roots
-        == ()
-    )
+    assert "roots" not in record
+    assert scmle.assurance.custody.manifest.Manifest.from_dict(
+        record
+    ).roots == (())
 
 
 def test_pairs_of_a_root_are_stored_as_tuples_after_a_round_trip():
-    manifest = make(row_roots=(("exploration", "a" * 64),))
+    manifest = make(roots=(("exploration", "a" * 64),))
     loaded = scmle.assurance.custody.manifest.Manifest.from_dict(
         manifest.to_dict()
     )
-    assert loaded.row_roots == (("exploration", "a" * 64),)
+    assert loaded.roots == (("exploration", "a" * 64),)
     assert loaded == manifest
 
 
@@ -400,11 +397,11 @@ def test_copies_of_a_record_land_on_one_side():
     ].to_numpy()
     ran = run(frame)
     manifest = ran.outcome.manifest
-    c = set(manifest.confirmation_ids)
-    x = set(manifest.exploration_ids)
+    c = set(manifest.sets.confirmation)
+    x = set(manifest.sets.exploration)
     for i in range(50):
         pair = {i, 500 + i}
-        assert pair <= c | set(manifest.final_test_ids) | x
+        assert pair <= c | set(manifest.sets.final) | x
         assert not (pair & c and pair & x)
     ran.vault.close()
 
@@ -420,7 +417,7 @@ def test_a_missing_class_in_c_means_no_confirmation_set():
     )
     vault = sealed.Vault(sealed.Journal(), process=False)
     outcome = pipeline.sequester(
-        charter=make_charter(min_effect=0.3, k_max=5),
+        charter=make_charter(effect=0.3, quota=5),
         split=split,
         frame=frame,
         spec=spec,
@@ -428,12 +425,12 @@ def test_a_missing_class_in_c_means_no_confirmation_set():
         data_hash=DATA_HASH,
         vault=vault,
     )
-    if not outcome.manifest.confirmation_ids:
+    if not outcome.manifest.sets.confirmation:
         assert any("not carved" in n for n in outcome.manifest.notes)
     else:
         labels = frame["y"].to_numpy()
-        in_c = set(labels[list(outcome.manifest.confirmation_ids)])
-        in_x = set(labels[list(outcome.manifest.exploration_ids)])
+        in_c = set(labels[list(outcome.manifest.sets.confirmation)])
+        in_x = set(labels[list(outcome.manifest.sets.exploration)])
         assert in_x <= in_c
 
 

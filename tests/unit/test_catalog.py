@@ -26,8 +26,8 @@ def test_dataframe_observation_is_deterministic_and_reviewable():
         uri="s3://bucket/events?version=7",
         version="7",
         owner="analytics",
-        acquisition_method="warehouse-export",
-        privacy_classification="internal",
+        acquisition="warehouse-export",
+        privacy="internal",
     )
 
     first = catalog.Catalog.from_data(
@@ -39,25 +39,25 @@ def test_dataframe_observation_is_deterministic_and_reviewable():
 
     assert first == second
     assert first.source.source_identity.startswith("sha256:")
-    assert first.data_kind == "pandas_dataframe"
+    assert first.kind == "pandas_dataframe"
     assert first.shape == (3, 3)
-    assert first.sample_count == 3
-    assert [field.name for field in first.schema] == [
+    assert first.samples == 3
+    assert [field.name for field in first.columns] == [
         "id",
         "value",
         "label",
     ]
-    assert first.missingness.missing_values == 2
-    assert first.missingness.rows_with_missing == 1
-    assert first.duplicates.duplicate_rows == 2
+    assert first.missingness.missing == 2
+    assert first.missingness.incomplete == 1
+    assert first.duplicates.rows == 2
     assert first.label.status == "constant"
-    assert first.label.missing_count == 1
+    assert first.label.missing == 1
     assert first.label.distribution['"keep"'] == 2
     assert "curation_only_no_model_fit_or_performance_claim" in (
         first.limitations
     )
-    assert "missingness_policy_not_declared" in first.release_blockers
-    assert "duplicate_policy_not_declared" in first.release_blockers
+    assert "missingness_policy_not_declared" in first.blockers
+    assert "duplicate_policy_not_declared" in first.blockers
 
 
 @pytest.mark.parametrize(
@@ -75,10 +75,10 @@ def test_common_caller_owned_shapes_are_cataloged(
     """The entry point accepts several data shapes without a model claim."""
     result = catalog.Catalog.from_data(data)
 
-    assert result.data_kind == expected_kind
+    assert result.kind == expected_kind
     assert result.shape == expected_shape
-    assert result.sample_count == expected_shape[0]
-    assert result.content_identity.startswith("sha256:")
+    assert result.samples == expected_shape[0]
+    assert result.digests["content"].startswith("sha256:")
 
 
 def test_raw_bytes_report_decoder_boundary_and_direct_identity():
@@ -87,12 +87,12 @@ def test_raw_bytes_report_decoder_boundary_and_direct_identity():
     result = catalog.Catalog.from_data(payload)
 
     expected = f"sha256:{hashlib.sha256(payload).hexdigest()}"
-    assert result.content_identity == expected
-    assert result.data_kind == "bytes"
-    assert result.sample_count == 1
+    assert result.digests["content"] == expected
+    assert result.kind == "bytes"
+    assert result.samples == 1
     assert result.missingness.status == "not_observed"
     assert result.duplicates.status == "not_observed"
-    assert "modality_specific_decoder_not_declared" in result.release_blockers
+    assert "modality_specific_decoder_not_declared" in result.blockers
     assert "modality_specific_decoding_was_not_attempted" in result.limitations
 
 
@@ -106,9 +106,9 @@ def test_opaque_data_requires_explicit_content_identity():
 
     result = catalog.Catalog.from_data(opaque, content_identity=identity)
 
-    assert result.content_identity == identity
-    assert result.data_kind == "object"
-    assert "schema_adapter_not_declared" in result.release_blockers
+    assert result.digests["content"] == identity
+    assert result.kind == "object"
+    assert "schema_adapter_not_declared" in result.blockers
     assert "content_identity_was_supplied_by_caller" in result.limitations
 
 
@@ -118,8 +118,8 @@ def test_source_metadata_removes_governance_blockers_for_clean_data():
         uri="memory://customer-sample",
         version="2026-10-23",
         owner="data-platform",
-        acquisition_method="approved-export",
-        privacy_classification="internal",
+        acquisition="approved-export",
+        privacy="internal",
     )
     result = catalog.Catalog.from_data(
         {"x": [1, 2], "label": [0, 1]},
@@ -127,7 +127,7 @@ def test_source_metadata_removes_governance_blockers_for_clean_data():
         label_column="label",
     )
 
-    assert result.release_blockers == ()
+    assert result.blockers == ()
     assert result.label.status == "observed"
     assert result.source.to_dict()["uri"] == "memory://customer-sample"
 
@@ -167,7 +167,7 @@ def test_catalog_persists_atomically_and_verifies_read_back(tmp_path):
     )
 
     tampered = json.loads(path.read_text(encoding="utf-8"))
-    tampered["sample_count"] = 99
+    tampered["samples"] = 99
     path.write_text(json.dumps(tampered), encoding="utf-8")
     with pytest.raises(ValueError, match="catalog digest"):
         catalog.Catalog.read_verified(path)
@@ -177,23 +177,23 @@ def test_adapter_owned_observation_supports_unknown_shapes():
     """Adapters can publish evidence without routing through a model API."""
     result = catalog.Catalog.glean(
         source="warehouse://events",
-        data_kind="custom_event_stream",
+        kind="custom_event_stream",
         shape=(12, 4),
-        schema=(catalog.Field("event", "custom"),),
-        sample_count=12,
+        columns=(catalog.Field("event", "custom"),),
+        samples=12,
         missingness=catalog.Missingness("not_observed", 0, 0, 0, {}),
         duplicates=catalog.Duplication(
             "not_observed", 0, 0.0, "adapter did not expose row identity"
         ),
         label=catalog.Labeling("not_declared", None, 0, 0, 0, {}),
-        content_identity="sha256:" + "b" * 64,
+        content="sha256:" + "b" * 64,
         limitations=("adapter_summary_only",),
-        release_blockers=("adapter_schema_review_required",),
+        blockers=("adapter_schema_review_required",),
     )
 
-    assert result.data_kind == "custom_event_stream"
+    assert result.kind == "custom_event_stream"
     assert result.shape == (12, 4)
-    assert result.release_blockers == ("adapter_schema_review_required",)
+    assert result.blockers == ("adapter_schema_review_required",)
 
 
 def test_catalog_is_a_pinned_public_name_of_its_module():
@@ -224,38 +224,38 @@ def test_contract_components_reject_invalid_accounting():
         catalog.Source(version=3)
     with pytest.raises(ValueError, match="field name"):
         catalog.Field(" ", "int64")
-    with pytest.raises(ValueError, match="data_type"):
+    with pytest.raises(ValueError, match="kind"):
         catalog.Field("x", " ")
     with pytest.raises(ValueError, match="status"):
         catalog.Missingness(" ", 0, 0, 0, {})
-    with pytest.raises(TypeError, match="total_values"):
+    with pytest.raises(TypeError, match="total"):
         catalog.Missingness("observed", True, 0, 0, {})
-    with pytest.raises(ValueError, match="missing_values"):
+    with pytest.raises(ValueError, match="missing cannot exceed"):
         catalog.Missingness("observed", 1, 2, 0, {})
-    with pytest.raises(ValueError, match="by_field"):
+    with pytest.raises(ValueError, match="fields"):
         catalog.Missingness("observed", 1, 0, 0, {"x": -1})
     with pytest.raises(ValueError, match="missing_fraction"):
         catalog.Missingness.from_dict(
             {
                 "status": "observed",
-                "total_values": 2,
-                "missing_values": 1,
-                "rows_with_missing": 1,
+                "total": 2,
+                "missing": 1,
+                "incomplete": 1,
                 "missing_fraction": 0.0,
             }
         )
     assert catalog.Missingness("observed", 0, 0, 0, {}).fraction == 0
     with pytest.raises(ValueError, match="duplicate status"):
         catalog.Duplication(" ", 0, 0.0, "method")
-    with pytest.raises(TypeError, match="duplicate_rows"):
+    with pytest.raises(TypeError, match="rows"):
         catalog.Duplication("observed", True, 0.0, "method")
-    with pytest.raises(ValueError, match="duplicate_fraction"):
+    with pytest.raises(ValueError, match="fraction"):
         catalog.Duplication("observed", 0, 1.1, "method")
     with pytest.raises(ValueError, match="label status"):
         catalog.Labeling(" ", None, 0, 0, 0, {})
     with pytest.raises(ValueError, match="label field"):
         catalog.Labeling("observed", " ", 0, 0, 0, {})
-    with pytest.raises(ValueError, match="distinct_count"):
+    with pytest.raises(ValueError, match="distinct"):
         catalog.Labeling("observed", "y", 0, 0, 1, {})
     with pytest.raises(ValueError, match="distribution"):
         catalog.Labeling("observed", "y", 1, 0, 1, {"a": -1})
@@ -270,9 +270,9 @@ def test_scalar_series_and_nested_value_observers_cover_type_boundaries():
     dated = catalog.Catalog.from_data(datetime.date(2026, 10, 23))
     series_result = catalog.Catalog.from_data(series)
 
-    assert series_result.data_kind == "pandas_series"
-    assert scalar.shape == () and scalar.sample_count == 1
-    assert dated.data_kind == "scalar"
+    assert series_result.kind == "pandas_series"
+    assert scalar.shape == () and scalar.samples == 1
+    assert dated.kind == "scalar"
     assert catalog.canonicalize(b"x")["bytes_length"] == 1
     assert catalog.canonicalize(numpy.int64(4)) == 4
     assert catalog.canonicalize(datetime.date(2026, 10, 23)) == ("2026-10-23")
@@ -297,11 +297,9 @@ def test_label_and_source_boundaries_are_explicit():
     path_source = catalog.Source(uri="relative/catalog.json")
 
     assert unavailable.label.status == "not_observed"
-    assert "declared_label_field_is_not_available" in (
-        unavailable.release_blockers
-    )
+    assert "declared_label_field_is_not_available" in (unavailable.blockers)
     assert ambiguous.label.status == "not_observed"
-    assert "declared_label_field_is_ambiguous" in ambiguous.release_blockers
+    assert "declared_label_field_is_ambiguous" in ambiguous.blockers
     assert path_source.uri.startswith("file://")
 
 
@@ -315,7 +313,7 @@ def test_raw_and_opaque_identity_overrides_are_validated():
         numpy.zeros((2, 2, 2)), content_identity=identity
     )
 
-    assert raw.content_identity == "sha256:" + identity
+    assert raw.digests["content"] == "sha256:" + identity
     assert raw.label.status == "not_observed"
     assert high_dimensional.shape == (2, 2, 2)
     with pytest.raises(ValueError, match="SHA-256"):
@@ -323,14 +321,14 @@ def test_raw_and_opaque_identity_overrides_are_validated():
     with pytest.raises(ValueError, match="SHA-256"):
         catalog.Catalog.glean(
             source="memory://bad",
-            data_kind="custom",
+            kind="custom",
             shape=(),
-            schema=(),
-            sample_count=1,
+            columns=(),
+            samples=1,
             missingness=catalog.Missingness("not_observed", 0, 0, 0, {}),
             duplicates=catalog.Duplication("not_observed", 0, 0.0, "none"),
             label=catalog.Labeling("not_declared", None, 0, 0, 0, {}),
-            content_identity="bad",
+            content="bad",
             limitations=("adapter_only",),
         )
 

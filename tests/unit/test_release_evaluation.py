@@ -12,21 +12,21 @@ from scmle.evaluation import release
 
 
 def make_record(
-    criterion_id: str,
+    criterion: str,
     result: evidence.Outcome = evidence.Outcome.PASS,
     decision: evidence.Disposition = evidence.Disposition.ACCEPTED,
 ) -> evidence.Record:
     """Build a complete evidence record for the release fixtures."""
     return evidence.Record(
-        criterion_id=criterion_id,
-        claim=f"evidence for {criterion_id}",
+        criterion=criterion,
+        claim=f"evidence for {criterion}",
         scope={"release": "beta"},
-        raw_inputs={"run": "sha256:run"},
-        command_or_test="uv run pytest tests/unit/test_release_evaluation.py",
-        artifact={"path": f"{criterion_id}.json", "digest": "sha256:item"},
+        inputs={"run": "sha256:run"},
+        command="uv run pytest tests/unit/test_release_evaluation.py",
+        artifact={"path": f"{criterion}.json", "digest": "sha256:item"},
         result=result,
         reviewer="release-reviewer",
-        observed_at="2026-10-20T12:00:00+00:00",
+        observed="2026-10-20T12:00:00+00:00",
         limitations=("Fixture evidence is local and synthetic.",),
         decision=decision,
     )

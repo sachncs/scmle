@@ -285,19 +285,17 @@ def test_the_label_certificate_counts_detections_and_false_alarms(
         "alpha": baseline.LABEL_ALPHA,
         "seed_offset": 9,
     }
-    assert cert.detector_id == baseline.DETECTOR_ID
-    assert cert.code_hash == framing_certify.code_digest()
+    assert cert.detector == baseline.DETECTOR_ID
+    assert cert.digests["code"] == framing_certify.code_digest()
     assert cert.policy == framing_certify.LABEL_POLICY
     assert cert.seeds == (9,)
     result = cert.outcomes[0].certificate
-    assert result.detector_id == baseline.DETECTOR_ID
-    assert result.defect_type == baseline.DEFECT_TYPE
+    assert result.detector == baseline.DETECTOR_ID
+    assert result.defect == baseline.DEFECT_TYPE
     assert (result.planted, result.detected) == (4, 4)
-    assert (result.clean_rows, result.false_alarms) == (4, 0)
-    assert result.seed_path == randomness.seed_path(
-        9, "framing.certify.labels", 0
-    )
-    assert result.seed_path == (9, "framing.certify.labels", 0)
+    assert (result.clean, result.alarms) == (4, 0)
+    assert result.seeds == randomness.seed_path(9, "framing.certify.labels", 0)
+    assert result.seeds == (9, "framing.certify.labels", 0)
 
 
 def test_the_label_certificate_hashes_the_world_description(monkeypatch):
@@ -314,7 +312,7 @@ def test_the_label_certificate_hashes_the_world_description(monkeypatch):
         },
         sort_keys=True,
     )
-    assert cert.corpus_hash == certificates.corpus_hash(
+    assert cert.digests["corpus"] == certificates.corpus_hash(
         [certificates.hash_source(description)]
     )
     assert description.startswith('{"alpha": ')
@@ -418,7 +416,7 @@ def test_the_omission_request_is_the_stated_one(monkeypatch):
     assert request.source == draft.Offer(
         "warehouse://crm/accounts",
         ("customer_id", "as_of", "churn", "current_rule"),
-        primary_key=("customer_id",),
+        key=("customer_id",),
     )
     assert list(seen["data"].columns) == list(request.source.columns)
     kwargs = seen["kwargs"]
@@ -529,12 +527,12 @@ def expected_base(number):
     base["estimand"].update(
         population="p",
         target="y",
-        prediction_moment="m",
-        summary_measure="s",
-        intercurrent_events=[{"event": "none", "strategy": "n/a"}],
+        moment="m",
+        summary="s",
+        intercurrent=[{"event": "none", "strategy": "n/a"}],
     )
     base["unit"] = "u"
-    base["deployment_population"] = "d"
+    base["population"] = "d"
     base["seed"] = number
     return base
 
@@ -572,7 +570,7 @@ def test_the_fuzz_tries_the_count_of_records_and_accepts_none(monkeypatch):
         assert record == expected_base(number)
     assert {
         frozenset(expected_base(n)) - frozenset(r) for n, r in extras["deleted"]
-    } == {frozenset({k}) for k in expected_base(0)}
+    } == {frozenset({k}) for k in expected_base(0) if k != "schema_version"}
     blanked = set()
     for number, record in extras["blank"]:
         blanks = [k for k in ("question", "unit") if record[k] == ""]
@@ -593,9 +591,9 @@ def test_the_fuzz_tries_the_count_of_records_and_accepts_none(monkeypatch):
         assert record == expected_base(number)
     kmax = set()
     for number, record in extras["kmax"]:
-        kmax.add(record["k_max"])
-        assert isinstance(record["k_max"], float)
-        record["k_max"] = expected_base(number)["k_max"]
+        kmax.add(record["quota"])
+        assert isinstance(record["quota"], float)
+        record["quota"] = expected_base(number)["quota"]
         assert record == expected_base(number)
     assert kmax == {0.0, -3.0}
 
@@ -616,7 +614,7 @@ def classify(records):
             found["power"].append(entry)
         elif record.get("question") == "" or record.get("unit") == "":
             found["blank"].append(entry)
-        elif record.get("k_max") in (0.0, -3.0):
+        elif record.get("quota") in (0.0, -3.0):
             found["kmax"].append(entry)
         else:
             found["deleted"].append(entry)
@@ -674,7 +672,7 @@ def test_certify_all_passes_the_offset_and_the_run_counts_through(
     assert seen["minimum"] == ({"k": {"clusters": 20}},)
     assert seen["fuzz"] == ()
     assert len(store.certificates) == 1
-    assert store.certificates[0].detector_id == baseline.DETECTOR_ID
+    assert store.certificates[0].detector == baseline.DETECTOR_ID
     assert set(document) == {
         "size",
         "size_bound",

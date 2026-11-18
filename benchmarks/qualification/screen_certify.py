@@ -390,13 +390,13 @@ def measure(kind: str, workers: int = 1) -> tuple[Any, dict[str, Any]]:
         }
         results.append(
             qualification.Certificate(
-                detector_id=screen.DETECTORS[kind],
-                defect_type=defect,
+                detector=screen.DETECTORS[kind],
+                defect=defect,
                 planted=PLANT_REPLICATES,
                 detected=detected,
-                clean_rows=NULL_REPLICATES,
-                false_alarms=false_alarms,
-                seed_path=randomness.seed_path(0, "screen.certify", 0),
+                clean=NULL_REPLICATES,
+                alarms=false_alarms,
+                seeds=randomness.seed_path(0, "screen.certify", 0),
             )
         )
     cert = certificates.certify(

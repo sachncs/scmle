@@ -33,9 +33,7 @@ def test_every_required_defect_type_has_an_outcome_on_file():
     digests = f6_certify.current_digests()
     for detector, defects in f6_certify.required_defects().items():
         (cert,) = store.current(detector, digests[detector])
-        assert {o.certificate.defect_type for o in cert.outcomes} == set(
-            defects
-        )
+        assert {o.certificate.defect for o in cert.outcomes} == set(defects)
 
 
 def test_missing_and_stale_certificates_are_reported():
@@ -75,17 +73,17 @@ def test_measurements_agree_with_the_certificates():
     (cert,) = store.current(shift.C2ST_ID, shift.code_digest())
     (outcome,) = cert.outcomes
     row = document[shift.C2ST_ID]
-    assert outcome.certificate.false_alarms == row["decision_false_alarms"]
+    assert outcome.certificate.alarms == row["decision_false_alarms"]
     assert outcome.certificate.detected == round(
         row["power"] * row["planted_replicates"]
     )
     (cert,) = store.current(stability.DETECTOR_ID, stability.code_digest())
-    by_type = {o.certificate.defect_type: o.certificate for o in cert.outcomes}
+    by_type = {o.certificate.defect: o.certificate for o in cert.outcomes}
     for kind, counts in document[stability.DETECTOR_ID]["by_defect"].items():
         assert by_type[kind].detected == counts["detected"]
         assert by_type[kind].planted == counts["planted"]
     clean = document[stability.DETECTOR_ID]
-    assert by_type[stability.DEFECT_NULL].false_alarms == (
+    assert by_type[stability.DEFECT_NULL].alarms == (
         clean["genuine_effects"] - clean["genuine_labelled_stable"]
     )
 

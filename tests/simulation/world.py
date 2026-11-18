@@ -47,14 +47,14 @@ ALLOWED_KINDS = frozenset(
 def make_policy(**changes):
     """A loop policy that lets an alarm gate retraining."""
     values = {
-        "reference_risk": 0.10,
+        "reference": 0.10,
         "tolerance": 0.05,
         "scope": SCOPE,
-        "initial_tau": 0.5,
-        "min_matured": 5,
-        "r_star": 0.6,
-        "alarm_gates_retrain": True,
-        "outcome_window": 0,
+        "tau": 0.5,
+        "matured": 5,
+        "target": 0.6,
+        "retrain": True,
+        "maturity": 0,
     }
     values.update(changes)
     return loop.Preregistration(**values)
@@ -68,11 +68,11 @@ def make_stream(**changes):
 def envelope(limit=1, **changes):
     """A signed envelope for the world's scope."""
     fields = {
-        "envelope_id": "e1",
+        "identifier": "e1",
         "limits": {"train_challenger": limit},
         "statement": "train a challenger when the alarm gates retraining",
         "role": "owner",
-        "name_or_id": "P. Owner",
+        "attestor": "P. Owner",
         "date": "2026-11-01",
         "scope": SCOPE,
         "expires": "2026-12-01",

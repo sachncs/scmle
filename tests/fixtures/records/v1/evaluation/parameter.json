@@ -1,0 +1,105 @@
+{
+  "digest": "4bf2fdfcde1e301c441070b9679fa9c6ac6182b423173c82812e4f7468bccff7",
+  "report": {
+    "covariance": [
+      [
+        0.0004116222636730066,
+        -0.00034911074614080406
+      ],
+      [
+        -0.00034911074614080406,
+        0.0005489295365156673
+      ]
+    ],
+    "diagnostics": {
+      "converged": true,
+      "covariance_conditioning": {
+        "condition_number": 6.716594583187428,
+        "condition_number_threshold": 1000000000000.0,
+        "dimension": 2,
+        "rank": 2,
+        "status": "identified"
+      },
+      "degrees_of_freedom": 28,
+      "iterations": 1,
+      "likelihood": "gaussian",
+      "residual_sum_of_squares": 0.2051790217985552,
+      "rmse": 0.0827000648525653
+    },
+    "estimand": {
+      "assumptions": [
+        "linear conditional mean"
+      ],
+      "description": "",
+      "feature_names": [
+        "feature"
+      ],
+      "likelihood": "gaussian",
+      "name": "slope",
+      "outcome": "outcome",
+      "population": "fixture rows"
+    },
+    "parameters": [
+      {
+        "estimate": 1.995343213480405,
+        "interval": [
+          1.9537841540798015,
+          2.0369022728810084
+        ],
+        "name": "intercept",
+        "p_value": 4.170594817754541e-37,
+        "standard_error": 0.020288476129887295
+      },
+      {
+        "estimate": 0.9731790061176206,
+        "interval": [
+          0.9251863726662907,
+          1.0211716395689505
+        ],
+        "name": "feature",
+        "p_value": 1.0566036808346694e-26,
+        "standard_error": 0.02342924532535496
+      }
+    ],
+    "policy": {
+      "bootstrap_replicates": 0,
+      "cluster_name": null,
+      "confidence_level": 0.95,
+      "covariance": "hc3",
+      "estimator": "linear",
+      "max_iterations": 100,
+      "missing": "reject",
+      "reference_tolerance": 1e-06,
+      "seed": 0,
+      "tolerance": 1e-08
+    },
+    "raw_input_fingerprint": "87e0048c215edaffd0460c27f3cf1245fa0d8271fff4d089ec6714e8e5684a02",
+    "reference": {
+      "max_absolute_difference": 6.661338147750939e-16,
+      "method": "numpy.linalg.lstsq",
+      "passed": true
+    },
+    "rows_dropped": 0,
+    "rows_input": 30,
+    "rows_used": 30,
+    "sensitivity": {
+      "distribution_shift": {
+        "status": "not_available"
+      },
+      "missingness": {
+        "policy": "reject",
+        "rows": 30,
+        "status": "evaluated"
+      },
+      "prior": {
+        "reason": "current estimators are frequentist and use no prior",
+        "status": "not_applicable"
+      },
+      "sampling": {
+        "bootstrap_replicates": 0,
+        "status": "not_requested"
+      }
+    }
+  },
+  "schema_version": 1
+}

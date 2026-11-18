@@ -49,7 +49,7 @@ def custody(rows=2000, process=True):
     log = sealed.Journal()
     vault = sealed.Vault(log, process=process)
     outcome = pipeline.sequester(
-        charter=make_charter(min_effect=0.3, k_max=5),
+        charter=make_charter(effect=0.3, quota=5),
         split=split,
         frame=frame,
         spec=spec,
@@ -57,8 +57,8 @@ def custody(rows=2000, process=True):
         data_hash="8" * 64,
         vault=vault,
     )
-    rows_c = outcome.manifest.confirmation_ids
-    rows_f = outcome.manifest.final_test_ids
+    rows_c = outcome.manifest.sets.confirmation
+    rows_f = outcome.manifest.sets.final
     return (
         outcome.view,
         vault,

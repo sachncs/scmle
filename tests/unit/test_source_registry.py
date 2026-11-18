@@ -13,14 +13,13 @@ from scmle.data.readers import registry
 def make_manifest(snapshot_id: str, data_hash: str) -> data.DatasetManifest:
     """Build a small manifest for registry tests."""
     return data.DatasetManifest(
-        dataset_id=f"dataset-{data_hash}",
-        schema_hash="schema-hash",
-        data_hash=data_hash,
-        row_count=2,
-        column_count=2,
+        identifier=f"dataset-{data_hash}",
+        digests={"schema": "schema-hash", "data": data_hash},
+        rows=2,
+        columns=2,
         target="label",
         uri="file:///tmp/events.csv",
-        snapshot_id=snapshot_id,
+        snapshot=snapshot_id,
     )
 
 
@@ -41,7 +40,7 @@ def make_snapshot(
 def test_registry_round_trips_and_repeats_are_idempotent():
     source = make_snapshot()
     observed_again = dataclasses.replace(
-        source, captured_at="2026-10-20T10:01:00+00:00"
+        source, captured="2026-10-20T10:01:00+00:00"
     )
     registry_value = registry.Sources()
     registry_value.register(source)
@@ -50,7 +49,7 @@ def test_registry_round_trips_and_repeats_are_idempotent():
     serialized = registry_value.to_json()
     restored = registry.Sources.from_json(serialized)
 
-    assert len(restored.snapshots[source.source_id]) == 1
+    assert len(restored.snapshots[source.source]) == 1
     assert json.loads(serialized) == json.loads(restored.to_json())
 
 
@@ -88,8 +87,8 @@ def test_snapshot_from_frame_preserves_ordered_source_types():
         "2026-10-20T10:00:00+00:00",
     )
 
-    assert list(source.schema) == ["value", "label"]
-    assert source.source_id.startswith("src_")
+    assert list(source.layout) == ["value", "label"]
+    assert source.source.startswith("src_")
 
 
 def test_registry_rejects_conflicting_repeated_snapshot():
@@ -118,9 +117,7 @@ def test_durable_registry_store_compares_snapshots_across_process_runs(
     assert store.register(additive).status == "additive"
 
     restored = registry.Registry(store.path).load()
-    assert [
-        item.snapshot_id for item in restored.snapshots[first.source_id]
-    ] == [
+    assert [item.snapshot for item in restored.snapshots[first.source]] == [
         "snapshot-1",
         "snapshot-2",
     ]

@@ -308,13 +308,13 @@ def shift_certificate(
     detected = sum(item[0] for item in plants)
     p_alone = sum(item[1] <= shift.ALPHA for item in nulls)
     result = qualification.Certificate(
-        detector_id=test,
-        defect_type=shift.DEFECT_TYPE,
+        detector=test,
+        defect=shift.DEFECT_TYPE,
         planted=SHIFT_PLANTED,
         detected=detected,
-        clean_rows=null_count,
-        false_alarms=false_alarms,
-        seed_path=randomness.seed_path(offset, f"f6.certify.{test}", 0),
+        clean=null_count,
+        alarms=false_alarms,
+        seeds=randomness.seed_path(offset, f"f6.certify.{test}", 0),
     )
     cert = certificates.certify(
         test,
@@ -392,15 +392,13 @@ def stability_certificate(
         }
         results.append(
             qualification.Certificate(
-                detector_id=stability.DETECTOR_ID,
-                defect_type=kind,
+                detector=stability.DETECTOR_ID,
+                defect=kind,
                 planted=PLANT_REPS,
                 detected=found,
-                clean_rows=STABLE_REPS,
-                false_alarms=false_alarms,
-                seed_path=randomness.seed_path(
-                    offset, "f6.certify.stability", 0
-                ),
+                clean=STABLE_REPS,
+                alarms=false_alarms,
+                seeds=randomness.seed_path(offset, "f6.certify.stability", 0),
             )
         )
     pool = pandas.Series(source_values()).to_frame("value")

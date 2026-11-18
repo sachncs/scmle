@@ -282,18 +282,18 @@ charter, so an attestation cannot be reused for another analysis):
 
 ```json
 {
-  "format_version": 1,
+  "schema_version": 2,
   "attestations": [
     {
       "column": "worst area",
-      "name_or_id": "A. Pathologist",
+      "attestor": "A. Pathologist",
       "role": "data owner",
       "statement": "Measured from the same image as every other column, when the sample is imaged; available at prediction.",
       "evidence": "imaging protocol v2, section 4",
       "date": "2026-11-05",
       "expires": "2027-11-05",
       "scope": "<the charter_hash of your signed charter>",
-      "lead_seconds": 0
+      "seconds": 0
     }
   ]
 }

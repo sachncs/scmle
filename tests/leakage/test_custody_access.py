@@ -48,7 +48,7 @@ def build():
     log = sealed.Journal()
     vault = sealed.Vault(log, process=True)
     outcome = pipeline.sequester(
-        charter=make_charter(min_effect=0.3, k_max=5),
+        charter=make_charter(effect=0.3, quota=5),
         split=split,
         frame=frame,
         spec=spec,
@@ -149,7 +149,7 @@ def test_the_orchestrator_process_keeps_only_the_ids():
     assert isinstance(held.locked, scmle.assurance.custody.vault.SealedTestSet)
     assert not hasattr(held.locked, "features")
     assert not hasattr(held.locked, "target")
-    assert held.ids == outcome.manifest.confirmation_ids
+    assert held.ids == outcome.manifest.sets.confirmation
     vault.close()
 
 

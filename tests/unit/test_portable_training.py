@@ -66,12 +66,12 @@ def test_a_run_writes_spec_checkpoints_result_and_manifest(store):
     manifest = local_runner(store, clock).run(spec_for())
     assert manifest.state == "succeeded" and len(manifest.attempts) == 1
     assert [c["step"] for c in manifest.checkpoints] == [1, 2, 3, 4, 5, 6]
-    assert manifest.result_sha256
+    assert manifest.digests["result"]
     keys = {e["key"] for e in manifest.evidence}
     assert {"runs/run-1/spec.json", "runs/run-1/result.json"} <= keys
     stored = json.loads(store.get("runs/run-1/manifest.json")[0])
-    assert stored["state"] == "succeeded" and stored["format"] == 1
-    assert stored["spec_digest"] == spec_for().digest()
+    assert stored["state"] == "succeeded" and stored["format"] == 2
+    assert stored["digests"]["spec"] == spec_for().digest()
     assert stored["identity"] == TRAIN
 
 
@@ -142,8 +142,8 @@ def test_the_cost_budget_stops_a_runaway_job(store):
     )
     assert manifest.state == "budget_stopped"
     assert len(manifest.attempts) == 1
-    assert manifest.total_cost > 0.2
-    assert manifest.total_cost <= 0.2 + RATE.cost(base.Resources(1, 1024), 60)
+    assert manifest.cost > 0.2
+    assert manifest.cost <= 0.2 + RATE.cost(base.Resources(1, 1024), 60)
     steps = [c["step"] for c in manifest.checkpoints]
     assert max(steps) < 1000 and steps == sorted(steps)
     again = local_runner(store, clock, slow).run(
@@ -167,7 +167,7 @@ def test_the_budget_accumulates_across_attempts(store):
         "cancelled",
     ]
     assert manifest.attempts[0].cost == pytest.approx(0.12, abs=0.001)
-    assert manifest.total_cost == pytest.approx(0.36, abs=0.001)
+    assert manifest.cost == pytest.approx(0.36, abs=0.001)
 
 
 def test_a_timeout_is_final(store):

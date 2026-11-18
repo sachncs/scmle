@@ -1,0 +1,215 @@
+{
+  "dataset_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "documentation": {
+    "card": "fixture"
+  },
+  "evaluation": {
+    "accuracy": 0.75
+  },
+  "inference": {
+    "rows": 3
+  },
+  "modality": "text",
+  "monitoring": {
+    "drift": false
+  },
+  "package": {
+    "model_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "path": "run/model",
+    "schema_version": 1,
+    "signature": "9999999999999999999999999999999999999999999999999999999999999999"
+  },
+  "performance": {
+    "seconds": 1.5
+  },
+  "recovery": {
+    "resumed": false
+  },
+  "schema_version": 2,
+  "signature": {
+    "algorithm": "hmac-sha256",
+    "value": "51523ba586978c53428b936aad5ebe610b8ac96a95751fab1917488e1a97b162"
+  },
+  "stage_evidence": [
+    {
+      "evidence": {
+        "stage": "ingestion"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed ingestion"
+      ],
+      "stage": "ingestion"
+    },
+    {
+      "evidence": {
+        "stage": "validation"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed validation"
+      ],
+      "stage": "validation"
+    },
+    {
+      "evidence": {
+        "stage": "profiling"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed profiling"
+      ],
+      "stage": "profiling"
+    },
+    {
+      "evidence": {
+        "stage": "curation"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed curation"
+      ],
+      "stage": "curation"
+    },
+    {
+      "evidence": {
+        "stage": "splitting"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed splitting"
+      ],
+      "stage": "splitting"
+    },
+    {
+      "evidence": {
+        "stage": "feature_preparation"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed feature_preparation"
+      ],
+      "stage": "feature_preparation"
+    },
+    {
+      "evidence": {
+        "stage": "modelling"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed modelling"
+      ],
+      "stage": "modelling"
+    },
+    {
+      "evidence": {
+        "stage": "evaluation"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed evaluation"
+      ],
+      "stage": "evaluation"
+    },
+    {
+      "evidence": {
+        "stage": "data_explainability"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed data_explainability"
+      ],
+      "stage": "data_explainability"
+    },
+    {
+      "evidence": {
+        "stage": "model_explainability"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed model_explainability"
+      ],
+      "stage": "model_explainability"
+    },
+    {
+      "evidence": {
+        "stage": "packaging"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed packaging"
+      ],
+      "stage": "packaging"
+    },
+    {
+      "evidence": {
+        "stage": "inference"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed inference"
+      ],
+      "stage": "inference"
+    },
+    {
+      "evidence": {
+        "stage": "monitoring"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed monitoring"
+      ],
+      "stage": "monitoring"
+    },
+    {
+      "evidence": {
+        "stage": "documentation"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed documentation"
+      ],
+      "stage": "documentation"
+    },
+    {
+      "evidence": {
+        "stage": "recovery_and_resource_tests"
+      },
+      "evidence_links": [
+        "modality_lifecycle.json"
+      ],
+      "notes": [
+        "completed recovery_and_resource_tests"
+      ],
+      "stage": "recovery_and_resource_tests"
+    }
+  ]
+}

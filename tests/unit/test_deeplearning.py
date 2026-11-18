@@ -160,7 +160,7 @@ def test_a_pytorch_model_family_trains_packages_and_predicts(
     )
     plan = project.plan()
     only_torch = dataclasses.replace(
-        plan, candidate_models=("dummy", "torch_residual")
+        plan, candidates=("dummy", "torch_residual")
     )
 
     result = project.run(only_torch)
@@ -187,9 +187,7 @@ def test_serving_limits_are_checked_for_a_pytorch_candidate(
         models=tasks.Candidates(),
         selection=tasks.Selection(max_model_mb=50.0),
     )
-    only_torch = dataclasses.replace(
-        project.plan(), candidate_models=("torch_mlp",)
-    )
+    only_torch = dataclasses.replace(project.plan(), candidates=("torch_mlp",))
 
     result = project.run(only_torch)
 

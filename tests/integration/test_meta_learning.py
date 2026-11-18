@@ -51,7 +51,7 @@ def test_plan_prioritizes_models_that_won_on_similar_datasets(tmp_path):
     plan = project.plan()
     decision = next(d for d in plan.decisions if d.technique == "meta_learning")
     assert decision.action == "include"
-    models = list(plan.candidate_models)
+    models = list(plan.candidates)
     assert models[0] == "dummy"  # baselines stay first
     preferred = [m for m in models[1:] if m in winners]
     assert models[1 : 1 + len(preferred)] == preferred

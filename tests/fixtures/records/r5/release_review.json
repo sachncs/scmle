@@ -1,0 +1,34 @@
+{
+  "key": "fixture-key",
+  "record": {
+    "artifact_digests": {
+      "wheel": "sha256:w"
+    },
+    "claims": [
+      {
+        "criterion_id": "metric.auc",
+        "evidence_uri": "evidence/auc.json",
+        "kind": "metric",
+        "notes": "ok",
+        "observed": "0.91",
+        "passed": true,
+        "reference": ">=0.90"
+      }
+    ],
+    "clean_clone_digest": "sha256:clone",
+    "commands": [
+      "uv run pytest"
+    ],
+    "decision": "approved",
+    "environment_digest": "sha256:env",
+    "implementer_ids": [
+      "eng@example.com"
+    ],
+    "observed_at": "2026-10-20T12:00:00+00:00",
+    "release_id": "beta-1",
+    "reviewer_id": "rev@example.com",
+    "schema_version": 1,
+    "signature": "9c09a42536638d34dd840df559ff1b9ba595bfbceea609cec2e8d662ffa0ac7e",
+    "source_commit": "abc1234"
+  }
+}

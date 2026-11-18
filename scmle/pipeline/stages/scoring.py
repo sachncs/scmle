@@ -64,7 +64,7 @@ def coverage_on_confirmation(
     block = charter.uncertainty
     return (
         block is not None
-        and block.coverage_on_confirmation
+        and block.confirmatory
         and coverage_confirm.principal(task.value) is not None
     )
 
@@ -85,7 +85,7 @@ def slicers(
     if not path:
         return ()
     block = sealing.read_verified(str(path)).charter.uncertainty
-    return () if block is None else block.slice_columns
+    return () if block is None else block.slices
 
 
 def decisional(
@@ -104,7 +104,7 @@ def decisional(
     if path is None:
         return None
     charter = sealing.read_verified(str(path)).charter
-    if charter.decision is None or charter.cost_model is None:
+    if charter.decision is None or charter.costs is None:
         return None
     return charter
 
@@ -144,15 +144,15 @@ def freeze(
             the chosen rule has no raw threshold.
     """
     layer = charter.decision
-    model = charter.cost_model
+    model = charter.costs
     if layer is None or model is None:
         raise errors.ScmleError("the charter has no decision layer")
     chosen = scmle.decision.threshold.operate(
         probabilities,
         actual.astype(float),
         model,
-        level=layer.model.calibration_level,
-        replicates=charter.error_budget.permutations_b,
+        level=layer.model.calibration,
+        replicates=charter.budget.permutations,
         seed=seed,
     )
     cut = chosen.rule.uncalibrated
@@ -204,7 +204,7 @@ def appraise(
     charter = decisional(context)
     if charter is None or decision is None or "f11" not in decision:
         return None
-    model = charter.cost_model
+    model = charter.costs
     if model is None:
         raise errors.ScmleError("the charter has no cost model")
     positive = pipeline.classes_[1]
@@ -219,10 +219,10 @@ def appraise(
         decision["f11"]["rule_hash"],
         (target == positive).to_numpy(dtype=float),
         (numpy.asarray(pipeline.predict(features)) == positive).astype(float),
-        (model.t_lo, model.t_hi),
+        (model.low, model.high),
         clusters=clusters,
-        alpha=float(charter.error_budget.confirmation.alpha_confirm),
-        replicates=max(charter.error_budget.permutations_b, 500),
+        alpha=float(charter.budget.confirmation.alpha_confirm),
+        replicates=max(charter.budget.permutations, 500),
         seed=charter.seed,
     )
     tier = "unverified" if model.unreviewed else "attested"

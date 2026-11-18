@@ -263,10 +263,10 @@ def test_the_ledger_record_is_complete():
     cfg = dataclasses.replace(FAST, run_seed=11)
     out = leakage.probe(x, y, CLS, cfg)
     check = out.check
-    assert check.check_id == "leakage.skill.copy"
-    assert check.set_id is Subset.EXPLORATION and check.tier is Tier.UNVERIFIED
+    assert check.identifier == "leakage.skill.copy"
+    assert check.subset is Subset.EXPLORATION and check.tier is Tier.UNVERIFIED
     assert check.p_value == out.p_value and check.n == 300
-    assert check.seed_path[0] == 11
+    assert check.seeds[0] == 11
     assert check.interval is not None and check.interval[0] == out.lower_bound
     assert check.effect == pytest.approx(out.skill - out.null_mean)
     assert qualification.Check.from_dict(check.to_dict()) == check
@@ -449,7 +449,7 @@ def test_scan_reports_every_feature_and_never_claims_proof():
     assert "not proof" in doc["note"]
     assert doc["gate"] == "descriptive"
     assert [f["feature"] for f in doc["features"]] == ["noise", "leak"]
-    ids = [c.check_id for c in report.checks]
+    ids = [c.identifier for c in report.checks]
     assert ids.count("leakage.skill.noise") == 1
     assert "leakage.conditional.leak" in ids
     assert len(ids) == len(set(ids))

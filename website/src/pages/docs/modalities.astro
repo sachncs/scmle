@@ -68,23 +68,23 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <pre><code>{`from scmle.contracts.data import Passport, Confidentiality, Origin
 
 manifest = Passport(
-    dataset_id="documents-2026-10-21",
-    snapshot_id="approved-export-17",
+    identifier="documents-2026-10-21",
+    snapshot="approved-export-17",
     modality="document",
     task="binary_classification",
-    sample_count=len(dataset.samples),
-    content_hash=dataset.content_hash,
+    samples=len(dataset.samples),
+    digests={"content": dataset.content_hash},
     source=Origin(
         owner="records-team",
-        acquisition_method="approved export",
+        acquisition="approved export",
         license="internal-use",
     ),
     privacy=Confidentiality(
         classification="restricted",
-        contains_pii=True,
-        consent_basis="employment-contract",
-        retention_period="90d",
-        deletion_policy="case-closure",
+        identifying=True,
+        consent="employment-contract",
+        retention="90d",
+        deletion="case-closure",
     ),
 )
 

@@ -197,8 +197,8 @@ def evaluate(
     low, high = min(low, effect), max(high, effect)
     label = verdict(effect_x, low, high)
     check = qualification.Check(
-        check_id=f"{CHECK_ID}:{name}",
-        null_hypothesis="the finding's effect on the forward set is zero",
+        identifier=f"{CHECK_ID}:{name}",
+        null="the finding's effect on the forward set is zero",
         statistic=effect,
         p_value=None,
         interval=(low, high),
@@ -209,8 +209,8 @@ def evaluate(
             if label == UNSTABLE
             else qualification.Decision.PASS
         ),
-        set_id=qualification.Subset.FORWARD,
-        seed_path=randomness.seed_path(seed, f"{CHECK_ID}.{name}", 0),
+        subset=qualification.Subset.FORWARD,
+        seeds=randomness.seed_path(seed, f"{CHECK_ID}.{name}", 0),
         tier=qualification.Tier.UNVERIFIED,
     )
     return Finding(name, effect_x, effect, label, check)

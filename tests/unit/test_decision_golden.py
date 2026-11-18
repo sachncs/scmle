@@ -28,12 +28,12 @@ def plan(**overrides):
     values = {
         "unit": "user",
         "primary": "conversion",
-        "assignment_prob": 0.5,
-        "delta_min": 0.01,
+        "assignment": 0.5,
+        "delta": 0.01,
         "tolerance": 0.01,
-        "n_max": 6000,
-        "alpha_promote": Fraction(1, 50),
-        "alpha_rollback": Fraction(1, 100),
+        "limit": 6000,
+        "promotion": Fraction(1, 50),
+        "rollback": Fraction(1, 100),
         "guardrails": (decision.Guardrail("bounce", margin=0.05),),
     }
     values.update(overrides)
@@ -141,7 +141,7 @@ def case_design():
             design.srm(5200, 10000, 0.5, 0.001),
             design.srm(5600, 10000, 0.5, 0.001),
         ],
-        "stopping": design.simulate(plan(n_max=3000), 0.10, 0.05, 6, 3),
+        "stopping": design.simulate(plan(limit=3000), 0.10, 0.05, 6, 3),
     }
 
 

@@ -51,12 +51,12 @@ def policy(tmp_path):
         The path of the policy file.
     """
     settings = loop.Preregistration(
-        reference_risk=0.1,
+        reference=0.1,
         tolerance=0.05,
-        r_star=0.6,
-        initial_tau=0.5,
-        min_matured=5,
-        outcome_window=0,
+        target=0.6,
+        tau=0.5,
+        matured=5,
+        maturity=0,
         scope="m:s",
     )
     path = tmp_path / "policy.json"
@@ -203,13 +203,13 @@ def test_a_second_reply_to_the_same_escalation_is_refused(tmp_path, caplog):
     deploy, pending = opened(tmp_path)
     answer = deployment_ledger.Attestation.create(
         KEY,
-        escalation_id=pending.id,
-        question_hash=pending.question_hash,
+        escalation=pending.id,
+        digests={"question": pending.question_hash},
         decision="approve",
         statement="ok",
         evidence="ticket",
         role="owner",
-        name_or_id="P",
+        attestor="P",
         date="2020-01-01",
         scope="m:s",
         expires="2099-01-01",
@@ -236,9 +236,7 @@ def test_a_second_reply_to_the_same_escalation_is_refused(tmp_path, caplog):
 def test_every_one_of_the_eleven_never_list_actions_needs_a_person(tmp_path):
     """Enforces docs/WHEN_THINGS_GO_WRONG.md:709."""
     assert len(never_list.Forbidden) == 11
-    settings = loop.Preregistration(
-        reference_risk=0.1, initial_tau=0.5, scope="m:s"
-    )
+    settings = loop.Preregistration(reference=0.1, tau=0.5, scope="m:s")
     guarded = loop.Loop.open(
         tmp_path / "deploy",
         types.SimpleNamespace(charter_hash="a" * 64),

@@ -761,6 +761,33 @@ def charter(lab: Lab, signed: bool = True) -> pathlib.Path:
     return path
 
 
+def field(document: dict[str, Any], *keys: str) -> Any:
+    """Reads a stored record key under its current name or an older one.
+
+    Stage B renamed stored record keys (docs/RECORD_KEYS.md); a dotted key
+    names a nested object. The first key present wins.
+
+    Args:
+        document: The parsed record.
+        *keys: Dotted keys, the current name first.
+
+    Returns:
+        The value at the first key present.
+
+    Raises:
+        KeyError: If none of the keys is present.
+    """
+    for key in keys:
+        value: Any = document
+        try:
+            for part in key.split("."):
+                value = value[part]
+        except (KeyError, TypeError):
+            continue
+        return value
+    raise KeyError(keys[-1])
+
+
 def confirmation(run: pathlib.Path) -> list[int]:
     """The confirmation rows of a charter run.
 
@@ -771,7 +798,7 @@ def confirmation(run: pathlib.Path) -> list[int]:
         The row ids of its confirmation set.
     """
     manifest = json.loads((run / "split_manifest.json").read_text("utf-8"))
-    return list(manifest["confirmation_ids"])
+    return list(field(manifest, "sets.confirmation", "confirmation_ids"))
 
 
 def rerun(lab: Lab) -> Callable[[], dict[str, Any]]:
@@ -845,10 +872,14 @@ def tampered(lab: Lab, recompute: bool) -> pathlib.Path:
     """
     path = charter(lab)
     record = json.loads(path.read_text(encoding="utf-8"))
-    confirm = record["charter"]["error_budget"]["confirmation"]
-    confirm["alpha_confirm"] = "1/2"
+    budget = field(record["charter"], "budget", "error_budget")
+    budget["confirmation"]["alpha_confirm"] = "1/2"
     if recompute:
-        record["charter_hash"] = hashed(lab, record["charter"])
+        stored = hashed(lab, record["charter"])
+        if "charter_hash" in record:
+            record["charter_hash"] = stored
+        else:
+            record["digests"]["charter"] = stored
     path.write_text(json.dumps(record), encoding="utf-8")
     return path
 

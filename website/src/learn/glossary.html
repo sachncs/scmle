@@ -12,7 +12,7 @@
 <h3 id="row-column-table">row, column, table</h3>
 <p><strong>Meaning.</strong> A table has rows (one per thing, here one per passenger) and columns (one fact about each thing).</p>
 <p><strong>Example.</strong> 1309 rows and 10 columns.</p>
-<p><strong>Why it matters.</strong> The unit of a row ("one passenger", "one customer-month") decides how you must split the data. See "grouping" in <a href="@@BASE@@/docs/decisions/">Decisions</a>.</p>
+<p><strong>Why it matters.</strong> The unit of a row ("one passenger", "one customer-month") decides how the data should be split. See "grouping" in <a href="@@BASE@@/docs/decisions/">Decisions</a>.</p>
 <h3 id="task">task</h3>
 <p><strong>Meaning.</strong> The kind of answer: a category (classification), a number (regression), a time until something happens (survival), and so on.</p>
 <p><strong>Example.</strong> <code>binary_classification</code> for two possible answers.</p>
@@ -41,7 +41,7 @@
 <h3 id="accuracy">accuracy</h3>
 <p><strong>Meaning.</strong> The share of predictions that are right.</p>
 <p><strong>Example.</strong> 0.824: 82 of every 100 passengers guessed right.</p>
-<p><strong>Why it matters.</strong> It misleads when one answer is rare. If 1 in 100 cases is fraud, a model that says "never fraud" is 99 percent accurate and useless.</p>
+<p><strong>Why it matters.</strong> It misleads when one answer is rare. If 1 in 100 cases is fraud, a model that answers "not fraud" every time is 99 percent accurate and useless.</p>
 <h3 id="precision-and-recall">precision and recall</h3>
 <p><strong>Meaning.</strong> Precision: of the ones you flagged, how many were truly "yes". Recall: of all the true "yes", how many you flagged.</p>
 <p><strong>Example.</strong> At a cut of 0.5, precision 0.78 and recall 0.76 for survivors.</p>
@@ -65,7 +65,7 @@
 <h3 id="calibration">calibration</h3>
 <p><strong>Meaning.</strong> Whether stated probabilities match reality. Of all cases given 0.8, about 80 percent should happen.</p>
 <p><strong>Example.</strong> In our run the model said 0.14 for a group where 0.10 lived: close.</p>
-<p><strong>Why it matters.</strong> If you act on the number ("call everyone above 70 percent") it must mean what it says. Check <code>diagnostics/calibration.json</code>.</p>
+<p><strong>Why it matters.</strong> If you act on the number ("call everyone above 70 percent") it needs to mean what it says. Check <code>diagnostics/calibration.json</code>.</p>
 <h3 id="threshold-cut-off">threshold (cut-off)</h3>
 <p><strong>Meaning.</strong> The probability above which you say "yes".</p>
 <p><strong>Example.</strong> 0.5 by default. At 0.8, precision is 0.94 and recall 0.55.</p>
@@ -78,7 +78,7 @@
 <h3 id="training-data-practice-rows">training data, practice rows</h3>
 <p><strong>Meaning.</strong> The rows the model learns from.</p>
 <p><strong>Example.</strong> 1093 of our 1309 rows.</p>
-<p><strong>Why it matters.</strong> The model will always look good on rows it has already seen. Those scores say nothing about the future.</p>
+<p><strong>Why it matters.</strong> A model usually looks better on rows it has already seen than on new ones. Those scores say nothing about the future.</p>
 <h3 id="held-out-data-exam-rows-test-set">held-out data (exam rows, test set)</h3>
 <p><strong>Meaning.</strong> Rows kept hidden until the end and used once to score the winner.</p>
 <p><strong>Example.</strong> 216 rows were hidden. SCMLE logs <code>test.opened</code> when it uses them.</p>
@@ -106,7 +106,7 @@
 <h3 id="false-flag">false flag</h3>
 <p><strong>Meaning.</strong> A column the leakage screen flags although it is legitimate: its values really are known at prediction time.</p>
 <p><strong>Example.</strong> Two of the 30 breast-cancer measurements (<code>worst radius</code> and <code>worst area</code>) when the whole table is screened.</p>
-<p><strong>Why it matters.</strong> The screen cannot avoid them, because a strong honest predictor and a leak look alike in the data. See Leakage.</p>
+<p><strong>Why it matters.</strong> No screen can tell them from leaks every time, because a strong honest predictor and a leak look alike in the data. See Leakage.</p>
 <h3 id="provisional">provisional</h3>
 <p><strong>Meaning.</strong> A score that may change once a person settles an open question.</p>
 <p><strong>Example.</strong> <code>test (PROVISIONAL: 2 flagged column(s) not attested: boat, body)</code>.</p>
@@ -114,7 +114,7 @@
 <h3 id="split">split</h3>
 <p><strong>Meaning.</strong> How rows are divided into practice and exam parts.</p>
 <p><strong>Example.</strong> <code>stratified</code>: each part keeps the same share of survivors.</p>
-<p><strong>Why it matters.</strong> A wrong split lets exam information leak into practice. Related rows must stay on the same side (see "group" and "time order").</p>
+<p><strong>Why it matters.</strong> A wrong split lets exam information leak into practice. Related rows must stay on the same side: given a group column, SCMLE keeps each group on one side (see "group" and "time order").</p>
 <h3 id="group-grouping">group, grouping</h3>
 <p><strong>Meaning.</strong> Rows that belong together, such as all rows of one customer.</p>
 <p><strong>Example.</strong> <code>--group-column customer_id</code>.</p>
@@ -122,7 +122,7 @@
 <h3 id="time-order-temporal-split">time order, temporal split</h3>
 <p><strong>Meaning.</strong> Training on the past and testing on the future.</p>
 <p><strong>Example.</strong> <code>--time-column event_time</code>.</p>
-<p><strong>Why it matters.</strong> Shuffled rows let the model learn from the future. A model for the future must be tested on the future.</p>
+<p><strong>Why it matters.</strong> Shuffled rows let the model learn from the future. Given a time column, SCMLE never trains on rows later than the rows it tests on.</p>
 <h3 id="dataset-fingerprint">dataset fingerprint</h3>
 <p><strong>Meaning.</strong> A short code that identifies exactly these rows.</p>
 <p><strong>Example.</strong> <code>split_fingerprint: 4bb647ae69c0aca6</code>.</p>
@@ -132,7 +132,7 @@
 <p><strong>Example.</strong> The command-line run and the Python run in <a href="@@BASE@@/docs/start-here/">Start here</a> gave identical scores.</p>
 <p><strong>Why it matters.</strong> You can check someone else's result. Note that a time budget makes the search depend on computer speed.</p>
 <h2 id="charter-custody-and-claims">Charter, custody and claims</h2>
-<p>These words belong to the careful, "pre-registered" way of working. You can build your first model without them. You need them when someone must be able to trust a finding, not just a model.</p>
+<p>These words belong to the careful, "pre-registered" way of working. You can build your first model without them. You need them when someone needs to be able to trust a finding, not just a model.</p>
 <h3 id="charter">charter</h3>
 <p><strong>Meaning.</strong> A written, signed plan made before looking at the data: the question, who the model is for, when it will be used, how many rows are held back and how much risk of a false finding you accept.</p>
 <p><strong>Example.</strong> "Can we predict from the ticket who survived? Population: passengers. Prediction moment: at boarding. Measure: ROC AUC."</p>
@@ -140,15 +140,15 @@
 <h3 id="estimand">estimand</h3>
 <p><strong>Meaning.</strong> The exact thing you are estimating: who, what, when and how it is summarised.</p>
 <p><strong>Example.</strong> Population "passengers", target "survived", moment "at boarding".</p>
-<p><strong>Why it matters.</strong> Vague questions give answers that cannot be checked.</p>
+<p><strong>Why it matters.</strong> Vague questions give answers that nobody can check.</p>
 <h3 id="custody-x-c-and-f">custody (X, C and F)</h3>
 <p><strong>Meaning.</strong> Custody means the data is divided into locked sets with rules for who may look. <strong>X</strong> is the exploration set: you may look at it as much as you like. <strong>C</strong> is the confirmation set: sealed, opened exactly once, after you have decided what to test. <strong>F</strong> is the forward-in-time set, for data with dates: the newest rows, kept for a final check.</p>
 <p><strong>Example.</strong> In the Titanic charter run, 819 rows were X and 273 were C.</p>
-<p><strong>Why it matters.</strong> Anything you find by looking is at risk of being luck. Testing it once on rows you never looked at is the only way to know. The seal is held in a separate helper program so ordinary code cannot read C.</p>
+<p><strong>Why it matters.</strong> Anything you find by looking is at risk of being luck. Testing it once on rows you have not looked at is the only way to know. The seal is held in a separate helper program so ordinary code cannot read C.</p>
 <h3 id="final-test-set">final test set</h3>
 <p><strong>Meaning.</strong> The exam rows used to score the finished model (F for data with dates).</p>
 <p><strong>Example.</strong> 216 rows.</p>
-<p><strong>Why it matters.</strong> It is separate from C, so a confirmed finding never shapes the model that is scored.</p>
+<p><strong>Why it matters.</strong> It is separate from C, and the model is trained on X alone, so the confirmation set never shapes the model that is scored.</p>
 <h3 id="hypothesis-ledger">hypothesis ledger</h3>
 <p><strong>Meaning.</strong> A log of every idea tested on X, whether it passed, and how much "error allowance" it used.</p>
 <p><strong>Example.</strong> <code>hypothesis_ledger.jsonl</code> in a charter run.</p>
@@ -172,15 +172,15 @@
 <h3 id="claim">claim</h3>
 <p><strong>Meaning.</strong> A finding that survived exploration on X and was then tested once on C.</p>
 <p><strong>Example.</strong> "fare is associated with survival", effect 0.344, confirmed.</p>
-<p><strong>Why it matters.</strong> Only claims, not hunches, carry the error guarantee. List them with <code>scmle claims list</code>.</p>
+<p><strong>Why it matters.</strong> The charter's limit on false findings covers claims, not hunches. List them with <code>scmle claims list</code>.</p>
 <h3 id="tier-confirmed-attested-unverified">tier (confirmed, attested, unverified)</h3>
-<p><strong>Meaning.</strong> A label on every claim saying how much evidence stands behind it. <code>confirmed</code>: it passed the one-time test on fresh rows. <code>attested</code>: a named person vouched for a fact the data cannot show (for example, "this column is known before the outcome"). <code>unverified</code>: SCMLE used a default and nobody has checked it.</p>
+<p><strong>Meaning.</strong> A label on every claim saying how much evidence stands behind it. <code>confirmed</code>: it passed the one-time test on fresh rows. <code>attested</code>: a named person vouched for a fact the data does not show (for example, "this column is known before the outcome"). <code>unverified</code>: SCMLE used a default and nobody has checked it.</p>
 <p><strong>Example.</strong> In the Titanic charter run, the three claims are <code>confirmed</code>; the feature entries in <code>admissibility_table.json</code> are <code>unverified</code> ("availability at serving is unknown").</p>
 <p><strong>Why it matters.</strong> It tells you how far to trust a statement. <code>unverified</code> is not an error. It is an honest "nobody has checked this yet". See <a href="@@BASE@@/docs/reading-results/">Reading results</a> and <a href="@@BASE@@/docs/when-things-go-wrong/">When things go wrong</a>.</p>
 <h3 id="attestation-attestor">attestation (attestor)</h3>
-<p><strong>Meaning.</strong> A signed statement by a named person about something data cannot prove.</p>
+<p><strong>Meaning.</strong> A signed statement by a named person about something the data alone does not prove.</p>
 <p><strong>Example.</strong> "I confirm that column <code>fare</code> is known at boarding."</p>
-<p><strong>Why it matters.</strong> It moves a claim from <code>unverified</code> to <code>attested</code>, and makes a person responsible. SCMLE refuses an attestation signed with a key the system itself holds. <strong>Attestor.</strong> The person or role who signs. For a causal claim the charter names the attestors in advance and says which assumption each may vouch for; a statement from anyone else, for another charter, past its expiry date, or with a signature that does not verify, does not count, and the assumption then has no named attestor (the claim stays <code>unverified</code>). A valid signature shows the statement was issued unchanged by someone holding the signing key. It does not show who that was, or that the assumption is true.</p>
+<p><strong>Why it matters.</strong> It moves a claim from <code>unverified</code> to <code>attested</code>, and makes a person responsible. In the closed loop, SCMLE refuses an attestation signed with a key the system itself holds. <strong>Attestor.</strong> The person or role who signs. For a causal claim the charter names the attestors in advance and says which assumption each may vouch for; a statement from anyone else, for another charter, past its expiry date, or with a signature that does not verify, does not count, and the assumption then has no named attestor (the claim stays <code>unverified</code>). A valid signature shows the statement was issued unchanged by someone holding the signing key. It does not show who that was, or that the assumption is true.</p>
 <h3 id="admissibility">admissibility</h3>
 <p><strong>Meaning.</strong> The check, per feature, of whether the model may use it: <code>admit</code>, <code>admit_flagged</code> (allowed with a warning) or <code>quarantine</code> (kept out).</p>
 <p><strong>Example.</strong> <code>boat</code> was quarantined; <code>sex</code> was <code>admit_flagged</code>.</p>
@@ -196,15 +196,15 @@
 <h3 id="certificate">certificate</h3>
 <p><strong>Meaning.</strong> A measured record of how often a check is wrong, tested on data with planted problems.</p>
 <p><strong>Example.</strong> The leakage screen used a certified detector.</p>
-<p><strong>Why it matters.</strong> Only a check with a passing certificate may block a run. Any other check is shown but never stops anything ("descriptive").</p>
+<p><strong>Why it matters.</strong> Only a detector or test with a passing certificate may block a run. Any other one is shown but never stops anything ("descriptive"). The leakage screen is the exception: its false-alarm rate is bounded by its construction, so it may block without one.</p>
 <h3 id="gate">gate</h3>
 <p><strong>Meaning.</strong> A check that can stop a run or a release.</p>
-<p><strong>Example.</strong> The leakage block.</p>
+<p><strong>Example.</strong> The leakage screen stopping a run when <code>leakage_policy</code> is <code>block</code>.</p>
 <p><strong>Why it matters.</strong> A gate is a decision, so it is only allowed to use checks whose error rates are known.</p>
 <h3 id="descriptive-versus-certified">descriptive (versus certified)</h3>
 <p><strong>Meaning.</strong> Output that informs but does not decide anything.</p>
 <p><strong>Example.</strong> A shift report that says "unverifiable".</p>
-<p><strong>Why it matters.</strong> Do not treat descriptive output as a guarantee.</p>
+<p><strong>Why it matters.</strong> Descriptive output is information, not a promise.</p>
 <h3 id="conformal-prediction-sets-and-intervals">conformal (prediction sets and intervals)</h3>
 <p><strong>Meaning.</strong> A method that wraps any model's predictions in an interval or a set that is right at a promised rate, such as 90 percent.</p>
 <p><strong>Example.</strong> <code>bundle.predict_interval(rows, coverage=0.9)</code> for a number; <code>bundle.predict_set(rows, coverage=0.9)</code> for a category.</p>
@@ -249,7 +249,7 @@
 <h2 id="watching-a-model-in-use">Watching a model in use</h2>
 <h3 id="monitoring">monitoring</h3>
 <p><strong>Meaning.</strong> Comparing production data and outcomes with what the model saw in training.</p>
-<p><strong>Example.</strong> <code>ModelMonitor.assess</code>.</p>
+<p><strong>Example.</strong> <code>Watcher.assess</code>.</p>
 <p><strong>Why it matters.</strong> Models fail quietly. Monitoring is how you hear about it.</p>
 <h3 id="delayed-labels">delayed labels</h3>
 <p><strong>Meaning.</strong> The true outcome arrives later than the prediction.</p>
@@ -283,7 +283,7 @@
 <h3 id="schema">schema</h3>
 <p><strong>Meaning.</strong> The list of columns and types the model expects.</p>
 <p><strong>Example.</strong> <code>pclass, sex, age, sibsp, parch, fare, embarked</code>.</p>
-<p><strong>Why it matters.</strong> Wrong columns are refused, not guessed.</p>
+<p><strong>Why it matters.</strong> Missing or misnamed columns are refused, not guessed; extra columns are ignored and reported.</p>
 <h3 id="checksum-digest-hash">checksum (digest, hash)</h3>
 <p><strong>Meaning.</strong> A short fingerprint of a file's exact contents. Change one byte and it changes.</p>
 <p><strong>Example.</strong> <code>artifact_digest: sha256:17d1...</code>.</p>
@@ -291,11 +291,11 @@
 <h3 id="signature-hmac">signature (HMAC)</h3>
 <p><strong>Meaning.</strong> A stamp made with a secret key. Anyone with the key can check that the content is unchanged and was stamped by a key holder.</p>
 <p><strong>Example.</strong> <code>signature.json</code> in the bundle.</p>
-<p><strong>Why it matters.</strong> Bundles can run code when opened, so SCMLE refuses an unsigned one. A signature proves the key, not the person; it is not a public certificate.</p>
+<p><strong>Why it matters.</strong> Bundles can run code when opened, so SCMLE refuses an unsigned one unless you pass <code>--trusted</code>. A signature proves the key, not the person; it is not a public certificate.</p>
 <h3 id="pickle-trusted">pickle, trusted</h3>
 <p><strong>Meaning.</strong> Pickle is the file format of the model. Opening one can run code. <code>--trusted</code> tells SCMLE "I made this myself; open it anyway".</p>
 <p><strong>Example.</strong> <code>scmle predict ... --trusted</code>.</p>
-<p><strong>Why it matters.</strong> Never use <code>--trusted</code> on a model from someone else. It is refused outright when <code>SCMLE_ENV=production</code>.</p>
+<p><strong>Why it matters.</strong> Use <code>--trusted</code> only on a model you made yourself. It is refused outright when <code>SCMLE_ENV=production</code>. It only covers a model with no signature at all: a signed model whose key you lack cannot be checked, so SCMLE refuses it even with <code>--trusted</code> (set <code>SCMLE_SIGNING_KEY</code>).</p>
 <h3 id="sbom-software-bill-of-materials">SBOM (software bill of materials)</h3>
 <p><strong>Meaning.</strong> A list of every library and version inside a package.</p>
 <p><strong>Example.</strong> <code>sbom.cdx.json</code>.</p>
@@ -303,14 +303,14 @@
 <h3 id="provenance">provenance</h3>
 <p><strong>Meaning.</strong> A signed record of where something came from and what it was made of.</p>
 <p><strong>Example.</strong> <code>provenance.json</code> lists the bundle digest and build files.</p>
-<p><strong>Why it matters.</strong> The service checks it at start-up. A package without a valid one never becomes ready.</p>
+<p><strong>Why it matters.</strong> The service checks it at start-up. In production a package without a valid one never becomes ready; elsewhere a missing one is allowed, but one that does not match the package is refused.</p>
 <h3 id="registry">registry</h3>
 <p><strong>Meaning.</strong> A shelf of numbered model versions with labels (<code>champion</code>, <code>previous</code>, <code>challenger</code>).</p>
 <p><strong>Example.</strong> <code>registry/</code> with versions 1 and 2.</p>
 <p><strong>Why it matters.</strong> It makes "which model is live" a recorded fact, and moving the champion label needs a signed approval.</p>
 <h3 id="promotion-approval">promotion, approval</h3>
 <p><strong>Meaning.</strong> Promotion makes a version the champion. An approval is a signed note by an independent reviewer bound to one exact model.</p>
-<p><strong>Example.</strong> <code>PromotionApproval(...).sign(key)</code>.</p>
+<p><strong>Example.</strong> <code>Sanction(...).sign(key)</code>.</p>
 <p><strong>Why it matters.</strong> It stops one person pushing an unreviewed model into use.</p>
 <h3 id="model-card">model card</h3>
 <p><strong>Meaning.</strong> A short description of a model's intended use, scores and limits.</p>
@@ -356,4 +356,4 @@
 <h3 id="scmle_signing_key">SCMLE_SIGNING_KEY</h3>
 <p><strong>Meaning.</strong> The environment variable holding your secret signing key.</p>
 <p><strong>Example.</strong> <code>export SCMLE_SIGNING_KEY=...</code></p>
-<p><strong>Why it matters.</strong> Without it signed bundles cannot be opened. Keep it out of files and chat. Keys are read from files, not typed on a command line, in the <code>deploy</code> commands.</p>
+<p><strong>Why it matters.</strong> Without it (or a key file named by <code>SCMLE_SIGNING_KEY_FILE</code>) a signed bundle is refused unless you pass <code>--trusted</code>. Keep it out of files and chat. Keys are read from files, not typed on a command line, in the <code>deploy</code> commands.</p>

@@ -123,8 +123,8 @@ What you should see: a page of JSON. Find these parts:
 
 ```text
 "label": {"distribution": {"0": 809, "1": 500}, ...}
-"duplicates": {"duplicate_fraction": 0.1787..., "duplicate_rows": 234, ...}
-"missingness": {"by_field": {"age": 263, "boat": 823, "body": 1188, ...}}
+"duplicates": {"fraction": 0.1787..., "rows": 234, ...}
+"missingness": {"fields": {"age": 263, "boat": 823, "body": 1188, ...}}
 ```
 
 What to look at:

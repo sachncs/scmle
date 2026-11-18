@@ -10,16 +10,16 @@ from scmle.contracts import qualification
 
 def make_check(**overrides):
     values = {
-        "check_id": "missingness.age",
-        "null_hypothesis": "missingness of age is independent of the target",
+        "identifier": "missingness.age",
+        "null": "missingness of age is independent of the target",
         "statistic": 12.5,
         "p_value": 0.01,
         "interval": None,
         "effect": 0.2,
         "n": 500,
         "decision": qualification.Decision.WARN,
-        "set_id": qualification.Subset.EXPLORATION,
-        "seed_path": (7, "missingness.age", 0),
+        "subset": qualification.Subset.EXPLORATION,
+        "seeds": (7, "missingness.age", 0),
         "tier": qualification.Tier.UNVERIFIED,
     }
     values.update(overrides)
@@ -32,7 +32,7 @@ def test_check_round_trips_through_json():
         json.loads(json.dumps(check.to_dict()))
     )
     assert restored == check
-    assert restored.seed_path == (7, "missingness.age", 0)
+    assert restored.seeds == (7, "missingness.age", 0)
 
 
 def test_check_accepts_an_interval_instead_of_a_p_value():
@@ -67,28 +67,28 @@ def test_check_rejects_inverted_or_non_finite_intervals():
 def test_check_rejects_negative_n_and_blank_text():
     with pytest.raises(ValueError, match="n must"):
         make_check(n=-1)
-    with pytest.raises(ValueError, match="check_id"):
-        make_check(check_id="  ")
-    with pytest.raises(ValueError, match="null_hypothesis"):
-        make_check(null_hypothesis="")
+    with pytest.raises(ValueError, match="identifier"):
+        make_check(identifier="  ")
+    with pytest.raises(ValueError, match="null"):
+        make_check(null="")
 
 
 @pytest.mark.parametrize(
-    "set_id",
+    "subset",
     [
         qualification.Subset.EXPLORATION,
         qualification.Subset.FORWARD,
         qualification.Subset.ALL,
     ],
 )
-def test_confirmed_tier_requires_the_confirmation_set(set_id):
+def test_confirmed_tier_requires_the_confirmation_set(subset):
     with pytest.raises(ValueError, match="confirmed"):
-        make_check(set_id=set_id, tier=qualification.Tier.CONFIRMED)
+        make_check(subset=subset, tier=qualification.Tier.CONFIRMED)
 
 
 def test_confirmed_tier_is_allowed_on_the_confirmation_set():
     check = make_check(
-        set_id=qualification.Subset.CONFIRMATION,
+        subset=qualification.Subset.CONFIRMATION,
         tier=qualification.Tier.CONFIRMED,
     )
     assert check.tier is qualification.Tier.CONFIRMED
@@ -112,9 +112,9 @@ def test_loading_rejects_unknown_and_missing_fields():
 
 def make_claim(**overrides):
     values = {
-        "claim_id": "claim.age-effect",
+        "identifier": "claim.age-effect",
         "statement": "age is associated with churn",
-        "check_ids": ("assoc.age",),
+        "checks": ("assoc.age",),
         "adjusted_p_value": 0.003,
         "effect": 0.3,
         "tier": qualification.Tier.CONFIRMED,
@@ -133,8 +133,8 @@ def test_claim_round_trips_through_json():
 
 
 def test_claim_needs_checks_and_a_p_value_to_be_confirmed():
-    with pytest.raises(ValueError, match="check_ids"):
-        make_claim(check_ids=())
+    with pytest.raises(ValueError, match="checks"):
+        make_claim(checks=())
     with pytest.raises(ValueError, match="confirmed"):
         make_claim(adjusted_p_value=None)
     unconfirmed = make_claim(
@@ -151,13 +151,13 @@ def test_claim_rejects_invalid_adjusted_p_values(p_value):
 
 def make_certificate(**overrides):
     values = {
-        "detector_id": "label_noise.confident_learning",
-        "defect_type": "label_flip",
+        "detector": "label_noise.confident_learning",
+        "defect": "label_flip",
         "planted": 100,
         "detected": 80,
-        "clean_rows": 1000,
-        "false_alarms": 20,
-        "seed_path": (7, "certificate.label_noise", 0),
+        "clean": 1000,
+        "alarms": 20,
+        "seeds": (7, "certificate.label_noise", 0),
     }
     values.update(overrides)
     return qualification.Certificate(**values)
@@ -187,7 +187,7 @@ def test_certificate_lower_bound_is_below_the_point_estimate():
 
 
 def test_certificate_edge_cases():
-    perfect = make_certificate(planted=50, detected=50, false_alarms=0)
+    perfect = make_certificate(planted=50, detected=50, alarms=0)
     assert perfect.recall_lower_bound() < 1.0
     assert perfect.false_alarm_rate == 0.0
 
@@ -197,10 +197,10 @@ def test_certificate_rejects_impossible_counts():
         make_certificate(detected=101)
     with pytest.raises(ValueError, match="planted"):
         make_certificate(planted=0, detected=0)
-    with pytest.raises(ValueError, match="false_alarms"):
-        make_certificate(false_alarms=1001)
-    with pytest.raises(ValueError, match="clean_rows"):
-        make_certificate(clean_rows=0, false_alarms=0)
+    with pytest.raises(ValueError, match="alarms"):
+        make_certificate(alarms=1001)
+    with pytest.raises(ValueError, match="clean"):
+        make_certificate(clean=0, alarms=0)
 
 
 def test_lower_bound_rejects_bad_confidence():

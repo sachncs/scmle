@@ -42,18 +42,18 @@ def charter_file(tmp_path, plan=True, uncertainty=None):
     rollout_plan = scmle.assurance.charter.decision.Experiment(
         unit="user",
         primary="conv",
-        assignment_prob=0.5,
-        delta_min=0.05,
+        assignment=0.5,
+        delta=0.05,
         tolerance=0.02,
-        n_max=400,
-        alpha_promote=Fraction(1, 20),
-        alpha_rollback=Fraction(1, 20),
+        limit=400,
+        promotion=Fraction(1, 20),
+        rollback=Fraction(1, 20),
     )
     layer = scmle.assurance.charter.decision.Layer(
         scmle.assurance.charter.decision.Policy("EUR per case"),
         (
             scmle.assurance.charter.decision.Constraint(
-                "grp", "demographic_parity", 0.4, "reweighing", min_group=20
+                "grp", "demographic_parity", 0.4, "reweighing", minimum=20
             ),
         ),
         rollout_plan if plan else None,
@@ -62,9 +62,9 @@ def charter_file(tmp_path, plan=True, uncertainty=None):
     sealing.inscribe(
         path,
         make_charter(
-            min_effect=0.5,
-            k_max=3,
-            cost_model=model,
+            effect=0.5,
+            quota=3,
+            costs=model,
             decision=layer,
             uncertainty=uncertainty,
         ),
@@ -92,8 +92,8 @@ def read(result, name):
 
 def test_the_decision_files_are_written_with_a_randomized_log(tmp_path):
     # Enforces docs/API_STABILITY.md:135.
-    # Enforces docs/ARTIFACTS.md:68.
-    # Enforces docs/ARTIFACTS.md:71.
+    # Enforces docs/ARTIFACTS.md:74.
+    # Enforces docs/ARTIFACTS.md:77.
     result = run(
         tmp_path, logged_action_column="treat", propensity_column="prop"
     )
@@ -116,7 +116,7 @@ def test_the_decision_files_are_written_with_a_randomized_log(tmp_path):
 def test_without_a_log_the_value_is_not_assessable_and_no_plan_no_design(
     tmp_path,
 ):
-    # Enforces docs/ARTIFACTS.md:68 and docs/ARTIFACTS.md:71.
+    # Enforces docs/ARTIFACTS.md:74 and docs/ARTIFACTS.md:77.
     result = run(tmp_path, plan=False)
     folder = pathlib.Path(result.run_dir)
 
@@ -127,7 +127,7 @@ def test_without_a_log_the_value_is_not_assessable_and_no_plan_no_design(
 
 
 def test_the_four_decision_files_are_registered_and_verified(tmp_path):
-    # Enforces docs/ARTIFACTS.md:69.
+    # Enforces docs/ARTIFACTS.md:75.
     from scmle.artifacts import claims_audit
 
     result = run(

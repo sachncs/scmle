@@ -199,7 +199,7 @@ def test_partial_source_identity_is_visible_as_a_quality_finding():
 
     report = document.Dataset((sample,)).curate()
 
-    assert [finding.finding_id for finding in report.quality_findings] == [
+    assert [finding.identifier for finding in report.quality_findings] == [
         "quality.document-source-traceability-incomplete",
     ]
 
@@ -248,7 +248,7 @@ def test_document_layout_confidence_and_offsets_fail_closed():
         (document.Sample("uncertain", content, layout=layout),)
     ).curate()
 
-    assert [finding.finding_id for finding in report.quality_findings] == [
+    assert [finding.identifier for finding in report.quality_findings] == [
         "quality.document-ocr-confidence-missing",
     ]
     invalid_layout = document.Layout(
@@ -270,7 +270,7 @@ def test_document_sensitive_content_is_detected_without_leaking_values():
     assert document.pii(content) == {"email": 1, "ssn": 1}
     assert report.sensitive_match_counts == {"email": 1, "ssn": 1}
     assert report.release_ready is False
-    assert [finding.finding_id for finding in report.risk_findings] == [
+    assert [finding.identifier for finding in report.risk_findings] == [
         "risk.document-sensitive-content",
     ]
     assert "alice@example.com" not in str(report.to_dict())
@@ -426,7 +426,7 @@ def test_curation_reports_composition_duplicates_and_bounded_profiles(
     assert report.language_counts == {"en": 3}
     assert report.format_counts == {"text": 3}
     assert report.label_counts == {"unlabeled": 3}
-    assert [finding.finding_id for finding in report.quality_findings] == [
+    assert [finding.identifier for finding in report.quality_findings] == [
         "quality.duplicate-document-content",
         "quality.profile-truncated",
     ]
@@ -447,11 +447,11 @@ def test_curation_blocks_identical_content_with_conflicting_labels():
     report = dataset.curate()
 
     assert report.release_ready is False
-    assert [finding.finding_id for finding in report.risk_findings] == [
+    assert [finding.identifier for finding in report.risk_findings] == [
         "risk.conflicting-duplicate-labels",
         "risk.mixed-label-state",
     ]
-    assert report.unresolved_blocking_findings[0].affected_scope == {
+    assert report.unresolved_blocking_findings[0].scope == {
         "document_ids": ["negative", "positive"]
     }
 

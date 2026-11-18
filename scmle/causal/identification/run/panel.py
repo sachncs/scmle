@@ -125,7 +125,7 @@ class DiD(Estimator):
             tests.append(
                 battery.Test("pretrend_wald", "placebo", fit.pretrend_p)
             )
-        for control in self.spec.negative_controls:
+        for control in self.spec.controls:
             if control.kind == "outcome":
                 est = self.reckon(c, level, control.variable)
                 test = waldify(
@@ -159,7 +159,7 @@ class DiD(Estimator):
         fit = self.fit(c, level)
         if fit.max_pre_change is None:
             return {"holds": None, "note": "fewer than two pre-periods"}
-        m = spec.sensitivity.m_max
+        m = spec.sensitivity.multiple
         low, high = fit.sensitivity(m)
         return {
             "holds": bool(low > 0 or high < 0),

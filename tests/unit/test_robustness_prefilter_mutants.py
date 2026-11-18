@@ -31,7 +31,7 @@ def test_feature_checks_put_rejected_columns_first_and_keep_their_seed_index():
 
     checks = prefilter.shifts(shift_result, rows=40, seed=7)
 
-    assert [c.check_id for c in checks] == [
+    assert [c.identifier for c in checks] == [
         "f6-shift-feature:b",
         "f6-shift-feature:a",
         "f6-shift-feature:c",
@@ -41,13 +41,13 @@ def test_feature_checks_put_rejected_columns_first_and_keep_their_seed_index():
         qualification.Decision.PASS,
         qualification.Decision.PASS,
     ]
-    assert [c.seed_path for c in checks] == [
+    assert [c.seeds for c in checks] == [
         randomness.seed_path(7, prefilter.FEATURE_SHIFT_ID, 1),
         randomness.seed_path(7, prefilter.FEATURE_SHIFT_ID, 0),
         randomness.seed_path(7, prefilter.FEATURE_SHIFT_ID, 2),
     ]
     assert all(
-        c.n == 40 and c.set_id is qualification.Subset.EXPLORATION
+        c.n == 40 and c.subset is qualification.Subset.EXPLORATION
         for c in checks
     )
 

@@ -1,0 +1,30 @@
+{
+  "record": {
+    "attempts": [
+      {
+        "attempt": 1,
+        "cost": 0.1,
+        "ended_at": "2026-11-01T00:01:00Z",
+        "job_id": "job-1",
+        "reason": "",
+        "seconds": 60.0,
+        "started_at": "2026-11-01T00:00:00Z",
+        "state": "succeeded"
+      }
+    ],
+    "budget": null,
+    "checkpoints": [],
+    "ended_at": "2026-11-01T00:01:00Z",
+    "evidence": [],
+    "format": 1,
+    "identity": "train",
+    "project_digest": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
+    "result_sha256": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+    "run_id": "run-1",
+    "runner": "local",
+    "spec_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "started_at": "2026-11-01T00:00:00Z",
+    "state": "started",
+    "total_cost": 0.1
+  }
+}

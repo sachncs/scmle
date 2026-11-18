@@ -69,7 +69,7 @@ def run(requested, tmp_path=None, reference=None, rule=None):
 
 def tiers(result):
     return {
-        result.ledger.hypotheses[c.claim_id].spec.column: c.tier.value
+        result.ledger.hypotheses[c.identifier].spec.column: c.tier.value
         for c in result.confirmation.claims
     }
 
@@ -83,7 +83,7 @@ def test_a_fragile_planted_effect_is_not_tested_on_c(tmp_path):
         "o": stability.FRAGILE,
     }
     assert tiers(result) == {"s": "confirmed", "o": "unverified"}
-    tested = {c.check_id.split(":")[0] for c in result.confirmation.checks}
+    tested = {c.identifier.split(":")[0] for c in result.confirmation.checks}
     fragile_id = next(
         h.hypothesis_id
         for h in result.ledger.survivors()
@@ -105,7 +105,7 @@ def test_without_the_charter_request_the_fragile_effect_is_still_tested():
     assert result.confirmation.stage_two is None
     assert not stage.applied
     assert stage.note.startswith("not applied: the charter does not ask")
-    tested = {c.check_id.split(":")[0] for c in result.confirmation.checks}
+    tested = {c.identifier.split(":")[0] for c in result.confirmation.checks}
     assert len(tested) == 2
     assert tiers(result)["s"] == "confirmed"
     assert report.stability_report(stage.found, stage.note)[
@@ -117,10 +117,10 @@ def test_stability_results_are_wealth_free_ledger_diagnostics():
     result = run(False)[0]
 
     ledger = result.ledger
-    ids = {c.check_id for c in ledger.diagnostics}
+    ids = {c.identifier for c in ledger.diagnostics}
     assert {"f6-stability:s", "f6-stability:o"} <= ids
     assert all(
-        c.set_id.value == "X" and c.tier.value == "unverified"
+        c.subset.value == "X" and c.tier.value == "unverified"
         for c in ledger.diagnostics
     )
 
@@ -141,20 +141,20 @@ def test_shift_results_are_diagnostics_when_a_reference_exists(tmp_path):
         second_stage=stage,
     )
 
-    ids = {c.check_id for c in result.ledger.diagnostics}
+    ids = {c.identifier for c in result.ledger.diagnostics}
     assert {"f6-shift-feature:s", "f6-shift-feature:n"} <= ids
     assert "f6-shift-c2st" in ids and "f6-shift-mmd" in ids
     row = next(
         c
         for c in result.ledger.diagnostics
-        if c.check_id == "f6-shift-feature:s"
+        if c.identifier == "f6-shift-feature:s"
     )
     assert row.decision.value == "warn" and row.p_value < 0.01
     loaded = type(result.ledger).load(
         tmp_path / "hypothesis_ledger.jsonl", expected_head=result.ledger.head
     )
-    assert [c.check_id for c in loaded.diagnostics] == [
-        c.check_id for c in result.ledger.diagnostics
+    assert [c.identifier for c in loaded.diagnostics] == [
+        c.identifier for c in result.ledger.diagnostics
     ]
     assert loaded.wealth == result.ledger.wealth
 

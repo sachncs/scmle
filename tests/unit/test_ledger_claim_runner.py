@@ -119,7 +119,7 @@ def new_ledger():
         None,
         charter_hash=charter.charter_hash,
         config=online_fdr.Settings("e-lond", 0.1),
-        alpha_confirm=charter.error_budget.confirmation.alpha_confirm,
+        alpha_confirm=charter.budget.confirmation.alpha_confirm,
         seed=0,
     )
 

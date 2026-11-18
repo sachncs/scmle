@@ -7,9 +7,9 @@ from scmle.assurance.detectors import certificates
 from scmle.contracts import qualification
 
 
-def explanation(amount=-100.0, attested_by="j.doe", detail="cut-off"):
+def explanation(amount=-100.0, attestor="j.doe", detail="cut-off"):
     return reconciliation.Explanation(
-        reconciliation.Mechanism.FILTER, detail, amount, attested_by
+        reconciliation.Mechanism.FILTER, detail, amount, attestor
     )
 
 
@@ -22,7 +22,7 @@ def make_item(extract=900.0, source=1000.0, explanations=(), name="rows"):
 def test_constants_and_mechanism_values_are_the_filed_names():
     assert reconciliation.DETECTOR_ID == "f4-reconciliation"
     assert reconciliation.DEFECT_TYPE == "unexplained_gap"
-    assert reconciliation.FORMAT_VERSION == 1
+    assert reconciliation.FORMAT_VERSION == 2
     assert [m.value for m in reconciliation.Mechanism] == [
         "filter",
         "late_arrival",
@@ -42,18 +42,18 @@ def test_explanation_round_trips_and_names_each_rejected_field():
         "mechanism": "filter",
         "detail": "cut-off",
         "amount": -100.0,
-        "attested_by": "j.doe",
+        "attestor": "j.doe",
     }
     assert reconciliation.Explanation.from_dict(record) == original
     with pytest.raises(ValueError, match=r"^mechanism must be a Mechanism$"):
         reconciliation.Explanation("filter", "d", 1.0)
     with pytest.raises(ValueError, match=r"^detail must not be empty$"):
         explanation(detail="  ")
-    with pytest.raises(ValueError, match=r"^attested_by must not be empty$"):
-        explanation(attested_by=" ")
+    with pytest.raises(ValueError, match=r"^attestor must not be empty$"):
+        explanation(attestor=" ")
     with pytest.raises(ValueError, match=r"^amount must be a finite number$"):
         explanation(amount=float("nan"))
-    assert explanation(attested_by=None).attested_by is None
+    assert explanation(attestor=None).attestor is None
 
 
 def test_explanation_from_dict_rejects_unknown_and_missing_fields():
@@ -113,8 +113,8 @@ def test_the_check_records_the_statistic_interval_and_seed():
         (3, "x", 4),
     )
     check = verdict.check
-    assert check.check_id == "reconciliation.rows"
-    assert check.null_hypothesis == (
+    assert check.identifier == "reconciliation.rows"
+    assert check.null == (
         "the extract equals finance ledger within 0.02, or a named "
         "mechanism explains the gap"
     )
@@ -123,7 +123,7 @@ def test_the_check_records_the_statistic_interval_and_seed():
     assert check.p_value is None
     assert check.n == 1
     assert check.interval == (pytest.approx(0.06), pytest.approx(0.1))
-    assert check.seed_path == (3, "x", 4)
+    assert check.seeds == (3, "x", 4)
     assert check.decision is qualification.Decision.BLOCK
     assert verdict.residual_gap == pytest.approx(0.06)
 
@@ -138,8 +138,8 @@ def test_the_interval_is_ordered_when_the_residual_exceeds_the_gap():
 
 def test_default_arguments_describe_and_record_a_zero_seed():
     verdict = reconciliation.settle(make_item())
-    assert verdict.check.seed_path == (0, "f4-reconciliation", 0)
-    assert verdict.check.set_id is qualification.Subset.ALL
+    assert verdict.check.seeds == (0, "f4-reconciliation", 0)
+    assert verdict.check.subset is qualification.Subset.ALL
     assert verdict.check.decision is qualification.Decision.WARN
 
 
@@ -204,13 +204,13 @@ def test_reconcile_numbers_the_seed_paths_and_reports_the_document():
     result = reconciliation.reconcile(
         items, 0.05, certificates.Authority.GATING, qualification.Subset.ALL
     )
-    assert [c.seed_path for c in result.checks] == [
+    assert [c.seeds for c in result.checks] == [
         (0, "f4-reconciliation", 0),
         (0, "f4-reconciliation", 1),
     ]
     assert result.passed is False
     document = result.to_dict()
-    assert document["format_version"] == 1
+    assert document["format_version"] == 2
     assert document["tolerance"] == 0.05
     assert document["passed"] is False
     assert [r["name"] for r in document["results"]] == ["a", "b"]
