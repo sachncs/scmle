@@ -365,7 +365,7 @@ def lowerband(
     point, lower, critical = band(
         stats, groups, weights, base is not None, (alpha, replicates, seed)
     )
-    positive = (lower > 0.0).all(axis=0)
+    positive = numpy.all(lower > 0.0, axis=0)
     mean_row = stats.mean(axis=0)
     names = BASELINE_NAMES if base is not None else BASELINE_NAMES[:2]
     n_clusters = (

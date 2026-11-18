@@ -59,7 +59,7 @@ class MlflowExperimentStore(stores.Store):
             if existing is not None
             else self.client.create_experiment(
                 experiment,
-                locate=self.locate(tracking_uri),
+                artifact_location=self.locate(tracking_uri),
             )
         )
         self.parents: dict[str, str] = {}

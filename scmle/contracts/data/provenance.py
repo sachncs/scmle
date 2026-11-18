@@ -322,7 +322,9 @@ class DatasetManifest:
     privacy: Confidentiality = dataclasses.field(
         default_factory=Confidentiality
     )
-    findings: tuple[findings.Finding, ...] = ()
+    # Quoted: the field shadows the `findings` module in the class body,
+    # and Python before 3.14 evaluates the annotation after the default.
+    findings: "tuple[findings.Finding, ...]" = ()
 
     def __post_init__(self) -> None:
         """Validates dataset identity before it enters a run or artifact.
@@ -490,7 +492,9 @@ class Passport:
     privacy: Confidentiality = dataclasses.field(
         default_factory=Confidentiality
     )
-    findings: tuple[findings.Finding, ...] = ()
+    # Quoted: the field shadows the `findings` module in the class body,
+    # and Python before 3.14 evaluates the annotation after the default.
+    findings: "tuple[findings.Finding, ...]" = ()
 
     def __post_init__(self) -> None:
         """Validates modality identity and attached governance metadata.

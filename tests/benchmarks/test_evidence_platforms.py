@@ -184,3 +184,44 @@ def test_main_gate_and_merged_output(tmp_path, monkeypatch):
 def test_load_refuses_a_missing_file(tmp_path):
     with pytest.raises(errors.InputError):
         platforms.load([tmp_path / "absent.json"])
+
+
+def test_merge_reads_every_record_below_a_folder(tmp_path, monkeypatch):
+    monkeypatch.setattr(platforms, "PATH", tmp_path / "platforms.json")
+    downloads = tmp_path / "records"
+    for name in ("ubuntu", "windows", "macos"):
+        folder = downloads / f"reproducibility-{name}"
+        folder.mkdir(parents=True)
+        (folder / "reproducibility.json").write_text(
+            json.dumps(document(**{name: record(name)})), encoding="utf-8"
+        )
+    (downloads / "notes.json").write_text("{}", encoding="utf-8")
+    into = tmp_path / "merged.json"
+    code = platforms.main(
+        ["--merge", str(downloads), "--into", str(into), "--gate"]
+    )
+    assert code == 0
+    stored = json.loads(platforms.PATH.read_text(encoding="utf-8"))
+    assert list(stored["merged"]["platforms"]) == [
+        "macos",
+        "ubuntu",
+        "windows",
+    ]
+    assert len(stored["sources"]) == 3
+    assert json.loads(into.read_text())["platforms"].keys() == {
+        "macos",
+        "ubuntu",
+        "windows",
+    }
+
+
+def test_merge_refuses_a_folder_without_records(tmp_path):
+    with pytest.raises(errors.InputError):
+        platforms.collect(tmp_path)
+    with pytest.raises(errors.InputError):
+        platforms.collect(tmp_path / "absent")
+
+
+def test_merge_takes_a_folder_not_files(tmp_path):
+    with pytest.raises(SystemExit):
+        platforms.main(["--merge", str(tmp_path), str(tmp_path / "a.json")])

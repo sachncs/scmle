@@ -5,7 +5,9 @@ the other platforms' records made by the same code. The workflow
 `.github/workflows/reproducibility.yml` runs it on Linux, Windows and macOS
 runners, each in its own job, and this module merges the documents those
 jobs upload into one reproducibility document and compares every pair of
-platforms.
+platforms. `--merge DIRECTORY` takes every `reproducibility.json` below a
+folder of downloaded artifacts (`gh run download RUN -p 'reproducibility-*'
+-D DIRECTORY`).
 
 What is measured: for every pair of platforms and every task both measured,
 the largest absolute and relative gap between their first-run locked-test
@@ -21,6 +23,8 @@ another tolerance are refused.
 
     python -m benchmarks.evidence.platforms --write [RECORD ...]
         [--into MERGED] [--gate]
+    python -m benchmarks.evidence.platforms --merge DIRECTORY
+        [--into MERGED] [--gate]
     python -m benchmarks.evidence.platforms --check
 """
 
@@ -34,7 +38,6 @@ from benchmarks.evidence import reproducibility
 from scmle.contracts import errors
 
 PATH = pathlib.Path(__file__).with_suffix(".json")
-# platforms needed before two can be compared; the rule's minimum sample
 
 
 def load(paths: list[pathlib.Path]) -> list[dict[str, Any]]:
@@ -56,6 +59,31 @@ def load(paths: list[pathlib.Path]) -> list[dict[str, Any]]:
         found = json.loads(path.read_text(encoding="utf-8"))
         documents.append(reproducibility.read(found))
     return documents
+
+
+def collect(directory: pathlib.Path) -> list[pathlib.Path]:
+    """Finds the reproducibility documents of downloaded runner artifacts.
+
+    `gh run download` and `actions/download-artifact` put each artifact in
+    its own folder, so the documents are searched for at any depth.
+
+    Args:
+        directory: Folder holding the downloaded artifacts.
+
+    Returns:
+        Every `reproducibility.json` below `directory`, sorted by path.
+
+    Raises:
+        InputError: If `directory` is not a folder or holds no document.
+    """
+    if not directory.is_dir():
+        raise errors.InputError(f"{directory} is not a directory")
+    found = sorted(directory.rglob(reproducibility.PATH.name))
+    if not found:
+        raise errors.InputError(
+            f"{directory} holds no {reproducibility.PATH.name}"
+        )
+    return found
 
 
 def merge(documents: list[dict[str, Any]]) -> dict[str, Any]:
@@ -246,25 +274,33 @@ def summary(document: dict[str, Any] | None = None) -> tuple[str, str]:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Writes (`--write`) or checks (`--check`) the merged measurement.
+    """Writes (`--write`, `--merge`) or checks (`--check`) the measurement.
 
     Args:
         arguments: Command-line arguments; None reads `sys.argv`.
 
     Returns:
-        0 after `--write`, or with `--gate` 0 only when the verdict is
-        "pass"; for `--check`, 0 when `problems` is empty and 1 otherwise.
+        0 after `--write` or `--merge` (the documents below a folder), or
+        with `--gate` 0 only when the verdict is "pass"; for `--check`, 0
+        when `problems` is empty and 1 otherwise.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--write", action="store_true")
     mode.add_argument("--check", action="store_true")
+    mode.add_argument("--merge", type=pathlib.Path, metavar="DIRECTORY")
     parser.add_argument("records", nargs="*", type=pathlib.Path)
     parser.add_argument("--into", type=pathlib.Path)
     parser.add_argument("--gate", action="store_true")
     options = parser.parse_args(arguments)
-    if options.write:
-        document = measure(options.records or [reproducibility.PATH])
+    if options.merge is not None and options.records:
+        parser.error("--merge takes a directory, not record files")
+    if options.write or options.merge is not None:
+        if options.merge is not None:
+            paths = collect(options.merge)
+        else:
+            paths = options.records or [reproducibility.PATH]
+        document = measure(paths)
         PATH.write_text(
             json.dumps(document, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",

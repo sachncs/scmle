@@ -2,8 +2,19 @@ name: reproducibility
 
 # Claim C6 across platforms: each runner measures its own platform with
 # benchmarks.evidence.reproducibility, and the merge job compares the
-# platforms' locked-test metrics against cross_platform_tol.
+# platforms' locked-test metrics against cross_platform_tol. To store the
+# result after a run: gh run download RUN -p 'reproducibility-*' -D records
+# then python -m benchmarks.evidence.platforms --merge records
+# --into benchmarks/evidence/reproducibility.json
 on:
+  push:
+    branches: [master]
+    paths:
+      - "scmle/**"
+      - "benchmarks/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/reproducibility.yml"
   schedule:
     - cron: "41 3 * * 1"
   workflow_dispatch:
@@ -65,14 +76,13 @@ jobs:
           path: records
       - name: Merge the platform records and gate on the tolerance
         run: >-
-          uv run python -m benchmarks.evidence.platforms --write
-          records/*/reproducibility.json
+          uv run python -m benchmarks.evidence.platforms --merge records
           --into benchmarks/evidence/reproducibility.json
           --gate
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: reproducibility-merged
+          name: platforms-merged
           path: |
             benchmarks/evidence/reproducibility.json
             benchmarks/evidence/platforms.json

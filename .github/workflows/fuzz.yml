@@ -1,0 +1,55 @@
+# Coverage-guided fuzzing with Atheris (libFuzzer for Python) of the code
+# that first reads untrusted input. A crash fails the job and its reproducer
+# is uploaded. Atheris ships Linux wheels only, pinned by hash in
+# fuzz/requirements.txt.
+name: fuzz
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "scmle/**"
+      - "fuzz/**"
+      - ".github/workflows/fuzz.yml"
+  pull_request:
+    paths:
+      - "scmle/**"
+      - "fuzz/**"
+      - ".github/workflows/fuzz.yml"
+  schedule:
+    - cron: "53 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  serving:
+    name: fuzz the request parser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      UV_PYTHON: "3.14"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - run: uv sync --python 3.14 --no-dev
+      - run: uv pip install --require-hashes -r fuzz/requirements.txt
+      - name: Fuzz for five minutes from the seed corpus
+        run: >-
+          mkdir -p corpus crashes &&
+          uv run --no-sync python fuzz/serving.py
+          -max_total_time=300 -artifact_prefix=crashes/
+          corpus fuzz/seeds/serving
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: fuzz-crashes
+          path: crashes/
+          if-no-files-found: ignore
