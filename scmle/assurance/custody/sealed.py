@@ -376,7 +376,7 @@ class Vault:
         locked: splitters.Lockbox = (
             vault.SealedTestSet(features, target, ids)
             if self.process
-            else splitters.ResidentTestSet(features, target, ids)
+            else splitters.lockbox.Resident(features, target, ids)
         )
         return self.adopt(set_id, locked)
 

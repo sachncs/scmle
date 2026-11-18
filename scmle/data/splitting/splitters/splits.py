@@ -1,4 +1,9 @@
-"""Random, stratified and preset partitioners."""
+"""The split strategies: one `Partitioner` per validation protocol.
+
+Each class is one way to hold out test rows and fold the development rows,
+named for what it preserves, so a call site reads `splits.Group` or
+`splits.Rolling`. `Splitter` selects one by its configured `name`.
+"""
 
 import math
 
@@ -12,12 +17,14 @@ from scmle.data.readers import streaming
 from scmle.data.splitting import iterative
 from scmle.data.splitting.splitters.partitions import Fold
 from scmle.data.splitting.splitters.partitions import MIN_FOLDS
+from scmle.data.splitting.splitters.partitions import MIN_ROLLING_FOLDS
+from scmle.data.splitting.splitters.partitions import MIN_ROLLING_TRAIN
 from scmle.data.splitting.splitters.partitions import MIN_STRATUM_ROWS
 from scmle.data.splitting.splitters.partitions import Partition
 from scmle.data.splitting.splitters.partitions import Partitioner
 
 
-class RandomSplit(Partitioner):
+class Random(Partitioner):
     """Shuffled holdout and K-fold; the default for regression."""
 
     name = "random"
@@ -116,7 +123,7 @@ class RandomSplit(Partitioner):
         return Partition(dev_ids, test_ids, folds, notes)
 
 
-class StratifiedSplit(RandomSplit):
+class Stratified(Random):
     """Class-proportion preserving split for classification."""
 
     name = "stratified"
@@ -177,7 +184,7 @@ class StratifiedSplit(RandomSplit):
         return list(splitter.split(numpy.arange(len(dev_ids)), labels))
 
 
-class EventStratifiedSplit(RandomSplit):
+class Events(Random):
     """Keeps the share of observed events equal across splits (survival)."""
 
     name = "stratified_events"
@@ -248,7 +255,7 @@ class EventStratifiedSplit(RandomSplit):
         return list(splitter.split(numpy.arange(len(dev_ids)), events))
 
 
-class Multilabel(RandomSplit):
+class Multilabel(Random):
     """Keeps every label's share steady across splits (multi-label)."""
 
     name = "multilabel_stratified"
@@ -328,7 +335,7 @@ class Multilabel(RandomSplit):
         return folds
 
 
-class TreatmentStratifiedSplit(RandomSplit):
+class Treatment(Random):
     """Keeps treatment and outcome shares equal across splits (uplift)."""
 
     name = "treatment_stratified"
@@ -402,7 +409,7 @@ class TreatmentStratifiedSplit(RandomSplit):
         return list(splitter.split(numpy.arange(len(dev_ids)), cells))
 
 
-class Preset(RandomSplit):
+class Preset(Random):
     """Uses a split that was decided while streaming the file.
 
     The `split_side` column says which rows are locked (1) and which are
@@ -440,3 +447,279 @@ class Preset(RandomSplit):
         else:
             parts = self.cross_validation_folds(frame, dev_ids, notes)
         return Partition(dev_ids, test_ids, parts, notes)
+
+
+class Group(Partitioner):
+    """Keeps every group wholly inside one partition."""
+
+    name = "group"
+
+    def partition(self, frame: pandas.DataFrame) -> Partition:
+        """Group-disjoint holdout and group K-fold.
+
+        Args:
+            frame: The full dataset including the target column.
+
+        Returns:
+            The development and test ids, group-disjoint folds over
+            development positions and any notes. Classification folds each
+            contain every class.
+
+        Raises:
+            BlockedError: If the group column has missing values, there are
+                fewer than `folds + 2` groups, or (for classification) no
+                group-disjoint folds keep every class.
+        """
+        column = self.data.group_column or self.data.query_column
+        groups = frame[column].to_numpy()
+        if pandas.isna(groups).any():
+            raise errors.BlockedError(
+                f"group column '{column}' has missing values"
+            )
+        folds = self.validation.folds
+        if len(set(groups)) < folds + 2:
+            raise errors.BlockedError(
+                f"need at least {folds + 2} groups for group validation"
+            )
+        holdout = model_selection.GroupShuffleSplit(
+            n_splits=1,
+            test_size=self.validation.test_fraction,
+            random_state=self.validation.seed,
+        )
+        dev_ids, test_ids = next(
+            holdout.split(numpy.arange(len(frame)), groups=groups)
+        )
+        dev_groups = groups[dev_ids]
+        folds = min(folds, len(set(dev_groups)))
+        notes: list[str] = []
+        if not self.task.is_classification:
+            splitter = model_selection.GroupKFold(n_splits=folds)
+            return Partition(
+                dev_ids,
+                test_ids,
+                list(
+                    splitter.split(
+                        numpy.arange(len(dev_ids)), groups=dev_groups
+                    )
+                ),
+                notes,
+            )
+        labels = frame[self.data.target].to_numpy()[dev_ids]
+        chosen = self.class_complete_folds(labels, dev_groups, folds, notes)
+        return Partition(dev_ids, test_ids, chosen, notes)
+
+    def class_complete_folds(
+        self,
+        labels: numpy.ndarray,
+        groups: numpy.ndarray,
+        folds: int,
+        notes: list[str],
+    ) -> list[Fold]:
+        """Builds group folds that each contain every class.
+
+        Every class must appear in every training and validation part, since
+        metrics such as ROC-AUC are undefined otherwise. Tries the requested
+        number of folds, then fewer.
+
+        Args:
+            labels: Class label of each development row.
+            groups: Group of each development row.
+            folds: The requested number of folds.
+            notes: Adjustments made while splitting; gets a note when fewer
+                folds are used.
+
+        Returns:
+            One `(train, validation)` pair of position arrays for each fold,
+            with groups kept disjoint between the two.
+
+        Raises:
+            BlockedError: If no group-disjoint split keeps all classes in
+                every fold.
+        """
+        classes = set(labels.tolist())
+        positions = numpy.arange(len(labels))
+        for count in range(folds, 1, -1):
+            splitter = model_selection.StratifiedGroupKFold(
+                n_splits=count,
+                shuffle=True,
+                random_state=self.validation.seed,
+            )
+            candidate = list(splitter.split(positions, labels, groups))
+            if all(
+                set(labels[fit].tolist()) == classes
+                and set(labels[held].tolist()) == classes
+                for fit, held in candidate
+            ):
+                if count != folds:
+                    notes.append(
+                        f"group folds reduced {folds}->{count} so every fold "
+                        "contains every class"
+                    )
+                return candidate
+        raise errors.BlockedError(
+            "no group-disjoint split keeps every class in every fold; the "
+            "classes are concentrated in too few groups"
+        )
+
+
+class Chronology(Partitioner):
+    """Trains on the past and evaluates on the future."""
+
+    name = "temporal"
+
+    def embargo(self, frame: pandas.DataFrame) -> int:
+        """Rows dropped between training and later windows.
+
+        A forecast row's target looks `horizon` steps ahead, so the rows just
+        before a window would otherwise train on the window's own values; the
+        embargo covers `horizon` time steps of every series.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The configured embargo rows when no horizon is set; otherwise the
+            larger of that and the horizon times the number of series (the
+            groups, or one).
+        """
+        configured = self.validation.embargo_rows
+        horizon = self.data.horizon
+        if horizon is None:
+            return configured
+        series = (
+            frame[self.data.group_column].nunique()
+            if self.data.group_column
+            else 1
+        )
+        return max(configured, horizon * series)
+
+    def chronological_holdout(
+        self, frame: pandas.DataFrame
+    ) -> tuple[numpy.ndarray, numpy.ndarray]:
+        """Orders rows in time and holds out the latest for the final test.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            Development row positions (oldest first, an embargo before the
+            test window removed) and test row positions.
+
+        Raises:
+            BlockedError: If the time column cannot order the rows.
+        """
+        column = self.data.time_column
+        times = pandas.to_datetime(frame[column], errors="coerce")
+        if times.isna().any():
+            raise errors.BlockedError(
+                f"time column '{column}' has unparseable/missing values: "
+                "ordering ambiguous"
+            )
+        order = numpy.argsort(times.to_numpy(), kind="stable")
+        rows = len(frame)
+        test_rows = max(1, round(rows * self.validation.test_fraction))
+        embargo = self.embargo(frame)
+        return order[: rows - test_rows - embargo], order[rows - test_rows :]
+
+    def partition(self, frame: pandas.DataFrame) -> Partition:
+        """Chronological holdout and expanding-window folds.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The development and test positions, the folds listed latest
+            window first, and notes on the embargo and fold order.
+
+        Raises:
+            BlockedError: If the time column cannot order the rows or there
+                are too few development rows for the folds and embargo.
+        """
+        dev_ids, test_ids = self.chronological_holdout(frame)
+        embargo = self.embargo(frame)
+        folds = self.validation.folds
+        if len(dev_ids) < folds + 1 + embargo:
+            raise errors.BlockedError(
+                "too few rows for temporal cross-validation"
+            )
+        splitter = model_selection.TimeSeriesSplit(n_splits=folds, gap=embargo)
+        notes = []
+        if embargo:
+            notes.append(
+                f"embargo of {embargo} rows between development and test and "
+                "between each training window and its validation window"
+            )
+        notes.append(
+            "folds are listed latest window first, so cheap first-rung "
+            "evaluations use the largest training window"
+        )
+        windows = list(splitter.split(numpy.arange(len(dev_ids))))
+        return Partition(dev_ids, test_ids, windows[::-1], notes)
+
+
+class Rolling(Chronology):
+    """Rolling-origin evaluation: slide forward, validate on what follows.
+
+    Each fold trains on the rows before a cut-off (at most `window_rows` of
+    them when set, otherwise all earlier rows), skips `embargo_rows`, and
+    validates on the next `horizon_rows`. Successive folds move the cut-off
+    back by one horizon, so every validation window is genuinely later than
+    its training window and the folds cover the most recent history.
+    """
+
+    name = "rolling"
+
+    def partition(self, frame: pandas.DataFrame) -> Partition:
+        """Chronological holdout and sliding training/validation windows.
+
+        Args:
+            frame: The full dataset.
+
+        Returns:
+            The development and test positions, the rolling windows listed
+            latest first as `(train, validation)` position arrays, and notes
+            describing them.
+
+        Raises:
+            BlockedError: If the time column cannot order the rows or fewer
+                than two windows fit.
+        """
+        dev_ids, test_ids = self.chronological_holdout(frame)
+        validation = self.validation
+        rows = len(dev_ids)
+        horizon = validation.horizon_rows or max(
+            1, rows // (validation.folds + 1)
+        )
+        windows = []
+        for fold in range(validation.folds):
+            held_end = rows - fold * horizon
+            held_start = held_end - horizon
+            train_end = held_start - validation.embargo_rows
+            train_start = (
+                0
+                if validation.window_rows is None
+                else max(0, train_end - validation.window_rows)
+            )
+            if train_end - train_start < MIN_ROLLING_TRAIN or held_start < 0:
+                break
+            windows.append(
+                (
+                    numpy.arange(train_start, train_end),
+                    numpy.arange(held_start, held_end),
+                )
+            )
+        if len(windows) < MIN_ROLLING_FOLDS:
+            raise errors.BlockedError(
+                f"only {len(windows)} rolling window(s) fit; shorten "
+                "horizon_rows, window_rows or embargo_rows, or add data"
+            )
+        notes = [
+            f"rolling origin: {len(windows)} windows, horizon {horizon} rows, "
+            + (
+                f"training window {validation.window_rows} rows"
+                if validation.window_rows
+                else "expanding training window"
+            ),
+            "folds are listed latest window first",
+        ]
+        return Partition(dev_ids, test_ids, windows, notes)

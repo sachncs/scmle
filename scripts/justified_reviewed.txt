@@ -11,7 +11,7 @@ scmle/artifacts/results.py save passthrough public Run method pinned in tests/fi
 scmle/contracts/models.py Estimator lone-interface structural protocol every scikit-learn estimator and pipeline satisfies; 83 references
 scmle/pipeline/policies.py Reviewer lone-interface documented extension point (README, docs/ARCHITECTURE.md, website)
 scmle/assurance/admissibility/screen/planning.py decline single-use builds the refusal of a real scan predicted past its share of the time budget (the 14-line message naming hypotheses, fits, permutations and the limit); inlined it would put screen_table back over the 80-line function limit
-scmle/assurance/custody/journal.py bind passthrough Custodian implements the abstract Lockbox.bind (scmle/data/splitting/splitters/partitions.py) and forwards it to the test set it guards
+scmle/assurance/custody/journal.py bind passthrough Custodian implements the abstract Lockbox.bind (scmle/data/splitting/splitters/lockbox.py) and forwards it to the test set it guards
 scmle/assurance/ledger/confirm/records.py Source lone-interface protocol satisfied by custody Locker and the vault, so the ledger layer does not import custody
 scmle/data/readers/streaming/transaction.py Sink lone-interface RecordingSink test double, an isinstance check in the code, and the website data docs
 scmle/data/readers/tabular.py load passthrough required TableReader hook called through the reader classes
@@ -20,7 +20,7 @@ scmle/data/readers/tabular.py load passthrough required TableReader hook called 
 scmle/data/readers/tabular.py load passthrough required TableReader hook called through the reader classes
 scmle/data/readers/tabular.py read_table passthrough builds the default Loader for seven production callers; inlining would spread that default
 scmle/data/splitting/inner_cv.py get_n_splits getter scikit-learn calls it by name
-scmle/data/splitting/splitters/partitions.py mint getter member of the Source protocol, satisfied by splitters and the vault
+scmle/data/splitting/splitters/lockbox.py mint getter member of the Source protocol, satisfied by splitters and the vault
 scmle/data/validation/columns.py matches passthrough required Family hook, called as kind.matches
 scmle/deploy/contract/runtime.py Provider lone-interface FakeAdapter test double; pinned in the public API and docs/API_STABILITY.md
 scmle/deploy/control.py ControlPlane lone-interface Processes and MemoryPlane implement it; pinned in the public API

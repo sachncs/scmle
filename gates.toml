@@ -133,7 +133,7 @@ override = "none"
 variables = ["data.target", "data.monotonic_constraints"]
 
 [split.event.folds]
-site = "scmle.data.splitting.splitters.stratification:EventStratifiedSplit.cross_validation_folds"
+site = "scmle.data.splitting.splitters.splits:Events.cross_validation_folds"
 error = "BlockedError"
 claim = "C5"
 passes = "Events and censored rows each number at least MIN_STRATUM_ROWS among the development rows; folds are reduced to the rarest count if needed."
@@ -142,7 +142,7 @@ override = "none"
 variables = ["MIN_STRATUM_ROWS", "validation.folds", "data.event_column"]
 
 [split.event.stratify]
-site = "scmle.data.splitting.splitters.stratification:EventStratifiedSplit.stratifier"
+site = "scmle.data.splitting.splitters.splits:Events.stratifier"
 error = "BlockedError"
 claim = "C5"
 passes = "Events and censored rows each number at least MIN_STRATUM_ROWS in the full data."
@@ -151,7 +151,7 @@ override = "none"
 variables = ["MIN_STRATUM_ROWS", "data.event_column"]
 
 [split.group.class_complete_folds]
-site = "scmle.data.splitting.splitters.grouping:GroupSplit.class_complete_folds"
+site = "scmle.data.splitting.splitters.splits:Group.class_complete_folds"
 error = "BlockedError"
 claim = "C5"
 passes = "Some fold count from validation.folds down to 2 gives group-disjoint folds whose training and validation parts each contain every class."
@@ -160,7 +160,7 @@ override = "none"
 variables = ["validation.folds", "validation.seed"]
 
 [split.group.partition]
-site = "scmle.data.splitting.splitters.grouping:GroupSplit.partition"
+site = "scmle.data.splitting.splitters.splits:Group.partition"
 error = "BlockedError"
 claim = "C5"
 passes = "The group column has no missing values, there are at least folds + 2 groups, and for classification class-complete group folds exist."
@@ -178,7 +178,7 @@ override = "none"
 variables = ["validation.strategy", "task"]
 
 [split.resident.bind]
-site = "scmle.data.splitting.splitters.partitions:ResidentTestSet.bind"
+site = "scmle.data.splitting.splitters.lockbox:Resident.bind"
 error = "LeakageError"
 claim = "C2, C8"
 passes = "No binding is set and the rows were not released."
@@ -187,7 +187,7 @@ override = "none"
 variables = []
 
 [split.resident.open]
-site = "scmle.data.splitting.splitters.partitions:ResidentTestSet.open"
+site = "scmle.data.splitting.splitters.lockbox:Resident.open"
 error = "LeakageError"
 claim = "C2, C8"
 passes = "The token matches, the rows were not released before, and either no binding is set or the given binding equals it."
@@ -223,7 +223,7 @@ override = "none; start a new run (records are only read when a run is resumed).
 variables = []
 
 [split.rolling.partition]
-site = "scmle.data.splitting.splitters.chronology:RollingSplit.partition"
+site = "scmle.data.splitting.splitters.splits:Rolling.partition"
 error = "BlockedError"
 claim = "C5"
 passes = "The time column orders the rows and at least MIN_ROLLING_FOLDS windows, each with at least MIN_ROLLING_TRAIN training rows, fit."
@@ -232,7 +232,7 @@ override = "Shorten validation.horizon_rows, validation.window_rows or validatio
 variables = ["MIN_ROLLING_FOLDS", "MIN_ROLLING_TRAIN", "validation.folds", "validation.horizon_rows", "validation.window_rows", "validation.embargo_rows", "validation.test_fraction", "data.time_column", "data.horizon"]
 
 [split.stratified.folds]
-site = "scmle.data.splitting.splitters.stratification:StratifiedSplit.cross_validation_folds"
+site = "scmle.data.splitting.splitters.splits:Stratified.cross_validation_folds"
 error = "BlockedError"
 claim = "C5"
 passes = "Every class has at least MIN_STRATUM_ROWS development rows; folds are reduced to the minority class size if needed."
@@ -241,7 +241,7 @@ override = "none"
 variables = ["MIN_STRATUM_ROWS", "validation.folds"]
 
 [split.stratified.stratify]
-site = "scmle.data.splitting.splitters.stratification:StratifiedSplit.stratifier"
+site = "scmle.data.splitting.splitters.splits:Stratified.stratifier"
 error = "BlockedError"
 claim = "C5"
 passes = "Every class has at least MIN_STRATUM_ROWS rows in the full data."
@@ -250,7 +250,7 @@ override = "none"
 variables = ["MIN_STRATUM_ROWS", "data.target"]
 
 [split.temporal.holdout]
-site = "scmle.data.splitting.splitters.chronology:Chronology.chronological_holdout"
+site = "scmle.data.splitting.splitters.splits:Chronology.chronological_holdout"
 error = "BlockedError"
 claim = "C5"
 passes = "Every value of the time column parses as a datetime."
@@ -259,7 +259,7 @@ override = "none"
 variables = ["data.time_column", "validation.test_fraction", "validation.embargo_rows", "data.horizon"]
 
 [split.temporal.partition]
-site = "scmle.data.splitting.splitters.chronology:Chronology.partition"
+site = "scmle.data.splitting.splitters.splits:Chronology.partition"
 error = "BlockedError"
 claim = "C5"
 passes = "The time column orders the rows and there are at least folds + 1 + embargo development rows."
@@ -268,7 +268,7 @@ override = "none"
 variables = ["validation.folds", "validation.embargo_rows", "data.horizon", "data.group_column", "data.time_column"]
 
 [split.treatment.folds]
-site = "scmle.data.splitting.splitters.stratification:TreatmentStratifiedSplit.cross_validation_folds"
+site = "scmle.data.splitting.splitters.splits:Treatment.cross_validation_folds"
 error = "BlockedError"
 claim = "C5"
 passes = "The rarest treatment / outcome cell in the development rows allows at least MIN_FOLDS folds."
@@ -277,7 +277,7 @@ override = "none"
 variables = ["MIN_FOLDS", "validation.folds", "data.treatment_column"]
 
 [split.treatment.stratify]
-site = "scmle.data.splitting.splitters.stratification:TreatmentStratifiedSplit.stratifier"
+site = "scmle.data.splitting.splitters.splits:Treatment.stratifier"
 error = "BlockedError"
 claim = "C5"
 passes = "Every treatment / outcome cell has at least MIN_STRATUM_ROWS rows."

@@ -2952,3 +2952,16 @@ Modules moved between packages by the layer map (`scripts/layers.toml`, register
 - `scmle.deploy.demo` -> `scmle.rehearsal.demo`
 - `scmle.operations.faults` -> `scmle.rehearsal.faults`
 - `scmle.governance.local_faults` -> `scmle.rehearsal.local_faults`
+
+## Splitter family (stage B phase 6)
+
+The splitters became single nouns in one module, `scmle.data.splitting.splitters.splits`,
+and the sealed test set moved to `lockbox`. The old names were removed (no aliases):
+
+- `RandomSplit` -> `splits.Random`
+- `StratifiedSplit` -> `splits.Stratified`
+- `EventStratifiedSplit` -> `splits.Events`
+- `TreatmentStratifiedSplit` -> `splits.Treatment`
+- `GroupSplit` -> `splits.Group`
+- `RollingSplit` -> `splits.Rolling`
+- `ResidentTestSet` -> `lockbox.Resident`

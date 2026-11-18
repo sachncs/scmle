@@ -7,6 +7,8 @@ import pytest
 from scmle.contracts import errors
 from scmle.contracts import tasks
 from scmle.data.splitting import splitters
+from scmle.data.splitting.splitters import lockbox
+from scmle.data.splitting.splitters import splits
 
 
 def make_spec(strategy="auto", **data_overrides):
@@ -122,7 +124,7 @@ def test_regression_defaults_to_random_and_rejects_stratified(frame):
     result = split(regression, task=tasks.Task.REGRESSION)
     assert result.manifest.strategy == "random"
     with pytest.raises(errors.BlockedError):
-        splitters.StratifiedSplit(make_spec(), tasks.Task.REGRESSION)
+        splits.Stratified(make_spec(), tasks.Task.REGRESSION)
 
 
 def test_strategy_registry_is_polymorphic():
@@ -137,8 +139,30 @@ def test_strategy_registry_is_polymorphic():
         "temporal",
         "rolling",
     }
-    assert issubclass(splitters.StratifiedSplit, splitters.RandomSplit)
-    assert issubclass(splitters.EventStratifiedSplit, splitters.RandomSplit)
+    assert issubclass(splits.Stratified, splits.Random)
+    assert issubclass(splits.Events, splits.Random)
+
+
+def test_strategies_are_one_family_of_single_noun_classes():
+    family = {
+        "random": splits.Random,
+        "stratified": splits.Stratified,
+        "stratified_events": splits.Events,
+        "multilabel_stratified": splits.Multilabel,
+        "treatment_stratified": splits.Treatment,
+        "preset": splits.Preset,
+        "group": splits.Group,
+        "temporal": splits.Chronology,
+        "rolling": splits.Rolling,
+    }
+    assert family == splitters.STRATEGIES
+    assert all(kind.__module__ == splits.__name__ for kind in family.values())
+
+
+def test_lockbox_module_holds_the_sealed_test_set_family():
+    assert issubclass(lockbox.Resident, lockbox.Lockbox)
+    assert splitters.Lockbox is lockbox.Lockbox
+    assert lockbox.Resident.__module__ == lockbox.__name__
 
 
 def test_locked_test_set_opens_once(frame):

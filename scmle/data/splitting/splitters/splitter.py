@@ -5,37 +5,27 @@ import pandas
 from scmle.contracts import tasks
 from scmle.data.readers import streaming
 from scmle.data.splitting import duplicates
-from scmle.data.splitting.splitters.chronology import Chronology
-from scmle.data.splitting.splitters.chronology import RollingSplit
-from scmle.data.splitting.splitters.grouping import GroupSplit
+from scmle.data.splitting.splitters import lockbox
+from scmle.data.splitting.splitters import splits
 from scmle.data.splitting.splitters.partitions import DUPLICATE_AWARE
 from scmle.data.splitting.splitters.partitions import Manifest
 from scmle.data.splitting.splitters.partitions import Partition
 from scmle.data.splitting.splitters.partitions import Partitioner
-from scmle.data.splitting.splitters.partitions import ResidentTestSet
 from scmle.data.splitting.splitters.partitions import Split
 from scmle.data.splitting.splitters.partitions import tuplify
-from scmle.data.splitting.splitters.stratification import EventStratifiedSplit
-from scmle.data.splitting.splitters.stratification import Multilabel
-from scmle.data.splitting.splitters.stratification import Preset
-from scmle.data.splitting.splitters.stratification import RandomSplit
-from scmle.data.splitting.splitters.stratification import StratifiedSplit
-from scmle.data.splitting.splitters.stratification import (
-    TreatmentStratifiedSplit,
-)
 
 STRATEGIES: dict[str, type[Partitioner]] = {
     strategy.name: strategy
     for strategy in (
-        RandomSplit,
-        StratifiedSplit,
-        EventStratifiedSplit,
-        Multilabel,
-        TreatmentStratifiedSplit,
-        Preset,
-        GroupSplit,
-        Chronology,
-        RollingSplit,
+        splits.Random,
+        splits.Stratified,
+        splits.Events,
+        splits.Multilabel,
+        splits.Treatment,
+        splits.Preset,
+        splits.Group,
+        splits.Chronology,
+        splits.Rolling,
     )
 }
 
@@ -163,7 +153,7 @@ class Splitter:
             Manifest, development data and the sealed test set.
         """
         name = (
-            Preset.name
+            splits.Preset.name
             if streaming.SPLIT_COLUMN in frame.columns
             else self.strategy_name
         )
@@ -182,7 +172,7 @@ class Splitter:
         target_name = self.spec.data.target
         features = frame.drop(columns=[target_name])
         target = frame[target_name]
-        locked = ResidentTestSet(
+        locked = lockbox.Resident(
             features.iloc[part.test_ids].reset_index(drop=True),
             target.iloc[part.test_ids].reset_index(drop=True),
             manifest.test_ids,
