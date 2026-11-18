@@ -525,7 +525,7 @@ class Staging:
         record = self.registry.register(
             self.model,
             bundle_dir,
-            metrics=result.evaluation["test_metrics"],
+            metrics=result.evaluation["metrics"],
             config=result.plan.to_dict() | {"project": project},
             run_id=result.run_id,
             trusted=True,  # exported moments ago by this very process

@@ -241,14 +241,14 @@ each group on one side (see "group" and "time order").
 ### group, grouping
 
 **Meaning.** Rows that belong together, such as all rows of one customer.
-**Example.** `--group-column customer_id`.
+**Example.** `--group customer_id`.
 **Why it matters.** If one customer is in both practice and exam, the model has
 effectively seen the exam. Scores come out too high.
 
 ### time order, temporal split
 
 **Meaning.** Training on the past and testing on the future.
-**Example.** `--time-column event_time`.
+**Example.** `--time event_time`.
 **Why it matters.** Shuffled rows let the model learn from the future. Given a
 time column, SCMLE never trains on rows later than the rows it tests on.
 
@@ -515,7 +515,7 @@ useful; one that does not is not.
 
 **Meaning.** A column such as sex or age group whose groups you want to compare
 for fairness.
-**Example.** `--sensitive-columns sex`.
+**Example.** `--sensitive sex`.
 **Why it matters.** A good overall score can hide a poor one for a group.
 SCMLE reports the gap (see `fairness.json` and `slice_performance.json`).
 

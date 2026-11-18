@@ -54,11 +54,11 @@ def test_parallel_run_matches_sequential_run(binary_frame, tmp_path):
         assert a.score_mean == pytest.approx(b.score_mean, nan_ok=True)
     assert sequential.selected_model == parallel.selected_model
     assert (
-        sequential.evaluation["selected_params"]
-        == parallel.evaluation["selected_params"]
+        sequential.evaluation["selected"]["params"]
+        == parallel.evaluation["selected"]["params"]
     )
-    assert sequential.evaluation["test_metrics"] == pytest.approx(
-        parallel.evaluation["test_metrics"]
+    assert sequential.evaluation["metrics"] == pytest.approx(
+        parallel.evaluation["metrics"]
     )
 
 

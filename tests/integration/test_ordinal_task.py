@@ -39,7 +39,7 @@ def result(tmp_path_factory):
 
 
 def test_the_model_beats_the_median_baseline_on_agreement(result):
-    assert result.evaluation["test_metrics"]["qwk"] > 0.4
+    assert result.evaluation["metrics"]["qwk"] > 0.4
     baseline = next(t for t in result.trials if t.model_name == "dummy")
     assert baseline.score_mean < 0.1
 

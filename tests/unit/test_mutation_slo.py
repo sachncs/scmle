@@ -147,3 +147,14 @@ def test_an_assessment_record_names_its_observed_maximum() -> None:
 def test_an_assessment_refuses_word_for_word(changes, kind, message) -> None:
     with pytest.raises(kind, match=message):
         assessment(**changes)
+
+
+def test_a_text_that_is_not_a_timestamp_is_refused_by_name() -> None:
+    with pytest.raises(
+        errors.InputError, match=r"^observed_at must be ISO-8601$"
+    ):
+        slo.parse_timestamp("yesterday", "observed_at")
+
+
+def test_an_untouched_error_budget_of_exactly_one_is_kept() -> None:
+    assert assessment(error_budget_remaining=1.0).error_budget_remaining == 1.0

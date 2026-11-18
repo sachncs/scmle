@@ -1,8 +1,14 @@
-"""The project configuration and the rules that span its sections."""
+"""The project configuration and the rules that span its sections.
+
+A configuration is stored with single-word keys (see `sections`) and read in
+either spelling. Its hash is taken on the old, version-1 layout, so renaming
+a key never changes the hash a run is known by.
+"""
 
 import hashlib
 import json
 from typing import Any
+from typing import ClassVar
 from typing import Literal
 from typing import Self
 
@@ -25,8 +31,19 @@ FAIRNESS_WEIGHT = "fairness_weight"
 """Weight column the reweighing mitigation adds to development rows."""
 
 
-class Config(records.Schema):
+class Config(sections.Section):
     """The explicit, versioned specification of an ML project."""
+
+    vocabulary: ClassVar[dict[str, str]] = {
+        "feature_graph": "derivation",
+        "leakage_policy": "leakage",
+        "charter_path": "charter",
+        "ledger_rule": "ledger",
+        "confirmation_rule": "confirmation",
+        "confirmation_failure_policy": "failure",
+        "leakage_attestations": "attestations",
+    }
+    spelling: ClassVar[records.Migration] = sections.spell(vocabulary)
 
     version: int = CONFIG_VERSION
     data: sections.Dataset
@@ -93,12 +110,8 @@ class Config(records.Schema):
         """
         if not isinstance(values, dict):
             return values
-        data = values.get("data")
-        data_record = (
-            data.model_dump()
-            if isinstance(data, sections.Dataset)
-            else dict(data or {})
-        )
+        values = named(cls, values)
+        data_record = named(sections.Dataset, values.get("data"))
         delays = data_record.get("feature_delays") or {}
         if not delays:
             return values
@@ -149,12 +162,8 @@ class Config(records.Schema):
         """
         if not isinstance(values, dict) or values.get("task") != "forecast":
             return values
-        data = values.get("data")
-        record = (
-            data.model_dump()
-            if isinstance(data, sections.Dataset)
-            else dict(data or {})
-        )
+        values = named(cls, values)
+        record = named(sections.Dataset, values.get("data"))
         if record.get("value_column") or not record.get("horizon"):
             return values
         value, horizon = record["target"], int(record["horizon"])
@@ -275,10 +284,68 @@ class Config(records.Schema):
             self.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
         )
 
+    def anchor(self) -> records.Layout:
+        """Returns the configuration in its version-1 layout (field names).
+
+        Returns:
+            The JSON dump with every section moved back to its field names,
+            the layout `config_hash` is taken on.
+        """
+        layout = self.spelling.downgrade(self.model_dump(mode="json"))
+        for name, kind in parts().items():
+            layout[name] = kind.spelling.downgrade(layout[name])
+        return layout
+
     def config_hash(self) -> str:
-        """Returns a short deterministic hash of the canonical configuration."""
-        digest = hashlib.sha256(self.canonize().encode()).hexdigest()
-        return digest[:16]
+        """Returns a short deterministic hash of the version-1 layout."""
+        text = json.dumps(self.anchor(), sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
+def named(kind: type[sections.Section], value: Any) -> records.Layout:
+    """Returns a section, given in either spelling, keyed by field name.
+
+    Args:
+        kind: The section's class.
+        value: The section, a mapping in either spelling, or None.
+
+    Returns:
+        The section's fields as a dict keyed by field name.
+    """
+    layout = (
+        value.model_dump()
+        if isinstance(value, pydantic.BaseModel)
+        else dict(value or {})
+    )
+    if set(layout) - set(kind.model_fields):
+        layout = kind.spelling.downgrade(layout)
+    return layout
+
+
+def parts() -> dict[str, type[sections.Section]]:
+    """Returns each configuration field that holds a spelled section."""
+    found = {}
+    for name, field in Config.model_fields.items():
+        kind = field.annotation
+        if isinstance(kind, type) and issubclass(kind, sections.Section):
+            found[name] = kind
+    return found
+
+
+def renamed() -> dict[str, str]:
+    """Returns every renamed configuration key as old to new dotted paths.
+
+    Returns:
+        For example `data.group_column` to `data.group` and
+        `validation.horizon_rows` to `validation.rolling.horizon`.
+    """
+    found = dict(Config.vocabulary)
+    for name, kind in parts().items():
+        found |= {
+            f"{name}.{old}": f"{name}.{new}"
+            for old, new in kind.vocabulary.items()
+        }
+    return found
 
 
 def validate(config: Config) -> None:

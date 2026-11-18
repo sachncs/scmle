@@ -12,7 +12,7 @@ server; the generated service writes JSON when `SCMLE_LOG_JSON` is set).
 | --- | --- |
 | 0 | Done. |
 | 1 | Failed: a handled error (bad data, a missing file, an invalid configuration). |
-| 2 | Blocked: a gate refused the run (for example a leakage suspicion under `--leakage-policy block`, or a locked test set opened twice). |
+| 2 | Blocked: a gate refused the run (for example a leakage suspicion under `--leakage block`, or a locked test set opened twice). |
 | 64 | Usage: the command line is wrong. |
 | 70 | Internal: an unexpected error, which is a defect; the traceback is always logged. |
 
@@ -40,15 +40,20 @@ The common ones:
 | --- | --- |
 | `--target COL [COL ...]` | Target column(s). Required. |
 | `--task`, `--metric` | Override the resolved task or metric. |
-| `--time-budget S`, `--workers N` | Search budget in seconds and parallel trials. |
+| `--budget S`, `--workers N` | Search budget in seconds and parallel trials. |
 | `--validation` | `auto`, `stratified`, `random`, `group`, `temporal`, `rolling`, and more. |
-| `--group-column`, `--time-column`, `--weight-column` | Data structure. |
-| `--exclude`, `--id-columns`, `--unavailable-at-prediction` | Keep columns out of the features. |
-| `--leakage-policy {warn,block}` | Default `warn`: the run finishes, logs a warning and labels the score provisional. `block` (opt-in) stops the run on suspicious features. See [LEAKAGE](LEAKAGE.md). |
+| `--group`, `--time`, `--weight` | Data structure. |
+| `--exclude`, `--identifiers`, `--unavailable` | Keep columns out of the features. |
+| `--leakage {warn,block}` | Default `warn`: the run finishes, logs a warning and labels the score provisional. `block` (opt-in) stops the run on suspicious features. See [LEAKAGE](LEAKAGE.md). |
 | `--charter FILE` | Govern the run by an analysis charter: a sealed confirmation set is split off before profiling. |
 | `--exclude-models`, `--exclude-families` | Restrict the search. |
 | `--output-dir`, `--seed` | Where runs go; reproducibility. |
 | `--config FILE` | Read a complete project specification (the format of `config.json`). |
+
+The options renamed to single words in this release (for example
+`--time-budget` to `--budget`, `--group-column` to `--group`,
+`--horizon-rows` to `--rolling-horizon`) still accept their old spelling
+for one release; each prints a deprecation warning once.
 
 ## Analysis charter
 
@@ -163,7 +168,7 @@ file is written by the runtime adapter you provide.
 
 ```bash
 scmle plan data.csv --target churn
-scmle run data.csv --target churn --workers 4 --time-budget 600
+scmle run data.csv --target churn --workers 4 --budget 600
 scmle resume runs/run_20261015_001
 scmle catalog data.csv --label-column churn --output catalog.json
 cat payload.bin | scmle catalog --raw-bytes

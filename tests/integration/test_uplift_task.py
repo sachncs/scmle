@@ -51,7 +51,7 @@ def test_estimated_uplift_tracks_the_true_effect_in_a_randomized_trial(result):
     estimated = result.bundle.predict(fresh.drop(columns=["bought"]))
 
     assert numpy.corrcoef(estimated, effect)[0, 1] > 0.5
-    assert result.evaluation["test_metrics"]["qini"] > 0.01
+    assert result.evaluation["metrics"]["qini"] > 0.01
 
 
 def test_the_treatment_is_never_a_feature(result):

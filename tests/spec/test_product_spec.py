@@ -159,7 +159,7 @@ def test_l23_to_l39_decision_table(run):
         ray_backend.Remote.name,
     }  # local-first, distributed-capable
     assert (
-        result.evaluation["split_fingerprint"]
+        result.evaluation["digests"]["split"]
         and (result.run_dir / "environment.lock").read_text()
     )  # reproducibility: config, data fingerprints, seeds, env
     assert (result.run_dir / "events.jsonl").exists()  # event-driven telemetry
@@ -480,7 +480,7 @@ def test_l234_to_l264_flow_with_locked_test_and_single_final_evaluation(run):
         < kinds.index("selection.frozen")
         < kinds.index("test.opened")
     )
-    assert result.evaluation["test_set_opened"] is True
+    assert result.evaluation["opened"] is True
     planned = {
         d.technique
         for d in result.plan.decisions
@@ -760,7 +760,8 @@ def test_l385_l387_calibration_and_threshold_use_validation_evidence(run):
     decision = result.evaluation["decision"]
     assert (
         decision["objective"] == "f1"
-        and decision["validation_rows"] <= result.evaluation["n_dev"]
+        and decision["validation_rows"]
+        <= result.evaluation["rows"]["development"]
     )
 
 
@@ -771,7 +772,7 @@ def test_l399_l409_evaluation_contract(run):
     """Standardized metrics/diagnostics; selectable objective; no accuracy assumption."""
     result = run[1]
     assert {"roc_auc", "pr_auc", "log_loss", "f1"} <= set(
-        result.evaluation["test_metrics"]
+        result.evaluation["metrics"]
     )
     assert {
         "classification_report",
@@ -818,7 +819,7 @@ def test_l411_l417_selection_constraints_measured_on_this_machine(
     ).run()
     usage = result.evaluation["resources"]
     assert usage["size"] <= 50 and usage["latency"] <= 1000 and usage["machine"]
-    assert "ties -> simpler_model" in result.evaluation["selection_policy"]
+    assert "ties -> simpler_model" in result.evaluation["policy"]
 
 
 # --------------------------------------------------------------- section 11
@@ -1091,7 +1092,7 @@ def test_l637_l669_test_categories_and_quality_gates(run):
         result.run_dir / "diagnostics" / "decision_log.json"
     ).exists()  # manifest + decision log
     assert (
-        "resource_limits" in result.evaluation
+        "limits" in result.evaluation
     )  # limits respected or limitations reported
     assert (
         ROOT / "benchmarks" / "baseline.json"

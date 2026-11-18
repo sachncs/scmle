@@ -233,7 +233,7 @@ def forecast_case(
         seasonal_period=period,
         folds=3,
     ).run()
-    steps = result.evaluation["forecast_backtest"]["steps"]
+    steps = result.evaluation["backtest"]["steps"]
     model = float(numpy.mean([s["model_mae"] for s in steps]))
     naive = {
         "last value": float(numpy.mean([s["last_value_mae"] for s in steps])),
@@ -303,7 +303,7 @@ def survival_case(
         len(frame),
         "c_index",
         higher_is_better=True,
-        framework=result.evaluation["test_metrics"]["c_index"],
+        framework=result.evaluation["metrics"]["c_index"],
         baseline=base,
         baseline_name="untuned ridge Cox",
         selected=result.selected_model,
@@ -343,12 +343,12 @@ def ordinal_case(
         len(frame),
         "qwk",
         higher_is_better=True,
-        framework=result.evaluation["test_metrics"]["qwk"],
+        framework=result.evaluation["metrics"]["qwk"],
         baseline=base,
         baseline_name="multiclass boosted classifier",
         selected=result.selected_model,
         note=f"{len(order)} ordered levels; MAE in levels "
-        f"{result.evaluation['test_metrics']['mace']:.3f} vs "
+        f"{result.evaluation['metrics']['mace']:.3f} vs "
         f"{ordinal.distance(ranks[test], guess):.3f}",
     )
 
@@ -390,12 +390,11 @@ def multilabel_case(
         len(frame),
         "macro F1",
         higher_is_better=True,
-        framework=result.evaluation["test_metrics"]["f1_macro_labels"],
+        framework=result.evaluation["metrics"]["f1_macro_labels"],
         baseline=base,
         baseline_name="one boosted classifier per label",
         selected=result.selected_model,
-        note=f"{len(labels)} labels; split "
-        f"{result.evaluation['split_strategy']}",
+        note=f"{len(labels)} labels; split {result.evaluation['validation']}",
     )
 
 
@@ -429,7 +428,7 @@ def multioutput_case(
         len(frame),
         "mean R2",
         higher_is_better=True,
-        framework=result.evaluation["test_metrics"]["r2_mean"],
+        framework=result.evaluation["metrics"]["r2_mean"],
         baseline=base,
         baseline_name="one boosted regressor per target",
         selected=result.selected_model,
@@ -480,7 +479,7 @@ def uplift_case(
         len(frame),
         "qini",
         higher_is_better=True,
-        framework=result.evaluation["test_metrics"]["qini"],
+        framework=result.evaluation["metrics"]["qini"],
         baseline=chance,
         baseline_name="random ranking (mean of 50)",
         selected=result.selected_model,
@@ -545,7 +544,7 @@ def ranking_case(root: pathlib.Path) -> Row:
         len(frame),
         "ndcg@10",
         higher_is_better=True,
-        framework=result.evaluation["test_metrics"]["ndcg"],
+        framework=result.evaluation["metrics"]["ndcg"],
         baseline=base,
         baseline_name="pointwise boosting",
         selected=result.selected_model,
@@ -580,7 +579,7 @@ def streaming_case(root: pathlib.Path) -> Row:
         output_dir=root,
         memory_budget_gb=0.05,
     ).run()
-    streamed = result.evaluation["streamed_locked"]
+    streamed = result.evaluation["streamed"]
     # Baseline: boosting trained on every development row, scored on the
     # same hashed locked rows.
     from scmle.data.readers import streaming
@@ -607,7 +606,8 @@ def streaming_case(root: pathlib.Path) -> Row:
         baseline_name="boosting on every development row",
         selected=result.selected_model,
         note=f"{streamed['rows']} locked rows scored by streaming; "
-        f"{result.evaluation['n_dev']} development rows in memory",
+        f"{result.evaluation['rows']['development']} development rows in "
+        "memory",
     )
 
 
@@ -656,8 +656,8 @@ def text_case(root: pathlib.Path) -> Row:
         len(frame),
         "roc_auc",
         higher_is_better=True,
-        framework=runs["embedding"].evaluation["test_metrics"]["roc_auc"],
-        baseline=runs["tfidf"].evaluation["test_metrics"]["roc_auc"],
+        framework=runs["embedding"].evaluation["metrics"]["roc_auc"],
+        baseline=runs["tfidf"].evaluation["metrics"]["roc_auc"],
         baseline_name="TF-IDF terms",
         selected=runs["embedding"].selected_model,
         note="same framework run with the text encoder switched",

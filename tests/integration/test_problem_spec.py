@@ -40,22 +40,22 @@ def test_met_criteria_are_reported_and_the_summary_says_so(tmp_path):
     result = run(tmp_path, {"roc_auc": 0.8})
 
     assert result.accomplished
-    assert result.evaluation["success_criteria"][0]["met"]
-    assert not result.evaluation["release_evaluation"]["passed"]
+    assert result.evaluation["criteria"][0]["met"]
+    assert not result.evaluation["release"]["evaluation"]["passed"]
     assert any(
         finding["kind"] == "reliability"
-        for finding in result.evaluation["release_evaluation"]["findings"]
+        for finding in result.evaluation["release"]["evaluation"]["findings"]
     )
-    assert result.evaluation["explanation_evidence"]
+    assert result.evaluation["explanations"]
     assert result.evaluation["provenance"]["config_hash"]
     assert result.evaluation["provenance"]["dataset"]["snapshot_id"]
     assert result.evaluation["provenance"]["model"]["manifest_sha256"]
     assert (result.run_dir / "provenance.json").exists()
     assert result.evaluation["sbom"]["bomFormat"] == "CycloneDX"
     assert (result.run_dir / "sbom.json").exists()
-    assert result.evaluation["release_attestation"]["schema_version"] == 2
+    assert result.evaluation["release"]["attestation"]["schema_version"] == 2
     assert (result.run_dir / "release_attestation.json").exists()
-    assert result.evaluation["reliability_plan"]["release_blocked"] is True
+    assert result.evaluation["reliability"]["release_blocked"] is True
     assert (result.run_dir / "fault_injection_plan.json").exists()
     source_registry = json.loads(
         (result.run_dir / "source_registry.json").read_text()
@@ -95,8 +95,8 @@ def test_missed_criteria_are_named_with_the_gap(tmp_path):
     result = run(tmp_path, {"roc_auc": 0.9999, "log_loss": 0.0001})
 
     assert not result.accomplished
-    assert not result.evaluation["release_evaluation"]["passed"]
-    assert result.evaluation["release_evaluation"]["blocked"]
+    assert not result.evaluation["release"]["evaluation"]["passed"]
+    assert result.evaluation["release"]["evaluation"]["blocked"]
     text = result.summary()
     assert "NOT met" in text and "roc_auc" in text and "log_loss" in text
 
@@ -104,8 +104,8 @@ def test_missed_criteria_are_named_with_the_gap(tmp_path):
 def test_no_criteria_means_nothing_to_miss(tmp_path):
     result = run(tmp_path, {})
 
-    assert result.accomplished and result.evaluation["success_criteria"] == []
-    assert result.evaluation["release_evaluation"]["status"] == (
+    assert result.accomplished and result.evaluation["criteria"] == []
+    assert result.evaluation["release"]["evaluation"]["status"] == (
         "policy_not_declared"
     )
     assert "criteria" not in result.summary()
@@ -123,7 +123,7 @@ def test_packaged_release_attestation_is_signed_when_key_is_configured(
 
     result = run(tmp_path, {"roc_auc": 0.8})
     record = attestation.Attestation.from_dict(
-        result.evaluation["release_attestation"]
+        result.evaluation["release"]["attestation"]
     )
 
     assert record.signature
@@ -133,11 +133,11 @@ def test_packaged_release_attestation_is_signed_when_key_is_configured(
         signing_key="release-key",
     )
     evidence_index = evidence.Index.from_dict(
-        result.evaluation["release_evidence"]
+        result.evaluation["release"]["evidence"]
     )
     assert evidence_index.verify("release-key")
     assert (result.run_dir / "release_evidence.json").exists()
     assert not any(
         finding["kind"] == "security"
-        for finding in result.evaluation["release_evaluation"]["findings"]
+        for finding in result.evaluation["release"]["evaluation"]["findings"]
     )

@@ -20,7 +20,7 @@ def run(data, tmp_path, **kwargs):
 def test_arrow_table_is_a_first_class_input(binary_frame, tmp_path):
     table = pyarrow.Table.from_pandas(binary_frame, preserve_index=False)
     result = run(table, tmp_path)
-    assert result.evaluation["test_metrics"]["roc_auc"] > 0.8
+    assert result.evaluation["metrics"]["roc_auc"] > 0.8
     features = binary_frame.drop(columns="y")
     arrow_features = pyarrow.Table.from_pandas(features, preserve_index=False)
     numpy.testing.assert_array_equal(
@@ -34,8 +34,8 @@ def test_polars_frames_and_lazyframes_are_accepted(binary_frame, tmp_path):
     result = run(eager, tmp_path / "eager")
     lazy = run(eager.lazy(), tmp_path / "lazy")
     assert (
-        result.evaluation["split_fingerprint"]
-        == lazy.evaluation["split_fingerprint"]
+        result.evaluation["digests"]["split"]
+        == lazy.evaluation["digests"]["split"]
     )
     features = polars.from_pandas(binary_frame.drop(columns="y"))
     assert len(result.predict(features)) == len(binary_frame)

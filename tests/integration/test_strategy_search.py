@@ -78,16 +78,18 @@ def test_adopted_strategy_is_used_for_the_final_model(
     imbalanced_frame, tmp_path
 ):
     result = run(imbalanced_frame, tmp_path)
-    assert result.evaluation["selected_strategy"] == result.bundle.info.strategy
+    assert (
+        result.evaluation["selected"]["strategy"] == result.bundle.info.strategy
+    )
     selected = next(
         t
         for t in result.trials
         if t.model_name == result.selected_model
-        and t.strategy == result.evaluation["selected_strategy"]
-        and t.params == result.evaluation["selected_params"]
+        and t.strategy == result.evaluation["selected"]["strategy"]
+        and t.params == result.evaluation["selected"]["params"]
     )
     assert selected.score_mean == pytest.approx(
-        result.evaluation["selected_cv_score"]
+        result.evaluation["selected"]["score"]
     )
     features = imbalanced_frame.drop(columns="y")
     loaded = scmle.artifacts.bundle.Bundle.load(
@@ -96,7 +98,7 @@ def test_adopted_strategy_is_used_for_the_final_model(
     numpy.testing.assert_allclose(
         result.predict_proba(features), loaded.predict_proba(features)
     )
-    assert loaded.info.strategy == result.evaluation["selected_strategy"]
+    assert loaded.info.strategy == result.evaluation["selected"]["strategy"]
 
 
 def test_strategies_can_be_forced_to_win_and_are_then_used(
@@ -125,7 +127,7 @@ def test_strategies_can_be_forced_to_win_and_are_then_used(
     assert (
         best_under > best_default
     )  # undersampling helps balanced accuracy here
-    assert result.evaluation["selected_strategy"] == "random_undersample"
+    assert result.evaluation["selected"]["strategy"] == "random_undersample"
 
 
 def test_balanced_data_skips_imbalance_strategies_with_logged_reasons(
@@ -197,8 +199,8 @@ def test_strategy_run_resumes_without_recomputation(
     resumed = scmle.api.project.Project.resume(directory, data=imbalanced_frame)
     assert calls == []
     assert (
-        resumed.evaluation["selected_strategy"]
-        == original.evaluation["selected_strategy"]
+        resumed.evaluation["selected"]["strategy"]
+        == original.evaluation["selected"]["strategy"]
     )
     assert [(t.trial_id, t.strategy) for t in resumed.trials] == [
         (t.trial_id, t.strategy) for t in original.trials
@@ -213,10 +215,10 @@ def test_leaderboard_marks_exactly_the_selected_trial(
     board = result.leaderboard()
     assert board["selected"].sum() == 1
     winner = board[board["selected"]].iloc[0]
-    assert winner["identifier"] == result.evaluation["selected_trial_id"]
+    assert winner["identifier"] == result.evaluation["selected"]["trial"]
     assert winner["model"] == result.selected_model
     assert winner["score"] == pytest.approx(
-        result.evaluation["selected_cv_score"]
+        result.evaluation["selected"]["score"]
     )
 
 

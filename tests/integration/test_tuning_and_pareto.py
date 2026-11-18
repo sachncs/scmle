@@ -47,7 +47,7 @@ def test_the_pareto_front_is_reported_and_the_fast_model_wins_a_tie(tmp_path):
         selection=tasks.Selection(pareto=True, pareto_tolerance=0.05),
     ).run()
 
-    front = result.evaluation["pareto_front"]
+    front = result.evaluation["pareto"]
     chosen = [p for p in front if p["chosen"]]
     assert len(chosen) == 1 and len(front) >= 3
     near = [
@@ -65,4 +65,4 @@ def test_pareto_is_off_by_default(tmp_path):
         frame(300), "y", time_budget=300, output_dir=tmp_path
     ).run()
 
-    assert result.evaluation["pareto_front"] is None
+    assert result.evaluation["pareto"] is None

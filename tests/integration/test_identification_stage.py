@@ -216,7 +216,7 @@ def test_a_charter_no_strategy_identifies_is_refused_without_an_estimate(
     report = read(result, "identification_report.json")
     assert claims["status"] == "not_identified" and claims["tier"] is None
     assert report["estimate"] is None and report["action"] == "refuse_claim"
-    assert result.evaluation["test_set_opened"] is True
+    assert result.evaluation["opened"] is True
 
 
 def test_subgroup_hypotheses_are_registered_and_reported_in_the_causal_files(

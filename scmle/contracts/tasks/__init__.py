@@ -9,6 +9,7 @@ from scmle.contracts.tasks.config import Config
 from scmle.contracts.tasks.config import CONFIG_VERSION
 from scmle.contracts.tasks.config import FAIRNESS_WEIGHT
 from scmle.contracts.tasks.config import FAST_BUDGET_SECONDS
+from scmle.contracts.tasks.config import renamed
 from scmle.contracts.tasks.graph import Derivation
 from scmle.contracts.tasks.graph import GRAPH_VERSION
 from scmle.contracts.tasks.graph import horizons
@@ -23,6 +24,7 @@ from scmle.contracts.tasks.sections import Parity
 from scmle.contracts.tasks.sections import Problem
 from scmle.contracts.tasks.sections import Resources
 from scmle.contracts.tasks.sections import Search
+from scmle.contracts.tasks.sections import Section
 from scmle.contracts.tasks.sections import Selection
 from scmle.contracts.tasks.sections import Stacking
 from scmle.contracts.tasks.sections import Strategies
@@ -45,6 +47,7 @@ __all__ = [
     "Problem",
     "Resources",
     "Search",
+    "Section",
     "Selection",
     "Stacking",
     "Strategies",
@@ -53,4 +56,5 @@ __all__ = [
     "Threshold",
     "Validation",
     "horizons",
+    "renamed",
 ]

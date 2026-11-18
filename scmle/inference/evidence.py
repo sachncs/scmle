@@ -9,10 +9,12 @@ import os
 import pathlib
 import tempfile
 from typing import Any
+from typing import ClassVar
 
 from scmle import durability
 from scmle.contracts import errors
 from scmle.contracts import lineage
+from scmle.contracts import records
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -26,7 +28,24 @@ class Link:
         bundle_digest: Digest of the model bundle that served the event.
         timestamp: ISO 8601 time of the event, including a timezone.
         graph_digest: Digest of the evidence graph after the event was added.
+        KEYS: Version-1 keys to the written ones (`event`, `digests.payload`,
+            `digests.prediction`, `digests.bundle`, `digests.graph`);
+            `downgrade` restores version 1. The node digest is anchored at
+            version 1: it hashes the version-1 keys, so renaming a written
+            key never breaks a stored chain.
     """
+
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {"event_id": "event"},
+        groups={
+            "digests": {
+                "input_fingerprint": "payload",
+                "output_fingerprint": "prediction",
+                "bundle_digest": "bundle",
+                "graph_digest": "graph",
+            }
+        },
+    )
 
     event_id: str
     input_fingerprint: str
@@ -61,17 +80,18 @@ class Link:
         """Converts the link to a JSON-native record.
 
         Returns:
-            A dictionary with one string entry per field.
+            The event and timestamp, and the four digests under `digests`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
     def node(self) -> lineage.Node:
         """Builds the inference node of the event.
 
         Returns:
             A node `inference:<event_id>` whose attributes are the identity
-            fields (without the graph digest) and whose digest is the SHA-256
-            of their canonical JSON.
+            fields (without the graph digest) under their version-1 keys and
+            whose digest is the SHA-256 of their canonical JSON; the keys stay
+            the version-1 ones so the digest of a stored event never changes.
         """
         payload = {
             "event_id": self.event_id,

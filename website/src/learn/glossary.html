@@ -117,11 +117,11 @@
 <p><strong>Why it matters.</strong> A wrong split lets exam information leak into practice. Related rows must stay on the same side: given a group column, SCMLE keeps each group on one side (see "group" and "time order").</p>
 <h3 id="group-grouping">group, grouping</h3>
 <p><strong>Meaning.</strong> Rows that belong together, such as all rows of one customer.</p>
-<p><strong>Example.</strong> <code>--group-column customer_id</code>.</p>
+<p><strong>Example.</strong> <code>--group customer_id</code>.</p>
 <p><strong>Why it matters.</strong> If one customer is in both practice and exam, the model has effectively seen the exam. Scores come out too high.</p>
 <h3 id="time-order-temporal-split">time order, temporal split</h3>
 <p><strong>Meaning.</strong> Training on the past and testing on the future.</p>
-<p><strong>Example.</strong> <code>--time-column event_time</code>.</p>
+<p><strong>Example.</strong> <code>--time event_time</code>.</p>
 <p><strong>Why it matters.</strong> Shuffled rows let the model learn from the future. Given a time column, SCMLE never trains on rows later than the rows it tests on.</p>
 <h3 id="dataset-fingerprint">dataset fingerprint</h3>
 <p><strong>Meaning.</strong> A short code that identifies exactly these rows.</p>
@@ -244,7 +244,7 @@
 <p><strong>Why it matters.</strong> A model that beats both across your plausible costs is useful; one that does not is not.</p>
 <h3 id="sensitive-column">sensitive column</h3>
 <p><strong>Meaning.</strong> A column such as sex or age group whose groups you want to compare for fairness.</p>
-<p><strong>Example.</strong> <code>--sensitive-columns sex</code>.</p>
+<p><strong>Example.</strong> <code>--sensitive sex</code>.</p>
 <p><strong>Why it matters.</strong> A good overall score can hide a poor one for a group. SCMLE reports the gap (see <code>fairness.json</code> and <code>slice_performance.json</code>).</p>
 <h2 id="watching-a-model-in-use">Watching a model in use</h2>
 <h3 id="monitoring">monitoring</h3>

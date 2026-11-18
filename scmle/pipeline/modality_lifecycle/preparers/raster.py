@@ -193,7 +193,7 @@ class Imagery(curators.Preparer):
         self.max_pixels = max_pixels
 
     @property
-    def dataset_hash(self) -> str:
+    def digest(self) -> str:
         """The raster identity and label-sidecar digest."""
         identities = (
             f"{sample.source}\0{sample.file_hash}\0"
@@ -222,7 +222,7 @@ class Imagery(curators.Preparer):
         quality_findings = flaws(self, profile)
         return curation.Curation(
             modality="geospatial-raster",
-            dataset_hash=self.dataset_hash,
+            dataset_hash=self.digest,
             sample_count=len(self.dataset),
             profile=profile,
             quality_findings=quality_findings,
@@ -596,7 +596,7 @@ def flaws(preparer: Imagery, profile: Survey) -> tuple[data.Finding, ...]:
             curation.flaw(
                 "quality.raster-shape-or-crs-drift",
                 data.FindingSeverity.WARNING,
-                {"dataset": preparer.dataset_hash},
+                {"dataset": preparer.digest},
                 {
                     "dimensions": profile["dimensions"],
                     "crs": crs_values,
@@ -612,7 +612,7 @@ def flaws(preparer: Imagery, profile: Survey) -> tuple[data.Finding, ...]:
             curation.flaw(
                 "quality.raster-nodata-unknown",
                 data.FindingSeverity.WARNING,
-                {"dataset": preparer.dataset_hash},
+                {"dataset": preparer.digest},
                 {"statuses": nodata_profile["statuses"]},
                 "Declare or measure nodata handling before interpreting "
                 "raster values.",

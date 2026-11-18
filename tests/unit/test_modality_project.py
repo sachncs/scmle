@@ -201,14 +201,14 @@ def test_modality_curation_project_accepts_unlabeled_data_without_modelling(
     Path(result.path).write_text(json.dumps(tampered), encoding="utf-8")
     with pytest.raises(
         ValueError,
-        match=r"signature does not verify|content_digest does not match evidence",
+        match=r"signature does not verify|digest does not match evidence",
     ):
         scmle.pipeline.modality_lifecycle.Curation.read_verified(
             result.path, "test-signing-key"
         )
     with pytest.raises(
         ValueError,
-        match=r"signature does not verify|content_digest does not match evidence",
+        match=r"signature does not verify|digest does not match evidence",
     ):
         scmle.api.project.Curator(
             adapter,

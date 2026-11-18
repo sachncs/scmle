@@ -37,7 +37,7 @@ def evaluation(result):
             return json.loads((folder / name).read_text())
     for candidate in folder.rglob("*.json"):
         data = json.loads(candidate.read_text())
-        if isinstance(data, dict) and "decision" in data and "n_dev" in data:
+        if isinstance(data, dict) and "decision" in data and "rows" in data:
             return data
     raise AssertionError("no evaluation artifact found")
 
@@ -63,7 +63,7 @@ def test_the_charter_cost_model_sets_the_threshold(binary_frame, tmp_path):
     assert detail["rule_hash"]
     if detail["path"] == "bayes":
         assert abs(decision["threshold"] - model.threshold) < 1e-12
-    benefit = document["net_benefit"]
+    benefit = document["benefit"]
     assert benefit["claim"] in ("useful", "not_useful_in_range")
     assert benefit["rule_hash"] == detail["rule_hash"]
     assert benefit["tier"] in ("attested", "unverified")
@@ -78,4 +78,4 @@ def test_a_run_without_a_decision_layer_has_no_net_benefit(
     result = support.make_project(
         binary_frame, "y", time_budget=300, output_dir=tmp_path / "out"
     ).run()
-    assert evaluation(result)["net_benefit"] is None
+    assert evaluation(result)["benefit"] is None

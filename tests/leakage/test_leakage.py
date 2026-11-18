@@ -23,8 +23,8 @@ def test_pure_noise_is_not_inflated_by_the_pipeline(tmp_path):
     result = support.make_project(
         frame, "y", output_dir=tmp_path, time_budget=120
     ).run()
-    assert abs(result.evaluation["test_metrics"]["roc_auc"] - 0.5) < 0.12
-    assert abs(result.evaluation["selected_cv_score"] - 0.5) < 0.12
+    assert abs(result.evaluation["metrics"]["roc_auc"] - 0.5) < 0.12
+    assert abs(result.evaluation["selected"]["score"] - 0.5) < 0.12
 
 
 def test_leaked_feature_is_flagged_and_can_block(binary_frame, tmp_path):
@@ -130,7 +130,7 @@ def test_groups_never_straddle_the_test_boundary(binary_frame, tmp_path):
 def test_test_set_is_opened_exactly_once_per_run(binary_frame, tmp_path):
     # Enforces docs/WHAT_SCMLE_CANNOT_DO.md:61.
     result = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
-    assert result.evaluation["test_set_opened"] is True
+    assert result.evaluation["opened"] is True
     events = (result.run_dir / "events.jsonl").read_text().splitlines()
     testing = [e for e in events if json.loads(e)["kind"] == "state.TESTING"]
     assert len(testing) == 1
@@ -170,8 +170,8 @@ def test_search_is_invariant_to_test_labels_and_test_features(
     second = run_default(altered, tmp_path / "b")
 
     assert (
-        second.evaluation["split_fingerprint"]
-        == first.evaluation["split_fingerprint"]
+        second.evaluation["digests"]["split"]
+        == first.evaluation["digests"]["split"]
     )
     assert [
         (t.trial_id, t.model_name, t.strategy, t.params) for t in second.trials
@@ -182,14 +182,14 @@ def test_search_is_invariant_to_test_labels_and_test_features(
         assert a.fold_scores == pytest.approx(b.fold_scores)
     assert second.selected_model == first.selected_model
     assert (
-        second.evaluation["selected_params"]
-        == first.evaluation["selected_params"]
+        second.evaluation["selected"]["params"]
+        == first.evaluation["selected"]["params"]
     )
-    assert second.evaluation["selected_cv_score"] == pytest.approx(
-        first.evaluation["selected_cv_score"]
+    assert second.evaluation["selected"]["score"] == pytest.approx(
+        first.evaluation["selected"]["score"]
     )
     # Sanity: the test partition really was different.
-    assert second.evaluation["test_metrics"] != first.evaluation["test_metrics"]
+    assert second.evaluation["metrics"] != first.evaluation["metrics"]
 
 
 def without_timings(statistics):
@@ -292,8 +292,8 @@ def test_hard_enforcement_moves_the_test_rows_out_of_reach(
 
     assert created["data"]["test_set_isolation"] == "separate vault process"
     assert seen and all(values.isdisjoint(test_values) for values in seen)
-    assert result.evaluation["n_test"] == len(test_ids)
-    assert result.evaluation["test_set_opened"] is True
+    assert result.evaluation["rows"]["test"] == len(test_ids)
+    assert result.evaluation["opened"] is True
 
 
 def test_cooperative_mode_says_it_relies_on_the_in_process_protocol(

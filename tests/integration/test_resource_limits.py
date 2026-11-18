@@ -33,7 +33,7 @@ def test_every_run_reports_how_limits_were_applied(binary_frame, tmp_path):
     # Enforces README.md:138.
     report = run_with(
         binary_frame, tmp_path, time_budget_seconds=600
-    ).evaluation["resource_limits"]
+    ).evaluation["limits"]
     assert report["time_budget"]["within_limit"] is True
     assert report["memory"]["observed_peak_gb"] > 0
     assert set(report) == {"time_budget", "cpu", "memory", "gpu"}
@@ -43,7 +43,7 @@ def test_cpu_limit_caps_the_worker_pool(binary_frame, tmp_path):
     result = run_with(
         binary_frame, tmp_path, time_budget_seconds=600, workers=4, cpu_limit=2
     )
-    cpu = result.evaluation["resource_limits"]["cpu"]
+    cpu = result.evaluation["limits"]["cpu"]
     assert cpu["workers"] == 2 and cpu["threads_per_worker"] == 1
 
 
@@ -57,9 +57,7 @@ def test_memory_limit_stops_new_trials_but_keeps_the_first(
     assert result.trials[0].status == "ok"
     skipped = [t for t in result.trials[1:] if t.status == "skipped"]
     assert skipped and all("memory limit" in t.error for t in skipped)
-    assert (
-        result.evaluation["resource_limits"]["memory"]["within_limit"] is False
-    )
+    assert result.evaluation["limits"]["memory"]["within_limit"] is False
 
 
 def test_required_gpu_blocks_with_an_explanation(binary_frame, tmp_path):
@@ -74,7 +72,7 @@ def test_disabled_gpu_is_accepted(binary_frame, tmp_path):
     result = run_with(
         binary_frame, tmp_path, time_budget_seconds=600, gpu="disabled"
     )
-    assert result.evaluation["resource_limits"]["gpu"]["mode"] == "disabled"
+    assert result.evaluation["limits"]["gpu"]["mode"] == "disabled"
 
 
 def test_hard_enforcement_supervises_trials_end_to_end(binary_frame, tmp_path):
@@ -83,7 +81,7 @@ def test_hard_enforcement_supervises_trials_end_to_end(binary_frame, tmp_path):
     )
     assert result.state == "COMPLETED"
     assert all(t.status == "ok" for t in result.trials)
-    report = result.evaluation["resource_limits"]
+    report = result.evaluation["limits"]
     assert "killed" in report["time_budget"]["enforcement"]
 
 

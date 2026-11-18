@@ -96,7 +96,7 @@ def respec(store: objectstore.Depot, run_id: str) -> base.Job:
         identity=record["identity"],
         resources=base.Resources(**record["resources"]),
         timeout_seconds=record["timeout_seconds"],
-        retries=retry.Retries(**record["retries"]),
+        retries=retry.Retries.read(record["retries"]),
         budget=None
         if budget is None
         else base.CostBudget(

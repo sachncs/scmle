@@ -83,11 +83,11 @@ def test_the_model_beats_the_per_label_prior_on_every_label(multilabel):
         accuracy = (predicted[label] == fresh[label]).mean()
         prior = max(fresh[label].mean(), 1 - fresh[label].mean())
         assert accuracy > prior + 0.05
-    assert multilabel.evaluation["test_metrics"]["f1_macro_labels"] > 0.5
+    assert multilabel.evaluation["metrics"]["f1_macro_labels"] > 0.5
 
 
 def test_folds_keep_every_label_when_the_data_allow(multilabel):
-    assert multilabel.evaluation["split_strategy"] == "multilabel_stratified"
+    assert multilabel.evaluation["validation"] == "multilabel_stratified"
     frame = labelled()
     import json
 
@@ -114,7 +114,7 @@ def test_multioutput_predicts_every_quantity_with_a_good_fit(multioutput):
     )
 
     assert list(multioutput.bundle.schema.targets) == ["first", "second"]
-    assert multioutput.evaluation["test_metrics"]["r2_mean"] > 0.8
+    assert multioutput.evaluation["metrics"]["r2_mean"] > 0.8
     for column in ("first", "second"):
         assert numpy.corrcoef(predicted[column], fresh[column])[0, 1] > 0.9
 

@@ -52,14 +52,14 @@ def test_no_query_appears_in_both_development_and_locked_rows(result):
     development = set(frame["query"].iloc[manifest["training"]])
     locked = set(frame["query"].iloc[manifest["test"]])
 
-    assert result.evaluation["split_strategy"] == "group"
+    assert result.evaluation["validation"] == "group"
     assert locked and not development & locked
 
 
 def test_the_selected_ranker_beats_a_constant_ordering(result):
-    assert result.evaluation["test_metrics"]["ndcg"] > 0.6
+    assert result.evaluation["metrics"]["ndcg"] > 0.6
     baseline = next(t for t in result.trials if t.model_name == "dummy")
-    assert result.evaluation["selected_cv_score"] > baseline.score_mean
+    assert result.evaluation["selected"]["score"] > baseline.score_mean
 
 
 def test_the_bundle_orders_rows_within_each_query(result):

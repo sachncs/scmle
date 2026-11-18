@@ -236,5 +236,5 @@ def test_public_capability_record_is_json_native():
     record = scmle.api.non_tabular.entitle(text_adapter()).to_dict()
 
     assert record["status"] == "experimental"
-    assert record["model_family"] == "regularized_linear_classifier"
+    assert record["family"] == "regularized_linear_classifier"
     assert isinstance(record["limitations"], list)

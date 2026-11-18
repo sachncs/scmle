@@ -27,7 +27,7 @@ class Renderer:
         escape = html.escape
         metric_rows = "".join(
             f"<tr><td>{escape(name)}</td><td>{value:.4f}</td></tr>"
-            for name, value in result.evaluation["test_metrics"].items()
+            for name, value in result.evaluation["metrics"].items()
         )
         findings = (
             *result.profile.quality_findings,
@@ -60,7 +60,7 @@ class Renderer:
             else ""
         )
         reliability = self.reliability(result)
-        explanation_records = result.evaluation.get("explanation_evidence", {})
+        explanation_records = result.evaluation.get("explanations", {})
         explanation_links = (
             "".join(
                 f'<li><a href="explanations/{escape(name)}.html">'
@@ -103,13 +103,13 @@ class Renderer:
         """
         escape = html.escape
         lines = []
-        health = result.evaluation.get("fit_health")
+        health = result.evaluation.get("health")
         if health:
             lines.append(
                 f"Fit health: <b>{escape(health['verdict'])}</b> "
                 f"({escape(health['note'])})"
             )
-        curve = result.evaluation.get("learning_curve")
+        curve = result.evaluation.get("learning")
         if curve:
             lines.append(
                 f"Learning curve: <b>{escape(curve['verdict'])}</b> "

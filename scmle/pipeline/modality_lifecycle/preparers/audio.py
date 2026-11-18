@@ -91,7 +91,7 @@ class AudioPreparer(curators.Preparer):
         self.dataset = dataset
 
     @property
-    def dataset_hash(self) -> str:
+    def digest(self) -> str:
         """The audio corpus identity."""
         return self.dataset.content_hash
 

@@ -31,18 +31,11 @@ DOC = ROOT / "docs" / "RECORD_KEYS.md"
 HEADING = re.compile(r"^### `([^`]+)` `([^`]+)`")
 ROW = re.compile(r"^\| `([^`]+)` \| (keep )?`?([^`|]+?)`? \|")
 FAMILY = re.compile(r"^## (F\d+) ")
-LANDED = frozenset({"F1", "F2", "F3", "F4", "F5", "F6", "F8"})
+LOOSE = re.compile(r"^### (\S+) .*— (\S+)$")
+"""A heading of a record without a class: `### <file> (<writers>) — <name>`."""
+LANDED = frozenset({"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9"})
 """Families of the rest vocabulary whose renames are in the code."""
-PENDING = frozenset(
-    {
-        "api/non_tabular.py Scope",
-        "artifacts/bundle/provenance.py Manifest",
-        "artifacts/claims_audit/verdict.py Verification",
-        "inference/evidence.py Link",
-        "pipeline/modality_lifecycle/containers.py Package",
-        "runtime/retry.py Retries",
-    }
-)
+PENDING: frozenset[str] = frozenset()
 """Kinds of a landed family whose renames are not in the code yet."""
 PROPERTIES = frozenset(
     {
@@ -54,6 +47,7 @@ PROPERTIES = frozenset(
         "data/modalities/document/report.py Curation",
         "data/modalities/graph/elements.py Validation",
         "monitoring/slo.py Assessment",
+        "pipeline/modality_lifecycle/curators.py Curation",
     }
 )
 """Kinds of the stored-property family (F10) that a landed family writes."""
@@ -140,8 +134,11 @@ Records are listed by class. The files most scripts read hold these:
 `AnalysisEstimand`, `SetSizes`, `Trigger`, `Procedure`, `Uncertainty`,
 `ErrorBudget` and `Tariff` parts), `split_manifest.json` the custody
 `Manifest`, `feasibility.json` a `Feasibility`, `decision_cost_model.json`
-a `Tariff`, a `--leakage-attestations` file `Affidavit` rows (with
-`Attestation` fields), and a loop `policy.json` a `Preregistration`.
+a `Tariff`, an `--attestations` file `Affidavit` rows (with
+`Attestation` fields), a loop `policy.json` a `Preregistration`,
+`config.json` a `Config` (with its `sections.py` parts; old files still
+load and keep their `config_hash`), and `evaluation.json` the
+`Evaluation` record (`schema_version` 2).
 [`ARTIFACTS.md`](ARTIFACTS.md) lists every file a run writes.
 
 The same map is machine-readable in
@@ -197,7 +194,7 @@ def landed(text: str) -> dict[str, dict[str, str]]:
         if found:
             family = found.group(1)
             continue
-        heading = HEADING.match(line)
+        heading = HEADING.match(line) or LOOSE.match(line)
         if heading:
             kind = f"{heading.group(1)} {heading.group(2)}"
             continue

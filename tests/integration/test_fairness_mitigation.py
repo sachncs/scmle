@@ -54,7 +54,7 @@ def mitigated(tmp_path_factory):
 def test_the_gap_on_the_released_rows_shrinks_and_the_cost_is_reported(
     mitigated,
 ):
-    record = mitigated.evaluation["fairness_mitigation"]
+    record = mitigated.evaluation["mitigation"]
 
     assert record["applied"]
     locked = record["locked_rows"]
@@ -97,7 +97,7 @@ def test_thresholds_apply_only_when_the_group_is_supplied(tmp_path):
 def test_a_small_gap_is_left_alone_and_the_reason_recorded(tmp_path):
     result = run(tmp_path, biased(shift=0.0), fairness=SPEC)
 
-    record = result.evaluation["fairness_mitigation"]
+    record = result.evaluation["mitigation"]
 
     assert not record["applied"]
     assert "within" in record["reason"]
@@ -117,4 +117,4 @@ def test_mitigation_needs_a_sensitive_column(tmp_path):
 def test_nothing_is_changed_unless_asked(tmp_path):
     result = run(tmp_path, biased())
 
-    assert result.evaluation["fairness_mitigation"] is None
+    assert result.evaluation["mitigation"] is None

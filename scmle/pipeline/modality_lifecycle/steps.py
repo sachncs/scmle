@@ -48,7 +48,7 @@ class Ingestion(state.Stage):
         context.record(
             self.stage,
             {
-                "dataset_hash": context.adapter.dataset_hash,
+                "dataset_hash": context.adapter.digest,
                 "sample_count": len(context.adapter.samples),
             },
         )
@@ -276,7 +276,7 @@ class Evaluation(state.Stage):
         predicted = model.predict(batch.values)
         probabilities = model.predict_proba(batch.values)
         context.evaluation = {
-            "sample_count": len(actual),
+            "samples": len(actual),
             "accuracy": float(accuracy_score(actual, predicted)),
             "macro_f1": float(f1_score(actual, predicted, average="macro")),
             "log_loss": float(
@@ -340,7 +340,7 @@ class Composition(state.Stage):
             for sample in samples
         ]
         context.data_explanation = {
-            "dataset_hash": context.adapter.dataset_hash,
+            "dataset_hash": context.adapter.digest,
             "sample_ids": list(batch.sample_ids),
             "sample_lineage": sample_lineage,
             "feature_ranges": {
@@ -399,7 +399,7 @@ class Packaging(state.Stage):
             context.adapter, context.package_path, context.signing_key
         )
         expected_features = context.feature_batches["train"].feature_names
-        if predictor.training_dataset_hash != context.adapter.dataset_hash:
+        if predictor.training_dataset_hash != context.adapter.digest:
             raise errors.InputError(
                 "checkpoint package dataset identity does not match "
                 "the resumed adapter"
@@ -456,7 +456,7 @@ class Packaging(state.Stage):
             unsigned = {
                 "schema_version": 1,
                 "modality": modalities.serialise(context.adapter.modality),
-                "dataset_hash": context.adapter.dataset_hash,
+                "dataset_hash": context.adapter.digest,
                 "feature_names": list(
                     context.feature_batches["train"].feature_names
                 ),
@@ -591,7 +591,7 @@ class Documentation(state.Stage):
             "intended_use": (
                 "bounded lifecycle validation and baseline comparison"
             ),
-            "dataset_hash": context.adapter.dataset_hash,
+            "dataset_hash": context.adapter.digest,
             "model_family": "regularized_linear_classifier",
             "dataset_card": dataset_card.to_dict(),
             "limitations": list(context.adapter.remarks()),

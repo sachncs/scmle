@@ -7,15 +7,19 @@ transient are injected.
 """
 
 from collections.abc import Callable
+from collections.abc import Mapping
 import dataclasses
 import errno
 import logging
 import math
 import time
+from typing import Any
+from typing import ClassVar
 from typing import TypeVar
 import urllib.error
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 LOGGER = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -84,7 +88,20 @@ class Retries:
         base_delay_seconds: Wait after the first failure.
         factor: Growth of the wait per failure (at least 1).
         max_delay_seconds: Ceiling of one wait.
+        KEYS: Version-1 keys to the written ones (`attempts`,
+            `delays.base`, `delays.cap`, in seconds); `downgrade` restores
+            version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {"max_attempts": "attempts"},
+        groups={
+            "delays": {
+                "base_delay_seconds": "base",
+                "max_delay_seconds": "cap",
+            }
+        },
+    )
 
     max_attempts: int = 3
     base_delay_seconds: float = 0.5
@@ -132,9 +149,30 @@ class Retries:
         """Returns the JSON-ready form.
 
         Returns:
-            The policy's fields as a dict.
+            The policy under its written keys: `attempts`, `factor` and the
+            waits under `delays`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
+
+    @classmethod
+    def read(cls, stored: Mapping[str, Any]) -> "Retries":
+        """Reads a stored policy in either layout.
+
+        Args:
+            stored: A policy from `to_dict`, or one with the version-1 field
+                names.
+
+        Returns:
+            The policy.
+
+        Raises:
+            InputError: If the record mixes an old key with its new one.
+        """
+        fields = {field.name for field in dataclasses.fields(cls)}
+        layout = dict(stored)
+        if set(layout) - fields:
+            layout = cls.KEYS.downgrade(layout)
+        return cls(**layout)
 
 
 def transient(error: BaseException) -> bool:

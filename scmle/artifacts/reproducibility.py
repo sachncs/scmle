@@ -16,6 +16,7 @@ import json
 import pathlib
 from typing import Any
 
+from scmle.artifacts import results
 from scmle.contracts import experiments
 from scmle.contracts import records
 from scmle.contracts.data import provenance
@@ -73,8 +74,8 @@ def reread(directory: str | pathlib.Path) -> dict[str, Any]:
         migrate(json.loads(path.read_text(encoding="utf-8")))
         for path in sorted((root / "trials").glob("trial_*.json"))
     ]
-    evaluation = json.loads(
-        (root / "evaluation.json").read_text(encoding="utf-8")
+    evaluation = results.evaluation(
+        json.loads((root / "evaluation.json").read_text(encoding="utf-8"))
     )
     parameter_path = root / "parameter_estimation.json"
     parameter_digest = None
@@ -89,12 +90,12 @@ def reread(directory: str | pathlib.Path) -> dict[str, Any]:
         "dataset": json.loads(
             (root / "dataset_manifest.json").read_text(encoding="utf-8")
         ),
-        "split": evaluation["split_fingerprint"],
+        "split": evaluation["digests"]["split"],
         "trials": trials,
         "selected": (
-            evaluation["selected_model"],
-            evaluation["selected_strategy"],
-            json.dumps(evaluation["selected_params"], sort_keys=True),
+            evaluation["selected"]["model"],
+            evaluation["selected"]["strategy"],
+            json.dumps(evaluation["selected"]["params"], sort_keys=True),
         ),
         "environment": (root / "environment.lock").read_text(encoding="utf-8")
         if (root / "environment.lock").exists()

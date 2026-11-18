@@ -226,9 +226,9 @@ def outcome(run: Any) -> dict[str, Any]:
     found: dict[str, Any] = clean(
         {
             "selected_model": run.selected_model,
-            "selected_params": evaluation["selected_params"],
-            "selected_cv_score": evaluation["selected_cv_score"],
-            "test_metrics": evaluation["test_metrics"],
+            "selected_params": evaluation["selected"]["params"],
+            "selected_cv_score": evaluation["selected"]["score"],
+            "test_metrics": evaluation["metrics"],
             "trials": [
                 [t.trial_id, t.model_name, str(t.status), t.score_mean]
                 for t in run.trials

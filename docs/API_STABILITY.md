@@ -63,7 +63,7 @@ differ in that one count.
 
 `Project` gained the optional keyword `leakage_attestations` (default
 `None`, so every existing call is unchanged), `Config` the field of the
-same name, and the CLI the flag `--leakage-attestations`; the snapshot in
+same name, and the CLI the flag `--attestations`; the snapshot in
 `tests/fixtures/public_api.json` was regenerated for the `Project` entry
 alone. In a charter run the leakage test is now the screen above instead of
 the earlier cross-fitted skill scan, so a charter run and a run without one
@@ -72,14 +72,14 @@ attestation keeps it.
 
 `Project` gained the optional keywords `baseline_column` and `framing_draft`
 (both default `None`, so every existing call is unchanged), `Dataset` the
-fields of the same names, and the CLI the flags `--baseline-column` and
-`--framing-draft` on `plan`, `run` and `resume`; `tests/fixtures/public_api.json`
+fields of the same names, and the CLI the flags `--baseline` and
+`--draft` on `plan`, `run` and `resume`; `tests/fixtures/public_api.json`
 was regenerated for the `Project` entry alone. `scmle claims list` prints
 claims registered by hash after the bivariate ones, and `scmle claims verify`
 gained one step, present only when a claim was registered.
 
 `Project` gained the optional keyword `ingest_plan` (default `None`),
-`Dataset` the field of the same name, and the CLI the flag `--ingest-plan`;
+`Dataset` the field of the same name, and the CLI the flag `--ingest`;
 the charter gained the optional field `ingest` (format 7) and a charter
 without it keeps its hash. `tests/fixtures/public_api.json` was regenerated
 for the `Project` entry alone. Charter format 8 adds the optional
@@ -125,12 +125,12 @@ deployment ledger gained the row kinds `rollout_experiment`,
 
 `Project` gained the optional keyword `baseline_subject` (`frozen_rule`,
 the default, or `selected_model`), `Dataset` the field of the same name, and
-`plan`, `run` and `resume` the flag `--baseline-subject`; `tests/fixtures/public_api.json`
+`plan`, `run` and `resume` the flag `--comparator`; `tests/fixtures/public_api.json`
 was regenerated for the `Project` entry alone.
 
 `Project` gained the optional keywords `logged_action_column` and
 `propensity_column` (default `None`), `Dataset` the fields of the same names,
-and the CLI the flags `--logged-action-column` and `--propensity-column`;
+and the CLI the flags `--action` and `--propensity`;
 `tests/fixtures/public_api.json` was regenerated for the `Project` entry
 alone. A charter run with a decision block now also writes `decision_report.json`,
 `policy_value.json` and, with a rollout plan, `rollout_design.json` and

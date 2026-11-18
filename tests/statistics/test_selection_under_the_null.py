@@ -143,7 +143,7 @@ def test_a_run_on_pure_noise_does_not_claim_skill_over_the_baseline(tmp_path):
         ).run()
         low = result.diagnostics["metric_uncertainty"]["ci_95"][0]
         claims += low > 0.5
-        assert abs(result.evaluation["test_metrics"]["roc_auc"] - 0.5) < 0.12
+        assert abs(result.evaluation["metrics"]["roc_auc"] - 0.5) < 0.12
     # a correct 95 percent interval claims skill in 2.5 percent of runs; four
     # or more of ten would be a gross failure (probability below 1e-4)
     print(f"MEASURED noise runs claiming skill: {claims} of {runs}")

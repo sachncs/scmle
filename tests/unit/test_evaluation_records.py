@@ -208,11 +208,11 @@ def test_an_old_curation_still_verifies_and_keeps_its_content_digest():
     assert curation.samples == old["sample_count"]
     assert curation.card == old["dataset_card"]
     assert curation.to_dict() == old
-    assert curation.content_digest == old["content_digest"]
+    assert curation.digest == old["content_digest"]
     current = dataclasses.replace(
         curation, schema_version=curators.VERSIONS[-1]
     )
-    assert current.content_digest == old["content_digest"]
+    assert current.digest == old["content_digest"]
     assert "samples" in current.to_dict()
 
 

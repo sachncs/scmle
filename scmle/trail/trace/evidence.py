@@ -3,6 +3,7 @@
 from typing import Any
 
 from scmle.artifacts import claims_audit
+from scmle.artifacts import results
 from scmle.trail import inputs
 from scmle.trail import outcomes
 from scmle.trail import records
@@ -108,18 +109,20 @@ class Evidence(reader.Reader):
     def selection(self) -> None:
         """Derives the selected model, its claims and the bundle identity."""
         name = "selection"
-        evaluation = self.json("run/evaluation.json", name) or {}
+        evaluation = results.evaluation(
+            self.json("run/evaluation.json", name) or {}
+        )
         manifest = self.need("run/model/model_manifest.json", name)
         facts: dict[str, Any] = {
-            "run_id": evaluation.get("run_id"),
-            "selected_model": evaluation.get("selected_model"),
+            "run_id": evaluation.get("run"),
+            "selected_model": evaluation["selected"].get("model"),
             "metric": evaluation.get("metric"),
-            "cv_score": evaluation.get("selected_cv_score"),
-            "cv_interval": evaluation.get("cv_confidence", {}).get("interval"),
-            "test_metrics": evaluation.get("test_metrics"),
-            "n_test": evaluation.get("n_test"),
+            "cv_score": evaluation["selected"].get("score"),
+            "cv_interval": (evaluation.get("confidence") or {}).get("interval"),
+            "test_metrics": evaluation.get("metrics"),
+            "n_test": evaluation["rows"].get("test"),
         }
-        self.run_id = str(evaluation.get("run_id", ""))
+        self.run_id = str(evaluation.get("run", ""))
         if manifest is not None:
             self.content_id = records.checksum(manifest)
             facts["content_id"] = self.content_id

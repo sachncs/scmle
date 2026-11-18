@@ -50,8 +50,8 @@ def prepare(
     good = fixture.train("good", data / "train.csv")
     bad = fixture.train("bad", data / "bad_release_train.csv")
     evaluation = {
-        "good": good.evaluation["test_metrics"],
-        "bad_release": bad.evaluation["test_metrics"],
+        "good": good.evaluation["metrics"],
+        "bad_release": bad.evaluation["metrics"],
     }
     (workdir / "evaluation.json").write_text(
         json.dumps(evaluation, indent=2, sort_keys=True),
@@ -101,7 +101,7 @@ def package(
             registry.register(
                 fixture.MODEL,
                 exported,
-                metrics=result.evaluation["test_metrics"],
+                metrics=result.evaluation["metrics"],
                 run_id=result.run_id,
                 signing_key=fixture.DEMO_SIGNING_KEY,
             )

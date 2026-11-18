@@ -29,7 +29,7 @@ def options(parser):
 
 
 def test_deploy_commands_take_keys_only_as_files():
-    """Enforces docs/CLI.md:158."""
+    """Enforces docs/CLI.md:163."""
     deploy = next(
         action.choices["deploy"]
         for action in vars(cli.build_parser())["_actions"]
@@ -50,7 +50,7 @@ class Interrupted:
 def test_serve_needs_authentication_beyond_loopback(
     tmp_path, monkeypatch, caplog
 ):
-    """Enforces docs/CLI.md:185."""
+    """Enforces docs/CLI.md:190."""
     for name in list(os.environ):
         if name.startswith("SCMLE_AUTH_"):
             monkeypatch.delenv(name)

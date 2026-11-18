@@ -159,7 +159,7 @@ use. You will see SCMLE flag it in Step 4.
 Run the simplest command, with only a short time limit and an output folder:
 
 ```bash runnable
-scmle run titanic.csv --target survived --time-budget 120 --workers 2 --output-dir runs_first
+scmle run titanic.csv --target survived --budget 120 --workers 2 --output-dir runs_first
 echo "exit code: $?"
 ```
 
@@ -206,11 +206,11 @@ You settle a flag in one of two ways:
 2. **The value is known at prediction time and a person vouches for it**: write
    an attestation (see [Leakage](LEAKAGE.md)).
 
-If you would rather have a hard stop than a warning, add `--leakage-policy
+If you would rather have a hard stop than a warning, add `--leakage
 block`. This is useful in regulated work. Try it:
 
 ```bash runnable
-scmle run titanic.csv --target survived --leakage-policy block --time-budget 120 --workers 2 --output-dir runs_blocked
+scmle run titanic.csv --target survived --leakage block --budget 120 --workers 2 --output-dir runs_blocked
 echo "exit code: $?"
 ```
 
@@ -265,8 +265,8 @@ the flag:
 
 ```bash runnable
 scmle run titanic.csv --target survived \
-  --unavailable-at-prediction boat body \
-  --time-budget 120 --workers 2 --output-dir runs
+  --unavailable boat body \
+  --budget 120 --workers 2 --output-dir runs
 ```
 
 This takes two to four minutes, depending on your computer. Lines scroll by
@@ -300,13 +300,13 @@ What to look at, in the order the run does them:
 
 What could go wrong:
 
-* `state.BLOCKED` again: you forgot `--unavailable-at-prediction boat body`.
+* `state.BLOCKED` again: you forgot `--unavailable boat body`.
 * `state.FAILED`: read the line after it. Run `scmle resume runs/run_...` to
   continue after an interruption (finished trials are kept).
 * `all trials failed`, or a trial `exceeded its 6.0s hard time ceiling and was
   killed`: the time budget is too small for your computer. The first run on a
-  new installation is the slowest. Raise `--time-budget` (try 300).
-* It stops early: the time budget ran out. Raise `--time-budget`. A short
+  new installation is the slowest. Raise `--budget` (try 300).
+* It stops early: the time budget ran out. Raise `--budget`. A short
   budget searches fewer models and can leave some report parts empty (see
   [Reading results](READING_RESULTS.md)).
 
@@ -354,7 +354,7 @@ imp = json.loads(
     (run / "diagnostics" / "permutation_importance.json").read_text()
 )
 if imp["truncated"]:
-    print("importance       : not finished in time; raise --time-budget")
+    print("importance       : not finished in time; raise --budget")
 for row in imp["features"][:4]:
     print("importance       :", row["feature"], round(row["importance"], 3))
 for item in json.loads(
@@ -398,7 +398,7 @@ same command, the winner was `bagged_logistic_regression` (practice 0.835, exam
 rows were missing because the time ran out. What to check on your machine: the
 exam score is clearly above 0.5, it is close to the practice score, and
 `fit health` says `healthy`. If the importance rows are missing, rerun with
-`--time-budget 300`.
+`--budget 300`.
 
 How to read it, line by line:
 
@@ -425,7 +425,7 @@ features would be `boat` or `body`. See [Reading results](READING_RESULTS.md).
 
 What could go wrong: the list of `importance` rows is empty, or
 `FileNotFoundError`. A short time budget can leave the importance table empty
-(the file then says `"truncated": true`). Rerun with a larger `--time-budget`.
+(the file then says `"truncated": true`). Rerun with a larger `--budget`.
 
 ## Step 8. Save the model and predict
 

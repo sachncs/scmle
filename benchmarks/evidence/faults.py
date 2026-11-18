@@ -855,8 +855,8 @@ def rolling(horizon: int) -> str | None:
     run = launch(
         frame, target, validation="rolling", horizon_rows=horizon, **options
     )
-    saved = configured(run)["validation"]["horizon_rows"]
-    return f"config.json: validation.horizon_rows {saved}"
+    saved = configured(run)["validation"]["rolling"]["horizon"]
+    return f"config.json: validation.rolling.horizon {saved}"
 
 
 def chronology(fault: str) -> Any:
@@ -1028,8 +1028,8 @@ def multiclass(constraints: dict[str, int]) -> str | None:
     """
     frame, target, options = clean("multiclass")
     run = launch(frame, target, monotonic_constraints=constraints, **options)
-    saved = configured(run)["data"]["monotonic_constraints"]
-    return f"config.json: data.monotonic_constraints {saved}"
+    saved = configured(run)["data"]["monotonic"]
+    return f"config.json: data.monotonic {saved}"
 
 
 @dataclasses.dataclass(frozen=True)

@@ -93,9 +93,9 @@ def test_runs_report_the_interval(binary_frame, tmp_path):
     import support
 
     result = support.make_project(binary_frame, "y", output_dir=tmp_path).run()
-    record = result.evaluation["cv_confidence"]
+    record = result.evaluation["confidence"]
     assert record["available"] and record["folds"] == 5
-    assert record["interval"][0] <= result.evaluation["selected_cv_score"]
+    assert record["interval"][0] <= result.evaluation["selected"]["score"]
     finished = [t for t in result.trials if t.status.value == "ok"]
     assert record["candidates"] == len(finished) > 1
     assert record["selection_optimism"] >= 0.0

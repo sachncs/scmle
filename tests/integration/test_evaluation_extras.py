@@ -25,7 +25,7 @@ def test_nested_validation_reports_the_optimism_of_the_winning_score(tmp_path):
         selection=tasks.Selection(nested_cv=True),
     ).run()
 
-    nested = result.evaluation["nested_cv"]
+    nested = result.evaluation["nested"]
     assert nested["folds"] >= 2 and nested["configurations"] >= 2
     assert "optimism_natural" in nested and 0.4 < nested["mean_natural"] <= 1.0
 
@@ -35,8 +35,8 @@ def test_nested_validation_is_off_unless_asked(tmp_path):
         frame(), "y", time_budget=300, output_dir=tmp_path
     ).run()
 
-    assert result.evaluation["nested_cv"] is None
-    assert result.evaluation["evaluation_prevalence"]["natural"]
+    assert result.evaluation["nested"] is None
+    assert result.evaluation["prevalence"]["natural"]
 
 
 def test_perfectly_equal_classes_get_a_down_sampling_warning(tmp_path):
@@ -67,7 +67,7 @@ def test_the_bias_variance_report_names_the_dominant_error(tmp_path):
         selection=tasks.Selection(bias_variance_replicates=15),
     ).run()
 
-    report = result.evaluation["bias_variance"]
+    report = result.evaluation["decomposition"]
     assert report["kind"] == "squared_error" and report["replicates"] == 15
     assert report["verdict"] in {
         "bias-dominated",
@@ -82,7 +82,7 @@ def test_the_bias_variance_report_is_off_by_default(tmp_path):
         frame(), "y", time_budget=300, output_dir=tmp_path
     ).run()
 
-    assert result.evaluation["bias_variance"] is None
+    assert result.evaluation["decomposition"] is None
 
 
 def test_the_sensitivity_report_separates_training_split_and_noise(tmp_path):

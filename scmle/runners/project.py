@@ -44,6 +44,7 @@ SECTIONS = {
     "models": tasks.Candidates,
     "ensemble": tasks.Stacking,
     "feature_graph": tasks.Derivation,
+    "derivation": tasks.Derivation,
     "selection": tasks.Selection,
     "decision": tasks.Threshold,
     "fairness": tasks.Parity,
@@ -200,6 +201,8 @@ def configure(options: Mapping[str, Any]) -> dict[str, Any]:
     for name, kind in SECTIONS.items():
         if isinstance(converted.get(name), Mapping):
             converted[name] = kind(**converted[name])
+    if "derivation" in converted:
+        converted["feature_graph"] = converted.pop("derivation")
     return converted
 
 
@@ -317,8 +320,8 @@ def summarize(result: Any, resumed: bool) -> dict[str, Any]:
         "resumed": resumed,
         "selected_model": result.selected_model,
         "metric": evaluation["metric"],
-        "selected_cv_score": evaluation["selected_cv_score"],
-        "test_metrics": evaluation["test_metrics"],
+        "selected_cv_score": evaluation["selected"]["score"],
+        "test_metrics": evaluation["metrics"],
         "trials": [
             {
                 "model": trial.model_name,

@@ -71,7 +71,7 @@ def unseal(signature: object) -> str:
 class Curation:
     """Signed curation evidence for a dataset without a model claim.
 
-    ``content_digest`` is the SHA-256 digest of the canonical unsigned
+    ``digest`` is the SHA-256 digest of the canonical unsigned
     evidence. It is deliberately independent of the signing key so that
     consumers can compare curation content across attestations, and it is
     anchored at schema version 1: it is computed over the evidence as
@@ -193,7 +193,7 @@ class Curation:
         return self.layout(self.schema_version)
 
     @property
-    def content_digest(self) -> str:
+    def digest(self) -> str:
         """The deterministic digest of the unsigned evidence at version 1."""
         return attestation.checksum(self.layout(records.ORIGIN))
 
@@ -216,11 +216,16 @@ class Curation:
 
         Returns:
             The unsigned content, laid out as at `schema_version`, plus the
-            content digest, path and a `signature` entry holding the
-            algorithm and value.
+            content digest (`digest`; `content_digest` at version 1), path
+            and a `signature` entry holding the algorithm and value.
         """
         record = self.preimage()
-        record["content_digest"] = self.content_digest
+        name = (
+            "content_digest"
+            if self.schema_version == records.ORIGIN
+            else "digest"
+        )
+        record[name] = self.digest
         record["path"] = self.path
         record["signature"] = {
             "algorithm": signing.SIGNATURE_ALGORITHM,
@@ -287,30 +292,27 @@ class Curation:
             signature=unseal(layout.get("signature")),
             schema_version=version,
         )
-        content_digest = layout.get("content_digest")
-        if content_digest is not None:
-            result.attest(content_digest)
+        digest = layout.get("digest", layout.get("content_digest"))
+        if digest is not None:
+            result.attest(digest)
         return result
 
-    def attest(self, content_digest: object) -> None:
+    def attest(self, digest: object) -> None:
         """Checks a persisted content digest against the evidence.
 
         Args:
-            content_digest: The persisted `content_digest` entry.
+            digest: The persisted `digest` entry (`content_digest` before
+                the key was renamed).
 
         Raises:
             ValueError: If it is not a SHA-256 digest or differs from the
                 digest of this result's content.
         """
-        if not isinstance(content_digest, str) or not containers.hashlike(
-            content_digest
-        ):
+        if not isinstance(digest, str) or not containers.hashlike(digest):
+            raise errors.InputError("modality curation digest is invalid")
+        if not hmac.compare_digest(digest, self.digest):
             raise errors.InputError(
-                "modality curation content_digest is invalid"
-            )
-        if not hmac.compare_digest(content_digest, self.content_digest):
-            raise errors.InputError(
-                "modality curation content_digest does not match evidence"
+                "modality curation digest does not match evidence"
             )
 
     @classmethod
@@ -365,7 +367,7 @@ class Curator(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def dataset_hash(self) -> str:
+    def digest(self) -> str:
         """The immutable dataset identity."""
 
     @property
@@ -444,7 +446,7 @@ class ExtensionCurator(Curator):
         return self.extension
 
     @property
-    def dataset_hash(self) -> str:
+    def digest(self) -> str:
         """The caller-owned immutable dataset identity."""
         return self.dataset_hash_value
 

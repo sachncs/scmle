@@ -100,7 +100,7 @@ def executed(monkeypatch):
 
 def headline(directory):
     evaluation = json.loads((directory / "evaluation.json").read_text())
-    return evaluation["selected_model"], evaluation["test_metrics"]
+    return evaluation["selected"]["model"], evaluation["metrics"]
 
 
 @pytest.fixture(scope="module")

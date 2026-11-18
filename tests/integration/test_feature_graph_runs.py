@@ -101,8 +101,8 @@ def test_derived_features_are_used_and_inference_needs_only_raw_columns(
     assert "when" in plan.extra_inputs
     assert set(result.bundle.features) == {"x1", "x2", "when"}
     assert "cross" not in result.bundle.features  # computed, not supplied
-    with_graph = result.evaluation["test_metrics"]["roc_auc"]
-    without = plain.evaluation["test_metrics"]["roc_auc"]
+    with_graph = result.evaluation["metrics"]["roc_auc"]
+    without = plain.evaluation["metrics"]["roc_auc"]
     assert without < 0.6 and with_graph > 0.95  # XOR is linear in the product
     raw = frame.drop(columns=["y"])
     assert len(result.predict(raw)) == len(frame)
@@ -162,7 +162,7 @@ def test_a_different_graph_is_a_different_configuration(tmp_path):
     )
     first = json.loads((one.run_dir / "config.json").read_text())
     second = json.loads((two.run_dir / "config.json").read_text())
-    assert first["feature_graph"] != second["feature_graph"]
+    assert first["derivation"] != second["derivation"]
 
 
 def test_invalid_graphs_are_refused_before_training(tmp_path):

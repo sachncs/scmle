@@ -1221,6 +1221,20 @@
     "preparation/pseudo_labeling.py Outcome": {
       "pseudo_rows": "pseudo"
     },
+    "api/non_tabular.py Scope": {
+      "decoder_policy": "decoder",
+      "model_family": "family"
+    },
+    "artifacts/bundle/provenance.py Manifest": {
+      "model_name": "model",
+      "model_version": "version",
+      "scmle_version": "scmle",
+      "model_params": "params",
+      "decision_threshold": "threshold"
+    },
+    "artifacts/claims_audit/verdict.py Verification": {
+      "run_dir": "directory"
+    },
     "deploy/observation.py Observation": {
       "image_digest": "digests.image",
       "observed_at": "observed"
@@ -1248,6 +1262,13 @@
     "governance/registry.py Sanction": {
       "content_id": "content",
       "approved_at": "approved"
+    },
+    "inference/evidence.py Link": {
+      "event_id": "event",
+      "input_fingerprint": "digests.payload",
+      "output_fingerprint": "digests.prediction",
+      "bundle_digest": "digests.bundle",
+      "graph_digest": "digests.graph"
     },
     "monitoring/abtest.py Comparison": {
       "control_score": "scores.control",
@@ -1306,9 +1327,17 @@
       "telemetry_digest": "digests.telemetry",
       "audit_head": "head"
     },
+    "pipeline/modality_lifecycle/containers.py Package": {
+      "model_sha256": "digests.model"
+    },
     "runners/base/job.py Job": {
       "run_id": "identifier",
       "timeout_seconds": "timeout"
+    },
+    "runtime/retry.py Retries": {
+      "max_attempts": "attempts",
+      "base_delay_seconds": "delays.base",
+      "max_delay_seconds": "delays.cap"
     },
     "workflow/definition.py Step": {
       "depends_on": "needs",
@@ -1322,6 +1351,98 @@
       "cost_budget": "budget",
       "group_limits": "limits",
       "max_parallel": "parallel"
+    },
+    "contracts/tasks/config.py Config": {
+      "feature_graph": "derivation",
+      "leakage_policy": "leakage",
+      "charter_path": "charter",
+      "ledger_rule": "ledger",
+      "confirmation_rule": "confirmation",
+      "confirmation_failure_policy": "failure",
+      "leakage_attestations": "attestations"
+    },
+    "contracts/tasks/sections.py Problem": {
+      "success_criteria": "criteria"
+    },
+    "contracts/tasks/sections.py Dataset": {
+      "id_columns": "identifiers",
+      "group_column": "group",
+      "time_column": "time",
+      "time_as_feature": "temporal",
+      "excluded_columns": "excluded",
+      "unavailable_at_prediction": "unavailable",
+      "feature_delays": "delays",
+      "sensitive_columns": "sensitive",
+      "monotonic_constraints": "monotonic",
+      "weight_column": "weight",
+      "event_column": "event",
+      "memory_budget_gb": "memory",
+      "treatment_column": "treatment",
+      "value_column": "value",
+      "seasonal_period": "period",
+      "forecast_lags": "forecast.lags",
+      "forecast_windows": "forecast.windows",
+      "forecast_calendar": "forecast.calendar",
+      "text_encoding": "encoding",
+      "embedding_model": "embedder",
+      "query_column": "query",
+      "ordinal_order": "order",
+      "reference_uri": "reference",
+      "pseudo_label_confidence": "confidence",
+      "baseline_column": "baseline",
+      "baseline_subject": "comparator",
+      "framing_draft": "draft",
+      "propensity_column": "propensity",
+      "logged_action_column": "action",
+      "ingest_plan": "ingest"
+    },
+    "contracts/tasks/sections.py Validation": {
+      "test_fraction": "test",
+      "embargo_rows": "embargo",
+      "horizon_rows": "rolling.horizon",
+      "window_rows": "rolling.window"
+    },
+    "contracts/tasks/sections.py Resources": {
+      "time_budget_seconds": "budget",
+      "memory_limit_gb": "limits.memory",
+      "cpu_limit": "limits.cpu",
+      "cluster_address": "cluster"
+    },
+    "contracts/tasks/sections.py Search": {
+      "top_models": "leaders",
+      "configs_per_model": "configurations",
+      "prune_fraction": "discard"
+    },
+    "contracts/tasks/sections.py Strategies": {
+      "top_models": "leaders"
+    },
+    "contracts/tasks/sections.py Selection": {
+      "max_model_mb": "size",
+      "max_p95_latency_ms": "latency",
+      "latency_safety_factor": "headroom",
+      "max_candidates_checked": "depth",
+      "tie_breaker": "tiebreaker",
+      "tie_tolerance": "tolerance",
+      "bayesian_confidence": "credibility",
+      "nested_cv": "nested",
+      "bias_variance_replicates": "replicates",
+      "sensitivity_repeats": "repeats",
+      "pareto_tolerance": "slack"
+    },
+    "contracts/tasks/sections.py Candidates": {
+      "exclude_models": "exclude.models",
+      "exclude_families": "exclude.families",
+      "experimental_models": "experimental"
+    },
+    "contracts/tasks/sections.py Threshold": {
+      "threshold_objective": "objective",
+      "false_positive_cost": "costs.fp",
+      "false_negative_cost": "costs.fn"
+    },
+    "contracts/tasks/sections.py Parity": {
+      "trigger_gap": "trigger",
+      "min_reduction": "reduction",
+      "max_accuracy_cost": "cost"
     },
     "contracts/evaluation/parts.py Uncertainty": {
       "confidence_level": "confidence",
@@ -1376,6 +1497,54 @@
       "privacy_decision": "clearance",
       "evidence_links": "links"
     },
+    "evaluation.json Evaluation": {
+      "run_id": "run",
+      "metric_greater_is_better": "direction",
+      "selection_policy": "policy",
+      "selected_model": "selected.model",
+      "selected_trial_id": "selected.trial",
+      "selected_params": "selected.params",
+      "selected_strategy": "selected.strategy",
+      "selected_cv_score": "selected.score",
+      "selected_cv_std": "selected.deviation",
+      "fit_health": "health",
+      "cv_confidence": "confidence",
+      "baseline_cv_score": "baseline",
+      "test_metrics": "metrics",
+      "weighted_test_metrics": "weighted",
+      "semi_supervised": "unlabeled",
+      "fairness_mitigation": "mitigation",
+      "execution_backend": "backend",
+      "pareto_front": "pareto",
+      "evaluation_prevalence": "prevalence",
+      "success_criteria": "criteria",
+      "streamed_locked": "streamed",
+      "n_dev": "rows.development",
+      "n_test": "rows.test",
+      "split_fingerprint": "digests.split",
+      "split_strategy": "validation",
+      "net_benefit": "benefit",
+      "resource_limits": "limits",
+      "skipped_for_time": "skipped",
+      "test_set_opened": "opened",
+      "elapsed_seconds": "elapsed",
+      "learning_curve": "learning",
+      "nested_cv": "nested",
+      "bias_variance": "decomposition",
+      "forecast_backtest": "backtest",
+      "quantile_coverage": "quantiles",
+      "model_card": "card",
+      "reliability_plan": "reliability",
+      "release_attestation": "release.attestation",
+      "release_policy": "release.policy",
+      "release_evaluation": "release.evaluation",
+      "release_evidence": "release.evidence",
+      "explanation_evidence": "explanations",
+      "artifact_verification": "verification"
+    },
+    "pipeline/modality_lifecycle/steps.py evaluation": {
+      "sample_count": "samples"
+    },
     "data/catalog/identity.py Source": {
       "source_identity": "identity"
     },
@@ -1385,6 +1554,9 @@
     "data/modalities/graph/elements.py Validation": {
       "error_codes": "codes",
       "is_valid": "valid"
+    },
+    "pipeline/modality_lifecycle/curators.py Curation": {
+      "content_digest": "digest"
     }
   }
 }

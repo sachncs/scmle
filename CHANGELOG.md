@@ -90,6 +90,69 @@ marked `Breaking:` and listed first in their group.
   version; dataset, model, job, workflow and alert digests are anchored at
   version 1 and do not change. Scripts of your own that read these files must
   use the new keys, listed in [`docs/RECORD_KEYS.md`](docs/RECORD_KEYS.md).
+* **Configuration keys, CLI flags and `gates.toml` variables renamed.**
+  `config.json` (and `Project.config.model_dump()`) stores single-word keys:
+  for example `feature_graph` -> `derivation`, `leakage_policy` ->
+  `leakage`, `data.group_column` -> `data.group`, `data.time_column` ->
+  `data.time`, `data.forecast_lags` -> `data.forecast.lags`,
+  `validation.horizon_rows` -> `validation.rolling.horizon`,
+  `resources.time_budget_seconds` -> `resources.budget`,
+  `resources.memory_limit_gb` -> `resources.limits.memory`,
+  `search.top_models` -> `search.leaders`, `models.exclude_models` ->
+  `models.exclude.models` and `decision.false_positive_cost` ->
+  `decision.costs.fp` (70 keys; all in
+  [`docs/RECORD_KEYS.md`](docs/RECORD_KEYS.md)). Old `config.json` files
+  and `--config` overlays in either spelling still load, and `config_hash`
+  is taken on the old layout, so a configuration keeps its hash. The Python
+  field names and `Project` keywords are unchanged. 29 `scmle run` flags
+  take the new names: `--time-budget` -> `--budget`, `--memory-budget-gb` ->
+  `--memory`, `--id-columns` -> `--identifiers`, `--group-column` ->
+  `--group`, `--time-column` -> `--time`, `--time-as-feature` ->
+  `--temporal`, `--weight-column` -> `--weight`, `--event-column` ->
+  `--event`, `--query-column` -> `--query`, `--treatment-column` ->
+  `--treatment`, `--baseline-column` -> `--baseline`, `--baseline-subject`
+  -> `--comparator`, `--framing-draft` -> `--draft`, `--propensity-column`
+  -> `--propensity`, `--logged-action-column` -> `--action`,
+  `--ingest-plan` -> `--ingest`, `--seasonal-period` -> `--period`,
+  `--ordinal-order` -> `--order`, `--sensitive-columns` -> `--sensitive`,
+  `--feature-delay` -> `--delay`, `--unavailable-at-prediction` ->
+  `--unavailable`, `--test-fraction` -> `--test`, `--embargo-rows` ->
+  `--embargo`, `--horizon-rows` -> `--rolling-horizon`, `--window-rows` ->
+  `--rolling-window`, `--top-models` -> `--leaders`, `--configs-per-model`
+  -> `--configurations`, `--leakage-policy` -> `--leakage` and
+  `--leakage-attestations` -> `--attestations`. The `variables` of
+  `gates.toml` use the new configuration paths (`resources.budget`,
+  `data.group`, `selection.size`, `validation.rolling.horizon`, ...).
+  **Deprecated:** the old flag spellings are hidden aliases that warn once,
+  and the gate registry still reads an old variable spelling with a warning;
+  both are removed in the next release.
+* **`evaluation.json` schema 2.** The file now carries `schema_version` 2
+  and single-word keys: the selected model's fields are grouped as
+  `selected.{model, trial, params, strategy, score, deviation}` (from
+  `selected_model`, `selected_trial_id`, `selected_params`,
+  `selected_strategy`, `selected_cv_score`, `selected_cv_std`), the row
+  counts as `rows.{development, test}`, the release records as
+  `release.{attestation, policy, evaluation, evidence}`,
+  `split_fingerprint` -> `digests.split`, `test_metrics` -> `metrics`,
+  `weighted_test_metrics` -> `weighted`, `fit_health` -> `health`,
+  `cv_confidence` -> `confidence`, `baseline_cv_score` -> `baseline`,
+  `run_id` -> `run`, `split_strategy` -> `validation`, `model_card` ->
+  `card`, and `metric_greater_is_better` (a bool) -> `direction` (`higher`
+  or `lower`); 44 keys in all. A run result's `evaluation` has the same
+  layout. `scmle.artifacts.results.evaluation()` reads a file of either
+  version at version 2.
+* **Six more write-only records renamed.** The non-tabular capability
+  `Scope` (`decoder_policy` -> `decoder`, `model_family` -> `family`), the
+  bundle provenance `Manifest` (`model_name` -> `model`, `model_version` ->
+  `version`, `scmle_version` -> `scmle`, `model_params` -> `params`,
+  `decision_threshold` -> `threshold`), the claims-audit `Verification`
+  (`run_dir` -> `directory`), the inference evidence `Link` (`event_id` ->
+  `event`, the fingerprints and digests under `digests.{payload,
+  prediction, bundle, graph}`; the node digest stays anchored at version
+  1), the modality model `Package` (`model_sha256` -> `digests.model`)
+  and the retry policy `Retries` (`max_attempts` -> `attempts`, the waits
+  under `delays.{base, cap}`). The modality curation evidence writes
+  `content_digest` as `digest`. scmle reads the old layouts.
 * **Modules moved by the package layering (DES-13).** Each package now imports
   only the layers below it; the moves are listed, `old -> new`, under "Module
   moves" in [`docs/RENAMES.md`](docs/RENAMES.md). Names inside a module are

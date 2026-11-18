@@ -187,3 +187,33 @@ def test_a_process_with_a_non_ascii_name_is_still_counted(
     )
     table = limits.tabulate()
     assert table[4242] == (1, 3 * limits.resource.getpagesize())
+
+
+def test_a_statm_that_is_not_ascii_skips_the_process(
+    monkeypatch, tmp_path
+) -> None:
+    stat = tmp_path / "stat"
+    stat.write_text("42 (a b) S 7 0 0", encoding="ascii")
+    statm = tmp_path / "statm"
+    statm.write_bytes("100 25 0 é".encode())
+    entry = Entry("42", {"stat": stat, "statm": statm})
+    root = types.SimpleNamespace(iterdir=lambda: [entry])
+    monkeypatch.setattr(
+        limits, "pathlib", types.SimpleNamespace(Path=lambda text: root)
+    )
+    assert limits.tabulate() == {}
+
+
+def test_a_cpu_cap_is_reported_word_for_word() -> None:
+    found = governor(cpu_limit=2).report()
+    assert found["cpu"]["enforcement"] == (
+        "worker count and library threads capped"
+    )
+
+
+def test_a_closed_trial_window_names_what_the_reserve_is_for() -> None:
+    reason = late().skip_reason(first=True)
+    assert reason is not None
+    assert reason.endswith(
+        "reserved for the final refit, diagnostics and packaging"
+    )

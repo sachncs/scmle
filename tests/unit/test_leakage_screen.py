@@ -634,4 +634,4 @@ def test_the_budget_remedy_is_kept_for_a_declined_screen():
     declined = screen.Screen(
         (), 10, 0, 0, 0.05, {}, {}, (), ("a",), "work limit for a 2 s budget"
     )
-    assert declined.remedy == "raise --time-budget or screen fewer columns"
+    assert declined.remedy == "raise --budget or screen fewer columns"

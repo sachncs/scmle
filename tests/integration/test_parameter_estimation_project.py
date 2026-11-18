@@ -77,7 +77,7 @@ def test_project_run_persists_separate_estimation_evidence(tmp_path):
     restored = Estimation.read(artifact)
     assert restored.digest() == result.estimation.digest()
     assert restored.policy.covariance == "clustered"
-    assert result.evaluation["selected_model"] == result.selected_model
+    assert result.evaluation["selected"]["model"] == result.selected_model
     assert result.evaluation["parameter_estimation"] == {
         "artifact": "parameter_estimation.json",
         "digest": restored.digest(),

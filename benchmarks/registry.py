@@ -8,6 +8,10 @@ every function in the package that raises `BlockedError` or `LeakageError`;
 a site that raises and is not registered, or a registered site that no
 longer raises, fails CI, so no gate exists that the scorecard cannot see.
 
+A variable names a configuration field by its stored key. The keys renamed
+to single words (`tasks.renamed`) are still read in their old spelling for
+one release, with a warning, and stored under the new one.
+
     python -m benchmarks.registry        # compare the registry with the code
 """
 
@@ -17,6 +21,9 @@ import json
 import pathlib
 import sys
 import tomllib
+import warnings
+
+from scmle.contracts import tasks
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PATH = ROOT / "gates.toml"
@@ -24,6 +31,7 @@ PACKAGE = ROOT / "scmle"
 ERRORS = frozenset({"BlockedError", "LeakageError"})
 CLAIMS = frozenset(f"C{n}" for n in range(1, 15))
 TEXTS = ("site", "error", "claim", "passes", "blocks", "override")
+RENAMED = tasks.renamed()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -91,6 +99,13 @@ def parse(name: str, table: dict[str, object]) -> Gate:
     variables = table.get("variables", [])
     if not isinstance(variables, list):
         raise ValueError(f"{name}: variables must be a list")
+    for old in [str(v) for v in variables if v in RENAMED]:
+        warnings.warn(
+            f"{name}: variable {old} is deprecated and will be removed in "
+            f"the next release; write {RENAMED[old]}",
+            FutureWarning,
+            stacklevel=2,
+        )
     return Gate(
         name,
         str(table["site"]),
@@ -99,7 +114,7 @@ def parse(name: str, table: dict[str, object]) -> Gate:
         str(table["passes"]),
         str(table["blocks"]),
         str(table["override"]),
-        tuple(map(str, variables)),
+        tuple(RENAMED.get(str(v), str(v)) for v in variables),
         str(table.get("certificate", "")),
     )
 

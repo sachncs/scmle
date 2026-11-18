@@ -75,7 +75,7 @@ class GeospatialPreparer(curators.Preparer):
         self.block_size = block_size
 
     @property
-    def dataset_hash(self) -> str:
+    def digest(self) -> str:
         """The vector dataset identity."""
         return self.dataset.content_hash
 
@@ -108,7 +108,7 @@ class GeospatialPreparer(curators.Preparer):
                         "quality.geospatial-boundary-leakage",
                         data.FindingSeverity.WARNING,
                         {
-                            "dataset": self.dataset_hash,
+                            "dataset": self.digest,
                             "block_size": self.block_size,
                         },
                         leakage.to_dict(),

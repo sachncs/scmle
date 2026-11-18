@@ -66,6 +66,7 @@ import pandas
 
 from benchmarks import acceptance
 from benchmarks.evidence import refusal
+from scmle.artifacts import results
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
 
@@ -98,7 +99,7 @@ KEY = "bypass-search-key"
 # Fast public options, as in tests/support.py: no search, strategies,
 # ensembles or slow families; trials run in process.
 FAST = (
-    "--top-models",
+    "--leaders",
     "0",
     "--exclude-families",
     "bagging",
@@ -266,10 +267,12 @@ def trained(result: Any) -> dict[str, Any]:
         a near-perfect score) and its run directory.
     """
     path = pathlib.Path(result.run_dir) / "evaluation.json"
-    evaluation = json.loads(path.read_text(encoding="utf-8"))
+    evaluation = results.evaluation(
+        json.loads(path.read_text(encoding="utf-8"))
+    )
     return {
         "model": result.selected_model,
-        "test": evaluation.get("test_metrics"),
+        "test": evaluation.get("metrics"),
         "run": pathlib.Path(result.run_dir).name,
     }
 
@@ -475,9 +478,9 @@ def command(lab: Lab, data: pathlib.Path, *extra: str) -> list[str]:
 
 
 def clileak(lab: Lab) -> Callable[[], dict[str, Any]]:
-    """A renamed leak through `scmle run --leakage-policy block`."""
+    """A renamed leak through `scmle run --leakage block`."""
     data = written(lab, leaked("renamed"))
-    arguments = command(lab, data, "--leakage-policy", "block")
+    arguments = command(lab, data, "--leakage", "block")
     return lambda: cli(arguments, folder=lab.folder)
 
 
@@ -485,9 +488,9 @@ def overlay(lab: Lab) -> Callable[[], dict[str, Any]]:
     """A `--config` file that tries to set the policy back to warn."""
     data = written(lab, leaked("renamed"))
     config = lab.folder / "config.json"
-    config.write_text(json.dumps({"leakage_policy": "warn"}), "utf-8")
+    config.write_text(json.dumps({"leakage": "warn"}), "utf-8")
     arguments = command(
-        lab, data, "--leakage-policy", "block", "--config", str(config)
+        lab, data, "--leakage", "block", "--config", str(config)
     )
     return lambda: cli(arguments, folder=lab.folder)
 
@@ -580,9 +583,9 @@ def budget(value: Any) -> Callable[[Lab], Callable[[], dict[str, Any]]]:
 
 
 def clibudget(lab: Lab) -> Callable[[], dict[str, Any]]:
-    """A two-second budget through `scmle run --time-budget 2`."""
+    """A two-second budget through `scmle run --budget 2`."""
     data = written(lab, table())
-    arguments = command(lab, data, "--time-budget", "2")
+    arguments = command(lab, data, "--budget", "2")
     return lambda: cli(arguments, folder=lab.folder)
 
 
@@ -675,7 +678,9 @@ def finished(lab: Lab, frame: pandas.DataFrame, **settings: Any) -> Any:
         The run directory and its evaluation.
     """
     run = pathlib.Path(project(lab, frame, **settings).run().run_dir)
-    evaluation = json.loads((run / "evaluation.json").read_text("utf-8"))
+    evaluation = results.evaluation(
+        json.loads((run / "evaluation.json").read_text("utf-8"))
+    )
     return run, evaluation
 
 
@@ -693,11 +698,13 @@ def reopened(
         The model and test metrics of both openings.
     """
     result = resume(run, frame)
-    after = json.loads((run / "evaluation.json").read_text("utf-8"))
+    after = results.evaluation(
+        json.loads((run / "evaluation.json").read_text("utf-8"))
+    )
     return {
         **result,
-        "first": [before["selected_model"], before["test_metrics"]],
-        "second": [after["selected_model"], after["test_metrics"]],
+        "first": [before["selected"]["model"], before["metrics"]],
+        "second": [after["selected"]["model"], after["metrics"]],
     }
 
 
@@ -726,8 +733,8 @@ def examedit(lab: Lab) -> Callable[[], dict[str, Any]]:
     """
     frame = table()
     run, before = finished(lab, frame)
-    winner = before["selected_model"]
-    edit(run, lambda c: c["models"]["exclude_models"].append(winner))
+    winner = before["selected"]["model"]
+    edit(run, lambda c: c["models"]["exclude"]["models"].append(winner))
     (run / "evaluation.json").unlink()
     (run / "complete.json").unlink()
     (run / "execution_plan.json").unlink(missing_ok=True)
@@ -1067,7 +1074,7 @@ ATTEMPTS = {
             "leak_cli",
             "leakage.policy",
             "cli",
-            "renamed copy through scmle run --leakage-policy block",
+            "renamed copy through scmle run --leakage block",
             clileak,
         ),
         Attempt(
@@ -1075,7 +1082,7 @@ ATTEMPTS = {
             "leakage.policy",
             "cli",
             "--config file setting leakage_policy to warn beside "
-            "--leakage-policy block",
+            "--leakage block",
             overlay,
         ),
         Attempt(
@@ -1134,7 +1141,7 @@ ATTEMPTS = {
             "budget_cli",
             "budget.minimum_run",
             "cli",
-            "scmle run --time-budget 2",
+            "scmle run --budget 2",
             clibudget,
         ),
         Attempt(

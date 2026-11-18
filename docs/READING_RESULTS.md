@@ -21,7 +21,7 @@ Terms are in the [glossary](GLOSSARY.md).
 | --- | --- | --- |
 | The headline | the last line of the run output | `selected ... (cv ...); test: ...` |
 | The story in one page | `report.html` | findings first, then the leaderboard; the long plan list is folded at the bottom |
-| Every number | `evaluation.json` | `test_metrics`, `selected_cv_score`, `fit_health`, `cv_confidence` |
+| Every number | `evaluation.json` | `metrics`, `selected.score`, `health`, `confidence` |
 | Every model tried | `leaderboard.parquet` or `result.leaderboard()` | `score`, `deviation`, `status`, `fit_health` |
 | Why each choice was made | `diagnostics/decision_log.json` | `selection`, `outcomes` |
 | What the model relies on | `diagnostics/permutation_importance.json` | the first rows |
@@ -40,10 +40,10 @@ exam 95% band    : [0.841, 0.927]
 dummy baseline   : 0.5
 ```
 
-* **Practice score** (`selected_cv_score`, "cv" in the run output): the
+* **Practice score** (`selected.score`, "cv" in the run output): the
   average over cross-validation rounds on the learning rows. The `+/-` is the
   spread between rounds. SCMLE used it to pick the winner.
-* **Exam score** (`test_metrics`): the winner scored once on held-out data,
+* **Exam score** (`metrics`): the winner scored once on held-out data,
   rows nobody touched. This is the fair preview.
 * **Band**: with 216 exam rows the true score could be 0.84 or 0.93. Quote the
   band, not just the point. When the bands of two models overlap, the data do
@@ -168,7 +168,7 @@ with how much it kept in validation.
 
 The author ran the same table twice. The only difference was `boat` and `body`:
 
-| | Without them (`--unavailable-at-prediction boat body`) | With them (default run) |
+| | Without them (`--unavailable boat body`) | With them (default run) |
 | --- | --- | --- |
 | Exam ROC AUC | 0.885 | 0.988 |
 | Top feature | `sex`, importance 0.242 | `boat`, importance 0.334 |
@@ -189,7 +189,7 @@ ticket" should have rung a bell: the real answer is not that predictable.
 Second, a flag is a suspicion and not a verdict: the data do not show when a
 value is recorded. Settle it by declaring the column unavailable, or by
 attesting it ([Leakage](LEAKAGE.md)). If you want a hard stop instead of a
-warning, use `--leakage-policy block`.
+warning, use `--leakage block`.
 
 A leakage suspicion is "not proof": a really strong, legitimate feature looks
 the same to a statistical screen. The cure is a human question: "Would I know
@@ -241,7 +241,7 @@ plan, check it, sign it and run with it:
 scmle charter init charter.json
 scmle charter check charter.json --rows 1093
 scmle charter sign charter.json
-scmle run titanic.csv --target survived --unavailable-at-prediction boat body --charter charter.json
+scmle run titanic.csv --target survived --unavailable boat body --charter charter.json
 ```
 
 (Edit the file *before* you sign it: `charter sign` wraps the plan inside a

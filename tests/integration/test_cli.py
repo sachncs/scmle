@@ -24,12 +24,12 @@ def test_plan_run_predict_roundtrip(binary_frame, tmp_path, caplog):
         "--output-dir",
         str(tmp_path / "runs"),
     ]
-    assert cli.main(["plan", *common, "--time-budget", "120"]) == 0
+    assert cli.main(["plan", *common, "--budget", "120"]) == 0
     assert "Candidates:" in caplog.text
     caplog.clear()
     assert not (tmp_path / "runs").exists()
 
-    assert cli.main(["run", *common, "--time-budget", "120"]) == 0
+    assert cli.main(["run", *common, "--budget", "120"]) == 0
     assert "selected" in caplog.text and "artifacts:" in caplog.text
     caplog.clear()
     bundle_dir = (
@@ -213,7 +213,7 @@ def test_predict_with_explicit_renames(binary_frame, tmp_path, monkeypatch):
             "y",
             "--output-dir",
             str(tmp_path / "runs"),
-            "--top-models",
+            "--leaders",
             "0",
         ]
     )
@@ -275,7 +275,7 @@ def test_config_file_and_flags_reach_the_full_specification(
         "y",
         "--output-dir",
         str(tmp_path / "runs"),
-        "--time-budget",
+        "--budget",
         "300",
         "--config",
         str(config),
@@ -283,7 +283,7 @@ def test_config_file_and_flags_reach_the_full_specification(
         "3",
         "--enforcement",
         "cooperative",
-        "--leakage-policy",
+        "--leakage",
         "block",
     ]
     assert cli.main(args) == 0
@@ -292,10 +292,10 @@ def test_config_file_and_flags_reach_the_full_specification(
         .joinpath("config.json")
         .read_text()
     )
-    assert saved["selection"]["tie_breaker"] == "lower_variance"
+    assert saved["selection"]["tiebreaker"] == "lower_variance"
     assert saved["validation"]["folds"] == 3
     assert saved["resources"]["enforcement"] == "cooperative"
-    assert saved["leakage_policy"] == "block"
+    assert saved["leakage"] == "block"
     bad = tmp_path / "bad.json"
     bad.write_text(json.dumps({"mystery": {}}))
     assert cli.main([*args[:-8], "--config", str(bad)]) != 0

@@ -1,8 +1,10 @@
 """`Manifest`, the provenance and compatibility record of a bundle."""
 
+from collections.abc import Mapping
 import dataclasses
 import platform
 from typing import Any
+from typing import ClassVar
 
 import pandas
 import sklearn
@@ -10,6 +12,7 @@ import sklearn
 import scmle
 from scmle.artifacts.bundle import environment
 from scmle.artifacts.bundle import layout
+from scmle.contracts import records
 
 
 def truncate(version: str) -> list[str]:
@@ -58,7 +61,19 @@ class Manifest:
             scmle ran from an installed wheel, whose version names the code.
         threads: Thread count per math library loaded when it was built.
         blas: BLAS implementation in use when it was built.
+        KEYS: Version-1 keys to the written ones (`model`, `version`,
+            `scmle`, `params`, `threshold`); `downgrade` restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "model_name": "model",
+            "model_version": "version",
+            "scmle_version": "scmle",
+            "model_params": "params",
+            "decision_threshold": "threshold",
+        }
+    )
 
     model_name: str
     model_version: str
@@ -108,9 +123,29 @@ class Manifest:
         """Returns a JSON-serializable mapping.
 
         Returns:
-            A dict of all fields.
+            A dict of all fields under their written keys.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
+
+    @classmethod
+    def read(cls, stored: Mapping[str, Any]) -> "Manifest":
+        """Reads a stored manifest in either layout.
+
+        Args:
+            stored: A `model_manifest.json` record, with the written keys or
+                with the version-1 field names.
+
+        Returns:
+            The manifest.
+
+        Raises:
+            InputError: If the record mixes an old key with its new one.
+        """
+        fields = {field.name for field in dataclasses.fields(cls)}
+        layout = dict(stored)
+        if set(layout) - fields:
+            layout = cls.KEYS.downgrade(layout)
+        return cls(**layout)
 
     def incompatibilities(self) -> list[str]:
         """Lists dependency mismatches with the running environment.

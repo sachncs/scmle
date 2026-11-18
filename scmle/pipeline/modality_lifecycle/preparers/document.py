@@ -39,7 +39,7 @@ class DocumentPreparer(curators.Preparer):
         self.dataset = dataset
 
     @property
-    def dataset_hash(self) -> str:
+    def digest(self) -> str:
         """The document corpus identity."""
         return self.dataset.content_hash
 

@@ -46,8 +46,8 @@ def test_selection_can_pick_a_tuned_configuration(regression_frame, tmp_path):
         for t in result.trials
         if t.status == "ok" and not t.params and t.model_name != "dummy"
     )
-    assert result.evaluation["selected_cv_score"] <= best_default + 1e-12
-    selected = result.evaluation["selected_params"]
+    assert result.evaluation["selected"]["score"] <= best_default + 1e-12
+    selected = result.evaluation["selected"]["params"]
     assert result.bundle.info.model_params == selected
 
 
@@ -98,8 +98,8 @@ def test_tuning_is_reproducible(binary_frame, tmp_path):
     first, second = run(binary_frame, tmp_path), run(binary_frame, tmp_path)
     assert [t.params for t in first.trials] == [t.params for t in second.trials]
     assert (
-        first.evaluation["selected_params"]
-        == second.evaluation["selected_params"]
+        first.evaluation["selected"]["params"]
+        == second.evaluation["selected"]["params"]
     )
 
 
@@ -124,11 +124,11 @@ def test_cli_exposes_search_options(binary_frame, tmp_path, caplog):
             "y",
             "--output-dir",
             str(tmp_path / "r"),
-            "--top-models",
+            "--leaders",
             "1",
-            "--configs-per-model",
+            "--configurations",
             "2",
-            "--time-budget",
+            "--budget",
             "300",
         ]
     )

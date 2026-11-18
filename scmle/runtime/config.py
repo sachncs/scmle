@@ -13,19 +13,23 @@ SECTIONS = {
     "models": tasks.Candidates,
     "ensemble": tasks.Stacking,
     "feature_graph": tasks.Derivation,
+    "derivation": tasks.Derivation,
     "selection": tasks.Selection,
     "decision": tasks.Threshold,
 }
+KEYWORDS = {"derivation": "feature_graph"}
+"""Stored section names whose `Project` keyword is still the field name."""
 
 
 def overlay(path: str | pathlib.Path | None) -> dict[str, Any]:
     """Reads the optional JSON file of nested specification sections.
 
     Args:
-        path: JSON file whose keys are section names.
+        path: JSON file whose keys are section names, in either spelling
+            (`derivation` or the older `feature_graph`).
 
     Returns:
-        Section name to specification object; empty without a file.
+        `Project` keyword to specification object; empty without a file.
 
     Raises:
         ConfigError: For unknown sections.
@@ -39,4 +43,7 @@ def overlay(path: str | pathlib.Path | None) -> dict[str, Any]:
             f"unknown config sections {sorted(unknown)}; allowed: "
             f"{sorted(SECTIONS)}"
         )
-    return {name: SECTIONS[name](**body) for name, body in record.items()}
+    return {
+        KEYWORDS.get(name, name): SECTIONS[name](**body)
+        for name, body in record.items()
+    }

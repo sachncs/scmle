@@ -52,17 +52,17 @@ def result(tmp_path_factory):
 def test_the_model_beats_no_change_and_the_seasonal_baseline_at_every_step(
     result,
 ):
-    steps = result.evaluation["forecast_backtest"]["steps"]
+    steps = result.evaluation["backtest"]["steps"]
 
     assert len(steps) == HORIZON
     for step in steps:
         assert step["model_mae"] < step["seasonal_naive_mae"]
         assert step["model_mae"] < step["last_value_mae"]
-    assert result.evaluation["test_metrics"]["mase"] < 0.6
+    assert result.evaluation["metrics"]["mase"] < 0.6
 
 
 def test_each_rolling_origin_is_reported_per_step(result):
-    origins = result.evaluation["forecast_backtest"]["origins"]
+    origins = result.evaluation["backtest"]["origins"]
 
     assert len(origins) >= 2
     for origin in origins:
@@ -81,7 +81,7 @@ def test_training_targets_never_reach_into_the_locked_period(result):
     last_training = usable["date"].iloc[manifest["training"]].max()
     first_test = usable["date"].iloc[manifest["test"]].min()
 
-    assert result.evaluation["split_strategy"] == "temporal"
+    assert result.evaluation["validation"] == "temporal"
     assert last_training + pandas.Timedelta(days=HORIZON) < first_test
 
 
@@ -149,6 +149,6 @@ def test_the_backtest_works_under_hard_isolation_where_locked_rows_are_sealed(
 ):
     result = run(tmp_path, series(300), enforcement="hard")
 
-    steps = result.evaluation["forecast_backtest"]["steps"]
+    steps = result.evaluation["backtest"]["steps"]
     assert len(steps) == HORIZON
     assert all(s["seasonal_naive_mae"] is not None for s in steps)

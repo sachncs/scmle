@@ -1,5 +1,6 @@
-"""Typed run result."""
+"""Typed run result and the `evaluation.json` record's versions."""
 
+from collections.abc import Mapping
 import dataclasses
 import json
 import pathlib
@@ -10,6 +11,7 @@ import pandas
 
 import scmle.artifacts.bundle
 from scmle.contracts import experiments
+from scmle.contracts import records
 import scmle.contracts.data
 from scmle.evaluation import fit_health
 from scmle.evaluation import parameter_estimation
@@ -21,6 +23,122 @@ LEADERBOARD_DETAILS = (
     "runtime",
     "training",
 )
+HIGHER = "higher"
+LOWER = "lower"
+GROUPS = records.nest(
+    {},
+    groups={
+        "selected": {
+            "selected_model": "model",
+            "selected_trial_id": "trial",
+            "selected_params": "params",
+            "selected_strategy": "strategy",
+            "selected_cv_score": "score",
+            "selected_cv_std": "deviation",
+        },
+        "rows": {"n_dev": "development", "n_test": "test"},
+        "digests": {"split_fingerprint": "split"},
+        "release": {
+            "release_attestation": "attestation",
+            "release_policy": "policy",
+            "release_evaluation": "evaluation",
+            "release_evidence": "evidence",
+        },
+    },
+)
+"""Gathers the version-1 keys that share a prefix into objects (rule 2)."""
+
+
+def orient(layout: records.Layout) -> records.Layout:
+    """Gathers the grouped keys and turns the metric direction into a word.
+
+    Args:
+        layout: An evaluation record after the version-2 renames.
+
+    Returns:
+        The record with its `GROUPS` objects, and a boolean `direction` given
+        as `higher` or `lower`.
+    """
+    layout = GROUPS.upgrade(layout)
+    if isinstance(layout.get("direction"), bool):
+        layout["direction"] = HIGHER if layout["direction"] else LOWER
+    return layout
+
+
+def disorient(layout: records.Layout) -> records.Layout:
+    """Undoes `orient`: the metric direction as a flag, the groups spread.
+
+    Args:
+        layout: An evaluation record at version 2.
+
+    Returns:
+        The record, with `direction` True for `higher` and False for `lower`
+        and the `GROUPS` objects spread back to top-level keys.
+    """
+    if layout.get("direction") in {HIGHER, LOWER}:
+        layout["direction"] = layout["direction"] == HIGHER
+    return GROUPS.downgrade(layout)
+
+
+MIGRATIONS = (
+    records.Migration(
+        renames={
+            "run_id": "run",
+            "metric_greater_is_better": "direction",
+            "selection_policy": "policy",
+            "fit_health": "health",
+            "cv_confidence": "confidence",
+            "baseline_cv_score": "baseline",
+            "test_metrics": "metrics",
+            "weighted_test_metrics": "weighted",
+            "semi_supervised": "unlabeled",
+            "fairness_mitigation": "mitigation",
+            "execution_backend": "backend",
+            "pareto_front": "pareto",
+            "evaluation_prevalence": "prevalence",
+            "success_criteria": "criteria",
+            "streamed_locked": "streamed",
+            "split_strategy": "validation",
+            "net_benefit": "benefit",
+            "resource_limits": "limits",
+            "skipped_for_time": "skipped",
+            "test_set_opened": "opened",
+            "elapsed_seconds": "elapsed",
+            "learning_curve": "learning",
+            "nested_cv": "nested",
+            "bias_variance": "decomposition",
+            "forecast_backtest": "backtest",
+            "quantile_coverage": "quantiles",
+            "model_card": "card",
+            "reliability_plan": "reliability",
+            "explanation_evidence": "explanations",
+            "artifact_verification": "verification",
+        },
+        change=orient,
+        revert=disorient,
+    ),
+)
+"""The version steps of `evaluation.json`, oldest first: version 2 writes one
+word per key, `selected.*`, `rows.*`, `digests.split`, `release.*`, and the
+metric direction as `higher` or `lower`."""
+
+
+def evaluation(raw: Mapping[str, Any]) -> records.Layout:
+    """Reads an `evaluation.json` record of any version at version 2.
+
+    Version 1 carried no version key; it is detected as version 1.
+
+    Args:
+        raw: The stored record, or a record built at version 1.
+
+    Returns:
+        The record at the current version, with `schema_version` set.
+
+    Raises:
+        InputError: If the stored version is not a positive integer or is
+            newer than this build.
+    """
+    return records.load("evaluation", MIGRATIONS, raw)
 
 
 @dataclasses.dataclass(slots=True)
@@ -81,7 +199,7 @@ class Run:
         if trial.status is not experiments.Termination.OK:
             return ""
         health = fit_health.sanity(
-            trial, self.trials, self.evaluation["metric_greater_is_better"]
+            trial, self.trials, self.evaluation["direction"] == HIGHER
         )
         return "" if health is None else health.verdict
 
@@ -100,12 +218,12 @@ class Run:
         board = board.drop(columns=list(LEADERBOARD_DETAILS))
         board["params"] = board["params"].map(json.dumps)
         board["selected"] = (
-            board["identifier"] == self.evaluation["selected_trial_id"]
+            board["identifier"] == self.evaluation["selected"]["trial"]
         )
         succeeded = board["status"] == str(experiments.Termination.OK)
         ranked = board[succeeded].sort_values(
             "score",
-            ascending=not self.evaluation["metric_greater_is_better"],
+            ascending=self.evaluation["direction"] == LOWER,
         )
         return pandas.concat([ranked, board[~succeeded]]).reset_index(drop=True)
 
@@ -174,7 +292,7 @@ class Run:
     @property
     def accomplished(self) -> bool:
         """Whether every stated success criterion was met (True if none)."""
-        return all(c["met"] for c in self.evaluation["success_criteria"])
+        return all(c["met"] for c in self.evaluation["criteria"])
 
     def suspect(self) -> list[str]:
         """Lists flagged columns that are neither quarantined nor attested.
@@ -227,7 +345,7 @@ class Run:
         evaluation = self.evaluation
         test = ", ".join(
             f"{name}={value:.4f}"
-            for name, value in evaluation["test_metrics"].items()
+            for name, value in evaluation["metrics"].items()
         )
         unattested = self.suspect()
         warning = self.profile.admonition
@@ -243,14 +361,14 @@ class Run:
         text = (
             f"{self.run_id}: selected {self.selected_model} "
             f"(cv {evaluation['metric']}="
-            f"{evaluation['selected_cv_score']:.4f}); test{label}: {test}"
+            f"{evaluation['selected']['score']:.4f}); test{label}: {test}"
         )
         missed = [
             f"{c['metric']} {c['achieved']:.4f} vs required {c['required']}"
-            for c in evaluation["success_criteria"]
+            for c in evaluation["criteria"]
             if not c["met"]
         ]
-        if evaluation["success_criteria"]:
+        if evaluation["criteria"]:
             text += (
                 "; success criteria met"
                 if not missed

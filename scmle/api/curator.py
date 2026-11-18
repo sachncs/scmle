@@ -109,10 +109,7 @@ def verify(
         ) from None
     stored = json.loads(path.read_text(encoding="utf-8"))
     canonical = json.loads(json.dumps(existing.to_dict()))
-    if (
-        stored != canonical
-        or existing.content_digest != candidate.content_digest
-    ):
+    if stored != canonical or existing.digest != candidate.digest:
         raise errors.InputError(
             "existing curation canonical content does not match current adapter"
         ) from None
@@ -224,7 +221,7 @@ class Curator:
             raise errors.InputError("output_dir must be a directory")
         sample_count = len(self.adapter.samples)
         modality = modalities.serialise(self.adapter.modality)
-        dataset_hash = self.adapter.dataset_hash
+        dataset_hash = self.adapter.digest
         curation_payload = self.examine(modality, dataset_hash, sample_count)
         card = curation.Datasheet.from_report(
             modality,

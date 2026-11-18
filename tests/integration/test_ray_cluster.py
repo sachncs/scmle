@@ -122,8 +122,8 @@ def test_a_multi_node_run_reproduces_the_single_node_trials(
 
     assert scores(local) == pytest.approx(scores(spread))
     assert local.selected_model == spread.selected_model
-    assert local.evaluation["execution_backend"] == "sequential"
-    assert spread.evaluation["execution_backend"] == "ray"
+    assert local.evaluation["backend"] == "sequential"
+    assert spread.evaluation["backend"] == "ray"
 
 
 def test_a_trial_past_the_memory_limit_is_killed_on_a_ray_worker(

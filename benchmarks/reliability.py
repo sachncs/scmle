@@ -236,7 +236,7 @@ def check_determinism(directory: pathlib.Path) -> CheckRecord:
         fast_project(data, "y", directory / f"run{i}", seed=7).run()
         for i in range(2)
     ]
-    scores = [r.evaluation["test_metrics"]["roc_auc"] for r in runs]
+    scores = [r.evaluation["metrics"]["roc_auc"] for r in runs]
     record.measured = {
         "models": [r.selected_model for r in runs],
         "score_difference": abs(scores[0] - scores[1]),
@@ -301,7 +301,7 @@ def check_no_false_skill(directory: pathlib.Path) -> CheckRecord:
         result = fast_project(
             frame, "y", directory / f"seed{seed}", seed=seed
         ).run()
-        gaps.append(abs(result.evaluation["test_metrics"]["roc_auc"] - 0.5))
+        gaps.append(abs(result.evaluation["metrics"]["roc_auc"] - 0.5))
     record.measured = {"mean_gap": float(numpy.mean(gaps)), "worst": max(gaps)}
     record.passed = (
         record.measured["mean_gap"] <= MEAN_GAP_CEILING

@@ -109,7 +109,7 @@ class Footage(curators.Preparer):
         )
 
     @property
-    def dataset_hash(self) -> str:
+    def digest(self) -> str:
         """The video corpus identity."""
         return self.dataset.content_hash
 

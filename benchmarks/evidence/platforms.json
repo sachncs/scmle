@@ -1,9 +1,9 @@
 {
   "claim": "C6",
-  "code": "a4af6ab74cc740be974ac26ad7aa2fa4a0e5e6f6d74d12c5877f11f06417b6f7",
+  "code": "0541e70bed12ea3237d52290af1f70f0e3737cbd79b6feaf11603f15ccb2efef",
   "merged": {
     "claim": "C6",
-    "code": "a4af6ab74cc740be974ac26ad7aa2fa4a0e5e6f6d74d12c5877f11f06417b6f7",
+    "code": "0541e70bed12ea3237d52290af1f70f0e3737cbd79b6feaf11603f15ccb2efef",
     "not_measured": [
       "platforms other than those recorded here",
       "a clean-runner rebuild from the lock file",
@@ -30,7 +30,7 @@
           }
         },
         "rows": 600,
-        "seconds": 40.2,
+        "seconds": 40.0,
         "seed": 7,
         "tasks": {
           "binary": {
@@ -42,12 +42,12 @@
             "hashes": {
               "conformal.json": "0acdda4b2b8c5dbe0edd17b67714f67870510c27b6aa4b098e905a1ef2cbf5b4",
               "coverage_report.json": "f9bed89f1d321a3592f3d0dd6c7bf7098cbf8b4760552fd66b676194033b1e3b",
-              "model_manifest.json": "f29b742bfdaf051838f583db567171775ffaeb00f904aecea2042417af9ba107",
+              "model_manifest.json": "86db41c2adba922b1c38fb90819c3fadbd042d43b57b1a95b999e72a018392bd",
               "novelty.joblib": "9064537f33db4f61ea6aec6caa8949613d712c7d86338820fc2c81e15f5d9ffc",
               "pipeline.joblib": "25c6a38f56b6b844980d4c4249a0f3087cccfba417bcb956411d1c8e9f02f8a8",
-              "reference.json": "50784221a9505d6e5e06e3d3ed9d2bf210132b6f4a5bbc85e4f9211269f87635",
+              "reference.json": "f3a2b0a07b368a3db9d76bc84632627fa2e06ccfc5159d5d4cc54cd521e91b61",
               "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-              "signature.json": "522dbd17003535aecd80c095c2e333ae682a9b028f9940bc778a4101f3d81212"
+              "signature.json": "f02626e025477e8674603190823f74f0edf1698fe79d68c73f917c57d16f97f8"
             },
             "members": 8,
             "metrics": {
@@ -59,8 +59,8 @@
               "roc_auc": 0.9598997493734336
             },
             "seconds": [
-              2.6,
-              2.7
+              2.8,
+              2.6
             ],
             "selected": [
               "logistic_regression",
@@ -88,12 +88,12 @@
             "hashes": {
               "conformal.json": "c53e56dc776e7d91b89229f5d1e56fff73a83958ac28e8749622fca806b1682f",
               "coverage_report.json": "55c021183fefafdc785e94307e24357426835fdde481bf6afa0d8d2cf80bf626",
-              "model_manifest.json": "92bee633a24e1d3b4431e35d408616c5348f695ed77d89a5e92aa35cb80c39d0",
+              "model_manifest.json": "613a03450526808d7655fb60398eccf444cf7dbae300508f4b97f757cd4871cd",
               "novelty.joblib": "72bb57854c0eb134a0a5841141e9a9fba807580b0e004a6e011ddb93387fd8c5",
               "pipeline.joblib": "cd71db618141ea12d9303539a7690952599fa87864c4d1a7f78a4951b1eeb175",
-              "reference.json": "1d660243eb62649c5d59050b7c9a7f2361ab32f88f26ff420821394a226a8283",
+              "reference.json": "f29412558b3106cc485aec7a6205161133b031f43ccc0c4171a66969946a88d3",
               "schema.json": "9fea73004e37ef087f2199eeb784707cf50dbaec2b0bb1674ff92e1774e49b86",
-              "signature.json": "102102540ded0be5f4a4a770e8d841447617fdcea643c10bdf7d439075d146af"
+              "signature.json": "a533330025055eeead19f63375e20ae4cd11dfe2335879f132bd67163dce5332"
             },
             "members": 8,
             "metrics": {
@@ -134,12 +134,12 @@
             "hashes": {
               "conformal.json": "fd926007ec8e2278e82be3604bf8682a74f60ddef350ff31a9e20e3377a6f383",
               "coverage_report.json": "b962ed592bbe565cdd5f0f077845291d96ee79798a9ae931849d5300a6eecdfe",
-              "model_manifest.json": "0b29f4f5c1e5c295d468ee05f758c89a6f932c71446b9b1056735a556ec71266",
+              "model_manifest.json": "1d8a6f84f85aa2702216916a2e1dbebce86a1616fb406f77877577afb3f82d9e",
               "novelty.joblib": "54146f7d822f6789680d2c004377f2e6997f4ee654b926cd59694542afbf9ad5",
               "pipeline.joblib": "546d3b2c6b395a50e948d8721059e4debf844f63c3b43ed8bf74c7e780603d9b",
-              "reference.json": "26dffd528abc0dd252db47ee2b919a0adbef91cf563687ae072720c135cc350f",
+              "reference.json": "09bb8ca652ed2976ce402c34ee1e2f2654b787e23e762cf06680eb54569a354e",
               "schema.json": "9328b9e7e7899e6e6b1d43ca3a12e7f80488bcaa10e8c94828b369f9bf5b8af0",
-              "signature.json": "58d120f8d9c6f80e974e4eeadb9fb6f3560ac8b2a839a87cfe2cc2bca8ba7975"
+              "signature.json": "c843b1612767de377cd4373e1136fae2d9a0118ddda212aa44a25225859a5ce5"
             },
             "members": 8,
             "metrics": {
@@ -179,13 +179,13 @@
               "conformal.json": "8fb2722c2938e9ae4ae988f90d1cc883e82fb68af215402e43a6379b757a6e65",
               "coverage_report.json": "5746ebe9f1977517097a44780d1848a2aa38848533b6cefc4a846549344e9d5b",
               "cv_plus.joblib": "5af87ecc7e65ebd6628eb6cb433fed95d124ab70977d640e464ef13d9aec755f",
-              "model_manifest.json": "bcc5f648fd3da281f5dba5f8172584eac2a224d00e9346e9ca2df60757c04257",
+              "model_manifest.json": "39f5abfdd132d495c96e7518850ad2b49f60c1fda9fc9425ae6b1f7fe465aed5",
               "novelty.joblib": "73b4418b09c0fe119f7d1511ba86a24231b4a831d15cd245bafbb61a40214616",
               "pipeline.joblib": "317b000b380bc7a615582d023de6d24ce9412569eb1d779cd48d37c253e96174",
               "quantile.joblib": "b089c6326f85845b73bfb3cc867fdb699f9fbbeee4cdc17ed380ab8c04071dbe",
-              "reference.json": "dc92313251ed935330eba0581d1d1a43ec4ed47bf3474330cbbf5b57bf410f0a",
+              "reference.json": "df3913ce339ff0d93403e28f4a9a3080dd5083de297d1ee92ee039ad2647df93",
               "schema.json": "26fb7bc1a1560ce271d432aedc31d2dfcb678bbb14221244681825785972337f",
-              "signature.json": "1e436a66a1bcf0b35d982d58647676d592d57280bcadc2745dcdcdc66e4a5902"
+              "signature.json": "9bd9960afbb790354509a87b59c69e2d4e75a02cafc70bbc4732d1d213775933"
             },
             "members": 10,
             "metrics": {

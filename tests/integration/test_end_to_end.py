@@ -29,9 +29,9 @@ def run(frame, tmp_path, **kwargs):
 def test_binary_end_to_end_artifacts_and_inference(binary_frame, tmp_path):
     result = run(binary_frame, tmp_path)
     evaluation = result.evaluation
-    assert evaluation["test_metrics"]["roc_auc"] > 0.8
-    assert evaluation["selected_cv_score"] > evaluation["baseline_cv_score"]
-    assert evaluation["test_set_opened"] is True and evaluation["n_test"] == 100
+    assert evaluation["metrics"]["roc_auc"] > 0.8
+    assert evaluation["selected"]["score"] > evaluation["baseline"]
+    assert evaluation["opened"] is True and evaluation["rows"]["test"] == 100
     expected = [
         "config.json",
         "environment.lock",
@@ -98,10 +98,9 @@ def test_multiclass_with_string_labels(multiclass_frame, tmp_path):
 
 def test_regression_is_ranked_by_lower_rmse(regression_frame, tmp_path):
     result = run(regression_frame, tmp_path, metric="rmse")
-    assert result.evaluation["test_metrics"]["r2"] > 0.9
+    assert result.evaluation["metrics"]["r2"] > 0.9
     assert (
-        result.evaluation["selected_cv_score"]
-        < result.evaluation["baseline_cv_score"]
+        result.evaluation["selected"]["score"] < result.evaluation["baseline"]
     )
     board = result.leaderboard()
     succeeded = board[board.status == "ok"]
@@ -137,11 +136,11 @@ def test_group_and_temporal_runs(binary_frame, tmp_path):
         t=numpy.arange(len(binary_frame)),
     )
     assert (
-        run(frame, tmp_path, group_column="g").evaluation["split_strategy"]
+        run(frame, tmp_path, group_column="g").evaluation["validation"]
         == "group"
     )
     assert (
-        run(frame, tmp_path, time_column="t").evaluation["split_strategy"]
+        run(frame, tmp_path, time_column="t").evaluation["validation"]
         == "temporal"
     )
 
@@ -165,11 +164,11 @@ def test_reruns_are_isolated_and_reproducible(binary_frame, tmp_path):
     first, second = run(binary_frame, tmp_path), run(binary_frame, tmp_path)
     assert first.run_dir != second.run_dir
     assert (
-        first.evaluation["split_fingerprint"]
-        == second.evaluation["split_fingerprint"]
+        first.evaluation["digests"]["split"]
+        == second.evaluation["digests"]["split"]
     )
-    assert first.evaluation["selected_cv_score"] == pytest.approx(
-        second.evaluation["selected_cv_score"]
+    assert first.evaluation["selected"]["score"] == pytest.approx(
+        second.evaluation["selected"]["score"]
     )
 
 
@@ -182,9 +181,9 @@ def test_string_labelled_binary_target_supports_every_binary_metric(
     )
     result = run(labelled, tmp_path, metric=metric)
     assert result.evaluation["metric"] == metric
-    assert not numpy.isnan(result.evaluation["selected_cv_score"])
+    assert not numpy.isnan(result.evaluation["selected"]["score"])
     assert not any(
-        numpy.isnan(v) for v in result.evaluation["test_metrics"].values()
+        numpy.isnan(v) for v in result.evaluation["metrics"].values()
     )
     assert set(result.predict(labelled.drop(columns="y"))) <= {"false", "true"}
 
@@ -267,7 +266,7 @@ def test_time_series_contracts_end_to_end(binary_frame, tmp_path):
     assert (
         "not available" in result.profile.feature_plan.dropped["outcome_code"]
     )
-    assert result.evaluation["split_strategy"] == "temporal"
+    assert result.evaluation["validation"] == "temporal"
 
 
 def test_a_modified_plan_changes_validation_budget_and_metric(
@@ -283,11 +282,11 @@ def test_a_modified_plan_changes_validation_budget_and_metric(
         candidates=("dummy", "logistic_regression"),
     )
     result = project.run(modified)
-    assert result.evaluation["split_strategy"] == "random"
+    assert result.evaluation["validation"] == "random"
     assert result.evaluation["metric"] == "pr_auc"
     saved = json.loads((result.run_dir / "config.json").read_text())
     assert saved["validation"]["strategy"] == "random"
-    assert saved["resources"]["time_budget_seconds"] == 250
+    assert saved["resources"]["budget"] == 250
     assert saved["metric"] == "pr_auc"
     assert {t.model_name for t in result.trials} == {
         "dummy",
@@ -353,7 +352,7 @@ def test_fit_health_is_recorded_for_the_selected_model_and_each_trial(
         binary_frame, "y", time_budget=300, output_dir=tmp_path
     ).run()
 
-    health = result.evaluation["fit_health"]
+    health = result.evaluation["health"]
     board = result.leaderboard()
 
     assert health["verdict"] in {"healthy", "overfit", "underfit", "unstable"}
@@ -468,7 +467,7 @@ def test_rolling_validation_runs_end_to_end_with_a_time_aware_report(tmp_path):
         (result.run_dir / "validation_manifest.json").read_text()
     )
     assert manifest["strategy"] == "rolling" and len(manifest["folds"]) == 3
-    assert result.evaluation["cv_confidence"]["note"]
+    assert result.evaluation["confidence"]["note"]
 
 
 def test_a_delayed_column_is_used_only_through_its_lagged_copy(tmp_path):
@@ -511,7 +510,7 @@ def test_datetime_features_train_and_predict_from_raw_timestamps(tmp_path):
         frame, "y", time_budget=300, output_dir=tmp_path
     ).run()
 
-    assert result.evaluation["test_metrics"]["roc_auc"] > 0.9
+    assert result.evaluation["metrics"]["roc_auc"] > 0.9
     as_text = (
         frame.drop(columns="y")
         .head(12)
@@ -552,7 +551,7 @@ def test_free_text_is_encoded_and_scored_from_raw_strings(tmp_path):
     ).run()
 
     assert "review" in result.profile.feature_plan.text
-    assert result.evaluation["test_metrics"]["roc_auc"] > 0.95
+    assert result.evaluation["metrics"]["roc_auc"] > 0.95
     fresh = pandas.DataFrame(
         {
             "review": ["great product recommend", "awful waste refund"],
@@ -606,7 +605,7 @@ def test_the_run_reports_whether_more_data_would_help(binary_frame, tmp_path):
         binary_frame, "y", time_budget=300, output_dir=tmp_path
     ).run()
 
-    curve = result.evaluation["learning_curve"]
+    curve = result.evaluation["learning"]
     assert curve["verdict"] in {"more data likely helps", "plateau", "unclear"}
     assert len(curve["sizes"]) == 5 and curve["sizes"] == sorted(curve["sizes"])
     assert "Learning curve" in (result.run_dir / "report.html").read_text()

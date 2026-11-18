@@ -38,26 +38,34 @@ def constrain(parser: argparse.ArgumentParser) -> None:
         metavar="COLUMN=SIGN",
         help="predictions must not fall (+1) or rise (-1) as COLUMN grows",
     )
-    parser.add_argument(
+    command.option(
+        parser,
+        "--sensitive",
         "--sensitive-columns",
         nargs="*",
         default=[],
         help="columns whose groups the fairness report compares",
     )
-    parser.add_argument(
+    command.option(
+        parser,
+        "--delay",
         "--feature-delay",
         nargs="*",
         default=[],
         metavar="COLUMN=ROWS",
         help="columns known only ROWS rows after the row they describe",
     )
-    parser.add_argument(
+    command.option(
+        parser,
+        "--embargo",
         "--embargo-rows",
         type=int,
         default=0,
         help="rows dropped between training and validation windows",
     )
-    parser.add_argument(
+    command.option(
+        parser,
+        "--unavailable",
         "--unavailable-at-prediction",
         nargs="*",
         default=[],
@@ -91,15 +99,21 @@ def govern(parser: argparse.ArgumentParser) -> None:
         default=[],
         help="model families to skip (for example deep_learning)",
     )
-    parser.add_argument(
-        "--leakage-policy", choices=["warn", "block"], default="warn"
+    command.option(
+        parser,
+        "--leakage",
+        "--leakage-policy",
+        choices=["warn", "block"],
+        default="warn",
     )
     parser.add_argument(
         "--charter",
         help="analysis charter (see `scmle charter init`): splits off a "
         "sealed confirmation set the exploration stages cannot read",
     )
-    parser.add_argument(
+    command.option(
+        parser,
+        "--attestations",
         "--leakage-attestations",
         help="JSON file of per-column attestations that a strong "
         "predictor flagged by the leakage screen is legitimate "
@@ -110,6 +124,38 @@ def govern(parser: argparse.ArgumentParser) -> None:
         help="JSON file with the nested sections `search`, `strategies`, "
         "`ensemble`, `feature_graph`, `selection` and `decision` "
         "(same fields as the specification classes)",
+    )
+
+
+def roles(parser: argparse.ArgumentParser) -> None:
+    """Adds the options naming the columns that play a role in the data.
+
+    Args:
+        parser: The argument parser of the command.
+    """
+    command.option(parser, "--group", "--group-column")
+    command.option(parser, "--weight", "--weight-column")
+    command.option(parser, "--event", "--event-column")
+    command.option(parser, "--query", "--query-column")
+    command.option(parser, "--treatment", "--treatment-column")
+    command.option(parser, "--baseline", "--baseline-column")
+    command.option(
+        parser,
+        "--comparator",
+        "--baseline-subject",
+        choices=("frozen_rule", "selected_model"),
+        default="frozen_rule",
+    )
+    command.option(parser, "--draft", "--framing-draft")
+    command.option(parser, "--propensity", "--propensity-column")
+    command.option(parser, "--action", "--logged-action-column")
+    command.option(parser, "--ingest", "--ingest-plan")
+    command.option(parser, "--time", "--time-column")
+    command.option(
+        parser, "--temporal", "--time-as-feature", action="store_true"
+    )
+    command.option(
+        parser, "--identifiers", "--id-columns", nargs="*", default=[]
     )
 
 
@@ -126,47 +172,51 @@ class ProjectCommand(command.Command):
         parser.add_argument("--target", required=True, nargs="+")
         parser.add_argument("--task", default="auto")
         parser.add_argument("--metric")
-        parser.add_argument("--time-budget", type=int, default=1800)
-        parser.add_argument("--workers", type=int, default=1)
-        parser.add_argument("--group-column")
-        parser.add_argument("--weight-column")
-        parser.add_argument("--event-column")
-        parser.add_argument("--query-column")
-        parser.add_argument("--treatment-column")
-        parser.add_argument("--baseline-column")
-        parser.add_argument(
-            "--baseline-subject",
-            choices=("frozen_rule", "selected_model"),
-            default="frozen_rule",
+        command.option(
+            parser,
+            "--budget",
+            "--time-budget",
+            type=int,
+            default=1800,
+            help="time budget in seconds",
         )
-        parser.add_argument("--framing-draft")
-        parser.add_argument("--propensity-column")
-        parser.add_argument("--logged-action-column")
-        parser.add_argument("--ingest-plan")
-        parser.add_argument("--memory-budget-gb", type=float)
+        parser.add_argument("--workers", type=int, default=1)
+        command.option(
+            parser,
+            "--memory",
+            "--memory-budget-gb",
+            type=float,
+            help="largest in-memory size of the data in GB",
+        )
         parser.add_argument(
             "--training", choices=["sample", "stream"], default="sample"
         )
         parser.add_argument("--horizon", type=int)
-        parser.add_argument("--seasonal-period", type=int)
-        parser.add_argument("--ordinal-order", nargs="+")
+        command.option(parser, "--period", "--seasonal-period", type=int)
+        command.option(parser, "--order", "--ordinal-order", nargs="+")
         parser.add_argument(
             "--unlabeled",
             choices=["block", "ignore", "pseudo_label"],
             default="block",
         )
-        parser.add_argument("--time-column")
-        parser.add_argument("--time-as-feature", action="store_true")
-        parser.add_argument("--id-columns", nargs="*", default=[])
+        roles(parser)
         parser.add_argument("--exclude", nargs="*", default=[])
         parser.add_argument("--seed", type=int, default=42)
-        parser.add_argument(
+        command.option(
+            parser,
+            "--leaders",
             "--top-models",
             type=int,
             default=2,
             help="models to hyperparameter-tune (0 disables search)",
         )
-        parser.add_argument("--configs-per-model", type=int, default=6)
+        command.option(
+            parser,
+            "--configurations",
+            "--configs-per-model",
+            type=int,
+            default=6,
+        )
         parser.add_argument(
             "--optimizer",
             choices=sorted(optimizers.OPTIMIZERS),
@@ -192,8 +242,8 @@ class ProjectCommand(command.Command):
         sections.setdefault(
             "search",
             tasks.Search(
-                top_models=args.top_models,
-                configs_per_model=args.configs_per_model,
+                top_models=args.leaders,
+                configs_per_model=args.configurations,
                 optimizer=args.optimizer,
             ),
         )
@@ -214,44 +264,44 @@ class ProjectCommand(command.Command):
             args.target[0] if len(args.target) == 1 else args.target,
             task=args.task,
             metric=args.metric,
-            time_budget=args.time_budget,
+            time_budget=args.budget,
             workers=args.workers,
-            id_columns=args.id_columns,
-            group_column=args.group_column,
-            weight_column=args.weight_column,
-            event_column=args.event_column,
-            query_column=args.query_column,
-            treatment_column=args.treatment_column,
-            memory_budget_gb=args.memory_budget_gb,
+            id_columns=args.identifiers,
+            group_column=args.group,
+            weight_column=args.weight,
+            event_column=args.event,
+            query_column=args.query,
+            treatment_column=args.treatment,
+            memory_budget_gb=args.memory,
             training=args.training,
             horizon=args.horizon,
-            seasonal_period=args.seasonal_period,
-            ordinal_order=args.ordinal_order,
+            seasonal_period=args.period,
+            ordinal_order=args.order,
             unlabeled=args.unlabeled,
-            time_column=args.time_column,
-            time_as_feature=args.time_as_feature,
+            time_column=args.time,
+            time_as_feature=args.temporal,
             excluded_columns=args.exclude,
             seed=args.seed,
             validation=args.validation,
             folds=args.folds,
-            test_fraction=args.test_fraction,
-            embargo_rows=args.embargo_rows,
-            sensitive_columns=args.sensitive_columns,
+            test_fraction=args.test,
+            embargo_rows=args.embargo,
+            sensitive_columns=args.sensitive,
             monotonic_constraints=parse(args.monotonic),
-            horizon_rows=args.horizon_rows,
-            window_rows=args.window_rows,
-            feature_delays=parse(args.feature_delay),
-            unavailable_at_prediction=args.unavailable_at_prediction,
+            horizon_rows=args.rolling_horizon,
+            window_rows=args.rolling_window,
+            feature_delays=parse(args.delay),
+            unavailable_at_prediction=args.unavailable,
             enforcement=args.enforcement,
-            leakage_policy=args.leakage_policy,
+            leakage_policy=args.leakage,
             charter=args.charter,
-            leakage_attestations=args.leakage_attestations,
-            baseline_column=args.baseline_column,
-            baseline_subject=args.baseline_subject,
-            framing_draft=args.framing_draft,
-            propensity_column=args.propensity_column,
-            logged_action_column=args.logged_action_column,
-            ingest_plan=args.ingest_plan,
+            leakage_attestations=args.attestations,
+            baseline_column=args.baseline,
+            baseline_subject=args.comparator,
+            framing_draft=args.draft,
+            propensity_column=args.propensity,
+            logged_action_column=args.action,
+            ingest_plan=args.ingest,
             output_dir=args.output_dir,
             **sections,
         )

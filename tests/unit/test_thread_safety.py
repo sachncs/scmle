@@ -256,7 +256,7 @@ def sequential_results(tmp_path_factory):
         out.append(
             (
                 result.selected_model,
-                result.evaluation["test_metrics"],
+                result.evaluation["metrics"],
                 result.predict(frame(60, seed=99)),
             )
         )
@@ -270,7 +270,7 @@ def test_parallel_projects_match_sequential_runs(tmp_path, sequential_results):
         result = small_project(frame(seed=index), shared).run()
         return (
             result.selected_model,
-            result.evaluation["test_metrics"],
+            result.evaluation["metrics"],
             result.predict(frame(60, seed=99)),
             result.run_dir,
         )

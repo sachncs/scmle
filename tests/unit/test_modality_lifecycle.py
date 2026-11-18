@@ -24,6 +24,7 @@ from scmle.data.modalities import video
 from scmle.explainability import quality
 from scmle.governance import attestation
 from scmle.pipeline import modality_lifecycle
+from scmle.pipeline.modality_lifecycle import containers
 
 
 def document_adapter() -> modality_lifecycle.DocumentPreparer:
@@ -494,7 +495,7 @@ def test_every_non_tabular_adapter_completes_all_fifteen_stages(
     )
     assert report.inference == {
         "package_verified": True,
-        "prediction_count": report.evaluation["sample_count"],
+        "prediction_count": report.evaluation["samples"],
         "predictions_match": True,
     }
     performance_evidence = report.performance
@@ -600,7 +601,7 @@ def test_lifecycle_report_rejects_a_stage_without_evidence_links(
 def test_lifecycle_report_signed_before_the_stage_key_rename_verifies(
     tmp_path: Path,
 ):
-    """A report whose stages still say `evidence_links` keeps verifying."""
+    """A report with `evidence_links` and `model_sha256` keeps verifying."""
     report_path = tmp_path / "report.json"
     report = modality_lifecycle.Lifecycle().run(
         document_adapter(),
@@ -611,6 +612,8 @@ def test_lifecycle_report_signed_before_the_stage_key_rename_verifies(
     record = report.to_dict()
     for stage in record["evidence"]:
         stage["evidence_links"] = stage.pop("links")
+    record["package"] = containers.Package.KEYS.downgrade(record["package"])
+    assert record["package"]["model_sha256"]
     unsigned = dict(record)
     unsigned.pop("signature")
     record["signature"] = {
@@ -871,8 +874,8 @@ def test_lifecycle_checkpoint_rejects_tampering_and_changed_identity(
             modality_lifecycle.Checkpoint(
                 modality="text",
                 digests=modality_lifecycle.checkpoints.Digests(
-                    dataset=adapter.dataset_hash,
-                    observed=adapter.dataset_hash,
+                    dataset=adapter.digest,
+                    observed=adapter.digest,
                     stages=("digest",)
                     * len(modalities.REQUIRED_LIFECYCLE_STAGES),
                 ),
@@ -933,7 +936,7 @@ def test_modality_predictor_verifies_package_and_predicts_new_samples(
     assert predictor.health() == {
         "package_verified": True,
         "modality": "image",
-        "training_dataset_hash": adapter.dataset_hash,
+        "training_dataset_hash": adapter.digest,
         "feature_names": list(predictor.feature_names),
         "model_sha256": report.package.model_sha256,
     }
@@ -992,7 +995,7 @@ def test_image_adapter_curation_hash_matches_declared_identity():
         image.Dataset(tuple(reversed(fixture.samples)))
     )
 
-    assert adapter.curate().dataset_hash == adapter.dataset_hash
+    assert adapter.curate().dataset_hash == adapter.digest
 
 
 def test_document_lifecycle_emits_span_provenance_evidence(tmp_path: Path):
@@ -1215,7 +1218,7 @@ def test_lifecycle_persists_supplied_modality_manifest(tmp_path: Path):
         modality="document",
         task="binary_classification",
         samples=len(adapter.samples),
-        digests={"content": adapter.dataset_hash},
+        digests={"content": adapter.digest},
         source=data.Origin(
             owner="records-team",
             acquisition="approved export",

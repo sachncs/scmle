@@ -275,7 +275,7 @@ class Orchestrator:
             BlockedError: If any checkpoint rejects, or the gate was rejected
                 before and no checkpoint here reviews it.
         """
-        record = journal.Journal.locate(context.run_store.directory)
+        record = journal.Journal.locate(context.workspace.directory)
         reviewers = [c for c in self.checkpoints if gate in c.gates]
         earlier = record.rejected().get(gate.value)
         if earlier is not None and not reviewers:
@@ -428,7 +428,7 @@ def bind(spec: tasks.Config, approved: experiments.Plan | None) -> tasks.Config:
         return spec
     record = spec.model_dump()
     record["validation"]["strategy"] = approved.validation
-    record["resources"]["time_budget_seconds"] = approved.budget
+    record["resources"]["budget"] = approved.budget
     record["metric"] = approved.metric
     return tasks.Config.model_validate(record)
 

@@ -9,8 +9,10 @@ of the package drawn before anything is run, by a rule fixed here:
    decision, removed before the draw and listed in the document with the
    reason (`REASONS`), in this order: an entry point (`__main__.py`); no
    mutants (mutmut finds none, as in a package `__init__.py` that only
-   re-exports); untested (no `tests/unit/test_*.py` imports it, step 6).
-   An untested module is a finding, stored under `untested`, not hidden.
+   re-exports). An untested module (no `tests/unit/test_*.py` imports it,
+   step 6) stays in the frame: when drawn, every mutant drawn from it is
+   `no tests`, a decided survivor, so untested code lowers the score. The
+   untested modules are also listed under `untested`.
 3. Strata: the top-level package (`data`, `models`, ...); single-file
    modules at the top of `scmle/` form the stratum `root`.
 4. Modules: `least` of them, the smallest number of trials the floor rule
@@ -39,8 +41,8 @@ one-sided Clopper-Pearson lower bound of the pooled score at `alpha` is at
 least the floor, on at least `planned` mutants from at least `least`
 modules.
 
-NOT measured: tests outside `tests/unit`, modules not drawn, modules out
-of the frame (untested ones are listed), module-level code (mutmut mutates
+NOT measured: tests outside `tests/unit`, modules not drawn, entry points
+and modules without mutants, module-level code (mutmut mutates
 function bodies only), equivalent-mutant review.
 
     python -m benchmarks.evidence.mutation --write
@@ -115,11 +117,11 @@ THREADS = (
 )
 STATUSES = ("killed", "survived", "no tests", "timeout", "crash")
 # Why a module is out of the frame, in the order the rules are applied.
-REASONS = ("entry point", "no mutants", "untested")
+REASONS = ("entry point", "no mutants")
 NOT_MEASURED = (
     "tests outside tests/unit",
     "modules not drawn",
-    "modules out of the frame (untested ones are listed)",
+    "entry points and modules without mutants",
     "module-level code (mutmut mutates function bodies only)",
     "equivalent-mutant review (survivors are all counted)",
 )
@@ -181,8 +183,6 @@ def reason(path: str, root: Path = ROOT) -> str | None:
         return "entry point"
     if not mutants(path, root):
         return "no mutants"
-    if not suite(path, root):
-        return "untested"
     return None
 
 
@@ -757,8 +757,9 @@ def measure() -> dict[str, Any]:
             "frame": len(kept),
             "excluded": {r: len(dropped[r]) for r in REASONS},
             "rule": "out of the frame before the draw: an entry point "
-            "(__main__.py), no mutmut mutants, or untested (no "
-            "tests/unit/test_*.py imports it)",
+            "(__main__.py) or no mutmut mutants; an untested module stays "
+            "in and its drawn mutants count as survivors",
+            "untested": sum(not suite(p) for p in kept),
             "strata": {
                 s: sum(stratum(p) == s for p in kept)
                 for s in sorted({stratum(p) for p in kept})
@@ -775,8 +776,8 @@ def measure() -> dict[str, Any]:
             "cap_seconds": CAP,
             "budget_seconds": BUDGET,
         },
-        "excluded": {r: dropped[r] for r in REASONS if r != "untested"},
-        "untested": dropped["untested"],
+        "excluded": {r: dropped[r] for r in REASONS},
+        "untested": [p for p in kept if not suite(p)],
         "sample": sample,
         "modules": modules,
         "pooled": pool(run),

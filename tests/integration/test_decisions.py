@@ -35,14 +35,14 @@ def test_threshold_is_optimized_on_validation_and_frozen_into_the_bundle(
     probability = result.predict_proba(features)[:, 1]
     expected = (probability >= chosen["threshold"]).astype(int)
     numpy.testing.assert_array_equal(result.predict(features), expected)
-    assert result.evaluation["test_set_opened"] is True
+    assert result.evaluation["opened"] is True
 
 
 def test_threshold_choice_never_uses_the_test_rows(imbalanced_frame, tmp_path):
     decision = tasks.Threshold(threshold_objective="balanced_accuracy")
     result = run(imbalanced_frame, tmp_path, decision)
     chosen = result.evaluation["decision"]
-    assert chosen["validation_rows"] <= result.evaluation["n_dev"]
+    assert chosen["validation_rows"] <= result.evaluation["rows"]["development"]
     reloaded = scmle.artifacts.bundle.Bundle.load(
         result.save(tmp_path / "bundle"), trusted=True
     )

@@ -142,11 +142,11 @@ def test_resume_of_tuned_run_recomputes_nothing(
         (t.trial_id, t.status, t.params) for t in original.trials
     ]
     assert (
-        resumed.evaluation["selected_params"]
-        == original.evaluation["selected_params"]
+        resumed.evaluation["selected"]["params"]
+        == original.evaluation["selected"]["params"]
     )
-    assert resumed.evaluation["selected_cv_score"] == pytest.approx(
-        original.evaluation["selected_cv_score"]
+    assert resumed.evaluation["selected"]["score"] == pytest.approx(
+        original.evaluation["selected"]["score"]
     )
 
 
@@ -173,10 +173,10 @@ def test_tracking_database_records_runs_trials_and_lineage(
     row = next(r for r in runs if r["run_id"] == first.run_id)
     assert row["dataset_id"] == first.profile.manifest.identifier
     assert row["data_hash"] == first.profile.manifest.digests["data"]
-    assert row["split_fingerprint"] == first.evaluation["split_fingerprint"]
+    assert row["split_fingerprint"] == first.evaluation["digests"]["split"]
     assert row["selected_model"] == first.selected_model
     assert json.loads(row["test_metrics"])["roc_auc"] == pytest.approx(
-        first.evaluation["test_metrics"]["roc_auc"]
+        first.evaluation["metrics"]["roc_auc"]
     )
     assert len(store.trials(first.run_id)) == len(first.trials)
     assert {t["strategy"] for t in store.trials(first.run_id)} >= {"default"}

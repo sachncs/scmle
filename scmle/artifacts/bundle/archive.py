@@ -91,7 +91,7 @@ def admit(
             "those names changed, so a bundle written by an earlier "
             "build cannot be loaded; retrain and save it again"
         )
-    info = provenance.Manifest(**manifest)
+    info = provenance.Manifest.read(manifest)
     if layout.SCHEMA_FILE not in info.files and not legacy:
         raise errors.ArtifactError(
             "bundle is missing a schema checksum; re-export it with "

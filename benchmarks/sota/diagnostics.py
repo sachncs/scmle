@@ -74,7 +74,10 @@ def summarize_run(run_dir: pathlib.Path) -> dict[str, Any]:
     """
     run_dir = pathlib.Path(run_dir)
     config = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
-    budget = float(config["resources"]["time_budget_seconds"])
+    resources = config["resources"]
+    budget = float(
+        resources.get("budget", resources.get("time_budget_seconds"))
+    )
     events = read_events(run_dir)
     elapsed = seconds_between(events[0]["timestamp"], events[-1]["timestamp"])
     board = pandas.read_parquet(run_dir / "leaderboard.parquet").rename(

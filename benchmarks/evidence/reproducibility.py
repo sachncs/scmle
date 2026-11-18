@@ -168,7 +168,7 @@ def train(kind: str, directory: pathlib.Path) -> dict[str, Any]:
         "selected": result.selected_model,
         "metrics": {
             name: float(value)
-            for name, value in result.evaluation["test_metrics"].items()
+            for name, value in result.evaluation["metrics"].items()
         },
         "trials": len(result.trials),
         "seconds": round(time.monotonic() - started, 1),

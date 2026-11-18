@@ -64,7 +64,7 @@ def test_editing_the_config_does_not_score_another_model(
     result = completed(binary_frame, tmp_path)
     run = result.run_dir
     record = json.loads((run / "config.json").read_text(encoding="utf-8"))
-    record["models"]["exclude_models"].append(result.selected_model)
+    record["models"]["exclude"]["models"].append(result.selected_model)
     (run / "config.json").write_text(json.dumps(record), encoding="utf-8")
     rehash(run)
     uncomplete(run)

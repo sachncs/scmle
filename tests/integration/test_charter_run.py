@@ -107,8 +107,8 @@ def test_profiling_sees_exploration_rows_only(binary_frame, tmp_path):
 
 def test_the_final_test_still_opens_once_and_scores(binary_frame, tmp_path):
     result = run(binary_frame, tmp_path, inscribe(tmp_path))
-    assert result.evaluation["test_set_opened"] is True
-    assert result.evaluation["n_test"] > 0
+    assert result.evaluation["opened"] is True
+    assert result.evaluation["rows"]["test"] > 0
 
 
 def test_a_run_without_a_charter_is_unchanged(binary_frame, tmp_path):
@@ -496,7 +496,7 @@ def test_a_charter_without_rules_is_reported_as_not_chartered(
 
 
 def test_a_specification_that_contradicts_the_chartered_rule_is_refused():
-    # Enforces docs/CLI.md:80.
+    # Enforces docs/CLI.md:85.
     from scmle.pipeline import stages
 
     assert stages.governing("x", "by", None, "by") == "by"

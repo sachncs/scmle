@@ -91,12 +91,12 @@ says so on the first lines and on the last line, and withholds the word
 "settled" until a person settles the flag.
 **What to do.** Settle each name:
 
-* The value is not known at prediction time: add `--unavailable-at-prediction
+* The value is not known at prediction time: add `--unavailable
   NAME` and run again. The label disappears and the score is the honest one.
 * The value is known and you can say who vouches for it: write an attestation
   (format and worked example in [Leakage](LEAKAGE.md)). Attestations are read in
   charter runs.
-* Nobody can settle it: do not rely on the score, or use `--leakage-policy
+* Nobody can settle it: do not rely on the score, or use `--leakage
   block`.
 
 ### Leakage block (Seen)
@@ -105,7 +105,7 @@ says so on the first lines and on the last line, and withholds the word
 blocked: unresolved leakage risk (permutation screen, Benjamini-Yekutieli level 0.05): body, boat
 ```
 
-**What it means.** You chose `--leakage-policy block` (it is opt-in; the default
+**What it means.** You chose `--leakage block` (it is opt-in; the default
 is `warn`), and a statistical screen found columns that predict the target
 suspiciously well, or whose "is it recorded?" pattern gives the answer away.
 The names are the suspects. A name repeats when more than one test flagged it.
@@ -120,7 +120,7 @@ Only checks with a measured error rate (a certificate) are allowed to block.
 **What to do.** Ask for each suspect: "Would I know this value at the moment I
 use the model?"
 
-* **No**: exclude it with `--unavailable-at-prediction COL ...` (or
+* **No**: exclude it with `--unavailable COL ...` (or
   `--exclude COL ...`) and run again.
 * **Yes, and I can say who confirms it**: in a charter run you can keep it by
   giving an attestation file (see [Unverified: what to do](#unverified-what-to-do)).
@@ -144,11 +144,11 @@ Each is exit code 2 and appears as `blocked: <message>`.
 | `need at least N groups for group validation` | Too few groups for the number of folds | Lower `--folds` or add groups |
 | `group column '<c>' has missing values` | Rows with no group | Fill the group column |
 | `no group-disjoint split keeps every class in every fold; the classes are concentrated in too few groups` | A class lives in few groups | More groups, or fewer folds |
-| `time column '<c>' has unparseable/missing values: ordering ambiguous` | Dates that cannot be read | Fix the dates or change `--time-column` |
-| `too few rows for temporal cross-validation` / `only N rolling window(s) fit ...` | Not enough history | More data, or smaller `--horizon-rows`, `--window-rows`, `--embargo-rows` |
+| `time column '<c>' has unparseable/missing values: ordering ambiguous` | Dates that cannot be read | Fix the dates or change `--time` |
+| `too few rows for temporal cross-validation` / `only N rolling window(s) fit ...` | Not enough history | More data, or smaller `--rolling-horizon`, `--rolling-window`, `--embargo` |
 | `no usable feature columns remain after exclusions` | You excluded everything | Reduce `--exclude` |
 | `monotonic constraints need numeric feature columns ...` / `... not multiclass` / `no available model can enforce the monotonic constraints; install the 'boosting' extra ...` | Your `--monotonic` rule cannot be met | Fix the rule, or `pip install "scmle[boosting]"` |
-| `none of the top N candidates satisfies the serving constraints; relax the limits or allow more candidates` | Your model-size or latency limit is impossible | Relax `max_model_mb` or `max_p95_latency_ms`, or raise `--top-models` |
+| `none of the top N candidates satisfies the serving constraints; relax the limits or allow more candidates` | Your model-size or latency limit is impossible | Relax `max_model_mb` or `max_p95_latency_ms`, or raise `--leaders` |
 | `PLANNING not approved by <reviewer>: <reason>` | A human approval checkpoint said no (Python `checkpoints=`) | Address the reason; run again |
 | `admissibility quarantined every feature` (charter runs) | Every feature was kept out | Provide provenance or attestations |
 | `the charter unit '<u>' does not match the grain of the target table` | Your table has a different unit than the charter says | Fix the charter `unit` or the table |
@@ -197,18 +197,18 @@ Exit code 1. A setting is invalid. Common ones (From the code):
 a 10 percent grace. When the earlier steps (reading, splitting and checking
 the data) used up the budget, only the grace is left: 6 seconds for a 60 second
 budget. Every trial passed that and was stopped. The author met this on a busy
-computer, on a first run, with `--time-budget 60`.
+computer, on a first run, with `--budget 60`.
 **Why it exists.** A limit that is not enforced is not a limit; a runaway model
 must not hold the computer.
-**What to do.** Raise `--time-budget` (120 to 300 is comfortable for a small
+**What to do.** Raise `--budget` (120 to 300 is comfortable for a small
 table). Look at `runs/run_*/trials/trial_001.json` to see the error. A second
 run on the same machine was faster because the libraries were already loaded.
 
 ### The run finished but part of the report is empty
 
-A short `--time-budget` can leave the importance table empty, or print
+A short `--budget` can leave the importance table empty, or print
 `conformal.skipped: ... time budget exhausted`. The file says `"truncated":
-true`. Raise `--time-budget` and run again.
+true`. Raise `--budget` and run again.
 
 ## Results that need care
 
@@ -268,7 +268,7 @@ column exists at prediction time. It says so rather than assume.
   something you will have. Keep that as a written decision.
 * To record that a person vouches for a strong predictor that the screen
   flagged (the `leakage suspect` case), write an attestation file and pass it
-  with `--leakage-attestations FILE` in a charter run. The file is JSON:
+  with `--attestations FILE` in a charter run. The file is JSON:
 
 ```json
 {

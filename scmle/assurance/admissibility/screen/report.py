@@ -146,7 +146,7 @@ class Screen:
             return "add rows, or attest the columns"
         if self.rationale.startswith("screen not run"):
             return "fix the target or the columns, or attest them"
-        return "raise --time-budget or screen fewer columns"
+        return "raise --budget or screen fewer columns"
 
     @property
     def suspects(self) -> tuple[Finding, ...]:

@@ -170,7 +170,7 @@ Read this carefully:
 ### The screen runs inside the time budget
 
 The screen is part of the run, so it is bounded by the project's
-`--time-budget` (default 1800 seconds) and not by the clock. Its work is the
+`--budget` (default 1800 seconds) and not by the clock. Its work is the
 number of cross-fitted fits: permutations x skill columns x classes (one
 versus rest above two classes). Each scan is predicted to take 1 second plus
 8.0e-8 seconds per row per fit for classification (1.2e-8 for regression),
@@ -183,16 +183,16 @@ gets the same flags on every machine. A breast-cancer sized table (455 rows,
 120 s. Digits (64 columns, 10 classes, about 3.6 million fits on 1,437 rows)
 is predicted at about 415 s, more than the 270 s that 15 percent of the
 default 1800 s budget allows, so it is **not run** under the default budget;
-it needs `--time-budget 2800` or more.
+it needs `--budget 2800` or more.
 
 A screen that does not run is never a clean bill. The run says so in the last
 line of its summary, for example `WARNING leakage screen NOT RUN for 64 columns
 (work limit for a 120 s time budget): these columns are unchecked, not clean;
-raise --time-budget or screen fewer columns`. The same sentence is the first
+raise --budget or screen fewer columns`. The same sentence is the first
 warning of the plan and the profile, the first finding of `report.html` and a
 `leakage_screen` entry in `diagnostics/decision_log.json`; the test score is
-labelled `PROVISIONAL: leakage screen incomplete`. `--leakage-policy warn`
-trains on and says so; `--leakage-policy block` **refuses** to run, because
+labelled `PROVISIONAL: leakage screen incomplete`. `--leakage warn`
+trains on and says so; `--leakage block` **refuses** to run, because
 `block` means do not train on unchecked suspicion (choose `warn`, or raise the
 budget, to proceed). A table that needs more than 100,000 permutations is
 reported the same way. The statistics of the screen did not change; only the
@@ -225,7 +225,7 @@ For leakage:
   earlier version printed nothing at the end of a run that scored 0.988 on
   Titanic because of two leaks. Loud, labelled, and settled by a person is the
   middle path.
-* **It lets you stop.** `--leakage-policy block` (opt-in) refuses a run that has
+* **It lets you stop.** `--leakage block` (opt-in) refuses a run that has
   a flagged column. A flag is a column whose test is significant after the
   Benjamini-Yekutieli step over permutation p-values and whose effect bound is
   above the pre-registered ceiling. The false-alarm control holds by
@@ -263,8 +263,8 @@ Ask: **when is this value known?**
 `boat` and `body` are only known after the sinking. Declare them:
 
 ```bash
-scmle run titanic.csv --target survived --unavailable-at-prediction boat body \
-  --time-budget 120 --workers 2 --output-dir runs
+scmle run titanic.csv --target survived --unavailable boat body \
+  --budget 120 --workers 2 --output-dir runs
 ```
 
 The flag is gone, the label is gone, and the exam ROC AUC falls from 0.988 to
@@ -301,11 +301,11 @@ charter, so an attestation cannot be reused for another analysis):
 
 All nine keys are required for each entry (one entry per column). `expires`
 must not be before `date`. The run is told about the file with
-`--leakage-attestations att2.json`:
+`--attestations att2.json`:
 
 ```bash
 scmle run cancer.csv --target target --charter charter2.json \
-  --leakage-attestations att2.json --time-budget 120 --workers 2 --output-dir runs_att
+  --attestations att2.json --budget 120 --workers 2 --output-dir runs_att
 ```
 
 What happened in the real runs (charter with a 10 percent confirmation set; all
@@ -339,7 +339,7 @@ analysis, until when. It does not check that they were right.
 
 ## When to use block
 
-Choose `--leakage-policy block` when:
+Choose `--leakage block` when:
 
 * no person can tell you when each value is known;
 * the work is regulated, and no unexplained strong column is allowed to reach

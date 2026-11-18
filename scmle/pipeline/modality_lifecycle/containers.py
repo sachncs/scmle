@@ -7,10 +7,12 @@ import dataclasses
 import json
 import threading
 from typing import Any
+from typing import ClassVar
 
 import numpy
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.pipeline.modality_lifecycle import constants
 
 
@@ -130,7 +132,14 @@ class Package:
         model_sha256: SHA-256 digest of the serialized model.
         signature: Signature value of the package manifest.
         schema_version: Version of the package layout.
+        KEYS: Version-1 keys to the written ones (`digests.model`);
+            `downgrade` restores version 1, the layout a lifecycle report's
+            signature covers.
     """
+
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {}, groups={"digests": {"model_sha256": "model"}}
+    )
 
     path: str
     model_sha256: str
@@ -164,9 +173,10 @@ class Package:
         """Converts the package identity to JSON-native values.
 
         Returns:
-            Mapping of field name to value.
+            The path, signature and schema version, and the model digest
+            under `digests.model`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def hashlike(value: str) -> bool:

@@ -77,7 +77,7 @@ benchmarks, which are not a head-to-head with people.
   (87.7 to 92.4) at 30, and lay wholly above the baseline's cross-validation
   score in 4.5 percent (3.1 to 6.5) and 9.7 percent (7.6 to 12.3). The band is
   now moved down by an estimate of that flattery (`selection_optimism` in the
-  `cv_confidence` record): for each fold, pick the candidate with the best mean
+  `confidence` record): for each fold, pick the candidate with the best mean
   on the other folds, score it on the held fold, and take the gap to the
   winner's own mean. With the move, the band contained 0.5 in 95.0 percent
   (91.0 to 97.3) of 200 runs at 30 candidates (was 89.5 percent on the same

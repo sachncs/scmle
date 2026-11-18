@@ -23,17 +23,17 @@ const commands = [
 const options = [
   ["<code>--target COL [COL …]</code>", "Target column(s). Required."],
   ["<code>--task</code>, <code>--metric</code>", "Override the resolved task or metric."],
-  ["<code>--time-budget S</code>, <code>--workers N</code>", "Search budget in seconds and parallel trials."],
+  ["<code>--budget S</code>, <code>--workers N</code>", "Search budget in seconds and parallel trials."],
   ["<code>--validation</code>", "<code>auto</code>, <code>stratified</code>, <code>random</code>, <code>group</code>, <code>temporal</code>, <code>rolling</code> and more."],
-  ["<code>--group-column</code>, <code>--time-column</code>, <code>--weight-column</code>", "Describe the structure of the data."],
-  ["<code>--exclude</code>, <code>--id-columns</code>, <code>--unavailable-at-prediction</code>", "Keep columns out of the features."],
-  ["<code>--leakage-policy {warn,block}</code>", "Default <code>warn</code>: the run finishes, logs a warning and labels the score provisional. <code>block</code> (opt-in) stops the run on suspicious features that have a passing certificate. See <a href=\"" + base + "/docs/leakage/\">the leakage screen</a>."],
+  ["<code>--group</code>, <code>--time</code>, <code>--weight</code>", "Describe the structure of the data."],
+  ["<code>--exclude</code>, <code>--identifiers</code>, <code>--unavailable</code>", "Keep columns out of the features."],
+  ["<code>--leakage {warn,block}</code>", "Default <code>warn</code>: the run finishes, logs a warning and labels the score provisional. <code>block</code> (opt-in) stops the run on suspicious features that have a passing certificate. See <a href=\"" + base + "/docs/leakage/\">the leakage screen</a>."],
   ["<code>--charter FILE</code>", "Govern the run by an analysis charter: a sealed confirmation set is split off before profiling."],
   ["<code>--exclude-models</code>, <code>--exclude-families</code>", "Restrict the search."],
   ["<code>--output-dir</code>, <code>--seed</code>", "Where runs go; reproducibility."],
-  ["<code>--baseline-column COL</code>, <code>--baseline-subject {frozen_rule,selected_model}</code>", "Measure the current process as a baseline. In a charter run the baseline claim is about a rule frozen on exploration rows (<code>frozen_rule</code>, the default) or, with <code>selected_model</code>, about the model the search selects: the confirmation set then stays sealed until the selection is frozen."],
-  ["<code>--logged-action-column</code>, <code>--propensity-column</code>", "Name a randomized log, so a charter run with a decision block can estimate the off-policy value of the frozen rule."],
-  ["<code>--ingest-plan FILE</code>, <code>--framing-draft FILE</code>, <code>--leakage-attestations FILE</code>", "Raw-data ingestion plan, a framing draft, and per-column attestations that keep a flagged column in the features."],
+  ["<code>--baseline COL</code>, <code>--comparator {frozen_rule,selected_model}</code>", "Measure the current process as a baseline. In a charter run the baseline claim is about a rule frozen on exploration rows (<code>frozen_rule</code>, the default) or, with <code>selected_model</code>, about the model the search selects: the confirmation set then stays sealed until the selection is frozen."],
+  ["<code>--action</code>, <code>--propensity</code>", "Name a randomized log, so a charter run with a decision block can estimate the off-policy value of the frozen rule."],
+  ["<code>--ingest FILE</code>, <code>--draft FILE</code>, <code>--attestations FILE</code>", "Raw-data ingestion plan, a framing draft, and per-column attestations that keep a flagged column in the features."],
   ["<code>--config FILE</code>", "Read a complete project specification (the format of <code>config.json</code>)."],
 ];
 ---
@@ -52,7 +52,7 @@ const options = [
 
   <h2>Examples</h2>
   <pre><code>{`scmle plan data.csv --target churn
-scmle run data.csv --target churn --workers 4 --time-budget 600
+scmle run data.csv --target churn --workers 4 --budget 600
 scmle resume runs/run_20261015_001
 scmle catalog data.csv --label-column churn --output catalog.json
 cat payload.bin | scmle catalog --raw-bytes`}</code></pre>

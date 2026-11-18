@@ -45,8 +45,8 @@ def test_quantile_coverage_tracks_the_nominal_level_on_locked_rows(tmp_path):
         noisy_line(), "y", time_budget=300, output_dir=tmp_path
     ).run()
 
-    curve = result.evaluation["quantile_coverage"]
-    tests = result.evaluation["n_test"]
+    curve = result.evaluation["quantiles"]
+    tests = result.evaluation["rows"]["test"]
 
     assert len(curve) >= 3
     for point in curve:

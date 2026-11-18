@@ -162,137 +162,147 @@
     "time": "str"
    },
    "config.json": {
-    "charter_path": "NoneType",
-    "confirmation_failure_policy": "str",
-    "confirmation_rule": "str",
+    "attestations": "NoneType",
+    "charter": "NoneType",
+    "confirmation": "str",
     "data": {
-     "baseline_column": "NoneType",
-     "baseline_subject": "str",
-     "embedding_model": "str",
-     "event_column": "NoneType",
-     "excluded_columns": [],
-     "feature_delays": {},
-     "forecast_calendar": [],
-     "forecast_lags": [],
-     "forecast_windows": [],
-     "framing_draft": "NoneType",
-     "group_column": "NoneType",
+     "action": "NoneType",
+     "baseline": "NoneType",
+     "comparator": "str",
+     "confidence": "float",
+     "delays": {},
+     "draft": "NoneType",
+     "embedder": "str",
+     "encoding": "str",
+     "event": "NoneType",
+     "excluded": [],
+     "forecast": {
+      "calendar": [],
+      "lags": [],
+      "windows": []
+     },
+     "group": "NoneType",
      "horizon": "NoneType",
-     "id_columns": [],
-     "ingest_plan": "NoneType",
-     "logged_action_column": "NoneType",
-     "memory_budget_gb": "NoneType",
+     "identifiers": [],
+     "ingest": "NoneType",
+     "memory": "NoneType",
      "modality": "str",
-     "monotonic_constraints": {},
-     "ordinal_order": [],
-     "propensity_column": "NoneType",
-     "pseudo_label_confidence": "float",
-     "query_column": "NoneType",
-     "reference_uri": "NoneType",
-     "seasonal_period": "NoneType",
-     "sensitive_columns": [],
+     "monotonic": {},
+     "order": [],
+     "period": "NoneType",
+     "propensity": "NoneType",
+     "query": "NoneType",
+     "reference": "NoneType",
+     "sensitive": [],
      "target": "str",
      "targets": [],
-     "text_encoding": "str",
-     "time_as_feature": "bool",
-     "time_column": "NoneType",
+     "temporal": "bool",
+     "time": "NoneType",
      "training": "str",
-     "treatment_column": "NoneType",
-     "unavailable_at_prediction": [],
+     "treatment": "NoneType",
+     "unavailable": [],
      "unlabeled": "str",
      "uri": "str",
-     "value_column": "NoneType",
-     "weight_column": "NoneType"
+     "value": "NoneType",
+     "weight": "NoneType"
     },
     "decision": {
-     "false_negative_cost": "float",
-     "false_positive_cost": "float",
-     "threshold_objective": "str"
+     "costs": {
+      "fn": "float",
+      "fp": "float"
+     },
+     "objective": "str"
+    },
+    "derivation": {
+     "nodes": [],
+     "version": "int"
     },
     "ensemble": {
      "size": "int"
     },
+    "failure": "str",
     "fairness": {
      "column": "NoneType",
+     "cost": "float",
      "criterion": "str",
-     "max_accuracy_cost": "float",
-     "min_reduction": "float",
      "mitigation": "str",
-     "trigger_gap": "float"
+     "reduction": "float",
+     "trigger": "float"
     },
-    "feature_graph": {
-     "nodes": [],
-     "version": "int"
-    },
-    "leakage_attestations": "NoneType",
-    "leakage_policy": "str",
-    "ledger_rule": "str",
+    "leakage": "str",
+    "ledger": "str",
     "metric": "NoneType",
     "models": {
-     "exclude_families": [
-      "str"
-     ],
-     "exclude_models": [
-      "str"
-     ],
-     "experimental_models": []
+     "exclude": {
+      "families": [
+       "str"
+      ],
+      "models": [
+       "str"
+      ]
+     },
+     "experimental": []
     },
     "problem": {
+     "criteria": {},
      "decision": "str",
-     "population": "str",
-     "success_criteria": {}
+     "population": "str"
     },
     "resources": {
-     "cluster_address": "NoneType",
-     "cpu_limit": "NoneType",
+     "budget": "int",
+     "cluster": "NoneType",
      "enforcement": "str",
      "executor": "str",
      "gpu": "str",
-     "memory_limit_gb": "float",
-     "time_budget_seconds": "int",
+     "limits": {
+      "cpu": "NoneType",
+      "memory": "float"
+     },
      "workers": "int"
     },
     "search": {
-     "configs_per_model": "int",
+     "configurations": "int",
+     "discard": "float",
      "eta": "int",
+     "leaders": "int",
      "optimizer": "str",
-     "prune_fraction": "float",
-     "pruning": "str",
-     "top_models": "int"
+     "pruning": "str"
     },
     "selection": {
-     "bayesian_confidence": "float",
-     "bias_variance_replicates": "int",
-     "latency_safety_factor": "float",
-     "max_candidates_checked": "int",
-     "max_model_mb": "NoneType",
-     "max_p95_latency_ms": "NoneType",
+     "credibility": "float",
+     "depth": "int",
+     "headroom": "float",
+     "latency": "NoneType",
      "maximize": "NoneType",
-     "nested_cv": "bool",
+     "nested": "bool",
      "pareto": "bool",
-     "pareto_tolerance": "float",
+     "repeats": "int",
+     "replicates": "int",
      "rope": "float",
-     "sensitivity_repeats": "int",
-     "tie_breaker": "str",
-     "tie_tolerance": "float",
+     "size": "NoneType",
+     "slack": "float",
+     "tiebreaker": "str",
+     "tolerance": "float",
      "uncertainty": "str",
      "weighted": "bool"
     },
     "strategies": {
+     "leaders": "int",
      "names": [
       "str"
-     ],
-     "top_models": "int"
+     ]
     },
     "task": "str",
     "validation": {
-     "embargo_rows": "int",
+     "embargo": "int",
      "folds": "int",
-     "horizon_rows": "NoneType",
+     "rolling": {
+      "horizon": "NoneType",
+      "window": "NoneType"
+     },
      "seed": "int",
      "strategy": "str",
-     "test_fraction": "float",
-     "window_rows": "NoneType"
+     "test": "float"
     },
     "version": "int"
    },
@@ -1442,14 +1452,71 @@
     ]
    },
    "evaluation.json": {
-    "artifact_verification": {
-     "largest_difference": "float",
-     "rows": "int",
-     "tolerance": "float"
+    "backend": "str",
+    "baseline": "float",
+    "benefit": "NoneType",
+    "card": {
+     "artifacts": [
+      "str"
+     ],
+     "dataset": "str",
+     "digests": {
+      "model": "str"
+     },
+     "evaluation": {
+      "cv_confidence": {
+       "available": "bool",
+       "candidates": "int",
+       "corrected_standard_error": "float",
+       "folds": "int",
+       "interval": [
+        "float"
+       ],
+       "level": "float",
+       "mean": "float",
+       "naive_standard_error": "float",
+       "note": "str",
+       "selection_optimism": "float"
+      },
+      "release_evaluation": "NoneType",
+      "selected_cv_score": "float",
+      "selected_cv_std": "float",
+      "test_metrics": {
+       "accuracy": "float",
+       "balanced_accuracy": "float",
+       "f1": "float",
+       "log_loss": "float",
+       "pr_auc": "float",
+       "roc_auc": "float"
+      }
+     },
+     "excluded": [
+      "str"
+     ],
+     "features": [
+      "str"
+     ],
+     "generated": "str",
+     "limitations": [
+      "str"
+     ],
+     "metric": "str",
+     "model": "str",
+     "resources": {
+      "latency": "float",
+      "machine": "str",
+      "size": "float",
+      "timed": "int"
+     },
+     "review": "str",
+     "schema_version": "int",
+     "snapshot": "str",
+     "support": "str",
+     "task": "str",
+     "use": "str",
+     "version": "str"
     },
-    "baseline_cv_score": "float",
-    "bias_variance": "NoneType",
-    "cv_confidence": {
+    "confidence": {
      "available": "bool",
      "candidates": "int",
      "corrected_standard_error": "float",
@@ -1463,18 +1530,18 @@
      "note": "str",
      "selection_optimism": "float"
     },
+    "criteria": [],
     "decision": "NoneType",
+    "decomposition": "NoneType",
     "diagnostics": [
      "str"
     ],
-    "elapsed_seconds": "float",
-    "evaluation_prevalence": {
-     "natural": "bool",
-     "note": "str",
-     "strategy": "str"
+    "digests": {
+     "split": "str"
     },
-    "execution_backend": "str",
-    "explanation_evidence": {
+    "direction": "str",
+    "elapsed": "float",
+    "explanations": {
      "pairwise_interaction": {
       "caveat": "str",
       "clearance": {
@@ -1674,8 +1741,7 @@
       }
      }
     },
-    "fairness_mitigation": "NoneType",
-    "fit_health": {
+    "health": {
      "gains": {
       "training": "float",
       "validation": "float"
@@ -1685,7 +1751,7 @@
      "retained": "float",
      "verdict": "str"
     },
-    "learning_curve": {
+    "learning": {
      "gains": {
       "last": "float",
       "total": "float"
@@ -1698,142 +1764,7 @@
      ],
      "verdict": "str"
     },
-    "metric": "str",
-    "metric_greater_is_better": "bool",
-    "model_card": {
-     "artifacts": [
-      "str"
-     ],
-     "dataset": "str",
-     "digests": {
-      "model": "str"
-     },
-     "evaluation": {
-      "cv_confidence": {
-       "available": "bool",
-       "candidates": "int",
-       "corrected_standard_error": "float",
-       "folds": "int",
-       "interval": [
-        "float"
-       ],
-       "level": "float",
-       "mean": "float",
-       "naive_standard_error": "float",
-       "note": "str",
-       "selection_optimism": "float"
-      },
-      "release_evaluation": "NoneType",
-      "selected_cv_score": "float",
-      "selected_cv_std": "float",
-      "test_metrics": {
-       "accuracy": "float",
-       "balanced_accuracy": "float",
-       "f1": "float",
-       "log_loss": "float",
-       "pr_auc": "float",
-       "roc_auc": "float"
-      }
-     },
-     "excluded": [
-      "str"
-     ],
-     "features": [
-      "str"
-     ],
-     "generated": "str",
-     "limitations": [
-      "str"
-     ],
-     "metric": "str",
-     "model": "str",
-     "resources": {
-      "latency": "float",
-      "machine": "str",
-      "size": "float",
-      "timed": "int"
-     },
-     "review": "str",
-     "schema_version": "int",
-     "snapshot": "str",
-     "support": "str",
-     "task": "str",
-     "use": "str",
-     "version": "str"
-    },
-    "n_dev": "int",
-    "n_test": "int",
-    "nested_cv": "NoneType",
-    "net_benefit": "NoneType",
-    "pareto_front": "NoneType",
-    "provenance": {
-     "config_hash": "str",
-     "dataset": {
-      "data_hash": "str",
-      "dataset_id": "str",
-      "raw_source_hash": "NoneType",
-      "snapshot_id": "str"
-     },
-     "environment": "installed",
-     "model": {
-      "manifest_path": "str",
-      "manifest_sha256": "str",
-      "model_name": "str",
-      "model_version": "str"
-     },
-     "run_id": "str",
-     "schema_version": "int",
-     "signature": {
-      "path": "str",
-      "present": "bool"
-     },
-     "software_version": "str"
-    },
-    "release_attestation": {
-     "digests": {
-      "manifest": "str",
-      "provenance": "str",
-      "sbom": "str"
-     },
-     "run": "str",
-     "schema_version": "int",
-     "signed": "bool"
-    },
-    "release_evaluation": {
-     "blocked": "bool",
-     "blockers": [
-      "str"
-     ],
-     "findings": [],
-     "passed": "bool",
-     "status": "str"
-    },
-    "release_evidence": {
-     "ready": "bool",
-     "records": []
-    },
-    "release_policy": "NoneType",
-    "reliability_plan": {
-     "execution_status": "str",
-     "limitation": "str",
-     "release_blocked": "bool",
-     "scenarios": [
-      {
-       "blocking": "bool",
-       "evidence": [],
-       "outcome": "str",
-       "recoverability": "str",
-       "requirements": [
-        "str"
-       ],
-       "scenario": "str",
-       "verification": "str"
-      }
-     ],
-     "schema_version": "int"
-    },
-    "reproducibility": "str",
-    "resource_limits": {
+    "limits": {
      "cpu": {
       "enforcement": "str",
       "limit": "NoneType",
@@ -1862,13 +1793,105 @@
       "within_limit": "bool"
      }
     },
+    "metric": "str",
+    "metrics": {
+     "accuracy": "float",
+     "balanced_accuracy": "float",
+     "f1": "float",
+     "log_loss": "float",
+     "pr_auc": "float",
+     "roc_auc": "float"
+    },
+    "mitigation": "NoneType",
+    "nested": "NoneType",
+    "opened": "bool",
+    "pareto": "NoneType",
+    "policy": "str",
+    "prevalence": {
+     "natural": "bool",
+     "note": "str",
+     "strategy": "str"
+    },
+    "provenance": {
+     "config_hash": "str",
+     "dataset": {
+      "data_hash": "str",
+      "dataset_id": "str",
+      "raw_source_hash": "NoneType",
+      "snapshot_id": "str"
+     },
+     "environment": "installed",
+     "model": {
+      "manifest_path": "str",
+      "manifest_sha256": "str",
+      "model_name": "str",
+      "model_version": "str"
+     },
+     "run_id": "str",
+     "schema_version": "int",
+     "signature": {
+      "path": "str",
+      "present": "bool"
+     },
+     "software_version": "str"
+    },
+    "release": {
+     "attestation": {
+      "digests": {
+       "manifest": "str",
+       "provenance": "str",
+       "sbom": "str"
+      },
+      "run": "str",
+      "schema_version": "int",
+      "signed": "bool"
+     },
+     "evaluation": {
+      "blocked": "bool",
+      "blockers": [
+       "str"
+      ],
+      "findings": [],
+      "passed": "bool",
+      "status": "str"
+     },
+     "evidence": {
+      "ready": "bool",
+      "records": []
+     },
+     "policy": "NoneType"
+    },
+    "reliability": {
+     "execution_status": "str",
+     "limitation": "str",
+     "release_blocked": "bool",
+     "scenarios": [
+      {
+       "blocking": "bool",
+       "evidence": [],
+       "outcome": "str",
+       "recoverability": "str",
+       "requirements": [
+        "str"
+       ],
+       "scenario": "str",
+       "verification": "str"
+      }
+     ],
+     "schema_version": "int"
+    },
+    "reproducibility": "str",
     "resources": {
      "latency": "float",
      "machine": "str",
      "size": "float",
      "timed": "int"
     },
-    "run_id": "str",
+    "rows": {
+     "development": "int",
+     "test": "int"
+    },
+    "run": "str",
     "sbom": {
      "$schema": "str",
      "bomFormat": "str",
@@ -1900,32 +1923,28 @@
      "specVersion": "str",
      "version": "int"
     },
-    "selected_cv_score": "float",
-    "selected_cv_std": "float",
-    "selected_model": "str",
-    "selected_params": {},
-    "selected_strategy": "str",
-    "selected_trial_id": "str",
-    "selection_policy": "str",
-    "semi_supervised": "NoneType",
-    "sensitivity": "NoneType",
-    "skipped_for_time": [],
-    "split_fingerprint": "str",
-    "split_strategy": "str",
-    "streamed_locked": "NoneType",
-    "success_criteria": [],
-    "task": "str",
-    "test_metrics": {
-     "accuracy": "float",
-     "balanced_accuracy": "float",
-     "f1": "float",
-     "log_loss": "float",
-     "pr_auc": "float",
-     "roc_auc": "float"
+    "schema_version": "int",
+    "selected": {
+     "deviation": "float",
+     "model": "str",
+     "params": {},
+     "score": "float",
+     "strategy": "str",
+     "trial": "str"
     },
-    "test_set_opened": "bool",
+    "sensitivity": "NoneType",
+    "skipped": [],
+    "streamed": "NoneType",
+    "task": "str",
+    "unlabeled": "NoneType",
     "uplift": "NoneType",
-    "weighted_test_metrics": "NoneType"
+    "validation": "str",
+    "verification": {
+     "largest_difference": "float",
+     "rows": "int",
+     "tolerance": "float"
+    },
+    "weighted": "NoneType"
    },
    "evidence/capability_resources.json": {
     "captured_at": "str",
@@ -2647,7 +2666,6 @@
     "commit": "str",
     "configuration": "str",
     "dataset": "str",
-    "decision_threshold": "NoneType",
     "environment": "installed",
     "files": {
      "conformal.json": "str",
@@ -2660,18 +2678,19 @@
     "format": "int",
     "libraries": "installed",
     "metric": "str",
-    "model_name": "str",
-    "model_params": {},
-    "model_version": "str",
+    "model": "str",
     "pandas": "str",
+    "params": {},
     "platform": "str",
     "python": "str",
-    "scmle_version": "str",
+    "scmle": "str",
     "seed": "int",
     "sklearn": "str",
     "split": "str",
     "strategy": "str",
-    "threads": "installed"
+    "threads": "installed",
+    "threshold": "NoneType",
+    "version": "str"
    },
    "model/reference.json": {
     "features": {
@@ -3632,137 +3651,147 @@
     "time": "str"
    },
    "config.json": {
-    "charter_path": "NoneType",
-    "confirmation_failure_policy": "str",
-    "confirmation_rule": "str",
+    "attestations": "NoneType",
+    "charter": "NoneType",
+    "confirmation": "str",
     "data": {
-     "baseline_column": "NoneType",
-     "baseline_subject": "str",
-     "embedding_model": "str",
-     "event_column": "NoneType",
-     "excluded_columns": [],
-     "feature_delays": {},
-     "forecast_calendar": [],
-     "forecast_lags": [],
-     "forecast_windows": [],
-     "framing_draft": "NoneType",
-     "group_column": "NoneType",
+     "action": "NoneType",
+     "baseline": "NoneType",
+     "comparator": "str",
+     "confidence": "float",
+     "delays": {},
+     "draft": "NoneType",
+     "embedder": "str",
+     "encoding": "str",
+     "event": "NoneType",
+     "excluded": [],
+     "forecast": {
+      "calendar": [],
+      "lags": [],
+      "windows": []
+     },
+     "group": "NoneType",
      "horizon": "NoneType",
-     "id_columns": [],
-     "ingest_plan": "NoneType",
-     "logged_action_column": "NoneType",
-     "memory_budget_gb": "NoneType",
+     "identifiers": [],
+     "ingest": "NoneType",
+     "memory": "NoneType",
      "modality": "str",
-     "monotonic_constraints": {},
-     "ordinal_order": [],
-     "propensity_column": "NoneType",
-     "pseudo_label_confidence": "float",
-     "query_column": "NoneType",
-     "reference_uri": "NoneType",
-     "seasonal_period": "NoneType",
-     "sensitive_columns": [],
+     "monotonic": {},
+     "order": [],
+     "period": "NoneType",
+     "propensity": "NoneType",
+     "query": "NoneType",
+     "reference": "NoneType",
+     "sensitive": [],
      "target": "str",
      "targets": [],
-     "text_encoding": "str",
-     "time_as_feature": "bool",
-     "time_column": "NoneType",
+     "temporal": "bool",
+     "time": "NoneType",
      "training": "str",
-     "treatment_column": "NoneType",
-     "unavailable_at_prediction": [],
+     "treatment": "NoneType",
+     "unavailable": [],
      "unlabeled": "str",
      "uri": "str",
-     "value_column": "NoneType",
-     "weight_column": "NoneType"
+     "value": "NoneType",
+     "weight": "NoneType"
     },
     "decision": {
-     "false_negative_cost": "float",
-     "false_positive_cost": "float",
-     "threshold_objective": "str"
+     "costs": {
+      "fn": "float",
+      "fp": "float"
+     },
+     "objective": "str"
+    },
+    "derivation": {
+     "nodes": [],
+     "version": "int"
     },
     "ensemble": {
      "size": "int"
     },
+    "failure": "str",
     "fairness": {
      "column": "NoneType",
+     "cost": "float",
      "criterion": "str",
-     "max_accuracy_cost": "float",
-     "min_reduction": "float",
      "mitigation": "str",
-     "trigger_gap": "float"
+     "reduction": "float",
+     "trigger": "float"
     },
-    "feature_graph": {
-     "nodes": [],
-     "version": "int"
-    },
-    "leakage_attestations": "NoneType",
-    "leakage_policy": "str",
-    "ledger_rule": "str",
+    "leakage": "str",
+    "ledger": "str",
     "metric": "NoneType",
     "models": {
-     "exclude_families": [
-      "str"
-     ],
-     "exclude_models": [
-      "str"
-     ],
-     "experimental_models": []
+     "exclude": {
+      "families": [
+       "str"
+      ],
+      "models": [
+       "str"
+      ]
+     },
+     "experimental": []
     },
     "problem": {
+     "criteria": {},
      "decision": "str",
-     "population": "str",
-     "success_criteria": {}
+     "population": "str"
     },
     "resources": {
-     "cluster_address": "NoneType",
-     "cpu_limit": "NoneType",
+     "budget": "int",
+     "cluster": "NoneType",
      "enforcement": "str",
      "executor": "str",
      "gpu": "str",
-     "memory_limit_gb": "float",
-     "time_budget_seconds": "int",
+     "limits": {
+      "cpu": "NoneType",
+      "memory": "float"
+     },
      "workers": "int"
     },
     "search": {
-     "configs_per_model": "int",
+     "configurations": "int",
+     "discard": "float",
      "eta": "int",
+     "leaders": "int",
      "optimizer": "str",
-     "prune_fraction": "float",
-     "pruning": "str",
-     "top_models": "int"
+     "pruning": "str"
     },
     "selection": {
-     "bayesian_confidence": "float",
-     "bias_variance_replicates": "int",
-     "latency_safety_factor": "float",
-     "max_candidates_checked": "int",
-     "max_model_mb": "NoneType",
-     "max_p95_latency_ms": "NoneType",
+     "credibility": "float",
+     "depth": "int",
+     "headroom": "float",
+     "latency": "NoneType",
      "maximize": "NoneType",
-     "nested_cv": "bool",
+     "nested": "bool",
      "pareto": "bool",
-     "pareto_tolerance": "float",
+     "repeats": "int",
+     "replicates": "int",
      "rope": "float",
-     "sensitivity_repeats": "int",
-     "tie_breaker": "str",
-     "tie_tolerance": "float",
+     "size": "NoneType",
+     "slack": "float",
+     "tiebreaker": "str",
+     "tolerance": "float",
      "uncertainty": "str",
      "weighted": "bool"
     },
     "strategies": {
+     "leaders": "int",
      "names": [
       "str"
-     ],
-     "top_models": "int"
+     ]
     },
     "task": "str",
     "validation": {
-     "embargo_rows": "int",
+     "embargo": "int",
      "folds": "int",
-     "horizon_rows": "NoneType",
+     "rolling": {
+      "horizon": "NoneType",
+      "window": "NoneType"
+     },
      "seed": "int",
      "strategy": "str",
-     "test_fraction": "float",
-     "window_rows": "NoneType"
+     "test": "float"
     },
     "version": "int"
    },
@@ -4983,14 +5012,69 @@
     "worst": []
    },
    "evaluation.json": {
-    "artifact_verification": {
-     "largest_difference": "float",
-     "rows": "int",
-     "tolerance": "float"
+    "backend": "str",
+    "baseline": "float",
+    "benefit": "NoneType",
+    "card": {
+     "artifacts": [
+      "str"
+     ],
+     "dataset": "str",
+     "digests": {
+      "model": "str"
+     },
+     "evaluation": {
+      "cv_confidence": {
+       "available": "bool",
+       "candidates": "int",
+       "corrected_standard_error": "float",
+       "folds": "int",
+       "interval": [
+        "float"
+       ],
+       "level": "float",
+       "mean": "float",
+       "naive_standard_error": "float",
+       "note": "str",
+       "selection_optimism": "float"
+      },
+      "release_evaluation": "NoneType",
+      "selected_cv_score": "float",
+      "selected_cv_std": "float",
+      "test_metrics": {
+       "accuracy": "float",
+       "balanced_accuracy": "float",
+       "f1_macro": "float",
+       "log_loss": "float"
+      }
+     },
+     "excluded": [
+      "str"
+     ],
+     "features": [
+      "str"
+     ],
+     "generated": "str",
+     "limitations": [
+      "str"
+     ],
+     "metric": "str",
+     "model": "str",
+     "resources": {
+      "latency": "float",
+      "machine": "str",
+      "size": "float",
+      "timed": "int"
+     },
+     "review": "str",
+     "schema_version": "int",
+     "snapshot": "str",
+     "support": "str",
+     "task": "str",
+     "use": "str",
+     "version": "str"
     },
-    "baseline_cv_score": "float",
-    "bias_variance": "NoneType",
-    "cv_confidence": {
+    "confidence": {
      "available": "bool",
      "candidates": "int",
      "corrected_standard_error": "float",
@@ -5004,18 +5088,18 @@
      "note": "str",
      "selection_optimism": "float"
     },
+    "criteria": [],
     "decision": "NoneType",
+    "decomposition": "NoneType",
     "diagnostics": [
      "str"
     ],
-    "elapsed_seconds": "float",
-    "evaluation_prevalence": {
-     "natural": "bool",
-     "note": "str",
-     "strategy": "str"
+    "digests": {
+     "split": "str"
     },
-    "execution_backend": "str",
-    "explanation_evidence": {
+    "direction": "str",
+    "elapsed": "float",
+    "explanations": {
      "pairwise_interaction": {
       "caveat": "str",
       "clearance": {
@@ -5146,8 +5230,7 @@
       }
      }
     },
-    "fairness_mitigation": "NoneType",
-    "fit_health": {
+    "health": {
      "gains": {
       "training": "float",
       "validation": "float"
@@ -5157,7 +5240,7 @@
      "retained": "float",
      "verdict": "str"
     },
-    "learning_curve": {
+    "learning": {
      "gains": {
       "last": "float",
       "total": "float"
@@ -5170,140 +5253,7 @@
      ],
      "verdict": "str"
     },
-    "metric": "str",
-    "metric_greater_is_better": "bool",
-    "model_card": {
-     "artifacts": [
-      "str"
-     ],
-     "dataset": "str",
-     "digests": {
-      "model": "str"
-     },
-     "evaluation": {
-      "cv_confidence": {
-       "available": "bool",
-       "candidates": "int",
-       "corrected_standard_error": "float",
-       "folds": "int",
-       "interval": [
-        "float"
-       ],
-       "level": "float",
-       "mean": "float",
-       "naive_standard_error": "float",
-       "note": "str",
-       "selection_optimism": "float"
-      },
-      "release_evaluation": "NoneType",
-      "selected_cv_score": "float",
-      "selected_cv_std": "float",
-      "test_metrics": {
-       "accuracy": "float",
-       "balanced_accuracy": "float",
-       "f1_macro": "float",
-       "log_loss": "float"
-      }
-     },
-     "excluded": [
-      "str"
-     ],
-     "features": [
-      "str"
-     ],
-     "generated": "str",
-     "limitations": [
-      "str"
-     ],
-     "metric": "str",
-     "model": "str",
-     "resources": {
-      "latency": "float",
-      "machine": "str",
-      "size": "float",
-      "timed": "int"
-     },
-     "review": "str",
-     "schema_version": "int",
-     "snapshot": "str",
-     "support": "str",
-     "task": "str",
-     "use": "str",
-     "version": "str"
-    },
-    "n_dev": "int",
-    "n_test": "int",
-    "nested_cv": "NoneType",
-    "net_benefit": "NoneType",
-    "pareto_front": "NoneType",
-    "provenance": {
-     "config_hash": "str",
-     "dataset": {
-      "data_hash": "str",
-      "dataset_id": "str",
-      "raw_source_hash": "NoneType",
-      "snapshot_id": "str"
-     },
-     "environment": "installed",
-     "model": {
-      "manifest_path": "str",
-      "manifest_sha256": "str",
-      "model_name": "str",
-      "model_version": "str"
-     },
-     "run_id": "str",
-     "schema_version": "int",
-     "signature": {
-      "path": "str",
-      "present": "bool"
-     },
-     "software_version": "str"
-    },
-    "release_attestation": {
-     "digests": {
-      "manifest": "str",
-      "provenance": "str",
-      "sbom": "str"
-     },
-     "run": "str",
-     "schema_version": "int",
-     "signed": "bool"
-    },
-    "release_evaluation": {
-     "blocked": "bool",
-     "blockers": [
-      "str"
-     ],
-     "findings": [],
-     "passed": "bool",
-     "status": "str"
-    },
-    "release_evidence": {
-     "ready": "bool",
-     "records": []
-    },
-    "release_policy": "NoneType",
-    "reliability_plan": {
-     "execution_status": "str",
-     "limitation": "str",
-     "release_blocked": "bool",
-     "scenarios": [
-      {
-       "blocking": "bool",
-       "evidence": [],
-       "outcome": "str",
-       "recoverability": "str",
-       "requirements": [
-        "str"
-       ],
-       "scenario": "str",
-       "verification": "str"
-      }
-     ],
-     "schema_version": "int"
-    },
-    "reproducibility": "str",
-    "resource_limits": {
+    "limits": {
      "cpu": {
       "enforcement": "str",
       "limit": "NoneType",
@@ -5332,13 +5282,103 @@
       "within_limit": "bool"
      }
     },
+    "metric": "str",
+    "metrics": {
+     "accuracy": "float",
+     "balanced_accuracy": "float",
+     "f1_macro": "float",
+     "log_loss": "float"
+    },
+    "mitigation": "NoneType",
+    "nested": "NoneType",
+    "opened": "bool",
+    "pareto": "NoneType",
+    "policy": "str",
+    "prevalence": {
+     "natural": "bool",
+     "note": "str",
+     "strategy": "str"
+    },
+    "provenance": {
+     "config_hash": "str",
+     "dataset": {
+      "data_hash": "str",
+      "dataset_id": "str",
+      "raw_source_hash": "NoneType",
+      "snapshot_id": "str"
+     },
+     "environment": "installed",
+     "model": {
+      "manifest_path": "str",
+      "manifest_sha256": "str",
+      "model_name": "str",
+      "model_version": "str"
+     },
+     "run_id": "str",
+     "schema_version": "int",
+     "signature": {
+      "path": "str",
+      "present": "bool"
+     },
+     "software_version": "str"
+    },
+    "release": {
+     "attestation": {
+      "digests": {
+       "manifest": "str",
+       "provenance": "str",
+       "sbom": "str"
+      },
+      "run": "str",
+      "schema_version": "int",
+      "signed": "bool"
+     },
+     "evaluation": {
+      "blocked": "bool",
+      "blockers": [
+       "str"
+      ],
+      "findings": [],
+      "passed": "bool",
+      "status": "str"
+     },
+     "evidence": {
+      "ready": "bool",
+      "records": []
+     },
+     "policy": "NoneType"
+    },
+    "reliability": {
+     "execution_status": "str",
+     "limitation": "str",
+     "release_blocked": "bool",
+     "scenarios": [
+      {
+       "blocking": "bool",
+       "evidence": [],
+       "outcome": "str",
+       "recoverability": "str",
+       "requirements": [
+        "str"
+       ],
+       "scenario": "str",
+       "verification": "str"
+      }
+     ],
+     "schema_version": "int"
+    },
+    "reproducibility": "str",
     "resources": {
      "latency": "float",
      "machine": "str",
      "size": "float",
      "timed": "int"
     },
-    "run_id": "str",
+    "rows": {
+     "development": "int",
+     "test": "int"
+    },
+    "run": "str",
     "sbom": {
      "$schema": "str",
      "bomFormat": "str",
@@ -5370,30 +5410,28 @@
      "specVersion": "str",
      "version": "int"
     },
-    "selected_cv_score": "float",
-    "selected_cv_std": "float",
-    "selected_model": "str",
-    "selected_params": {},
-    "selected_strategy": "str",
-    "selected_trial_id": "str",
-    "selection_policy": "str",
-    "semi_supervised": "NoneType",
-    "sensitivity": "NoneType",
-    "skipped_for_time": [],
-    "split_fingerprint": "str",
-    "split_strategy": "str",
-    "streamed_locked": "NoneType",
-    "success_criteria": [],
-    "task": "str",
-    "test_metrics": {
-     "accuracy": "float",
-     "balanced_accuracy": "float",
-     "f1_macro": "float",
-     "log_loss": "float"
+    "schema_version": "int",
+    "selected": {
+     "deviation": "float",
+     "model": "str",
+     "params": {},
+     "score": "float",
+     "strategy": "str",
+     "trial": "str"
     },
-    "test_set_opened": "bool",
+    "sensitivity": "NoneType",
+    "skipped": [],
+    "streamed": "NoneType",
+    "task": "str",
+    "unlabeled": "NoneType",
     "uplift": "NoneType",
-    "weighted_test_metrics": "NoneType"
+    "validation": "str",
+    "verification": {
+     "largest_difference": "float",
+     "rows": "int",
+     "tolerance": "float"
+    },
+    "weighted": "NoneType"
    },
    "evidence/capability_resources.json": {
     "captured_at": "str",
@@ -6142,7 +6180,6 @@
     "commit": "str",
     "configuration": "str",
     "dataset": "str",
-    "decision_threshold": "NoneType",
     "environment": "installed",
     "files": {
      "conformal.json": "str",
@@ -6155,18 +6192,19 @@
     "format": "int",
     "libraries": "installed",
     "metric": "str",
-    "model_name": "str",
-    "model_params": {},
-    "model_version": "str",
+    "model": "str",
     "pandas": "str",
+    "params": {},
     "platform": "str",
     "python": "str",
-    "scmle_version": "str",
+    "scmle": "str",
     "seed": "int",
     "sklearn": "str",
     "split": "str",
     "strategy": "str",
-    "threads": "installed"
+    "threads": "installed",
+    "threshold": "NoneType",
+    "version": "str"
    },
    "model/reference.json": {
     "features": {
@@ -7128,137 +7166,147 @@
     "time": "str"
    },
    "config.json": {
-    "charter_path": "NoneType",
-    "confirmation_failure_policy": "str",
-    "confirmation_rule": "str",
+    "attestations": "NoneType",
+    "charter": "NoneType",
+    "confirmation": "str",
     "data": {
-     "baseline_column": "NoneType",
-     "baseline_subject": "str",
-     "embedding_model": "str",
-     "event_column": "NoneType",
-     "excluded_columns": [],
-     "feature_delays": {},
-     "forecast_calendar": [],
-     "forecast_lags": [],
-     "forecast_windows": [],
-     "framing_draft": "NoneType",
-     "group_column": "NoneType",
+     "action": "NoneType",
+     "baseline": "NoneType",
+     "comparator": "str",
+     "confidence": "float",
+     "delays": {},
+     "draft": "NoneType",
+     "embedder": "str",
+     "encoding": "str",
+     "event": "NoneType",
+     "excluded": [],
+     "forecast": {
+      "calendar": [],
+      "lags": [],
+      "windows": []
+     },
+     "group": "NoneType",
      "horizon": "NoneType",
-     "id_columns": [],
-     "ingest_plan": "NoneType",
-     "logged_action_column": "NoneType",
-     "memory_budget_gb": "NoneType",
+     "identifiers": [],
+     "ingest": "NoneType",
+     "memory": "NoneType",
      "modality": "str",
-     "monotonic_constraints": {},
-     "ordinal_order": [],
-     "propensity_column": "NoneType",
-     "pseudo_label_confidence": "float",
-     "query_column": "NoneType",
-     "reference_uri": "NoneType",
-     "seasonal_period": "NoneType",
-     "sensitive_columns": [],
+     "monotonic": {},
+     "order": [],
+     "period": "NoneType",
+     "propensity": "NoneType",
+     "query": "NoneType",
+     "reference": "NoneType",
+     "sensitive": [],
      "target": "str",
      "targets": [],
-     "text_encoding": "str",
-     "time_as_feature": "bool",
-     "time_column": "NoneType",
+     "temporal": "bool",
+     "time": "NoneType",
      "training": "str",
-     "treatment_column": "NoneType",
-     "unavailable_at_prediction": [],
+     "treatment": "NoneType",
+     "unavailable": [],
      "unlabeled": "str",
      "uri": "str",
-     "value_column": "NoneType",
-     "weight_column": "NoneType"
+     "value": "NoneType",
+     "weight": "NoneType"
     },
     "decision": {
-     "false_negative_cost": "float",
-     "false_positive_cost": "float",
-     "threshold_objective": "str"
+     "costs": {
+      "fn": "float",
+      "fp": "float"
+     },
+     "objective": "str"
+    },
+    "derivation": {
+     "nodes": [],
+     "version": "int"
     },
     "ensemble": {
      "size": "int"
     },
+    "failure": "str",
     "fairness": {
      "column": "NoneType",
+     "cost": "float",
      "criterion": "str",
-     "max_accuracy_cost": "float",
-     "min_reduction": "float",
      "mitigation": "str",
-     "trigger_gap": "float"
+     "reduction": "float",
+     "trigger": "float"
     },
-    "feature_graph": {
-     "nodes": [],
-     "version": "int"
-    },
-    "leakage_attestations": "NoneType",
-    "leakage_policy": "str",
-    "ledger_rule": "str",
+    "leakage": "str",
+    "ledger": "str",
     "metric": "NoneType",
     "models": {
-     "exclude_families": [
-      "str"
-     ],
-     "exclude_models": [
-      "str"
-     ],
-     "experimental_models": []
+     "exclude": {
+      "families": [
+       "str"
+      ],
+      "models": [
+       "str"
+      ]
+     },
+     "experimental": []
     },
     "problem": {
+     "criteria": {},
      "decision": "str",
-     "population": "str",
-     "success_criteria": {}
+     "population": "str"
     },
     "resources": {
-     "cluster_address": "NoneType",
-     "cpu_limit": "NoneType",
+     "budget": "int",
+     "cluster": "NoneType",
      "enforcement": "str",
      "executor": "str",
      "gpu": "str",
-     "memory_limit_gb": "float",
-     "time_budget_seconds": "int",
+     "limits": {
+      "cpu": "NoneType",
+      "memory": "float"
+     },
      "workers": "int"
     },
     "search": {
-     "configs_per_model": "int",
+     "configurations": "int",
+     "discard": "float",
      "eta": "int",
+     "leaders": "int",
      "optimizer": "str",
-     "prune_fraction": "float",
-     "pruning": "str",
-     "top_models": "int"
+     "pruning": "str"
     },
     "selection": {
-     "bayesian_confidence": "float",
-     "bias_variance_replicates": "int",
-     "latency_safety_factor": "float",
-     "max_candidates_checked": "int",
-     "max_model_mb": "NoneType",
-     "max_p95_latency_ms": "NoneType",
+     "credibility": "float",
+     "depth": "int",
+     "headroom": "float",
+     "latency": "NoneType",
      "maximize": "NoneType",
-     "nested_cv": "bool",
+     "nested": "bool",
      "pareto": "bool",
-     "pareto_tolerance": "float",
+     "repeats": "int",
+     "replicates": "int",
      "rope": "float",
-     "sensitivity_repeats": "int",
-     "tie_breaker": "str",
-     "tie_tolerance": "float",
+     "size": "NoneType",
+     "slack": "float",
+     "tiebreaker": "str",
+     "tolerance": "float",
      "uncertainty": "str",
      "weighted": "bool"
     },
     "strategies": {
+     "leaders": "int",
      "names": [
       "str"
-     ],
-     "top_models": "int"
+     ]
     },
     "task": "str",
     "validation": {
-     "embargo_rows": "int",
+     "embargo": "int",
      "folds": "int",
-     "horizon_rows": "NoneType",
+     "rolling": {
+      "horizon": "NoneType",
+      "window": "NoneType"
+     },
      "seed": "int",
      "strategy": "str",
-     "test_fraction": "float",
-     "window_rows": "NoneType"
+     "test": "float"
     },
     "version": "int"
    },
@@ -8245,14 +8293,68 @@
     "worst": []
    },
    "evaluation.json": {
-    "artifact_verification": {
-     "largest_difference": "float",
-     "rows": "int",
-     "tolerance": "float"
+    "backend": "str",
+    "baseline": "float",
+    "benefit": "NoneType",
+    "card": {
+     "artifacts": [
+      "str"
+     ],
+     "dataset": "str",
+     "digests": {
+      "model": "str"
+     },
+     "evaluation": {
+      "cv_confidence": {
+       "available": "bool",
+       "candidates": "int",
+       "corrected_standard_error": "float",
+       "folds": "int",
+       "interval": [
+        "float"
+       ],
+       "level": "float",
+       "mean": "float",
+       "naive_standard_error": "float",
+       "note": "str",
+       "selection_optimism": "float"
+      },
+      "release_evaluation": "NoneType",
+      "selected_cv_score": "float",
+      "selected_cv_std": "float",
+      "test_metrics": {
+       "mae": "float",
+       "r2": "float",
+       "rmse": "float"
+      }
+     },
+     "excluded": [
+      "str"
+     ],
+     "features": [
+      "str"
+     ],
+     "generated": "str",
+     "limitations": [
+      "str"
+     ],
+     "metric": "str",
+     "model": "str",
+     "resources": {
+      "latency": "float",
+      "machine": "str",
+      "size": "float",
+      "timed": "int"
+     },
+     "review": "str",
+     "schema_version": "int",
+     "snapshot": "str",
+     "support": "str",
+     "task": "str",
+     "use": "str",
+     "version": "str"
     },
-    "baseline_cv_score": "float",
-    "bias_variance": "NoneType",
-    "cv_confidence": {
+    "confidence": {
      "available": "bool",
      "candidates": "int",
      "corrected_standard_error": "float",
@@ -8266,18 +8368,18 @@
      "note": "str",
      "selection_optimism": "float"
     },
+    "criteria": [],
     "decision": "NoneType",
+    "decomposition": "NoneType",
     "diagnostics": [
      "str"
     ],
-    "elapsed_seconds": "float",
-    "evaluation_prevalence": {
-     "natural": "bool",
-     "note": "str",
-     "strategy": "str"
+    "digests": {
+     "split": "str"
     },
-    "execution_backend": "str",
-    "explanation_evidence": {
+    "direction": "str",
+    "elapsed": "float",
+    "explanations": {
      "pairwise_interaction": {
       "caveat": "str",
       "clearance": {
@@ -8477,8 +8579,7 @@
       }
      }
     },
-    "fairness_mitigation": "NoneType",
-    "fit_health": {
+    "health": {
      "gains": {
       "training": "float",
       "validation": "float"
@@ -8488,7 +8589,7 @@
      "retained": "float",
      "verdict": "str"
     },
-    "learning_curve": {
+    "learning": {
      "gains": {
       "last": "float",
       "total": "float"
@@ -8501,146 +8602,7 @@
      ],
      "verdict": "str"
     },
-    "metric": "str",
-    "metric_greater_is_better": "bool",
-    "model_card": {
-     "artifacts": [
-      "str"
-     ],
-     "dataset": "str",
-     "digests": {
-      "model": "str"
-     },
-     "evaluation": {
-      "cv_confidence": {
-       "available": "bool",
-       "candidates": "int",
-       "corrected_standard_error": "float",
-       "folds": "int",
-       "interval": [
-        "float"
-       ],
-       "level": "float",
-       "mean": "float",
-       "naive_standard_error": "float",
-       "note": "str",
-       "selection_optimism": "float"
-      },
-      "release_evaluation": "NoneType",
-      "selected_cv_score": "float",
-      "selected_cv_std": "float",
-      "test_metrics": {
-       "mae": "float",
-       "r2": "float",
-       "rmse": "float"
-      }
-     },
-     "excluded": [
-      "str"
-     ],
-     "features": [
-      "str"
-     ],
-     "generated": "str",
-     "limitations": [
-      "str"
-     ],
-     "metric": "str",
-     "model": "str",
-     "resources": {
-      "latency": "float",
-      "machine": "str",
-      "size": "float",
-      "timed": "int"
-     },
-     "review": "str",
-     "schema_version": "int",
-     "snapshot": "str",
-     "support": "str",
-     "task": "str",
-     "use": "str",
-     "version": "str"
-    },
-    "n_dev": "int",
-    "n_test": "int",
-    "nested_cv": "NoneType",
-    "net_benefit": "NoneType",
-    "pareto_front": "NoneType",
-    "provenance": {
-     "config_hash": "str",
-     "dataset": {
-      "data_hash": "str",
-      "dataset_id": "str",
-      "raw_source_hash": "NoneType",
-      "snapshot_id": "str"
-     },
-     "environment": "installed",
-     "model": {
-      "manifest_path": "str",
-      "manifest_sha256": "str",
-      "model_name": "str",
-      "model_version": "str"
-     },
-     "run_id": "str",
-     "schema_version": "int",
-     "signature": {
-      "path": "str",
-      "present": "bool"
-     },
-     "software_version": "str"
-    },
-    "quantile_coverage": [
-     {
-      "empirical": "float",
-      "mean_width": "float",
-      "nominal": "float"
-     }
-    ],
-    "release_attestation": {
-     "digests": {
-      "manifest": "str",
-      "provenance": "str",
-      "sbom": "str"
-     },
-     "run": "str",
-     "schema_version": "int",
-     "signed": "bool"
-    },
-    "release_evaluation": {
-     "blocked": "bool",
-     "blockers": [
-      "str"
-     ],
-     "findings": [],
-     "passed": "bool",
-     "status": "str"
-    },
-    "release_evidence": {
-     "ready": "bool",
-     "records": []
-    },
-    "release_policy": "NoneType",
-    "reliability_plan": {
-     "execution_status": "str",
-     "limitation": "str",
-     "release_blocked": "bool",
-     "scenarios": [
-      {
-       "blocking": "bool",
-       "evidence": [],
-       "outcome": "str",
-       "recoverability": "str",
-       "requirements": [
-        "str"
-       ],
-       "scenario": "str",
-       "verification": "str"
-      }
-     ],
-     "schema_version": "int"
-    },
-    "reproducibility": "str",
-    "resource_limits": {
+    "limits": {
      "cpu": {
       "enforcement": "str",
       "limit": "NoneType",
@@ -8669,13 +8631,109 @@
       "within_limit": "bool"
      }
     },
+    "metric": "str",
+    "metrics": {
+     "mae": "float",
+     "r2": "float",
+     "rmse": "float"
+    },
+    "mitigation": "NoneType",
+    "nested": "NoneType",
+    "opened": "bool",
+    "pareto": "NoneType",
+    "policy": "str",
+    "prevalence": {
+     "natural": "bool",
+     "note": "str",
+     "strategy": "str"
+    },
+    "provenance": {
+     "config_hash": "str",
+     "dataset": {
+      "data_hash": "str",
+      "dataset_id": "str",
+      "raw_source_hash": "NoneType",
+      "snapshot_id": "str"
+     },
+     "environment": "installed",
+     "model": {
+      "manifest_path": "str",
+      "manifest_sha256": "str",
+      "model_name": "str",
+      "model_version": "str"
+     },
+     "run_id": "str",
+     "schema_version": "int",
+     "signature": {
+      "path": "str",
+      "present": "bool"
+     },
+     "software_version": "str"
+    },
+    "quantiles": [
+     {
+      "empirical": "float",
+      "mean_width": "float",
+      "nominal": "float"
+     }
+    ],
+    "release": {
+     "attestation": {
+      "digests": {
+       "manifest": "str",
+       "provenance": "str",
+       "sbom": "str"
+      },
+      "run": "str",
+      "schema_version": "int",
+      "signed": "bool"
+     },
+     "evaluation": {
+      "blocked": "bool",
+      "blockers": [
+       "str"
+      ],
+      "findings": [],
+      "passed": "bool",
+      "status": "str"
+     },
+     "evidence": {
+      "ready": "bool",
+      "records": []
+     },
+     "policy": "NoneType"
+    },
+    "reliability": {
+     "execution_status": "str",
+     "limitation": "str",
+     "release_blocked": "bool",
+     "scenarios": [
+      {
+       "blocking": "bool",
+       "evidence": [],
+       "outcome": "str",
+       "recoverability": "str",
+       "requirements": [
+        "str"
+       ],
+       "scenario": "str",
+       "verification": "str"
+      }
+     ],
+     "schema_version": "int"
+    },
+    "reproducibility": "str",
     "resources": {
      "latency": "float",
      "machine": "str",
      "size": "float",
      "timed": "int"
     },
-    "run_id": "str",
+    "rows": {
+     "development": "int",
+     "test": "int"
+    },
+    "run": "str",
     "sbom": {
      "$schema": "str",
      "bomFormat": "str",
@@ -8707,29 +8765,28 @@
      "specVersion": "str",
      "version": "int"
     },
-    "selected_cv_score": "float",
-    "selected_cv_std": "float",
-    "selected_model": "str",
-    "selected_params": {},
-    "selected_strategy": "str",
-    "selected_trial_id": "str",
-    "selection_policy": "str",
-    "semi_supervised": "NoneType",
-    "sensitivity": "NoneType",
-    "skipped_for_time": [],
-    "split_fingerprint": "str",
-    "split_strategy": "str",
-    "streamed_locked": "NoneType",
-    "success_criteria": [],
-    "task": "str",
-    "test_metrics": {
-     "mae": "float",
-     "r2": "float",
-     "rmse": "float"
+    "schema_version": "int",
+    "selected": {
+     "deviation": "float",
+     "model": "str",
+     "params": {},
+     "score": "float",
+     "strategy": "str",
+     "trial": "str"
     },
-    "test_set_opened": "bool",
+    "sensitivity": "NoneType",
+    "skipped": [],
+    "streamed": "NoneType",
+    "task": "str",
+    "unlabeled": "NoneType",
     "uplift": "NoneType",
-    "weighted_test_metrics": "NoneType"
+    "validation": "str",
+    "verification": {
+     "largest_difference": "float",
+     "rows": "int",
+     "tolerance": "float"
+    },
+    "weighted": "NoneType"
    },
    "evidence/capability_resources.json": {
     "captured_at": "str",
@@ -9299,7 +9356,6 @@
     "commit": "str",
     "configuration": "str",
     "dataset": "str",
-    "decision_threshold": "NoneType",
     "environment": "installed",
     "files": {
      "conformal.json": "str",
@@ -9314,18 +9370,19 @@
     "format": "int",
     "libraries": "installed",
     "metric": "str",
-    "model_name": "str",
-    "model_params": {},
-    "model_version": "str",
+    "model": "str",
     "pandas": "str",
+    "params": {},
     "platform": "str",
     "python": "str",
-    "scmle_version": "str",
+    "scmle": "str",
     "seed": "int",
     "sklearn": "str",
     "split": "str",
     "strategy": "str",
-    "threads": "installed"
+    "threads": "installed",
+    "threshold": "NoneType",
+    "version": "str"
    },
    "model/reference.json": {
     "features": {

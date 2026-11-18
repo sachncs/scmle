@@ -48,7 +48,7 @@ def test_the_draw_is_stratified_seeded_and_stable():
     assert len({mutation.stratum(p) for p in sample}) > 1
 
 
-def test_the_frame_drops_modules_that_cannot_decide(tmp_path):
+def test_the_frame_keeps_untested_modules_and_drops_the_rest(tmp_path):
     package = tmp_path / "scmle" / "part"
     package.mkdir(parents=True)
     (tmp_path / "tests" / "unit").mkdir(parents=True)
@@ -63,12 +63,25 @@ def test_the_frame_drops_modules_that_cannot_decide(tmp_path):
     )
     paths = mutation.population(tmp_path)
     kept, dropped = mutation.frame(paths, tmp_path)
-    assert kept == ["scmle/part/used.py"]
+    assert kept == ["scmle/part/lonely.py", "scmle/part/used.py"]
     assert dropped == {
         "entry point": ["scmle/part/__main__.py"],
         "no mutants": ["scmle/part/__init__.py", "scmle/part/flat.py"],
-        "untested": ["scmle/part/lonely.py"],
     }
+    assert mutation.suite("scmle/part/lonely.py", tmp_path) == []
+
+
+def test_every_drawn_mutant_of_an_untested_module_is_a_survivor(tmp_path):
+    package = tmp_path / "scmle" / "part"
+    package.mkdir(parents=True)
+    (tmp_path / "tests" / "unit").mkdir(parents=True)
+    (package / "lonely.py").write_text(
+        "def f(x):\n    return x + 1\n", encoding="utf-8"
+    )
+    found = mutation.examine(tmp_path, "scmle/part/lonely.py", 0, 60.0)
+    assert found["tests"] == []
+    assert found["counts"]["killed"] == 0
+    assert found["counts"]["no tests"] == found["decided"] > 0
 
 
 def test_a_package_init_takes_the_package_name():

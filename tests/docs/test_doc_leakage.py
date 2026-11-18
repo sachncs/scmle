@@ -45,7 +45,7 @@ def test_every_entry_point_defaults_to_the_warn_policy():
 
     assert signature.parameters["leakage_policy"].default == "warn"
     assert tasks.Config.model_fields["leakage_policy"].default == "warn"
-    assert run.leakage_policy == "warn"
+    assert run.leakage == "warn"
 
 
 @pytest.mark.parametrize(

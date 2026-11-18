@@ -34,7 +34,7 @@ x["y"] = (x.a - x.b + rng.normal(scale=0.5, size=500) > 0).astype(int)
 x.to_csv("demo.csv", index=False)
 PY
 scmle plan demo.csv --target y
-scmle run  demo.csv --target y --time-budget 60
+scmle run  demo.csv --target y --budget 60
 ```
 
 Full reference: [`docs/CLI.md`](../docs/CLI.md).

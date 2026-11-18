@@ -72,18 +72,18 @@ Typical traps:
 * A column that is a copy or near-copy of the target in disguise (a status
   code that contains the answer).
 * An identifier (row number, customer id). It lets the model memorise rows.
-  Mark it with `--id-columns`.
+  Mark it with `--identifiers`.
 * A column you are not allowed to use for legal or ethical reasons. Remove it,
-  and also name it in `--sensitive-columns` so SCMLE reports how the model
+  and also name it in `--sensitive` so SCMLE reports how the model
   treats each group.
 
 Tools:
 
-* `--unavailable-at-prediction boat body` says "known only after the outcome".
+* `--unavailable boat body` says "known only after the outcome".
   This is the right flag for leaks.
 * `--exclude colA colB` drops columns for any other reason.
-* `--leakage-policy warn` is the default: the run finishes, labels the score
-  `PROVISIONAL` and names the flagged columns. `--leakage-policy block` stops
+* `--leakage warn` is the default: the run finishes, labels the score
+  `PROVISIONAL` and names the flagged columns. `--leakage block` stops
   instead; choose it when nobody can attest where each value comes from, or in
   regulated work. Why neither is a verdict: [Leakage](LEAKAGE.md).
 
@@ -106,7 +106,7 @@ the exam part, the model has seen that customer's habits before the exam. The
 exam score is too high, and the model will do worse on new customers than the
 report says.
 
-**Command.** `--group-column customer_id`. If the same entity appears many
+**Command.** `--group customer_id`. If the same entity appears many
 times and you do not group, SCMLE may print a recommendation about duplicates
 (see the last line in Step 7 of [Start here](START_HERE.md)).
 
@@ -118,11 +118,11 @@ times and you do not group, SCMLE may print a recommendation about duplicates
 later rows, then yes. Name the date column. SCMLE trains on the earlier rows and
 tests on the later ones. If the order of rows is meaningless, no.
 
-* `--time-column event_time` trains on the past and tests on the future.
-* `--validation temporal` or `rolling` for stricter schemes; `--embargo-rows N`
+* `--time event_time` trains on the past and tests on the future.
+* `--validation temporal` or `rolling` for stricter schemes; `--embargo N`
   leaves a gap between training and test so that neighbouring rows do not leak
   into each other.
-* `--feature-delay COL=ROWS` for a column that is only known some rows after
+* `--delay COL=ROWS` for a column that is only known some rows after
   the fact.
 
 **If you choose wrong.** Randomly shuffled rows let the model learn from the
@@ -165,7 +165,7 @@ a made-up number.
 tolerate, and how many rows can I keep unseen?
 
 **How to choose.** For a first model, the defaults are fine: SCMLE keeps about
-a fifth of the rows for the exam (`--test-fraction`, default 0.20; our
+a fifth of the rows for the exam (`--test`, default 0.20; our
 Titanic run kept 216 of 1309). With a charter, you
 choose the confirmation fraction (default 0.25), the effect size worth finding
 (default 0.2) and the error allowance (`alpha_confirm` of 1/20). Run
@@ -183,7 +183,7 @@ default effect 0.2 and the 1093 Titanic rows left after the exam rows:
 
 **The question.** How long may the computer search?
 
-**How to choose.** Start with `--time-budget 120` to see the whole pipeline
+**How to choose.** Start with `--budget 120` to see the whole pipeline
 work. For a result you will rely on, give it 10 minutes or more. Set
 `--workers` to the number of spare CPU cores. A longer budget lets SCMLE tune
 more hyperparameters (the settings of each model).

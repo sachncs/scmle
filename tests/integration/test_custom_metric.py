@@ -34,8 +34,8 @@ def test_a_custom_cost_metric_is_optimised_and_reported(
     ).run()
 
     assert result.evaluation["metric"] == "business_cost"
-    assert result.evaluation["metric_greater_is_better"] is False
-    assert "business_cost" in result.evaluation["test_metrics"]
+    assert result.evaluation["direction"] == "lower"
+    assert "business_cost" in result.evaluation["metrics"]
     board = result.leaderboard()
     best = board[board["status"] == "ok"]["score"]
     assert best.iloc[0] == best.min()
@@ -79,4 +79,4 @@ def test_a_regression_metric_can_be_user_defined(tmp_path):
     finally:
         metrics.CATALOG.unregister("mape")
 
-    assert result.evaluation["test_metrics"]["mape"] < 0.2
+    assert result.evaluation["metrics"]["mape"] < 0.2

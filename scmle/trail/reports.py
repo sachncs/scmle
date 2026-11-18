@@ -9,6 +9,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from scmle.artifacts import results
 from scmle.contracts.data import profiles
 from scmle.contracts.data import provenance
 import scmle.contracts.experiments
@@ -156,7 +157,7 @@ def experiments(directory: Path) -> dict[str, Any]:
         reading.
     """
     base = directory / records.RETAINED / "run"
-    evaluation = records.read_json(base / "evaluation.json")
+    evaluation = results.evaluation(records.read_json(base / "evaluation.json"))
     rows = [entry(p) for p in sorted((base / "trials").glob("trial_*.json"))]
     done = [r for r in rows if r["status"] == "ok" and r["score"] is not None]
     done.sort(key=lambda r: (-r["score"], r["trial"]))
@@ -164,7 +165,7 @@ def experiments(directory: Path) -> dict[str, Any]:
     for rank, row in enumerate(done, start=1):
         row["rank"] = rank
         row["bar"] = bar(row["score"], top)
-    selected = evaluation["selected_trial_id"]
+    selected = evaluation["selected"]["trial"]
     chosen = next((r for r in done if r["trial"] == selected), None)
     others = [r for r in done if r["trial"] != selected]
     lead = None
@@ -177,9 +178,9 @@ def experiments(directory: Path) -> dict[str, Any]:
     body = {
         "kind": "experiment_comparison",
         "metric": evaluation["metric"],
-        "selection_policy": evaluation["selection_policy"],
+        "selection_policy": evaluation["policy"],
         "selected_trial": selected,
-        "selected_model": evaluation["selected_model"],
+        "selected_model": evaluation["selected"]["model"],
         "ranked": done,
         "not_scored": [
             {"trial": r["trial"], "model": r["model"], "status": r["status"]}
@@ -189,8 +190,8 @@ def experiments(directory: Path) -> dict[str, Any]:
         "lead_over_runner_up": lead,
         "lead_exceeds_spread": separated,
         "baseline_score": dummy[0]["score"] if dummy else None,
-        "cv_interval": evaluation["cv_confidence"].get("interval"),
-        "test_metrics": evaluation["test_metrics"],
+        "cv_interval": evaluation["confidence"].get("interval"),
+        "test_metrics": evaluation["metrics"],
         "reading": (
             "Cross-validation scores overlap across the top candidates: "
             "the lead of the selected model is "

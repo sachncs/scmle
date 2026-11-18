@@ -34,4 +34,4 @@ def test_the_time_column_becomes_a_feature_on_request(tmp_path):
     result = run(tmp_path, time_as_feature=True)
 
     assert "t" in result.bundle.features
-    assert result.evaluation["split_strategy"] == "temporal"
+    assert result.evaluation["validation"] == "temporal"

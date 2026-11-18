@@ -42,16 +42,14 @@ def test_every_decision_that_shapes_the_run_is_an_audit_event(
         < kinds.index("test.opened")
     )
     split = next(e for e in events if e["kind"] == "split.created")
-    assert (
-        split["data"]["fingerprint"] == result.evaluation["split_fingerprint"]
-    )
+    assert split["data"]["fingerprint"] == result.evaluation["digests"]["split"]
     assert split["data"]["development_rows"] + split["data"][
         "test_rows"
     ] == len(binary_frame)
     features = next(e for e in events if e["kind"] == "features.selected")
     assert set(features["data"]) == {"numeric", "categorical", "dropped"}
     frozen = next(e for e in events if e["kind"] == "selection.frozen")
-    assert frozen["data"]["trial_id"] == result.evaluation["selected_trial_id"]
+    assert frozen["data"]["trial_id"] == result.evaluation["selected"]["trial"]
 
 
 def test_exclusions_are_audited_with_reasons(binary_frame, tmp_path):

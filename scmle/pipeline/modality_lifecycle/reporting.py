@@ -91,7 +91,8 @@ def unpack(raw_package: object) -> containers.Package:
     """Restores the package identity of a persisted lifecycle report.
 
     Args:
-        raw_package: The report's `package` entry.
+        raw_package: The report's `package` entry, with the written keys
+            (`digests.model`) or the version-1 ones (`model_sha256`).
 
     Returns:
         The restored package identity.
@@ -103,6 +104,8 @@ def unpack(raw_package: object) -> containers.Package:
     """
     if not isinstance(raw_package, Mapping):
         raise errors.InputError("lifecycle report package is invalid")
+    if isinstance(raw_package.get("digests"), Mapping):
+        raw_package = containers.Package.KEYS.downgrade(dict(raw_package))
     package_values = {
         "path": raw_package.get("path"),
         "model_sha256": raw_package.get("model_sha256"),
@@ -286,27 +289,29 @@ class Record:
         """Lays out every field except the signature as at `schema_version`.
 
         Args:
-            anchored: Whether each stage record is taken at its version 1
-                (`evidence_links`), as the signature covers it, so renaming
-                a stage key never changes the signature of a stored report.
-                A version-2 report always lays its stages out so.
+            anchored: Whether the stages and the package are taken at their
+                version 1 (`evidence_links`, `model_sha256`), as the signature
+                covers them, so a key rename never changes the signature of a
+                stored report. A version-2 report always lays them out so.
 
         Returns:
             JSON-native mapping of the report content.
         """
         evidence = [proof.to_dict() for proof in self.evidence]
+        package = self.package.to_dict()
         if anchored or self.schema_version == PREVIOUS:
             evidence = [
                 records.downgrade(modalities.Proof.migrations, stage)
                 for stage in evidence
             ]
+            package = containers.Package.KEYS.downgrade(package)
         content: records.Layout = {
             "modality": self.modality,
             "digests": dict(self.digests),
             "evidence": evidence,
             "evaluation": self.evaluation,
             "performance": self.performance,
-            "package": self.package.to_dict(),
+            "package": package,
             "inference": self.inference,
             "monitoring": self.monitoring,
             "documentation": self.documentation,

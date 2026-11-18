@@ -1,5 +1,15 @@
-"""The sections of a project configuration other than the feature graph."""
+"""The sections of a project configuration other than the feature graph.
 
+Each section is a `records.Spelled` part: its fields keep their names in
+code while a stored configuration carries single words. A section's
+`vocabulary` maps each renamed field to its stored key, where a dotted key
+(`rolling.horizon`) nests the field under a shared object; `spelling` is
+the step built from it. A configuration in the old spelling still loads.
+"""
+
+from collections.abc import Mapping
+from typing import Any
+from typing import ClassVar
 from typing import Literal
 
 import pydantic
@@ -8,7 +18,70 @@ from scmle.contracts import records
 from scmle.contracts.tasks import kinds
 
 
-class Dataset(records.Schema):
+def spell(vocabulary: Mapping[str, str]) -> records.Migration:
+    """Builds the spelling step of a section from its vocabulary.
+
+    Args:
+        vocabulary: Field name to stored key; a dotted key nests the field
+            under the object named before the dot.
+
+    Returns:
+        The step from the field-name layout to the stored layout.
+    """
+    flat = {old: new for old, new in vocabulary.items() if "." not in new}
+    groups: dict[str, dict[str, str]] = {}
+    for old, new in vocabulary.items():
+        if "." in new:
+            name, leaf = new.split(".")
+            groups.setdefault(name, {})[old] = leaf
+    return records.nest(flat, groups=groups)
+
+
+class Section(records.Spelled):
+    """A configuration section stored with single-word keys.
+
+    Attributes:
+        vocabulary: Field name to stored key for each renamed field.
+    """
+
+    vocabulary: ClassVar[dict[str, str]] = {}
+
+    @pydantic.model_validator(mode="before")
+    @classmethod
+    def migrate(cls, raw: Any) -> Any:
+        """Reads either spelling; a field name wins over its stored key.
+
+        Code that edits a dumped section writes the field name next to the
+        stored key it dumped (`resources.time_budget_seconds` beside
+        `budget`); the edit is the value meant, so the stored key is
+        dropped before the section moves back to its field names.
+
+        Args:
+            raw: The section, keyword arguments, or a value pydantic will
+                reject.
+
+        Returns:
+            The layout keyed by field name, or `raw` unchanged when it is not
+            a mapping.
+        """
+        if not isinstance(raw, Mapping):
+            return raw
+        layout = dict(raw)
+        for old, new in cls.vocabulary.items():
+            if old not in layout:
+                continue
+            name, dot, leaf = new.partition(".")
+            if not dot:
+                layout.pop(name, None)
+            elif isinstance(layout.get(name), Mapping):
+                group = {k: v for k, v in layout[name].items() if k != leaf}
+                layout[name] = group
+                if not group:
+                    layout.pop(name)
+        return super().migrate(layout)  # type: ignore[operator]
+
+
+class Dataset(Section):
     """Where the data lives and what its columns mean.
 
     Attributes:
@@ -122,6 +195,40 @@ class Dataset(records.Schema):
             of an unsigned charter stays `unverified`.
     """
 
+    vocabulary: ClassVar[dict[str, str]] = {
+        "id_columns": "identifiers",
+        "group_column": "group",
+        "time_column": "time",
+        "time_as_feature": "temporal",
+        "excluded_columns": "excluded",
+        "unavailable_at_prediction": "unavailable",
+        "feature_delays": "delays",
+        "sensitive_columns": "sensitive",
+        "monotonic_constraints": "monotonic",
+        "weight_column": "weight",
+        "event_column": "event",
+        "memory_budget_gb": "memory",
+        "treatment_column": "treatment",
+        "value_column": "value",
+        "seasonal_period": "period",
+        "forecast_lags": "forecast.lags",
+        "forecast_windows": "forecast.windows",
+        "forecast_calendar": "forecast.calendar",
+        "text_encoding": "encoding",
+        "embedding_model": "embedder",
+        "query_column": "query",
+        "ordinal_order": "order",
+        "reference_uri": "reference",
+        "pseudo_label_confidence": "confidence",
+        "baseline_column": "baseline",
+        "baseline_subject": "comparator",
+        "framing_draft": "draft",
+        "propensity_column": "propensity",
+        "logged_action_column": "action",
+        "ingest_plan": "ingest",
+    }
+    spelling: ClassVar[records.Migration] = spell(vocabulary)
+
     uri: str
     target: str
     modality: kinds.DatasetModality = "tabular"
@@ -161,7 +268,7 @@ class Dataset(records.Schema):
     ingest_plan: str | None = None
 
 
-class Validation(records.Schema):
+class Validation(Section):
     """How data is partitioned for model selection and final testing.
 
     Attributes:
@@ -177,6 +284,14 @@ class Validation(records.Schema):
         window_rows: Rolling only: rows in each training window (None keeps
             every earlier row, an expanding window).
     """
+
+    vocabulary: ClassVar[dict[str, str]] = {
+        "test_fraction": "test",
+        "embargo_rows": "embargo",
+        "horizon_rows": "rolling.horizon",
+        "window_rows": "rolling.window",
+    }
+    spelling: ClassVar[records.Migration] = spell(vocabulary)
 
     strategy: Literal[
         "auto",
@@ -197,8 +312,16 @@ class Validation(records.Schema):
     window_rows: int | None = pydantic.Field(default=None, ge=1)
 
 
-class Resources(records.Schema):
-    """Compute limits for a run."""
+class Resources(Section):
+    """Compute limits for a run (time in seconds, memory in GB)."""
+
+    vocabulary: ClassVar[dict[str, str]] = {
+        "time_budget_seconds": "budget",
+        "memory_limit_gb": "limits.memory",
+        "cpu_limit": "limits.cpu",
+        "cluster_address": "cluster",
+    }
+    spelling: ClassVar[records.Migration] = spell(vocabulary)
 
     time_budget_seconds: int = pydantic.Field(default=1800, gt=0)
     memory_limit_gb: float = pydantic.Field(default=8.0, gt=0)
@@ -210,8 +333,15 @@ class Resources(records.Schema):
     enforcement: Literal["hard", "cooperative"] = "hard"
 
 
-class Search(records.Schema):
+class Search(Section):
     """Hyperparameter search settings (disabled when `top_models` is 0)."""
+
+    vocabulary: ClassVar[dict[str, str]] = {
+        "top_models": "leaders",
+        "configs_per_model": "configurations",
+        "prune_fraction": "discard",
+    }
+    spelling: ClassVar[records.Migration] = spell(vocabulary)
 
     top_models: int = pydantic.Field(default=2, ge=0)
     configs_per_model: int = pydantic.Field(default=6, ge=1)
@@ -221,8 +351,11 @@ class Search(records.Schema):
     eta: int = pydantic.Field(default=3, ge=2)
 
 
-class Strategies(records.Schema):
+class Strategies(Section):
     """Which data strategies to evaluate (imbalance and feature variants)."""
+
+    vocabulary: ClassVar[dict[str, str]] = {"top_models": "leaders"}
+    spelling: ClassVar[records.Migration] = spell(vocabulary)
 
     names: list[str] = pydantic.Field(
         default_factory=lambda: [
@@ -253,7 +386,7 @@ class Stacking(records.Schema):
     size: int = pydantic.Field(default=3, ge=0)
 
 
-class Selection(records.Schema):
+class Selection(Section):
     """How the winning model is chosen and which constraints it must meet.
 
     Attributes:
@@ -299,6 +432,21 @@ class Selection(records.Schema):
             (metrics that cannot take weights stay unweighted).
     """
 
+    vocabulary: ClassVar[dict[str, str]] = {
+        "max_model_mb": "size",
+        "max_p95_latency_ms": "latency",
+        "latency_safety_factor": "headroom",
+        "max_candidates_checked": "depth",
+        "tie_breaker": "tiebreaker",
+        "tie_tolerance": "tolerance",
+        "bayesian_confidence": "credibility",
+        "nested_cv": "nested",
+        "bias_variance_replicates": "replicates",
+        "sensitivity_repeats": "repeats",
+        "pareto_tolerance": "slack",
+    }
+    spelling: ClassVar[records.Migration] = spell(vocabulary)
+
     maximize: str | None = None
     max_model_mb: float | None = pydantic.Field(default=None, gt=0)
     max_p95_latency_ms: float | None = pydantic.Field(default=None, gt=0)
@@ -317,7 +465,7 @@ class Selection(records.Schema):
     pareto_tolerance: float = pydantic.Field(default=0.0, ge=0.0)
 
 
-class Candidates(records.Schema):
+class Candidates(Section):
     """Which model families may be considered.
 
     Attributes:
@@ -332,13 +480,27 @@ class Candidates(records.Schema):
             tabular-only.
     """
 
+    vocabulary: ClassVar[dict[str, str]] = {
+        "exclude_models": "exclude.models",
+        "exclude_families": "exclude.families",
+        "experimental_models": "experimental",
+    }
+    spelling: ClassVar[records.Migration] = spell(vocabulary)
+
     exclude_models: list[str] = pydantic.Field(default_factory=list)
     exclude_families: list[str] = pydantic.Field(default_factory=list)
     experimental_models: list[str] = pydantic.Field(default_factory=list)
 
 
-class Threshold(records.Schema):
+class Threshold(Section):
     """How binary probabilities become decisions (threshold optimization)."""
+
+    vocabulary: ClassVar[dict[str, str]] = {
+        "threshold_objective": "objective",
+        "false_positive_cost": "costs.fp",
+        "false_negative_cost": "costs.fn",
+    }
+    spelling: ClassVar[records.Migration] = spell(vocabulary)
 
     threshold_objective: Literal[
         "none", "f1", "accuracy", "balanced_accuracy", "cost"
@@ -347,7 +509,7 @@ class Threshold(records.Schema):
     false_negative_cost: float = pydantic.Field(default=1.0, gt=0)
 
 
-class Parity(records.Schema):
+class Parity(Section):
     """Optional reduction of outcome gaps between groups (binary tasks).
 
     Attributes:
@@ -368,6 +530,13 @@ class Parity(records.Schema):
         max_accuracy_cost: Most accuracy that may be given up.
     """
 
+    vocabulary: ClassVar[dict[str, str]] = {
+        "trigger_gap": "trigger",
+        "min_reduction": "reduction",
+        "max_accuracy_cost": "cost",
+    }
+    spelling: ClassVar[records.Migration] = spell(vocabulary)
+
     mitigation: Literal["none", "group_thresholds", "reweighing"] = "none"
     criterion: Literal["demographic_parity", "equal_opportunity"] = (
         "demographic_parity"
@@ -378,7 +547,7 @@ class Parity(records.Schema):
     max_accuracy_cost: float = pydantic.Field(default=0.03, ge=0.0, lt=1.0)
 
 
-class Problem(records.Schema):
+class Problem(Section):
     """What the model is for, so the result can be judged against it.
 
     Attributes:
@@ -388,6 +557,9 @@ class Problem(records.Schema):
             the locked rows (a floor for higher-is-better metrics, a
             ceiling for lower-is-better ones).
     """
+
+    vocabulary: ClassVar[dict[str, str]] = {"success_criteria": "criteria"}
+    spelling: ClassVar[records.Migration] = spell(vocabulary)
 
     decision: str = ""
     population: str = ""

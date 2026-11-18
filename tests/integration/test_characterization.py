@@ -85,8 +85,8 @@ def shape(value):
 def headline(run_dir):
     """The metrics the goldens hold: selection and test scores."""
     evaluation = json.loads((run_dir / "evaluation.json").read_text())
-    found = {"selected_cv_score": evaluation.get("selected_cv_score")}
-    for name, score in sorted(evaluation.get("test_metrics", {}).items()):
+    found = {"selected_cv_score": evaluation["selected"]["score"]}
+    for name, score in sorted(evaluation.get("metrics", {}).items()):
         if isinstance(score, int | float):
             found[f"test.{name}"] = score
     return found

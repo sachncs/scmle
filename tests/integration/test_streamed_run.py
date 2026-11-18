@@ -45,12 +45,15 @@ def sampled(tmp_path_factory, big_file):
 
 
 def test_every_locked_row_is_scored_by_streaming_the_file(sampled):
-    streamed = sampled.evaluation["streamed_locked"]
+    streamed = sampled.evaluation["streamed"]
 
     assert streamed["of_total"] == ROWS
     assert streamed["rows"] == pytest.approx(0.2 * ROWS, rel=0.05)
     assert streamed["metrics"]["roc_auc"] > 0.9
-    in_memory = sampled.evaluation["n_dev"] + sampled.evaluation["n_test"]
+    in_memory = (
+        sampled.evaluation["rows"]["development"]
+        + sampled.evaluation["rows"]["test"]
+    )
     assert in_memory < ROWS / 3
 
 
@@ -58,7 +61,7 @@ def test_the_profile_says_the_file_was_streamed(sampled):
     assert any(
         "streamed" in finding for finding in sampled.profile.quality_findings
     )
-    assert sampled.evaluation["split_strategy"] == "preset"
+    assert sampled.evaluation["validation"] == "preset"
 
 
 def test_the_split_side_column_is_never_a_feature(sampled):
@@ -77,7 +80,7 @@ def test_stream_training_keeps_only_models_that_learn_in_batches(
     )
     reasons = [d["reason"] for d in log["plan"] if d["action"] == "reject"]
     assert any("cannot learn incrementally" in r for r in reasons)
-    assert result.evaluation["streamed_locked"]["metrics"]["roc_auc"] > 0.85
+    assert result.evaluation["streamed"]["metrics"]["roc_auc"] > 0.85
     events = [
         json.loads(line)
         for line in (result.run_dir / "events.jsonl").read_text().splitlines()
@@ -118,8 +121,8 @@ def test_a_small_file_is_read_normally_even_with_a_budget(tmp_path):
         memory_budget_gb=5.0,
     ).run()
 
-    assert result.evaluation["streamed_locked"] is None
-    assert result.evaluation["split_strategy"] != "preset"
+    assert result.evaluation["streamed"] is None
+    assert result.evaluation["validation"] != "preset"
 
 
 def test_streaming_models_are_not_candidates_for_ordinary_runs(tmp_path):

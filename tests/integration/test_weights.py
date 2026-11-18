@@ -61,10 +61,10 @@ def test_weighted_test_metrics_are_reported_beside_the_plain_ones(tmp_path):
     )
     plain = run(frame, tmp_path / "p", excluded_columns=["first", "w"])
 
-    assert set(weighted.evaluation["weighted_test_metrics"]) == set(
-        weighted.evaluation["test_metrics"]
+    assert set(weighted.evaluation["weighted"]) == set(
+        weighted.evaluation["metrics"]
     )
-    assert plain.evaluation["weighted_test_metrics"] is None
+    assert plain.evaluation["weighted"] is None
 
 
 def weights_frame(rows=700, seed=3):

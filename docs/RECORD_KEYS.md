@@ -45,8 +45,11 @@ Records are listed by class. The files most scripts read hold these:
 `AnalysisEstimand`, `SetSizes`, `Trigger`, `Procedure`, `Uncertainty`,
 `ErrorBudget` and `Tariff` parts), `split_manifest.json` the custody
 `Manifest`, `feasibility.json` a `Feasibility`, `decision_cost_model.json`
-a `Tariff`, a `--leakage-attestations` file `Affidavit` rows (with
-`Attestation` fields), and a loop `policy.json` a `Preregistration`.
+a `Tariff`, an `--attestations` file `Affidavit` rows (with
+`Attestation` fields), a loop `policy.json` a `Preregistration`,
+`config.json` a `Config` (with its `sections.py` parts; old files still
+load and keep their `config_hash`), and `evaluation.json` the
+`Evaluation` record (`schema_version` 2).
 [`ARTIFACTS.md`](ARTIFACTS.md) lists every file a run writes.
 
 The same map is machine-readable in
@@ -60,7 +63,7 @@ hand.
 
 ## The map
 
-889 renamed keys on 248 record kinds.
+1021 renamed keys on 268 record kinds.
 
 ### `Confounding` (`data/charter/causal.py`)
 
@@ -1927,6 +1930,29 @@ hand.
 |---|---|
 | `pseudo_rows` | `pseudo` |
 
+### `Scope` (`api/non_tabular.py`)
+
+| Old | New |
+|---|---|
+| `decoder_policy` | `decoder` |
+| `model_family` | `family` |
+
+### `Manifest` (`artifacts/bundle/provenance.py`)
+
+| Old | New |
+|---|---|
+| `model_name` | `model` |
+| `model_version` | `version` |
+| `scmle_version` | `scmle` |
+| `model_params` | `params` |
+| `decision_threshold` | `threshold` |
+
+### `Verification` (`artifacts/claims_audit/verdict.py`)
+
+| Old | New |
+|---|---|
+| `run_dir` | `directory` |
+
 ### `Observation` (`deploy/observation.py`)
 
 | Old | New |
@@ -1969,6 +1995,16 @@ hand.
 |---|---|
 | `content_id` | `content` |
 | `approved_at` | `approved` |
+
+### `Link` (`inference/evidence.py`)
+
+| Old | New |
+|---|---|
+| `event_id` | `event` |
+| `input_fingerprint` | `digests.payload` |
+| `output_fingerprint` | `digests.prediction` |
+| `bundle_digest` | `digests.bundle` |
+| `graph_digest` | `digests.graph` |
 
 ### `Comparison` (`monitoring/abtest.py`)
 
@@ -2060,12 +2096,26 @@ hand.
 | `telemetry_digest` | `digests.telemetry` |
 | `audit_head` | `head` |
 
+### `Package` (`pipeline/modality_lifecycle/containers.py`)
+
+| Old | New |
+|---|---|
+| `model_sha256` | `digests.model` |
+
 ### `Job` (`runners/base/job.py`)
 
 | Old | New |
 |---|---|
 | `run_id` | `identifier` |
 | `timeout_seconds` | `timeout` |
+
+### `Retries` (`runtime/retry.py`)
+
+| Old | New |
+|---|---|
+| `max_attempts` | `attempts` |
+| `base_delay_seconds` | `delays.base` |
+| `max_delay_seconds` | `delays.cap` |
 
 ### `Step` (`workflow/definition.py`)
 
@@ -2085,6 +2135,131 @@ hand.
 | `cost_budget` | `budget` |
 | `group_limits` | `limits` |
 | `max_parallel` | `parallel` |
+
+### `Config` (`contracts/tasks/config.py`)
+
+| Old | New |
+|---|---|
+| `feature_graph` | `derivation` |
+| `leakage_policy` | `leakage` |
+| `charter_path` | `charter` |
+| `ledger_rule` | `ledger` |
+| `confirmation_rule` | `confirmation` |
+| `confirmation_failure_policy` | `failure` |
+| `leakage_attestations` | `attestations` |
+
+### `Problem` (`contracts/tasks/sections.py`)
+
+| Old | New |
+|---|---|
+| `success_criteria` | `criteria` |
+
+### `Dataset` (`contracts/tasks/sections.py`)
+
+| Old | New |
+|---|---|
+| `id_columns` | `identifiers` |
+| `group_column` | `group` |
+| `time_column` | `time` |
+| `time_as_feature` | `temporal` |
+| `excluded_columns` | `excluded` |
+| `unavailable_at_prediction` | `unavailable` |
+| `feature_delays` | `delays` |
+| `sensitive_columns` | `sensitive` |
+| `monotonic_constraints` | `monotonic` |
+| `weight_column` | `weight` |
+| `event_column` | `event` |
+| `memory_budget_gb` | `memory` |
+| `treatment_column` | `treatment` |
+| `value_column` | `value` |
+| `seasonal_period` | `period` |
+| `forecast_lags` | `forecast.lags` |
+| `forecast_windows` | `forecast.windows` |
+| `forecast_calendar` | `forecast.calendar` |
+| `text_encoding` | `encoding` |
+| `embedding_model` | `embedder` |
+| `query_column` | `query` |
+| `ordinal_order` | `order` |
+| `reference_uri` | `reference` |
+| `pseudo_label_confidence` | `confidence` |
+| `baseline_column` | `baseline` |
+| `baseline_subject` | `comparator` |
+| `framing_draft` | `draft` |
+| `propensity_column` | `propensity` |
+| `logged_action_column` | `action` |
+| `ingest_plan` | `ingest` |
+
+### `Validation` (`contracts/tasks/sections.py`)
+
+| Old | New |
+|---|---|
+| `test_fraction` | `test` |
+| `embargo_rows` | `embargo` |
+| `horizon_rows` | `rolling.horizon` |
+| `window_rows` | `rolling.window` |
+
+### `Resources` (`contracts/tasks/sections.py`)
+
+| Old | New |
+|---|---|
+| `time_budget_seconds` | `budget` |
+| `memory_limit_gb` | `limits.memory` |
+| `cpu_limit` | `limits.cpu` |
+| `cluster_address` | `cluster` |
+
+### `Search` (`contracts/tasks/sections.py`)
+
+| Old | New |
+|---|---|
+| `top_models` | `leaders` |
+| `configs_per_model` | `configurations` |
+| `prune_fraction` | `discard` |
+
+### `Strategies` (`contracts/tasks/sections.py`)
+
+| Old | New |
+|---|---|
+| `top_models` | `leaders` |
+
+### `Selection` (`contracts/tasks/sections.py`)
+
+| Old | New |
+|---|---|
+| `max_model_mb` | `size` |
+| `max_p95_latency_ms` | `latency` |
+| `latency_safety_factor` | `headroom` |
+| `max_candidates_checked` | `depth` |
+| `tie_breaker` | `tiebreaker` |
+| `tie_tolerance` | `tolerance` |
+| `bayesian_confidence` | `credibility` |
+| `nested_cv` | `nested` |
+| `bias_variance_replicates` | `replicates` |
+| `sensitivity_repeats` | `repeats` |
+| `pareto_tolerance` | `slack` |
+
+### `Candidates` (`contracts/tasks/sections.py`)
+
+| Old | New |
+|---|---|
+| `exclude_models` | `exclude.models` |
+| `exclude_families` | `exclude.families` |
+| `experimental_models` | `experimental` |
+
+### `Threshold` (`contracts/tasks/sections.py`)
+
+| Old | New |
+|---|---|
+| `threshold_objective` | `objective` |
+| `false_positive_cost` | `costs.fp` |
+| `false_negative_cost` | `costs.fn` |
+
+### `Parity` (`contracts/tasks/sections.py`)
+
+| Old | New |
+|---|---|
+| `trigger_gap` | `trigger` |
+| `min_reduction` | `reduction` |
+| `max_accuracy_cost` | `cost` |
 
 ### `Uncertainty` (`contracts/evaluation/parts.py`)
 
@@ -2172,6 +2347,60 @@ hand.
 | `privacy_decision` | `clearance` |
 | `evidence_links` | `links` |
 
+### `Evaluation` (`evaluation.json`)
+
+| Old | New |
+|---|---|
+| `run_id` | `run` |
+| `metric_greater_is_better` | `direction` |
+| `selection_policy` | `policy` |
+| `selected_model` | `selected.model` |
+| `selected_trial_id` | `selected.trial` |
+| `selected_params` | `selected.params` |
+| `selected_strategy` | `selected.strategy` |
+| `selected_cv_score` | `selected.score` |
+| `selected_cv_std` | `selected.deviation` |
+| `fit_health` | `health` |
+| `cv_confidence` | `confidence` |
+| `baseline_cv_score` | `baseline` |
+| `test_metrics` | `metrics` |
+| `weighted_test_metrics` | `weighted` |
+| `semi_supervised` | `unlabeled` |
+| `fairness_mitigation` | `mitigation` |
+| `execution_backend` | `backend` |
+| `pareto_front` | `pareto` |
+| `evaluation_prevalence` | `prevalence` |
+| `success_criteria` | `criteria` |
+| `streamed_locked` | `streamed` |
+| `n_dev` | `rows.development` |
+| `n_test` | `rows.test` |
+| `split_fingerprint` | `digests.split` |
+| `split_strategy` | `validation` |
+| `net_benefit` | `benefit` |
+| `resource_limits` | `limits` |
+| `skipped_for_time` | `skipped` |
+| `test_set_opened` | `opened` |
+| `elapsed_seconds` | `elapsed` |
+| `learning_curve` | `learning` |
+| `nested_cv` | `nested` |
+| `bias_variance` | `decomposition` |
+| `forecast_backtest` | `backtest` |
+| `quantile_coverage` | `quantiles` |
+| `model_card` | `card` |
+| `reliability_plan` | `reliability` |
+| `release_attestation` | `release.attestation` |
+| `release_policy` | `release.policy` |
+| `release_evaluation` | `release.evaluation` |
+| `release_evidence` | `release.evidence` |
+| `explanation_evidence` | `explanations` |
+| `artifact_verification` | `verification` |
+
+### `evaluation` (`pipeline/modality_lifecycle/steps.py`)
+
+| Old | New |
+|---|---|
+| `sample_count` | `samples` |
+
 ### `Source` (`data/catalog/identity.py`)
 
 | Old | New |
@@ -2190,3 +2419,9 @@ hand.
 |---|---|
 | `error_codes` | `codes` |
 | `is_valid` | `valid` |
+
+### `Curation` (`pipeline/modality_lifecycle/curators.py`)
+
+| Old | New |
+|---|---|
+| `content_digest` | `digest` |

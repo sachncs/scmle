@@ -198,7 +198,7 @@ whose outcome has arrived, with the labeled fraction alongside.
 
 ```bash
 scmle plan  data.csv --target churn
-scmle run   data.csv --target churn --workers 4 --time-budget 600
+scmle run   data.csv --target churn --workers 4 --budget 600
 scmle resume runs/run_20261015_001
 scmle catalog data.csv --label-column churn --output artifacts/catalog.json
 cat payload.bin | scmle catalog --raw-bytes

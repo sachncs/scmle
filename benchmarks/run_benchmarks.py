@@ -138,17 +138,16 @@ def run_one(
                 record.rows = len(frame)
                 record.task = evaluation["task"]
                 record.metric = evaluation["metric"]
-                record.selected = (
-                    f"{result.selected_model}/{evaluation['selected_strategy']}"
-                )
-                record.baseline_cv = evaluation["baseline_cv_score"]
+                strategy = evaluation["selected"]["strategy"]
+                record.selected = f"{result.selected_model}/{strategy}"
+                record.baseline_cv = evaluation["baseline"]
                 record.findings = list(
                     result.profile.quality_findings
                     + result.profile.risk_findings
                 )
             record.trials += len(result.trials)
-            cv_scores.append(evaluation["selected_cv_score"])
-            record.test_scores.append(evaluation["test_metrics"][record.metric])
+            cv_scores.append(evaluation["selected"]["score"])
+            record.test_scores.append(evaluation["metrics"][record.metric])
             record.reference_scores.append(
                 reference.reference_score(
                     frame,

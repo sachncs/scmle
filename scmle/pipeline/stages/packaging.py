@@ -75,12 +75,16 @@ class PackageStage(tracing.Tracing):
 
         Builds the model bundle with its conformal, quantile and coverage
         evidence, saves it, and writes the model card, attestation, evidence
-        graph, leaderboard and HTML report.
+        graph, leaderboard and HTML report. The stages build the evaluation
+        record in its version-1 layout; it is moved to the current layout
+        (`results.evaluation`) just before `evaluation.json` is written, and
+        the result carries that layout.
 
         Args:
-            context: The run context; receives the bundle and the result.
+            context: The run context; receives the bundle, the result and the
+                evaluation record at its current layout.
         """
-        store = context.run_store
+        store = context.workspace
         split = scmle.pipeline.context.require(context.split, "split")
         selected = scmle.pipeline.context.require(context.selected, "selected")
         evaluation = scmle.pipeline.context.require(
@@ -116,6 +120,8 @@ class PackageStage(tracing.Tracing):
         bundle.save(store.path("model"))
         self.certify(context, bundle, evaluation)
         self.release_evaluation(context, store, evaluation)
+        evaluation = results.evaluation(evaluation)
+        context.evaluation = evaluation
         store.write_json("evaluation.json", evaluation)
         evidence_graph = self.trace(context, store)
         graph_record = evidence_graph.to_dict()
@@ -214,7 +220,7 @@ class PackageStage(tracing.Tracing):
                 plan, SBOM, provenance, attestation, explanation evidence and
                 round-trip check.
         """
-        store = context.run_store
+        store = context.workspace
         split = scmle.pipeline.context.require(context.split, "split")
         selected = scmle.pipeline.context.require(context.selected, "selected")
         profile = scmle.pipeline.context.require(context.profile, "profile")

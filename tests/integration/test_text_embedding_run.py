@@ -39,7 +39,7 @@ def test_embedded_text_trains_packages_and_predicts(tmp_path):
         text_encoding="embedding",
     ).run()
 
-    assert result.evaluation["test_metrics"]["roc_auc"] > 0.9
+    assert result.evaluation["metrics"]["roc_auc"] > 0.9
     fresh = reviews(50, seed=4).drop(columns="y")
     assert len(result.bundle.predict(fresh)) == 50
     assert "text" in result.bundle.features

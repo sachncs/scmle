@@ -53,7 +53,7 @@ cd ~/first-model</code></pre>
 <p>The last row is the most important one. A column that records something that happens after the outcome gives the model the answer. That is called <strong>leakage</strong>. A model with leakage scores wonderfully and then fails on real use. You will see SCMLE flag it in Step 4.</p>
 <h2 id="step-4-your-first-run-finishes-and-it-warns">Step 4. Your first run finishes, and it warns</h2>
 <p>Run the simplest command, with only a short time limit and an output folder:</p>
-<pre><code class="language-bash">scmle run titanic.csv --target survived --time-budget 120 --workers 2 --output-dir runs_first
+<pre><code class="language-bash">scmle run titanic.csv --target survived --budget 120 --workers 2 --output-dir runs_first
 echo "exit code: $?"</code></pre>
 <p>This takes two to four minutes. Near the start you will see one line that is easy to miss, and the last lines look like this:</p>
 <pre><code class="language-text">leakage suspect(s) boat, body stay in the features; the test score is provisional until a person settles them (declare the column unavailable at prediction, or attest it)
@@ -67,8 +67,8 @@ artifacts: runs_first/run_20261105_001</code></pre>
 <p>Why SCMLE warns instead of refusing. From the data alone, a leaked column and a genuinely strong, legitimate column look identical. The screen has no way to know when a value is recorded. If it stopped on every flagged column, it would also stop good analyses (it flags legitimate measurements on the breast-cancer table). So it trains, says so loudly, labels the score provisional, and leaves the decision to a person who knows when each value is known. The full reasoning and the measured error rates are in Leakage.</p>
 <p>You settle a flag in one of two ways:</p>
 <ol><li><strong>The value is not known at prediction time</strong>: declare it so. This is what we do next (Step 6). The score falls to the honest 0.885.</li><li><strong>The value is known at prediction time and a person vouches for it</strong>: write an attestation (see Leakage).</li></ol>
-<p>If you would rather have a hard stop than a warning, add <code>--leakage-policy block</code>. This is useful in regulated work. Try it:</p>
-<pre><code class="language-bash">scmle run titanic.csv --target survived --leakage-policy block --time-budget 120 --workers 2 --output-dir runs_blocked
+<p>If you would rather have a hard stop than a warning, add <code>--leakage block</code>. This is useful in regulated work. Try it:</p>
+<pre><code class="language-bash">scmle run titanic.csv --target survived --leakage block --budget 120 --workers 2 --output-dir runs_blocked
 echo "exit code: $?"</code></pre>
 <p>What you should see (last two lines):</p>
 <pre><code class="language-text">[run_20261105_001] state.BLOCKED: unresolved leakage risk (permutation screen, Benjamini-Yekutieli level 0.05): body, boat
@@ -88,8 +88,8 @@ Candidates: dummy, hist_gradient_boosting, decision_tree, logistic_regression, b
 <h2 id="step-6-run-for-real">Step 6. Run for real</h2>
 <p>Tell SCMLE those two columns are only known after the outcome. This settles the flag:</p>
 <pre><code class="language-bash">scmle run titanic.csv --target survived \
-  --unavailable-at-prediction boat body \
-  --time-budget 120 --workers 2 --output-dir runs</code></pre>
+  --unavailable boat body \
+  --budget 120 --workers 2 --output-dir runs</code></pre>
 <p>This takes two to four minutes, depending on your computer. Lines scroll by as it works. The ones that matter:</p>
 <pre><code class="language-text">[run_20261105_001] state.PROFILING: profile dataset
 [run_20261105_001] split.created: stratified split
@@ -106,7 +106,7 @@ artifacts: runs/run_20261105_001</code></pre>
 <p>What to look at, in the order the run does them:</p>
 <ol><li><code>split.created</code>: SCMLE set some rows aside before looking at anything.</li><li><code>trial.ok</code> lines: one practice model each. <code>trial.pruned</code> means it gave up early on a hopeless one. That is fine.</li><li><code>selection.frozen</code>: the winner is chosen using only the practice rows.</li><li><code>test.opened</code>: only now are the hidden rows used, and only once.</li><li>The last line: <code>cv roc_auc=0.8482</code> is the practice score and <code>test: roc_auc=0.8855</code> is the exam score. Trust the exam score.</li></ol>
 <p>What could go wrong:</p>
-<ul><li><code>state.BLOCKED</code> again: you forgot <code>--unavailable-at-prediction boat body</code>.</li><li><code>state.FAILED</code>: read the line after it. Run <code>scmle resume runs/run_...</code> to continue after an interruption (finished trials are kept).</li><li><code>all trials failed</code>, or a trial <code>exceeded its 6.0s hard time ceiling and was killed</code>: the time budget is too small for your computer. The first run on a new installation is the slowest. Raise <code>--time-budget</code> (try 300).</li><li>It stops early: the time budget ran out. Raise <code>--time-budget</code>. A short budget searches fewer models and can leave some report parts empty (see <a href="@@BASE@@/docs/reading-results/">Reading results</a>).</li></ul>
+<ul><li><code>state.BLOCKED</code> again: you forgot <code>--unavailable boat body</code>.</li><li><code>state.FAILED</code>: read the line after it. Run <code>scmle resume runs/run_...</code> to continue after an interruption (finished trials are kept).</li><li><code>all trials failed</code>, or a trial <code>exceeded its 6.0s hard time ceiling and was killed</code>: the time budget is too small for your computer. The first run on a new installation is the slowest. Raise <code>--budget</code> (try 300).</li><li>It stops early: the time budget ran out. Raise <code>--budget</code>. A short budget searches fewer models and can leave some report parts empty (see <a href="@@BASE@@/docs/reading-results/">Reading results</a>).</li></ul>
 <h2 id="step-7-read-the-result">Step 7. Read the result</h2>
 <p>SCMLE wrote a folder <code>runs/run_20261105_001</code>. The file <code>report.html</code> is the full report. Open it in a browser. It starts with a long list of plan decisions. Scroll to the "Leaderboard" heading. The same numbers are easier to read with this short script. Save it as <code>read_results.py</code>:</p>
 <pre><code class="language-python">import json
@@ -145,7 +145,7 @@ imp = json.loads(
     (run / "diagnostics" / "permutation_importance.json").read_text()
 )
 if imp["truncated"]:
-    print("importance       : not finished in time; raise --time-budget")
+    print("importance       : not finished in time; raise --budget")
 for row in imp["features"][:4]:
     print("importance       :", row["feature"], round(row["importance"], 3))
 for item in json.loads(
@@ -171,11 +171,11 @@ importance       : pclass 0.074
 importance       : age 0.039
 importance       : fare 0.017
 recommendation   : 14% of rows are exact duplicates; duplicates can appear in both training and validation folds and inflate scores. Deduplicate, or set data.group_column if rows belong to the same entity</code></pre>
-<p>Your numbers will not match these exactly, and that is normal. The search stops when the time budget ends, so a slower or busier computer tries fewer models. When the author repeated this page on a second, busier machine with the same command, the winner was <code>bagged_logistic_regression</code> (practice 0.835, exam 0.869) instead of <code>stacking</code> (practice 0.848, exam 0.885), and the importance rows were missing because the time ran out. What to check on your machine: the exam score is clearly above 0.5, it is close to the practice score, and <code>fit health</code> says <code>healthy</code>. If the importance rows are missing, rerun with <code>--time-budget 300</code>.</p>
+<p>Your numbers will not match these exactly, and that is normal. The search stops when the time budget ends, so a slower or busier computer tries fewer models. When the author repeated this page on a second, busier machine with the same command, the winner was <code>bagged_logistic_regression</code> (practice 0.835, exam 0.869) instead of <code>stacking</code> (practice 0.848, exam 0.885), and the importance rows were missing because the time ran out. What to check on your machine: the exam score is clearly above 0.5, it is close to the practice score, and <code>fit health</code> says <code>healthy</code>. If the importance rows are missing, rerun with <code>--budget 300</code>.</p>
 <p>How to read it, line by line:</p>
 <ul><li><strong>practice score 0.848</strong> and <strong>exam score 0.885</strong> are close. Good. A big gap (practice far above exam) would mean the model memorised.</li><li><strong>exam 95% band 0.841 to 0.927</strong>: with only 216 exam rows, the true score could plausibly be anywhere in that band. Do not report "0.885" as if it were exact.</li><li><strong>dummy baseline 0.5</strong>: a model that ignores the data scores 0.5. Ours is far above, so it learned something.</li><li><strong>fit health healthy</strong>: what it learned in practice carried over.</li><li><strong>confusion matrix</strong>: rows are the truth (died, lived), columns are the guess. 113 deaths guessed right, 18 wrongly guessed as lived; 65 survivors guessed right, 20 wrongly guessed as died.</li><li><strong>importance</strong>: shuffling <code>sex</code> hurts the score most. That fits the history (women were let into boats first). If the top feature were a surprise, you would investigate.</li><li><strong>recommendation</strong>: a warning that the table has copies. It is the same warning from Step 2. It means 0.885 may be a little optimistic. This is honest: the model's number is not perfect, and the tool says so.</li></ul>
 <p>If this were a leaked run, the exam score would be about 0.99 and the top features would be <code>boat</code> or <code>body</code>. See <a href="@@BASE@@/docs/reading-results/">Reading results</a>.</p>
-<p>What could go wrong: the list of <code>importance</code> rows is empty, or <code>FileNotFoundError</code>. A short time budget can leave the importance table empty (the file then says <code>"truncated": true</code>). Rerun with a larger <code>--time-budget</code>.</p>
+<p>What could go wrong: the list of <code>importance</code> rows is empty, or <code>FileNotFoundError</code>. A short time budget can leave the importance table empty (the file then says <code>"truncated": true</code>). Rerun with a larger <code>--budget</code>.</p>
 <h2 id="step-8-save-the-model-and-predict">Step 8. Save the model and predict</h2>
 <p>The model is inside <code>runs/run_.../model</code>. It is stored as a "bundle" (a folder of files). Bundles can run code when opened, so SCMLE refuses to open one that is not <strong>signed</strong>. A signature is a stamp made with a secret key that shows the folder has not been changed. Pick a secret and keep it. Here we use a demo one:</p>
 <pre><code class="language-bash">export SCMLE_SIGNING_KEY=demo-key-change-me</code></pre>

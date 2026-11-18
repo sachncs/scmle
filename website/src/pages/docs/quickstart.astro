@@ -60,7 +60,7 @@ c0003,4,110.97,1,1</code></pre>
 
   <h2>3. Run a project</h2>
   <p>The target is <code>churned</code>, the column to predict. <code>customer_id</code> only names a row, so it is kept out of the features. The time budget is set explicitly to 60 seconds; without it the command line uses a much longer default.</p>
-  <pre><code>scmle run customers.csv --target churned --id-columns customer_id --time-budget 60 --output-dir runs/customers</code></pre>
+  <pre><code>scmle run customers.csv --target churned --identifiers customer_id --budget 60 --output-dir runs/customers</code></pre>
   <p>It prints one line for each step, then stops. On the author's machine it took about 30 seconds. The last lines were:</p>
   <pre><code>[run_20261105_001] state.COMPLETED: run complete
 run_20261105_001: selected stacking (cv roc_auc=0.7739); test: roc_auc=0.7350, pr_auc=0.8141, log_loss=0.5874, f1=0.7317, balanced_accuracy=0.6500, accuracy=0.6700
@@ -96,10 +96,10 @@ $RUN</code></pre>
   <h3>Recommended: sign the bundle, then predict with the key</h3>
   <p>Make a secret key and keep it in the environment variable <code>SCMLE_SIGNING_KEY</code>, then run again. The bundle is signed when it is written. macOS and Linux:</p>
   <pre><code>export SCMLE_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
-scmle run customers.csv --target churned --id-columns customer_id --time-budget 60 --output-dir runs/signed</code></pre>
+scmle run customers.csv --target churned --identifiers customer_id --budget 60 --output-dir runs/signed</code></pre>
   <p>Windows PowerShell:</p>
   <pre><code>$env:SCMLE_SIGNING_KEY = python -c "import secrets; print(secrets.token_hex(32))"
-scmle run customers.csv --target churned --id-columns customer_id --time-budget 60 --output-dir runs/signed</code></pre>
+scmle run customers.csv --target churned --identifiers customer_id --budget 60 --output-dir runs/signed</code></pre>
   <p>The run prints the same kind of last lines (the same scores, since the data and seed are the same). Then predict, with the key still set in that terminal (<code>RUN</code> now points at <code>runs/signed</code>; set it again with <code>ls -d runs/signed/run_* | tail -1</code> or the PowerShell equivalent):</p>
   <pre><code>scmle predict "$RUN/model" new_customers.csv --output predictions.csv</code></pre>
   <pre><code>wrote 5 predictions to predictions.csv</code></pre>

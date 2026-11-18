@@ -13,6 +13,7 @@ import dataclasses
 from pathlib import Path
 from typing import Any
 from typing import cast
+from typing import ClassVar
 from typing import Literal
 from typing import TYPE_CHECKING
 
@@ -20,6 +21,7 @@ from scmle.contracts import data
 from scmle.contracts import errors
 from scmle.contracts import modalities
 from scmle.contracts import performance
+from scmle.contracts import records
 from scmle.pipeline import modality_lifecycle
 
 if TYPE_CHECKING:
@@ -49,7 +51,13 @@ class Scope:
         model_family: The model family fitted on the representation.
         status: Always `experimental`.
         limitations: Non-empty statements of what the path does not claim.
+        KEYS: Version-1 keys to the written ones (`decoder`, `family`);
+            `downgrade` restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"decoder_policy": "decoder", "model_family": "family"}
+    )
 
     modality: str
     representation: str
@@ -93,16 +101,19 @@ class Scope:
         """Returns JSON-native capability evidence.
 
         Returns:
-            A dict of all fields, with the limitations as a list.
+            A dict of all fields under their written keys, with the
+            limitations as a list.
         """
-        return {
-            "modality": self.modality,
-            "representation": self.representation,
-            "decoder_policy": self.decoder_policy,
-            "model_family": self.model_family,
-            "status": self.status,
-            "limitations": list(self.limitations),
-        }
+        return self.KEYS.upgrade(
+            {
+                "modality": self.modality,
+                "representation": self.representation,
+                "decoder_policy": self.decoder_policy,
+                "model_family": self.model_family,
+                "status": self.status,
+                "limitations": list(self.limitations),
+            }
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -144,7 +155,7 @@ class Predictor:
         return self.capability.modality
 
     @property
-    def dataset_hash(self) -> str:
+    def digest(self) -> str:
         """The immutable training snapshot identity."""
         return self.report.digests["dataset"]
 
@@ -593,12 +604,12 @@ class Modeler:
         self.result: Predictor | None = None
 
     @property
-    def report_path(self) -> Path:
+    def report(self) -> Path:
         """The signed lifecycle report location."""
         return self.output_dir / NON_TABULAR_MODEL_REPORT
 
     @property
-    def package_path(self) -> Path:
+    def package(self) -> Path:
         """The signed model package location."""
         return self.output_dir / NON_TABULAR_MODEL_DIRECTORY
 
@@ -622,11 +633,11 @@ class Modeler:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.lifecycle.run(
             self.adapter,
-            self.package_path,
+            self.package,
             self.signing_key,
             seed=self.seed,
             observed_adapter=self.observed_adapter,
-            report_path=self.report_path,
+            report_path=self.report,
             performance_budget=self.performance_budget,
             performance_baseline=self.performance_baseline,
             manifest=self.manifest,
@@ -650,13 +661,13 @@ class Modeler:
                 project.
         """
         report = modality_lifecycle.Record.read_verified(
-            self.report_path, self.signing_key
+            self.report, self.signing_key
         )
         if report.modality != self.capability.modality:
             raise errors.InputError(
                 "lifecycle report modality does not match project"
             )
-        if report.digests["dataset"] != self.adapter.dataset_hash:
+        if report.digests["dataset"] != self.adapter.digest:
             raise errors.InputError(
                 "lifecycle report dataset does not match project"
             )
@@ -664,7 +675,7 @@ class Modeler:
             self.adapter,
             report.package.path,
             self.signing_key,
-            lifecycle_report_path=self.report_path,
+            lifecycle_report_path=self.report,
         )
         self.result = Predictor(
             report=report,

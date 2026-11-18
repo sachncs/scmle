@@ -15,8 +15,8 @@ so four operational readings are counted, each as the run would present it:
   winner's test ROC AUC (`diagnostics/metric_uncertainty`) lies wholly above
   0.5, the baseline's test score.
 * `cv_interval_excludes_baseline`: the Nadeau-Bengio interval of the winner's
-  cross-validation score (`cv_confidence`) lies wholly above the baseline's
-  cross-validation score (`baseline_cv_score`).
+  cross-validation score (`confidence` in `evaluation.json`) lies wholly
+  above the baseline's cross-validation score (`baseline`).
 * `lead_exceeds_spread`: the winner's cross-validation lead over the
   next-best trial is larger than the larger fold spread, the rule the trail
   comparison report (`scmle.trail.reports`) uses for `lead_exceeds_spread`.
@@ -130,7 +130,7 @@ def lead_exceeds_spread(run: Any) -> bool:
     """
     done = [t for t in run.trials if t.status is experiments.Termination.OK]
     done.sort(key=lambda t: (-t.score_mean, t.trial_id))
-    selected = run.evaluation["selected_trial_id"]
+    selected = run.evaluation["selected"]["trial"]
     chosen = next(t for t in done if t.trial_id == selected)
     others = [t for t in done if t.trial_id != selected]
     if not others:
@@ -185,9 +185,9 @@ def one_run(
     ).run()
     evaluation = run.evaluation
     test_low, test_high = run.diagnostics["metric_uncertainty"]["ci_95"]
-    cv_low, cv_high = evaluation["cv_confidence"]["interval"]
+    cv_low, cv_high = evaluation["confidence"]["interval"]
     chosen = next(
-        t for t in run.trials if t.trial_id == evaluation["selected_trial_id"]
+        t for t in run.trials if t.trial_id == evaluation["selected"]["trial"]
     )
     truth = TRUE_SKILL
     if signal:
@@ -200,17 +200,15 @@ def one_run(
     record = {
         "run": index,
         "candidates": candidate_count(run),
-        "selected_model": evaluation["selected_model"],
-        "test_auc": evaluation["test_metrics"]["roc_auc"],
-        "cv_score": evaluation["selected_cv_score"],
-        "baseline_cv_score": evaluation["baseline_cv_score"],
+        "selected_model": evaluation["selected"]["model"],
+        "test_auc": evaluation["metrics"]["roc_auc"],
+        "cv_score": evaluation["selected"]["score"],
+        "baseline_cv_score": evaluation["baseline"],
         "test_interval": [test_low, test_high],
         "cv_interval": [cv_low, cv_high],
         "fit_health": run.diagnose(chosen),
         "test_interval_excludes_baseline": bool(test_low > TRUE_SKILL),
-        "cv_interval_excludes_baseline": bool(
-            cv_low > evaluation["baseline_cv_score"]
-        ),
+        "cv_interval_excludes_baseline": bool(cv_low > evaluation["baseline"]),
         "lead_exceeds_spread": lead_exceeds_spread(run),
         "fit_health_healthy": run.diagnose(chosen) == "healthy",
         "leakage_suspect": bool(run.profile.leakage.get("suspects")),
@@ -218,7 +216,7 @@ def one_run(
         "test_interval_covers_truth": bool(test_low <= truth <= test_high),
         "test_interval_above_truth": bool(test_low > truth),
         "test_interval_below_truth": bool(test_high < truth),
-        "selected_trial_id": evaluation["selected_trial_id"],
+        "selected_trial_id": evaluation["selected"]["trial"],
         "trial_fold_scores": {
             t.trial_id: t.fold_scores
             for t in run.trials

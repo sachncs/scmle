@@ -120,7 +120,7 @@ def test_checkpoints_do_not_change_results(binary_frame, tmp_path):
     approve = policies.Callback(lambda review: True)
     gated = project(binary_frame, tmp_path / "b", approve).run()
     assert gated.selected_model == plain.selected_model
-    assert gated.evaluation["selected_cv_score"] == pytest.approx(
-        plain.evaluation["selected_cv_score"]
+    assert gated.evaluation["selected"]["score"] == pytest.approx(
+        plain.evaluation["selected"]["score"]
     )
     assert isinstance(scmle.api.project.Project, type)

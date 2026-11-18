@@ -236,7 +236,7 @@ def test_production_verification_accepts_a_signed_service(signed_service):
 def test_trusted_is_refused_in_production_everywhere(
     signed_service, reference, tmp_path, monkeypatch
 ):
-    # Enforces docs/CLI.md:174.
+    # Enforces docs/CLI.md:179.
     # Enforces docs/GLOSSARY.md:612.
     # Enforces docs/WHEN_THINGS_GO_WRONG.md:442.
     with pytest.raises(

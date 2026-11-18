@@ -17,5 +17,5 @@ def test_the_bundle_names_the_seed_configuration_data_and_split(tmp_path):
     assert info.seed == project.spec.validation.seed
     assert info.configuration == project.spec.config_hash()
     assert info.dataset == dataset["digests"]["data"]
-    assert info.split == evaluation["split_fingerprint"]
+    assert info.split == evaluation["digests"]["split"]
     assert info.commit and info.threads

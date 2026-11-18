@@ -1,5 +1,10 @@
 """The model card's limitations, evaluation copy and record, word for word."""
 
+import dataclasses
+
+import pytest
+
+from scmle.contracts import errors
 from scmle.governance import model_card
 from tests.unit.test_model_card import build
 
@@ -57,3 +62,15 @@ def test_the_record_holds_every_field_under_its_name() -> None:
         "review": "machine_generated_unreviewed",
         "generated": card.generated_at,
     }
+
+
+def test_a_blank_field_and_no_limitations_are_refused_word_for_word() -> None:
+    card = build({"test_metrics": {}})
+    with pytest.raises(
+        errors.InputError, match=r"^model_name must not be empty$"
+    ):
+        dataclasses.replace(card, model_name=" ")
+    with pytest.raises(
+        errors.InputError, match=r"^limitations must not be empty$"
+    ):
+        dataclasses.replace(card, limitations=())

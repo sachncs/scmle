@@ -56,7 +56,7 @@ claim = "C2"
 passes = "leakage_policy is warn, or under block every screened column was checked and no column is a suspect (significant after Benjamini-Yekutieli over permutation p-values, effect bound above the ceiling); planted leaks the probe did not find on these rows are logged as a WARNING and recorded, not refused."
 blocks = "Under leakage_policy block: the profile has unchecked columns, or a column is a suspect and no valid attestation keeps it."
 override = "Set leakage_policy to 'warn' (the default), which logs warnings instead of raising."
-variables = ["leakage_policy"]
+variables = ["leakage"]
 
 [admissibility.quarantine_all]
 site = "scmle.pipeline.stages.admission:Admission.qualify_exploration"
@@ -65,7 +65,7 @@ claim = "C2"
 passes = "At least one feature of the feature plan is not quarantined by admissibility."
 blocks = "Admissibility quarantined fields and no feature of the plan is left."
 override = "A valid per-column attestation in the file named by leakage_attestations keeps a suspect field (tier attested)."
-variables = ["leakage_attestations", "data.group_column", "data.time_column"]
+variables = ["attestations", "data.group", "data.time"]
 certificate = "detector_certificates.json: F5 detectors (the leakage screen gates on its run-time probe; its certificates are reported evidence)"
 
 
@@ -85,7 +85,7 @@ claim = "C1"
 passes = "No serving limit is set and pareto is off, or one of the top max_candidates_checked trials, refit and measured, is within every limit."
 blocks = "Serving limits are active, pareto is off, and none of the checked candidates meets every limit."
 override = "Relax selection.max_model_mb or selection.max_p95_latency_ms, or raise selection.max_candidates_checked."
-variables = ["selection.max_model_mb", "selection.max_p95_latency_ms", "selection.latency_safety_factor", "selection.max_candidates_checked", "selection.pareto"]
+variables = ["selection.size", "selection.latency", "selection.headroom", "selection.depth", "selection.pareto"]
 
 [select.pareto_front]
 site = "scmle.pipeline.stages.selecting:SelectStage.select_on_front"
@@ -94,7 +94,7 @@ claim = "C1"
 passes = "At least one checked candidate, refit and measured, meets the serving limits."
 blocks = "Every checked candidate violates a serving limit."
 override = "Relax selection.max_model_mb or selection.max_p95_latency_ms, or raise selection.max_candidates_checked."
-variables = ["selection.max_model_mb", "selection.max_p95_latency_ms", "selection.latency_safety_factor", "selection.max_candidates_checked", "selection.pareto_tolerance"]
+variables = ["selection.size", "selection.latency", "selection.headroom", "selection.depth", "selection.slack"]
 
 [ingest.reconcile]
 site = "scmle.assurance.ingest.declared:require"
@@ -121,7 +121,7 @@ claim = "C1"
 passes = "Every column in data.monotonic_constraints is a numeric feature."
 blocks = "A column in data.monotonic_constraints is missing, excluded or not numeric."
 override = "none"
-variables = ["data.monotonic_constraints"]
+variables = ["data.monotonic"]
 
 [profile.target_and_features]
 site = "scmle.pipeline.profiler:Profiler.portray"
@@ -130,7 +130,7 @@ claim = "C5"
 passes = "The target has no missing values, a usable numeric, categorical, datetime or text feature remains, and the monotonic constraints name numeric features."
 blocks = "The target has missing values; no numeric, categorical, datetime or text feature remains after exclusions; a monotonic constraint names a column that is not a numeric feature."
 override = "none"
-variables = ["data.target", "data.monotonic_constraints"]
+variables = ["data.target", "data.monotonic"]
 
 [split.event.folds]
 site = "scmle.data.splitting.splitters.splits:Events.cross_validation_folds"
@@ -139,7 +139,7 @@ claim = "C5"
 passes = "Events and censored rows each number at least MIN_STRATUM_ROWS among the development rows; folds are reduced to the rarest count if needed."
 blocks = "The rarer of events and censored rows in the development partition is below MIN_STRATUM_ROWS."
 override = "none"
-variables = ["MIN_STRATUM_ROWS", "validation.folds", "data.event_column"]
+variables = ["MIN_STRATUM_ROWS", "validation.folds", "data.event"]
 
 [split.event.stratify]
 site = "scmle.data.splitting.splitters.splits:Events.stratifier"
@@ -148,7 +148,7 @@ claim = "C5"
 passes = "Events and censored rows each number at least MIN_STRATUM_ROWS in the full data."
 blocks = "The count of events or of censored rows is below MIN_STRATUM_ROWS."
 override = "none"
-variables = ["MIN_STRATUM_ROWS", "data.event_column"]
+variables = ["MIN_STRATUM_ROWS", "data.event"]
 
 [split.group.class_complete_folds]
 site = "scmle.data.splitting.splitters.splits:Group.class_complete_folds"
@@ -166,7 +166,7 @@ claim = "C5"
 passes = "The group column has no missing values, there are at least folds + 2 groups, and for classification class-complete group folds exist."
 blocks = "The group (or query) column has missing values; there are fewer than validation.folds + 2 distinct groups; for classification, class_complete_folds finds no valid split."
 override = "none"
-variables = ["data.group_column", "data.query_column", "validation.folds", "validation.test_fraction"]
+variables = ["data.group", "data.query", "validation.folds", "validation.test"]
 
 [split.task_supported]
 site = "scmle.data.splitting.splitters.partitions:Partitioner.check_task"
@@ -228,8 +228,8 @@ error = "BlockedError"
 claim = "C5"
 passes = "The time column orders the rows and at least MIN_ROLLING_FOLDS windows, each with at least MIN_ROLLING_TRAIN training rows, fit."
 blocks = "The time column has unparseable or missing values (from chronological_holdout); fewer than MIN_ROLLING_FOLDS rolling windows fit."
-override = "Shorten validation.horizon_rows, validation.window_rows or validation.embargo_rows, as the error message says."
-variables = ["MIN_ROLLING_FOLDS", "MIN_ROLLING_TRAIN", "validation.folds", "validation.horizon_rows", "validation.window_rows", "validation.embargo_rows", "validation.test_fraction", "data.time_column", "data.horizon"]
+override = "Shorten validation.rolling.horizon, validation.rolling.window or validation.embargo, as the error message says."
+variables = ["MIN_ROLLING_FOLDS", "MIN_ROLLING_TRAIN", "validation.folds", "validation.rolling.horizon", "validation.rolling.window", "validation.embargo", "validation.test", "data.time", "data.horizon"]
 
 [split.stratified.folds]
 site = "scmle.data.splitting.splitters.splits:Stratified.cross_validation_folds"
@@ -256,7 +256,7 @@ claim = "C5"
 passes = "Every value of the time column parses as a datetime."
 blocks = "The time column has values that are missing or do not parse as datetimes."
 override = "none"
-variables = ["data.time_column", "validation.test_fraction", "validation.embargo_rows", "data.horizon"]
+variables = ["data.time", "validation.test", "validation.embargo", "data.horizon"]
 
 [split.temporal.partition]
 site = "scmle.data.splitting.splitters.splits:Chronology.partition"
@@ -265,7 +265,7 @@ claim = "C5"
 passes = "The time column orders the rows and there are at least folds + 1 + embargo development rows."
 blocks = "The time column has unparseable or missing values; the development rows number fewer than validation.folds + 1 + embargo."
 override = "none"
-variables = ["validation.folds", "validation.embargo_rows", "data.horizon", "data.group_column", "data.time_column"]
+variables = ["validation.folds", "validation.embargo", "data.horizon", "data.group", "data.time"]
 
 [split.treatment.folds]
 site = "scmle.data.splitting.splitters.splits:Treatment.cross_validation_folds"
@@ -274,7 +274,7 @@ claim = "C5"
 passes = "The rarest treatment / outcome cell in the development rows allows at least MIN_FOLDS folds."
 blocks = "min(validation.folds, rarest cell count) is below MIN_FOLDS."
 override = "none"
-variables = ["MIN_FOLDS", "validation.folds", "data.treatment_column"]
+variables = ["MIN_FOLDS", "validation.folds", "data.treatment"]
 
 [split.treatment.stratify]
 site = "scmle.data.splitting.splitters.splits:Treatment.stratifier"
@@ -283,7 +283,7 @@ claim = "C5"
 passes = "Every treatment / outcome cell has at least MIN_STRATUM_ROWS rows."
 blocks = "A treatment / outcome cell has fewer than MIN_STRATUM_ROWS rows."
 override = "none"
-variables = ["MIN_STRATUM_ROWS", "data.treatment_column"]
+variables = ["MIN_STRATUM_ROWS", "data.treatment"]
 
 [task.resolve]
 site = "scmle.data.validation.target:TaskResolver.resolve"
@@ -319,7 +319,7 @@ claim = "C5"
 passes = "The labels in the data are exactly those listed in data.ordinal_order."
 blocks = "A label present in the data is missing from data.ordinal_order; a listed label has no rows."
 override = "none"
-variables = ["data.ordinal_order"]
+variables = ["data.order"]
 
 [task.ranking]
 site = "scmle.data.validation.target:TaskResolver.resolve_ranking"
@@ -364,7 +364,7 @@ claim = "C5"
 passes = "The event column exists, holds 0 or 1 in every row and records at least MIN_EVENTS events."
 blocks = "The event column is not configured or not found; it has a missing, unparseable or non 0/1 value; it records fewer than MIN_EVENTS events."
 override = "none"
-variables = ["data.event_column", "MIN_EVENTS"]
+variables = ["data.event", "MIN_EVENTS"]
 
 [target.columns]
 site = "scmle.data.validation.target:check_targets"
@@ -382,7 +382,7 @@ claim = "C5"
 passes = "The treatment column exists, holds 0 or 1 in every row and each arm has at least MIN_ARM_ROWS rows."
 blocks = "The treatment column is not configured or not found; it has a missing, unparseable or non 0/1 value; the smaller arm has fewer than MIN_ARM_ROWS rows."
 override = "none"
-variables = ["data.treatment_column", "MIN_ARM_ROWS"]
+variables = ["data.treatment", "MIN_ARM_ROWS"]
 
 [vault.bind]
 site = "scmle.assurance.custody.vault:SealedTestSet.bind"
@@ -418,16 +418,16 @@ claim = "C1"
 passes = "No monotonic constraint is set, or the task is not multiclass and a candidate can enforce the constraints."
 blocks = "Monotonic constraints are set and the task is multiclass; no remaining candidate has a monotonic parameter."
 override = "Relax data.monotonic_constraints or install the 'boosting' extra, as the error message says."
-variables = ["data.monotonic_constraints", "task"]
+variables = ["data.monotonic", "task"]
 
 [budget.minimum_run]
 site = "scmle.runtime.budget:Reserve.admit"
 error = "BlockedError"
 claim = "C7, C1"
 passes = "Preparation (estimated from the table's rows, feature columns and classes), one cheapest trial and the reserve for the final refit, diagnostics and packaging fit in the time budget; checked right after ingestion, before any profiling or training."
-blocks = "That minimum run is estimated above resources.time_budget_seconds; the message and details give the estimate, the reserve by part and the smallest budget that fits."
-override = "none; raise resources.time_budget_seconds (time_budget, --time-budget) to at least the smallest budget the refusal names."
-variables = ["resources.time_budget_seconds", "START_SECONDS", "CHEAPEST_RATE", "REFIT_SHARE", "EXPLAIN_SHARE", "PACKAGE_SHARE", "OTHER_DIAGNOSTIC_SECONDS"]
+blocks = "That minimum run is estimated above resources.budget; the message and details give the estimate, the reserve by part and the smallest budget that fits."
+override = "none; raise resources.budget (time_budget, --budget) to at least the smallest budget the refusal names."
+variables = ["resources.budget", "START_SECONDS", "CHEAPEST_RATE", "REFIT_SHARE", "EXPLAIN_SHARE", "PACKAGE_SHARE", "OTHER_DIAGNOSTIC_SECONDS"]
 
 [train.first_trial]
 site = "scmle.pipeline.stages.training:TrainStage.execute"
@@ -435,5 +435,5 @@ error = "BlockedError"
 claim = "C7, C1"
 passes = "At least one trial of the first chunk of candidates starts: preparation left START_SECONDS or more of the trial window (the budget minus the reserve, counted from the run's start); the memory limit never holds back the first trial."
 blocks = "Every trial of the first chunk was skipped because preparation, longer than its estimate, closed the trial window; the message and details give the preparation seconds and the smallest budget that fits."
-override = "none; raise resources.time_budget_seconds (time_budget, --time-budget) to at least the smallest budget the refusal names."
-variables = ["resources.time_budget_seconds", "START_SECONDS"]
+override = "none; raise resources.budget (time_budget, --budget) to at least the smallest budget the refusal names."
+variables = ["resources.budget", "START_SECONDS"]

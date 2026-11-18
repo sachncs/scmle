@@ -113,7 +113,7 @@ class Plan:
     report_preexisting: bool
 
     @property
-    def manifest_digest(self) -> str | None:
+    def digest(self) -> str | None:
         """The digest of the manifest, or None without one."""
         if self.manifest is None:
             return None
@@ -167,7 +167,7 @@ class Plan:
             return
         if manifest.modality != modalities.serialise(self.adapter.modality):
             raise errors.InputError("manifest modality must match adapter")
-        if manifest.digests["content"] != self.adapter.dataset_hash:
+        if manifest.digests["content"] != self.adapter.digest:
             raise errors.InputError("manifest content_hash must match adapter")
         if manifest.samples != len(self.adapter.samples):
             raise errors.InputError("manifest sample_count must match adapter")
@@ -198,13 +198,13 @@ class Plan:
         """
         return {
             "modality": modalities.serialise(self.adapter.modality),
-            "dataset": self.adapter.dataset_hash,
-            "observed": self.observed.dataset_hash,
+            "dataset": self.adapter.digest,
+            "observed": self.observed.digest,
             "package": str(self.package_target),
             "report": str(self.report_target),
             "seed": self.seed,
             "independent": self.require_independent_ground_truth,
-            "manifest": self.manifest_digest,
+            "manifest": self.digest,
         }
 
     def reload(self, stage_names: Sequence[str]) -> checkpoints.Checkpoint:
@@ -265,7 +265,7 @@ class Plan:
         if (
             completed_report.modality
             != modalities.serialise(self.adapter.modality)
-            or completed_report.digests["dataset"] != self.adapter.dataset_hash
+            or completed_report.digests["dataset"] != self.adapter.digest
             or Path(completed_report.package.path) != self.package_target
         ):
             raise errors.InputError(
@@ -299,10 +299,10 @@ class Plan:
         record = checkpoints.Checkpoint(
             modality=modalities.serialise(self.adapter.modality),
             digests=checkpoints.Digests(
-                dataset=self.adapter.dataset_hash,
-                observed=self.observed.dataset_hash,
+                dataset=self.adapter.digest,
+                observed=self.observed.digest,
                 stages=tuple(stage_digests),
-                manifest=self.manifest_digest,
+                manifest=self.digest,
             ),
             package=str(self.package_target),
             report=str(self.report_target),
@@ -360,7 +360,7 @@ def benchmark(
         if operation in context.performance_observations
     )
     performance_run = performance.Run(
-        identifier=f"{plan.adapter.dataset_hash}:{plan.seed}",
+        identifier=f"{plan.adapter.digest}:{plan.seed}",
         observations=observations,
     )
     performance_result = (
@@ -502,7 +502,7 @@ def publish(
     )
     report = reporting.Record(
         modality=modalities.serialise(plan.adapter.modality),
-        digests={"dataset": plan.adapter.dataset_hash},
+        digests={"dataset": plan.adapter.digest},
         evidence=records,
         evaluation=context.evaluation,
         performance=performance_evidence,

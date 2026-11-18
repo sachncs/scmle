@@ -88,7 +88,7 @@ class FinalEvaluationStage(summary.Summary):
         if not isinstance(split.locked_test, journal.Custodian):
             split.locked_test = journal.Custodian(
                 split.locked_test,
-                journal.Journal.locate(context.run_store.directory),
+                journal.Journal.locate(context.workspace.directory),
             )
         selected = scmle.pipeline.context.require(context.selected, "selected")
         task = scmle.pipeline.context.require(context.task, "task")

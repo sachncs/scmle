@@ -61,7 +61,7 @@ def test_verification_serializes_every_field():
     )
     result = claims_audit.Verification("some/dir", items)
     assert result.to_dict() == {
-        "run_dir": "some/dir",
+        "directory": "some/dir",
         "ok": False,
         "passed": 1,
         "findings": [
@@ -719,7 +719,7 @@ def write_custody(folder, events, key=KEY):
 
 
 def test_custody_findings_are_exact_for_hand_made_logs(tmp_path):
-    # Enforces docs/CLI.md:106.
+    # Enforces docs/CLI.md:111.
     document = {"outcome": confirm.CONFIRMED, "digests": {"survivors": "s"}}
     assert claims_audit.custodial(tmp_path, document, KEY) == finding(
         CUSTODY, "skipped", "custody_log.jsonl is not in the run"

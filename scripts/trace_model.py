@@ -464,10 +464,9 @@ class Walk:
         self.say("6. Selection, registry and the signed approval")
         evaluation = load(self.base / "run/evaluation.json")
         content_id = file_digest(self.base / "run/model/model_manifest.json")
-        self.say(
-            f"  selected {evaluation['selected_model']}, test "
-            f"{evaluation['test_metrics']['roc_auc']:.4f} ROC AUC"
-        )
+        model = field(evaluation, "selected.model", "selected_model")
+        metrics = field(evaluation, "metrics", "test_metrics")
+        self.say(f"  selected {model}, test {metrics['roc_auc']:.4f} ROC AUC")
         index = load(self.base / "registry/registry.json")
         entry = index["models"][inputs["model"]]["versions"][
             str(inputs["version"])

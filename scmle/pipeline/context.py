@@ -242,12 +242,12 @@ class Context(journal.Journal):
         return self.started_at + self.spec.resources.time_budget_seconds
 
     @property
-    def run_store(self) -> scmle.artifacts.store.Workspace:
+    def workspace(self) -> scmle.artifacts.store.Workspace:
         """The run store; raises for previews that have none."""
         return require(self.store, "store")
 
     @property
-    def run_directory(self) -> str:
+    def directory(self) -> str:
         """Runs directory as a string, empty for previews."""
         return str(self.store.directory) if self.store else ""
 
@@ -286,5 +286,5 @@ class Context(journal.Journal):
         """
         if self.cancel_event.is_set():
             raise errors.CancelledError(
-                "run cancelled", {"run_dir": self.run_directory}
+                "run cancelled", {"run_dir": self.directory}
             )

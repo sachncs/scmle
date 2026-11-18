@@ -46,7 +46,7 @@ def result(tmp_path_factory):
 
 
 def test_the_selected_model_orders_risk_well_beyond_chance(result):
-    assert result.evaluation["test_metrics"]["c_index"] > 0.7
+    assert result.evaluation["metrics"]["c_index"] > 0.7
     baseline = next(t for t in result.trials if t.model_name == "dummy")
     assert baseline.score_mean == pytest.approx(0.5)
 
@@ -129,12 +129,12 @@ def test_survival_works_with_a_weight_column(tmp_path):
 
     result = run(tmp_path, frame, weight_column="w")
 
-    assert result.evaluation["test_metrics"]["c_index"] > 0.65
+    assert result.evaluation["metrics"]["c_index"] > 0.65
     assert "w" not in result.bundle.features
 
 
 def test_time_dependent_metrics_are_reported_on_the_locked_rows(result):
-    metrics = result.evaluation["test_metrics"]
+    metrics = result.evaluation["metrics"]
 
     assert {"c_index", "ibs", "td_auc"} <= set(metrics)
     assert metrics["td_auc"] > 0.65

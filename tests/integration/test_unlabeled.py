@@ -32,18 +32,22 @@ def test_unlabeled_rows_are_refused_by_default(tmp_path):
 def test_ignored_rows_are_reported_and_kept_out_of_the_split(tmp_path):
     result = run(tmp_path, partly_labeled(), unlabeled="ignore")
 
-    assert result.evaluation["n_dev"] + result.evaluation["n_test"] == 600
+    assert (
+        result.evaluation["rows"]["development"]
+        + result.evaluation["rows"]["test"]
+        == 600
+    )
     assert any(
         "300 row(s) without a target" in finding
         for finding in result.profile.quality_findings
     )
-    assert result.evaluation["semi_supervised"] is None
+    assert result.evaluation["unlabeled"] is None
 
 
 def test_pseudo_labeling_is_judged_and_recorded(tmp_path):
     result = run(tmp_path, partly_labeled(), unlabeled="pseudo_label")
 
-    record = result.evaluation["semi_supervised"]
+    record = result.evaluation["unlabeled"]
     assert record["unlabeled_rows"] == 300
     assert record["used"] == bool(
         record["outcome"] and record["outcome"]["accepted"]

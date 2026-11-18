@@ -40,10 +40,10 @@ const surfaces = [
   <p>Each change below added an optional keyword with a <code>None</code> default, so every existing call is unchanged, and regenerated the snapshot for the <code>Project</code> entry alone.</p>
   <DocTable label="Changes to the Project entry" head={["Keyword", "Added for", "Also"]} rows={[
     ["<code>charter</code>", "The analysis charter and custody", "Charter and custody modules are extension surfaces."],
-    ["<code>leakage_attestations</code>", "Per-column attestation that keeps a certified suspect", "<code>Config</code> field; CLI flag <code>--leakage-attestations</code>."],
+    ["<code>leakage_attestations</code>", "Per-column attestation that keeps a certified suspect", "<code>Config</code> field; CLI flag <code>--attestations</code>."],
     ["<code>baseline_column</code>, <code>framing_draft</code>", "Problem framing and the baseline claim", "<code>Dataset</code> fields; CLI flags on <code>plan</code>, <code>run</code>, <code>resume</code>."],
     ["<code>ingest_plan</code>", "Raw-data ingestion", "Charter format 7 gained an optional <code>ingest</code> field; a charter without it keeps its hash."],
-    ["<code>baseline_subject</code>", "Whether the baseline claim concerns a frozen rule (the default) or the selected model", "<code>Dataset</code> field; CLI flag <code>--baseline-subject</code> on <code>plan</code>, <code>run</code>, <code>resume</code>."],
+    ["<code>baseline_subject</code>", "Whether the baseline claim concerns a frozen rule (the default) or the selected model", "<code>Dataset</code> field; CLI flag <code>--comparator</code> on <code>plan</code>, <code>run</code>, <code>resume</code>."],
     ["<code>logged_action_column</code>, <code>propensity_column</code>", "Off-policy value of a decision rule", "A charter run with a decision block also writes the decision, policy-value and rollout files."],
   ]} />
 
