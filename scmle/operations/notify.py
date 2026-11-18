@@ -25,11 +25,13 @@ import json
 import math
 import time
 from typing import Any
+from typing import ClassVar
 import urllib.error
 import urllib.parse
 import urllib.request
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 SIGNATURE_HEADER = "X-Scmle-Signature"
 TIMESTAMP_HEADER = "X-Scmle-Timestamp"
@@ -67,7 +69,14 @@ class Delivery:
             that used every attempt; never a credential.
         idempotency_key: The key sent on every attempt; empty if no sender
             was configured.
+        KEYS: Version-1 keys to the written ones (`code`, `idempotency`);
+            `downgrade` restores version 1. The HTTP header keeps its name,
+            `Idempotency-Key`.
     """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"http_status": "code", "idempotency_key": "idempotency"}
+    )
 
     kind: str
     delivered: bool
@@ -80,9 +89,9 @@ class Delivery:
         """A JSON-ready record.
 
         Returns:
-            The delivery's fields as a dict.
+            The delivery's fields as a dict, with the written keys.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def sign(secret: str | bytes, timestamp: str, body: bytes) -> str:

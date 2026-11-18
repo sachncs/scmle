@@ -9,8 +9,10 @@ import hashlib
 import json
 import time
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.runtime import retry
 
 MAX_RUN_ID_LENGTH = 64
@@ -192,7 +194,14 @@ class Job:
         retries: Attempts and backoff.
         budget: Cost ceiling for the whole run, if any.
         environment: Non-secret environment for the job.
+        KEYS: Version-1 keys to the written ones (`identifier`, `timeout`
+            in seconds, `digests.project`); `downgrade` restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {"run_id": "identifier", "timeout_seconds": "timeout"},
+        groups={"digests": {"project_digest": "project"}},
+    )
 
     run_id: str
     name: str
@@ -241,8 +250,28 @@ class Job:
         """Builds the JSON-ready form that is stored with the run.
 
         Returns:
-            A dict of all fields, plus the project digest, with nested objects
-            as dicts.
+            A dict of all fields, plus the project digest under
+            `digests.project`, with nested objects as dicts.
+        """
+        return self.KEYS.upgrade(self.layout(self.retries.to_dict()))
+
+    def anchor(self) -> records.Layout:
+        """Builds the spec in its version-1 layout, the one `digest` names.
+
+        Returns:
+            The spec as version 1 wrote it (`run_id`, `project_digest`,
+            `timeout_seconds`, the retry policy's field names).
+        """
+        return self.layout(dataclasses.asdict(self.retries))
+
+    def layout(self, retries: Mapping[str, Any]) -> records.Layout:
+        """Builds the version-1 layout around a written retry policy.
+
+        Args:
+            retries: The retry policy as it is to be written.
+
+        Returns:
+            The spec's fields with their version-1 keys.
         """
         return {
             "run_id": self.run_id,
@@ -252,7 +281,7 @@ class Job:
             "identity": self.identity,
             "resources": dataclasses.asdict(self.resources),
             "timeout_seconds": self.timeout_seconds,
-            "retries": self.retries.to_dict(),
+            "retries": dict(retries),
             "budget": None
             if self.budget is None
             else {
@@ -263,12 +292,14 @@ class Job:
         }
 
     def digest(self) -> str:
-        """Digests the whole spec.
+        """Digests the whole spec, anchored at version 1.
+
+        Renaming a written key leaves the digest of a started run unchanged.
 
         Returns:
-            The hex SHA-256 of the key-sorted JSON of `to_dict()`.
+            The hex SHA-256 of the key-sorted JSON of `anchor()`.
         """
-        text = json.dumps(self.to_dict(), sort_keys=True)
+        text = json.dumps(self.anchor(), sort_keys=True)
         return hashlib.sha256(text.encode()).hexdigest()
 
 

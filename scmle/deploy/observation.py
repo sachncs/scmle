@@ -10,8 +10,10 @@ and nothing else; none of them reads a provider response directly.
 import dataclasses
 import re
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.deploy import contract
 
 REVISION_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}")
@@ -59,7 +61,14 @@ class Observation:
         traffic: Revisions and their shares; the shares sum to 100.
         observed_at: UTC time of the read.
         revisions: Image digest of every revision the response named.
+        KEYS: Version-1 keys to the written ones (`digests.image`,
+            `observed`); `downgrade` restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {"observed_at": "observed"},
+        groups={"digests": {"image_digest": "image"}},
+    )
 
     provider: str
     service: str
@@ -117,13 +126,15 @@ class Observation:
             A dict of all fields, with traffic as a list of dicts and revisions
             as a list of pairs.
         """
-        return {
-            "provider": self.provider,
-            "service": self.service,
-            "revision": self.revision,
-            "image_digest": self.image_digest,
-            "ready": self.ready,
-            "traffic": [dataclasses.asdict(t) for t in self.traffic],
-            "revisions": [list(item) for item in self.revisions],
-            "observed_at": self.observed_at,
-        }
+        return self.KEYS.upgrade(
+            {
+                "provider": self.provider,
+                "service": self.service,
+                "revision": self.revision,
+                "image_digest": self.image_digest,
+                "ready": self.ready,
+                "traffic": [dataclasses.asdict(t) for t in self.traffic],
+                "revisions": [list(item) for item in self.revisions],
+                "observed_at": self.observed_at,
+            }
+        )

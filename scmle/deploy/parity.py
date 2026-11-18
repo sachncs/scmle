@@ -12,6 +12,7 @@ import dataclasses
 import json
 import pathlib
 from typing import Any
+from typing import ClassVar
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -29,6 +30,7 @@ from sklearn.preprocessing import StandardScaler
 from scmle.artifacts import bundle
 from scmle.contracts import data
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts import serving
 
 MISSING_CATEGORY = "__missing__"
@@ -112,7 +114,13 @@ class Parity:
             difference; infinite when the output count was wrong.
         tolerance: The probability tolerance applied.
         mismatches: Description of each difference found.
+        KEYS: Version-1 keys to the written ones (`error`); `downgrade`
+            restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"max_probability_error": "error"}
+    )
 
     passed: bool
     records: int
@@ -127,13 +135,15 @@ class Parity:
             A dictionary with one entry per attribute; the mismatches are a
             list.
         """
-        return {
-            "passed": self.passed,
-            "records": self.records,
-            "max_probability_error": self.max_probability_error,
-            "tolerance": self.tolerance,
-            "mismatches": list(self.mismatches),
-        }
+        return self.KEYS.upgrade(
+            {
+                "passed": self.passed,
+                "records": self.records,
+                "max_probability_error": self.max_probability_error,
+                "tolerance": self.tolerance,
+                "mismatches": list(self.mismatches),
+            }
+        )
 
 
 def goldens(directory: str | pathlib.Path) -> Goldens:

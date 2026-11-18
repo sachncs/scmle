@@ -11,12 +11,14 @@ import os
 from pathlib import Path
 import time
 from typing import Any
+from typing import ClassVar
 from urllib import parse
 import urllib.error
 import urllib.request
 
 from scmle import durability
 from scmle.contracts import errors
+from scmle.contracts import records
 
 
 class DeliveryError(RuntimeError):
@@ -35,7 +37,16 @@ class Alert:
         details: Further JSON-compatible facts.
         evidence_digest: Digest of the evidence the alert is bound to.
         created_at: ISO-8601 creation time.
+        KEYS: Version-1 keys to the written ones (`identifier`,
+            `digests.evidence`, `created`); `downgrade` restores version 1.
+            The id is the digest of a fixed version-1 literal
+            (`from_evidence`), so renaming keys leaves every id unchanged.
     """
+
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {"alert_id": "identifier", "created_at": "created"},
+        groups={"digests": {"evidence_digest": "evidence"}},
+    )
 
     alert_id: str
     route: str
@@ -78,15 +89,17 @@ class Alert:
         Returns:
             A dict of all fields.
         """
-        return {
-            "alert_id": self.alert_id,
-            "route": self.route,
-            "severity": self.severity,
-            "title": self.title,
-            "details": dict(self.details),
-            "evidence_digest": self.evidence_digest,
-            "created_at": self.created_at,
-        }
+        return self.KEYS.upgrade(
+            {
+                "alert_id": self.alert_id,
+                "route": self.route,
+                "severity": self.severity,
+                "title": self.title,
+                "details": dict(self.details),
+                "evidence_digest": self.evidence_digest,
+                "created_at": self.created_at,
+            }
+        )
 
     @classmethod
     def from_evidence(
@@ -116,6 +129,7 @@ class Alert:
             evidence, ensure_ascii=True, sort_keys=True, separators=(",", ":")
         ).encode("utf-8")
         evidence_digest = hashlib.sha256(encoded_evidence).hexdigest()
+        # The version-1 literal: the id must not move when keys are renamed.
         identity = json.dumps(
             {
                 "route": route,
@@ -151,7 +165,13 @@ class Delivery:
         attempts: Delivery attempts made.
         reason: One sentence explaining the status.
         observed_at: ISO-8601 time of the outcome.
+        KEYS: Version-1 keys to the written ones (`alert`, `observed`);
+            `downgrade` restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"alert_id": "alert", "observed_at": "observed"}
+    )
 
     alert_id: str
     route: str
@@ -178,9 +198,9 @@ class Delivery:
         """Returns JSON-native delivery evidence.
 
         Returns:
-            A dict of all fields.
+            A dict of all fields, with the written keys.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 class Sink(abc.ABC):
@@ -454,7 +474,8 @@ class Dispatcher:
 
         Returns:
             The IDs of alerts whose journal record has status `delivered`; empty
-            if there is no journal.
+            if there is no journal. A record written before the keys were
+            renamed names its alert `alert_id`.
         """
         if not self.journal.exists():
             return set()
@@ -462,7 +483,10 @@ class Dispatcher:
         for line in self.journal.read_text(encoding="utf-8").splitlines():
             record = json.loads(line)
             if record.get("delivery", {}).get("status") == "delivered":
-                successful.add(str(record["alert"]["alert_id"]))
+                alert = record["alert"]
+                successful.add(
+                    str(alert.get("identifier", alert.get("alert_id")))
+                )
         return successful
 
     def append(self, alert: Alert, delivery: Delivery) -> None:

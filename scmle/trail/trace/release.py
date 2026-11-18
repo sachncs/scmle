@@ -1,5 +1,6 @@
 """The release steps of a trail: approval and deployment."""
 
+from collections.abc import Mapping
 from typing import Any
 
 from scmle.contracts import errors
@@ -8,6 +9,34 @@ from scmle.governance import registry
 from scmle.trail import records
 from scmle.trail.trace import finding
 from scmle.trail.trace import reader
+
+
+def sanction(record: Mapping[str, Any]) -> registry.Sanction:
+    """Rebuilds a stored approval, requiring every signed field.
+
+    Args:
+        record: The approval in its version-1 layout (`content_id`,
+            `approved_at`); the written layout is moved down first.
+
+    Returns:
+        The approval.
+
+    Raises:
+        KeyError: If a signed field is missing.
+        ValueError: If a field is invalid.
+    """
+    return registry.Sanction(
+        model=record["model"],
+        version=record["version"],
+        content_id=record["content_id"],
+        reviewer=record["reviewer"],
+        decision=record["decision"],
+        reason=record["reason"],
+        evidence=tuple(record["evidence"]),
+        approved_at=record["approved_at"],
+        independent=record["independent"],
+        signature=record.get("signature"),
+    )
 
 
 class Release(reader.Reader):
@@ -116,21 +145,11 @@ class Release(reader.Reader):
                 "no signed approval promoted this version to champion",
             )
             return None
-        record = dict(rows[-1]["approval_record"])
         key = self.keys.get("reviewer")
+        record = dict(rows[-1]["approval_record"])
         try:
-            held = registry.Sanction(
-                model=record["model"],
-                version=record["version"],
-                content_id=record["content_id"],
-                reviewer=record["reviewer"],
-                decision=record["decision"],
-                reason=record["reason"],
-                evidence=tuple(record["evidence"]),
-                approved_at=record["approved_at"],
-                independent=record["independent"],
-                signature=record.get("signature"),
-            )
+            record = registry.Sanction.KEYS.downgrade(record)
+            held = sanction(record)
         except (KeyError, ValueError, TypeError) as error:
             # handled: recorded as trace problem
             self.problem(

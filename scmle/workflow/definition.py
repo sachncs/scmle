@@ -21,8 +21,10 @@ import enum
 import hashlib
 import json
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.runtime import retry
 
 NAME_CHARACTERS = frozenset(
@@ -105,7 +107,20 @@ class Step:
         parameters: JSON-ready parameters for the handler.
         approvers: For an approval step, the identities that may decide.
         expires_seconds: For an approval step, how long it waits.
+        KEYS: Version-1 keys to the written ones (`needs`, `timeout` and
+            `expiry` in seconds, `budget`, `concurrency`); `downgrade`
+            restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "depends_on": "needs",
+            "timeout_seconds": "timeout",
+            "cost_budget": "budget",
+            "concurrency_group": "concurrency",
+            "expires_seconds": "expiry",
+        }
+    )
 
     name: str
     kind: StepKind
@@ -146,15 +161,35 @@ class Step:
         """Builds a JSON-ready form.
 
         Returns:
-            A dict of all fields, with the kind as its value and the retry
-            policy as a dict.
+            A dict of all fields with the written keys, the kind as its
+            value and the retry policy as a dict.
+        """
+        return self.KEYS.upgrade(self.layout(self.retries.to_dict()))
+
+    def anchor(self) -> records.Layout:
+        """Builds the step in its version-1 layout, the one digests name.
+
+        Returns:
+            The step as version 1 wrote it, with the retry policy's field
+            names.
+        """
+        return self.layout(dataclasses.asdict(self.retries))
+
+    def layout(self, retries: Mapping[str, Any]) -> records.Layout:
+        """Builds the version-1 layout around a written retry policy.
+
+        Args:
+            retries: The retry policy as it is to be written.
+
+        Returns:
+            The step's fields with their version-1 keys.
         """
         return {
             "name": self.name,
             "kind": self.kind.value,
             "depends_on": list(self.depends_on),
             "timeout_seconds": self.timeout_seconds,
-            "retries": self.retries.to_dict(),
+            "retries": dict(retries),
             "cost_budget": self.cost_budget,
             "concurrency_group": self.concurrency_group,
             "effect": self.effect,
@@ -206,7 +241,20 @@ class Workflow:
         group_limits: Concurrency group name to the steps allowed at once (a
             group not listed allows one).
         max_parallel: Steps the local executor runs at once.
+        KEYS: Version-1 keys to the written ones (`concurrency`, `budget`,
+            `limits`, `parallel`, and each step's own); `downgrade`
+            restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {
+            "max_concurrent_runs": "concurrency",
+            "cost_budget": "budget",
+            "group_limits": "limits",
+            "max_parallel": "parallel",
+        },
+        parts={"steps": Step.KEYS},
+    )
 
     name: str
     version: str
@@ -351,12 +399,34 @@ class Workflow:
         """Builds a JSON-ready form.
 
         Returns:
-            A dict of all fields, with the steps and schedule as dicts.
+            A dict of all fields with the written keys, the steps and
+            schedule as dicts.
+        """
+        written = self.KEYS.upgrade(self.anchor())
+        written["steps"] = [step.to_dict() for step in self.steps]
+        return written
+
+    def anchor(self) -> records.Layout:
+        """Builds the definition in its version-1 layout, named by `digest`.
+
+        Returns:
+            The definition as version 1 wrote it, every step included.
+        """
+        return self.layout([step.anchor() for step in self.steps])
+
+    def layout(self, steps: Sequence[Mapping[str, Any]]) -> records.Layout:
+        """Builds the version-1 layout around the given steps.
+
+        Args:
+            steps: The steps as they are to be written.
+
+        Returns:
+            The definition's fields with their version-1 keys.
         """
         return {
             "name": self.name,
             "version": self.version,
-            "steps": [step.to_dict() for step in self.steps],
+            "steps": [dict(step) for step in steps],
             "schedule": None
             if self.schedule is None
             else {
@@ -372,12 +442,15 @@ class Workflow:
         }
 
     def digest(self) -> str:
-        """Digests the definition.
+        """Digests the definition, anchored at version 1.
+
+        Renaming a written key leaves the digest of a recorded run
+        unchanged.
 
         Returns:
-            The hex SHA-256 of the key-sorted JSON of `to_dict()`.
+            The hex SHA-256 of the key-sorted JSON of `anchor()`.
         """
-        text = json.dumps(self.to_dict(), sort_keys=True)
+        text = json.dumps(self.anchor(), sort_keys=True)
         return hashlib.sha256(text.encode()).hexdigest()
 
 

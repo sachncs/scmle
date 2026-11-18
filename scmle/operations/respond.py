@@ -23,9 +23,11 @@ import json
 import pathlib
 import time
 from typing import Any
+from typing import ClassVar
 
 from scmle import durability
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.operations import classify
 from scmle.operations import logs
 from scmle.operations import notify
@@ -48,7 +50,14 @@ class Response:
         telemetry_digest: SHA-256 of the line retained for the window.
         audit_head: Hash of the newest audit row: the one that opened the
             incident, or the current ledger head if none was opened.
+        KEYS: Version-1 keys to the written ones (`incident`,
+            `digests.telemetry`, `head`); `downgrade` restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {"incident_id": "incident", "audit_head": "head"},
+        groups={"digests": {"telemetry_digest": "telemetry"}},
+    )
 
     incident_id: str | None
     classification: classify.Classification
@@ -63,13 +72,15 @@ class Response:
             The incident id, classification, deliveries, telemetry digest and
             audit head as a dict.
         """
-        return {
-            "incident_id": self.incident_id,
-            "classification": self.classification.to_dict(),
-            "deliveries": [d.to_dict() for d in self.deliveries],
-            "telemetry_digest": self.telemetry_digest,
-            "audit_head": self.audit_head,
-        }
+        return self.KEYS.upgrade(
+            {
+                "incident_id": self.incident_id,
+                "classification": self.classification.to_dict(),
+                "deliveries": [d.to_dict() for d in self.deliveries],
+                "telemetry_digest": self.telemetry_digest,
+                "audit_head": self.audit_head,
+            }
+        )
 
 
 class Desk:

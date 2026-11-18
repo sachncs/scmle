@@ -4,10 +4,12 @@ from collections.abc import Mapping
 import dataclasses
 import datetime
 from typing import Any
+from typing import ClassVar
 
 import scmle.artifacts.bundle
 from scmle.contracts import data
 from scmle.contracts import errors
+from scmle.contracts import records
 
 EXCLUSIONS = (
     (
@@ -70,7 +72,33 @@ def caveat(release: object) -> tuple[str, ...]:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Card:
-    """Reviewable context for one packaged model."""
+    """Reviewable context for one packaged model.
+
+    Attributes:
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `model`, `version`, `digests.model`, `dataset`,
+            `snapshot`, `use`, `excluded`, `features`, `artifacts`,
+            `support`, `review` and `generated`, the `Datasheet` spelling.
+    """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {
+                "model_name": "model",
+                "model_version": "version",
+                "dataset_id": "dataset",
+                "snapshot_id": "snapshot",
+                "intended_use": "use",
+                "out_of_scope": "excluded",
+                "feature_names": "features",
+                "evidence_artifacts": "artifacts",
+                "support_status": "support",
+                "review_status": "review",
+                "generated_at": "generated",
+            },
+            groups={"digests": {"model_fingerprint": "model"}},
+        ),
+    )
 
     model_name: str
     model_version: str
@@ -88,7 +116,7 @@ class Card:
     evidence_artifacts: tuple[str, ...]
     support_status: str
     review_status: str = "machine_generated_unreviewed"
-    schema_version: int = 1
+    schema_version: int = records.ORIGIN + 1
     generated_at: str = dataclasses.field(
         default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat()
     )
@@ -188,9 +216,13 @@ class Card:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns a JSON-compatible model card."""
-        return {
-            "schema_version": self.schema_version,
+        """Returns a JSON-compatible model card.
+
+        Returns:
+            The card in the current written layout, with `schema_version`
+            set to the current version.
+        """
+        layout = {
             "model_name": self.model_name,
             "model_version": self.model_version,
             "model_fingerprint": self.model_fingerprint,
@@ -208,4 +240,8 @@ class Card:
             "support_status": self.support_status,
             "review_status": self.review_status,
             "generated_at": self.generated_at,
+        }
+        return {
+            records.KEY: records.ORIGIN + len(self.migrations),
+            **records.upgrade(self.migrations, layout, records.ORIGIN),
         }

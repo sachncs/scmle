@@ -3,8 +3,10 @@
 from collections.abc import Sequence
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.operations import signals
 
 RECOMMEND = "recommend"
@@ -72,9 +74,19 @@ class RetrainDecision:
         escalation_id: The pending escalation carrying the question.
         challenger: Name of the challenger a trigger started.
         alarm_gates_retrain: Copied from the loop policy, for the record.
+        KEYS: Version-1 keys to the written ones (`withheld`, `escalation`,
+            `retrain`); `downgrade` restores version 1.
     """
 
     __module__ = "scmle.operations.continuous"
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "held_back": "withheld",
+            "escalation_id": "escalation",
+            "alarm_gates_retrain": "retrain",
+        }
+    )
 
     action: str
     reasons: tuple[str, ...]
@@ -87,9 +99,9 @@ class RetrainDecision:
         """A JSON-ready record.
 
         Returns:
-            The decision's fields as a dict.
+            The decision's fields as a dict, with the written keys.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def decide(

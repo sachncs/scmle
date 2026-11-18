@@ -15,12 +15,14 @@ import json
 import pathlib
 import shutil
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle import durability
 from scmle.artifacts import bundle
 from scmle.contracts import errors
 from scmle.contracts import events
+from scmle.contracts import records
 from scmle.contracts import signing
 from scmle.governance import never_list
 
@@ -40,7 +42,19 @@ class Verdict(enum.StrEnum):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Sanction:
-    """Approval bound to one exact registered model bundle."""
+    """Approval bound to one exact registered model bundle.
+
+    The signature covers the version-1 layout (`preimage`), so an approval
+    signed before the keys were renamed still verifies.
+
+    Attributes:
+        KEYS: Version-1 keys to the written ones (`content`, `approved`);
+            `downgrade` restores version 1.
+    """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"content_id": "content", "approved_at": "approved"}
+    )
 
     model: str
     version: int
@@ -93,7 +107,11 @@ class Sanction:
             raise errors.InputError("signature must be non-empty text")
 
     def preimage(self) -> dict[str, Any]:
-        """Returns the approval fields covered by its signature."""
+        """Returns the approval fields covered by its signature.
+
+        The fields are in their version-1 layout (`content_id`,
+        `approved_at`), the layout every stored signature was made over.
+        """
         return {
             "model": self.model,
             "version": self.version,
@@ -183,11 +201,35 @@ class Sanction:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Returns the complete approval record for durable audit evidence."""
-        record = self.preimage()
+        """Returns the complete approval record for durable audit evidence.
+
+        Returns:
+            The signed fields with the written keys (`content`, `approved`),
+            plus the signature when there is one.
+        """
+        record = self.KEYS.upgrade(self.preimage())
         if self.signature is not None:
             record["signature"] = self.signature
         return record
+
+    @classmethod
+    def load(cls, record: Mapping[str, Any]) -> Self:
+        """Rebuilds an approval from its stored record.
+
+        Args:
+            record: A record from `to_dict`, in the written layout or
+                version 1 (`content_id`, `approved_at`).
+
+        Returns:
+            The approval; `evidence` becomes a tuple.
+
+        Raises:
+            KeyError: If a required field is missing.
+            ValueError: If a field is invalid.
+        """
+        values = cls.KEYS.downgrade(dict(record))
+        values["evidence"] = tuple(values.get("evidence", ()))
+        return cls(**values)
 
 
 @dataclasses.dataclass(frozen=True)

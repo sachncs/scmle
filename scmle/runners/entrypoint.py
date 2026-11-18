@@ -82,10 +82,12 @@ def respec(store: objectstore.Depot, run_id: str) -> base.Job:
         run_id: The run.
 
     Returns:
-        The job spec stored at `runs/<run_id>/spec.json`.
+        The job spec stored at `runs/<run_id>/spec.json`, written in the
+        current layout (`identifier`, `timeout`, `digests.project`) or in
+        version 1 (`run_id`, `timeout_seconds`, `project_digest`).
     """
     data = store.get(f"runs/{run_id}/spec.json")[0]
-    record = json.loads(data)
+    record = base.Job.KEYS.downgrade(json.loads(data))
     budget = record["budget"]
     return base.Job(
         run_id=record["run_id"],

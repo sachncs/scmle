@@ -4,9 +4,11 @@ from collections.abc import Sequence
 import dataclasses
 import datetime
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
 from scmle.contracts import observability
+from scmle.contracts import records
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -24,7 +26,19 @@ class Evaluation:
             sorted.
         threshold_breaches: Metrics over their alert threshold, each with the
             metric name, observed value, threshold and unit, sorted by name.
+        KEYS: Version-1 keys to the written ones (`observed`, `missing`,
+            `expired`, `future`, `breaches`); `downgrade` restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "observed_at": "observed",
+            "missing_signals": "missing",
+            "expired_metrics": "expired",
+            "future_metrics": "future",
+            "threshold_breaches": "breaches",
+        }
+    )
 
     passed: bool
     observed_at: str
@@ -39,16 +53,18 @@ class Evaluation:
         Returns:
             A dict of all fields, with tuples as lists.
         """
-        return {
-            "passed": self.passed,
-            "observed_at": self.observed_at,
-            "missing_signals": list(self.missing_signals),
-            "expired_metrics": list(self.expired_metrics),
-            "future_metrics": list(self.future_metrics),
-            "threshold_breaches": [
-                dict(breach) for breach in self.threshold_breaches
-            ],
-        }
+        return self.KEYS.upgrade(
+            {
+                "passed": self.passed,
+                "observed_at": self.observed_at,
+                "missing_signals": list(self.missing_signals),
+                "expired_metrics": list(self.expired_metrics),
+                "future_metrics": list(self.future_metrics),
+                "threshold_breaches": [
+                    dict(breach) for breach in self.threshold_breaches
+                ],
+            }
+        )
 
 
 def evaluate(

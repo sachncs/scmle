@@ -6,9 +6,11 @@ import datetime
 import enum
 import math
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
 from scmle.contracts import observability
+from scmle.contracts import records
 
 
 class Status(enum.StrEnum):
@@ -83,7 +85,18 @@ class Slo:
         owner: Who answers for the objective.
         runbook: Where the response procedure is described.
         alert_route: Where alerts are sent.
+        KEYS: Version-1 keys to the written ones (`metric`, `window` in
+            days, `samples`, `route`); `downgrade` restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "metric_name": "metric",
+            "window_days": "window",
+            "minimum_samples": "samples",
+            "alert_route": "route",
+        }
+    )
 
     name: str
     metric_name: str
@@ -126,17 +139,19 @@ class Slo:
         Returns:
             A dict of all fields, with the kind as its value.
         """
-        return {
-            "name": self.name,
-            "metric_name": self.metric_name,
-            "kind": self.kind.value,
-            "maximum": self.maximum,
-            "window_days": self.window_days,
-            "minimum_samples": self.minimum_samples,
-            "owner": self.owner,
-            "runbook": self.runbook,
-            "alert_route": self.alert_route,
-        }
+        return self.KEYS.upgrade(
+            {
+                "name": self.name,
+                "metric_name": self.metric_name,
+                "kind": self.kind.value,
+                "maximum": self.maximum,
+                "window_days": self.window_days,
+                "minimum_samples": self.minimum_samples,
+                "owner": self.owner,
+                "runbook": self.runbook,
+                "alert_route": self.alert_route,
+            }
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -153,7 +168,21 @@ class Assessment:
         error_budget_remaining: Share of the allowed maximum not yet used, in
             [0, 1], or None without a decision.
         reason: One sentence explaining the status.
+        KEYS: Version-1 keys to the written ones (`observed`, `samples`,
+            `windowed`, `maximum`, `remaining`, `escalate`); `downgrade`
+            restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "observed_at": "observed",
+            "sample_count": "samples",
+            "in_window_count": "windowed",
+            "observed_maximum": "maximum",
+            "error_budget_remaining": "remaining",
+            "incident_required": "escalate",
+        }
+    )
 
     target: Slo
     observed_at: str
@@ -218,20 +247,22 @@ class Assessment:
             budget, whether an incident is required, and the owner, runbook,
             alert route and reason.
         """
-        return {
-            "target": self.target.to_dict(),
-            "observed_at": self.observed_at,
-            "status": self.status.value,
-            "sample_count": self.sample_count,
-            "in_window_count": self.in_window_count,
-            "observed_maximum": self.observed_maximum,
-            "error_budget_remaining": self.error_budget_remaining,
-            "incident_required": self.incident_required,
-            "owner": self.target.owner,
-            "runbook": self.target.runbook,
-            "alert_route": self.target.alert_route,
-            "reason": self.reason,
-        }
+        return self.KEYS.upgrade(
+            {
+                "target": self.target.to_dict(),
+                "observed_at": self.observed_at,
+                "status": self.status.value,
+                "sample_count": self.sample_count,
+                "in_window_count": self.in_window_count,
+                "observed_maximum": self.observed_maximum,
+                "error_budget_remaining": self.error_budget_remaining,
+                "incident_required": self.incident_required,
+                "owner": self.target.owner,
+                "runbook": self.target.runbook,
+                "alert_route": self.target.alert_route,
+                "reason": self.reason,
+            }
+        )
 
 
 def partition(

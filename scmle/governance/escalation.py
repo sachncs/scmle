@@ -50,10 +50,12 @@ from collections.abc import Sequence
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 
 import numpy
 from scipy import stats
 
+from scmle.contracts import records
 import scmle.contracts.errors
 
 ANSWERED = "answered"
@@ -144,7 +146,13 @@ class Threshold:
         weighted: Whether Kish effective sizes were used (approximate).
         steps: The sequence in the order visited, including thresholds
             skipped for a too small sample and the first one not rejected.
+        KEYS: Version-1 keys to the written ones (`target`, the loop
+            policy's spelling); `downgrade` restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"r_star": "target"}
+    )
 
     tau: float
     coverage: float
@@ -166,15 +174,17 @@ class Threshold:
             The result's fields, with an infinite threshold and a NaN risk
             written as None and each step as a dict.
         """
-        return {
-            "tau": None if self.saturated else self.tau,
-            "coverage": self.coverage,
-            "risk": None if math.isnan(self.risk) else self.risk,
-            "r_star": self.r_star,
-            "delta": self.delta,
-            "weighted": self.weighted,
-            "steps": [dataclasses.asdict(s) for s in self.steps],
-        }
+        return self.KEYS.upgrade(
+            {
+                "tau": None if self.saturated else self.tau,
+                "coverage": self.coverage,
+                "risk": None if math.isnan(self.risk) else self.risk,
+                "r_star": self.r_star,
+                "delta": self.delta,
+                "weighted": self.weighted,
+                "steps": [dataclasses.asdict(s) for s in self.steps],
+            }
+        )
 
 
 def temper(

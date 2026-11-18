@@ -2704,7 +2704,6 @@
     "threshold": {
      "coverage": 0.702666667,
      "delta": 0.1,
-     "r_star": 0.05,
      "risk": 0.042694497,
      "steps": [
       {
@@ -3219,6 +3218,7 @@
        "tau": 0.28
       }
      ],
+     "target": 0.05,
      "tau": 0.29,
      "weighted": false
     }
@@ -4035,7 +4035,6 @@
      "calibration": {
       "coverage": 0.0,
       "delta": 0.1,
-      "r_star": 0.05,
       "risk": null,
       "steps": [
        {
@@ -4746,6 +4745,7 @@
         "tau": 0.0
        }
       ],
+      "target": 0.05,
       "tau": null,
       "weighted": false
      }
@@ -4759,7 +4759,6 @@
      "recalibration": {
       "coverage": 0.702666667,
       "delta": 0.1,
-      "r_star": 0.05,
       "risk": 0.042694497,
       "steps": [
        {
@@ -5274,6 +5273,7 @@
         "tau": 0.28
        }
       ],
+      "target": 0.05,
       "tau": 0.29,
       "weighted": false
      }

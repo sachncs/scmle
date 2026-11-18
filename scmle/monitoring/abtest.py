@@ -11,10 +11,12 @@ when an arm has too few rows to say.
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
 
+from scmle.contracts import records
 from scmle.contracts import tasks
 from scmle.evaluation import metrics
 from scmle.evaluation import replay
@@ -59,7 +61,21 @@ class Comparison:
         decision: `adopt`, `keep` or `inconclusive`.
         dropped: Resamples that could not be scored (a resample missing a
             class) and are not in the interval.
+        KEYS: Version-1 keys to the written ones (`scores.control`,
+            `scores.treatment`, `rows.control`, `rows.treatment`);
+            `downgrade` restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {},
+        groups={
+            "scores": {
+                "control_score": "control",
+                "treatment_score": "treatment",
+            },
+            "rows": {"control_rows": "control", "treatment_rows": "treatment"},
+        },
+    )
 
     metric: str
     control_score: float
@@ -75,9 +91,10 @@ class Comparison:
         """Builds a JSON-ready record.
 
         Returns:
-            A dict of all fields.
+            A dict of all fields, the arm scores under `scores` and the arm
+            sizes under `rows`.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def tally(

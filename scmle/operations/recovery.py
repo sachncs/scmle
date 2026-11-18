@@ -30,8 +30,10 @@ import os
 import time
 import traceback
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 PASSED = "passed"
 FAILED = "failed"
@@ -382,7 +384,13 @@ class Measurement:
         rpo_lost: Acknowledged units found missing after recovery; None if
             not measured.
         method: How both were measured.
+        KEYS: Version-1 keys to the written ones (`rto` in seconds, `rpo`);
+            `downgrade` restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"rto_seconds": "rto", "rpo_lost": "rpo"}
+    )
 
     component: str
     rto_seconds: float | None
@@ -440,18 +448,22 @@ class Measurement:
             ValueError: If the time-scale variable is set to something that
                 is not a positive number.
         """
-        return {
-            "component": self.component,
-            "rto_seconds": None
-            if self.rto_seconds is None
-            else round(self.rto_seconds, 3),
-            "rto_objective_seconds": OBJECTIVE_OF[self.component].rto_seconds,
-            "time_scale": time_scale(),
-            "rpo_lost": self.rpo_lost,
-            "rpo_objective": OBJECTIVE_OF[self.component].rpo_lost,
-            "rpo_unit": OBJECTIVE_OF[self.component].rpo_unit,
-            "method": self.method,
-        }
+        return self.KEYS.upgrade(
+            {
+                "component": self.component,
+                "rto_seconds": None
+                if self.rto_seconds is None
+                else round(self.rto_seconds, 3),
+                "rto_objective_seconds": OBJECTIVE_OF[
+                    self.component
+                ].rto_seconds,
+                "time_scale": time_scale(),
+                "rpo_lost": self.rpo_lost,
+                "rpo_objective": OBJECTIVE_OF[self.component].rpo_lost,
+                "rpo_unit": OBJECTIVE_OF[self.component].rpo_unit,
+                "method": self.method,
+            }
+        )
 
 
 @dataclasses.dataclass(slots=True)
@@ -467,7 +479,13 @@ class Outcome:
         detail: Facts worth keeping.
         problems: Why it failed.
         seconds: Wall time of the scenario.
+        KEYS: Version-1 keys to the written ones (`fault`); `downgrade`
+            restores version 1.
     """
+
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"fault_id": "fault"}
+    )
 
     fault_id: str
     status: str = PASSED
@@ -498,16 +516,18 @@ class Outcome:
             places), checks, measurements as dicts, detail and problems as a
             dict.
         """
-        return {
-            "fault_id": self.fault_id,
-            "status": self.status,
-            "environment": self.environment,
-            "seconds": round(self.seconds, 2),
-            "checks": dict(self.checks),
-            "measurements": [m.to_dict() for m in self.measurements],
-            "detail": self.detail,
-            "problems": list(self.problems),
-        }
+        return self.KEYS.upgrade(
+            {
+                "fault_id": self.fault_id,
+                "status": self.status,
+                "environment": self.environment,
+                "seconds": round(self.seconds, 2),
+                "checks": dict(self.checks),
+                "measurements": [m.to_dict() for m in self.measurements],
+                "detail": self.detail,
+                "problems": list(self.problems),
+            }
+        )
 
 
 Scenario = Callable[[], Outcome]

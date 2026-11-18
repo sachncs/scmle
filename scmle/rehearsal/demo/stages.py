@@ -420,7 +420,7 @@ def corroborate(
         "golden-record parity",
         started,
         ok=bool(report["passed"]),
-        max_probability_error=report.get("max_probability_error"),
+        max_probability_error=report.get("error"),
         tolerance=report.get("tolerance"),
     )
 

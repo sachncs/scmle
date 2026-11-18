@@ -61,7 +61,9 @@ def revive(record: Mapping[str, Any]) -> registry.Sanction:
     """Rebuilds a promotion approval from its JSON record.
 
     Args:
-        record: The approval's fields; `evidence` defaults to empty.
+        record: The approval's fields, in the written layout (`content`,
+            `approved`) or version 1 (`content_id`, `approved_at`);
+            `evidence` defaults to empty.
 
     Returns:
         The approval.
@@ -69,10 +71,8 @@ def revive(record: Mapping[str, Any]) -> registry.Sanction:
     Raises:
         ArtifactError: If the fields do not make a valid approval.
     """
-    values = dict(record)
-    values["evidence"] = tuple(values.get("evidence", ()))
     try:
-        return registry.Sanction(**values)
+        return registry.Sanction.load(record)
     except (TypeError, ValueError) as error:
         raise errors.ArtifactError(f"bad approval record: {error}") from error
 
@@ -81,11 +81,15 @@ def rebuild(record: Mapping[str, Any]) -> observation.Observation:
     """Rebuilds an observation from `Observation.to_dict`.
 
     Args:
-        record: A record produced by `Observation.to_dict`.
+        record: A record produced by `Observation.to_dict`, in the written
+            layout (`digests.image`, `observed`) or version 1
+            (`image_digest`, `observed_at`).
 
     Returns:
         The observation.
     """
+    if "digests" in record or "observed" in record:
+        record = observation.Observation.KEYS.downgrade(dict(record))
     return observation.Observation(
         provider=record["provider"],
         service=record["service"],
