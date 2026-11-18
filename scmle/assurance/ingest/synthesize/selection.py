@@ -10,6 +10,7 @@ import dataclasses
 import datetime
 import hashlib
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
@@ -25,6 +26,7 @@ from scmle.assurance.ingest.synthesize.grammar import WINDOWS_DAYS
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 
 FAMILY = "synthesized"
 
@@ -46,7 +48,13 @@ class Selection:
             reason it was dropped.
         declared_family_size: Number of kept features. Fixed here, before any
             feature meets the target.
+        migrations: The written layout's version steps, oldest first;
+            version 2 spells `declared_family_size` as `family`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"declared_family_size": "family"}),
+    )
 
     frame: pandas.DataFrame
     manifest: tuple[dict[str, Any], ...]
@@ -68,7 +76,7 @@ class Selection:
             of proposals and the manifest.
         """
         return {
-            "declared_family_size": self.declared_family_size,
+            "family": self.declared_family_size,
             "proposed": len(self.manifest),
             "features": list(self.manifest),
         }

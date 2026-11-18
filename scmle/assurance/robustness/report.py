@@ -13,7 +13,11 @@ from scmle.assurance.robustness import shift
 from scmle.assurance.robustness import stability
 from scmle.contracts import errors
 
-SCHEMA_VERSION = 1
+# Version 2: the nested records spell their keys in single words (the
+# stability rule, the permutation curve, coverage cells, forward findings and
+# drift rows; see each record's `to_dict`). Version 1 documents still pass
+# `conform` and `validate_shift`, whose keys did not change.
+SCHEMA_VERSION = 2
 STABILITY_KEYS = (
     "schema_version",
     "status",
@@ -173,13 +177,13 @@ def require(document: dict[str, Any], keys: tuple[str, ...], name: str) -> None:
         name: What the document is, for the error message.
 
     Raises:
-        ValueError: When a key is missing or `schema_version` is not the
-            supported one.
+        ValueError: When a key is missing or `schema_version` is not a
+            supported one (1 up to `SCHEMA_VERSION`).
     """
     missing = [k for k in keys if k not in document]
     if missing:
         raise errors.InputError(f"{name} is missing {missing}")
-    if document["schema_version"] != SCHEMA_VERSION:
+    if document["schema_version"] not in range(1, SCHEMA_VERSION + 1):
         raise errors.InputError(f"{name} has an unsupported schema_version")
 
 

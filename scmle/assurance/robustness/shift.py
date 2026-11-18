@@ -267,13 +267,11 @@ def c2st(
     Returns:
         A check whose statistic is the held-out AUC, effect the excess over
         0.5, interval the DeLong interval and p-value the permutation value.
-        Differing columns or too few rows raise `ValueError` (see
-        `align`).
+        Differing columns or too few rows raise `ValueError` (see `align`).
     """
     align(sample, reference)
     both = pool(sample, reference)
-    # The side of each pooled row: 0 for each sample row, then 1 for each
-    # reference row, in the row order of `pool`.
+    # Side of each pooled row: 0 per sample row, then 1 per reference row.
     side: numpy.ndarray = numpy.r_[
         numpy.zeros(len(sample)), numpy.ones(len(reference))
     ]
@@ -546,7 +544,7 @@ class Drift:
         effect: KS distance or Cramer's V.
         rejected: Whether the adjusted p-value is at most the level.
         low_counts: True when a chi-square expected count is below 5, which
-            makes the approximation poor.
+            makes the approximation poor; written as `sparse`.
     """
 
     column: str
@@ -562,9 +560,11 @@ class Drift:
         """Converts the record to a JSON-ready dictionary.
 
         Returns:
-            The fields by name.
+            The fields by name; version 1 spelled `sparse` as `low_counts`.
         """
-        return dataclasses.asdict(self)
+        record = dataclasses.asdict(self)
+        record["sparse"] = record.pop("low_counts")
+        return record
 
 
 def contrast(

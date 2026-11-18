@@ -26,6 +26,7 @@ import itertools
 import json
 import re
 from typing import Any
+from typing import ClassVar
 from typing import Protocol
 
 import numpy
@@ -33,6 +34,7 @@ import pandas
 from scipy import stats
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.contracts import signing
 
 CRITICAL_SLOTS = ("target", "prediction_moment", "unit", "population")
@@ -339,7 +341,13 @@ class Calibration:
         epsilon: Tolerated error rate among accepted drafts.
         n_calibration: Problems in the calibration split.
         curve: (tau, coverage, error rate, CP upper bound) per candidate.
+        migrations: The written layout's version steps, oldest first;
+            version 2 spells `n_calibration` as `calibration`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"n_calibration": "calibration"}),
+    )
 
     tau: float | None
     epsilon: float
@@ -356,7 +364,7 @@ class Calibration:
         return {
             "tau": self.tau,
             "epsilon": self.epsilon,
-            "n_calibration": self.n_calibration,
+            "calibration": self.n_calibration,
             "risk_coverage": [list(c) for c in self.curve],
         }
 

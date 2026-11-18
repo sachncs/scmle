@@ -15,12 +15,14 @@ stratify.
 from collections.abc import Mapping
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 import pandas
 from scipy import stats
 
 from scmle.assurance.robustness import shift
 from scmle.contracts import errors
+from scmle.contracts import records
 
 ALPHA = 0.05
 MISSING_LEVEL = "<missing>"
@@ -39,7 +41,13 @@ class Cell:
         interval: Exact interval for the sample share.
         deployment_share: Share in the deployment population, or None.
         status: `pass`, `fail` or `unverifiable`.
+        migrations: The written layout's version steps, oldest first;
+            version 2 spells `deployment_share` as `deployment`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"deployment_share": "deployment"}),
+    )
 
     column: str
     level: str
@@ -60,7 +68,7 @@ class Cell:
         record = dataclasses.asdict(self)
         record["status"] = self.status.value
         record["interval"] = list(self.interval)
-        return record
+        return records.upgrade(self.migrations, record, records.ORIGIN)
 
 
 def shares(column: pandas.Series) -> dict[str, float]:

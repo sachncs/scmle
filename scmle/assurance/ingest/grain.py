@@ -20,9 +20,11 @@ import dataclasses
 import itertools
 import re
 from typing import Any
+from typing import ClassVar
 
 from scmle.assurance.ingest import profile
 from scmle.contracts import errors
+from scmle.contracts import records
 
 LEVELS = 3
 SMALL_N = 1000
@@ -105,7 +107,13 @@ class Candidate:
         distinct: Distinct non-null combinations.
         rows: Rows in the table.
         small_n: True when the table is small enough for accidental keys.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `nulls` and `small`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"null_rate": "nulls", "small_n": "small"}),
+    )
 
     columns: tuple[str, ...]
     g3: float
@@ -128,7 +136,8 @@ class Candidate:
         Returns:
             A JSON-ready mapping of the fields, with columns as a list.
         """
-        return {**dataclasses.asdict(self), "columns": list(self.columns)}
+        layout = {**dataclasses.asdict(self), "columns": list(self.columns)}
+        return records.upgrade(self.migrations, layout, records.ORIGIN)
 
 
 @dataclasses.dataclass(slots=True)
@@ -144,7 +153,18 @@ class Scan:
         partial: True when the budget stopped the search.
         eps_key: Largest g3 accepted as a key.
         eps_null: Largest null rate accepted in a key.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `levels`, `tolerances.{key, null}` and
+            the keys at their version 2.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {"levels_done": "levels"},
+            parts={"keys": Candidate.migrations[0]},
+            groups={"tolerances": {"eps_key": "key", "eps_null": "null"}},
+        ),
+    )
 
     table: str
     rows: int
@@ -178,10 +198,9 @@ class Scan:
             "rows": self.rows,
             "keys": [k.to_dict() for k in self.keys],
             "ties": [[list(c) for c in g] for g in self.ties()],
-            "levels_done": self.levels_done,
+            "levels": self.levels_done,
             "partial": self.partial,
-            "eps_key": self.eps_key,
-            "eps_null": self.eps_null,
+            "tolerances": {"key": self.eps_key, "null": self.eps_null},
         }
 
 
@@ -456,7 +475,13 @@ class UnitVerdict:
         unit_columns: Columns the unit text was matched to.
         reason: Why, in one sentence.
         questions: Things a person must settle, if any.
+        migrations: The written layout's version steps, oldest first;
+            version 2 spells `unit_columns` as `columns`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"unit_columns": "columns"}),
+    )
 
     verdict: str
     unit: str
@@ -478,12 +503,13 @@ class UnitVerdict:
         Returns:
             A JSON-ready mapping of the fields plus `blocks`.
         """
-        return {
+        layout = {
             **dataclasses.asdict(self),
             "unit_columns": list(self.unit_columns),
             "questions": list(self.questions),
             "blocks": self.blocks,
         }
+        return records.upgrade(self.migrations, layout, records.ORIGIN)
 
 
 def align(

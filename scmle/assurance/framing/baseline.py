@@ -30,6 +30,7 @@ from collections.abc import Mapping
 import dataclasses
 import hashlib
 from typing import Any
+from typing import ClassVar
 
 import numpy
 from numpy.typing import ArrayLike
@@ -39,6 +40,7 @@ from scipy import stats
 from scmle.assurance.framing import costs
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 from scmle.contracts import signing
 
 DETECTOR_ID = "framing-selective-labels"
@@ -203,7 +205,23 @@ class Selectivity:
         p_value: Fisher exact p-value for the direction observed.
         tolerance: Smallest absolute difference that counts.
         alpha: Level of the Fisher test.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes the two rates as `missing.control` (`b = 0`)
+            and `missing.treated` (`b = 1`). It follows the version of the
+            document that holds it.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {},
+            groups={
+                "missing": {
+                    "missing_rate_b0": "control",
+                    "missing_rate_b1": "treated",
+                }
+            },
+        ),
+    )
 
     flagged: bool
     missing_rate_b0: float
@@ -219,7 +237,9 @@ class Selectivity:
         Returns:
             A mapping of every field of the finding to its value.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 def selective_labels(observed: ArrayLike, b: ArrayLike) -> Selectivity:
@@ -406,7 +426,19 @@ class Outcome:
         checks: One check per endpoint, on `C`.
         claim: The claim, tier `confirmed` only if issued and every input
             may support that tier.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `registration_hash` as
+            `digests.registration` and the selective-label finding at its
+            version 2.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {},
+            parts={"selective_labels": Selectivity.migrations[0]},
+            groups={"digests": {"registration_hash": "registration"}},
+        ),
+    )
 
     issued: bool
     status: str
@@ -427,14 +459,14 @@ class Outcome:
             statement of the guarantee.
         """
         return {
-            "schema_version": 1,
+            records.KEY: records.ORIGIN + len(self.migrations),
             "status": self.status,
             "issued": self.issued,
             "reasons": list(self.reasons),
             "p_value_intersection_union": self.p_value,
             "endpoints": [dataclasses.asdict(e) for e in self.endpoints],
             "selective_labels": self.selectivity.to_dict(),
-            "registration_hash": self.registration_hash,
+            "digests": {"registration": self.registration_hash},
             "checks": [c.to_dict() for c in self.checks],
             "claim": self.claim.to_dict(),
             "guarantee": (

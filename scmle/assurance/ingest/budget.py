@@ -12,8 +12,10 @@ from collections.abc import Callable
 import dataclasses
 import time
 from typing import Any
+from typing import ClassVar
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -26,7 +28,21 @@ class Budget:
             observable through DB-API, so the unit is rows.
         max_seconds: Wall time allowed (see `Meter` for repeatability).
         max_features: Cap on synthesized features.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `queries`, `scanned`, `seconds` and
+            `features`, the charter's ingest spelling.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "max_queries": "queries",
+                "max_rows_scanned": "scanned",
+                "max_seconds": "seconds",
+                "max_features": "features",
+            }
+        ),
+    )
 
     max_queries: int | None = None
     max_rows_scanned: int | None = None
@@ -54,7 +70,9 @@ class Budget:
         Returns:
             A JSON-ready mapping of limit name to value.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

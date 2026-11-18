@@ -13,6 +13,7 @@ reported `inconclusive` when they disagree.
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 
 import numpy
 from numpy.typing import ArrayLike
@@ -21,6 +22,7 @@ from scipy import stats
 from scmle.assurance.charter import feasibility
 from scmle.assurance.framing import baseline
 from scmle.contracts import errors
+from scmle.contracts import records
 
 INCONCLUSIVE = "inconclusive"
 CONFIDENCE = 0.95
@@ -74,7 +76,22 @@ class Verdict:
         n_required: Rows needed at the point estimate.
         n_effective: Confirmation rows divided by the design effect.
         reason: Why the verdict was reached.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `deviation`, `interval`, `deff`, `required`
+            and `effective`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "s_d": "deviation",
+                "s_d_interval": "interval",
+                "design_effect": "deff",
+                "n_required": "required",
+                "n_effective": "effective",
+            }
+        ),
+    )
 
     verdict: str
     scope: str
@@ -95,7 +112,7 @@ class Verdict:
         """
         record = dataclasses.asdict(self)
         record["s_d_interval"] = list(self.s_d_interval)
-        return record
+        return records.upgrade(self.migrations, record, records.ORIGIN)
 
 
 def judge(

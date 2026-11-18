@@ -20,11 +20,13 @@ import hashlib
 import json
 import re
 from typing import Any
+from typing import ClassVar
 
 import pandas
 
 from scmle.assurance.ingest import budget
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.data.readers import connectors
 
 ORDER_BY = re.compile(r"\border\s+by\b", re.IGNORECASE)
@@ -216,7 +218,13 @@ class Aggregates:
         distinct: Count of distinct non-null values.
         minimum: Smallest value, as text, or None.
         maximum: Largest value, as text, or None.
+        migrations: The written layout's version steps, oldest first;
+            version 2 spells `non_null` as `present`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"non_null": "present"}),
+    )
 
     name: str
     kind: str
@@ -231,7 +239,9 @@ class Aggregates:
         Returns:
             A JSON-ready mapping of the fields.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

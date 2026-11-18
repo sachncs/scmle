@@ -111,7 +111,7 @@ class Screen:
         notes: Plain statements of what was not done.
         unchecked: Columns the screen declined to test; they are unchecked,
             not clean.
-        unchecked_reason: Why they were declined, for the warning.
+        rationale: Why they were declined, for the warning.
         probe: Leak type to whether its plant was found on these rows; empty
             when no probe ran.
     """
@@ -125,7 +125,7 @@ class Screen:
     ceilings: Mapping[str, float]
     notes: tuple[str, ...] = ()
     unchecked: tuple[str, ...] = ()
-    unchecked_reason: str = ""
+    rationale: str = ""
     probe: Mapping[str, bool] = dataclasses.field(default_factory=dict)
 
     @property
@@ -135,16 +135,16 @@ class Screen:
             return ""
         return (
             f"leakage screen NOT RUN for {len(self.unchecked)} columns "
-            f"({self.unchecked_reason}): these columns are unchecked, not "
+            f"({self.rationale}): these columns are unchecked, not "
             f"clean; {self.remedy}"
         )
 
     @property
     def remedy(self) -> str:
         """What would let the screen run, given why it did not."""
-        if "too few rows" in self.unchecked_reason:
+        if "too few rows" in self.rationale:
             return "add rows, or attest the columns"
-        if self.unchecked_reason.startswith("screen not run"):
+        if self.rationale.startswith("screen not run"):
             return "fix the target or the columns, or attest them"
         return "raise --time-budget or screen fewer columns"
 

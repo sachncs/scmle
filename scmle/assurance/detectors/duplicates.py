@@ -20,6 +20,7 @@ from collections.abc import Sequence
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
@@ -27,6 +28,7 @@ from scipy import stats
 from sklearn import neighbors
 
 from scmle.contracts import errors
+from scmle.contracts import records
 import scmle.data.splitting.duplicates
 
 DEFAULT_CUT = 0.01
@@ -48,7 +50,23 @@ class Duplicates:
         label_conflicts: Exact groups whose rows disagree on the target
             (0 when no target was given).
         groups: Number of exact duplicate groups.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `exact.{extra, rate, interval}`, `near` and
+            `conflicts`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {"near_extra": "near", "label_conflicts": "conflicts"},
+            groups={
+                "exact": {
+                    "exact_extra": "extra",
+                    "exact_rate": "rate",
+                    "exact_interval": "interval",
+                }
+            },
+        ),
+    )
 
     rows: int
     exact_extra: int
@@ -65,7 +83,9 @@ class Duplicates:
         Returns:
             A mapping of every field to its value.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 def verbatim(frame: pandas.DataFrame, columns: Sequence[str]) -> numpy.ndarray:

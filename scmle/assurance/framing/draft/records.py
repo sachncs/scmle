@@ -133,7 +133,14 @@ class Draft:
         refusal: Why the draft was refused, if it was.
         llm: Model id, prompt, raw samples, hash and ambiguity, if used.
         discarded: What was dropped and why (the LLM path, for example).
+        migrations: The written layout's version steps, oldest first;
+            version 2 spells `open_items` as `pending`. The digest
+            (`sha`) is computed on the version-1 layout.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"open_items": "pending"}),
+    )
 
     status: str
     charter: contracts.AnalysisCharter | None
@@ -157,7 +164,7 @@ class Draft:
             that the draft is unverified.
         """
         return {
-            "schema_version": 1,
+            records.KEY: records.ORIGIN + len(self.migrations),
             "status": self.status,
             "charter": None if self.charter is None else self.charter.to_dict(),
             "charter_hash": (
@@ -165,7 +172,7 @@ class Draft:
             ),
             "fields": {k: v.value for k, v in sorted(self.fields.items())},
             "checks": [c.to_dict() for c in self.checks],
-            "open_items": list(self.open_items),
+            "pending": list(self.open_items),
             "llm": self.llm,
             "discarded": list(self.discarded),
             "label": (
@@ -178,11 +185,26 @@ class Draft:
     def sha(self) -> str:
         """The SHA-256 hex digest of the draft document, anchored at version 1.
 
-        The charter enters in its version-1 layout (`AnalysisCharter.anchor`),
-        so renaming a charter or cost-model key leaves the digest of a
-        registered draft unchanged.
+        The document enters in its version-1 layout (`anchor`) and the
+        charter in its own (`AnalysisCharter.anchor`), so renaming a draft,
+        charter or cost-model key leaves the digest of a registered draft
+        unchanged.
         """
-        document = self.to_dict()
+        document = self.anchor()
         if self.charter is not None:
             document["charter"] = self.charter.anchor()
         return hashlib.sha256(signing.canonicalise(document)).hexdigest()
+
+    def anchor(self) -> records.Layout:
+        """Builds the document in its version-1 layout.
+
+        Returns:
+            The `framing_draft.json` document as version 1 wrote it
+            (`open_items`), with `schema_version` 1.
+        """
+        current = self.to_dict()
+        del current[records.KEY]
+        return {
+            records.KEY: records.ORIGIN,
+            **records.downgrade(self.migrations, current),
+        }

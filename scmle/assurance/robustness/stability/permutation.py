@@ -4,6 +4,7 @@ import dataclasses
 import itertools
 import operator
 from typing import Any
+from typing import ClassVar
 
 import numpy
 
@@ -12,6 +13,7 @@ from scmle.assurance.ledger import controls
 from scmle.assurance.robustness import multiverse
 from scmle.assurance.robustness.stability import estimation
 from scmle.contracts import qualification
+from scmle.contracts import records
 from scmle.runtime import randomness
 
 
@@ -26,7 +28,17 @@ class Curve:
         p_median: Permutation p-value of the median absolute effect:
             ``(1 + #{permuted >= observed}) / (permutations + 1)``.
         p_share: The same for the share significant.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `median`, `significant` and
+            `pvalues.{median, share}`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {"median_abs_effect": "median", "share_significant": "significant"},
+            groups={"pvalues": {"p_median": "median", "p_share": "share"}},
+        ),
+    )
 
     permutations: int
     median_abs_effect: float
@@ -40,7 +52,9 @@ class Curve:
         Returns:
             The fields by name.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 def summarize(

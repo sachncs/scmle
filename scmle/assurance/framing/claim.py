@@ -59,6 +59,7 @@ from scmle.assurance.ledger import explore
 from scmle.assurance.ledger import ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 
 DOCUMENT = "baseline_report.json"
 SELECTED = "selected_model"
@@ -532,14 +533,14 @@ def refused(
         "comparison is biased and was not run"
     )
     return {
-        "schema_version": 1,
+        records.KEY: records.ORIGIN + len(baseline.Outcome.migrations),
         "status": "not_issued",
         "issued": False,
         "reasons": [reason],
         "p_value_intersection_union": None,
         "endpoints": [],
         "selective_labels": dict(selection),
-        "registration_hash": registration.registration_hash,
+        "digests": {"registration": registration.registration_hash},
         "checks": [],
         "claim": {
             "claim_id": baseline.CLAIM_ID,

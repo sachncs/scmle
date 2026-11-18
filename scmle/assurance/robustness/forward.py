@@ -28,6 +28,7 @@ import json
 import math
 import operator
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
@@ -35,6 +36,7 @@ import pandas
 from scmle.assurance.ledger import confirm
 from scmle.assurance.robustness import stability
 from scmle.contracts import qualification
+from scmle.contracts import records
 from scmle.runtime import randomness
 
 ACTOR = "f6-forward"
@@ -59,7 +61,16 @@ class Finding:
         effect_f: Its effect on `F`, or None when not defined.
         label: `holds`, `unstable_over_time` or `inconclusive`.
         check: The `Check` record on `F`, or None when not defined.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `effects.{observed, forward}`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {},
+            groups={"effects": {"effect_x": "observed", "effect_f": "forward"}},
+        ),
+    )
 
     name: str
     effect_x: float
@@ -75,8 +86,7 @@ class Finding:
         """
         return {
             "name": self.name,
-            "effect_x": self.effect_x,
-            "effect_f": self.effect_f,
+            "effects": {"observed": self.effect_x, "forward": self.effect_f},
             "label": self.label,
             "check": None if self.check is None else self.check.to_dict(),
         }

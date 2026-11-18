@@ -32,6 +32,7 @@ import dataclasses
 import itertools
 import operator
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
@@ -39,6 +40,7 @@ from scipy import stats
 from sklearn import impute
 from sklearn import model_selection
 
+from scmle.contracts import records
 import scmle.contracts.errors
 from scmle.runtime import randomness
 
@@ -133,7 +135,19 @@ class Missingness:
         alpha: Family level.
         skipped: Reasons something was not run ("skipped, over budget").
         tier: Always `unverified`: no provenance is supplied.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `checked`, `received` and `rejected`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "rows_checked": "checked",
+                "input_rows": "received",
+                "mcar_rejected": "rejected",
+            }
+        ),
+    )
 
     rows_checked: int
     input_rows: int
@@ -150,7 +164,9 @@ class Missingness:
         Returns:
             A mapping of every field to its value.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 def numerics(frame: pandas.DataFrame) -> list[Any]:

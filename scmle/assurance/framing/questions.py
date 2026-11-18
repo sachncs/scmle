@@ -13,11 +13,13 @@ from collections.abc import Collection
 from collections.abc import Sequence
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 import numpy
 from numpy.typing import ArrayLike
 
 from scmle.assurance.framing import baseline
+from scmle.contracts import records
 
 GRID_POINTS = 41
 BISECTION_WIDTH = 1e-12
@@ -53,7 +55,13 @@ class Question:
         high: Highest plausible value.
         tipping_value: Value at which the verdict changes.
         verdicts: The verdict at each end of the range.
+        migrations: The written layout's version steps, oldest first;
+            version 2 spells `tipping_value` as `tipping`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"tipping_value": "tipping"}),
+    )
 
     slot: str
     form: str
@@ -71,7 +79,7 @@ class Question:
         """
         record = dataclasses.asdict(self)
         record["verdicts"] = list(self.verdicts)
-        return record
+        return records.upgrade(self.migrations, record, records.ORIGIN)
 
 
 def tipover(unknown: Unknown) -> Question | None:

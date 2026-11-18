@@ -39,8 +39,9 @@ from scmle.contracts import qualification
 from scmle.contracts import records
 
 # Version 2: each decision spells `suspicion_kept` as `suspected`
-# (`Decision.migrations`).
-FORMAT_VERSION = 2
+# (`Decision.migrations`). Version 3: `dag_hash` is `digests.dag` and
+# `adjustment_set` is `adjustment` (`Admissibility.migrations`).
+FORMAT_VERSION = 3
 KINDS = ("predictive", "causal")
 
 
@@ -374,9 +375,23 @@ class Admissibility:
         kind: Estimand kind, `predictive` or `causal`.
         mode: Strict or permissive.
         decisions: One per field, in the order of the provenance table.
-        dag_hash: Hash of the graph used, or None.
-        adjustment_set: The back-door set found, for a causal estimand.
+        dag_hash: Hash of the graph used, or None; written as
+            `digests.dag`.
+        adjustment_set: The back-door set found, for a causal estimand;
+            written as `adjustment`.
+        migrations: The written layout's version steps, oldest first, one
+            per format version: version 2 changed the decisions, version 3
+            moved `dag_hash` to `digests.dag` and `adjustment_set` to
+            `adjustment`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest({}, parts={"decisions": Decision.migrations[0]}),
+        records.nest(
+            {"adjustment_set": "adjustment"},
+            groups={"digests": {"dag_hash": "dag"}},
+        ),
+    )
 
     kind: str
     mode: Mode
@@ -419,11 +434,11 @@ class Admissibility:
             "format_version": FORMAT_VERSION,
             "kind": self.kind,
             "mode": self.mode.value,
-            "dag_hash": self.dag_hash,
-            "adjustment_set": None
+            "adjustment": None
             if self.adjustment_set is None
             else list(self.adjustment_set),
             "decisions": [d.to_dict() for d in self.decisions],
+            "digests": {"dag": self.dag_hash},
         }
 
 

@@ -27,12 +27,14 @@ import dataclasses
 import json
 from pathlib import Path
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
 
 from scmle.assurance.detectors import certificates
 import scmle.certificates
+from scmle.contracts import records
 from scmle.evaluation import coverage
 
 MAX_LEVELS = 12
@@ -57,7 +59,13 @@ class FlagGate:
         status: `gating` or `descriptive`.
         reason: One sentence saying why.
         min_rows: Smallest slice (rows) at which detection was certified.
+        migrations: The written layout's version steps, oldest first;
+            version 2 spells `min_rows` as `rows`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"min_rows": "rows"}),
+    )
 
     status: str
     reason: str
@@ -69,7 +77,9 @@ class FlagGate:
         Returns:
             A mapping of `status`, `reason` and `min_rows`.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 def fingerprint() -> str:

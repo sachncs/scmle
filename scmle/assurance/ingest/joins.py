@@ -16,10 +16,12 @@ from collections.abc import Mapping
 from collections.abc import Sequence
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 from scmle.assurance.ingest import grain
 from scmle.assurance.ingest import profile
 from scmle.contracts import errors
+from scmle.contracts import records
 
 ACCEPTED = "accepted"
 CANDIDATE = "candidate"
@@ -76,7 +78,22 @@ class Link:
         score: Ranking aid, never a probability.
         decision: `accepted`, `candidate`, `many_to_many`, `declared_violated`.
         why: One sentence on the decision.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `columns.{child, parent}`, `distinct` and
+            `named`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {"child_distinct": "distinct", "name_support": "named"},
+            groups={
+                "columns": {
+                    "child_columns": "child",
+                    "parent_columns": "parent",
+                }
+            },
+        ),
+    )
 
     child: str
     child_columns: tuple[str, ...]
@@ -102,12 +119,13 @@ class Link:
         Returns:
             A JSON-ready mapping of the fields plus `joinable`.
         """
-        return {
+        layout = {
             **dataclasses.asdict(self),
             "child_columns": list(self.child_columns),
             "parent_columns": list(self.parent_columns),
             "joinable": self.joinable,
         }
+        return records.upgrade(self.migrations, layout, records.ORIGIN)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

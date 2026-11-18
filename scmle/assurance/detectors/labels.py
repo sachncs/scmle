@@ -32,6 +32,7 @@ import dataclasses
 import math
 from typing import Any
 from typing import cast
+from typing import ClassVar
 
 import numpy
 import pandas
@@ -41,6 +42,7 @@ from sklearn import model_selection
 
 from scmle.assurance.detectors import certificates
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.runtime import randomness
 
 MIN_ROWS = 50
@@ -94,7 +96,21 @@ class Noise:
             capped sample (0.0 when no sampling happened).
         rate: Noise-rate estimate for the suspects.
         thresholds: Confident-learning class thresholds.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `candidates`, `checked`, `received` and
+            `bound`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(
+            renames={
+                "confident_learning": "candidates",
+                "rows_checked": "checked",
+                "input_rows": "received",
+                "sampling_bound": "bound",
+            }
+        ),
+    )
 
     confident_learning: tuple[int, ...]
     margin: tuple[int, ...]
@@ -112,7 +128,9 @@ class Noise:
         Returns:
             A mapping of every field to its value.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 def encode(

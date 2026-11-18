@@ -33,8 +33,9 @@ from scmle.contracts import records
 DETECTOR_ID = "f4-reconciliation"
 DEFECT_TYPE = "unexplained_gap"
 # Version 2: each explanation spells `attested_by` as `attestor`
-# (`Explanation.migrations`).
-FORMAT_VERSION = 2
+# (`Explanation.migrations`). Version 3: each result spells `residual_gap`
+# as `residual` (`Verdict.migrations`).
+FORMAT_VERSION = 3
 
 
 class Mechanism(enum.StrEnum):
@@ -174,12 +175,21 @@ class Verdict:
     Attributes:
         item: The quantity.
         gap: Relative gap before explanations.
-        residual_gap: Relative gap left after the explanations.
+        residual_gap: Relative gap left after the explanations, written as
+            `residual`.
         status: `matched`, `explained` or `unexplained`.
         tier: `attested` when the source is named and, for an explained gap,
             every explanation is attested; otherwise `unverified`.
         check: Ledger record.
+        migrations: The written layout's version steps, oldest first, one
+            per reconciliation format version: version 2 changed the
+            explanations, version 3 spells `residual_gap` as `residual`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest({}, parts={"explanations": Explanation.migrations[0]}),
+        records.Migration(renames={"residual_gap": "residual"}),
+    )
 
     item: Item
     gap: float
@@ -201,7 +211,7 @@ class Verdict:
             "source": self.item.source,
             "source_name": self.item.source_name,
             "gap": self.gap,
-            "residual_gap": self.residual_gap,
+            "residual": self.residual_gap,
             "status": self.status.value,
             "tier": self.tier.value,
             "explanations": [e.to_dict() for e in self.item.explanations],

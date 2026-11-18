@@ -6,6 +6,7 @@ import itertools
 import math
 import operator
 from typing import Any
+from typing import ClassVar
 
 import numpy
 from scipy import stats
@@ -14,6 +15,7 @@ from scmle.assurance.charter import contracts
 from scmle.assurance.robustness import multiverse
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 from scmle.runtime import randomness
 
 DETECTOR_ID = "f6-stability"
@@ -53,7 +55,14 @@ class Thresholds:
             headline effect.
         q_min: Smallest share of specifications whose perturbation interval
             excludes zero.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `agreement` and `exclusion`, the
+            charter's spelling.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"s_min": "agreement", "q_min": "exclusion"}),
+    )
 
     s_min: float = 0.8
     band: float = 0.5
@@ -77,9 +86,11 @@ class Thresholds:
         """Converts the rule to a JSON-ready dictionary.
 
         Returns:
-            The thresholds `s_min`, `band` and `q_min` by name.
+            The thresholds `agreement`, `band` and `exclusion` by name.
         """
-        return dataclasses.asdict(self)
+        return records.upgrade(
+            self.migrations, dataclasses.asdict(self), records.ORIGIN
+        )
 
 
 DEFAULT_RULE = Thresholds()

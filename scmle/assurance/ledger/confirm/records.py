@@ -8,6 +8,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any
+from typing import ClassVar
 from typing import Protocol
 
 import pandas
@@ -17,6 +18,7 @@ from scmle.assurance.ledger import multiplicity
 import scmle.assurance.ledger.ledger
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 
 LOGGER = logging.getLogger(__name__)
 
@@ -273,7 +275,21 @@ class Confirmation:
         registered: Claim id to its registration hash and status, or None
             when no claim was registered.
         documents: Report files the registered claims produced.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `schema_version`, `alpha`, `digests.survivors`,
+            `heads.{ledger, custody}` and `second`. The ledger and custody
+            rows keep their own keys.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {"alpha_confirm": "alpha", "stage_two": "second"},
+            groups={
+                "digests": {"survivors_sha256": "survivors"},
+                "heads": {"ledger_head": "ledger", "custody_head": "custody"},
+            },
+        ),
+    )
 
     outcome: str
     reason: str
@@ -302,21 +318,22 @@ class Confirmation:
         """Builds the JSON-ready record (``confirmed_claims.json``).
 
         Returns:
-            A mapping with the outcome and its reason, the rule and its
+            A mapping with the `schema_version` (version 1 files carry
+            none), the outcome and its reason, the rule and its
             guarantee statement, the level, the hashes, the negative
-            control, the claims, the checks and a note. ``stage_two``,
+            control, the claims, the checks and a note. ``second``,
             ``registered_claims`` and ``attachments`` (a hash per document)
             are present only when they apply.
         """
         record = {
+            records.KEY: records.ORIGIN + len(self.migrations),
             "outcome": self.outcome,
             "reason": self.reason,
             "rule": self.rule,
             "guarantee": multiplicity.STATEMENTS[budget.Correction(self.rule)],
-            "alpha_confirm": str(self.alpha_confirm),
-            "survivors_sha256": self.survivors_sha256,
-            "ledger_head": self.ledger_head,
-            "custody_head": self.custody_head,
+            "alpha": str(self.alpha_confirm),
+            "digests": {"survivors": self.survivors_sha256},
+            "heads": {"ledger": self.ledger_head, "custody": self.custody_head},
             "negative_control": self.control,
             "claims": [c.to_dict() for c in self.claims],
             "checks": [c.to_dict() for c in self.checks],
@@ -328,7 +345,7 @@ class Confirmation:
             ),
         }
         if self.stage_two is not None:
-            record["stage_two"] = self.stage_two
+            record["second"] = self.stage_two
         if self.registered is not None:
             record["registered_claims"] = self.registered
         if self.documents:

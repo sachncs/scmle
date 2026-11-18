@@ -20,6 +20,7 @@ from collections.abc import Sequence
 import dataclasses
 import sys
 from typing import Any
+from typing import ClassVar
 
 import pandas
 
@@ -28,6 +29,7 @@ from scmle.assurance.detectors import certificates
 from scmle.assurance.ingest import profile
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 
 DETECTOR_ID = "ingest-reconcile"
 DEFECT_FANOUT = "fanout"
@@ -76,7 +78,13 @@ class Report:
         result: The ordinary reconciliation.
         not_reconciled: Names of quantities whose source total was zero or
             null, so no gap ratio exists; they are `unverified`.
+        migrations: The written layout's version steps, oldest first;
+            version 2 spells `not_reconciled` as `unreconciled`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.Migration(renames={"not_reconciled": "unreconciled"}),
+    )
 
     result: reconciliation.Reconciliation
     not_reconciled: tuple[str, ...]
@@ -95,7 +103,7 @@ class Report:
         """
         return {
             **self.result.to_dict(),
-            "not_reconciled": list(self.not_reconciled),
+            "unreconciled": list(self.not_reconciled),
             "passed": self.passed,
         }
 

@@ -5,6 +5,7 @@ import dataclasses
 import itertools
 import math
 from typing import Any
+from typing import ClassVar
 
 import numpy
 
@@ -14,6 +15,7 @@ from scmle.assurance.ingest.entities.fitting import LEVELS
 from scmle.assurance.ingest.entities.fitting import Model
 from scmle.assurance.ingest.entities.sampling import Estimate
 from scmle.contracts import qualification
+from scmle.contracts import records
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -32,7 +34,17 @@ class Resolution:
         skipped_blocks: Blocks too large to compare.
         estimate: Clerical-sample estimate, or None when unlabelled.
         tier: `attested` with a named reviewer's sample, else `unverified`.
+        migrations: The written layout's version steps, oldest first;
+            version 2 writes `thresholds.{group, linkage}`, `reduction`
+            and `skipped`.
     """
+
+    migrations: ClassVar[tuple[records.Migration, ...]] = (
+        records.nest(
+            {"reduction_ratio": "reduction", "skipped_blocks": "skipped"},
+            groups={"thresholds": {"t_group": "group", "t_match": "linkage"}},
+        ),
+    )
 
     groups: list[int]
     links: tuple[Pair, ...]
@@ -54,11 +66,10 @@ class Resolution:
         """
         return {
             "tier": self.tier.value,
-            "t_group": self.t_group,
-            "t_match": self.t_match,
+            "thresholds": {"group": self.t_group, "linkage": self.t_match},
             "compared_pairs": self.compared,
-            "reduction_ratio": self.reduction_ratio,
-            "skipped_blocks": self.skipped_blocks,
+            "reduction": self.reduction_ratio,
+            "skipped": self.skipped_blocks,
             "links": len(self.links),
             "groups": len(set(self.groups)),
             "records": len(self.groups),
