@@ -903,3 +903,169 @@ def test_a_corrupt_record_names_its_key(store):
     store.put(lock, b"{torn")
     with pytest.raises(errors.ArtifactError, match="corrupt"):
         executor.acquire("run-c")
+
+
+# ---- characterization: the step-record transcript -------------------------
+
+
+class Transcript(objectstore.LocalObjectStore):
+    """A store that logs every record write under a run, lease excluded.
+
+    The lease (`lock`) is excluded because its heartbeat renewals depend on
+    wall-clock timing; every other record write is part of the contract
+    that a resumed or taken-over executor reads back.
+    """
+
+    def __init__(self, root):
+        super().__init__(root)
+        self.lines = []
+
+    def put(self, key, data, **options):
+        found = super().put(key, data, **options)
+        if "/runs/" in key and not key.endswith("/lock"):
+            record = json.loads(data)
+            self.lines.append(
+                [
+                    key.split("/runs/", 1)[1].split("/", 1)[1],
+                    record.get("state", record.get("decision")),
+                    sorted(record),
+                ]
+            )
+        return found
+
+
+RUN = [
+    "cost",
+    "fence",
+    "requested_by",
+    "run_id",
+    "started_at",
+    "state",
+    "trigger_key",
+    "workflow",
+    "workflow_digest",
+    "workflow_version",
+]
+CLOSED = sorted([*RUN, "ended_at", "steps"])
+OPENED = ["attempts", "fence", "idempotency_key", "state", "step"]
+KEPT = sorted([*OPENED, "cost", "outputs"])
+FAILED = sorted([*OPENED, "cost", "error"])
+SKIPPED = ["fence", "reason", "state", "step"]
+WAITING = ["fence", "state", "step", "waiting_since"]
+DECIDED = ["cost", "fence", "idempotency_key", "outputs", "state", "step"]
+DECISION = [
+    "approver",
+    "at",
+    "decision",
+    "run_id",
+    "signature",
+    "step",
+    "workflow_digest",
+]
+
+
+def steps(*names):
+    """The transcript of steps that start once and succeed."""
+    lines = []
+    for name in names:
+        lines.append([f"steps/{name}.json", "running", OPENED])
+        lines.append([f"steps/{name}.json", "succeeded", KEPT])
+    return lines
+
+
+TRANSCRIPTS = {
+    # Pins the sequence and the keys of every step, run and approval
+    # record of a run that waits for an approval and then succeeds: the
+    # format a resumed or taken-over executor reads back (phase 4 step 1).
+    "approved": [
+        ["run.json", "running", RUN],
+        *steps("ingest", "train", "evaluate"),
+        ["steps/approve.json", "waiting", WAITING],
+        *steps("monitor"),
+        ["run.json", "waiting_approval", CLOSED],
+        ["approvals/approve.json", "approve", DECISION],
+        ["run.json", "running", CLOSED],
+        ["steps/approve.json", "succeeded", DECIDED],
+        *steps("batch_predict"),
+        ["run.json", "succeeded", CLOSED],
+    ],
+    # A transient failure retried in place, a failure that skips the
+    # dependents, and the resume that runs only what had not succeeded.
+    "failed": [
+        ["run.json", "running", RUN],
+        *steps("ingest"),
+        ["steps/train.json", "running", OPENED],
+        ["steps/train.json", "running", OPENED],
+        ["steps/train.json", "succeeded", KEPT],
+        ["steps/evaluate.json", "running", OPENED],
+        ["steps/evaluate.json", "failed", FAILED],
+        ["steps/approve.json", "skipped", SKIPPED],
+        ["steps/monitor.json", "skipped", SKIPPED],
+        ["steps/batch_predict.json", "skipped", SKIPPED],
+        ["run.json", "failed", CLOSED],
+        ["run.json", "running", CLOSED],
+        *steps("evaluate"),
+        ["steps/approve.json", "waiting", WAITING],
+        *steps("monitor"),
+        ["run.json", "waiting_approval", CLOSED],
+    ],
+    # Train's spend takes the run over its budget, which fails it, and the
+    # pending steps are skipped for the run budget in definition order.
+    "budget": [
+        ["run.json", "running", RUN],
+        *steps("ingest"),
+        ["steps/train.json", "running", OPENED],
+        ["steps/train.json", "failed", FAILED],
+        ["steps/evaluate.json", "skipped", SKIPPED],
+        ["steps/monitor.json", "skipped", SKIPPED],
+        ["steps/approve.json", "skipped", SKIPPED],
+        ["steps/batch_predict.json", "skipped", SKIPPED],
+        ["run.json", "budget_stopped", CLOSED],
+    ],
+}
+
+
+def transcribe(tmp_path, scenario):
+    """Runs one scenario and returns its record transcript."""
+    store = Transcript(tmp_path / scenario)
+    clock = Clock()
+    recorder = Recorder(clock)
+    flow = pipeline(cost_budget=10.0) if scenario == "budget" else pipeline()
+    executor = executor_for(store, flow, recorder, clock)
+    if scenario == "approved":
+        record = executor.start("req-1", "alice")
+        signed = executor.decide(
+            record["run_id"], "approve", "ml-owner", "approve", KEYS["ml-owner"]
+        )
+        executor.ratify(signed)
+        executor.resume(record["run_id"])
+    elif scenario == "failed":
+
+        def flaky(context):
+            if context.attempt < 2:
+                raise scmle.workflow.executor.PreemptedError("preempted")
+            return {"ok": True}
+
+        def broken(context):
+            raise errors.DataError("bad metric")
+
+        recorder.behaviour["train"] = flaky
+        recorder.behaviour["evaluate"] = broken
+        record = executor.start("req-1", "alice")
+        recorder.behaviour.pop("evaluate")
+        executor.resume(record["run_id"])
+    else:
+
+        def spender(context):
+            context.spend(6.0)
+            return {"spent": 6.0}
+
+        recorder.behaviour["ingest"] = spender
+        recorder.behaviour["train"] = spender
+        executor.start("req-1", "alice")
+    return store.lines
+
+
+@pytest.mark.parametrize("scenario", sorted(TRANSCRIPTS))
+def test_the_step_record_transcript_is_unchanged(tmp_path, scenario):
+    assert transcribe(tmp_path, scenario) == TRANSCRIPTS[scenario]
