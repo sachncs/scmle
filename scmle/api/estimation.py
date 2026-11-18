@@ -5,11 +5,15 @@ estimate made against the project's dataset, and the binding of the verified
 report into the run's evidence graph. Model selection never reads it.
 """
 
+from collections.abc import Hashable
+from collections.abc import Mapping
 import dataclasses
 import hashlib
 import json
 import pathlib
 from typing import Any
+
+import pandas
 
 from scmle import durability
 from scmle.artifacts import bundle
@@ -148,6 +152,58 @@ def unwrap(
     return envelope
 
 
+def rebuild(
+    envelope: Mapping[str, Any],
+) -> tuple[parameter_estimation.Estimand, parameter_estimation.Config]:
+    """Reconstructs the estimand and policy of an enabled declaration.
+
+    The stored policy is plain JSON: the prior, the assumption lists and the
+    variance bounds are restored to the types the configuration takes.
+
+    Args:
+        envelope: The verified declaration, with `estimand` and `policy`.
+
+    Returns:
+        The estimand and the policy.
+
+    Raises:
+        KeyError: If a required field is absent.
+        TypeError: If a field has the wrong shape.
+        ValueError: If the estimand or the policy is invalid.
+    """
+    estimand_record = envelope["estimand"]
+    estimand = parameter_estimation.Estimand(
+        name=estimand_record["name"],
+        outcome=estimand_record["outcome"],
+        population=estimand_record["population"],
+        likelihood=estimand_record["likelihood"],
+        feature_names=tuple(estimand_record["feature_names"]),
+        assumptions=tuple(estimand_record["assumptions"]),
+        description=estimand_record.get("description", ""),
+    )
+    policy_values = dict(envelope["policy"])
+    if "prior" in policy_values:
+        prior_values = dict(policy_values["prior"])
+        policy_values["prior"] = parameter_estimation.BayesianPrior(
+            mean=tuple(prior_values["mean"]),
+            precision=tuple(tuple(row) for row in prior_values["precision"]),
+            shape=prior_values.get("shape", 2.0),
+            scale=prior_values.get("scale", 1.0),
+        )
+    for field in (
+        "causal_assumptions",
+        "continuous_treatment_assumptions",
+        "hierarchical_assumptions",
+    ):
+        if field in policy_values:
+            policy_values[field] = tuple(policy_values[field])
+    if "reml_variance_bounds" in policy_values:
+        policy_values["reml_variance_bounds"] = tuple(
+            policy_values["reml_variance_bounds"]
+        )
+    return estimand, parameter_estimation.Config(**policy_values)
+
+
 def restore(
     run_directory: str | pathlib.Path,
     expected_config_hash: str,
@@ -200,47 +256,12 @@ def restore(
             {"run_dir": str(artifact_path)},
         )
     try:
-        estimand_record = envelope["estimand"]
-        estimand = parameter_estimation.Estimand(
-            name=estimand_record["name"],
-            outcome=estimand_record["outcome"],
-            population=estimand_record["population"],
-            likelihood=estimand_record["likelihood"],
-            feature_names=tuple(estimand_record["feature_names"]),
-            assumptions=tuple(estimand_record["assumptions"]),
-            description=estimand_record.get("description", ""),
-        )
-        # The stored policy is plain JSON: restore the prior, the assumption
-        # lists and the variance bounds to the types the configuration takes.
-        policy_values = dict(envelope["policy"])
-        if "prior" in policy_values:
-            prior_values = dict(policy_values["prior"])
-            policy_values["prior"] = parameter_estimation.BayesianPrior(
-                mean=tuple(prior_values["mean"]),
-                precision=tuple(
-                    tuple(row) for row in prior_values["precision"]
-                ),
-                shape=prior_values.get("shape", 2.0),
-                scale=prior_values.get("scale", 1.0),
-            )
-        for field in (
-            "causal_assumptions",
-            "continuous_treatment_assumptions",
-            "hierarchical_assumptions",
-        ):
-            if field in policy_values:
-                policy_values[field] = tuple(policy_values[field])
-        if "reml_variance_bounds" in policy_values:
-            policy_values["reml_variance_bounds"] = tuple(
-                policy_values["reml_variance_bounds"]
-            )
-        policy = parameter_estimation.Config(**policy_values)
+        return rebuild(envelope)
     except (KeyError, TypeError, ValueError) as error:
         raise errors.ArtifactError(
             "parameter estimation declaration is invalid",
             {"run_dir": str(artifact_path)},
         ) from error
-    return estimand, policy
 
 
 def bind(
@@ -417,6 +438,83 @@ def locate(
     return treatment_column
 
 
+def screen(
+    orchestrator: scmle.pipeline.orchestrator.Orchestrator,
+    estimand: parameter_estimation.Estimand,
+    policy: parameter_estimation.Config,
+    frame: pandas.DataFrame,
+) -> tuple[list[str], str | None, dict[Hashable, int]]:
+    """Checks the declared columns against the frame before fitting.
+
+    Args:
+        orchestrator: The orchestrator holding the project's spec.
+        estimand: The declared population quantity.
+        policy: The declared estimation policy.
+        frame: The project's dataset.
+
+    Returns:
+        The declared columns in first-mention order, the treatment column (or
+        None for an estimator without one), and the missing-value count of
+        each declared column that has any.
+
+    Raises:
+        ConfigError: If a treatment-based estimator lacks a consistent
+            `treatment_column`.
+        DataError: If a declared column is absent, or has missing values under
+            the `reject` policy.
+    """
+    declared = [*estimand.feature_names, estimand.outcome]
+    treatment_column = None
+    if policy.estimator in {
+        "bayesian_ate",
+        "ipw_ate",
+        "aipw_ate",
+        "continuous_ipw_ate",
+    }:
+        treatment_column = locate(orchestrator, estimand, policy)
+        declared.append(treatment_column)
+    if policy.cluster_name is not None:
+        declared.append(policy.cluster_name)
+    declared = list(dict.fromkeys(declared))
+    missing = sorted(set(declared) - set(frame.columns))
+    if missing:
+        raise errors.DataError(
+            f"parameter estimation columns are missing: {missing}"
+        )
+    missing_counts = frame.loc[:, declared].isna().sum()
+    missing_values = {
+        name: int(count) for name, count in missing_counts.items() if count
+    }
+    if missing_values and policy.missing == "reject":
+        raise errors.DataError(
+            "parameter estimation missing values require an explicit "
+            f"complete_case policy: {missing_values}"
+        )
+    return declared, treatment_column, missing_values
+
+
+def trace(uri: str, frame: pandas.DataFrame) -> dict[str, str | None]:
+    """Records which data an estimate was made from.
+
+    Args:
+        uri: The project's data URI, or an in-memory marker.
+        frame: The project's dataset.
+
+    Returns:
+        The source URI, the source's identity (None for in-memory data) and
+        the snapshot identifier of the frame.
+    """
+    snapshot_id = tabular.identify(frame, uri)
+    source_identity: str | None = None
+    if uri not in {"<memory>", "<in-memory>"}:
+        source_identity = connectors.source_identity(uri)
+    return {
+        "source_uri": uri,
+        "source_identity": source_identity,
+        "snapshot_id": snapshot_id,
+    }
+
+
 def estimate(
     orchestrator: scmle.pipeline.orchestrator.Orchestrator,
     estimand: parameter_estimation.Estimand,
@@ -454,43 +552,16 @@ def estimate(
     frame = orchestrator.frame
     if frame is None:
         frame = tabular.read_table(orchestrator.spec.data.uri)
-    declared = [*estimand.feature_names, estimand.outcome]
-    treatment_column = None
-    if policy.estimator in {
-        "bayesian_ate",
-        "ipw_ate",
-        "aipw_ate",
-        "continuous_ipw_ate",
-    }:
-        treatment_column = locate(orchestrator, estimand, policy)
-        declared.append(treatment_column)
-    if policy.cluster_name is not None:
-        declared.append(policy.cluster_name)
-    declared = list(dict.fromkeys(declared))
-    missing = sorted(set(declared) - set(frame.columns))
-    if missing:
-        raise errors.DataError(
-            f"parameter estimation columns are missing: {missing}"
-        )
-    missing_counts = frame.loc[:, declared].isna().sum()
-    missing_values = {
-        name: int(count) for name, count in missing_counts.items() if count
-    }
-    if missing_values and policy.missing == "reject":
-        raise errors.DataError(
-            "parameter estimation missing values require an explicit "
-            f"complete_case policy: {missing_values}"
-        )
+    declared, treatment_column, missing_values = screen(
+        orchestrator, estimand, policy, frame
+    )
     features = frame.loc[:, list(estimand.feature_names)]
     outcome = frame.loc[:, estimand.outcome]
-    clusters = None
-    if policy.cluster_name is not None:
-        clusters = frame.loc[:, policy.cluster_name]
-    cluster_values = None if clusters is None else clusters.tolist()
-    snapshot_id = tabular.identify(frame, orchestrator.spec.data.uri)
-    source_identity = None
-    if orchestrator.spec.data.uri not in {"<memory>", "<in-memory>"}:
-        source_identity = connectors.source_identity(orchestrator.spec.data.uri)
+    cluster_values = (
+        None
+        if policy.cluster_name is None
+        else frame.loc[:, policy.cluster_name].tolist()
+    )
     estimation = parameter_estimation.estimate_parameters(
         features.to_numpy(),
         outcome.to_numpy(),
@@ -513,11 +584,7 @@ def estimate(
                 "columns": declared,
                 "missing_counts": missing_values,
             },
-            "data_identity": {
-                "source_uri": orchestrator.spec.data.uri,
-                "source_identity": source_identity,
-                "snapshot_id": snapshot_id,
-            },
+            "data_identity": trace(orchestrator.spec.data.uri, frame),
         },
     )
     if artifact_directory is not None:

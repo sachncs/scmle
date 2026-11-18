@@ -259,6 +259,60 @@ def delimit(adapter: modality_lifecycle.Imagery) -> Scope:
     )
 
 
+ASSOCIATIONAL = "The model is associational and not a causal explanation."
+SCOPES: dict[type, Scope] = {
+    modality_lifecycle.ImagePreparer: Scope(
+        modality="image",
+        representation="decoded_resized_rgb_pixels",
+        decoder_policy="built-in bounded RGB decoder",
+        limitations=(
+            (
+                "This is a pixel baseline, not object detection, semantic "
+                "segmentation, or validated saliency."
+            ),
+            ASSOCIATIONAL,
+        ),
+    ),
+    modality_lifecycle.AudioPreparer: Scope(
+        modality="audio",
+        representation="bounded_decoded_wav_signal_statistics",
+        decoder_policy="built-in WAV decoder; other codecs are rejected",
+        limitations=(
+            (
+                "This representation does not provide transcript, "
+                "speaker, or semantic event understanding."
+            ),
+            ASSOCIATIONAL,
+        ),
+    ),
+    modality_lifecycle.GraphPreparer: Scope(
+        modality="graph",
+        representation="declared_inductive_node_features",
+        decoder_policy="caller-declared graph nodes and features",
+        limitations=(
+            (
+                "Edges are retained for evidence but are not model "
+                "inputs; this is not GNN or topology attribution support."
+            ),
+            ASSOCIATIONAL,
+        ),
+    ),
+    modality_lifecycle.GeospatialPreparer: Scope(
+        modality="geospatial",
+        representation="declared_crs_geometry_features",
+        decoder_policy="caller-declared geometries and CRS",
+        limitations=(
+            (
+                "This is a bounded geometry baseline, not a geospatial "
+                "foundation model or spatial causal analysis."
+            ),
+            "CRS and spatial split policy remain domain responsibilities.",
+        ),
+    ),
+}
+"""The capability of each exact built-in adapter type whose scope is fixed."""
+
+
 def invariant(
     adapter: modality_lifecycle.Preparer,
 ) -> Scope | None:
@@ -286,62 +340,10 @@ def invariant(
                     "This is a lexical baseline, not OCR, layout, table, or "
                     "semantic document understanding."
                 ),
-                "The model is associational and not a causal explanation.",
+                ASSOCIATIONAL,
             ),
         )
-    if adapter_type is modality_lifecycle.ImagePreparer:
-        return Scope(
-            modality="image",
-            representation="decoded_resized_rgb_pixels",
-            decoder_policy="built-in bounded RGB decoder",
-            limitations=(
-                (
-                    "This is a pixel baseline, not object detection, semantic "
-                    "segmentation, or validated saliency."
-                ),
-                "The model is associational and not a causal explanation.",
-            ),
-        )
-    if adapter_type is modality_lifecycle.AudioPreparer:
-        return Scope(
-            modality="audio",
-            representation="bounded_decoded_wav_signal_statistics",
-            decoder_policy="built-in WAV decoder; other codecs are rejected",
-            limitations=(
-                (
-                    "This representation does not provide transcript, "
-                    "speaker, or semantic event understanding."
-                ),
-                "The model is associational and not a causal explanation.",
-            ),
-        )
-    if adapter_type is modality_lifecycle.GraphPreparer:
-        return Scope(
-            modality="graph",
-            representation="declared_inductive_node_features",
-            decoder_policy="caller-declared graph nodes and features",
-            limitations=(
-                (
-                    "Edges are retained for evidence but are not model "
-                    "inputs; this is not GNN or topology attribution support."
-                ),
-                "The model is associational and not a causal explanation.",
-            ),
-        )
-    if adapter_type is modality_lifecycle.GeospatialPreparer:
-        return Scope(
-            modality="geospatial",
-            representation="declared_crs_geometry_features",
-            decoder_policy="caller-declared geometries and CRS",
-            limitations=(
-                (
-                    "This is a bounded geometry baseline, not a geospatial "
-                    "foundation model or spatial causal analysis."
-                ),
-                "CRS and spatial split policy remain domain responsibilities.",
-            ),
-        )
-    return None
+    return SCOPES.get(adapter_type)
 
 
 def entitle(
@@ -438,6 +440,57 @@ def conform(
         )
 
 
+def vet(
+    signing_key: str | bytes,
+    seed: int,
+    require_independent_ground_truth: bool,
+    resume: bool,
+) -> None:
+    """Checks the run arguments every modality lifecycle surface shares.
+
+    Args:
+        signing_key: Key that authenticates the package.
+        seed: Seed of the split and the model.
+        require_independent_ground_truth: Whether an independent explanation
+            reference suite is required.
+        resume: Whether to resume from the checkpoint.
+
+    Raises:
+        ValueError: If the signing key is empty.
+        TypeError: If the seed is not an integer (a bool is refused) or a
+            flag is not a bool.
+    """
+    if not signing_key:
+        raise errors.InputError("signing_key must not be empty")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise errors.KindError("seed must be an integer")
+    if not isinstance(require_independent_ground_truth, bool):
+        raise errors.KindError("require_independent_ground_truth must be bool")
+    if not isinstance(resume, bool):
+        raise errors.KindError("resume must be bool")
+
+
+def consent(experimental_opt_in: bool, capability: Scope) -> None:
+    """Checks that the caller acknowledged the experimental status.
+
+    Args:
+        experimental_opt_in: The caller's acknowledgement.
+        capability: The capability the run would be built under.
+
+    Raises:
+        TypeError: If the acknowledgement is not a bool.
+        UnsupportedNonTabularModelError: If it is not given.
+    """
+    if not isinstance(experimental_opt_in, bool):
+        raise errors.KindError("experimental_opt_in must be bool")
+    if not experimental_opt_in:
+        raise UnsupportedNonTabularModelError(
+            "non-tabular modelling is experimental; set "
+            "experimental_opt_in=True explicitly",
+            {"modality": capability.modality, "status": capability.status},
+        )
+
+
 class Modeler:
     """Runs a bounded, explicitly experimental non-tabular model lifecycle.
 
@@ -514,27 +567,8 @@ class Modeler:
             ValueError: If the signing key is empty.
         """
         self.capability = entitle(adapter)
-        if not isinstance(experimental_opt_in, bool):
-            raise errors.KindError("experimental_opt_in must be bool")
-        if not experimental_opt_in:
-            raise UnsupportedNonTabularModelError(
-                "non-tabular modelling is experimental; set "
-                "experimental_opt_in=True explicitly",
-                {
-                    "modality": self.capability.modality,
-                    "status": self.capability.status,
-                },
-            )
-        if not signing_key:
-            raise errors.InputError("signing_key must not be empty")
-        if isinstance(seed, bool) or not isinstance(seed, int):
-            raise errors.KindError("seed must be an integer")
-        if not isinstance(require_independent_ground_truth, bool):
-            raise errors.KindError(
-                "require_independent_ground_truth must be bool"
-            )
-        if not isinstance(resume, bool):
-            raise errors.KindError("resume must be bool")
+        consent(experimental_opt_in, self.capability)
+        vet(signing_key, seed, require_independent_ground_truth, resume)
         if observed_adapter is not None:
             conform(adapter, observed_adapter, self.capability)
         if cancellation is not None and not isinstance(

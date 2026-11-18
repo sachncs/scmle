@@ -1,10 +1,12 @@
 """Curation-only runs: signed evidence about a modality, with no model."""
 
+from collections.abc import Mapping
 import contextlib
 import json
 import os
 import pathlib
 import tempfile
+from typing import Any
 
 from scmle import durability
 from scmle.contracts import errors
@@ -164,6 +166,39 @@ class Curator:
         self.output_dir = pathlib.Path(output_dir)
         self.manifest = manifest
 
+    def examine(
+        self, modality: str, dataset_hash: str, sample_count: int
+    ) -> Mapping[str, Any]:
+        """Curates the adapter's dataset and checks the report describes it.
+
+        Args:
+            modality: The adapter's serialized modality.
+            dataset_hash: The adapter's dataset hash.
+            sample_count: The adapter's number of samples.
+
+        Returns:
+            The curation report as a JSON-native mapping.
+
+        Raises:
+            ValueError: If the manifest or the curation report disagrees with
+                the adapter.
+            TypeError: If the adapter's `curate()` does not return a modality
+                curation report.
+        """
+        if self.manifest is not None:
+            conform(self.manifest, modality, dataset_hash, sample_count)
+        report = self.adapter.curate()
+        if not isinstance(report, (curation.Curation, document.Curation)):
+            raise errors.KindError(
+                "adapter curate() must return a modality curation report"
+            )
+        curation_payload = report.to_dict()
+        if curation_payload.get("dataset_hash") != dataset_hash:
+            raise errors.InputError("curation dataset_hash must match adapter")
+        if curation_payload.get("sample_count") != sample_count:
+            raise errors.InputError("curation sample_count must match adapter")
+        return curation_payload
+
     def run(self) -> modality_lifecycle.Curation:
         """Persists signed curation evidence without entering modelling.
 
@@ -186,30 +221,10 @@ class Curator:
         """
         if self.output_dir.exists() and not self.output_dir.is_dir():
             raise errors.InputError("output_dir must be a directory")
-        samples = self.adapter.samples
+        sample_count = len(self.adapter.samples)
         modality = modalities.serialise(self.adapter.modality)
         dataset_hash = self.adapter.dataset_hash
-        sample_count = len(samples)
-        if self.manifest is not None:
-            conform(self.manifest, modality, dataset_hash, sample_count)
-        report = self.adapter.curate()
-        if not isinstance(
-            report,
-            (
-                curation.Curation,
-                document.Curation,
-            ),
-        ):
-            raise errors.KindError(
-                "adapter curate() must return a modality curation report"
-            )
-        curation_payload = report.to_dict()
-        reported_dataset_hash = curation_payload.get("dataset_hash")
-        reported_sample_count = curation_payload.get("sample_count")
-        if reported_dataset_hash != dataset_hash:
-            raise errors.InputError("curation dataset_hash must match adapter")
-        if reported_sample_count != sample_count:
-            raise errors.InputError("curation sample_count must match adapter")
+        curation_payload = self.examine(modality, dataset_hash, sample_count)
         card = curation.Datasheet.from_report(
             modality,
             curation_payload,

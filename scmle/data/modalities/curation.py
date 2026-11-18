@@ -265,6 +265,52 @@ def allocate(
     )
 
 
+def disclose(
+    manifest: data.Passport,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """States a card's provenance and privacy without inventing either.
+
+    Args:
+        manifest: The manifest the card carries.
+
+    Returns:
+        The provenance and privacy status fields: declared when the manifest
+        names a source owner, an acquisition method or a privacy
+        classification, and otherwise marked as not declared with the action
+        required before promotion.
+    """
+    if (
+        not manifest.source.owner
+        and not manifest.source.acquisition
+        and manifest.privacy.classification == "unclassified"
+    ):
+        return (
+            {
+                "status": "adapter_source_metadata_not_declared",
+                "required_action": (
+                    "record source ownership and lineage before promotion"
+                ),
+            },
+            {
+                "status": "not_assessed",
+                "required_action": (
+                    "record consent, PII classification, retention, and "
+                    "access policy before promotion"
+                ),
+            },
+        )
+    return (
+        {
+            "status": "declared",
+            "manifest": "source, lineage, and ownership are in manifest",
+        },
+        {
+            "status": "declared",
+            "manifest": "privacy, consent, and retention are in manifest",
+        },
+    )
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class Datasheet:
     """Human-reviewable card generated from modality curation evidence.
@@ -403,32 +449,7 @@ class Datasheet:
             raise errors.InputError("manifest does not match sample_count")
         if manifest.modality != modality:
             raise errors.InputError("manifest does not match modality")
-        declared_provenance = {
-            "status": "declared",
-            "manifest": "source, lineage, and ownership are in manifest",
-        }
-        declared_privacy = {
-            "status": "declared",
-            "manifest": "privacy, consent, and retention are in manifest",
-        }
-        if (
-            not manifest.source.owner
-            and not manifest.source.acquisition
-            and manifest.privacy.classification == "unclassified"
-        ):
-            declared_provenance = {
-                "status": "adapter_source_metadata_not_declared",
-                "required_action": (
-                    "record source ownership and lineage before promotion"
-                ),
-            }
-            declared_privacy = {
-                "status": "not_assessed",
-                "required_action": (
-                    "record consent, PII classification, retention, and "
-                    "access policy before promotion"
-                ),
-            }
+        declared_provenance, declared_privacy = disclose(manifest)
         return cls(
             modality=modality,
             dataset_hash=dataset_hash_value,
