@@ -247,8 +247,94 @@ def representatives(
     ]
 
 
+class Margins:
+    """The conformal margins a calibrator reads off its stored scores.
+
+    Mixed into `ConformalCalibrator`, which supplies the attributes below.
+
+    Attributes:
+        kind: `regression` or `classification`.
+        scores: Pooled nonconformity scores.
+        classes: Class labels, in probability-column order.
+        conditional: Scores of each true class, in the order of `classes`.
+    """
+
+    kind: str
+    scores: tuple[float, ...]
+    classes: tuple[Any, ...]
+    conditional: tuple[tuple[float, ...], ...]
+
+    def margin(self, coverage: float = DEFAULT_COVERAGE) -> float:
+        """The margin guaranteeing `coverage` for exchangeable new rows.
+
+        Args:
+            coverage: Desired coverage, strictly between 0 and 1.
+
+        Returns:
+            The finite-sample quantile of the pooled scores; infinity when
+            there are too few scores for `coverage`.
+
+        Raises:
+            ValueError: If coverage is not strictly between 0 and 1.
+        """
+        if not 0.0 < coverage < 1.0:
+            raise scmle.contracts.errors.InputError(
+                "coverage must lie strictly between 0 and 1"
+            )
+        return cutoff(numpy.asarray(self.scores), coverage)
+
+    def class_margins(
+        self, coverage: float = DEFAULT_COVERAGE
+    ) -> tuple[float, ...]:
+        """One margin per class from that class's calibration rows only.
+
+        A class with fewer than `ceil(1 / (1 - coverage)) - 1` rows has an
+        infinite margin: its label is kept in every set.
+
+        Args:
+            coverage: Desired coverage, strictly between 0 and 1.
+
+        Returns:
+            The margin of each class, in the order of `classes`.
+
+        Raises:
+            ValueError: Without per-class scores or with a bad coverage.
+        """
+        if not 0.0 < coverage < 1.0:
+            raise scmle.contracts.errors.InputError(
+                "coverage must lie strictly between 0 and 1"
+            )
+        if self.kind != "classification" or not self.conditional:
+            raise scmle.contracts.errors.InputError(
+                "this calibrator has no per-class scores"
+            )
+        return tuple(
+            cutoff(numpy.asarray(scores), coverage)
+            for scores in self.conditional
+        )
+
+    def scarce(self, coverage: float = DEFAULT_COVERAGE) -> list[Any]:
+        """Classes too rare for a finite class-conditional margin.
+
+        Args:
+            coverage: Desired coverage, strictly between 0 and 1.
+
+        Returns:
+            The labels whose class-conditional margin is infinite, in the
+            order of `classes`. A calibrator without per-class scores or an
+            invalid coverage is rejected by `class_margins` with a
+            `ValueError`.
+        """
+        margins = self.class_margins(coverage)
+        return [
+            label
+            for label, margin in zip(self.classes, margins, strict=True)
+            if math.isinf(margin)
+        ]
+
+
 @dataclasses.dataclass(frozen=True)
-class ConformalCalibrator:
+class ConformalCalibrator(Margins):
     """Calibration scores for intervals (regression) or sets (classification).
 
     Attributes:
@@ -354,25 +440,6 @@ class ConformalCalibrator:
             )
         return tuple(float(s) for s in scores)
 
-    def margin(self, coverage: float = DEFAULT_COVERAGE) -> float:
-        """The margin guaranteeing `coverage` for exchangeable new rows.
-
-        Args:
-            coverage: Desired coverage, strictly between 0 and 1.
-
-        Returns:
-            The finite-sample quantile of the pooled scores; infinity when
-            there are too few scores for `coverage`.
-
-        Raises:
-            ValueError: If coverage is not strictly between 0 and 1.
-        """
-        if not 0.0 < coverage < 1.0:
-            raise scmle.contracts.errors.InputError(
-                "coverage must lie strictly between 0 and 1"
-            )
-        return cutoff(numpy.asarray(self.scores), coverage)
-
     def interval(
         self,
         predictions: Sequence[float] | numpy.ndarray,
@@ -399,55 +466,6 @@ class ConformalCalibrator:
         values = numpy.asarray(predictions, dtype=float)
         margin = self.margin(coverage)
         return values - margin, values + margin
-
-    def class_margins(
-        self, coverage: float = DEFAULT_COVERAGE
-    ) -> tuple[float, ...]:
-        """One margin per class from that class's calibration rows only.
-
-        A class with fewer than `ceil(1 / (1 - coverage)) - 1` rows has an
-        infinite margin: its label is kept in every set.
-
-        Args:
-            coverage: Desired coverage, strictly between 0 and 1.
-
-        Returns:
-            The margin of each class, in the order of `classes`.
-
-        Raises:
-            ValueError: Without per-class scores or with a bad coverage.
-        """
-        if not 0.0 < coverage < 1.0:
-            raise scmle.contracts.errors.InputError(
-                "coverage must lie strictly between 0 and 1"
-            )
-        if self.kind != "classification" or not self.conditional:
-            raise scmle.contracts.errors.InputError(
-                "this calibrator has no per-class scores"
-            )
-        return tuple(
-            cutoff(numpy.asarray(scores), coverage)
-            for scores in self.conditional
-        )
-
-    def scarce(self, coverage: float = DEFAULT_COVERAGE) -> list[Any]:
-        """Classes too rare for a finite class-conditional margin.
-
-        Args:
-            coverage: Desired coverage, strictly between 0 and 1.
-
-        Returns:
-            The labels whose class-conditional margin is infinite, in the
-            order of `classes`. A calibrator without per-class scores or an
-            invalid coverage is rejected by `class_margins` with a
-            `ValueError`.
-        """
-        margins = self.class_margins(coverage)
-        return [
-            label
-            for label, margin in zip(self.classes, margins, strict=True)
-            if math.isinf(margin)
-        ]
 
     def weighted_interval(
         self,

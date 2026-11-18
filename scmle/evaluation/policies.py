@@ -5,6 +5,35 @@ from collections.abc import Mapping
 from scmle.contracts import evaluation
 from scmle.contracts import tasks
 
+EVIDENCE = "diagnostics/metric_uncertainty.json"
+
+
+def release(gates: list[evaluation.Hurdle]) -> evaluation.Gates:
+    """The release gates: the metric hurdles and the uncertainty evidence.
+
+    Args:
+        gates: One hurdle per success criterion.
+
+    Returns:
+        The hurdles plus a blocking gate on the metric-uncertainty
+        diagnostic, with the evidence every release needs.
+    """
+    return evaluation.Gates(
+        metric_gates=tuple(gates),
+        diagnostic_gates=(
+            evaluation.Requirement(
+                name="metric_uncertainty",
+                action=evaluation.Remedy.BLOCK,
+                required_evidence=(EVIDENCE,),
+            ),
+        ),
+        required_evidence=(
+            "dataset_manifest.json",
+            "model/model_manifest.json",
+            EVIDENCE,
+        ),
+    )
+
 
 def derive(
     task: tasks.Task,
@@ -66,7 +95,6 @@ def derive(
                 metric=name, direction=direction, threshold=float(threshold)
             )
         )
-    evidence_ref = "diagnostics/metric_uncertainty.json"
     return evaluation.Criteria(
         task=task,
         primary_metric=primary_metric,
@@ -80,19 +108,5 @@ def derive(
         explanations=evaluation.Explanations(
             availability=evaluation.Explicability.NONE
         ),
-        release=evaluation.Gates(
-            metric_gates=tuple(gates),
-            diagnostic_gates=(
-                evaluation.Requirement(
-                    name="metric_uncertainty",
-                    action=evaluation.Remedy.BLOCK,
-                    required_evidence=(evidence_ref,),
-                ),
-            ),
-            required_evidence=(
-                "dataset_manifest.json",
-                "model/model_manifest.json",
-                evidence_ref,
-            ),
-        ),
+        release=release(gates),
     )

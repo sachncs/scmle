@@ -259,6 +259,56 @@ def choose(
     return float(bandwidth)
 
 
+def falsify(
+    frame: pandas.DataFrame,
+    rows: tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray],
+    cutoff: float,
+    h: float,
+    level: float,
+    covariates: tuple[str, ...],
+) -> tuple[
+    dict[str, dict[str, float]],
+    dict[str, dict[str, float]],
+    dict[str, dict[str, float]],
+]:
+    """Fits the placebo cutoffs, covariate jumps and bandwidth multiples.
+
+    Args:
+        frame: Rows with the covariates.
+        rows: The running variable, the outcome and the mask of the rows
+            below the cutoff.
+        cutoff: The threshold.
+        h: The bandwidth.
+        level: Confidence level.
+        covariates: Predetermined covariates to test for a jump.
+
+    Returns:
+        The fits at the median of each side (with their `cutoff`), of each
+        covariate at the cutoff, and at each of `SENSITIVITY_MULTIPLES`
+        times the bandwidth; degenerate fits are left out.
+    """
+    x, y, left = rows
+    placebos = {}
+    for name, mask in (("left_median", left), ("right_median", ~left)):
+        point = float(numpy.median(x[mask]))
+        found = discontinuity(x[mask], y[mask], point, h, level)
+        if found is not None:
+            placebos[name] = {"cutoff": point, **found}
+    balance = {}
+    for name in covariates:
+        found = discontinuity(
+            x, frame[name].to_numpy(dtype=float), cutoff, h, level
+        )
+        if found is not None:
+            balance[name] = found
+    sensitivity = {}
+    for multiple in SENSITIVITY_MULTIPLES:
+        found = discontinuity(x, y, cutoff, h * multiple, level)
+        if found is not None:
+            sensitivity[str(multiple)] = found
+    return placebos, balance, sensitivity
+
+
 def estimate(
     frame: pandas.DataFrame,
     running: str,
@@ -310,24 +360,9 @@ def estimate(
     inside_right = int(((x >= cutoff) & (x < cutoff + h)).sum())
     total = inside_left + inside_right
     density_p = float(stats.binomtest(inside_right, total, 0.5).pvalue)
-    placebos = {}
-    for name, mask in (("left_median", left), ("right_median", ~left)):
-        point = float(numpy.median(x[mask]))
-        found = discontinuity(x[mask], y[mask], point, h, level)
-        if found is not None:
-            placebos[name] = {"cutoff": point, **found}
-    balance = {}
-    for name in covariates:
-        found = discontinuity(
-            x, frame[name].to_numpy(dtype=float), cutoff, h, level
-        )
-        if found is not None:
-            balance[name] = found
-    sensitivity = {}
-    for multiple in SENSITIVITY_MULTIPLES:
-        found = discontinuity(x, y, cutoff, h * multiple, level)
-        if found is not None:
-            sensitivity[str(multiple)] = found
+    placebos, balance, sensitivity = falsify(
+        frame, (x, y, left), cutoff, h, level, covariates
+    )
     return Estimate(
         estimate=main["estimate"],
         bias_corrected=main["bias_corrected"],

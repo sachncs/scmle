@@ -197,6 +197,43 @@ def collect(
     return predictions
 
 
+def partition(
+    guesses: list[Any], truth: Any, classification: bool
+) -> tuple[float, float, float]:
+    """Bias, variance and total error of one row's out-of-bag predictions.
+
+    Args:
+        guesses: The row's predictions by the refits that held it out.
+        truth: The row's target.
+        classification: Whether to use 0-1 error rather than squared error.
+
+    Returns:
+        The bias, variance and mean error of the predictions: against the
+        majority label under 0-1 error, against the mean under squared
+        error (whose bias drops the finite-replicate excess).
+    """
+    if classification:
+        labels, counts = numpy.unique(
+            numpy.asarray(guesses), return_counts=True
+        )
+        consensus = labels[int(numpy.argmax(counts))]
+        return (
+            float(consensus != truth),
+            float(numpy.mean(numpy.asarray(guesses) != consensus)),
+            float(numpy.mean(numpy.asarray(guesses) != truth)),
+        )
+    values = numpy.asarray(guesses, dtype=float)
+    # The mean of m noisy refits overstates the squared distance to the
+    # truth by var / m; remove that finite-replicate excess.
+    excess = float(values.var(ddof=1)) / len(values)
+    gap = (values.mean() - float(truth)) ** 2
+    return (
+        float(gap - excess),
+        float(values.var()),
+        float(numpy.mean((values - float(truth)) ** 2)),
+    )
+
+
 def decompose(
     build: Callable[[], models.Estimator],
     features: pandas.DataFrame,
@@ -232,29 +269,10 @@ def decompose(
         if len(guesses) < MIN_PREDICTIONS:
             continue
         used += 1
-        if classification:
-            labels, counts = numpy.unique(
-                numpy.asarray(guesses), return_counts=True
-            )
-            consensus = labels[int(numpy.argmax(counts))]
-            bias.append(float(consensus != truth[position]))
-            variance.append(
-                float(numpy.mean(numpy.asarray(guesses) != consensus))
-            )
-            total.append(
-                float(numpy.mean(numpy.asarray(guesses) != truth[position]))
-            )
-        else:
-            values = numpy.asarray(guesses, dtype=float)
-            # The mean of m noisy refits overstates the squared distance to
-            # the truth by var / m; remove that finite-replicate excess.
-            excess = float(values.var(ddof=1)) / len(values)
-            gap = (values.mean() - float(truth[position])) ** 2
-            bias.append(float(gap - excess))
-            variance.append(float(values.var()))
-            total.append(
-                float(numpy.mean((values - float(truth[position])) ** 2))
-            )
+        terms = partition(guesses, truth[position], classification)
+        bias.append(terms[0])
+        variance.append(terms[1])
+        total.append(terms[2])
     if used == 0:
         return None
     raw_bias, mean_variance = (

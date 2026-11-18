@@ -246,6 +246,59 @@ def stretch(
     return float(grid[best[0]]), float(grid[best[1] - 1])
 
 
+def band(
+    stats: NDArray[numpy.float64],
+    groups: NDArray[numpy.intp] | None,
+    weights: NDArray[numpy.float64],
+    incumbent: bool,
+    settings: tuple[float, int, int],
+) -> tuple[NDArray[numpy.float64], NDArray[numpy.float64], float]:
+    """The net-benefit differences and their simultaneous lower band.
+
+    The band is studentized: each grid point's bootstrap standard error
+    (at least `MIN_SD`) scales one critical value, the `1 - alpha` quantile
+    of the largest standardized deviation over the grid and baselines.
+
+    Args:
+        stats: `columns`'s per-row statistics.
+        groups: Cluster index per row, or None for independent rows.
+        weights: The odds `t / (1 - t)` of each grid threshold.
+        incumbent: Whether the statistics carry the incumbent's columns.
+        settings: The one-sided level `alpha`, the bootstrap replicates and
+            the seed of the bootstrap stream.
+
+    Returns:
+        The differences against each baseline at each grid point, their
+        lower band and the critical value.
+    """
+    alpha, replicates, seed = settings
+    rng = randomness.component_rng(seed, "decision.netbenefit", 0)
+    point = diffs(stats.mean(axis=0, keepdims=True), weights, incumbent)[0]
+    boot = diffs(redraw(stats, groups, replicates, rng), weights, incumbent)
+    sd = numpy.maximum(boot.std(axis=0, ddof=1), MIN_SD)
+    sup = ((boot - point) / sd).reshape(replicates, -1).max(axis=1)
+    critical = float(numpy.quantile(sup, 1.0 - alpha))
+    return point, point - critical * sd, critical
+
+
+def curve(
+    means: NDArray[numpy.float64], start: int, weights: NDArray[numpy.float64]
+) -> tuple[float, ...]:
+    """Net benefit of one policy at each grid threshold.
+
+    Args:
+        means: The mean of each of `columns`'s statistics.
+        start: The column of the policy's true positives; its false
+            positives are the next column.
+        weights: The odds `t / (1 - t)` of each grid threshold.
+
+    Returns:
+        True positives minus odds-weighted false positives, per row, at each
+        grid threshold.
+    """
+    return tuple(float(v) for v in means[start] - means[start + 1] * weights)
+
+
 def lowerband(
     y: ArrayLike,
     acts: ArrayLike,
@@ -299,19 +352,9 @@ def lowerband(
     groups = factorize(clusters)
     if groups is not None and groups.shape != outcomes.shape:
         raise errors.InputError("clusters must have the length of y")
-    rng = randomness.component_rng(seed, "decision.netbenefit", 0)
-    point = diffs(stats.mean(axis=0, keepdims=True), weights, base is not None)[
-        0
-    ]
-    boot = diffs(
-        redraw(stats, groups, replicates, rng),
-        weights,
-        base is not None,
+    point, lower, critical = band(
+        stats, groups, weights, base is not None, (alpha, replicates, seed)
     )
-    sd = numpy.maximum(boot.std(axis=0, ddof=1), MIN_SD)
-    sup = ((boot - point) / sd).reshape(replicates, -1).max(axis=1)
-    critical = float(numpy.quantile(sup, 1.0 - alpha))
-    lower = point - critical * sd
     positive = (lower > 0.0).all(axis=0)
     mean_row = stats.mean(axis=0)
     names = BASELINE_NAMES if base is not None else BASELINE_NAMES[:2]
@@ -321,13 +364,9 @@ def lowerband(
     claim = USEFUL if bool(positive.all()) else NOT_USEFUL
     return Benefit(
         thresholds=tuple(float(t) for t in grid),
-        rule=tuple(float(v) for v in mean_row[0] - mean_row[1] * weights),
-        treat_all=tuple(float(v) for v in mean_row[2] - mean_row[3] * weights),
-        incumbent=(
-            None
-            if base is None
-            else tuple(float(v) for v in mean_row[4] - mean_row[5] * weights)
-        ),
+        rule=curve(mean_row, 0, weights),
+        treat_all=curve(mean_row, 2, weights),
+        incumbent=None if base is None else curve(mean_row, 4, weights),
         baselines=names,
         difference=tuple(tuple(float(v) for v in row) for row in point),
         lower=tuple(tuple(float(v) for v in row) for row in lower),

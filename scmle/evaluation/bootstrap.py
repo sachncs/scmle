@@ -315,6 +315,131 @@ def expose(
     )
 
 
+def align(
+    inputs: diagnostics.DiagnosticInput,
+) -> tuple[Cache, pandas.DataFrame, pandas.Series, pandas.Series | None]:
+    """The evaluation rows indexed from zero, with their cached predictions.
+
+    Args:
+        inputs: The fitted candidate and evaluation data.
+
+    Returns:
+        The replay of the candidate's predictions, the sourced features,
+        the target and the groups (None without groups).
+    """
+    features = inputs.features[list(inputs.feature_plan.sourced)]
+    features = features.reset_index(drop=True)
+    target = inputs.target.reset_index(drop=True)
+    replay_class = (
+        RegressorReplay if inputs.task is tasks.Task.REGRESSION else Replay
+    )
+    cache = replay_class(inputs.estimator, features)
+    groups = (
+        inputs.groups.reset_index(drop=True)
+        if inputs.groups is not None
+        else None
+    )
+    return cache, features, target, groups
+
+
+def pivot(
+    inputs: diagnostics.DiagnosticInput,
+    cache: Cache,
+    target: pandas.Series,
+    groups: pandas.Series | None,
+) -> tuple[
+    tuple[numpy.ndarray, numpy.ndarray] | None, tuple[float, float] | None
+]:
+    """The closed-form inputs and full-sample statistic of a bootstrap-t.
+
+    Blocks overlap and the full sample has no blocks to cluster by, so a
+    temporal bootstrap keeps the percentile interval (both are None).
+
+    Args:
+        inputs: The evaluation data.
+        cache: The cached predictions of the candidate.
+        target: The evaluation target, indexed from zero.
+        groups: The evaluation groups, indexed from zero, if any.
+
+    Returns:
+        `expose`'s arrays (None when the metric has no closed form) and
+        `studentize`'s full-sample estimate and standard error.
+    """
+    name = inputs.metric.name
+    exposed = None if inputs.temporal else expose(cache, target, name)
+    centre = (
+        None
+        if exposed is None
+        else studentize(
+            name,
+            *exposed,
+            numpy.arange(len(target)) if groups is None else groups.to_numpy(),
+        )
+    )
+    return exposed, centre
+
+
+def resample(
+    inputs: diagnostics.DiagnosticInput,
+    rows: tuple[
+        models.Estimator, pandas.DataFrame, pandas.Series, pandas.Series | None
+    ],
+    exposed: tuple[numpy.ndarray, numpy.ndarray] | None,
+    centre: tuple[float, float] | None,
+    planned: int,
+) -> tuple[list[float], list[float], int]:
+    """Scores up to `planned` resamples of the evaluation rows.
+
+    The deadline is checked before each resample. A resample with a closed
+    form (`exposed`) is studentized; any other is scored by the metric, and
+    one that fails with a `ValueError` (such as one missing a class) is
+    skipped.
+
+    Args:
+        inputs: The evaluation data, with its seed and deadline.
+        rows: The cached predictions (typed as an estimator), features,
+            target and groups (None without groups) of the evaluation
+            rows, indexed from zero.
+        exposed: `pivot`'s closed-form arrays, or None.
+        centre: `pivot`'s full-sample statistic, or None.
+        planned: The most resamples to draw.
+
+    Returns:
+        The metric of each scored resample, the pivot of each studentized
+        one, and the number of resamples attempted.
+    """
+    replay, features, target, groups = rows
+    metric, positive = inputs.metric, inputs.positive_label
+    scores: list[float] = []
+    ratios: list[float] = []
+    rng = numpy.random.default_rng(inputs.seed)
+    attempted = 0
+    for replicate in range(planned):  # noqa: B007
+        if inputs.expired():
+            break
+        picked, units = draw(len(target), groups, inputs.temporal, rng)
+        attempted += 1
+        if exposed is not None and centre is not None:
+            found = studentize(
+                metric.name, exposed[0][picked], exposed[1][picked], units
+            )
+            if found is not None:
+                scores.append(found[0])
+                ratios.append(divide(found[0] - centre[0], found[1]))
+            continue
+        try:
+            scores.append(
+                metric.score(
+                    replay, features.iloc[picked], target.iloc[picked], positive
+                )
+            )
+        except (
+            ValueError
+        ):  # handled: counted in `dropped`; too many give no interval
+            continue
+    return scores, ratios, attempted
+
+
 class Uncertainty(diagnostics.Diagnostic):
     """Bootstrap confidence interval for the primary test metric.
 
@@ -427,25 +552,11 @@ class Uncertainty(diagnostics.Diagnostic):
             else rows). When the deadline left fewer than
             `minimum_resamples`, the report is `skipped` with the reason.
         """
-        features = inputs.features[list(inputs.feature_plan.sourced)]
-        features = features.reset_index(drop=True)
-        target = inputs.target.reset_index(drop=True)
-        replay_class = (
-            RegressorReplay if inputs.task is tasks.Task.REGRESSION else Replay
-        )
-        cache = replay_class(inputs.estimator, features)
+        cache, features, target, groups = align(inputs)
         # Scorers only call predict and predict_proba on the replay.
         replay = cast("models.Estimator", cache)
         metric, positive = inputs.metric, inputs.positive_label
         estimate = metric.score(replay, features, target, positive)
-        groups = (
-            inputs.groups.reset_index(drop=True)
-            if inputs.groups is not None
-            else None
-        )
-        rng = numpy.random.default_rng(inputs.seed)
-        scores: list[float] = []
-        ratios: list[float] = []
         unit = (
             "groups"
             if groups is not None
@@ -453,54 +564,18 @@ class Uncertainty(diagnostics.Diagnostic):
             if inputs.temporal
             else "rows"
         )
-        # Blocks overlap and the full sample has no blocks to cluster by, so
-        # a temporal bootstrap keeps the percentile interval.
-        exposed = (
-            None if inputs.temporal else expose(cache, target, metric.name)
-        )
-        centre = (
-            None
-            if exposed is None
-            else studentize(
-                metric.name,
-                *exposed,
-                numpy.arange(len(target))
-                if groups is None
-                else groups.to_numpy(),
-            )
-        )
+        exposed, centre = pivot(inputs, cache, target, groups)
         each = self.cost(inputs)
         planned = self.replicates(len(target))
         if inputs.deadline is not None:
             planned = min(planned, max(int(inputs.left() // each), 0))
-        attempted = 0
-        if planned >= self.minimum_resamples:
-            for replicate in range(planned):  # noqa: B007
-                if inputs.expired():
-                    break
-                rows, units = draw(len(target), groups, inputs.temporal, rng)
-                attempted += 1
-                if exposed is not None and centre is not None:
-                    found = studentize(
-                        metric.name, exposed[0][rows], exposed[1][rows], units
-                    )
-                    if found is not None:
-                        scores.append(found[0])
-                        ratios.append(divide(found[0] - centre[0], found[1]))
-                    continue
-                try:
-                    scores.append(
-                        metric.score(
-                            replay,
-                            features.iloc[rows],
-                            target.iloc[rows],
-                            positive,
-                        )
-                    )
-                except (
-                    ValueError
-                ):  # handled: counted in `dropped`; too many give no interval
-                    continue
+        scores, ratios, attempted = resample(
+            inputs,
+            (replay, features, target, groups),
+            exposed,
+            centre,
+            planned if planned >= self.minimum_resamples else 0,
+        )
         interval = None
         if attempted >= self.minimum_resamples and len(scores) >= (
             attempted * KEPT

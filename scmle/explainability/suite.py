@@ -13,6 +13,38 @@ from scmle.explainability import importance
 from scmle.explainability import interaction
 
 
+def validate(
+    diagnostic: diagnostics.Diagnostic,
+    limitations: Sequence[str],
+    evidence_links: Sequence[explanations.Link],
+) -> str:
+    """Checks the inputs `substantiate` does not leave to the contract.
+
+    Args:
+        diagnostic: Explanation diagnostic that produced the result.
+        limitations: Known limitations that travel with the result.
+        evidence_links: References to independently reviewable evidence.
+
+    Returns:
+        The diagnostic's name.
+
+    Raises:
+        ValueError: If the diagnostic does not declare a usable name.
+        TypeError: If ``limitations`` or ``evidence_links`` is a string.
+    """
+    method_name = getattr(diagnostic, "name", None)
+    if not isinstance(method_name, str) or not method_name.strip():
+        raise errors.InputError("diagnostic.name must be a non-empty string")
+    if isinstance(limitations, str):
+        raise errors.KindError("limitations must be a sequence of strings")
+    supplied_links: object = evidence_links  # callers may pass a string
+    if isinstance(supplied_links, str):
+        raise errors.KindError(
+            "evidence_links must be a sequence of Link values"
+        )
+    return method_name
+
+
 def substantiate(
     diagnostic: diagnostics.Diagnostic,
     result: Mapping[str, Any],
@@ -69,17 +101,7 @@ def substantiate(
         ValueError: If the diagnostic does not declare a usable name.
         TypeError: If ``limitations`` or ``evidence_links`` is a string.
     """
-    method_name = getattr(diagnostic, "name", None)
-    if not isinstance(method_name, str) or not method_name.strip():
-        raise errors.InputError("diagnostic.name must be a non-empty string")
-    if isinstance(limitations, str):
-        raise errors.KindError("limitations must be a sequence of strings")
-    supplied_links: object = evidence_links  # callers may pass a string
-    if isinstance(supplied_links, str):
-        raise errors.KindError(
-            "evidence_links must be a sequence of Link values"
-        )
-
+    method_name = validate(diagnostic, limitations, evidence_links)
     return explanations.Evidence(
         model_fingerprint=model_fingerprint,
         bundle_digest=bundle_digest,

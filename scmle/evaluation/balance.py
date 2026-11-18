@@ -38,6 +38,43 @@ NOTE = (
 )
 
 
+def impute(features: pandas.DataFrame) -> numpy.ndarray:
+    """The numeric covariates with non-finite values set to the column median.
+
+    Args:
+        features: Covariates, one row per unit.
+
+    Returns:
+        The numeric columns as floats; a column without a finite value is
+        filled with zero.
+    """
+    matrix = features.select_dtypes("number").to_numpy(dtype=float)
+    if matrix.size:
+        medians = numpy.nanmedian(
+            numpy.where(numpy.isfinite(matrix), matrix, numpy.nan), 0
+        )
+        medians = numpy.where(numpy.isfinite(medians), medians, 0.0)
+        matrix = numpy.where(numpy.isfinite(matrix), matrix, medians)
+    return matrix
+
+
+def contrast(labels: numpy.ndarray, standard: numpy.ndarray) -> numpy.ndarray:
+    """Sum of squared standardized differences in means between the arms.
+
+    Args:
+        labels: Arm labels (0.0 or 1.0), one row per labelling.
+        standard: Standardized covariates, one row per unit.
+
+    Returns:
+        The statistic of each labelling.
+    """
+    ones = labels.sum(axis=-1, keepdims=True)
+    zeros = labels.shape[-1] - ones
+    up = labels @ standard / ones
+    down = (1.0 - labels) @ standard / zeros
+    return numpy.asarray(((up - down) ** 2).sum(axis=-1))
+
+
 def randomisation(
     features: pandas.DataFrame,
     treatment: ArrayLike,
@@ -76,14 +113,7 @@ def randomisation(
         raise errors.InputError("permutations must be positive")
     if not 0.0 < level < 1.0:
         raise errors.InputError("level must lie in (0, 1)")
-    numeric = features.select_dtypes("number")
-    matrix = numeric.to_numpy(dtype=float)
-    if matrix.size:
-        medians = numpy.nanmedian(
-            numpy.where(numpy.isfinite(matrix), matrix, numpy.nan), 0
-        )
-        medians = numpy.where(numpy.isfinite(medians), medians, 0.0)
-        matrix = numpy.where(numpy.isfinite(matrix), matrix, medians)
+    matrix = impute(features)
     spread = matrix.std(axis=0) if matrix.size else numpy.zeros(0)
     keep = spread > 0.0
     base = {
@@ -102,15 +132,7 @@ def randomisation(
         }
     standard = (matrix[:, keep] - matrix[:, keep].mean(0)) / spread[keep]
     rng = randomness.component_rng(seed, COMPONENT, 0)
-
-    def statistic(labels: numpy.ndarray) -> numpy.ndarray:
-        ones = labels.sum(axis=-1, keepdims=True)
-        zeros = labels.shape[-1] - ones
-        up = labels @ standard / ones
-        down = (1.0 - labels) @ standard / zeros
-        return numpy.asarray(((up - down) ** 2).sum(axis=-1))
-
-    observed = float(statistic(arm.astype(float)[None, :])[0])
+    observed = float(contrast(arm.astype(float)[None, :], standard)[0])
     draws = numpy.stack(
         list(
             map(
@@ -119,7 +141,7 @@ def randomisation(
             )
         )
     )
-    null = statistic(draws.astype(float))
+    null = contrast(draws.astype(float), standard)
     p_value = float((1 + numpy.sum(null >= observed)) / (permutations + 1))
     return {
         **base,

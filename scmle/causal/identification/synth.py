@@ -142,6 +142,41 @@ def quorum(alpha: float) -> int:
     return math.ceil(1.0 / alpha) - 1
 
 
+def widen(
+    frame: pandas.DataFrame,
+    unit: str,
+    time: str,
+    outcome: str,
+    treated_unit: Any,
+) -> pandas.DataFrame:
+    """Pivots the panel to one row per period and one column per unit.
+
+    Args:
+        frame: Long panel data.
+        unit: Unit column.
+        time: Period column.
+        outcome: Outcome column.
+        treated_unit: The one treated unit.
+
+    Returns:
+        The outcomes, periods in order.
+
+    Raises:
+        ValueError: If a unit-period pair is repeated, an outcome is missing
+            after pivoting, or the treated unit is absent.
+    """
+    wide = frame.pivot(  # noqa: PD010 -- pivot_table would average repeated unit-period rows; pivot raises on them, as documented
+        index=time, columns=unit, values=outcome
+    ).sort_index()
+    if wide.isna().any().any():
+        raise errors.InputError(
+            "the panel must be balanced with no missing outcomes"
+        )
+    if treated_unit not in wide.columns:
+        raise errors.InputError("the treated unit is not in the panel")
+    return wide
+
+
 def estimate(
     frame: pandas.DataFrame,
     unit: str,
@@ -176,15 +211,7 @@ def estimate(
             precede `first_treated` or none follow it, or fewer than
             `quorum(alpha)` donors exist.
     """
-    wide = frame.pivot(  # noqa: PD010 -- pivot_table would average repeated unit-period rows; pivot raises on them, as documented
-        index=time, columns=unit, values=outcome
-    ).sort_index()
-    if wide.isna().any().any():
-        raise errors.InputError(
-            "the panel must be balanced with no missing outcomes"
-        )
-    if treated_unit not in wide.columns:
-        raise errors.InputError("the treated unit is not in the panel")
+    wide = widen(frame, unit, time, outcome, treated_unit)
     is_pre = wide.index < first_treated
     if is_pre.sum() < MIN_PRE_PERIODS or (~is_pre).sum() < 1:
         raise errors.InputError("need two pre-periods and one post-period")

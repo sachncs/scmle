@@ -72,6 +72,69 @@ def replication(
     return {"by_column": results, "passed": passed}
 
 
+def examine(
+    adapter: Estimator,
+    c: pandas.DataFrame,
+    level: float,
+    column: str,
+    value: str,
+) -> dict[str, Any]:
+    """Tests one declared subgroup's effect against zero.
+
+    Args:
+        adapter: The strategy's adapter.
+        c: The confirmation rows.
+        level: Confidence level.
+        column: The subgroup's column.
+        value: The subgroup's value of `column`, as text.
+
+    Returns:
+        The hypothesis row: the column, value and Wald p-value, with the
+        estimate, interval and rows when the subgroup was estimated, or the
+        reason it was skipped (its p-value is then 1).
+    """
+    row: dict[str, Any] = {
+        "column": column,
+        "value": value,
+        "skipped": None,
+    }
+    part = None
+    if column not in c.columns:
+        row["skipped"] = "column not in C"
+    else:
+        part = c[c[column].astype(str) == value]
+        if len(part) < MIN_STRATUM_ROWS:
+            row["skipped"] = f"fewer than {MIN_STRATUM_ROWS} rows"
+    p_value = 1.0
+    if part is not None and row["skipped"] is None:
+        try:
+            est = adapter.estimate(part, level)
+        except ValueError as error:
+            # handled: returned as failed finding/problem/refusal with
+            # error text
+            row["skipped"] = str(error)
+        else:
+            if numpy.isfinite(est.se) and est.se > 0:
+                test = battery.wald(
+                    f"{column}={value}",
+                    "subgroup",
+                    est.estimate,
+                    est.se,
+                )
+                p_value = test.p_value
+                row.update(
+                    estimate=est.estimate,
+                    se=est.se,
+                    low=est.low,
+                    high=est.high,
+                    n=est.n,
+                )
+            else:
+                row["skipped"] = "no usable standard error"
+    row["p_value"] = p_value
+    return row
+
+
 def stratify(
     adapter: Estimator,
     c: pandas.DataFrame,
@@ -106,49 +169,11 @@ def stratify(
         (`identify` restores it).
     """
     saved = dict(adapter.design)
-    rows: list[dict[str, Any]] = []
-    for group in subgroups:
-        for value in group.values:  # noqa: PD011 -- `Subgroup.values` is a dataclass field, not a pandas attribute
-            row: dict[str, Any] = {
-                "column": group.column,
-                "value": value,
-                "skipped": None,
-            }
-            part = None
-            if group.column not in c.columns:
-                row["skipped"] = "column not in C"
-            else:
-                part = c[c[group.column].astype(str) == value]
-                if len(part) < MIN_STRATUM_ROWS:
-                    row["skipped"] = f"fewer than {MIN_STRATUM_ROWS} rows"
-            p_value = 1.0
-            if part is not None and row["skipped"] is None:
-                try:
-                    est = adapter.estimate(part, level)
-                except ValueError as error:
-                    # handled: returned as failed finding/problem/refusal with
-                    # error text
-                    row["skipped"] = str(error)
-                else:
-                    if numpy.isfinite(est.se) and est.se > 0:
-                        test = battery.wald(
-                            f"{group.column}={value}",
-                            "subgroup",
-                            est.estimate,
-                            est.se,
-                        )
-                        p_value = test.p_value
-                        row.update(
-                            estimate=est.estimate,
-                            se=est.se,
-                            low=est.low,
-                            high=est.high,
-                            n=est.n,
-                        )
-                    else:
-                        row["skipped"] = "no usable standard error"
-            row["p_value"] = p_value
-            rows.append(row)
+    rows = [
+        examine(adapter, c, level, group.column, value)
+        for group in subgroups
+        for value in group.values  # noqa: PD011 -- `Subgroup.values` is a dataclass field, not a pandas attribute
+    ]
     adapter.design = saved
     alpha = Fraction(1.0 - level).limit_denominator(10**9)
     adjusted = multiplicity.adjust(

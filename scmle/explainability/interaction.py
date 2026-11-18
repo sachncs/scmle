@@ -12,6 +12,28 @@ MAX_INTERACTION_ROWS = 200
 MIN_NUMERIC_FEATURES = 2
 
 
+def rank(item: dict[str, object]) -> tuple[float, tuple[str, ...]]:
+    """Orders interaction terms by strength and feature names.
+
+    Args:
+        item: One interaction term with its feature pair and mean
+            absolute interaction.
+
+    Returns:
+        The negated strength followed by the feature names, so that
+        ascending sorting puts the strongest term first.
+
+    Raises:
+        TypeError: If the strength is not a number or the features
+            are not a list.
+    """
+    score = item["mean_absolute_interaction"]
+    features = item["features"]
+    if not isinstance(score, (int, float)) or not isinstance(features, list):
+        raise TypeError("interaction term has an invalid shape")
+    return (-float(score), tuple(str(value) for value in features))
+
+
 class Pairwise(diagnostics.Diagnostic):
     """Measure model-output interaction between pairs of numeric features.
 
@@ -74,19 +96,8 @@ class Pairwise(diagnostics.Diagnostic):
                 if inputs.expired():
                     truncated = True
                     break
-                both = sample.copy()
-                left_only = sample.copy()
-                right_only = sample.copy()
-                neither = sample.copy()
-                left_only.loc[:, right] = medians[right]
-                right_only.loc[:, left] = medians[left]
-                neither.loc[:, left] = medians[left]
-                neither.loc[:, right] = medians[right]
-                interaction = (
-                    self.score(inputs, both)
-                    - self.score(inputs, left_only)
-                    - self.score(inputs, right_only)
-                    + self.score(inputs, neither)
+                interaction = self.interact(
+                    inputs, sample, medians, (left, right)
                 )
                 terms.append(
                     {
@@ -98,29 +109,6 @@ class Pairwise(diagnostics.Diagnostic):
                 )
             if truncated:
                 break
-
-        def rank(item: dict[str, object]) -> tuple[float, tuple[str, ...]]:
-            """Orders interaction terms by strength and feature names.
-
-            Args:
-                item: One interaction term with its feature pair and mean
-                    absolute interaction.
-
-            Returns:
-                The negated strength followed by the feature names, so that
-                ascending sorting puts the strongest term first.
-
-            Raises:
-                TypeError: If the strength is not a number or the features
-                    are not a list.
-            """
-            score = item["mean_absolute_interaction"]
-            features = item["features"]
-            if not isinstance(score, (int, float)) or not isinstance(
-                features, list
-            ):
-                raise TypeError("interaction term has an invalid shape")
-            return (-float(score), tuple(str(value) for value in features))
 
         terms.sort(key=rank)
         return {
@@ -134,6 +122,42 @@ class Pairwise(diagnostics.Diagnostic):
                 "Categorical and raw-modality interactions are not measured.",
             ],
         }
+
+    def interact(
+        self,
+        inputs: diagnostics.DiagnosticInput,
+        sample: pandas.DataFrame,
+        medians: dict[str, float],
+        pair: tuple[str, str],
+    ) -> numpy.ndarray:
+        """The second-order difference of the model output for one pair.
+
+        Args:
+            inputs: The fitted candidate.
+            sample: The evaluation rows used.
+            medians: The median of each numeric feature on `sample`.
+            pair: The two features.
+
+        Returns:
+            Per row, the output with both features observed, minus the
+            output with each one alone replaced by its median, plus the
+            output with both replaced.
+        """
+        left, right = pair
+        both = sample.copy()
+        left_only = sample.copy()
+        right_only = sample.copy()
+        neither = sample.copy()
+        left_only.loc[:, right] = medians[right]
+        right_only.loc[:, left] = medians[left]
+        neither.loc[:, left] = medians[left]
+        neither.loc[:, right] = medians[right]
+        return numpy.asarray(
+            self.score(inputs, both)
+            - self.score(inputs, left_only)
+            - self.score(inputs, right_only)
+            + self.score(inputs, neither)
+        )
 
     @staticmethod
     def score(

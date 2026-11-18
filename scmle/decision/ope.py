@@ -260,6 +260,37 @@ def wald(
     return centre, (centre - z * se, centre + z * se)
 
 
+def screen(
+    log: Bandits, min_propensity: float, ess_floor: float
+) -> tuple[float, list[str]]:
+    """Runs the support and effective-sample-size gates of an estimate.
+
+    Args:
+        log: The logged data and target policy.
+        min_propensity: Declared support floor.
+        ess_floor: Declared floor for the effective sample size ratio,
+            computed from the unclipped weights.
+
+    Returns:
+        The effective sample size ratio and the reason of each failed gate
+        (empty when both pass).
+    """
+    raw = weights(log, None)[0]
+    ess = sequential.effective_sample_size(raw) / log.rows
+    reasons = []
+    violations = unsupported(log, min_propensity)
+    if violations:
+        reasons.append(
+            f"support: {violations} rows put target mass where the logged "
+            f"probability is below {min_propensity}"
+        )
+    if ess < ess_floor:
+        reasons.append(
+            f"effective sample size ratio {ess:.3f} is below {ess_floor}"
+        )
+    return ess, reasons
+
+
 def evaluate(
     log: Bandits,
     estimator: str = "dr",
@@ -300,19 +331,7 @@ def evaluate(
     if not 0.0 < level < 1.0:
         raise errors.InputError("level must be strictly between 0 and 1")
     qualification.finite(min_propensity, "min_propensity")
-    raw = weights(log, None)[0]
-    ess = sequential.effective_sample_size(raw) / log.rows
-    reasons = []
-    violations = unsupported(log, min_propensity)
-    if violations:
-        reasons.append(
-            f"support: {violations} rows put target mass where the logged "
-            f"probability is below {min_propensity}"
-        )
-    if ess < ess_floor:
-        reasons.append(
-            f"effective sample size ratio {ess:.3f} is below {ess_floor}"
-        )
+    ess, reasons = screen(log, min_propensity, ess_floor)
     if reasons:
         return Estimate(
             REFUSED,

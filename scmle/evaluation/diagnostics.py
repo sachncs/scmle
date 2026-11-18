@@ -453,6 +453,36 @@ class Residuals(Diagnostic):
         return report
 
 
+# The limitations of the error report: how rows are identified, and what
+# each ranking's statistic can and cannot say.
+IDENTITY = (
+    "Rows are identified by their evaluation index only; raw feature values "
+    "are not copied into the report."
+)
+CAVEATS = {
+    "misclassification_then_low_confidence": (
+        "Confidence is model probability, not correctness certainty or "
+        "causality."
+    ),
+    "absolute_error": (
+        "Residuals diagnose model behaviour and do not establish causal "
+        "failure reasons."
+    ),
+}
+
+
+def worst(keys: list[tuple[Any, ...]]) -> list[int]:
+    """Positions of the `MAX_ERROR_ROWS` rows with the smallest sort keys.
+
+    Args:
+        keys: One sort key per row, in row order.
+
+    Returns:
+        The positions, smallest key first.
+    """
+    return sorted(range(len(keys)), key=keys.__getitem__)[:MAX_ERROR_ROWS]
+
+
 class Errors(Diagnostic):
     """Identifies the highest-risk held-out rows without exposing features."""
 
@@ -477,24 +507,22 @@ class Errors(Diagnostic):
             absolute error.
         """
         predicted = numpy.asarray(inputs.estimator.predict(inputs.features))
-        row_ids = [str(value) for value in inputs.features.index]
+        ids = [str(value) for value in inputs.features.index]
         if inputs.task in CLASSIFICATION:
             probabilities = numpy.asarray(
                 inputs.estimator.predict_proba(inputs.features)
             )
             confidence = probabilities.max(axis=1)
             incorrect = predicted != inputs.target.to_numpy()
-            positions = sorted(
-                range(len(predicted)),
-                key=lambda position: (
-                    not bool(incorrect[position]),
-                    float(confidence[position]),
-                    position,
-                ),
-            )[:MAX_ERROR_ROWS]
+            positions = worst(
+                [
+                    (not bool(incorrect[k]), float(confidence[k]), k)
+                    for k in range(len(predicted))
+                ]
+            )
             rows = [
                 {
-                    "row_id": row_ids[position],
+                    "row_id": ids[position],
                     "actual": str(inputs.target.iloc[position]),
                     "predicted": str(predicted[position]),
                     "confidence": float(confidence[position]),
@@ -502,54 +530,35 @@ class Errors(Diagnostic):
                 }
                 for position in positions
             ]
-            return {
-                "task": inputs.task.value,
-                "row_count": len(predicted),
-                "misclassified_count": int(incorrect.sum()),
-                "rows": rows,
-                "ranked_by": "misclassification_then_low_confidence",
-                "limitations": [
-                    (
-                        "Rows are identified by their evaluation index only; "
-                        "raw feature values are not copied into the report."
-                    ),
-                    (
-                        "Confidence is model probability, not correctness "
-                        "certainty or causality."
-                    ),
-                ],
+            summary: dict[str, float] = {
+                "misclassified_count": int(incorrect.sum())
             }
-        actual = inputs.target.to_numpy(dtype=float)
-        numeric_prediction = predicted.astype(float)
-        residual = actual - numeric_prediction
-        absolute = numpy.abs(residual)
-        positions = sorted(
-            range(len(predicted)),
-            key=lambda position: (-float(absolute[position]), position),
-        )[:MAX_ERROR_ROWS]
-        return {
-            "task": inputs.task.value,
-            "row_count": len(predicted),
-            "mean_absolute_error": float(absolute.mean()),
-            "rows": [
+            ranking = "misclassification_then_low_confidence"
+        else:
+            actual = inputs.target.to_numpy(dtype=float)
+            numeric_prediction = predicted.astype(float)
+            residual = actual - numeric_prediction
+            absolute = numpy.abs(residual)
+            positions = worst(
+                [(-float(absolute[k]), k) for k in range(len(predicted))]
+            )
+            rows = [
                 {
-                    "row_id": row_ids[position],
+                    "row_id": ids[position],
                     "actual": float(actual[position]),
                     "predicted": float(numeric_prediction[position]),
                     "residual": float(residual[position]),
                     "absolute_error": float(absolute[position]),
                 }
                 for position in positions
-            ],
-            "ranked_by": "absolute_error",
-            "limitations": [
-                (
-                    "Rows are identified by their evaluation index only; raw "
-                    "feature values are not copied into the report."
-                ),
-                (
-                    "Residuals diagnose model behaviour and do not establish "
-                    "causal failure reasons."
-                ),
-            ],
+            ]
+            summary = {"mean_absolute_error": float(absolute.mean())}
+            ranking = "absolute_error"
+        return {
+            "task": inputs.task.value,
+            "row_count": len(predicted),
+            **summary,
+            "rows": rows,
+            "ranked_by": ranking,
+            "limitations": [IDENTITY, CAVEATS[ranking]],
         }

@@ -335,6 +335,92 @@ def pretrend(
     return float(max(jumps))
 
 
+def cohorts(
+    frame: pandas.DataFrame,
+    wide: pandas.DataFrame,
+    unit: str,
+    adoption: str,
+    index: dict[Any, int],
+) -> tuple[pandas.Series, numpy.ndarray, list[Any]]:
+    """The adoption period of each unit and the adoption groups.
+
+    Args:
+        frame: Long panel data.
+        wide: The outcome by unit (rows) and period (columns).
+        unit: Unit column.
+        adoption: Column with the unit's first treated period.
+        index: The position of each period.
+
+    Returns:
+        The adoption period of each row of `wide`, whether each is never
+        treated, and the adoption groups with a pre-period, sorted.
+
+    Raises:
+        ValueError: If the adoption value varies within a unit, there are
+            fewer than two never-treated units or no adoption group has a
+            pre-period.
+    """
+    per_unit = frame.groupby(unit)[adoption]
+    if (per_unit.nunique(dropna=False) > 1).any():  # noqa: PD101 -- a per-unit count on a SeriesGroupBy, not a check that one Series is constant
+        raise errors.InputError("adoption must be constant within a unit")
+    adopt = per_unit.first().reindex(wide.index)
+    never = adopt.isna().to_numpy()
+    if never.sum() < MIN_NEVER_TREATED:
+        raise errors.InputError("at least two never-treated units are needed")
+    groups = sorted(g for g in adopt.dropna().unique() if g in index)
+    groups = [g for g in groups if index[g] >= 1]
+    if not groups:
+        raise errors.InputError("no adoption group has a pre-period")
+    return adopt, never, groups
+
+
+def study(
+    y: numpy.ndarray,
+    index: dict[Any, int],
+    groups: list[Any],
+    cells: tuple[dict[Any, int], dict[Any, numpy.ndarray], numpy.ndarray],
+) -> tuple[list[int], list[float], numpy.ndarray]:
+    """The event-study coefficients and their covariance.
+
+    Args:
+        y: The outcome by unit and period.
+        index: The position of each period.
+        groups: The adoption groups.
+        cells: The size and member mask of each group, and the
+            never-treated mask.
+
+    Returns:
+        The event times (all but the reference period `-1`), the mean
+        treated change minus the mean never-treated change at each, and
+        their covariance.
+    """
+    sizes, members, never = cells
+    count = y.shape[1]
+    events = sorted(
+        {
+            j - index[g]
+            for g in groups
+            for j in range(count)
+            if j != index[g] - 1
+        }
+    )
+    treated_vars, control_vars = arms(
+        y, index, count, groups, sizes, members, never, events
+    )
+    # Mean treated change minus mean never-treated change at each event time.
+    coefficients = [
+        float(
+            sum(v.mean() for v in treated_vars[e].values())
+            - control_vars[e].mean()
+        )
+        for e in events
+    ]
+    covariance = vcov(
+        events, groups, sizes, treated_vars, control_vars, int(never.sum())
+    )
+    return events, coefficients, covariance
+
+
 def estimate(
     frame: pandas.DataFrame,
     unit: str,
@@ -369,43 +455,14 @@ def estimate(
     periods = list(wide.columns)
     if len(periods) < MIN_PERIODS:
         raise errors.InputError(f"at least {MIN_PERIODS} periods are needed")
-    per_unit = frame.groupby(unit)[adoption]
-    if (per_unit.nunique(dropna=False) > 1).any():  # noqa: PD101 -- a per-unit count on a SeriesGroupBy, not a check that one Series is constant
-        raise errors.InputError("adoption must be constant within a unit")
-    adopt = per_unit.first().reindex(wide.index)
-    never = adopt.isna().to_numpy()
-    if never.sum() < MIN_NEVER_TREATED:
-        raise errors.InputError("at least two never-treated units are needed")
     y = wide.to_numpy(dtype=float)
     index = {p: i for i, p in enumerate(periods)}
-    groups = sorted(g for g in adopt.dropna().unique() if g in index)
-    groups = [g for g in groups if index[g] >= 1]
-    if not groups:
-        raise errors.InputError("no adoption group has a pre-period")
+    adopt, never, groups = cohorts(frame, wide, unit, adoption, index)
     members = {g: (adopt == g).to_numpy() for g in groups}
     sizes = {g: int(members[g].sum()) for g in groups}
-    events = sorted(
-        {
-            j - index[g]
-            for g in groups
-            for j in range(len(periods))
-            if j != index[g] - 1
-        }
-    )
-    treated_vars, control_vars = arms(
-        y, index, len(periods), groups, sizes, members, never, events
-    )
-    # Mean treated change minus mean never-treated change at each event time.
-    coefficients = [
-        float(
-            sum(v.mean() for v in treated_vars[e].values())
-            - control_vars[e].mean()
-        )
-        for e in events
-    ]
     n_never = int(never.sum())
-    covariance = vcov(
-        events, groups, sizes, treated_vars, control_vars, n_never
+    events, coefficients, covariance = study(
+        y, index, groups, (sizes, members, never)
     )
     post_cells = [(g, j) for g in groups for j in range(index[g], len(periods))]
     weights = numpy.array([sizes[cell[0]] for cell in post_cells], dtype=float)
