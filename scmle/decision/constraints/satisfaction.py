@@ -10,6 +10,7 @@ Either is a claim tested once: the upper bound of the gap must be at most
 import dataclasses
 import itertools
 from typing import Any
+from typing import ClassVar
 
 import numpy
 from numpy.typing import ArrayLike
@@ -17,6 +18,7 @@ from numpy.typing import NDArray
 
 from scmle.assurance.charter import decision
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.decision.constraints import rates
 from scmle.runtime import randomness
 
@@ -50,13 +52,23 @@ class Satisfaction:
     small_groups: tuple[str, ...]
     alpha: float
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "max_gap": "gap",
+            "point_gap": "estimate",
+            "upper_bound": "upper",
+            "small_groups": "small",
+        }
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready record.
 
         Returns:
             Every field of the test as a mapping.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def screen(

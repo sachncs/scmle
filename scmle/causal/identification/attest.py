@@ -44,6 +44,7 @@ import hmac
 import json
 from pathlib import Path
 from typing import Any
+from typing import ClassVar
 from typing import Self
 
 from scmle.assurance.admissibility import provenance
@@ -52,6 +53,7 @@ from scmle.contracts import errors
 from scmle.contracts import evidence
 from scmle.contracts import qualification
 from scmle.contracts import signing
+import scmle.contracts.records
 
 FORMAT_VERSION = 1
 
@@ -181,18 +183,25 @@ class Applied:
     rejected: Mapping[str, str]
     evaluated_on: str
 
+    KEYS: ClassVar[scmle.contracts.records.Migration] = (
+        scmle.contracts.records.Migration(renames={"evaluated_on": "evaluated"})
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Builds the `attestations` section of `causal_claims.json`.
 
         Returns:
-            A mapping of the evaluation date, the accepted records and the
-            rejection reason per assumption.
+            A mapping of the evaluation date (`evaluated`), the accepted
+            records and the rejection reason per assumption.
         """
-        return {
-            "evaluated_on": self.evaluated_on,
-            "accepted": [r.to_dict() for r in self.records],
-            "rejected": dict(self.rejected),
-        }
+        return self.KEYS.upgrade(
+            {
+                "evaluated_on": self.evaluated_on,
+                "accepted": [r.to_dict() for r in self.records],
+                "rejected": dict(self.rejected),
+            }
+        )
 
 
 def load(path: str | Path) -> tuple[Attestation, ...]:

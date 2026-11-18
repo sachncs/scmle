@@ -29,12 +29,14 @@ monotonicity is checked here.
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
 from scipy import stats
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 F_THRESHOLD = 10.0
 FIRST_STAGE_TOLERANCE = 1e-12
@@ -103,6 +105,25 @@ class Estimate:
             return self.ar_low < value < self.ar_high
         return False
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {
+            "first_stage": "stage",
+            "f_stat": "fstat",
+        },
+        groups={
+            "wald": {
+                "wald_low": "low",
+                "wald_high": "high",
+            },
+            "ar": {
+                "ar_kind": "kind",
+                "ar_low": "low",
+                "ar_high": "high",
+            },
+        },
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
 
@@ -114,7 +135,7 @@ class Estimate:
         for key, value in record.items():
             if isinstance(value, float) and not math.isfinite(value):
                 record[key] = str(value)
-        return record
+        return self.KEYS.upgrade(record)
 
 
 def residualise(

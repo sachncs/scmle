@@ -26,6 +26,7 @@ identification strategy and `unverified` without one.
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 import numpy
 from numpy.typing import ArrayLike
@@ -34,6 +35,7 @@ from scipy import stats
 
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 from scmle.evaluation import sequential
 
 ESTIMATORS = ("ipw", "snips", "dr")
@@ -152,13 +154,21 @@ class Estimate:
     tier: str
     clipped: bool
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "ess_ratio": "ess",
+            "clipped_share": "truncation",
+        }
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready record.
 
         Returns:
             Every field of the estimate as a mapping.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def weights(

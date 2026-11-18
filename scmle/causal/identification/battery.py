@@ -22,11 +22,13 @@ At least two strata are required.
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 import numpy
 from scipy import stats
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.evaluation import coverage
 
 MIN_STRATA = 2
@@ -163,6 +165,15 @@ class Replication:
     alpha: float
     passed: bool
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "pooled_sign": "sign",
+            "same_sign": "agreeing",
+            "p_heterogeneity": "heterogeneity",
+        }
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
 
@@ -172,7 +183,7 @@ class Replication:
         """
         record = dataclasses.asdict(self)
         record["strata"] = {k: list(v) for k, v in self.strata.items()}
-        return record
+        return self.KEYS.upgrade(record)
 
 
 def replicate(

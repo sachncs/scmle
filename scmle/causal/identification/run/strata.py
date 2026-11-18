@@ -243,7 +243,7 @@ def certify(found: dict[str, Any], named: tuple[str, ...] | None) -> None:
     found["statement_gate"] = (
         "gating: the family-wise error and the power at the certified size "
         "met their pre-registered floors (a result for a subgroup under "
-        "`min_rows` is still descriptive)"
+        "`rows` is still descriptive)"
         if gating
         else "descriptive: the family-wise error and power of the subgroup "
         "tests are not certified, so read a rejected level as exploratory; "

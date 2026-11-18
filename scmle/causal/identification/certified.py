@@ -13,6 +13,7 @@ import dataclasses
 import json
 from pathlib import Path
 from typing import Any
+from typing import ClassVar
 
 from scmle.assurance.detectors import certificates
 from scmle.assurance.ledger import multiplicity
@@ -26,6 +27,7 @@ from scmle.causal.identification import sensitivity
 from scmle.causal.identification import synth
 from scmle.causal.identification import tier
 import scmle.certificates
+from scmle.contracts import records
 
 STORE_PATH = scmle.certificates.DIRECTORY / "f10_certificates.json"
 METHOD_SOURCES: dict[str, list[Any]] = {
@@ -121,13 +123,20 @@ class SubgroupGate:
     reason: str
     min_rows: int | None = None
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "min_rows": "rows",
+        }
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
 
         Returns:
             A mapping of the status, reason and minimum rows.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def fingerprint(report: Any) -> str:

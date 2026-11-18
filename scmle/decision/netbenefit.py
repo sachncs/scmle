@@ -22,6 +22,7 @@ the number of clusters.
 import dataclasses
 import hashlib
 from typing import Any
+from typing import ClassVar
 
 import numpy
 from numpy.typing import ArrayLike
@@ -30,6 +31,7 @@ from numpy.typing import NDArray
 from scmle.assurance.framing import costs
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 from scmle.runtime import randomness
 
 GRID_POINTS = 21
@@ -209,13 +211,21 @@ class Benefit:
     claim: str
     useful_range: tuple[float, float] | None
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "treat_all": "everyone",
+            "useful_range": "useful",
+        }
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready record.
 
         Returns:
             Every field of the report as a mapping.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def stretch(

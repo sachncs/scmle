@@ -46,6 +46,7 @@ import json
 import math
 from pathlib import Path
 from typing import Any
+from typing import ClassVar
 
 import numpy
 from numpy.typing import ArrayLike
@@ -53,6 +54,7 @@ from numpy.typing import NDArray
 
 import scmle.assurance.charter.decision
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.decision import anytime
 from scmle.decision import design
 
@@ -96,13 +98,22 @@ class Decision:
     tier: str
     assumptions: tuple[str, ...] = ASSUMPTIONS
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "log_e": "evalues",
+            "lower_bound": "lower",
+            "challenger_units": "challenger",
+        }
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready record.
 
         Returns:
             Every field of the decision as a mapping.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def metric_stream(

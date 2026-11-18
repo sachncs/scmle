@@ -19,6 +19,7 @@ final evaluation set.
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 import numpy
 from numpy.typing import ArrayLike
@@ -29,6 +30,7 @@ from scipy import stats
 from scmle.assurance.framing import costs
 from scmle.contracts import errors
 from scmle.contracts import qualification
+from scmle.contracts import records
 from scmle.decision import netbenefit
 from scmle.models import thresholds
 from scmle.runtime import randomness
@@ -319,6 +321,15 @@ class Thresholding:
     cost_interval: tuple[float, float]
     stable_range: tuple[float, float] | None
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "expected_cost": "cost",
+            "cost_interval": "interval",
+            "stable_range": "stable",
+        }
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Returns the JSON-ready record.
 
@@ -326,23 +337,27 @@ class Thresholding:
             The threshold, path, rule hash, tier, both checks, expected
             cost, cost interval and stable range, with tuples as lists.
         """
-        return {
-            "threshold": self.rule.threshold,
-            "path": self.rule.path,
-            "rule_hash": self.rule.digest,
-            "tier": self.tier,
-            "check": dataclasses.asdict(self.check),
-            "recheck": (
-                None
-                if self.recheck is None
-                else dataclasses.asdict(self.recheck)
-            ),
-            "expected_cost": self.expected_cost,
-            "cost_interval": list(self.cost_interval),
-            "stable_range": (
-                None if self.stable_range is None else list(self.stable_range)
-            ),
-        }
+        return self.KEYS.upgrade(
+            {
+                "threshold": self.rule.threshold,
+                "path": self.rule.path,
+                "rule_hash": self.rule.digest,
+                "tier": self.tier,
+                "check": dataclasses.asdict(self.check),
+                "recheck": (
+                    None
+                    if self.recheck is None
+                    else dataclasses.asdict(self.recheck)
+                ),
+                "expected_cost": self.expected_cost,
+                "cost_interval": list(self.cost_interval),
+                "stable_range": (
+                    None
+                    if self.stable_range is None
+                    else list(self.stable_range)
+                ),
+            }
+        )
 
 
 def cost_interval(

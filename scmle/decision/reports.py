@@ -63,6 +63,10 @@ NET_BENEFIT_FILE = "net_benefit.json"
 POLICY_FILE = "policy_value.json"
 DESIGN_FILE = "rollout_design.json"
 DECISION_FILES = (THRESHOLD_FILE, NET_BENEFIT_FILE, POLICY_FILE, DESIGN_FILE)
+REPORT_VERSION = 2
+"""Layout of `decision_report.json`. Version 2 writes the single-word keys of
+the net benefit (`everyone`, `useful`) and satisfaction (`gap`, `estimate`,
+`upper`, `small`) records it holds; their `KEYS.downgrade` gives version 1."""
 REGISTRATION_EVENT = "decision_files"
 
 
@@ -294,7 +298,7 @@ def decision_report(
     """
     model = charter.costs
     return {
-        "schema_version": 1,
+        "schema_version": REPORT_VERSION,
         "cost_model_hash": None if model is None else model.model_hash,
         "unit": None
         if charter.decision is None

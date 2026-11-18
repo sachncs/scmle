@@ -32,11 +32,13 @@ beyond the diagnostics above.
 
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
 from scipy import stats
 
+from scmle.contracts import records
 import scmle.contracts.errors
 
 GRID = (0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0)
@@ -174,13 +176,27 @@ class Estimate:
     balance: dict[str, dict[str, float]]
     sensitivity: dict[str, dict[str, float]]
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {
+            "bias_corrected": "corrected",
+            "density_p": "density",
+        },
+        groups={
+            "counts": {
+                "n_left": "left",
+                "n_right": "right",
+            },
+        },
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
 
         Returns:
             A mapping of every field.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def discontinuity(

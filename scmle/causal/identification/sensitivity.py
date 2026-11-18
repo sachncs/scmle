@@ -54,12 +54,14 @@ description of how fragile that linear summary is.
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
 from scipy import stats
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 D_TO_RR = 0.91
 INFEASIBLE = 0.999
@@ -368,13 +370,20 @@ class Sensitivity:
     holds: bool
     covariate: str | None
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "rv_alpha": "rvalpha",
+        }
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
 
         Returns:
             A mapping of every field.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def assess(

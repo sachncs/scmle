@@ -11,9 +11,11 @@ specification search. When nothing is eligible the result is a refusal:
 from collections.abc import Mapping
 import dataclasses
 from typing import Any
+from typing import ClassVar
 
 import scmle.assurance.admissibility.dag
 from scmle.assurance.charter import causal
+from scmle.contracts import records
 
 IDENTIFIED = "identified"
 NOT_IDENTIFIED = "not_identified"
@@ -117,6 +119,17 @@ class Verdict:
     reasons: tuple[str, ...] = ()
     checked: bool = False
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {},
+        groups={
+            "missing": {
+                "missing_assumptions": "assumptions",
+                "missing_design": "design",
+            },
+        },
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
 
@@ -124,14 +137,16 @@ class Verdict:
             A mapping of the strategy, eligibility, the missing pieces, the
             reasons and whether a DAG checked the adjustment set.
         """
-        return {
-            "strategy": self.strategy,
-            "eligible": self.eligible,
-            "missing_assumptions": list(self.missing_assumptions),
-            "missing_design": list(self.missing_design),
-            "reasons": list(self.reasons),
-            "adjustment_checked_by_dag": self.checked,
-        }
+        return self.KEYS.upgrade(
+            {
+                "strategy": self.strategy,
+                "eligible": self.eligible,
+                "missing_assumptions": list(self.missing_assumptions),
+                "missing_design": list(self.missing_design),
+                "reasons": list(self.reasons),
+                "adjustment_checked_by_dag": self.checked,
+            }
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -171,12 +186,18 @@ class Plan:
                 return item
         raise KeyError(name)
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={"order_chartered": "chartered"}
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready plan.
 
         Returns:
-            A mapping of the status, primary strategy, multiverse, order and
-            per-strategy verdicts. A plan that is not identified adds a null
+            A mapping of the status, primary strategy, multiverse, order,
+            whether the order is chartered (`chartered`) and per-strategy
+            verdicts. A plan that is not identified adds a null
             estimate, the action `refuse_claim` and a note that any printed
             summary is associational.
         """
@@ -192,7 +213,7 @@ class Plan:
             record["estimate"] = None
             record["action"] = "refuse_claim"
             record["note"] = ASSOCIATIONAL
-        return record
+        return self.KEYS.upgrade(record)
 
 
 def judge(
@@ -331,11 +352,13 @@ def refusal(plan: Plan, spec: causal.Question) -> Mapping[str, Any]:
         associational.
     """
     missing = {
-        v.strategy: {
-            "missing_assumptions": list(v.missing_assumptions),
-            "missing_design": list(v.missing_design),
-            "reasons": list(v.reasons),
-        }
+        v.strategy: Verdict.KEYS.upgrade(
+            {
+                "missing_assumptions": list(v.missing_assumptions),
+                "missing_design": list(v.missing_design),
+                "reasons": list(v.reasons),
+            }
+        )
         for v in plan.verdicts
     }
     return {

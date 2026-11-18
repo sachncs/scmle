@@ -21,12 +21,14 @@ caps such a claim at `attested`.
 import dataclasses
 import math
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
 from scipy import optimize
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 MIN_PRE_PERIODS = 2
 MIN_DONOR_WEIGHT = 1e-6
@@ -62,13 +64,27 @@ class Estimate:
     placebo_ratios: dict[str, float]
     alpha: float
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {
+            "min_p": "floor",
+            "placebo_ratios": "placebos",
+        },
+        groups={
+            "rmspe": {
+                "pre_rmspe": "pre",
+                "post_rmspe": "post",
+            },
+        },
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
 
         Returns:
             A mapping of every field.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def weigh(target: numpy.ndarray, donors: numpy.ndarray) -> numpy.ndarray:

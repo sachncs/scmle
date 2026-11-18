@@ -32,12 +32,14 @@ from collections.abc import Sequence
 import dataclasses
 import itertools
 from typing import Any
+from typing import ClassVar
 
 import numpy
 import pandas
 from scipy import stats
 
 from scmle.contracts import errors
+from scmle.contracts import records
 
 MIN_PERIODS = 3
 MIN_NEVER_TREATED = 2
@@ -120,13 +122,23 @@ class Estimate:
         scale = self.max_pre_change * self.mean_horizon
         return float("inf") if scale == 0 else gap / scale
 
+    KEYS: ClassVar[records.Migration] = records.Migration(
+        renames={
+            "n_never": "untreated",
+            "pretrend_p": "pretrend",
+            "max_pre_change": "drift",
+            "mean_horizon": "horizon",
+        }
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
 
         Returns:
             A mapping of every field.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def widen(

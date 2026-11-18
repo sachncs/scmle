@@ -30,6 +30,7 @@ import dataclasses
 import hashlib
 from typing import Any
 from typing import cast
+from typing import ClassVar
 
 import numpy
 import pandas
@@ -39,6 +40,7 @@ from sklearn import linear_model
 from sklearn import preprocessing
 
 from scmle.contracts import errors
+from scmle.contracts import records
 from scmle.evaluation import sequential
 
 LEARNERS = ("linear", "boosted")
@@ -379,13 +381,25 @@ class Estimate:
     population: str
     nuisance_digest: str
 
+    KEYS: ClassVar[records.Migration] = records.nest(
+        {
+            "n_input": "received",
+        },
+        groups={
+            "digests": {
+                "nuisance_digest": "nuisance",
+            },
+        },
+    )
+    """Version-1 keys to the written ones; `downgrade` restores version 1."""
+
     def to_dict(self) -> dict[str, Any]:
         """Builds the JSON-ready record.
 
         Returns:
             A mapping of every field.
         """
-        return dataclasses.asdict(self)
+        return self.KEYS.upgrade(dataclasses.asdict(self))
 
 
 def scores(
